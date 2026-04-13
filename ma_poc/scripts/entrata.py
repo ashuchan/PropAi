@@ -145,6 +145,21 @@ _FALSE_POSITIVE_HOSTS = {
     "facebook.com", "connect.facebook.net",
     "hotjar.com",
     "sentry.io",
+    # Chatbot / leasing assistant widgets — config & tour scheduling only
+    "meetelise.com", "app.meetelise.com",
+    "sierra.chat",
+    "theconversioncloud.com", "api.theconversioncloud.com",
+    # Lead-gen / referral / review widgets — no unit data
+    "nestiolistings.com",
+    "rentgrata.com", "api.rentgrata.com",
+    "g5marketingcloud.com", "client-leads.g5marketingcloud.com",
+    "g5-api-proxy.g5marketingcloud.com",
+    # Accessibility widgets
+    "userway.org", "api.userway.org",
+    # Chat widgets
+    "omni.cafe", "webchat.omni.cafe",
+    # Entrata communications/chat widget API
+    "comms.entrata.com",
 }
 
 # URL path fragments that are never unit/availability data.
@@ -156,6 +171,21 @@ _FALSE_POSITIVE_PATH_FRAGMENTS = {
     "/gtag/",
     "/pixel",
     "/beacon",
+    # Entrata CMS widgets (directions, gallery, schedule-a-tour, chat)
+    "/apartments/module/widgets/",
+    # Entrata chat/messaging widget endpoints
+    "/widget/inbox_members",
+    "/widget/contact",
+    "/widget/messages",
+    "/widget/conversations",
+    "/widget/campaigns",
+    # Tour scheduling (no unit data)
+    "/tour/availabilities",
+    # G5 lead forms and review widgets
+    "/html_forms/",
+    "/yext_reviews/",
+    # RealPage blurb/marketing text endpoints (no unit data)
+    "/blurb/v1/",
 }
 
 
@@ -919,6 +949,402 @@ async def click_expanders(page: Page):
                 # Element may have detached, navigated, or been obscured — skip and continue.
                 continue
 
+# ── Embedded JSON extraction (Tier 1.5) ──────────────────────────────────────
+
+# Known JS globals where SSR frameworks embed page data.
+_EMBEDDED_JS_GLOBALS = [
+    "__NEXT_DATA__",           # Next.js
+    "__INITIAL_STATE__",       # Redux SSR / generic SSR
+    "__NUXT__",                # Nuxt.js
+    "__remixContext",          # Remix
+    "__APP_DATA__",            # Various
+    "pageData",               # Custom CMS
+    "__data__",                # Custom CMS
+    "initialState",           # Generic
+    "serverData",             # Generic
+]
+
+# Domains that host leasing portals inside iframes or via redirects.
+_LEASING_PORTAL_DOMAINS = frozenset({
+    "sightmap.com",
+    "realpage.com",
+    "loftliving.com",
+    "on-site.com",
+    "rentcafe.com",
+    "entrata.com",
+    "yardi.com",
+    "smartrent.com",
+    "onlineleasing.realpage.com",
+})
+
+
+async def extract_embedded_json(page: Page) -> list[dict]:
+    """Tier 1.5: Extract unit/floor plan data from inline ``<script>`` tags and
+    JavaScript global variables.
+
+    Many SSR sites (Next.js, Nuxt.js, Remix, custom CMSes) embed structured
+    data in the page as JS globals or ``<script type="application/json">``
+    blocks rather than fetching it via XHR.  This function searches for those
+    blobs and returns them in the same ``{url, body}`` shape as captured API
+    responses so the downstream ``parse_api_responses`` pipeline can handle
+    them transparently.
+
+    Returns:
+        List of dicts with ``url`` (synthetic, prefixed ``embedded:``) and
+        ``body`` (parsed JSON object/array).
+    """
+    found: list[dict] = []
+
+    # ── Strategy 1: Known JS global variables ─────────────────────────────
+    for var in _EMBEDDED_JS_GLOBALS:
+        try:
+            raw = await page.evaluate(
+                f"typeof window['{var}'] !== 'undefined'"
+                f" ? JSON.stringify(window['{var}'])"
+                f" : null"
+            )
+            if raw and len(raw) > 200:
+                data = json.loads(raw)
+                found.append({"url": f"embedded:js:{var}", "body": data})
+                print(f"  📦 Embedded: window.{var} ({len(raw):,} chars)")
+        except Exception:
+            continue
+
+    # ── Strategy 2: <script type="application/json"> blocks ───────────────
+    # (Excluding ld+json — that's handled by Tier 2 parse_jsonld.)
+    try:
+        json_blocks = await page.evaluate("""() => {
+            const scripts = document.querySelectorAll(
+                'script[type="application/json"]'
+            );
+            return Array.from(scripts)
+                .map(s => ({id: s.id || s.getAttribute('data-id') || '', text: s.textContent}))
+                .filter(s => s.text && s.text.length > 200 && s.text.length < 1000000);
+        }""")
+        for block in (json_blocks or []):
+            try:
+                data = json.loads(block["text"])
+                found.append({
+                    "url": f"embedded:json-block:{block['id'] or 'anon'}",
+                    "body": data,
+                })
+                print(f"  📦 Embedded: <script type=application/json> "
+                      f"id={block['id']!r} ({len(block['text']):,} chars)")
+            except (json.JSONDecodeError, ValueError):
+                continue
+    except Exception:
+        pass
+
+    # ── Strategy 3: Inline <script> containing JSON with unit keywords ────
+    # Catches patterns like:  var floorPlans = [{...}, ...];
+    #                         window.propertyData = {...};
+    try:
+        script_texts = await page.evaluate("""() => {
+            const scripts = document.querySelectorAll('script:not([src]):not([type])');
+            return Array.from(scripts)
+                .map(s => s.textContent)
+                .filter(t => t && t.length > 300 && t.length < 500000)
+                .filter(t => /(?:floor.?plan|floorPlan|units|avail|rent|bedroom|sqft|pricing)/i.test(t));
+        }""")
+        for script_text in (script_texts or [])[:5]:
+            # Try to extract JSON objects assigned to a variable.
+            # Pattern: var/let/const X = {...}; or window.X = {...};
+            for m in re.finditer(
+                r"""(?:var|let|const|window\.)\s*(\w+)\s*=\s*"""
+                r"""(\[\s*\{[\s\S]*?\}\s*\]|\{[\s\S]*?\})"""
+                r"""\s*;""",
+                script_text,
+            ):
+                var_name = m.group(1)
+                json_str = m.group(2)
+                if len(json_str) < 200:
+                    continue
+                try:
+                    data = json.loads(json_str)
+                    found.append({
+                        "url": f"embedded:script-var:{var_name}",
+                        "body": data,
+                    })
+                    print(f"  📦 Embedded: var {var_name} ({len(json_str):,} chars)")
+                except (json.JSONDecodeError, ValueError):
+                    # Regex-extracted snippet may not be valid JSON — expected.
+                    continue
+            if found:
+                break
+    except Exception:
+        pass
+
+    # ── Strategy 4: Evaluate common property-data variable names ──────────
+    # Some sites assign data to variables that our regex in Strategy 3 can't
+    # reliably extract (minified, multi-line, template literals).  Evaluate
+    # them directly in the browser context.
+    if not found:
+        _PROPERTY_VARS = [
+            "floorPlans", "floorplans", "floor_plans",
+            "unitData", "units", "propertyData", "propertyInfo",
+            "availableUnits", "apartmentData", "pricingData",
+            "communityData", "buildingData",
+        ]
+        for var in _PROPERTY_VARS:
+            try:
+                raw = await page.evaluate(
+                    f"typeof window['{var}'] !== 'undefined' && window['{var}'] !== null"
+                    f" ? JSON.stringify(window['{var}'])"
+                    f" : null"
+                )
+                if raw and len(raw) > 200:
+                    data = json.loads(raw)
+                    # Quick sanity check: should be a list of 2+ dicts or a dict with a list.
+                    looks_useful = False
+                    if isinstance(data, list) and len(data) >= 2 and isinstance(data[0], dict):
+                        looks_useful = True
+                    elif isinstance(data, dict):
+                        for v in data.values():
+                            if isinstance(v, list) and len(v) >= 2 and isinstance(v[0], dict):
+                                looks_useful = True
+                                break
+                    if looks_useful:
+                        found.append({"url": f"embedded:js:{var}", "body": data})
+                        print(f"  📦 Embedded: window.{var} ({len(raw):,} chars)")
+            except Exception:
+                continue
+
+    if found:
+        print(f"  📦 Total embedded JSON blobs: {len(found)}")
+
+    return found
+
+
+async def detect_leasing_portals(page: Page) -> list[str]:
+    """Detect leasing portal iframes or JS redirects on the current page.
+
+    Returns a list of portal URLs that should be navigated to for API capture.
+    Checks:
+      1. ``<iframe src="...">`` pointing to known leasing portal domains
+      2. Hidden ``<a>`` links to leasing portals (e.g. "Apply Now" buttons)
+      3. Meta-refresh or JS-redirect targets captured during page load
+    """
+    portal_urls: list[str] = []
+
+    # ── Check iframes ─────────────────────────────────────────────────────
+    try:
+        iframe_srcs = await page.evaluate("""() => {
+            return Array.from(document.querySelectorAll('iframe[src]'))
+                .map(f => f.src)
+                .filter(s => s && s.startsWith('http'));
+        }""")
+        for src in (iframe_srcs or []):
+            host = urllib.parse.urlparse(src).netloc.lower()
+            for domain in _LEASING_PORTAL_DOMAINS:
+                if domain in host:
+                    portal_urls.append(src)
+                    break
+    except Exception:
+        pass
+
+    # ── Check "Apply Now" / "View Floor Plans" links to leasing portals ───
+    try:
+        leasing_links = await page.evaluate("""() => {
+            const links = document.querySelectorAll(
+                'a[href*="sightmap"], a[href*="realpage"], a[href*="rentcafe"],'
+                + 'a[href*="loftliving"], a[href*="on-site.com"], a[href*="onlineleasing"]'
+            );
+            return Array.from(links).map(a => a.href).filter(h => h.startsWith('http'));
+        }""")
+        for href in (leasing_links or []):
+            if href not in portal_urls:
+                portal_urls.append(href)
+    except Exception:
+        pass
+
+    # ── Check if current page.url is itself a leasing portal ──────────────
+    # (can happen after a JS redirect that Playwright followed)
+    current_host = urllib.parse.urlparse(page.url).netloc.lower()
+    for domain in _LEASING_PORTAL_DOMAINS:
+        if domain in current_host:
+            # We're already on the portal — no need to navigate
+            print(f"  🔍 Current page is a leasing portal: {page.url[:80]}")
+            return []
+
+    if portal_urls:
+        print(f"  🔍 Found {len(portal_urls)} leasing portal link(s):")
+        for u in portal_urls[:5]:
+            print(f"     {u[:120]}")
+
+    return portal_urls
+
+
+async def probe_entrata_api(page: Page, base_url: str) -> list[dict]:
+    """For Entrata-hosted sites, try to fetch floor plan data via known API
+    endpoints using the browser's session cookies.
+
+    Entrata sites use POST-based APIs at ``/api/v1/propertyunits/`` with a
+    ``method`` + ``params`` body.  The property ID is extracted from the page's
+    HTML/JS globals.
+
+    Returns API-response-shaped dicts (same format as captured responses).
+    """
+    found: list[dict] = []
+
+    # ── Detect Entrata site ───────────────────────────────────────────────
+    # Check if we're on an Entrata-hosted property site.
+    is_entrata = False
+    try:
+        has_entrata_marker = await page.evaluate("""() => {
+            // Entrata sites typically have these markers in the DOM
+            const markers = [
+                document.querySelector('meta[name*="entrata"]'),
+                document.querySelector('link[href*="entrata"]'),
+                document.querySelector('script[src*="entrata"]'),
+                document.querySelector('[class*="entrata"]'),
+                document.querySelector('#entrata-widget-container'),
+            ];
+            return markers.some(m => m !== null);
+        }""")
+        if has_entrata_marker:
+            is_entrata = True
+    except Exception:
+        pass
+
+    # Also detect by URL pattern: /Apartments/ is Entrata's standard URL prefix.
+    if not is_entrata:
+        try:
+            page_html = await page.content()
+            if "/Apartments/module/" in page_html or "entrata.com" in page_html.lower():
+                is_entrata = True
+        except Exception:
+            pass
+
+    if not is_entrata:
+        return found
+
+    print("  🏢 Entrata site detected — probing floor plan API")
+
+    # ── Extract property/site ID from the page ────────────────────────────
+    property_id = None
+    try:
+        property_id = await page.evaluate("""() => {
+            // Check common Entrata ID locations
+            const meta = document.querySelector('meta[name="entrata:property_id"]');
+            if (meta) return meta.content;
+
+            // Check URL patterns like /Apartments/module/application_NNN/
+            const m = window.location.pathname.match(/\\/(\\d{3,8})\\b/);
+            if (m) return m[1];
+
+            // Check for Entrata config in global JS
+            if (window.entrataConfig && window.entrataConfig.propertyId)
+                return String(window.entrataConfig.propertyId);
+            if (window.propertyId)
+                return String(window.propertyId);
+
+            // Search hidden inputs
+            const input = document.querySelector(
+                'input[name*="property_id"], input[name*="propertyId"], '
+                + 'input[name*="PropertyId"]'
+            );
+            if (input) return input.value;
+
+            // Search data attributes
+            const el = document.querySelector('[data-property-id]');
+            if (el) return el.getAttribute('data-property-id');
+
+            return null;
+        }""")
+    except Exception:
+        pass
+
+    if not property_id:
+        # Try extracting from any captured widget URLs (they often contain property IDs)
+        try:
+            page_url = page.url
+            m = re.search(r"/(\d{4,8})(?:/|$|\?)", page_url)
+            if m:
+                property_id = m.group(1)
+        except Exception:
+            pass
+
+    if not property_id:
+        print("  ↳ Entrata: could not extract property ID — skipping API probe")
+        return found
+
+    print(f"  🏢 Entrata property ID: {property_id}")
+
+    # ── Try known Entrata API endpoints ───────────────────────────────────
+    # Use page.evaluate(fetch(...)) so the request carries session cookies.
+    entrata_api_paths = [
+        f"/api/v1/floorplans/{property_id}",
+        f"/api/v1/propertyunits/{property_id}",
+        "/api/v1/floorplans",
+        "/api/v1/units",
+    ]
+
+    origin = urllib.parse.urlparse(base_url)
+    api_base = f"{origin.scheme}://{origin.netloc}"
+
+    for api_path in entrata_api_paths:
+        api_url = api_base + api_path
+        try:
+            raw = await page.evaluate(f"""async () => {{
+                try {{
+                    const resp = await fetch('{api_url}', {{
+                        headers: {{'Accept': 'application/json'}},
+                        credentials: 'same-origin',
+                    }});
+                    if (!resp.ok) return null;
+                    const ct = resp.headers.get('content-type') || '';
+                    if (!ct.includes('json')) return null;
+                    const body = await resp.json();
+                    return JSON.stringify(body);
+                }} catch(e) {{
+                    return null;
+                }}
+            }}""")
+            if raw and len(raw) > 100:
+                data = json.loads(raw)
+                found.append({"url": f"entrata-api:{api_path}", "body": data})
+                print(f"  🏢 Entrata API hit: {api_path} ({len(raw):,} chars)")
+        except Exception:
+            continue
+
+    # ── Try Entrata's POST-based widget API for floor plans ───────────────
+    try:
+        raw = await page.evaluate(f"""async () => {{
+            try {{
+                const resp = await fetch('{api_base}/api/v1/propertyunits/', {{
+                    method: 'POST',
+                    headers: {{
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    }},
+                    credentials: 'same-origin',
+                    body: JSON.stringify({{
+                        method: {{
+                            name: "getUnits",
+                            version: "r1",
+                            params: {{propertyId: "{property_id}"}}
+                        }}
+                    }})
+                }});
+                if (!resp.ok) return null;
+                const ct = resp.headers.get('content-type') || '';
+                if (!ct.includes('json')) return null;
+                return await resp.text();
+            }} catch(e) {{ return null; }}
+        }}""")
+        if raw and len(raw) > 100:
+            data = json.loads(raw)
+            found.append({"url": "entrata-api:POST /api/v1/propertyunits/", "body": data})
+            print(f"  🏢 Entrata POST API hit: /api/v1/propertyunits/ ({len(raw):,} chars)")
+    except Exception:
+        pass
+
+    if found:
+        print(f"  🏢 Entrata API probe: {len(found)} response(s) captured")
+
+    return found
+
+
 # ── Main scraper ───────────────────────────────────────────────────────────────
 
 def _proxy_config(proxy: Optional[str]) -> Optional[dict]:
@@ -1156,8 +1582,6 @@ async def scrape(base_url: str, proxy: Optional[str] = None) -> dict:
 
             results["property_links_crawled"] = list(visited)
             results["api_calls_intercepted"]  = [r["url"] for r in api_responses]
-            # Stash full raw bodies for post-run inspection / adding new parsers.
-            results["_raw_api_responses"] = api_responses
 
             # ── 4. Extraction: Tier 1 — API ───────────────────────────────
             print(f"\n{'='*65}")
@@ -1171,54 +1595,175 @@ async def scrape(base_url: str, proxy: Optional[str] = None) -> dict:
             else:
                 print("  ↳ Tier 1: no units from API")
 
-                # Navigate to a floor-plans page for DOM-based tiers.
-                fp_candidates = [
-                    base_url.rstrip("/") + p for p in ("/floor-plans", "/floorplans", "/apartments")
-                ]
-                landed = False
-                for fp_url in fp_candidates:
-                    try:
-                        await _goto_robust(page, fp_url, timeout_ms=45000)
-                        await click_expanders(page)
-                        await asyncio.sleep(1.5)
-                        landed = True
-                        break
-                    except Exception as e:
-                        print(f"  ⚠ {fp_url} error: {e}")
-                if not landed:
-                    # Fall back to whatever page is currently loaded.
-                    print("  ↳ Using current page for DOM tiers")
+                # ── Tier 1.5a — Embedded JSON on homepage ────────────
+                # Before navigating away from the homepage, check for
+                # data embedded in <script> tags or JS globals (SSR).
+                embedded_blobs = await extract_embedded_json(page)
+                if embedded_blobs:
+                    api_responses.extend(embedded_blobs)
+                    units = parse_api_responses(embedded_blobs)
+                    if units:
+                        print(f"  ✅ TIER 1.5 (Embedded JSON — homepage): "
+                              f"{len(units)} units/floor plans")
+                        results["extraction_tier_used"] = "TIER_1_5_EMBEDDED"
+
+                # ── Navigate to floor-plans page for remaining tiers ──
+                if not units:
+                    fp_candidates = [
+                        base_url.rstrip("/") + p
+                        for p in ("/floor-plans", "/floorplans", "/apartments")
+                    ]
+                    landed = False
+                    redirect_url: Optional[str] = None
+                    for fp_url in fp_candidates:
+                        try:
+                            await _goto_robust(page, fp_url, timeout_ms=45000)
+                            await click_expanders(page)
+                            await asyncio.sleep(1.5)
+                            landed = True
+                            break
+                        except Exception as e:
+                            err_str = str(e)
+                            # Capture redirect targets — some sites redirect
+                            # their floor-plan page to a leasing portal.
+                            redir_m = re.search(
+                                r'interrupted by another navigation to "([^"]+)"',
+                                err_str,
+                            )
+                            if redir_m:
+                                redirect_url = redir_m.group(1)
+                                print(f"  🔀 Redirect detected → {redirect_url[:100]}")
+                            else:
+                                print(f"  ⚠ {fp_url} error: {e}")
+                    if not landed:
+                        # Fall back to whatever page is currently loaded.
+                        print("  ↳ Using current page for DOM tiers")
+
+                    # If a redirect to a leasing portal was detected, try
+                    # following it — it may have the actual unit data.
+                    if not landed and redirect_url:
+                        try:
+                            print(f"  🔀 Following redirect to leasing portal")
+                            await _goto_robust(page, redirect_url, timeout_ms=45000)
+                            await asyncio.sleep(2.0)
+                            landed = True
+                        except Exception as e:
+                            print(f"  ⚠ Redirect follow error: {e}")
+
+                    # ── Tier 1.5b — Embedded JSON on floor-plans page ─
+                    # Re-check for embedded data on the floor-plans page
+                    # (different page may have different inline data).
+                    embedded_blobs_fp = await extract_embedded_json(page)
+                    if embedded_blobs_fp:
+                        api_responses.extend(embedded_blobs_fp)
+                        units = parse_api_responses(embedded_blobs_fp)
+                        if units:
+                            print(f"  ✅ TIER 1.5 (Embedded JSON — floor-plans page): "
+                                  f"{len(units)} units/floor plans")
+                            results["extraction_tier_used"] = "TIER_1_5_EMBEDDED"
+
+                    # Also check if the floor-plans page load triggered
+                    # new API captures (response handler is still active).
+                    if not units:
+                        new_api_units = parse_api_responses(api_responses)
+                        if new_api_units:
+                            units = new_api_units
+                            print(f"  ✅ TIER 1 (API — floor-plans page): "
+                                  f"{len(units)} units/floor plans")
+                            results["extraction_tier_used"] = "TIER_1_API"
 
                 # ── Tier 2 — JSON-LD ─────────────────────────────────────
-                units = await parse_jsonld(page)
-                if units:
-                    print(f"  ✅ TIER 2 (JSON-LD): {len(units)} items")
-                    results["extraction_tier_used"] = "TIER_2_JSONLD"
-                else:
-                    # Diagnose: count JSON-LD blocks on the page.
-                    try:
-                        ld_count = await page.eval_on_selector_all(
-                            'script[type="application/ld+json"]', "els => els.length"
-                        )
-                    except Exception:
-                        ld_count = "?"
-                    print(f"  ↳ Tier 2: no JSON-LD units "
-                          f"({ld_count} ld+json blocks on page, "
-                          f"none matched Apartment/Offer types)")
+                if not units:
+                    units = await parse_jsonld(page)
+                    if units:
+                        print(f"  ✅ TIER 2 (JSON-LD): {len(units)} items")
+                        results["extraction_tier_used"] = "TIER_2_JSONLD"
+                    else:
+                        # Diagnose: count JSON-LD blocks on the page.
+                        try:
+                            ld_count = await page.eval_on_selector_all(
+                                'script[type="application/ld+json"]', "els => els.length"
+                            )
+                        except Exception:
+                            ld_count = "?"
+                        print(f"  ↳ Tier 2: no JSON-LD units "
+                              f"({ld_count} ld+json blocks on page, "
+                              f"none matched Apartment/Offer types)")
 
-                    # ── Tier 3 — DOM ─────────────────────────────────────
+                # ── Tier 3 — DOM ─────────────────────────────────────────
+                if not units:
                     units = await parse_dom(page, base_url)
                     if units:
                         print(f"  ✅ TIER 3 (DOM): {len(units)} units/floor plans")
                         results["extraction_tier_used"] = "TIER_3_DOM"
                     else:
-                        page_url = page.url
-                        print(f"  ↳ Tier 3: DOM parsing found 0 units on {page_url[:80]}")
-                        print(f"  ⚠ ALL TIERS FAILED — no units extracted. "
-                              f"Check raw_api/ for captured responses "
-                              f"or add DOM selectors for this site.")
-                        results["extraction_tier_used"] = "FAILED"
+                        print(f"  ↳ Tier 3: DOM parsing found 0 units on {page.url[:80]}")
 
+                # ── Tier 4 — Entrata API probe + leasing portal iframes ──
+                if not units:
+                    # 4a: Try Entrata-specific API endpoints.
+                    entrata_blobs = await probe_entrata_api(page, base_url)
+                    if entrata_blobs:
+                        api_responses.extend(entrata_blobs)
+                        units = parse_api_responses(entrata_blobs)
+                        if units:
+                            print(f"  ✅ TIER 4 (Entrata API probe): "
+                                  f"{len(units)} units/floor plans")
+                            results["extraction_tier_used"] = "TIER_4_ENTRATA_API"
+
+                # ── Tier 5 — Leasing portal iframes ──────────────────────
+                if not units:
+                    portal_urls = await detect_leasing_portals(page)
+                    for portal_url in portal_urls[:2]:
+                        print(f"  🔍 Navigating into leasing portal: "
+                              f"{portal_url[:100]}")
+                        try:
+                            await _goto_robust(page, portal_url, timeout_ms=30000)
+                            await asyncio.sleep(2.0)
+                            # Check for new API captures from the portal.
+                            portal_units = parse_api_responses(api_responses)
+                            if portal_units:
+                                units = portal_units
+                                print(f"  ✅ TIER 5 (Leasing portal API): "
+                                      f"{len(units)} units/floor plans")
+                                results["extraction_tier_used"] = "TIER_5_PORTAL"
+                                break
+                            # Try embedded JSON on the portal page.
+                            portal_blobs = await extract_embedded_json(page)
+                            if portal_blobs:
+                                api_responses.extend(portal_blobs)
+                                units = parse_api_responses(portal_blobs)
+                                if units:
+                                    print(f"  ✅ TIER 5 (Portal embedded JSON): "
+                                          f"{len(units)} units/floor plans")
+                                    results["extraction_tier_used"] = "TIER_5_PORTAL"
+                                    break
+                            # Try JSON-LD on the portal page.
+                            units = await parse_jsonld(page)
+                            if units:
+                                print(f"  ✅ TIER 5 (Portal JSON-LD): "
+                                      f"{len(units)} items")
+                                results["extraction_tier_used"] = "TIER_5_PORTAL"
+                                break
+                            # Try DOM parsing on the portal page.
+                            units = await parse_dom(page, portal_url)
+                            if units:
+                                print(f"  ✅ TIER 5 (Portal DOM): "
+                                      f"{len(units)} units/floor plans")
+                                results["extraction_tier_used"] = "TIER_5_PORTAL"
+                                break
+                        except Exception as e:
+                            print(f"  ⚠ Portal probe error: {e}")
+
+                if not units:
+                    print(f"  ⚠ ALL TIERS FAILED — no units extracted. "
+                          f"Check raw_api/ for captured responses "
+                          f"or add DOM selectors for this site.")
+                    results["extraction_tier_used"] = "FAILED"
+
+            # Update with any blobs added during extraction probes.
+            results["_raw_api_responses"] = api_responses
+            results["api_calls_intercepted"] = [r["url"] for r in api_responses]
             results["units"] = units
         finally:
             try:

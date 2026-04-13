@@ -117,6 +117,37 @@ python scripts/scrape_properties.py --csv config/properties.csv --out output/pro
   - Concessions: `(\d+)\s+(?:week|month)s?\s+free`
 - **Click-to-expand**: Before parsing, clicks buttons matching patterns like "available unit", "view unit", "show more", "view all" (restricted to `button`, `a`, `[role=button]`)
 
+### Tier 1.5 — Embedded JSON (SSR / inline script data)
+
+Runs between Tier 1 and Tier 2 when API interception finds no units. Many sites embed data server-side in `<script>` tags rather than fetching via XHR. Four extraction strategies:
+
+1. **Known JS globals**: `window.__NEXT_DATA__` (Next.js), `__INITIAL_STATE__` (Redux SSR), `__NUXT__`, `__remixContext`, `pageData`, `serverData`, etc.
+2. **`<script type="application/json">` blocks**: Non-ld+json script blocks >200 chars
+3. **Inline script variable assignments**: Regex scan for `var X = [{...}]` containing floor plan keywords
+4. **Property-data variable names**: Direct `window[varName]` evaluation for `floorPlans`, `unitData`, `propertyData`, `pricingData`, `communityData`, etc.
+
+Runs **twice**: once on the homepage (before navigation), once on the floor-plans page (after navigation). Found blobs are fed through `parse_api_responses()` — same parsing pipeline as Tier 1.
+
+### Tier 4 — Entrata API Probe
+
+Runs only when Tiers 1–3 all fail and the site is detected as Entrata-hosted (by DOM markers like `[class*="entrata"]`, `script[src*="entrata"]`, or `/Apartments/module/` in page HTML). Attempts:
+
+1. Extract property ID from meta tags, JS globals, URL patterns, hidden inputs, data attributes
+2. GET known Entrata REST endpoints: `/api/v1/floorplans/{id}`, `/api/v1/propertyunits/{id}`, `/api/v1/floorplans`, `/api/v1/units`
+3. POST to `/api/v1/propertyunits/` with `{method: {name: "getUnits", params: {propertyId: "..."}}}` body
+
+All requests use `page.evaluate(fetch(...))` to carry the browser's session cookies.
+
+### Tier 5 — Leasing Portal Detection
+
+Last resort when all other tiers fail. Detects and navigates into leasing portal iframes or redirect targets:
+
+- **Iframe detection**: Scans `<iframe src="...">` for known portal domains (sightmap.com, realpage.com, rentcafe.com, loftliving.com, on-site.com, entrata.com, yardi.com)
+- **Link detection**: Finds `<a href="...">` links to the same portal domains (e.g. "Apply Now" buttons)
+- **Redirect handling**: When navigating to `/floor-plans` raises "interrupted by another navigation", captures the redirect URL and follows it
+
+After navigating to the portal, re-runs the full extraction stack (API capture, embedded JSON, JSON-LD, DOM parsing) on the portal page.
+
 ### Why Tier 1 wins most of the time
 
 Modern multifamily websites (Entrata, RentCafe, AppFolio, Yardi) are SPAs that load unit data via API calls. The page DOM often shows summary cards, but the API response has the full unit-level detail. Tier 1 captures this directly from the network — no DOM parsing needed.
@@ -513,6 +544,27 @@ Analysis of the first 78-property production run revealed five failure categorie
 | `ERR_NAME_NOT_RESOLVED` | Domain doesn't exist | Remove from CSV |
 
 **Lesson**: These are input data problems, not code bugs. Periodically validate `properties.csv` URLs to prune dead/broken sites before scraping.
+
+### 7. Noise-only API captures + all tiers failing (18 properties, 2026-04-13)
+
+**Root cause**: 18 properties had raw API captures but 0 extracted units. Analysis revealed the captured APIs were all noise — chatbot configs (EliseAI, Sierra), CMS widgets (Entrata directions/gallery/amenities widgets), accessibility tools (UserWay), lead forms (G5 Marketing Cloud, Rentgrata), analytics (Wix tag manager), and Google Maps CSP tests. No actual floor plan / unit data was intercepted, and Tiers 2 (JSON-LD) and 3 (DOM) also found nothing.
+
+Five sub-categories:
+- **Entrata CMS widgets** (6): Only non-floor-plan widgets captured (directions, gallery, amenities). Floor plan data loads via a different mechanism.
+- **Chatbot/leasing assistants** (4): EliseAI, Nestio, ConversionCloud, Sierra chat configs.
+- **Wix sites** (3): Only tag-manager and analytics configs. Data is in static HTML.
+- **Maps-only** (3): Only Google Maps gen_204 CSP test captured. SSR or inline JS data.
+- **G5/accessibility widgets** (2): Lead forms, reviews, UserWay configs.
+
+**Fixes applied**:
+- Expanded `_FALSE_POSITIVE_HOSTS` with 13 new domains: meetelise.com, sierra.chat, theconversioncloud.com, nestiolistings.com, rentgrata.com, g5marketingcloud.com, userway.org, omni.cafe, comms.entrata.com
+- Expanded `_FALSE_POSITIVE_PATH_FRAGMENTS` with 8 new patterns: `/apartments/module/widgets/`, Entrata chat endpoints, `/tour/availabilities`, `/html_forms/`, `/yext_reviews/`, `/blurb/v1/`
+- Added **Tier 1.5 (Embedded JSON)**: Extracts data from inline `<script>` tags and JS globals (window.__NEXT_DATA__, floorPlans, unitData, etc.) — catches SSR sites that embed data in the page rather than fetching via XHR
+- Added **Tier 4 (Entrata API probe)**: Detects Entrata-hosted sites and tries known API endpoints (GET/POST to /api/v1/floorplans/, /api/v1/propertyunits/) using the browser's session cookies
+- Added **Tier 5 (Leasing portal detection)**: Detects iframes and redirect targets pointing to leasing portals (SightMap, RealPage OLL, RentCafe), navigates into them, and re-runs the full extraction stack
+- Added **redirect capture**: When floor-plan page navigation is "interrupted by another navigation" to a leasing portal, follows the redirect instead of treating it as an error
+
+**Lesson**: API interception only works for sites that load unit data via XHR/fetch. Sites using SSR, inline JS, Entrata's widget system, or embedded leasing portals need alternative extraction paths. Always check `raw_api/` to distinguish "parser bug" (data present but unparsed) from "no data captured" (need a different extraction mechanism).
 
 ---
 
