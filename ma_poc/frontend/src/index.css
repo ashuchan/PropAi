@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-rent-primary: #1D9E75;
+  --color-rent-secondary: #0F6E56;
+}
+
+html { transition: background-color 0.2s ease, color 0.2s ease; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+.leaflet-container { width: 100%; height: 100%; z-index: 0; }

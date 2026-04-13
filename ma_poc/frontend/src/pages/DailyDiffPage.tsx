@@ -1,0 +1,27 @@
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Star } from 'lucide-react';
+import { useDailyDiff } from '@/hooks/useDailyDiff';
+import { MetricCard } from '@/components/shared/MetricCard';
+import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { formatCurrency, formatDate } from '@/utils/formatters';
+
+export function DailyDiffPage() {
+  const [selectedDate, setSelectedDate] = useState<string | undefined>();
+  const { data: diff, isLoading } = useDailyDiff(selectedDate);
+  if (isLoading) return <LoadingSkeleton variant="metric" count={6} />;
+  if (!diff) return <EmptyState title="No diff data" description="No daily comparison data is available yet." />;
+  return (
+    <ErrorBoundary><div className="space-y-6">
+      <div className="flex items-center gap-4"><button onClick={() => setSelectedDate(diff.previousDate)} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><ChevronLeft size={18} /></button><h1 className="text-[18px] font-medium text-slate-900 dark:text-slate-100">Daily Changes — {formatDate(diff.date, 'long')}</h1><button onClick={() => setSelectedDate(undefined)} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><ChevronRight size={18} /></button></div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6" data-testid="diff-summary"><MetricCard label="Rents Up" value={diff.summary.rentsIncreased} accentColor="#E24B4A" trend={diff.summary.rentsIncreased > 0 ? 'up' : undefined} /><MetricCard label="Rents Down" value={diff.summary.rentsDecreased} accentColor="#1D9E75" trend={diff.summary.rentsDecreased > 0 ? 'down' : undefined} /><MetricCard label="New Available" value={diff.summary.newAvailable} accentColor="#378ADD" /><MetricCard label="Became Leased" value={diff.summary.becameLeased} accentColor="#ADB5BD" /><MetricCard label="New Concessions" value={diff.summary.newConcessions} accentColor="#EF9F27" /><MetricCard label="Disappeared" value={diff.summary.disappearedUnits} accentColor="#868E96" /></div>
+      {diff.rentChanges.length > 0 && <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"><h3 className="mb-3 flex items-center gap-2 text-[14px] font-medium text-red-600 dark:text-red-400"><TrendingUp size={16} />Rent Increases ({diff.rentChanges.filter((r: any) => r.direction === 'up').length})</h3><div className="space-y-2 max-h-80 overflow-auto">{diff.rentChanges.filter((r: any) => r.direction === 'up').map((change: any, i: number) => <div key={i} className="flex items-center justify-between rounded-lg bg-red-50/50 px-3 py-2 dark:bg-red-950/20"><div><p className="text-[12px] font-medium text-slate-900 dark:text-slate-100">{change.propertyName}</p><p className="text-[11px] text-slate-500">Unit {change.unitId}</p></div><div className="text-right"><p className="font-mono text-[12px] text-red-600 dark:text-red-400">+{formatCurrency(change.change)}</p><p className="text-[10px] text-slate-500">{formatCurrency(change.previousRent)} → {formatCurrency(change.currentRent)}</p></div></div>)}</div></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"><h3 className="mb-3 flex items-center gap-2 text-[14px] font-medium text-emerald-600 dark:text-emerald-400"><TrendingDown size={16} />Rent Decreases ({diff.rentChanges.filter((r: any) => r.direction === 'down').length})</h3><div className="space-y-2 max-h-80 overflow-auto">{diff.rentChanges.filter((r: any) => r.direction === 'down').map((change: any, i: number) => <div key={i} className="flex items-center justify-between rounded-lg bg-emerald-50/50 px-3 py-2 dark:bg-emerald-950/20"><div><p className="text-[12px] font-medium text-slate-900 dark:text-slate-100">{change.propertyName}</p><p className="text-[11px] text-slate-500">Unit {change.unitId}</p></div><div className="text-right"><p className="font-mono text-[12px] text-emerald-600 dark:text-emerald-400">{formatCurrency(change.change)}</p><p className="text-[10px] text-slate-500">{formatCurrency(change.previousRent)} → {formatCurrency(change.currentRent)}</p></div></div>)}</div></div>
+      </div>}
+      {diff.concessionChanges.length > 0 && <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"><h3 className="mb-3 flex items-center gap-2 text-[14px] font-medium text-amber-600 dark:text-amber-400"><Star size={16} />Concession Changes ({diff.concessionChanges.length})</h3><div className="space-y-2">{diff.concessionChanges.map((change: any, i: number) => <div key={i} className="flex items-center justify-between rounded-lg bg-amber-50/50 px-3 py-2 dark:bg-amber-950/20"><p className="text-[12px] font-medium text-slate-900 dark:text-slate-100">{change.propertyName}</p><span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">{change.changeType}</span></div>)}</div></div>}
+      {diff.rentChanges.length === 0 && diff.concessionChanges.length === 0 && <EmptyState title="No changes detected" description="No rent or concession changes between these runs." />}
+    </div></ErrorBoundary>
+  );
+}

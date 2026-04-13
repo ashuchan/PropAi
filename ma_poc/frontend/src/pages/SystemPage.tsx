@@ -1,0 +1,29 @@
+import { AlertTriangle } from 'lucide-react';
+import { clsx } from 'clsx';
+import { useHealthSummary, useTierDistribution, useTopFailures, useEntityResolution } from '@/hooks/useHealthMetrics';
+import { useLatestRun } from '@/hooks/useRunHistory';
+import { MetricCard } from '@/components/shared/MetricCard';
+import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { formatPercent, formatNumber, formatDuration, formatDate } from '@/utils/formatters';
+import { TIER_CHART_COLORS } from '@/utils/colors';
+
+export function SystemPage() {
+  const { data: health, isLoading } = useHealthSummary();
+  const { data: tiers } = useTierDistribution();
+  const { data: failures } = useTopFailures();
+  const { data: identity } = useEntityResolution();
+  const { data: latestRun } = useLatestRun();
+  if (isLoading) return <LoadingSkeleton variant="metric" count={8} />;
+  return (
+    <ErrorBoundary><div className="space-y-6">
+      <h1 className="text-[22px] font-medium text-slate-900 dark:text-slate-100">System Health</h1>
+      {health?.alerts && health.alerts.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30" data-testid="alert-banner"><div className="flex items-start gap-3"><AlertTriangle size={20} className="mt-0.5 text-amber-600 dark:text-amber-400" /><div><h3 className="text-[14px] font-medium text-amber-900 dark:text-amber-200">Active Alerts</h3><ul className="mt-1 space-y-1">{health.alerts.map((a: any, i: number) => <li key={i} className="text-[12px] text-amber-800 dark:text-amber-300">[{a.severity}] {a.message}</li>)}</ul></div></div></div>}
+      {health && <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="health-cards"><MetricCard label="Success Rate" value={formatPercent(health.successRate)} accentColor={health.successRate >= 0.95 ? '#1D9E75' : '#E24B4A'} /><MetricCard label="Properties" value={formatNumber(health.totalProperties)} /><MetricCard label="Units Extracted" value={formatNumber(health.totalUnits)} /><MetricCard label="Duration" value={formatDuration(health.avgDurationSeconds)} /></div>}
+      {latestRun && <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-3 text-[16px] font-medium text-slate-900 dark:text-slate-100">Latest Run</h2><div className="grid grid-cols-2 gap-4 text-[12px] lg:grid-cols-4"><div><span className="text-slate-500">Date</span><p className="font-mono text-slate-900 dark:text-slate-100">{formatDate(latestRun.date)}</p></div><div><span className="text-slate-500">Duration</span><p className="font-mono text-slate-900 dark:text-slate-100">{formatDuration(latestRun.durationSeconds)}</p></div><div><span className="text-slate-500">Succeeded</span><p className="font-mono text-slate-900 dark:text-slate-100">{latestRun.succeeded} / {latestRun.totalProperties}</p></div><div><span className="text-slate-500">Status</span><p className={clsx('font-mono', latestRun.exitStatus === 'OK' ? 'text-emerald-600' : 'text-red-600')}>{latestRun.exitStatus}</p></div></div></div>}
+      {tiers && tiers.tiers.length > 0 && <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-3 text-[16px] font-medium text-slate-900 dark:text-slate-100">Tier Distribution</h2><div className="space-y-2">{tiers.tiers.map((t: any) => <div key={t.tier} className="flex items-center gap-3"><span className="w-20 text-[12px] text-slate-500">{t.tier.replace('TIER_', '').replace('_', ' ')}</span><div className="flex-1 h-6 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden"><div className="h-full rounded-full flex items-center justify-end pr-2" style={{ width: `${Math.max(t.percentage * 100, 2)}%`, backgroundColor: TIER_CHART_COLORS[t.tier] || '#868E96' }}><span className="text-[10px] font-mono text-white">{t.count}</span></div></div><span className="w-12 text-right font-mono text-[11px] text-slate-600 dark:text-slate-400">{formatPercent(t.percentage, 0)}</span></div>)}</div></div>}
+      {failures && failures.length > 0 && <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-3 text-[16px] font-medium text-slate-900 dark:text-slate-100">Top Failures ({failures.length})</h2><div className="overflow-auto"><table className="w-full text-[12px]"><thead><tr className="border-b border-slate-200 dark:border-slate-700"><th className="px-3 py-2 text-left font-medium uppercase tracking-wide text-slate-500">Property</th><th className="px-3 py-2 text-left font-medium uppercase tracking-wide text-slate-500">Error</th><th className="px-3 py-2 text-left font-medium uppercase tracking-wide text-slate-500">Last Failure</th></tr></thead><tbody>{failures.map((f: any, i: number) => <tr key={i} className={i % 2 === 1 ? 'bg-slate-50/50 dark:bg-slate-800/25' : ''}><td className="px-3 py-2 text-slate-900 dark:text-slate-100">{f.propertyName}</td><td className="px-3 py-2 font-mono text-red-600 dark:text-red-400">{f.errorCode}</td><td className="px-3 py-2 text-slate-500">{formatDate(f.lastFailureDate)}</td></tr>)}</tbody></table></div></div>}
+      {identity && <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-3 text-[16px] font-medium text-slate-900 dark:text-slate-100">Entity Resolution</h2><div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><MetricCard label="Canonical IDs" value={formatNumber(identity.totalCanonicalIds)} /><MetricCard label="Raw IDs" value={formatNumber(identity.totalRawIds)} /><MetricCard label="Merged" value={formatNumber(identity.mergedCount)} /><MetricCard label="Resolution Rate" value={formatPercent(identity.resolutionRate)} /></div></div>}
+    </div></ErrorBoundary>
+  );
+}

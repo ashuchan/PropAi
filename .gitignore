@@ -205,3 +205,12 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+.claude/settings.json
+config/Properties.csv
+ma_poc/config/
+ma_poc/data/
+ma_poc/output/properties_smoke.json
+ma_poc/frontend/node_modules/
+ma_poc/frontend/api/node_modules/
+ma_poc/services/node_modules/
+
