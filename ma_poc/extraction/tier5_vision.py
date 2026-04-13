@@ -10,8 +10,6 @@ Acceptance criteria (CLAUDE.md PR-04):
 """
 from __future__ import annotations
 
-from typing import Any, Optional
-
 from extraction.confidence import composite, low_confidence_fields
 from llm.factory import get_vision_provider
 from llm.images import check_size
@@ -61,7 +59,7 @@ async def _capture_targeted_sections(session: BrowserSession) -> list[bytes]:
     return images
 
 
-async def maybe_run_vision_fallback(session: BrowserSession) -> Optional[ExtractionResult]:
+async def maybe_run_vision_fallback(session: BrowserSession) -> ExtractionResult | None:
     """Run Tier 5 vision extraction. Returns None if provider unavailable."""
     try:
         provider = get_vision_provider()

@@ -52,9 +52,9 @@ import statistics
 import sys
 import urllib.parse
 from collections import Counter
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # Force UTF-8 stdout on Windows so emoji prints in entrata.py don't crash.
 for _stream in (sys.stdout, sys.stderr):
@@ -75,7 +75,7 @@ from entrata import scrape  # noqa: E402
 ISO_DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
 US_DATE_RE  = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})$")
 
-def _to_iso_date(s: Any) -> Optional[str]:
+def _to_iso_date(s: Any) -> str | None:
     if s is None:
         return None
     s = str(s).strip()
@@ -97,7 +97,7 @@ def _to_iso_date(s: Any) -> Optional[str]:
     except (ValueError, TypeError):
         return None
 
-def _money_to_int(s: Any) -> Optional[int]:
+def _money_to_int(s: Any) -> int | None:
     if s is None:
         return None
     cleaned = re.sub(r"[^\d.]", "", str(s))
@@ -108,7 +108,7 @@ def _money_to_int(s: Any) -> Optional[int]:
     except ValueError:
         return None
 
-def _sightmap_lease_link(unit: dict, fp: dict) -> Optional[str]:
+def _sightmap_lease_link(unit: dict, fp: dict) -> str | None:
     """First non-null leasing URL we can find on the SightMap unit/floor plan."""
     for key in ("leasing_price_url", "leasing_start_dates_url"):
         v = unit.get(key)
@@ -188,7 +188,7 @@ _RENT_KEYS     = {"price", "minRent", "askingRent", "rent", "monthlyRent",
                   "display_price", "displayPrice", "monthly_rent",
                   "rentTerms", "pricing", "market_rent"}
 
-def _extract_rent(u: dict) -> tuple[Optional[int], Optional[int]]:
+def _extract_rent(u: dict) -> tuple[int | None, int | None]:
     """Extract (rent_low, rent_high) from a unit/floorplan dict.
 
     Handles two patterns:
@@ -204,8 +204,8 @@ def _extract_rent(u: dict) -> tuple[Optional[int], Optional[int]]:
                  "rentTerms", "pricing")
     _HI_KEYS = ("maxRent", "price_max", "max_price", "maxPrice", "rent_max")
 
-    lo: Optional[int] = None
-    hi: Optional[int] = None
+    lo: int | None = None
+    hi: int | None = None
 
     # Try flat scalar keys first.
     for k in _LO_KEYS:
@@ -364,7 +364,7 @@ def _realpage_units_from_body(body, source_url: str) -> list[dict]:
                 continue
             fp_id = str(fp.get("id") or fp.get("name") or "")
             beds = fp.get("bedRooms") or fp.get("bedrooms")
-            baths = fp.get("bathRooms") or fp.get("bathrooms")
+            fp.get("bathRooms") or fp.get("bathrooms")
             sqft = fp.get("sqft") or fp.get("squareFeet")
             sqft_v = None
             if isinstance(sqft, (int, float)) and sqft > 0:
@@ -652,14 +652,14 @@ def build_property_record(csv_row: dict, scrape_result: dict, target_units: list
 
 def read_properties_csv(path: Path) -> list[dict]:
     """Read CSV with BOM-tolerant UTF-8. Returns list of dict rows."""
-    with open(path, "r", encoding="utf-8-sig", newline="") as f:
+    with open(path, encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         return list(reader)
 
 # ── Orchestration ─────────────────────────────────────────────────────────────
 
-async def run(csv_path: Path, out_path: Path, limit: Optional[int],
-              start_at: int, proxy: Optional[str]) -> None:
+async def run(csv_path: Path, out_path: Path, limit: int | None,
+              start_at: int, proxy: str | None) -> None:
     rows = read_properties_csv(csv_path)
     print(f"\nLoaded {len(rows)} properties from {csv_path}")
 

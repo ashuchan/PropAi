@@ -23,6 +23,6 @@ def check_size(image_bytes: bytes, limit: int) -> bytes:
             data = buf.getvalue()
             if len(data) <= limit:
                 return data
-        return data  # type: ignore[possibly-undefined]
+        return data  # noqa: F821  # last iteration always defines data
     except Exception:
         return image_bytes[:limit]

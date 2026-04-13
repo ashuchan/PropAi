@@ -29,7 +29,7 @@ import hashlib
 import re
 import urllib.parse
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 # ── Column-name aliases ────────────────────────────────────────────────────────
 
@@ -117,7 +117,7 @@ def _sha1_short(s: str, n: int = 16) -> str:
 
 @dataclass
 class PropertyIdentity:
-    canonical_id:    Optional[str]
+    canonical_id:    str | None
     id_source:       str                 # one of: "unique_id" | "property_id" | "address_fp" | "geo_fp" | "website_fp" | "unresolved"
     confidence:      float
     components:      dict[str, Any] = field(default_factory=dict)

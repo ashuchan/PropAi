@@ -47,16 +47,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import csv
 import json
 import logging
 import sys
-import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # Force UTF-8 stdout on Windows.
 for _stream in (sys.stdout, sys.stderr):
@@ -69,24 +67,31 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from daily_runner import (                                       # noqa: E402
-    read_properties_csv, build_property_record, _scrape_one,
-    _scrape_in_thread, _write_issues_jsonl, _append_ledger,
-    load_ledger, TARGET_PROPERTY_FIELDS,
+import validation as V  # noqa: E402
+from concurrency import SystemResources  # noqa: E402
+from daily_runner import (  # noqa: E402
+    TARGET_PROPERTY_FIELDS,
+    _append_ledger,
+    _scrape_in_thread,
+    _write_issues_jsonl,
+    build_property_record,
+    load_ledger,
+    read_properties_csv,
 )
-from concurrency import SystemResources                          # noqa: E402
-from entrata import scrape                                       # noqa: E402
-from identity import (                                           # noqa: E402
-    resolve_identity, detect_duplicates, csv_get,
-    NAME_KEYS, UNIQUE_ID_KEYS, PROPERTY_ID_KEYS,
-    ADDRESS_KEYS, CITY_KEYS, STATE_KEYS, ZIP_KEYS,
-    LAT_KEYS, LNG_KEYS, WEBSITE_KEYS,
+from identity import (  # noqa: E402
+    ADDRESS_KEYS,
+    CITY_KEYS,
+    NAME_KEYS,
+    STATE_KEYS,
+    WEBSITE_KEYS,
+    ZIP_KEYS,
+    csv_get,
+    resolve_identity,
 )
-from state_store import StateStore                               # noqa: E402
-import validation as V                                           # noqa: E402
-from scrape_properties import (                                  # noqa: E402
-    transform_units_from_scrape, aggregate_unit_stats, _clean,
+from scrape_properties import (  # noqa: E402
+    transform_units_from_scrape,
 )
+from state_store import StateStore  # noqa: E402
 
 log = logging.getLogger("retry_runner")
 
@@ -172,7 +177,7 @@ def _filter_rows_resume(
       - Its ledger status is FAILED, UNRESOLVED, or any non-SUCCESS value
     """
     eligible = []
-    for idx, (row, ident) in enumerate(zip(rows, identities)):
+    for idx, (row, ident) in enumerate(zip(rows, identities, strict=False)):
         cid = ident.canonical_id
         if cid is None:
             # Unresolved rows: retry if they were unresolved before (identity
@@ -207,7 +212,7 @@ def _filter_rows_retry_errors(
         to produce units — worth retrying after parser fixes)
     """
     eligible = []
-    for idx, (row, ident) in enumerate(zip(rows, identities)):
+    for idx, (row, ident) in enumerate(zip(rows, identities, strict=False)):
         cid = ident.canonical_id
         if cid is None:
             continue  # Can't retry unresolved — no identity to match.
@@ -232,7 +237,7 @@ def _load_existing_properties(path: Path) -> list[dict]:
     if not path.exists():
         return []
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, list) else []
     except (json.JSONDecodeError, OSError):
@@ -249,7 +254,7 @@ def _merge_properties(
 
     Match key: _meta.canonical_id (preferred) or Unique ID.
     """
-    def _get_cid(rec: dict) -> Optional[str]:
+    def _get_cid(rec: dict) -> str | None:
         meta = rec.get("_meta") or {}
         return meta.get("canonical_id") or rec.get("Unique ID")
 
@@ -287,8 +292,8 @@ async def run_retry(
     run_date: str,
     data_dir: Path,
     mode: str,
-    limit: Optional[int],
-    proxy: Optional[str],
+    limit: int | None,
+    proxy: str | None,
     scrape_timeout_s: int,
 ) -> dict:
     """
@@ -297,7 +302,7 @@ async def run_retry(
     Args:
         mode: "resume" or "retry_errors"
     """
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     run_dir = data_dir / "runs" / run_date
     state_dir = data_dir / "state"
     raw_dir = run_dir / "raw_api"
@@ -410,7 +415,7 @@ async def run_retry(
                 "status": "UNRESOLVED",
                 "reason": "IDENTITY_UNRESOLVED",
                 "retry_mode": mode,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             })
             continue
 
@@ -649,7 +654,7 @@ async def run_retry(
             "warning_count": sum(1 for i in per_prop_issues if i.severity == "WARNING"),
             "url": url,
             "retry_mode": mode,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
 
         if ledger_status in ("SUCCESS", "SUCCESS_WITH_ERRORS"):
@@ -685,7 +690,7 @@ async def run_retry(
     except Exception as e:
         log.error(f"failed to save state: {e}")
 
-    finished_at = datetime.now(timezone.utc)
+    finished_at = datetime.now(UTC)
 
     # ── 9. Build report ─────────────────────────────────────────────────
     # Reload the ledger to get the full picture (original + retry entries).

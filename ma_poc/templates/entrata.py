@@ -18,8 +18,6 @@ for networkidle on Playwright pages BEFORE calling extract().
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from bs4 import BeautifulSoup, Tag
 
 from models.unit_record import AvailabilityStatus, UnitRecord
@@ -92,8 +90,8 @@ def _find_containers(soup: BeautifulSoup) -> list[Tag]:
 def _extract_from_row(
     row: Tag,
     property_id: str,
-    parent_fp_name: Optional[str] = None,
-) -> Optional[UnitRecord]:
+    parent_fp_name: str | None = None,
+) -> UnitRecord | None:
     """
     Extract a UnitRecord from a single row/card element.
     CSS selectors first, then regex fallback on the element's full text.

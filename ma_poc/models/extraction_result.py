@@ -9,9 +9,9 @@ Acceptance criteria (CLAUDE.md PR-03):
 - field_confidences and low_confidence_fields populated by tiers that report
   per-field confidence
 """
-from datetime import datetime, timezone
-from enum import Enum, IntEnum
-from typing import Any, Optional
+from datetime import UTC, datetime
+from enum import IntEnum, StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -24,26 +24,26 @@ class ExtractionTier(IntEnum):
     VISION_FALLBACK = 5
 
 
-class ExtractionStatus(str, Enum):
+class ExtractionStatus(StrEnum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     SKIPPED = "SKIPPED"  # Change detection determined no change
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class ExtractionResult(BaseModel):
     property_id: str
-    tier: Optional[ExtractionTier] = None
+    tier: ExtractionTier | None = None
     status: ExtractionStatus
     confidence_score: float = Field(default=0.0, ge=0.0, le=1.0)
     raw_fields: dict[str, Any] = Field(default_factory=dict)
     field_confidences: dict[str, float] = Field(default_factory=dict)
     low_confidence_fields: list[str] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=_utcnow)
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     @property
     def succeeded(self) -> bool:

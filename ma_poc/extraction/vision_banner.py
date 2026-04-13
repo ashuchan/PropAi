@@ -10,11 +10,10 @@ Acceptance criteria (CLAUDE.md PR-04 / Role B):
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Any
 
 from llm.factory import get_vision_provider
 from scraper.browser import BrowserSession
-
 
 _BANNER_KEYWORDS = (
     "free", "off", "concession", "special", "limited", "weeks free",
@@ -34,7 +33,7 @@ _PROMPT = (
 )
 
 
-def _detect_banner_text(html: Optional[str]) -> Optional[str]:
+def _detect_banner_text(html: str | None) -> str | None:
     if not html:
         return None
     h = html.lower()
@@ -45,7 +44,7 @@ def _detect_banner_text(html: Optional[str]) -> Optional[str]:
     return None
 
 
-async def _capture_banner_image(session: BrowserSession) -> Optional[bytes]:
+async def _capture_banner_image(session: BrowserSession) -> bytes | None:
     page = session.page
     if page is None:
         return None
@@ -60,7 +59,7 @@ async def _capture_banner_image(session: BrowserSession) -> Optional[bytes]:
     return None
 
 
-async def capture_banner(session: BrowserSession) -> Optional[dict[str, Any]]:
+async def capture_banner(session: BrowserSession) -> dict[str, Any] | None:
     """
     Returns the structured banner dict if a concession is found, else None.
 

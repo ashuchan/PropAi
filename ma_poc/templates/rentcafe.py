@@ -14,8 +14,6 @@ Returns [] on total selector failure (caller treats as Tier 3 failure).
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from bs4 import BeautifulSoup, Tag
 
 from models.unit_record import AvailabilityStatus, UnitRecord
@@ -24,7 +22,6 @@ from templates._common import (
     full_text,
     parse_availability,
     parse_availability_date,
-    parse_concession,
     parse_floor,
     parse_floor_plan_type,
     parse_int_from_text,
@@ -112,8 +109,8 @@ def _find_units_in_soup(soup: BeautifulSoup) -> list[Tag]:
 def _extract_from_card(
     card: Tag,
     property_id: str,
-    parent_fp_name: Optional[str] = None,
-) -> Optional[UnitRecord]:
+    parent_fp_name: str | None = None,
+) -> UnitRecord | None:
     """
     Extract a UnitRecord from a single card/row element.
     Uses CSS selectors first, falls back to regex on the card's full text.

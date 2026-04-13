@@ -14,12 +14,11 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Optional
+from typing import Any
 
 from extraction.confidence import composite, low_confidence_fields
 from models.extraction_result import ExtractionResult, ExtractionStatus, ExtractionTier
 from scraper.browser import BrowserSession
-
 
 _RENT_KEYS = ("asking_rent", "rent", "price", "marketRent", "rent_price", "minRent")
 _AVAIL_KEYS = ("availability_status", "availability", "status", "available")
@@ -35,7 +34,7 @@ def _first(d: dict[str, Any], keys: tuple[str, ...]) -> Any:
     return None
 
 
-def _coerce_unit(d: dict[str, Any]) -> Optional[dict[str, Any]]:
+def _coerce_unit(d: dict[str, Any]) -> dict[str, Any] | None:
     unit_number = _first(d, _UNIT_KEYS)
     rent = _first(d, _RENT_KEYS)
     avail = _first(d, _AVAIL_KEYS)
@@ -51,7 +50,7 @@ def _coerce_unit(d: dict[str, Any]) -> Optional[dict[str, Any]]:
     return out
 
 
-def _to_float(x: Any) -> Optional[float]:
+def _to_float(x: Any) -> float | None:
     if x is None:
         return None
     try:
@@ -64,12 +63,12 @@ def _to_float(x: Any) -> Optional[float]:
         return None
 
 
-def _to_int(x: Any) -> Optional[int]:
+def _to_int(x: Any) -> int | None:
     f = _to_float(x)
     return int(f) if f is not None else None
 
 
-def _normalize_avail(x: Any) -> Optional[str]:
+def _normalize_avail(x: Any) -> str | None:
     if x is None:
         return None
     s = str(x).strip().lower()
@@ -108,7 +107,7 @@ def matches_catalogue(url: str, catalogue: dict[str, Any]) -> bool:
     return False
 
 
-async def extract(session: BrowserSession, catalogue: Optional[dict[str, Any]] = None) -> ExtractionResult:
+async def extract(session: BrowserSession, catalogue: dict[str, Any] | None = None) -> ExtractionResult:
     """
     Walk session.intercepted_api_responses, match against the API catalogue,
     parse JSON bodies (with try/except — bug-hunt #3), produce a list of unit

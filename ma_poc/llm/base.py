@@ -48,13 +48,15 @@ class LLMProvider(ABC):
         self, system: str, user: str, *, max_tokens: int = 4096,
     ) -> str:
         """Text completion with jitter-based retry on rate limits."""
-        return await self._with_retry(self._complete_once, system, user, max_tokens)
+        result: str = await self._with_retry(self._complete_once, system, user, max_tokens)
+        return result
 
     async def extract_from_images(
         self, images: list[bytes], prompt: str, *, max_tokens: int = 4096,
     ) -> dict[str, Any]:
         """Vision extraction with jitter-based retry on rate limits."""
-        return await self._with_retry(self._extract_images_once, images, prompt, max_tokens)
+        result: dict[str, Any] = await self._with_retry(self._extract_images_once, images, prompt, max_tokens)
+        return result
 
     async def _with_retry(self, fn: Any, *args: Any) -> Any:
         last_exc: BaseException | None = None

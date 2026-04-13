@@ -27,6 +27,7 @@ module = [
     "aiofiles.*",
     "lxml.*",
     "bs4.*",
+    "PIL.*",
 ]
 ignore_missing_imports = true
 

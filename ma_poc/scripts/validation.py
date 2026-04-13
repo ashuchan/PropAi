@@ -18,8 +18,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 # ── Issue codes (machine-readable) ────────────────────────────────────────────
 
@@ -67,10 +67,10 @@ class ValidationIssue:
     severity:    str                                  # ERROR | WARNING | INFO
     code:        str
     message:     str
-    canonical_id: Optional[str] = None
-    row_index:   Optional[int]  = None
+    canonical_id: str | None = None
+    row_index:   int | None  = None
     details:     dict[str, Any] = field(default_factory=dict)
-    timestamp:   str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp:   str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def to_dict(self) -> dict:
         return asdict(self)

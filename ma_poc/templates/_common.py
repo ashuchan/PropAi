@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import re
 from datetime import date
-from typing import Optional
 
 from bs4 import Tag
 
@@ -43,7 +42,7 @@ CONCESSION_RE = re.compile(
 # ── Scalar parsers ────────────────────────────────────────────────────────────
 
 
-def parse_rent(text: Optional[str]) -> Optional[float]:
+def parse_rent(text: str | None) -> float | None:
     """Extract the first dollar amount from text. '$1,450' -> 1450.0"""
     if not text:
         return None
@@ -56,7 +55,7 @@ def parse_rent(text: Optional[str]) -> Optional[float]:
         return None
 
 
-def parse_int_from_text(text: Optional[str]) -> Optional[int]:
+def parse_int_from_text(text: str | None) -> int | None:
     """Extract the first integer-like number from text. '1,050 sqft' -> 1050"""
     if not text:
         return None
@@ -69,7 +68,7 @@ def parse_int_from_text(text: Optional[str]) -> Optional[int]:
         return None
 
 
-def parse_sqft(text: Optional[str]) -> Optional[int]:
+def parse_sqft(text: str | None) -> int | None:
     """Extract sqft from text using the sqft-specific regex."""
     if not text:
         return None
@@ -82,7 +81,7 @@ def parse_sqft(text: Optional[str]) -> Optional[int]:
     return parse_int_from_text(text)
 
 
-def parse_availability(text: Optional[str]) -> AvailabilityStatus:
+def parse_availability(text: str | None) -> AvailabilityStatus:
     """Determine availability status from free-form text."""
     if not text:
         return AvailabilityStatus.UNKNOWN
@@ -94,7 +93,7 @@ def parse_availability(text: Optional[str]) -> AvailabilityStatus:
     return AvailabilityStatus.UNKNOWN
 
 
-def parse_availability_date(text: Optional[str]) -> Optional[date]:
+def parse_availability_date(text: str | None) -> date | None:
     """
     Try to extract an availability date from text.
     Handles: 'Available 06/15/2026', 'Available Now', 'Jan 15, 2026'.
@@ -141,7 +140,7 @@ def parse_availability_date(text: Optional[str]) -> Optional[date]:
     return None
 
 
-def parse_floor_plan_type(text: Optional[str]) -> Optional[str]:
+def parse_floor_plan_type(text: str | None) -> str | None:
     """
     Infer floor plan type label from text containing bed/bath info.
     '2 Bed / 2 Bath' -> '2/2', 'Studio' -> 'Studio'.
@@ -163,7 +162,7 @@ def parse_floor_plan_type(text: Optional[str]) -> Optional[str]:
     return text.strip() if text.strip() else None
 
 
-def parse_floor(text: Optional[str]) -> Optional[int]:
+def parse_floor(text: str | None) -> int | None:
     """Extract floor number from text. 'Floor 3' -> 3."""
     if not text:
         return None
@@ -176,7 +175,7 @@ def parse_floor(text: Optional[str]) -> Optional[int]:
     return None
 
 
-def parse_concession(text: Optional[str]) -> Optional[str]:
+def parse_concession(text: str | None) -> str | None:
     """Extract concession text like '2 months free'."""
     if not text:
         return None
@@ -187,7 +186,7 @@ def parse_concession(text: Optional[str]) -> Optional[str]:
 # ── DOM helpers ───────────────────────────────────────────────────────────────
 
 
-def text_of(node: Optional[Tag], selector: str) -> Optional[str]:
+def text_of(node: Tag | None, selector: str) -> str | None:
     """Get text content of the first element matching selector within node."""
     if node is None:
         return None
@@ -195,7 +194,7 @@ def text_of(node: Optional[Tag], selector: str) -> Optional[str]:
     return el.get_text(" ", strip=True) if el else None
 
 
-def attr_of(node: Optional[Tag], selector: str, attr: str) -> Optional[str]:
+def attr_of(node: Tag | None, selector: str, attr: str) -> str | None:
     """Get an attribute value from the first matching element."""
     if node is None:
         return None
@@ -208,7 +207,7 @@ def attr_of(node: Optional[Tag], selector: str, attr: str) -> Optional[str]:
     return str(val) if val else None
 
 
-def full_text(node: Optional[Tag]) -> str:
+def full_text(node: Tag | None) -> str:
     """Get all text from a node for regex-based extraction."""
     if node is None:
         return ""

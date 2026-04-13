@@ -13,7 +13,6 @@ import respx
 from models.scrape_event import ChangeDetectionResult
 from scraper.change_detection import ChangeDetector, PropertyState, StateStore
 
-
 URL = "https://example.com/property"
 
 

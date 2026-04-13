@@ -22,9 +22,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # ── File I/O helpers ──────────────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ def _safe_load(path: Path) -> dict:
     if not path.exists():
         return {}
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, dict):
             raise ValueError(f"state file {path} is not a JSON object")
@@ -85,7 +85,7 @@ class StateStore:
 
     # ── Property operations ──────────────────────────────────────────────────
 
-    def get_property(self, canonical_id: str) -> Optional[dict]:
+    def get_property(self, canonical_id: str) -> dict | None:
         return self.property_index.get(canonical_id)
 
     def is_known(self, canonical_id: str) -> bool:
@@ -100,7 +100,7 @@ class StateStore:
         existing = self.property_index.get(canonical_id, {})
         merged = {**existing, **snapshot}
         merged["last_seen_date"] = run_date
-        merged["last_seen_at"]   = datetime.now(timezone.utc).isoformat()
+        merged["last_seen_at"]   = datetime.now(UTC).isoformat()
         if is_new:
             merged["first_seen_date"] = run_date
         else:
@@ -150,7 +150,7 @@ class StateStore:
                 "available_date":   u.get("available_date"),
                 "concessions":      u.get("concessions"),
                 "last_seen_date":   run_date,
-                "last_seen_at":     datetime.now(timezone.utc).isoformat(),
+                "last_seen_at":     datetime.now(UTC).isoformat(),
                 "carryforward_days": 0,
             }
 

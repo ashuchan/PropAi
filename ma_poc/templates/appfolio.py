@@ -11,8 +11,6 @@ Falls back to regex-based text extraction when CSS selectors miss fields.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from bs4 import BeautifulSoup, Tag
 
 from models.unit_record import AvailabilityStatus, UnitRecord
@@ -71,7 +69,7 @@ def _find_containers(soup: BeautifulSoup) -> list[Tag]:
     return []
 
 
-def _extract_from_card(card: Tag, property_id: str) -> Optional[UnitRecord]:
+def _extract_from_card(card: Tag, property_id: str) -> UnitRecord | None:
     """
     Extract a UnitRecord from a single listing card.
     CSS selectors first, then regex fallback on full card text.

@@ -10,8 +10,12 @@ from llm.base import LLMProvider
 
 try:
     from anthropic import (
-        AsyncAnthropic,
         APIError as AnthropicAPIError,
+    )
+    from anthropic import (
+        AsyncAnthropic,
+    )
+    from anthropic import (
         RateLimitError as AnthropicRateLimitError,
     )
 except ImportError:  # pragma: no cover

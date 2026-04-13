@@ -12,8 +12,7 @@ from __future__ import annotations
 import os
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
 
@@ -26,7 +25,7 @@ class ProxyCredentials:
     provider: str = "brightdata"
 
     @classmethod
-    def from_env(cls) -> Optional["ProxyCredentials"]:
+    def from_env(cls) -> ProxyCredentials | None:
         host = os.getenv("PROXY_HOST", "").strip()
         port = os.getenv("PROXY_PORT", "").strip()
         user = os.getenv("PROXY_USERNAME", "").strip()
@@ -70,7 +69,7 @@ class ProxyManager:
     ROLLING_WINDOW = timedelta(days=7)
     THRESHOLD = 0.02
 
-    def __init__(self, creds: Optional[ProxyCredentials] = None) -> None:
+    def __init__(self, creds: ProxyCredentials | None = None) -> None:
         self.creds = creds or ProxyCredentials.from_env()
         self._stats: dict[str, _DomainStats] = defaultdict(_DomainStats)
 
@@ -81,12 +80,12 @@ class ProxyManager:
 
     def record(self, url: str, success: bool) -> None:
         domain = self.domain_of(url)
-        self._stats[domain].attempts.append((datetime.now(timezone.utc), success))
+        self._stats[domain].attempts.append((datetime.now(UTC), success))
         if self._failure_rate(domain) > self.THRESHOLD:
             self._stats[domain].forced_proxy = True
 
     def _failure_rate(self, domain: str) -> float:
-        cutoff = datetime.now(timezone.utc) - self.ROLLING_WINDOW
+        cutoff = datetime.now(UTC) - self.ROLLING_WINDOW
         rolling = [s for ts, s in self._stats[domain].attempts if ts >= cutoff]
         if not rolling:
             return 0.0
@@ -98,7 +97,7 @@ class ProxyManager:
             return False
         return self._stats[self.domain_of(url)].forced_proxy
 
-    def proxy_config_for(self, url: str) -> Optional[dict[str, str]]:
+    def proxy_config_for(self, url: str) -> dict[str, str] | None:
         if not self.should_use_proxy(url):
             return None
         assert self.creds is not None

@@ -18,9 +18,9 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -30,11 +30,11 @@ from models.scrape_event import ChangeDetectionResult
 
 @dataclass
 class PropertyState:
-    last_etag: Optional[str] = None
-    last_lastmodified: Optional[str] = None
-    last_sitemap_lastmod: Optional[str] = None
-    last_api_hash: Optional[str] = None
-    last_full_scrape_date: Optional[str] = None  # ISO date
+    last_etag: str | None = None
+    last_lastmodified: str | None = None
+    last_sitemap_lastmod: str | None = None
+    last_api_hash: str | None = None
+    last_full_scrape_date: str | None = None  # ISO date
     carryforward_days: int = 0
 
 
@@ -67,7 +67,7 @@ class StateStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = asyncio.Lock()
-        self._cache: Optional[dict[str, dict[str, Any]]] = None
+        self._cache: dict[str, dict[str, Any]] | None = None
 
     async def _load(self) -> dict[str, dict[str, Any]]:
         if self._cache is not None:
@@ -112,15 +112,15 @@ class ChangeDetector:
     def __init__(
         self,
         state: StateStore,
-        api_catalogue: Optional[dict[str, Any]] = None,
-        client: Optional[httpx.AsyncClient] = None,
+        api_catalogue: dict[str, Any] | None = None,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
         self.state = state
         self.api_catalogue = api_catalogue or {}
         self._client = client
         self._owns_client = client is None
 
-    async def __aenter__(self) -> "ChangeDetector":
+    async def __aenter__(self) -> ChangeDetector:
         if self._client is None:
             self._client = httpx.AsyncClient(
                 timeout=httpx.Timeout(10.0),
@@ -211,7 +211,7 @@ class ChangeDetector:
         body = resp.text
         # Cheap text scan: locate matching <url> block then its <lastmod>.
         url_blocks = re.findall(r"<url>(.*?)</url>", body, flags=re.DOTALL | re.IGNORECASE)
-        lastmod: Optional[str] = None
+        lastmod: str | None = None
         for block in url_blocks:
             loc_match = re.search(r"<loc>(.*?)</loc>", block, flags=re.IGNORECASE)
             if not loc_match:
@@ -255,10 +255,10 @@ class ChangeDetector:
         property_id: str,
         state: PropertyState,
         *,
-        etag: Optional[str] = None,
-        last_modified: Optional[str] = None,
-        sitemap_lastmod: Optional[str] = None,
-        api_hash: Optional[str] = None,
+        etag: str | None = None,
+        last_modified: str | None = None,
+        sitemap_lastmod: str | None = None,
+        api_hash: str | None = None,
     ) -> None:
         state.carryforward_days = 0
         state.last_full_scrape_date = date.today().isoformat()
@@ -274,4 +274,4 @@ class ChangeDetector:
 
 
 def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()

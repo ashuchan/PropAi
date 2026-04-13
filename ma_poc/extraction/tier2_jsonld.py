@@ -12,7 +12,7 @@ Acceptance criteria (CLAUDE.md PR-03 / Tier 2):
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -46,7 +46,7 @@ def _types_of(node: dict[str, Any]) -> list[str]:
     return []
 
 
-def _to_float(x: Any) -> Optional[float]:
+def _to_float(x: Any) -> float | None:
     if x is None:
         return None
     try:
@@ -57,7 +57,7 @@ def _to_float(x: Any) -> Optional[float]:
         return None
 
 
-def _to_int(x: Any) -> Optional[int]:
+def _to_int(x: Any) -> int | None:
     f = _to_float(x)
     return int(f) if f is not None else None
 
@@ -83,8 +83,8 @@ def _coerce_apartment(node: dict[str, Any]) -> dict[str, Any]:
     offers = node.get("offers") or []
     if isinstance(offers, dict):
         offers = [offers]
-    rent: Optional[float] = None
-    avail: Optional[str] = None
+    rent: float | None = None
+    avail: str | None = None
     for off in offers:
         if not isinstance(off, dict):
             continue

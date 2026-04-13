@@ -4,12 +4,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 from extraction import tier1_api
 from extraction.tier1_api import matches_catalogue
 from models.extraction_result import ExtractionStatus
 from scraper.browser import BrowserSession, InterceptedResponse
-
 
 CATALOGUE = {
     "patterns": [

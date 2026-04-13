@@ -18,9 +18,9 @@ import csv
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from extraction.pipeline import run_extraction_pipeline
 from extraction.tier5_vision import maybe_run_vision_fallback
@@ -34,10 +34,11 @@ from scraper.proxy_manager import ProxyManager
 from storage.event_log import EventLog, write_extraction_output
 
 try:
-    from timezonefinder import TimezoneFinder
     from zoneinfo import ZoneInfo
 
-    _TZF: Optional[TimezoneFinder] = TimezoneFinder()
+    from timezonefinder import TimezoneFinder
+
+    _TZF: TimezoneFinder | None = TimezoneFinder()
 except Exception:  # pragma: no cover
     _TZF = None
     ZoneInfo = None  # type: ignore[assignment,misc]
@@ -48,10 +49,10 @@ class PropertyRow:
     property_id: str
     url: str
     type: str  # "STABILISED" | "LEASE_UP"
-    pms_platform: Optional[str] = None
-    zip: Optional[str] = None
-    state: Optional[str] = None
-    name: Optional[str] = None
+    pms_platform: str | None = None
+    zip: str | None = None
+    state: str | None = None
+    name: str | None = None
 
 
 # Map RealPage CSV headers to internal names. Loader is tolerant of casing.
@@ -132,13 +133,13 @@ def _local_tz_for(row: PropertyRow) -> Any:
     return ZoneInfo(tz_name)
 
 
-def is_due_now(row: PropertyRow, now_utc: Optional[datetime] = None) -> bool:
+def is_due_now(row: PropertyRow, now_utc: datetime | None = None) -> bool:
     """
     Per-row schedule check. STABILISED → due once per local day after 02:00 local.
     LEASE_UP → due if current local time is within 08:00–21:00 and at a 4-hour slot
     boundary (window granularity = 1 hour for forgiveness).
     """
-    now_utc = now_utc or datetime.now(timezone.utc)
+    now_utc = now_utc or datetime.now(UTC)
     tz = _local_tz_for(row)
     if tz is None:
         local = now_utc
@@ -155,15 +156,15 @@ def is_due_now(row: PropertyRow, now_utc: Optional[datetime] = None) -> bool:
 class ScrapeFleet:
     """
     Top-level coordinator. Owns: BrowserFleet, EventLog, ChangeDetector,
-    extraction pipeline. Enforces concurrency cap via asyncio.Semaphore.
+    extraction pipeline. Enforces concurrency cap via batch sizing.
     """
 
     def __init__(
         self,
         properties: list[PropertyRow],
-        data_dir: Optional[Path] = None,
-        max_concurrent: Optional[int] = None,
-        api_catalogue: Optional[dict[str, Any]] = None,
+        data_dir: Path | None = None,
+        max_concurrent: int | None = None,
+        api_catalogue: dict[str, Any] | None = None,
         headless: bool = True,
     ) -> None:
         self.properties = properties
@@ -176,7 +177,6 @@ class ScrapeFleet:
         )
         self.event_log = EventLog(self.data_dir / "scrape_events.jsonl")
         self.state_store = StateStore(self.data_dir / "change_detection_state.json")
-        self._sem = asyncio.Semaphore(self.max_concurrent)
 
     async def run_once(self, only_due: bool = False) -> list[ScrapeEvent]:
         await self.browser_fleet.start()
@@ -200,7 +200,7 @@ class ScrapeFleet:
                         evt = ScrapeEvent(
                             event_id=str(uuid.uuid4()),
                             property_id=batch[i].property_id,
-                            scrape_timestamp=datetime.now(timezone.utc),
+                            scrape_timestamp=datetime.now(UTC),
                             scrape_outcome=ScrapeOutcome.FAILED,
                             failure_reason=f"task_crashed: {r}",
                         )
@@ -225,12 +225,12 @@ class ScrapeFleet:
             return await asyncio.wait_for(
                 self._scrape_one_inner(row), timeout=per_property_timeout
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             print(f"  [timeout] {row.property_id} exceeded {per_property_timeout}s")
             evt = ScrapeEvent(
                 event_id=str(uuid.uuid4()),
                 property_id=row.property_id,
-                scrape_timestamp=datetime.now(timezone.utc),
+                scrape_timestamp=datetime.now(UTC),
                 scrape_outcome=ScrapeOutcome.FAILED,
                 failure_reason=f"per_property_timeout ({per_property_timeout}s)",
             )
@@ -239,15 +239,15 @@ class ScrapeFleet:
 
     async def _scrape_one_inner(self, row: PropertyRow) -> ScrapeEvent:
         event_id = str(uuid.uuid4())
-        scrape_ts = datetime.now(timezone.utc)
+        scrape_ts = datetime.now(UTC)
         cd_result: ChangeDetectionResult = ChangeDetectionResult.INCONCLUSIVE
         outcome = ScrapeOutcome.FAILED
-        tier: Optional[int] = None
-        confidence: Optional[float] = None
-        failure_reason: Optional[str] = None
-        page_load_ms: Optional[int] = None
-        raw_html_path: Optional[str] = None
-        screenshot_path: Optional[str] = None
+        tier: int | None = None
+        confidence: float | None = None
+        failure_reason: str | None = None
+        page_load_ms: int | None = None
+        raw_html_path: str | None = None
+        screenshot_path: str | None = None
         banner_attempted = False
         banner_found = False
         vision_used = False
@@ -321,6 +321,7 @@ class ScrapeFleet:
                             row.property_id,
                             scrape_ts.date(),
                             primary=result,
+                            screenshot_path=session.screenshot_path,
                         )
 
                 # Persist extraction output

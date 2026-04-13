@@ -10,7 +10,7 @@ import json
 import os
 import sys
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -69,7 +69,7 @@ def main() -> int:
         return 1
 
     # Last 24h
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
     recent = [
         e for e in events
         if datetime.fromisoformat(e["scrape_timestamp"].replace("Z", "+00:00")) >= cutoff
@@ -106,7 +106,7 @@ def main() -> int:
     p95 = percentile(page_loads, 95)
 
     # Per-domain rolling 7d failure rate
-    week_cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    week_cutoff = datetime.now(UTC) - timedelta(days=7)
     per_dom: dict[str, list[bool]] = defaultdict(list)
     for e in events:
         if datetime.fromisoformat(e["scrape_timestamp"].replace("Z", "+00:00")) < week_cutoff:

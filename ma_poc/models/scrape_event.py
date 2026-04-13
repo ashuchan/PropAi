@@ -8,19 +8,18 @@ Acceptance criteria (CLAUDE.md PR-01):
   result + scrape_outcome + tier + confidence
 """
 from datetime import datetime
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 from pydantic import BaseModel
 
 
-class ChangeDetectionResult(str, Enum):
+class ChangeDetectionResult(StrEnum):
     CHANGED = "CHANGED"
     UNCHANGED = "UNCHANGED"
     INCONCLUSIVE = "INCONCLUSIVE"
 
 
-class ScrapeOutcome(str, Enum):
+class ScrapeOutcome(StrEnum):
     SUCCESS = "SUCCESS"
     SKIPPED = "SKIPPED"
     FAILED = "FAILED"
@@ -31,17 +30,17 @@ class ScrapeEvent(BaseModel):
     event_id: str  # UUID4
     property_id: str
     scrape_timestamp: datetime
-    extraction_tier: Optional[int] = None
-    change_detection_result: Optional[ChangeDetectionResult] = None
+    extraction_tier: int | None = None
+    change_detection_result: ChangeDetectionResult | None = None
     scrape_outcome: ScrapeOutcome
-    failure_reason: Optional[str] = None
-    page_load_ms: Optional[int] = None
+    failure_reason: str | None = None
+    page_load_ms: int | None = None
     proxy_used: bool = False
-    proxy_provider: Optional[str] = None
+    proxy_provider: str | None = None
     vision_fallback_used: bool = False
     banner_capture_attempted: bool = False
     banner_concession_found: bool = False
     accuracy_sample_selected: bool = False
-    raw_html_path: Optional[str] = None
-    screenshot_path: Optional[str] = None
-    confidence_score: Optional[float] = None
+    raw_html_path: str | None = None
+    screenshot_path: str | None = None
+    confidence_score: float | None = None

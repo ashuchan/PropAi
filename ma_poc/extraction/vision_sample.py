@@ -74,10 +74,15 @@ async def write_sample_comparison(
     property_id: str,
     scrape_date: date,
     primary: ExtractionResult,
+    screenshot_path: Path | str | None = None,
 ) -> Path:
     """
     Run vision against the same property and write the comparison JSON.
     Isolated from the primary result — never mutates it.
+
+    Uses the saved screenshot on disk (cheap — no extra browser session).
+    Falls back to data/screenshots/{property_id}/{date}.png if no explicit
+    screenshot_path is provided.
     """
     out_dir = Path(output_dir) / property_id
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -97,22 +102,55 @@ async def write_sample_comparison(
     }
 
     try:
-        get_vision_provider()
+        provider = get_vision_provider()
     except Exception as exc:
         comparison["error"] = f"vision_provider_unavailable: {exc}"
         out_path.write_text(json.dumps(comparison, indent=2), encoding="utf-8")
         return out_path
 
-    try:
-        # Reuse whatever screenshot we already have on disk to keep Role C cheap.
-        # In production, the fleet passes the BrowserSession in directly.
-        comparison["error"] = "headless_run_only"
+    # Locate the screenshot: explicit path > convention path
+    img_path: Path | None = None
+    if screenshot_path is not None:
+        img_path = Path(screenshot_path)
+    else:
+        # Convention: data/screenshots/{property_id}/{date}.png
+        base = Path(output_dir).parent / "screenshots" / property_id
+        candidate = base / f"{scrape_date.isoformat()}.png"
+        if candidate.exists():
+            img_path = candidate
+
+    if img_path is None or not img_path.exists():
+        comparison["error"] = "no_screenshot_available"
         out_path.write_text(json.dumps(comparison, indent=2), encoding="utf-8")
         return out_path
+
+    try:
+        image_bytes = img_path.read_bytes()
+        vision_prompt = (
+            "You see a screenshot of an apartment property's pricing/availability page. "
+            'Return a JSON object: {"units": [{"unit_number": str, "floor_plan_type": str, '
+            '"asking_rent": number, "availability_status": "AVAILABLE"|"UNAVAILABLE"|"UNKNOWN", '
+            '"sqft": int|null}]}. Return ONLY the JSON object.'
+        )
+        payload = await provider.extract_from_images([image_bytes], vision_prompt)
     except Exception as exc:
         comparison["error"] = f"vision_call_failed: {exc}"
         out_path.write_text(json.dumps(comparison, indent=2), encoding="utf-8")
         return out_path
+
+    vision_units = [u for u in payload.get("units", []) if isinstance(u, dict)]
+    diff = _diff_units(primary_units, vision_units)
+    comparison.update({
+        "vision_units": len(vision_units),
+        "agreement_rate": diff["agreement_rate"],
+        "comparisons": diff["comparisons"],
+        "agreements": diff["agreements"],
+        "only_in_primary": diff["only_in_primary"],
+        "only_in_vision": diff["only_in_vision"],
+        "diffs": diff["diffs"],
+    })
+    out_path.write_text(json.dumps(comparison, indent=2), encoding="utf-8")
+    return out_path
 
 
 __all__ = ["select_for_sample", "write_sample_comparison", "_diff_units"]

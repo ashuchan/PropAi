@@ -40,9 +40,10 @@ import ctypes
 import logging
 import os
 import platform
+from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Optional, TypeVar
+from typing import Any, TypeVar
 
 log = logging.getLogger("concurrency")
 
@@ -345,7 +346,7 @@ class ThreadedPool:
         fn: Callable[..., T],
         args_list: list[tuple],
         *,
-        timeout_per_task: Optional[float] = None,
+        timeout_per_task: float | None = None,
     ) -> list[T | Exception]:
         """
         Submit synchronous *fn* for each args tuple.  Returns results in
@@ -416,7 +417,7 @@ async def run_concurrent_scrapes(
     scrape_fn: Callable[..., Awaitable[dict]],
     work_items: list[tuple],
     *,
-    max_workers: Optional[int] = None,
+    max_workers: int | None = None,
 ) -> list[dict | Exception]:
     """
     High-level helper: detect resources, size the pool, run all scrapes.

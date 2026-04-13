@@ -10,8 +10,7 @@ Acceptance criteria:
 """
 from __future__ import annotations
 
-from typing import Iterable, Mapping
-
+from collections.abc import Iterable, Mapping
 
 REQUIRED_FIELDS = ("unit_number", "asking_rent", "availability_status")
 PREFERRED_FIELDS = ("sqft", "floor_plan_type")

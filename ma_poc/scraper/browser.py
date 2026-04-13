@@ -21,9 +21,9 @@ import asyncio
 import os
 import random
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from scraper.proxy_manager import ProxyManager
 
@@ -81,13 +81,13 @@ class BrowserSession:
 
     property_id: str
     url: str
-    pms_platform: Optional[str] = None
-    page: Optional[Any] = None  # playwright Page
-    html: Optional[str] = None
-    screenshot_path: Optional[Path] = None
-    raw_html_path: Optional[Path] = None
-    page_load_ms: Optional[int] = None
-    failure_reason: Optional[str] = None
+    pms_platform: str | None = None
+    page: Any | None = None  # playwright Page
+    html: str | None = None
+    screenshot_path: Path | None = None
+    raw_html_path: Path | None = None
+    page_load_ms: int | None = None
+    failure_reason: str | None = None
     proxy_used: bool = False
     intercepted_api_responses: list[InterceptedResponse] = field(default_factory=list)
 
@@ -160,15 +160,15 @@ class BrowserFleet:
 
     def __init__(
         self,
-        proxy_manager: Optional[ProxyManager] = None,
-        data_dir: Optional[Path] = None,
+        proxy_manager: ProxyManager | None = None,
+        data_dir: Path | None = None,
         headless: bool = True,
     ) -> None:
         self.proxy_manager = proxy_manager or ProxyManager()
         self.data_dir = Path(data_dir if data_dir is not None else os.getenv("DATA_DIR", "./data"))
         self.headless = headless
-        self._playwright: Optional[Any] = None
-        self._browser: Optional[Any] = None
+        self._playwright: Any | None = None
+        self._browser: Any | None = None
         self._lock = asyncio.Lock()
         self._open_contexts: set[Any] = set()
 
@@ -211,8 +211,8 @@ class BrowserFleet:
         self,
         property_id: str,
         url: str,
-        pms_platform: Optional[str] = None,
-        timeout_ms: Optional[int] = None,
+        pms_platform: str | None = None,
+        timeout_ms: int | None = None,
     ) -> BrowserSession:
         """
         Run one scrape: open context → register interceptor → goto → settle →
@@ -237,7 +237,7 @@ class BrowserFleet:
         if proxy_cfg is not None:
             context_kwargs["proxy"] = proxy_cfg
 
-        context: Optional[Any] = None
+        context: Any | None = None
         _on_response: Any = None  # defined below; needed for cleanup in finally
 
         try:
@@ -274,7 +274,7 @@ class BrowserFleet:
 
             page.on("response", _on_response)
 
-            t0 = datetime.now(timezone.utc)
+            t0 = datetime.now(UTC)
             try:
                 await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
             except Exception as exc:
@@ -289,7 +289,7 @@ class BrowserFleet:
             except Exception:
                 pass  # best-effort; continue with whatever page we have
 
-            session.page_load_ms = int((datetime.now(timezone.utc) - t0).total_seconds() * 1000)
+            session.page_load_ms = int((datetime.now(UTC) - t0).total_seconds() * 1000)
 
             try:
                 session.html = await page.content()
@@ -339,3 +339,38 @@ class BrowserFleet:
                 except Exception:
                     pass
                 self._open_contexts.discard(context)
+
+
+def cleanup_old_files(data_dir: Path, retention_days: int = 30) -> int:
+    """
+    Delete raw_html and screenshot files older than retention_days.
+
+    Bug-hunt #12: idempotent — running twice in one day does not delete
+    files newer than the retention window.
+
+    Returns the number of files deleted.
+    """
+    cutoff = date.today() - __import__("datetime").timedelta(days=retention_days)
+    deleted = 0
+    for subdir in ("raw_html", "screenshots"):
+        root = data_dir / subdir
+        if not root.exists():
+            continue
+        for property_dir in root.iterdir():
+            if not property_dir.is_dir():
+                continue
+            for f in property_dir.iterdir():
+                # Files are named {YYYY-MM-DD}.html or {YYYY-MM-DD}.png
+                try:
+                    file_date = date.fromisoformat(f.stem)
+                except ValueError:
+                    continue
+                if file_date < cutoff:
+                    f.unlink(missing_ok=True)
+                    deleted += 1
+            # Remove empty property directories
+            try:
+                property_dir.rmdir()
+            except OSError:
+                pass  # not empty — that's fine
+    return deleted

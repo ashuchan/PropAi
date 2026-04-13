@@ -54,12 +54,11 @@ import csv
 import json
 import logging
 import sys
-import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # Force UTF-8 stdout on Windows so emoji prints don't crash the run.
 for _stream in (sys.stdout, sys.stderr):
@@ -73,20 +72,31 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from entrata import scrape                                    # noqa: E402
-from identity import (                                        # noqa: E402
-    PropertyIdentity, resolve_identity, detect_duplicates,
-    csv_get, UNIQUE_ID_KEYS, PROPERTY_ID_KEYS, ADDRESS_KEYS,
-    CITY_KEYS, STATE_KEYS, ZIP_KEYS, LAT_KEYS, LNG_KEYS,
-    WEBSITE_KEYS, NAME_KEYS,
+import validation as V  # noqa: E402
+from concurrency import SystemResources  # noqa: E402
+from entrata import scrape  # noqa: E402
+from identity import (  # noqa: E402
+    ADDRESS_KEYS,
+    CITY_KEYS,
+    LAT_KEYS,
+    LNG_KEYS,
+    NAME_KEYS,
+    PROPERTY_ID_KEYS,
+    STATE_KEYS,
+    UNIQUE_ID_KEYS,
+    WEBSITE_KEYS,
+    ZIP_KEYS,
+    PropertyIdentity,
+    csv_get,
+    detect_duplicates,
+    resolve_identity,
 )
-from state_store import StateStore                            # noqa: E402
-import validation as V                                        # noqa: E402
-from scrape_properties import (                               # noqa: E402
-    transform_units_from_scrape, aggregate_unit_stats,
-    _money_to_int, _clean,
+from scrape_properties import (  # noqa: E402
+    _clean,
+    aggregate_unit_stats,
+    transform_units_from_scrape,
 )
-from concurrency import SystemResources                       # noqa: E402
+from state_store import StateStore  # noqa: E402
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -113,7 +123,7 @@ def read_properties_csv(path: Path) -> list[dict]:
     """UTF-8-BOM tolerant CSV read. Returns list of dict rows."""
     if not path.exists():
         raise FileNotFoundError(f"CSV not found: {path}")
-    with open(path, "r", encoding="utf-8-sig", newline="") as f:
+    with open(path, encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         rows = list(reader)
     log.info(f"Loaded {len(rows)} rows from {path}")
@@ -152,7 +162,7 @@ def _f(row: dict, *keys: str) -> Any:
     """Return cleaned CSV value or None."""
     return _clean(csv_get(row, *keys)) or None
 
-def _num(row: dict, *keys: str) -> Optional[float]:
+def _num(row: dict, *keys: str) -> float | None:
     v = csv_get(row, *keys)
     if not v:
         return None
@@ -166,7 +176,7 @@ def build_property_record(
     ident: PropertyIdentity,
     scrape_result: dict,
     target_units: list[dict],
-    state_snapshot: Optional[dict],
+    state_snapshot: dict | None,
     carry_forward_used: bool,
 ) -> dict:
     """
@@ -244,16 +254,16 @@ def build_property_record(
 
 # ── Run orchestrator ──────────────────────────────────────────────────────────
 
-async def _scrape_one(url: str, proxy: Optional[str], timeout_s: int) -> dict:
+async def _scrape_one(url: str, proxy: str | None, timeout_s: int) -> dict:
     """Run scrape() with a hard timeout so a stuck page can never hang the run."""
     try:
         return await asyncio.wait_for(scrape(url, proxy=proxy), timeout=timeout_s)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {"errors": [f"scrape timeout after {timeout_s}s"], "base_url": url,
                 "_timeout": True}
 
 
-def _scrape_in_thread(url: str, proxy: Optional[str], timeout_s: int) -> dict:
+def _scrape_in_thread(url: str, proxy: str | None, timeout_s: int) -> dict:
     """
     Run a single scrape in its own thread with its own event loop.
 
@@ -287,7 +297,7 @@ def load_ledger(path: Path) -> dict[str, dict]:
     entries: dict[str, dict] = {}
     if not path.exists():
         return entries
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -325,7 +335,7 @@ def _write_markdown_report(path: Path, report: dict) -> None:
     lines.append(f"- Resolved: **{ids['resolved']}** / Unresolved: **{ids['unresolved']}**")
     lines.append(f"- Hard duplicates (same canonical_id): **{len(ids['hard_duplicates'])}**")
     lines.append(f"- Soft duplicates (same address, different id): **{len(ids['soft_duplicates'])}**")
-    lines.append(f"- By source: " + ", ".join(f"{k}={v}" for k, v in ids["by_source"].items()))
+    lines.append("- By source: " + ", ".join(f"{k}={v}" for k, v in ids["by_source"].items()))
     lines.append("")
     lines.append("## Issues")
     lines.append(f"- Total: **{report['issues']['total']}**")
@@ -361,12 +371,12 @@ async def run_daily(
     csv_path: Path,
     run_date: str,
     data_dir: Path,
-    limit: Optional[int],
+    limit: int | None,
     start_at: int,
-    proxy: Optional[str],
+    proxy: str | None,
     scrape_timeout_s: int,
 ) -> dict:
-    started_at = datetime.now(timezone.utc)
+    started_at = datetime.now(UTC)
     run_dir = data_dir / "runs" / run_date
     state_dir = data_dir / "state"
     raw_dir = run_dir / "raw_api"
@@ -476,7 +486,7 @@ async def run_daily(
     # Scrapeable rows are batched for concurrent scraping.
     scrapeable: list[tuple[int, dict, PropertyIdentity, str]] = []  # (idx, row, ident, url)
 
-    for idx, (row, ident) in enumerate(zip(rows, identities)):
+    for idx, (row, ident) in enumerate(zip(rows, identities, strict=False)):
         url = csv_get(row, *WEBSITE_KEYS)
         cid = ident.canonical_id
 
@@ -501,7 +511,7 @@ async def run_daily(
                 "canonical_id": None, "row_index": idx,
                 "status": "UNRESOLVED",
                 "reason": "IDENTITY_UNRESOLVED",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             })
             continue
 
@@ -511,7 +521,7 @@ async def run_daily(
                 "canonical_id": cid, "row_index": idx,
                 "status": "SKIPPED",
                 "reason": "DUPLICATE_CANONICAL_ID",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             })
             continue
         processed.add(cid)
@@ -637,7 +647,6 @@ async def run_daily(
         # Strip the internal helper fields (underscore-prefixed) that the
         # transformer uses for aggregates. We still need the originals for
         # stats, so compute stats before stripping.
-        stats_units = target_units
         public_units = [{k: v for k, v in u.items() if not k.startswith("_")} for u in target_units]
 
         # ── Validate ───────────────────────────────────────────────────────
@@ -661,7 +670,6 @@ async def run_daily(
                 units_total["carried_forward"] += len(cf_units)
                 public_units = cf_units
                 # Recompute stats over the carry-forward set.
-                stats_units = []  # aggregates won't have the internal helper fields; fine — stats default to None
                 per_prop_issues.append(V.info(
                     V.UNITS_CARRIED_FORWARD,
                     f"carried forward {len(cf_units)} units from prior state",
@@ -779,7 +787,7 @@ async def run_daily(
             "error_count": sum(1 for i in per_prop_issues if i.severity == "ERROR"),
             "warning_count": sum(1 for i in per_prop_issues if i.severity == "WARNING"),
             "url": url,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
 
         # ── Incremental save ──────────────────────────────────────────────
@@ -818,7 +826,7 @@ async def run_daily(
     except Exception as e:
         log.error(f"⚠ failed to save state: {e}")
 
-    finished_at = datetime.now(timezone.utc)
+    finished_at = datetime.now(UTC)
 
     # ── 8. Build report ───────────────────────────────────────────────────
     new_ids = sorted(seen_ids_today - prior_property_ids)

@@ -30,17 +30,17 @@ Usage:
     python san_artes_scraper.py --proxy http://user:pass@proxy.brightdata.com:22225
 """
 
+import argparse
 import asyncio
+import csv
 import json
 import re
-import csv
 import sys
-import argparse
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
-from playwright.async_api import async_playwright, BrowserContext, Page
+
+from playwright.async_api import BrowserContext, Page, async_playwright
 
 # Windows console defaults to cp1252 and will crash on emoji prints.
 # Force UTF-8 on stdout/stderr if the stream supports reconfigure().
@@ -106,7 +106,7 @@ USER_AGENT = (
 def _norm_host(host: str) -> str:
     return host.lower().lstrip(".").removeprefix("www.")
 
-def normalise_url(base: str, href: Optional[str]) -> Optional[str]:
+def normalise_url(base: str, href: str | None) -> str | None:
     if not href:
         return None
     href = href.strip()
@@ -276,7 +276,7 @@ def _get(d: dict, *keys) -> str:
         return str(v)
     return ""
 
-def _money_to_int(s: str) -> Optional[int]:
+def _money_to_int(s: str) -> int | None:
     """Parse '$1,450', '1450.00', '1,450 USD' → 1450. Returns None on failure."""
     if not s:
         return None
@@ -325,7 +325,7 @@ def _parse_sightmap_payload(body, url: str) -> list[dict]:
         fp = fp_by_id.get(str(u.get("floor_plan_id") or ""), {})
 
         price = u.get("price")
-        price_i: Optional[int] = None
+        price_i: int | None = None
         if isinstance(price, (int, float)) and price > 0:
             price_i = int(price)
         else:
@@ -815,7 +815,7 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
             break
 
     if not cards:
-        print(f"  ⚠ DOM: no card containers found")
+        print("  ⚠ DOM: no card containers found")
         return units
 
     print(f"  ✓ DOM: {len(cards)} cards matched with selector '{matched_sel}'")
@@ -1347,7 +1347,7 @@ async def probe_entrata_api(page: Page, base_url: str) -> list[dict]:
 
 # ── Main scraper ───────────────────────────────────────────────────────────────
 
-def _proxy_config(proxy: Optional[str]) -> Optional[dict]:
+def _proxy_config(proxy: str | None) -> dict | None:
     if not proxy:
         return None
     # Allow bare "host:port" by defaulting to http scheme.
@@ -1379,7 +1379,7 @@ async def _goto_robust(page: Page, url: str, timeout_ms: int = 45000) -> None:
         pass
     await asyncio.sleep(1.0)
 
-async def scrape(base_url: str, proxy: Optional[str] = None) -> dict:
+async def scrape(base_url: str, proxy: str | None = None) -> dict:
     # Normalize http → https.  Nearly all property sites support HTTPS;
     # plain HTTP causes redirect stalls (3-5s wasted per page) or hangs
     # entirely when the server forces HSTS but the redirect chain is slow.
@@ -1387,7 +1387,7 @@ async def scrape(base_url: str, proxy: Optional[str] = None) -> dict:
         base_url = "https://" + base_url[len("http://"):]
 
     results = {
-        "scraped_at":             datetime.now(timezone.utc).isoformat(),
+        "scraped_at":             datetime.now(UTC).isoformat(),
         "property_name":          urllib.parse.urlparse(base_url).netloc or base_url,
         "base_url":               base_url,
         "links_found":            [],
@@ -1475,7 +1475,7 @@ async def scrape(base_url: str, proxy: Optional[str] = None) -> dict:
                 print(f"  ⚠ Property metadata extraction error: {e}")
                 results["property_metadata"] = {}
 
-            all_hrefs: list[Optional[str]] = []
+            all_hrefs: list[str | None] = []
             try:
                 all_hrefs = await page.eval_on_selector_all(
                     "a[href]", "els => els.map(e => e.getAttribute('href'))"
@@ -1614,7 +1614,7 @@ async def scrape(base_url: str, proxy: Optional[str] = None) -> dict:
                         for p in ("/floor-plans", "/floorplans", "/apartments")
                     ]
                     landed = False
-                    redirect_url: Optional[str] = None
+                    redirect_url: str | None = None
                     for fp_url in fp_candidates:
                         try:
                             await _goto_robust(page, fp_url, timeout_ms=45000)
@@ -1643,7 +1643,7 @@ async def scrape(base_url: str, proxy: Optional[str] = None) -> dict:
                     # following it — it may have the actual unit data.
                     if not landed and redirect_url:
                         try:
-                            print(f"  🔀 Following redirect to leasing portal")
+                            print("  🔀 Following redirect to leasing portal")
                             await _goto_robust(page, redirect_url, timeout_ms=45000)
                             await asyncio.sleep(2.0)
                             landed = True
@@ -1756,9 +1756,9 @@ async def scrape(base_url: str, proxy: Optional[str] = None) -> dict:
                             print(f"  ⚠ Portal probe error: {e}")
 
                 if not units:
-                    print(f"  ⚠ ALL TIERS FAILED — no units extracted. "
-                          f"Check raw_api/ for captured responses "
-                          f"or add DOM selectors for this site.")
+                    print("  ⚠ ALL TIERS FAILED — no units extracted. "
+                          "Check raw_api/ for captured responses "
+                          "or add DOM selectors for this site.")
                     results["extraction_tier_used"] = "FAILED"
 
             # Update with any blobs added during extraction probes.
@@ -1824,7 +1824,7 @@ def save_results(results: dict, output_dir: Path):
     print(f"\n{'='*65}")
     print(f"  📄 JSON: {json_path}")
     print(f"  📊 CSV:  {csv_path}")
-    print(f"\n  ── SUMMARY ──────────────────────────────────────────────")
+    print("\n  ── SUMMARY ──────────────────────────────────────────────")
     print(f"  Property:    {results['property_name']}")
     print(f"  Scraped at:  {results['scraped_at']}")
     print(f"  Tier used:   {results['extraction_tier_used']}")
@@ -1838,7 +1838,7 @@ def save_results(results: dict, output_dir: Path):
             print(f"    - {e}")
 
     if units:
-        print(f"\n  ── UNITS / FLOOR PLANS ──────────────────────────────────")
+        print("\n  ── UNITS / FLOOR PLANS ──────────────────────────────────")
         print(f"  {'Plan Name':30s} {'Type':12s} {'Sqft':12s} {'Rent':22s} {'Avail':6s} {'Date'}")
         print(f"  {'─'*30} {'─'*12} {'─'*12} {'─'*22} {'─'*6} {'─'*12}")
         for u in units:
@@ -1862,7 +1862,7 @@ def main():
     args = parser.parse_args()
 
     print(f"\n{'='*65}")
-    print(f"  Property Scraper")
+    print("  Property Scraper")
     print(f"  Target: {args.url}")
     print(f"  Proxy:  {args.proxy or 'None (direct)'}")
     print(f"{'='*65}")

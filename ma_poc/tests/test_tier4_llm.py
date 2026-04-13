@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -71,7 +70,7 @@ async def test_429_backoff_retries(monkeypatch: pytest.MonkeyPatch, rentcafe_htm
     monkeypatch.setattr(tier4_llm, "_get_provider", lambda: provider)
 
     # First call raises, so tier4 returns FAILED with the error message
-    result = await tier4_llm.extract(_session(rentcafe_html))
+    await tier4_llm.extract(_session(rentcafe_html))
     # The retry logic is now inside the provider; tier4 sees the exception on first attempt
     assert provider.complete.await_count == 1
 

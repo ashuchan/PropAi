@@ -14,14 +14,13 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Optional
+from typing import Any
 
 from bs4 import BeautifulSoup
 
 from extraction.confidence import composite, low_confidence_fields
 from models.extraction_result import ExtractionResult, ExtractionStatus, ExtractionTier
 from scraper.browser import BrowserSession
-
 
 SYSTEM_PROMPT = """You are a real estate data extraction agent.
 Extract all apartment unit listings from the provided HTML.
@@ -86,7 +85,7 @@ def prepare_html(html: str) -> tuple[str, bool]:
     return focused[:MAX_HTML_CHARS], True
 
 
-def _parse_units(content: str) -> tuple[list[dict[str, Any]], Optional[str]]:
+def _parse_units(content: str) -> tuple[list[dict[str, Any]], str | None]:
     try:
         payload = json.loads(content)
     except json.JSONDecodeError as exc:
@@ -141,7 +140,7 @@ async def extract(session: BrowserSession) -> ExtractionResult:
         )
 
     prompt_text, truncated = prepare_html(session.html)
-    truncation_note: Optional[str] = "html_truncated" if truncated else None
+    truncation_note: str | None = "html_truncated" if truncated else None
 
     try:
         content = await provider.complete(SYSTEM_PROMPT, prompt_text)
