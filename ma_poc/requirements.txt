@@ -1,0 +1,26 @@
+# Windows ARM64 compatible — using >= to get the latest binary wheel available.
+# CLAUDE.md originally specified exact pins; relaxed here because many C-extension
+# packages lack Windows ARM64 wheels at older versions.
+playwright>=1.55.0
+aiofiles>=23.2.0
+openai>=1.30.0
+anthropic>=0.26.0
+extruct>=0.17.0
+lxml>=5.2.0
+beautifulsoup4>=4.12.3
+httpx>=0.27.0
+tenacity>=8.3.0
+pydantic>=2.7.0
+pyyaml>=6.0.1
+python-dotenv>=1.0.1
+pytest>=8.2.0
+pytest-asyncio>=0.23.6
+pytest-mock>=3.14.0
+respx>=0.21.0
+pytest-cov>=5.0.0
+ruff>=0.4.7
+mypy>=1.10.0
+structlog>=24.2.0
+rich>=13.7.1
+# timezonefinder dropped — no ARM64 binary wheel. Timezone derivation falls
+# back to state-based approximation in scraper/fleet.py.

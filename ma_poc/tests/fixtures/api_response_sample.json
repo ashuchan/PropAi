@@ -1,0 +1,18 @@
+{
+  "floorplans": [
+    {
+      "name": "1 Bed",
+      "units": [
+        {"unitNumber": "501", "rent": 2750, "availability": "available", "squareFeet": 720, "bedBath": "1/1"},
+        {"unitNumber": "502", "rent": 2825, "availability": "available", "squareFeet": 740, "bedBath": "1/1"},
+        {"unitNumber": "503", "rent": 2900, "availability": "leased",    "squareFeet": 760, "bedBath": "1/1"}
+      ]
+    },
+    {
+      "name": "2 Bed",
+      "units": [
+        {"unitNumber": "601", "rent": 4100, "availability": "available", "squareFeet": 1050, "bedBath": "2/2"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+[project]
+name = "ma_poc"
+version = "0.1.0"
+description = "MA Rent Intelligence Platform — Phase A POC"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+ignore_missing_imports = false
+warn_unused_ignores = false
+exclude = ["tests/fixtures/.*"]
+
+[[tool.mypy.overrides]]
+module = [
+    "playwright.*",
+    "extruct.*",
+    "timezonefinder.*",
+    "respx.*",
+    "aiofiles.*",
+    "lxml.*",
+    "bs4.*",
+]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B"]
