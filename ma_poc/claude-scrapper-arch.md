@@ -1,8 +1,69 @@
-# Self-Learning Scrape Profile — Implementation Instructions
+# Self-Learning Scrape Profile — Architecture & Implementation Status
 
-## Mission
+## Implementation Status (2026-04-14)
 
-Implement the self-learning scrape profile architecture into the existing MA POC codebase. The system teaches itself how to scrape each property by using LLM extraction (Tier 4) as a one-time teacher — extracting data AND generating reusable hints (CSS selectors, API URL paths, JSON field mappings) that are stored in a per-property profile. On subsequent runs the profile drives deterministic extraction without LLM calls.
+**All phases below are IMPLEMENTED.** The original instructions below served as the spec. Key changes from the original spec:
+
+### What's built (beyond the original spec)
+
+1. **7-Phase Pipeline** — The `scrape()` function in `entrata.py` was restructured from the original linear tier cascade into a 7-phase pipeline with exploratory link navigation and per-page network observation. See `scripts/CLAUDE.md` for the full pipeline documentation.
+
+2. **LLM-Assisted API Discovery (Phase 5)** — Instead of only using LLM as a fallback extractor (send whole page), LLM now analyzes individual API responses one at a time (`services/llm_extractor.py:analyze_api_with_llm()`). It classifies each API as units/noise and provides `json_paths` + `response_envelope` for deterministic replay.
+
+3. **Per-Property API Blocklist** — `BlockedEndpoint` model added to `ScrapeProfile`. When LLM identifies an API response as noise (chatbot config, analytics, etc.), the URL is saved to the profile's blocklist and filtered out on future runs.
+
+4. **LLM Field Mapping Replay** — `LlmFieldMapping` model added. LLM-generated json_paths mappings are saved to profiles and replayed deterministically via `apply_saved_mapping()` on subsequent runs — no LLM call needed.
+
+5. **Targeted DOM Analysis** — `analyze_dom_with_llm()` sends specific DOM sections (not full pages) to LLM using `config/prompts/dom_analysis.txt`. Returns units AND CSS selectors for profile persistence.
+
+6. **Availability Defaults** — If units/floor plans are found but have no availability data, status defaults to `AVAILABLE` and date to today.
+
+7. **Explored Link Tracking** — `NavigationConfig.explored_links` records links that had no data, skipping them on future runs. `availability_links` records links that worked.
+
+### Updated model schema
+
+The `ScrapeProfile` model (`models/scrape_profile.py`) now includes:
+- `BlockedEndpoint` — per-property API noise blocklist (url_pattern, reason, attempts)
+- `LlmFieldMapping` — deterministic replay mapping (api_url_pattern, json_paths, response_envelope, success_count)
+- `ApiHints.blocked_endpoints: list[BlockedEndpoint]`
+- `ApiHints.llm_field_mappings: list[LlmFieldMapping]`
+- `NavigationConfig.availability_links: list[str]`
+- `NavigationConfig.explored_links: list[str]`
+- `DomHints.availability_page_sections: list[str]`
+- `LlmArtifacts.last_api_analysis_results: dict[str, str]`
+
+### New prompt templates
+
+- `config/prompts/api_analysis.txt` — targeted single-API analysis (Phase 5)
+- `config/prompts/dom_analysis.txt` — targeted DOM section analysis (Phase 6a)
+- `config/prompts/tier4_extraction.txt` — legacy broad extraction (Phase 6b fallback)
+
+### New functions in services/llm_extractor.py
+
+- `analyze_api_with_llm()` — single API response → (units, mapping, is_noise)
+- `analyze_dom_with_llm()` — DOM section → (units, css_selectors)
+- `apply_saved_mapping()` — deterministic extraction from saved LlmFieldMapping
+
+### New functions in services/profile_updater.py
+
+- `update_profile_blocklist()` — add/update blocked endpoints
+- `save_llm_field_mapping()` — save/update LLM field mappings
+- `record_explored_link()` — track links with/without data
+
+### New helper functions in scripts/entrata.py
+
+- `filter_network_noise()` — 3-layer filtering (global + profile + content-type)
+- `prioritize_links()` — sort links by profile knowledge → anchor text → URL keywords
+- `try_known_patterns()` — profile mappings → known endpoints → global parser
+- `explore_link_with_observation()` — navigate + observe per-page network calls
+- `apply_availability_defaults()` — set AVAILABLE + today when missing
+- `_extract_dom_sections_with_rent_signals()` — find DOM sections for targeted LLM
+
+---
+
+## Original Mission
+
+Implement the self-learning scrape profile architecture into the existing MA POC codebase. The system teaches itself how to scrape each property by using LLM extraction as a one-time teacher — extracting data AND generating reusable hints (CSS selectors, API URL paths, JSON field mappings) that are stored in a per-property profile. On subsequent runs the profile drives deterministic extraction without LLM calls.
 
 **Cardinal rule:** This is an enhancement to the existing pipeline, not a rewrite. Every new module must integrate cleanly with the existing `daily_runner.py` → `entrata.py` → templates flow. Reuse existing functions. Do not duplicate logic that already works.
 

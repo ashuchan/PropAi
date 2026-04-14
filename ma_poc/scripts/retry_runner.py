@@ -56,6 +56,13 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+# Load .env early so API keys are available for LLM providers.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # Force UTF-8 stdout on Windows.
 for _stream in (sys.stdout, sys.stderr):
     try:
@@ -64,8 +71,10 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 _HERE = Path(__file__).resolve().parent
-if str(_HERE) not in sys.path:
-    sys.path.insert(0, str(_HERE))
+_PROJECT_ROOT = _HERE.parent  # ma_poc/
+for _p in (_HERE, _PROJECT_ROOT):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 import validation as V  # noqa: E402
 from concurrency import SystemResources  # noqa: E402
@@ -92,6 +101,14 @@ from scrape_properties import (  # noqa: E402
     transform_units_from_scrape,
 )
 from state_store import StateStore  # noqa: E402
+
+try:
+    from services.profile_store import ProfileStore
+    from services.profile_updater import update_profile_after_extraction
+    from services.drift_detector import detect_drift, apply_drift_demotion
+    _PROFILES_AVAILABLE = True
+except ImportError:
+    _PROFILES_AVAILABLE = False
 
 log = logging.getLogger("retry_runner")
 
@@ -386,8 +403,16 @@ async def run_retry(
                    "disappeared": 0, "carried_forward": 0}
     carry_forward_count = 0
 
+    profile_store = None
+    if _PROFILES_AVAILABLE:
+        try:
+            profile_store = ProfileStore(Path("config/profiles"))
+        except Exception as e:
+            log.warning(f"Profile store unavailable: {e}")
+
     # ── 6a. Pre-filter: separate scrapeable from immediately-skippable ──
     scrapeable: list[tuple[int, dict, Any, str]] = []  # (orig_idx, row, ident, url)
+    seen_cids: set[str] = set()  # deduplicate rows with same canonical_id
 
     for orig_idx, row, ident in eligible:
         url = csv_get(row, *WEBSITE_KEYS)
@@ -419,9 +444,32 @@ async def run_retry(
             })
             continue
 
+        if cid in seen_cids:
+            log.warning(f"  ↳ skipping duplicate canonical_id {cid} at row {orig_idx}")
+            _append_ledger(ledger_path, {
+                "canonical_id": cid, "row_index": orig_idx,
+                "status": "SKIPPED",
+                "reason": "DUPLICATE_CANONICAL_ID",
+                "retry_mode": mode,
+                "timestamp": datetime.now(UTC).isoformat(),
+            })
+            continue
+        seen_cids.add(cid)
+
         scrapeable.append((orig_idx, row, ident, url or ""))
 
-    # ── 6b. Concurrent scraping phase (thread pool — true parallelism) ──
+    # ── 6b. Load profiles for each property (non-fatal) ──────────────────
+    scrape_profiles: list[Any] = [None] * len(scrapeable)
+    if profile_store is not None:
+        for si, (orig_idx, row, ident, url) in enumerate(scrapeable):
+            cid = ident.canonical_id
+            if cid:
+                try:
+                    scrape_profiles[si] = profile_store.load(cid)
+                except Exception:
+                    pass
+
+    # ── 6c. Concurrent scraping phase (thread pool — true parallelism) ──
     sysres = SystemResources.detect()
     log.info(f"System resources: {sysres.summary()}")
     pool_size = sysres.optimal_pool_size()
@@ -435,9 +483,15 @@ async def run_retry(
     ) as executor:
         futures = [
             loop.run_in_executor(
-                executor, _scrape_in_thread, item[3], proxy, scrape_timeout_s
+                executor,
+                _scrape_in_thread,
+                item[3],          # url
+                proxy,
+                scrape_timeout_s,
+                item[2].canonical_id or "unknown",  # property_id for LLM logging
+                scrape_profiles[si],                 # profile for tier-skip routing
             )
-            for item in scrapeable
+            for si, item in enumerate(scrapeable)
         ]
         scrape_results_raw = await asyncio.gather(*futures, return_exceptions=True)
 
@@ -598,6 +652,42 @@ async def run_retry(
                 canonical_id=cid, row_index=orig_idx,
             ))
 
+        # ── Profile update (non-fatal) ────────────────────────────────
+        if profile_store is not None and _PROFILES_AVAILABLE:
+            try:
+                prof = profile_store.load(cid)
+                if prof is None:
+                    prof = profile_store.bootstrap_from_meta(
+                        cid, dict(row), url or "",
+                    )
+                prof = update_profile_after_extraction(
+                    prof, scrape_result, len(public_units), profile_store,
+                )
+                drift_detected, drift_reasons = detect_drift(
+                    prof, len(public_units), scrape_result,
+                )
+                if drift_detected:
+                    prof = apply_drift_demotion(prof, drift_reasons)
+                    profile_store.save(prof)
+                    per_prop_issues.append(V.warning(
+                        "PROFILE_DRIFT_DETECTED",
+                        f"drift detected: {'; '.join(drift_reasons)}",
+                        canonical_id=cid, row_index=orig_idx,
+                    ))
+            except Exception as e:
+                log.warning(f"  profile update failed for {cid}: {e}")
+
+        # ── Collect LLM interaction records for cost accounting ────────
+        llm_interactions: list[dict] = scrape_result.get("_llm_interactions") or []
+        if llm_interactions:
+            try:
+                from llm.interaction_logger import write_property_report
+                write_property_report(cid, llm_interactions, run_dir)
+                log.info(f"  LLM interactions: {len(llm_interactions)} call(s), "
+                         f"total cost=${sum(i.get('cost_usd', 0) for i in llm_interactions):.5f}")
+            except Exception as e:
+                log.warning(f"  could not write LLM report for {cid}: {e}")
+
         # ── Save raw API bodies ───────────────────────────────────────
         raw = scrape_result.get("_raw_api_responses")
         if raw:
@@ -610,6 +700,7 @@ async def run_retry(
 
         # ── Build record ──────────────────────────────────────────────
         state_snapshot = state.get_property(cid)
+        rec: dict | None = None
         try:
             rec = build_property_record(
                 row, ident, scrape_result, public_units,
@@ -627,6 +718,18 @@ async def run_retry(
                 "row_index": orig_idx, "canonical_id": cid,
                 "reason": f"build_property_record exception: {e}",
             })
+
+        # ── Per-property scrape report (markdown) ────────────────────
+        try:
+            from scrape_report import generate_property_report
+            rpt_path = generate_property_report(
+                scrape_result, rec, unit_diff,
+                per_prop_issues, run_dir, cid, run_date,
+            )
+            if rpt_path:
+                log.info(f"  scrape report: {rpt_path.name}")
+        except Exception as e:
+            log.warning(f"  could not write scrape report for {cid}: {e}")
 
         # Track failed properties.
         if scrape_failed and not carry_forward_used:

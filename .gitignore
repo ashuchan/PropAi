@@ -214,3 +214,5 @@ ma_poc/frontend/node_modules/
 ma_poc/frontend/api/node_modules/
 ma_poc/services/node_modules/
 
+config/*
+data/*

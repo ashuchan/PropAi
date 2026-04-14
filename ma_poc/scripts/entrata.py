@@ -39,8 +39,25 @@ import sys
 import urllib.parse
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
+# Load .env early so API keys are available before any LLM provider is
+# instantiated (needed when Tier 6/7 LLM calls are triggered).
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from playwright.async_api import BrowserContext, Page, async_playwright
+
+# Make ma_poc/ root importable so lazy imports like `from services.X` and
+# `from llm.factory` work regardless of which directory the script is invoked from.
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _SCRIPT_DIR.parent  # ma_poc/
+for _p in (_SCRIPT_DIR, _PROJECT_ROOT):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 # Windows console defaults to cp1252 and will crash on emoji prints.
 # Force UTF-8 on stdout/stderr if the stream supports reconfigure().
@@ -82,6 +99,7 @@ ENTRATA_PRIORITY_PATHS = [
     "/apartments",
     "/availability",
     "/rent",
+    "/conventional",        # Entrata "conventional" lease page
 ]
 
 # Buttons to click to reveal unit data
@@ -93,6 +111,13 @@ EXPAND_BUTTON_PATTERNS = [
     r"floor\s+plan",
     r"show\s+more",
     r"view\s+all",
+    r"view\s+availability",
+    r"see\s+availability",
+    r"check\s+availability",
+    r"view\s+floor",
+    r"see\s+floor",
+    r"view\s+pricing",
+    r"see\s+pricing",
 ]
 
 USER_AGENT = (
@@ -130,8 +155,68 @@ def is_property_link(url: str) -> bool:
     keywords = [
         "floor-plan", "floorplan", "apartment", "unit", "bedroom",
         "studio", "availability", "lease", "rent", "plan",
+        "conventional", "pricing", "available",
     ]
     return any(k in path for k in keywords)
+
+
+# Links whose anchor text suggests they lead to unit/availability data.
+# Used for anchor-text-based discovery (complements URL-path matching).
+_AVAILABILITY_ANCHOR_RE = re.compile(
+    r"view\s+availab|see\s+availab|check\s+availab"
+    r"|view\s+floor|see\s+floor|floor\s*plan"
+    r"|view\s+pricing|see\s+pricing"
+    r"|view\s+unit|see\s+unit|view\s+apartment"
+    r"|availab\w*\s+unit|available\s+apartment"
+    r"|view\s+all\s+unit|see\s+all\s+unit",
+    re.IGNORECASE,
+)
+
+
+# Links to exclude from the fallback exploratory crawl.
+# These pages never contain unit/availability data.
+_NON_PROPERTY_PATH_RE = re.compile(
+    r"/(?:"
+    r"contact|help|support|faq|about|career|job|press|news|blog|media"
+    r"|privacy|terms|legal|policy|cookie|accessibility|sitemap"
+    r"|login|sign-?in|register|account|profile|password|reset"
+    r"|gallery|photo|video|virtual-tour|tour|3d"
+    r"|amenit|neighborhood|area|location|direction|map|nearby"
+    r"|resident|portal|pay|maintenance|apply|application"
+    r"|review|testimonial|team|staff|management"
+    r"|pet|parking|storage|gym|pool|fitness"
+    r"|schedule|appointment|call|request"
+    r"|thank|confirm|success|error|404|403"
+    r"|wp-content|wp-admin|wp-json|assets|static|cdn"
+    r"|\.pdf|\.jpg|\.png|\.svg|\.gif|\.css|\.js"
+    r")(?:/|$|\?|#)",
+    re.IGNORECASE,
+)
+
+
+def is_exploratory_candidate(url: str, base_url: str) -> bool:
+    """Return True if a link is worth visiting during fallback exploratory crawl.
+
+    Accepts same-host links that are NOT obviously non-property pages.
+    This is intentionally permissive — the fallback only runs when all
+    targeted crawling has failed, so casting a wider net is appropriate.
+    """
+    parsed = urllib.parse.urlparse(url)
+    base_parsed = urllib.parse.urlparse(base_url)
+    # Must be same host.
+    if _norm_host(parsed.netloc) != _norm_host(base_parsed.netloc):
+        return False
+    path = parsed.path.lower()
+    # Skip homepage (already visited).
+    if path in ("", "/", base_parsed.path.lower()):
+        return False
+    # Skip links already matched by is_property_link (already in the queue).
+    if is_property_link(url):
+        return False
+    # Reject known non-property pages.
+    if _NON_PROPERTY_PATH_RE.search(path):
+        return False
+    return True
 
 # Hosts whose API responses are never apartment data — these get captured
 # because their URLs happen to match broad patterns like "/api/" or "/units".
@@ -171,8 +256,9 @@ _FALSE_POSITIVE_PATH_FRAGMENTS = {
     "/gtag/",
     "/pixel",
     "/beacon",
-    # Entrata CMS widgets (directions, gallery, schedule-a-tour, chat)
-    "/apartments/module/widgets/",
+    # NOTE: /apartments/module/widgets/ is NOT blocked — some widget responses
+    # (floorPlanWidget, availabilityWidget) contain real floor plan data.
+    # Non-property widgets are filtered in _filter_entrata_widget_response().
     # Entrata chat/messaging widget endpoints
     "/widget/inbox_members",
     "/widget/contact",
@@ -215,6 +301,50 @@ def looks_like_availability_api(url: str) -> bool:
     return any(p.lower() in url_lower for p in ENTRATA_API_PATTERNS)
 
 
+# Entrata widget types that contain real floor plan / availability data.
+_ENTRATA_PROPERTY_WIDGET_TYPES = {"floor_plans", "availability"}
+
+# Entrata widget types that are known to NOT contain unit data.
+_ENTRATA_NOISE_WIDGET_TYPES = {
+    "custom", "directions", "events", "specials", "resident_login",
+    "gallery", "contact", "reviews", "social", "blog", "amenities",
+}
+
+
+def _filter_entrata_widget_response(body: dict) -> dict | None:
+    """Filter Entrata /Apartments/module/widgets/ responses.
+
+    Returns the body unchanged if it contains floor plan / availability data,
+    or None if it's a non-property widget (directions, gallery, etc.).
+    """
+    widget_name = body.get("widget_name", "")
+    if widget_name in _ENTRATA_NOISE_WIDGET_TYPES:
+        return None
+    # Check if widget_data.content actually contains floor plan data
+    # (not just layout config). The floor_plans widget has a nested
+    # floor_plans list; the availability widget usually only has UI config.
+    widget_data = body.get("widget_data", {})
+    content = widget_data.get("content", {})
+    if isinstance(content, dict):
+        fp_section = content.get("floor_plans", {})
+        if isinstance(fp_section, dict):
+            fp_list = fp_section.get("floor_plans", [])
+            if isinstance(fp_list, list) and fp_list:
+                return body
+        # Check for availability section with actual unit data
+        avail_section = content.get("availability", {})
+        if isinstance(avail_section, dict):
+            avail_units = avail_section.get("units", [])
+            if isinstance(avail_units, list) and avail_units:
+                return body
+    # Unknown widget with no recognisable floor plan data.
+    if widget_name not in _ENTRATA_PROPERTY_WIDGET_TYPES:
+        return None
+    # Known property widget type but no data — still keep it for
+    # the parser to attempt (it might have a different structure).
+    return body
+
+
 def _response_looks_like_units(body) -> bool:
     """Quick heuristic: does this API response body contain unit/floorplan data?
 
@@ -223,11 +353,13 @@ def _response_looks_like_units(body) -> bool:
     we skip sub-page crawling.
     """
     _SIGNAL_KEYS = {
-        "rent", "minRent", "maxRent", "price", "askingRent", "monthlyRent",
+        "rent", "minRent", "maxRent", "min_rent", "max_rent",
+        "price", "askingRent", "monthlyRent",
         "baseRent", "base_rent", "display_price", "startingPrice",
         "bedrooms", "beds", "bedRooms", "sqft", "squareFeet", "square_feet",
+        "square_footage", "no_of_bedroom", "no_of_bathroom",
         "unitNumber", "unit_number", "unitId", "unit_id",
-        "floorPlanName", "floor_plan_name", "floorplan_name",
+        "floorPlanName", "floor_plan_name", "floorplan_name", "floorplan-name",
         "availableDate", "available_date", "availableCount",
     }
 
@@ -429,17 +561,20 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
                 continue
 
             name      = _get(item, "floorPlanName","floor_plan_name","name","planName",
-                              "unitType","unit_type","title","FloorPlanName","floorplan_name")
-            rent_lo   = _get(item, "minRent","rent_min","startingFrom","starting_rent",
+                              "unitType","unit_type","title","FloorPlanName","floorplan_name",
+                              "floorplan-name")
+            rent_lo   = _get(item, "minRent","rent_min","min_rent","startingFrom","starting_rent",
                               "askingRent","rent","minPrice","startingPrice","MinRent",
                               "price","base_rent","baseRent","display_price","displayPrice",
                               "monthlyRent","monthly_rent")
-            rent_hi   = _get(item, "maxRent","rent_max","maxAskingRent","endingAt","MaxRent",
+            rent_hi   = _get(item, "maxRent","rent_max","max_rent","maxAskingRent","endingAt","MaxRent",
                               "max_price","maxPrice","price_max")
             beds      = _get(item, "bedrooms","beds","bedroom_count","numBedrooms",
-                              "bd","Bedrooms","BedroomCount","bedroomCount","num_bedrooms")
+                              "bd","Bedrooms","BedroomCount","bedroomCount","num_bedrooms",
+                              "no_of_bedroom","no_of_bedrooms")
             baths     = _get(item, "bathrooms","baths","bathroom_count","numBathrooms",
-                              "ba","Bathrooms","BathroomCount","bathroomCount","num_bathrooms")
+                              "ba","Bathrooms","BathroomCount","bathroomCount","num_bathrooms",
+                              "no_of_bathroom","no_of_bathrooms")
             sqft      = _get(item, "sqft","squareFeet","square_feet","minSqft",
                               "size","SquareFeet","Sqft","sqftMin","area","square_footage",
                               "squareFootage","display_area","displayArea")
@@ -1379,12 +1514,330 @@ async def _goto_robust(page: Page, url: str, timeout_ms: int = 45000) -> None:
         pass
     await asyncio.sleep(1.0)
 
-async def scrape(base_url: str, proxy: str | None = None) -> dict:
+# ── Helper functions for the 7-phase pipeline ────────────────────────────────
+
+
+def filter_network_noise(
+    api_responses: list[dict],
+    profile: Any | None = None,
+) -> list[dict]:
+    """Filter API responses through three layers: global blocklist, profile
+    blocklist, and unit-signal scoring. Returns filtered + sorted responses.
+    """
+    # Layer 1+3 are already handled by looks_like_availability_api() in the
+    # response handler. Here we apply the profile-specific blocklist.
+    if profile is None:
+        return api_responses
+
+    blocked_patterns: set[str] = set()
+    api_hints = getattr(profile, "api_hints", None)
+    if api_hints:
+        for ep in getattr(api_hints, "blocked_endpoints", []):
+            blocked_patterns.add(ep.url_pattern)
+
+    if not blocked_patterns:
+        return api_responses
+
+    filtered = []
+    for resp in api_responses:
+        url = resp.get("url", "")
+        if url in blocked_patterns:
+            print(f"  -- Profile blocklist: skipping {url[:80]}")
+            continue
+        # Also check if the URL matches any blocked pattern as a substring
+        blocked = False
+        for pattern in blocked_patterns:
+            if pattern in url:
+                print(f"  -- Profile blocklist (substring): skipping {url[:80]}")
+                blocked = True
+                break
+        if not blocked:
+            filtered.append(resp)
+
+    return filtered
+
+
+def prioritize_links(
+    internal_links: set[str],
+    anchor_text_links: list[str],
+    profile: Any | None = None,
+    base_url: str = "",
+) -> list[str]:
+    """Sort and deduplicate links by priority for exploration.
+
+    Priority order:
+    1. Profile winning_page_url and availability_links
+    2. Anchor text matches ("View Availability", etc.)
+    3. URL keyword matches (is_property_link())
+    4. Exploratory candidates
+    Excludes profile.navigation.explored_links that previously had no data.
+    """
+    # Gather links to skip (previously explored with no data)
+    skip_links: set[str] = set()
+    if profile is not None:
+        nav = getattr(profile, "navigation", None)
+        if nav:
+            skip_links.update(getattr(nav, "explored_links", []))
+
+    result: list[str] = []
+    seen: set[str] = set()
+
+    def _add(url: str) -> None:
+        if url and url not in seen and url not in skip_links:
+            seen.add(url)
+            result.append(url)
+
+    # Priority 1: Profile-learned URLs
+    if profile is not None:
+        nav = getattr(profile, "navigation", None)
+        if nav:
+            winning = getattr(nav, "winning_page_url", None)
+            if winning:
+                _add(winning)
+            for link in getattr(nav, "availability_links", []):
+                _add(link)
+            avail_path = getattr(nav, "availability_page_path", None)
+            if avail_path and base_url:
+                _add(base_url.rstrip("/") + avail_path)
+
+    # Priority 2: Anchor text matches
+    for link in anchor_text_links:
+        _add(link)
+
+    # Priority 3: Always-crawl priority paths
+    for path in ENTRATA_PRIORITY_PATHS:
+        url = base_url.rstrip("/") + path
+        _add(url)
+
+    # Priority 4: URL keyword matches from internal links
+    for link in sorted(internal_links):
+        if is_property_link(link):
+            _add(link)
+
+    # Priority 5: Exploratory candidates (cast wider net)
+    for link in sorted(internal_links):
+        if is_exploratory_candidate(link, base_url):
+            _add(link)
+
+    return result
+
+
+def try_known_patterns(
+    api_responses: list[dict],
+    profile: Any | None = None,
+) -> list[dict]:
+    """Try to extract units using profile-learned patterns before global patterns.
+
+    Checks:
+    1. Profile known_endpoints with json_paths
+    2. Profile llm_field_mappings (deterministic replay)
+    3. Falls back to global parse_api_responses()
+
+    Returns units list or [].
+    """
+    if not api_responses:
+        return []
+
+    captured_urls = {r.get("url", "") for r in api_responses}
+    captured_by_url = {r.get("url", ""): r for r in api_responses}
+
+    if profile is not None:
+        api_hints = getattr(profile, "api_hints", None)
+        if api_hints:
+            # Check LLM field mappings first (most specific, learned from past LLM calls)
+            for mapping in getattr(api_hints, "llm_field_mappings", []):
+                pattern = mapping.api_url_pattern
+                # Check if any captured URL matches this pattern
+                for url in captured_urls:
+                    if pattern in url or url in pattern:
+                        resp = captured_by_url.get(url)
+                        if resp and resp.get("body"):
+                            try:
+                                from services.llm_extractor import apply_saved_mapping
+                                units = apply_saved_mapping(
+                                    resp["body"],
+                                    {
+                                        "response_envelope": mapping.response_envelope,
+                                        "json_paths": mapping.json_paths,
+                                    },
+                                )
+                                if units:
+                                    print(f"  ✅ Profile LLM mapping matched: {url[:80]} → {len(units)} units")
+                                    return units
+                            except Exception as e:
+                                print(f"  ⚠ Profile mapping replay failed: {e}")
+
+            # Check known endpoints
+            for endpoint in getattr(api_hints, "known_endpoints", []):
+                pattern = endpoint.url_pattern
+                for url in captured_urls:
+                    if pattern in url or url in pattern:
+                        # Known endpoint found — try global parser on just this response
+                        resp = captured_by_url.get(url)
+                        if resp:
+                            units = parse_api_responses([resp])
+                            if units:
+                                print(f"  ✅ Profile known endpoint matched: {url[:80]} → {len(units)} units")
+                                return units
+
+    # Fall back to global pattern matching
+    units = parse_api_responses(api_responses)
+    return units
+
+
+def apply_availability_defaults(units: list[dict]) -> list[dict]:
+    """Apply default availability status and date when missing.
+
+    If units/floor plans are found but have no availability data:
+    - Set availability_status to "AVAILABLE"
+    - Set availability_date to today's date
+
+    All US multifamily property sites have an availability section,
+    so if we found the unit listed, it's available.
+    """
+    today_str = datetime.now(UTC).strftime("%Y-%m-%d")
+    for unit in units:
+        status = unit.get("availability_status")
+        if not status or status == "UNKNOWN":
+            unit["availability_status"] = "AVAILABLE"
+        date_val = unit.get("available_date") or unit.get("availability_date")
+        if not date_val:
+            unit["available_date"] = today_str
+            unit["availability_date"] = today_str
+    return units
+
+
+async def explore_link_with_observation(
+    page: Page,
+    link: str,
+    api_responses: list[dict],
+    base_url: str,
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Navigate to a link, observe new network calls, try extraction.
+
+    Returns:
+        (units_found, new_api_responses, llm_candidates)
+        - units_found: extracted units if any deterministic tier succeeded
+        - new_api_responses: API responses captured during this navigation
+        - llm_candidates: promising APIs that couldn't be parsed deterministically
+    """
+    api_count_before = len(api_responses)
+
+    try:
+        await _goto_robust(page, link, timeout_ms=20000)
+    except Exception as e:
+        err_str = str(e)
+        if "Timeout" in err_str or "timeout" in err_str:
+            print(f"  ⏱ TIMEOUT: {link[:70]}")
+        else:
+            print(f"  ⚠ Load error: {err_str[:120]}")
+        return [], [], []
+
+    await click_expanders(page)
+    await asyncio.sleep(1.5)
+
+    # Identify new API responses captured during this navigation
+    new_responses = api_responses[api_count_before:]
+    if new_responses:
+        print(f"    📡 {len(new_responses)} new API responses on this page")
+
+    llm_candidates: list[dict] = []
+
+    # Try deterministic extraction on new responses
+    if new_responses:
+        units = parse_api_responses(new_responses)
+        if units:
+            return units, new_responses, []
+        # Check for promising but unparsed responses
+        for resp in new_responses:
+            if _response_looks_like_units(resp.get("body")):
+                llm_candidates.append(resp)
+
+    # Try embedded JSON
+    embedded_blobs = await extract_embedded_json(page)
+    if embedded_blobs:
+        api_responses.extend(embedded_blobs)
+        units = parse_api_responses(embedded_blobs)
+        if units:
+            return units, new_responses + embedded_blobs, []
+
+    # Try JSON-LD
+    units = await parse_jsonld(page)
+    if units:
+        return units, new_responses, []
+
+    # Try DOM parsing
+    units = await parse_dom(page, base_url)
+    if units:
+        return units, new_responses, []
+
+    return [], new_responses, llm_candidates
+
+
+async def _extract_dom_sections_with_rent_signals(page: Page) -> list[str]:
+    """Find DOM sections that contain rent/unit signals for targeted LLM analysis.
+
+    Instead of sending the full page HTML, this identifies specific container
+    sections that have price patterns, then extracts just those sections.
+    Returns a list of HTML strings for the matching sections.
+    """
+    try:
+        sections = await page.evaluate("""() => {
+            const containers = document.querySelectorAll(
+                'section, [class*="floor"], [class*="plan"], [class*="unit"], ' +
+                '[class*="avail"], [class*="pricing"], [class*="rent"], ' +
+                'main, [role="main"], .content, #content'
+            );
+            const results = [];
+            const priceRe = /\\$\\d{3,}/;
+            for (const el of containers) {
+                const text = el.innerText || '';
+                if (priceRe.test(text) && text.length > 100 && text.length < 50000) {
+                    // Check it's not just a header with a single price
+                    const priceCount = (text.match(/\\$\\d{3,}/g) || []).length;
+                    if (priceCount >= 2) {
+                        results.push(el.outerHTML.substring(0, 20000));
+                    }
+                }
+                if (results.length >= 3) break;
+            }
+            return results;
+        }""")
+        return sections if isinstance(sections, list) else []
+    except Exception as e:
+        print(f"  ⚠ DOM section extraction error: {e}")
+        return []
+
+
+async def scrape(base_url: str, proxy: str | None = None,
+                 profile: Any | None = None) -> dict:
     # Normalize http → https.  Nearly all property sites support HTTPS;
     # plain HTTP causes redirect stalls (3-5s wasted per page) or hangs
     # entirely when the server forces HSTS but the redirect chain is slow.
     if base_url.startswith("http://"):
         base_url = "https://" + base_url[len("http://"):]
+
+    # ── Profile-guided routing ───────────────────────────────────────────
+    # Determines which tiers to skip based on past extraction success.
+    # HOT profiles jump directly to the known-good tier.
+    # WARM profiles try preferred tier first but cascade on failure.
+    # COLD / no profile → full cascade, no skipping.
+    skip_to_tier: int | None = None
+    run_full_cascade: bool = True
+    if profile is not None:
+        try:
+            from services.profile_router import route
+            decision = route(profile)
+            skip_to_tier = decision.skip_to_tier
+            run_full_cascade = decision.run_full_cascade
+            maturity = getattr(profile, "confidence", None)
+            mat_label = getattr(maturity, "maturity", "COLD") if maturity else "COLD"
+            if skip_to_tier:
+                print(f"  📋 Profile: maturity={mat_label}, "
+                      f"preferred_tier={skip_to_tier}, "
+                      f"cascade={'yes' if run_full_cascade else 'no'}")
+        except Exception as e:
+            print(f"  ⚠ Profile routing failed: {e}")
 
     results = {
         "scraped_at":             datetime.now(UTC).isoformat(),
@@ -1395,7 +1848,17 @@ async def scrape(base_url: str, proxy: str | None = None) -> dict:
         "api_calls_intercepted":  [],
         "units":                  [],
         "extraction_tier_used":   None,
+        "_winning_page_url":      None,   # URL/endpoint that actually produced units
         "errors":                 [],
+        # Populated by caller (daily_runner) so LLM interaction records can
+        # carry the canonical property ID for cost accounting.
+        "_property_id":           "unknown",
+        # Interaction records from Tier 6 (LLM) and Tier 7 (Vision) calls.
+        # Each element is a dict produced by llm.interaction_logger.make_interaction().
+        "_llm_interactions":      [],
+        # Profile routing metadata for debugging.
+        "_profile_skip_to_tier":  skip_to_tier,
+        "_profile_cascade":       run_full_cascade,
     }
 
     launch_args: dict = {
@@ -1425,7 +1888,11 @@ async def scrape(base_url: str, proxy: str | None = None) -> dict:
                     url = response.url
                     if not looks_like_availability_api(url):
                         return
-                    if url in seen_api_urls:
+                    # Entrata widget endpoints return multiple distinct responses
+                    # (one per widget type) on the same URL — don't deduplicate
+                    # those, otherwise we'd miss the floor_plans widget.
+                    is_widget_url = "/apartments/module/widgets/" in url.lower()
+                    if url in seen_api_urls and not is_widget_url:
                         return
                     ct = (response.headers or {}).get("content-type", "").lower()
                     if "json" not in ct and not url.lower().endswith(".json"):
@@ -1436,6 +1903,27 @@ async def scrape(base_url: str, proxy: str | None = None) -> dict:
                         return
                     body = await response.json()
                     seen_api_urls.add(url)
+
+                    # Filter Entrata widget responses: keep floor_plans /
+                    # availability widgets, discard noise (directions, gallery, etc.)
+                    if "/apartments/module/widgets/" in url.lower() and isinstance(body, dict):
+                        filtered = _filter_entrata_widget_response(body)
+                        if filtered is None:
+                            wn = body.get("widget_name", "?")
+                            print(f"  -- Widget skipped ({wn}): {url[:80]}")
+                            return
+                        # Extract the floor_plans list from the widget wrapper so the
+                        # generic parser can process it like a normal API response.
+                        widget_data = body.get("widget_data", {})
+                        content = widget_data.get("content", {})
+                        fp_list = content.get("floor_plans", {})
+                        if isinstance(fp_list, dict):
+                            fp_list = fp_list.get("floor_plans", [])
+                        if isinstance(fp_list, list) and fp_list:
+                            body = fp_list
+                            print(f"  📡 Widget floor_plans extracted: "
+                                  f"{len(fp_list)} floor plans from {url[:80]}")
+
                     api_responses.append({"url": url, "body": body})
                     # Log body shape so failed extractions can be diagnosed.
                     body_hint = ""
@@ -1476,14 +1964,34 @@ async def scrape(base_url: str, proxy: str | None = None) -> dict:
                 results["property_metadata"] = {}
 
             all_hrefs: list[str | None] = []
+            # Collect both href and visible text for each link so we can
+            # use anchor text to identify availability links whose URL
+            # paths don't contain recognisable keywords.
+            all_links_with_text: list[dict] = []
             try:
-                all_hrefs = await page.eval_on_selector_all(
-                    "a[href]", "els => els.map(e => e.getAttribute('href'))"
+                all_links_with_text = await page.eval_on_selector_all(
+                    "a[href]",
+                    """els => els.map(e => ({
+                        href: e.getAttribute('href'),
+                        text: (e.innerText || e.textContent || '').trim().substring(0, 120)
+                    }))""",
                 )
+                all_hrefs = [l["href"] for l in all_links_with_text]
             except Exception:
                 pass
 
             internal_links: set[str] = set()
+            # Links whose anchor text matches availability-related phrases —
+            # these are high-priority crawl targets regardless of URL path.
+            anchor_text_links: list[str] = []
+            for link_info in all_links_with_text:
+                url = normalise_url(base_url, link_info.get("href"))
+                if url:
+                    internal_links.add(url)
+                    text = link_info.get("text", "")
+                    if text and _AVAILABILITY_ANCHOR_RE.search(text):
+                        anchor_text_links.append(url)
+            # Also normalise any plain hrefs not yet covered.
             for href in all_hrefs:
                 url = normalise_url(base_url, href)
                 if url:
@@ -1494,110 +2002,40 @@ async def scrape(base_url: str, proxy: str | None = None) -> dict:
             for link in sorted(internal_links):
                 print(f"     {link}")
 
-            # ── 2. Early-exit check ──────────────────────────────────────
-            # If the homepage load already captured API responses that look
-            # like unit/floorplan data, skip sub-page crawling entirely.
-            # This avoids the #1 cause of 180s timeouts: BFS-crawling dozens
-            # of slow sub-pages when the data already arrived via XHR.
-            unit_api_urls = [
-                r["url"] for r in api_responses
-                if _response_looks_like_units(r["body"])
-            ]
-            homepage_has_unit_apis = len(unit_api_urls) > 0
-            if homepage_has_unit_apis:
-                print(f"\n  >> Early-exit: {len(unit_api_urls)} of {len(api_responses)} "
-                      f"API responses contain unit data — skipping sub-page crawl")
-                for u in unit_api_urls:
-                    print(f"     >> {u[:100]}")
-            elif api_responses:
-                print(f"\n  -- {len(api_responses)} API responses captured but none "
-                      f"contain unit signal keys — will crawl sub-pages")
+            # ════════════════════════════════════════════════════════════
+            # PHASE 2: Noise Filtering
+            # ════════════════════════════════════════════════════════════
+            # Apply profile-specific blocklist on top of global filters
+            filtered_responses = filter_network_noise(api_responses, profile)
+            if len(filtered_responses) < len(api_responses):
+                print(f"\n  🔇 Noise filter: {len(api_responses)} → {len(filtered_responses)} "
+                      f"API responses (profile blocklist removed {len(api_responses) - len(filtered_responses)})")
 
-            # ── 2b. Build crawl queue (skipped if early-exit) ────────────
-            crawl_queue: list[str] = []
-
-            if not homepage_has_unit_apis:
-                # Always-crawl Entrata paths first.
-                for path in ENTRATA_PRIORITY_PATHS:
-                    url = base_url.rstrip("/") + path
-                    if url not in crawl_queue:
-                        crawl_queue.insert(0, url)
-
-                # Property-looking links discovered from homepage.
-                for link in internal_links:
-                    if is_property_link(link) and link not in crawl_queue:
-                        crawl_queue.append(link)
-
-            print(f"\n  🏠 Pages to crawl (initial): {len(crawl_queue)}")
-            for link in crawl_queue:
-                print(f"     {link}")
-
-            # ── 3. Crawl each page (BFS-style, capped) ────────────────────
-            visited: set[str] = set()
-            idx = 0
-            while idx < len(crawl_queue) and len(visited) < MAX_CRAWL_PAGES:
-                target = crawl_queue[idx]
-                idx += 1
-                if target in visited:
-                    continue
-                visited.add(target)
-
-                print(f"\n{'─'*65}")
-                print(f"  STEP 3 [{len(visited)}/{MAX_CRAWL_PAGES}]: Crawling — {target}")
-                try:
-                    # Sub-pages get a shorter timeout (20s vs 45s for homepage)
-                    # to avoid burning time on slow internal pages when we
-                    # already have the homepage data.
-                    await _goto_robust(page, target, timeout_ms=20000)
-                except Exception as e:
-                    err_str = str(e)
-                    if "Timeout" in err_str or "timeout" in err_str:
-                        print(f"  ⏱ TIMEOUT loading sub-page ({target[:70]})")
-                    else:
-                        print(f"  ⚠ Load error ({target[:70]}): {err_str[:120]}")
-                    results["errors"].append(f"Load error {target}: {e}")
-                    continue
-
-                await click_expanders(page)
-                await asyncio.sleep(1.5)
-
-                # Discover sub-links on this page.
-                try:
-                    sub_hrefs = await page.eval_on_selector_all(
-                        "a[href]", "els => els.map(e => e.getAttribute('href'))"
-                    )
-                    for href in sub_hrefs:
-                        sub_url = normalise_url(base_url, href)
-                        if (sub_url and sub_url not in visited
-                                and is_property_link(sub_url)
-                                and sub_url not in crawl_queue):
-                            if len(crawl_queue) >= MAX_CRAWL_PAGES * 2:
-                                break
-                            print(f"    + Discovered sub-link: {sub_url}")
-                            crawl_queue.append(sub_url)
-                except Exception:
-                    pass
-
-                print(f"    API responses so far: {len(api_responses)}")
-
-            results["property_links_crawled"] = list(visited)
-            results["api_calls_intercepted"]  = [r["url"] for r in api_responses]
-
-            # ── 4. Extraction: Tier 1 — API ───────────────────────────────
+            # ════════════════════════════════════════════════════════════
+            # PHASE 3: Known Pattern Extraction
+            # ════════════════════════════════════════════════════════════
+            # Try profile-learned patterns, then global patterns, then
+            # embedded JSON, JSON-LD, DOM — all on homepage data.
             print(f"\n{'='*65}")
-            print(f"  STEP 4: Extraction — {len(api_responses)} API responses captured")
+            print(f"  PHASE 3: Known Pattern Extraction — {len(filtered_responses)} API responses")
             print(f"{'='*65}")
 
-            units = parse_api_responses(api_responses)
+            units = try_known_patterns(filtered_responses, profile)
             if units:
-                print(f"  ✅ TIER 1 (API Interception): {len(units)} units/floor plans")
-                results["extraction_tier_used"] = "TIER_1_API"
-            else:
-                print("  ↳ Tier 1: no units from API")
+                tier_label = "TIER_1_API"
+                # Check if it came from a profile mapping
+                if profile is not None:
+                    api_hints = getattr(profile, "api_hints", None)
+                    if api_hints and getattr(api_hints, "llm_field_mappings", []):
+                        tier_label = "TIER_1_PROFILE_MAPPING"
+                print(f"  ✅ {tier_label}: {len(units)} units/floor plans")
+                results["extraction_tier_used"] = tier_label
+                unit_api_srcs = [r["url"] for r in filtered_responses
+                                 if _response_looks_like_units(r["body"])]
+                results["_winning_page_url"] = unit_api_srcs[0] if unit_api_srcs else base_url
 
-                # ── Tier 1.5a — Embedded JSON on homepage ────────────
-                # Before navigating away from the homepage, check for
-                # data embedded in <script> tags or JS globals (SSR).
+            # Tier 1.5 — Embedded JSON on homepage
+            if not units:
                 embedded_blobs = await extract_embedded_json(page)
                 if embedded_blobs:
                     api_responses.extend(embedded_blobs)
@@ -1607,161 +2045,314 @@ async def scrape(base_url: str, proxy: str | None = None) -> dict:
                               f"{len(units)} units/floor plans")
                         results["extraction_tier_used"] = "TIER_1_5_EMBEDDED"
 
-                # ── Navigate to floor-plans page for remaining tiers ──
-                if not units:
-                    fp_candidates = [
-                        base_url.rstrip("/") + p
-                        for p in ("/floor-plans", "/floorplans", "/apartments")
-                    ]
-                    landed = False
-                    redirect_url: str | None = None
-                    for fp_url in fp_candidates:
-                        try:
-                            await _goto_robust(page, fp_url, timeout_ms=45000)
-                            await click_expanders(page)
-                            await asyncio.sleep(1.5)
-                            landed = True
-                            break
-                        except Exception as e:
-                            err_str = str(e)
-                            # Capture redirect targets — some sites redirect
-                            # their floor-plan page to a leasing portal.
-                            redir_m = re.search(
-                                r'interrupted by another navigation to "([^"]+)"',
-                                err_str,
-                            )
-                            if redir_m:
-                                redirect_url = redir_m.group(1)
-                                print(f"  🔀 Redirect detected → {redirect_url[:100]}")
-                            else:
-                                print(f"  ⚠ {fp_url} error: {e}")
-                    if not landed:
-                        # Fall back to whatever page is currently loaded.
-                        print("  ↳ Using current page for DOM tiers")
+            # Tier 2 — JSON-LD on homepage
+            if not units:
+                units = await parse_jsonld(page)
+                if units:
+                    print(f"  ✅ TIER 2 (JSON-LD): {len(units)} items")
+                    results["extraction_tier_used"] = "TIER_2_JSONLD"
 
-                    # If a redirect to a leasing portal was detected, try
-                    # following it — it may have the actual unit data.
-                    if not landed and redirect_url:
-                        try:
-                            print("  🔀 Following redirect to leasing portal")
-                            await _goto_robust(page, redirect_url, timeout_ms=45000)
-                            await asyncio.sleep(2.0)
-                            landed = True
-                        except Exception as e:
-                            print(f"  ⚠ Redirect follow error: {e}")
+            # Tier 3 — DOM on homepage
+            if not units:
+                units = await parse_dom(page, base_url)
+                if units:
+                    print(f"  ✅ TIER 3 (DOM — homepage): {len(units)} units/floor plans")
+                    results["extraction_tier_used"] = "TIER_3_DOM"
 
-                    # ── Tier 1.5b — Embedded JSON on floor-plans page ─
-                    # Re-check for embedded data on the floor-plans page
-                    # (different page may have different inline data).
-                    embedded_blobs_fp = await extract_embedded_json(page)
-                    if embedded_blobs_fp:
-                        api_responses.extend(embedded_blobs_fp)
-                        units = parse_api_responses(embedded_blobs_fp)
-                        if units:
-                            print(f"  ✅ TIER 1.5 (Embedded JSON — floor-plans page): "
-                                  f"{len(units)} units/floor plans")
-                            results["extraction_tier_used"] = "TIER_1_5_EMBEDDED"
+            if units:
+                print(f"\n  >> Phase 3 success: {len(units)} units from homepage — skipping exploration")
 
-                    # Also check if the floor-plans page load triggered
-                    # new API captures (response handler is still active).
+            # ════════════════════════════════════════════════════════════
+            # PHASE 4: Link-by-Link Exploration with Network Observation
+            # ════════════════════════════════════════════════════════════
+            # Navigate links one by one, observe NEW network calls per page,
+            # collect LLM candidates for Phase 5.
+            all_llm_candidates: list[dict] = []
+            explored_links_status: dict[str, bool] = {}  # link -> had_data
+            visited: set[str] = set()
+
+            # Profile skip: if profile says only LLM/Vision works, skip crawl
+            _profile_skip_crawl = (
+                skip_to_tier is not None
+                and skip_to_tier >= 4
+                and not run_full_cascade
+            )
+
+            if not units and not _profile_skip_crawl:
+                crawl_queue = prioritize_links(
+                    internal_links, anchor_text_links, profile, base_url
+                )
+                print(f"\n{'='*65}")
+                print(f"  PHASE 4: Link Exploration — {len(crawl_queue)} links to visit")
+                print(f"{'='*65}")
+                for link in crawl_queue[:5]:
+                    print(f"     {link}")
+                if len(crawl_queue) > 5:
+                    print(f"     ... and {len(crawl_queue) - 5} more")
+
+                link_idx = 0
+                while link_idx < len(crawl_queue) and len(visited) < MAX_CRAWL_PAGES:
+                    target = crawl_queue[link_idx]
+                    link_idx += 1
+                    if target in visited:
+                        continue
+                    visited.add(target)
+
+                    print(f"\n{'─'*65}")
+                    print(f"  PHASE 4 [{len(visited)}/{MAX_CRAWL_PAGES}]: {target}")
+
+                    link_units, new_resps, llm_cands = await explore_link_with_observation(
+                        page, target, api_responses, base_url,
+                    )
+
+                    # Filter new responses through profile blocklist
+                    if new_resps:
+                        new_resps = filter_network_noise(new_resps, profile)
+
+                    if link_units:
+                        units = link_units
+                        explored_links_status[target] = True
+                        print(f"  ✅ PHASE 4 (Exploration): {len(units)} units from {target[:80]}")
+                        results["extraction_tier_used"] = "TIER_5_5_EXPLORATORY"
+                        results["_winning_page_url"] = target
+                        break
+                    else:
+                        explored_links_status[target] = False
+                        all_llm_candidates.extend(llm_cands)
+                        if llm_cands:
+                            print(f"    + {len(llm_cands)} promising APIs for LLM analysis")
+
+                    # Also try Entrata API probe on this page
                     if not units:
-                        new_api_units = parse_api_responses(api_responses)
-                        if new_api_units:
-                            units = new_api_units
-                            print(f"  ✅ TIER 1 (API — floor-plans page): "
-                                  f"{len(units)} units/floor plans")
-                            results["extraction_tier_used"] = "TIER_1_API"
-
-                # ── Tier 2 — JSON-LD ─────────────────────────────────────
-                if not units:
-                    units = await parse_jsonld(page)
-                    if units:
-                        print(f"  ✅ TIER 2 (JSON-LD): {len(units)} items")
-                        results["extraction_tier_used"] = "TIER_2_JSONLD"
-                    else:
-                        # Diagnose: count JSON-LD blocks on the page.
-                        try:
-                            ld_count = await page.eval_on_selector_all(
-                                'script[type="application/ld+json"]', "els => els.length"
-                            )
-                        except Exception:
-                            ld_count = "?"
-                        print(f"  ↳ Tier 2: no JSON-LD units "
-                              f"({ld_count} ld+json blocks on page, "
-                              f"none matched Apartment/Offer types)")
-
-                # ── Tier 3 — DOM ─────────────────────────────────────────
-                if not units:
-                    units = await parse_dom(page, base_url)
-                    if units:
-                        print(f"  ✅ TIER 3 (DOM): {len(units)} units/floor plans")
-                        results["extraction_tier_used"] = "TIER_3_DOM"
-                    else:
-                        print(f"  ↳ Tier 3: DOM parsing found 0 units on {page.url[:80]}")
-
-                # ── Tier 4 — Entrata API probe + leasing portal iframes ──
-                if not units:
-                    # 4a: Try Entrata-specific API endpoints.
-                    entrata_blobs = await probe_entrata_api(page, base_url)
-                    if entrata_blobs:
-                        api_responses.extend(entrata_blobs)
-                        units = parse_api_responses(entrata_blobs)
-                        if units:
-                            print(f"  ✅ TIER 4 (Entrata API probe): "
-                                  f"{len(units)} units/floor plans")
-                            results["extraction_tier_used"] = "TIER_4_ENTRATA_API"
-
-                # ── Tier 5 — Leasing portal iframes ──────────────────────
-                if not units:
-                    portal_urls = await detect_leasing_portals(page)
-                    for portal_url in portal_urls[:2]:
-                        print(f"  🔍 Navigating into leasing portal: "
-                              f"{portal_url[:100]}")
-                        try:
-                            await _goto_robust(page, portal_url, timeout_ms=30000)
-                            await asyncio.sleep(2.0)
-                            # Check for new API captures from the portal.
-                            portal_units = parse_api_responses(api_responses)
-                            if portal_units:
-                                units = portal_units
-                                print(f"  ✅ TIER 5 (Leasing portal API): "
+                        entrata_blobs = await probe_entrata_api(page, base_url)
+                        if entrata_blobs:
+                            api_responses.extend(entrata_blobs)
+                            units = parse_api_responses(entrata_blobs)
+                            if units:
+                                print(f"  ✅ TIER 4 (Entrata API probe): "
                                       f"{len(units)} units/floor plans")
-                                results["extraction_tier_used"] = "TIER_5_PORTAL"
+                                results["extraction_tier_used"] = "TIER_4_ENTRATA_API"
+                                explored_links_status[target] = True
                                 break
-                            # Try embedded JSON on the portal page.
-                            portal_blobs = await extract_embedded_json(page)
-                            if portal_blobs:
-                                api_responses.extend(portal_blobs)
-                                units = parse_api_responses(portal_blobs)
-                                if units:
-                                    print(f"  ✅ TIER 5 (Portal embedded JSON): "
-                                          f"{len(units)} units/floor plans")
+
+                    # Check for leasing portal iframes on this page
+                    if not units:
+                        portal_urls = await detect_leasing_portals(page)
+                        for portal_url in portal_urls[:1]:
+                            print(f"  🔍 Portal detected: {portal_url[:100]}")
+                            try:
+                                await _goto_robust(page, portal_url, timeout_ms=30000)
+                                await asyncio.sleep(2.0)
+                                portal_units = parse_api_responses(api_responses)
+                                if portal_units:
+                                    units = portal_units
+                                    print(f"  ✅ TIER 5 (Portal): {len(units)} units")
                                     results["extraction_tier_used"] = "TIER_5_PORTAL"
+                                    explored_links_status[target] = True
                                     break
-                            # Try JSON-LD on the portal page.
-                            units = await parse_jsonld(page)
-                            if units:
-                                print(f"  ✅ TIER 5 (Portal JSON-LD): "
-                                      f"{len(units)} items")
-                                results["extraction_tier_used"] = "TIER_5_PORTAL"
-                                break
-                            # Try DOM parsing on the portal page.
-                            units = await parse_dom(page, portal_url)
-                            if units:
-                                print(f"  ✅ TIER 5 (Portal DOM): "
-                                      f"{len(units)} units/floor plans")
-                                results["extraction_tier_used"] = "TIER_5_PORTAL"
-                                break
-                        except Exception as e:
-                            print(f"  ⚠ Portal probe error: {e}")
+                                # Try embedded JSON + JSON-LD + DOM on portal
+                                portal_blobs = await extract_embedded_json(page)
+                                if portal_blobs:
+                                    api_responses.extend(portal_blobs)
+                                    units = parse_api_responses(portal_blobs)
+                                    if units:
+                                        print(f"  ✅ TIER 5 (Portal embedded): {len(units)} units")
+                                        results["extraction_tier_used"] = "TIER_5_PORTAL"
+                                        explored_links_status[target] = True
+                                        break
+                                units = await parse_jsonld(page)
+                                if units:
+                                    print(f"  ✅ TIER 5 (Portal JSON-LD): {len(units)} items")
+                                    results["extraction_tier_used"] = "TIER_5_PORTAL"
+                                    explored_links_status[target] = True
+                                    break
+                                units = await parse_dom(page, portal_url)
+                                if units:
+                                    print(f"  ✅ TIER 5 (Portal DOM): {len(units)} units")
+                                    results["extraction_tier_used"] = "TIER_5_PORTAL"
+                                    explored_links_status[target] = True
+                                    break
+                            except Exception as e:
+                                print(f"  ⚠ Portal error: {e}")
+                    if units:
+                        break
 
                 if not units:
-                    print("  ⚠ ALL TIERS FAILED — no units extracted. "
-                          "Check raw_api/ for captured responses "
-                          "or add DOM selectors for this site.")
+                    print(f"\n  ↳ Phase 4: explored {len(visited)} pages, "
+                          f"collected {len(all_llm_candidates)} LLM candidates")
+
+            results["property_links_crawled"] = list(visited)
+            results["api_calls_intercepted"] = [r["url"] for r in api_responses]
+
+            # ════════════════════════════════════════════════════════════
+            # PHASE 5: LLM-Assisted API Analysis
+            # ════════════════════════════════════════════════════════════
+            # Analyze promising but unparsed API responses one at a time.
+            # Max 3 LLM calls per property.
+            llm_analysis_results: dict[str, Any] = {}
+
+            if not units and all_llm_candidates:
+                print(f"\n{'='*65}")
+                print(f"  PHASE 5: LLM API Analysis — {len(all_llm_candidates)} candidates (max 3)")
+                print(f"{'='*65}")
+
+                _property_ctx = {
+                    "property_name": results.get("property_name", ""),
+                    "website": base_url,
+                }
+                _prop_id = results.get("_property_id", "unknown")
+
+                try:
+                    from services.llm_extractor import analyze_api_with_llm as _analyze_api
+
+                    for i, candidate in enumerate(all_llm_candidates[:3]):
+                        api_url = candidate.get("url", "unknown")
+                        print(f"\n  LLM [{i+1}/3]: Analyzing {api_url[:100]}")
+
+                        llm_units, mapping_dict, is_noise, interaction = await _analyze_api(
+                            candidate, _property_ctx, property_id=_prop_id,
+                        )
+                        if interaction is not None:
+                            results.setdefault("_llm_interactions", []).append(interaction)
+
+                        if is_noise:
+                            print(f"    → Noise (will blocklist)")
+                            llm_analysis_results[api_url] = f"noise: {candidate.get('url', '')}"
+                            continue
+
+                        if llm_units:
+                            units = llm_units
+                            print(f"  ✅ PHASE 5 (LLM API Analysis): {len(units)} units from {api_url[:80]}")
+                            results["extraction_tier_used"] = "TIER_4_LLM"
+                            if mapping_dict:
+                                llm_analysis_results[api_url] = mapping_dict
+                                results["_llm_hints"] = {"json_paths": mapping_dict.get("json_paths", {})}
+                            break
+                        else:
+                            print(f"    → No units extracted")
+                            llm_analysis_results[api_url] = "noise: llm_returned_empty"
+
+                except Exception as e:
+                    print(f"  ⚠ Phase 5 (LLM API Analysis) error: {e}")
+
+            # ════════════════════════════════════════════════════════════
+            # PHASE 6: DOM Fallback with Targeted LLM
+            # ════════════════════════════════════════════════════════════
+            # If no APIs worked, find DOM sections with rent signals and
+            # analyze them with LLM. Falls back to Vision LLM last.
+            if not units:
+                print(f"\n{'='*65}")
+                print(f"  PHASE 6: DOM Fallback + LLM")
+                print(f"{'='*65}")
+
+                # 6a: Try to find DOM sections with rent signals
+                dom_sections = await _extract_dom_sections_with_rent_signals(page)
+                if dom_sections:
+                    print(f"  Found {len(dom_sections)} DOM sections with rent signals")
+                    try:
+                        from services.llm_extractor import analyze_dom_with_llm as _analyze_dom
+
+                        _property_ctx = {
+                            "property_name": results.get("property_name", ""),
+                            "website": base_url,
+                        }
+                        _prop_id = results.get("_property_id", "unknown")
+                        current_url = page.url
+
+                        # Analyze the first section (budget: 1 DOM LLM call)
+                        dom_units, css_selectors, dom_interaction = await _analyze_dom(
+                            dom_sections[0], current_url, _property_ctx,
+                            property_id=_prop_id,
+                        )
+                        if dom_interaction is not None:
+                            results.setdefault("_llm_interactions", []).append(dom_interaction)
+
+                        if dom_units:
+                            units = dom_units
+                            print(f"  ✅ PHASE 6a (DOM LLM): {len(units)} units")
+                            results["extraction_tier_used"] = "TIER_3_DOM_LLM"
+                            if css_selectors:
+                                results["_llm_hints"] = {"css_selectors": css_selectors}
+
+                    except Exception as e:
+                        print(f"  ⚠ Phase 6a (DOM LLM) error: {e}")
+                else:
+                    print(f"  ↳ No DOM sections with rent signals found")
+
+                # 6b: Fallback to legacy LLM (full page + APIs) if targeted approach failed
+                if not units:
+                    try:
+                        from services.llm_extractor import extract_with_llm, prepare_llm_input
+
+                        llm_input = prepare_llm_input(
+                            page_html=await page.content(),
+                            api_responses=api_responses,
+                            property_context={
+                                "property_name": results.get("property_name", ""),
+                                "website": base_url,
+                            },
+                        )
+                        llm_units, llm_hints, _, llm_interaction = await extract_with_llm(
+                            llm_input,
+                            property_id=results.get("_property_id", "unknown"),
+                        )
+                        if llm_interaction is not None:
+                            results.setdefault("_llm_interactions", []).append(llm_interaction)
+
+                        if llm_units:
+                            units = llm_units
+                            print(f"  ✅ PHASE 6b (Legacy LLM): {len(units)} units/floor plans")
+                            results["extraction_tier_used"] = "TIER_4_LLM"
+                            results["_llm_hints"] = llm_hints
+                    except Exception as e:
+                        print(f"  ⚠ Phase 6b (Legacy LLM) error: {e}")
+
+                # 6c: Vision LLM as absolute last resort
+                if not units:
+                    try:
+                        from services.vision_extractor import extract_with_vision
+
+                        screenshot = await page.screenshot(full_page=True)
+                        vision_units, vision_hints, _, vision_interaction = await extract_with_vision(
+                            screenshot=screenshot,
+                            property_context={
+                                "property_name": results.get("property_name", ""),
+                                "website": base_url,
+                            },
+                            property_id=results.get("_property_id", "unknown"),
+                        )
+                        if vision_interaction is not None:
+                            results.setdefault("_llm_interactions", []).append(vision_interaction)
+
+                        if vision_units:
+                            units = vision_units
+                            print(f"  ✅ PHASE 6c (Vision): {len(units)} units")
+                            results["extraction_tier_used"] = "TIER_5_VISION"
+                            results["_llm_hints"] = vision_hints
+                    except Exception as e:
+                        print(f"  ⚠ Phase 6c (Vision) error: {e}")
+
+                if not units:
+                    print("  ⚠ ALL PHASES (3-6) FAILED — no units extracted.")
                     results["extraction_tier_used"] = "FAILED"
 
-            # Update with any blobs added during extraction probes.
+            # ════════════════════════════════════════════════════════════
+            # PHASE 7: Finalization + Profile Learning
+            # ════════════════════════════════════════════════════════════
+            # Apply availability defaults and record learning data.
+            if units:
+                units = apply_availability_defaults(units)
+
+            # Record which page/URL produced the winning data
+            if units and not results.get("_winning_page_url"):
+                try:
+                    results["_winning_page_url"] = page.url
+                except Exception:
+                    results["_winning_page_url"] = base_url
+
+            # Attach profile learning data for the updater
+            results["_llm_analysis_results"] = llm_analysis_results
+            results["_explored_links"] = explored_links_status
             results["_raw_api_responses"] = api_responses
             results["api_calls_intercepted"] = [r["url"] for r in api_responses]
             results["units"] = units

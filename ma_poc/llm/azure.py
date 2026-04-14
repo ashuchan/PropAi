@@ -54,6 +54,15 @@ class AzureLLMProvider(LLMProvider):
             max_tokens=max_tokens,
             response_format={"type": "json_object"},
         )
+        # Capture usage for interaction logging (instance-scoped, not module-level).
+        usage = resp.usage
+        self._last_usage: dict[str, object] = {
+            "input_tokens":  usage.prompt_tokens if usage else 0,
+            "output_tokens": usage.completion_tokens if usage else 0,
+            "model":         self._text_model,
+            "call_type":     "text",
+            "provider":      "azure",
+        }
         return resp.choices[0].message.content or ""
 
     async def _extract_images_once(
@@ -76,6 +85,15 @@ class AzureLLMProvider(LLMProvider):
             max_tokens=max_tokens,
             response_format={"type": "json_object"},
         )
+        # Capture usage for interaction logging.
+        usage = resp.usage
+        self._last_usage = {
+            "input_tokens":  usage.prompt_tokens if usage else 0,
+            "output_tokens": usage.completion_tokens if usage else 0,
+            "model":         self._vision_model,
+            "call_type":     "vision",
+            "provider":      "azure",
+        }
         text = resp.choices[0].message.content or "{}"
         try:
             return json.loads(text)  # type: ignore[no-any-return]

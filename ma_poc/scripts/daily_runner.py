@@ -60,6 +60,14 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+# Load .env early so API keys (ANTHROPIC_API_KEY, AZURE_OPENAI_API_KEY, etc.)
+# are available before any LLM provider is instantiated.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # Force UTF-8 stdout on Windows so emoji prints don't crash the run.
 for _stream in (sys.stdout, sys.stderr):
     try:
@@ -69,8 +77,10 @@ for _stream in (sys.stdout, sys.stderr):
 
 # Make sibling script modules importable regardless of invocation cwd.
 _HERE = Path(__file__).resolve().parent
-if str(_HERE) not in sys.path:
-    sys.path.insert(0, str(_HERE))
+_PROJECT_ROOT = _HERE.parent  # ma_poc/
+for _p in (_HERE, _PROJECT_ROOT):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 import validation as V  # noqa: E402
 from concurrency import SystemResources  # noqa: E402
@@ -97,6 +107,16 @@ from scrape_properties import (  # noqa: E402
     transform_units_from_scrape,
 )
 from state_store import StateStore  # noqa: E402
+
+# Profile system imports — lazy-loaded to avoid hard dependency.
+# Profile failures must never crash the pipeline.
+try:
+    from services.profile_store import ProfileStore
+    from services.profile_updater import update_profile_after_extraction
+    from services.drift_detector import detect_drift, apply_drift_demotion
+    _PROFILES_AVAILABLE = True
+except ImportError:
+    _PROFILES_AVAILABLE = False
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -254,30 +274,52 @@ def build_property_record(
 
 # ── Run orchestrator ──────────────────────────────────────────────────────────
 
-async def _scrape_one(url: str, proxy: str | None, timeout_s: int) -> dict:
+async def _scrape_one(url: str, proxy: str | None, timeout_s: int,
+                      profile: Any = None) -> dict:
     """Run scrape() with a hard timeout so a stuck page can never hang the run."""
     try:
-        return await asyncio.wait_for(scrape(url, proxy=proxy), timeout=timeout_s)
+        return await asyncio.wait_for(
+            scrape(url, proxy=proxy, profile=profile), timeout=timeout_s,
+        )
     except TimeoutError:
         return {"errors": [f"scrape timeout after {timeout_s}s"], "base_url": url,
                 "_timeout": True}
 
 
-def _scrape_in_thread(url: str, proxy: str | None, timeout_s: int) -> dict:
+def _scrape_in_thread(
+    url: str,
+    proxy: str | None,
+    timeout_s: int,
+    property_id: str = "unknown",
+    profile: Any = None,
+) -> dict:
     """
     Run a single scrape in its own thread with its own event loop.
 
     Each thread gets an independent asyncio event loop and Playwright
     instance, giving true OS-level parallelism instead of single-threaded
     async concurrency.
+
+    ``property_id`` is injected into the result so LLM interaction records
+    (Tier 6 / Tier 7) carry the canonical ID for cost accounting.
+    ``profile`` is the ScrapeProfile used for tier-skip routing.
     """
     if not url:
-        return {"errors": ["no URL"], "base_url": ""}
+        return {"errors": ["no URL"], "base_url": "", "_property_id": property_id,
+                "_llm_interactions": []}
     loop = asyncio.new_event_loop()
     try:
-        return loop.run_until_complete(_scrape_one(url, proxy, timeout_s))
+        result = loop.run_until_complete(
+            _scrape_one(url, proxy, timeout_s, profile=profile),
+        )
+        # Stamp the canonical property ID so entrata.py's LLM tiers can
+        # reference it when building interaction records.
+        if isinstance(result, dict):
+            result["_property_id"] = property_id
+        return result
     except Exception as e:
-        return {"errors": [str(e)], "base_url": url, "_exception": e}
+        return {"errors": [str(e)], "base_url": url, "_exception": e,
+                "_property_id": property_id, "_llm_interactions": []}
     finally:
         loop.close()
 
@@ -396,6 +438,7 @@ async def run_daily(
 
     all_issues: list[V.ValidationIssue] = []
     failed_properties: list[dict] = []
+    all_llm_interactions: list[dict] = []  # accumulated across all properties
 
     log.info(f"=== Daily run {run_date} → {run_dir} ===")
 
@@ -471,6 +514,15 @@ async def run_daily(
     prior_property_ids = state.all_canonical_ids()
     log.info(f"State store loaded: {len(prior_property_ids)} known properties")
 
+    # ── 4b. Load profile store (non-fatal if unavailable) ─────────────────
+    profile_store = None
+    if _PROFILES_AVAILABLE:
+        try:
+            profile_store = ProfileStore(Path("config/profiles"))
+            log.info("Profile store loaded")
+        except Exception as e:
+            log.warning(f"Profile store unavailable: {e}")
+
     # Track processed canonical_ids to skip hard duplicates' second+ occurrences.
     processed: set[str] = set()
     properties_out: list[dict] = []
@@ -528,7 +580,20 @@ async def run_daily(
         seen_ids_today.add(cid)
         scrapeable.append((idx, row, ident, url or ""))
 
-    # ── 5b. Concurrent scraping phase (thread pool — true parallelism) ───
+    # ── 5b. Load profiles for each property (non-fatal) ──────────────────
+    # Profiles guide tier-skip routing: HOT properties jump straight to the
+    # known-good tier instead of running the full cascade every time.
+    scrape_profiles: list[Any] = [None] * len(scrapeable)
+    if profile_store is not None:
+        for si, (idx, row, ident, url) in enumerate(scrapeable):
+            cid = ident.canonical_id
+            if cid:
+                try:
+                    scrape_profiles[si] = profile_store.load(cid)
+                except Exception:
+                    pass
+
+    # ── 5c. Concurrent scraping phase (thread pool — true parallelism) ───
     res = SystemResources.detect()
     log.info(f"System resources: {res.summary()}")
     pool_size = res.optimal_pool_size()
@@ -542,9 +607,15 @@ async def run_daily(
     ) as executor:
         futures = [
             loop.run_in_executor(
-                executor, _scrape_in_thread, item[3], proxy, scrape_timeout_s
+                executor,
+                _scrape_in_thread,
+                item[3],          # url
+                proxy,
+                scrape_timeout_s,
+                item[2].canonical_id or "unknown",  # property_id for LLM logging
+                scrape_profiles[si],                 # profile for tier-skip routing
             )
-            for item in scrapeable
+            for si, item in enumerate(scrapeable)
         ]
         # return_exceptions=True so one crash doesn't cancel others.
         scrape_results_raw = await asyncio.gather(*futures, return_exceptions=True)
@@ -727,6 +798,43 @@ async def run_daily(
                 canonical_id=cid, row_index=idx,
             ))
 
+        # ── Profile update (non-fatal) ────────────────────────────────────
+        if profile_store is not None and _PROFILES_AVAILABLE:
+            try:
+                profile = profile_store.load(cid)
+                if profile is None:
+                    profile = profile_store.bootstrap_from_meta(
+                        cid, dict(row), url or "",
+                    )
+                profile = update_profile_after_extraction(
+                    profile, scrape_result, len(public_units), profile_store,
+                )
+                drift_detected, drift_reasons = detect_drift(
+                    profile, len(public_units), scrape_result,
+                )
+                if drift_detected:
+                    profile = apply_drift_demotion(profile, drift_reasons)
+                    profile_store.save(profile)
+                    per_prop_issues.append(V.warning(
+                        "PROFILE_DRIFT_DETECTED",
+                        f"drift detected: {'; '.join(drift_reasons)}",
+                        canonical_id=cid, row_index=idx,
+                    ))
+            except Exception as e:
+                log.warning(f"  profile update failed for {cid}: {e}")
+
+        # ── Collect LLM interaction records for cost accounting ───────────
+        llm_interactions: list[dict] = scrape_result.get("_llm_interactions") or []
+        if llm_interactions:
+            all_llm_interactions.extend(llm_interactions)
+            try:
+                from llm.interaction_logger import write_property_report
+                write_property_report(cid, llm_interactions, run_dir)
+                log.info(f"  LLM interactions: {len(llm_interactions)} call(s), "
+                         f"total cost=${sum(i.get('cost_usd', 0) for i in llm_interactions):.5f}")
+            except Exception as e:
+                log.warning(f"  could not write LLM report for {cid}: {e}")
+
         # ── Save raw API bodies for this property (debug aid) ─────────────
         raw = scrape_result.get("_raw_api_responses")
         if raw:
@@ -739,6 +847,7 @@ async def run_daily(
 
         # ── Build record ───────────────────────────────────────────────────
         state_snapshot = state.get_property(cid)
+        rec: dict | None = None
         try:
             rec = build_property_record(
                 row, ident, scrape_result, public_units,
@@ -756,6 +865,18 @@ async def run_daily(
                 "row_index": idx, "canonical_id": cid,
                 "reason": f"build_property_record exception: {e}",
             })
+
+        # ── Per-property scrape report (markdown) ─────────────────────────
+        try:
+            from scrape_report import generate_property_report
+            rpt_path = generate_property_report(
+                scrape_result, rec, unit_diff,
+                per_prop_issues, run_dir, cid, run_date,
+            )
+            if rpt_path:
+                log.info(f"  scrape report: {rpt_path.name}")
+        except Exception as e:
+            log.warning(f"  could not write scrape report for {cid}: {e}")
 
         # Track failed properties for the report summary.
         if scrape_failed and not carry_forward_used:
@@ -881,6 +1002,20 @@ async def run_daily(
         log.info(f"Report written: {report_json.name}, {report_md.name}")
     except Exception as e:
         log.error(f"⚠ report write failed: {e}")
+
+    # ── LLM cost summary (run-wide aggregate) ─────────────────────────────
+    try:
+        from llm.interaction_logger import write_run_summary
+        write_run_summary(all_llm_interactions, run_dir)
+        total_llm_cost = sum(i.get("cost_usd", 0) for i in all_llm_interactions)
+        log.info(
+            f"LLM report: {len(all_llm_interactions)} total call(s) across "
+            f"{len({i.get('property_id') for i in all_llm_interactions})} propert(ies) | "
+            f"total cost=${total_llm_cost:.5f} | "
+            f"→ {run_dir / 'llm_report.json'}"
+        )
+    except Exception as e:
+        log.warning(f"⚠ LLM run summary write failed: {e}")
 
     # Update latest-run pointer.
     try:

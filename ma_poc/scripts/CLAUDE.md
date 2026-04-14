@@ -21,11 +21,22 @@ daily_runner.py          # Orchestrator: loads CSV, resolves identity, runs pipe
     +-- identity.py      # 5-tier canonical ID resolution (dedup across runs)
     |
     +-- entrata.py       # Core scraper engine (despite the name, handles ALL platforms)
-    |     |
-    |     +-- Tier 1: API interception (XHR/fetch capture during page load)
-    |     +-- Tier 2: JSON-LD (Schema.org structured data)
-    |     +-- Tier 3: DOM parsing (selector cascade + regex fallback)
-    |     +-- Property metadata extraction (name, address, geo, phone)
+    |     |              # 7-phase extraction pipeline with self-learning profiles
+    |     +-- Phase 1: Homepage load + full network capture
+    |     +-- Phase 2: Noise filtering (global + profile-specific blocklists)
+    |     +-- Phase 3: Known pattern extraction (profile mappings → API → JSON-LD → DOM)
+    |     +-- Phase 4: Link-by-link exploration with per-page network observation
+    |     +-- Phase 5: LLM-assisted API analysis (single API at a time, max 3 calls)
+    |     +-- Phase 6: DOM fallback with targeted LLM → legacy LLM → Vision LLM
+    |     +-- Phase 7: Availability defaults + profile learning persistence
+    |
+    +-- services/
+    |     +-- profile_store.py      # Load/save per-property profiles from config/profiles/
+    |     +-- profile_router.py     # HOT/WARM/COLD routing (skip tiers based on maturity)
+    |     +-- profile_updater.py    # Update profiles after extraction (endpoints, blocklists, mappings)
+    |     +-- drift_detector.py     # Detect unit count drops, all-rents-null, timeout patterns
+    |     +-- llm_extractor.py      # Targeted LLM analysis: per-API and per-DOM-section
+    |     +-- vision_extractor.py   # Vision LLM extraction (screenshot-based last resort)
     |
     +-- scrape_properties.py   # Unit transformation: raw API bodies -> target schema
     |                          # (unit_id, market_rent_low/high, available_date, ...)
@@ -42,6 +53,7 @@ daily_runner.py          # Orchestrator: loads CSV, resolves identity, runs pipe
           data/runs/{date}/issues.jsonl      # validation issues
           data/state/property_index.json     # persisted between runs
           data/state/unit_index.json         # unit history with diffs
+          config/profiles/{canonical_id}.json # per-property learned extraction profiles
 ```
 
 ---
@@ -76,81 +88,97 @@ python scripts/scrape_properties.py --csv config/properties.csv --out output/pro
 
 ---
 
-## Extraction tiers (entrata.py)
+## 7-Phase Extraction Pipeline (entrata.py)
 
-`entrata.py` is the core scraping engine. Despite the filename, it handles **all** multifamily property websites — Entrata, RentCafe, AppFolio, Yardi, custom sites. The tiers run in priority order; first one that produces data wins.
+`entrata.py` is the core scraping engine. Despite the filename, it handles **all** multifamily property websites — Entrata, RentCafe, AppFolio, Yardi, custom sites. The pipeline uses a 7-phase approach that is **exploratory and self-learning**: it navigates links systematically, observes network calls per page, uses LLM surgically on individual API responses, and persists what works (and what doesn't) to per-property profiles.
 
-### Tier 1 — API Interception (highest fidelity)
+### Phase 1 — Homepage Load + Full Network Capture
 
-- Registers a Playwright `page.on("response")` handler **before** `page.goto()`
-- Captures all XHR/fetch responses whose URLs match patterns: `/api/`, `/availabilities`, `/floor-plans`, `/pricing`, `/units`, `/apartments`, `floorplan`, `availability`, `getFloorPlans`, `getAvailabilities`, `propertyInfo`
-- **SightMap dedicated parser**: Joins `data.units[]` to `data.floor_plans[]` by `floor_plan_id`. Extracts unit_number, price, sqft, availability, lease links, concessions
-- **Generic API parser**: Unwraps nested JSON envelopes (`data.results.units`, `response.floorPlans`, etc.). Tries 50+ key name variants for each field. Deduplicates by unit_number or floor plan fingerprint
-- Produces the richest data: individual unit IDs, exact rents, availability dates, lease links
+- Launches Playwright Chromium with `page.on("response")` handler registered **before** `page.goto()`
+- Captures all XHR/fetch responses matching URL patterns (`/api/`, `/availabilities`, `/floor-plans`, `/pricing`, `/units`, etc.)
+- Filters out known false-positive hosts (googleapis.com, hotjar.com, sentry.io, meetelise.com, etc.) and path fragments (`/analytics/`, `/beacon`, `/tag-manager/`)
+- Collects all internal links with anchor text for later exploration
+- Extracts property metadata (name, address, geo, phone) from the homepage
 
-### Tier 2 — JSON-LD / Schema.org
+### Phase 2 — Noise Filtering
 
-- Extracts `<script type="application/ld+json">` blocks from the page
-- Walks `@graph`, `itemListElement`, nested structures recursively
-- Targets: `Apartment`, `ApartmentComplex`, `Offer`, `FloorPlan`, `Residence`, `SingleFamilyResidence`
-- Extracts: name, rent (from `offers.lowPrice`/`offers.highPrice`/`offers[].price`), sqft (from `floorSize`), numberOfRooms
-- Typically yields floor-plan-level data (not individual units)
+Three-layer filtering of captured API responses:
 
-### Tier 3 — DOM Parsing (broadest coverage)
+1. **Global blocklists** — `_FALSE_POSITIVE_HOSTS` (30+ domains) and `_FALSE_POSITIVE_PATH_FRAGMENTS` (15+ patterns)
+2. **Profile-specific blocklist** — `profile.api_hints.blocked_endpoints` (learned from past runs where LLM identified an API as noise)
+3. **Content-type filter** — only JSON responses are kept
 
-- CSS selector cascade from specific to generic:
-  ```
-  .fp-group -> .floorplan-item -> .floor-plan-card -> .fp-item
-  -> [class*='FloorPlan'] -> [class*='floorplan']
-  -> .apartment-item -> .unit-card -> .plan-card
-  -> [data-floor-plan] -> [data-unit]
-  -> article -> .card -> li
-  ```
-- Requires 2+ matching elements AND at least one containing a `$XXX` pattern (rent signal)
-- Extracts fields via **regex on inner text** (not dependent on specific CSS classes):
-  - Beds: `(\d+)\s*(?:bed|bd|bedroom)s?`
-  - Baths: `(\d+)\s*(?:bath|ba)s?`
-  - Sqft: `([\d,]+)\s*(?:sq ft|sqft|sf)`
-  - Rent: `\$([\d,]+)(?:/mo)?(?:\s*[-–]\s*\$([\d,]+))?`
-  - Unit number: `(?:unit|apt)\s*#?\s*([A-Z]?\d{2,4}[A-Z]?)`
-  - Availability date: multiple formats (MM/DD/YYYY, month-name)
-  - Concessions: `(\d+)\s+(?:week|month)s?\s+free`
-- **Click-to-expand**: Before parsing, clicks buttons matching patterns like "available unit", "view unit", "show more", "view all" (restricted to `button`, `a`, `[role=button]`)
+Links are prioritized using `prioritize_links()`:
+1. Profile `winning_page_url` and `availability_links` (known working pages)
+2. Anchor text matches ("View Availability", "See Floor Plans", etc.)
+3. URL keyword matches (`/floor-plans`, `/apartments`, `/availability`)
+4. Exploratory candidates (excludes `profile.navigation.explored_links` that had no data)
 
-### Tier 1.5 — Embedded JSON (SSR / inline script data)
+### Phase 3 — Known Pattern Extraction
 
-Runs between Tier 1 and Tier 2 when API interception finds no units. Many sites embed data server-side in `<script>` tags rather than fetching via XHR. Four extraction strategies:
+Tries extraction on homepage data using all deterministic methods. First hit with units wins:
 
-1. **Known JS globals**: `window.__NEXT_DATA__` (Next.js), `__INITIAL_STATE__` (Redux SSR), `__NUXT__`, `__remixContext`, `pageData`, `serverData`, etc.
-2. **`<script type="application/json">` blocks**: Non-ld+json script blocks >200 chars
-3. **Inline script variable assignments**: Regex scan for `var X = [{...}]` containing floor plan keywords
-4. **Property-data variable names**: Direct `window[varName]` evaluation for `floorPlans`, `unitData`, `propertyData`, `pricingData`, `communityData`, etc.
+1. **Profile LLM field mappings** — replays saved `LlmFieldMapping` json_paths against matching API URLs. No LLM call needed — deterministic extraction from a mapping learned on a prior run.
+2. **Profile known endpoints** — checks if any `profile.api_hints.known_endpoints` URL was captured
+3. **Global API pattern match** — `parse_api_responses()` with 50+ key name variants, SightMap/RealPage dedicated parsers
+4. **Embedded JSON (Tier 1.5)** — SSR data in `<script>` tags, JS globals (`__NEXT_DATA__`, `floorPlans`, etc.)
+5. **JSON-LD (Tier 2)** — `<script type="application/ld+json">` blocks (Apartment, ApartmentComplex, Offer schemas)
+6. **DOM parsing (Tier 3)** — CSS selector cascade + regex extraction, with profile-learned selectors tried first
 
-Runs **twice**: once on the homepage (before navigation), once on the floor-plans page (after navigation). Found blobs are fed through `parse_api_responses()` — same parsing pipeline as Tier 1.
+If units found here, skips directly to Phase 7.
 
-### Tier 4 — Entrata API Probe
+### Phase 4 — Link-by-Link Exploration with Network Observation
 
-Runs only when Tiers 1–3 all fail and the site is detected as Entrata-hosted (by DOM markers like `[class*="entrata"]`, `script[src*="entrata"]`, or `/Apartments/module/` in page HTML). Attempts:
+Key behavioral change from the old BFS crawl: instead of visiting all links and checking the cumulative API response list, we **observe which new APIs fire per page navigation**.
 
-1. Extract property ID from meta tags, JS globals, URL patterns, hidden inputs, data attributes
-2. GET known Entrata REST endpoints: `/api/v1/floorplans/{id}`, `/api/v1/propertyunits/{id}`, `/api/v1/floorplans`, `/api/v1/units`
-3. POST to `/api/v1/propertyunits/` with `{method: {name: "getUnits", params: {propertyId: "..."}}}` body
+For each link in the prioritized queue (capped at `MAX_CRAWL_PAGES=10`):
+1. Record `api_count_before` — snapshot the API response list length
+2. Navigate to the link, click expanders, wait 1.5s
+3. Identify `new_responses = api_responses[api_count_before:]` — only APIs triggered by this page
+4. Filter new responses through the profile blocklist
+5. Try deterministic extraction (API parser, embedded JSON, JSON-LD, DOM) on this page
+6. If promising APIs found but parser failed → collect as `llm_candidates` for Phase 5
+7. Also tries Entrata API probe and leasing portal detection on each page
 
-All requests use `page.evaluate(fetch(...))` to carry the browser's session cookies.
+Tracks which links had data vs. didn't — this is persisted to the profile after the run.
 
-### Tier 5 — Leasing Portal Detection
+### Phase 5 — LLM-Assisted API Analysis (max 3 calls per property)
 
-Last resort when all other tiers fail. Detects and navigates into leasing portal iframes or redirect targets:
+Analyzes promising but unparsed API responses **one at a time** (not batched with HTML):
 
-- **Iframe detection**: Scans `<iframe src="...">` for known portal domains (sightmap.com, realpage.com, rentcafe.com, loftliving.com, on-site.com, entrata.com, yardi.com)
-- **Link detection**: Finds `<a href="...">` links to the same portal domains (e.g. "Apply Now" buttons)
-- **Redirect handling**: When navigating to `/floor-plans` raises "interrupted by another navigation", captures the redirect URL and follows it
+1. Sends a SINGLE API response body (~30KB cap) to LLM using `config/prompts/api_analysis.txt`
+2. LLM determines: has_unit_data (bool), data_type, noise_reason
+3. If units found: extracts them AND provides `json_paths` + `response_envelope` mapping
+4. The mapping is saved as `LlmFieldMapping` in the profile — on the next run, this API is extracted deterministically without any LLM call
+5. If LLM says no unit data: the API URL is added to `profile.api_hints.blocked_endpoints` with the LLM-provided reason — never analyzed again
 
-After navigating to the portal, re-runs the full extraction stack (API capture, embedded JSON, JSON-LD, DOM parsing) on the portal page.
+**LLM budget**: max 3 API analysis calls + 1 DOM analysis call per property per run.
 
-### Why Tier 1 wins most of the time
+### Phase 6 — DOM Fallback with Targeted LLM → Legacy LLM → Vision
 
-Modern multifamily websites (Entrata, RentCafe, AppFolio, Yardi) are SPAs that load unit data via API calls. The page DOM often shows summary cards, but the API response has the full unit-level detail. Tier 1 captures this directly from the network — no DOM parsing needed.
+Three fallback stages if all APIs failed:
+
+**6a — Targeted DOM LLM**: Finds DOM sections with rent signals (`$XXX` patterns, 2+ price matches). Extracts just the relevant container HTML (~20KB, not full page). Sends to LLM using `config/prompts/dom_analysis.txt`. LLM returns units AND CSS selectors, which are saved to the profile.
+
+**6b — Legacy LLM**: Falls back to the original approach — sends trimmed page HTML + top 3 ranked API responses as combined input. Less targeted but catches cases the new approach misses.
+
+**6c — Vision LLM**: Screenshot-based extraction as absolute last resort. Full-page screenshot sent to GPT-4o (Azure) or Claude Sonnet (Anthropic).
+
+### Phase 7 — Finalization + Profile Learning
+
+**Availability defaults**: If units/floor plans are found but have no availability data:
+- `availability_status` → `"AVAILABLE"` (if a unit is listed on the site, it's available)
+- `availability_date` → today's date
+
+**Profile learning data** attached to scrape results for `profile_updater.py`:
+- `_llm_analysis_results`: API URL → `LlmFieldMapping` dict (if units found) or `"noise:reason"` (if blocked)
+- `_explored_links`: link → True/False (had data or not)
+- `_winning_page_url`: the URL/API that produced the winning data
+- `_llm_hints`: CSS selectors or json_paths from LLM analysis
+
+### Why Phase 3 wins most of the time
+
+Modern multifamily websites (Entrata, RentCafe, AppFolio, Yardi) are SPAs that load unit data via API calls. Phase 3 captures this directly from the network — no link exploration or LLM needed. For WARM/HOT profiles, a saved `LlmFieldMapping` or `known_endpoint` produces instant results without even running the generic parser.
 
 ---
 
@@ -336,8 +364,10 @@ All issues are written to `data/runs/{date}/issues.jsonl` and summarized in `rep
 ### Scraping resilience
 - `networkidle` timeout is capped at 5 seconds (not blocking), fallback to `domcontentloaded`
 - Click-to-expand is best-effort — exceptions are swallowed, scraping continues
-- Sub-link discovery is BFS with a hard cap of 40 pages
+- Link exploration capped at `MAX_CRAWL_PAGES=10` pages per property
 - Per-property scrape timeout (default 180s) prevents stuck pages from hanging the run
+- Profile-learned `explored_links` skip pages that previously had no data
+- Profile-learned `blocked_endpoints` skip noise APIs without re-analyzing them
 
 ### Data priority rules
 - **CSV values always take precedence** over scraped values for fields that exist in the CSV (address, city, state, zip, name)
@@ -388,6 +418,160 @@ The `templates/` directory (`rentcafe.py`, `entrata.py`, `appfolio.py`) and `ext
 - DOM parsing via live Playwright selectors + regex on `innerText`
 
 The two systems do not share extraction code. When adding new PMS platform support or fixing extraction bugs, changes need to be made in **both places** if you want both pipelines to benefit.
+
+---
+
+## Self-Learning Scrape Profile System
+
+Every property gets a per-property profile stored at `config/profiles/{canonical_id}.json`. The profile learns from each scrape run — recording which APIs work, which are noise, what CSS selectors to use, and what LLM-generated field mappings can be replayed deterministically.
+
+### Profile model (`models/scrape_profile.py`)
+
+```
+ScrapeProfile
+├── canonical_id: str
+├── version: int (auto-incremented on each save)
+├── created_at / updated_at: datetime
+├── updated_by: str (BOOTSTRAP | LLM_EXTRACTION | LLM_VISION | HUMAN)
+│
+├── navigation: NavigationConfig
+│   ├── entry_url: str                  # Homepage URL
+│   ├── availability_page_path: str     # e.g., "/floor-plans"
+│   ├── winning_page_url: str           # URL that produced units last time
+│   ├── availability_links: list[str]   # All links that led to availability data
+│   ├── explored_links: list[str]       # Links explored that had no data (skip next run)
+│   ├── requires_interaction: list[ExpanderAction]
+│   ├── timeout_ms: int
+│   └── block_resource_domains: list[str]
+│
+├── api_hints: ApiHints
+│   ├── known_endpoints: list[ApiEndpoint]
+│   │   └── url_pattern, json_paths, provider
+│   ├── widget_endpoints: list[str]     # Entrata widget URLs with data
+│   ├── api_provider: str               # Detected PMS platform
+│   ├── blocked_endpoints: list[BlockedEndpoint]   # Per-property noise blocklist
+│   │   └── url_pattern, reason, blocked_at, attempts
+│   └── llm_field_mappings: list[LlmFieldMapping]  # Saved for deterministic replay
+│       └── api_url_pattern, json_paths, response_envelope, success_count
+│
+├── dom_hints: DomHints
+│   ├── platform_detected: str          # entrata, rentcafe, appfolio, etc.
+│   ├── field_selectors: FieldSelectorMap
+│   │   └── container, unit_id, rent, sqft, bedrooms, bathrooms, availability_date, floor_plan_name
+│   ├── jsonld_present: bool
+│   └── availability_page_sections: list[str]  # CSS selectors for unit sections
+│
+├── confidence: ExtractionConfidence
+│   ├── preferred_tier: int (1-5)
+│   ├── last_success_tier: int
+│   ├── consecutive_successes: int      # Promotes maturity at 3+
+│   ├── consecutive_failures: int       # Demotes at 3+
+│   ├── last_unit_count: int
+│   └── maturity: ProfileMaturity (COLD | WARM | HOT)
+│
+├── llm_artifacts: LlmArtifacts
+│   ├── extraction_prompt_hash: str
+│   ├── field_mapping_notes: str
+│   ├── api_schema_signature: str
+│   ├── dom_structure_hash: str
+│   └── last_api_analysis_results: dict[str, str]  # API URL -> "has_units"|"noise"
+│
+└── cluster_id: str (optional, for cross-property learning — not yet implemented)
+```
+
+### BlockedEndpoint — per-property noise learning
+
+When the LLM (Phase 5) analyzes an API response and determines it has no unit data, the URL is saved as a `BlockedEndpoint` with the reason (e.g., "chatbot_config", "analytics_pixel", "cms_gallery_widget"). On subsequent runs, Phase 2 filters these out before any extraction is attempted.
+
+```python
+class BlockedEndpoint(BaseModel):
+    url_pattern: str         # The API URL to block
+    reason: str              # LLM-provided classification
+    blocked_at: datetime     # When it was blocked
+    attempts: int = 1        # Incremented on re-encounter (max 50 entries)
+```
+
+### LlmFieldMapping — deterministic replay without LLM
+
+When the LLM successfully extracts units from an API response (Phase 5), it also provides the `json_paths` mapping (which JSON keys map to which unit fields) and the `response_envelope` (path to the unit list in the JSON structure). This mapping is saved and replayed deterministically on future runs via `apply_saved_mapping()` — no LLM call needed.
+
+```python
+class LlmFieldMapping(BaseModel):
+    api_url_pattern: str               # The API URL this mapping applies to
+    json_paths: dict[str, str]         # field -> key name, e.g. {"rent_low": "minRent"}
+    response_envelope: str             # e.g., "data.results.units"
+    discovered_at: datetime
+    success_count: int = 0             # Incremented on each successful replay (max 20 entries)
+```
+
+**Example flow**:
+1. Run 1 (COLD profile): Phase 5 LLM analyzes `https://example.com/api/v1/units` and extracts 45 units. Returns `json_paths: {"rent_low": "minRent", "unit_id": "unitNumber", ...}`, `response_envelope: "data.units"`. Saved to profile.
+2. Run 2 (WARM profile): Phase 3 sees the same API URL was captured. Calls `apply_saved_mapping()` with the saved mapping. Extracts 45 units deterministically. No LLM call, no cost.
+
+### Profile maturity and routing
+
+**Maturity levels** (`services/profile_router.py`):
+
+| Maturity | Trigger | Behavior |
+|---|---|---|
+| COLD | New property, or 3+ consecutive failures | Full 7-phase cascade, no shortcuts |
+| WARM | 1+ successful extraction | Try `preferred_tier` first, then cascade on failure |
+| HOT | 3+ consecutive successes | Skip directly to `preferred_tier`, no fallback cascade |
+
+**Profile routing in `scrape()`**:
+- COLD: all phases run in order
+- WARM: Phase 3 tries profile-learned patterns first, falls through to Phase 4+ on failure
+- HOT: jumps directly to the known-good tier (e.g., if `preferred_tier=1`, only checks API interception)
+
+### Profile update flow (`services/profile_updater.py`)
+
+After every scrape, `update_profile_after_extraction()` is called with the scrape result:
+
+**On successful extraction:**
+- Records `winning_page_url` and `availability_page_path`
+- Records API URLs that had data as `known_endpoints`
+- Records `llm_field_mappings` from Phase 5 analysis
+- Records `availability_links` (pages that had data)
+- Increments `consecutive_successes`, resets `consecutive_failures`
+- Promotes maturity: COLD → WARM (1 success), WARM → HOT (3 consecutive)
+- Updates `preferred_tier` (prefers lower tiers that work)
+
+**On failed extraction:**
+- Records `blocked_endpoints` with LLM-provided reasons
+- Records `explored_links` that had no data (skipped on next run)
+- Increments `consecutive_failures`, resets `consecutive_successes`
+- Demotes maturity after 3 consecutive failures
+
+**Drift detection** (`services/drift_detector.py`):
+- Unit count drops >30% from expected → demotion
+- All rents null → severe demotion to COLD
+- 3+ consecutive timeouts → demotion
+
+### Profile storage (`services/profile_store.py`)
+
+- Profiles stored at `config/profiles/{canonical_id}.json`
+- Audit copies at `config/profiles/_audit/{canonical_id}_{version}.json`
+- `bootstrap_from_meta()` creates a COLD profile from CSV metadata + URL-based PMS detection
+- All new fields have defaults — existing profiles deserialize without breaking
+
+### LLM prompt templates
+
+Two targeted prompts replace the old "send entire page" approach:
+
+**`config/prompts/api_analysis.txt`** — Used in Phase 5
+- Input: ONE API response body + property context
+- Output: `has_unit_data`, `data_type`, `noise_reason`, `units[]`, `json_paths{}`, `response_envelope`
+- Purpose: classify API as units/noise, extract data, AND provide deterministic mapping for replay
+
+**`config/prompts/dom_analysis.txt`** — Used in Phase 6a
+- Input: DOM section HTML (~20KB cap, not full page) + property context
+- Output: `units[]`, `css_selectors{}` (container, rent, sqft, etc.)
+- Purpose: extract units AND provide CSS selectors for deterministic replay
+
+**`config/prompts/tier4_extraction.txt`** — Used in Phase 6b (legacy fallback)
+- Input: trimmed page HTML + top 3 ranked API responses + property context
+- Output: `units[]`, `profile_hints{}` (api_urls, json_paths, css_selectors, platform_guess)
+- Purpose: broad extraction when targeted approaches fail
 
 ---
 
@@ -575,3 +759,5 @@ Five sub-categories:
 - **Effective rent / concession calculation**: Unit-level `concessions` field captures raw text from the website. Computing `effective_rent` (asking_rent minus concession value) is Phase B PR-07.
 - **Geo-based timezone for LEASE_UP scheduling**: Only implemented in `run_phase_a.py` via state-based approximation. `daily_runner.py` does not handle LEASE_UP multi-scrape schedules.
 - **StateStore is not concurrent**: Post-processing (state upsert, diff, carry-forward) runs sequentially after all scrapes complete. Making StateStore thread-safe would allow fully pipelined processing.
+- **No cross-property learning**: Profiles are per-property only. Sites with identical structure (same PMS, same template) each learn independently. The `cluster_id` field exists on `ScrapeProfile` but clustering logic is not implemented.
+- **LLM field mapping drift**: If a PMS API changes its response schema between runs, a saved `LlmFieldMapping` will fail to produce units. The mapping falls through to `parse_api_responses()` in that case, but the stale mapping is not automatically cleared — the drift detector handles this via unit-count-drop detection.

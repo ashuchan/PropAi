@@ -38,8 +38,8 @@ class AnthropicLLMProvider(LLMProvider):
         if AsyncAnthropic is None:
             raise RuntimeError("anthropic package not installed")
         self._client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
-        self._text_model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
-        self._vision_model = os.getenv("ANTHROPIC_VISION_MODEL", "claude-3-5-sonnet-20241022")
+        self._text_model = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+        self._vision_model = os.getenv("ANTHROPIC_VISION_MODEL", "claude-sonnet-4-20250514")
 
     async def _complete_once(
         self, system: str, user: str, max_tokens: int,
@@ -50,6 +50,15 @@ class AnthropicLLMProvider(LLMProvider):
             system=system,
             messages=[{"role": "user", "content": user}],
         )
+        # Capture usage for interaction logging (bug-hunt #14: _last_usage is
+        # instance-scoped so concurrent providers don't cross-contaminate).
+        self._last_usage: dict[str, object] = {
+            "input_tokens":  resp.usage.input_tokens,
+            "output_tokens": resp.usage.output_tokens,
+            "model":         self._text_model,
+            "call_type":     "text",
+            "provider":      "anthropic",
+        }
         return "".join(getattr(blk, "text", "") for blk in resp.content)
 
     async def _extract_images_once(
@@ -74,6 +83,14 @@ class AnthropicLLMProvider(LLMProvider):
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": content}],  # type: ignore[typeddict-item]
         )
+        # Capture usage for interaction logging.
+        self._last_usage = {
+            "input_tokens":  resp.usage.input_tokens,
+            "output_tokens": resp.usage.output_tokens,
+            "model":         self._vision_model,
+            "call_type":     "vision",
+            "provider":      "anthropic",
+        }
         text = "".join(getattr(blk, "text", "") for blk in resp.content)
         try:
             return json.loads(text)  # type: ignore[no-any-return]
