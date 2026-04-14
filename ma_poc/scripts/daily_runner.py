@@ -321,6 +321,34 @@ def _scrape_in_thread(
         return {"errors": [str(e)], "base_url": url, "_exception": e,
                 "_property_id": property_id, "_llm_interactions": []}
     finally:
+        # Drain pending tasks (e.g., Playwright/httpx internal aclose coroutines)
+        # before closing the loop. Without this, background ``AsyncClient.aclose()``
+        # tasks fire after ``loop.close()`` and spam "Event loop is closed" errors.
+        _close_event_loop(loop)
+
+
+def _close_event_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Shutdown a worker event loop cleanly.
+
+    Cancels any tasks still pending, waits for them to finish (best-effort),
+    shuts down async generators, then closes the loop. This prevents
+    ``RuntimeError: Event loop is closed`` noise from httpx's garbage-collected
+    ``AsyncClient`` instances whose ``aclose()`` coroutines would otherwise be
+    scheduled on an already-closed loop.
+    """
+    try:
+        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+        for task in pending:
+            task.cancel()
+        if pending:
+            loop.run_until_complete(
+                asyncio.gather(*pending, return_exceptions=True),
+            )
+        loop.run_until_complete(loop.shutdown_asyncgens())
+    except Exception:
+        # Best-effort cleanup — never let drain errors mask the scrape result.
+        pass
+    finally:
         loop.close()
 
 def _append_ledger(path: Path, entry: dict) -> None:

@@ -9,7 +9,7 @@ export function TopNav() {
   const [isDark, setIsDark] = useLocalStorage('ma-dark-mode', false);
   useEffect(() => { document.documentElement.classList.toggle('dark', isDark); }, [isDark]);
   const isExplorePage = location.pathname === '/';
-  const navLinks = [{ to: '/', label: 'Explore' }, { to: '/diff', label: 'Diff' }, { to: '/system', label: 'System' }];
+  const navLinks = [{ to: '/', label: 'Explore' }, { to: '/diff', label: 'Diff' }, { to: '/reports', label: 'Reports' }, { to: '/system', label: 'System' }];
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/80">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-6">

@@ -31,6 +31,9 @@ export interface PropertySummary {
   carryForwardDays: number;
   imageUrl: string | null;
   websiteUrl: string;
+  llmCostUsd: number;
+  llmCallCount: number;
+  llmTokensTotal: number;
 }
 
 /** Full property with units and metrics */

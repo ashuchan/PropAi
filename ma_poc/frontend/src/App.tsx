@@ -5,6 +5,7 @@ import { ExplorePage } from '@/pages/ExplorePage';
 import { PropertyDetailPage } from '@/pages/PropertyDetailPage';
 import { DailyDiffPage } from '@/pages/DailyDiffPage';
 import { SystemPage } from '@/pages/SystemPage';
+import { ReportsPage } from '@/pages/ReportsPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 const queryClient = new QueryClient({
@@ -23,6 +24,7 @@ export function App() {
             <Route path="/properties/:id" element={<PropertyDetailPage />} />
             <Route path="/diff" element={<DailyDiffPage />} />
             <Route path="/system" element={<SystemPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

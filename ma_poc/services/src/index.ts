@@ -12,7 +12,7 @@ export type { HealthSummary, HealthAlert, TierDistribution, FailureRecord, Entit
 export type { PaginatedResult, PropertyFilters, SortOptions, ExtractionTier, ScrapeStatus, PropertyStatus } from './types/common.js';
 
 // Interfaces
-export type { IPropertyService } from './interfaces/IPropertyService.js';
+export type { IPropertyService, PropertyReport, PropertyProfile } from './interfaces/IPropertyService.js';
 export type { IUnitService } from './interfaces/IUnitService.js';
 export type { IRunService } from './interfaces/IRunService.js';
 export type { IDiffService } from './interfaces/IDiffService.js';

@@ -22,5 +22,7 @@ export function createPropertyRoutes(propertyService: IPropertyService): Router 
   router.get('/search', validateQuery(searchSchema), async (req, res, next) => { try { const { q, limit } = req.query as Record<string, string>; res.json(await propertyService.searchProperties(q, parseInt(limit) || 20)); } catch (err) { next(err); } });
   router.get('/ranked', validateQuery(rankedSchema), async (req, res, next) => { try { const { metric, dir, limit } = req.query as Record<string, string>; res.json(await propertyService.getRankedProperties(metric, (dir as 'asc' | 'desc') || 'desc', parseInt(limit) || 10)); } catch (err) { next(err); } });
   router.get('/:id', async (req, res, next) => { try { const p = await propertyService.getPropertyById(req.params.id); if (!p) { res.status(404).json({ error: 'Property not found' }); return; } res.json(p); } catch (err) { next(err); } });
+  router.get('/:id/report', async (req, res, next) => { try { const r = await propertyService.getPropertyReport(req.params.id); if (!r) { res.status(404).json({ error: 'Report not found' }); return; } res.json(r); } catch (err) { next(err); } });
+  router.get('/:id/profile', async (req, res, next) => { try { const p = await propertyService.getPropertyProfile(req.params.id); if (!p) { res.status(404).json({ error: 'Profile not found' }); return; } res.json(p); } catch (err) { next(err); } });
   return router;
 }

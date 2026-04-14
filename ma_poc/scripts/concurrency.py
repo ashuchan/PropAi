@@ -402,7 +402,22 @@ class ThreadedPool:
             try:
                 return loop.run_until_complete(async_fn(*args))
             finally:
-                loop.close()
+                # Drain pending tasks and async generators before closing so
+                # httpx/Playwright background ``aclose()`` coroutines don't
+                # spam "Event loop is closed" errors after we return.
+                try:
+                    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+                    for task in pending:
+                        task.cancel()
+                    if pending:
+                        loop.run_until_complete(
+                            asyncio.gather(*pending, return_exceptions=True),
+                        )
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                except Exception:
+                    pass
+                finally:
+                    loop.close()
 
         return self.map(
             _thread_runner,

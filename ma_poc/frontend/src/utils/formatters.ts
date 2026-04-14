@@ -2,6 +2,13 @@ export function formatCurrency(value: number | null | undefined, decimals = 0): 
   if (value == null) return '—';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value);
 }
+export function formatCostUsd(value: number | null | undefined): string {
+  if (value == null) return '—';
+  if (value === 0) return '$0.00';
+  if (value < 0.01) return `$${value.toFixed(4)}`;
+  if (value < 1) return `$${value.toFixed(3)}`;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+}
 export function formatNumber(value: number | null | undefined): string {
   if (value == null) return '—';
   return new Intl.NumberFormat('en-US').format(value);

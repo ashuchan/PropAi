@@ -59,6 +59,27 @@ export async function readJsonFile<T>(filePath: string): Promise<T | null> {
 }
 
 /**
+ * Read a plain text file (e.g., markdown reports).
+ * @param filePath - Absolute path to file
+ * @returns File contents or null if not found
+ */
+export async function readTextFile(filePath: string): Promise<string | null> {
+  return cached<string | null>(`text:${filePath}`, async () => {
+    try {
+      return await readFile(filePath, 'utf-8');
+    } catch (err) {
+      const error = err as NodeJS.ErrnoException;
+      if (error.code === 'ENOENT') {
+        logger.warn({ file: filePath }, 'text file not found');
+        return null;
+      }
+      logger.error({ file: filePath, error: error.message }, 'failed to read text');
+      return null;
+    }
+  });
+}
+
+/**
  * Read and parse a JSONL file (one JSON object per line).
  * @param filePath - Absolute path to JSONL file
  * @returns Array of parsed objects

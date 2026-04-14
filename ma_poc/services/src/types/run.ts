@@ -15,6 +15,9 @@ export interface RunSummary {
   failed: number;
   successRate: number;
   unitsExtracted: number;
+  llmCostUsd: number;
+  llmCallCount: number;
+  llmTokensTotal: number;
 }
 
 /** Detailed run report */
@@ -43,6 +46,16 @@ export interface RunDetail extends RunSummary {
     unitsUnchanged: number;
     unitsDisappeared: number;
     unitsCarriedForward: number;
+  };
+  llmBreakdown: {
+    successfulCalls: number;
+    failedCalls: number;
+    tokensInput: number;
+    tokensOutput: number;
+    propertiesWithLlm: number;
+    byTier: Record<string, { calls: number; costUsd: number; tokensTotal: number }>;
+    byProvider: Record<string, { calls: number; costUsd: number; tokensTotal: number }>;
+    byModel: Record<string, { calls: number; costUsd: number; tokensTotal: number }>;
   };
   failedProperties: Array<{
     rowIndex: number;

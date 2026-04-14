@@ -4,10 +4,11 @@
  * Implements IPropertyService. Caches parsed data with 60s TTL.
  */
 
-import type { IPropertyService } from '../../interfaces/IPropertyService.js';
+import { join } from 'node:path';
+import type { IPropertyService, PropertyReport, PropertyProfile } from '../../interfaces/IPropertyService.js';
 import type { PaginatedResult, PropertyFilters, SortOptions, ExtractionTier, ScrapeStatus } from '../../types/common.js';
 import type { PropertySummary, Property, PropertyAggregates, Unit, FloorPlan, MarketMetrics } from '../../types/property.js';
-import { readJsonFile, readJsonlFile, getLatestRunDate, runPath, statePath } from './dataLoader.js';
+import { readJsonFile, readJsonlFile, readTextFile, getLatestRunDate, getRunDates, runPath, statePath } from './dataLoader.js';
 
 /** Raw property format from backend properties.json */
 interface RawProperty {
@@ -79,6 +80,23 @@ interface RawLedgerEntry {
   warning_count: number;
 }
 
+interface RawLlmReport {
+  by_property?: Array<{
+    property_id: string;
+    calls: number;
+    tokens_input: number;
+    tokens_output: number;
+    tokens_total: number;
+    cost_usd: number;
+  }>;
+}
+
+interface LlmCostEntry {
+  costUsd: number;
+  calls: number;
+  tokensTotal: number;
+}
+
 export class JsonFilePropertyService implements IPropertyService {
   constructor(private readonly dataDir: string) {}
 
@@ -92,14 +110,30 @@ export class JsonFilePropertyService implements IPropertyService {
     const index = await readJsonFile<RawPropertyIndex>(statePath(this.dataDir, 'property_index.json'));
     const ledger = await readJsonlFile<RawLedgerEntry>(runPath(this.dataDir, latestDate, 'ledger.jsonl'));
     const ledgerMap = new Map(ledger.map(l => [l.canonical_id, l]));
+    const llmMap = await this.loadLlmCosts(latestDate);
 
-    return raw.map(p => this.toPropertySummary(p, index, ledgerMap));
+    return raw.map(p => this.toPropertySummary(p, index, ledgerMap, llmMap));
+  }
+
+  private async loadLlmCosts(date: string): Promise<Map<string, LlmCostEntry>> {
+    const report = await readJsonFile<RawLlmReport>(runPath(this.dataDir, date, 'llm_report.json'));
+    const map = new Map<string, LlmCostEntry>();
+    if (!report?.by_property) return map;
+    for (const entry of report.by_property) {
+      map.set(entry.property_id, {
+        costUsd: entry.cost_usd || 0,
+        calls: entry.calls || 0,
+        tokensTotal: entry.tokens_total || 0,
+      });
+    }
+    return map;
   }
 
   private toPropertySummary(
     raw: RawProperty,
     index: RawPropertyIndex | null,
-    ledgerMap: Map<string, RawLedgerEntry>
+    ledgerMap: Map<string, RawLedgerEntry>,
+    llmMap: Map<string, LlmCostEntry>
   ): PropertySummary {
     const id = raw['Unique ID'] || raw['Property ID'];
     const units = raw.units || [];
@@ -112,11 +146,13 @@ export class JsonFilePropertyService implements IPropertyService {
     const avgRent = rents.length > 0 ? rents.reduce((a, b) => a + b, 0) / rents.length : 0;
     const concessions = units.map(u => u.concessions).filter(Boolean);
 
-    const scrapeStatus: ScrapeStatus = ledgerEntry?.carry_forward_used
-      ? 'CARRIED_FORWARD'
-      : ledgerEntry?.scrape_failed
-        ? 'FAILED'
-        : (indexEntry?.last_scrape_status as ScrapeStatus) || 'SUCCESS';
+    const scrapeStatus: ScrapeStatus = units.length === 0
+      ? 'FAILED'
+      : ledgerEntry?.carry_forward_used
+        ? 'CARRIED_FORWARD'
+        : ledgerEntry?.scrape_failed
+          ? 'FAILED'
+          : (indexEntry?.last_scrape_status as ScrapeStatus) || 'SUCCESS';
 
     return {
       id,
@@ -143,6 +179,9 @@ export class JsonFilePropertyService implements IPropertyService {
       carryForwardDays: ledgerEntry?.carry_forward_used ? 1 : 0,
       imageUrl: null,
       websiteUrl: raw['Website'] || indexEntry?.website || '',
+      llmCostUsd: llmMap.get(id)?.costUsd ?? 0,
+      llmCallCount: llmMap.get(id)?.calls ?? 0,
+      llmTokensTotal: llmMap.get(id)?.tokensTotal ?? 0,
     };
   }
 
@@ -192,8 +231,9 @@ export class JsonFilePropertyService implements IPropertyService {
     const index = await readJsonFile<RawPropertyIndex>(statePath(this.dataDir, 'property_index.json'));
     const ledger = await readJsonlFile<RawLedgerEntry>(runPath(this.dataDir, latestDate, 'ledger.jsonl'));
     const ledgerMap = new Map(ledger.map(l => [l.canonical_id, l]));
+    const llmMap = await this.loadLlmCosts(latestDate);
 
-    const summary = this.toPropertySummary(rawProp, index, ledgerMap);
+    const summary = this.toPropertySummary(rawProp, index, ledgerMap, llmMap);
     const units = this.transformUnits(rawProp.units || [], id);
     const floorPlans = this.buildFloorPlans(units);
     const metrics = this.computeMetrics(units);
@@ -258,6 +298,27 @@ export class JsonFilePropertyService implements IPropertyService {
     const items = await this.loadProperties();
     const sorted = this.applySort(items, { field: metric, direction });
     return sorted.slice(0, limit);
+  }
+
+  async getPropertyReport(id: string): Promise<PropertyReport | null> {
+    const dates = await getRunDates(this.dataDir);
+    // Walk runs newest-first so a property with a report in a prior run still resolves.
+    for (const date of dates) {
+      const filePath = runPath(this.dataDir, date, `property_reports/${id}.md`);
+      const markdown = await readTextFile(filePath);
+      if (markdown != null) {
+        return { propertyId: id, runDate: date, filePath, markdown };
+      }
+    }
+    return null;
+  }
+
+  async getPropertyProfile(id: string): Promise<PropertyProfile | null> {
+    const profilesDir = join(this.dataDir, '..', 'config', 'profiles');
+    const filePath = join(profilesDir, `${id}.json`);
+    const data = await readJsonFile<Record<string, unknown>>(filePath);
+    if (!data) return null;
+    return { canonicalId: id, filePath, data };
   }
 
   private transformUnits(rawUnits: RawUnit[], propertyId: string): Unit[] {

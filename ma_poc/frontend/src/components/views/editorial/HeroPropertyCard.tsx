@@ -4,7 +4,7 @@ import { PropertyImage } from '@/components/shared/PropertyImage';
 import { TierBadge } from '@/components/shared/TierBadge';
 import { ConcessionTag } from '@/components/shared/ConcessionTag';
 import { MetricCard } from '@/components/shared/MetricCard';
-import { formatCurrency, formatPercent } from '@/utils/formatters';
+import { formatCurrency, formatPercent, formatCostUsd } from '@/utils/formatters';
 import { cardHover } from '@/utils/motion';
 import type { ApiPropertySummary } from '@/api/properties';
 
@@ -22,10 +22,11 @@ export function HeroPropertyCard({ property }: { property: ApiPropertySummary })
             <TierBadge tier={property.extractionTier} />
           </div>
           {property.activeConcession && <div className="mt-3"><ConcessionTag text={property.activeConcession} /></div>}
-          <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <MetricCard label="Units" value={property.totalUnits} />
             <MetricCard label="Avg Rent" value={formatCurrency(property.avgAskingRent)} />
             <MetricCard label="Availability" value={formatPercent(property.availabilityRate)} />
+            <MetricCard label="LLM Cost" value={formatCostUsd(property.llmCostUsd)} subtitle={property.llmCallCount > 0 ? `${property.llmCallCount} calls` : 'none'} accentColor={property.llmCallCount > 0 ? '#EF9F27' : undefined} />
           </div>
         </div>
       </Link>

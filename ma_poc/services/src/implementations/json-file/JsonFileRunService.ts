@@ -9,6 +9,22 @@ import type { IRunService } from '../../interfaces/IRunService.js';
 import type { RunSummary, RunDetail } from '../../types/run.js';
 import { readJsonFile, getRunDates, runPath } from './dataLoader.js';
 
+interface RawLlmReport {
+  summary?: {
+    total_properties_with_llm?: number;
+    total_calls?: number;
+    successful_calls?: number;
+    failed_calls?: number;
+    total_tokens_input?: number;
+    total_tokens_output?: number;
+    total_tokens?: number;
+    total_cost_usd?: number;
+    by_tier?: Record<string, { calls: number; cost_usd: number; tokens_total: number }>;
+    by_provider?: Record<string, { calls: number; cost_usd: number; tokens_total: number }>;
+    by_model?: Record<string, { calls: number; cost_usd: number; tokens_total: number }>;
+  };
+}
+
 interface RawReport {
   run_date: string;
   retry_mode: string;
@@ -56,7 +72,10 @@ export class JsonFileRunService implements IRunService {
     const summaries: RunSummary[] = [];
     for (const date of dates.slice(0, limit)) {
       const report = await this.loadReport(date);
-      if (report) summaries.push(this.toSummary(report));
+      if (report) {
+        const llm = await this.loadLlmReport(date);
+        summaries.push(this.toSummary(report, llm));
+      }
     }
     return summaries;
   }
@@ -64,7 +83,8 @@ export class JsonFileRunService implements IRunService {
   async getRunByDate(date: string): Promise<RunDetail | null> {
     const report = await this.loadReport(date);
     if (!report) return null;
-    return this.toDetail(report);
+    const llm = await this.loadLlmReport(date);
+    return this.toDetail(report, llm);
   }
 
   async getLatestRun(): Promise<RunDetail> {
@@ -72,7 +92,12 @@ export class JsonFileRunService implements IRunService {
     if (dates.length === 0) throw new Error('No runs found');
     const report = await this.loadReport(dates[0]);
     if (!report) throw new Error(`Report not found for ${dates[0]}`);
-    return this.toDetail(report);
+    const llm = await this.loadLlmReport(dates[0]);
+    return this.toDetail(report, llm);
+  }
+
+  private async loadLlmReport(date: string): Promise<RawLlmReport | null> {
+    return await readJsonFile<RawLlmReport>(runPath(this.dataDir, date, 'llm_report.json'));
   }
 
   private async loadReport(date: string): Promise<RawReport | null> {
@@ -90,7 +115,7 @@ export class JsonFileRunService implements IRunService {
     return null;
   }
 
-  private toSummary(r: RawReport): RunSummary {
+  private toSummary(r: RawReport, llm: RawLlmReport | null): RunSummary {
     const total = r.totals.rows_processed || r.totals.csv_rows_total;
     const succeeded = r.totals.rows_succeeded;
     return {
@@ -99,12 +124,34 @@ export class JsonFileRunService implements IRunService {
       totalProperties: total, succeeded, failed: r.totals.rows_failed,
       successRate: total > 0 ? succeeded / total : 0,
       unitsExtracted: r.state_diff?.units_extracted ?? 0,
+      llmCostUsd: llm?.summary?.total_cost_usd ?? 0,
+      llmCallCount: llm?.summary?.total_calls ?? 0,
+      llmTokensTotal: llm?.summary?.total_tokens ?? 0,
     };
   }
 
-  private toDetail(r: RawReport): RunDetail {
+  private mapLlmBreakdown(raw: Record<string, { calls: number; cost_usd: number; tokens_total: number }> | undefined) {
+    const out: Record<string, { calls: number; costUsd: number; tokensTotal: number }> = {};
+    if (!raw) return out;
+    for (const [k, v] of Object.entries(raw)) {
+      out[k] = { calls: v.calls, costUsd: v.cost_usd, tokensTotal: v.tokens_total };
+    }
+    return out;
+  }
+
+  private toDetail(r: RawReport, llm: RawLlmReport | null): RunDetail {
     return {
-      ...this.toSummary(r),
+      ...this.toSummary(r, llm),
+      llmBreakdown: {
+        successfulCalls: llm?.summary?.successful_calls ?? 0,
+        failedCalls: llm?.summary?.failed_calls ?? 0,
+        tokensInput: llm?.summary?.total_tokens_input ?? 0,
+        tokensOutput: llm?.summary?.total_tokens_output ?? 0,
+        propertiesWithLlm: llm?.summary?.total_properties_with_llm ?? 0,
+        byTier: this.mapLlmBreakdown(llm?.summary?.by_tier),
+        byProvider: this.mapLlmBreakdown(llm?.summary?.by_provider),
+        byModel: this.mapLlmBreakdown(llm?.summary?.by_model),
+      },
       retryMode: r.retry_mode, csvPath: r.csv_path,
       totals: {
         csvRowsTotal: r.totals.csv_rows_total, rowsEligible: r.totals.rows_eligible,

@@ -9,6 +9,7 @@ export interface ApiPropertySummary {
   yearBuilt: number | null; stories: number | null;
   activeConcession: string | null; lastScrapeTimestamp: string;
   carryForwardDays: number; imageUrl: string | null; websiteUrl: string;
+  llmCostUsd: number; llmCallCount: number; llmTokensTotal: number;
 }
 
 export interface ApiPaginatedResult<T> { items: T[]; total: number; page: number; pageSize: number; totalPages: number; }
@@ -19,5 +20,7 @@ export async function fetchProperties(params?: Record<string, string | number | 
   const { data } = await apiClient.get('/properties', { params: cleanParams }); return data;
 }
 export async function fetchPropertyById(id: string) { const { data } = await apiClient.get(`/properties/${id}`); return data; }
+export async function fetchPropertyReport(id: string) { const { data } = await apiClient.get(`/properties/${id}/report`); return data; }
+export async function fetchPropertyProfile(id: string) { const { data } = await apiClient.get(`/properties/${id}/profile`); return data; }
 export async function fetchPropertyStats(): Promise<ApiPropertyAggregates> { const { data } = await apiClient.get('/properties/stats'); return data; }
 export async function searchProperties(q: string, limit = 20): Promise<ApiPropertySummary[]> { const { data } = await apiClient.get('/properties/search', { params: { q, limit } }); return data; }
