@@ -118,13 +118,16 @@ def validate_unit(unit: dict, canonical_id: str, idx: int) -> list[ValidationIss
 
     missing = REQUIRED_UNIT_KEYS - set(unit.keys())
     extra   = set(unit.keys()) - REQUIRED_UNIT_KEYS
-    if missing or extra:
+    if missing:
         issues.append(error(
             UNIT_INVALID_SCHEMA,
-            f"unit {unit.get('unit_id')} has schema mismatch",
+            f"unit {unit.get('unit_id')} missing required keys: {sorted(missing)}",
             canonical_id=canonical_id,
             details={"unit_index": idx, "missing": sorted(missing), "extra": sorted(extra)},
         ))
+    # Extra fields beyond the required set are harmless — APIs often return
+    # more fields than we need (e.g. floorplan_image_url, _sqft, _floor_plan).
+    # No warning emitted for extra keys.
 
     uid = unit.get("unit_id")
     if not uid or not str(uid).strip():

@@ -98,6 +98,7 @@ ENTRATA_PRIORITY_PATHS = [
     "/floorplans",
     "/apartments",
     "/availability",
+    "/vacancies",            # vacancy listing pages (e.g. projectmanagementinc.net)
     "/rent",
     "/conventional",        # Entrata "conventional" lease page
 ]
@@ -247,6 +248,13 @@ _FALSE_POSITIVE_HOSTS = {
     "comms.entrata.com",
 }
 
+# Subdomains of blocked hosts that actually serve unit/floor-plan data.
+# Checked BEFORE _FALSE_POSITIVE_HOSTS — an allowlisted host is never blocked.
+_ALLOWLIST_OVERRIDES = {
+    "api.ws.realpage.com",          # /v2/property/{id}/floorplans, /v2/units
+    "onlineleasing.realpage.com",   # leasing portal with unit data
+}
+
 # URL path fragments that are never unit/availability data.
 _FALSE_POSITIVE_PATH_FRAGMENTS = {
     "/tag-manager/",
@@ -284,12 +292,13 @@ def looks_like_availability_api(url: str) -> bool:
     """
     url_lower = url.lower()
 
-    # Reject known false-positive hosts.
+    # Reject known false-positive hosts (unless allowlisted).
     try:
         host = urllib.parse.urlparse(url_lower).netloc
-        for fp_host in _FALSE_POSITIVE_HOSTS:
-            if host == fp_host or host.endswith("." + fp_host):
-                return False
+        if host not in _ALLOWLIST_OVERRIDES:
+            for fp_host in _FALSE_POSITIVE_HOSTS:
+                if host == fp_host or host.endswith("." + fp_host):
+                    return False
     except Exception:
         pass
 
@@ -571,10 +580,10 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
                               "max_price","maxPrice","price_max")
             beds      = _get(item, "bedrooms","beds","bedroom_count","numBedrooms",
                               "bd","Bedrooms","BedroomCount","bedroomCount","num_bedrooms",
-                              "no_of_bedroom","no_of_bedrooms")
+                              "no_of_bedroom","no_of_bedrooms","bedroomNumber","BedroomNumber")
             baths     = _get(item, "bathrooms","baths","bathroom_count","numBathrooms",
                               "ba","Bathrooms","BathroomCount","bathroomCount","num_bathrooms",
-                              "no_of_bathroom","no_of_bathrooms")
+                              "no_of_bathroom","no_of_bathrooms","bathroomNumber","BathroomNumber")
             sqft      = _get(item, "sqft","squareFeet","square_feet","minSqft",
                               "size","SquareFeet","Sqft","sqftMin","area","square_footage",
                               "squareFootage","display_area","displayArea")
@@ -586,7 +595,7 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
                               "available_on","availableOn","display_available_on","readyDate")
             status    = _get(item, "status","availability_status","leaseStatus","Status","unit_status")
             unit_num  = _get(item, "unitNumber","unit_number","unitId","unit_id","UnitNumber",
-                              "label","display_unit_number")
+                              "label","display_unit_number","unitCode","unit_code")
             floor_num = _get(item, "floor","floorNumber","FloorNumber","floor_id","floorId")
             building  = _get(item, "building","buildingName","BuildingName","building_name")
             plan_type = _get(item, "floorPlanType","type","bedBath","BedBath")
@@ -667,6 +676,51 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
 
 TARGET_JSONLD_TYPES = {"Apartment", "ApartmentComplex", "Offer", "FloorPlan", "Residence", "SingleFamilyResidence"}
 
+
+def _is_low_signal_units(units: list[dict]) -> bool:
+    """True if every unit is missing both a rent and a unit_number/unit_id.
+
+    Phase 3 tiers (JSON-LD, DOM, generic API parser) can return placeholder
+    rows that pass a container/selector check but carry no rent and no unit
+    identifier. Accepting such a result makes the pipeline stop before
+    Phase 4 link exploration, which is where real unit data usually lives.
+    """
+    if not units:
+        return True
+    for u in units:
+        has_rent = bool(
+            u.get("rent_range") or u.get("market_rent_low")
+            or u.get("market_rent_high") or u.get("rent")
+        )
+        has_id = bool(
+            (u.get("unit_number") or "").strip()
+            or (u.get("unit_id") or "").strip()
+        )
+        if has_rent or has_id:
+            return False
+    return True
+
+
+def _units_below_expected(units: list[dict], expected: int | None,
+                          floor_ratio: float = 0.2) -> bool:
+    """True if ``units`` is materially smaller than the known expected count.
+
+    Used to reject premature Phase 3 success when the prior run or the CSV
+    says the property has N units and today's extractor returned <20% of N.
+    Applies only when every unit in the result is also rent-less — a small
+    but correctly-priced result may just reflect low availability.
+    """
+    if not expected or expected <= 0 or not units:
+        return False
+    if len(units) >= max(1, int(expected * floor_ratio)):
+        return False
+    # Only veto if rents are also missing — a 2-unit result with real rents
+    # may legitimately be the only availability.
+    return all(
+        not (u.get("rent_range") or u.get("market_rent_low") or u.get("rent"))
+        for u in units
+    )
+
 def _jsonld_type_matches(item: dict) -> bool:
     t = item.get("@type")
     if isinstance(t, list):
@@ -717,6 +771,8 @@ async def extract_property_metadata(page: Page) -> dict:
         "year_built":  None,
         "stories":     None,
         "total_units": None,
+        "image_url":   None,
+        "gallery_urls": [],
     }
 
     try:
@@ -750,6 +806,13 @@ async def extract_property_metadata(page: Page) -> dict:
     md["site_name"]   = (ogs.get("og:site_name") or "").strip()
     if not md["name"]:
         md["name"] = md["site_name"] or (ogs.get("og:title") or "").strip() or md["title"]
+
+    # Property hero image — prefer og:image, fall back to twitter:image.
+    _hero = (ogs.get("og:image") or ogs.get("og:image:secure_url")
+             or ogs.get("twitter:image") or ogs.get("twitter:image:src") or "").strip()
+    if _hero:
+        md["image_url"] = _hero
+        md["gallery_urls"].append(_hero)
 
     # Lat/lng from common meta-tag conventions.
     for k in ("place:location:latitude", "geo.position", "ICBM", "og:latitude"):
@@ -802,6 +865,22 @@ async def extract_property_metadata(page: Page) -> dict:
                         pass
                 if not md["total_units"] and isinstance(node.get("numberOfRooms"), (int, float)):
                     md["total_units"] = int(node["numberOfRooms"])
+                # JSON-LD image: string | {url: ...} | list of either.
+                img = node.get("image") or node.get("photo")
+                if img:
+                    _urls: list[str] = []
+                    for item in (img if isinstance(img, list) else [img]):
+                        if isinstance(item, str) and item.strip():
+                            _urls.append(item.strip())
+                        elif isinstance(item, dict):
+                            u = item.get("url") or item.get("contentUrl")
+                            if isinstance(u, str) and u.strip():
+                                _urls.append(u.strip())
+                    if _urls and not md["image_url"]:
+                        md["image_url"] = _urls[0]
+                    for u in _urls:
+                        if u not in md["gallery_urls"]:
+                            md["gallery_urls"].append(u)
             for v in node.values():
                 _walk(v)
         elif isinstance(node, list):
@@ -821,6 +900,37 @@ async def extract_property_metadata(page: Page) -> dict:
             md["telephone"] = m.group(0).strip()
 
     return md
+
+def _jsonld_item_has_unit_signal(item: dict) -> bool:
+    """True if a JSON-LD node has offers/pricing/rooms data — i.e. unit-level.
+
+    ApartmentComplex blocks describing the *property* as a whole (just name,
+    address, phone) routinely pass the @type filter but have no offers or
+    numberOfRooms. Emitting them as units produces a garbage single-unit
+    record and makes Phase 3 declare premature success.
+    """
+    offers = item.get("offers")
+    if isinstance(offers, dict) and (
+        offers.get("price") or offers.get("lowPrice") or offers.get("highPrice")
+    ):
+        return True
+    if isinstance(offers, list) and offers:
+        return True
+    num_rooms = item.get("numberOfRooms")
+    if isinstance(num_rooms, dict):
+        num_rooms = num_rooms.get("value")
+    try:
+        if num_rooms not in (None, "") and float(num_rooms) > 0:
+            return True
+    except (TypeError, ValueError):
+        pass
+    if item.get("floorSize"):
+        return True
+    t = item.get("@type")
+    t_list = t if isinstance(t, list) else [t]
+    return any(x in ("Apartment", "FloorPlan", "Residence", "Offer",
+                     "SingleFamilyResidence") for x in t_list if isinstance(x, str))
+
 
 async def parse_jsonld(page: Page) -> list[dict]:
     """Tier 2: parse Schema.org JSON-LD blocks."""
@@ -846,6 +956,11 @@ async def parse_jsonld(page: Page) -> list[dict]:
         _walk_jsonld(data, matched)
 
         for item in matched:
+            # Quality gate: skip property-level shells (ApartmentComplex with
+            # no offers/rooms/floorSize) — they're not units.
+            if not _jsonld_item_has_unit_signal(item):
+                continue
+
             name = item.get("name") or ""
             if not isinstance(name, str):
                 name = str(name)
@@ -941,7 +1056,13 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
         # Must have multiple matching elements AND at least one with rent-like text
         if len(els) >= 2:
             for el in els[:5]:
-                txt = await el.inner_text()
+                try:
+                    txt = await el.inner_text()
+                except Exception:
+                    try:
+                        txt = await page.evaluate("el => el.textContent || ''", el)
+                    except Exception:
+                        continue
                 if re.search(r"\$\d{3,}", txt):
                     cards = els
                     matched_sel = sel
@@ -958,7 +1079,10 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
     seen: set[str] = set()
     for card in cards:
         try:
-            text = (await card.inner_text()).strip()
+            try:
+                text = (await card.inner_text()).strip()
+            except Exception:
+                text = (await page.evaluate("el => el.textContent || ''", card)).strip()
             if not text or len(text) < 20:
                 continue
 
@@ -1050,9 +1174,16 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
             unum_m = re.search(r"(?:unit|apt\.?)\s*#?\s*([A-Z]?\d{2,4}[A-Z]?)", text, re.I)
             unit["unit_number"] = unum_m.group(1) if unum_m else ""
 
+            # DOM-tier minimum: require a rent OR a unit number. Floor-plan
+            # cards with just name/bed/sqft are not unit records and produce
+            # misleading zero-rent rows if accepted. Fall through to Phase 4
+            # so the real availability page / API can be discovered.
+            if not (unit["rent_range"] or unit["unit_number"]):
+                continue
+
             # Dedup
             key = unit["unit_number"] or f"{unit['floor_plan_name']}|{unit['bedrooms']}|{unit['sqft']}|{unit['rent_range']}"
-            if key in seen or not (unit["floor_plan_name"] or unit["rent_range"]):
+            if key in seen:
                 continue
             seen.add(key)
 
@@ -1064,8 +1195,13 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
 
 # ── Click expanders ────────────────────────────────────────────────────────────
 
-async def click_expanders(page: Page):
-    """Click 'View Available Units', 'See All', etc. — restricted to actually-clickable elements."""
+async def click_expanders(page: Page, deep: bool = False):
+    """Click 'View Available Units', 'See All', etc. — restricted to actually-clickable elements.
+
+    When ``deep=True``, also clicks floor-plan cards/tabs to trigger per-plan
+    availability APIs (required for sites like Elio at Lake Lena where each
+    floor plan has a separate "Check Availability" action).
+    """
     clickable = page.locator("button, a, [role='button'], input[type='button'], input[type='submit']")
     for pattern in EXPAND_BUTTON_PATTERNS:
         try:
@@ -1077,12 +1213,39 @@ async def click_expanders(page: Page):
                 if not await btn.is_visible():
                     continue
                 label = (await btn.inner_text()).strip()[:60]
-                print(f"    🖱  Clicking: {label!r}")
+                print(f"    Clicking: {label!r}")
                 await btn.click(timeout=3000, no_wait_after=True)
                 await asyncio.sleep(1.5)
             except Exception:
                 # Element may have detached, navigated, or been obscured — skip and continue.
                 continue
+
+    # Deep interaction: click individual floor-plan cards/tabs to trigger
+    # their per-plan availability APIs or reveal per-plan unit tables.
+    if deep:
+        _FP_SELECTORS = (
+            '[class*="floor-plan"] a, [class*="floor-plan"] button, '
+            '[class*="floorplan"] a, [class*="floorplan"] button, '
+            '.plan-card, .fp-card, [data-floor-plan], '
+            '[class*="FloorPlan"] a, [class*="FloorPlan"] button, '
+            '.floor-plan-card a, .floor-plan-card button'
+        )
+        try:
+            fp_cards = await page.query_selector_all(_FP_SELECTORS)
+            for card in fp_cards[:8]:
+                try:
+                    if not await card.is_visible():
+                        continue
+                    label = (await page.evaluate("el => el.textContent || ''", card)).strip()[:40]
+                    if not label:
+                        continue
+                    print(f"    Deep-click (floor plan): {label!r}")
+                    await card.click(timeout=3000, no_wait_after=True)
+                    await asyncio.sleep(2.0)
+                except Exception:
+                    continue
+        except Exception:
+            pass
 
 # ── Embedded JSON extraction (Tier 1.5) ──────────────────────────────────────
 
@@ -1301,8 +1464,42 @@ async def detect_leasing_portals(page: Page) -> list[str]:
             print(f"  🔍 Current page is a leasing portal: {page.url[:80]}")
             return []
 
+    # ── Check for external property-domain links ─────────────────────────
+    # Management company sites (e.g. willowbridgepc.com) often link to the
+    # property's own domain (e.g. eliolakelena.com).  Detect these by
+    # checking if any external link's domain contains a word from the page
+    # title or property name (4+ chars, excluding common stop words).
+    if not portal_urls:
+        try:
+            page_title = await page.title()
+            _stop = {"the", "apartments", "apartment", "community", "communities",
+                     "home", "homes", "welcome", "living", "residences",
+                     "properties", "property", "www", "com", "net", "org"}
+            name_words = [w.lower() for w in re.findall(r'[a-zA-Z]{4,}', page_title or '')
+                         if w.lower() not in _stop]
+            if name_words:
+                all_links = await page.evaluate("""() => {
+                    return Array.from(document.querySelectorAll('a[href]'))
+                        .map(a => ({href: a.href, text: (a.innerText || '').trim().substring(0, 80)}))
+                        .filter(l => l.href.startsWith('http'));
+                }""")
+                current_domain = urllib.parse.urlparse(page.url).netloc.lower()
+                for link_info in (all_links or []):
+                    link_domain = urllib.parse.urlparse(link_info['href']).netloc.lower()
+                    if link_domain == current_domain:
+                        continue
+                    for word in name_words:
+                        if word in link_domain:
+                            portal_urls.append(link_info['href'])
+                            print(f"  External property domain detected: {link_info['href'][:100]}")
+                            break
+                    if portal_urls:
+                        break  # Take only the first match
+        except Exception:
+            pass
+
     if portal_urls:
-        print(f"  🔍 Found {len(portal_urls)} leasing portal link(s):")
+        print(f"  Found {len(portal_urls)} leasing portal / external property link(s):")
         for u in portal_urls[:5]:
             print(f"     {u[:120]}")
 
@@ -1562,6 +1759,7 @@ def prioritize_links(
     anchor_text_links: list[str],
     profile: Any | None = None,
     base_url: str = "",
+    property_city: str | None = None,
 ) -> list[str]:
     """Sort and deduplicate links by priority for exploration.
 
@@ -1608,6 +1806,15 @@ def prioritize_links(
     for path in ENTRATA_PRIORITY_PATHS:
         url = base_url.rstrip("/") + path
         _add(url)
+        # For vacancy-type pages, also try with city filter appended.
+        if property_city and path == "/vacancies":
+            _add(url + "?city=" + urllib.parse.quote(property_city))
+
+    # Also check if the base domain (not the property sub-path) has a vacancies page.
+    if property_city:
+        parsed = urllib.parse.urlparse(base_url)
+        domain_root = f"{parsed.scheme}://{parsed.netloc}"
+        _add(domain_root + "/vacancies?city=" + urllib.parse.quote(property_city))
 
     # Priority 4: URL keyword matches from internal links
     for link in sorted(internal_links):
@@ -1712,6 +1919,7 @@ async def explore_link_with_observation(
     link: str,
     api_responses: list[dict],
     base_url: str,
+    deep_click: bool = False,
 ) -> tuple[list[dict], list[dict], list[dict]]:
     """Navigate to a link, observe new network calls, try extraction.
 
@@ -1733,7 +1941,7 @@ async def explore_link_with_observation(
             print(f"  ⚠ Load error: {err_str[:120]}")
         return [], [], []
 
-    await click_expanders(page)
+    await click_expanders(page, deep=deep_click)
     await asyncio.sleep(1.5)
 
     # Identify new API responses captured during this navigation
@@ -1810,7 +2018,9 @@ async def _extract_dom_sections_with_rent_signals(page: Page) -> list[str]:
 
 
 async def scrape(base_url: str, proxy: str | None = None,
-                 profile: Any | None = None) -> dict:
+                 profile: Any | None = None,
+                 expected_total_units: int | None = None,
+                 property_city: str | None = None) -> dict:
     # Normalize http → https.  Nearly all property sites support HTTPS;
     # plain HTTP causes redirect stalls (3-5s wasted per page) or hangs
     # entirely when the server forces HSTS but the redirect chain is slow.
@@ -1945,12 +2155,23 @@ async def scrape(base_url: str, proxy: str | None = None,
             print(f"\n{'='*65}")
             print(f"  STEP 1: Load homepage — {base_url}")
             print(f"{'='*65}")
+            _page_unreachable = False
             try:
                 await _goto_robust(page, base_url, timeout_ms=60000)
             except Exception as e:
                 msg = f"Homepage load error: {e}"
                 print(f"  ⚠ {msg}")
                 results["errors"].append(msg)
+                # Mark page as unreachable so LLM/Vision phases are skipped
+                # (no point analyzing a browser error page).
+                err_str = str(e).lower()
+                if any(sig in err_str for sig in (
+                    "err_ssl", "err_name_not_resolved", "err_connection_refused",
+                    "err_connection_timed_out", "err_too_many_redirects",
+                    "err_cert", "net::err_", "timeout",
+                )):
+                    _page_unreachable = True
+                    print(f"  ⛔ Page unreachable — will skip LLM/Vision phases")
 
             # Extract property-level metadata from the loaded homepage.
             try:
@@ -2002,6 +2223,12 @@ async def scrape(base_url: str, proxy: str | None = None,
             for link in sorted(internal_links):
                 print(f"     {link}")
 
+            # Wait briefly for any in-flight XHR/fetch responses to arrive.
+            # SPA sites (SightMap, Entrata widgets) fire API calls AFTER
+            # domcontentloaded — a 2s settle catches most of them.
+            if not api_responses:
+                await asyncio.sleep(2.0)
+
             # ════════════════════════════════════════════════════════════
             # PHASE 2: Noise Filtering
             # ════════════════════════════════════════════════════════════
@@ -2020,7 +2247,35 @@ async def scrape(base_url: str, proxy: str | None = None,
             print(f"  PHASE 3: Known Pattern Extraction — {len(filtered_responses)} API responses")
             print(f"{'='*65}")
 
+            # Effective expected unit count — CSV's "Total Units" wins if
+            # provided, otherwise fall back to last successful scrape.
+            _expected_units = expected_total_units
+            if not _expected_units and profile is not None:
+                conf = getattr(profile, "confidence", None)
+                _expected_units = getattr(conf, "last_unit_count", None) if conf else None
+
+            def _phase3_accept(candidate: list[dict], tier_name: str) -> bool:
+                """Reject premature Phase 3 success when the result looks bogus.
+
+                Three rejection conditions:
+                  1. Every unit lacks both rent and an id (placeholder row).
+                  2. Unit count is <20% of the known expected count AND rents
+                     are missing (likely a featured-units teaser).
+                  3. CSV Total Units is known and result is <20% of it.
+                """
+                if _is_low_signal_units(candidate):
+                    print(f"  ✗ {tier_name}: rejected — all units have no rent "
+                          f"and no unit_id (continuing cascade)")
+                    return False
+                if _units_below_expected(candidate, _expected_units):
+                    print(f"  ✗ {tier_name}: rejected — {len(candidate)} units "
+                          f"<< expected {_expected_units} (continuing cascade)")
+                    return False
+                return True
+
             units = try_known_patterns(filtered_responses, profile)
+            if units and not _phase3_accept(units, "TIER_1_API"):
+                units = []
             if units:
                 tier_label = "TIER_1_API"
                 # Check if it came from a profile mapping
@@ -2039,23 +2294,26 @@ async def scrape(base_url: str, proxy: str | None = None,
                 embedded_blobs = await extract_embedded_json(page)
                 if embedded_blobs:
                     api_responses.extend(embedded_blobs)
-                    units = parse_api_responses(embedded_blobs)
-                    if units:
+                    candidate = parse_api_responses(embedded_blobs)
+                    if candidate and _phase3_accept(candidate, "TIER_1_5_EMBEDDED"):
+                        units = candidate
                         print(f"  ✅ TIER 1.5 (Embedded JSON — homepage): "
                               f"{len(units)} units/floor plans")
                         results["extraction_tier_used"] = "TIER_1_5_EMBEDDED"
 
             # Tier 2 — JSON-LD on homepage
             if not units:
-                units = await parse_jsonld(page)
-                if units:
+                candidate = await parse_jsonld(page)
+                if candidate and _phase3_accept(candidate, "TIER_2_JSONLD"):
+                    units = candidate
                     print(f"  ✅ TIER 2 (JSON-LD): {len(units)} items")
                     results["extraction_tier_used"] = "TIER_2_JSONLD"
 
             # Tier 3 — DOM on homepage
             if not units:
-                units = await parse_dom(page, base_url)
-                if units:
+                candidate = await parse_dom(page, base_url)
+                if candidate and _phase3_accept(candidate, "TIER_3_DOM"):
+                    units = candidate
                     print(f"  ✅ TIER 3 (DOM — homepage): {len(units)} units/floor plans")
                     results["extraction_tier_used"] = "TIER_3_DOM"
 
@@ -2080,7 +2338,8 @@ async def scrape(base_url: str, proxy: str | None = None,
 
             if not units and not _profile_skip_crawl:
                 crawl_queue = prioritize_links(
-                    internal_links, anchor_text_links, profile, base_url
+                    internal_links, anchor_text_links, profile, base_url,
+                    property_city=property_city,
                 )
                 print(f"\n{'='*65}")
                 print(f"  PHASE 4: Link Exploration — {len(crawl_queue)} links to visit")
@@ -2101,8 +2360,16 @@ async def scrape(base_url: str, proxy: str | None = None,
                     print(f"\n{'─'*65}")
                     print(f"  PHASE 4 [{len(visited)}/{MAX_CRAWL_PAGES}]: {target}")
 
+                    # Use deep clicking for COLD profiles to discover
+                    # floor-plan tabs/accordions that trigger per-plan APIs.
+                    _is_cold = True
+                    if profile is not None:
+                        _conf = getattr(profile, "confidence", None)
+                        _mat = getattr(_conf, "maturity", "COLD") if _conf else "COLD"
+                        _is_cold = (_mat == "COLD")
                     link_units, new_resps, llm_cands = await explore_link_with_observation(
                         page, target, api_responses, base_url,
+                        deep_click=_is_cold,
                     )
 
                     # Filter new responses through profile blocklist
@@ -2185,13 +2452,108 @@ async def scrape(base_url: str, proxy: str | None = None,
             results["api_calls_intercepted"] = [r["url"] for r in api_responses]
 
             # ════════════════════════════════════════════════════════════
+            # PHASE 4.5: LLM-Guided Navigation Discovery
+            # ════════════════════════════════════════════════════════════
+            # For COLD profiles with 0 units and no LLM candidates after
+            # Phase 4, use vision LLM to suggest navigation actions.
+            if (not units and not all_llm_candidates and not _page_unreachable
+                    and len(visited) < MAX_CRAWL_PAGES):
+                _is_cold_4_5 = True
+                if profile is not None:
+                    _c45 = getattr(profile, "confidence", None)
+                    _m45 = getattr(_c45, "maturity", "COLD") if _c45 else "COLD"
+                    _is_cold_4_5 = (_m45 == "COLD")
+
+                if _is_cold_4_5:
+                    print(f"\n{'='*65}")
+                    print(f"  PHASE 4.5: LLM Navigation Discovery")
+                    print(f"{'='*65}")
+                    try:
+                        screenshot = await page.screenshot(full_page=True)
+                        from services.vision_extractor import suggest_navigation
+
+                        nav_suggestions = await suggest_navigation(
+                            screenshot=screenshot,
+                            property_context={
+                                "property_name": results.get("property_name", ""),
+                                "website": base_url,
+                            },
+                            property_id=results.get("_property_id", "unknown"),
+                        )
+
+                        if nav_suggestions:
+                            print(f"  LLM suggested {len(nav_suggestions)} navigation actions")
+                            for suggestion in nav_suggestions[:3]:
+                                action = suggestion.get("action", "")
+                                if action == "navigate":
+                                    target_url = suggestion.get("url", "")
+                                    if target_url and target_url not in visited:
+                                        print(f"    Navigate → {target_url[:80]}")
+                                        visited.add(target_url)
+                                        link_units, new_resps, llm_cands = await explore_link_with_observation(
+                                            page, target_url, api_responses, base_url,
+                                            deep_click=True,
+                                        )
+                                        if new_resps:
+                                            new_resps = filter_network_noise(new_resps, profile)
+                                        if link_units:
+                                            units = link_units
+                                            results["extraction_tier_used"] = "TIER_4_5_LLM_NAV"
+                                            results["_winning_page_url"] = target_url
+                                            print(f"  PHASE 4.5: {len(units)} units from {target_url[:80]}")
+                                            break
+                                        all_llm_candidates.extend(llm_cands)
+                                elif action == "click":
+                                    selector = suggestion.get("selector", "")
+                                    text = suggestion.get("text", "")
+                                    if selector:
+                                        try:
+                                            print(f"    Click → {text!r} ({selector})")
+                                            api_before = len(api_responses)
+                                            await page.click(selector, timeout=5000)
+                                            await asyncio.sleep(2.0)
+                                            new_apis = api_responses[api_before:]
+                                            if new_apis:
+                                                new_apis = filter_network_noise(new_apis, profile)
+                                                click_units = parse_api_responses(new_apis)
+                                                if click_units:
+                                                    units = click_units
+                                                    results["extraction_tier_used"] = "TIER_4_5_LLM_NAV"
+                                                    print(f"  PHASE 4.5: {len(units)} units from click")
+                                                    break
+                                                all_llm_candidates.extend(
+                                                    [r for r in new_apis
+                                                     if _response_looks_like_units(r.get("body"))]
+                                                )
+                                        except Exception as e:
+                                            print(f"    Click failed: {e}")
+                                            continue
+                        else:
+                            print("  No navigation suggestions from LLM")
+                    except ImportError:
+                        print("  (vision_extractor.suggest_navigation not available)")
+                    except Exception as e:
+                        print(f"  Phase 4.5 error: {e}")
+
+            # ════════════════════════════════════════════════════════════
             # PHASE 5: LLM-Assisted API Analysis
             # ════════════════════════════════════════════════════════════
             # Analyze promising but unparsed API responses one at a time.
             # Max 3 LLM calls per property.
             llm_analysis_results: dict[str, Any] = {}
 
-            if not units and all_llm_candidates:
+            # HOT profiles with run_full_cascade=False skip LLM phases —
+            # the profile says only the known-good tier works for this property.
+            _skip_llm = (
+                not run_full_cascade
+                and skip_to_tier is not None
+                and skip_to_tier <= 3
+            )
+            if _skip_llm:
+                print(f"  📋 Profile: HOT with preferred_tier={skip_to_tier}, "
+                      "skipping LLM/Vision (no cascade)")
+
+            if not units and all_llm_candidates and not _page_unreachable and not _skip_llm:
                 print(f"\n{'='*65}")
                 print(f"  PHASE 5: LLM API Analysis — {len(all_llm_candidates)} candidates (max 3)")
                 print(f"{'='*65}")
@@ -2240,7 +2602,7 @@ async def scrape(base_url: str, proxy: str | None = None,
             # ════════════════════════════════════════════════════════════
             # If no APIs worked, find DOM sections with rent signals and
             # analyze them with LLM. Falls back to Vision LLM last.
-            if not units:
+            if not units and not _page_unreachable and not _skip_llm:
                 print(f"\n{'='*65}")
                 print(f"  PHASE 6: DOM Fallback + LLM")
                 print(f"{'='*65}")
@@ -2335,6 +2697,10 @@ async def scrape(base_url: str, proxy: str | None = None,
                 if not units:
                     print("  ⚠ ALL PHASES (3-6) FAILED — no units extracted.")
                     results["extraction_tier_used"] = "FAILED"
+
+            if not units and _page_unreachable:
+                print("  ⛔ UNREACHABLE — skipped LLM/Vision phases to avoid wasting budget.")
+                results["extraction_tier_used"] = "FAILED_UNREACHABLE"
 
             # ════════════════════════════════════════════════════════════
             # PHASE 7: Finalization + Profile Learning

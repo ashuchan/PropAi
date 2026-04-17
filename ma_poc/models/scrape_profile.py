@@ -12,9 +12,9 @@ from __future__ import annotations
 import urllib.parse
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ProfileMaturity(str, Enum):
@@ -26,6 +26,8 @@ class ProfileMaturity(str, Enum):
 class BlockedEndpoint(BaseModel):
     """API endpoint analyzed and found to contain no unit data."""
 
+    model_config = ConfigDict(extra="ignore")
+
     url_pattern: str
     reason: str = ""  # "chatbot_config", "analytics", "no_unit_data", etc.
     blocked_at: datetime = Field(default_factory=datetime.utcnow)
@@ -34,6 +36,8 @@ class BlockedEndpoint(BaseModel):
 
 class LlmFieldMapping(BaseModel):
     """LLM-generated JSON path mapping for deterministic replay on future runs."""
+
+    model_config = ConfigDict(extra="ignore")
 
     api_url_pattern: str
     json_paths: dict[str, str] = Field(default_factory=dict)  # field -> key name in API response
@@ -45,6 +49,8 @@ class LlmFieldMapping(BaseModel):
 class ApiEndpoint(BaseModel):
     """A discovered API endpoint that returns unit/floor-plan data."""
 
+    model_config = ConfigDict(extra="ignore")
+
     url_pattern: str
     json_paths: dict[str, str] = Field(default_factory=dict)
     provider: Optional[str] = None  # "sightmap", "knock", "entrata_api", etc.
@@ -52,6 +58,8 @@ class ApiEndpoint(BaseModel):
 
 class FieldSelectorMap(BaseModel):
     """CSS selectors for extracting unit fields from the DOM."""
+
+    model_config = ConfigDict(extra="ignore")
 
     container: Optional[str] = None
     unit_id: Optional[str] = None
@@ -67,12 +75,16 @@ class FieldSelectorMap(BaseModel):
 class ExpanderAction(BaseModel):
     """A click-to-expand action needed before DOM parsing."""
 
+    model_config = ConfigDict(extra="ignore")
+
     selector: str
     action: str = "click"  # "click" or "scroll_into_view"
 
 
 class NavigationConfig(BaseModel):
     """How to navigate to the property's availability page."""
+
+    model_config = ConfigDict(extra="ignore")
 
     entry_url: Optional[str] = None
     availability_page_path: Optional[str] = None
@@ -83,22 +95,50 @@ class NavigationConfig(BaseModel):
     availability_links: list[str] = Field(default_factory=list)  # All links that led to availability data
     explored_links: list[str] = Field(default_factory=list)  # Links explored that had no data (skip next run)
 
+    @field_validator("explored_links", mode="before")
+    @classmethod
+    def cap_explored_links(cls, v: list[str]) -> list[str]:
+        """Cap explored_links at 50 entries to prevent unbounded growth."""
+        if isinstance(v, list) and len(v) > 50:
+            return v[:50]
+        return v
+
 
 class ApiHints(BaseModel):
     """Learned API interception hints."""
 
+    model_config = ConfigDict(extra="ignore")
+
     known_endpoints: list[ApiEndpoint] = Field(default_factory=list)
     widget_endpoints: list[str] = Field(default_factory=list)  # Entrata widget URLs with data
-    api_provider: Optional[str] = None
+    api_provider: Optional[str] = "unknown"
+    client_account_id: Optional[str] = None
     wait_for_url_pattern: Optional[str] = None
     blocked_endpoints: list[BlockedEndpoint] = Field(default_factory=list)  # Per-property noise blocklist
     llm_field_mappings: list[LlmFieldMapping] = Field(default_factory=list)  # Saved mappings for replay
+
+    @field_validator("blocked_endpoints", mode="before")
+    @classmethod
+    def cap_blocked_endpoints(cls, v: list[object]) -> list[object]:
+        """Cap blocked_endpoints at 50 entries."""
+        if isinstance(v, list) and len(v) > 50:
+            return v[:50]
+        return v
+
+    @field_validator("llm_field_mappings", mode="before")
+    @classmethod
+    def cap_llm_field_mappings(cls, v: list[object]) -> list[object]:
+        """Cap llm_field_mappings at 20 entries."""
+        if isinstance(v, list) and len(v) > 20:
+            return v[:20]
+        return v
 
 
 class DomHints(BaseModel):
     """Learned DOM parsing hints."""
 
-    platform_detected: Optional[str] = None
+    model_config = ConfigDict(extra="ignore")
+
     field_selectors: FieldSelectorMap = Field(default_factory=FieldSelectorMap)
     jsonld_present: bool = False
     availability_page_sections: list[str] = Field(default_factory=list)  # CSS selectors for unit sections
@@ -107,16 +147,22 @@ class DomHints(BaseModel):
 class ExtractionConfidence(BaseModel):
     """Track extraction success/failure history to drive maturity promotion."""
 
+    model_config = ConfigDict(extra="ignore")
+
     preferred_tier: Optional[int] = None  # 1-5
     last_success_tier: Optional[int] = None
     consecutive_successes: int = 0
     consecutive_failures: int = 0
     last_unit_count: int = 0
     maturity: ProfileMaturity = ProfileMaturity.COLD
+    last_success_detection: Any = None  # Stores DetectedPMS dict from pms.detector
+    consecutive_unreachable: int = 0
 
 
 class LlmArtifacts(BaseModel):
     """Artifacts from LLM extraction calls, used for drift detection."""
+
+    model_config = ConfigDict(extra="ignore")
 
     extraction_prompt_hash: Optional[str] = None
     field_mapping_notes: Optional[str] = None
@@ -125,11 +171,29 @@ class LlmArtifacts(BaseModel):
     last_api_analysis_results: dict[str, str] = Field(default_factory=dict)  # API URL -> "has_units"|"noise"
 
 
+class ProfileStats(BaseModel):
+    """Aggregate statistics for a scrape profile."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    total_scrapes: int = 0
+    total_successes: int = 0
+    total_failures: int = 0
+    total_llm_calls: int = 0
+    total_llm_cost_usd: float = 0.0
+    last_tier_used: Optional[str] = None
+    last_unit_count: int = 0
+    p50_scrape_duration_ms: Optional[int] = None
+    p95_scrape_duration_ms: Optional[int] = None
+
+
 class ScrapeProfile(BaseModel):
     """Per-property scraping profile that learns optimal extraction strategy."""
 
+    model_config = ConfigDict(extra="ignore")
+
     canonical_id: str
-    version: int = 1
+    version: int = 2
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     updated_by: str = "BOOTSTRAP"  # BOOTSTRAP | LLM_EXTRACTION | LLM_VISION | HUMAN
@@ -139,7 +203,7 @@ class ScrapeProfile(BaseModel):
     dom_hints: DomHints = Field(default_factory=DomHints)
     confidence: ExtractionConfidence = Field(default_factory=ExtractionConfidence)
     llm_artifacts: LlmArtifacts = Field(default_factory=LlmArtifacts)
-    cluster_id: Optional[str] = None
+    stats: ProfileStats = Field(default_factory=ProfileStats)
 
 
 def detect_platform(url: str) -> Optional[str]:

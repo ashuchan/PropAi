@@ -165,6 +165,7 @@ TARGET_PROPERTY_FIELDS = [
     "First Move-In Date", "Property Style", "Update Date", "Unit Mix",
     "Asset Grade in Submarket", "Asset Grade in Market",
     "Phone", "Website",
+    "Property Image URL", "Property Gallery URLs",
 ]
 
 # Field groups that are pass-through from CSV; runner never tries to extract them.
@@ -241,6 +242,10 @@ def build_property_record(
     rec["Phone"]              = pick(_f(row, "Phone"), md.get("telephone"))
     rec["Website"]            = _f(row, *WEBSITE_KEYS) or scrape_result.get("base_url")
 
+    # ── Images (scraped from OpenGraph / JSON-LD) ──────────────────────────
+    rec["Property Image URL"]    = md.get("image_url") or None
+    rec["Property Gallery URLs"] = md.get("gallery_urls") or []
+
     # ── Aggregates from scraped units (computed every run, always wins) ────
     rec["Average Unit Size (SF)"] = stats["average_unit_size_sf"] or _num(row, "Average Unit Size (SF)")
     rec["Total Units"]            = stats["total_units_found"] or _num(row, "Total Units")
@@ -275,11 +280,16 @@ def build_property_record(
 # ── Run orchestrator ──────────────────────────────────────────────────────────
 
 async def _scrape_one(url: str, proxy: str | None, timeout_s: int,
-                      profile: Any = None) -> dict:
+                      profile: Any = None,
+                      expected_total_units: int | None = None,
+                      property_city: str | None = None) -> dict:
     """Run scrape() with a hard timeout so a stuck page can never hang the run."""
     try:
         return await asyncio.wait_for(
-            scrape(url, proxy=proxy, profile=profile), timeout=timeout_s,
+            scrape(url, proxy=proxy, profile=profile,
+                   expected_total_units=expected_total_units,
+                   property_city=property_city),
+            timeout=timeout_s,
         )
     except TimeoutError:
         return {"errors": [f"scrape timeout after {timeout_s}s"], "base_url": url,
@@ -292,6 +302,8 @@ def _scrape_in_thread(
     timeout_s: int,
     property_id: str = "unknown",
     profile: Any = None,
+    expected_total_units: int | None = None,
+    property_city: str | None = None,
 ) -> dict:
     """
     Run a single scrape in its own thread with its own event loop.
@@ -310,7 +322,9 @@ def _scrape_in_thread(
     loop = asyncio.new_event_loop()
     try:
         result = loop.run_until_complete(
-            _scrape_one(url, proxy, timeout_s, profile=profile),
+            _scrape_one(url, proxy, timeout_s, profile=profile,
+                        expected_total_units=expected_total_units,
+                        property_city=property_city),
         )
         # Stamp the canonical property ID so entrata.py's LLM tiers can
         # reference it when building interaction records.
@@ -633,6 +647,15 @@ async def run_daily(
     with ThreadPoolExecutor(
         max_workers=pool_size, thread_name_prefix="scrape"
     ) as executor:
+        def _expected_units_for(row: dict) -> int | None:
+            """Parse CSV 'Total Units' as an integer hint for Phase 3 gating."""
+            v = _num(row, "Total Units")
+            try:
+                n = int(v) if v is not None else 0
+                return n if n > 0 else None
+            except (TypeError, ValueError):
+                return None
+
         futures = [
             loop.run_in_executor(
                 executor,
@@ -642,6 +665,8 @@ async def run_daily(
                 scrape_timeout_s,
                 item[2].canonical_id or "unknown",  # property_id for LLM logging
                 scrape_profiles[si],                 # profile for tier-skip routing
+                _expected_units_for(item[1]),        # expected Total Units from CSV
+                csv_get(item[1], *CITY_KEYS) or None,  # property_city for vacancy filtering
             )
             for si, item in enumerate(scrapeable)
         ]
@@ -742,6 +767,22 @@ async def run_daily(
                 canonical_id=cid, row_index=idx,
                 details={"exception": str(e), "traceback": traceback.format_exc()[-1500:]},
             ))
+
+        # If transform produced units but the scraper didn't set a tier,
+        # infer the tier from the API responses so profile updater counts it
+        # as a success (e.g., SightMap units extracted by transform_units).
+        if target_units and not scrape_result.get("extraction_tier_used"):
+            raw_apis = scrape_result.get("_raw_api_responses") or []
+            for api in raw_apis:
+                api_url = api.get("url", "")
+                if "sightmap.com" in api_url:
+                    scrape_result["extraction_tier_used"] = "TIER_1_SIGHTMAP"
+                    break
+                elif "realpage.com" in api_url:
+                    scrape_result["extraction_tier_used"] = "TIER_1_API"
+                    break
+            else:
+                scrape_result["extraction_tier_used"] = "TIER_1_API"
 
         # Strip the internal helper fields (underscore-prefixed) that the
         # transformer uses for aggregates. We still need the originals for

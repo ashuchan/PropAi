@@ -216,3 +216,4 @@ ma_poc/services/node_modules/
 
 config/*
 data/*
+ma_poc/tests/pms/adapters/fixtures/*/*.json

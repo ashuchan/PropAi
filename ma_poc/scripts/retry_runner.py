@@ -81,6 +81,7 @@ from concurrency import SystemResources  # noqa: E402
 from daily_runner import (  # noqa: E402
     TARGET_PROPERTY_FIELDS,
     _append_ledger,
+    _num,
     _scrape_in_thread,
     _write_issues_jsonl,
     build_property_record,
@@ -475,6 +476,15 @@ async def run_retry(
     pool_size = sysres.optimal_pool_size()
     log.info(f"Scraping {len(scrapeable)} properties with {pool_size} threads")
 
+    def _expected_units_for(row: dict) -> int | None:
+        """Parse CSV 'Total Units' as an integer hint for Phase 3 gating."""
+        v = _num(row, "Total Units")
+        try:
+            n = int(v) if v is not None else 0
+            return n if n > 0 else None
+        except (TypeError, ValueError):
+            return None
+
     loop = asyncio.get_running_loop()
     scrape_results_raw: list[Any] = [None] * len(scrapeable)
 
@@ -490,6 +500,7 @@ async def run_retry(
                 scrape_timeout_s,
                 item[2].canonical_id or "unknown",  # property_id for LLM logging
                 scrape_profiles[si],                 # profile for tier-skip routing
+                _expected_units_for(item[1]),         # expected Total Units from CSV
             )
             for si, item in enumerate(scrapeable)
         ]
@@ -585,6 +596,20 @@ async def run_retry(
                 canonical_id=cid, row_index=orig_idx,
                 details={"exception": str(e), "traceback": traceback.format_exc()[-1500:]},
             ))
+
+        # Infer tier from API responses if transform found units but scraper didn't set one.
+        if target_units and not scrape_result.get("extraction_tier_used"):
+            raw_apis = scrape_result.get("_raw_api_responses") or []
+            for api in raw_apis:
+                api_url = api.get("url", "")
+                if "sightmap.com" in api_url:
+                    scrape_result["extraction_tier_used"] = "TIER_1_SIGHTMAP"
+                    break
+                elif "realpage.com" in api_url:
+                    scrape_result["extraction_tier_used"] = "TIER_1_API"
+                    break
+            else:
+                scrape_result["extraction_tier_used"] = "TIER_1_API"
 
         public_units = [{k: v for k, v in u.items() if not k.startswith("_")} for u in target_units]
 

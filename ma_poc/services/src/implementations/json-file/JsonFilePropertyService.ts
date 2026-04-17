@@ -40,6 +40,8 @@ interface RawProperty {
   'Asset Grade in Submarket': string;
   'Asset Grade in Market': string;
   'Update Date': string;
+  'Property Image URL'?: string | null;
+  'Property Gallery URLs'?: string[];
   units: RawUnit[];
 }
 
@@ -51,6 +53,7 @@ interface RawUnit {
   lease_link: string;
   concessions: string | null;
   amenities: string | null;
+  floorplan_image_url?: string | null;
 }
 
 interface RawPropertyIndex {
@@ -177,7 +180,8 @@ export class JsonFilePropertyService implements IPropertyService {
       activeConcession: concessions[0] || null,
       lastScrapeTimestamp: indexEntry?.last_seen_at || raw['Update Date'] || '',
       carryForwardDays: ledgerEntry?.carry_forward_used ? 1 : 0,
-      imageUrl: null,
+      imageUrl: raw['Property Image URL'] || null,
+      galleryUrls: raw['Property Gallery URLs'] || [],
       websiteUrl: raw['Website'] || indexEntry?.website || '',
       llmCostUsd: llmMap.get(id)?.costUsd ?? 0,
       llmCallCount: llmMap.get(id)?.calls ?? 0,
@@ -332,6 +336,7 @@ export class JsonFilePropertyService implements IPropertyService {
         availableDate: u.available_date || null, leaseLink: u.lease_link || '',
         concessions: u.concessions, amenities: u.amenities,
         daysOnMarket: null, rentPerSqft: null,
+        floorplanImageUrl: u.floorplan_image_url || null,
       };
     });
   }

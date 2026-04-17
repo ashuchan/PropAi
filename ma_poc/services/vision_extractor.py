@@ -201,3 +201,90 @@ async def extract_with_vision(
     )
 
     return units, hints, raw_response_str, interaction
+
+
+# ── Navigation Discovery (Phase 4.5) ─────────────────────────────────────────
+
+_NAV_PROMPT: str | None = None
+
+def _load_nav_prompt() -> str:
+    """Load navigation discovery prompt from config/prompts/."""
+    global _NAV_PROMPT
+    if _NAV_PROMPT is not None:
+        return _NAV_PROMPT
+    import pathlib
+    prompt_path = pathlib.Path(__file__).resolve().parent.parent / "config" / "prompts" / "navigation_discovery.txt"
+    if prompt_path.exists():
+        _NAV_PROMPT = prompt_path.read_text(encoding="utf-8")
+    else:
+        _NAV_PROMPT = (
+            "You are analyzing a screenshot of an apartment property website. "
+            "Identify navigation actions (click buttons/tabs, or navigate to URLs) "
+            "that would lead to apartment unit availability and pricing data. "
+            "Return JSON: {{\"suggestions\": [{{\"action\": \"click\"|\"navigate\", "
+            "\"selector\": \"CSS selector\", \"url\": \"URL\", \"text\": \"label\", "
+            "\"reasoning\": \"why\"}}], \"page_analysis\": \"description\"}}"
+        )
+    return _NAV_PROMPT
+
+
+async def suggest_navigation(
+    screenshot: bytes,
+    property_context: dict,
+    property_id: str = "unknown",
+) -> list[dict]:
+    """Use vision LLM to suggest navigation actions for finding unit data.
+
+    Returns a list of action dicts:
+      [{"action": "click", "selector": "...", "text": "..."}, ...]
+    or [{"action": "navigate", "url": "...", "text": "..."}, ...]
+    """
+    prompt_template = _load_nav_prompt()
+    prompt = prompt_template.format(
+        property_name=property_context.get("property_name", "Unknown"),
+        website=property_context.get("website", ""),
+    )
+
+    try:
+        from llm.factory import get_vision_provider
+        provider = get_vision_provider()
+    except Exception as exc:
+        log.error("Failed to get vision provider for navigation: %s", exc)
+        return []
+
+    t0 = time.monotonic()
+    result: dict[str, Any] = {}
+    try:
+        result = await provider.extract_from_images([screenshot], prompt, max_tokens=2048)
+    except Exception as exc:
+        log.error("Navigation LLM call failed: %s", exc)
+        return []
+
+    latency_ms = int((time.monotonic() - t0) * 1000)
+
+    # Parse the response
+    if isinstance(result, dict):
+        suggestions = result.get("suggestions", [])
+    else:
+        parsed = _parse_vision_response(str(result))
+        suggestions = parsed.get("suggestions", [])
+
+    if not isinstance(suggestions, list):
+        suggestions = []
+
+    # Filter to valid actions only
+    valid = []
+    for s in suggestions[:5]:
+        if not isinstance(s, dict):
+            continue
+        action = s.get("action", "")
+        if action == "click" and s.get("selector"):
+            valid.append(s)
+        elif action == "navigate" and s.get("url"):
+            valid.append(s)
+
+    log.info(
+        "Navigation discovery: %d suggestions | latency=%dms | property=%s",
+        len(valid), latency_ms, property_id,
+    )
+    return valid

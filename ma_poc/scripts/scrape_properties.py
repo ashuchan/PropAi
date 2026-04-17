@@ -163,6 +163,8 @@ def _sightmap_units_from_body(body: dict, source_url: str) -> list[dict]:
             "lease_link":       _sightmap_lease_link(u, fp),
             "concessions":      (u.get("specials_description") or None),
             "amenities":        None,  # SightMap stores amenities as filter IDs only.
+            # Floor plan diagram image (SightMap exposes directly on the floor_plan).
+            "floorplan_image_url": fp.get("image") or fp.get("image_3d") or fp.get("image_secondary") or None,
             # Carry sqft for property-level Average Unit Size aggregate.
             "_sqft":            int(u["area"]) if isinstance(u.get("area"), (int, float)) and u["area"] > 0 else None,
             "_floor_plan":      fp.get("name") or fp.get("filter_label") or "",
@@ -305,6 +307,13 @@ def _generic_units_from_body(body, source_url: str) -> list[dict]:
             continue
 
         sqft_v = u.get("area") or u.get("sqft") or u.get("square_feet") or u.get("squareFeet")
+        # Floor plan / unit image — many PMS APIs expose one of these keys.
+        fp_img = (u.get("floorplan_image") or u.get("floorplanImage") or u.get("floorPlanImage")
+                  or u.get("floor_plan_image") or u.get("floorplan_image_url") or u.get("floorPlanImageUrl")
+                  or u.get("image") or u.get("imageUrl") or u.get("image_url")
+                  or u.get("thumbnail") or u.get("photoUrl") or None)
+        if isinstance(fp_img, dict):
+            fp_img = fp_img.get("url") or fp_img.get("src") or None
         out.append({
             "unit_id":          unit_id,
             "market_rent_low":  lo,
@@ -315,6 +324,7 @@ def _generic_units_from_body(body, source_url: str) -> list[dict]:
             "concessions":      u.get("specials_description") or u.get("concession")
                                 or u.get("special") or u.get("specials") or None,
             "amenities":        None,
+            "floorplan_image_url": fp_img if isinstance(fp_img, str) and fp_img.startswith("http") else None,
             "_sqft":            int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
             "_floor_plan":      u.get("floorPlanName") or u.get("floor_plan_name")
                                 or u.get("model_id") or u.get("name") or "",
@@ -382,6 +392,7 @@ def _realpage_units_from_body(body, source_url: str) -> list[dict]:
                 "lease_link":       None,
                 "concessions":      None,
                 "amenities":        None,
+                "floorplan_image_url": fp.get("imageUrl") or fp.get("image") or fp.get("floorPlanImage") or None,
                 "_sqft":            sqft_v,
                 "_floor_plan":      fp.get("name") or fp_id,
                 "_bedrooms":        beds,
@@ -413,12 +424,76 @@ def _realpage_units_from_body(body, source_url: str) -> list[dict]:
                 "lease_link":       u.get("applyOnlineUrl") or None,
                 "concessions":      u.get("concessions") or u.get("specials") or None,
                 "amenities":        None,
+                "floorplan_image_url": u.get("floorPlanImage") or u.get("floorplanImage") or u.get("imageUrl") or None,
                 "_sqft":            int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
                 "_floor_plan":      u.get("floorPlanName") or u.get("floorplanName") or "",
                 "_bedrooms":        u.get("bedrooms") or u.get("bedRooms"),
             })
         return out
 
+    return out
+
+
+def _avalon_units_from_body(body, source_url: str) -> list[dict]:
+    """Parse AvalonBay community-units API responses.
+
+    AvalonBay's ``/pf/api/v3/content/fetch/community-units`` endpoint returns
+    a dict with ``units`` (list of individual apartment units) and optionally
+    ``unitsSummary`` (promotional banners — ignored).
+
+    Each unit has: ``unitId``, ``bedroomNumber``, ``bathroomNumber``,
+    ``squareFeet``, ``floorPlanName``, ``pricing`` (nested dict with
+    ``effectiveRent``, ``minRent``, ``maxRent``), ``availableDate``, etc.
+    """
+    out: list[dict] = []
+    if not isinstance(body, dict):
+        return out
+
+    # The unit list lives directly at body["units"] — NOT inside unitsSummary.
+    raw_units = body.get("units")
+    if not isinstance(raw_units, list) or not raw_units:
+        return out
+
+    print(f"    avalon_parser({source_url[:60]}): "
+          f"{len(raw_units)} raw units")
+
+    for u in raw_units:
+        if not isinstance(u, dict):
+            continue
+        uid = str(u.get("unitId") or u.get("unitNumber") or u.get("unitCode") or "")
+        if not uid:
+            continue
+
+        # Avalon nests rent inside a pricing object or at top level.
+        lo, hi = _extract_rent(u)
+        if lo is None:
+            pricing = u.get("pricing")
+            if isinstance(pricing, dict):
+                lo = _money_to_int(pricing.get("effectiveRent") or pricing.get("minRent")
+                                   or pricing.get("rent"))
+                hi = _money_to_int(pricing.get("maxRent")) or lo
+        if hi is None:
+            hi = lo
+        if lo is not None and (lo < _RENT_MIN or lo > _RENT_MAX):
+            continue
+
+        sqft = u.get("squareFeet") or u.get("sqft")
+        sqft_v = int(sqft) if isinstance(sqft, (int, float)) and sqft > 0 else None
+
+        out.append({
+            "unit_id":          uid,
+            "market_rent_low":  lo,
+            "market_rent_high": hi,
+            "available_date":   _to_iso_date(u.get("availableDate") or u.get("moveInDate")
+                                             or u.get("available_date")),
+            "lease_link":       u.get("applyUrl") or u.get("applyOnlineUrl") or None,
+            "concessions":      u.get("promotionTitle") or u.get("concession") or None,
+            "amenities":        None,
+            "floorplan_image_url": u.get("floorPlanImage") or u.get("imageUrl") or None,
+            "_sqft":            sqft_v,
+            "_floor_plan":      u.get("floorPlanName") or u.get("floorplanName") or "",
+            "_bedrooms":        u.get("bedroomNumber") or u.get("bedrooms"),
+        })
     return out
 
 
@@ -462,6 +537,15 @@ def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
             if len(target) > before:
                 parser_used = "realpage"
                 print(f"  transform: RealPage parser → {len(target) - before} units from {url[:60]}")
+        elif ("avaloncommunities" in host or "avalonbay" in host
+              or "community-units" in url.lower()):
+            before = len(target)
+            for u in _avalon_units_from_body(body, url):
+                _add(u)
+                dedicated_hit = True
+            if len(target) > before:
+                parser_used = "avalon"
+                print(f"  transform: Avalon parser → {len(target) - before} units from {url[:60]}")
 
     # Pass 2: generic walker — only if no dedicated parser yielded anything,
     # because authoritative APIs make every other captured response noise.
@@ -498,6 +582,7 @@ def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
                 "lease_link":       u.get("source_api_url") or None,
                 "concessions":      u.get("concession") or None,
                 "amenities":        None,
+                "floorplan_image_url": u.get("floorplan_image_url") or u.get("floor_plan_image") or None,
                 "_sqft":            sqft_v,
                 "_floor_plan":      u.get("floor_plan_name") or "",
                 "_bedrooms":        u.get("bedrooms") or None,
@@ -638,6 +723,9 @@ def build_property_record(csv_row: dict, scrape_result: dict, target_units: list
         "Asset Grade in Submarket":  None,
         "Asset Grade in Market":     None,
         "Lease Start Date":          None,
+
+        "Property Image URL":        md.get("image_url") or None,
+        "Property Gallery URLs":     md.get("gallery_urls") or [],
 
         "Update Date":               date.today().isoformat(),
 

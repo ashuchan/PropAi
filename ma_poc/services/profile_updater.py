@@ -28,11 +28,13 @@ log = logging.getLogger(__name__)
 # Tier name → tier number mapping
 _TIER_MAP: dict[str, int] = {
     "TIER_1_API": 1,
+    "TIER_1_PROFILE_MAPPING": 1,
     "TIER_1_5_EMBEDDED": 1,
     "TIER_1_SIGHTMAP": 1,
     "TIER_1_WIDGET": 1,
     "TIER_2_JSONLD": 2,
     "TIER_3_DOM": 3,
+    "TIER_3_DOM_LLM": 3,
     "TIER_4_LLM": 4,
     "TIER_4_ENTRATA_API": 4,
     "TIER_5_PORTAL": 5,
@@ -169,7 +171,8 @@ def update_profile_after_extraction(
             profile.navigation.availability_page_path = path
 
     # ── Record API URLs that had data (Tier 1 / widget) ──────────────
-    if tier in ("TIER_1_API", "TIER_1_WIDGET", "TIER_5_5_EXPLORATORY"):
+    if tier in ("TIER_1_API", "TIER_1_PROFILE_MAPPING", "TIER_1_5_EMBEDDED",
+                "TIER_1_WIDGET", "TIER_5_5_EXPLORATORY"):
         raw_apis = scrape_result.get("_raw_api_responses", [])
         for api in raw_apis:
             url = api.get("url", "")

@@ -8,7 +8,7 @@ export interface ApiPropertySummary {
   extractionTier: string; scrapeStatus: string; propertyStatus: string;
   yearBuilt: number | null; stories: number | null;
   activeConcession: string | null; lastScrapeTimestamp: string;
-  carryForwardDays: number; imageUrl: string | null; websiteUrl: string;
+  carryForwardDays: number; imageUrl: string | null; galleryUrls?: string[]; websiteUrl: string;
   llmCostUsd: number; llmCallCount: number; llmTokensTotal: number;
 }
 

@@ -30,6 +30,7 @@ export interface PropertySummary {
   lastScrapeTimestamp: string;
   carryForwardDays: number;
   imageUrl: string | null;
+  galleryUrls?: string[];
   websiteUrl: string;
   llmCostUsd: number;
   llmCallCount: number;
@@ -72,6 +73,7 @@ export interface Unit {
   amenities: string | null;
   daysOnMarket: number | null;
   rentPerSqft: number | null;
+  floorplanImageUrl: string | null;
 }
 
 /** Floor plan grouping */
