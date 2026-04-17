@@ -459,10 +459,13 @@ async def run_daily(
     start_at: int,
     proxy: str | None,
     scrape_timeout_s: int,
+    schema_version: str = "v1",
 ) -> dict:
     started_at = datetime.now(UTC)
-    run_dir = data_dir / "runs" / run_date
-    state_dir = data_dir / "state"
+    # Namespace runs and state by schema version so V1/V2 data never collide.
+    schema_root = data_dir / schema_version
+    run_dir = schema_root / "runs" / run_date
+    state_dir = schema_root / "state"
     raw_dir = run_dir / "raw_api"
     run_dir.mkdir(parents=True, exist_ok=True)
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -482,7 +485,7 @@ async def run_daily(
     failed_properties: list[dict] = []
     all_llm_interactions: list[dict] = []  # accumulated across all properties
 
-    log.info(f"=== Daily run {run_date} → {run_dir} ===")
+    log.info(f"=== Daily run {run_date} → {run_dir} | schema={schema_version} ===")
 
     # ── 1. Load CSV ─────────────────────────────────────────────────────────
     try:
@@ -918,10 +921,19 @@ async def run_daily(
         state_snapshot = state.get_property(cid)
         rec: dict | None = None
         try:
-            rec = build_property_record(
-                row, ident, scrape_result, public_units,
-                state_snapshot, carry_forward_used,
-            )
+            if schema_version == "v2":
+                from schema_v2 import build_v2_property, validate_v2_property
+                rec = build_v2_property(
+                    row, ident, scrape_result, public_units,
+                    scrape_ts=datetime.now(UTC),
+                )
+                v2_issues = validate_v2_property(rec, canonical_id=cid)
+                per_prop_issues.extend(v2_issues)
+            else:
+                rec = build_property_record(
+                    row, ident, scrape_result, public_units,
+                    state_snapshot, carry_forward_used,
+                )
             properties_out.append(rec)
         except Exception as e:
             per_prop_issues.append(V.error(
@@ -1086,11 +1098,17 @@ async def run_daily(
     except Exception as e:
         log.warning(f"⚠ LLM run summary write failed: {e}")
 
-    # Update latest-run pointer.
+    # Update latest-run pointer (schema-namespaced + global).
     try:
+        pointer = {"run_date": run_date, "path": str(run_dir),
+                   "schema_version": schema_version,
+                   "properties": report["totals"]["properties_emitted"]}
+        # Per-schema pointer
+        with open(schema_root / "latest_run.json", "w", encoding="utf-8") as f:
+            json.dump(pointer, f, indent=2)
+        # Global pointer (whichever schema ran last)
         with open(data_dir / "latest_run.json", "w", encoding="utf-8") as f:
-            json.dump({"run_date": run_date, "path": str(run_dir),
-                       "properties": report["totals"]["properties_emitted"]}, f, indent=2)
+            json.dump(pointer, f, indent=2)
     except Exception:
         pass
 
@@ -1118,17 +1136,23 @@ def main():
     p.add_argument("--proxy",    default=None)
     p.add_argument("--scrape-timeout", type=int, default=180,
                    help="Per-property scrape timeout (seconds)")
+    p.add_argument("--schema-version", choices=["v1", "v2"], default=None,
+                   help="Output schema version (default: env SCHEMA_VERSION or v1)")
     args = p.parse_args()
 
     csv_path = Path(args.csv)
     data_dir = Path(args.data_dir)
     run_date = args.run_date or date.today().isoformat()
 
+    from schema_v2 import get_schema_version
+    schema_version = get_schema_version(args)
+
     try:
         report = asyncio.run(run_daily(
             csv_path, run_date, data_dir,
             args.limit, args.start_at, args.proxy,
             args.scrape_timeout,
+            schema_version=schema_version,
         ))
         if report.get("exit_status") == "FATAL":
             sys.exit(2)

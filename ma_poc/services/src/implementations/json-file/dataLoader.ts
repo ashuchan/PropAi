@@ -1,9 +1,12 @@
 /**
  * @file dataLoader.ts
  * @description Centralized file I/O with caching for JSON data files.
+ * Supports schema-versioned directory layout (data/{v1|v2}/runs/, data/{v1|v2}/state/)
+ * with automatic fallback to legacy flat layout (data/runs/, data/state/).
  */
 
 import { readFile, readdir, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { logger } from '../../logger.js';
 
@@ -111,13 +114,44 @@ export async function readJsonlFile<T>(filePath: string): Promise<T[]> {
 }
 
 /**
+ * Resolve the effective data root for the current schema version.
+ * Checks data/{version}/runs/ first — if it exists, uses the versioned layout.
+ * Otherwise falls back to the legacy flat layout (data/runs/).
+ * Result is cached per dataDir so the check runs only once per process.
+ */
+const resolvedRoots = new Map<string, string>();
+
+function resolveDataRoot(dataDir: string): string {
+  const existing = resolvedRoots.get(dataDir);
+  if (existing) return existing;
+
+  const version = process.env.SCHEMA_VERSION || 'v1';
+  const versioned = join(dataDir, version);
+  const versionedRunsDir = join(versioned, 'runs');
+
+  let root: string;
+  if (existsSync(versionedRunsDir)) {
+    root = versioned;
+    logger.info({ root, version }, 'using schema-versioned data directory');
+  } else {
+    // No versioned directory yet — use legacy flat layout
+    root = dataDir;
+    logger.info({ root, version, checked: versionedRunsDir }, 'versioned data dir not found, using legacy flat layout');
+  }
+
+  resolvedRoots.set(dataDir, root);
+  return root;
+}
+
+/**
  * Get sorted list of available run dates.
  * @param dataDir - Base data directory
  * @returns Array of date strings sorted descending
  */
 export async function getRunDates(dataDir: string): Promise<string[]> {
-  return cached<string[]>(`runs:${dataDir}`, async () => {
-    const runsDir = join(dataDir, 'runs');
+  const root = resolveDataRoot(dataDir);
+  return cached<string[]>(`runs:${root}`, async () => {
+    const runsDir = join(root, 'runs');
     try {
       const entries = await readdir(runsDir);
       const dateDirs: string[] = [];
@@ -155,7 +189,8 @@ export async function getLatestRunDate(dataDir: string): Promise<string | null> 
  * @returns Absolute file path
  */
 export function runPath(dataDir: string, date: string, filename: string): string {
-  return join(dataDir, 'runs', date, filename);
+  const root = resolveDataRoot(dataDir);
+  return join(root, 'runs', date, filename);
 }
 
 /**
@@ -165,10 +200,12 @@ export function runPath(dataDir: string, date: string, filename: string): string
  * @returns Absolute file path
  */
 export function statePath(dataDir: string, filename: string): string {
-  return join(dataDir, 'state', filename);
+  const root = resolveDataRoot(dataDir);
+  return join(root, 'state', filename);
 }
 
-/** Clear all cached data. Useful for testing. */
+/** Clear all cached data and resolved roots. Useful for testing. */
 export function clearCache(): void {
   cache.clear();
+  resolvedRoots.clear();
 }

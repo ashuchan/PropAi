@@ -19,6 +19,7 @@ interface RawProperty {
     lease_link: string;
     concessions: string | null;
     amenities: string | null;
+    floorplan_image_url?: string | null;
   }>;
 }
 
@@ -77,6 +78,7 @@ export class JsonFileUnitService implements IUnitService {
         availableDate: u.available_date || null, leaseLink: u.lease_link || '',
         concessions: u.concessions, amenities: u.amenities,
         daysOnMarket: null, rentPerSqft: null,
+        floorplanImageUrl: u.floorplan_image_url || null,
       };
     });
   }

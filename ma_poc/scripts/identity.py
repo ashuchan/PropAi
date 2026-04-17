@@ -33,7 +33,7 @@ from typing import Any
 
 # ── Column-name aliases ────────────────────────────────────────────────────────
 
-UNIQUE_ID_KEYS   = ("Unique ID", "unique_id", "UniqueID")
+UNIQUE_ID_KEYS   = ("Unique ID", "unique_id", "UniqueID", "apartmentid", "apartment_id")
 PROPERTY_ID_KEYS = ("Property ID", "property_id", "PropertyID", "id")
 ADDRESS_KEYS     = ("Property Address", "Address", "address", "Street")
 CITY_KEYS        = ("City", "city")

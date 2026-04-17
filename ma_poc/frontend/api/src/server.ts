@@ -1,3 +1,12 @@
+import { config as dotenvConfig } from 'dotenv';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Load .env from ma_poc/ root (3 levels up from api/src/)
+const __filename2 = fileURLToPath(import.meta.url);
+const __dirname2 = dirname(__filename2);
+dotenvConfig({ path: resolve(__dirname2, '..', '..', '..', '.env') });
+
 import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
@@ -15,6 +24,7 @@ async function startServer() {
   app.use(cors({ origin: config.corsOrigin }));
   app.use(express.json());
   app.use(createRequestLogger(config.logLevel));
+  app.get('/api/config', (_req, res) => { res.json({ schemaVersion: config.schemaVersion }); });
   app.use('/api/properties', createPropertyRoutes(services.properties));
   app.use('/api/runs', createRunRoutes(services.runs));
   app.use('/api/diff', createDiffRoutes(services.diff));

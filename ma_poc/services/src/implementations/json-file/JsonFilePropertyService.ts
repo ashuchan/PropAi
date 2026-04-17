@@ -7,7 +7,7 @@
 import { join } from 'node:path';
 import type { IPropertyService, PropertyReport, PropertyProfile } from '../../interfaces/IPropertyService.js';
 import type { PaginatedResult, PropertyFilters, SortOptions, ExtractionTier, ScrapeStatus } from '../../types/common.js';
-import type { PropertySummary, Property, PropertyAggregates, Unit, FloorPlan, MarketMetrics } from '../../types/property.js';
+import type { PropertySummary, Property, PropertyAggregates, Unit, FloorPlan, MarketMetrics, PropertyMedia, FloorPlanImage, SchemaVersion } from '../../types/property.js';
 import { readJsonFile, readJsonlFile, readTextFile, getLatestRunDate, getRunDates, runPath, statePath } from './dataLoader.js';
 
 /** Raw property format from backend properties.json */
@@ -54,6 +54,47 @@ interface RawUnit {
   concessions: string | null;
   amenities: string | null;
   floorplan_image_url?: string | null;
+}
+
+/** Raw V2 property format from backend properties.json (schema_v2.py output) */
+interface RawV2Property {
+  apartment_id: number | null;
+  proj_name: string;
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string | null;
+  country: string | null;
+  phone: string | null;
+  email_address: string | null;
+  website: string | null;
+  pmc: string | null;
+  website_design: string | null;
+  concessions: string | null;
+  units: RawV2Unit[];
+}
+
+interface RawV2Unit {
+  unit_id: string | null;
+  beds: number;
+  baths: number;
+  floor_plan_name: string | null;
+  area: number;
+  rent_low: number | null;
+  rent_high: number | null;
+  date_captured: string;
+  available_date: string | null;
+  lease_term: number | null;
+  move_in_date: string | null;
+}
+
+/** Detect whether raw JSON array is V1 or V2 format */
+function detectSchemaVersion(raw: unknown[]): SchemaVersion {
+  if (!raw || raw.length === 0) return 'v1';
+  const first = raw[0] as Record<string, unknown>;
+  // V2 records have apartment_id and proj_name; V1 has 'Property Name' and 'Unique ID'
+  if ('apartment_id' in first || 'proj_name' in first) return 'v2';
+  return 'v1';
 }
 
 interface RawPropertyIndex {
@@ -103,19 +144,26 @@ interface LlmCostEntry {
 export class JsonFilePropertyService implements IPropertyService {
   constructor(private readonly dataDir: string) {}
 
+  private detectedSchema: SchemaVersion = 'v1';
+
   private async loadProperties(): Promise<PropertySummary[]> {
     const latestDate = await getLatestRunDate(this.dataDir);
     if (!latestDate) return [];
 
-    const raw = await readJsonFile<RawProperty[]>(runPath(this.dataDir, latestDate, 'properties.json'));
+    const raw = await readJsonFile<unknown[]>(runPath(this.dataDir, latestDate, 'properties.json'));
     if (!raw) return [];
+
+    this.detectedSchema = detectSchemaVersion(raw);
 
     const index = await readJsonFile<RawPropertyIndex>(statePath(this.dataDir, 'property_index.json'));
     const ledger = await readJsonlFile<RawLedgerEntry>(runPath(this.dataDir, latestDate, 'ledger.jsonl'));
     const ledgerMap = new Map(ledger.map(l => [l.canonical_id, l]));
     const llmMap = await this.loadLlmCosts(latestDate);
 
-    return raw.map(p => this.toPropertySummary(p, index, ledgerMap, llmMap));
+    if (this.detectedSchema === 'v2') {
+      return (raw as RawV2Property[]).map(p => this.toPropertySummaryV2(p, index, ledgerMap, llmMap));
+    }
+    return (raw as RawProperty[]).map(p => this.toPropertySummary(p, index, ledgerMap, llmMap));
   }
 
   private async loadLlmCosts(date: string): Promise<Map<string, LlmCostEntry>> {
@@ -189,6 +237,75 @@ export class JsonFilePropertyService implements IPropertyService {
     };
   }
 
+  private toPropertySummaryV2(
+    raw: RawV2Property,
+    index: RawPropertyIndex | null,
+    ledgerMap: Map<string, RawLedgerEntry>,
+    llmMap: Map<string, LlmCostEntry>
+  ): PropertySummary {
+    const id = raw.apartment_id != null ? String(raw.apartment_id) : '';
+    const units = raw.units || [];
+    const rents = units
+      .map(u => {
+        const lo = u.rent_low ?? 0;
+        const hi = u.rent_high ?? 0;
+        return lo > 0 && hi > 0 ? (lo + hi) / 2 : lo > 0 ? lo : hi;
+      })
+      .filter(r => r > 0);
+    const availableUnits = units.filter(u => u.available_date != null).length;
+    const indexEntry = index?.[id];
+    const ledgerEntry = ledgerMap.get(id);
+    const sortedRents = [...rents].sort((a, b) => a - b);
+    const medianRent = sortedRents.length > 0 ? sortedRents[Math.floor(sortedRents.length / 2)] : 0;
+    const avgRent = rents.length > 0 ? rents.reduce((a, b) => a + b, 0) / rents.length : 0;
+
+    const scrapeStatus: ScrapeStatus = units.length === 0
+      ? 'FAILED'
+      : ledgerEntry?.carry_forward_used
+        ? 'CARRIED_FORWARD'
+        : ledgerEntry?.scrape_failed
+          ? 'FAILED'
+          : (indexEntry?.last_scrape_status as ScrapeStatus) || 'SUCCESS';
+
+    return {
+      id,
+      name: raw.proj_name || '',
+      address: raw.address || '',
+      city: raw.city || '',
+      state: raw.state || '',
+      zip: raw.zip_code || '',
+      latitude: 0,
+      longitude: 0,
+      managementCompany: raw.pmc || '',
+      totalUnits: units.length,
+      avgAskingRent: Math.round(avgRent),
+      medianAskingRent: Math.round(medianRent),
+      availabilityRate: units.length > 0 ? availableUnits / units.length : 0,
+      availableUnits,
+      extractionTier: this.inferTierV2(units),
+      scrapeStatus,
+      propertyStatus: 'ACTIVE',
+      yearBuilt: null,
+      stories: null,
+      activeConcession: raw.concessions || null,
+      lastScrapeTimestamp: units[0]?.date_captured || indexEntry?.last_seen_at || '',
+      carryForwardDays: ledgerEntry?.carry_forward_used ? 1 : 0,
+      imageUrl: null,
+      galleryUrls: [],
+      websiteUrl: raw.website || indexEntry?.website || '',
+      llmCostUsd: llmMap.get(id)?.costUsd ?? 0,
+      llmCallCount: llmMap.get(id)?.calls ?? 0,
+      llmTokensTotal: llmMap.get(id)?.tokensTotal ?? 0,
+    };
+  }
+
+  private inferTierV2(units: RawV2Unit[]): ExtractionTier {
+    if (units.length === 0) return 'FAILED';
+    const hasRent = units.some(u => (u.rent_low ?? 0) > 0 || (u.rent_high ?? 0) > 0);
+    if (!hasRent) return 'TIER_3_DOM';
+    return 'TIER_1_API';
+  }
+
   private inferTier(units: RawUnit[]): ExtractionTier {
     if (units.length === 0) return 'FAILED';
     const hasRent = units.some(u => u.market_rent_low > 0 || u.market_rent_high > 0);
@@ -226,9 +343,18 @@ export class JsonFilePropertyService implements IPropertyService {
     const latestDate = await getLatestRunDate(this.dataDir);
     if (!latestDate) return null;
 
-    const raw = await readJsonFile<RawProperty[]>(runPath(this.dataDir, latestDate, 'properties.json'));
+    const raw = await readJsonFile<unknown[]>(runPath(this.dataDir, latestDate, 'properties.json'));
     if (!raw) return null;
 
+    const schema = detectSchemaVersion(raw);
+
+    if (schema === 'v2') {
+      return this.getPropertyByIdV2(raw as RawV2Property[], id, latestDate);
+    }
+    return this.getPropertyByIdV1(raw as RawProperty[], id, latestDate);
+  }
+
+  private async getPropertyByIdV1(raw: RawProperty[], id: string, latestDate: string): Promise<Property | null> {
     const rawProp = raw.find(p => (p['Unique ID'] || p['Property ID']) === id);
     if (!rawProp) return null;
 
@@ -241,6 +367,7 @@ export class JsonFilePropertyService implements IPropertyService {
     const units = this.transformUnits(rawProp.units || [], id);
     const floorPlans = this.buildFloorPlans(units);
     const metrics = this.computeMetrics(units);
+    const media = this.buildMediaV1(rawProp, units);
 
     return {
       ...summary,
@@ -249,6 +376,7 @@ export class JsonFilePropertyService implements IPropertyService {
       marketMetrics: metrics,
       scrapeHistory: [],
       screenshotPaths: { pricingPage: null, banner: null },
+      media,
       developmentCompany: rawProp['Development Company'] || '',
       propertyOwner: rawProp['Property Owner'] || '',
       marketName: rawProp['Market Name'] || '',
@@ -259,6 +387,45 @@ export class JsonFilePropertyService implements IPropertyService {
       assetGradeSubmarket: rawProp['Asset Grade in Submarket'] || '',
       assetGradeMarket: rawProp['Asset Grade in Market'] || '',
       averageUnitSizeSf: rawProp['Average Unit Size (SF)'],
+      schemaVersion: 'v1',
+    };
+  }
+
+  private async getPropertyByIdV2(raw: RawV2Property[], id: string, latestDate: string): Promise<Property | null> {
+    const rawProp = raw.find(p => String(p.apartment_id) === id);
+    if (!rawProp) return null;
+
+    const index = await readJsonFile<RawPropertyIndex>(statePath(this.dataDir, 'property_index.json'));
+    const ledger = await readJsonlFile<RawLedgerEntry>(runPath(this.dataDir, latestDate, 'ledger.jsonl'));
+    const ledgerMap = new Map(ledger.map(l => [l.canonical_id, l]));
+    const llmMap = await this.loadLlmCosts(latestDate);
+
+    const summary = this.toPropertySummaryV2(rawProp, index, ledgerMap, llmMap);
+    const units = this.transformUnitsV2(rawProp.units || [], id);
+    const floorPlans = this.buildFloorPlans(units);
+    const metrics = this.computeMetrics(units);
+
+    return {
+      ...summary,
+      units,
+      floorPlans,
+      marketMetrics: metrics,
+      scrapeHistory: [],
+      screenshotPaths: { pricingPage: null, banner: null },
+      media: { heroImageUrl: null, galleryUrls: [], screenshots: { pricingPage: null, banner: null, homepage: null }, floorPlanImages: [] },
+      developmentCompany: '',
+      propertyOwner: '',
+      marketName: '',
+      submarketName: '',
+      region: '',
+      phone: rawProp.phone || '',
+      unitMix: this.computeUnitMixV2(rawProp.units || []),
+      assetGradeSubmarket: '',
+      assetGradeMarket: '',
+      averageUnitSizeSf: this.computeAvgAreaV2(rawProp.units || []),
+      emailAddress: rawProp.email_address,
+      websiteDesign: rawProp.website_design,
+      schemaVersion: 'v2',
     };
   }
 
@@ -341,6 +508,72 @@ export class JsonFilePropertyService implements IPropertyService {
     });
   }
 
+  private transformUnitsV2(rawUnits: RawV2Unit[], propertyId: string): Unit[] {
+    return rawUnits.map(u => {
+      const lo = u.rent_low ?? 0;
+      const hi = u.rent_high ?? 0;
+      const askingRent = lo > 0 && hi > 0 ? (lo + hi) / 2 : lo > 0 ? lo : hi;
+      const sqft = u.area > 0 ? u.area : null;
+      return {
+        unitId: u.unit_id || '', propertyId, floorPlanType: u.floor_plan_name || null,
+        marketRentLow: lo, marketRentHigh: hi,
+        askingRent: Math.round(askingRent), effectiveRent: null,
+        sqft,
+        availabilityStatus: u.available_date ? 'AVAILABLE' as const : 'UNKNOWN' as const,
+        availableDate: u.available_date || null, leaseLink: '',
+        concessions: null, amenities: null,
+        daysOnMarket: null,
+        rentPerSqft: sqft && sqft > 0 && askingRent > 0 ? Math.round((askingRent / sqft) * 100) / 100 : null,
+        floorplanImageUrl: null,
+        // V2 fields
+        beds: u.beds,
+        baths: u.baths,
+        area: u.area,
+        floorPlanName: u.floor_plan_name,
+        leaseTerm: u.lease_term,
+        moveInDate: u.move_in_date,
+        dateCaptured: u.date_captured,
+      };
+    });
+  }
+
+  private computeUnitMixV2(units: RawV2Unit[]): string {
+    const counts: Record<string, number> = {};
+    for (const u of units) {
+      const label = u.beds === 0 ? 'Studio' : `${u.beds}BR`;
+      counts[label] = (counts[label] || 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => `${k}: ${v}`).join('; ');
+  }
+
+  private computeAvgAreaV2(units: RawV2Unit[]): number | null {
+    const areas = units.map(u => u.area).filter(a => a > 0);
+    if (areas.length === 0) return null;
+    return Math.round(areas.reduce((a, b) => a + b, 0) / areas.length);
+  }
+
+  private buildMediaV1(rawProp: RawProperty, units: Unit[]): PropertyMedia {
+    const floorPlanImages: FloorPlanImage[] = [];
+    const fpGroups = new Map<string, { url: string; unitIds: string[] }>();
+    for (const u of units) {
+      if (u.floorplanImageUrl) {
+        const key = u.floorplanImageUrl;
+        const existing = fpGroups.get(key);
+        if (existing) { existing.unitIds.push(u.unitId); }
+        else { fpGroups.set(key, { url: key, unitIds: [u.unitId] }); }
+      }
+    }
+    for (const [, val] of fpGroups) {
+      floorPlanImages.push({ floorPlanName: val.unitIds[0] || 'Unknown', imageUrl: val.url, unitIds: val.unitIds });
+    }
+    return {
+      heroImageUrl: rawProp['Property Image URL'] || null,
+      galleryUrls: rawProp['Property Gallery URLs'] || [],
+      screenshots: { pricingPage: null, banner: null, homepage: null },
+      floorPlanImages,
+    };
+  }
+
   private buildFloorPlans(units: Unit[]): FloorPlan[] {
     const groups = new Map<string, Unit[]>();
     for (const unit of units) {
@@ -397,8 +630,8 @@ export class JsonFilePropertyService implements IPropertyService {
     const { field, direction } = sort;
     const mult = direction === 'asc' ? 1 : -1;
     return [...items].sort((a, b) => {
-      const aVal = (a as Record<string, unknown>)[field];
-      const bVal = (b as Record<string, unknown>)[field];
+      const aVal = (a as unknown as Record<string, unknown>)[field];
+      const bVal = (b as unknown as Record<string, unknown>)[field];
       if (aVal == null && bVal == null) return 0;
       if (aVal == null) return 1;
       if (bVal == null) return -1;

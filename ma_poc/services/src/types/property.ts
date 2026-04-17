@@ -44,6 +44,7 @@ export interface Property extends PropertySummary {
   marketMetrics: MarketMetrics;
   scrapeHistory: ScrapeEvent[];
   screenshotPaths: { pricingPage: string | null; banner: string | null };
+  media: PropertyMedia;
   developmentCompany: string;
   propertyOwner: string;
   marketName: string;
@@ -54,6 +55,10 @@ export interface Property extends PropertySummary {
   assetGradeSubmarket: string;
   assetGradeMarket: string;
   averageUnitSizeSf: number | null;
+  /** V2-only fields */
+  emailAddress?: string | null;
+  websiteDesign?: string | null;
+  schemaVersion: SchemaVersion;
 }
 
 /** Individual rental unit */
@@ -74,6 +79,36 @@ export interface Unit {
   daysOnMarket: number | null;
   rentPerSqft: number | null;
   floorplanImageUrl: string | null;
+  /** V2 fields — present only when data source is V2 schema */
+  beds?: number | null;
+  baths?: number | null;
+  area?: number | null;
+  floorPlanName?: string | null;
+  leaseTerm?: number | null;
+  moveInDate?: string | null;
+  dateCaptured?: string | null;
+}
+
+/** Schema version indicator */
+export type SchemaVersion = 'v1' | 'v2';
+
+/** Property media — screenshots and images for property and floor plans */
+export interface PropertyMedia {
+  heroImageUrl: string | null;
+  galleryUrls: string[];
+  screenshots: {
+    pricingPage: string | null;
+    banner: string | null;
+    homepage: string | null;
+  };
+  floorPlanImages: FloorPlanImage[];
+}
+
+/** Floor plan image reference */
+export interface FloorPlanImage {
+  floorPlanName: string;
+  imageUrl: string;
+  unitIds: string[];
 }
 
 /** Floor plan grouping */

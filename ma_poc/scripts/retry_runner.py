@@ -274,7 +274,9 @@ def _merge_properties(
     """
     def _get_cid(rec: dict) -> str | None:
         meta = rec.get("_meta") or {}
-        return meta.get("canonical_id") or rec.get("Unique ID")
+        return (meta.get("canonical_id")
+                or rec.get("Unique ID")
+                or str(rec["apartment_id"]) if rec.get("apartment_id") else None)
 
     # Index new records by canonical_id for O(1) lookup.
     new_by_cid: dict[str, dict] = {}
@@ -313,16 +315,20 @@ async def run_retry(
     limit: int | None,
     proxy: str | None,
     scrape_timeout_s: int,
+    schema_version: str = "v1",
 ) -> dict:
     """
     Execute a retry/resume pass over the pipeline.
 
     Args:
         mode: "resume" or "retry_errors"
+        schema_version: "v1" or "v2" — controls output format
     """
     started_at = datetime.now(UTC)
-    run_dir = data_dir / "runs" / run_date
-    state_dir = data_dir / "state"
+    # Namespace runs and state by schema version so V1/V2 data never collide.
+    schema_root = data_dir / schema_version
+    run_dir = schema_root / "runs" / run_date
+    state_dir = schema_root / "state"
     raw_dir = run_dir / "raw_api"
     run_dir.mkdir(parents=True, exist_ok=True)
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -727,10 +733,19 @@ async def run_retry(
         state_snapshot = state.get_property(cid)
         rec: dict | None = None
         try:
-            rec = build_property_record(
-                row, ident, scrape_result, public_units,
-                state_snapshot, carry_forward_used,
-            )
+            if schema_version == "v2":
+                from schema_v2 import build_v2_property, validate_v2_property
+                rec = build_v2_property(
+                    row, ident, scrape_result, public_units,
+                    scrape_ts=datetime.now(UTC),
+                )
+                v2_issues = validate_v2_property(rec, canonical_id=cid)
+                per_prop_issues.extend(v2_issues)
+            else:
+                rec = build_property_record(
+                    row, ident, scrape_result, public_units,
+                    state_snapshot, carry_forward_used,
+                )
             new_records.append(rec)
         except Exception as e:
             per_prop_issues.append(V.error(
@@ -913,6 +928,8 @@ Examples:
     p.add_argument("--proxy",    default=None)
     p.add_argument("--scrape-timeout", type=int, default=180,
                    help="Per-property scrape timeout (seconds)")
+    p.add_argument("--schema-version", choices=["v1", "v2"], default=None,
+                   help="Output schema version (default: env SCHEMA_VERSION or v1)")
     args = p.parse_args()
 
     csv_path = Path(args.csv)
@@ -920,10 +937,14 @@ Examples:
     run_date = args.run_date or date.today().isoformat()
     mode = "resume" if args.resume else "retry_errors"
 
+    from schema_v2 import get_schema_version
+    schema_version = get_schema_version(args)
+
     try:
         report = asyncio.run(run_retry(
             csv_path, run_date, data_dir, mode,
             args.limit, args.proxy, args.scrape_timeout,
+            schema_version=schema_version,
         ))
         if report.get("exit_status") == "FATAL":
             sys.exit(2)

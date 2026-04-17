@@ -8,4 +8,5 @@ export const config = {
   dataDir: process.env.DATA_DIR || resolve(join(__dirname, '..', '..', '..', 'data')),
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   logLevel: process.env.LOG_LEVEL || 'info',
+  schemaVersion: (process.env.SCHEMA_VERSION || 'v1') as 'v1' | 'v2',
 };
