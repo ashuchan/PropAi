@@ -103,6 +103,7 @@ async def run_jugnu(
     proxy: str | None = None,
     run_date: str | None = None,
     schema_version: str = "v1",
+    start_index: int = 0,
 ) -> dict[str, Any]:
     """Run the Jugnu integrated pipeline.
 
@@ -113,6 +114,9 @@ async def run_jugnu(
         proxy: Proxy URL.
         run_date: Override run date (YYYY-MM-DD).
         schema_version: "v1" or "v2" output format.
+        start_index: Zero-based row index in the CSV to start scraping from.
+            Rows before this index are skipped. ``limit`` still caps the
+            number of rows processed *after* skipping.
 
     Returns:
         Run summary dict.
@@ -145,8 +149,11 @@ async def run_jugnu(
     cost_ledger = CostLedger(run_dir / "cost_ledger.db")
 
     # Load CSV
-    rows = _load_csv(csv_path, limit)
-    log.info("Loaded %d properties from %s", len(rows), csv_path)
+    rows = _load_csv(csv_path, limit, start_index=start_index)
+    log.info(
+        "Loaded %d properties from %s (start_index=%d, limit=%s)",
+        len(rows), csv_path, start_index, limit,
+    )
 
     # Setup L2 components
     frontier = Frontier(state_dir / "frontier.sqlite")
@@ -1051,21 +1058,34 @@ def _safe_int_gt1(val: Any) -> int | None:
 # ---------------------------------------------------------------------------
 
 
-def _load_csv(csv_path: Path, limit: int | None = None) -> list[dict[str, Any]]:
+def _load_csv(
+    csv_path: Path,
+    limit: int | None = None,
+    start_index: int = 0,
+) -> list[dict[str, Any]]:
     """Load CSV rows with flexible column names.
 
     Args:
         csv_path: Path to the CSV file.
-        limit: Max rows to load.
+        limit: Max rows to load *after* applying ``start_index``.
+        start_index: Zero-based row index to start from. Rows before this
+            index are skipped. The resulting ``property_id`` fallback still
+            uses the original row index so IDs stay stable across resumed
+            runs.
 
     Returns:
         List of row dicts.
     """
+    if start_index < 0:
+        raise ValueError(f"start_index must be >= 0, got {start_index}")
+
     rows: list[dict[str, Any]] = []
     with open(csv_path, encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader):
-            if limit and i >= limit:
+            if i < start_index:
+                continue
+            if limit and len(rows) >= limit:
                 break
             # Normalize column names
             normalized: dict[str, Any] = {}
@@ -1199,6 +1219,10 @@ def main() -> int:
     parser.add_argument("--data-dir", type=Path, default=_MA_POC_ROOT / "data")
     parser.add_argument("--run-date", type=str, default=None)
     parser.add_argument(
+        "--start-index", type=int, default=0,
+        help="Zero-based CSV row index to start scraping from (skips earlier rows).",
+    )
+    parser.add_argument(
         "--schema-version", choices=["v1", "v2"], default=None,
         help="Output schema version (default: env SCHEMA_VERSION or v1)",
     )
@@ -1213,6 +1237,7 @@ def main() -> int:
         proxy=args.proxy,
         run_date=args.run_date,
         schema_version=schema_version,
+        start_index=args.start_index,
     ))
 
     print(f"Run complete: {report['totals']['succeeded']}/{report['totals']['properties']} succeeded")
