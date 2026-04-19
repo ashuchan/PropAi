@@ -1,0 +1,185 @@
+"""DTOs for the data-provider layer.
+
+Where existing Pydantic models cover a concept we re-export them (`UnitRecord`,
+`ScrapeEvent`, `ExtractionResult`, `ScrapeProfile`). Where the codebase uses
+raw dicts today (property-index entries, unit-index entries, run reports,
+issues, ledger rows) we define explicit models so both FS and Postgres
+providers can share a contract.
+
+Unknown-key tolerance (`extra="allow"` where appropriate) preserves forward
+compatibility with fields the scraper already writes but that aren't yet
+formalised.
+"""
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+# ── Re-exports so consumers import everything from `ma_poc.data_provider` ────
+from models.extraction_result import (
+    ExtractionResult,
+    ExtractionStatus,
+    ExtractionTier,
+)
+from models.scrape_event import (
+    ChangeDetectionResult,
+    ScrapeEvent,
+    ScrapeOutcome,
+)
+from models.scrape_profile import ScrapeProfile
+from models.unit_record import (
+    AvailabilityStatus,
+    DataQualityFlag,
+    UnitRecord,
+)
+
+__all__ = [
+    "ExtractionResult",
+    "ExtractionStatus",
+    "ExtractionTier",
+    "ScrapeEvent",
+    "ScrapeOutcome",
+    "ChangeDetectionResult",
+    "ScrapeProfile",
+    "UnitRecord",
+    "AvailabilityStatus",
+    "DataQualityFlag",
+    "PropertyIndexEntry",
+    "UnitIndexEntry",
+    "UnitDiff",
+    "PropertyRecord",
+    "RunSummary",
+    "RunReport",
+    "IssueEntry",
+    "LedgerEntry",
+]
+
+
+class PropertyIndexEntry(BaseModel):
+    """Row in data/state/property_index.json (one per canonical_id)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    canonical_id: str
+    name: str | None = None
+    website: str | None = None
+    address: str | None = None
+    city: str | None = None
+    state: str | None = None
+    zip: str | None = None
+    first_seen_date: str | None = None
+    last_seen_date: str | None = None
+    last_seen_at: str | None = None
+    last_scrape_status: str | None = None
+    last_units_count: int | None = None
+
+
+class UnitIndexEntry(BaseModel):
+    """Row in data/state/unit_index.json (canonical_id → unit_id → this)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    unit_id: str
+    unit_number: str | None = None
+    market_rent_low: float | int | None = None
+    market_rent_high: float | int | None = None
+    available_date: str | None = None
+    concessions: Any = None
+    bedrooms: float | int | None = None
+    bathrooms: float | int | None = None
+    sqft: int | None = None
+    floor_plan_name: str | None = None
+    availability_status: str | None = None
+    first_seen_date: str | None = None
+    last_seen_date: str | None = None
+    last_seen_at: str | None = None
+    carryforward_days: int = 0
+    disappeared_since: str | None = None
+    last_absent_date: str | None = None
+    changed_fields: list[str] = Field(default_factory=list)
+
+
+class UnitDiff(BaseModel):
+    """Output of IUnitStateStore.upsert_units — matches StateStore.upsert_units."""
+
+    new: list[str] = Field(default_factory=list)
+    updated: list[str] = Field(default_factory=list)
+    unchanged: list[str] = Field(default_factory=list)
+    disappeared: list[str] = Field(default_factory=list)
+
+
+class PropertyRecord(BaseModel):
+    """One property row inside data/runs/{date}/properties.json.
+
+    The 46-key schema is still implicit in the scraper — this DTO passes
+    arbitrary keys through (`extra="allow"`) rather than formalising the
+    column list. Phase 1 of the PG migration should tighten this.
+    """
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    # The scraper writes human-readable keys ("Property Name", "City", …) so
+    # we don't declare required fields. This DTO is a typed wrapper around
+    # the existing dict shape for read/write symmetry.
+
+
+class RunSummary(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    properties: int = 0
+    succeeded: int = 0
+    failed: int = 0
+    carry_forward: int = 0
+    success_rate_pct: float = 0.0
+
+
+class RunReport(BaseModel):
+    """data/runs/{date}/report.json.
+
+    Tolerant of both the new reporting.run_report.build() shape (which emits
+    `generated_at`) and the Jugnu runner shape (which emits
+    `started_at`/`finished_at`). `generated_at` falls back to `finished_at`
+    (or an empty string) during load so both payloads round-trip.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    run_date: str
+    generated_at: str = ""
+    totals: RunSummary = Field(default_factory=lambda: RunSummary())
+    tier_distribution: dict[str, int] = Field(default_factory=dict)
+    cost: dict[str, float] = Field(default_factory=dict)
+    slo_violations: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class IssueEntry(BaseModel):
+    """One line in data/runs/{date}/issues.jsonl."""
+
+    model_config = ConfigDict(extra="allow")
+
+    severity: str  # ERROR | WARNING | INFO
+    code: str
+    message: str
+    canonical_id: str | None = None
+    row_index: int | None = None
+    details: dict[str, Any] | None = None
+    timestamp: datetime | str | None = None
+
+
+class LedgerEntry(BaseModel):
+    """One line in data/runs/{date}/ledger.jsonl."""
+
+    model_config = ConfigDict(extra="allow")
+
+    canonical_id: str | None = None
+    row_index: int | None = None
+    status: str | None = None
+    units_count: int | None = None
+    carry_forward_used: bool | None = None
+    scrape_failed: bool | None = None
+    error_count: int | None = None
+    warning_count: int | None = None
+    url: str | None = None
+    timestamp: datetime | str | None = None

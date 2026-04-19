@@ -24,3 +24,9 @@ structlog>=24.2.0
 rich>=13.7.1
 # timezonefinder dropped — no ARM64 binary wheel. Timezone derivation falls
 # back to state-based approximation in scraper/fleet.py.
+
+# Data-provider SQL backend (Phase 4 — postgres | sqlite via SQLAlchemy).
+# psycopg[binary] only needed when DATA_PROVIDER=postgres.
+sqlalchemy>=2.0.30
+alembic>=1.13.0
+psycopg[binary]>=3.1.18

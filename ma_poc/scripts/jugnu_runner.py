@@ -117,23 +117,18 @@ async def run_jugnu(
     Returns:
         Run summary dict.
     """
-    from ma_poc.discovery.carry_forward import carry_forward_property, should_carry_forward
     from ma_poc.discovery.change_detector import decide as decide_change
-    from ma_poc.discovery.contracts import CrawlTask, TaskReason
+    from ma_poc.discovery.contracts import CrawlTask
     from ma_poc.discovery.dlq import Dlq
     from ma_poc.discovery.frontier import Frontier
     from ma_poc.discovery.scheduler import Scheduler
     from ma_poc.discovery.sitemap import SitemapConsumer
     from ma_poc.fetch import fetch as jugnu_fetch
     from ma_poc.fetch.conditional import ConditionalCache
-    from ma_poc.fetch.contracts import FetchOutcome, RenderMode
     from ma_poc.observability import events
     from ma_poc.observability.cost_ledger import CostLedger
-    from ma_poc.observability.events import EventKind
     from ma_poc.observability.slo_watcher import check as slo_check
     from ma_poc.reporting.run_report import build as build_run_report
-    from ma_poc.reporting.verdict import compute as compute_verdict
-    from ma_poc.validation.orchestrator import validate
 
     # Setup
     today = run_date or date.today().isoformat()
@@ -191,8 +186,16 @@ async def run_jugnu(
             result = await _process_property(
                 task, cost_ledger, profile_store, frontier, dlq, data_dir,
                 csv_row=csv_row,
+                run_dir=run_dir,
             )
             formatted = _format_output(result, csv_row, schema_version)
+            # F2: Null Field Recovery — runs on v2 units with null rent_low
+            # / unit_id produced by Tier-1 adapters. Applies high-confidence
+            # recoveries in place on the unit dicts.
+            if schema_version == "v2":
+                await _run_null_field_recovery(
+                    result, formatted, run_dir, task.property_id,
+                )
             # Per-property report — same format as daily_runner emits, but
             # sourced from jugnu's raw scrape_result + formatted v1/v2 record
             # so v2 metadata (apartment_id/pmc/website_design/concessions)
@@ -242,6 +245,7 @@ async def _process_property(
     dlq: Any,
     data_dir: Path,
     csv_row: dict[str, Any] | None = None,
+    run_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Process a single property through L1-L4.
 
@@ -362,6 +366,84 @@ async def _process_property(
     emit(EventKind.PROPERTY_EMITTED, task.property_id,
          verdict=verdict.verdict.value, units=len(result.get("units", [])))
 
+    # ── F1: Adapter Debugger ──────────────────────────────────────────────
+    # Runs once per FAILED_NO_DATA on TIER_1_* tiers. Gated by existing
+    # diagnosis file (one diagnosis per property per run is enough).
+    _tier_used = ""
+    if extract_result is not None:
+        _tier_used = getattr(extract_result, "tier_used", "") or ""
+    if (
+        run_dir is not None
+        and verdict.verdict.value == "FAILED_NO_DATA"
+        and _tier_used.startswith("TIER_1_")
+    ):
+        try:
+            from ma_poc.services.llm_diagnostics import (
+                adapter_debugger,
+                get_adapter_parser_source,
+            )
+            _raw_apis = result.get("_raw_api_responses") or []
+            _KNOWN_ADAPTERS = {
+                "rentcafe", "sightmap", "appfolio", "entrata",
+                "onesite", "realpage", "generic",
+            }
+            _adapter_name = (
+                _tier_used.replace("TIER_1_API_", "")
+                .replace("TIER_1_API", "generic")
+                .lower()
+            ) or "generic"
+            if _adapter_name not in _KNOWN_ADAPTERS:
+                _adapter_name = "generic"
+            _parser_source = get_adapter_parser_source(_adapter_name)
+            _diag_dir = run_dir / "llm_diagnostics"
+            _diag_path = _diag_dir / f"{task.property_id}_adapter_debug.json"
+
+            if _diag_path.exists():
+                log.debug(
+                    "F1 diagnosis already exists for %s, skipping", task.property_id
+                )
+            else:
+                _csv_row = csv_row or {}
+                for _resp in _raw_apis[:3]:
+                    _diag = await adapter_debugger(
+                        property_id=task.property_id,
+                        adapter_name=_adapter_name,
+                        adapter_parser_source=_parser_source,
+                        api_response=_resp,
+                        property_context={
+                            "property_name": str(
+                                _csv_row.get("name")
+                                or _csv_row.get("Name")
+                                or _csv_row.get("proj_name")
+                                or ""
+                            ),
+                            "website": str(
+                                _csv_row.get("website") or _csv_row.get("Website") or ""
+                            ),
+                            "city": str(_csv_row.get("city") or _csv_row.get("City") or ""),
+                            "state": str(
+                                _csv_row.get("state") or _csv_row.get("State") or ""
+                            ),
+                        },
+                        output_dir=_diag_dir,
+                    )
+                    if _diag is not None:
+                        log.info(
+                            "  F1 diagnosis for %s: %s (can_auto_fix=%s, recoverable=%d units)",
+                            task.property_id,
+                            _diag.failure_category,
+                            _diag.can_auto_fix,
+                            _diag.estimated_units_recoverable,
+                        )
+                        _interaction = getattr(_diag, "_llm_interaction", None)
+                        if isinstance(_interaction, dict):
+                            result.setdefault("_llm_interactions", []).append(_interaction)
+                        break
+        except Exception as _exc:
+            log.debug(
+                "F1 adapter_debugger hook failed for %s: %s", task.property_id, _exc
+            )
+
     return result
 
 
@@ -473,8 +555,33 @@ def _format_v1(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "units": units,
         # Metadata
         "_meta": meta,
+        "_extract_result": _extract_result_summary(result),
     }
     return rec
+
+
+def _extract_result_summary(result: dict[str, Any]) -> dict[str, Any] | None:
+    """Project ``result["_extract_result"]`` down to a JSON-safe dict.
+
+    Why: ``run_report.py`` and ``slo_watcher.py`` key off
+    ``_extract_result.tier_used`` to compute tier_distribution. Without
+    this projection the emitted property record has no ``_extract_result``
+    key at all (the dataclass lives on the in-process result dict but never
+    reaches ``properties.json``), so every run reports ``tier=UNKNOWN``.
+    """
+    er = result.get("_extract_result")
+    if er is None:
+        return None
+    if isinstance(er, dict):
+        tier = er.get("tier_used")
+        llm_cost = er.get("llm_cost_usd", 0.0)
+    else:
+        tier = getattr(er, "tier_used", None)
+        llm_cost = getattr(er, "llm_cost_usd", 0.0)
+    return {
+        "tier_used": tier,
+        "llm_cost_usd": llm_cost,
+    }
 
 
 def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any]:
@@ -545,6 +652,7 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "units": [_format_v2_unit(u, scrape_ts) for u in units],
         # Keep _meta for internal tracking (stripped on final delivery)
         "_meta": meta,
+        "_extract_result": _extract_result_summary(result),
     }
     return prop
 
@@ -607,6 +715,102 @@ def _format_v2_unit(unit: dict[str, Any], scrape_ts: datetime) -> dict[str, Any]
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date_str(unit.get("move_in_date") or unit.get("_move_in_date")),
     }
+
+
+async def _run_null_field_recovery(
+    scrape_result: dict[str, Any],
+    formatted: dict[str, Any],
+    run_dir: Path,
+    canonical_id: str,
+) -> None:
+    """Call LLM null-field recovery on v2 units missing rent_low or unit_id.
+
+    Only runs for Tier-1 adapters with raw API responses captured. Applies
+    high-confidence (>=0.85) recoveries in place on the formatted unit dicts.
+    Best-effort — never raises.
+    """
+    try:
+        meta = scrape_result.get("_meta", {}) or {}
+        extract = scrape_result.get("_extract_result")
+        tier = ""
+        if extract is not None:
+            tier = getattr(extract, "tier_used", "") or ""
+        if not tier:
+            tier = str(meta.get("scrape_tier_used", "") or "")
+
+        raw_apis = scrape_result.get("_raw_api_responses") or []
+        if not tier.startswith("TIER_1_") or not raw_apis:
+            return
+
+        units = formatted.get("units") or []
+        null_units = [
+            u for u in units
+            if u.get("rent_low") is None or u.get("unit_id") is None
+        ]
+        if not null_units:
+            return
+
+        from ma_poc.services.llm_diagnostics import (
+            _build_parser_logic_summary,
+            null_field_recovery,
+        )
+
+        adapter_name = tier.replace("TIER_1_API_", "").lower() or "generic"
+        diag_dir = run_dir / "llm_diagnostics"
+
+        source_body = raw_apis[0].get("body") if raw_apis else {}
+        source_items: list[Any] = []
+        if isinstance(source_body, list):
+            source_items = source_body
+        elif isinstance(source_body, dict):
+            for k in ("data", "results", "floorplans", "FloorplanList", "Result"):
+                v = source_body.get(k)
+                if isinstance(v, list):
+                    source_items = v
+                    break
+
+        property_context = {
+            "property_name": str(formatted.get("proj_name") or ""),
+            "website": str(formatted.get("website") or ""),
+            "city": str(formatted.get("city") or ""),
+            "state": str(formatted.get("state") or ""),
+        }
+
+        for i, unit in enumerate(null_units[:5]):
+            fragment = source_items[i] if i < len(source_items) else source_body
+            recovery = await null_field_recovery(
+                property_id=canonical_id,
+                partial_unit=unit,
+                source_fragment=fragment,
+                tier_used=tier,
+                parser_logic_summary=_build_parser_logic_summary(adapter_name, tier),
+                property_context=property_context,
+                output_dir=diag_dir,
+            )
+            if recovery is None:
+                continue
+            interaction = getattr(recovery, "_llm_interaction", None)
+            if isinstance(interaction, dict):
+                scrape_result.setdefault("_llm_interactions", []).append(interaction)
+            for rf in recovery.recovered_fields:
+                if rf.confidence < 0.85 or rf.recovered_value is None:
+                    continue
+                if rf.field_name == "rent_low" and unit.get("rent_low") is None:
+                    try:
+                        unit["rent_low"] = _format_rent(rf.recovered_value)
+                    except Exception:
+                        pass
+                elif rf.field_name == "rent_high" and unit.get("rent_high") is None:
+                    try:
+                        unit["rent_high"] = _format_rent(rf.recovered_value)
+                    except Exception:
+                        pass
+                elif rf.field_name == "unit_id" and unit.get("unit_id") is None:
+                    unit["unit_id"] = str(rf.recovered_value)
+                elif rf.field_name == "floor_plan_name" and unit.get("floor_plan_name") is None:
+                    unit["floor_plan_name"] = str(rf.recovered_value)
+    except Exception as exc:
+        log.debug("F2 null_field_recovery hook failed for %s: %s", canonical_id, exc)
 
 
 def _write_property_report(

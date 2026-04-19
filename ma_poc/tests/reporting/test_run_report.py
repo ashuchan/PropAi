@@ -38,3 +38,29 @@ def test_run_report_includes_slo_section(tmp_path: Path) -> None:
     build(props, tmp_path, "2026-04-18")
     md = (tmp_path / "report.md").read_text()
     assert "## SLO Status" in md
+
+
+def test_run_report_reads_jugnu_extract_result_tier(tmp_path: Path) -> None:
+    """Jugnu emits tier on ``_extract_result.tier_used`` (not on _meta).
+
+    Regression: the 2026-04-19 run shipped properties without
+    ``_extract_result`` attached, so the report bucketed all 100
+    properties under UNKNOWN despite tier_won events being recorded.
+    """
+    props = [
+        {
+            "_meta": {"verdict": "SUCCESS", "canonical_id": f"p{i}"},
+            "_extract_result": {"tier_used": "TIER_3_DOM", "llm_cost_usd": 0.0},
+        }
+        for i in range(3)
+    ] + [
+        {
+            "_meta": {"verdict": "FAILED_NO_DATA", "canonical_id": "p3"},
+            "_extract_result": {"tier_used": "TIER_4_LLM", "llm_cost_usd": 0.05},
+        }
+    ]
+    report = build(props, tmp_path, "2026-04-19")
+    assert report["tier_distribution"].get("TIER_3_DOM") == 3
+    assert report["tier_distribution"].get("TIER_4_LLM") == 1
+    assert "UNKNOWN" not in report["tier_distribution"]
+    assert report["totals"]["failed"] == 1

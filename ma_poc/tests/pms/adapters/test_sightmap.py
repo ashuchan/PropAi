@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
-from ma_poc.pms.adapters.sightmap import SightMapAdapter, parse_sightmap_payload
+from ma_poc.pms.adapters.sightmap import (
+    SightMapAdapter,
+    _is_sightmap_response,
+    parse_sightmap_payload,
+)
 from ma_poc.pms.detector import detect_pms
 
 FIXTURES = Path(__file__).parent / "fixtures" / "sightmap"
@@ -140,3 +144,123 @@ def test_parse_sightmap_display_price_fallback() -> None:
     units = parse_sightmap_payload(body, "test")
     assert len(units) == 1
     assert "$1,300" in units[0]["rent_range"]
+
+
+# --- 2026-04-19 fix tests (SM_T01 – SM_T08) ---------------------------------
+
+
+def _sm_valid_body() -> dict:
+    return {
+        "data": {
+            "units": [{
+                "floor_plan_id": 1, "price": 1800, "unit_number": "101",
+                "area": 720, "available_on": "2026-05-01",
+            }],
+            "floor_plans": [{
+                "id": 1, "name": "1BR", "bedroom_count": 1, "bathroom_count": 1,
+            }],
+        }
+    }
+
+
+@pytest.mark.asyncio
+async def test_sm_t01_sightmap_url_still_works() -> None:
+    """SM_T01: sightmap.com URL + valid body still extracts units."""
+    body = _sm_valid_body()
+    assert _is_sightmap_response(body) is True
+    responses = [{
+        "url": "https://sightmap.com/app/api/v1/abc/sightmaps/123",
+        "body": body,
+    }]
+    adapter = SightMapAdapter()
+    ctx = _make_ctx(responses)
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert len(result.units) == 1
+    u = result.units[0]
+    assert u["bedrooms"] == "1"
+    assert u["rent_range"]
+    assert u["unit_number"] == "101"
+
+
+@pytest.mark.asyncio
+async def test_sm_t02_proxied_url_is_matched() -> None:
+    """SM_T02: proxied URL (no sightmap.com) + valid body is matched."""
+    body = _sm_valid_body()
+    assert _is_sightmap_response(body) is True
+    responses = [{
+        "url": "https://lasvegasliving.com/api/properties/123/availability",
+        "body": body,
+    }]
+    adapter = SightMapAdapter()
+    ctx = _make_ctx(responses)
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert len(result.units) == 1
+
+
+@pytest.mark.asyncio
+async def test_sm_t03_amenities_only_error() -> None:
+    """SM_T03: amenities-only response produces SIGHTMAP_AMENITIES_ONLY error."""
+    responses = [{
+        "url": "https://sightmap.com/app/api/v1/abc/sightmaps/456",
+        "body": {"data": {"amenities": [{"id": 1, "name": "Pool"}],
+                          "floor_plans": [], "units": []}},
+    }]
+    adapter = SightMapAdapter()
+    ctx = _make_ctx(responses)
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.units == []
+    assert any(e.startswith("SIGHTMAP_AMENITIES_ONLY") for e in result.errors)
+
+
+@pytest.mark.asyncio
+async def test_sm_t04_no_sightmap_response_error() -> None:
+    """SM_T04: no SightMap-shaped response produces SIGHTMAP_NO_RESPONSE."""
+    responses = [{"url": "https://example.com/api/other", "body": {"foo": "bar"}}]
+    adapter = SightMapAdapter()
+    ctx = _make_ctx(responses)
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.units == []
+    assert any(e.startswith("SIGHTMAP_NO_RESPONSE") for e in result.errors)
+
+
+@pytest.mark.asyncio
+async def test_sm_t05_units_but_empty_fps_parse_failed() -> None:
+    """SM_T05: units[] present but floor_plans[] empty → SIGHTMAP_PARSE_FAILED."""
+    responses = [{
+        "url": "https://sightmap.com/app/api/v1/x/sightmaps/1",
+        "body": {"data": {"units": [{"floor_plan_id": 99, "price": 1500}],
+                          "floor_plans": []}},
+    }]
+    adapter = SightMapAdapter()
+    ctx = _make_ctx(responses)
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.units == []
+    assert any(e.startswith("SIGHTMAP_PARSE_FAILED") for e in result.errors)
+
+
+def test_sm_t06_is_sightmap_response_rejects_non_sightmap_body() -> None:
+    """SM_T06: _is_sightmap_response rejects non-SightMap body."""
+    assert _is_sightmap_response({"floorplanName": "1BR", "minimumRent": "1800"}) is False
+
+
+def test_sm_t07_is_sightmap_response_matches_sightmap_id_alone() -> None:
+    """SM_T07: sightmap_id alone in data is sufficient to match."""
+    assert _is_sightmap_response({"data": {"sightmap_id": 80671, "other_stuff": []}}) is True
+
+
+@pytest.mark.asyncio
+async def test_sm_t08_unmatched_floor_plan_join_fails() -> None:
+    """SM_T08: unit without matching floor plan → 0 units + SIGHTMAP_PARSE_FAILED."""
+    responses = [{
+        "url": "https://sightmap.com/app/api/v1/x/sightmaps/9",
+        "body": {"data": {
+            "units": [{"floor_plan_id": 999, "price": 2000,
+                        "unit_number": "A1", "area": 800}],
+            "floor_plans": [],
+        }},
+    }]
+    adapter = SightMapAdapter()
+    ctx = _make_ctx(responses)
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.units == []
+    assert any(e.startswith("SIGHTMAP_PARSE_FAILED") for e in result.errors)

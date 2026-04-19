@@ -24,6 +24,11 @@ Key findings:
     marker. availabilityURL points to securecafe.com for unit-level detail. Some
     RentCafe sites use JSON-LD (Schema.org) instead of or in addition to API.
     The .aspx vanity domain heuristic in detector.py catches non-hosted sites.
+  - 2026-04-19 fix: Windsor Communities, Weidner, Bexley, Pacifica Residential
+    all use PascalCase keys (FloorplanName, FloorplanId, MinimumRent, etc.).
+    _normalise_item() lowercases all item keys before fingerprinting and parsing.
+    _unwrap_rentcafe_list extended with Floorplans, FloorplanList,
+    GetFloorplansResult, and two-level nesting support.
 """
 from __future__ import annotations
 
@@ -47,32 +52,34 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
     for item in items:
         if not isinstance(item, dict):
             continue
-        name = str(item.get("floorplanName") or item.get("floorPlanName") or "")
-        beds_raw = item.get("beds")
-        baths_raw = item.get("baths")
+        item_lc = _normalise_item(item)
+
+        name = str(item_lc.get("floorplanname") or "")
+        beds_raw = item_lc.get("beds")
+        baths_raw = item_lc.get("baths")
         beds = int(beds_raw) if beds_raw is not None else None
         baths_str = str(baths_raw) if baths_raw is not None else None
         baths = int(float(baths_str)) if baths_str is not None else None
 
-        sqft_lo = str(item.get("minimumSQFT") or item.get("minSqft") or "")
-        sqft_hi = str(item.get("maximumSQFT") or item.get("maxSqft") or "")
+        sqft_lo = str(item_lc.get("minimumsqft") or item_lc.get("minsqft") or "")
+        sqft_hi = str(item_lc.get("maximumsqft") or item_lc.get("maxsqft") or "")
         sqft = sqft_lo if sqft_lo == sqft_hi or not sqft_hi else f"{sqft_lo}-{sqft_hi}"
 
         # Prefer numeric min_price/max_price; fall back to string minimumRent/maximumRent
-        rent_lo_raw = item.get("min_price")
+        rent_lo_raw = item_lc.get("min_price")
         if rent_lo_raw is not None and rent_lo_raw != "":
             rent_lo = int(rent_lo_raw) if rent_lo_raw else None
         else:
-            rent_lo = money_to_int(str(item.get("minimumRent") or ""))
+            rent_lo = money_to_int(str(item_lc.get("minimumrent") or ""))
 
-        rent_hi_raw = item.get("max_price")
+        rent_hi_raw = item_lc.get("max_price")
         if rent_hi_raw is not None and rent_hi_raw != "":
             rent_hi = int(rent_hi_raw) if rent_hi_raw else None
         else:
-            rent_hi = money_to_int(str(item.get("maximumRent") or ""))
+            rent_hi = money_to_int(str(item_lc.get("maximumrent") or ""))
 
-        avail_count = str(item.get("availableUnitsCount") or item.get("unitsCount") or "")
-        avail_date = str(item.get("availableDate") or "")
+        avail_count = str(item_lc.get("availableunitscount") or item_lc.get("unitscount") or "")
+        avail_date = str(item_lc.get("availabledate") or "")
 
         units.append(make_unit_dict(
             floor_plan_name=name,
@@ -80,7 +87,7 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
             bedrooms=str(beds) if beds is not None else "",
             bathrooms=str(baths) if baths is not None else "",
             sqft=sqft,
-            unit_number=str(item.get("floorplanId") or item.get("floorPlanId") or ""),
+            unit_number=str(item_lc.get("floorplanid") or ""),
             rent_range=format_rent_range(rent_lo, rent_hi),
             availability_status="AVAILABLE" if avail_count and avail_count != "0" else "UNAVAILABLE",
             available_units=avail_count,
@@ -91,18 +98,75 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
     return units
 
 
+_RENTCAFE_WRAPPER_KEYS = (
+    "data", "results", "floorplans", "floorPlans", "Floorplans",
+    "FloorplanList", "GetFloorplansResult", "items", "Result",
+)
+
+# Keys used when the list is nested two levels deep, e.g.
+# {"response": {"result": [...]}} or {"Property": {"Floorplans": [...]}}
+_RENTCAFE_WRAPPER_KEYS_L2: tuple[tuple[str, str], ...] = (
+    ("response", "result"),
+    ("Property", "Floorplans"),
+    ("property", "floorplans"),
+)
+
+
+def _unwrap_rentcafe_list(body: Any) -> list[Any] | None:
+    """Return the floorplan list inside common wrapper shapes, or None.
+
+    Handles:
+    - Root-level list: [...]
+    - Single-level dict wrapper: {"data": [...]} / {"Result": [...]} / etc.
+    - Two-level dict wrapper: {"response": {"result": [...]}} / {"Property": {"Floorplans": [...]}}
+
+    Why: the original matcher only accepted root-level lists. Sites like
+    windsorcommunities.com wrap the same RentCafe payload as
+    ``{"data": [...]}`` or ``{"Result": [...]}`` (Yardi-style), so 12 of
+    13 RentCafe NO_DATA properties in the 2026-04-19 run were silently
+    rejected even when the API was successfully captured.
+    """
+    if isinstance(body, list):
+        return body if body else None
+    if isinstance(body, dict):
+        for k in _RENTCAFE_WRAPPER_KEYS:
+            v = body.get(k)
+            if isinstance(v, list) and v:
+                return v
+        for outer, inner in _RENTCAFE_WRAPPER_KEYS_L2:
+            outer_val = body.get(outer)
+            if isinstance(outer_val, dict):
+                v = outer_val.get(inner)
+                if isinstance(v, list) and v:
+                    return v
+    return None
+
+
+def _normalise_item(item: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of *item* with all keys lowercased.
+
+    RentCafe/Yardi APIs are inconsistent in casing across management companies
+    (e.g. Windsor Communities uses PascalCase while Brookfield uses camelCase).
+    Normalising to lowercase lets all downstream field lookups use a single key.
+    Called by both _is_rentcafe_response and parse_rentcafe_floorplans.
+    """
+    return {k.lower(): v for k, v in item.items()}
+
+
 def _is_rentcafe_response(body: Any) -> bool:
     """Check if a response body looks like RentCafe floorplan data."""
-    if not isinstance(body, list) or not body:
+    items = _unwrap_rentcafe_list(body)
+    if not items:
         return False
-    first = body[0]
+    first = items[0]
     if not isinstance(first, dict):
         return False
-    if first.get("api") == "rentcafe":
+    first_lc = _normalise_item(first)
+    if first_lc.get("api") == "rentcafe":
         return True
-    rentcafe_keys = {"floorplanName", "floorplanId", "minimumRent", "maximumRent",
-                     "availableUnitsCount", "availabilityURL"}
-    return len(rentcafe_keys & set(first.keys())) >= 3
+    rentcafe_keys = {"floorplanname", "floorplanid", "minimumrent", "maximumrent",
+                     "availableunitscount", "availabilityurl"}
+    return len(rentcafe_keys & set(first_lc.keys())) >= 3
 
 
 class RentCafeAdapter:
@@ -119,12 +183,16 @@ class RentCafeAdapter:
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
         for resp in api_responses:
             body = resp.get("body")
-            if _is_rentcafe_response(body) and isinstance(body, list):
-                url = resp.get("url", "")
-                units = parse_rentcafe_floorplans(body, url)
-                if units:
-                    all_units.extend(units)
-                    result.api_responses.append(resp)
+            if not _is_rentcafe_response(body):
+                continue
+            items = _unwrap_rentcafe_list(body)
+            if not items:
+                continue
+            url = resp.get("url", "")
+            units = parse_rentcafe_floorplans(items, url)
+            if units:
+                all_units.extend(units)
+                result.api_responses.append(resp)
 
         if all_units:
             result.units = all_units

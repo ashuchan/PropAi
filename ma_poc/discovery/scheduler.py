@@ -94,6 +94,9 @@ class Scheduler:
             url = str(row.get("url", row.get("Website", "")))
             if not url or not pid:
                 continue
+            url = _normalize_url(url)
+            if not url:
+                continue
 
             # Skip parked properties
             if self._dlq.is_parked(pid):
@@ -220,6 +223,25 @@ class Scheduler:
             return (now - last_dt).days
         except ValueError:
             return None
+
+
+def _normalize_url(url: str) -> str:
+    """Ensure a fetchable URL. Returns "" if the input is unusable.
+
+    Why: 12 properties in the 2026-04-19 run failed in ~2s with a generic
+    "Error" outcome because the CSV listed the site as a bare domain
+    ("www.foo.com") and Playwright rejected the navigation. Prepending a
+    scheme recovers these fetches. Prefers https:// since production sites
+    almost always support it — plain http:// triggers HSTS redirect stalls.
+    """
+    s = (url or "").strip()
+    if not s:
+        return ""
+    if s.startswith(("http://", "https://")):
+        return s
+    # Strip any leading "//" some CSVs emit, then prepend https.
+    s = s.lstrip("/")
+    return "https://" + s
 
 
 def _shuffle_by_host(tasks: list[CrawlTask]) -> None:

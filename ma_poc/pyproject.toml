@@ -10,6 +10,9 @@ testpaths = ["tests"]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
+markers = [
+    "llm: test requires a live LLM provider (skip with -m 'not llm')",
+]
 
 [tool.mypy]
 strict = true

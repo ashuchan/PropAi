@@ -51,3 +51,30 @@ def test_slo_custom_thresholds_respected() -> None:
     violations = check({"llm": 0.0}, props, thresholds=t)
     names = [v.name for v in violations]
     assert "success_rate" not in names  # 60% > 50%
+
+
+def test_slo_reads_jugnu_extract_result_tier() -> None:
+    """Verdict + ``_extract_result.tier_used`` keep success_rate accurate.
+
+    Regression: the 2026-04-19 run had ``_extract_result`` missing from
+    every property record, so SLO observed=0.0000 success despite 47
+    properties verdicted SUCCESS. Lock the Jugnu shape here so the keys
+    can't drift silently again.
+    """
+    succ = [
+        {
+            "_meta": {"verdict": "SUCCESS", "canonical_id": f"s{i}"},
+            "_extract_result": {"tier_used": "TIER_3_DOM", "llm_cost_usd": 0.0},
+        }
+        for i in range(95)
+    ]
+    fail = [
+        {
+            "_meta": {"verdict": "FAILED_NO_DATA", "canonical_id": f"f{i}"},
+            "_extract_result": {"tier_used": "TIER_4_LLM", "llm_cost_usd": 0.05},
+        }
+        for i in range(5)
+    ]
+    violations = check({"llm": 0.5}, succ + fail)
+    names = [v.name for v in violations]
+    assert "success_rate" not in names  # 95% meets the 95% threshold

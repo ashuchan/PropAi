@@ -656,7 +656,17 @@ class GenericAdapter:
         # means the site shape drifted (or the data lives on a sub-page);
         # the LLM can sometimes recover from the home-page HTML that's
         # right there in front of us.
-        if skip_llm and html:
+        # PMS deny-list for the gate relaxation. RentCafe is excluded because
+        # the 2026-04-19 run relaxed the gate 39× for RentCafe properties
+        # (75% NO_DATA rate) but produced zero recovered units — RentCafe
+        # has a structured Tier-1 API and when our parser misses, throwing
+        # LLM at the home-page HTML doesn't recover the data; the rent lives
+        # behind a sub-page or in an API our parser didn't capture. Fix the
+        # parser, don't burn LLM budget. Add other PMSes here if the same
+        # signature appears (high relax count, zero recovered units).
+        _LLM_GATE_RELAX_DENY = {"rentcafe"}
+
+        if skip_llm and html and ctx.detected.pms not in _LLM_GATE_RELAX_DENY:
             try:
                 _text = _re_strip_script.sub("", html)
                 _text = _re_strip_tag.sub(" ", _text)

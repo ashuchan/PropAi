@@ -369,12 +369,19 @@ class Fetcher:
                             body = await response.body()
                         except Exception:
                             body = b""
+                        # Body cap: 256KB. The previous 10KB cap silently
+                        # truncated RentCafe getFloorplans (5-30KB) and
+                        # SightMap /sightmaps/ payloads (30-150KB) mid-JSON,
+                        # which then failed json.loads downstream and made
+                        # adapters reject the response as a string. 256KB
+                        # covers every real-world unit-API body we've seen
+                        # while still capping image/HTML page captures.
                         network_log.append({
                             "url": url,
                             "status": response.status,
                             "content_type": content_type,
                             "body_size": len(body),
-                            "body": body.decode("utf-8", errors="replace")[:10000],
+                            "body": body.decode("utf-8", errors="replace")[:262_144],
                         })
                 except Exception:
                     pass

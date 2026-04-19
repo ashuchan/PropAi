@@ -23,6 +23,21 @@ Key findings:
     property map is configured without unit data. When units[] exists, SightMap
     only lists leasable (available) inventory — all units are status AVAILABLE.
     Parser ported from scripts/entrata.py:433 (_parse_sightmap_payload).
+    - 2026-04-19 fix: removed "sightmap.com" URL filter from extract().
+      lasvegasliving.com (Summer Winds, Madera) proxies SightMap data through
+      its own CDN — no sightmap.com in the response URL. Replaced with
+      _is_sightmap_response() body-shape check so any domain serving
+      SightMap-shaped JSON is matched.
+    - 2026-04-19: added three-way error differentiation: SIGHTMAP_NO_RESPONSE
+      vs SIGHTMAP_AMENITIES_ONLY vs SIGHTMAP_PARSE_FAILED.
+    - 2026-04-19 research note: data/runs/2026-04-17/raw_api/268836.json
+      contains a unit-bearing SightMap payload (sightmap.com/app/api/v1/
+      rxwjj7ldw1e/sightmaps/80671). Observed field names confirm the current
+      parser: units[].{floor_plan_id, price, display_price, unit_number, label,
+      area, display_area, floor_id, building, available_on, display_available_on,
+      specials_description}; floor_plans[].{id, name, filter_label,
+      bedroom_count, bathroom_count}. No payload starting with 24928/24929/
+      liveotis/ovationco/sightmap was present in raw_api as of 2026-04-19.
 """
 from __future__ import annotations
 
@@ -65,7 +80,13 @@ def parse_sightmap_payload(body: Any, url: str) -> list[dict[str, str]]:
     for u in raw_units:
         if not isinstance(u, dict):
             continue
-        fp = fp_by_id.get(str(u.get("floor_plan_id") or ""), {})
+        fp_id = str(u.get("floor_plan_id") or "")
+        if fp_id not in fp_by_id:
+            # Unit cannot be joined to a floor plan — skip. The extract()
+            # caller surfaces this as SIGHTMAP_PARSE_FAILED so field-name
+            # drift is diagnosable rather than silently emitting stub records.
+            continue
+        fp = fp_by_id[fp_id]
 
         price = u.get("price")
         price_i: int | None = None
@@ -104,6 +125,27 @@ def parse_sightmap_payload(body: Any, url: str) -> list[dict[str, str]]:
     return units_out
 
 
+def _is_sightmap_response(body: Any) -> bool:
+    """Return True if *body* looks like a SightMap API response.
+
+    Matches on body shape rather than source URL so that portal sites
+    (e.g. lasvegasliving.com) that proxy SightMap data through their own
+    CDN domain are handled correctly.
+
+    Positive match criteria (any one sufficient):
+    - body is a dict with a "data" key whose value has a "units" or
+      "floor_plans" or "amenities" subkey (SightMap data envelope)
+    - body["data"]["sightmap_id"] exists (direct SightMap identifier)
+    """
+    if not isinstance(body, dict):
+        return False
+    data = body.get("data")
+    if not isinstance(data, dict):
+        return False
+    sightmap_keys = {"units", "floor_plans", "amenities", "sightmap_id"}
+    return bool(sightmap_keys & set(data.keys()))
+
+
 class SightMapAdapter:
     """SightMap PMS adapter. Parses sightmap.com API responses."""
 
@@ -119,9 +161,9 @@ class SightMapAdapter:
         for resp in api_responses:
             url = resp.get("url", "")
             body = resp.get("body")
-            if "sightmap.com" not in url:
-                continue
             if not isinstance(body, dict):
+                continue
+            if not _is_sightmap_response(body):
                 continue
             units = parse_sightmap_payload(body, url)
             if units:
@@ -134,7 +176,31 @@ class SightMapAdapter:
             result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
         else:
             result.confidence = 0.0
-            result.errors.append("No SightMap unit data found in captured API responses")
+            sightmap_responses = [
+                r for r in api_responses
+                if isinstance(r.get("body"), dict) and _is_sightmap_response(r.get("body"))
+            ]
+            if not sightmap_responses:
+                result.errors.append(
+                    "SIGHTMAP_NO_RESPONSE: no SightMap-shaped response captured — "
+                    "check if the page loads sightmap.com assets at all"
+                )
+            else:
+                for r in sightmap_responses:
+                    data = r.get("body", {}).get("data", {})
+                    raw_units = data.get("units") or []
+                    if not raw_units:
+                        result.errors.append(
+                            f"SIGHTMAP_AMENITIES_ONLY: sightmap response at {r.get('url','?')[:80]} "
+                            f"has no units[] — map may be configured as amenities-only; "
+                            f"check for a separate /available or /assets endpoint"
+                        )
+                    else:
+                        result.errors.append(
+                            f"SIGHTMAP_PARSE_FAILED: units[] present ({len(raw_units)} entries) "
+                            f"but join produced 0 records — field name mismatch likely; "
+                            f"inspect raw_api payload for {r.get('url','?')[:80]}"
+                        )
 
         return result
 
