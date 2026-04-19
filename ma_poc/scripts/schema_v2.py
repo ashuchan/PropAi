@@ -172,14 +172,29 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime) -> dict:
             or unit.get("sqft")
             or unit.get("area"))
 
+    # unit_id alias (adapters emit unit_number)
+    uid = unit.get("unit_id") or unit.get("unit_number") or unit.get("_unit_number")
+
+    # rent: try numeric fields first, then parse rent_range string
+    rent_lo = unit.get("market_rent_low") or unit.get("asking_rent")
+    rent_hi = unit.get("market_rent_high") or unit.get("asking_rent")
+    if rent_lo is None and rent_hi is None:
+        rent_range = unit.get("rent_range")
+        if rent_range:
+            try:
+                from ma_poc.pms.adapters._parsing import parse_rent_range
+                rent_lo, rent_hi = parse_rent_range(str(rent_range))
+            except Exception:
+                pass
+
     return {
         "beds":           _normalize_beds(beds_raw),
         "baths":          _normalize_baths(baths_raw),
         "floor_plan_name": fp_name if fp_name else None,
         "area":           _format_area(sqft),
-        "unit_id":        unit.get("unit_id") or None,
-        "rent_low":       _format_rent(unit.get("market_rent_low")),
-        "rent_high":      _format_rent(unit.get("market_rent_high")),
+        "unit_id":        str(uid) if uid not in (None, "", "null") else None,
+        "rent_low":       _format_rent(rent_lo),
+        "rent_high":      _format_rent(rent_hi),
         "date_captured":  scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         "available_date": _format_date(unit.get("available_date")),
         "lease_term":     _safe_lease_term(unit.get("lease_term") or unit.get("_lease_term")),
@@ -199,37 +214,38 @@ def _safe_int(val: Any) -> int | None:
         return None
 
 
-def _normalize_beds(val: Any) -> int:
-    """Convert bedroom value to integer. Studio → 0, clamp [0, 7].
+def _normalize_beds(val: Any) -> int | None:
+    """Convert bedroom value to integer. Studio -> 0, clamp [0, 7].
 
-    Returns 0 for null/unrecognized (conservative default for Studio-like).
+    Returns ``None`` when the source emitted nothing so callers can
+    distinguish "studio confirmed" (0) from "not extracted" (None).
     """
     if val is None or val == "":
-        return 0
+        return None
     s = str(val).strip().lower()
-    if s in ("studio", "s", "0"):
+    if s in ("studio", "s"):
         return 0
     try:
         n = int(float(s))
         return max(0, min(n, 7))
     except (ValueError, TypeError):
-        return 0
+        return None
 
 
-def _normalize_baths(val: Any) -> float:
+def _normalize_baths(val: Any) -> float | None:
     """Convert bathroom value to nearest 0.5 multiple, clamp [0, 10].
 
-    Returns 1.0 for null (conservative default).
+    Returns ``None`` on missing input (same rationale as ``_normalize_beds``).
     """
     if val is None or val == "":
-        return 1.0
+        return None
     try:
         n = float(str(val).strip())
         # Round to nearest 0.5
         n = round(n * 2) / 2
         return max(0.0, min(n, 10.0))
     except (ValueError, TypeError):
-        return 1.0
+        return None
 
 
 def _format_zip_5(val: Any) -> str | None:
@@ -263,14 +279,21 @@ def _format_rent(val: Any) -> float | None:
 
 
 def _format_area(val: Any) -> int:
-    """Convert sqft to int. Must be > 0, otherwise -1 (absent sentinel)."""
-    if val is None:
+    """Convert sqft to int. Clamp to [150, 10000]; -1 is the absent sentinel.
+
+    Rejects values outside realistic apartment bounds (150-10000 sqft). This
+    prevents bedroom counts / floor numbers / truncated strings (observed in
+    the 2026-04-19 run: 9, 12, 50, 70, 100, 127-129) from leaking as sqft.
+    """
+    if val is None or val == -1:
         return -1
     try:
         n = int(float(str(val)))
-        return n if n > 0 else -1
     except (ValueError, TypeError):
         return -1
+    if 150 <= n <= 10_000:
+        return n
+    return -1
 
 
 def _format_date(val: Any) -> str | None:

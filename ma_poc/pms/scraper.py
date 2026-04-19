@@ -263,13 +263,40 @@ async def scrape(
     fallback_chain.append(adapter_name)
 
     # --- Step 7: Build context and extract ---
+    # Phase 2: surface CSV metadata on the AdapterContext so the LLM prompt
+    # (and any future context-aware adapter) can reference property name,
+    # city, state, and management company. Helper handles the column-name
+    # variants that show up across CSV formats.
+    def _from_csv(*keys: str) -> str:
+        if not csv_row:
+            return ""
+        for k in keys:
+            v = csv_row.get(k)
+            if v not in (None, "", "null", "None"):
+                return str(v).strip()
+        return ""
+
+    expected_units = expected_total_units
+    if expected_units is None:
+        cu = _from_csv("Total Units", "Total Units (Est.)", "total_units")
+        if cu:
+            try:
+                expected_units = int(float(cu))
+            except (ValueError, TypeError):
+                expected_units = None
+
     ctx = AdapterContext(
         base_url=resolved.resolved_url,
         detected=detection,
         profile=profile,
-        expected_total_units=expected_total_units,
+        expected_total_units=expected_units,
         property_id=property_id or "unknown",
         fetch_result=fetch_result,
+        property_name=_from_csv("name", "Name", "Property Name", "proj_name"),
+        city=_from_csv("city", "City"),
+        state=_from_csv("state", "State"),
+        zip_code=_from_csv("zip", "Zip", "zip_code", "ZIP Code"),
+        pmc=_from_csv("Management Company", "pmc"),
     )
     # Attach API responses to context for generic adapter. Prefer the
     # explicit ``api_responses`` arg (tests pass this directly); otherwise
@@ -324,9 +351,14 @@ async def scrape(
             base_url=resolved.resolved_url,
             detected=detection,  # keeps original PMS so generic knows to skip LLM
             profile=profile,
-            expected_total_units=expected_total_units,
+            expected_total_units=ctx.expected_total_units,
             property_id=property_id or "unknown",
             fetch_result=fetch_result,
+            property_name=ctx.property_name,
+            city=ctx.city,
+            state=ctx.state,
+            zip_code=ctx.zip_code,
+            pmc=ctx.pmc,
         )
         fallback_ctx._api_responses = getattr(ctx, "_api_responses", [])  # type: ignore[attr-defined]
 
@@ -364,6 +396,22 @@ async def scrape(
     adapter_hints = getattr(adapter_result, "_llm_hints", None)
     if adapter_hints:
         result["_llm_hints"] = adapter_hints
+
+    # Phase 3/4: surface the new learning payloads for profile_updater.
+    # ``_llm_analysis_results`` is consumed by services.profile_updater to
+    # write blocked_endpoints on ``noise`` verdicts; ``_llm_field_mappings``
+    # becomes profile.api_hints.llm_field_mappings for deterministic replay
+    # on subsequent runs. ``_llm_navigation_hints`` is consumed by the
+    # link-hop in scrape_jugnu as a prioritised candidate list.
+    analysis_results = getattr(adapter_result, "_llm_analysis_results", None)
+    if analysis_results:
+        result["_llm_analysis_results"] = dict(analysis_results)
+    field_mappings = getattr(adapter_result, "_llm_field_mappings", None)
+    if field_mappings:
+        result["_llm_field_mappings"] = list(field_mappings)
+    nav_hints = getattr(adapter_result, "_llm_navigation_hints", None)
+    if nav_hints:
+        result["_llm_navigation_hints"] = list(nav_hints)
 
     return result
 
@@ -448,6 +496,42 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
 # Typical win case: RentCafe/Entrata/AppFolio vanity home pages that embed
 # tracking scripts but don't carry unit data — the real portal is one
 # "View Availability" click away.
+
+def _augment_ranked_with_hints(
+    ranked: list[tuple[str, int, str]],
+    hints: list[str],
+    base_url: str,
+) -> list[tuple[str, int, str]]:
+    """Push LLM-provided navigation hints to the top of the ranked list.
+
+    When the monolithic LLM call returned ``units: []`` but filled in
+    ``profile_hints.navigation_hint`` (e.g. "/Marketing/FloorPlans"), we want
+    link-hop to try that URL first. The hint can be a relative path or a
+    full URL — we resolve against ``base_url`` either way and deduplicate.
+
+    Phase 5: acts on LLM diagnostic output that was previously discarded.
+    """
+    if not hints:
+        return ranked
+    seen_urls = {u for u, _, _ in ranked}
+    augmented: list[tuple[str, int, str]] = []
+    for raw in hints:
+        raw_s = (raw or "").strip()
+        if not raw_s:
+            continue
+        try:
+            abs_url = urllib.parse.urljoin(base_url, raw_s)
+        except Exception:
+            continue
+        if not abs_url.startswith(("http://", "https://")):
+            continue
+        if abs_url in seen_urls:
+            continue
+        seen_urls.add(abs_url)
+        # Score 1000 so LLM hints always outrank keyword-matched links.
+        augmented.append((abs_url, 1000, f"llm-hint:{raw_s[:60]}"))
+    return augmented + ranked
+
 
 _LINK_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
     # (keyword, score) — anchor text, lowercased, substring match
@@ -581,6 +665,7 @@ async def _try_link_hop(
     property_id: str,
     csv_row: dict[str, Any] | None,
     max_hops: int = 3,
+    llm_navigation_hints: list[str] | None = None,
 ) -> dict[str, Any] | None:
     """One-level BFS over home-page links when primary extraction is empty.
 
@@ -588,10 +673,15 @@ async def _try_link_hop(
     ``scrape()`` on each, and returns the first sub-result that yields
     units. Returns ``None`` if no hop recovered data.
 
-    The sub-``scrape()`` call is passed ``_in_link_hop=True`` to disable
-    recursive link-hopping and prevent runaway crawling.
+    ``llm_navigation_hints`` (Phase 5) takes priority over keyword-ranked
+    candidates — if the LLM already diagnosed where data lives, we try
+    that URL first instead of guessing from anchor text.
     """
     ranked = _rank_internal_links(entry_page_html, entry_url, limit=max_hops)
+    if llm_navigation_hints:
+        ranked = _augment_ranked_with_hints(ranked, llm_navigation_hints, entry_url)
+        # Cap to keep budget bounded even with hints merged in.
+        ranked = ranked[: max(max_hops, len(llm_navigation_hints) + 1)]
     if not ranked:
         return None
 
@@ -609,6 +699,12 @@ async def _try_link_hop(
     emit(EventKind.LINK_HOP_STARTED, property_id,
          entry_url=entry_url,
          candidates=[{"url": u, "score": s, "anchor": a[:60]} for u, s, a in ranked])
+
+    # Phase 4: track which sub-URLs were tried and whether they produced
+    # data. profile_updater consumes this dict to persist
+    # profile.navigation.explored_links (skip-next-run) and
+    # profile.navigation.availability_links (prioritise-next-run).
+    explored: dict[str, bool] = {}
 
     for idx, (sub_url, score, anchor) in enumerate(ranked, 1):
         sub_task = CrawlTask(
@@ -638,6 +734,7 @@ async def _try_link_hop(
              hop_index=idx, score=score, anchor=anchor[:60])
 
         if outcome_val != "OK":
+            explored[sub_url] = False
             continue
 
         # Re-run extraction on the sub-page via ``scrape()`` (not
@@ -655,19 +752,33 @@ async def _try_link_hop(
             )
         except Exception as exc:
             log.warning("link-hop scrape failed for %s: %s", sub_url, exc)
+            explored[sub_url] = False
             continue
 
-        if sub_result.get("units"):
+        had_data = bool(sub_result.get("units"))
+        explored[sub_url] = had_data
+        if had_data:
             sub_result["_link_hop_from"] = entry_url
             sub_result["_link_hop_depth"] = 1
             sub_result["_link_hop_score"] = score
             sub_result["_link_hop_anchor"] = anchor
+            # Merge explored history so the profile updater (Phase 4) can
+            # record which links the crawler already tried.
+            existing_explored = sub_result.get("_explored_links") or {}
+            existing_explored.update(explored)
+            sub_result["_explored_links"] = existing_explored
             emit(EventKind.LINK_HOP_RECOVERED, property_id,
                  entry_url=entry_url, sub_url=sub_url, units=len(sub_result["units"]),
                  tier=sub_result.get("extraction_tier_used"),
                  hop_index=idx, score=score)
             return sub_result
 
+    # No hop recovered — return None but stash the explored map on the
+    # outer link-hop caller via a sentinel dict. The caller (scrape_jugnu)
+    # can drop it onto the final empty result so learning still happens on
+    # failure too.
+    if explored:
+        return {"_units_empty": True, "_explored_links": explored}
     return None
 
 
@@ -807,6 +918,8 @@ async def scrape_jugnu(
                     pms=detected_pms.get("pms", "unknown"),
                     confidence=float(detected_pms.get("confidence", 0.0)),
                 )
+                # Phase 5: feed LLM navigation hints (if any) into the
+                # ranker so they outrank keyword candidates.
                 hop_result = await _try_link_hop(
                     entry_url=base_url,
                     entry_page_html=entry_html,
@@ -816,6 +929,7 @@ async def scrape_jugnu(
                     property_id=property_id,
                     csv_row=csv_row,
                     max_hops=3,
+                    llm_navigation_hints=result.get("_llm_navigation_hints"),
                 )
             except Exception as exc:
                 log.warning("link-hop orchestration failed for %s: %s",
@@ -830,7 +944,9 @@ async def scrape_jugnu(
                           "api_calls_intercepted", "_winning_page_url",
                           "_raw_api_responses", "_adapter_used",
                           "_fallback_chain", "_tier_attempts",
-                          "_llm_interactions", "_llm_hints"):
+                          "_llm_interactions", "_llm_hints",
+                          "_llm_analysis_results", "_llm_field_mappings",
+                          "_explored_links"):
                     if k in hop_result:
                         result[k] = hop_result[k]
                 for k in ("_link_hop_from", "_link_hop_depth",
@@ -838,6 +954,11 @@ async def scrape_jugnu(
                     if k in hop_result:
                         result[k] = hop_result[k]
                 result["_link_hop_success"] = True
+            elif hop_result and hop_result.get("_units_empty"):
+                # Phase 4: link-hop failed to recover data but we still
+                # learned which sub-URLs had nothing. Feed that into the
+                # profile so subsequent runs skip them.
+                result["_explored_links"] = hop_result.get("_explored_links") or {}
                 # Update adapter_name so downstream events see the real winner.
                 adapter_name = result.get("_adapter_used", adapter_name)
 

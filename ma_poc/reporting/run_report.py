@@ -40,10 +40,23 @@ def build(
     carry_forward = 0
 
     for p in properties:
-        meta = p.get("_meta", {})
-        tier = meta.get("scrape_tier_used") or "UNKNOWN"
+        meta = p.get("_meta", {}) or {}
+        # Jugnu writes extraction tier on _extract_result; legacy path writes
+        # it on _meta.scrape_tier_used. Read both so the same report works for
+        # either pipeline.
+        extract_result = p.get("_extract_result") or {}
+        tier = (
+            meta.get("scrape_tier_used")
+            or (extract_result.get("tier_used") if isinstance(extract_result, dict)
+                else getattr(extract_result, "tier_used", None))
+            or "UNKNOWN"
+        )
         tier_counts[tier] += 1
-        if "FAIL" in str(tier).upper():
+        # Verdict is the authoritative success/fail signal — tier_used can
+        # say TIER_1_API on a carry-forward record, so tier string alone is
+        # not a failure indicator.
+        verdict = meta.get("verdict") or ""
+        if verdict.startswith("FAILED") or "FAIL" in str(tier).upper():
             failed += 1
         if meta.get("carry_forward_used"):
             carry_forward += 1

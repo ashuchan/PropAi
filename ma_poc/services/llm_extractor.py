@@ -46,6 +46,8 @@ Extract unit-level apartment availability data from the provided website content
 
 PROPERTY CONTEXT:
 - Name: {property_name}
+- City: {city}, {state}
+- Management Company: {pmc}
 - Website: {website}
 
 CONTENT TO ANALYZE:
@@ -68,6 +70,8 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
       "market_rent_high": number_or_null,
       "available_date": "YYYY-MM-DD or null",
       "availability_status": "AVAILABLE|UNAVAILABLE|WAITLIST|UNKNOWN",
+      "lease_term": number_or_null,
+      "move_in_date": "YYYY-MM-DD or null",
       "confidence": 0.0-1.0
     }}
   ],
@@ -76,6 +80,7 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
     "json_paths": {{}},
     "css_selectors": {{}},
     "platform_guess": null,
+    "navigation_hint": "",
     "field_mapping_notes": ""
   }}
 }}
@@ -84,6 +89,7 @@ RULES:
 - Extract ALL available units, not just a sample.
 - If data is floor-plan-level (not unit-level), extract floor plans.
 - For rent ranges like "$1,200 - $1,500", set market_rent_low=1200, market_rent_high=1500.
+- If data is NOT on this page, put the subpage URL in navigation_hint.
 - confidence: 1.0 = certain, 0.7 = likely correct, <0.5 = guessing.
 """
 
@@ -179,12 +185,13 @@ def _build_prompt(llm_input: dict[str, Any]) -> str:
     template = _load_prompt_template()
     ctx = llm_input.get("property_context", {})
     replacements = {
-        "{property_name}": ctx.get("property_name", "Unknown"),
-        "{city}": ctx.get("city", ""),
-        "{state}": ctx.get("state", ""),
-        "{total_units}": str(ctx.get("total_units", "unknown")),
-        "{website}": ctx.get("website", ""),
-        "{content_type}": llm_input.get("content_type", "HTML"),
+        "{property_name}": ctx.get("property_name", "Unknown") or "Unknown",
+        "{city}":          ctx.get("city", "") or "",
+        "{state}":         ctx.get("state", "") or "",
+        "{pmc}":           ctx.get("pmc", "") or "",
+        "{total_units}":   str(ctx.get("total_units") or "unknown"),
+        "{website}":       ctx.get("website", "") or "",
+        "{content_type}":  llm_input.get("content_type", "HTML"),
         "{trimmed_content}": llm_input.get("trimmed_content", ""),
     }
     result = template
@@ -460,8 +467,14 @@ async def analyze_api_with_llm(
     if len(body_str) > 30_000:
         body_str = body_str[:30_000] + "\n... (truncated)"
 
-    prompt = template.replace("{property_name}", property_context.get("property_name", "Unknown"))
-    prompt = prompt.replace("{website}", property_context.get("website", ""))
+    # Phase 2 context enrichment — every targeted prompt now sees the CSV
+    # metadata so the LLM can disambiguate (e.g. PMC-specific plan names)
+    # and validate addresses against the known city/state.
+    prompt = template.replace("{property_name}", property_context.get("property_name", "") or "Unknown")
+    prompt = prompt.replace("{city}", property_context.get("city", "") or "")
+    prompt = prompt.replace("{state}", property_context.get("state", "") or "")
+    prompt = prompt.replace("{pmc}", property_context.get("pmc", "") or "")
+    prompt = prompt.replace("{website}", property_context.get("website", "") or "")
     prompt = prompt.replace("{api_url}", api_url)
     prompt = prompt.replace("{api_response_json}", body_str)
 
@@ -583,8 +596,11 @@ async def analyze_dom_with_llm(
     if len(dom_html) > 20_000:
         dom_html = dom_html[:20_000] + "\n<!-- truncated -->"
 
-    prompt = template.replace("{property_name}", property_context.get("property_name", "Unknown"))
-    prompt = prompt.replace("{website}", property_context.get("website", ""))
+    prompt = template.replace("{property_name}", property_context.get("property_name", "") or "Unknown")
+    prompt = prompt.replace("{city}", property_context.get("city", "") or "")
+    prompt = prompt.replace("{state}", property_context.get("state", "") or "")
+    prompt = prompt.replace("{pmc}", property_context.get("pmc", "") or "")
+    prompt = prompt.replace("{website}", property_context.get("website", "") or "")
     prompt = prompt.replace("{page_url}", page_url)
     prompt = prompt.replace("{dom_section_html}", dom_html)
 

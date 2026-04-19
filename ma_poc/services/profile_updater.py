@@ -36,6 +36,8 @@ _TIER_MAP: dict[str, int] = {
     "TIER_3_DOM": 3,
     "TIER_3_DOM_LLM": 3,
     "TIER_4_LLM": 4,
+    "TIER_4_LLM_API": 4,   # Phase 3: targeted analyze_api_with_llm
+    "TIER_4_LLM_DOM": 4,   # Phase 3: targeted analyze_dom_with_llm
     "TIER_4_ENTRATA_API": 4,
     "TIER_5_PORTAL": 5,
     "TIER_5_5_EXPLORATORY": 5,
@@ -185,9 +187,14 @@ def update_profile_after_extraction(
                     profile.api_hints.known_endpoints.append(ApiEndpoint(url_pattern=url))
 
     # ── Record LLM-generated hints (Tier 4 / Tier 5) ────────────────
+    # Phase 3 added TIER_4_LLM_API (targeted per-API analysis) and
+    # TIER_4_LLM_DOM (targeted per-DOM-section analysis). Both carry
+    # learnable hints — json_paths for the former, css_selectors for the
+    # latter — so they're treated the same as the monolithic TIER_4_LLM.
     llm_hints = scrape_result.get("_llm_hints")
-    if llm_hints and tier in ("TIER_4_LLM", "TIER_5_VISION"):
-        profile.updated_by = "LLM_EXTRACTION" if tier == "TIER_4_LLM" else "LLM_VISION"
+    llm_tiers = ("TIER_4_LLM", "TIER_4_LLM_API", "TIER_4_LLM_DOM", "TIER_5_VISION")
+    if llm_hints and tier in llm_tiers:
+        profile.updated_by = "LLM_VISION" if tier == "TIER_5_VISION" else "LLM_EXTRACTION"
 
         # API hints from LLM
         for api_url in llm_hints.get("api_urls_with_data") or []:

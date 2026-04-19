@@ -23,6 +23,15 @@ class AdapterContext:
     # Jugnu: L1 fetch result — the adapter does not re-fetch. For adapters
     # that work from network_log, the page argument can be a stub.
     fetch_result: Any | None = None  # FetchResult; typed Any to avoid import cycle
+    # Property metadata from the CSV row. Threaded through so LLM prompts
+    # and any adapter that wants property-aware behavior (e.g. validating
+    # extracted city against CSV city) have the context. Before Phase 2
+    # these were hard-coded to "" in the generic adapter's LLM call.
+    property_name: str = ""
+    city: str = ""
+    state: str = ""
+    zip_code: str = ""
+    pmc: str = ""  # Management company
 
 
 @dataclass

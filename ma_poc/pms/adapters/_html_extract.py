@@ -191,11 +191,18 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
                 "floor":              "",
                 "building":           "",
                 "rent_range":         rent_range,
+                # Surface numeric rent so the v2 transform doesn't have to
+                # re-parse the human-readable string. Fall back to ``lo_i``
+                # for both when the high price is missing (single-value rent).
+                "market_rent_low":    lo_i,
+                "market_rent_high":   hi_i if hi_i is not None else lo_i,
                 "deposit":            "",
                 "concession":         "",
                 "availability_status": "",
                 "available_units":    "",
                 "availability_date":  "",
+                "lease_term":         "",
+                "move_in_date":       "",
                 "source_api_url":     source_url,
                 "extraction_tier":    "TIER_2_JSONLD",
             })

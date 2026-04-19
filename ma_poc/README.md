@@ -161,8 +161,19 @@ PMS-aware extraction with 10 adapters.
 |---|---|
 | `detector.py` | Offline PMS detection from URL/HTML signals |
 | `resolver.py` | CTA-hop + leasing portal resolver (follows redirects to PMS pages) |
-| `scraper.py` | Orchestrator: detect → resolve → adapt. `scrape_jugnu()` entry point |
+| `scraper.py` | Orchestrator: detect → resolve → adapt. `scrape_jugnu()` entry point. Link-hop acts on LLM `navigation_hint` when extraction is empty. |
 | `adapters/` | RentCafe, Entrata, AppFolio, OneSite, SightMap, RealPage OLL, AvalonBay, Squarespace, Wix, Generic |
+
+`AdapterContext` now threads `property_name`, `city`, `state`, `zip_code`,
+`pmc` from the CSV row into every extraction call. Used by the generic
+adapter to populate LLM prompts with real property context (previously
+hard-coded to empty strings).
+
+The generic adapter runs a profile-aware cascade: blocked-endpoint
+filter → saved `LlmFieldMapping` replay → narrow API → broad API →
+JSON-LD (rent/sqft-gated) → embedded JSON → DOM scan → targeted API
+LLM (max 3) → targeted DOM LLM (max 1) → monolithic LLM. See
+`scripts/CLAUDE.md` for the full table.
 
 ### L4 — Validation (`ma_poc/validation/`)
 
@@ -184,7 +195,7 @@ Event tracking, cost accounting, SLO monitoring.
 | `events.py` | 28 event types, `emit()` function, buffered ledger backend |
 | `event_ledger.py` | Append-only JSONL with crash-safe reads |
 | `cost_ledger.py` | SQLite-backed LLM/vision/proxy cost tracking |
-| `slo_watcher.py` | Success rate >=95%, LLM cost <$1, vision fallback <=5% |
+| `slo_watcher.py` | Reads `_meta.verdict` + `_extract_result.tier_used`. Success rate >=95%, LLM cost <$1, vision fallback <=5% |
 | `replay_store.py` | Load raw HTML + events for property replay debugging |
 | `dlq_controller.py` | Policy layer: parks after 3 consecutive unreachable |
 
@@ -193,7 +204,27 @@ Event tracking, cost accounting, SLO monitoring.
 | Module | Purpose |
 |---|---|
 | `verdict.py` | Per-property verdict: SUCCESS, FAILED_UNREACHABLE, CARRY_FORWARD, etc. |
-| `run_report.py` | Run-level JSON + markdown report with SLO section |
+| `run_report.py` | Run-level JSON + markdown report with SLO section. Reads outcome from `_meta.verdict` and tier from `_extract_result.tier_used`. |
+| `property_report.py` | Per-property markdown report including LLM Interactions section |
+
+### Self-learning loop
+
+After every scrape, `services.profile_updater.update_profile_after_extraction`
+consumes these result-dict keys to persist learned knowledge on
+`config/profiles/{canonical_id}.json`:
+
+| Result key | Consumed as |
+|---|---|
+| `_winning_page_url` | `profile.navigation.winning_page_url` |
+| `_raw_api_responses` | `profile.api_hints.known_endpoints` (for successful Tier-1 runs) |
+| `_llm_analysis_results` | Dict-valued entries → `profile.api_hints.llm_field_mappings` (replayable without LLM next run). `"noise:<reason>"` strings → `profile.api_hints.blocked_endpoints` (filtered before extraction). |
+| `_llm_hints.css_selectors` | `profile.dom_hints.field_selectors` |
+| `_llm_hints.platform_guess` | `profile.dom_hints.platform_detected`, `profile.api_hints.api_provider` |
+| `_explored_links` | `profile.navigation.availability_links` (had data) / `explored_links` (empty) |
+
+Maturity rules: 1 success → WARM, 3 consecutive successes → HOT, 3
+consecutive failures → COLD. HOT profiles get a fast path via
+`TIER_1_PROFILE_MAPPING` that replays saved mappings without any LLM call.
 
 ## Inputs
 

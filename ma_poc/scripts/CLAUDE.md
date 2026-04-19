@@ -6,6 +6,45 @@
 
 ---
 
+## Extraction cascade inside GenericAdapter (2026-04-19 refactor)
+
+The Jugnu `GenericAdapter` (`ma_poc/pms/adapters/generic.py`) runs tiers in this order. Each tier emits `extract.tier_attempted` so the per-property report can show exactly what fired.
+
+| Sub-tier | Key | What it does |
+|---|---|---|
+| 0 | `generic:blocked_filter` | Drops API responses matching `profile.api_hints.blocked_endpoints` before any extractor sees them. Populated by Phase 3 LLM noise classification. |
+| 0 | `generic:profile_replay` | Deterministic replay of saved `LlmFieldMapping`. Zero LLM cost when a prior run already learned the API shape. Wins with tier `TIER_1_PROFILE_MAPPING`. |
+| 1 | `generic:api_narrow` | Narrow generic API parser (`parse_generic_api`) on responses with unit signals. Now emits `market_rent_low/high` ints alongside `rent_range`. |
+| 2 | `generic:api_broad` | Broad parser + host-specific (SightMap, RealPage) parsers. |
+| 3 | `generic:jsonld` | JSON-LD Apartment/Offer parser. **Rejects plan-name-only output** (no rent, no sqft) so it doesn't block the LLM sub-tiers. |
+| 4 | `generic:embedded_json` | `__NEXT_DATA__` / `__NUXT__` / window-global SSR blobs. |
+| 5 | `generic:dom_scan` | CSS-selector DOM cascade. Now filters junk (`MODULE_*`, "Lease Magnet", "Pop-Up") at extract time. |
+| 6a | `generic:llm_api_targeted` | `analyze_api_with_llm` on each candidate API (max 3/property). Returns units + `json_paths` + `response_envelope` — persisted as a replayable mapping. Tier `TIER_4_LLM_API`. |
+| 6b | `generic:llm_dom_targeted` | `analyze_dom_with_llm` on the tightest rent-containing DOM section (max 1/property). Returns units + CSS selectors. Tier `TIER_4_LLM_DOM`. |
+| 6c | `generic:llm` | Monolithic fallback (`extract_with_llm`). Only fires when 6a + 6b returned empty. Captures `navigation_hint` so link-hop can follow the LLM's pointer. |
+
+### LLM gate and budget
+
+- Default: `skip_llm = (ctx.detected.pms != "unknown")`.
+- Relaxed (`LLM_GATE_RELAXED`) when the detected adapter returned empty AND the page has ≥5KB text + ≥1 rent signal. Covers SightMap / RentCafe failures where the API wasn't captured.
+- Budget: 3 targeted API calls + 1 targeted DOM call + 1 monolithic fallback. Tracked in `ma_poc/observability/cost_ledger.py`.
+
+### Self-learning payload surfaced to the profile updater
+
+Every `scrape_jugnu` result dict now carries:
+- `_llm_interactions` — cost-accounting records for every LLM call.
+- `_llm_analysis_results` — `{api_url: LlmFieldMapping | "noise:<reason>"}`. Consumed by `services.profile_updater.update_profile_after_extraction` to persist `llm_field_mappings` and `blocked_endpoints`.
+- `_llm_field_mappings` — list of the mapping dicts written on this run.
+- `_llm_hints` — `{css_selectors: {...}, platform_guess, navigation_hint, ...}`.
+- `_llm_navigation_hints` — URLs extracted from `navigation_hint` fields; forwarded to link-hop as priority-1000 candidates.
+- `_explored_links` — `{sub_url: had_data_bool}` from link-hop. Populated even when the hop recovered nothing so the profile learns which links NOT to revisit.
+
+### Property context threaded into every prompt
+
+`AdapterContext` (see `ma_poc/pms/adapters/base.py`) carries `property_name`, `city`, `state`, `zip_code`, `pmc` sourced from the CSV row. All three prompt templates (`tier4_extraction.txt`, `api_analysis.txt`, `dom_analysis.txt`) reference these placeholders. Before this change the generic adapter hard-coded them to empty strings.
+
+---
+
 ## Architecture overview
 
 The platform has **two pipeline implementations**. The Jugnu pipeline is the recommended architecture going forward.
@@ -381,6 +420,37 @@ Fields set to `null` require external data sources (CoStar, county assessor, Cen
   "amenities": null
 }
 ```
+
+### V2 unit-dict conventions (2026-04-19 refactor)
+
+The v2 schema transform (`_format_v2_unit` in `jugnu_runner.py` and
+`schema_v2.py`) now tolerates several adapter-side naming conventions:
+
+| v2 output key | Read from (in priority order) |
+|---|---|
+| `unit_id` | `unit_id` → `unit_number` → `_unit_number` |
+| `rent_low` / `rent_high` | `market_rent_low/high` → `asking_rent` → parsed from `rent_range` string (e.g. `"$1,200 - $1,500"`) |
+| `floor_plan_name` | `_floor_plan` → `floor_plan_name` → `floorplan_name` |
+| `area` | `_sqft` → `sqft` → `area` (rejected if outside 150-10000 sqft) |
+| `beds` / `baths` | `None` when the source emitted nothing — no silent default to 0 / 1.0 |
+
+`lease_term` and `move_in_date` are plumbed end-to-end; parsers that learn
+to extract them don't need a format change. Today they're still mostly
+null because the regex/LLM paths don't target them yet.
+
+Junk filters (`is_junk_floor_plan`, `is_junk_unit_number` in
+`ma_poc/pms/adapters/_parsing.py`) drop CMS module names (`MODULE_*`,
+"Lease Magnet", "Pop-Up", vendor prefixes like `[Riedman]`) and
+stop-word unit numbers ("Left", "s", etc). Applied in both
+`parse_generic_api` and the v2 transform for belt-and-braces safety.
+
+### Carry-forward persists the full unit (2026-04-19)
+
+`StateStore.upsert_units` now snapshots bedrooms, bathrooms, sqft,
+floor_plan_name, unit_number, rent_range, lease_term, and move_in_date
+alongside rent/availability. `carry_forward_units` emits the full prior
+dict so a CF-SUCCESS record ships with complete data instead of a
+rent-only stub.
 
 ---
 
@@ -923,3 +993,18 @@ Column mapping:
 | Error handling | try/except per property | Never-fail contract across all layers |
 | State | JSON files (property_index, unit_index) | SQLite (frontier, cache, cost ledger) |
 | Reports | report.json/md | report.json/md + SLO section + per-property verdicts |
+
+### Reporting key source of truth (2026-04-19 fix)
+
+`ma_poc/reporting/run_report.py` and `ma_poc/observability/slo_watcher.py`
+both read the outcome from **`_meta.verdict`** (SUCCESS /
+FAILED_UNREACHABLE / FAILED_NO_DATA) and the tier from
+**`_extract_result.tier_used`**.
+
+Previously they read `_meta.scrape_tier_used`, which only the legacy
+pipeline writes. Jugnu runs therefore showed `tier=UNKNOWN`,
+`failed=0`, and `success_rate observed=0.0000` alongside
+`success_rate=100%` — the reporting values contradicted each other. If
+you rename or move these keys, update both files together and keep the
+integration test in `ma_poc/tests/observability/test_slo_watcher.py`
+asserting against a Jugnu-shaped record.

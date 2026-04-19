@@ -52,18 +52,34 @@ def check(
     violations: list[SloViolation] = []
     total = len(property_results) or 1
 
+    # Source of truth for per-property outcome: `_meta.verdict` (SUCCESS /
+    # FAILED_UNREACHABLE / FAILED_NO_DATA / PARTIAL). `_meta.scrape_tier_used`
+    # is written by the legacy pipeline but NOT by Jugnu, so reading it alone
+    # flags every Jugnu property as failed.
+    def _failed(p: dict[str, Any]) -> bool:
+        meta = p.get("_meta", {}) or {}
+        verdict = str(meta.get("verdict") or "")
+        if verdict.startswith("FAILED"):
+            return True
+        tier_legacy = str(meta.get("scrape_tier_used") or "")
+        return "FAIL" in tier_legacy.upper()
+
+    def _tier(p: dict[str, Any]) -> str:
+        meta = p.get("_meta", {}) or {}
+        extract_result = p.get("_extract_result") or {}
+        tier_from_extract = (
+            extract_result.get("tier_used") if isinstance(extract_result, dict)
+            else getattr(extract_result, "tier_used", None)
+        )
+        return str(meta.get("scrape_tier_used") or tier_from_extract or "")
+
     # Success rate
-    failed = sum(
-        1 for p in property_results
-        if "FAIL" in str(p.get("_meta", {}).get("scrape_tier_used", "")).upper()
-        or not p.get("_meta", {}).get("scrape_tier_used")
-    )
+    failed = sum(1 for p in property_results if _failed(p))
     success_rate = 1.0 - (failed / total)
     if success_rate < thresholds.success_rate_min:
         fail_cids = [
-            p.get("_meta", {}).get("canonical_id", "?")
-            for p in property_results
-            if "FAIL" in str(p.get("_meta", {}).get("scrape_tier_used", "")).upper()
+            (p.get("_meta", {}) or {}).get("canonical_id", "?")
+            for p in property_results if _failed(p)
         ][:5]
         violations.append(SloViolation(
             name="success_rate",
@@ -82,10 +98,7 @@ def check(
         ))
 
     # Vision fallback rate
-    vision_used = sum(
-        1 for p in property_results
-        if "vision" in str(p.get("_meta", {}).get("scrape_tier_used", "")).lower()
-    )
+    vision_used = sum(1 for p in property_results if "vision" in _tier(p).lower())
     vision_pct = vision_used / total
     if vision_pct > thresholds.vision_fallback_max_pct:
         violations.append(SloViolation(

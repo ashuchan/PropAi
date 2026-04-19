@@ -51,6 +51,8 @@ from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     format_rent_range,
     get_field,
+    is_junk_floor_plan,
+    is_junk_unit_number,
     make_unit_dict,
     money_to_int,
     rent_in_sanity_range,
@@ -94,6 +96,70 @@ def _find_unit_list(body: Any) -> list[dict[str, Any]]:
                 return nested
 
     return []
+
+
+def _extract_rent_dom_section(html: str, max_bytes: int = 20_000) -> str | None:
+    """Return the smallest HTML chunk that contains the site's rent signals.
+
+    We pick the tightest ancestor around rent-looking text rather than
+    sending the entire page to the DOM-analysis LLM. This keeps the prompt
+    small enough to meet per-call token limits and biases the model toward
+    the unit/floor-plan container instead of global layout chrome.
+
+    Strategy:
+      1. Prefer ``<main>`` when present — apartment sites almost always put
+         availability content there.
+      2. Otherwise find the smallest container with 2+ rent-pattern matches.
+      3. Cap at ``max_bytes`` so oversized ``<main>`` tags don't blow the
+         per-call token budget.
+    """
+    if not html:
+        return None
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return html[:max_bytes]
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+        except Exception:
+            return html[:max_bytes]
+
+    # Strip noise tags.
+    for tag in soup.find_all(["script", "style", "svg", "noscript",
+                              "nav", "footer", "header", "iframe"]):
+        tag.decompose()
+
+    main = soup.find("main")
+    if main:
+        block = str(main)
+        if len(block) > max_bytes:
+            block = block[:max_bytes] + "<!-- truncated -->"
+        return block
+
+    # Find smallest ancestor holding 2+ rent patterns.
+    best: Any = None
+    best_len = 10**9
+    for el in soup.find_all(True):
+        try:
+            text = el.get_text(" ", strip=True)
+        except Exception:
+            continue
+        if len(_re_rent.findall(text)) < 2:
+            continue
+        s = str(el)
+        if 500 <= len(s) <= max_bytes and len(s) < best_len:
+            best, best_len = el, len(s)
+
+    if best is not None:
+        return str(best)
+
+    # Last resort: strip to body, then truncate.
+    body = soup.find("body")
+    fallback = str(body) if body else str(soup)
+    return fallback[:max_bytes]
 
 
 async def _get_page_html(page: Any, ctx: AdapterContext) -> str | None:
@@ -196,6 +262,17 @@ def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, s
         if not any([name, beds_str, sqft_str, rent_lo_str]):
             continue
 
+        # Phase 5: junk deny-list. Drops CMS-widget names like
+        # "MODULE_CONCESSIONMANAGER" and "[Riedman] Lease Magnet - Pop-Up"
+        # that the 2026-04-19 run surfaced as fake units. Also drops
+        # unit_number stop-words ("Left", "s", etc).
+        if is_junk_floor_plan(name):
+            continue
+        if is_junk_unit_number(unit_num):
+            # Prefer to clear the unit number rather than drop the whole
+            # record — the rent/sqft may still be valid floor-plan data.
+            unit_num = ""
+
         # Dedup key
         dedup = unit_num or f"{name}|{beds_str}|{sqft_str}|{rent_lo_str}"
         if dedup in seen:
@@ -225,6 +302,8 @@ def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, s
             floor=floor_str,
             building=building_str,
             rent_range=format_rent_range(rent_lo, rent_hi),
+            rent_low=rent_lo,
+            rent_high=rent_hi or rent_lo,
             deposit=deposit_str,
             concession=concession_str,
             availability_status=status_str.upper() if status_str else "AVAILABLE",
@@ -294,6 +373,100 @@ class GenericAdapter:
         skip_llm = ctx.detected.pms != "unknown"
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
+
+        # Phase 4: filter out API URLs the profile previously classified as
+        # noise. Saves token spend on known-bad endpoints (chatbot configs,
+        # analytics pixels, CMS widgets). New noise discoveries also flow
+        # back into this list via _llm_analysis_results.
+        profile = getattr(ctx, "profile", None)
+        blocked_urls: set[str] = set()
+        if profile is not None:
+            try:
+                for be in getattr(profile.api_hints, "blocked_endpoints", []) or []:
+                    pat = getattr(be, "url_pattern", None)
+                    if pat:
+                        blocked_urls.add(str(pat))
+            except Exception:
+                blocked_urls = set()
+        if blocked_urls:
+            before = len(api_responses)
+            api_responses = [r for r in api_responses
+                             if r.get("url", "") not in blocked_urls]
+            dropped = before - len(api_responses)
+            if dropped:
+                _log_attempt(
+                    "generic:blocked_filter", "ran_units",
+                    units=0,
+                    reason=f"dropped {dropped} API(s) from profile.blocked_endpoints",
+                )
+
+        # Phase 4 sub-tier 0: deterministic replay of saved LLM mappings.
+        # Runs before ANY parser: if a prior run's LLM told us exactly how
+        # to extract units from a specific API shape, we can reuse it with
+        # zero LLM cost. Falls through to the generic cascade on miss.
+        if profile is not None and api_responses:
+            t0 = _time.monotonic()
+            replayed_units: list[dict[str, Any]] = []
+            try:
+                saved = list(getattr(profile.api_hints, "llm_field_mappings", []) or [])
+            except Exception:
+                saved = []
+            if saved:
+                try:
+                    try:
+                        from ma_poc.services.llm_extractor import apply_saved_mapping
+                    except ImportError:
+                        from services.llm_extractor import apply_saved_mapping  # type: ignore[no-redef]
+                except ImportError:
+                    apply_saved_mapping = None  # type: ignore[assignment]
+                if apply_saved_mapping is not None:
+                    for mapping in saved:
+                        try:
+                            pat = getattr(mapping, "api_url_pattern", None) or (
+                                mapping.get("api_url_pattern")
+                                if isinstance(mapping, dict) else None
+                            )
+                        except Exception:
+                            pat = None
+                        if not pat:
+                            continue
+                        for resp in api_responses:
+                            if pat in resp.get("url", ""):
+                                mdict = mapping if isinstance(mapping, dict) else {
+                                    "api_url_pattern": pat,
+                                    "json_paths": getattr(mapping, "json_paths", {}) or {},
+                                    "response_envelope": getattr(mapping, "response_envelope", "") or "",
+                                }
+                                try:
+                                    units = apply_saved_mapping(resp.get("body"), mdict) or []
+                                except Exception:
+                                    units = []
+                                if units:
+                                    replayed_units.extend(units)
+                                    result.api_responses.append(resp)
+                                    break
+            if replayed_units:
+                _log_attempt(
+                    "generic:profile_replay", "ran_units",
+                    units=len(replayed_units),
+                    reason="replayed saved LlmFieldMapping",
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                result.units = replayed_units
+                result.tier_used = "TIER_1_PROFILE_MAPPING"
+                result.winning_url = (
+                    result.api_responses[0].get("url") if result.api_responses
+                    else ctx.base_url
+                )
+                result.confidence = min(0.90, 0.7 + 0.03 * len(replayed_units))
+                return result
+            _log_attempt(
+                "generic:profile_replay",
+                "skipped" if not saved else "ran_empty",
+                reason=("no saved mappings" if not saved
+                        else "saved mappings didn't match any captured API"),
+                duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
 
         # Sub-tier 1: narrow generic API parser -----------------------------
         t0 = _time.monotonic()
@@ -378,13 +551,40 @@ class GenericAdapter:
             # Sub-tier 3: JSON-LD
             t0 = _time.monotonic()
             jsonld_units = extract_jsonld_from_html(html, ctx.base_url)
-            _log_attempt(
-                "generic:jsonld",
-                "ran_units" if jsonld_units else "ran_empty",
-                units=len(jsonld_units or []),
-                reason="" if jsonld_units else "no Apartment/Offer schema in HTML",
-                duration_ms=int((_time.monotonic() - t0) * 1000),
-            )
+            # Phase 5: reject JSON-LD success when the extraction is
+            # plan-name-only with no Offer prices. That shape was gating
+            # the LLM sub-tiers from running on 8 properties in the
+            # 2026-04-19 run — marking them "SUCCESS" with a list of
+            # floor-plan labels but no rent/sqft. Better to fall through.
+            if jsonld_units:
+                has_rent = any(
+                    u.get("market_rent_low") or u.get("market_rent_high")
+                    or u.get("rent_range") for u in jsonld_units
+                )
+                has_size = any(u.get("sqft") for u in jsonld_units)
+                if not has_rent and not has_size:
+                    _log_attempt(
+                        "generic:jsonld",
+                        "ran_empty",
+                        units=len(jsonld_units),
+                        reason="JSON-LD had floor-plan names only (no rent/sqft) — falling through",
+                        duration_ms=int((_time.monotonic() - t0) * 1000),
+                    )
+                    jsonld_units = []
+            if jsonld_units:
+                _log_attempt(
+                    "generic:jsonld",
+                    "ran_units",
+                    units=len(jsonld_units),
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+            elif "generic:jsonld" not in {a["tier_key"] for a in attempts}:
+                _log_attempt(
+                    "generic:jsonld",
+                    "ran_empty",
+                    reason="no Apartment/Offer schema in HTML",
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
             if jsonld_units:
                 result.units = jsonld_units
                 result.tier_used = "TIER_2_JSONLD"
@@ -502,32 +702,182 @@ class GenericAdapter:
             result.confidence = 0.0
             return result
 
-        t0 = _time.monotonic()
+        # Phase 2: shared property context for every LLM call below.
+        property_context = {
+            "property_name": getattr(ctx, "property_name", "") or "",
+            "city":          getattr(ctx, "city", "") or "",
+            "state":         getattr(ctx, "state", "") or "",
+            "pmc":           getattr(ctx, "pmc", "") or "",
+            "total_units":   ctx.expected_total_units or "",
+            "website":       ctx.base_url,
+        }
+
+        # Import the targeted LLM helpers; fall through cleanly if unavailable
+        # so the adapter degrades gracefully (monolithic call still runs).
         try:
             try:
                 from ma_poc.services.llm_extractor import (
-                    extract_with_llm, prepare_llm_input,
+                    analyze_api_with_llm,
+                    analyze_dom_with_llm,
+                    extract_with_llm,
+                    prepare_llm_input,
                 )
             except ImportError:
                 from services.llm_extractor import (  # type: ignore[no-redef]
-                    extract_with_llm, prepare_llm_input,
+                    analyze_api_with_llm,
+                    analyze_dom_with_llm,
+                    extract_with_llm,
+                    prepare_llm_input,
                 )
-            property_context = {
-                "property_name": "",
-                "city": "", "state": "",
-                "total_units": ctx.expected_total_units or "",
-                "website": ctx.base_url,
-            }
+        except ImportError as exc:
+            _log_attempt("generic:llm", "errored", reason=f"llm_extractor import: {exc}")
+            result.errors.append(f"llm-import-error: {exc}")
+            result.confidence = 0.0
+            return result
+
+        # Budget: capped per property so a broken site can't burn unlimited
+        # tokens. Mirrors the legacy entrata.py budget (3 API + 1 DOM).
+        api_llm_budget = 3
+        dom_llm_budget = 1
+        llm_interactions: list[dict[str, Any]] = (
+            getattr(result, "_llm_interactions", []) or []
+        )
+        # Self-learning payload surfaced to scraper.py. Shape matches what
+        # services.profile_updater.update_profile_after_extraction expects:
+        #   - dict (with api_url_pattern) => save as LlmFieldMapping
+        #   - "noise:<reason>" string     => add to blocked_endpoints
+        llm_analysis_results: dict[str, Any] = {}
+        llm_field_mappings: list[dict[str, Any]] = []
+        llm_css_selectors: dict[str, Any] | None = None
+        llm_navigation_hints: list[str] = []
+
+        # Sub-tier 6a: targeted API analysis ------------------------------
+        # For each captured API response with unit-like signals that the
+        # deterministic parsers couldn't unwrap, ask the LLM to both
+        # extract units AND return json_paths + response_envelope that we
+        # can replay deterministically on the next run (zero LLM cost).
+        targeted_units: list[dict[str, Any]] = []
+        if api_responses and api_llm_budget > 0:
+            t0 = _time.monotonic()
+            api_calls_made = 0
+            for resp in api_responses:
+                if api_calls_made >= api_llm_budget:
+                    break
+                body = resp.get("body")
+                items = _find_unit_list(body)
+                # Only spend budget on responses where something looks like a
+                # unit list — avoids feeding analytics payloads to the LLM.
+                if not items or not _has_unit_signals(items):
+                    continue
+                url = resp.get("url", "")
+                try:
+                    units, mapping, is_noise, interaction = await analyze_api_with_llm(
+                        resp, property_context, ctx.property_id or "unknown",
+                    )
+                except Exception as exc:
+                    result.errors.append(f"api-analysis-error: {exc}")
+                    continue
+                api_calls_made += 1
+                if interaction:
+                    llm_interactions.append(interaction)
+                if is_noise:
+                    # Feed profile_updater the colon-prefixed format it
+                    # already recognises so this URL ends up in
+                    # profile.api_hints.blocked_endpoints on next run.
+                    llm_analysis_results[url] = "noise:no_unit_data"
+                    continue
+                if units:
+                    targeted_units.extend(units)
+                    if mapping:
+                        # Emit the mapping dict at its URL key — matches
+                        # the shape profile_updater reads via
+                        # save_llm_field_mapping().
+                        llm_field_mappings.append(mapping)
+                        llm_analysis_results[url] = mapping
+                        if not result.api_responses:
+                            result.api_responses.append(resp)
+
+            _log_attempt(
+                "generic:llm_api_targeted",
+                "ran_units" if targeted_units else ("ran_empty" if api_calls_made else "skipped"),
+                units=len(targeted_units),
+                reason="" if targeted_units else (
+                    f"{api_calls_made} API(s) analysed, no units" if api_calls_made
+                    else "no API responses with unit signals"
+                ),
+                duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
+
+        if targeted_units:
+            result.units = targeted_units
+            result.tier_used = "TIER_4_LLM_API"
+            result.winning_url = (
+                result.api_responses[0].get("url") if result.api_responses
+                else ctx.base_url
+            )
+            result.confidence = min(0.85, 0.6 + 0.04 * len(targeted_units))
+            result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
+            result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
+            result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
+            return result
+
+        # Sub-tier 6b: targeted DOM analysis ------------------------------
+        # Extract the rent-bearing DOM section (not the full page) and ask
+        # the LLM to return units AND CSS selectors we can replay next run.
+        dom_units: list[dict[str, Any]] = []
+        dom_section_html = _extract_rent_dom_section(html) if html else None
+        if dom_section_html and dom_llm_budget > 0:
+            t0 = _time.monotonic()
+            try:
+                dom_units, selectors, interaction = await analyze_dom_with_llm(
+                    dom_section_html, ctx.base_url, property_context,
+                    ctx.property_id or "unknown",
+                )
+            except Exception as exc:
+                result.errors.append(f"dom-analysis-error: {exc}")
+                dom_units, selectors, interaction = [], None, None
+            if interaction:
+                llm_interactions.append(interaction)
+            if selectors:
+                llm_css_selectors = selectors
+            _log_attempt(
+                "generic:llm_dom_targeted",
+                "ran_units" if dom_units else "ran_empty",
+                units=len(dom_units or []),
+                reason="" if dom_units else "targeted DOM LLM returned no units",
+                duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
+
+        if dom_units:
+            result.units = dom_units
+            result.tier_used = "TIER_4_LLM_DOM"
+            result.winning_url = ctx.base_url
+            result.confidence = min(0.80, 0.55 + 0.04 * len(dom_units))
+            result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
+            result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
+            result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
+            if llm_css_selectors:
+                result._llm_hints = {"css_selectors": llm_css_selectors}  # type: ignore[attr-defined]
+            return result
+
+        # Sub-tier 6c: monolithic fallback --------------------------------
+        # Only fires when 6a + 6b both returned empty. This is the legacy
+        # "send full HTML + top-3 APIs" prompt — broadest coverage, highest
+        # token cost, so it runs last.
+        t0 = _time.monotonic()
+        try:
             llm_input = prepare_llm_input(html, api_responses, property_context)
             llm_units, hints, _raw, interaction = await extract_with_llm(
                 llm_input, property_id=ctx.property_id or "unknown",
             )
             if interaction:
-                # Stash the interaction dict so scraper.py surfaces it on
-                # result["_llm_interactions"] for cost accounting + reports.
-                existing = getattr(result, "_llm_interactions", []) or []
-                existing.append(interaction)
-                result._llm_interactions = existing  # type: ignore[attr-defined]
+                llm_interactions.append(interaction)
+            # Capture navigation_hint (Phase 3 + Phase 5) so scrape_jugnu's
+            # link-hop can prioritise the URL the LLM just told us about.
+            if isinstance(hints, dict):
+                nav = hints.get("navigation_hint") or ""
+                if nav:
+                    llm_navigation_hints.append(str(nav))
             _log_attempt(
                 "generic:llm",
                 "ran_units" if llm_units else "ran_empty",
@@ -540,8 +890,9 @@ class GenericAdapter:
                 result.tier_used = "TIER_4_LLM"
                 result.winning_url = ctx.base_url
                 result.confidence = min(0.75, 0.5 + 0.04 * len(llm_units))
-                # Surface the LLM-discovered hints so the profile updater can
-                # record css_selectors / api_urls_with_data for future runs.
+                result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
+                result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
+                result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
                 if hints:
                     result._llm_hints = hints  # type: ignore[attr-defined]
                 return result
@@ -553,6 +904,14 @@ class GenericAdapter:
             )
             result.errors.append(f"llm-tier-error: {exc}")
 
+        # All LLM sub-tiers empty — surface everything we learned so the
+        # profile updater (Phase 4) can still record blocked endpoints and
+        # link-hop (Phase 5) can follow navigation_hint on a second pass.
+        result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
+        result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
+        result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
+        if llm_navigation_hints:
+            result._llm_navigation_hints = llm_navigation_hints  # type: ignore[attr-defined]
         result.confidence = 0.0
         result.errors.append("Generic parser found no units in captured API responses")
         return result

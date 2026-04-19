@@ -550,20 +550,58 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
 
 
 def _format_v2_unit(unit: dict[str, Any], scrape_ts: datetime) -> dict[str, Any]:
-    """Format a single unit to v2 schema."""
+    """Format a single unit to v2 schema.
+
+    Phase 1 fixes:
+    - Alias ``unit_number`` to ``unit_id`` so API/DOM extractors that emit
+      ``unit_number`` (the adapter convention) don't silently lose identity.
+    - Parse ``rent_range`` string (e.g. "$1,200 - $1,500") as a fallback when
+      numeric ``market_rent_low/high`` are missing. This recovers rent on
+      TIER_1_API and TIER_2_JSONLD extractions that only produce the string.
+    - Plumb ``lease_term`` / ``move_in_date`` with a broader key fallback so
+      parsers can start populating them without another format change.
+    """
     beds_raw = unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds")
     baths_raw = unit.get("_bathrooms") or unit.get("bathrooms") or unit.get("baths")
     fp_name = unit.get("_floor_plan") or unit.get("floor_plan_name") or unit.get("floorplan_name")
     sqft = unit.get("_sqft") or unit.get("sqft") or unit.get("area")
+
+    # unit_id alias: prefer an explicit unit_id but fall back to unit_number
+    uid = unit.get("unit_id") or unit.get("unit_number") or unit.get("_unit_number")
+
+    # Phase 5 junk filter: belt-and-braces with the adapter-level filter.
+    # If an adapter outside GenericAdapter emitted a CMS-module plan name
+    # or a stop-word unit number, scrub them here before the v2 record
+    # ships downstream.
+    try:
+        from ma_poc.pms.adapters._parsing import is_junk_floor_plan, is_junk_unit_number
+        if is_junk_floor_plan(fp_name):
+            fp_name = None
+        if is_junk_unit_number(uid):
+            uid = None
+    except Exception:
+        pass
+
+    # rent: numeric first, parse rent_range string if needed.
+    rent_lo_raw = unit.get("market_rent_low") or unit.get("asking_rent")
+    rent_hi_raw = unit.get("market_rent_high") or unit.get("asking_rent")
+    if rent_lo_raw is None and rent_hi_raw is None:
+        rent_range = unit.get("rent_range")
+        if rent_range:
+            try:
+                from ma_poc.pms.adapters._parsing import parse_rent_range
+                rent_lo_raw, rent_hi_raw = parse_rent_range(str(rent_range))
+            except Exception:
+                pass
 
     return {
         "beds": _normalize_beds(beds_raw),
         "baths": _normalize_baths(baths_raw),
         "floor_plan_name": fp_name or None,
         "area": _format_area(sqft),
-        "unit_id": unit.get("unit_id") or None,
-        "rent_low": _format_rent(unit.get("market_rent_low") or unit.get("asking_rent")),
-        "rent_high": _format_rent(unit.get("market_rent_high") or unit.get("asking_rent")),
+        "unit_id": str(uid) if uid not in (None, "", "null") else None,
+        "rent_low": _format_rent(rent_lo_raw),
+        "rent_high": _format_rent(rent_hi_raw),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         "available_date": _format_date_str(unit.get("available_date")),
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
@@ -696,28 +734,38 @@ def _make_failed_record(
 import re as _re
 
 
-def _normalize_beds(val: Any) -> int:
-    """Convert bedroom value to integer. Studio -> 0, clamp [0, 7]."""
+def _normalize_beds(val: Any) -> int | None:
+    """Convert bedroom value to integer. Studio -> 0, clamp [0, 7].
+
+    Returns ``None`` when the source emitted nothing. Previously this
+    defaulted to 0, which silently collapsed "studio confirmed" and
+    "not extracted" into the same value — making it impossible to spot
+    upstream parser gaps in the downstream data.
+    """
     if val is None or val == "":
-        return 0
+        return None
     s = str(val).strip().lower()
-    if s in ("studio", "s", "0"):
+    if s in ("studio", "s"):
         return 0
     try:
         return max(0, min(int(float(s)), 7))
     except (ValueError, TypeError):
-        return 0
+        return None
 
 
-def _normalize_baths(val: Any) -> float:
-    """Convert bathroom value to nearest 0.5 multiple, clamp [0, 10]."""
+def _normalize_baths(val: Any) -> float | None:
+    """Convert bathroom value to nearest 0.5 multiple, clamp [0, 10].
+
+    Returns ``None`` when the source emitted nothing (same rationale as
+    ``_normalize_beds``). Previously defaulted to 1.0.
+    """
     if val is None or val == "":
-        return 1.0
+        return None
     try:
         n = float(str(val).strip())
         return max(0.0, min(round(n * 2) / 2, 10.0))
     except (ValueError, TypeError):
-        return 1.0
+        return None
 
 
 def _format_zip(val: Any) -> str | None:
@@ -747,14 +795,23 @@ def _format_rent(val: Any) -> float | None:
 
 
 def _format_area(val: Any) -> int:
-    """Convert sqft to int. > 0 or -1 (absent sentinel)."""
-    if val is None:
+    """Convert sqft to int. Keeps -1 as the "absent" sentinel.
+
+    Sanity bounds: a real apartment floor-plan area is between 150 and 10,000
+    sqft. Anything outside that is garbage (bedroom counts, floor numbers,
+    truncated values like "070") and gets coerced to -1. Previously any
+    positive integer was accepted, which is why the 2026-04-19 run had area
+    values of 9, 12, 50, 70, 100, etc. passed through as "successful".
+    """
+    if val is None or val == -1:
         return -1
     try:
         n = int(float(str(val)))
-        return n if n > 0 else -1
     except (ValueError, TypeError):
         return -1
+    if 150 <= n <= 10_000:
+        return n
+    return -1
 
 
 def _format_date_str(val: Any) -> str | None:
