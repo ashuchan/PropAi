@@ -388,21 +388,86 @@ class Fetcher:
 
             page.on("response", _on_response)
 
-            # Cap per-attempt navigation at 35s (down from 60s). Today's
-            # TRANSIENT bucket showed attempts running 32-78s and still
-            # failing — longer waits almost never flipped the outcome and
-            # inflated the total per-property budget by 3x.
-            timeout_ms = min(task.budget_ms, 35000)
-            resp = await page.goto(task.url, wait_until="networkidle", timeout=timeout_ms)
-            await asyncio.sleep(2.0)
+            # Cap per-attempt navigation at 20s. Probe (ma_poc/data/probe_runs/
+            # 20260419T175926Z) showed that every timeout property rendered full
+            # HTML at domcontentloaded in 4-12s but then blocked waiting on
+            # analytics trackers that keep firing, so networkidle never
+            # settles. Switching to wait_until="domcontentloaded" + post-load
+            # settle sleep captures the same body as networkidle would have,
+            # in a fraction of the time, without relying on salvage.
+            timeout_ms = min(task.budget_ms, 20000)
+            resp: Any = None
+            nav_exc: Exception | None = None
+            try:
+                resp = await page.goto(
+                    task.url, wait_until="domcontentloaded", timeout=timeout_ms,
+                )
+            except Exception as exc:
+                nav_exc = exc
 
-            body = (await page.content()).encode("utf-8")
-            status = resp.status if resp else 200
+            # Post-load settle: give SPAs a beat to hydrate. Next/Nuxt and
+            # similar frameworks finish client-side rendering after
+            # domcontentloaded fires.
+            try:
+                await asyncio.sleep(2.0)
+            except Exception:
+                pass
+
+            # Always-salvage: even when page.goto() timed out, page.content()
+            # typically returns a usable DOM (probe: charterclubapts.com timed
+            # out on networkidle but had 144KB of rendered HTML with rent data
+            # already visible). Only emit TRANSIENT when we couldn't pull any
+            # body at all.
+            body_text: str | None = None
+            try:
+                body_text = await page.content()
+            except Exception as exc:
+                if nav_exc is None:
+                    nav_exc = exc
+
+            if body_text is None or len(body_text) < 512:
+                outcome, sig = classify(
+                    resp.status if resp else None, {}, None, exception=nav_exc,
+                )
+                return FetchResult(
+                    url=task.url, outcome=outcome,
+                    status=resp.status if resp else None,
+                    body=None, headers={}, render_mode=RenderMode.RENDER,
+                    final_url=page.url if nav_exc is None else task.url,
+                    attempts=attempt,
+                    elapsed_ms=_now_ms() - start_ms,
+                    network_log=network_log,
+                    error_signature=sig,
+                    proxy_used=_redact_proxy(proxy),
+                )
+
+            body = body_text.encode("utf-8", errors="replace")
             final_url = page.url
             resp_headers = {k.lower(): v for k, v in (resp.headers if resp else {}).items()}
             body_head = body[:4096]
 
-            outcome, sig = classify(status, resp_headers, body_head)
+            if nav_exc is not None:
+                # Timeout/abort but body salvaged. If the salvaged page looks
+                # like a Cloudflare/reCAPTCHA interstitial, mark BOT_BLOCKED so
+                # the outer retry rotates identity+proxy. Otherwise treat as OK
+                # so adapters can run against the rendered DOM + captured
+                # network_log; tag the signature so reports can distinguish
+                # salvage from clean.
+                try:
+                    is_captcha, provider = looks_like_captcha(body_head)
+                except Exception:
+                    is_captcha, provider = False, None
+                status = resp.status if resp else 200
+                if is_captcha:
+                    outcome = FetchOutcome.BOT_BLOCKED
+                    sig = "CF_CHALLENGE" if provider == "cloudflare" \
+                        else f"CAPTCHA_{(provider or 'unknown').upper()}"
+                else:
+                    outcome = FetchOutcome.OK
+                    sig = "TIMEOUT_SALVAGED"
+            else:
+                status = resp.status if resp else 200
+                outcome, sig = classify(status, resp_headers, body_head)
 
             return FetchResult(
                 url=task.url, outcome=outcome, status=status,

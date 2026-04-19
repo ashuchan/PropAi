@@ -22,6 +22,18 @@ log = logging.getLogger(__name__)
 # Exceptions that indicate DNS resolution failure
 _DNS_ERRORS = (gaierror, OSError)
 
+# Playwright's TimeoutError is its own hierarchy: playwright._impl._errors.Error
+# → Exception. It does NOT inherit from asyncio.TimeoutError or the builtin
+# TimeoutError, so `isinstance(exc, TimeoutError)` misses it and the classifier
+# falls through to a generic "TimeoutError" signature instead of "timeout".
+# Downstream retry logic keys on "TIMEOUT" in the signature and happened to work
+# by accident, but diagnostic tooling and retry-after behavior break. Import
+# defensively so the classifier remains usable without Playwright installed.
+try:  # pragma: no cover — import-time only
+    from playwright._impl._errors import TimeoutError as _PlaywrightTimeoutError
+except Exception:  # pragma: no cover
+    _PlaywrightTimeoutError = None  # type: ignore[assignment,misc]
+
 
 def classify(
     status: int | None,
@@ -49,6 +61,10 @@ def classify(
             if "getaddrinfo" in err_msg or "name or service" in err_msg:
                 return FetchOutcome.HARD_FAIL, "ERR_DNS"
         if isinstance(exception, (asyncio.TimeoutError, TimeoutError)):
+            return FetchOutcome.TRANSIENT, "timeout"
+        if _PlaywrightTimeoutError is not None and isinstance(
+            exception, _PlaywrightTimeoutError
+        ):
             return FetchOutcome.TRANSIENT, "timeout"
         if isinstance(exception, ConnectionError):
             return FetchOutcome.TRANSIENT, f"connection_{type(exception).__name__}"

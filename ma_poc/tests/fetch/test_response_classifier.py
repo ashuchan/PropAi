@@ -65,6 +65,19 @@ def test_classify_timeout_exception() -> None:
     assert sig == "timeout"
 
 
+def test_classify_playwright_timeout_exception() -> None:
+    # Playwright's TimeoutError is its own hierarchy and does not inherit from
+    # asyncio.TimeoutError or builtins.TimeoutError — before the classifier was
+    # taught about it, render-mode navigation timeouts fell through to a
+    # generic "TimeoutError" signature, which broke retry back-off that keyed
+    # on the literal string "timeout".
+    from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
+    exc = PlaywrightTimeoutError("Page.goto: Timeout 20000ms exceeded.")
+    outcome, sig = classify(None, {}, None, exception=exc)
+    assert outcome == FetchOutcome.TRANSIENT
+    assert sig == "timeout"
+
+
 def test_classify_404_hard_fail() -> None:
     outcome, sig = classify(404, {}, b"")
     assert outcome == FetchOutcome.HARD_FAIL
