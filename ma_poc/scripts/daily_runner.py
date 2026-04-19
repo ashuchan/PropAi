@@ -563,7 +563,7 @@ async def run_daily(
     profile_store = None
     if _PROFILES_AVAILABLE:
         try:
-            profile_store = ProfileStore(Path("config/profiles"))
+            profile_store = ProfileStore(_PROJECT_ROOT / "config" / "profiles")
             log.info("Profile store loaded")
         except Exception as e:
             log.warning(f"Profile store unavailable: {e}")
@@ -1123,10 +1123,10 @@ async def run_daily(
 
 def main():
     p = argparse.ArgumentParser(description="Daily multi-property runner")
-    p.add_argument("--csv",      default="config/properties.csv",
-                   help="Path to properties CSV")
-    p.add_argument("--data-dir", default="data",
-                   help="Root data directory (runs/, state/ live under here)")
+    p.add_argument("--csv",      default=str(_PROJECT_ROOT / "config" / "properties.csv"),
+                   help="Path to properties CSV (default: ma_poc/config/properties.csv)")
+    p.add_argument("--data-dir", default=str(_PROJECT_ROOT / "data"),
+                   help="Root data directory (runs/, state/ live under here; default: ma_poc/data)")
     p.add_argument("--run-date", default=None,
                    help="Override run date (YYYY-MM-DD); defaults to today")
     p.add_argument("--limit",    type=int, default=None,

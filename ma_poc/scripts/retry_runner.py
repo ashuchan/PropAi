@@ -413,7 +413,7 @@ async def run_retry(
     profile_store = None
     if _PROFILES_AVAILABLE:
         try:
-            profile_store = ProfileStore(Path("config/profiles"))
+            profile_store = ProfileStore(_PROJECT_ROOT / "config" / "profiles")
         except Exception as e:
             log.warning(f"Profile store unavailable: {e}")
 
@@ -917,10 +917,10 @@ Examples:
         "--retry-errors", action="store_true",
         help="Retry FAILED + SUCCESS/SUCCESS_WITH_ERRORS that have 0 units",
     )
-    p.add_argument("--csv",      default="config/properties.csv",
-                   help="Path to properties CSV")
-    p.add_argument("--data-dir", default="data",
-                   help="Root data directory")
+    p.add_argument("--csv",      default=str(_PROJECT_ROOT / "config" / "properties.csv"),
+                   help="Path to properties CSV (default: ma_poc/config/properties.csv)")
+    p.add_argument("--data-dir", default=str(_PROJECT_ROOT / "data"),
+                   help="Root data directory (default: ma_poc/data)")
     p.add_argument("--run-date", default=None,
                    help="Target run date (YYYY-MM-DD); defaults to today")
     p.add_argument("--limit",    type=int, default=None,

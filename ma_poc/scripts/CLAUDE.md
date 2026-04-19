@@ -2,11 +2,72 @@
 
 ## What this directory is
 
-`scripts/` contains the **production scraping pipeline** — the system that actually runs against live property websites, extracts unit data, tracks state across daily runs, and produces the 46-key property output schema. This is separate from the `ma_poc/extraction/` tiered pipeline (which is the CLAUDE.md Phase A spec). Both systems exist; this one is what produces real output.
+`scripts/` contains the **production scraping pipeline** — the system that actually runs against live property websites, extracts unit data, tracks state across daily runs, and produces the 46-key property output schema.
 
 ---
 
 ## Architecture overview
+
+The platform has **two pipeline implementations**. The Jugnu pipeline is the recommended architecture going forward.
+
+### Jugnu Pipeline (`jugnu_runner.py`) — 5-Layer Architecture
+
+```
+CSV input
+    |
+    v
+jugnu_runner.py              # Integrated runner wiring all 5 layers
+    |
+    L2 Scheduler              # Builds prioritised task list from CSV + frontier + DLQ
+    |   +-- frontier.py       # SQLite-backed URL frontier with attempt history
+    |   +-- sitemap.py        # Sitemap.xml consumer with ETag caching
+    |   +-- change_detector.py# Pure function: maturity + frontier → crawl/skip
+    |   +-- dlq.py            # Dead-letter queue: hourly→daily retry escalation
+    |
+    L1 Fetcher                # Stealth HTTP/browser fetch, never raises
+    |   +-- fetcher.py        # 9-step flow: robots → cache → rate limit → request → classify → retry
+    |   +-- browser_pool.py   # Playwright context pool with semaphore
+    |   +-- proxy_pool.py     # Health-weighted proxy selection + quarantine
+    |   +-- rate_limiter.py   # Async token bucket per host
+    |   +-- stealth.py        # 8 curated browser identities, SHA256 sticky keys
+    |   +-- conditional.py    # SQLite ETag/Last-Modified cache
+    |   +-- captcha_detect.py # Cloudflare/reCAPTCHA/hCaptcha/PerimeterX detection
+    |
+    L3 Extraction             # PMS-aware adapter extraction
+    |   +-- detector.py       # Offline PMS detection from URL/HTML signals
+    |   +-- resolver.py       # CTA-hop + leasing portal resolver
+    |   +-- scraper.py        # scrape_jugnu(): detect → resolve → adapt
+    |   +-- adapters/         # 10 adapters: RentCafe, Entrata, AppFolio, OneSite,
+    |                         #   SightMap, RealPage OLL, AvalonBay, Squarespace, Wix, Generic
+    |
+    L4 Validation             # Schema enforcement + identity resolution
+    |   +-- schema_gate.py    # Rent bounds, sqft bounds, date format checks
+    |   +-- identity_fallback.py  # SHA256 fingerprint fallback for missing unit_id
+    |   +-- cross_run_sanity.py   # Flags rent swings >20%, sqft changes >5%
+    |   +-- orchestrator.py   # Runs gate → fallback → sanity, sets next_tier_requested
+    |
+    L5 Observability          # Event tracking + cost accounting + SLO
+    |   +-- events.py         # 28 event types, emit() with buffered ledger backend
+    |   +-- event_ledger.py   # Append-only JSONL, crash-safe reads
+    |   +-- cost_ledger.py    # SQLite LLM/vision/proxy cost tracking
+    |   +-- slo_watcher.py    # Success >=95%, LLM cost <$1, vision <=5%
+    |   +-- replay_store.py   # Load raw HTML + events for debugging
+    |   +-- dlq_controller.py # Parks after 3 consecutive unreachable
+    |
+    Reporting
+    |   +-- verdict.py        # Per-property: SUCCESS/FAILED_UNREACHABLE/CARRY_FORWARD/PARTIAL
+    |   +-- run_report.py     # JSON + markdown report with SLO section
+    |
+    +-- Output:
+          data/runs/{date}/properties.json   # Property records with nested units
+          data/runs/{date}/report.json       # Run summary
+          data/runs/{date}/report.md         # Human-readable report with SLO status
+          data/runs/{date}/cost_ledger.db    # Per-property cost breakdown
+          data/state/frontier.sqlite         # URL frontier with attempt history
+          data/state/dlq.jsonl               # Dead-letter queue
+```
+
+### Legacy Pipeline (`daily_runner.py`) — 7-Phase Extraction
 
 ```
 CSV input
@@ -16,12 +77,10 @@ daily_runner.py          # Orchestrator: loads CSV, resolves identity, runs pipe
     |                    # diffs against prior state, writes output + report
     |
     +-- concurrency.py   # System resource detection + concurrent pool management
-    |                    # Auto-sizes worker pool from CPU cores + available RAM
     |
     +-- identity.py      # 5-tier canonical ID resolution (dedup across runs)
     |
-    +-- entrata.py       # Core scraper engine (despite the name, handles ALL platforms)
-    |     |              # 7-phase extraction pipeline with self-learning profiles
+    +-- entrata.py       # Core scraper engine (handles ALL platforms)
     |     +-- Phase 1: Homepage load + full network capture
     |     +-- Phase 2: Noise filtering (global + profile-specific blocklists)
     |     +-- Phase 3: Known pattern extraction (profile mappings → API → JSON-LD → DOM)
@@ -31,51 +90,44 @@ daily_runner.py          # Orchestrator: loads CSV, resolves identity, runs pipe
     |     +-- Phase 7: Availability defaults + profile learning persistence
     |
     +-- services/
-    |     +-- profile_store.py      # Load/save per-property profiles from config/profiles/
-    |     +-- profile_router.py     # HOT/WARM/COLD routing (skip tiers based on maturity)
-    |     +-- profile_updater.py    # Update profiles after extraction (endpoints, blocklists, mappings)
-    |     +-- drift_detector.py     # Detect unit count drops, all-rents-null, timeout patterns
-    |     +-- llm_extractor.py      # Targeted LLM analysis: per-API and per-DOM-section
-    |     +-- vision_extractor.py   # Vision LLM extraction (screenshot-based last resort)
+    |     +-- profile_store.py, profile_router.py, profile_updater.py
+    |     +-- drift_detector.py, llm_extractor.py, vision_extractor.py
     |
     +-- scrape_properties.py   # Unit transformation: raw API bodies -> target schema
-    |                          # (unit_id, market_rent_low/high, available_date, ...)
-    |
-    +-- state_store.py   # Persistent JSON state: property_index + unit_index
-    |                    # Tracks new/updated/unchanged/disappeared across runs
-    |
-    +-- validation.py    # Structured issue logging (ERROR/WARNING/INFO + codes)
+    +-- state_store.py         # Persistent JSON state: property_index + unit_index
+    +-- validation.py          # Structured issue logging (ERROR/WARNING/INFO + codes)
     |
     +-- Output:
           data/runs/{date}/properties.json   # 46-key records
-          data/runs/{date}/report.json       # run summary
-          data/runs/{date}/report.md         # human-readable report
-          data/runs/{date}/issues.jsonl      # validation issues
-          data/state/property_index.json     # persisted between runs
-          data/state/unit_index.json         # unit history with diffs
-          config/profiles/{canonical_id}.json # per-property learned extraction profiles
+          data/runs/{date}/report.json/md    # Run summary
+          data/runs/{date}/issues.jsonl      # Validation issues
+          data/state/property_index.json     # Persisted between runs
+          data/state/unit_index.json         # Unit history with diffs
+          config/profiles/{canonical_id}.json # Per-property learned extraction profiles
 ```
 
 ---
 
-## The two pipeline paths (and when to use which)
+## The three pipeline paths (and when to use which)
 
-### `daily_runner.py` — Production pipeline (USE THIS)
+### `jugnu_runner.py` — Jugnu pipeline (RECOMMENDED)
 
-The full pipeline with state tracking, identity resolution, carry-forward, validation, and the 46-key output schema. Uses `entrata.py` as its scraping engine. **Scraping runs concurrently** via `concurrency.py` — the pool size is auto-detected from system resources (CPU cores, available RAM, `MAX_CONCURRENT_BROWSERS` env var).
+The 5-layer architecture with hard contracts between layers. Uses L2 Scheduler for task generation, L1 Fetcher for stealth requests, L3 PMS adapters for extraction, L4 for validation, and L5 for observability. Produces per-property verdicts and run reports with SLO monitoring.
+
+```bash
+python scripts/jugnu_runner.py --csv config/properties.csv
+python scripts/jugnu_runner.py --csv config/properties.csv --limit 5
+python scripts/jugnu_runner.py --csv config/properties.csv --run-date 2026-04-18
+```
+
+### `daily_runner.py` — Legacy pipeline
+
+The full pipeline with state tracking, identity resolution, carry-forward, validation, and the 46-key output schema. Uses `entrata.py` as its scraping engine. **Scraping runs concurrently** via `concurrency.py` — the pool size is auto-detected from system resources.
 
 ```bash
 python scripts/daily_runner.py --csv config/properties.csv
 python scripts/daily_runner.py --csv config/properties.csv --limit 5
 python scripts/daily_runner.py --proxy http://user:pass@host:port
-```
-
-### `run_phase_a.py` — BRD-spec Phase A pipeline
-
-The CLAUDE.md-specified pipeline with change detection, 5-tier extraction, vision fallback, banner capture, accuracy sampling. Outputs a minimal 6-key per-property JSON. Used for Phase A acceptance gates, not for production output.
-
-```bash
-python scripts/run_phase_a.py
 ```
 
 ### `scrape_properties.py` — Simpler batch scraper (no state tracking)
@@ -761,3 +813,113 @@ Five sub-categories:
 - **StateStore is not concurrent**: Post-processing (state upsert, diff, carry-forward) runs sequentially after all scrapes complete. Making StateStore thread-safe would allow fully pipelined processing.
 - **No cross-property learning**: Profiles are per-property only. Sites with identical structure (same PMS, same template) each learn independently. The `cluster_id` field exists on `ScrapeProfile` but clustering logic is not implemented.
 - **LLM field mapping drift**: If a PMS API changes its response schema between runs, a saved `LlmFieldMapping` will fail to produce units. The mapping falls through to `parse_api_responses()` in that case, but the stale mapping is not automatically cleared — the drift detector handles this via unit-count-drop detection.
+
+---
+
+## Jugnu Architecture — Detailed Reference
+
+The Jugnu pipeline (`jugnu_runner.py`) reorganises the system into 5 horizontal layers with frozen dataclass contracts between them. This section documents the layer contracts, invariants, and operational details.
+
+### Cross-layer contracts
+
+All inter-layer data flows through frozen dataclasses defined in each layer's `contracts.py`:
+
+| Contract | Source | Fields |
+|---|---|---|
+| `FetchResult` | `ma_poc.fetch.contracts` | `url`, `outcome` (OK/NOT_MODIFIED/BOT_BLOCKED/RATE_LIMITED/TRANSIENT/HARD_FAIL/PROXY_ERROR), `status_code`, `headers`, `body`, `elapsed_ms`, `render_mode`, `identity_key`, `proxy_label`, `error_signature` |
+| `CrawlTask` | `ma_poc.discovery.contracts` | `property_id`, `url`, `reason` (SCHEDULED/CARRY_FORWARD_CHECK/RETRY/SITEMAP_DISCOVERED/DLQ_REVIVE/MANUAL), `render_mode`, `priority` |
+| `ExtractResult` | `ma_poc.pms.contracts` | `records` (list of dicts), `tier_used`, `llm_cost_usd`, `vision_cost_usd`, `llm_calls`, `vision_calls`, `errors` |
+| `ValidatedRecords` | `ma_poc.validation.contracts` | `accepted` (list), `rejected` (list with reasons), `flagged` (list with flags), `next_tier_requested` (bool) |
+| `Event` | `ma_poc.observability.events` | `kind` (28 types), `property_id`, `run_id`, `ts`, `payload` dict |
+
+### Layer invariants
+
+**L1 Fetch**: `fetch()` never raises. Returns `FetchResult` with `outcome` indicating success/failure type. Rate limiter is async token bucket per host. Proxy pool uses health scoring (success +0.05, failure -0.25, quarantine at <0.25). Conditional cache stores ETag/Last-Modified in SQLite with 7-day expiry.
+
+**L2 Discovery**: Scheduler yields each URL at most once per run. Frontier deduplicates by URL. DLQ retries escalate from hourly to daily at the 6-hour mark. Carry-forward fires on fetch hard-fail, empty records, or validation reject.
+
+**L3 Extraction**: `detect_pms()` never raises (fuzz-safe for None, "", binary input). `get_adapter()` never returns None — unknown PMS maps to GenericAdapter. LLM/Vision calls only happen inside GenericAdapter, never in PMS-specific adapters. `tier_used` follows `<adapter>:<tier_key>` format.
+
+**L4 Validation**: Schema gate never raises on malformed input. Identity fallback uses `hashlib.sha256`, never `hash()`. Rent bounds reject negative and >$50K. Cross-run sanity flags but does not reject. `next_tier_requested` only when reject ratio strictly >50%.
+
+**L5 Observability**: `emit()` never raises (swallows all exceptions). Event ledger is append-only; truncated lines from prior crashes are tolerated. Cost ledger is thread-safe with `threading.Lock`. All SQLite writes use threading locks.
+
+### Running the Jugnu pipeline
+
+```bash
+# Full run
+python scripts/jugnu_runner.py --csv config/properties.csv
+
+# Limited test run
+python scripts/jugnu_runner.py --csv config/properties.csv --limit 5
+
+# Override date
+python scripts/jugnu_runner.py --csv config/properties.csv --run-date 2026-04-18
+
+# Specify data directory
+python scripts/jugnu_runner.py --csv config/properties.csv --data-dir data
+```
+
+### Gate validation
+
+```bash
+# Check all phase gates
+python scripts/gate_jugnu.py all
+
+# Check specific phase (0-9)
+python scripts/gate_jugnu.py phase 1
+
+# Run pytest for a phase
+python scripts/gate_jugnu.py tests 1
+```
+
+### Test suite (161 tests)
+
+| Directory | Layer | Tests |
+|---|---|---|
+| `tests/fetch/` | L1 Fetch | 43 |
+| `tests/discovery/` | L2 Discovery | 35 |
+| `tests/pms/` | L3 Extraction | 4 |
+| `tests/validation/` | L4 Validation | 30 |
+| `tests/observability/` | L5 Observability | 19 |
+| `tests/reporting/` | Reporting | 9 |
+| `tests/baseline/` | J0 Baseline | 10 |
+
+```bash
+# All Jugnu tests
+pytest tests/ -v --tb=short
+
+# By layer
+pytest tests/fetch/ -v
+pytest tests/discovery/ -v
+pytest tests/validation/ -v
+pytest tests/observability/ -v
+pytest tests/reporting/ -v
+```
+
+### CSV input format
+
+The Jugnu runner accepts flexible column names:
+
+```
+apartmentid,name,address,city,state,zip,website
+67598,Lofts at Little Creek,123 Main St,Scottsdale,AZ,85255,http://www.example.com
+```
+
+Column mapping:
+- `property_id` ← `property_id` | `Unique ID` | `Property ID` | `apartmentid`
+- `url` ← `url` | `Website` | `website`
+
+### Key differences from legacy pipeline
+
+| Feature | Legacy (`daily_runner.py`) | Jugnu (`jugnu_runner.py`) |
+|---|---|---|
+| Fetch | Playwright directly in entrata.py | L1 Fetcher with proxy pool, rate limiter, stealth |
+| Scheduling | Sequential CSV iteration | L2 Scheduler with frontier, DLQ, sitemap discovery |
+| Extraction | 7-phase monolithic in entrata.py | L3 PMS detection → resolution → adapter dispatch |
+| Validation | validation.py issue codes | L4 schema gate + identity fallback + cross-run sanity |
+| Observability | scrape_events.jsonl | L5 event ledger + cost ledger + SLO watcher |
+| Carry-forward | state_store.py | L2 carry_forward.py (checks fetch outcome first) |
+| Error handling | try/except per property | Never-fail contract across all layers |
+| State | JSON files (property_index, unit_index) | SQLite (frontier, cache, cost ledger) |
+| Reports | report.json/md | report.json/md + SLO section + per-property verdicts |

@@ -6,14 +6,14 @@ import typing as t
 import pytest
 
 import pms.adapters as adapters_pkg  # noqa: F401  — triggers registration
-from pms.adapters.base import PmsAdapter
-from pms.adapters.registry import (
+from ma_poc.pms.adapters.base import PmsAdapter
+from ma_poc.pms.adapters.registry import (
     _registered_names,
     all_adapters,
     get_adapter,
     register,
 )
-from pms.detector import DetectedPMS
+from ma_poc.pms.detector import DetectedPMS
 
 # Literals that must resolve to a concrete, non-generic adapter.
 _CONCRETE_PMS_LITERALS = [
@@ -75,13 +75,13 @@ def test_every_concrete_adapter_returns_adapter_result() -> None:
     # Phase 3 adapters must return AdapterResult (not raise, not return None).
     import asyncio
 
-    from pms.adapters.base import AdapterContext, AdapterResult
+    from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
     class _DummyPage:
         pass
 
     async def _call() -> AdapterResult:
-        from pms.detector import detect_pms
+        from ma_poc.pms.detector import detect_pms
         ctx = AdapterContext(
             base_url="https://example.com",
             detected=detect_pms("https://example.com"),

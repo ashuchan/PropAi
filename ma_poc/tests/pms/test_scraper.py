@@ -9,10 +9,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pms.adapters.base import AdapterContext, AdapterResult
-from pms.detector import DetectedPMS
-from pms.resolver import ResolvedTarget
-from pms.scraper import scrape
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.detector import DetectedPMS
+from ma_poc.pms.resolver import ResolvedTarget
+from ma_poc.pms.scraper import scrape
 
 
 # ---------------------------------------------------------------------------
@@ -90,9 +90,9 @@ async def test_orchestrator_detects_then_calls_correct_adapter() -> None:
     mock_adapter.extract = AsyncMock(return_value=_make_adapter_result(units=expected_units))
 
     with (
-        patch("pms.scraper.detect_pms", return_value=_make_detection("entrata")),
-        patch("pms.scraper.resolve_target", return_value=_make_resolved(pms="entrata")),
-        patch("pms.scraper.get_adapter", return_value=mock_adapter),
+        patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("entrata")),
+        patch("ma_poc.pms.scraper.resolve_target", return_value=_make_resolved(pms="entrata")),
+        patch("ma_poc.pms.scraper.get_adapter", return_value=mock_adapter),
     ):
         result = await scrape("http://example.com/", page=page)
 
@@ -128,9 +128,9 @@ async def test_orchestrator_falls_through_to_generic_when_adapter_empty() -> Non
         return generic_adapter
 
     with (
-        patch("pms.scraper.detect_pms", return_value=_make_detection("rentcafe")),
-        patch("pms.scraper.resolve_target", return_value=_make_resolved(pms="rentcafe")),
-        patch("pms.scraper.get_adapter", side_effect=_get_adapter),
+        patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("rentcafe")),
+        patch("ma_poc.pms.scraper.resolve_target", return_value=_make_resolved(pms="rentcafe")),
+        patch("ma_poc.pms.scraper.get_adapter", side_effect=_get_adapter),
     ):
         result = await scrape("https://example.com/", page=page)
 
@@ -160,9 +160,9 @@ async def test_orchestrator_runs_llm_only_for_unknown_pms() -> None:
     mock_adapter.extract = AsyncMock(side_effect=_capture_extract)
 
     with (
-        patch("pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)),
-        patch("pms.scraper.resolve_target", return_value=_make_resolved(pms="unknown")),
-        patch("pms.scraper.get_adapter", return_value=mock_adapter),
+        patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)),
+        patch("ma_poc.pms.scraper.resolve_target", return_value=_make_resolved(pms="unknown")),
+        patch("ma_poc.pms.scraper.get_adapter", return_value=mock_adapter),
     ):
         result = await scrape("https://mystery-site.com/", page=page)
 
@@ -202,9 +202,9 @@ async def test_orchestrator_never_runs_llm_for_detected_pms_failure() -> None:
         return generic_adapter
 
     with (
-        patch("pms.scraper.detect_pms", return_value=_make_detection("entrata")),
-        patch("pms.scraper.resolve_target", return_value=_make_resolved(pms="entrata")),
-        patch("pms.scraper.get_adapter", side_effect=_get_adapter),
+        patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("entrata")),
+        patch("ma_poc.pms.scraper.resolve_target", return_value=_make_resolved(pms="entrata")),
+        patch("ma_poc.pms.scraper.get_adapter", side_effect=_get_adapter),
     ):
         result = await scrape("https://example.com/", page=page)
 
@@ -221,7 +221,7 @@ async def test_orchestrator_skips_everything_on_ssl_error() -> None:
         content_raises=Exception("net::ERR_SSL_PROTOCOL_ERROR at https://example.com/")
     )
 
-    with patch("pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)):
+    with patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)):
         result = await scrape("https://bad-ssl.example.com/", page=page)
 
     assert any("FAILED_UNREACHABLE" in e for e in result["errors"])
@@ -235,7 +235,7 @@ async def test_orchestrator_skips_everything_on_dns_error() -> None:
         content_raises=Exception("net::ERR_NAME_NOT_RESOLVED")
     )
 
-    with patch("pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)):
+    with patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)):
         result = await scrape("https://nonexistent.example.com/", page=page)
 
     assert any("FAILED_UNREACHABLE" in e for e in result["errors"])
@@ -270,9 +270,9 @@ async def test_orchestrator_hop_to_pms_subdomain() -> None:
     )
 
     with (
-        patch("pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)),
-        patch("pms.scraper.resolve_target", return_value=resolved),
-        patch("pms.scraper.get_adapter", return_value=mock_adapter),
+        patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)),
+        patch("ma_poc.pms.scraper.resolve_target", return_value=resolved),
+        patch("ma_poc.pms.scraper.get_adapter", return_value=mock_adapter),
     ):
         result = await scrape("https://vanity.example.com/", page=page)
 
@@ -294,9 +294,9 @@ async def test_orchestrator_preserves_legacy_result_keys() -> None:
     mock_adapter.extract = AsyncMock(return_value=_make_adapter_result())
 
     with (
-        patch("pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)),
-        patch("pms.scraper.resolve_target", return_value=_make_resolved(pms="unknown")),
-        patch("pms.scraper.get_adapter", return_value=mock_adapter),
+        patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)),
+        patch("ma_poc.pms.scraper.resolve_target", return_value=_make_resolved(pms="unknown")),
+        patch("ma_poc.pms.scraper.get_adapter", return_value=mock_adapter),
     ):
         result = await scrape("https://example.com/", page=page)
 
@@ -334,9 +334,9 @@ async def test_orchestrator_adds_new_detection_keys() -> None:
     mock_adapter.extract = AsyncMock(return_value=_make_adapter_result(units=units))
 
     with (
-        patch("pms.scraper.detect_pms", return_value=_make_detection("appfolio", 0.90)),
-        patch("pms.scraper.resolve_target", return_value=_make_resolved(pms="appfolio")),
-        patch("pms.scraper.get_adapter", return_value=mock_adapter),
+        patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("appfolio", 0.90)),
+        patch("ma_poc.pms.scraper.resolve_target", return_value=_make_resolved(pms="appfolio")),
+        patch("ma_poc.pms.scraper.get_adapter", return_value=mock_adapter),
     ):
         result = await scrape("https://myplace.appfolio.com/listings", page=page)
 

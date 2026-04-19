@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from pms.adapters.base import AdapterContext, AdapterResult
-from pms.adapters.sightmap import SightMapAdapter, parse_sightmap_payload
-from pms.detector import detect_pms
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.sightmap import SightMapAdapter, parse_sightmap_payload
+from ma_poc.pms.detector import detect_pms
 
 FIXTURES = Path(__file__).parent / "fixtures" / "sightmap"
 

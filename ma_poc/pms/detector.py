@@ -251,6 +251,135 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     return None
 
 
+# Signal helpers for DETECTOR_SIGNALS telemetry ---------------------------
+
+_SCRIPT_SRC_RE = re.compile(r"<script[^>]+src=[\"']([^\"']+)[\"']", re.IGNORECASE)
+_IFRAME_SRC_RE = re.compile(r"<iframe[^>]+src=[\"']([^\"']+)[\"']", re.IGNORECASE)
+_META_GEN_RE = re.compile(
+    r"<meta[^>]+name=[\"']generator[\"'][^>]+content=[\"']([^\"']+)[\"']",
+    re.IGNORECASE,
+)
+_META_APP_RE = re.compile(
+    r"<meta[^>]+name=[\"']application-name[\"'][^>]+content=[\"']([^\"']+)[\"']",
+    re.IGNORECASE,
+)
+
+# Fingerprints we check against HTML, keyed by PMS/platform label. The booleans
+# returned in ``fingerprints_matched`` correspond 1-1 to the keys here.
+#
+# The ``marketing_*`` labels below are NOT PMS platforms — they are
+# marketing-stack / lead-capture vendors (Knock, Hyly, Market Apartments) that
+# commonly sit on top of vanity domains. Detection returning these signals the
+# report that the site is a custom CMS + external lead-gen; the data still
+# lives in the HTML (or behind a portal link) so the extraction path is the
+# GenericAdapter HTML/LLM cascade — but knowing the stack is present means
+# future work can add dedicated portal resolvers for these vendors.
+_HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
+    "entrata":            ("entrata.com", "/apartments/module/", "entrata-widget"),
+    "rentcafe":           ("rentcafe", "yardi"),
+    "sightmap":           ("sightmap.com",),
+    "appfolio":           (".appfolio.com",),
+    "onesite":            ("onlineleasing.realpage.com",),
+    "wix":                ("static.parastorage.com", "wix.com"),
+    "squarespace":        ("squarespace.com",),
+    "realpage":           ("api.ws.realpage.com", "realpage.com"),
+    "avalonbay":          ("avaloncommunities.com",),
+    # Marketing / lead-capture stacks — observed in 10-property roll-up
+    # (doorway.knck.io, cdn-media.hy.ly, chat.hyly.ai, marketapts.com).
+    "marketing_knock":    ("doorway.knck.io", "knockrentals.com"),
+    "marketing_hyly":     ("hy.ly", "hyly.ai"),
+    "marketing_marketapts": ("marketapts.com",),
+}
+
+
+def _unique_hosts(urls: list[str], limit: int = 10) -> list[str]:
+    """Return up to ``limit`` unique hosts (deduped, in order)."""
+    seen: set[str] = set()
+    hosts: list[str] = []
+    for u in urls:
+        try:
+            h = urllib.parse.urlparse(u).hostname or u
+        except Exception:
+            h = u
+        if h and h not in seen:
+            seen.add(h)
+            hosts.append(h)
+        if len(hosts) >= limit:
+            break
+    return hosts
+
+
+def collect_detector_signals(
+    url: str,
+    csv_row: dict[str, object] | None,
+    page_html: str | None,
+) -> dict[str, Any]:
+    """Collect the raw signals ``detect_pms`` examines, without classifying.
+
+    Returned dict is emitted as ``EventKind.DETECTOR_SIGNALS`` and rendered in
+    the per-property report so when detection fails we can see *what* the
+    detector saw — script hosts, iframes, meta tags, matched fingerprints,
+    and whether the CSV mgmt-company prior fired.
+    """
+    try:
+        parsed = urllib.parse.urlparse(url or "")
+    except Exception:
+        parsed = urllib.parse.urlparse("")
+    host = (parsed.hostname or "").lower()
+    path = (parsed.path or "").lower()
+    aspx_detected = path.endswith(".aspx") and not host.endswith((
+        "microsoft.com", "live.com", "sharepoint.com",
+    ))
+
+    script_srcs: list[str] = []
+    iframe_srcs: list[str] = []
+    meta_generator: str | None = None
+    meta_application_name: str | None = None
+    body_bytes = 0
+    fingerprints_matched: list[str] = []
+
+    if isinstance(page_html, str) and page_html:
+        body_bytes = len(page_html.encode("utf-8", errors="ignore"))
+        h = page_html.lower()
+        for label, needles in _HTML_FINGERPRINTS.items():
+            if any(n in h for n in needles):
+                fingerprints_matched.append(label)
+        script_srcs = _SCRIPT_SRC_RE.findall(page_html)
+        iframe_srcs = _IFRAME_SRC_RE.findall(page_html)
+        m = _META_GEN_RE.search(page_html)
+        if m:
+            meta_generator = m.group(1)[:120]
+        m = _META_APP_RE.search(page_html)
+        if m:
+            meta_application_name = m.group(1)[:120]
+
+    mgmt_raw: str | None = None
+    mgmt_prior_matched = False
+    if csv_row:
+        for key in ("Management Company", "management_company", "Mgmt Company", "mgmt"):
+            raw = csv_row.get(key)
+            if isinstance(raw, str) and raw.strip():
+                mgmt_raw = raw.strip()
+                if mgmt_raw.lower() in MGMT_TO_PMS_PRIOR:
+                    mgmt_prior_matched = True
+                break
+
+    return {
+        "url_host": host or None,
+        "url_path": path or None,
+        "aspx_detected": aspx_detected,
+        "body_bytes": body_bytes,
+        "fingerprints_checked": list(_HTML_FINGERPRINTS.keys()),
+        "fingerprints_matched": fingerprints_matched,
+        "script_srcs_sample": _unique_hosts(script_srcs, limit=10),
+        "iframe_srcs_sample": _unique_hosts(iframe_srcs, limit=5),
+        "meta_generator": meta_generator,
+        "meta_application_name": meta_application_name,
+        "csv_mgmt_company": mgmt_raw,
+        "csv_mgmt_prior_matched": mgmt_prior_matched,
+    }
+
+
 def detect_pms(
     url: str,
     csv_row: dict[str, object] | None = None,

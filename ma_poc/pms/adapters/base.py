@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from pms.detector import DetectedPMS
+from ma_poc.pms.detector import DetectedPMS
 
 if TYPE_CHECKING:
     # Playwright is a heavy import and is unavailable in unit-test environments
@@ -20,6 +20,9 @@ class AdapterContext:
     profile: Any | None  # ScrapeProfile; typed Any to avoid a hard dep cycle here
     expected_total_units: int | None
     property_id: str
+    # Jugnu: L1 fetch result — the adapter does not re-fetch. For adapters
+    # that work from network_log, the page argument can be a stub.
+    fetch_result: Any | None = None  # FetchResult; typed Any to avoid import cycle
 
 
 @dataclass

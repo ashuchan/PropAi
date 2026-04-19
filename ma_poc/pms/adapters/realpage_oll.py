@@ -22,8 +22,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pms.adapters.base import AdapterContext, AdapterResult
-from pms.adapters.onesite import parse_realpage_floorplans
+from ma_poc.pms.adapters._daily_runner_parsers import (
+    realpage_units_to_adapter_shape as _dr_realpage_units,
+)
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.onesite import (
+    _is_realpage_units_response,
+    parse_realpage_floorplans,
+)
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -47,16 +53,26 @@ class RealPageOllAdapter:
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
         for resp in api_responses:
             body = resp.get("body")
-            if isinstance(body, dict) and isinstance(body.get("response"), dict):
-                if "floorplans" in body["response"]:
-                    url = resp.get("url", "")
-                    units = parse_realpage_floorplans(body, url)
-                    if units:
-                        # Override tier label
-                        for u in units:
-                            u["extraction_tier"] = "TIER_1_API_REALPAGE_OLL"
-                        all_units.extend(units)
-                        result.api_responses.append(resp)
+            url = resp.get("url", "")
+            if isinstance(body, dict) and isinstance(body.get("response"), dict) \
+                    and "floorplans" in body["response"]:
+                units = parse_realpage_floorplans(body, url)
+                if units:
+                    for u in units:
+                        u["extraction_tier"] = "TIER_1_API_REALPAGE_OLL"
+                    all_units.extend(units)
+                    result.api_responses.append(resp)
+            elif _is_realpage_units_response(body, url):
+                try:
+                    units = _dr_realpage_units(body, url) or []
+                except Exception as exc:
+                    units = []
+                    result.errors.append(f"realpage-units-parse-error: {exc}")
+                if units:
+                    for u in units:
+                        u["extraction_tier"] = "TIER_1_API_REALPAGE_OLL"
+                    all_units.extend(units)
+                    result.api_responses.append(resp)
 
         if all_units:
             result.units = all_units

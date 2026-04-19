@@ -10,13 +10,13 @@ from pathlib import Path
 
 import pytest
 
-from pms.adapters.appfolio import AppFolioAdapter, parse_appfolio_listings
-from pms.adapters.avalonbay import AvalonBayAdapter, parse_avalonbay_units
-from pms.adapters.base import AdapterContext, AdapterResult
-from pms.adapters.realpage_oll import RealPageOllAdapter
-from pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
-from pms.adapters.wix_nopms import WixNoPmsAdapter
-from pms.detector import detect_pms
+from ma_poc.pms.adapters.appfolio import AppFolioAdapter, parse_appfolio_listings
+from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter, parse_avalonbay_units
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
+from ma_poc.pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
+from ma_poc.pms.adapters.wix_nopms import WixNoPmsAdapter
+from ma_poc.pms.detector import detect_pms
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

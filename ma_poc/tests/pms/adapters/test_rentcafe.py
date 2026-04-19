@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from pms.adapters.base import AdapterContext, AdapterResult
-from pms.adapters.rentcafe import (
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.rentcafe import (
     RentCafeAdapter,
     _is_rentcafe_response,
     parse_rentcafe_floorplans,
 )
-from pms.detector import detect_pms
+from ma_poc.pms.detector import detect_pms
 
 FIXTURES = Path(__file__).parent / "fixtures" / "rentcafe"
 

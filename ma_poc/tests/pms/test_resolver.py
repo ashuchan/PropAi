@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from pms.detector import detect_pms
-from pms.resolver import ResolvedTarget, resolve_target
+from ma_poc.pms.detector import detect_pms
+from ma_poc.pms.resolver import ResolvedTarget, resolve_target
 
 
 def _make_mock_page(

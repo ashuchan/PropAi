@@ -28,12 +28,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pms.adapters._parsing import (
+from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     make_unit_dict,
     money_to_int,
 )
-from pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 if TYPE_CHECKING:
     from playwright.async_api import Page

@@ -27,12 +27,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pms.adapters._parsing import (
+from ma_poc.pms.adapters._daily_runner_parsers import (
+    realpage_units_to_adapter_shape as _dr_realpage_units,
+)
+from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     format_rent_range,
     make_unit_dict,
 )
-from pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -96,6 +99,22 @@ def _is_realpage_response(body: Any) -> bool:
     return False
 
 
+def _is_realpage_units_response(body: Any, url: str) -> bool:
+    """Check for the RealPage /units endpoint shape.
+
+    RealPage splits data across /floorplans and /units. The /units endpoint
+    can return null, [], or {response: null} when nothing is available, and
+    a list of unit dicts when there is. daily_runner's
+    _realpage_units_from_body handles all three shapes.
+    """
+    if "realpage" not in url.lower():
+        return False
+    if "/units" not in url.lower():
+        return False
+    # Accept null / [] / {response: [...]}
+    return True
+
+
 class OneSiteAdapter:
     """OneSite (RealPage) PMS adapter."""
 
@@ -110,9 +129,19 @@ class OneSiteAdapter:
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
         for resp in api_responses:
             body = resp.get("body")
+            url = resp.get("url", "")
             if _is_realpage_response(body) and isinstance(body, dict):
-                url = resp.get("url", "")
                 units = parse_realpage_floorplans(body, url)
+                if units:
+                    all_units.extend(units)
+                    result.api_responses.append(resp)
+            elif _is_realpage_units_response(body, url):
+                # RealPage /units endpoint — body may be null/[]/{response:[...]}
+                try:
+                    units = _dr_realpage_units(body, url) or []
+                except Exception as exc:
+                    units = []
+                    result.errors.append(f"realpage-units-parse-error: {exc}")
                 if units:
                     all_units.extend(units)
                     result.api_responses.append(resp)

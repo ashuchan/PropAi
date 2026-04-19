@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from pms.adapters.base import AdapterContext, AdapterResult
-from pms.adapters.entrata import (
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.entrata import (
     EntrataAdapter,
     parse_entrata_floorplans,
     parse_entrata_widget_envelope,
 )
-from pms.detector import detect_pms
+from ma_poc.pms.detector import detect_pms
 
 FIXTURES = Path(__file__).parent / "fixtures" / "entrata"
 

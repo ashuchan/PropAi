@@ -1,41 +1,77 @@
-# Bug Hunt Checklist — PMS-First Refactor
+# Jugnu Bug Hunt Checklist
 
-## Detection & routing
-- [x] `detect_pms` never raises on any input. Fuzz with: `None`, `""`, `"not-a-url"`, `"javascript:alert(1)"`, binary bytes decoded as latin-1
-- [x] `detect_pms` is deterministic — same inputs produce same `DetectedPMS` including same `evidence` ordering
-- [x] `get_adapter` never returns `None` — unknown PMS returns generic
-- [x] Resolver does not navigate more than 5 hops on any input (check with a cycle: A→B→A)
-- [x] Resolver cancels in-flight navigation on exception (no zombie browser tabs)
+Work through each item. For each: confirm absence or fix and re-test.
 
-## Orchestrator
-- [x] On SSL error, no adapter is called. Grep for any adapter `extract` call in a code path reachable after the error check
-- [x] Legacy return keys enumerated in the result dict are all present on every scrape result
-- [x] `_property_id` is stamped on every result dict, even when scrape fails early
-- [x] Context/browser are closed on every exit path (scraper does not own browser; caller manages lifecycle)
+## Fetch layer (J1)
 
-## Adapters
-- [x] No adapter directly mutates `profile` — all profile updates go through `profile_updater` after scrape
-- [x] No adapter has a broader blocklist entry than the URL pattern it matches
-- [x] Every adapter's `extract` returns an `AdapterResult` — not `None`, not a bare list, not a dict
-- [x] Adapter `confidence` field in `AdapterResult` is 0.0 on empty units, not an arbitrary default
+- [ ] `fetch()` never raises on any input (fuzz: "", "not a url", "javascript:", unicode)
+- [ ] Proxy-pool `pick()` returns None when empty; caller doesn't crash
+- [ ] Rate-limiter `acquire()` eventually returns; no deadlock under fuzz
+- [ ] Conditional cache: deleting SQLite mid-run does not crash
+- [ ] Robots fetch timeout does not stall the fetcher (5s cap)
+- [ ] CAPTCHA detector no false-positive on common marketing pages
+- [ ] Browser context closed in all code paths including exceptions
+- [ ] Every `fetch.*` event carries a `property_id`
 
-## Profile
-- [x] Every v1 profile in `config/profiles/` loads as v2 without warnings (ConfigDict extra="ignore" on all models)
-- [x] `stats.total_llm_cost_usd` monotonically increases — never decreases across runs (additive in integration_helpers)
-- [x] `consecutive_unreachable` and `consecutive_failures` are separate fields with distinct semantics
-- [x] LRU cap on `explored_links` evicts oldest, not newest (Pydantic validator takes last 50)
+## Discovery layer (J2)
 
-## Report
-- [x] Report markdown renders valid markdown (tables are properly formatted)
-- [x] No report has a section that's present-but-empty (empty sections are omitted)
-- [x] Verdict is always one of the 4 literal values — SUCCESS, FAILED_UNREACHABLE, FAILED_NO_DATA, CARRY_FORWARD
+- [ ] Scheduler does not yield the same task twice
+- [ ] Frontier deduplicates URLs
+- [ ] DLQ retries escalate from hourly to daily at 6h mark
+- [ ] Carry-forward fires on fetch hard-fail AND empty-records AND validation-reject
+- [ ] Sitemap consumer caps child-file follow at 10
+- [ ] Change detector is pure: no side effects
 
-## Integration
-- [x] Profile update only overwrites api_provider when confidence >= 0.80
-- [x] Missing `_detected_pms` key in scrape result does not crash
-- [x] Run report includes `properties_by_pms` and `llm_cost_by_pms` metrics
+## Extraction layer (J3)
 
-## Note
-Models in `models/extraction_result.py`, `models/scrape_event.py`, and `models/unit_record.py` do not have
-`ConfigDict(extra="ignore")`. These are from the Phase A BRD-spec pipeline (not the refactor scope) and are
-flagged as a follow-up item.
+- [ ] `detect_pms()` never raises (fuzz: None, "", binary)
+- [ ] `detect_pms()` is deterministic
+- [ ] `get_adapter()` never returns None (unknown -> generic)
+- [ ] Resolver does not navigate > 5 hops
+- [ ] Orchestrator: on SSL error, no adapter called
+- [ ] LLM/Vision only inside generic adapter, not specific-PMS adapters
+- [ ] No PMS string literal outside its adapter/detector/resolver
+- [ ] `tier_used` follows `<adapter>:<tier_key>` format
+
+## Validation layer (J4)
+
+- [ ] Schema gate never raises on malformed input
+- [ ] Identity fallback uses `hashlib.sha256`, never `hash()`
+- [ ] Rent bounds reject negative and >$50K
+- [ ] Cross-run sanity flags but does not reject
+- [ ] `next_tier_requested` only when reject ratio strictly >50%
+
+## Observability (J5)
+
+- [ ] `emit()` never raises (swallows all exceptions)
+- [ ] Event ledger append-only; truncated line on prior crash tolerated
+- [ ] Cost ledger thread-safe with threading.Lock
+- [ ] Replay tool handles missing HTML gracefully
+
+## Profile (J6)
+
+- [ ] v1 profiles load under v2 schema without error (`extra="ignore"`)
+- [ ] `schema_version` field present and set to "v2"
+- [ ] LRU caps on explored_links (50), blocked_endpoints (50), llm_field_mappings (20)
+
+## Report (J7)
+
+- [ ] Verdict computation is pure and deterministic
+- [ ] Run report writes both JSON and markdown
+- [ ] SLO section present in run report
+
+## Integration (J8)
+
+- [ ] 46-key output schema preserved
+- [ ] State files backward-compatible
+- [ ] Never-fail contract: no single property crashes the run
+- [ ] `model_dump(mode="json")` used for all serialisation (not `.dict()`)
+- [ ] `hashlib.sha256` used everywhere (never `hash()`)
+
+## Cross-cutting
+
+- [ ] No layer imports a higher layer
+- [ ] No `print()` in new code
+- [ ] All async contexts have `finally` blocks
+- [ ] All `json.loads()` wrapped in try/except
+- [ ] Pydantic v2 `model_dump(mode="json")` used (not `.dict()`)

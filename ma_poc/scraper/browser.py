@@ -27,6 +27,9 @@ from typing import Any
 
 from scraper.proxy_manager import ProxyManager
 
+_MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
+_DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
+
 # Playwright is heavy and unavailable in some test environments. Import lazily.
 try:
     from playwright.async_api import (
@@ -165,7 +168,7 @@ class BrowserFleet:
         headless: bool = True,
     ) -> None:
         self.proxy_manager = proxy_manager or ProxyManager()
-        self.data_dir = Path(data_dir if data_dir is not None else os.getenv("DATA_DIR", "./data"))
+        self.data_dir = Path(data_dir if data_dir is not None else os.getenv("DATA_DIR", _DEFAULT_DATA_DIR))
         self.headless = headless
         self._playwright: Any | None = None
         self._browser: Any | None = None

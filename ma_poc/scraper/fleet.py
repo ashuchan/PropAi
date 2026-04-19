@@ -22,6 +22,9 @@ from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Any
 
+_MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
+_DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
+
 from extraction.pipeline import run_extraction_pipeline
 from extraction.tier5_vision import maybe_run_vision_fallback
 from extraction.vision_banner import capture_banner
@@ -168,7 +171,7 @@ class ScrapeFleet:
         headless: bool = True,
     ) -> None:
         self.properties = properties
-        self.data_dir = Path(data_dir if data_dir is not None else os.getenv("DATA_DIR", "./data"))
+        self.data_dir = Path(data_dir if data_dir is not None else os.getenv("DATA_DIR", _DEFAULT_DATA_DIR))
         self.max_concurrent = int(max_concurrent if max_concurrent is not None else os.getenv("MAX_CONCURRENT_BROWSERS", "10"))
         self.api_catalogue = api_catalogue or {}
         self.proxy_manager = ProxyManager()

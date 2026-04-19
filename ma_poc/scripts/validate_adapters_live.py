@@ -20,9 +20,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from pms.adapters.base import AdapterContext, AdapterResult
-from pms.adapters.registry import get_adapter
-from pms.detector import detect_pms
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.registry import get_adapter
+from ma_poc.pms.detector import detect_pms
 
 # Real property URLs grouped by expected PMS.
 # Each tuple: (canonical_id, expected_pms, url)

@@ -31,7 +31,7 @@ _repo = Path(__file__).resolve().parent.parent
 if str(_repo) not in sys.path:
     sys.path.insert(0, str(_repo))
 
-from pms.detector import detect_pms  # noqa: E402
+from ma_poc.pms.detector import detect_pms  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

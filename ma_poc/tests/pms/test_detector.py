@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import typing as t
 
-from pms.detector import (
+from ma_poc.pms.detector import (
     _STRATEGY_BY_PMS,
     MGMT_TO_PMS_PRIOR,
     DetectedPMS,

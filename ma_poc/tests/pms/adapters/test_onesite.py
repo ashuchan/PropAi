@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from pms.adapters.base import AdapterContext, AdapterResult
-from pms.adapters.onesite import OneSiteAdapter, parse_realpage_floorplans
-from pms.detector import detect_pms
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.onesite import OneSiteAdapter, parse_realpage_floorplans
+from ma_poc.pms.detector import detect_pms
 
 FIXTURES = Path(__file__).parent / "fixtures" / "onesite"
 

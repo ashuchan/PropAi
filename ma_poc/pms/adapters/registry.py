@@ -1,7 +1,7 @@
 """Adapter registry. See claude_refactor.md Phase 2."""
 from __future__ import annotations
 
-from pms.adapters.base import PmsAdapter
+from ma_poc.pms.adapters.base import PmsAdapter
 
 _REGISTRY: dict[str, PmsAdapter] = {}
 

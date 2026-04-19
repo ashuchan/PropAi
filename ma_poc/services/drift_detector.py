@@ -32,14 +32,18 @@ def detect_drift(
     if expected > 0 and units_extracted < expected * 0.7:
         reasons.append(f"unit_count_drop: expected ~{expected}, got {units_extracted}")
 
-    # All rents null (extracted shells without data)
+    # All rents null (extracted shells without data). Covers both v1
+    # (market_rent_low/high, asking_rent, rent_range) and v2 (rent_low/high)
+    # — a v2 success was otherwise spuriously demoted to COLD because the
+    # updater promotes COLD→WARM and drift then saw zero recognized rents.
     units = scrape_result.get("units", [])
+    _rent_keys = (
+        "rent_range", "market_rent_low", "market_rent_high",
+        "asking_rent", "rent_low", "rent_high",
+    )
     if units_extracted > 0 and units:
         null_rents = sum(
-            1
-            for u in units
-            if not u.get("rent_range") and not u.get("market_rent_low")
-               and not u.get("market_rent_high") and not u.get("asking_rent")
+            1 for u in units if not any(u.get(k) for k in _rent_keys)
         )
         if null_rents == len(units):
             reasons.append(

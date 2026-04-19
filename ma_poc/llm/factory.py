@@ -14,14 +14,21 @@ def _resolve(env_var: str, default: str = "anthropic") -> str:
     return os.getenv(env_var, default).strip().lower()
 
 
-def get_text_provider() -> LLMProvider:
-    """Return a text-completion LLM provider based on LLM_PROVIDER env var."""
-    provider = _resolve("LLM_PROVIDER")
-    if provider == "anthropic":
+def _build_provider(name: str) -> LLMProvider:
+    """Instantiate a provider by its canonical name."""
+    if name == "anthropic":
         from llm.anthropic import AnthropicLLMProvider
         return AnthropicLLMProvider()
+    if name == "openrouter":
+        from llm.openrouter import OpenRouterLLMProvider
+        return OpenRouterLLMProvider()
     from llm.azure import AzureLLMProvider
     return AzureLLMProvider()
+
+
+def get_text_provider() -> LLMProvider:
+    """Return a text-completion LLM provider based on LLM_PROVIDER env var."""
+    return _build_provider(_resolve("LLM_PROVIDER"))
 
 
 def get_vision_provider() -> LLMProvider:
@@ -29,9 +36,4 @@ def get_vision_provider() -> LLMProvider:
 
     Uses VISION_PROVIDER if set, otherwise falls back to LLM_PROVIDER.
     """
-    provider = _resolve("VISION_PROVIDER", os.getenv("LLM_PROVIDER", "anthropic"))
-    if provider == "anthropic":
-        from llm.anthropic import AnthropicLLMProvider
-        return AnthropicLLMProvider()
-    from llm.azure import AzureLLMProvider
-    return AzureLLMProvider()
+    return _build_provider(_resolve("VISION_PROVIDER", os.getenv("LLM_PROVIDER", "anthropic")))

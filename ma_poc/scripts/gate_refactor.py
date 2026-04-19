@@ -107,7 +107,7 @@ def check_phase_1() -> GateResult:
 
 def _every_literal_has_test() -> tuple[bool, str]:
     """Crude static check: every DetectedPMS literal appears in a test assertion."""
-    from pms.detector import DetectedPMS
+    from ma_poc.pms.detector import DetectedPMS
 
     literals = t.get_args(t.get_type_hints(DetectedPMS)["pms"])
     test_body = (ROOT / "tests" / "pms" / "test_detector.py").read_text(encoding="utf-8")
@@ -134,7 +134,7 @@ def check_phase_2() -> GateResult:
     result.add(ok, f"mypy --strict pms/adapters/ — {summary}")
 
     # Every literal (except unknown, custom) has an adapter module file.
-    from pms.detector import DetectedPMS
+    from ma_poc.pms.detector import DetectedPMS
 
     literals = t.get_args(t.get_type_hints(DetectedPMS)["pms"])
     adapters_dir = ROOT / "pms" / "adapters"
@@ -174,9 +174,9 @@ def check_phase_3() -> GateResult:
             continue
         content = py.read_text(encoding="utf-8")
         for line in content.splitlines():
-            if "from pms.adapters" in line and "from pms.adapters.base" not in line \
-                    and "from pms.adapters._parsing" not in line \
-                    and "from pms.adapters._stub" not in line:
+            if "from ma_poc.pms.adapters" in line and "from ma_poc.pms.adapters.base" not in line \
+                    and "from ma_poc.pms.adapters._parsing" not in line \
+                    and "from ma_poc.pms.adapters._stub" not in line:
                 # realpage_oll importing onesite is acceptable (shared parser)
                 if py.name == "realpage_oll.py" and "onesite" in line:
                     continue
@@ -192,7 +192,7 @@ def check_phase_3() -> GateResult:
         result.add(not found, f"no PMS strings in generic.py (found: {found})")
 
     # Research log comment at top of each adapter.
-    from pms.detector import DetectedPMS
+    from ma_poc.pms.detector import DetectedPMS
     literals = t.get_args(t.get_type_hints(DetectedPMS)["pms"])
     missing_log: list[str] = []
     for lit in literals:

@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from pms.adapters.base import AdapterContext, AdapterResult
-from pms.adapters.generic import GenericAdapter, parse_generic_api, _find_unit_list
-from pms.detector import detect_pms
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.generic import GenericAdapter, parse_generic_api, _find_unit_list
+from ma_poc.pms.detector import detect_pms
 
 FIXTURES = Path(__file__).parent / "fixtures" / "generic"
 

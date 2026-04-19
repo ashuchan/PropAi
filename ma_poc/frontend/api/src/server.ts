@@ -1,12 +1,3 @@
-import { config as dotenvConfig } from 'dotenv';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-// Load .env from ma_poc/ root (3 levels up from api/src/)
-const __filename2 = fileURLToPath(import.meta.url);
-const __dirname2 = dirname(__filename2);
-dotenvConfig({ path: resolve(__dirname2, '..', '..', '..', '.env') });
-
 import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';

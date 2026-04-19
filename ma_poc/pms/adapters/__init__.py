@@ -5,18 +5,18 @@ the registry wiring in this file does not change.
 """
 from __future__ import annotations
 
-from pms.adapters.appfolio import AppFolioAdapter
-from pms.adapters.avalonbay import AvalonBayAdapter
-from pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
-from pms.adapters.entrata import EntrataAdapter
-from pms.adapters.generic import GenericAdapter
-from pms.adapters.onesite import OneSiteAdapter
-from pms.adapters.realpage_oll import RealPageOllAdapter
-from pms.adapters.registry import all_adapters, get_adapter, register
-from pms.adapters.rentcafe import RentCafeAdapter
-from pms.adapters.sightmap import SightMapAdapter
-from pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
-from pms.adapters.wix_nopms import WixNoPmsAdapter
+from ma_poc.pms.adapters.appfolio import AppFolioAdapter
+from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
+from ma_poc.pms.adapters.entrata import EntrataAdapter
+from ma_poc.pms.adapters.generic import GenericAdapter
+from ma_poc.pms.adapters.onesite import OneSiteAdapter
+from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
+from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
+from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
+from ma_poc.pms.adapters.sightmap import SightMapAdapter
+from ma_poc.pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
+from ma_poc.pms.adapters.wix_nopms import WixNoPmsAdapter
 
 __all__ = [
     "AdapterContext",
@@ -31,7 +31,7 @@ __all__ = [
 def _bootstrap_registry() -> None:
     # Idempotent — registering twice is a hard error, so we guard against
     # double-import (pytest reloads, script re-invocations).
-    from pms.adapters.registry import _registered_names
+    from ma_poc.pms.adapters.registry import _registered_names
 
     already = _registered_names()
     for cls in (

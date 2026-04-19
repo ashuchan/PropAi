@@ -26,9 +26,28 @@ Key findings:
 """
 from __future__ import annotations
 
+import re as _re
 from typing import TYPE_CHECKING, Any
 
-from pms.adapters._parsing import (
+# Used by the Option C relaxed-LLM gate to sanity-check HTML has enough
+# rent-ish content to be worth an LLM call even when the detected PMS
+# adapter already returned empty.
+_re_strip_script = _re.compile(r"<script.*?</script>|<style.*?</style>",
+                                _re.IGNORECASE | _re.DOTALL)
+_re_strip_tag = _re.compile(r"<[^>]+>")
+_re_rent = _re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?",
+                        _re.IGNORECASE)
+
+from ma_poc.pms.adapters._daily_runner_parsers import (
+    parse_api_responses as _dr_parse_api_responses,
+    parse_sightmap_payload as _dr_parse_sightmap,
+)
+from ma_poc.pms.adapters._html_extract import (
+    extract_embedded_blobs_from_html,
+    extract_jsonld_from_html,
+    extract_units_from_dom,
+)
+from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     format_rent_range,
     get_field,
@@ -36,7 +55,7 @@ from pms.adapters._parsing import (
     money_to_int,
     rent_in_sanity_range,
 )
-from pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -75,6 +94,40 @@ def _find_unit_list(body: Any) -> list[dict[str, Any]]:
                 return nested
 
     return []
+
+
+async def _get_page_html(page: Any, ctx: AdapterContext) -> str | None:
+    """Extract raw HTML from either a live Playwright page or fetch_result.body.
+
+    Jugnu adapters may receive either a real Page (legacy ``scrape()`` path)
+    or ``page=None`` with ``ctx.fetch_result.body`` populated by L1. Both
+    should be usable; prefer the live page (post-JS-render content) and
+    fall back to the fetch body (raw server HTML).
+    """
+    # Prefer live page content — it reflects post-render DOM.
+    if page is not None and hasattr(page, "content"):
+        try:
+            content = await page.content()
+            if content:
+                return content
+        except Exception:
+            pass
+
+    # Fall back to the raw fetch body (bytes or str).
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is None:
+        return None
+    body = getattr(fr, "body", None)
+    if body is None:
+        return None
+    if isinstance(body, bytes):
+        try:
+            return body.decode("utf-8", errors="replace")
+        except Exception:
+            return None
+    if isinstance(body, str):
+        return body
+    return None
 
 
 def _has_unit_signals(items: list[dict[str, Any]]) -> bool:
@@ -200,12 +253,50 @@ class GenericAdapter:
 
         For detected PMS failures (pms != "unknown"), only deterministic tiers run.
         LLM/Vision are reserved for truly unknown sites.
+
+        Emits ``extract.tier_attempted`` for every sub-tier run so the report
+        shows exactly which sub-tiers fired, how long they took, and why empty
+        ones stopped — the existing single-bucket ``tier_used`` hides all of
+        that detail.
         """
+        import time as _time
+        try:
+            from ma_poc.observability.events import EventKind, emit as _emit
+        except Exception:
+            _emit, EventKind = None, None  # type: ignore[assignment]
+
+        attempts: list[dict[str, Any]] = []
+
+        def _log_attempt(key: str, outcome: str, units: int = 0,
+                          reason: str = "", duration_ms: int = 0) -> None:
+            entry = {
+                "tier_key": key, "outcome": outcome, "units_found": units,
+                "reason": reason, "duration_ms": duration_ms,
+            }
+            attempts.append(entry)
+            if _emit is not None and EventKind is not None:
+                try:
+                    _emit(EventKind.TIER_ATTEMPTED, ctx.property_id, **entry)
+                except Exception:
+                    pass
+
         result = AdapterResult(tier_used="TIER_1_API")
+        result._tier_attempts = attempts  # type: ignore[attr-defined]
         all_units: list[dict[str, str]] = []
+        # Option C gate: default is skip LLM when the detected PMS is not
+        # "unknown" (GenericAdapter runs as a fallback for a failed PMS
+        # adapter — spending LLM budget on those was originally gated OFF).
+        # However the 10-property validation showed 2 FAILED_NO_DATA cases
+        # (SightMap, RentCafe) where the detected adapter found nothing but
+        # the HTML had visible text + rent signals. The relaxation below
+        # re-enables LLM for those — evaluated after we have ``html`` and
+        # can inspect its shape.
         skip_llm = ctx.detected.pms != "unknown"
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
+
+        # Sub-tier 1: narrow generic API parser -----------------------------
+        t0 = _time.monotonic()
         for resp in api_responses:
             body = resp.get("body")
             items = _find_unit_list(body)
@@ -215,6 +306,61 @@ class GenericAdapter:
                 if units:
                     all_units.extend(units)
                     result.api_responses.append(resp)
+        _narrow_ms = int((_time.monotonic() - t0) * 1000)
+        if api_responses:
+            _log_attempt(
+                "generic:api_narrow",
+                "ran_units" if all_units else "ran_empty",
+                units=len(all_units),
+                reason="" if all_units else "no items matched unit-signal heuristic",
+                duration_ms=_narrow_ms,
+            )
+        else:
+            _log_attempt("generic:api_narrow", "skipped",
+                         reason="no captured API responses", duration_ms=0)
+
+        # Sub-tier 2: broad parser + host-specific (SightMap/RealPage) -----
+        if not all_units and api_responses:
+            t0 = _time.monotonic()
+            for resp in api_responses:
+                url = resp.get("url") or ""
+                body = resp.get("body")
+                host_units: list[dict[str, str]] = []
+                if body is not None and "sightmap.com" in url.lower():
+                    try:
+                        host_units = _dr_parse_sightmap(body, url) or []
+                    except Exception as exc:  # defensive — never break the run
+                        result.errors.append(f"sightmap-parse-error: {exc}")
+                if host_units:
+                    all_units.extend(host_units)
+                    result.api_responses.append(resp)
+            if not all_units:
+                try:
+                    broad = _dr_parse_api_responses(list(api_responses)) or []
+                except Exception as exc:
+                    broad = []
+                    result.errors.append(f"daily-runner-parser-error: {exc}")
+                if broad:
+                    all_units.extend(broad)
+                    # parse_api_responses tags each unit with source_api_url;
+                    # surface the first as winning_url if we don't have one.
+                    if not result.api_responses:
+                        first_url = next(
+                            (u.get("source_api_url") for u in broad if u.get("source_api_url")),
+                            None,
+                        )
+                        if first_url:
+                            for resp in api_responses:
+                                if resp.get("url") == first_url:
+                                    result.api_responses.append(resp)
+                                    break
+            _log_attempt(
+                "generic:api_broad",
+                "ran_units" if all_units else "ran_empty",
+                units=len(all_units),
+                reason="" if all_units else "broad parser + host-specific found no units",
+                duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
 
         if all_units:
             result.units = all_units
@@ -222,17 +368,193 @@ class GenericAdapter:
             result.confidence = min(0.85, 0.6 + 0.05 * len(all_units))
             return result
 
-        # No units from API — if LLM is allowed (unknown PMS), the orchestrator
-        # will handle LLM/Vision tiers. We just report failure here.
-        result.confidence = 0.0
+        # ── HTML-based tiers ──────────────────────────────────────────────
+        # If neither narrow nor broad API parsers produced units, fall through
+        # to the HTML extractors. These run on the raw page HTML (either from
+        # a live Playwright page or from fetch_result.body) and cover the SSR
+        # / static-site cases where no XHR fires during load.
+        html = await _get_page_html(page, ctx)
+        if html:
+            # Sub-tier 3: JSON-LD
+            t0 = _time.monotonic()
+            jsonld_units = extract_jsonld_from_html(html, ctx.base_url)
+            _log_attempt(
+                "generic:jsonld",
+                "ran_units" if jsonld_units else "ran_empty",
+                units=len(jsonld_units or []),
+                reason="" if jsonld_units else "no Apartment/Offer schema in HTML",
+                duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
+            if jsonld_units:
+                result.units = jsonld_units
+                result.tier_used = "TIER_2_JSONLD"
+                result.winning_url = ctx.base_url
+                result.confidence = min(0.80, 0.55 + 0.05 * len(jsonld_units))
+                return result
+
+            # Sub-tier 4: Embedded JSON / SSR blobs -------------------------
+            t0 = _time.monotonic()
+            embedded = extract_embedded_blobs_from_html(html)
+            if embedded:
+                try:
+                    embedded_units = _dr_parse_api_responses(embedded) or []
+                except Exception as exc:
+                    embedded_units = []
+                    result.errors.append(f"embedded-parse-error: {exc}")
+            else:
+                embedded_units = []
+            _log_attempt(
+                "generic:embedded_json",
+                "ran_units" if embedded_units else ("ran_empty" if embedded else "skipped"),
+                units=len(embedded_units),
+                reason="" if embedded_units else (
+                    f"{len(embedded)} SSR blob(s) had no unit signals" if embedded
+                    else "no __NEXT_DATA__/__NUXT__/window globals in HTML"
+                ),
+                duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
+            if embedded_units:
+                result.units = embedded_units
+                result.tier_used = "TIER_1_5_EMBEDDED"
+                result.winning_url = ctx.base_url
+                result.confidence = min(0.80, 0.55 + 0.05 * len(embedded_units))
+                return result
+
+            # Sub-tier 5: DOM selector cascade ------------------------------
+            # Scans container elements (.unit, .floor-plan, .pricing-card, …)
+            # for visible rent + structural signals. Catches static HTML sites
+            # where unit data lives in the markup, not in any JSON envelope.
+            t0 = _time.monotonic()
+            try:
+                dom_units = extract_units_from_dom(html, ctx.base_url) or []
+            except Exception as exc:
+                dom_units = []
+                result.errors.append(f"dom-scan-error: {exc}")
+            _log_attempt(
+                "generic:dom_scan",
+                "ran_units" if dom_units else "ran_empty",
+                units=len(dom_units),
+                reason="" if dom_units else "no DOM container matched rent + structural signals",
+                duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
+            if dom_units:
+                result.units = dom_units
+                result.tier_used = "TIER_3_DOM"
+                result.winning_url = ctx.base_url
+                result.confidence = min(0.75, 0.5 + 0.04 * len(dom_units))
+                return result
+        else:
+            _log_attempt("generic:jsonld", "skipped", reason="no HTML body available")
+            _log_attempt("generic:embedded_json", "skipped", reason="no HTML body available")
+            _log_attempt("generic:dom_scan", "skipped", reason="no HTML body available")
+
+        # Sub-tier 6: LLM extraction --------------------------------------
+        # Originally gated ON only for ``pms=unknown``. Option C relaxes
+        # that gate: if the detected adapter returned empty BUT the page
+        # has enough visible text and rent signals for the LLM to have a
+        # shot, we let it run. Rationale: a detected-but-failing adapter
+        # means the site shape drifted (or the data lives on a sub-page);
+        # the LLM can sometimes recover from the home-page HTML that's
+        # right there in front of us.
+        if skip_llm and html:
+            try:
+                _text = _re_strip_script.sub("", html)
+                _text = _re_strip_tag.sub(" ", _text)
+                _rent_hits = len(_re_rent.findall(html))
+                _text_bytes = len(_text.encode("utf-8", errors="ignore"))
+                if _text_bytes >= 5000 and _rent_hits >= 1:
+                    try:
+                        from ma_poc.observability.events import EventKind, emit as _gate_emit
+                        _gate_emit(
+                            EventKind.LLM_GATE_RELAXED, ctx.property_id,
+                            detected_pms=ctx.detected.pms,
+                            text_bytes=_text_bytes, rent_signals=_rent_hits,
+                            reason="detected_adapter_empty_html_has_signals",
+                        )
+                    except Exception:
+                        pass
+                    skip_llm = False
+            except Exception:
+                pass
+
         if skip_llm:
+            _log_attempt("generic:llm", "skipped",
+                         reason=f"detected PMS '{ctx.detected.pms}' — LLM gated off")
             result.errors.append(
                 f"Generic fallback found no units for detected PMS '{ctx.detected.pms}'; "
                 "LLM/Vision skipped for non-unknown PMS"
             )
-        else:
-            result.errors.append("Generic parser found no units in captured API responses")
+            result.confidence = 0.0
+            return result
 
+        import os as _os
+        if _os.getenv("ENABLE_TIER4_LLM", "true").lower() not in ("1", "true", "yes"):
+            _log_attempt("generic:llm", "skipped",
+                         reason="ENABLE_TIER4_LLM=false")
+            result.errors.append("Generic parser found no units in captured API responses")
+            result.confidence = 0.0
+            return result
+
+        if not html:
+            _log_attempt("generic:llm", "skipped",
+                         reason="no HTML body to send to LLM")
+            result.errors.append("Generic parser found no units; no HTML for LLM")
+            result.confidence = 0.0
+            return result
+
+        t0 = _time.monotonic()
+        try:
+            try:
+                from ma_poc.services.llm_extractor import (
+                    extract_with_llm, prepare_llm_input,
+                )
+            except ImportError:
+                from services.llm_extractor import (  # type: ignore[no-redef]
+                    extract_with_llm, prepare_llm_input,
+                )
+            property_context = {
+                "property_name": "",
+                "city": "", "state": "",
+                "total_units": ctx.expected_total_units or "",
+                "website": ctx.base_url,
+            }
+            llm_input = prepare_llm_input(html, api_responses, property_context)
+            llm_units, hints, _raw, interaction = await extract_with_llm(
+                llm_input, property_id=ctx.property_id or "unknown",
+            )
+            if interaction:
+                # Stash the interaction dict so scraper.py surfaces it on
+                # result["_llm_interactions"] for cost accounting + reports.
+                existing = getattr(result, "_llm_interactions", []) or []
+                existing.append(interaction)
+                result._llm_interactions = existing  # type: ignore[attr-defined]
+            _log_attempt(
+                "generic:llm",
+                "ran_units" if llm_units else "ran_empty",
+                units=len(llm_units or []),
+                reason="" if llm_units else "LLM returned no structured units",
+                duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
+            if llm_units:
+                result.units = llm_units
+                result.tier_used = "TIER_4_LLM"
+                result.winning_url = ctx.base_url
+                result.confidence = min(0.75, 0.5 + 0.04 * len(llm_units))
+                # Surface the LLM-discovered hints so the profile updater can
+                # record css_selectors / api_urls_with_data for future runs.
+                if hints:
+                    result._llm_hints = hints  # type: ignore[attr-defined]
+                return result
+        except Exception as exc:
+            _log_attempt(
+                "generic:llm", "errored",
+                reason=str(exc)[:200],
+                duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
+            result.errors.append(f"llm-tier-error: {exc}")
+
+        result.confidence = 0.0
+        result.errors.append("Generic parser found no units in captured API responses")
         return result
 
     def static_fingerprints(self) -> list[str]:

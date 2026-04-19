@@ -10,8 +10,8 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
-from pms.adapters.registry import all_adapters
-from pms.detector import DetectedPMS, detect_pms
+from ma_poc.pms.adapters.registry import all_adapters
+from ma_poc.pms.detector import DetectedPMS, detect_pms
 
 if TYPE_CHECKING:
     from playwright.async_api import Page

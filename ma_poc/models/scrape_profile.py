@@ -155,7 +155,7 @@ class ExtractionConfidence(BaseModel):
     consecutive_failures: int = 0
     last_unit_count: int = 0
     maturity: ProfileMaturity = ProfileMaturity.COLD
-    last_success_detection: Any = None  # Stores DetectedPMS dict from pms.detector
+    last_success_detection: Any = None  # Stores DetectedPMS dict from ma_poc.pms.detector
     consecutive_unreachable: int = 0
 
 
@@ -194,6 +194,7 @@ class ScrapeProfile(BaseModel):
 
     canonical_id: str
     version: int = 2
+    schema_version: str = "v2"  # Jugnu explicit marker
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     updated_by: str = "BOOTSTRAP"  # BOOTSTRAP | LLM_EXTRACTION | LLM_VISION | HUMAN

@@ -65,6 +65,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 # Make `entrata` importable when run from anywhere.
 _HERE = Path(__file__).resolve().parent
+_MA_POC_ROOT = _HERE.parent  # ma_poc/
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
@@ -797,10 +798,10 @@ async def run(csv_path: Path, out_path: Path, limit: int | None,
 
 def main():
     p = argparse.ArgumentParser(description="Multi-property scraper (CSV-driven)")
-    p.add_argument("--csv",      default="config/properties.csv",
-                   help="Path to properties CSV")
-    p.add_argument("--out",      default="output/properties.json",
-                   help="Output JSON path")
+    p.add_argument("--csv",      default=str(_MA_POC_ROOT / "config" / "properties.csv"),
+                   help="Path to properties CSV (default: ma_poc/config/properties.csv)")
+    p.add_argument("--out",      default=str(_MA_POC_ROOT / "data" / "output" / "properties.json"),
+                   help="Output JSON path (default: ma_poc/data/output/properties.json)")
     p.add_argument("--limit",    type=int, default=None,
                    help="Process at most N rows")
     p.add_argument("--start-at", type=int, default=0,

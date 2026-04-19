@@ -103,6 +103,13 @@ def _build_report(
     # Property metadata
     sections.append(_metadata_section(sr, rec))
 
+    # New diagnostic sections (Wave 1-4 telemetry)
+    sections.append(_fetch_diagnostic_section(sr))
+    sections.append(_detector_signals_section(sr))
+    sections.append(_html_characterization_section(sr))
+    sections.append(_tier_attempts_section(sr))
+    sections.append(_link_hop_section(sr))
+
     # Profile routing
     sections.append(_profile_section(sr))
 
@@ -184,7 +191,13 @@ def _summary_box(sr: dict, unit_diff: dict) -> str:
 
 
 def _metadata_section(sr: dict, rec: dict | None) -> str:
-    """Property metadata from scrape and record."""
+    """Property metadata from scrape and record.
+
+    Auto-detects v1 (46-key) vs v2 (flat) property records and renders the
+    fields appropriate to the schema. V2 exposes ``apartment_id``, ``pmc``,
+    ``website_design``, ``concessions`` and normalized address fields; v1
+    uses the historical Title-Case labels.
+    """
     meta = sr.get("property_metadata") or {}
     if not meta and not rec:
         return ""
@@ -193,21 +206,219 @@ def _metadata_section(sr: dict, rec: dict | None) -> str:
     lines.append("| Field | Value |")
     lines.append("|---|---|")
 
-    # From scrape metadata
+    # From scrape metadata (schema-independent)
     for key in ("name", "title", "address", "city", "state", "zip",
                 "lat", "lng", "phone", "total_units"):
         val = meta.get(key)
         if val:
             lines.append(f"| {key} | {val} |")
 
-    # From property record (CSV-enriched)
+    # From property record — schema-aware
     if rec:
-        for key in ("Property Name", "City", "State", "ZIP Code",
-                     "Management Company", "Type", "Property Address"):
-            val = rec.get(key)
-            if val:
-                lines.append(f"| {key} (record) | {val} |")
+        is_v2 = "apartment_id" in rec or "proj_name" in rec
+        if is_v2:
+            v2_fields = [
+                ("apartment_id", "Apartment ID"),
+                ("proj_name", "Property Name"),
+                ("address", "Address"),
+                ("city", "City"),
+                ("state", "State"),
+                ("zip_code", "ZIP Code"),
+                ("phone", "Phone"),
+                ("email_address", "Email"),
+                ("website", "Website"),
+                ("pmc", "Management Company"),
+                ("website_design", "Platform"),
+                ("concessions", "Concessions"),
+            ]
+            for key, label in v2_fields:
+                val = rec.get(key)
+                if val:
+                    lines.append(f"| {label} (record) | {val} |")
+        else:
+            for key in ("Property Name", "City", "State", "ZIP Code",
+                        "Management Company", "Type", "Property Address"):
+                val = rec.get(key)
+                if val:
+                    lines.append(f"| {key} (record) | {val} |")
 
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _fetch_diagnostic_section(sr: dict) -> str:
+    """Fetch layer diagnostic — why a fetch failed (or succeeded slowly).
+
+    Populated by ``scrape_jugnu`` from the L1 FetchResult. Shows outcome,
+    ``error_signature`` (TLS / timeout / DNS / bot-wall), redirect destination,
+    body size, CAPTCHA detection result, proxy + identity hash. This is what
+    distinguishes a TRANSIENT that was a slow server from one that was a
+    challenge page.
+    """
+    fd = sr.get("_fetch_diagnostic")
+    if not fd:
+        return ""
+    lines = ["## Fetch Diagnostic", ""]
+    lines.append("| Field | Value |")
+    lines.append("|---|---|")
+    rows = [
+        ("Outcome", fd.get("outcome")),
+        ("Status", fd.get("status")),
+        ("Attempts", fd.get("attempts")),
+        ("Elapsed", f"{fd.get('elapsed_ms', 0):,} ms"),
+        ("Render Mode", fd.get("render_mode")),
+        ("Error Signature", fd.get("error_signature") or "—"),
+        ("Final URL", fd.get("final_url")),
+        ("Body Bytes", f"{fd.get('body_bytes', 0):,}"),
+        ("CAPTCHA Detected", fd.get("captcha_detected")),
+        ("CAPTCHA Provider", fd.get("captcha_provider") or "—"),
+        ("Proxy Used", fd.get("proxy_used") or "none"),
+        ("Network Log Entries", fd.get("network_log_count", 0)),
+    ]
+    for label, val in rows:
+        if val in (None, "", "—") and label not in ("Error Signature", "CAPTCHA Provider", "Proxy Used"):
+            continue
+        lines.append(f"| {label} | {val} |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _detector_signals_section(sr: dict) -> str:
+    """PMS detector signals — what the detector saw vs what it matched.
+
+    When ``detect_pms`` returns ``pms=unknown`` at 0.0 confidence, this is
+    the first place to look. It shows which fingerprints were checked, which
+    actually matched, and what script/iframe hosts + meta tags were present
+    in the fetched HTML. If script_srcs_sample contains e.g. ``assets.appfolio.com``
+    and detection still said unknown, the marker list in ``detector.py`` needs
+    a new entry.
+    """
+    sig = sr.get("_detector_signals")
+    if not sig:
+        return ""
+    lines = ["## PMS Detection Signals", ""]
+    lines.append("| Field | Value |")
+    lines.append("|---|---|")
+    lines.append(f"| URL host | `{sig.get('url_host') or '—'}` |")
+    lines.append(f"| URL path | `{sig.get('url_path') or '—'}` |")
+    lines.append(f"| .aspx detected | {sig.get('aspx_detected')} |")
+    lines.append(f"| HTML body bytes | {sig.get('body_bytes', 0):,} |")
+    lines.append(f"| Meta generator | {sig.get('meta_generator') or '—'} |")
+    lines.append(f"| Meta application-name | {sig.get('meta_application_name') or '—'} |")
+    lines.append(f"| CSV mgmt company | {sig.get('csv_mgmt_company') or '—'} |")
+    lines.append(f"| CSV mgmt prior matched | {sig.get('csv_mgmt_prior_matched')} |")
+    lines.append("")
+
+    checked = sig.get("fingerprints_checked") or []
+    matched = set(sig.get("fingerprints_matched") or [])
+    if checked:
+        lines.append("### Fingerprints")
+        lines.append("")
+        lines.append("| Platform | Matched |")
+        lines.append("|---|---|")
+        for f in checked:
+            lines.append(f"| {f} | {'YES' if f in matched else 'no'} |")
+        lines.append("")
+
+    scripts = sig.get("script_srcs_sample") or []
+    if scripts:
+        lines.append("### Script hosts (first 10 unique)")
+        lines.append("")
+        for h in scripts:
+            lines.append(f"- `{h}`")
+        lines.append("")
+
+    iframes = sig.get("iframe_srcs_sample") or []
+    if iframes:
+        lines.append("### Iframe hosts (first 5 unique)")
+        lines.append("")
+        for h in iframes:
+            lines.append(f"- `{h}`")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _html_characterization_section(sr: dict) -> str:
+    """Coarse shape of the fetched HTML — SPA vs SSR, JSON-LD present, etc.
+
+    Distinguishes "200 OK but 2KB JS shell" from "real SSR page". When every
+    deterministic tier returns empty and ``spa_confidence`` is high, the
+    property needs RENDER mode (or we already rendered and the page lazy-loads
+    unit data after onload).
+    """
+    hc = sr.get("_html_characterization")
+    if not hc:
+        return ""
+    lines = ["## HTML Characterization", ""]
+    lines.append("| Field | Value |")
+    lines.append("|---|---|")
+    rows = [
+        ("Body bytes", f"{hc.get('body_bytes', 0):,}"),
+        ("Text bytes (scripts/styles stripped)", f"{hc.get('text_bytes', 0):,}"),
+        ("Script tags", hc.get("script_count")),
+        ("Iframe tags", hc.get("iframe_count")),
+        ("JSON-LD blocks", hc.get("jsonld_block_count")),
+        ("JSON-LD @types", ", ".join(hc.get("jsonld_types") or []) or "—"),
+        ("Framework hints", ", ".join(hc.get("framework_hints") or []) or "—"),
+        ("SPA confidence", hc.get("spa_confidence")),
+        ("Rent signals ($NNN)", hc.get("rent_signal_count")),
+    ]
+    for label, val in rows:
+        lines.append(f"| {label} | {val} |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _tier_attempts_section(sr: dict) -> str:
+    """Per-sub-tier extraction attempts.
+
+    GenericAdapter (and PMS-specific adapters over time) emit a row per
+    sub-tier so we can see which ones ran, how many units each produced,
+    and — for empty ones — the reason they gave up. Replaces the single
+    ``extraction_tier_used`` bucket with a genuine trace.
+    """
+    attempts = sr.get("_tier_attempts") or []
+    if not attempts:
+        return ""
+    lines = ["## Extraction Attempts", ""]
+    lines.append("| Tier | Outcome | Units | Duration | Reason |")
+    lines.append("|---|---|---|---|---|")
+    for a in attempts:
+        key = a.get("tier_key", "?")
+        outcome = a.get("outcome", "?")
+        units = a.get("units_found", 0)
+        dur = f"{a.get('duration_ms', 0):,}ms"
+        reason = _trunc(str(a.get("reason") or ""), 80)
+        lines.append(f"| `{key}` | {outcome} | {units} | {dur} | {reason} |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _link_hop_section(sr: dict) -> str:
+    """Link-hop trace — when the entry URL produced no units, shows which
+    internal links were tried and which (if any) recovered.
+
+    Scraper stamps ``_link_hop_from`` / ``_link_hop_score`` / ``_link_hop_anchor``
+    on the result when a hop succeeded. Absence of these keys on a failed
+    property means either no internal links scored >0 or all hops came back
+    empty as well.
+    """
+    if not sr.get("_link_hop_success") and not sr.get("_link_hop_from"):
+        return ""
+    lines = ["## Link-Hop", ""]
+    lines.append("| Field | Value |")
+    lines.append("|---|---|")
+    lines.append(f"| Recovered via link-hop | {sr.get('_link_hop_success', False)} |")
+    if sr.get("_link_hop_from"):
+        lines.append(f"| Entry URL (home page) | {sr['_link_hop_from']} |")
+    if sr.get("_winning_page_url"):
+        lines.append(f"| Winning sub-page | {sr['_winning_page_url']} |")
+    if sr.get("_link_hop_score") is not None:
+        lines.append(f"| Rank score | {sr['_link_hop_score']} |")
+    if sr.get("_link_hop_anchor"):
+        lines.append(f"| Anchor text | {sr['_link_hop_anchor']} |")
+    if sr.get("_link_hop_depth") is not None:
+        lines.append(f"| Hops used | {sr['_link_hop_depth']} |")
     lines.append("")
     return "\n".join(lines)
 
@@ -622,13 +833,18 @@ def _units_section(sr: dict) -> str:
     for u in units:
         all_keys.update(u.keys())
 
-    # Priority columns for the table
+    # Priority columns for the table. Covers raw internal unit keys and v2
+    # schema keys (beds/baths/area/date_captured/lease_term/move_in_date) so
+    # the same table renders cleanly whether the units are the raw scrape
+    # output or the v2-formatted record units.
     priority_cols = [
         "unit_number", "unit_id", "floor_plan_name",
-        "bedrooms", "bathrooms", "sqft",
+        "beds", "baths", "bedrooms", "bathrooms",
+        "area", "sqft",
         "rent_low", "rent_high", "asking_rent",
         "market_rent_low", "market_rent_high",
         "availability_status", "availability_date", "available_date",
+        "move_in_date", "lease_term", "date_captured",
     ]
     # Use only columns that exist in the data
     cols = [c for c in priority_cols if c in all_keys]
