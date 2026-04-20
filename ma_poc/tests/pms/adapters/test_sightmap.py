@@ -39,14 +39,12 @@ class _DummyPage:
 
 @pytest.mark.asyncio
 async def test_sightmap_extract_happy_path() -> None:
-    """Synthetic SightMap payload with units produces correct output."""
     responses = _load_fixture("synthetic_units.json")
     adapter = SightMapAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert isinstance(result, AdapterResult)
     assert len(result.units) == 4
-    # Check floor plan join worked
     unit_101 = [u for u in result.units if u["unit_number"] == "101"][0]
     assert unit_101["floor_plan_name"] == "A1"
     assert unit_101["bedrooms"] == "1"
@@ -56,7 +54,6 @@ async def test_sightmap_extract_happy_path() -> None:
 
 @pytest.mark.asyncio
 async def test_sightmap_extract_from_stored_fixture() -> None:
-    """All stored fixtures load without error."""
     for fixture_path in FIXTURES.glob("*.json"):
         responses = json.loads(fixture_path.read_text(encoding="utf-8"))
         adapter = SightMapAdapter()
@@ -67,7 +64,6 @@ async def test_sightmap_extract_from_stored_fixture() -> None:
 
 @pytest.mark.asyncio
 async def test_sightmap_extract_real_fixture_268836() -> None:
-    """Real SightMap payload (268836 Hawthorne) produces units."""
     responses = _load_fixture("268836_amenities_only.json")
     adapter = SightMapAdapter()
     ctx = _make_ctx(responses)
@@ -78,7 +74,6 @@ async def test_sightmap_extract_real_fixture_268836() -> None:
 
 @pytest.mark.asyncio
 async def test_sightmap_extract_returns_empty_on_no_data() -> None:
-    """Response with no units key returns empty."""
     responses = [{"url": "https://sightmap.com/app/api/v1/x/sightmaps/1",
                   "body": {"data": {"amenities": []}}}]
     adapter = SightMapAdapter()
@@ -89,21 +84,23 @@ async def test_sightmap_extract_returns_empty_on_no_data() -> None:
 
 
 def test_parse_sightmap_handles_null_units() -> None:
-    """Null units list returns empty."""
     body = {"data": {"units": None, "floor_plans": []}}
-    assert parse_sightmap_payload(body, "test") == []
+    units, dropped = parse_sightmap_payload(body, "test")
+    assert units == []
+    assert dropped == 0
 
 
 def test_parse_sightmap_handles_empty_units() -> None:
     body = {"data": {"units": [], "floor_plans": []}}
-    assert parse_sightmap_payload(body, "test") == []
+    units, dropped = parse_sightmap_payload(body, "test")
+    assert units == []
+    assert dropped == 0
 
 
 def test_parse_sightmap_studio_detection() -> None:
-    """Studio floor plans (bedroom_count=0) get correct bed_label."""
     responses = _load_fixture("synthetic_units.json")
     body = responses[0]["body"]
-    units = parse_sightmap_payload(body, "test")
+    units, _ = parse_sightmap_payload(body, "test")
     studio = [u for u in units if u["unit_number"] == "301"][0]
     assert studio["bed_label"] == "Studio"
 
@@ -115,14 +112,14 @@ def test_static_fingerprints_nonempty() -> None:
 def test_tier_used_label_is_pms_specific() -> None:
     responses = _load_fixture("synthetic_units.json")
     body = responses[0]["body"]
-    units = parse_sightmap_payload(body, "test")
+    units, _ = parse_sightmap_payload(body, "test")
     assert all("SIGHTMAP" in u["extraction_tier"] for u in units)
 
 
 def test_rent_within_sanity_range() -> None:
     responses = _load_fixture("synthetic_units.json")
     body = responses[0]["body"]
-    units = parse_sightmap_payload(body, "test")
+    units, _ = parse_sightmap_payload(body, "test")
     import re
     for u in units:
         if u["rent_range"]:
@@ -133,7 +130,6 @@ def test_rent_within_sanity_range() -> None:
 
 
 def test_parse_sightmap_display_price_fallback() -> None:
-    """When price is null, falls back to display_price."""
     body = {
         "data": {
             "units": [{"id": "1", "floor_plan_id": "1", "unit_number": "X1",
@@ -141,7 +137,7 @@ def test_parse_sightmap_display_price_fallback() -> None:
             "floor_plans": [{"id": "1", "name": "Test", "bedroom_count": 1, "bathroom_count": 1}],
         }
     }
-    units = parse_sightmap_payload(body, "test")
+    units, _ = parse_sightmap_payload(body, "test")
     assert len(units) == 1
     assert "$1,300" in units[0]["rent_range"]
 
@@ -165,7 +161,6 @@ def _sm_valid_body() -> dict:
 
 @pytest.mark.asyncio
 async def test_sm_t01_sightmap_url_still_works() -> None:
-    """SM_T01: sightmap.com URL + valid body still extracts units."""
     body = _sm_valid_body()
     assert _is_sightmap_response(body) is True
     responses = [{
@@ -184,7 +179,6 @@ async def test_sm_t01_sightmap_url_still_works() -> None:
 
 @pytest.mark.asyncio
 async def test_sm_t02_proxied_url_is_matched() -> None:
-    """SM_T02: proxied URL (no sightmap.com) + valid body is matched."""
     body = _sm_valid_body()
     assert _is_sightmap_response(body) is True
     responses = [{
@@ -199,7 +193,6 @@ async def test_sm_t02_proxied_url_is_matched() -> None:
 
 @pytest.mark.asyncio
 async def test_sm_t03_amenities_only_error() -> None:
-    """SM_T03: amenities-only response produces SIGHTMAP_AMENITIES_ONLY error."""
     responses = [{
         "url": "https://sightmap.com/app/api/v1/abc/sightmaps/456",
         "body": {"data": {"amenities": [{"id": 1, "name": "Pool"}],
@@ -214,8 +207,14 @@ async def test_sm_t03_amenities_only_error() -> None:
 
 @pytest.mark.asyncio
 async def test_sm_t04_no_sightmap_response_error() -> None:
-    """SM_T04: no SightMap-shaped response produces SIGHTMAP_NO_RESPONSE."""
-    responses = [{"url": "https://example.com/api/other", "body": {"foo": "bar"}}]
+    """SM_T04: empty network log produces SIGHTMAP_NO_RESPONSE.
+
+    Updated 2026-04-20: the prior test sent a non-empty response that didn't
+    shape-match. Under the structured-error refactor that path is now
+    SIGHTMAP_SHAPE_REJECTED. To keep this test's *intent* — verifying the
+    NO_RESPONSE branch fires — we now pass an empty api_responses list.
+    """
+    responses: list[dict] = []
     adapter = SightMapAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -225,7 +224,6 @@ async def test_sm_t04_no_sightmap_response_error() -> None:
 
 @pytest.mark.asyncio
 async def test_sm_t05_units_but_empty_fps_parse_failed() -> None:
-    """SM_T05: units[] present but floor_plans[] empty → SIGHTMAP_PARSE_FAILED."""
     responses = [{
         "url": "https://sightmap.com/app/api/v1/x/sightmaps/1",
         "body": {"data": {"units": [{"floor_plan_id": 99, "price": 1500}],
@@ -239,18 +237,15 @@ async def test_sm_t05_units_but_empty_fps_parse_failed() -> None:
 
 
 def test_sm_t06_is_sightmap_response_rejects_non_sightmap_body() -> None:
-    """SM_T06: _is_sightmap_response rejects non-SightMap body."""
     assert _is_sightmap_response({"floorplanName": "1BR", "minimumRent": "1800"}) is False
 
 
 def test_sm_t07_is_sightmap_response_matches_sightmap_id_alone() -> None:
-    """SM_T07: sightmap_id alone in data is sufficient to match."""
     assert _is_sightmap_response({"data": {"sightmap_id": 80671, "other_stuff": []}}) is True
 
 
 @pytest.mark.asyncio
 async def test_sm_t08_unmatched_floor_plan_join_fails() -> None:
-    """SM_T08: unit without matching floor plan → 0 units + SIGHTMAP_PARSE_FAILED."""
     responses = [{
         "url": "https://sightmap.com/app/api/v1/x/sightmaps/9",
         "body": {"data": {
@@ -264,3 +259,64 @@ async def test_sm_t08_unmatched_floor_plan_join_fails() -> None:
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert result.units == []
     assert any(e.startswith("SIGHTMAP_PARSE_FAILED") for e in result.errors)
+
+
+# --- 2026-04-20 fix tests (structured failure tier codes) -------------------
+
+
+@pytest.mark.asyncio
+async def test_sightmap_tier_re_stamped_on_no_response() -> None:
+    """Empty network log → ``TIER_1_API_SIGHTMAP_NO_RESPONSE``."""
+    adapter = SightMapAdapter()
+    ctx = _make_ctx([])
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_API_SIGHTMAP_NO_RESPONSE"
+
+
+def test_sightmap_amenities_only_no_false_positive() -> None:
+    """``data.amenities`` alone must not match (was a false-positive pre-fix)."""
+    body = {"data": {"amenities": [{"id": 1, "name": "Pool"}]}}
+    assert _is_sightmap_response(body) is False
+
+
+def test_sightmap_shape_check_requires_fp_keys() -> None:
+    """A bare ``floor_plans`` array without SightMap-specific keys is rejected."""
+    body = {"data": {"floor_plans": [{"id": 1, "name": "X"}]}}
+    assert _is_sightmap_response(body) is False
+
+
+def test_sightmap_shape_check_accepts_real_fp_envelope() -> None:
+    """``floor_plans`` with SightMap-specific keys (bedroom_count) matches."""
+    body = {"data": {"floor_plans": [{"id": 1, "name": "X", "bedroom_count": 1}]}}
+    assert _is_sightmap_response(body) is True
+
+
+@pytest.mark.asyncio
+async def test_sightmap_tier_re_stamped_on_partial_parse() -> None:
+    """SightMap success with >20% join drops emits SIGHTMAP_PARTIAL_JOIN warning."""
+    body = {"data": {
+        "units": [
+            {"floor_plan_id": 1, "price": 1500, "unit_number": "101", "area": 700},
+            {"floor_plan_id": 999, "price": 1500, "unit_number": "102", "area": 700},
+            {"floor_plan_id": 999, "price": 1500, "unit_number": "103", "area": 700},
+            {"floor_plan_id": 999, "price": 1500, "unit_number": "104", "area": 700},
+            {"floor_plan_id": 999, "price": 1500, "unit_number": "105", "area": 700},
+        ],
+        "floor_plans": [{"id": 1, "name": "1BR", "bedroom_count": 1, "bathroom_count": 1}],
+    }}
+    adapter = SightMapAdapter()
+    ctx = _make_ctx([{"url": "https://sightmap.com/api", "body": body}])
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert len(result.units) == 1
+    assert any(e.startswith("SIGHTMAP_PARTIAL_JOIN") for e in result.errors)
+
+
+def test_sightmap_matches_response_body_protocol() -> None:
+    """``matches_response_body`` is implemented and reuses the predicate."""
+    adapter = SightMapAdapter()
+    assert adapter.matches_response_body(
+        {"data": {"units": [{"id": "1"}], "floor_plans": [
+            {"id": 1, "bedroom_count": 1}
+        ]}}
+    ) is True
+    assert adapter.matches_response_body({"random": "not-sightmap"}) is False
