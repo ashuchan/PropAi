@@ -62,6 +62,39 @@ def compute_fallback_id(record: dict[str, Any]) -> str | None:
     return f"inferred_{digest}"
 
 
+def compute_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | None:
+    """Compute a stable SHA256-based unit_id from v2 unit fields when no natural key exists.
+
+    Uses the v2 field names (beds, baths, area, rent_low, floor_plan_name, available_date).
+    Returns None when fewer than 2 non-empty identifying fields are present — not enough
+    content to produce a meaningful stable hash.
+
+    Prefix 'inferred_' marks the ID as non-natural for downstream consumers.
+    """
+    def _n(v: Any) -> str:
+        if v is None:
+            return ""
+        if v == -1:  # area sentinel
+            return ""
+        return str(v).strip().lower()
+
+    parts = [
+        property_id or "",
+        _n(unit.get("floor_plan_name")),
+        _n(unit.get("beds")),
+        _n(unit.get("baths")),
+        _n(unit.get("area")),
+        _n(unit.get("rent_low")),
+        _n(unit.get("available_date")),
+    ]
+    identifying = parts[1:]  # exclude property_id itself
+    if sum(1 for p in identifying if p) < 2:
+        return None
+    blob = "|".join(parts)
+    digest = hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+    return f"inferred_{digest}"
+
+
 def _normalise_floor_plan(name: str) -> str:
     """Normalise floor plan name for consistent hashing.
 

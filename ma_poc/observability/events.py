@@ -61,6 +61,11 @@ class EventKind(str, Enum):
     PROFILE_UPDATED = "output.profile_updated"
     PROFILE_DRIFT = "output.profile_drift_detected"
 
+    # F2: LLM rescue events
+    LLM_RESCUE_ATTEMPTED = "extract.llm_rescue_attempted"
+    LLM_RESCUE_SUCCEEDED = "extract.llm_rescue_succeeded"
+    LLM_RESCUE_FAILED = "extract.llm_rescue_failed"
+
 
 @dataclass(slots=True, frozen=True)
 class Event:

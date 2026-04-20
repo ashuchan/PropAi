@@ -1,0 +1,9 @@
+{
+  "data": {
+    "property_id": "280734",
+    "floorPlans": [
+      {"id": "fp1", "name": null, "bedrooms": null, "bathrooms": null, "sqft": null, "minRent": null, "maxRent": null},
+      {"id": "fp2", "name": null, "bedrooms": null, "bathrooms": null, "sqft": null, "minRent": null, "maxRent": null}
+    ]
+  }
+}

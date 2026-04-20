@@ -376,6 +376,91 @@ async def scrape(
             return result
         adapter_result = AdapterResult(errors=[str(exc)])
 
+    # --- F2: LLM rescue for Tier-1 API adapters --------------------------------
+    # When the adapter captures API responses but produces no substantive units,
+    # hand the bodies to the LLM rescue service. Adapters never import this module.
+    try:
+        from ma_poc.validation.schema_gate import property_passes_quality_gate
+        from ma_poc.observability.events import EventKind, emit
+
+        profile_stats = getattr(getattr(ctx, "profile", None), "stats", None)
+        consecutive_rescue_failures = getattr(
+            profile_stats, "consecutive_llm_rescue_failures", 0
+        )
+        raw_api_responses = getattr(ctx, "_api_responses", []) or []
+        page_unreachable = any("FAILED_UNREACHABLE" in str(e) for e in adapter_result.errors)
+
+        needs_rescue = (
+            not property_passes_quality_gate(adapter_result.units)
+            and bool(raw_api_responses)
+            and pms_name in {"generic", "entrata", "appfolio"}
+            and consecutive_rescue_failures < 3
+            and not page_unreachable
+        )
+
+        if needs_rescue:
+            from ma_poc.services.llm_api_rescue import RescueInput, rescue_from_api_responses
+
+            emit(
+                EventKind.LLM_RESCUE_ATTEMPTED,
+                ctx.property_id,
+                source_adapter=pms_name,
+                n_candidates=len(raw_api_responses),
+            )
+
+            rescue = await rescue_from_api_responses(RescueInput(
+                property_id=ctx.property_id,
+                property_context={
+                    "name": getattr(ctx, "property_name", ""),
+                    "website": ctx.base_url,
+                    "city": getattr(ctx, "city", ""),
+                    "expected_units": ctx.expected_total_units,
+                },
+                source_adapter=pms_name,
+                api_responses=raw_api_responses,
+                profile_snapshot=(
+                    ctx.profile.model_dump(mode="json")
+                    if ctx.profile is not None else None
+                ),
+            ))
+
+            result["_rescue_cost_usd"] = rescue.cost_usd
+
+            if rescue.units:
+                adapter_result.units = rescue.units
+                adapter_result.tier_used = rescue.tier_used
+                if rescue.winning_url:
+                    adapter_result.winning_url = rescue.winning_url
+                adapter_result.llm_field_mappings = list(
+                    getattr(adapter_result, "llm_field_mappings", [])
+                ) + rescue.llm_field_mappings
+                adapter_result.blocked_endpoints = list(
+                    getattr(adapter_result, "blocked_endpoints", [])
+                ) + [{"url_pattern": u, "reason": r} for u, r in rescue.blocked_endpoints]
+                adapter_result.confidence = max(
+                    getattr(adapter_result, "confidence", 0.0), rescue.confidence
+                )
+                emit(
+                    EventKind.LLM_RESCUE_SUCCEEDED,
+                    ctx.property_id,
+                    tier=rescue.tier_used,
+                    units=len(rescue.units),
+                    cost=rescue.cost_usd,
+                )
+            else:
+                emit(
+                    EventKind.LLM_RESCUE_FAILED,
+                    ctx.property_id,
+                    errors=rescue.errors,
+                    cost=rescue.cost_usd,
+                )
+
+            result["_rescue_attempted"] = True
+            result["_rescue_succeeded"] = bool(rescue.units)
+            result["_rescue_n_llm_calls"] = rescue.n_llm_calls
+    except Exception as _rescue_exc:
+        log.warning("F2 rescue orchestration failed for %s: %s", property_id, _rescue_exc)
+
     # --- Step 8: Fallback to generic if adapter returned empty ---
     if not adapter_result.units and pms_name != "unknown" and adapter_name != "generic":
         generic = get_adapter("unknown")  # resolves to generic

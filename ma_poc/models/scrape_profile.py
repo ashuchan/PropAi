@@ -185,6 +185,8 @@ class ProfileStats(BaseModel):
     last_unit_count: int = 0
     p50_scrape_duration_ms: Optional[int] = None
     p95_scrape_duration_ms: Optional[int] = None
+    # F2: tracks consecutive LLM rescue failures to skip expensive calls on dead endpoints
+    consecutive_llm_rescue_failures: int = 0
 
 
 class ScrapeProfile(BaseModel):

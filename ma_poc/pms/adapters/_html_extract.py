@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -208,6 +209,142 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
             })
 
     return units
+
+
+def parse_jsonld(html: str, source_url: str = "") -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """F5: Strict JSON-LD parser that returns (property_metadata, units).
+
+    Units list is empty UNLESS the JSON-LD contains an ItemList or Offer array
+    of length >= 2, or an ApartmentUnit[] collection, AND the items have at
+    least 2 distinct discriminating fields (numberOfRooms, floorSize, price,
+    name) across the collection.
+
+    A single 'Apartment' schema object where every 'unit' is actually the
+    property itself is treated as property metadata only — units=[] is returned.
+    """
+    property_metadata: dict[str, Any] = {}
+
+    if not html:
+        return property_metadata, []
+
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        soup = BeautifulSoup(html, "html.parser")
+
+    candidate_collections: list[list[dict]] = []
+
+    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        text = script.string or script.get_text()
+        if not text or not text.strip():
+            continue
+        try:
+            data = json.loads(text)
+        except (json.JSONDecodeError, ValueError):
+            continue
+
+        # Extract property metadata (ApartmentComplex / Place nodes)
+        def _extract_meta(node: Any) -> None:
+            if not isinstance(node, dict):
+                return
+            t = node.get("@type", "")
+            if isinstance(t, str) and t in ("ApartmentComplex", "Place", "LocalBusiness"):
+                for k in ("name", "telephone", "url"):
+                    if node.get(k):
+                        property_metadata[k] = node[k]
+                addr = node.get("address")
+                if isinstance(addr, dict):
+                    property_metadata["address"] = addr
+            if isinstance(node.get("@graph"), list):
+                for child in node["@graph"]:
+                    _extract_meta(child)
+
+        _extract_meta(data)
+
+        # Collect ItemList / ApartmentUnit arrays
+        def _find_collections(node: Any) -> None:
+            if not isinstance(node, dict):
+                return
+            t = node.get("@type", "")
+            t_types = [t] if isinstance(t, str) else (t if isinstance(t, list) else [])
+
+            if "ItemList" in t_types:
+                items = node.get("itemListElement") or []
+                if isinstance(items, list) and len(items) >= 2:
+                    candidate_collections.append(items)
+
+            # Direct array of apartment/floorplan nodes
+            for v in node.values():
+                if isinstance(v, list) and len(v) >= 2:
+                    if all(isinstance(i, dict) for i in v):
+                        types_in_list = [i.get("@type", "") for i in v]
+                        apartment_types = {"Apartment", "ApartmentUnit", "FloorPlan", "Product"}
+                        if any(t in apartment_types for t in types_in_list):
+                            candidate_collections.append(v)
+                if isinstance(v, dict):
+                    _find_collections(v)
+            if isinstance(node.get("@graph"), list):
+                for child in node["@graph"]:
+                    _find_collections(child)
+
+        _find_collections(data)
+
+    # Evaluate candidate collections for discriminating distinctness
+    def _field_val(item: dict, field: str) -> str:
+        v = item.get(field)
+        if v is None:
+            return ""
+        if isinstance(v, dict):
+            return str(v.get("value", v.get("price", "")))
+        if isinstance(v, list) and v and isinstance(v[0], dict):
+            p = v[0].get("price", "")
+            return str(p)
+        return str(v)
+
+    _DISCRIMINATING = ("numberOfRooms", "floorSize", "name")
+    _PRICE_KEYS = ("price", "lowPrice", "highPrice")
+
+    def _has_distinct_fields(collection: list[dict]) -> bool:
+        distinct_dimensions = 0
+        for field in _DISCRIMINATING:
+            vals = {_field_val(i, field) for i in collection if _field_val(i, field)}
+            if len(vals) >= 2:
+                distinct_dimensions += 1
+        # Check offers/price distinctness
+        prices: set[str] = set()
+        for item in collection:
+            offers = item.get("offers")
+            if isinstance(offers, dict):
+                for pk in _PRICE_KEYS:
+                    if offers.get(pk):
+                        prices.add(str(offers[pk]))
+            elif isinstance(offers, list):
+                for o in offers:
+                    if isinstance(o, dict):
+                        for pk in _PRICE_KEYS:
+                            if o.get(pk):
+                                prices.add(str(o[pk]))
+        if len(prices) >= 2:
+            distinct_dimensions += 1
+        return distinct_dimensions >= 2
+
+    best_units: list[dict[str, Any]] = []
+    for collection in candidate_collections:
+        if not _has_distinct_fields(collection):
+            continue
+        # Emit units from this collection via existing logic
+        collection_units = extract_jsonld_from_html(
+            # Fake an HTML wrapper so extract_jsonld_from_html can parse the items
+            # Re-emit as JSON-LD for the existing parser to handle
+            "<script type=\"application/ld+json\">"
+            + json.dumps({"@type": "ItemList", "itemListElement": collection})
+            + "</script>",
+            source_url,
+        )
+        if len(collection_units) > len(best_units):
+            best_units = collection_units
+
+    return property_metadata, best_units
 
 
 def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
@@ -461,3 +598,103 @@ def extract_units_from_dom(html: str, source_url: str) -> list[dict[str, Any]]:
             # coherent (all units come from the same container pattern).
             break
     return units
+
+
+# ── F4: available_date extraction ─────────────────────────────────────────────
+
+_AVAIL_DATE_TEXT_RE = re.compile(
+    r"(?:available|move[- ]?in)[\s:]+([A-Za-z]+\s+\d{1,2},?\s*\d{0,4}|\d{1,2}/\d{1,2}/\d{2,4})",
+    re.IGNORECASE,
+)
+_AVAIL_NOW_RE = re.compile(r"available\s+now", re.IGNORECASE)
+_TODAY = None  # Populated lazily to avoid import-time side effects
+
+
+def _today_date() -> date:
+    return date.today()
+
+
+def extract_available_date_from_card(card_html: str) -> str | None:
+    """Extract an available_date from a unit card's HTML subtree.
+
+    Tries the following in order:
+      1. ``[data-available-date]`` / ``[data-move-in]`` attribute
+      2. ``<time datetime=...>`` element
+      3. ``[class*="available"]``, ``[class*="availability"]``, ``[class*="avail-date"]``
+      4. Text regex: ``(available|move-in): <date>``
+
+    Normalizes to ISO YYYY-MM-DD. Skips past dates unless "available now"
+    appears in the card (indicating immediate availability).
+
+    Returns None on any parse failure or ambiguity.
+    """
+    if not card_html:
+        return None
+    try:
+        from dateutil import parser as du_parser  # type: ignore[import]
+    except ImportError:
+        return None
+
+    try:
+        soup = BeautifulSoup(card_html, "lxml")
+    except Exception:
+        try:
+            soup = BeautifulSoup(card_html, "html.parser")
+        except Exception:
+            return None
+
+    available_now = bool(_AVAIL_NOW_RE.search(card_html))
+
+    def _parse_date_str(raw: str) -> str | None:
+        raw = raw.strip()
+        if not raw:
+            return None
+        # Guard against bare numbers that dateutil happily parses as "12th of this month"
+        if re.match(r"^\d{1,2}$", raw):
+            return None
+        try:
+            dt = du_parser.parse(raw, default=None)
+            if dt is None:
+                return None
+            d = dt.date()
+            today = _today_date()
+            if d < today and not available_now:
+                return None
+            return d.isoformat()
+        except Exception:
+            return None
+
+    # 1. data-available-date / data-move-in attribute
+    for attr in ("data-available-date", "data-move-in"):
+        el = soup.find(attrs={attr: True})
+        if el:
+            raw = el.get(attr, "")
+            result = _parse_date_str(str(raw))
+            if result:
+                return result
+
+    # 2. <time> element
+    for time_el in soup.find_all("time"):
+        raw = time_el.get("datetime") or time_el.get_text()
+        result = _parse_date_str(str(raw))
+        if result:
+            return result
+
+    # 3. Class-based selectors
+    for el in soup.find_all(class_=True):
+        classes = " ".join(el.get("class", []))
+        if any(k in classes.lower() for k in ("available", "availability", "avail-date")):
+            raw = el.get_text(" ", strip=True)
+            result = _parse_date_str(raw)
+            if result:
+                return result
+
+    # 4. Regex on full card text
+    text = soup.get_text(" ", strip=True)
+    m = _AVAIL_DATE_TEXT_RE.search(text)
+    if m:
+        result = _parse_date_str(m.group(1))
+        if result:
+            return result
+
+    return None

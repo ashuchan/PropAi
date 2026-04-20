@@ -41,6 +41,7 @@ def compute(
     extract_result: Any = None,
     validated: Any = None,
     carry_forward_applied: bool = False,
+    units_hollow: bool = False,
 ) -> VerdictResult:
     """Compute the verdict for a property scrape.
 
@@ -53,8 +54,9 @@ def compute(
     Returns:
         VerdictResult with verdict, reason, and source.
     """
+    # F7 fix: carry-forward is always checked first, before any other signal.
     if carry_forward_applied:
-        return VerdictResult(Verdict.CARRY_FORWARD, "carry-forward applied", "carry_forward")
+        return VerdictResult(Verdict.CARRY_FORWARD, "carry_forward_applied", "carry_forward")
 
     if fetch_outcome and fetch_outcome not in ("OK", "NOT_MODIFIED"):
         return VerdictResult(
@@ -79,5 +81,9 @@ def compute(
         accepted_count = len(getattr(validated, "accepted", []))
         if rejected_count > accepted_count and (rejected_count + accepted_count) > 0:
             return VerdictResult(Verdict.PARTIAL, "majority rejected by validation", "validate")
+
+    # F1: if units were extracted but all are hollow and no rescue tier helped
+    if units_hollow:
+        return VerdictResult(Verdict.FAILED_NO_DATA, "units_hollow_all_tiers", "validate")
 
     return VerdictResult(Verdict.SUCCESS, "all checks passed", "extract")

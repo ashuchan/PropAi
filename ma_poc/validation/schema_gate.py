@@ -19,6 +19,46 @@ log = logging.getLogger(__name__)
 _MAX_RENT = 50_000
 _MAX_SQFT = 20_000
 
+# F1: substantive-field quality gate — v2 canonical names and v1 legacy aliases.
+SUBSTANTIVE_FIELDS: tuple[str, ...] = ("beds", "rent_low", "floor_plan_name", "area")
+_LEGACY_SUBSTANTIVE_FIELDS: tuple[str, ...] = (
+    "bedrooms", "asking_rent", "market_rent_low", "sqft", "floor_plan_type",
+)
+
+
+def _is_present(value: Any) -> bool:
+    """Return True when a field carries a real value (not None, empty, or -1 sentinel)."""
+    if value is None:
+        return False
+    if value == -1:  # area sentinel used when sqft is absent
+        return False
+    if isinstance(value, str) and not value.strip():
+        return False
+    return True
+
+
+def is_substantive(unit: dict[str, Any]) -> bool:
+    """Return True when at least one identifying/pricing field is present.
+
+    Checks both v2 canonical names and v1 legacy aliases so that records
+    from either schema generation pass the quality gate correctly.
+    """
+    all_keys = SUBSTANTIVE_FIELDS + _LEGACY_SUBSTANTIVE_FIELDS
+    return any(_is_present(unit.get(k)) for k in all_keys)
+
+
+def property_passes_quality_gate(units: list[dict[str, Any]], threshold: float = 0.5) -> bool:
+    """Return True when >=threshold fraction of units are substantive.
+
+    An empty list always fails — a property with no units has nothing to
+    evaluate. A 50 % default allows a few legitimately sparse units alongside
+    full records without triggering a false alarm.
+    """
+    if not units:
+        return False
+    good = sum(1 for u in units if is_substantive(u))
+    return (good / len(units)) >= threshold
+
 
 @dataclass(frozen=True)
 class SchemaGateResult:
