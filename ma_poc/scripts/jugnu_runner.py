@@ -226,12 +226,19 @@ async def run_jugnu(
             log.error("Task returned exception: %s", r)
             continue
         properties.append(r)
-    _write_properties_incremental(run_dir / "properties.json", properties)
+
+    # Merge with any properties.json already in run_dir so partial / resumed
+    # runs (e.g. --start-index 100 after a prior --start-index 0 --limit 100)
+    # don't clobber the earlier batch. Reports run off the merged list so the
+    # totals reflect everything in the run dir, not just this invocation.
+    properties_path = run_dir / "properties.json"
+    merged_properties = _merge_with_existing_properties(properties_path, properties)
+    _write_properties_incremental(properties_path, merged_properties)
 
     # Run-level reporting
     cost_rollup = cost_ledger.total()
-    slo_violations = slo_check(cost_rollup, properties)
-    report = build_run_report(properties, run_dir, today, cost_rollup, slo_violations)
+    slo_violations = slo_check(cost_rollup, merged_properties)
+    report = build_run_report(merged_properties, run_dir, today, cost_rollup, slo_violations)
 
     # Cleanup
     cost_ledger.close()
@@ -239,8 +246,10 @@ async def run_jugnu(
     cond_cache.close()
     events.shutdown()
 
-    log.info("Jugnu run complete: %d properties, %d failed",
-             len(properties), report["totals"]["failed"])
+    log.info(
+        "Jugnu run complete: this batch=%d, run-dir total=%d, failed=%d",
+        len(properties), len(merged_properties), report["totals"]["failed"],
+    )
     return report
 
 
@@ -1109,12 +1118,82 @@ def _load_csv(
     return rows
 
 
+def _merge_with_existing_properties(
+    path: Path,
+    new_properties: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Merge ``new_properties`` on top of any existing ``properties.json``.
+
+    Keys on ``_meta.canonical_id``. New entries replace existing ones with
+    the same canonical id; entries not touched by this run are preserved.
+    This is what makes ``--start-index`` (and crash-resumes) additive
+    instead of clobbering prior batches in the same run directory.
+
+    Returns the merged list. Returns ``new_properties`` unchanged if the
+    existing file is missing, empty, or malformed — never raises.
+    """
+    existing: list[dict[str, Any]] = []
+    if path.exists():
+        try:
+            raw = path.read_text(encoding="utf-8")
+            if raw.strip():
+                loaded = json.loads(raw)
+                if isinstance(loaded, list):
+                    existing = [r for r in loaded if isinstance(r, dict)]
+        except (OSError, json.JSONDecodeError) as exc:
+            log.warning(
+                "Existing %s unreadable (%s) — overwriting with new batch only",
+                path, exc,
+            )
+            return list(new_properties)
+
+    if not existing:
+        return list(new_properties)
+
+    def _cid(rec: dict[str, Any]) -> str | None:
+        meta = rec.get("_meta") or {}
+        cid = meta.get("canonical_id")
+        return str(cid) if cid else None
+
+    new_by_cid: dict[str, dict[str, Any]] = {}
+    new_without_cid: list[dict[str, Any]] = []
+    for rec in new_properties:
+        cid = _cid(rec)
+        if cid:
+            new_by_cid[cid] = rec
+        else:
+            new_without_cid.append(rec)
+
+    merged: list[dict[str, Any]] = []
+    seen_cids: set[str] = set()
+    for rec in existing:
+        cid = _cid(rec)
+        if cid and cid in new_by_cid:
+            merged.append(new_by_cid[cid])
+            seen_cids.add(cid)
+        else:
+            merged.append(rec)
+
+    for cid, rec in new_by_cid.items():
+        if cid not in seen_cids:
+            merged.append(rec)
+
+    merged.extend(new_without_cid)
+
+    log.info(
+        "properties.json merge: existing=%d, new=%d, replaced=%d, total=%d",
+        len(existing), len(new_properties), len(seen_cids), len(merged),
+    )
+    return merged
+
+
 def _write_properties_incremental(path: Path, properties: list[dict[str, Any]]) -> None:
-    """Write properties JSON incrementally.
+    """Write properties JSON.
 
     Args:
         path: Output file path.
-        properties: All properties so far.
+        properties: Properties to write (already merged with prior contents
+            by the caller — this writer is a plain overwrite).
     """
     try:
         path.write_text(
