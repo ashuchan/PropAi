@@ -46,6 +46,8 @@ PmsName = Literal[
     "sightmap",
     "realpage_oll",
     "avalonbay",
+    "funnel",
+    "touchtour",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -69,6 +71,8 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "sightmap": "api_first",
     "realpage_oll": "portal_hop",
     "avalonbay": "api_first",
+    "funnel": "api_first",
+    "touchtour": "cascade",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -83,6 +87,14 @@ MGMT_TO_PMS_PRIOR: dict[str, PmsName] = {
     "mark taylor": "entrata",              # Same, alt spelling
     "lindsey management": "rentcafe",      # Handoff: Lindsey is Yardi/RentCafe
     "avalonbay communities": "avalonbay",  # Direct — AvalonBay properties use the REIT's custom stack
+    # 2026-04-20: live-fetch of windsorcommunities.com showed Apply buttons
+    # pointing at nestiolistings.com/api/v2/onlineleasing-link — Windsor runs
+    # on Funnel (Nestio), not RentCafe, despite mgmt priors suggesting Yardi.
+    "windsor communities": "funnel",
+    "windsor property management": "funnel",
+    # Ovation Property Management operates the 3 Vegas properties (Summer
+    # Winds / Madera / Positano) on *.mytouchtour.com — DOM-only TouchTour.
+    "ovation property management": "touchtour",
 }
 
 # Host-suffix patterns that are definitive. First match wins.
@@ -97,6 +109,16 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
     # portal.realpage.com, api.ws.realpage.com. Lower confidence because the
     # RealPage domain covers multiple products.
     (re.compile(r"(?:^|\.)realpage\.com$"), "realpage_oll", 0.80, "host ends in realpage.com (non-OneSite RealPage product)"),
+    # Funnel / Nestio — the listings API always serves from nestiolistings.com
+    # regardless of customer marketing domain.
+    (re.compile(r"(?:^|\.)nestiolistings\.com$"), "funnel", 0.95, "host ends in nestiolistings.com (Funnel/Nestio listings API)"),
+    # TouchTour / Ovation — proprietary multifamily platform. Customer
+    # domains look like ``<market>.mytouchtour.com`` or ``liveovation.com``
+    # (the Ovation parent portfolio site). liveovation.com is lower-confidence
+    # because it's the parent brand portal, which may link out to multiple
+    # PMSes depending on the property.
+    (re.compile(r"(?:^|\.)mytouchtour\.com$"), "touchtour", 0.95, "host ends in mytouchtour.com (TouchTour platform)"),
+    (re.compile(r"(?:^|\.)liveovation\.com$"), "touchtour", 0.85, "host ends in liveovation.com (Ovation parent portfolio)"),
 ]
 
 _ONESITE_CLIENT_ID_RE = re.compile(r"^(?P<id>\d{3,9})\.onlineleasing\.realpage\.com$")
@@ -248,6 +270,16 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         return "sightmap", 0.80, ["SightMap iframe/script marker in HTML"]
     if ".appfolio.com" in h:
         return "appfolio", 0.80, ["AppFolio marker in HTML"]
+    # Funnel / Nestio — script hosts, JS globals, data- attributes. Observed
+    # on windsorcommunities.com property subpages (04-20 live fetch).
+    if ("nestiolistings.com" in h
+            or "nestio_" in h
+            or "data-nestio-" in h):
+        return "funnel", 0.90, ["Funnel/Nestio marker in HTML (nestiolistings.com / NESTIO_* / data-nestio-*)"]
+    # TouchTour / Ovation — marketing subdomains under mytouchtour.com, or
+    # the liveovation.com parent portfolio.
+    if "mytouchtour.com" in h or "liveovation.com" in h:
+        return "touchtour", 0.85, ["TouchTour/Ovation marker in HTML (mytouchtour.com / liveovation.com)"]
     return None
 
 
@@ -284,6 +316,8 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "squarespace":        ("squarespace.com",),
     "realpage":           ("api.ws.realpage.com", "realpage.com"),
     "avalonbay":          ("avaloncommunities.com",),
+    "funnel":             ("nestiolistings.com", "nestio_", "data-nestio-"),
+    "touchtour":          ("mytouchtour.com", "liveovation.com"),
     # Marketing / lead-capture stacks — observed in 10-property roll-up
     # (doorway.knck.io, cdn-media.hy.ly, chat.hyly.ai, marketapts.com).
     "marketing_knock":    ("doorway.knck.io", "knockrentals.com"),
@@ -378,6 +412,65 @@ def collect_detector_signals(
         "csv_mgmt_company": mgmt_raw,
         "csv_mgmt_prior_matched": mgmt_prior_matched,
     }
+
+
+def confirm_detection(
+    initial: DetectedPMS,
+    api_responses: list[dict[str, t.Any]] | None,
+) -> DetectedPMS:
+    """After page load, verify the URL-based detection against captured bodies.
+
+    If no captured response matches the detected PMS's body shape, demote to
+    ``pms="unknown"`` so the generic cascade (with LLM/Vision allowed) runs
+    rather than stamping a misleading ``TIER_1_API_<PMS>`` label on a
+    mismatched property. This is the counter to Windsor/Mark-Taylor/Vegas
+    misrouting observed in the 2026-04-20 run: the URL said ``RentCafe`` but
+    the captured body shape was ``Funnel``.
+
+    Adapter opt-in is by defining ``matches_response_body(body) -> bool``.
+    Adapters that don't implement the method (DOM-only parsers like
+    TouchTour) are treated as opt-out: the URL detection stays intact.
+    """
+    # "unknown" is already the fallthrough — nothing to demote to.
+    if initial.pms == "unknown":
+        return initial
+
+    # Local import to avoid a circular adapters→detector→registry dep at import time.
+    try:
+        from ma_poc.pms.adapters.registry import get_adapter
+    except Exception:
+        return initial
+
+    try:
+        adapter = get_adapter(initial.pms)
+    except Exception:
+        return initial
+
+    checker = getattr(adapter, "matches_response_body", None)
+    if checker is None or not callable(checker):
+        # Adapter didn't opt in — preserve URL-based detection.
+        return initial
+
+    responses = api_responses or []
+    for resp in responses:
+        body = resp.get("body") if isinstance(resp, dict) else None
+        try:
+            if checker(body):
+                return initial
+        except Exception:
+            # A misbehaving checker must not demote or crash the pipeline.
+            continue
+
+    # No captured body matched the detected PMS — demote to "unknown".
+    return DetectedPMS(
+        pms="unknown",
+        confidence=0.0,
+        evidence=list(initial.evidence) + [
+            f"demoted_from_{initial.pms}:no_matching_body_in_{len(responses)}_captures"
+        ],
+        pms_client_account_id=None,
+        recommended_strategy=_STRATEGY_BY_PMS["unknown"],
+    )
 
 
 def detect_pms(

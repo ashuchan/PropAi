@@ -217,4 +217,5 @@ ma_poc/services/node_modules/
 config/*
 data/*
 ma_poc/tests/pms/adapters/fixtures/*/*.json
+!ma_poc/tests/pms/adapters/fixtures/*/synthetic_*.json
 ma_poc/frontend/api/package-lock.json

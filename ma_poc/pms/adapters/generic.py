@@ -712,6 +712,30 @@ class GenericAdapter:
             result.confidence = 0.0
             return result
 
+        # Change 5: LLM escalation gate. The 04-20 run spent ~$0.94 across 13
+        # TIER_1_API properties where the captured body had nothing for the
+        # LLM to rescue. Gate *before* we burn any tokens. Gate failure must
+        # never crash extraction — wrap in try/except so a buggy gate falls
+        # back to the legacy behaviour (run the LLM).
+        try:
+            from ma_poc.services.llm_gate import should_escalate_to_llm
+
+            tier1_proxy = {"api_responses": api_responses}
+            decision = should_escalate_to_llm(
+                html=html,
+                tier1_result=tier1_proxy,
+                tier2_units=None,
+                tier3_units=None,
+            )
+            if not decision.escalate:
+                _log_attempt("generic:llm", "skipped", reason=decision.reason)
+                result.tier_used = decision.reason.split(":")[0]
+                result.errors.append(decision.reason)
+                result.confidence = 0.0
+                return result
+        except Exception as exc:
+            _log_attempt("generic:llm_gate", "errored", reason=str(exc)[:200])
+
         # Phase 2: shared property context for every LLM call below.
         property_context = {
             "property_name": getattr(ctx, "property_name", "") or "",
