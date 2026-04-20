@@ -162,11 +162,54 @@ def _is_rentcafe_response(body: Any) -> bool:
     if not isinstance(first, dict):
         return False
     first_lc = _normalise_item(first)
-    if first_lc.get("api") == "rentcafe":
+    # 2026-04-20 fix: PascalCase Windsor payloads ship ``"Api": "RentCafe"``.
+    # _normalise_item lowercases the *keys* but not the *values*, so the prior
+    # equality check only matched lowercase "rentcafe". Lowercase the value too.
+    if str(first_lc.get("api") or "").lower() == "rentcafe":
         return True
     rentcafe_keys = {"floorplanname", "floorplanid", "minimumrent", "maximumrent",
                      "availableunitscount", "availabilityurl"}
     return len(rentcafe_keys & set(first_lc.keys())) >= 3
+
+
+# 2026-04-20 fix: structured tier codes for failure-mode classification.
+# Pre-fix, every RentCafe failure stamped ``TIER_1_API_RENTCAFE`` regardless of
+# whether the adapter saw zero responses, saw responses that didn't shape-match,
+# or shape-matched but parsed to zero units. The 04-20 report had 38 RentCafe
+# failures collapsed into a single bucket so downstream triage could not tell
+# misrouting (Windsor sites that aren't actually RentCafe) from genuine empty
+# inventory. Sub-codes split that bucket into machine-readable verdicts.
+_TIER_BASE = "TIER_1_API_RENTCAFE"
+_TIER_NO_RESPONSE = f"{_TIER_BASE}_NO_RESPONSE"
+_TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
+_TIER_LIST_EMPTY = f"{_TIER_BASE}_LIST_EMPTY"
+_TIER_PARSE_ZERO = f"{_TIER_BASE}_PARSE_ZERO"
+
+
+def _classify_rentcafe_failure(api_responses: list[dict[str, Any]]) -> tuple[str, str]:
+    """Return (tier_code, machine-readable error message) for a failed run."""
+    if not api_responses:
+        return (_TIER_NO_RESPONSE,
+                "RENTCAFE_NO_RESPONSE: no network responses captured during page load")
+    shape_matches = [
+        r for r in api_responses if _is_rentcafe_response(r.get("body"))
+    ]
+    if not shape_matches:
+        return (_TIER_SHAPE_REJECTED,
+                f"RENTCAFE_SHAPE_REJECTED: {len(api_responses)} responses captured, "
+                "none matched RentCafe envelope/key signature")
+    total_items = 0
+    for r in shape_matches:
+        items = _unwrap_rentcafe_list(r.get("body")) or []
+        total_items += len(items)
+    if total_items == 0:
+        return (_TIER_LIST_EMPTY,
+                f"RENTCAFE_LIST_EMPTY: {len(shape_matches)} shape-matched responses, "
+                "floorplan list was empty in all")
+    return (_TIER_PARSE_ZERO,
+            f"RENTCAFE_PARSE_ZERO: {total_items} floorplan items present across "
+            f"{len(shape_matches)} responses, but parser emitted zero units "
+            "(field-name mismatch likely)")
 
 
 class RentCafeAdapter:
@@ -177,7 +220,7 @@ class RentCafeAdapter:
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units from RentCafe API responses captured during page load."""
-        result = AdapterResult(tier_used="TIER_1_API_RENTCAFE")
+        result = AdapterResult(tier_used=_TIER_BASE)
         all_units: list[dict[str, str]] = []
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
@@ -196,13 +239,29 @@ class RentCafeAdapter:
 
         if all_units:
             result.units = all_units
-            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
+            result.winning_url = (
+                result.api_responses[0].get("url") if result.api_responses else None
+            )
             result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
-        else:
-            result.confidence = 0.0
-            result.errors.append("No RentCafe floorplan data found in captured API responses")
+            result.tier_used = _TIER_BASE
+            return result
 
+        # Failure path: re-stamp tier_used with a structured sub-code so the
+        # downstream report can distinguish misrouting from genuine zero data.
+        tier_code, err_msg = _classify_rentcafe_failure(api_responses)
+        result.tier_used = tier_code
+        result.confidence = 0.0
+        result.errors.append(err_msg)
         return result
 
     def static_fingerprints(self) -> list[str]:
         return list(self._fingerprints)
+
+    def matches_response_body(self, body: Any) -> bool:
+        """Body-shape check used by ``detector.confirm_detection``.
+
+        Returns True if *body* plausibly belongs to RentCafe. Reuses the same
+        ``_is_rentcafe_response`` predicate the extractor uses internally so
+        the router and the parser agree on what "RentCafe-shaped" means.
+        """
+        return _is_rentcafe_response(body)

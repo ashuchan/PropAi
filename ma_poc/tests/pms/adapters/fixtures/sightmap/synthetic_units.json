@@ -1,0 +1,91 @@
+[
+  {
+    "url": "https://sightmap.com/app/api/v1/syn/sightmaps/9999",
+    "body": {
+      "data": {
+        "sightmap_id": 9999,
+        "floor_plans": [
+          {
+            "id": 1,
+            "name": "A1",
+            "filter_label": "1BR",
+            "bedroom_count": 1,
+            "bathroom_count": 1
+          },
+          {
+            "id": 2,
+            "name": "B2",
+            "filter_label": "2BR",
+            "bedroom_count": 2,
+            "bathroom_count": 2
+          },
+          {
+            "id": 3,
+            "name": "S1",
+            "filter_label": "Studio",
+            "bedroom_count": 0,
+            "bathroom_count": 1
+          }
+        ],
+        "units": [
+          {
+            "id": "u101",
+            "floor_plan_id": 1,
+            "unit_number": "101",
+            "label": "101",
+            "price": 1500,
+            "display_price": "$1,500",
+            "area": 720,
+            "display_area": "720 sqft",
+            "floor_id": 1,
+            "building": "A",
+            "available_on": "2026-05-01",
+            "display_available_on": "May 1, 2026"
+          },
+          {
+            "id": "u202",
+            "floor_plan_id": 2,
+            "unit_number": "202",
+            "label": "202",
+            "price": 2200,
+            "display_price": "$2,200",
+            "area": 1100,
+            "display_area": "1,100 sqft",
+            "floor_id": 2,
+            "building": "A",
+            "available_on": "2026-06-01",
+            "display_available_on": "June 1, 2026"
+          },
+          {
+            "id": "u301",
+            "floor_plan_id": 3,
+            "unit_number": "301",
+            "label": "301",
+            "price": 1200,
+            "display_price": "$1,200",
+            "area": 480,
+            "display_area": "480 sqft",
+            "floor_id": 3,
+            "building": "B",
+            "available_on": "2026-05-15",
+            "display_available_on": "May 15, 2026"
+          },
+          {
+            "id": "u402",
+            "floor_plan_id": 2,
+            "unit_number": "402",
+            "label": "402",
+            "price": 2400,
+            "display_price": "$2,400",
+            "area": 1100,
+            "display_area": "1,100 sqft",
+            "floor_id": 4,
+            "building": "B",
+            "available_on": "2026-07-01",
+            "display_available_on": "July 1, 2026"
+          }
+        ]
+      }
+    }
+  }
+]
