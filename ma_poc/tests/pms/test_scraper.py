@@ -131,6 +131,16 @@ async def test_orchestrator_falls_through_to_generic_when_adapter_empty() -> Non
         patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("rentcafe")),
         patch("ma_poc.pms.scraper.resolve_target", return_value=_make_resolved(pms="rentcafe")),
         patch("ma_poc.pms.scraper.get_adapter", side_effect=_get_adapter),
+        # Change 2 introduces confirm_detection between adapter selection
+        # and adapter.extract(); with no api_responses in this test the
+        # router would demote rentcafe→unknown, which would rewrite the
+        # fallback chain the test asserts on. Patch the call to a
+        # passthrough so the test exercises the *adapter-empty → generic*
+        # fallback path it was written for.
+        patch(
+            "ma_poc.pms.scraper.confirm_detection",
+            side_effect=lambda det, _responses: det,
+        ),
     ):
         result = await scrape("https://example.com/", page=page)
 

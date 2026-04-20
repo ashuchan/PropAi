@@ -21,7 +21,12 @@ from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.adapters.registry import get_adapter
-from ma_poc.pms.detector import DetectedPMS, collect_detector_signals, detect_pms
+from ma_poc.pms.detector import (
+    DetectedPMS,
+    collect_detector_signals,
+    confirm_detection,
+    detect_pms,
+)
 from ma_poc.pms.resolver import ResolvedTarget, resolve_target
 
 if TYPE_CHECKING:
@@ -329,6 +334,37 @@ async def scrape(
                 "content_type": entry.get("content_type"),
             })
         ctx._api_responses = prepared  # type: ignore[attr-defined]
+
+    # --- Step 6b: Router invariant (Change 2) ------------------------------
+    # Before we hand control to the detected PMS adapter, ask the detector
+    # whether any captured response body actually matches that PMS's
+    # envelope. If none do, demote the detection to ``unknown`` and
+    # re-select the generic adapter — which runs the full cascade and
+    # (per Change 5) the LLM gate. This is the router's guard against
+    # URL-based false positives (Windsor sites routed to RentCafe, Vegas
+    # sites routed to SightMap) that Change 1's sub-tier codes made
+    # diagnosable but didn't fix.
+    responses_for_confirm = getattr(ctx, "_api_responses", []) or []
+    confirmed_detection = confirm_detection(detection, responses_for_confirm)
+    detection_confirmed = confirmed_detection.pms == detection.pms
+    result["_detection_confirmed"] = {
+        "confirmed": detection_confirmed,
+        "initial_pms": detection.pms,
+        "final_pms": confirmed_detection.pms,
+        "evidence": list(confirmed_detection.evidence),
+        "response_count": len(responses_for_confirm),
+    }
+    if not detection_confirmed:
+        detection = confirmed_detection
+        ctx.detected = detection
+        pms_name = detection.pms
+        adapter = get_adapter(pms_name)
+        adapter_name = getattr(adapter, "pms_name", "unknown")
+        # Overwrite the reported adapter_used and append to the fallback chain
+        # so the report shows that the router stepped in.
+        result["_adapter_used"] = adapter_name
+        fallback_chain.append(adapter_name)
+        result["_detected_pms"] = _detection_to_dict(detection)
 
     adapter_result: AdapterResult
     try:

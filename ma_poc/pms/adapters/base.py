@@ -53,3 +53,19 @@ class PmsAdapter(Protocol):
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult: ...
 
     def static_fingerprints(self) -> list[str]: ...
+
+    # Optional — intentionally NOT in the Protocol body so that `runtime_checkable`
+    # isinstance() checks remain backward-compatible with adapters that predate
+    # Change 2. Adapters that opt in implement the following signature:
+    #
+    #     def matches_response_body(self, body: Any) -> bool:
+    #         """Cheap body-shape check used by detector.confirm_detection to
+    #         demote a URL-based detection when no captured network body
+    #         matches the adapter's expected envelope.
+    #
+    #         Adapters that omit this method are treated as "no body-shape
+    #         check available"; confirm_detection keeps the URL detection
+    #         intact for them (this is the correct behaviour for DOM-only
+    #         adapters like TouchTour where inventory is server-rendered
+    #         rather than fetched via XHR)."""
+    #         ...

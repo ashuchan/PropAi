@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import typing as t
 
+import ma_poc.pms.adapters  # noqa: F401  # register adapters for confirm_detection
 from ma_poc.pms.detector import (
     _STRATEGY_BY_PMS,
     MGMT_TO_PMS_PRIOR,
     DetectedPMS,
+    confirm_detection,
     detect_pms,
 )
 
@@ -216,3 +218,121 @@ def test_no_rentcafe_false_positive_on_squarespace_with_cdn_asset() -> None:
     )
     r = detect_pms("https://vanity.example/", page_html=html)
     assert r.pms == "squarespace_nopms"
+
+
+# ---------------------------------------------------------------------------
+# Change 2 — confirm_detection (router invariant)
+# ---------------------------------------------------------------------------
+
+
+def _rentcafe_initial() -> DetectedPMS:
+    return DetectedPMS(
+        pms="rentcafe",
+        confidence=0.95,
+        evidence=["host ends in rentcafe.com (test.rentcafe.com)"],
+        recommended_strategy="jsonld_first",
+    )
+
+
+def _rentcafe_body() -> dict[str, object]:
+    # Minimal body shape _is_rentcafe_response accepts (3+ known keys).
+    return {
+        "data": [
+            {
+                "floorplanName": "A1",
+                "floorplanId": "1",
+                "minimumRent": "1500",
+                "maximumRent": "1600",
+            }
+        ]
+    }
+
+
+def _funnel_body() -> dict[str, object]:
+    return {
+        "results": [
+            {"listingId": "abc", "marketRent": 1850, "unit": "101"}
+        ]
+    }
+
+
+def test_confirm_detection_keeps_when_body_matches() -> None:
+    initial = _rentcafe_initial()
+    responses = [{"url": "https://x/api", "body": _rentcafe_body()}]
+    result = confirm_detection(initial, responses)
+    assert result.pms == "rentcafe"
+    assert result.confidence == initial.confidence
+
+
+def test_confirm_detection_demotes_when_no_body_matches() -> None:
+    initial = _rentcafe_initial()
+    responses = [{"url": "https://nestiolistings.com/x", "body": _funnel_body()}]
+    result = confirm_detection(initial, responses)
+    assert result.pms == "unknown"
+    assert any("demoted_from_rentcafe" in e for e in result.evidence)
+    assert result.recommended_strategy == "cascade"
+
+
+def test_confirm_detection_demotes_when_no_responses() -> None:
+    initial = _rentcafe_initial()
+    result = confirm_detection(initial, [])
+    assert result.pms == "unknown"
+    assert any("demoted_from_rentcafe" in e for e in result.evidence)
+
+
+def test_confirm_detection_leaves_unknown_alone() -> None:
+    initial = DetectedPMS(
+        pms="unknown", confidence=0.0, evidence=["no signal"],
+        recommended_strategy="cascade",
+    )
+    result = confirm_detection(initial, [{"url": "x", "body": _rentcafe_body()}])
+    assert result is initial or result.pms == "unknown"
+
+
+def test_detect_funnel_from_mgmt_windsor_communities() -> None:
+    r = detect_pms(
+        "https://windsorcommunities.com/properties/windsor-sugarloaf/",
+        csv_row={"Management Company": "Windsor Communities"},
+    )
+    assert r.pms == "funnel"
+    assert r.confidence >= 0.70
+
+
+def test_detect_funnel_from_html_nestio_script() -> None:
+    html = (
+        '<html><head>'
+        '<script src="https://nestiolistings.com/static/bundle.js"></script>'
+        '</head></html>'
+    )
+    r = detect_pms("https://windsorcommunities.com/x/", page_html=html)
+    assert r.pms == "funnel"
+    assert r.confidence >= 0.85
+
+
+def test_detect_rentcafe_no_longer_matches_windsor() -> None:
+    # Windsor CSV + vanity host must NOT land on rentcafe — Change 3 priors
+    # point "windsor communities" at funnel instead.
+    r = detect_pms(
+        "https://windsorcommunities.com/properties/x/",
+        csv_row={"Management Company": "Windsor Communities"},
+    )
+    assert r.pms != "rentcafe"
+
+
+def test_detect_funnel_from_nestio_host() -> None:
+    r = detect_pms(
+        "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x"
+    )
+    assert r.pms == "funnel"
+    assert r.confidence >= 0.95
+
+
+def test_confirm_detection_handles_adapter_without_body_check() -> None:
+    # The Entrata adapter (pre-Change 2) has no matches_response_body method;
+    # confirm_detection must leave the URL-based detection alone.
+    initial = DetectedPMS(
+        pms="entrata", confidence=0.95, evidence=["entrata-host"],
+        recommended_strategy="api_first",
+    )
+    result = confirm_detection(initial, [{"url": "x", "body": {"noise": 1}}])
+    assert result.pms == "entrata"
