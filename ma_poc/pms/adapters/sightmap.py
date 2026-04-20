@@ -30,14 +30,11 @@ Key findings:
       SightMap-shaped JSON is matched.
     - 2026-04-19: added three-way error differentiation: SIGHTMAP_NO_RESPONSE
       vs SIGHTMAP_AMENITIES_ONLY vs SIGHTMAP_PARSE_FAILED.
-    - 2026-04-19 research note: data/runs/2026-04-17/raw_api/268836.json
-      contains a unit-bearing SightMap payload (sightmap.com/app/api/v1/
-      rxwjj7ldw1e/sightmaps/80671). Observed field names confirm the current
-      parser: units[].{floor_plan_id, price, display_price, unit_number, label,
-      area, display_area, floor_id, building, available_on, display_available_on,
-      specials_description}; floor_plans[].{id, name, filter_label,
-      bedroom_count, bathroom_count}. No payload starting with 24928/24929/
-      liveotis/ovationco/sightmap was present in raw_api as of 2026-04-19.
+    - 2026-04-20 fix: structured failure tier codes (NO_RESPONSE /
+      SHAPE_REJECTED / AMENITIES_ONLY / PARSE_FAILED) plus SIGHTMAP_PARTIAL_JOIN
+      warning when >20% of units cannot be joined to a floor plan. Tightened
+      _is_sightmap_response so a bare ``data.amenities`` array no longer
+      false-matches as SightMap.
 """
 from __future__ import annotations
 
@@ -54,23 +51,50 @@ if TYPE_CHECKING:
     from playwright.async_api import Page
 
 
-def parse_sightmap_payload(body: Any, url: str) -> list[dict[str, str]]:
+# 2026-04-20: structured tier codes mirror the RentCafe pattern. Each
+# failure mode gets its own tier label so reporting can split misrouted
+# properties (e.g. Vegas TouchTour sites that aren't actually SightMap) from
+# genuine empty inventory or genuine field-name drift.
+_TIER_BASE = "TIER_1_API_SIGHTMAP"
+_TIER_NO_RESPONSE = f"{_TIER_BASE}_NO_RESPONSE"
+_TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
+_TIER_AMENITIES_ONLY = f"{_TIER_BASE}_AMENITIES_ONLY"
+_TIER_PARSE_FAILED = f"{_TIER_BASE}_PARSE_FAILED"
+
+# Threshold above which a partial parse triggers a SIGHTMAP_PARTIAL_JOIN
+# warning even on a successful extract. 20% chosen because at ~64.9% missing-
+# rent rate observed on TIER_1_API scrapes (04-20 report), even a 20% silent
+# loss is enough to make the upstream signal wrong.
+_PARTIAL_JOIN_FRACTION = 0.2
+
+
+def parse_sightmap_payload(
+    body: Any, url: str
+) -> tuple[list[dict[str, str]], int]:
     """SightMap dedicated parser.
 
     Joins data.units[] to data.floor_plans[] by floor_plan_id so each unit
     gets name/beds/baths from its floor plan plus price/sqft/availability.
 
+    Returns a (units, dropped_count) tuple. ``dropped_count`` is the number of
+    raw units that could not be joined to a floor plan and were silently
+    skipped — the caller raises ``SIGHTMAP_PARTIAL_JOIN`` when this exceeds
+    20% of the input. Surfacing this prevents the 04-20 failure mode where
+    "successful" SightMap scrapes silently lost the majority of inventory due
+    to a floor_plan_id key drift on the SightMap side.
+
     Ported from scripts/entrata.py:433.
     """
     units_out: list[dict[str, str]] = []
+    dropped = 0
     data = body.get("data") if isinstance(body, dict) else None
     if not isinstance(data, dict):
-        return units_out
+        return units_out, dropped
 
     raw_units = data.get("units") or []
     raw_fps = data.get("floor_plans") or []
     if not isinstance(raw_units, list) or not raw_units:
-        return units_out
+        return units_out, dropped
 
     fp_by_id: dict[str, dict[str, Any]] = {}
     for fp in raw_fps if isinstance(raw_fps, list) else []:
@@ -83,8 +107,10 @@ def parse_sightmap_payload(body: Any, url: str) -> list[dict[str, str]]:
         fp_id = str(u.get("floor_plan_id") or "")
         if fp_id not in fp_by_id:
             # Unit cannot be joined to a floor plan — skip. The extract()
-            # caller surfaces this as SIGHTMAP_PARSE_FAILED so field-name
+            # caller surfaces this as SIGHTMAP_PARSE_FAILED (or the partial-
+            # join warning when only a fraction is dropped) so field-name
             # drift is diagnosable rather than silently emitting stub records.
+            dropped += 1
             continue
         fp = fp_by_id[fp_id]
 
@@ -120,9 +146,9 @@ def parse_sightmap_payload(body: Any, url: str) -> list[dict[str, str]]:
             available_units="1",
             availability_date=str(u.get("available_on") or u.get("display_available_on") or ""),
             source_api_url=url,
-            extraction_tier="TIER_1_API_SIGHTMAP",
+            extraction_tier=_TIER_BASE,
         ))
-    return units_out
+    return units_out, dropped
 
 
 def _is_sightmap_response(body: Any) -> bool:
@@ -133,17 +159,30 @@ def _is_sightmap_response(body: Any) -> bool:
     CDN domain are handled correctly.
 
     Positive match criteria (any one sufficient):
-    - body is a dict with a "data" key whose value has a "units" or
-      "floor_plans" or "amenities" subkey (SightMap data envelope)
-    - body["data"]["sightmap_id"] exists (direct SightMap identifier)
+    - body["data"]["sightmap_id"] is present (explicit SightMap identifier)
+    - body["data"]["floor_plans"] is a non-empty list whose first entry has
+      SightMap-specific keys (bedroom_count / bathroom_count / filter_label)
+    - body["data"] has BOTH "units" and "floor_plans"
+
+    The 2026-04-20 fix tightens the prior loose check that matched any CMS
+    with a ``data.amenities`` array — a positive shape match must now show
+    SightMap-specific structure, not just an amenities list.
     """
     if not isinstance(body, dict):
         return False
     data = body.get("data")
     if not isinstance(data, dict):
         return False
-    sightmap_keys = {"units", "floor_plans", "amenities", "sightmap_id"}
-    return bool(sightmap_keys & set(data.keys()))
+    if "sightmap_id" in data:
+        return True
+    fps = data.get("floor_plans")
+    if isinstance(fps, list) and fps and isinstance(fps[0], dict):
+        sightmap_fp_keys = {"bedroom_count", "bathroom_count", "filter_label"}
+        if sightmap_fp_keys & set(fps[0].keys()):
+            return True
+    if "units" in data and "floor_plans" in data:
+        return True
+    return False
 
 
 class SightMapAdapter:
@@ -154,8 +193,12 @@ class SightMapAdapter:
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units from SightMap API responses captured during page load."""
-        result = AdapterResult(tier_used="TIER_1_API_SIGHTMAP")
+        result = AdapterResult(tier_used=_TIER_BASE)
         all_units: list[dict[str, str]] = []
+        # Aggregate across all matched responses so the partial-join check
+        # is computed against the run as a whole rather than per-response.
+        total_raw_units = 0
+        total_dropped = 0
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
         for resp in api_responses:
@@ -165,44 +208,85 @@ class SightMapAdapter:
                 continue
             if not _is_sightmap_response(body):
                 continue
-            units = parse_sightmap_payload(body, url)
+            data = body.get("data") or {}
+            raw_units_list = data.get("units") if isinstance(data, dict) else None
+            if isinstance(raw_units_list, list):
+                total_raw_units += len(raw_units_list)
+            units, dropped = parse_sightmap_payload(body, url)
+            total_dropped += dropped
             if units:
                 all_units.extend(units)
                 result.api_responses.append(resp)
 
         if all_units:
             result.units = all_units
-            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
+            result.winning_url = (
+                result.api_responses[0].get("url") if result.api_responses else None
+            )
             result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
-        else:
-            result.confidence = 0.0
-            sightmap_responses = [
-                r for r in api_responses
-                if isinstance(r.get("body"), dict) and _is_sightmap_response(r.get("body"))
-            ]
-            if not sightmap_responses:
+            result.tier_used = _TIER_BASE
+            # Even on success, surface silent unit-level loss when the join
+            # rate drops below the 80% floor.
+            if total_raw_units > 0 and total_dropped > _PARTIAL_JOIN_FRACTION * total_raw_units:
                 result.errors.append(
-                    "SIGHTMAP_NO_RESPONSE: no SightMap-shaped response captured — "
-                    "check if the page loads sightmap.com assets at all"
+                    f"SIGHTMAP_PARTIAL_JOIN: {total_dropped} of {total_raw_units} "
+                    f"units could not be joined to a floor plan "
+                    f"({total_dropped / total_raw_units:.0%} silently dropped) — "
+                    "inspect floor_plan_id field on dropped units for drift"
                 )
-            else:
-                for r in sightmap_responses:
-                    data = r.get("body", {}).get("data", {})
-                    raw_units = data.get("units") or []
-                    if not raw_units:
-                        result.errors.append(
-                            f"SIGHTMAP_AMENITIES_ONLY: sightmap response at {r.get('url','?')[:80]} "
-                            f"has no units[] — map may be configured as amenities-only; "
-                            f"check for a separate /available or /assets endpoint"
-                        )
-                    else:
-                        result.errors.append(
-                            f"SIGHTMAP_PARSE_FAILED: units[] present ({len(raw_units)} entries) "
-                            f"but join produced 0 records — field name mismatch likely; "
-                            f"inspect raw_api payload for {r.get('url','?')[:80]}"
-                        )
+            return result
+
+        # Failure path: classify via structured sub-codes mirroring the RentCafe
+        # adapter pattern.
+        result.confidence = 0.0
+        sightmap_responses = [
+            r for r in api_responses
+            if isinstance(r.get("body"), dict) and _is_sightmap_response(r.get("body"))
+        ]
+        if not api_responses:
+            result.tier_used = _TIER_NO_RESPONSE
+            result.errors.append(
+                "SIGHTMAP_NO_RESPONSE: no network responses captured during page load"
+            )
+        elif not sightmap_responses:
+            result.tier_used = _TIER_SHAPE_REJECTED
+            result.errors.append(
+                f"SIGHTMAP_SHAPE_REJECTED: {len(api_responses)} responses captured, "
+                "none matched SightMap envelope (data.{units|floor_plans|sightmap_id})"
+            )
+        else:
+            # Some shape-matched responses but extraction emitted zero units.
+            saw_units = False
+            for r in sightmap_responses:
+                data = (r.get("body") or {}).get("data") or {}
+                raw_units = data.get("units") if isinstance(data, dict) else None
+                if isinstance(raw_units, list) and raw_units:
+                    saw_units = True
+                    result.tier_used = _TIER_PARSE_FAILED
+                    result.errors.append(
+                        f"SIGHTMAP_PARSE_FAILED: units[] present ({len(raw_units)} entries) "
+                        f"but join produced 0 records — field name mismatch likely; "
+                        f"inspect raw_api payload for {str(r.get('url', '?'))[:80]}"
+                    )
+                else:
+                    if not saw_units:
+                        result.tier_used = _TIER_AMENITIES_ONLY
+                    result.errors.append(
+                        f"SIGHTMAP_AMENITIES_ONLY: sightmap response at "
+                        f"{str(r.get('url', '?'))[:80]} "
+                        "has no units[] — map may be configured as amenities-only; "
+                        "check for a separate /available or /assets endpoint"
+                    )
 
         return result
 
     def static_fingerprints(self) -> list[str]:
         return list(self._fingerprints)
+
+    def matches_response_body(self, body: Any) -> bool:
+        """Body-shape check used by ``detector.confirm_detection``.
+
+        Returns True if *body* plausibly belongs to SightMap. Reuses the
+        adapter's own envelope check so router and parser stay in sync.
+        """
+        return _is_sightmap_response(body)
