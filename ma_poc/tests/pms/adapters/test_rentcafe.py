@@ -9,6 +9,7 @@ import pytest
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.adapters.rentcafe import (
     RentCafeAdapter,
+    _classify_rentcafe_failure,
     _is_rentcafe_response,
     _unwrap_rentcafe_list,
     parse_rentcafe_floorplans,
@@ -88,13 +89,7 @@ def test_is_rentcafe_response_negative() -> None:
 
 @pytest.mark.asyncio
 async def test_rentcafe_extracts_from_dict_wrapped_payload() -> None:
-    """Yardi-style ``{"data": [...]}`` wrappers must extract the same units.
-
-    Regression: 12 of 13 RentCafe NO_DATA properties in the 2026-04-19 run
-    (Windsor Communities, Brookfield, etc.) shipped the floorplan list
-    inside a ``data``/``Result`` wrapper. The original matcher only saw
-    root-level lists and silently rejected them.
-    """
+    """Yardi-style ``{"data": [...]}`` wrappers must extract the same units."""
     item = {
         "floorplanName": "A1",
         "api": "rentcafe",
@@ -125,7 +120,7 @@ def test_parse_rentcafe_min_max_price() -> None:
               "availableUnitsCount": "1", "availableDate": "2026-05-01"}]
     units = parse_rentcafe_floorplans(items, "test")
     assert len(units) == 1
-    assert units[0]["rent_range"] == "$1,349"  # min_price == max_price
+    assert units[0]["rent_range"] == "$1,349"
     assert units[0]["availability_status"] == "AVAILABLE"
 
 
@@ -159,16 +154,10 @@ def test_rent_within_sanity_range() -> None:
 
 
 def test_rc_t01_lowercase_root_list_regression_guard() -> None:
-    """RC_T01: existing lowercase / research-log payload still works."""
     body = [{
-        "floorplanName": "Studio",
-        "floorplanId": "F1",
-        "api": "rentcafe",
-        "beds": "0",
-        "baths": "1",
-        "minimumRent": "1200.00",
-        "maximumRent": "1400.00",
-        "availableUnitsCount": "1",
+        "floorplanName": "Studio", "floorplanId": "F1", "api": "rentcafe",
+        "beds": "0", "baths": "1", "minimumRent": "1200.00",
+        "maximumRent": "1400.00", "availableUnitsCount": "1",
     }]
     assert _is_rentcafe_response(body) is True
     units = parse_rentcafe_floorplans(body, "test")
@@ -178,35 +167,20 @@ def test_rc_t01_lowercase_root_list_regression_guard() -> None:
 
 
 def test_rc_t02_pascalcase_root_list_is_fingerprinted() -> None:
-    """RC_T02: PascalCase root-level list is fingerprinted correctly."""
     body = [{
-        "FloorplanName": "1BR",
-        "FloorplanId": "FP1",
-        "MinimumRent": "2100.00",
-        "MaximumRent": "2400.00",
-        "AvailableUnitsCount": 2,
-        "Beds": 1,
-        "Baths": 1,
-        "MinimumSQFT": "700",
-        "MaximumSQFT": "750",
+        "FloorplanName": "1BR", "FloorplanId": "FP1", "MinimumRent": "2100.00",
+        "MaximumRent": "2400.00", "AvailableUnitsCount": 2, "Beds": 1, "Baths": 1,
+        "MinimumSQFT": "700", "MaximumSQFT": "750",
     }]
     assert _is_rentcafe_response(body) is True
 
 
 def test_rc_t03_pascalcase_items_parse_to_correct_fields() -> None:
-    """RC_T03: PascalCase items parse to correct field values."""
     import re
-
     body = [{
-        "FloorplanName": "1BR",
-        "FloorplanId": "FP1",
-        "MinimumRent": "2100.00",
-        "MaximumRent": "2400.00",
-        "AvailableUnitsCount": 2,
-        "Beds": 1,
-        "Baths": 1,
-        "MinimumSQFT": "700",
-        "MaximumSQFT": "750",
+        "FloorplanName": "1BR", "FloorplanId": "FP1", "MinimumRent": "2100.00",
+        "MaximumRent": "2400.00", "AvailableUnitsCount": 2, "Beds": 1, "Baths": 1,
+        "MinimumSQFT": "700", "MaximumSQFT": "750",
     }]
     units = parse_rentcafe_floorplans(body, "test")
     assert len(units) == 1
@@ -220,17 +194,10 @@ def test_rc_t03_pascalcase_items_parse_to_correct_fields() -> None:
 
 @pytest.mark.asyncio
 async def test_rc_t04_data_wrapper_pascalcase_items() -> None:
-    """RC_T04: {"data": [PascalCase items]} wrapper is unwrapped and parsed."""
     body = {"data": [{
-        "FloorplanName": "Aspen",
-        "FloorplanId": "A1",
-        "Beds": 1,
-        "MinimumRent": "2195.00",
-        "MaximumRent": "2395.00",
-        "AvailableUnitsCount": 3,
-        "Baths": 1,
-        "MinimumSQFT": "685",
-        "MaximumSQFT": "695",
+        "FloorplanName": "Aspen", "FloorplanId": "A1", "Beds": 1,
+        "MinimumRent": "2195.00", "MaximumRent": "2395.00",
+        "AvailableUnitsCount": 3, "Baths": 1, "MinimumSQFT": "685", "MaximumSQFT": "695",
     }]}
     assert _is_rentcafe_response(body) is True
     responses = [{"url": "https://windsor.example.com/api", "body": body}]
@@ -243,12 +210,9 @@ async def test_rc_t04_data_wrapper_pascalcase_items() -> None:
 
 @pytest.mark.asyncio
 async def test_rc_t05_result_wrapper_lowercase_items() -> None:
-    """RC_T05: {"Result": [lowercase items]} wrapper unwraps (existing wrapper)."""
     body = {"Result": [{
-        "floorplanName": "Studio",
-        "floorplanId": "S1",
-        "minimumRent": "1500.00",
-        "availableUnitsCount": 1,
+        "floorplanName": "Studio", "floorplanId": "S1",
+        "minimumRent": "1500.00", "availableUnitsCount": 1,
         "availabilityURL": "https://securecafe.com/...",
     }]}
     assert _is_rentcafe_response(body) is True
@@ -260,23 +224,17 @@ async def test_rc_t05_result_wrapper_lowercase_items() -> None:
 
 
 def test_rc_t06_floorplans_new_wrapper_key() -> None:
-    """RC_T06: {"Floorplans": [...]} new wrapper key is handled."""
     body = {"Floorplans": [{
-        "floorplanName": "2BR",
-        "api": "rentcafe",
-        "minimumRent": "2500.00",
-        "availableUnitsCount": 1,
+        "floorplanName": "2BR", "api": "rentcafe",
+        "minimumRent": "2500.00", "availableUnitsCount": 1,
     }]}
     assert _is_rentcafe_response(body) is True
 
 
 def test_rc_t07_two_level_response_result_unwrap() -> None:
-    """RC_T07: two-level {"response": {"result": [...]}} is unwrapped."""
     body = {"response": {"result": [{
-        "floorplanName": "1BR",
-        "api": "rentcafe",
-        "minimumRent": "1800.00",
-        "availableUnitsCount": 2,
+        "floorplanName": "1BR", "api": "rentcafe",
+        "minimumRent": "1800.00", "availableUnitsCount": 2,
     }]}}
     items = _unwrap_rentcafe_list(body)
     assert items is not None
@@ -285,15 +243,10 @@ def test_rc_t07_two_level_response_result_unwrap() -> None:
 
 
 def test_rc_t08_all_unavailable_floorplans_still_extracted() -> None:
-    """RC_T08: availableUnitsCount==0 floorplans extract as UNAVAILABLE."""
     body = [{
-        "floorplanName": "3BR",
-        "floorplanId": "FP3",
-        "minimumRent": "3000.00",
-        "maximumRent": "3200.00",
-        "availableUnitsCount": 0,
-        "beds": 3,
-        "baths": 2,
+        "floorplanName": "3BR", "floorplanId": "FP3",
+        "minimumRent": "3000.00", "maximumRent": "3200.00",
+        "availableUnitsCount": 0, "beds": 3, "baths": 2,
     }]
     units = parse_rentcafe_floorplans(body, "test")
     assert len(units) == 1
@@ -302,12 +255,111 @@ def test_rc_t08_all_unavailable_floorplans_still_extracted() -> None:
 
 
 def test_rc_t09_non_rentcafe_body_rejected() -> None:
-    """RC_T09: non-RentCafe JSON body is rejected."""
     body = {"amenities": [{"id": 1, "name": "Pool"}], "events": []}
     assert _is_rentcafe_response(body) is False
 
 
 def test_rc_t10_empty_list_body_rejected() -> None:
-    """RC_T10: empty list body is rejected."""
     assert _is_rentcafe_response([]) is False
     assert _unwrap_rentcafe_list([]) is None
+
+
+# --- 2026-04-20 fix tests (structured failure tier codes) -------------------
+#
+# These cover Change 1 from claude_adapter_fixes.md: every RentCafe failure
+# path must re-stamp ``tier_used`` with a sub-code so the report can split
+# misrouted properties (Windsor on Funnel) from genuine zero-data sites.
+
+
+@pytest.mark.asyncio
+async def test_rentcafe_tier_re_stamped_on_no_response() -> None:
+    """Empty network log → ``TIER_1_API_RENTCAFE_NO_RESPONSE``."""
+    adapter = RentCafeAdapter()
+    ctx = _make_ctx([])
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_API_RENTCAFE_NO_RESPONSE"
+    assert result.confidence == 0.0
+    assert any(e.startswith("RENTCAFE_NO_RESPONSE") for e in result.errors)
+
+
+@pytest.mark.asyncio
+async def test_rentcafe_tier_re_stamped_on_shape_reject() -> None:
+    """Responses captured but none shape-match → ``..._SHAPE_REJECTED``."""
+    adapter = RentCafeAdapter()
+    ctx = _make_ctx([{"url": "https://example.com/x", "body": {"random": "payload"}}])
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_API_RENTCAFE_SHAPE_REJECTED"
+    assert any(e.startswith("RENTCAFE_SHAPE_REJECTED") for e in result.errors)
+
+
+@pytest.mark.asyncio
+async def test_rentcafe_tier_re_stamped_on_empty_list() -> None:
+    """Yardi wrapper with empty list → ``..._SHAPE_REJECTED``."""
+    body = {"data": []}
+    adapter = RentCafeAdapter()
+    ctx = _make_ctx([{"url": "https://example.com/x", "body": body}])
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_API_RENTCAFE_SHAPE_REJECTED"
+
+
+@pytest.mark.asyncio
+async def test_rentcafe_tier_re_stamped_on_parse_zero() -> None:
+    """Shape-matched envelope with un-parseable items → ``..._PARSE_ZERO``."""
+    fake_responses = [{
+        "url": "https://example.com/x",
+        "body": [{"floorplanName": "X", "api": "rentcafe"}],
+    }]
+    tier_code, msg = _classify_rentcafe_failure(fake_responses)
+    assert tier_code == "TIER_1_API_RENTCAFE_PARSE_ZERO"
+    assert msg.startswith("RENTCAFE_PARSE_ZERO")
+
+
+@pytest.mark.asyncio
+async def test_rentcafe_success_tier_unchanged() -> None:
+    """Real-shaped success → ``tier_used`` stays at ``TIER_1_API_RENTCAFE``."""
+    body = [{
+        "floorplanName": "1BR", "floorplanId": "FP1", "api": "rentcafe",
+        "minimumRent": "1500.00", "maximumRent": "1700.00",
+        "availableUnitsCount": "2", "beds": "1", "baths": "1",
+    }]
+    adapter = RentCafeAdapter()
+    ctx = _make_ctx([{"url": "https://example.com/api", "body": body}])
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_API_RENTCAFE"
+    assert len(result.units) == 1
+
+
+def test_rentcafe_api_value_case_insensitive() -> None:
+    """``"Api": "RentCafe"`` PascalCase value is recognised."""
+    body = [{
+        "Api": "RentCafe", "FloorplanName": "A1", "FloorplanId": "1",
+        "MinimumRent": "1500", "MaximumRent": "1600",
+    }]
+    assert _is_rentcafe_response(body) is True
+
+
+@pytest.mark.asyncio
+async def test_rentcafe_errors_list_has_machine_readable_prefix() -> None:
+    """All failure-path errors start with an upper-snake-case code prefix."""
+    import re
+    code_re = re.compile(r"^RENTCAFE_[A-Z_]+:")
+    for responses in [
+        [],
+        [{"url": "x", "body": {"random": "payload"}}],
+    ]:
+        adapter = RentCafeAdapter()
+        ctx = _make_ctx(responses)
+        result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+        assert result.errors, f"expected at least one error for input={responses!r}"
+        assert code_re.match(result.errors[0]), (
+            f"error did not start with machine-readable code prefix: {result.errors[0]!r}"
+        )
+
+
+def test_rentcafe_matches_response_body_protocol() -> None:
+    """``matches_response_body`` is implemented and reuses the predicate."""
+    adapter = RentCafeAdapter()
+    assert adapter.matches_response_body(
+        [{"floorplanName": "A1", "api": "rentcafe", "minimumRent": "1000"}]
+    ) is True
+    assert adapter.matches_response_body({"random": "not-rentcafe"}) is False
