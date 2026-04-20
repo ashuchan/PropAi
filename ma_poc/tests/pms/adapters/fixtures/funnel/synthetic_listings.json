@@ -1,0 +1,51 @@
+[
+    {
+        "listingId": "L-65069-01",
+        "buildingName": "Olympic by Windsor",
+        "floorPlanName": "A1",
+        "availabilityDate": "2026-05-01",
+        "rentals": [
+            {
+                "unit": "1020",
+                "marketRent": 2450,
+                "availabilityDate": "2026-05-01",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "squareFeet": 712,
+                "floorPlanName": "A1",
+                "buildingName": "Olympic by Windsor",
+                "floor": 10
+            },
+            {
+                "unit": "1120",
+                "marketRent": 2520,
+                "availabilityDate": "2026-06-01",
+                "bedrooms": 1,
+                "bathrooms": 1.0,
+                "squareFeet": 712,
+                "floorPlanName": "A1",
+                "buildingName": "Olympic by Windsor",
+                "floor": 11
+            }
+        ]
+    },
+    {
+        "listingId": "L-77589-01",
+        "buildingName": "Windsor Sugarloaf",
+        "floorPlanName": "B2",
+        "availabilityDate": "2026-05-15",
+        "rentals": [
+            {
+                "unit": "201",
+                "marketRent": 1890,
+                "availabilityDate": "2026-05-15",
+                "bedrooms": 2,
+                "bathrooms": 2.0,
+                "squareFeet": 1100,
+                "floorPlanName": "B2",
+                "buildingName": "Windsor Sugarloaf",
+                "floor": 2
+            }
+        ]
+    }
+]

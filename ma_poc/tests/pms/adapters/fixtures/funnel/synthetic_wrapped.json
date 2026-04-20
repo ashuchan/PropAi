@@ -1,0 +1,40 @@
+{
+    "results": [
+        {
+            "listingId": "L-5715-S1",
+            "unit": "S101",
+            "marketRent": 1495,
+            "availabilityDate": "2026-05-20",
+            "bedrooms": 0,
+            "bathrooms": 1.0,
+            "squareFeet": 485,
+            "floorPlanName": "Studio A",
+            "buildingName": "Windsor Westminster",
+            "floor": 1
+        },
+        {
+            "listingId": "L-5715-S2",
+            "unit": "S102",
+            "marketRent": 1525,
+            "availabilityDate": "2026-06-01",
+            "bedrooms": 0,
+            "bathrooms": 1.0,
+            "squareFeet": 490,
+            "floorPlanName": "Studio A",
+            "buildingName": "Windsor Westminster",
+            "floor": 1
+        },
+        {
+            "listingId": "L-5715-A1",
+            "unit": "203",
+            "marketRent": 1995,
+            "availabilityDate": "2026-05-10",
+            "bedrooms": 1,
+            "bathrooms": 1.0,
+            "squareFeet": 720,
+            "floorPlanName": "A1",
+            "buildingName": "Windsor Westminster",
+            "floor": 2
+        }
+    ]
+}
