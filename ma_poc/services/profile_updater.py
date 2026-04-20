@@ -112,6 +112,19 @@ def save_llm_field_mapping(
         profile.api_hints.llm_field_mappings = profile.api_hints.llm_field_mappings[-_MAX_LLM_FIELD_MAPPINGS:]
 
 
+def update_rescue_counter(profile: ScrapeProfile, rescue_succeeded: bool) -> ScrapeProfile:
+    """After an LLM rescue attempt, increment or reset the consecutive-failure counter.
+
+    When the counter reaches 3, the orchestrator skips future rescue attempts
+    for this property (cost guard).
+    """
+    if rescue_succeeded:
+        profile.stats.consecutive_llm_rescue_failures = 0
+    else:
+        profile.stats.consecutive_llm_rescue_failures += 1
+    return profile
+
+
 def record_explored_link(
     profile: ScrapeProfile,
     link: str,

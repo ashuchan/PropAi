@@ -63,6 +63,39 @@ def build(
 
     success_rate = ((total - failed) / total * 100) if total > 0 else 0
 
+    # F7: separate pre-extraction terminations from real tier outcomes.
+    _PRE_EXTRACTION_TIERS = frozenset({
+        "generic:no_body_short_circuit",
+    })
+    pre_extraction: Counter[str] = Counter()
+    real_tier_counts: Counter[str] = Counter()
+    for tier, count in tier_counts.items():
+        if tier in _PRE_EXTRACTION_TIERS:
+            pre_extraction[tier] += count
+        else:
+            real_tier_counts[tier] += count
+
+    # Map fetch-outcome short-circuit tiers to descriptive keys
+    pre_extraction_terminations: dict[str, int] = {}
+    for tier, count in pre_extraction.items():
+        if tier == "generic:no_body_short_circuit":
+            # Distribute across fetch outcome types by inspecting property _metas
+            for p in properties:
+                meta = p.get("_meta", {}) or {}
+                err = " ".join(meta.get("errors", []) + (p.get("errors") or []))
+                if "TRANSIENT" in err:
+                    pre_extraction_terminations.setdefault("fetch_transient", 0)
+                    pre_extraction_terminations["fetch_transient"] += 1
+                elif "HARD_FAIL" in err:
+                    pre_extraction_terminations.setdefault("fetch_hard_fail", 0)
+                    pre_extraction_terminations["fetch_hard_fail"] += 1
+                elif "BOT_BLOCKED" in err or "bot_blocked" in err.lower():
+                    pre_extraction_terminations.setdefault("fetch_bot_blocked", 0)
+                    pre_extraction_terminations["fetch_bot_blocked"] += 1
+                else:
+                    pre_extraction_terminations.setdefault("fetch_other", 0)
+                    pre_extraction_terminations["fetch_other"] += 1
+
     report = {
         "run_date": run_date,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -73,7 +106,14 @@ def build(
             "carry_forward": carry_forward,
             "success_rate_pct": round(success_rate, 2),
         },
-        "tier_distribution": dict(tier_counts.most_common()),
+        # F7: no_body_short_circuit removed — moved to pre_extraction_terminations
+        "tier_distribution": dict(real_tier_counts.most_common()),
+        "pre_extraction_terminations": pre_extraction_terminations,
+        # F4: fields that are tracked in the schema but not currently extracted
+        "non_extracted_fields": [
+            "lease_term", "move_in_date", "pmc", "website_design",
+            "phone", "email_address", "concessions",
+        ],
         "cost": cost_rollup or {},
         "slo_violations": [
             {"name": v.name, "threshold": v.threshold, "observed": v.observed}

@@ -1,0 +1,7 @@
+{
+  "results": [
+    {"unit_number": "101", "bedrooms": 1, "bathrooms": 1, "sqft": 750, "rent": 1200, "available": true},
+    {"unit_number": "102", "bedrooms": 2, "bathrooms": 2, "sqft": 1100, "rent": 1650, "available": true},
+    {"unit_number": "103", "bedrooms": 1, "bathrooms": 1, "sqft": 750, "rent": 1225, "available": false}
+  ]
+}

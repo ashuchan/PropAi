@@ -10,7 +10,7 @@ from typing import Any
 from ..observability.events import EventKind, emit
 from .contracts import FlaggedRecord, RejectedRecord, ValidatedRecords
 from .cross_run_sanity import check as sanity_check
-from .schema_gate import check as schema_check
+from .schema_gate import check as schema_check, property_passes_quality_gate
 
 log = logging.getLogger(__name__)
 
@@ -102,6 +102,19 @@ def validate(
             next_tier = True
             emit(EventKind.NEXT_TIER_REQUESTED, property_id,
                  reject_ratio=reject_ratio)
+
+    # F1: quality gate — if accepted units are all hollow, request the next tier
+    # even though the row count passed. This exposes silent-failure properties to
+    # the LLM rescue path (F2) rather than marking them SUCCESS with no data.
+    if accepted and not property_passes_quality_gate(accepted):
+        next_tier = True
+        emit(EventKind.NEXT_TIER_REQUESTED, property_id,
+             reason="UNITS_HOLLOW_API",
+             hollow_count=len(accepted))
+        log.info(
+            "Quality gate: %d accepted units for %s are all hollow — next_tier_requested",
+            len(accepted), property_id,
+        )
 
     return ValidatedRecords(
         property_id=property_id,
