@@ -1,3 +1,1 @@
-"""MA Rent Intelligence Platform — Jugnu Architecture."""
-
-CONTRACTS_VERSION = "1.0"
+# Jugnu scraping pipeline package.

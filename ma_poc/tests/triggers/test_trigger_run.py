@@ -1,4 +1,5 @@
 """Unit tests for trigger_run.py and _trigger_common.plan_tasks."""
+
 from __future__ import annotations
 
 import json
@@ -15,17 +16,20 @@ for _p in (_app, _here):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from scripts._trigger_common import (
+from scripts._trigger_common import (  # noqa: E402
     ABSOLUTE_MAX_TASKS,
     MAX_TASKS_F1_MICRO,
     MAX_TASKS_G1_SMALL,
-    TaskPlan,
+    check_job_exists,
     emit_structured_result,
     plan_tasks,
+    project_for_env,
+    run_gcloud,
+    verify_gcloud_auth,
 )
 
-
 # ── plan_tasks() ─────────────────────────────────────────────────────────────
+
 
 class TestPlanTasks:
     def test_rejects_both_flags(self) -> None:
@@ -93,6 +97,7 @@ class TestPlanTasks:
 
 # ── trigger_run.py argument validation ───────────────────────────────────────
 
+
 class TestTriggerRunArgs:
     def test_dry_run_does_not_call_gcloud(self) -> None:
         """--dry-run must not invoke any gcloud subprocess."""
@@ -100,10 +105,16 @@ class TestTriggerRunArgs:
             with pytest.raises(SystemExit) as exc_info:
                 # Simulate: python trigger_run.py --env staging --tasks 3 --dry-run --yes
                 sys.argv = [
-                    "trigger_run.py", "--env", "staging",
-                    "--tasks", "3", "--dry-run", "--yes",
+                    "trigger_run.py",
+                    "--env",
+                    "staging",
+                    "--tasks",
+                    "3",
+                    "--dry-run",
+                    "--yes",
                 ]
                 from scripts import trigger_run  # noqa: PLC0415
+
                 trigger_run.main()
             assert exc_info.value.code == 0
             # gcloud must not have been called
@@ -113,51 +124,75 @@ class TestTriggerRunArgs:
         with pytest.raises(SystemExit) as exc_info:
             sys.argv = ["trigger_run.py", "--env", "staging"]
             from scripts import trigger_run  # noqa: PLC0415
+
             trigger_run.main()
         assert exc_info.value.code == 2
 
     def test_safety_clamp_target_hours_too_low(self) -> None:
         with pytest.raises(SystemExit) as exc_info:
             sys.argv = [
-                "trigger_run.py", "--env", "staging",
-                "--target-hours", "0.2", "--yes",
+                "trigger_run.py",
+                "--env",
+                "staging",
+                "--target-hours",
+                "0.2",
+                "--yes",
             ]
             from scripts import trigger_run  # noqa: PLC0415
+
             trigger_run.main()
         assert exc_info.value.code == 4
 
     def test_safety_clamp_target_hours_too_high(self) -> None:
         with pytest.raises(SystemExit) as exc_info:
             sys.argv = [
-                "trigger_run.py", "--env", "staging",
-                "--target-hours", "9", "--yes",
+                "trigger_run.py",
+                "--env",
+                "staging",
+                "--target-hours",
+                "9",
+                "--yes",
             ]
             from scripts import trigger_run  # noqa: PLC0415
+
             trigger_run.main()
         assert exc_info.value.code == 4
 
     def test_safety_clamp_tasks_too_high_on_f1_micro(self) -> None:
         with pytest.raises(SystemExit) as exc_info:
             sys.argv = [
-                "trigger_run.py", "--env", "staging",
-                "--tasks", "16", "--db-tier", "f1-micro", "--yes",
+                "trigger_run.py",
+                "--env",
+                "staging",
+                "--tasks",
+                "16",
+                "--db-tier",
+                "f1-micro",
+                "--yes",
             ]
             from scripts import trigger_run  # noqa: PLC0415
+
             trigger_run.main()
         assert exc_info.value.code == 4
 
     def test_safety_clamp_absolute_max_tasks(self) -> None:
         with pytest.raises(SystemExit) as exc_info:
             sys.argv = [
-                "trigger_run.py", "--env", "staging",
-                "--tasks", "41", "--yes",
+                "trigger_run.py",
+                "--env",
+                "staging",
+                "--tasks",
+                "41",
+                "--yes",
             ]
             from scripts import trigger_run  # noqa: PLC0415
+
             trigger_run.main()
         assert exc_info.value.code == 4
 
 
 # ── emit_structured_result ────────────────────────────────────────────────────
+
 
 class TestEmitStructuredResult:
     def test_emits_valid_json_on_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
@@ -165,7 +200,7 @@ class TestEmitStructuredResult:
         captured = capsys.readouterr()
         line = captured.err.strip()
         assert line.startswith("RESULT:")
-        payload = json.loads(line[len("RESULT:"):])
+        payload = json.loads(line[len("RESULT:") :])
         assert payload["status"] == "SUCCESS"
         assert payload["tasks"] == 5
         assert payload["env"] == "staging"
@@ -180,6 +215,81 @@ class TestEmitStructuredResult:
         }
         emit_structured_result(result)
         captured = capsys.readouterr()
-        payload = json.loads(captured.err.strip()[len("RESULT:"):])
+        payload = json.loads(captured.err.strip()[len("RESULT:") :])
         for key in result:
             assert key in payload
+
+
+# ── project_for_env ───────────────────────────────────────────────────────────
+
+
+class TestProjectForEnv:
+    def test_staging_returns_project(self) -> None:
+        result = project_for_env("staging")
+        assert "staging" in result
+
+    def test_prod_returns_project(self) -> None:
+        result = project_for_env("prod")
+        assert "prod" in result
+
+    def test_unknown_env_raises(self) -> None:
+        with pytest.raises(ValueError, match="Unknown environment"):
+            project_for_env("development")
+
+
+# ── verify_gcloud_auth ────────────────────────────────────────────────────────
+
+
+class TestVerifyGcloudAuth:
+    def test_exit_3_when_gcloud_fails(self) -> None:
+        mock_result = MagicMock(returncode=1, stdout="")
+        with patch("subprocess.run", return_value=mock_result):
+            with pytest.raises(SystemExit) as exc_info:
+                verify_gcloud_auth("jugnu-staging-abc")
+            assert exc_info.value.code == 3
+
+    def test_exit_3_when_wrong_project(self) -> None:
+        mock_result = MagicMock(returncode=0, stdout="wrong-project\n")
+        with patch("subprocess.run", return_value=mock_result):
+            with pytest.raises(SystemExit) as exc_info:
+                verify_gcloud_auth("jugnu-staging-abc")
+            assert exc_info.value.code == 3
+
+    def test_passes_when_project_matches(self) -> None:
+        mock_result = MagicMock(returncode=0, stdout="jugnu-staging-abc\n")
+        with patch("subprocess.run", return_value=mock_result):
+            verify_gcloud_auth("jugnu-staging-abc")  # must not raise
+
+
+# ── check_job_exists ──────────────────────────────────────────────────────────
+
+
+class TestCheckJobExists:
+    def test_exit_3_when_job_not_found(self) -> None:
+        mock_result = MagicMock(returncode=1, stdout="")
+        with patch("subprocess.run", return_value=mock_result):
+            with pytest.raises(SystemExit) as exc_info:
+                check_job_exists("jugnu-scrape-staging", "us-central1", "jugnu-staging-abc")
+            assert exc_info.value.code == 3
+
+    def test_passes_when_job_exists(self) -> None:
+        mock_result = MagicMock(returncode=0, stdout="jugnu-scrape-staging\n")
+        with patch("subprocess.run", return_value=mock_result):
+            check_job_exists("jugnu-scrape-staging", "us-central1", "jugnu-staging-abc")
+
+
+# ── run_gcloud ────────────────────────────────────────────────────────────────
+
+
+class TestRunGcloud:
+    def test_returns_completed_process(self) -> None:
+        mock_result = MagicMock(returncode=0, stdout="output\n")
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            result = run_gcloud("gcloud", "config", "list")
+            mock_run.assert_called_once_with(
+                ["gcloud", "config", "list"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert result.returncode == 0

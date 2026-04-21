@@ -10,6 +10,7 @@ Exit code contract (documented here; used by all trigger scripts):
   6  Timeout
   130 SIGINT
 """
+
 from __future__ import annotations
 
 import json
@@ -26,9 +27,9 @@ from typing import Literal
 # Conservative floor (headroom for warm-up, slow pages):
 BASELINE_PROPS_PER_TASK_PER_HOUR: int = 2000
 
-MAX_TASKS_F1_MICRO: int = 10    # db-f1-micro: ~25 connections, 2-3 per task
-MAX_TASKS_G1_SMALL: int = 20    # db-g1-small: ~50 connections
-ABSOLUTE_MAX_TASKS: int = 40    # Cloud Run parallelism ceiling we're willing to pay for
+MAX_TASKS_F1_MICRO: int = 10  # db-f1-micro: ~25 connections, 2-3 per task
+MAX_TASKS_G1_SMALL: int = 20  # db-g1-small: ~50 connections
+ABSOLUTE_MAX_TASKS: int = 40  # Cloud Run parallelism ceiling we're willing to pay for
 
 # Environment → GCP project mapping.  Keep in sync with infra/terraform/envs/*.tfvars.
 _ENV_PROJECTS: dict[str, str] = {
@@ -88,11 +89,6 @@ def plan_tasks(
             f"{tasks} tasks requested but db tier '{db_tier}' safely supports "
             f"≤ {ceiling}. Either upgrade the database or lower parallelism."
         )
-    elif tasks > MAX_TASKS_F1_MICRO and db_tier == "f1-micro":
-        warning = (
-            f"{tasks} tasks on db-f1-micro risks connection exhaustion. "
-            f"Consider upgrading to db-g1-small for runs this parallel."
-        )
 
     return TaskPlan(tasks=tasks, estimated_hours=estimated_hours, warning=warning)
 
@@ -108,7 +104,9 @@ def verify_gcloud_auth(required_project: str) -> None:
     """Fail fast (exit 3) if gcloud is not authenticated or pointed at the wrong project."""
     result = subprocess.run(
         ["gcloud", "config", "get-value", "project"],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode != 0 or not result.stdout.strip():
         print("gcloud not authenticated. Run: gcloud auth login", file=sys.stderr)
@@ -127,11 +125,18 @@ def check_job_exists(job_name: str, region: str, project: str) -> None:
     """Exit 3 with a clear message if the Cloud Run job does not exist."""
     result = subprocess.run(
         [
-            "gcloud", "run", "jobs", "describe", job_name,
-            f"--region={region}", f"--project={project}",
+            "gcloud",
+            "run",
+            "jobs",
+            "describe",
+            job_name,
+            f"--region={region}",
+            f"--project={project}",
             "--format=value(name)",
         ],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode != 0:
         print(
