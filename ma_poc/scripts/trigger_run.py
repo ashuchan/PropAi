@@ -30,14 +30,14 @@ Examples:
   python scripts/trigger_run.py --env staging --tasks 2 --limit 50 --no-wait
   python scripts/trigger_run.py --env prod --target-hours 1 --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import signal
 import sys
-from datetime import UTC, date
+from datetime import date
 from pathlib import Path
 
 # Path bootstrap
@@ -50,7 +50,6 @@ for _p in (_app, _ma_poc):
 
 from scripts._trigger_common import (  # noqa: E402
     ABSOLUTE_MAX_TASKS,
-    MAX_TASKS_F1_MICRO,
     REGION,
     TaskPlan,
     check_job_exists,
@@ -76,31 +75,38 @@ def _parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    p.add_argument("--env", choices=["staging", "prod"], required=True,
-                   help="Target environment (no default — always explicit)")
+    p.add_argument(
+        "--env",
+        choices=["staging", "prod"],
+        required=True,
+        help="Target environment (no default — always explicit)",
+    )
     group = p.add_mutually_exclusive_group()
-    group.add_argument("--tasks", type=int, metavar="N",
-                       help="Explicit task count (1-40)")
-    group.add_argument("--target-hours", type=float, metavar="H",
-                       help="Pick tasks to fit wall clock target (0.5-8)")
-    p.add_argument("--csv", metavar="GCS_URI",
-                   help="Override default property-list CSV location")
-    p.add_argument("--limit", type=int, metavar="N",
-                   help="Cap properties per shard (useful for tests)")
-    p.add_argument("--run-date", metavar="YYYY-MM-DD",
-                   help="Override run date (default: today UTC)")
-    p.add_argument("--db-tier", choices=["f1-micro", "g1-small", "larger"],
-                   default="f1-micro", help="DB tier for parallelism safety clamp")
-    p.add_argument("--total-props", type=int, metavar="N",
-                   help="Total property count (required when --csv is non-default)")
-    p.add_argument("--wait", dest="wait", action="store_true", default=True,
-                   help="Wait for job completion (default)")
-    p.add_argument("--no-wait", dest="wait", action="store_false",
-                   help="Submit and return immediately")
-    p.add_argument("--dry-run", action="store_true",
-                   help="Print plan, do not submit")
-    p.add_argument("--yes", action="store_true",
-                   help="Skip confirmation prompt (for CI)")
+    group.add_argument("--tasks", type=int, metavar="N", help="Explicit task count (1-40)")
+    group.add_argument(
+        "--target-hours", type=float, metavar="H", help="Pick tasks to fit wall clock target (0.5-8)"
+    )
+    p.add_argument("--csv", metavar="GCS_URI", help="Override default property-list CSV location")
+    p.add_argument("--limit", type=int, metavar="N", help="Cap properties per shard (useful for tests)")
+    p.add_argument("--run-date", metavar="YYYY-MM-DD", help="Override run date (default: today UTC)")
+    p.add_argument(
+        "--db-tier",
+        choices=["f1-micro", "g1-small", "larger"],
+        default="f1-micro",
+        help="DB tier for parallelism safety clamp",
+    )
+    p.add_argument(
+        "--total-props",
+        type=int,
+        metavar="N",
+        help="Total property count (required when --csv is non-default)",
+    )
+    p.add_argument(
+        "--wait", dest="wait", action="store_true", default=True, help="Wait for job completion (default)"
+    )
+    p.add_argument("--no-wait", dest="wait", action="store_false", help="Submit and return immediately")
+    p.add_argument("--dry-run", action="store_true", help="Print plan, do not submit")
+    p.add_argument("--yes", action="store_true", help="Skip confirmation prompt (for CI)")
     return p.parse_args()
 
 
@@ -115,10 +121,16 @@ def _enforce_safety_clamps(args: argparse.Namespace) -> None:
             sys.exit(4)
     if args.tasks is not None:
         if args.tasks > ABSOLUTE_MAX_TASKS:
-            print(f"tasks > {ABSOLUTE_MAX_TASKS}: absolute ceiling; change the code, not the flag", file=sys.stderr)
+            print(
+                f"tasks > {ABSOLUTE_MAX_TASKS}: absolute ceiling; change the code, not the flag",
+                file=sys.stderr,
+            )
             sys.exit(4)
         if args.tasks > 15 and args.db_tier == "f1-micro":
-            print("tasks > 15 on db-f1-micro risks connection exhaustion; upgrade db tier or lower tasks", file=sys.stderr)
+            print(
+                "tasks > 15 on db-f1-micro risks connection exhaustion; upgrade db tier or lower tasks",
+                file=sys.stderr,
+            )
             sys.exit(4)
 
 
@@ -205,7 +217,11 @@ Plan:
         env_vars.append(f"LIMIT={args.limit}")
 
     gcloud_cmd = [
-        "gcloud", "run", "jobs", "execute", job_name,
+        "gcloud",
+        "run",
+        "jobs",
+        "execute",
+        job_name,
         f"--project={project}",
         f"--region={REGION}",
         f"--tasks={plan.tasks}",
@@ -219,7 +235,9 @@ Plan:
 
     # Parse execution name from JSON response
     execution_name = "unknown"
-    console_url = f"https://console.cloud.google.com/run/jobs/details/{REGION}/{job_name}/executions?project={project}"
+    console_url = (
+        f"https://console.cloud.google.com/run/jobs/details/{REGION}/{job_name}/executions?project={project}"
+    )
     try:
         data = json.loads(result.stdout)
         if isinstance(data, dict):
@@ -231,22 +249,26 @@ Plan:
 
     if args.wait:
         status = "SUCCESS" if result.returncode == 0 else "FAILED"
-        emit_structured_result({
-            "status": status,
-            "execution_name": execution_name,
-            "tasks": plan.tasks,
-            "env": args.env,
-            "console_url": console_url,
-        })
+        emit_structured_result(
+            {
+                "status": status,
+                "execution_name": execution_name,
+                "tasks": plan.tasks,
+                "env": args.env,
+                "console_url": console_url,
+            }
+        )
         sys.exit(0 if result.returncode == 0 else 1)
     else:
-        emit_structured_result({
-            "status": "SUBMITTED",
-            "execution_name": execution_name,
-            "tasks": plan.tasks,
-            "env": args.env,
-            "console_url": console_url,
-        })
+        emit_structured_result(
+            {
+                "status": "SUBMITTED",
+                "execution_name": execution_name,
+                "tasks": plan.tasks,
+                "env": args.env,
+                "console_url": console_url,
+            }
+        )
         sys.exit(0)
 
 

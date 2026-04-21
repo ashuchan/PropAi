@@ -16,10 +16,10 @@ Options:
   --timeout-seconds N   Fail if run takes longer than N seconds (default: 600)
   --min-rows N          Fail if fewer than N rows written to DB (default: 3)
 """
+
 from __future__ import annotations
 
 import argparse
-import json
 import signal
 import subprocess
 import sys
@@ -64,14 +64,18 @@ def _check_gcs_dlq_empty(bucket_name: str, run_date: str) -> bool:
     gcs_path = f"gs://{bucket_name}/runs/{run_date}/shard_0/dlq.jsonl"
     result = subprocess.run(
         ["gsutil", "stat", gcs_path],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode != 0:
         return True  # file absent → no DLQ entries → OK
 
     cat_result = subprocess.run(
         ["gsutil", "cat", gcs_path],
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     content = cat_result.stdout.strip()
     return not content  # empty file → OK
@@ -99,7 +103,11 @@ def main() -> None:
     print(f"[smoke] Running canary scrape against {canary_csv}", file=sys.stderr)
 
     gcloud_cmd = [
-        "gcloud", "run", "jobs", "execute", job_name,
+        "gcloud",
+        "run",
+        "jobs",
+        "execute",
+        job_name,
         f"--project={project}",
         f"--region={REGION}",
         "--tasks=1",
@@ -111,21 +119,25 @@ def main() -> None:
 
     if result.returncode != 0:
         print(f"[smoke] Job execution failed (exit {result.returncode})", file=sys.stderr)
-        emit_structured_result({
-            "status": "FAILED",
-            "failed_check": "job_exit_code",
-            "env": args.env,
-        })
+        emit_structured_result(
+            {
+                "status": "FAILED",
+                "failed_check": "job_exit_code",
+                "env": args.env,
+            }
+        )
         sys.exit(1)
 
     # Post-condition 1: DLQ is empty
     if not _check_gcs_dlq_empty(bucket_name, run_date):
         print("[smoke] FAILED: DLQ is non-empty", file=sys.stderr)
-        emit_structured_result({
-            "status": "FAILED",
-            "failed_check": "dlq_non_empty",
-            "env": args.env,
-        })
+        emit_structured_result(
+            {
+                "status": "FAILED",
+                "failed_check": "dlq_non_empty",
+                "env": args.env,
+            }
+        )
         sys.exit(5)
 
     # All checks passed

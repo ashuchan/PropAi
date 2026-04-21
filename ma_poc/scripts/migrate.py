@@ -15,6 +15,7 @@ The script:
   5. Invokes alembic
   6. Always stops the proxy cleanly in a finally block
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,9 +23,9 @@ import os
 import subprocess
 import sys
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
 
 # Mapping from env to (project_id, sql_instance_name).
 # Keep in sync with infra/terraform/envs/*.tfvars.
@@ -50,9 +51,10 @@ ALEMBIC_CONFIG = _REPO_ROOT / "infra" / "sql" / "alembic.ini"
 def ensure_sql_running(project: str, instance: str) -> None:
     """Handle the stop-when-idle trap; return only when SQL is RUNNABLE."""
     result = subprocess.run(
-        ["gcloud", "sql", "instances", "describe", instance,
-         f"--project={project}", "--format=value(state)"],
-        capture_output=True, text=True, check=False,
+        ["gcloud", "sql", "instances", "describe", instance, f"--project={project}", "--format=value(state)"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode != 0:
         print(f"Failed to describe SQL instance {instance}: {result.stderr}", file=sys.stderr)
@@ -64,16 +66,32 @@ def ensure_sql_running(project: str, instance: str) -> None:
 
     print(f"SQL instance state: {state}; starting...", file=sys.stderr)
     subprocess.run(
-        ["gcloud", "sql", "instances", "patch", instance,
-         f"--project={project}", "--activation-policy=ALWAYS"],
+        [
+            "gcloud",
+            "sql",
+            "instances",
+            "patch",
+            instance,
+            f"--project={project}",
+            "--activation-policy=ALWAYS",
+        ],
         check=True,
     )
     # Poll until ready (max 3 minutes)
     for _ in range(36):
         result = subprocess.run(
-            ["gcloud", "sql", "instances", "describe", instance,
-             f"--project={project}", "--format=value(state)"],
-            capture_output=True, text=True, check=False,
+            [
+                "gcloud",
+                "sql",
+                "instances",
+                "describe",
+                instance,
+                f"--project={project}",
+                "--format=value(state)",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if result.stdout.strip() == "RUNNABLE":
             print("SQL instance is RUNNABLE", file=sys.stderr)
@@ -83,9 +101,7 @@ def ensure_sql_running(project: str, instance: str) -> None:
 
 
 @contextmanager
-def cloud_sql_proxy(
-    project: str, instance: str, region: str = "us-central1"
-) -> Generator[None, None, None]:
+def cloud_sql_proxy(project: str, instance: str, region: str = "us-central1") -> Generator[None, None, None]:
     """Spawn cloud-sql-proxy; yield when ready; terminate on exit."""
     conn_name = f"{project}:{region}:{instance}"
     proc = subprocess.Popen(
@@ -135,7 +151,9 @@ def main() -> None:
     # Get the authenticated IAM identity (SA email or user email)
     result = subprocess.run(
         ["gcloud", "config", "get-value", "account"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     iam_user = result.stdout.strip()
 

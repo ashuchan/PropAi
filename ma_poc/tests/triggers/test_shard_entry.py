@@ -1,10 +1,11 @@
 """Unit tests for jugnu_shard_entry.py — CSV slicing and artifact upload logic."""
+
 from __future__ import annotations
 
 import csv
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -15,10 +16,10 @@ for _p in (_app, _here):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from scripts.jugnu_shard_entry import _slice_csv, _upload_artifacts
-
+from scripts.jugnu_shard_entry import _slice_csv, _upload_artifacts  # noqa: E402
 
 # ── CSV slicing ──────────────────────────────────────────────────────────────
+
 
 def _make_csv(tmp_path: Path, rows: list[list[str]]) -> Path:
     p = tmp_path / "props.csv"
@@ -88,6 +89,7 @@ class TestSliceCsv:
 
 # ── artifact upload ──────────────────────────────────────────────────────────
 
+
 class TestUploadArtifacts:
     def test_uploads_existing_artifacts(self, tmp_path: Path) -> None:
         """When artifacts exist, gsutil cp is called for each one."""
@@ -111,7 +113,7 @@ class TestUploadArtifacts:
         def patched_path(s: str) -> Path:
             # Redirect /tmp/data/... to our tmp_path/data/...
             if s.startswith("/tmp/"):
-                return tmp_path / s[len("/tmp/"):]
+                return tmp_path / s[len("/tmp/") :]
             return original_path_cls(s)
 
         with patch("subprocess.run", side_effect=fake_run):
@@ -144,6 +146,7 @@ class TestUploadArtifacts:
 
 
 # ── runner exit code propagation ─────────────────────────────────────────────
+
 
 class TestRunnerExitCode:
     def test_runner_failure_propagates_and_artifacts_still_uploaded(

@@ -25,6 +25,7 @@ Examples:
   python scripts/trigger_retry.py --env prod --mode errors --run-date 2026-04-18
   python scripts/trigger_retry.py --env staging --mode resume
 """
+
 from __future__ import annotations
 
 import argparse
@@ -66,10 +67,13 @@ def _parse_args() -> argparse.Namespace:
         epilog=__doc__,
     )
     p.add_argument("--env", choices=["staging", "prod"], required=True)
-    p.add_argument("--mode", choices=["errors", "resume"], required=True,
-                   help="errors = retry failed properties; resume = resume interrupted run")
-    p.add_argument("--run-date", metavar="YYYY-MM-DD",
-                   help="Target run date (default: most recent)")
+    p.add_argument(
+        "--mode",
+        choices=["errors", "resume"],
+        required=True,
+        help="errors = retry failed properties; resume = resume interrupted run",
+    )
+    p.add_argument("--run-date", metavar="YYYY-MM-DD", help="Target run date (default: most recent)")
     p.add_argument("--limit", type=int, metavar="N")
     p.add_argument("--wait", dest="wait", action="store_true", default=True)
     p.add_argument("--no-wait", dest="wait", action="store_false")
@@ -123,7 +127,11 @@ Plan:
         env_vars.append(f"LIMIT={args.limit}")
 
     gcloud_cmd = [
-        "gcloud", "run", "jobs", "execute", job_name,
+        "gcloud",
+        "run",
+        "jobs",
+        "execute",
+        job_name,
         f"--project={project}",
         f"--region={REGION}",
         f"--update-env-vars={','.join(env_vars)}",
@@ -135,7 +143,9 @@ Plan:
     result = run_gcloud(*gcloud_cmd)
 
     execution_name = "unknown"
-    console_url = f"https://console.cloud.google.com/run/jobs/details/{REGION}/{job_name}/executions?project={project}"
+    console_url = (
+        f"https://console.cloud.google.com/run/jobs/details/{REGION}/{job_name}/executions?project={project}"
+    )
     try:
         data = json.loads(result.stdout)
         if isinstance(data, dict):
@@ -147,22 +157,26 @@ Plan:
 
     if args.wait:
         status = "SUCCESS" if result.returncode == 0 else "FAILED"
-        emit_structured_result({
-            "status": status,
-            "execution_name": execution_name,
-            "mode": args.mode,
-            "env": args.env,
-            "console_url": console_url,
-        })
+        emit_structured_result(
+            {
+                "status": status,
+                "execution_name": execution_name,
+                "mode": args.mode,
+                "env": args.env,
+                "console_url": console_url,
+            }
+        )
         sys.exit(0 if result.returncode == 0 else 1)
     else:
-        emit_structured_result({
-            "status": "SUBMITTED",
-            "execution_name": execution_name,
-            "mode": args.mode,
-            "env": args.env,
-            "console_url": console_url,
-        })
+        emit_structured_result(
+            {
+                "status": "SUBMITTED",
+                "execution_name": execution_name,
+                "mode": args.mode,
+                "env": args.env,
+                "console_url": console_url,
+            }
+        )
         sys.exit(0)
 
 

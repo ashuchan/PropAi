@@ -22,6 +22,7 @@ Flow:
 Artifact upload happens in a try/finally — ensures artifacts exist even when
 the runner crashes. This is how Claude Code debugs failed shards.
 """
+
 from __future__ import annotations
 
 import csv
@@ -29,13 +30,13 @@ import math
 import os
 import subprocess
 import sys
-from datetime import UTC, date, datetime
+from datetime import date
 from pathlib import Path
 
 # Ensure ma_poc is importable when invoked as /app/ma_poc/scripts/jugnu_shard_entry.py
 _script_dir = Path(__file__).resolve().parent
-_ma_poc_root = _script_dir.parent   # /app/ma_poc
-_app_root = _ma_poc_root.parent     # /app
+_ma_poc_root = _script_dir.parent  # /app/ma_poc
+_app_root = _ma_poc_root.parent  # /app
 for _p in (_app_root, _ma_poc_root):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
@@ -130,11 +131,16 @@ def main() -> None:
     # 4-5. Run the pipeline; always upload artifacts
     runner = _app_root / "ma_poc" / "scripts" / "jugnu_runner.py"
     cmd = [
-        sys.executable, str(runner),
-        "--csv", str(shard_csv),
-        "--run-date", run_date,
-        "--schema-version", schema_version,
-        "--data-dir", "/tmp/data",
+        sys.executable,
+        str(runner),
+        "--csv",
+        str(shard_csv),
+        "--run-date",
+        run_date,
+        "--schema-version",
+        schema_version,
+        "--data-dir",
+        "/tmp/data",
     ]
     if limit is not None:
         cmd += ["--limit", str(limit)]

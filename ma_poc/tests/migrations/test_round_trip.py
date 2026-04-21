@@ -6,6 +6,7 @@ container — no external database needed.
 
 Requires: testcontainers[postgres], alembic, sqlalchemy, psycopg[binary]
 """
+
 from __future__ import annotations
 
 import os

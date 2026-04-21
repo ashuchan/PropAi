@@ -12,6 +12,7 @@ Usage:
   python scripts/deploy_csv_sync.py --env staging
   python scripts/deploy_csv_sync.py --env prod --path data/property-list/properties.csv
 """
+
 from __future__ import annotations
 
 import argparse
@@ -37,9 +38,14 @@ def validate(path: Path) -> None:
     # Accept the canonical header or common variants
     if header != EXPECTED_HEADER:
         # Also accept header-less or extended CSVs as long as first column looks like an ID
-        if not header or (header[0].lower() not in ("canonical_id", "id", "property_id", "unique_id", "apartmentid")):
+        if not header or (
+            header[0].lower() not in ("canonical_id", "id", "property_id", "unique_id", "apartmentid")
+        ):
             sys.exit(f"CSV header mismatch.\n  Expected: {EXPECTED_HEADER}\n  Got:      {header}")
-        print(f"WARNING: CSV header {header!r} differs from canonical {EXPECTED_HEADER!r}; proceeding", file=sys.stderr)
+        print(
+            f"WARNING: CSV header {header!r} differs from canonical {EXPECTED_HEADER!r}; proceeding",
+            file=sys.stderr,
+        )
 
     # Second pass: count rows and check for duplicate canonical_ids
     with path.open(newline="") as f:
@@ -65,19 +71,27 @@ def validate(path: Path) -> None:
 
 def upload(path: Path, env: str) -> None:
     target = f"gs://jugnu-raw-{env}/property-list/properties.csv"
-    subprocess.check_call([
-        "gsutil",
-        "-h", "Cache-Control:no-cache",
-        "cp", str(path), target,
-    ])
+    subprocess.check_call(
+        [
+            "gsutil",
+            "-h",
+            "Cache-Control:no-cache",
+            "cp",
+            str(path),
+            target,
+        ]
+    )
     print(f"✓ uploaded to {target}", file=sys.stderr)
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Sync property-list CSV to GCS.")
     p.add_argument("--env", choices=["staging", "prod"], required=True)
-    p.add_argument("--path", default="data/property-list/properties.csv",
-                   help="Local CSV path (default: data/property-list/properties.csv)")
+    p.add_argument(
+        "--path",
+        default="data/property-list/properties.csv",
+        help="Local CSV path (default: data/property-list/properties.csv)",
+    )
     args = p.parse_args()
     csv_path = Path(args.path)
     validate(csv_path)

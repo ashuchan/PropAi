@@ -22,6 +22,7 @@ Flow:
   6. Upload any new artifacts back to gs://{bucket}/runs/{run_date}/retry-{timestamp}/
   7. Exit with runner's code.
 """
+
 from __future__ import annotations
 
 import os
@@ -93,11 +94,15 @@ def main() -> None:
     runner = _app_root / "ma_poc" / "scripts" / "jugnu_retry_runner.py"
     mode_flag = "--retry-errors" if retry_mode == "errors" else "--resume"
     cmd = [
-        sys.executable, str(runner),
+        sys.executable,
+        str(runner),
         mode_flag,
-        "--run-date", run_date,
-        "--csv", str(csv_local),
-        "--data-dir", "/tmp/data",
+        "--run-date",
+        run_date,
+        "--csv",
+        str(csv_local),
+        "--data-dir",
+        "/tmp/data",
     ]
     if limit is not None:
         cmd += ["--limit", str(limit)]

@@ -1,10 +1,10 @@
 """Unit tests for jugnu_retry_entry.py — mode translation and env handling."""
+
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -44,7 +44,9 @@ class TestRetryModeTranslation:
                 with pytest.raises(SystemExit):
                     # Re-import to pick up fresh env
                     import importlib
+
                     import scripts.jugnu_retry_entry as m  # noqa: PLC0415
+
                     importlib.reload(m)
                     m.main()
 
@@ -69,7 +71,9 @@ class TestRetryModeTranslation:
 
         with pytest.raises(SystemExit) as exc_info:
             import importlib
+
             import scripts.jugnu_retry_entry as m  # noqa: PLC0415
+
             importlib.reload(m)
             m.main()
 
@@ -83,7 +87,9 @@ class TestRetryModeTranslation:
 
         with pytest.raises(SystemExit) as exc_info:
             import importlib
+
             import scripts.jugnu_retry_entry as m  # noqa: PLC0415
+
             importlib.reload(m)
             m.main()
 
@@ -96,7 +102,9 @@ class TestRetryModeTranslation:
 
         with pytest.raises(SystemExit) as exc_info:
             import importlib
+
             import scripts.jugnu_retry_entry as m  # noqa: PLC0415
+
             importlib.reload(m)
             m.main()
 
