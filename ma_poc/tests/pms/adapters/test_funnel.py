@@ -1,4 +1,5 @@
 """Change 3 — Funnel / Nestio adapter tests."""
+
 from __future__ import annotations
 
 import json
@@ -32,7 +33,9 @@ def _make_ctx(
     ctx = AdapterContext(
         base_url=base_url,
         detected=DetectedPMS(
-            pms="funnel", confidence=0.95, evidence=["test"],
+            pms="funnel",
+            confidence=0.95,
+            evidence=["test"],
             recommended_strategy="api_first",
         ),
         profile=None,
@@ -55,10 +58,12 @@ class _DummyPage:
 @pytest.mark.asyncio
 async def test_funnel_extract_happy_path_from_fixture() -> None:
     body = _load_fixture("synthetic_listings.json")
-    responses = [{
-        "url": "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x",
-        "body": body,
-    }]
+    responses = [
+        {
+            "url": "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x",
+            "body": body,
+        }
+    ]
     adapter = FunnelAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -73,10 +78,12 @@ async def test_funnel_extract_happy_path_from_fixture() -> None:
 @pytest.mark.asyncio
 async def test_funnel_extract_from_second_fixture() -> None:
     body = _load_fixture("synthetic_wrapped.json")
-    responses = [{
-        "url": "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=y",
-        "body": body,
-    }]
+    responses = [
+        {
+            "url": "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=y",
+            "body": body,
+        }
+    ]
     adapter = FunnelAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -103,11 +110,15 @@ async def test_funnel_returns_empty_on_no_data() -> None:
 @pytest.mark.asyncio
 async def test_funnel_tier_re_stamped_on_shape_reject() -> None:
     # RentCafe-shaped body, no nestiolistings URL — must shape-reject.
-    rentcafe_body = [{
-        "floorplanName": "A1", "floorplanId": "1",
-        "minimumRent": "1500", "maximumRent": "1600",
-        "api": "rentcafe",
-    }]
+    rentcafe_body = [
+        {
+            "floorplanName": "A1",
+            "floorplanId": "1",
+            "minimumRent": "1500",
+            "maximumRent": "1600",
+            "api": "rentcafe",
+        }
+    ]
     adapter = FunnelAdapter()
     ctx = _make_ctx([{"url": "https://other.example/x", "body": rentcafe_body}])
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -117,10 +128,14 @@ async def test_funnel_tier_re_stamped_on_shape_reject() -> None:
 @pytest.mark.asyncio
 async def test_funnel_tier_re_stamped_on_empty_list() -> None:
     adapter = FunnelAdapter()
-    ctx = _make_ctx([{
-        "url": "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x",
-        "body": {"results": []},
-    }])
+    ctx = _make_ctx(
+        [
+            {
+                "url": "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x",
+                "body": {"results": []},
+            }
+        ]
+    )
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert result.tier_used == "TIER_1_API_FUNNEL_LIST_EMPTY"
 
@@ -143,15 +158,18 @@ def test_funnel_matches_response_body_accepts_real_capture() -> None:
 
 def test_funnel_matches_response_body_rejects_rentcafe_and_sightmap() -> None:
     rentcafe_body = {
-        "data": [{
-            "floorplanName": "A1", "floorplanId": "1",
-            "minimumRent": "1500", "maximumRent": "1600",
-        }]
+        "data": [
+            {
+                "floorplanName": "A1",
+                "floorplanId": "1",
+                "minimumRent": "1500",
+                "maximumRent": "1600",
+            }
+        ]
     }
     sightmap_body = {
         "data": {
-            "floor_plans": [{"id": 1, "name": "A",
-                             "bedroom_count": 1, "filter_label": "1BR"}],
+            "floor_plans": [{"id": 1, "name": "A", "bedroom_count": 1, "filter_label": "1BR"}],
             "units": [{"floor_plan_id": "1", "price": 1500}],
         }
     }
@@ -168,7 +186,8 @@ def test_funnel_matches_response_body_rejects_rentcafe_and_sightmap() -> None:
 def test_funnel_tier_used_is_pms_specific() -> None:
     body = _load_fixture("synthetic_listings.json")
     units = parse_funnel_listings(
-        body, "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x")
+        body, "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x"
+    )
     assert units
     for u in units:
         assert "FUNNEL" in u["extraction_tier"]
@@ -204,12 +223,8 @@ def test_funnel_rent_within_sanity_range() -> None:
 
 
 def test_funnel_url_marker_check() -> None:
-    assert _is_funnel_response_url(
-        "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x"
-    )
-    assert _is_funnel_response_url(
-        "https://nestiostaging.com/api/v2/listings/residential/rentals/?key=y"
-    )
+    assert _is_funnel_response_url("https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x")
+    assert _is_funnel_response_url("https://nestiostaging.com/api/v2/listings/residential/rentals/?key=y")
     assert not _is_funnel_response_url("https://windsorcommunities.com/")
 
 
@@ -230,7 +245,7 @@ def test_funnel_body_check_handles_various_envelopes() -> None:
 
 @pytest.mark.skip(
     reason="research-blocked: need >=2 real Funnel captures from "
-           "Windsor 65069/77589/5715 before enabling this test"
+    "Windsor 65069/77589/5715 before enabling this test"
 )
 def test_funnel_real_capture_unit_count_matches_property_inventory() -> None:
     raise AssertionError("placeholder for real-capture validation")

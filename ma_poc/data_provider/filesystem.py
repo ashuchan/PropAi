@@ -18,15 +18,17 @@ Layout (paths below are rooted at `base_dir` / `config_dir`):
     {base_dir}/extraction_output/{pid}/{date}.json  — IExtractionResultStore
     {config_dir}/profiles/{canonical_id}.json — IProfileStore
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import os
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from data_provider.contracts import (
     DataProvider,
@@ -61,7 +63,6 @@ if str(_MA_POC_ROOT) not in sys.path:
 
 from scripts.state_store import StateStore as _StateStore  # noqa: E402
 from services.profile_store import ProfileStore as _ProfileStore  # noqa: E402
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -125,9 +126,7 @@ class FsPropertyStateStore(IPropertyStateStore):
         self._ensure_loaded()
         return self._s.is_known(canonical_id)
 
-    def upsert(
-        self, canonical_id: str, snapshot: dict[str, Any], run_date: str
-    ) -> bool:
+    def upsert(self, canonical_id: str, snapshot: dict[str, Any], run_date: str) -> bool:
         self._ensure_loaded()
         is_new = self._s.upsert_property(canonical_id, snapshot, run_date)
         self._owner._dirty = True
@@ -169,9 +168,7 @@ class FsUnitStateStore(IUnitStateStore):
         self._owner._dirty = True
         return UnitDiff(**diff)
 
-    def carry_forward_units(
-        self, canonical_id: str, run_date: str
-    ) -> list[dict[str, Any]]:
+    def carry_forward_units(self, canonical_id: str, run_date: str) -> list[dict[str, Any]]:
         self._ensure_loaded()
         result = self._s.carry_forward_units(canonical_id, run_date)
         self._owner._dirty = True
@@ -188,9 +185,7 @@ class FsRunStore(IRunStore):
     def _run_dir(self, run_date: str) -> Path:
         return self._runs / run_date
 
-    def write_properties(
-        self, run_date: str, properties: list[dict[str, Any]]
-    ) -> None:
+    def write_properties(self, run_date: str, properties: list[dict[str, Any]]) -> None:
         _atomic_write_json(self._run_dir(run_date) / "properties.json", properties)
 
     def read_properties(self, run_date: str) -> list[dict[str, Any]]:
@@ -333,9 +328,7 @@ class FsExtractionResultStore(IExtractionResultStore):
             result.model_dump(mode="json"),
         )
 
-    def read(
-        self, run_date: str, property_id: str
-    ) -> ExtractionResult | None:
+    def read(self, run_date: str, property_id: str) -> ExtractionResult | None:
         path = self._path(property_id, run_date)
         if not path.exists():
             return None
@@ -379,8 +372,7 @@ class FileSystemDataProvider(DataProvider):
         self.unit_state = FsUnitStateStore(self._shared_state, self)
         self.runs = FsRunStore(self._base)
         self.scrape_events = FsScrapeEventStore(
-            Path(scrape_events_path) if scrape_events_path
-            else self._base / "scrape_events.jsonl"
+            Path(scrape_events_path) if scrape_events_path else self._base / "scrape_events.jsonl"
         )
         self.profiles = FsProfileStore(self._config / "profiles")
         self.extraction_results = FsExtractionResultStore(self._base)

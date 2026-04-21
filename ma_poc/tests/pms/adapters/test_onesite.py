@@ -1,4 +1,5 @@
 """Phase 3 — OneSite (RealPage) adapter tests."""
+
 from __future__ import annotations
 
 import json
@@ -58,8 +59,12 @@ async def test_onesite_extract_from_stored_fixture() -> None:
 
 @pytest.mark.asyncio
 async def test_onesite_extract_returns_empty_on_no_data() -> None:
-    responses = [{"url": "https://api.ws.realpage.com/v2/property/999/floorplans",
-                  "body": {"status": 200, "response": {"floorplans": []}}}]
+    responses = [
+        {
+            "url": "https://api.ws.realpage.com/v2/property/999/floorplans",
+            "body": {"status": 200, "response": {"floorplans": []}},
+        }
+    ]
     adapter = OneSiteAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -76,12 +81,19 @@ def test_parse_realpage_beds_baths_extraction() -> None:
     body = {
         "status": 200,
         "response": {
-            "floorplans": [{
-                "id": "1", "name": "2/1", "bedRooms": "2", "bathRooms": "1",
-                "minimumSquareFeet": "750", "maximumSquareFeet": "750",
-                "minimumMarketRent": 1895.0, "maximumMarketRent": 1995.0,
-            }]
-        }
+            "floorplans": [
+                {
+                    "id": "1",
+                    "name": "2/1",
+                    "bedRooms": "2",
+                    "bathRooms": "1",
+                    "minimumSquareFeet": "750",
+                    "maximumSquareFeet": "750",
+                    "minimumMarketRent": 1895.0,
+                    "maximumMarketRent": 1995.0,
+                }
+            ]
+        },
     }
     units = parse_realpage_floorplans(body, "test")
     assert len(units) == 1
@@ -98,10 +110,18 @@ def test_tier_used_label_is_pms_specific() -> None:
     body = {
         "status": 200,
         "response": {
-            "floorplans": [{"id": "1", "name": "A", "bedRooms": "1", "bathRooms": "1",
-                            "minimumSquareFeet": "500", "minimumMarketRent": 1000.0,
-                            "maximumMarketRent": 1200.0}]
-        }
+            "floorplans": [
+                {
+                    "id": "1",
+                    "name": "A",
+                    "bedRooms": "1",
+                    "bathRooms": "1",
+                    "minimumSquareFeet": "500",
+                    "minimumMarketRent": 1000.0,
+                    "maximumMarketRent": 1200.0,
+                }
+            ]
+        },
     }
     units = parse_realpage_floorplans(body, "test")
     assert "ONESITE" in units[0]["extraction_tier"]
@@ -110,6 +130,7 @@ def test_tier_used_label_is_pms_specific() -> None:
 def test_rent_within_sanity_range() -> None:
     responses = _load_fixture("293707.json")
     import re
+
     for resp in responses:
         body = resp.get("body")
         if isinstance(body, dict):

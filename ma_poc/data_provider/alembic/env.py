@@ -4,9 +4,9 @@ Resolves the DB URL at runtime from `DATABASE_URL` (via
 `data_provider.sql.engine.resolve_database_url`) so the same alembic
 command works against Postgres in prod and SQLite locally.
 """
+
 from __future__ import annotations
 
-import os
 import sys
 from logging.config import fileConfig
 from pathlib import Path

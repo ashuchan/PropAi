@@ -18,6 +18,7 @@ for post-run inspection.
 LLM model: inherits AZURE_OPENAI_DEPLOYMENT env var, same as llm_extractor.py.
 Temperature: 0.0 on all calls.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -60,10 +61,7 @@ class FieldMappingFix(BaseModel):
         description="The actual value from the payload for this field, for verification",
     )
     code_change: str = Field(
-        description=(
-            "Exact Python expression to extract this field from item_lc (the lowercased "
-            "item dict)."
-        )
+        description=("Exact Python expression to extract this field from item_lc (the lowercased item dict).")
     )
 
 
@@ -71,7 +69,7 @@ class WrapperFix(BaseModel):
     wrapper_key_path: list[str] = Field(
         description=(
             "Ordered list of dict keys to traverse to reach the floorplan list. "
-            "Single-level: [\"data\"]. Two-level: [\"response\", \"result\"]. "
+            'Single-level: ["data"]. Two-level: ["response", "result"]. '
             "Root list: []."
         )
     )
@@ -82,9 +80,7 @@ class AdapterDiagnosis(BaseModel):
     property_id: str
     adapter_name: str
     payload_url: str
-    diagnosis_summary: str = Field(
-        description="One paragraph plain-English summary of why extraction failed"
-    )
+    diagnosis_summary: str = Field(description="One paragraph plain-English summary of why extraction failed")
     failure_category: Literal[
         "case_mismatch",
         "missing_wrapper_key",
@@ -293,6 +289,7 @@ async def _call_llm(
     """
     try:
         from llm.factory import get_text_provider  # type: ignore[import-not-found]
+
         provider = get_text_provider()
     except Exception as exc:
         log.warning("llm_diagnostics: failed to get LLM provider: %s", exc)
@@ -468,10 +465,7 @@ async def null_field_recovery(
     Writes/appends to {output_dir}/{property_id}_field_recovery.json.
     """
     try:
-        needs_recovery = (
-            partial_unit.get("rent_low") is None
-            or partial_unit.get("unit_id") is None
-        )
+        needs_recovery = partial_unit.get("rent_low") is None or partial_unit.get("unit_id") is None
         if not needs_recovery:
             return None
 

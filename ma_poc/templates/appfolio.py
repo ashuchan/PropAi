@@ -9,6 +9,7 @@ Selectors (priority order):
 Handles paginated unit tables (each page concatenated by caller before extract).
 Falls back to regex-based text extraction when CSS selectors miss fields.
 """
+
 from __future__ import annotations
 
 from bs4 import BeautifulSoup, Tag
@@ -121,15 +122,9 @@ def _extract_from_card(card: Tag, property_id: str) -> UnitRecord | None:
         or text_of(card, "[class*='bed']")
     )
 
-    floor_text = (
-        text_of(card, ".floor")
-        or text_of(card, "[class*='floor']")
-    )
+    floor_text = text_of(card, ".floor") or text_of(card, "[class*='floor']")
 
-    building_text = (
-        text_of(card, ".building")
-        or text_of(card, "[class*='building']")
-    )
+    building_text = text_of(card, ".building") or text_of(card, "[class*='building']")
 
     # ── Regex fallback on card text ───────────────────────────────────────
     card_text = full_text(card)

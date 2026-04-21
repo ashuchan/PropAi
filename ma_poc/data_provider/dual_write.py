@@ -22,11 +22,13 @@ Env wiring: set `DATA_PROVIDER=dual` and (optionally)
 `DUAL_PRIMARY=filesystem|postgres`, `DUAL_SECONDARY=postgres|filesystem`.
 Defaults: primary=filesystem, secondary=postgres.
 """
+
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 from data_provider.contracts import (
     DataProvider,
@@ -89,16 +91,12 @@ class _DualUnitState(IUnitStateStore):
     def get_units(self, canonical_id: str) -> dict[str, UnitIndexEntry]:
         return self._p.get_units(canonical_id)
 
-    def upsert_units(
-        self, canonical_id: str, today_units: list[dict[str, Any]], run_date: str
-    ) -> UnitDiff:
+    def upsert_units(self, canonical_id: str, today_units: list[dict[str, Any]], run_date: str) -> UnitDiff:
         diff = self._p.upsert_units(canonical_id, today_units, run_date)
         _shadow("unit_state.upsert_units", self._s.upsert_units, canonical_id, today_units, run_date)
         return diff
 
-    def carry_forward_units(
-        self, canonical_id: str, run_date: str
-    ) -> list[dict[str, Any]]:
+    def carry_forward_units(self, canonical_id: str, run_date: str) -> list[dict[str, Any]]:
         carried = self._p.carry_forward_units(canonical_id, run_date)
         _shadow("unit_state.carry_forward_units", self._s.carry_forward_units, canonical_id, run_date)
         return carried
@@ -228,8 +226,7 @@ class DualWriteDataProvider(DataProvider):
                     yield
             except Exception:
                 log.exception(
-                    "Secondary transaction failed; primary will roll back too "
-                    "to keep the two in sync"
+                    "Secondary transaction failed; primary will roll back too to keep the two in sync"
                 )
                 raise
 

@@ -6,13 +6,13 @@ Audit copies at ``config/profiles/_audit/{canonical_id}_{version}.json``.
 
 Phase: claude-scrapper-arch.md Step 1.2
 """
+
 from __future__ import annotations
 
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from models.scrape_profile import (
     ApiHints,
@@ -40,7 +40,7 @@ class ProfileStore:
         self._base.mkdir(parents=True, exist_ok=True)
         self._audit.mkdir(parents=True, exist_ok=True)
 
-    def load(self, canonical_id: str) -> Optional[ScrapeProfile]:
+    def load(self, canonical_id: str) -> ScrapeProfile | None:
         """Load a profile by canonical ID. Returns None if not found."""
         safe_name = _safe_filename(canonical_id)
         path = self._base / f"{safe_name}.json"

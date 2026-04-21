@@ -15,6 +15,7 @@ Usage:
   python scripts/jugnu_runner.py --csv config/properties.csv --limit 20
   python scripts/jugnu_runner.py --csv config/properties.csv --schema-version v2
 """
+
 from __future__ import annotations
 
 import argparse
@@ -41,6 +42,7 @@ for _p in (_repo_root, _MA_POC_ROOT):
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -137,7 +139,9 @@ async def run_jugnu(
     # Setup
     today = run_date or date.today().isoformat()
     run_dir, state_dir, cache_dir, schema_root = _resolve_data_dirs(
-        data_dir, schema_version, today,
+        data_dir,
+        schema_version,
+        today,
     )
     run_id = f"{today}_{uuid.uuid4().hex[:8]}"
 
@@ -152,7 +156,10 @@ async def run_jugnu(
     rows = _load_csv(csv_path, limit, start_index=start_index)
     log.info(
         "Loaded %d properties from %s (start_index=%d, limit=%s)",
-        len(rows), csv_path, start_index, limit,
+        len(rows),
+        csv_path,
+        start_index,
+        limit,
     )
 
     # Setup L2 components
@@ -165,8 +172,11 @@ async def run_jugnu(
     profile_store = _SimpleProfileStore(_MA_POC_ROOT / "config" / "profiles")
 
     scheduler = Scheduler(
-        frontier=frontier, dlq=dlq, sitemap=sitemap,
-        profile_store=profile_store, change_detector_fn=decide_change,
+        frontier=frontier,
+        dlq=dlq,
+        sitemap=sitemap,
+        profile_store=profile_store,
+        change_detector_fn=decide_change,
     )
 
     # Build tasks
@@ -191,7 +201,12 @@ async def run_jugnu(
         try:
             csv_row = csv_lookup.get(task.property_id, {})
             result = await _process_property(
-                task, cost_ledger, profile_store, frontier, dlq, data_dir,
+                task,
+                cost_ledger,
+                profile_store,
+                frontier,
+                dlq,
+                data_dir,
                 csv_row=csv_row,
                 run_dir=run_dir,
             )
@@ -201,20 +216,30 @@ async def run_jugnu(
             # recoveries in place on the unit dicts.
             if schema_version == "v2":
                 await _run_null_field_recovery(
-                    result, formatted, run_dir, task.property_id,
+                    result,
+                    formatted,
+                    run_dir,
+                    task.property_id,
                 )
             # Per-property report — same format as daily_runner emits, but
             # sourced from jugnu's raw scrape_result + formatted v1/v2 record
             # so v2 metadata (apartment_id/pmc/website_design/concessions)
             # and v2 unit fields (beds/baths/rent_low/rent_high) render.
             _write_property_report(
-                result, formatted, run_dir, task.property_id, today,
+                result,
+                formatted,
+                run_dir,
+                task.property_id,
+                today,
             )
             return formatted
         except Exception as exc:
             log.error("Property %s crashed: %s", task.property_id, exc)
             return _make_failed_record(
-                task.property_id, task.url, str(exc), schema_version,
+                task.property_id,
+                task.url,
+                str(exc),
+                schema_version,
             )
 
     results = await pool.map(_process_one, [(t,) for t in tasks])
@@ -248,7 +273,9 @@ async def run_jugnu(
 
     log.info(
         "Jugnu run complete: this batch=%d, run-dir total=%d, failed=%d",
-        len(properties), len(merged_properties), report["totals"]["failed"],
+        len(properties),
+        len(merged_properties),
+        report["totals"]["failed"],
     )
     return report
 
@@ -295,6 +322,7 @@ async def _process_property(
             # Try carry-forward from prior state
             from ma_poc.discovery.carry_forward import carry_forward_property
             from ma_poc.scripts.state_store import StateStore
+
             try:
                 state_store = StateStore(data_dir / "state")
                 cf_record = carry_forward_property(
@@ -341,8 +369,10 @@ async def _process_property(
 
             units_extracted = len(result.get("units") or [])
             profile = update_profile_after_extraction(
-                profile, result, units_extracted, profile_store.backing
-                if hasattr(profile_store, "backing") else profile_store,
+                profile,
+                result,
+                units_extracted,
+                profile_store.backing if hasattr(profile_store, "backing") else profile_store,
             )
             drift_detected, reasons = detect_drift(profile, units_extracted, result)
             if drift_detected:
@@ -363,8 +393,11 @@ async def _process_property(
             pms = result.get("_detected_pms", {}).get("pms", "unknown")
             tier = result.get("extraction_tier_used", "unknown")
             cost_ledger.record_llm(
-                task.property_id, pms, tier,
-                extract_result.llm_cost_usd, "gpt-4o-mini",
+                task.property_id,
+                pms,
+                tier,
+                extract_result.llm_cost_usd,
+                "gpt-4o-mini",
                 0,  # tokens not tracked at this level
             )
 
@@ -379,8 +412,12 @@ async def _process_property(
     meta["verdict"] = verdict.verdict.value
     meta["verdict_reason"] = verdict.reason
 
-    emit(EventKind.PROPERTY_EMITTED, task.property_id,
-         verdict=verdict.verdict.value, units=len(result.get("units", [])))
+    emit(
+        EventKind.PROPERTY_EMITTED,
+        task.property_id,
+        verdict=verdict.verdict.value,
+        units=len(result.get("units", [])),
+    )
 
     # ── F1: Adapter Debugger ──────────────────────────────────────────────
     # Runs once per FAILED_NO_DATA on TIER_1_* tiers. Gated by existing
@@ -388,25 +425,25 @@ async def _process_property(
     _tier_used = ""
     if extract_result is not None:
         _tier_used = getattr(extract_result, "tier_used", "") or ""
-    if (
-        run_dir is not None
-        and verdict.verdict.value == "FAILED_NO_DATA"
-        and _tier_used.startswith("TIER_1_")
-    ):
+    if run_dir is not None and verdict.verdict.value == "FAILED_NO_DATA" and _tier_used.startswith("TIER_1_"):
         try:
             from ma_poc.services.llm_diagnostics import (
                 adapter_debugger,
                 get_adapter_parser_source,
             )
+
             _raw_apis = result.get("_raw_api_responses") or []
             _KNOWN_ADAPTERS = {
-                "rentcafe", "sightmap", "appfolio", "entrata",
-                "onesite", "realpage", "generic",
+                "rentcafe",
+                "sightmap",
+                "appfolio",
+                "entrata",
+                "onesite",
+                "realpage",
+                "generic",
             }
             _adapter_name = (
-                _tier_used.replace("TIER_1_API_", "")
-                .replace("TIER_1_API", "generic")
-                .lower()
+                _tier_used.replace("TIER_1_API_", "").replace("TIER_1_API", "generic").lower()
             ) or "generic"
             if _adapter_name not in _KNOWN_ADAPTERS:
                 _adapter_name = "generic"
@@ -415,9 +452,7 @@ async def _process_property(
             _diag_path = _diag_dir / f"{task.property_id}_adapter_debug.json"
 
             if _diag_path.exists():
-                log.debug(
-                    "F1 diagnosis already exists for %s, skipping", task.property_id
-                )
+                log.debug("F1 diagnosis already exists for %s, skipping", task.property_id)
             else:
                 _csv_row = csv_row or {}
                 for _resp in _raw_apis[:3]:
@@ -433,13 +468,9 @@ async def _process_property(
                                 or _csv_row.get("proj_name")
                                 or ""
                             ),
-                            "website": str(
-                                _csv_row.get("website") or _csv_row.get("Website") or ""
-                            ),
+                            "website": str(_csv_row.get("website") or _csv_row.get("Website") or ""),
                             "city": str(_csv_row.get("city") or _csv_row.get("City") or ""),
-                            "state": str(
-                                _csv_row.get("state") or _csv_row.get("State") or ""
-                            ),
+                            "state": str(_csv_row.get("state") or _csv_row.get("State") or ""),
                         },
                         output_dir=_diag_dir,
                     )
@@ -456,9 +487,7 @@ async def _process_property(
                             result.setdefault("_llm_interactions", []).append(_interaction)
                         break
         except Exception as _exc:
-            log.debug(
-                "F1 adapter_debugger hook failed for %s: %s", task.property_id, _exc
-            )
+            log.debug("F1 adapter_debugger hook failed for %s: %s", task.property_id, _exc)
 
     return result
 
@@ -609,7 +638,7 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
     meta = result.get("_meta", {})
     md = result.get("property_metadata") or {}
     units = result.get("units", [])
-    canonical_id = meta.get("canonical_id", "")
+    meta.get("canonical_id", "")
     scrape_ts = datetime.now(UTC)
 
     def _csv(key: str) -> Any:
@@ -699,6 +728,7 @@ def _format_v2_unit(unit: dict[str, Any], scrape_ts: datetime) -> dict[str, Any]
     # ships downstream.
     try:
         from ma_poc.pms.adapters._parsing import is_junk_floor_plan, is_junk_unit_number
+
         if is_junk_floor_plan(fp_name):
             fp_name = None
         if is_junk_unit_number(uid):
@@ -714,6 +744,7 @@ def _format_v2_unit(unit: dict[str, Any], scrape_ts: datetime) -> dict[str, Any]
         if rent_range:
             try:
                 from ma_poc.pms.adapters._parsing import parse_rent_range
+
                 rent_lo_raw, rent_hi_raw = parse_rent_range(str(rent_range))
             except Exception:
                 pass
@@ -759,10 +790,7 @@ async def _run_null_field_recovery(
             return
 
         units = formatted.get("units") or []
-        null_units = [
-            u for u in units
-            if u.get("rent_low") is None or u.get("unit_id") is None
-        ]
+        null_units = [u for u in units if u.get("rent_low") is None or u.get("unit_id") is None]
         if not null_units:
             return
 
@@ -855,29 +883,37 @@ def _write_property_report(
         except ImportError:
             from ma_poc.scripts.scrape_report import generate_property_report  # type: ignore[no-redef]
     except ImportError as exc:
-        log.debug("scrape_report unavailable — skipping report for %s: %s",
-                  canonical_id, exc)
+        log.debug("scrape_report unavailable — skipping report for %s: %s", canonical_id, exc)
         return
 
     from types import SimpleNamespace
 
     validated = scrape_result.get("_validated") or {}
     issues: list[Any] = []
-    for rej in (validated.get("rejected") or []):
+    for rej in validated.get("rejected") or []:
         msg = rej.get("reason") if isinstance(rej, dict) else str(rej)
-        issues.append(SimpleNamespace(
-            severity="ERROR", code="VALIDATION_REJECTED",
-            message=str(msg)[:200],
-        ))
-    for fl in (validated.get("flagged") or []):
+        issues.append(
+            SimpleNamespace(
+                severity="ERROR",
+                code="VALIDATION_REJECTED",
+                message=str(msg)[:200],
+            )
+        )
+    for fl in validated.get("flagged") or []:
         msg = fl.get("flag") if isinstance(fl, dict) else str(fl)
-        issues.append(SimpleNamespace(
-            severity="WARNING", code="VALIDATION_FLAGGED",
-            message=str(msg)[:200],
-        ))
+        issues.append(
+            SimpleNamespace(
+                severity="WARNING",
+                code="VALIDATION_FLAGGED",
+                message=str(msg)[:200],
+            )
+        )
 
     unit_diff: dict[str, list] = {
-        "new": [], "updated": [], "unchanged": [], "disappeared": [],
+        "new": [],
+        "updated": [],
+        "unchanged": [],
+        "disappeared": [],
     }
 
     try:
@@ -891,8 +927,7 @@ def _write_property_report(
             run_date=run_date,
         )
     except Exception as exc:
-        log.warning("property report generation failed for %s: %s",
-                    canonical_id, exc)
+        log.warning("property report generation failed for %s: %s", canonical_id, exc)
 
 
 def _make_failed_record(
@@ -1109,11 +1144,7 @@ def _load_csv(
                     or f"row_{i}"
                 )
             if "url" not in normalized:
-                normalized["url"] = (
-                    normalized.get("Website")
-                    or normalized.get("website")
-                    or ""
-                )
+                normalized["url"] = normalized.get("Website") or normalized.get("website") or ""
             rows.append(normalized)
     return rows
 
@@ -1143,7 +1174,8 @@ def _merge_with_existing_properties(
         except (OSError, json.JSONDecodeError) as exc:
             log.warning(
                 "Existing %s unreadable (%s) — overwriting with new batch only",
-                path, exc,
+                path,
+                exc,
             )
             return list(new_properties)
 
@@ -1182,7 +1214,10 @@ def _merge_with_existing_properties(
 
     log.info(
         "properties.json merge: existing=%d, new=%d, replaced=%d, total=%d",
-        len(existing), len(new_properties), len(seen_cids), len(merged),
+        len(existing),
+        len(new_properties),
+        len(seen_cids),
+        len(merged),
     )
     return merged
 
@@ -1226,6 +1261,7 @@ class _SimpleProfileStore:
         # Lazy imports so importing this module doesn't drag in the services
         # layer (and its deps) unless the profile loop is actually used.
         from services.profile_store import ProfileStore  # type: ignore[import-not-found]
+
         self._backing = ProfileStore(profiles_dir)
 
     def get_profile(self, property_id: str) -> Any:
@@ -1252,6 +1288,7 @@ class _SimpleProfileStore:
                 ScrapeProfile,
                 detect_platform,
             )
+
             platform = detect_platform(website) if website else None
             nav = NavigationConfig()
             if website:
@@ -1298,26 +1335,32 @@ def main() -> int:
     parser.add_argument("--data-dir", type=Path, default=_MA_POC_ROOT / "data")
     parser.add_argument("--run-date", type=str, default=None)
     parser.add_argument(
-        "--start-index", type=int, default=0,
+        "--start-index",
+        type=int,
+        default=0,
         help="Zero-based CSV row index to start scraping from (skips earlier rows).",
     )
     parser.add_argument(
-        "--schema-version", choices=["v1", "v2"], default=None,
+        "--schema-version",
+        choices=["v1", "v2"],
+        default=None,
         help="Output schema version (default: env SCHEMA_VERSION or v1)",
     )
     args = parser.parse_args()
 
     schema_version = _resolve_schema_version(args)
 
-    report = asyncio.run(run_jugnu(
-        csv_path=args.csv,
-        data_dir=args.data_dir,
-        limit=args.limit,
-        proxy=args.proxy,
-        run_date=args.run_date,
-        schema_version=schema_version,
-        start_index=args.start_index,
-    ))
+    report = asyncio.run(
+        run_jugnu(
+            csv_path=args.csv,
+            data_dir=args.data_dir,
+            limit=args.limit,
+            proxy=args.proxy,
+            run_date=args.run_date,
+            schema_version=schema_version,
+            start_index=args.start_index,
+        )
+    )
 
     print(f"Run complete: {report['totals']['succeeded']}/{report['totals']['properties']} succeeded")
     return 0 if report["totals"]["failed"] == 0 else 1

@@ -3,14 +3,14 @@
 ValidatedRecords is the output contract: validated unit records ready for
 state_store and output emission.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ..models.unit_record import UnitRecord
-    from ..pms.contracts import ExtractResult
+    pass
 
 
 @dataclass(slots=True, frozen=True)

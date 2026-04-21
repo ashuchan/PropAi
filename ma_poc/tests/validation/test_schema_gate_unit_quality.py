@@ -1,13 +1,12 @@
 """Tests for F1 — schema-gated unit quality functions."""
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
 
 from ma_poc.validation.schema_gate import (
-    _is_present,
     is_substantive,
     property_passes_quality_gate,
 )
@@ -32,6 +31,7 @@ def _with(**kw: Any) -> dict[str, Any]:
 
 
 # ── _is_present ──────────────────────────────────────────────────────────────
+
 
 def test_is_substantive_detects_beds_present() -> None:
     assert is_substantive(_with(beds=1))
@@ -63,6 +63,7 @@ def test_is_substantive_rejects_all_null_unit() -> None:
 
 # ── property_passes_quality_gate ─────────────────────────────────────────────
 
+
 def test_property_passes_quality_gate_empty_list_fails() -> None:
     assert not property_passes_quality_gate([])
 
@@ -89,6 +90,7 @@ def test_property_passes_quality_gate_all_hollow_fails() -> None:
 
 # ── Orchestrator integration ──────────────────────────────────────────────────
 
+
 def test_orchestrator_flips_next_tier_requested_on_hollow_success() -> None:
     """When units pass row-count but all are hollow, next_tier_requested becomes True."""
     from ma_poc.validation.orchestrator import validate
@@ -97,11 +99,20 @@ def test_orchestrator_flips_next_tier_requested_on_hollow_success() -> None:
         property_id = "280734"
         # Use old-style field names the schema gate understands
         records = [
-            {"unit_id": f"id{i}", "floor_plan_type": None, "bedrooms": None,
-             "asking_rent": None, "sqft": None,
-             # v2 fields all hollow
-             "beds": None, "baths": None, "floor_plan_name": None,
-             "area": -1, "rent_low": None, "rent_high": None}
+            {
+                "unit_id": f"id{i}",
+                "floor_plan_type": None,
+                "bedrooms": None,
+                "asking_rent": None,
+                "sqft": None,
+                # v2 fields all hollow
+                "beds": None,
+                "baths": None,
+                "floor_plan_name": None,
+                "area": -1,
+                "rent_low": None,
+                "rent_high": None,
+            }
             for i in range(5)
         ]
 
@@ -116,8 +127,14 @@ def test_verdict_flips_to_failed_no_data_when_all_tiers_hollow() -> None:
 
     class FakeExtract:
         records = [
-            {"unit_id": f"id{i}", "beds": None, "baths": None,
-             "floor_plan_name": None, "area": -1, "rent_low": None}
+            {
+                "unit_id": f"id{i}",
+                "beds": None,
+                "baths": None,
+                "floor_plan_name": None,
+                "area": -1,
+                "rent_low": None,
+            }
             for i in range(3)
         ]
 

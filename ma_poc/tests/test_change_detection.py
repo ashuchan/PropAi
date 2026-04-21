@@ -1,4 +1,5 @@
 """Tests for scraper/change_detection.py — 8+ tests covering all required cases."""
+
 from __future__ import annotations
 
 import asyncio
@@ -30,8 +31,11 @@ def http_client() -> httpx.AsyncClient:
 async def test_etag_304_returns_unchanged(state_store: StateStore) -> None:
     respx.head(URL).mock(return_value=httpx.Response(304))
     respx.get("https://example.com/sitemap.xml").mock(return_value=httpx.Response(404))
-    state = PropertyState(last_etag='"abc123"', last_lastmodified="Mon, 01 Apr 2026 00:00:00 GMT",
-                          last_full_scrape_date=date.today().isoformat())
+    state = PropertyState(
+        last_etag='"abc123"',
+        last_lastmodified="Mon, 01 Apr 2026 00:00:00 GMT",
+        last_full_scrape_date=date.today().isoformat(),
+    )
     await state_store.put("P1", state)
     async with ChangeDetector(state_store) as cd:
         decision, _ = await cd.evaluate("P1", URL)
@@ -54,9 +58,7 @@ async def test_no_etag_or_lastmod_header_inconclusive(state_store: StateStore) -
 async def test_sitemap_lastmod_unchanged(state_store: StateStore) -> None:
     respx.head(URL).mock(return_value=httpx.Response(200, headers={}))
     sitemap_body = (
-        '<?xml version="1.0"?><urlset>'
-        f'<url><loc>{URL}</loc><lastmod>2026-04-01</lastmod></url>'
-        '</urlset>'
+        f'<?xml version="1.0"?><urlset><url><loc>{URL}</loc><lastmod>2026-04-01</lastmod></url></urlset>'
     )
     respx.get("https://example.com/sitemap.xml").mock(return_value=httpx.Response(200, text=sitemap_body))
     state = PropertyState(last_sitemap_lastmod="2026-04-01", last_full_scrape_date=date.today().isoformat())
@@ -98,13 +100,12 @@ async def test_carryforward_days_increments(state_store: StateStore) -> None:
 async def test_all_unchanged_triggers_skip(state_store: StateStore) -> None:
     respx.head(URL).mock(return_value=httpx.Response(304))
     sitemap_body = (
-        '<?xml version="1.0"?><urlset>'
-        f'<url><loc>{URL}</loc><lastmod>2026-04-01</lastmod></url>'
-        '</urlset>'
+        f'<?xml version="1.0"?><urlset><url><loc>{URL}</loc><lastmod>2026-04-01</lastmod></url></urlset>'
     )
     respx.get("https://example.com/sitemap.xml").mock(return_value=httpx.Response(200, text=sitemap_body))
-    state = PropertyState(last_etag='"e"', last_sitemap_lastmod="2026-04-01",
-                          last_full_scrape_date=date.today().isoformat())
+    state = PropertyState(
+        last_etag='"e"', last_sitemap_lastmod="2026-04-01", last_full_scrape_date=date.today().isoformat()
+    )
     await state_store.put("P1", state)
     async with ChangeDetector(state_store) as cd:
         decision, _ = await cd.evaluate("P1", URL)

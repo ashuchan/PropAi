@@ -3,12 +3,13 @@
 SQLite-backed. The fetched_at column enables cache expiry after N days
 (forced full re-fetch as a safety net for stale parsers).
 """
+
 from __future__ import annotations
 
 import logging
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -57,9 +58,7 @@ class ConditionalCache:
             return None, None
         return row[0], row[1]
 
-    def write(
-        self, url: str, etag: str | None, last_modified: str | None
-    ) -> None:
+    def write(self, url: str, etag: str | None, last_modified: str | None) -> None:
         """Insert or update the cache entry for a URL.
 
         Args:
@@ -67,7 +66,7 @@ class ConditionalCache:
             etag: ETag header value, or None.
             last_modified: Last-Modified header value, or None.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._lock:
             self._conn.execute(
                 """INSERT INTO conditional_cache (url, etag, last_modified, fetched_at)
@@ -89,7 +88,7 @@ class ConditionalCache:
         Returns:
             Number of entries removed.
         """
-        cutoff = datetime.now(timezone.utc).isoformat()
+        cutoff = datetime.now(UTC).isoformat()
         # SQLite datetime comparison works on ISO strings
         cursor = self._conn.execute(
             """DELETE FROM conditional_cache

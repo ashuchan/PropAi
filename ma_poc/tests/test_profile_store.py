@@ -1,4 +1,5 @@
 """Tests for ProfileStore — claude-scrapper-arch.md Step 6.2."""
+
 from __future__ import annotations
 
 import pytest
@@ -43,9 +44,7 @@ def test_save_creates_audit_copy(store: ProfileStore) -> None:
 
 
 def test_bootstrap_from_meta_detects_rentcafe(store: ProfileStore) -> None:
-    p = store.bootstrap_from_meta(
-        "rc-001", {"name": "Test"}, "https://www.rentcafe.com/apartments/foo"
-    )
+    p = store.bootstrap_from_meta("rc-001", {"name": "Test"}, "https://www.rentcafe.com/apartments/foo")
     assert p.dom_hints.platform_detected == "rentcafe"
     assert p.confidence.maturity == ProfileMaturity.COLD
     # Profile file should be created
@@ -53,16 +52,12 @@ def test_bootstrap_from_meta_detects_rentcafe(store: ProfileStore) -> None:
 
 
 def test_bootstrap_from_meta_detects_entrata(store: ProfileStore) -> None:
-    p = store.bootstrap_from_meta(
-        "ent-001", {}, "https://my.entrata.com/property"
-    )
+    p = store.bootstrap_from_meta("ent-001", {}, "https://my.entrata.com/property")
     assert p.dom_hints.platform_detected == "entrata"
 
 
 def test_bootstrap_from_meta_unknown_platform(store: ProfileStore) -> None:
-    p = store.bootstrap_from_meta(
-        "unk-001", {}, "https://some-custom-site.com"
-    )
+    p = store.bootstrap_from_meta("unk-001", {}, "https://some-custom-site.com")
     assert p.dom_hints.platform_detected is None
     assert p.canonical_id == "unk-001"
 

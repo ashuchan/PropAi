@@ -3,6 +3,7 @@ scripts/run_phase_a.py — Phase A entrypoint.
 
 Runs the full daily scrape over all properties in config/properties.csv.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -16,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:  # pragma: no cover
     pass

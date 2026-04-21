@@ -10,6 +10,7 @@ Acceptance criteria (CLAUDE.md PR-03 / Tier 3):
 - Scroll to bottom for lazy-loaded content (Entrata)
 - Re-capture HTML after interaction so templates parse the full DOM
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -64,9 +65,7 @@ async def _click_expanders(page: Any) -> bool:
     """
     clicked_any = False
     try:
-        clickable = page.locator(
-            "button, a, [role='button'], input[type='button'], input[type='submit']"
-        )
+        clickable = page.locator("button, a, [role='button'], input[type='button'], input[type='submit']")
         for pattern in _EXPAND_BUTTON_PATTERNS:
             try:
                 btns = await clickable.filter(has_text=pattern).all()

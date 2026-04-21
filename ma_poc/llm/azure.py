@@ -1,4 +1,5 @@
 """Azure OpenAI LLM provider implementation."""
+
 from __future__ import annotations
 
 import base64
@@ -42,7 +43,10 @@ class AzureLLMProvider(LLMProvider):
         self._vision_model = os.getenv("AZURE_OPENAI_DEPLOYMENT_GPT4O_VISION", "gpt-4o")
 
     async def _complete_once(
-        self, system: str, user: str, max_tokens: int,
+        self,
+        system: str,
+        user: str,
+        max_tokens: int,
     ) -> str:
         resp = await self._client.chat.completions.create(
             model=self._text_model,
@@ -57,16 +61,19 @@ class AzureLLMProvider(LLMProvider):
         # Capture usage for interaction logging (instance-scoped, not module-level).
         usage = resp.usage
         self._last_usage: dict[str, object] = {
-            "input_tokens":  usage.prompt_tokens if usage else 0,
+            "input_tokens": usage.prompt_tokens if usage else 0,
             "output_tokens": usage.completion_tokens if usage else 0,
-            "model":         self._text_model,
-            "call_type":     "text",
-            "provider":      "azure",
+            "model": self._text_model,
+            "call_type": "text",
+            "provider": "azure",
         }
         return resp.choices[0].message.content or ""
 
     async def _extract_images_once(
-        self, images: list[bytes], prompt: str, max_tokens: int,
+        self,
+        images: list[bytes],
+        prompt: str,
+        max_tokens: int,
     ) -> dict[str, Any]:
         from llm.images import check_size
 
@@ -74,10 +81,12 @@ class AzureLLMProvider(LLMProvider):
         for img in images:
             sized = check_size(img, AZURE_IMAGE_LIMIT_BYTES)
             b64 = base64.b64encode(sized).decode("ascii")
-            content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/png;base64,{b64}"},
-            })
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{b64}"},
+                }
+            )
         resp = await self._client.chat.completions.create(  # type: ignore[call-overload]
             model=self._vision_model,
             messages=[{"role": "user", "content": content}],
@@ -88,11 +97,11 @@ class AzureLLMProvider(LLMProvider):
         # Capture usage for interaction logging.
         usage = resp.usage
         self._last_usage = {
-            "input_tokens":  usage.prompt_tokens if usage else 0,
+            "input_tokens": usage.prompt_tokens if usage else 0,
             "output_tokens": usage.completion_tokens if usage else 0,
-            "model":         self._vision_model,
-            "call_type":     "vision",
-            "provider":      "azure",
+            "model": self._vision_model,
+            "call_type": "vision",
+            "provider": "azure",
         }
         text = resp.choices[0].message.content or "{}"
         try:

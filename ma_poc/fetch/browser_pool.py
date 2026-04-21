@@ -6,6 +6,7 @@ is reused across properties.
 
 Uses context.close() not browser.close() — existing convention.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -34,20 +35,19 @@ class BrowserContextPool:
         self._lock = asyncio.Lock()
         self._active_contexts: list[BrowserContext] = []
 
-    async def _ensure_browser(self) -> "Browser":
+    async def _ensure_browser(self) -> Browser:
         """Launch browser if not already running."""
         if self._browser is None or not self._browser.is_connected():
             async with self._lock:
                 if self._browser is None or not self._browser.is_connected():
                     from playwright.async_api import async_playwright
+
                     pw = await async_playwright().start()
                     self._browser = await pw.chromium.launch(headless=True)
                     log.info("Launched Playwright browser")
         return self._browser
 
-    async def acquire(
-        self, identity: Identity, proxy: str | None = None
-    ) -> "Page":
+    async def acquire(self, identity: Identity, proxy: str | None = None) -> Page:
         """Acquire a new page in an isolated browser context.
 
         Args:
@@ -73,7 +73,7 @@ class BrowserContextPool:
         page = await context.new_page()
         return page
 
-    async def release(self, page: "Page") -> None:
+    async def release(self, page: Page) -> None:
         """Release a page and close its context.
 
         Args:

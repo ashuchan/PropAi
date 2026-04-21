@@ -6,13 +6,13 @@ Sources consulted:
 - Cloudflare challenge page patterns (developer docs)
 - Standard HTTP status code semantics (RFC 9110)
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import ssl
 from socket import gaierror
-from typing import Any
 
 from .captcha_detect import looks_like_captcha
 from .contracts import FetchOutcome
@@ -62,9 +62,7 @@ def classify(
                 return FetchOutcome.HARD_FAIL, "ERR_DNS"
         if isinstance(exception, (asyncio.TimeoutError, TimeoutError)):
             return FetchOutcome.TRANSIENT, "timeout"
-        if _PlaywrightTimeoutError is not None and isinstance(
-            exception, _PlaywrightTimeoutError
-        ):
+        if _PlaywrightTimeoutError is not None and isinstance(exception, _PlaywrightTimeoutError):
             return FetchOutcome.TRANSIENT, "timeout"
         if isinstance(exception, ConnectionError):
             return FetchOutcome.TRANSIENT, f"connection_{type(exception).__name__}"
@@ -88,7 +86,10 @@ def classify(
     if status == 403:
         is_captcha, provider = looks_like_captcha(body_head or b"")
         if is_captcha:
-            return FetchOutcome.BOT_BLOCKED, f"CF_CHALLENGE" if provider == "cloudflare" else f"CAPTCHA_{(provider or 'unknown').upper()}"
+            return (
+                FetchOutcome.BOT_BLOCKED,
+                "CF_CHALLENGE" if provider == "cloudflare" else f"CAPTCHA_{(provider or 'unknown').upper()}",
+            )
         return FetchOutcome.HARD_FAIL, "HTTP_403"
 
     if 500 <= status < 600:

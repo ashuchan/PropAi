@@ -127,9 +127,7 @@ class SystemResources:
             try:
                 env_limit = int(env_val)
             except ValueError:
-                log.warning(
-                    f"{env_override_key}={env_val!r} is not an integer; ignoring"
-                )
+                log.warning(f"{env_override_key}={env_val!r} is not an integer; ignoring")
 
         pool_size = min(ram_limit, cpu_limit, env_limit)
         pool_size = max(_MIN_WORKERS, min(pool_size, _MAX_WORKERS_HARD_CAP))
@@ -213,9 +211,7 @@ class SystemResources:
         total = 8 * 1024**3
         available = 4 * 1024**3
         try:
-            out = subprocess.check_output(
-                ["sysctl", "-n", "hw.memsize"], text=True
-            ).strip()
+            out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True).strip()
             total = int(out)
         except Exception:
             pass
@@ -304,10 +300,7 @@ class AsyncPool:
         self._total = len(args_list)
         self._completed = 0
 
-        tasks = [
-            asyncio.create_task(self._run_one(i, fn, args))
-            for i, args in enumerate(args_list)
-        ]
+        tasks = [asyncio.create_task(self._run_one(i, fn, args)) for i, args in enumerate(args_list)]
 
         raw = await asyncio.gather(*tasks)
         # Re-order by original index.
@@ -360,27 +353,20 @@ class ThreadedPool:
             max_workers=self.max_workers,
             thread_name_prefix="scrape-worker",
         ) as executor:
-            future_to_idx = {
-                executor.submit(fn, *args): i
-                for i, args in enumerate(args_list)
-            }
+            future_to_idx = {executor.submit(fn, *args): i for i, args in enumerate(args_list)}
 
             for future in as_completed(future_to_idx):
                 idx = future_to_idx[future]
                 try:
                     results[idx] = future.result(timeout=timeout_per_task)
                 except Exception as exc:
-                    log.warning(
-                        f"ThreadedPool task {idx} raised "
-                        f"{type(exc).__name__}: {exc}"
-                    )
+                    log.warning(f"ThreadedPool task {idx} raised {type(exc).__name__}: {exc}")
                     results[idx] = exc
                 finally:
                     completed += 1
                     if total > 0 and completed % max(1, total // 10) == 0:
                         log.info(
-                            f"ThreadedPool progress: {completed}/{total} "
-                            f"({100 * completed / total:.0f}%)"
+                            f"ThreadedPool progress: {completed}/{total} ({100 * completed / total:.0f}%)"
                         )
 
         return results
@@ -459,8 +445,5 @@ async def run_concurrent_scrapes(
         max_workers = res.optimal_pool_size()
 
     pool = AsyncPool(max_workers)
-    log.info(
-        f"Starting concurrent scrapes: {len(work_items)} items, "
-        f"{max_workers} workers"
-    )
+    log.info(f"Starting concurrent scrapes: {len(work_items)} items, {max_workers} workers")
     return await pool.map(scrape_fn, work_items)

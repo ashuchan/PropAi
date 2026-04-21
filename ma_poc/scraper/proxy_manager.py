@@ -7,6 +7,7 @@ Acceptance criteria (CLAUDE.md PR-01):
 - Reads creds from env (PROXY_HOST/PORT/USERNAME/PASSWORD); never commits secrets
 - Per-domain failure rate computed from a 7-day rolling window of attempts
 """
+
 from __future__ import annotations
 
 import os

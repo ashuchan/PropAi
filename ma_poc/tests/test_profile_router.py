@@ -1,8 +1,9 @@
 """Tests for profile router — claude-scrapper-arch.md Step 6.6."""
+
 from __future__ import annotations
 
 from models.scrape_profile import ProfileMaturity, ScrapeProfile
-from services.profile_router import RouteDecision, route
+from services.profile_router import route
 
 
 def _make_profile(maturity: ProfileMaturity, preferred_tier: int | None = None) -> ScrapeProfile:

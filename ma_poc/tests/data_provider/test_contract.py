@@ -4,6 +4,7 @@ Any new provider must pass this suite. The FS provider runs against a
 tmp_path sandbox; the PG provider is opt-in via DATABASE_URL (skipped
 otherwise) and not exercised until Phase 4 lands.
 """
+
 from __future__ import annotations
 
 import os
@@ -74,9 +75,7 @@ def provider(request, tmp_path) -> DataProvider:
         p.close()
 
 
-providers = pytest.mark.parametrize(
-    "provider", ["filesystem", "sqlite", "postgres"], indirect=True
-)
+providers = pytest.mark.parametrize("provider", ["filesystem", "sqlite", "postgres"], indirect=True)
 
 
 # ── property_state / unit_state ──────────────────────────────────────────────

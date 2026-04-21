@@ -2,6 +2,7 @@
 
 Pure logic. No sleeps — callers handle waiting. Tests pass a clock callable.
 """
+
 from __future__ import annotations
 
 import logging

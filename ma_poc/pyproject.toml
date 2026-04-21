@@ -34,13 +34,24 @@ module = [
 ]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = [
+    "scripts.entrata",
+    "scripts.scrape_properties",
+    "scripts.daily_runner",
+    "entrata",
+    "scrape_properties",
+]
+follow_imports = "skip"
+ignore_missing_imports = true
+
 [tool.ruff]
 line-length = 110
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
-ignore = ["E501", "B008"]
+ignore = ["E501", "B008", "E402", "B007", "E741"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B"]

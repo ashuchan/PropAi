@@ -36,6 +36,7 @@ Key findings:
       _is_sightmap_response so a bare ``data.amenities`` array no longer
       false-matches as SightMap.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -68,9 +69,7 @@ _TIER_PARSE_FAILED = f"{_TIER_BASE}_PARSE_FAILED"
 _PARTIAL_JOIN_FRACTION = 0.2
 
 
-def parse_sightmap_payload(
-    body: Any, url: str
-) -> tuple[list[dict[str, str]], int]:
+def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], int]:
     """SightMap dedicated parser.
 
     Joins data.units[] to data.floor_plans[] by floor_plan_id so each unit
@@ -131,23 +130,25 @@ def parse_sightmap_payload(
         baths = fp.get("bathroom_count")
         name = fp.get("name") or fp.get("filter_label") or ""
 
-        units_out.append(make_unit_dict(
-            floor_plan_name=str(name),
-            bed_label=bed_label_from(beds, str(name)),
-            bedrooms=str(beds) if beds is not None else "",
-            bathrooms=str(baths) if baths is not None else "",
-            sqft=sqft,
-            unit_number=str(u.get("unit_number") or u.get("label") or ""),
-            floor=str(u.get("floor_id") or ""),
-            building=str(u.get("building") or ""),
-            rent_range=f"${price_i:,}" if price_i else str(u.get("display_price") or ""),
-            concession=str(u.get("specials_description") or ""),
-            availability_status="AVAILABLE",
-            available_units="1",
-            availability_date=str(u.get("available_on") or u.get("display_available_on") or ""),
-            source_api_url=url,
-            extraction_tier=_TIER_BASE,
-        ))
+        units_out.append(
+            make_unit_dict(
+                floor_plan_name=str(name),
+                bed_label=bed_label_from(beds, str(name)),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft=sqft,
+                unit_number=str(u.get("unit_number") or u.get("label") or ""),
+                floor=str(u.get("floor_id") or ""),
+                building=str(u.get("building") or ""),
+                rent_range=f"${price_i:,}" if price_i else str(u.get("display_price") or ""),
+                concession=str(u.get("specials_description") or ""),
+                availability_status="AVAILABLE",
+                available_units="1",
+                availability_date=str(u.get("available_on") or u.get("display_available_on") or ""),
+                source_api_url=url,
+                extraction_tier=_TIER_BASE,
+            )
+        )
     return units_out, dropped
 
 
@@ -220,9 +221,7 @@ class SightMapAdapter:
 
         if all_units:
             result.units = all_units
-            result.winning_url = (
-                result.api_responses[0].get("url") if result.api_responses else None
-            )
+            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
             result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
             result.tier_used = _TIER_BASE
             # Even on success, surface silent unit-level loss when the join
@@ -240,14 +239,13 @@ class SightMapAdapter:
         # adapter pattern.
         result.confidence = 0.0
         sightmap_responses = [
-            r for r in api_responses
+            r
+            for r in api_responses
             if isinstance(r.get("body"), dict) and _is_sightmap_response(r.get("body"))
         ]
         if not api_responses:
             result.tier_used = _TIER_NO_RESPONSE
-            result.errors.append(
-                "SIGHTMAP_NO_RESPONSE: no network responses captured during page load"
-            )
+            result.errors.append("SIGHTMAP_NO_RESPONSE: no network responses captured during page load")
         elif not sightmap_responses:
             result.tier_used = _TIER_SHAPE_REJECTED
             result.errors.append(

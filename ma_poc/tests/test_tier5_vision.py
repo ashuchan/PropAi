@@ -1,4 +1,5 @@
 """Tests for extraction/tier5_vision.py + vision_banner + vision_sample — 5+ tests."""
+
 from __future__ import annotations
 
 import json

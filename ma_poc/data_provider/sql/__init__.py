@@ -6,6 +6,7 @@ test surrogate so the contract suite runs without a live database.
 
 Public surface is `SqlDataProvider` + the SQLAlchemy `Base` (for Alembic).
 """
+
 from data_provider.sql.models import Base
 from data_provider.sql.provider import SqlDataProvider
 

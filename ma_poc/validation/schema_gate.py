@@ -5,6 +5,7 @@ Two paths:
   2. Soft: record missing unit_id -> call identity_fallback; if fallback
      returns an id, accept with inferred_id=True; else reject.
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,7 +23,11 @@ _MAX_SQFT = 20_000
 # F1: substantive-field quality gate — v2 canonical names and v1 legacy aliases.
 SUBSTANTIVE_FIELDS: tuple[str, ...] = ("beds", "rent_low", "floor_plan_name", "area")
 _LEGACY_SUBSTANTIVE_FIELDS: tuple[str, ...] = (
-    "bedrooms", "asking_rent", "market_rent_low", "sqft", "floor_plan_type",
+    "bedrooms",
+    "asking_rent",
+    "market_rent_low",
+    "sqft",
+    "floor_plan_type",
 )
 
 

@@ -5,6 +5,7 @@ Provides pure-function utilities that mirror the profile-update and
 report-enrichment logic that daily_runner.py performs after each scrape.
 These are designed to be tested in isolation without launching Playwright.
 """
+
 from __future__ import annotations
 
 from typing import Any

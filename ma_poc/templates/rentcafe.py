@@ -12,6 +12,7 @@ Handles list view AND floorplan-grouped view.
 Falls back to regex-based text extraction when CSS selectors miss fields.
 Returns [] on total selector failure (caller treats as Tier 3 failure).
 """
+
 from __future__ import annotations
 
 from bs4 import BeautifulSoup, Tag
@@ -164,16 +165,10 @@ def _extract_from_card(
         or text_of(card, "[class*='plan-name']")
     )
 
-    floor_text = (
-        text_of(card, ".floor")
-        or text_of(card, ".unit-floor")
-        or text_of(card, "[class*='floor']")
-    )
+    floor_text = text_of(card, ".floor") or text_of(card, ".unit-floor") or text_of(card, "[class*='floor']")
 
     building_text = (
-        text_of(card, ".building")
-        or text_of(card, ".unit-building")
-        or text_of(card, "[class*='building']")
+        text_of(card, ".building") or text_of(card, ".unit-building") or text_of(card, "[class*='building']")
     )
 
     # ── Regex fallback on card text for missing fields ────────────────────

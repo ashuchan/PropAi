@@ -4,14 +4,15 @@ FetchResult is the single output contract that crosses the L1/L2 boundary.
 It is never raised as an exception. L1 catches all transient and hard errors
 and returns a FetchResult with the appropriate outcome.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class RenderMode(str, Enum):
+class RenderMode(StrEnum):
     """How the URL should be fetched."""
 
     HEAD = "HEAD"  # cheap change probe
@@ -19,7 +20,7 @@ class RenderMode(str, Enum):
     RENDER = "RENDER"  # Playwright with network capture
 
 
-class FetchOutcome(str, Enum):
+class FetchOutcome(StrEnum):
     """Outcome classification for a fetch attempt."""
 
     OK = "OK"  # 2xx, body available

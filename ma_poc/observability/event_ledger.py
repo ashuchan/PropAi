@@ -3,12 +3,12 @@
 Crash-safe: at most buffer_size events lost on crash.
 Line-buffered at Python level; append mode on open.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import threading
-import time
 from pathlib import Path
 from typing import Any
 
@@ -26,9 +26,7 @@ class EventLedger:
         buffer_size: Events buffered before auto-flush.
     """
 
-    def __init__(
-        self, path: Path, run_id: str, buffer_size: int = 16
-    ) -> None:
+    def __init__(self, path: Path, run_id: str, buffer_size: int = 16) -> None:
         self._path = path
         self._run_id = run_id
         self._buffer_size = buffer_size

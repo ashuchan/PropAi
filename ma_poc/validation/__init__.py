@@ -2,6 +2,7 @@
 
 Public API: validate(extract_result, history) -> ValidatedRecords
 """
+
 from .contracts import FlaggedRecord, RejectedRecord, ValidatedRecords
 from .orchestrator import validate
 

@@ -3,6 +3,7 @@ Squarespace, Wix).
 
 Grouped in one file since these adapters have limited real captured data.
 """
+
 from __future__ import annotations
 
 import json
@@ -39,6 +40,7 @@ class _DummyPage:
 
 # ── AppFolio ──────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_appfolio_extract_happy_path() -> None:
     responses = json.loads((FIXTURES / "appfolio" / "synthetic_listings.json").read_text())
@@ -67,14 +69,24 @@ def test_appfolio_static_fingerprints() -> None:
 
 
 def test_parse_appfolio_listings_basic() -> None:
-    items = [{"id": "1", "name": "Suite A", "bedrooms": 1, "bathrooms": 1,
-              "sqft": 650, "price": 1400, "status": "available"}]
+    items = [
+        {
+            "id": "1",
+            "name": "Suite A",
+            "bedrooms": 1,
+            "bathrooms": 1,
+            "sqft": 650,
+            "price": 1400,
+            "status": "available",
+        }
+    ]
     units = parse_appfolio_listings(items, "test")
     assert len(units) == 1
     assert "$1,400" in units[0]["rent_range"]
 
 
 # ── AvalonBay ─────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_avalonbay_extract_happy_path() -> None:
@@ -102,10 +114,18 @@ def test_avalonbay_static_fingerprints() -> None:
 
 def test_parse_avalonbay_units_basic() -> None:
     """AvalonBay real API shape with bedroomNumber, unitName, squareFeet."""
-    items = [{"unitName": "1043", "bedroomNumber": 1, "bathroomNumber": 1,
-              "squareFeet": 711, "floorPlan": {"name": "AM12"},
-              "floorNumber": "1", "availableDateUnfurnished": "2026-06-11T04:00:00+00:00",
-              "promotions": [{"promotionTitle": "1 month free!"}]}]
+    items = [
+        {
+            "unitName": "1043",
+            "bedroomNumber": 1,
+            "bathroomNumber": 1,
+            "squareFeet": 711,
+            "floorPlan": {"name": "AM12"},
+            "floorNumber": "1",
+            "availableDateUnfurnished": "2026-06-11T04:00:00+00:00",
+            "promotions": [{"promotionTitle": "1 month free!"}],
+        }
+    ]
     summary = {"totalPricesStartingAt": {"1": {"unfurnished": 2431}}}
     units = parse_avalonbay_units(items, "test", summary)
     assert len(units) == 1
@@ -118,6 +138,7 @@ def test_parse_avalonbay_units_basic() -> None:
 
 
 # ── RealPage OLL ──────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_realpage_oll_extract_happy_path() -> None:
@@ -145,6 +166,7 @@ def test_realpage_oll_static_fingerprints() -> None:
 
 # ── Squarespace ───────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_squarespace_returns_empty() -> None:
     adapter = SquarespaceNoPmsAdapter()
@@ -161,6 +183,7 @@ def test_squarespace_static_fingerprints() -> None:
 
 
 # ── Wix ───────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_wix_returns_empty() -> None:

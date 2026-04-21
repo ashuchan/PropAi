@@ -1,4 +1,5 @@
 """Tests for v1 -> v2 profile migration."""
+
 from __future__ import annotations
 
 import json
@@ -75,9 +76,13 @@ def _make_v1_profile(**overrides: Any) -> dict[str, Any]:
 # Fake DetectedPMS for mocking
 # ---------------------------------------------------------------------------
 class _FakeDetectedPMS:
-    def __init__(self, pms: str = "unknown", confidence: float = 0.0,
-                 evidence: list[str] | None = None,
-                 pms_client_account_id: str | None = None):
+    def __init__(
+        self,
+        pms: str = "unknown",
+        confidence: float = 0.0,
+        evidence: list[str] | None = None,
+        pms_client_account_id: str | None = None,
+    ):
         self.pms = pms
         self.confidence = confidence
         self.evidence = evidence or []
@@ -115,7 +120,11 @@ class TestMigrateOne:
     def test_migration_preserves_llm_field_mappings(self) -> None:
         """Existing llm_field_mappings (within cap) are preserved."""
         mappings = [
-            {"api_url_pattern": "/api/units", "json_paths": {"rent": "price"}, "response_envelope": "data.units"},
+            {
+                "api_url_pattern": "/api/units",
+                "json_paths": {"rent": "price"},
+                "response_envelope": "data.units",
+            },
             {"api_url_pattern": "/api/fp", "json_paths": {"sqft": "area"}, "response_envelope": "data"},
         ]
         v1 = _make_v1_profile()
@@ -219,10 +228,7 @@ class TestMigrateOne:
         # Validate that a HOT profile with unknown provider is a concern
         # In real usage, the pipeline would warn. Here we verify the state is detectable.
         profile = ScrapeProfile(**v2)
-        if (
-            profile.confidence.maturity.value == "HOT"
-            and profile.api_hints.api_provider in (None, "unknown")
-        ):
+        if profile.confidence.maturity.value == "HOT" and profile.api_hints.api_provider in (None, "unknown"):
             logging.getLogger("test").warning(
                 "HOT profile %s has api_provider=%s — extraction may be suboptimal",
                 profile.canonical_id,

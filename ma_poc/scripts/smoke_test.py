@@ -12,6 +12,7 @@ Asserts (CLAUDE.md):
 
 Exits 0 if 5/5 pass, 1 otherwise.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -26,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:  # pragma: no cover
     pass

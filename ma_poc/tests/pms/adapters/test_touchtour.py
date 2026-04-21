@@ -1,4 +1,5 @@
 """Change 4 — TouchTour / Ovation adapter tests."""
+
 from __future__ import annotations
 
 import pytest
@@ -13,7 +14,9 @@ def _make_ctx(api_responses: list[dict]) -> AdapterContext:
     ctx = AdapterContext(
         base_url="https://lasvegasliving.mytouchtour.com/community/floorplans/summer_winds",
         detected=DetectedPMS(
-            pms="touchtour", confidence=0.95, evidence=["test"],
+            pms="touchtour",
+            confidence=0.95,
+            evidence=["test"],
             recommended_strategy="cascade",
         ),
         profile=None,
@@ -47,10 +50,14 @@ async def test_touchtour_returns_empty_on_no_data() -> None:
 @pytest.mark.asyncio
 async def test_touchtour_research_blocked_when_responses_present() -> None:
     adapter = TouchTourAdapter()
-    ctx = _make_ctx([{
-        "url": "https://lasvegasliving.mytouchtour.com/api/floorplans",
-        "body": {"units": [{"n": 1}]},
-    }])
+    ctx = _make_ctx(
+        [
+            {
+                "url": "https://lasvegasliving.mytouchtour.com/api/floorplans",
+                "body": {"units": [{"n": 1}]},
+            }
+        ]
+    )
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert result.tier_used == "TIER_1_API_TOUCHTOUR_RESEARCH_BLOCKED"
     assert any("RESEARCH_BLOCKED" in e for e in result.errors)
@@ -74,9 +81,7 @@ def test_touchtour_does_not_implement_body_check() -> None:
 
 
 def test_touchtour_detector_routes_from_mytouchtour_url() -> None:
-    r = detect_pms(
-        "https://lasvegasliving.mytouchtour.com/community/floorplans/summer_winds"
-    )
+    r = detect_pms("https://lasvegasliving.mytouchtour.com/community/floorplans/summer_winds")
     assert r.pms == "touchtour"
     assert r.confidence >= 0.95
 
@@ -100,9 +105,7 @@ def test_touchtour_sightmap_no_longer_matches_vegas() -> None:
     # Historical misrouting: the 3 Vegas properties were stamped
     # TIER_1_API_SIGHTMAP. With mytouchtour.com in the host fingerprint,
     # the router must now pick touchtour, not sightmap.
-    r = detect_pms(
-        "https://lasvegasliving.mytouchtour.com/community/floorplans/positano"
-    )
+    r = detect_pms("https://lasvegasliving.mytouchtour.com/community/floorplans/positano")
     assert r.pms != "sightmap"
     assert r.pms == "touchtour"
 
@@ -114,7 +117,7 @@ def test_touchtour_sightmap_no_longer_matches_vegas() -> None:
 
 @pytest.mark.skip(
     reason="research-blocked: need >=2 real TouchTour captures from "
-           "Summer Winds 24928, Madera 26151, Positano 27595"
+    "Summer Winds 24928, Madera 26151, Positano 27595"
 )
 def test_touchtour_real_capture_parser_happy_path() -> None:
     raise AssertionError("placeholder for real-capture validation")

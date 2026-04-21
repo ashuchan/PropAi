@@ -1,4 +1,5 @@
 """Phase 1 — detector tests. See claude_refactor.md Phase 1."""
+
 from __future__ import annotations
 
 import typing as t
@@ -67,9 +68,7 @@ def test_detect_sightmap_from_host() -> None:
 
 
 def test_detect_appfolio_from_host() -> None:
-    result = detect_pms(
-        "https://livecommonplace.appfolio.com/listings/rental_applications/new"
-    )
+    result = detect_pms("https://livecommonplace.appfolio.com/listings/rental_applications/new")
     assert result.pms == "appfolio"
     assert result.confidence >= 0.95
     assert result.pms_client_account_id == "livecommonplace"
@@ -249,11 +248,7 @@ def _rentcafe_body() -> dict[str, object]:
 
 
 def _funnel_body() -> dict[str, object]:
-    return {
-        "results": [
-            {"listingId": "abc", "marketRent": 1850, "unit": "101"}
-        ]
-    }
+    return {"results": [{"listingId": "abc", "marketRent": 1850, "unit": "101"}]}
 
 
 def test_confirm_detection_keeps_when_body_matches() -> None:
@@ -282,7 +277,9 @@ def test_confirm_detection_demotes_when_no_responses() -> None:
 
 def test_confirm_detection_leaves_unknown_alone() -> None:
     initial = DetectedPMS(
-        pms="unknown", confidence=0.0, evidence=["no signal"],
+        pms="unknown",
+        confidence=0.0,
+        evidence=["no signal"],
         recommended_strategy="cascade",
     )
     result = confirm_detection(initial, [{"url": "x", "body": _rentcafe_body()}])
@@ -299,11 +296,7 @@ def test_detect_funnel_from_mgmt_windsor_communities() -> None:
 
 
 def test_detect_funnel_from_html_nestio_script() -> None:
-    html = (
-        '<html><head>'
-        '<script src="https://nestiolistings.com/static/bundle.js"></script>'
-        '</head></html>'
-    )
+    html = '<html><head><script src="https://nestiolistings.com/static/bundle.js"></script></head></html>'
     r = detect_pms("https://windsorcommunities.com/x/", page_html=html)
     assert r.pms == "funnel"
     assert r.confidence >= 0.85
@@ -320,9 +313,7 @@ def test_detect_rentcafe_no_longer_matches_windsor() -> None:
 
 
 def test_detect_funnel_from_nestio_host() -> None:
-    r = detect_pms(
-        "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x"
-    )
+    r = detect_pms("https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x")
     assert r.pms == "funnel"
     assert r.confidence >= 0.95
 
@@ -331,7 +322,9 @@ def test_confirm_detection_handles_adapter_without_body_check() -> None:
     # The Entrata adapter (pre-Change 2) has no matches_response_body method;
     # confirm_detection must leave the URL-based detection alone.
     initial = DetectedPMS(
-        pms="entrata", confidence=0.95, evidence=["entrata-host"],
+        pms="entrata",
+        confidence=0.95,
+        evidence=["entrata-host"],
         recommended_strategy="api_first",
     )
     result = confirm_detection(initial, [{"url": "x", "body": {"noise": 1}}])

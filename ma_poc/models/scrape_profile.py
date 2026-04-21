@@ -7,17 +7,18 @@ extraction without LLM calls.
 
 Phase: claude-scrapper-arch.md Step 1.1
 """
+
 from __future__ import annotations
 
 import urllib.parse
 from datetime import datetime
-from enum import Enum
-from typing import Any, Optional
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class ProfileMaturity(str, Enum):
+class ProfileMaturity(StrEnum):
     COLD = "COLD"
     WARM = "WARM"
     HOT = "HOT"
@@ -53,7 +54,7 @@ class ApiEndpoint(BaseModel):
 
     url_pattern: str
     json_paths: dict[str, str] = Field(default_factory=dict)
-    provider: Optional[str] = None  # "sightmap", "knock", "entrata_api", etc.
+    provider: str | None = None  # "sightmap", "knock", "entrata_api", etc.
 
 
 class FieldSelectorMap(BaseModel):
@@ -61,15 +62,15 @@ class FieldSelectorMap(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    container: Optional[str] = None
-    unit_id: Optional[str] = None
-    rent: Optional[str] = None
-    sqft: Optional[str] = None
-    bedrooms: Optional[str] = None
-    bathrooms: Optional[str] = None
-    availability_status: Optional[str] = None
-    availability_date: Optional[str] = None
-    floor_plan_name: Optional[str] = None
+    container: str | None = None
+    unit_id: str | None = None
+    rent: str | None = None
+    sqft: str | None = None
+    bedrooms: str | None = None
+    bathrooms: str | None = None
+    availability_status: str | None = None
+    availability_date: str | None = None
+    floor_plan_name: str | None = None
 
 
 class ExpanderAction(BaseModel):
@@ -86,9 +87,9 @@ class NavigationConfig(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    entry_url: Optional[str] = None
-    availability_page_path: Optional[str] = None
-    winning_page_url: Optional[str] = None  # Exact URL that produced units last time
+    entry_url: str | None = None
+    availability_page_path: str | None = None
+    winning_page_url: str | None = None  # Exact URL that produced units last time
     requires_interaction: list[ExpanderAction] = Field(default_factory=list)
     timeout_ms: int = 60000
     block_resource_domains: list[str] = Field(default_factory=list)
@@ -111,9 +112,9 @@ class ApiHints(BaseModel):
 
     known_endpoints: list[ApiEndpoint] = Field(default_factory=list)
     widget_endpoints: list[str] = Field(default_factory=list)  # Entrata widget URLs with data
-    api_provider: Optional[str] = "unknown"
-    client_account_id: Optional[str] = None
-    wait_for_url_pattern: Optional[str] = None
+    api_provider: str | None = "unknown"
+    client_account_id: str | None = None
+    wait_for_url_pattern: str | None = None
     blocked_endpoints: list[BlockedEndpoint] = Field(default_factory=list)  # Per-property noise blocklist
     llm_field_mappings: list[LlmFieldMapping] = Field(default_factory=list)  # Saved mappings for replay
 
@@ -149,8 +150,8 @@ class ExtractionConfidence(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    preferred_tier: Optional[int] = None  # 1-5
-    last_success_tier: Optional[int] = None
+    preferred_tier: int | None = None  # 1-5
+    last_success_tier: int | None = None
     consecutive_successes: int = 0
     consecutive_failures: int = 0
     last_unit_count: int = 0
@@ -164,10 +165,10 @@ class LlmArtifacts(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    extraction_prompt_hash: Optional[str] = None
-    field_mapping_notes: Optional[str] = None
-    api_schema_signature: Optional[str] = None
-    dom_structure_hash: Optional[str] = None
+    extraction_prompt_hash: str | None = None
+    field_mapping_notes: str | None = None
+    api_schema_signature: str | None = None
+    dom_structure_hash: str | None = None
     last_api_analysis_results: dict[str, str] = Field(default_factory=dict)  # API URL -> "has_units"|"noise"
 
 
@@ -181,10 +182,10 @@ class ProfileStats(BaseModel):
     total_failures: int = 0
     total_llm_calls: int = 0
     total_llm_cost_usd: float = 0.0
-    last_tier_used: Optional[str] = None
+    last_tier_used: str | None = None
     last_unit_count: int = 0
-    p50_scrape_duration_ms: Optional[int] = None
-    p95_scrape_duration_ms: Optional[int] = None
+    p50_scrape_duration_ms: int | None = None
+    p95_scrape_duration_ms: int | None = None
     # F2: tracks consecutive LLM rescue failures to skip expensive calls on dead endpoints
     consecutive_llm_rescue_failures: int = 0
 
@@ -209,7 +210,7 @@ class ScrapeProfile(BaseModel):
     stats: ProfileStats = Field(default_factory=ProfileStats)
 
 
-def detect_platform(url: str) -> Optional[str]:
+def detect_platform(url: str) -> str | None:
     """Detect PMS platform from URL patterns.
 
     Returns platform slug or None if unknown.

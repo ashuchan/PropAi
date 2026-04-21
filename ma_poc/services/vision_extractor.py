@@ -5,6 +5,7 @@ Called when Tier 4 (text LLM) also fails — uses screenshot of the rendered pag
 
 Phase: claude-scrapper-arch.md Step 2.2
 """
+
 from __future__ import annotations
 
 import json
@@ -121,6 +122,7 @@ async def extract_with_vision(
 
     try:
         from llm.factory import get_vision_provider
+
         provider = get_vision_provider()
     except Exception as exc:
         log.error("Failed to get vision provider: %s", exc)
@@ -142,16 +144,17 @@ async def extract_with_vision(
 
     # Read token usage captured by the provider after the API call.
     usage: dict[str, Any] = getattr(provider, "_last_usage", {})
-    tokens_in  = int(usage.get("input_tokens",  0))
+    tokens_in = int(usage.get("input_tokens", 0))
     tokens_out = int(usage.get("output_tokens", 0))
-    model      = str(usage.get("model",    "unknown"))
-    prov_name  = str(usage.get("provider", "unknown"))
+    model = str(usage.get("model", "unknown"))
+    prov_name = str(usage.get("provider", "unknown"))
 
     raw_response_str = json.dumps(result) if isinstance(result, dict) else str(result)
 
     # Build interaction record for cost accounting.
     try:
         from llm.interaction_logger import make_interaction
+
         interaction: dict[str, Any] | None = make_interaction(
             property_id=property_id,
             tier="TIER_7_VISION",
@@ -196,8 +199,12 @@ async def extract_with_vision(
     units = _normalize_units(raw_units)
     log.info(
         "Tier 5 Vision extracted %d units (raw: %d) | tokens=%d+%d | cost=$%.5f | latency=%dms",
-        len(units), len(raw_units), tokens_in, tokens_out,
-        (interaction or {}).get("cost_usd", 0.0), latency_ms,
+        len(units),
+        len(raw_units),
+        tokens_in,
+        tokens_out,
+        (interaction or {}).get("cost_usd", 0.0),
+        latency_ms,
     )
 
     return units, hints, raw_response_str, interaction
@@ -207,13 +214,17 @@ async def extract_with_vision(
 
 _NAV_PROMPT: str | None = None
 
+
 def _load_nav_prompt() -> str:
     """Load navigation discovery prompt from config/prompts/."""
     global _NAV_PROMPT
     if _NAV_PROMPT is not None:
         return _NAV_PROMPT
     import pathlib
-    prompt_path = pathlib.Path(__file__).resolve().parent.parent / "config" / "prompts" / "navigation_discovery.txt"
+
+    prompt_path = (
+        pathlib.Path(__file__).resolve().parent.parent / "config" / "prompts" / "navigation_discovery.txt"
+    )
     if prompt_path.exists():
         _NAV_PROMPT = prompt_path.read_text(encoding="utf-8")
     else:
@@ -221,9 +232,9 @@ def _load_nav_prompt() -> str:
             "You are analyzing a screenshot of an apartment property website. "
             "Identify navigation actions (click buttons/tabs, or navigate to URLs) "
             "that would lead to apartment unit availability and pricing data. "
-            "Return JSON: {{\"suggestions\": [{{\"action\": \"click\"|\"navigate\", "
-            "\"selector\": \"CSS selector\", \"url\": \"URL\", \"text\": \"label\", "
-            "\"reasoning\": \"why\"}}], \"page_analysis\": \"description\"}}"
+            'Return JSON: {{"suggestions": [{{"action": "click"|"navigate", '
+            '"selector": "CSS selector", "url": "URL", "text": "label", '
+            '"reasoning": "why"}}], "page_analysis": "description"}}'
         )
     return _NAV_PROMPT
 
@@ -247,6 +258,7 @@ async def suggest_navigation(
 
     try:
         from llm.factory import get_vision_provider
+
         provider = get_vision_provider()
     except Exception as exc:
         log.error("Failed to get vision provider for navigation: %s", exc)
@@ -285,6 +297,8 @@ async def suggest_navigation(
 
     log.info(
         "Navigation discovery: %d suggestions | latency=%dms | property=%s",
-        len(valid), latency_ms, property_id,
+        len(valid),
+        latency_ms,
+        property_id,
     )
     return valid

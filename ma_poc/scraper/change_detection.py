@@ -11,6 +11,7 @@ Acceptance criteria (CLAUDE.md PR-02):
 - NEVER use Playwright for change checks — defeats the purpose of the gate
 - Bug-hunt #8: send BOTH If-None-Match AND If-Modified-Since headers
 """
+
 from __future__ import annotations
 
 import asyncio

@@ -33,18 +33,19 @@ from typing import Any
 
 # ── Column-name aliases ────────────────────────────────────────────────────────
 
-UNIQUE_ID_KEYS   = ("Unique ID", "unique_id", "UniqueID", "apartmentid", "apartment_id")
+UNIQUE_ID_KEYS = ("Unique ID", "unique_id", "UniqueID", "apartmentid", "apartment_id")
 PROPERTY_ID_KEYS = ("Property ID", "property_id", "PropertyID", "id")
-ADDRESS_KEYS     = ("Property Address", "Address", "address", "Street")
-CITY_KEYS        = ("City", "city")
-STATE_KEYS       = ("State", "state")
-ZIP_KEYS         = ("ZIP Code", "ZIP", "Zip", "Zip Code", "zip_code", "zip")
-LAT_KEYS         = ("Latitude", "latitude", "lat")
-LNG_KEYS         = ("Longitude", "longitude", "lng", "lon", "long")
-WEBSITE_KEYS     = ("Website", "Property URL", "URL", "url", "website")
-NAME_KEYS        = ("Property Name", "property_name", "Name", "name")
+ADDRESS_KEYS = ("Property Address", "Address", "address", "Street")
+CITY_KEYS = ("City", "city")
+STATE_KEYS = ("State", "state")
+ZIP_KEYS = ("ZIP Code", "ZIP", "Zip", "Zip Code", "zip_code", "zip")
+LAT_KEYS = ("Latitude", "latitude", "lat")
+LNG_KEYS = ("Longitude", "longitude", "lng", "lon", "long")
+WEBSITE_KEYS = ("Website", "Property URL", "URL", "url", "website")
+NAME_KEYS = ("Property Name", "property_name", "Name", "name")
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def csv_get(row: dict, *keys: str) -> str:
     """Return the first non-empty value found under any of the given column names."""
@@ -57,27 +58,54 @@ def csv_get(row: dict, *keys: str) -> str:
             return s
     return ""
 
+
 # Common street-suffix abbreviations. The goal is canonical form, not
 # prettiness — so both "St" and "street" collapse to "st".
 _SUFFIXES = {
-    "street": "st", "st.": "st",
-    "avenue": "ave", "ave.": "ave", "av": "ave",
-    "boulevard": "blvd", "blvd.": "blvd",
-    "road": "rd", "rd.": "rd",
-    "drive": "dr", "dr.": "dr",
-    "lane": "ln", "ln.": "ln",
-    "court": "ct", "ct.": "ct",
-    "place": "pl", "pl.": "pl",
-    "terrace": "ter", "ter.": "ter",
-    "parkway": "pkwy", "pkwy.": "pkwy",
-    "highway": "hwy", "hwy.": "hwy",
-    "circle": "cir", "cir.": "cir",
-    "square": "sq", "sq.": "sq",
-    "north": "n", "south": "s", "east": "e", "west": "w",
-    "northeast": "ne", "northwest": "nw", "southeast": "se", "southwest": "sw",
-    "apartment": "apt", "apt.": "apt", "suite": "ste", "ste.": "ste",
-    "floor": "fl", "fl.": "fl", "unit": "unit",
+    "street": "st",
+    "st.": "st",
+    "avenue": "ave",
+    "ave.": "ave",
+    "av": "ave",
+    "boulevard": "blvd",
+    "blvd.": "blvd",
+    "road": "rd",
+    "rd.": "rd",
+    "drive": "dr",
+    "dr.": "dr",
+    "lane": "ln",
+    "ln.": "ln",
+    "court": "ct",
+    "ct.": "ct",
+    "place": "pl",
+    "pl.": "pl",
+    "terrace": "ter",
+    "ter.": "ter",
+    "parkway": "pkwy",
+    "pkwy.": "pkwy",
+    "highway": "hwy",
+    "hwy.": "hwy",
+    "circle": "cir",
+    "cir.": "cir",
+    "square": "sq",
+    "sq.": "sq",
+    "north": "n",
+    "south": "s",
+    "east": "e",
+    "west": "w",
+    "northeast": "ne",
+    "northwest": "nw",
+    "southeast": "se",
+    "southwest": "sw",
+    "apartment": "apt",
+    "apt.": "apt",
+    "suite": "ste",
+    "ste.": "ste",
+    "floor": "fl",
+    "fl.": "fl",
+    "unit": "unit",
 }
+
 
 def normalize_address(s: str) -> str:
     """Lowercase, strip punctuation, expand/collapse common street suffixes."""
@@ -89,12 +117,14 @@ def normalize_address(s: str) -> str:
     tokens = [_SUFFIXES.get(t, t) for t in tokens]
     return " ".join(tokens)
 
+
 def normalize_zip(s: str) -> str:
     """Return 5-digit zip (drops ZIP+4 extension)."""
     if not s:
         return ""
     m = re.match(r"^(\d{5})", str(s).strip())
     return m.group(1) if m else ""
+
 
 def normalize_host(url: str) -> str:
     """Lowercase host, strip 'www.', drop trailing dots."""
@@ -110,46 +140,54 @@ def normalize_host(url: str) -> str:
         host = host[4:]
     return host
 
+
 def _sha1_short(s: str, n: int = 16) -> str:
     return hashlib.sha1(s.encode("utf-8"), usedforsecurity=False).hexdigest()[:n]
 
+
 # ── Identity dataclass ────────────────────────────────────────────────────────
+
 
 @dataclass
 class PropertyIdentity:
-    canonical_id:    str | None
-    id_source:       str                 # one of: "unique_id" | "property_id" | "address_fp" | "geo_fp" | "website_fp" | "unresolved"
-    confidence:      float
-    components:      dict[str, Any] = field(default_factory=dict)
-    raw_unique_id:   str = ""
+    canonical_id: str | None
+    id_source: (
+        str  # one of: "unique_id" | "property_id" | "address_fp" | "geo_fp" | "website_fp" | "unresolved"
+    )
+    confidence: float
+    components: dict[str, Any] = field(default_factory=dict)
+    raw_unique_id: str = ""
     raw_property_id: str = ""
-    address_fp:      str = ""            # always computed if any address data exists (for soft-dup detection)
-    geo_fp:          str = ""
-    website_fp:      str = ""
+    address_fp: str = ""  # always computed if any address data exists (for soft-dup detection)
+    geo_fp: str = ""
+    website_fp: str = ""
 
     def to_dict(self) -> dict:
         return {
-            "canonical_id":    self.canonical_id,
-            "id_source":       self.id_source,
-            "confidence":      self.confidence,
-            "raw_unique_id":   self.raw_unique_id,
+            "canonical_id": self.canonical_id,
+            "id_source": self.id_source,
+            "confidence": self.confidence,
+            "raw_unique_id": self.raw_unique_id,
             "raw_property_id": self.raw_property_id,
-            "address_fp":      self.address_fp,
-            "geo_fp":          self.geo_fp,
-            "website_fp":      self.website_fp,
+            "address_fp": self.address_fp,
+            "geo_fp": self.geo_fp,
+            "website_fp": self.website_fp,
         }
+
 
 # ── Resolution ────────────────────────────────────────────────────────────────
 
+
 def compute_address_fp(row: dict) -> str:
-    addr  = normalize_address(csv_get(row, *ADDRESS_KEYS))
-    city  = normalize_address(csv_get(row, *CITY_KEYS))
+    addr = normalize_address(csv_get(row, *ADDRESS_KEYS))
+    city = normalize_address(csv_get(row, *CITY_KEYS))
     state = csv_get(row, *STATE_KEYS).lower()
-    zipc  = normalize_zip(csv_get(row, *ZIP_KEYS))
+    zipc = normalize_zip(csv_get(row, *ZIP_KEYS))
     if not addr or not (city or zipc):
         return ""
     raw = f"{addr}|{city}|{state}|{zipc}"
     return "addr_" + _sha1_short(raw)
+
 
 def compute_geo_fp(row: dict) -> str:
     lat = csv_get(row, *LAT_KEYS)
@@ -166,11 +204,13 @@ def compute_geo_fp(row: dict) -> str:
         return ""
     return f"geo_{lat_f:.4f}_{lng_f:.4f}"
 
+
 def compute_website_fp(row: dict) -> str:
     host = normalize_host(csv_get(row, *WEBSITE_KEYS))
     if not host:
         return ""
     return "web_" + _sha1_short(host)
+
 
 def resolve_identity(row: dict) -> PropertyIdentity:
     """
@@ -178,11 +218,11 @@ def resolve_identity(row: dict) -> PropertyIdentity:
     Always returns a PropertyIdentity (never raises). A failed resolution has
     canonical_id=None and id_source="unresolved".
     """
-    unique_id   = csv_get(row, *UNIQUE_ID_KEYS)
+    unique_id = csv_get(row, *UNIQUE_ID_KEYS)
     property_id = csv_get(row, *PROPERTY_ID_KEYS)
-    address_fp  = compute_address_fp(row)
-    geo_fp      = compute_geo_fp(row)
-    website_fp  = compute_website_fp(row)
+    address_fp = compute_address_fp(row)
+    geo_fp = compute_geo_fp(row)
+    website_fp = compute_website_fp(row)
 
     ident = PropertyIdentity(
         canonical_id=None,
@@ -197,36 +237,38 @@ def resolve_identity(row: dict) -> PropertyIdentity:
 
     if unique_id:
         ident.canonical_id = unique_id
-        ident.id_source    = "unique_id"
-        ident.confidence   = 1.0
+        ident.id_source = "unique_id"
+        ident.confidence = 1.0
     elif property_id:
         ident.canonical_id = property_id
-        ident.id_source    = "property_id"
-        ident.confidence   = 0.95
+        ident.id_source = "property_id"
+        ident.confidence = 0.95
     elif address_fp:
         ident.canonical_id = address_fp
-        ident.id_source    = "address_fp"
-        ident.confidence   = 0.80
+        ident.id_source = "address_fp"
+        ident.confidence = 0.80
     elif geo_fp:
         ident.canonical_id = geo_fp
-        ident.id_source    = "geo_fp"
-        ident.confidence   = 0.65
+        ident.id_source = "geo_fp"
+        ident.confidence = 0.65
     elif website_fp:
         ident.canonical_id = website_fp
-        ident.id_source    = "website_fp"
-        ident.confidence   = 0.45
+        ident.id_source = "website_fp"
+        ident.confidence = 0.45
 
     ident.components = {
-        "unique_id_present":   bool(unique_id),
+        "unique_id_present": bool(unique_id),
         "property_id_present": bool(property_id),
-        "address_present":     bool(csv_get(row, *ADDRESS_KEYS)),
-        "zip_present":         bool(csv_get(row, *ZIP_KEYS)),
-        "geo_present":         bool(geo_fp),
-        "website_present":     bool(website_fp),
+        "address_present": bool(csv_get(row, *ADDRESS_KEYS)),
+        "zip_present": bool(csv_get(row, *ZIP_KEYS)),
+        "geo_present": bool(geo_fp),
+        "website_present": bool(website_fp),
     }
     return ident
 
+
 # ── Dedup detection across a full CSV ─────────────────────────────────────────
+
 
 @dataclass
 class DuplicateReport:
@@ -235,13 +277,15 @@ class DuplicateReport:
     # Rows with matching address_fp but different canonical_id (possible mismatch).
     soft_duplicates: dict[str, list[int]] = field(default_factory=dict)
     # Rows with matching geo_fp but different canonical_id.
-    geo_duplicates:  dict[str, list[int]] = field(default_factory=dict)
+    geo_duplicates: dict[str, list[int]] = field(default_factory=dict)
     # Rows for which resolve_identity could not produce any canonical_id.
     unresolved_rows: list[int] = field(default_factory=list)
 
     def any(self) -> bool:
-        return bool(self.hard_duplicates or self.soft_duplicates
-                    or self.geo_duplicates or self.unresolved_rows)
+        return bool(
+            self.hard_duplicates or self.soft_duplicates or self.geo_duplicates or self.unresolved_rows
+        )
+
 
 def detect_duplicates(identities: list[PropertyIdentity]) -> DuplicateReport:
     """
@@ -251,8 +295,8 @@ def detect_duplicates(identities: list[PropertyIdentity]) -> DuplicateReport:
     """
     report = DuplicateReport()
     by_canonical: dict[str, list[int]] = {}
-    by_address: dict[str, list[int]]   = {}
-    by_geo: dict[str, list[int]]       = {}
+    by_address: dict[str, list[int]] = {}
+    by_geo: dict[str, list[int]] = {}
 
     for idx, ident in enumerate(identities):
         if ident.canonical_id is None:

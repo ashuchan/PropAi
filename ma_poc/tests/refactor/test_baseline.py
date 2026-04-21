@@ -1,4 +1,5 @@
 """Phase 0 — tests for scripts/refactor_baseline.py."""
+
 from __future__ import annotations
 
 import json
@@ -82,9 +83,7 @@ def _write_run(base: Path, date: str, reports: dict[str, str], issues: list[dict
                 fh.write(json.dumps(issue) + "\n")
     # Minimal report.json so duration loader has something to read
     (run_dir / "report.json").write_text(
-        json.dumps(
-            {"duration_s": 60.0, "totals": {"properties_processed": len(reports)}}
-        ),
+        json.dumps({"duration_s": 60.0, "totals": {"properties_processed": len(reports)}}),
         encoding="utf-8",
     )
     return run_dir

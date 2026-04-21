@@ -9,6 +9,7 @@ Not recommended for production: single-writer, weaker concurrency guarantees,
 limited JSON operator support. Switch to `DATA_PROVIDER=postgres` before
 running the real scraper at scale.
 """
+
 from __future__ import annotations
 
 import os

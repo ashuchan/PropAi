@@ -6,13 +6,15 @@ Yields tasks in priority order:
 3. HEAD/GET (hot profiles, recent renders)
 4. SITEMAP_DISCOVERED
 """
+
 from __future__ import annotations
 
 import logging
 import random
 from collections import defaultdict
-from datetime import date, datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, date, datetime
+from typing import Any
 from urllib.parse import urlparse
 
 from ..fetch.contracts import RenderMode
@@ -73,20 +75,22 @@ class Scheduler:
         light_tasks: list[CrawlTask] = []
 
         # 1. DLQ revive tasks
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for dlq_entry in self._dlq.due_for_retry(now):
             # Find URL from frontier
             urls = self._frontier.property_urls(dlq_entry.property_id)
             if urls:
                 url = urls[0]["url"]
-                dlq_tasks.append(CrawlTask(
-                    url=str(url),
-                    property_id=dlq_entry.property_id,
-                    priority=0,
-                    budget_ms=180_000,
-                    reason=TaskReason.DLQ_REVIVE,
-                    render_mode=RenderMode.RENDER,
-                ))
+                dlq_tasks.append(
+                    CrawlTask(
+                        url=str(url),
+                        property_id=dlq_entry.property_id,
+                        priority=0,
+                        budget_ms=180_000,
+                        reason=TaskReason.DLQ_REVIVE,
+                        render_mode=RenderMode.RENDER,
+                    )
+                )
 
         # 2. Scheduled tasks from CSV
         for row in csv_rows:
@@ -101,6 +105,7 @@ class Scheduler:
             # Skip parked properties
             if self._dlq.is_parked(pid):
                 from ..observability.events import EventKind, emit
+
                 emit(EventKind.TASK_SKIPPED_DLQ, pid, url=url)
                 continue
 
@@ -201,9 +206,7 @@ class Scheduler:
             pass
         return None
 
-    def _days_since_render(
-        self, frontier_entry: dict[str, object] | None
-    ) -> int | None:
+    def _days_since_render(self, frontier_entry: dict[str, object] | None) -> int | None:
         """Calculate days since last successful render.
 
         Args:
@@ -219,7 +222,7 @@ class Scheduler:
             return None
         try:
             last_dt = datetime.fromisoformat(last)
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             return (now - last_dt).days
         except ValueError:
             return None

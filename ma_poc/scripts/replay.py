@@ -7,6 +7,7 @@ Usage:
     python scripts/replay.py --cid 5317 --date 2026-04-17
     python scripts/replay.py --cid 5317 --date 2026-04-17 --rerun
 """
+
 from __future__ import annotations
 
 import argparse
@@ -62,16 +63,20 @@ def main() -> int:
     for event in payload.events:
         ts = event.get("ts", "?")
         kind = event.get("kind", "?")
-        lines.append(f"- `{ts}` **{kind}** {json.dumps({k: v for k, v in event.items() if k not in ('ts', 'kind', 'event_id', 'run_id', 'property_id')}, default=str)}")
+        lines.append(
+            f"- `{ts}` **{kind}** {json.dumps({k: v for k, v in event.items() if k not in ('ts', 'kind', 'event_id', 'run_id', 'property_id')}, default=str)}"
+        )
 
     if payload.extract_result:
-        lines.extend([
-            "",
-            "## Extract result",
-            f"```json",
-            json.dumps(payload.extract_result, indent=2, default=str),
-            "```",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Extract result",
+                "```json",
+                json.dumps(payload.extract_result, indent=2, default=str),
+                "```",
+            ]
+        )
 
     lines.append("")
     report = "\n".join(lines)

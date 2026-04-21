@@ -1,7 +1,8 @@
 """Tests for dlq — dead-letter queue."""
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ma_poc.discovery.dlq import Dlq
@@ -17,7 +18,7 @@ def test_dlq_due_for_retry_hourly_for_6h(tmp_path: Path) -> None:
     dlq = Dlq(tmp_path / "dlq.jsonl")
     dlq.park("p1", "unreachable", "ERR_SSL")
     # After 1 hour, should be due
-    future = datetime.now(timezone.utc) + timedelta(hours=1, minutes=1)
+    future = datetime.now(UTC) + timedelta(hours=1, minutes=1)
     due = dlq.due_for_retry(future)
     assert len(due) == 1
     assert due[0].property_id == "p1"
@@ -28,7 +29,7 @@ def test_dlq_due_for_retry_daily_after_6h(tmp_path: Path) -> None:
     dlq.park("p1", "unreachable", "ERR_SSL")
     dlq.reschedule("p1")  # Reschedule for later
     # The reschedule within 6h sets hourly; still works
-    future = datetime.now(timezone.utc) + timedelta(hours=2)
+    future = datetime.now(UTC) + timedelta(hours=2)
     due = dlq.due_for_retry(future)
     assert len(due) >= 1
 
@@ -38,7 +39,7 @@ def test_dlq_unpark_removes_from_due(tmp_path: Path) -> None:
     dlq.park("p1", "unreachable", "ERR_SSL")
     dlq.unpark("p1")
     assert not dlq.is_parked("p1")
-    future = datetime.now(timezone.utc) + timedelta(hours=2)
+    future = datetime.now(UTC) + timedelta(hours=2)
     due = dlq.due_for_retry(future)
     assert len(due) == 0
 

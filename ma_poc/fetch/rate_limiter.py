@@ -3,12 +3,13 @@
 Async-safe. robots.txt Crawl-delay sets the refill rate per host;
 default is 2 requests/second.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 log = logging.getLogger(__name__)
 

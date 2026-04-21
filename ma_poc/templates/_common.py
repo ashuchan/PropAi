@@ -7,6 +7,7 @@ fails, dramatically reducing the number of properties that fall through to Tier 
 
 All helpers are pure functions operating on strings — no Playwright dependency.
 """
+
 from __future__ import annotations
 
 import re
@@ -34,9 +35,7 @@ AVAIL_DATE_RE = re.compile(
     re.IGNORECASE,
 )
 AVAIL_DATE_NUMERIC_RE = re.compile(r"\b(\d{1,2}/\d{1,2}/\d{2,4})\b")
-CONCESSION_RE = re.compile(
-    r"(\d+)\s+(?:week|month)s?\s+free", re.IGNORECASE
-)
+CONCESSION_RE = re.compile(r"(\d+)\s+(?:week|month)s?\s+free", re.IGNORECASE)
 
 
 # ── Scalar parsers ────────────────────────────────────────────────────────────
@@ -126,8 +125,18 @@ def parse_availability_date(text: str | None) -> date | None:
     )
     if m:
         month_names = {
-            "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-            "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+            "jan": 1,
+            "feb": 2,
+            "mar": 3,
+            "apr": 4,
+            "may": 5,
+            "jun": 6,
+            "jul": 7,
+            "aug": 8,
+            "sep": 9,
+            "oct": 10,
+            "nov": 11,
+            "dec": 12,
         }
         month = month_names.get(m.group(1).lower()[:3], 0)
         day = int(m.group(2))

@@ -3,12 +3,13 @@
 Consumes cost ledger, SLO watcher, and all property results to produce
 the run-level summary report.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -47,8 +48,11 @@ def build(
         extract_result = p.get("_extract_result") or {}
         tier = (
             meta.get("scrape_tier_used")
-            or (extract_result.get("tier_used") if isinstance(extract_result, dict)
-                else getattr(extract_result, "tier_used", None))
+            or (
+                extract_result.get("tier_used")
+                if isinstance(extract_result, dict)
+                else getattr(extract_result, "tier_used", None)
+            )
             or "UNKNOWN"
         )
         tier_counts[tier] += 1
@@ -64,9 +68,11 @@ def build(
     success_rate = ((total - failed) / total * 100) if total > 0 else 0
 
     # F7: separate pre-extraction terminations from real tier outcomes.
-    _PRE_EXTRACTION_TIERS = frozenset({
-        "generic:no_body_short_circuit",
-    })
+    _PRE_EXTRACTION_TIERS = frozenset(
+        {
+            "generic:no_body_short_circuit",
+        }
+    )
     pre_extraction: Counter[str] = Counter()
     real_tier_counts: Counter[str] = Counter()
     for tier, count in tier_counts.items():
@@ -98,7 +104,7 @@ def build(
 
     report = {
         "run_date": run_date,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "totals": {
             "properties": total,
             "succeeded": total - failed,
@@ -111,13 +117,17 @@ def build(
         "pre_extraction_terminations": pre_extraction_terminations,
         # F4: fields that are tracked in the schema but not currently extracted
         "non_extracted_fields": [
-            "lease_term", "move_in_date", "pmc", "website_design",
-            "phone", "email_address", "concessions",
+            "lease_term",
+            "move_in_date",
+            "pmc",
+            "website_design",
+            "phone",
+            "email_address",
+            "concessions",
         ],
         "cost": cost_rollup or {},
         "slo_violations": [
-            {"name": v.name, "threshold": v.threshold, "observed": v.observed}
-            for v in (slo_violations or [])
+            {"name": v.name, "threshold": v.threshold, "observed": v.observed} for v in (slo_violations or [])
         ],
     }
 
@@ -146,19 +156,23 @@ def build(
     for tier, count in tier_counts.most_common():
         md_lines.append(f"| {tier} | {count} |")
 
-    md_lines.extend([
-        "",
-        "## Cost",
-        "",
-    ])
+    md_lines.extend(
+        [
+            "",
+            "## Cost",
+            "",
+        ]
+    )
     for cat, amount in (cost_rollup or {}).items():
         md_lines.append(f"- {cat}: ${amount:.4f}")
 
-    md_lines.extend([
-        "",
-        "## SLO Status",
-        "",
-    ])
+    md_lines.extend(
+        [
+            "",
+            "## SLO Status",
+            "",
+        ]
+    )
     if slo_violations:
         for v in slo_violations:
             md_lines.append(f"- **{v.name}**: observed={v.observed:.4f}, threshold={v.threshold}")

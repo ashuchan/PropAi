@@ -44,7 +44,7 @@ jobs:
       - name: mypy strict on key modules
         run: |
           cd ma_poc
-          mypy --strict pms/ reporting/ scripts/_trigger_common.py
+          mypy --strict --explicit-package-bases pms/ reporting/ scripts/_trigger_common.py
 
   python-test:
     runs-on: ubuntu-latest

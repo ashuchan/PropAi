@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import validation as V
@@ -30,22 +30,22 @@ import validation as V
 # We map these to the internal keys that daily_runner / identity.py expect.
 
 V2_CSV_COLUMN_MAP: dict[str, list[str]] = {
-    "apartment_id":    ["apartmentid", "apartment_id", "ApartmentID"],
-    "property_name":   ["name", "Name"],
+    "apartment_id": ["apartmentid", "apartment_id", "ApartmentID"],
+    "property_name": ["name", "Name"],
     "property_address": ["address", "Address"],
-    "city":            ["city", "City"],
-    "state":           ["state", "State"],
-    "zip_code":        ["zip", "Zip", "zip_code"],
-    "website":         ["website", "Website"],
+    "city": ["city", "City"],
+    "state": ["state", "State"],
+    "zip_code": ["zip", "Zip", "zip_code"],
+    "website": ["website", "Website"],
 }
 
 # Key aliases for csv_get() — used by daily_runner when schema_version == "v2"
-V2_ID_KEYS      = ("apartmentid", "apartment_id", "ApartmentID")
-V2_NAME_KEYS    = ("name", "Name")
+V2_ID_KEYS = ("apartmentid", "apartment_id", "ApartmentID")
+V2_NAME_KEYS = ("name", "Name")
 V2_ADDRESS_KEYS = ("address", "Address")
-V2_CITY_KEYS    = ("city", "City")
-V2_STATE_KEYS   = ("state", "State")
-V2_ZIP_KEYS     = ("zip", "Zip", "zip_code")
+V2_CITY_KEYS = ("city", "City")
+V2_STATE_KEYS = ("state", "State")
+V2_ZIP_KEYS = ("zip", "Zip", "zip_code")
 V2_WEBSITE_KEYS = ("website", "Website")
 
 
@@ -67,14 +67,14 @@ def get_schema_version(args: Any = None) -> str:
 
 # Platform guess → human-readable website design label
 _PLATFORM_LABELS: dict[str, str] = {
-    "entrata":    "Powered by Entrata",
-    "rentcafe":   "Powered by RentCafe",
-    "appfolio":   "Powered by AppFolio",
-    "yardi":      "Powered by RentCafe (Yardi)",
-    "realpage":   "Powered by RealPage",
-    "sightmap":   "Powered by SightMap",
-    "knock":      "Powered by Knock",
-    "respage":    "Powered by Respage",
+    "entrata": "Powered by Entrata",
+    "rentcafe": "Powered by RentCafe",
+    "appfolio": "Powered by AppFolio",
+    "yardi": "Powered by RentCafe (Yardi)",
+    "realpage": "Powered by RealPage",
+    "sightmap": "Powered by SightMap",
+    "knock": "Powered by Knock",
+    "respage": "Powered by Respage",
 }
 
 
@@ -106,18 +106,16 @@ def build_v2_property(
         return scraped_val if scraped_val not in (None, "", "null", "None") else None
 
     # CSV values
-    csv_id      = csv_get(row, *V2_ID_KEYS)
-    csv_name    = csv_get(row, *V2_NAME_KEYS)
-    csv_addr    = csv_get(row, *V2_ADDRESS_KEYS)
-    csv_city    = csv_get(row, *V2_CITY_KEYS)
-    csv_state   = csv_get(row, *V2_STATE_KEYS)
-    csv_zip     = csv_get(row, *V2_ZIP_KEYS)
+    csv_id = csv_get(row, *V2_ID_KEYS)
+    csv_name = csv_get(row, *V2_NAME_KEYS)
+    csv_addr = csv_get(row, *V2_ADDRESS_KEYS)
+    csv_city = csv_get(row, *V2_CITY_KEYS)
+    csv_state = csv_get(row, *V2_STATE_KEYS)
+    csv_zip = csv_get(row, *V2_ZIP_KEYS)
     csv_website = csv_get(row, *V2_WEBSITE_KEYS)
 
     # Platform / website design
-    platform = (scrape_result.get("platform_detected")
-                or (md.get("api_provider") if md else None)
-                or "")
+    platform = scrape_result.get("platform_detected") or (md.get("api_provider") if md else None) or ""
     website_design = _PLATFORM_LABELS.get(platform.lower(), platform or None)
 
     # Concessions — prefer scraped banner text
@@ -125,26 +123,27 @@ def build_v2_property(
 
     prop: dict[str, Any] = {
         # ── Property-level fields ────────────────────────────────────────
-        "apartment_id":   _safe_int(csv_id),
-        "proj_name":      _pick(csv_name, md.get("name") or md.get("title")),
-        "address":        _pick(csv_addr, md.get("address")),
-        "city":           _pick(csv_city, md.get("city")),
-        "state":          _pick(csv_state, md.get("state")),
-        "zip_code":       _format_zip_5(_pick(csv_zip, md.get("zip"))),
-        "country":        md.get("country") or None,
-        "phone":          _pick(
-                              csv_get(row, "Phone", "phone"),
-                              md.get("telephone"),
-                          ) or None,
-        "email_address":  md.get("email") or md.get("email_address") or None,
-        "website":        csv_website or scrape_result.get("base_url") or None,
-        "pmc":            _pick(
-                              csv_get(row, "Management Company", "pmc"),
-                              md.get("management_company"),
-                          ) or None,
+        "apartment_id": _safe_int(csv_id),
+        "proj_name": _pick(csv_name, md.get("name") or md.get("title")),
+        "address": _pick(csv_addr, md.get("address")),
+        "city": _pick(csv_city, md.get("city")),
+        "state": _pick(csv_state, md.get("state")),
+        "zip_code": _format_zip_5(_pick(csv_zip, md.get("zip"))),
+        "country": md.get("country") or None,
+        "phone": _pick(
+            csv_get(row, "Phone", "phone"),
+            md.get("telephone"),
+        )
+        or None,
+        "email_address": md.get("email") or md.get("email_address") or None,
+        "website": csv_website or scrape_result.get("base_url") or None,
+        "pmc": _pick(
+            csv_get(row, "Management Company", "pmc"),
+            md.get("management_company"),
+        )
+        or None,
         "website_design": website_design if website_design else None,
-        "concessions":    concessions_text,
-
+        "concessions": concessions_text,
         # ── Units ────────────────────────────────────────────────────────
         "units": [_format_v2_unit(u, scrape_ts) for u in target_units],
     }
@@ -159,18 +158,10 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime) -> dict:
     ``scrape_properties.py`` that are not part of the V1 public schema but
     contain the raw data we need for V2.
     """
-    beds_raw = (unit.get("_bedrooms")
-                or unit.get("bedrooms")
-                or unit.get("beds"))
-    baths_raw = (unit.get("_bathrooms")
-                 or unit.get("bathrooms")
-                 or unit.get("baths"))
-    fp_name = (unit.get("_floor_plan")
-               or unit.get("floor_plan_name")
-               or unit.get("floorplan_name"))
-    sqft = (unit.get("_sqft")
-            or unit.get("sqft")
-            or unit.get("area"))
+    beds_raw = unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds")
+    baths_raw = unit.get("_bathrooms") or unit.get("bathrooms") or unit.get("baths")
+    fp_name = unit.get("_floor_plan") or unit.get("floor_plan_name") or unit.get("floorplan_name")
+    sqft = unit.get("_sqft") or unit.get("sqft") or unit.get("area")
 
     # unit_id alias (adapters emit unit_number)
     uid = unit.get("unit_id") or unit.get("unit_number") or unit.get("_unit_number")
@@ -183,26 +174,28 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime) -> dict:
         if rent_range:
             try:
                 from ma_poc.pms.adapters._parsing import parse_rent_range
+
                 rent_lo, rent_hi = parse_rent_range(str(rent_range))
             except Exception:
                 pass
 
     return {
-        "beds":           _normalize_beds(beds_raw),
-        "baths":          _normalize_baths(baths_raw),
+        "beds": _normalize_beds(beds_raw),
+        "baths": _normalize_baths(baths_raw),
         "floor_plan_name": fp_name if fp_name else None,
-        "area":           _format_area(sqft),
-        "unit_id":        str(uid) if uid not in (None, "", "null") else None,
-        "rent_low":       _format_rent(rent_lo),
-        "rent_high":      _format_rent(rent_hi),
-        "date_captured":  scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
+        "area": _format_area(sqft),
+        "unit_id": str(uid) if uid not in (None, "", "null") else None,
+        "rent_low": _format_rent(rent_lo),
+        "rent_high": _format_rent(rent_hi),
+        "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         "available_date": _format_date(unit.get("available_date")),
-        "lease_term":     _safe_lease_term(unit.get("lease_term") or unit.get("_lease_term")),
-        "move_in_date":   _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
+        "lease_term": _safe_lease_term(unit.get("lease_term") or unit.get("_lease_term")),
+        "move_in_date": _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
     }
 
 
 # ── Formatting helpers ───────────────────────────────────────────────────────
+
 
 def _safe_int(val: Any) -> int | None:
     """Convert to int, return None on failure."""
@@ -333,17 +326,16 @@ def _safe_lease_term(val: Any) -> int | None:
 # Returns issues using the same ValidationIssue shape as validation.py.
 
 # V2-specific issue codes — defined in validation.py, imported here.
-V2_MISSING_REQUIRED    = V.V2_MISSING_REQUIRED
+V2_MISSING_REQUIRED = V.V2_MISSING_REQUIRED
 V2_INVALID_APARTMENT_ID = V.V2_INVALID_APARTMENT_ID
-V2_INVALID_ZIP         = V.V2_INVALID_ZIP
-V2_INVALID_BEDS        = V.V2_INVALID_BEDS
-V2_INVALID_BATHS       = V.V2_INVALID_BATHS
-V2_INVALID_AREA        = V.V2_INVALID_AREA
-V2_INVALID_RENT        = V.V2_INVALID_RENT
-V2_INVALID_LEASE_TERM  = V.V2_INVALID_LEASE_TERM
+V2_INVALID_ZIP = V.V2_INVALID_ZIP
+V2_INVALID_BEDS = V.V2_INVALID_BEDS
+V2_INVALID_BATHS = V.V2_INVALID_BATHS
+V2_INVALID_AREA = V.V2_INVALID_AREA
+V2_INVALID_RENT = V.V2_INVALID_RENT
+V2_INVALID_LEASE_TERM = V.V2_INVALID_LEASE_TERM
 
-_V2_REQUIRED_PROP_FIELDS = ("apartment_id", "proj_name", "address", "city",
-                             "state", "zip_code", "website")
+_V2_REQUIRED_PROP_FIELDS = ("apartment_id", "proj_name", "address", "city", "state", "zip_code", "website")
 
 
 def validate_v2_property(prop: dict, canonical_id: str | None = None) -> list[V.ValidationIssue]:
@@ -359,32 +351,38 @@ def validate_v2_property(prop: dict, canonical_id: str | None = None) -> list[V.
     for field in _V2_REQUIRED_PROP_FIELDS:
         val = prop.get(field)
         if val is None or (isinstance(val, str) and not val.strip()):
-            issues.append(V.error(
-                V2_MISSING_REQUIRED,
-                f"V2 required field '{field}' is null or empty",
-                canonical_id=cid,
-                details={"field": field, "value": val},
-            ))
+            issues.append(
+                V.error(
+                    V2_MISSING_REQUIRED,
+                    f"V2 required field '{field}' is null or empty",
+                    canonical_id=cid,
+                    details={"field": field, "value": val},
+                )
+            )
 
     # apartment_id: must be integer > 1
     aid = prop.get("apartment_id")
     if aid is not None and (not isinstance(aid, int) or aid < 1):
-        issues.append(V.error(
-            V2_INVALID_APARTMENT_ID,
-            f"apartment_id must be integer > 1, got {aid!r}",
-            canonical_id=cid,
-            details={"value": aid},
-        ))
+        issues.append(
+            V.error(
+                V2_INVALID_APARTMENT_ID,
+                f"apartment_id must be integer > 1, got {aid!r}",
+                canonical_id=cid,
+                details={"value": aid},
+            )
+        )
 
     # zip_code: must be exactly 5 digits
     zc = prop.get("zip_code")
     if zc is not None and not re.match(r"^\d{5}$", str(zc)):
-        issues.append(V.warning(
-            V2_INVALID_ZIP,
-            f"zip_code is not 5 digits: {zc!r}",
-            canonical_id=cid,
-            details={"value": zc},
-        ))
+        issues.append(
+            V.warning(
+                V2_INVALID_ZIP,
+                f"zip_code is not 5 digits: {zc!r}",
+                canonical_id=cid,
+                details={"value": zc},
+            )
+        )
 
     # ── Unit-level validation ────────────────────────────────────────────
     for idx, unit in enumerate(prop.get("units") or []):
@@ -393,82 +391,97 @@ def validate_v2_property(prop: dict, canonical_id: str | None = None) -> list[V.
         # beds: 0-7
         beds = unit.get("beds")
         if beds is not None and (not isinstance(beds, int) or beds < 0 or beds > 7):
-            issues.append(V.warning(
-                V2_INVALID_BEDS,
-                f"beds={beds!r} outside [0, 7]",
-                canonical_id=cid,
-                details={"unit_id": uid, "value": beds},
-            ))
+            issues.append(
+                V.warning(
+                    V2_INVALID_BEDS,
+                    f"beds={beds!r} outside [0, 7]",
+                    canonical_id=cid,
+                    details={"unit_id": uid, "value": beds},
+                )
+            )
 
         # baths: 0-10, multiple of 0.5
         baths = unit.get("baths")
         if baths is not None:
             if not isinstance(baths, (int, float)) or baths < 0 or baths > 10:
-                issues.append(V.warning(
-                    V2_INVALID_BATHS,
-                    f"baths={baths!r} outside [0, 10]",
-                    canonical_id=cid,
-                    details={"unit_id": uid, "value": baths},
-                ))
+                issues.append(
+                    V.warning(
+                        V2_INVALID_BATHS,
+                        f"baths={baths!r} outside [0, 10]",
+                        canonical_id=cid,
+                        details={"unit_id": uid, "value": baths},
+                    )
+                )
             elif (baths * 2) != int(baths * 2):
-                issues.append(V.warning(
-                    V2_INVALID_BATHS,
-                    f"baths={baths!r} not a multiple of 0.5",
-                    canonical_id=cid,
-                    details={"unit_id": uid, "value": baths},
-                ))
+                issues.append(
+                    V.warning(
+                        V2_INVALID_BATHS,
+                        f"baths={baths!r} not a multiple of 0.5",
+                        canonical_id=cid,
+                        details={"unit_id": uid, "value": baths},
+                    )
+                )
 
         # area: must be > 0 or exactly -1
         area = unit.get("area")
         if area is not None and area != -1 and (not isinstance(area, int) or area <= 0):
-            issues.append(V.warning(
-                V2_INVALID_AREA,
-                f"area={area!r} must be > 0 or -1",
-                canonical_id=cid,
-                details={"unit_id": uid, "value": area},
-            ))
+            issues.append(
+                V.warning(
+                    V2_INVALID_AREA,
+                    f"area={area!r} must be > 0 or -1",
+                    canonical_id=cid,
+                    details={"unit_id": uid, "value": area},
+                )
+            )
 
         # rent: must be > 1 if present
         for rent_field in ("rent_low", "rent_high"):
             rv = unit.get(rent_field)
             if rv is not None and (not isinstance(rv, (int, float)) or rv <= 1):
-                issues.append(V.warning(
-                    V2_INVALID_RENT,
-                    f"{rent_field}={rv!r} must be > 1",
-                    canonical_id=cid,
-                    details={"unit_id": uid, "field": rent_field, "value": rv},
-                ))
+                issues.append(
+                    V.warning(
+                        V2_INVALID_RENT,
+                        f"{rent_field}={rv!r} must be > 1",
+                        canonical_id=cid,
+                        details={"unit_id": uid, "field": rent_field, "value": rv},
+                    )
+                )
 
         # rent_low <= rent_high
         rl = unit.get("rent_low")
         rh = unit.get("rent_high")
-        if (isinstance(rl, (int, float)) and isinstance(rh, (int, float))
-                and rl > rh):
-            issues.append(V.warning(
-                V2_INVALID_RENT,
-                f"rent_low ({rl}) > rent_high ({rh})",
-                canonical_id=cid,
-                details={"unit_id": uid, "low": rl, "high": rh},
-            ))
+        if isinstance(rl, (int, float)) and isinstance(rh, (int, float)) and rl > rh:
+            issues.append(
+                V.warning(
+                    V2_INVALID_RENT,
+                    f"rent_low ({rl}) > rent_high ({rh})",
+                    canonical_id=cid,
+                    details={"unit_id": uid, "low": rl, "high": rh},
+                )
+            )
 
         # lease_term: must be > 1 if present
         lt = unit.get("lease_term")
         if lt is not None and (not isinstance(lt, int) or lt <= 1):
-            issues.append(V.warning(
-                V2_INVALID_LEASE_TERM,
-                f"lease_term={lt!r} must be > 1",
-                canonical_id=cid,
-                details={"unit_id": uid, "value": lt},
-            ))
+            issues.append(
+                V.warning(
+                    V2_INVALID_LEASE_TERM,
+                    f"lease_term={lt!r} must be > 1",
+                    canonical_id=cid,
+                    details={"unit_id": uid, "value": lt},
+                )
+            )
 
         # date_captured: NOT NULL
         dc = unit.get("date_captured")
         if not dc:
-            issues.append(V.error(
-                V2_MISSING_REQUIRED,
-                f"V2 required field 'date_captured' is null for unit {uid}",
-                canonical_id=cid,
-                details={"unit_id": uid, "field": "date_captured"},
-            ))
+            issues.append(
+                V.error(
+                    V2_MISSING_REQUIRED,
+                    f"V2 required field 'date_captured' is null for unit {uid}",
+                    canonical_id=cid,
+                    details={"unit_id": uid, "field": "date_captured"},
+                )
+            )
 
     return issues

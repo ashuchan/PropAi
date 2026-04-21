@@ -7,6 +7,7 @@ Acceptance criteria (CLAUDE.md PR-01):
 - Includes proxy/vision/banner/sample flags + page_load_ms + change-detection
   result + scrape_outcome + tier + confidence
 """
+
 from datetime import datetime
 from enum import StrEnum
 

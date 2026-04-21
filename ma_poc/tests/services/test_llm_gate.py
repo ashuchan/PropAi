@@ -1,4 +1,5 @@
 """Change 5 — LLM escalation gate tests."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -20,9 +21,7 @@ class _FakeAdapterResult:
     units: list[dict[str, Any]] = field(default_factory=list)
 
 
-_MEANINGFUL_HTML = (
-    "<html><body>" + ("<p>rent available apartment studio floor</p>" * 80) + "</body></html>"
-)
+_MEANINGFUL_HTML = "<html><body>" + ("<p>rent available apartment studio floor</p>" * 80) + "</body></html>"
 assert len(_MEANINGFUL_HTML.encode("utf-8")) > 1024
 
 
@@ -46,9 +45,7 @@ def test_llm_gate_skips_on_body_without_rent_tokens() -> None:
 
 
 def test_llm_gate_escalates_on_shape_matched_but_empty() -> None:
-    tier1 = _FakeAdapterResult(
-        api_responses=[{"url": "https://x", "body": {"data": [1]}}]
-    )
+    tier1 = _FakeAdapterResult(api_responses=[{"url": "https://x", "body": {"data": [1]}}])
     d = should_escalate_to_llm(html=_MEANINGFUL_HTML, tier1_result=tier1)
     assert d.escalate is True
     assert LLM_GATE_TIER1_SHAPE_MATCHED in d.reason
@@ -101,6 +98,6 @@ def test_page_has_meaningful_body_thresholds() -> None:
     # Large body with rent token → True
     assert page_has_meaningful_body("x" * 2000 + " floor plan ") is True
     # Just over threshold → True
-    body = ("apartment " * 120)
+    body = "apartment " * 120
     assert len(body.encode("utf-8")) > 1024
     assert page_has_meaningful_body(body) is True

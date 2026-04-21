@@ -3,6 +3,7 @@
 ExtractResult is the output contract passed from L3 to L4.
 ProfileHints carries what the extractor learned back to the profile writer.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

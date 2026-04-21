@@ -30,6 +30,7 @@ Key findings:
     _unwrap_rentcafe_list extended with Floorplans, FloorplanList,
     GetFloorplansResult, and two-level nesting support.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -81,26 +82,35 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         avail_count = str(item_lc.get("availableunitscount") or item_lc.get("unitscount") or "")
         avail_date = str(item_lc.get("availabledate") or "")
 
-        units.append(make_unit_dict(
-            floor_plan_name=name,
-            bed_label=bed_label_from(beds, name),
-            bedrooms=str(beds) if beds is not None else "",
-            bathrooms=str(baths) if baths is not None else "",
-            sqft=sqft,
-            unit_number=str(item_lc.get("floorplanid") or ""),
-            rent_range=format_rent_range(rent_lo, rent_hi),
-            availability_status="AVAILABLE" if avail_count and avail_count != "0" else "UNAVAILABLE",
-            available_units=avail_count,
-            availability_date=avail_date,
-            source_api_url=url,
-            extraction_tier="TIER_1_API_RENTCAFE",
-        ))
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft=sqft,
+                unit_number=str(item_lc.get("floorplanid") or ""),
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                availability_status="AVAILABLE" if avail_count and avail_count != "0" else "UNAVAILABLE",
+                available_units=avail_count,
+                availability_date=avail_date,
+                source_api_url=url,
+                extraction_tier="TIER_1_API_RENTCAFE",
+            )
+        )
     return units
 
 
 _RENTCAFE_WRAPPER_KEYS = (
-    "data", "results", "floorplans", "floorPlans", "Floorplans",
-    "FloorplanList", "GetFloorplansResult", "items", "Result",
+    "data",
+    "results",
+    "floorplans",
+    "floorPlans",
+    "Floorplans",
+    "FloorplanList",
+    "GetFloorplansResult",
+    "items",
+    "Result",
 )
 
 # Keys used when the list is nested two levels deep, e.g.
@@ -167,8 +177,14 @@ def _is_rentcafe_response(body: Any) -> bool:
     # equality check only matched lowercase "rentcafe". Lowercase the value too.
     if str(first_lc.get("api") or "").lower() == "rentcafe":
         return True
-    rentcafe_keys = {"floorplanname", "floorplanid", "minimumrent", "maximumrent",
-                     "availableunitscount", "availabilityurl"}
+    rentcafe_keys = {
+        "floorplanname",
+        "floorplanid",
+        "minimumrent",
+        "maximumrent",
+        "availableunitscount",
+        "availabilityurl",
+    }
     return len(rentcafe_keys & set(first_lc.keys())) >= 3
 
 
@@ -189,27 +205,30 @@ _TIER_PARSE_ZERO = f"{_TIER_BASE}_PARSE_ZERO"
 def _classify_rentcafe_failure(api_responses: list[dict[str, Any]]) -> tuple[str, str]:
     """Return (tier_code, machine-readable error message) for a failed run."""
     if not api_responses:
-        return (_TIER_NO_RESPONSE,
-                "RENTCAFE_NO_RESPONSE: no network responses captured during page load")
-    shape_matches = [
-        r for r in api_responses if _is_rentcafe_response(r.get("body"))
-    ]
+        return (_TIER_NO_RESPONSE, "RENTCAFE_NO_RESPONSE: no network responses captured during page load")
+    shape_matches = [r for r in api_responses if _is_rentcafe_response(r.get("body"))]
     if not shape_matches:
-        return (_TIER_SHAPE_REJECTED,
-                f"RENTCAFE_SHAPE_REJECTED: {len(api_responses)} responses captured, "
-                "none matched RentCafe envelope/key signature")
+        return (
+            _TIER_SHAPE_REJECTED,
+            f"RENTCAFE_SHAPE_REJECTED: {len(api_responses)} responses captured, "
+            "none matched RentCafe envelope/key signature",
+        )
     total_items = 0
     for r in shape_matches:
         items = _unwrap_rentcafe_list(r.get("body")) or []
         total_items += len(items)
     if total_items == 0:
-        return (_TIER_LIST_EMPTY,
-                f"RENTCAFE_LIST_EMPTY: {len(shape_matches)} shape-matched responses, "
-                "floorplan list was empty in all")
-    return (_TIER_PARSE_ZERO,
-            f"RENTCAFE_PARSE_ZERO: {total_items} floorplan items present across "
-            f"{len(shape_matches)} responses, but parser emitted zero units "
-            "(field-name mismatch likely)")
+        return (
+            _TIER_LIST_EMPTY,
+            f"RENTCAFE_LIST_EMPTY: {len(shape_matches)} shape-matched responses, "
+            "floorplan list was empty in all",
+        )
+    return (
+        _TIER_PARSE_ZERO,
+        f"RENTCAFE_PARSE_ZERO: {total_items} floorplan items present across "
+        f"{len(shape_matches)} responses, but parser emitted zero units "
+        "(field-name mismatch likely)",
+    )
 
 
 class RentCafeAdapter:
@@ -239,9 +258,7 @@ class RentCafeAdapter:
 
         if all_units:
             result.units = all_units
-            result.winning_url = (
-                result.api_responses[0].get("url") if result.api_responses else None
-            )
+            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
             result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
             result.tier_used = _TIER_BASE
             return result

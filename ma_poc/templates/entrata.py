@@ -16,6 +16,7 @@ Selectors (priority order):
 Lazy-load handling: caller (tier3_templates.py) scrolls to bottom + waits
 for networkidle on Playwright pages BEFORE calling extract().
 """
+
 from __future__ import annotations
 
 from bs4 import BeautifulSoup, Tag
@@ -147,15 +148,9 @@ def _extract_from_row(
         or text_of(row, "[class*='floorplan']")
     )
 
-    floor_text = (
-        text_of(row, ".floor")
-        or text_of(row, "[class*='floor']")
-    )
+    floor_text = text_of(row, ".floor") or text_of(row, "[class*='floor']")
 
-    building_text = (
-        text_of(row, ".building")
-        or text_of(row, "[class*='building']")
-    )
+    building_text = text_of(row, ".building") or text_of(row, "[class*='building']")
 
     # ── Heading-based name extraction (for floorplan cards) ───────────────
     if not fp_text:

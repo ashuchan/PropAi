@@ -1,4 +1,5 @@
 """Tests for extraction/pipeline.py — 5+ tests."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -20,6 +21,7 @@ def _session() -> BrowserSession:
 def _make_async(result: ExtractionResult) -> Any:
     async def _fn(s: BrowserSession, catalogue: Any = None) -> ExtractionResult:
         return result
+
     return _fn
 
 
@@ -48,9 +50,16 @@ async def test_tier1_success_short_circuits(monkeypatch: pytest.MonkeyPatch) -> 
 async def test_tier1_2_fail_tier3_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail(score: float) -> ExtractionResult:
         return ExtractionResult(property_id="P1", status=ExtractionStatus.FAILED, confidence_score=score)
+
     monkeypatch.setattr(pipe, "_t1", _make_async(fail(0.1)))
     monkeypatch.setattr(pipe, "_t2", _make_async(fail(0.2)))
-    monkeypatch.setattr(pipe, "_t3", _make_async(ExtractionResult(property_id="P1", status=ExtractionStatus.SUCCESS, confidence_score=0.85)))
+    monkeypatch.setattr(
+        pipe,
+        "_t3",
+        _make_async(
+            ExtractionResult(property_id="P1", status=ExtractionStatus.SUCCESS, confidence_score=0.85)
+        ),
+    )
     monkeypatch.setattr(pipe, "_t4", _make_async(fail(0.0)))
 
     result = await run_extraction_pipeline(_session())
@@ -61,6 +70,7 @@ async def test_tier1_2_fail_tier3_succeeds(monkeypatch: pytest.MonkeyPatch) -> N
 async def test_all_tiers_fail_returns_best(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail(score: float) -> ExtractionResult:
         return ExtractionResult(property_id="P1", status=ExtractionStatus.FAILED, confidence_score=score)
+
     monkeypatch.setattr(pipe, "_t1", _make_async(fail(0.1)))
     monkeypatch.setattr(pipe, "_t2", _make_async(fail(0.4)))
     monkeypatch.setattr(pipe, "_t3", _make_async(fail(0.3)))
@@ -74,6 +84,7 @@ async def test_all_tiers_fail_returns_best(monkeypatch: pytest.MonkeyPatch) -> N
 async def test_low_confidence_marked_failed_for_vision_signal(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail(score: float) -> ExtractionResult:
         return ExtractionResult(property_id="P1", status=ExtractionStatus.FAILED, confidence_score=score)
+
     monkeypatch.setattr(pipe, "_t1", _make_async(fail(0.55)))
     monkeypatch.setattr(pipe, "_t2", _make_async(fail(0.5)))
     monkeypatch.setattr(pipe, "_t3", _make_async(fail(0.4)))
@@ -85,9 +96,21 @@ async def test_low_confidence_marked_failed_for_vision_signal(monkeypatch: pytes
 
 
 async def test_tier_logged_in_result(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(pipe, "_t1", _make_async(ExtractionResult(property_id="P1", status=ExtractionStatus.SUCCESS, confidence_score=0.9)))
-    monkeypatch.setattr(pipe, "_t2", _make_async(ExtractionResult(property_id="P1", status=ExtractionStatus.FAILED)))
-    monkeypatch.setattr(pipe, "_t3", _make_async(ExtractionResult(property_id="P1", status=ExtractionStatus.FAILED)))
-    monkeypatch.setattr(pipe, "_t4", _make_async(ExtractionResult(property_id="P1", status=ExtractionStatus.FAILED)))
+    monkeypatch.setattr(
+        pipe,
+        "_t1",
+        _make_async(
+            ExtractionResult(property_id="P1", status=ExtractionStatus.SUCCESS, confidence_score=0.9)
+        ),
+    )
+    monkeypatch.setattr(
+        pipe, "_t2", _make_async(ExtractionResult(property_id="P1", status=ExtractionStatus.FAILED))
+    )
+    monkeypatch.setattr(
+        pipe, "_t3", _make_async(ExtractionResult(property_id="P1", status=ExtractionStatus.FAILED))
+    )
+    monkeypatch.setattr(
+        pipe, "_t4", _make_async(ExtractionResult(property_id="P1", status=ExtractionStatus.FAILED))
+    )
     result = await run_extraction_pipeline(_session())
     assert result.tier is not None

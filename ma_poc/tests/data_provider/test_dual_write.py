@@ -1,5 +1,6 @@
 """DualWriteDataProvider tests — writes land in both, reads come from primary,
 secondary failures don't propagate."""
+
 from __future__ import annotations
 
 import uuid
@@ -93,10 +94,17 @@ def test_scrape_events_and_profiles_dual_written(dual, primary, secondary) -> No
 class _BrokenStore(IPropertyStateStore):
     """Every method raises — used to verify secondary failures don't propagate."""
 
-    def get(self, canonical_id): raise RuntimeError("boom")
-    def exists(self, canonical_id): raise RuntimeError("boom")
-    def upsert(self, canonical_id, snapshot, run_date): raise RuntimeError("boom")
-    def all_canonical_ids(self): raise RuntimeError("boom")
+    def get(self, canonical_id):
+        raise RuntimeError("boom")
+
+    def exists(self, canonical_id):
+        raise RuntimeError("boom")
+
+    def upsert(self, canonical_id, snapshot, run_date):
+        raise RuntimeError("boom")
+
+    def all_canonical_ids(self):
+        raise RuntimeError("boom")
 
 
 def test_secondary_write_failure_does_not_break_primary(dual, primary) -> None:
@@ -111,6 +119,7 @@ def test_secondary_write_failure_does_not_break_primary(dual, primary) -> None:
 
 def test_factory_builds_dual_provider(monkeypatch, tmp_path) -> None:
     from data_provider import get_data_provider, reset_cached_provider
+
     monkeypatch.setenv("DATA_PROVIDER", "dual")
     monkeypatch.setenv("DUAL_PRIMARY", "filesystem")
     monkeypatch.setenv("DUAL_SECONDARY", "sqlite")

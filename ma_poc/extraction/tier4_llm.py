@@ -10,6 +10,7 @@ Acceptance criteria (CLAUDE.md PR-03 / Tier 4):
 - Backoff with random.uniform(0, cap) jitter for 429 (bug-hunt #13); 5 retries max
 - Token count logged per call
 """
+
 from __future__ import annotations
 
 import json
@@ -62,8 +63,14 @@ def _focus_pricing_section(html: str) -> str:
     soup = BeautifulSoup(html, "lxml")
     keep: list[str] = []
     for sel in (
-        ".pricing", ".pricingWrapper", ".unitContainer", ".availability",
-        ".units", "#availability", "#pricing", "table.units",
+        ".pricing",
+        ".pricingWrapper",
+        ".unitContainer",
+        ".availability",
+        ".units",
+        "#availability",
+        "#pricing",
+        "table.units",
     ):
         for el in soup.select(sel):
             keep.append(str(el))
@@ -105,6 +112,7 @@ def _get_provider() -> Any:
     """Return a text LLM provider or None if unconfigured."""
     try:
         from llm.factory import get_text_provider
+
         return get_text_provider()
     except Exception:
         return None

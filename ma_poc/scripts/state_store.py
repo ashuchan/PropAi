@@ -28,6 +28,7 @@ from typing import Any
 
 # ── File I/O helpers ──────────────────────────────────────────────────────────
 
+
 def _atomic_write(path: Path, payload: Any) -> None:
     """Write JSON atomically so a crash can never leave a half-written state file."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -35,6 +36,7 @@ def _atomic_write(path: Path, payload: Any) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False, default=str)
     os.replace(tmp, path)
+
 
 def _safe_load(path: Path) -> dict:
     """Load JSON, returning {} on missing/corrupt. Corrupt files are moved aside."""
@@ -56,13 +58,15 @@ def _safe_load(path: Path) -> dict:
         print(f"  ⚠ State file {path.name} unreadable ({e}); backed up to {backup.name}, starting fresh")
         return {}
 
+
 # ── StateStore ────────────────────────────────────────────────────────────────
+
 
 class StateStore:
     def __init__(self, state_dir: Path):
-        self.state_dir         = Path(state_dir)
+        self.state_dir = Path(state_dir)
         self.property_index_path = self.state_dir / "property_index.json"
-        self.unit_index_path   = self.state_dir / "unit_index.json"
+        self.unit_index_path = self.state_dir / "unit_index.json"
         self.property_index: dict[str, dict] = {}
         self.unit_index: dict[str, dict[str, dict]] = {}
 
@@ -100,7 +104,7 @@ class StateStore:
         existing = self.property_index.get(canonical_id, {})
         merged = {**existing, **snapshot}
         merged["last_seen_date"] = run_date
-        merged["last_seen_at"]   = datetime.now(UTC).isoformat()
+        merged["last_seen_at"] = datetime.now(UTC).isoformat()
         if is_new:
             merged["first_seen_date"] = run_date
         else:
@@ -147,26 +151,26 @@ class StateStore:
             # a carry-forward on the next run produces a complete record
             # instead of a stub with bedrooms/bathrooms/sqft/plan all null.
             snapshot = {
-                "unit_id":          uid,
-                "market_rent_low":  u.get("market_rent_low"),
+                "unit_id": uid,
+                "market_rent_low": u.get("market_rent_low"),
                 "market_rent_high": u.get("market_rent_high"),
-                "available_date":   u.get("available_date"),
-                "concessions":      u.get("concessions"),
+                "available_date": u.get("available_date"),
+                "concessions": u.get("concessions"),
                 # Extended fields — see carry_forward_units() below.
-                "bedrooms":         u.get("bedrooms") or u.get("_bedrooms"),
-                "bathrooms":        u.get("bathrooms") or u.get("_bathrooms"),
-                "sqft":             u.get("sqft") or u.get("_sqft") or u.get("area"),
-                "floor_plan_name":  u.get("floor_plan_name") or u.get("_floor_plan"),
-                "unit_number":      u.get("unit_number") or u.get("_unit_number"),
-                "bed_label":        u.get("bed_label"),
-                "floor":            u.get("floor"),
-                "building":         u.get("building"),
-                "rent_range":       u.get("rent_range"),
-                "lease_term":       u.get("lease_term") or u.get("_lease_term"),
-                "move_in_date":     u.get("move_in_date") or u.get("_move_in_date"),
+                "bedrooms": u.get("bedrooms") or u.get("_bedrooms"),
+                "bathrooms": u.get("bathrooms") or u.get("_bathrooms"),
+                "sqft": u.get("sqft") or u.get("_sqft") or u.get("area"),
+                "floor_plan_name": u.get("floor_plan_name") or u.get("_floor_plan"),
+                "unit_number": u.get("unit_number") or u.get("_unit_number"),
+                "bed_label": u.get("bed_label"),
+                "floor": u.get("floor"),
+                "building": u.get("building"),
+                "rent_range": u.get("rent_range"),
+                "lease_term": u.get("lease_term") or u.get("_lease_term"),
+                "move_in_date": u.get("move_in_date") or u.get("_move_in_date"),
                 "availability_status": u.get("availability_status"),
-                "last_seen_date":   run_date,
-                "last_seen_at":     datetime.now(UTC).isoformat(),
+                "last_seen_date": run_date,
+                "last_seen_at": datetime.now(UTC).isoformat(),
                 "carryforward_days": 0,
             }
 
@@ -214,32 +218,34 @@ class StateStore:
                 continue
             cfd = int(rec.get("carryforward_days") or 0) + 1
             rec["carryforward_days"] = cfd
-            rec["last_seen_date"]    = run_date
+            rec["last_seen_date"] = run_date
             # Emit the full prior snapshot so the v2 transform can populate
             # beds/baths/area/floor_plan_name instead of silently defaulting.
             # Kept optional (.get) so older state files without extended
             # fields still carry forward at least rent/availability.
-            out.append({
-                "unit_id":            uid,
-                "unit_number":        rec.get("unit_number") or uid,
-                "market_rent_low":    rec.get("market_rent_low"),
-                "market_rent_high":   rec.get("market_rent_high"),
-                "available_date":     rec.get("available_date"),
-                "lease_link":         None,
-                "concessions":        rec.get("concessions"),
-                "amenities":          None,
-                # Extended carry-forward fields (Phase 1):
-                "bedrooms":           rec.get("bedrooms"),
-                "bathrooms":          rec.get("bathrooms"),
-                "sqft":               rec.get("sqft"),
-                "floor_plan_name":    rec.get("floor_plan_name"),
-                "bed_label":          rec.get("bed_label"),
-                "floor":              rec.get("floor"),
-                "building":           rec.get("building"),
-                "rent_range":         rec.get("rent_range"),
-                "lease_term":         rec.get("lease_term"),
-                "move_in_date":       rec.get("move_in_date"),
-                "availability_status": rec.get("availability_status"),
-                "carryforward_days":  cfd,
-            })
+            out.append(
+                {
+                    "unit_id": uid,
+                    "unit_number": rec.get("unit_number") or uid,
+                    "market_rent_low": rec.get("market_rent_low"),
+                    "market_rent_high": rec.get("market_rent_high"),
+                    "available_date": rec.get("available_date"),
+                    "lease_link": None,
+                    "concessions": rec.get("concessions"),
+                    "amenities": None,
+                    # Extended carry-forward fields (Phase 1):
+                    "bedrooms": rec.get("bedrooms"),
+                    "bathrooms": rec.get("bathrooms"),
+                    "sqft": rec.get("sqft"),
+                    "floor_plan_name": rec.get("floor_plan_name"),
+                    "bed_label": rec.get("bed_label"),
+                    "floor": rec.get("floor"),
+                    "building": rec.get("building"),
+                    "rent_range": rec.get("rent_range"),
+                    "lease_term": rec.get("lease_term"),
+                    "move_in_date": rec.get("move_in_date"),
+                    "availability_status": rec.get("availability_status"),
+                    "carryforward_days": cfd,
+                }
+            )
         return out

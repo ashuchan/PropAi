@@ -1,4 +1,5 @@
 """Tests for cost_ledger — SQLite cost accumulator."""
+
 from __future__ import annotations
 
 import threading
@@ -79,6 +80,7 @@ def test_cost_records_detail_as_json(tmp_path: Path) -> None:
     cl.record_llm("p1", "ent", "t1", 0.01, "gpt-4o-mini", 500)
     rows = cl._conn.execute("SELECT detail FROM cost_entries").fetchall()
     import json
+
     detail = json.loads(rows[0]["detail"])
     assert detail["model"] == "gpt-4o-mini"
     assert detail["tokens"] == 500

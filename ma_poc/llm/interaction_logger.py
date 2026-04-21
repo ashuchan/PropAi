@@ -17,6 +17,7 @@ Usage (in service layer):
 Usage (in daily_runner):
     from llm.interaction_logger import write_property_report, write_run_summary
 """
+
 from __future__ import annotations
 
 import json
@@ -32,23 +33,23 @@ from typing import Any
 # ---------------------------------------------------------------------------
 _MODEL_PRICING: dict[str, dict[str, float]] = {
     # Anthropic — Claude 4 series
-    "claude-opus-4-20250514":     {"input": 15.00, "output": 75.00},
-    "claude-sonnet-4-20250514":   {"input":  3.00, "output": 15.00},
-    "claude-haiku-4-20250514":    {"input":  0.80, "output":  4.00},
+    "claude-opus-4-20250514": {"input": 15.00, "output": 75.00},
+    "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},
+    "claude-haiku-4-20250514": {"input": 0.80, "output": 4.00},
     # Anthropic — Claude 3.5 series
-    "claude-3-5-sonnet-20241022": {"input":  3.00, "output": 15.00},
-    "claude-3-5-haiku-20241022":  {"input":  0.80, "output":  4.00},
+    "claude-3-5-sonnet-20241022": {"input": 3.00, "output": 15.00},
+    "claude-3-5-haiku-20241022": {"input": 0.80, "output": 4.00},
     # Anthropic — Claude 3 series
-    "claude-3-opus-20240229":     {"input": 15.00, "output": 75.00},
-    "claude-3-sonnet-20240229":   {"input":  3.00, "output": 15.00},
-    "claude-3-haiku-20240307":    {"input":  0.25, "output":  1.25},
+    "claude-3-opus-20240229": {"input": 15.00, "output": 75.00},
+    "claude-3-sonnet-20240229": {"input": 3.00, "output": 15.00},
+    "claude-3-haiku-20240307": {"input": 0.25, "output": 1.25},
     # Azure OpenAI — GPT-4o family
-    "gpt-4o":                     {"input":  2.50, "output": 10.00},
-    "gpt-4o-mini":                {"input":  0.15, "output":  0.60},
+    "gpt-4o": {"input": 2.50, "output": 10.00},
+    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
     # Azure OpenAI — legacy
-    "gpt-4-turbo":                {"input": 10.00, "output": 30.00},
-    "gpt-4":                      {"input": 30.00, "output": 60.00},
-    "gpt-35-turbo":               {"input":  0.50, "output":  1.50},
+    "gpt-4-turbo": {"input": 10.00, "output": 30.00},
+    "gpt-4": {"input": 30.00, "output": 60.00},
+    "gpt-35-turbo": {"input": 0.50, "output": 1.50},
 }
 
 # Conservative fallback when the model name is not in the table.
@@ -58,6 +59,7 @@ _DEFAULT_PRICING: dict[str, float] = {"input": 3.00, "output": 15.00}
 # ---------------------------------------------------------------------------
 # Core helpers
 # ---------------------------------------------------------------------------
+
 
 def compute_cost(model: str, tokens_input: int, tokens_output: int) -> float:
     """Compute USD cost for a single LLM call.
@@ -71,10 +73,7 @@ def compute_cost(model: str, tokens_input: int, tokens_output: int) -> float:
         Estimated cost in USD (not rounded — caller rounds as needed).
     """
     pricing = _MODEL_PRICING.get(model, _DEFAULT_PRICING)
-    return (
-        tokens_input  * pricing["input"]
-        + tokens_output * pricing["output"]
-    ) / 1_000_000
+    return (tokens_input * pricing["input"] + tokens_output * pricing["output"]) / 1_000_000
 
 
 def make_interaction(
@@ -117,28 +116,29 @@ def make_interaction(
     """
     cost = compute_cost(model, tokens_input, tokens_output)
     return {
-        "property_id":   property_id,
-        "tier":          tier,
-        "call_type":     call_type,
-        "provider":      provider,
-        "model":         model,
+        "property_id": property_id,
+        "tier": tier,
+        "call_type": call_type,
+        "provider": provider,
+        "model": model,
         "system_prompt": system_prompt,
-        "user_prompt":   user_prompt,
-        "raw_response":  raw_response,
-        "tokens_input":  tokens_input,
+        "user_prompt": user_prompt,
+        "raw_response": raw_response,
+        "tokens_input": tokens_input,
         "tokens_output": tokens_output,
-        "tokens_total":  tokens_input + tokens_output,
-        "cost_usd":      round(cost, 8),
-        "latency_ms":    latency_ms,
-        "timestamp":     timestamp,
-        "success":       success,
-        "error":         error,
+        "tokens_total": tokens_input + tokens_output,
+        "cost_usd": round(cost, 8),
+        "latency_ms": latency_ms,
+        "timestamp": timestamp,
+        "success": success,
+        "error": error,
     }
 
 
 # ---------------------------------------------------------------------------
 # Report writers
 # ---------------------------------------------------------------------------
+
 
 def write_property_report(
     property_id: str,
@@ -161,25 +161,25 @@ def write_property_report(
     llm_dir = run_dir / "llm_report"
     llm_dir.mkdir(parents=True, exist_ok=True)
 
-    total_cost     = sum(i.get("cost_usd", 0.0)      for i in interactions)
-    total_input    = sum(i.get("tokens_input", 0)     for i in interactions)
-    total_output   = sum(i.get("tokens_output", 0)    for i in interactions)
-    successful     = sum(1 for i in interactions if i.get("success"))
+    total_cost = sum(i.get("cost_usd", 0.0) for i in interactions)
+    total_input = sum(i.get("tokens_input", 0) for i in interactions)
+    total_output = sum(i.get("tokens_output", 0) for i in interactions)
+    successful = sum(1 for i in interactions if i.get("success"))
 
     report: dict[str, Any] = {
-        "property_id":  property_id,
+        "property_id": property_id,
         "generated_at": datetime.now(UTC).isoformat(),
         "summary": {
-            "total_calls":         len(interactions),
-            "successful_calls":    successful,
-            "failed_calls":        len(interactions) - successful,
-            "total_tokens_input":  total_input,
+            "total_calls": len(interactions),
+            "successful_calls": successful,
+            "failed_calls": len(interactions) - successful,
+            "total_tokens_input": total_input,
             "total_tokens_output": total_output,
-            "total_tokens":        total_input + total_output,
-            "total_cost_usd":      round(total_cost, 6),
-            "by_tier":             _group_by("tier",     interactions),
-            "by_provider":         _group_by("provider", interactions),
-            "by_model":            _group_by("model",    interactions),
+            "total_tokens": total_input + total_output,
+            "total_cost_usd": round(total_cost, 6),
+            "by_tier": _group_by("tier", interactions),
+            "by_provider": _group_by("provider", interactions),
+            "by_model": _group_by("model", interactions),
         },
         "interactions": interactions,
     }
@@ -208,10 +208,10 @@ def write_run_summary(
     if not all_interactions:
         return
 
-    total_cost   = sum(i.get("cost_usd", 0.0)   for i in all_interactions)
-    total_input  = sum(i.get("tokens_input", 0)  for i in all_interactions)
+    total_cost = sum(i.get("cost_usd", 0.0) for i in all_interactions)
+    total_input = sum(i.get("tokens_input", 0) for i in all_interactions)
     total_output = sum(i.get("tokens_output", 0) for i in all_interactions)
-    successful   = sum(1 for i in all_interactions if i.get("success"))
+    successful = sum(1 for i in all_interactions if i.get("success"))
 
     # Per-property breakdown (only summary — full records in per-property files).
     by_property: dict[str, list[dict[str, Any]]] = {}
@@ -221,34 +221,36 @@ def write_run_summary(
 
     property_summaries: list[dict[str, Any]] = []
     for pid, items in sorted(by_property.items()):
-        prop_cost  = sum(x.get("cost_usd", 0.0)   for x in items)
-        prop_in    = sum(x.get("tokens_input", 0)  for x in items)
-        prop_out   = sum(x.get("tokens_output", 0) for x in items)
-        property_summaries.append({
-            "property_id":    pid,
-            "calls":          len(items),
-            "tokens_input":   prop_in,
-            "tokens_output":  prop_out,
-            "tokens_total":   prop_in + prop_out,
-            "cost_usd":       round(prop_cost, 6),
-            "successful":     sum(1 for x in items if x.get("success")),
-            "failed":         sum(1 for x in items if not x.get("success")),
-        })
+        prop_cost = sum(x.get("cost_usd", 0.0) for x in items)
+        prop_in = sum(x.get("tokens_input", 0) for x in items)
+        prop_out = sum(x.get("tokens_output", 0) for x in items)
+        property_summaries.append(
+            {
+                "property_id": pid,
+                "calls": len(items),
+                "tokens_input": prop_in,
+                "tokens_output": prop_out,
+                "tokens_total": prop_in + prop_out,
+                "cost_usd": round(prop_cost, 6),
+                "successful": sum(1 for x in items if x.get("success")),
+                "failed": sum(1 for x in items if not x.get("success")),
+            }
+        )
 
     summary: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(),
         "summary": {
             "total_properties_with_llm": len(by_property),
-            "total_calls":               len(all_interactions),
-            "successful_calls":          successful,
-            "failed_calls":              len(all_interactions) - successful,
-            "total_tokens_input":        total_input,
-            "total_tokens_output":       total_output,
-            "total_tokens":              total_input + total_output,
-            "total_cost_usd":            round(total_cost, 6),
-            "by_tier":                   _group_by("tier",     all_interactions),
-            "by_provider":               _group_by("provider", all_interactions),
-            "by_model":                  _group_by("model",    all_interactions),
+            "total_calls": len(all_interactions),
+            "successful_calls": successful,
+            "failed_calls": len(all_interactions) - successful,
+            "total_tokens_input": total_input,
+            "total_tokens_output": total_output,
+            "total_tokens": total_input + total_output,
+            "total_cost_usd": round(total_cost, 6),
+            "by_tier": _group_by("tier", all_interactions),
+            "by_provider": _group_by("provider", all_interactions),
+            "by_model": _group_by("model", all_interactions),
         },
         "by_property": property_summaries,
     }
@@ -262,6 +264,7 @@ def write_run_summary(
 # Private helpers
 # ---------------------------------------------------------------------------
 
+
 def _group_by(field: str, interactions: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Aggregate interactions by a single field (tier / provider / model)."""
     result: dict[str, dict[str, Any]] = {}
@@ -269,8 +272,8 @@ def _group_by(field: str, interactions: list[dict[str, Any]]) -> dict[str, dict[
         key = str(i.get(field, "unknown"))
         if key not in result:
             result[key] = {"calls": 0, "cost_usd": 0.0, "tokens_total": 0}
-        result[key]["calls"]        += 1
-        result[key]["cost_usd"]     += i.get("cost_usd", 0.0)
+        result[key]["calls"] += 1
+        result[key]["cost_usd"] += i.get("cost_usd", 0.0)
         result[key]["tokens_total"] += i.get("tokens_total", 0)
     for v in result.values():
         v["cost_usd"] = round(v["cost_usd"], 6)

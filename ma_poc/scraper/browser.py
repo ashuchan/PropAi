@@ -15,6 +15,7 @@ Acceptance criteria (CLAUDE.md PR-01 / browser.py — critical rules):
 - Save raw HTML + screenshot to data/raw_html/{property_id}/{date}.html and
   data/screenshots/{property_id}/{date}.png after page load.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -179,7 +180,9 @@ class BrowserFleet:
         if self._playwright is not None:
             return
         if not PLAYWRIGHT_AVAILABLE or async_playwright is None:
-            raise RuntimeError("playwright is not installed; pip install playwright && playwright install chromium")
+            raise RuntimeError(
+                "playwright is not installed; pip install playwright && playwright install chromium"
+            )
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(headless=self.headless)
 

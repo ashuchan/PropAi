@@ -24,6 +24,7 @@ Key findings:
   - LLM/Vision tiers only run for pms=="unknown"; detected PMS failures skip LLM
   - Ported from parse_api_responses() with PMS-specific branches removed
 """
+
 from __future__ import annotations
 
 import re as _re
@@ -32,14 +33,14 @@ from typing import TYPE_CHECKING, Any
 # Used by the Option C relaxed-LLM gate to sanity-check HTML has enough
 # rent-ish content to be worth an LLM call even when the detected PMS
 # adapter already returned empty.
-_re_strip_script = _re.compile(r"<script.*?</script>|<style.*?</style>",
-                                _re.IGNORECASE | _re.DOTALL)
+_re_strip_script = _re.compile(r"<script.*?</script>|<style.*?</style>", _re.IGNORECASE | _re.DOTALL)
 _re_strip_tag = _re.compile(r"<[^>]+>")
-_re_rent = _re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?",
-                        _re.IGNORECASE)
+_re_rent = _re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?", _re.IGNORECASE)
 
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_api_responses as _dr_parse_api_responses,
+)
+from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_sightmap_payload as _dr_parse_sightmap,
 )
 from ma_poc.pms.adapters._html_extract import (
@@ -70,9 +71,16 @@ def _find_unit_list(body: Any) -> list[dict[str, Any]]:
     one level of nesting (data.units, response.floorplans, etc.).
     """
     _LIST_KEYS = (
-        "floorPlans", "floor_plans", "FloorPlans", "floorplans",
-        "units", "apartments", "availabilities",
-        "results", "items", "listings",
+        "floorPlans",
+        "floor_plans",
+        "FloorPlans",
+        "floorplans",
+        "units",
+        "apartments",
+        "availabilities",
+        "results",
+        "items",
+        "listings",
     )
 
     if isinstance(body, list) and body and isinstance(body[0], dict):
@@ -128,8 +136,7 @@ def _extract_rent_dom_section(html: str, max_bytes: int = 20_000) -> str | None:
             return html[:max_bytes]
 
     # Strip noise tags.
-    for tag in soup.find_all(["script", "style", "svg", "noscript",
-                              "nav", "footer", "header", "iframe"]):
+    for tag in soup.find_all(["script", "style", "svg", "noscript", "nav", "footer", "header", "iframe"]):
         tag.decompose()
 
     main = soup.find("main")
@@ -201,15 +208,43 @@ def _has_unit_signals(items: list[dict[str, Any]]) -> bool:
     if not items:
         return False
     _SIGNAL_KEYS = {
-        "rent", "minRent", "maxRent", "min_rent", "max_rent",
-        "price", "askingRent", "monthlyRent", "baseRent",
-        "bedrooms", "beds", "bedRooms", "bed", "sqft", "squareFeet",
-        "square_footage", "sq_ft", "minimumSquareFeet",
-        "no_of_bedroom", "unitNumber", "unit_number", "unitId", "unit_id",
-        "floorPlanName", "floor_plan_name", "floorplan_name", "floorplan-name",
-        "availableDate", "available_date", "availableCount",
-        "minimumRent", "maximumRent", "minimumMarketRent", "maximumMarketRent",
-        "rentRange", "depositAmount", "numberOfUnitsDisplay",
+        "rent",
+        "minRent",
+        "maxRent",
+        "min_rent",
+        "max_rent",
+        "price",
+        "askingRent",
+        "monthlyRent",
+        "baseRent",
+        "bedrooms",
+        "beds",
+        "bedRooms",
+        "bed",
+        "sqft",
+        "squareFeet",
+        "square_footage",
+        "sq_ft",
+        "minimumSquareFeet",
+        "no_of_bedroom",
+        "unitNumber",
+        "unit_number",
+        "unitId",
+        "unit_id",
+        "floorPlanName",
+        "floor_plan_name",
+        "floorplan_name",
+        "floorplan-name",
+        "availableDate",
+        "available_date",
+        "availableCount",
+        "minimumRent",
+        "maximumRent",
+        "minimumMarketRent",
+        "maximumMarketRent",
+        "rentRange",
+        "depositAmount",
+        "numberOfUnitsDisplay",
     }
     sample_keys = set(items[0].keys())
     return len(sample_keys & _SIGNAL_KEYS) >= 2
@@ -228,33 +263,98 @@ def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, s
         if not isinstance(item, dict):
             continue
 
-        name = get_field(item, "floorPlanName", "floor_plan_name", "floorplan_name",
-                         "floorplan-name", "name", "unitType", "planName")
-        beds_str = get_field(item, "bedrooms", "beds", "bedroom_count", "bedRooms",
-                             "numBedrooms", "no_of_bedroom", "bd", "bed")
-        baths_str = get_field(item, "bathrooms", "baths", "bathroom_count", "bathRooms",
-                              "numBathrooms", "no_of_bathroom", "ba", "bath")
-        sqft_str = get_field(item, "sqft", "squareFeet", "square_feet", "minSqft",
-                             "minimumSquareFeet", "size", "area", "square_footage",
-                             "sq_ft", "maximumSquareFeet")
-        unit_num = get_field(item, "unitNumber", "unit_number", "unitId", "unit_id",
-                             "label", "display_unit_number", "id", "unit_name")
-        rent_lo_str = get_field(item, "minRent", "rent_min", "min_rent", "startingFrom",
-                                "askingRent", "price", "rent", "minimumRent",
-                                "minimumMarketRent", "baseRent", "display_price",
-                                "monthlyRent", "startingPrice")
-        rent_hi_str = get_field(item, "maxRent", "rent_max", "max_rent", "maxAskingRent",
-                                "endingAt", "maximumRent", "maximumMarketRent")
-        avail_str = get_field(item, "availableCount", "available_count", "numAvailable",
-                              "unitsAvailable", "units_available", "availableUnitsCount")
-        avail_dt = get_field(item, "availableDate", "available_date", "moveInDate",
-                             "moveInReady", "availableOn", "readyDate")
+        name = get_field(
+            item,
+            "floorPlanName",
+            "floor_plan_name",
+            "floorplan_name",
+            "floorplan-name",
+            "name",
+            "unitType",
+            "planName",
+        )
+        beds_str = get_field(
+            item, "bedrooms", "beds", "bedroom_count", "bedRooms", "numBedrooms", "no_of_bedroom", "bd", "bed"
+        )
+        baths_str = get_field(
+            item,
+            "bathrooms",
+            "baths",
+            "bathroom_count",
+            "bathRooms",
+            "numBathrooms",
+            "no_of_bathroom",
+            "ba",
+            "bath",
+        )
+        sqft_str = get_field(
+            item,
+            "sqft",
+            "squareFeet",
+            "square_feet",
+            "minSqft",
+            "minimumSquareFeet",
+            "size",
+            "area",
+            "square_footage",
+            "sq_ft",
+            "maximumSquareFeet",
+        )
+        unit_num = get_field(
+            item,
+            "unitNumber",
+            "unit_number",
+            "unitId",
+            "unit_id",
+            "label",
+            "display_unit_number",
+            "id",
+            "unit_name",
+        )
+        rent_lo_str = get_field(
+            item,
+            "minRent",
+            "rent_min",
+            "min_rent",
+            "startingFrom",
+            "askingRent",
+            "price",
+            "rent",
+            "minimumRent",
+            "minimumMarketRent",
+            "baseRent",
+            "display_price",
+            "monthlyRent",
+            "startingPrice",
+        )
+        rent_hi_str = get_field(
+            item,
+            "maxRent",
+            "rent_max",
+            "max_rent",
+            "maxAskingRent",
+            "endingAt",
+            "maximumRent",
+            "maximumMarketRent",
+        )
+        avail_str = get_field(
+            item,
+            "availableCount",
+            "available_count",
+            "numAvailable",
+            "unitsAvailable",
+            "units_available",
+            "availableUnitsCount",
+        )
+        avail_dt = get_field(
+            item, "availableDate", "available_date", "moveInDate", "moveInReady", "availableOn", "readyDate"
+        )
         floor_str = get_field(item, "floor", "floorNumber", "floor_id", "floorId")
         building_str = get_field(item, "building", "buildingName", "building_name")
-        deposit_str = get_field(item, "deposit", "securityDeposit", "security_deposit",
-                                "depositAmount")
-        concession_str = get_field(item, "concession", "special", "promotion",
-                                   "specials_description", "specialsDescription")
+        deposit_str = get_field(item, "deposit", "securityDeposit", "security_deposit", "depositAmount")
+        concession_str = get_field(
+            item, "concession", "special", "promotion", "specials_description", "specialsDescription"
+        )
         plan_type = get_field(item, "floorPlanType", "type", "bedBath", "BedBath")
         status_str = get_field(item, "status", "availability_status", "leaseStatus", "unit_status")
 
@@ -292,26 +392,28 @@ def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, s
         if not bl and plan_type:
             bl = plan_type
 
-        units.append(make_unit_dict(
-            floor_plan_name=name,
-            bed_label=bl,
-            bedrooms=str(beds) if beds is not None else "",
-            bathrooms=str(baths) if baths is not None else "",
-            sqft=sqft_str,
-            unit_number=unit_num,
-            floor=floor_str,
-            building=building_str,
-            rent_range=format_rent_range(rent_lo, rent_hi),
-            rent_low=rent_lo,
-            rent_high=rent_hi or rent_lo,
-            deposit=deposit_str,
-            concession=concession_str,
-            availability_status=status_str.upper() if status_str else "AVAILABLE",
-            available_units=avail_str,
-            availability_date=avail_dt,
-            source_api_url=url,
-            extraction_tier="TIER_1_API",
-        ))
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bl,
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft=sqft_str,
+                unit_number=unit_num,
+                floor=floor_str,
+                building=building_str,
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi or rent_lo,
+                deposit=deposit_str,
+                concession=concession_str,
+                availability_status=status_str.upper() if status_str else "AVAILABLE",
+                available_units=avail_str,
+                availability_date=avail_dt,
+                source_api_url=url,
+                extraction_tier="TIER_1_API",
+            )
+        )
 
     return units
 
@@ -339,18 +441,24 @@ class GenericAdapter:
         that detail.
         """
         import time as _time
+
         try:
-            from ma_poc.observability.events import EventKind, emit as _emit
+            from ma_poc.observability.events import EventKind
+            from ma_poc.observability.events import emit as _emit
         except Exception:
             _emit, EventKind = None, None  # type: ignore[assignment]
 
         attempts: list[dict[str, Any]] = []
 
-        def _log_attempt(key: str, outcome: str, units: int = 0,
-                          reason: str = "", duration_ms: int = 0) -> None:
+        def _log_attempt(
+            key: str, outcome: str, units: int = 0, reason: str = "", duration_ms: int = 0
+        ) -> None:
             entry = {
-                "tier_key": key, "outcome": outcome, "units_found": units,
-                "reason": reason, "duration_ms": duration_ms,
+                "tier_key": key,
+                "outcome": outcome,
+                "units_found": units,
+                "reason": reason,
+                "duration_ms": duration_ms,
             }
             attempts.append(entry)
             if _emit is not None and EventKind is not None:
@@ -390,12 +498,12 @@ class GenericAdapter:
                 blocked_urls = set()
         if blocked_urls:
             before = len(api_responses)
-            api_responses = [r for r in api_responses
-                             if r.get("url", "") not in blocked_urls]
+            api_responses = [r for r in api_responses if r.get("url", "") not in blocked_urls]
             dropped = before - len(api_responses)
             if dropped:
                 _log_attempt(
-                    "generic:blocked_filter", "ran_units",
+                    "generic:blocked_filter",
+                    "ran_units",
                     units=0,
                     reason=f"dropped {dropped} API(s) from profile.blocked_endpoints",
                 )
@@ -423,8 +531,7 @@ class GenericAdapter:
                     for mapping in saved:
                         try:
                             pat = getattr(mapping, "api_url_pattern", None) or (
-                                mapping.get("api_url_pattern")
-                                if isinstance(mapping, dict) else None
+                                mapping.get("api_url_pattern") if isinstance(mapping, dict) else None
                             )
                         except Exception:
                             pat = None
@@ -432,11 +539,15 @@ class GenericAdapter:
                             continue
                         for resp in api_responses:
                             if pat in resp.get("url", ""):
-                                mdict = mapping if isinstance(mapping, dict) else {
-                                    "api_url_pattern": pat,
-                                    "json_paths": getattr(mapping, "json_paths", {}) or {},
-                                    "response_envelope": getattr(mapping, "response_envelope", "") or "",
-                                }
+                                mdict = (
+                                    mapping
+                                    if isinstance(mapping, dict)
+                                    else {
+                                        "api_url_pattern": pat,
+                                        "json_paths": getattr(mapping, "json_paths", {}) or {},
+                                        "response_envelope": getattr(mapping, "response_envelope", "") or "",
+                                    }
+                                )
                                 try:
                                     units = apply_saved_mapping(resp.get("body"), mdict) or []
                                 except Exception:
@@ -447,7 +558,8 @@ class GenericAdapter:
                                     break
             if replayed_units:
                 _log_attempt(
-                    "generic:profile_replay", "ran_units",
+                    "generic:profile_replay",
+                    "ran_units",
                     units=len(replayed_units),
                     reason="replayed saved LlmFieldMapping",
                     duration_ms=int((_time.monotonic() - t0) * 1000),
@@ -455,16 +567,14 @@ class GenericAdapter:
                 result.units = replayed_units
                 result.tier_used = "TIER_1_PROFILE_MAPPING"
                 result.winning_url = (
-                    result.api_responses[0].get("url") if result.api_responses
-                    else ctx.base_url
+                    result.api_responses[0].get("url") if result.api_responses else ctx.base_url
                 )
                 result.confidence = min(0.90, 0.7 + 0.03 * len(replayed_units))
                 return result
             _log_attempt(
                 "generic:profile_replay",
                 "skipped" if not saved else "ran_empty",
-                reason=("no saved mappings" if not saved
-                        else "saved mappings didn't match any captured API"),
+                reason=("no saved mappings" if not saved else "saved mappings didn't match any captured API"),
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
 
@@ -489,8 +599,7 @@ class GenericAdapter:
                 duration_ms=_narrow_ms,
             )
         else:
-            _log_attempt("generic:api_narrow", "skipped",
-                         reason="no captured API responses", duration_ms=0)
+            _log_attempt("generic:api_narrow", "skipped", reason="no captured API responses", duration_ms=0)
 
         # Sub-tier 2: broad parser + host-specific (SightMap/RealPage) -----
         if not all_units and api_responses:
@@ -558,8 +667,8 @@ class GenericAdapter:
             # floor-plan labels but no rent/sqft. Better to fall through.
             if jsonld_units:
                 has_rent = any(
-                    u.get("market_rent_low") or u.get("market_rent_high")
-                    or u.get("rent_range") for u in jsonld_units
+                    u.get("market_rent_low") or u.get("market_rent_high") or u.get("rent_range")
+                    for u in jsonld_units
                 )
                 has_size = any(u.get("sqft") for u in jsonld_units)
                 if not has_rent and not has_size:
@@ -607,8 +716,11 @@ class GenericAdapter:
                 "generic:embedded_json",
                 "ran_units" if embedded_units else ("ran_empty" if embedded else "skipped"),
                 units=len(embedded_units),
-                reason="" if embedded_units else (
-                    f"{len(embedded)} SSR blob(s) had no unit signals" if embedded
+                reason=""
+                if embedded_units
+                else (
+                    f"{len(embedded)} SSR blob(s) had no unit signals"
+                    if embedded
                     else "no __NEXT_DATA__/__NUXT__/window globals in HTML"
                 ),
                 duration_ms=int((_time.monotonic() - t0) * 1000),
@@ -674,11 +786,15 @@ class GenericAdapter:
                 _text_bytes = len(_text.encode("utf-8", errors="ignore"))
                 if _text_bytes >= 5000 and _rent_hits >= 1:
                     try:
-                        from ma_poc.observability.events import EventKind, emit as _gate_emit
+                        from ma_poc.observability.events import EventKind
+                        from ma_poc.observability.events import emit as _gate_emit
+
                         _gate_emit(
-                            EventKind.LLM_GATE_RELAXED, ctx.property_id,
+                            EventKind.LLM_GATE_RELAXED,
+                            ctx.property_id,
                             detected_pms=ctx.detected.pms,
-                            text_bytes=_text_bytes, rent_signals=_rent_hits,
+                            text_bytes=_text_bytes,
+                            rent_signals=_rent_hits,
                             reason="detected_adapter_empty_html_has_signals",
                         )
                     except Exception:
@@ -688,8 +804,9 @@ class GenericAdapter:
                 pass
 
         if skip_llm:
-            _log_attempt("generic:llm", "skipped",
-                         reason=f"detected PMS '{ctx.detected.pms}' — LLM gated off")
+            _log_attempt(
+                "generic:llm", "skipped", reason=f"detected PMS '{ctx.detected.pms}' — LLM gated off"
+            )
             result.errors.append(
                 f"Generic fallback found no units for detected PMS '{ctx.detected.pms}'; "
                 "LLM/Vision skipped for non-unknown PMS"
@@ -698,16 +815,15 @@ class GenericAdapter:
             return result
 
         import os as _os
+
         if _os.getenv("ENABLE_TIER4_LLM", "true").lower() not in ("1", "true", "yes"):
-            _log_attempt("generic:llm", "skipped",
-                         reason="ENABLE_TIER4_LLM=false")
+            _log_attempt("generic:llm", "skipped", reason="ENABLE_TIER4_LLM=false")
             result.errors.append("Generic parser found no units in captured API responses")
             result.confidence = 0.0
             return result
 
         if not html:
-            _log_attempt("generic:llm", "skipped",
-                         reason="no HTML body to send to LLM")
+            _log_attempt("generic:llm", "skipped", reason="no HTML body to send to LLM")
             result.errors.append("Generic parser found no units; no HTML for LLM")
             result.confidence = 0.0
             return result
@@ -739,11 +855,11 @@ class GenericAdapter:
         # Phase 2: shared property context for every LLM call below.
         property_context = {
             "property_name": getattr(ctx, "property_name", "") or "",
-            "city":          getattr(ctx, "city", "") or "",
-            "state":         getattr(ctx, "state", "") or "",
-            "pmc":           getattr(ctx, "pmc", "") or "",
-            "total_units":   ctx.expected_total_units or "",
-            "website":       ctx.base_url,
+            "city": getattr(ctx, "city", "") or "",
+            "state": getattr(ctx, "state", "") or "",
+            "pmc": getattr(ctx, "pmc", "") or "",
+            "total_units": ctx.expected_total_units or "",
+            "website": ctx.base_url,
         }
 
         # Import the targeted LLM helpers; fall through cleanly if unavailable
@@ -773,9 +889,7 @@ class GenericAdapter:
         # tokens. Mirrors the legacy entrata.py budget (3 API + 1 DOM).
         api_llm_budget = 3
         dom_llm_budget = 1
-        llm_interactions: list[dict[str, Any]] = (
-            getattr(result, "_llm_interactions", []) or []
-        )
+        llm_interactions: list[dict[str, Any]] = getattr(result, "_llm_interactions", []) or []
         # Self-learning payload surfaced to scraper.py. Shape matches what
         # services.profile_updater.update_profile_after_extraction expects:
         #   - dict (with api_url_pattern) => save as LlmFieldMapping
@@ -806,7 +920,9 @@ class GenericAdapter:
                 url = resp.get("url", "")
                 try:
                     units, mapping, is_noise, interaction = await analyze_api_with_llm(
-                        resp, property_context, ctx.property_id or "unknown",
+                        resp,
+                        property_context,
+                        ctx.property_id or "unknown",
                     )
                 except Exception as exc:
                     result.errors.append(f"api-analysis-error: {exc}")
@@ -835,8 +951,11 @@ class GenericAdapter:
                 "generic:llm_api_targeted",
                 "ran_units" if targeted_units else ("ran_empty" if api_calls_made else "skipped"),
                 units=len(targeted_units),
-                reason="" if targeted_units else (
-                    f"{api_calls_made} API(s) analysed, no units" if api_calls_made
+                reason=""
+                if targeted_units
+                else (
+                    f"{api_calls_made} API(s) analysed, no units"
+                    if api_calls_made
                     else "no API responses with unit signals"
                 ),
                 duration_ms=int((_time.monotonic() - t0) * 1000),
@@ -845,10 +964,7 @@ class GenericAdapter:
         if targeted_units:
             result.units = targeted_units
             result.tier_used = "TIER_4_LLM_API"
-            result.winning_url = (
-                result.api_responses[0].get("url") if result.api_responses
-                else ctx.base_url
-            )
+            result.winning_url = result.api_responses[0].get("url") if result.api_responses else ctx.base_url
             result.confidence = min(0.85, 0.6 + 0.04 * len(targeted_units))
             result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
             result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
@@ -864,7 +980,9 @@ class GenericAdapter:
             t0 = _time.monotonic()
             try:
                 dom_units, selectors, interaction = await analyze_dom_with_llm(
-                    dom_section_html, ctx.base_url, property_context,
+                    dom_section_html,
+                    ctx.base_url,
+                    property_context,
                     ctx.property_id or "unknown",
                 )
             except Exception as exc:
@@ -902,7 +1020,8 @@ class GenericAdapter:
         try:
             llm_input = prepare_llm_input(html, api_responses, property_context)
             llm_units, hints, _raw, interaction = await extract_with_llm(
-                llm_input, property_id=ctx.property_id or "unknown",
+                llm_input,
+                property_id=ctx.property_id or "unknown",
             )
             if interaction:
                 llm_interactions.append(interaction)
@@ -932,7 +1051,8 @@ class GenericAdapter:
                 return result
         except Exception as exc:
             _log_attempt(
-                "generic:llm", "errored",
+                "generic:llm",
+                "errored",
                 reason=str(exc)[:200],
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )

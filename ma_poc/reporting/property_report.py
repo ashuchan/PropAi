@@ -74,7 +74,9 @@ def _render_status_table(
         f"| Canonical ID | {property_id} |",
         f"| Units extracted | {len(units)} |",
         f"| Scrape duration | {duration}s |",
-        f"| LLM cost | ${llm_cost:.4f} |" if isinstance(llm_cost, (int, float)) else f"| LLM cost | ${llm_cost} |",
+        f"| LLM cost | ${llm_cost:.4f} |"
+        if isinstance(llm_cost, (int, float))
+        else f"| LLM cost | ${llm_cost} |",
     ]
     return "\n".join(lines)
 

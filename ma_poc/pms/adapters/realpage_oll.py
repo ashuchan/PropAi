@@ -18,6 +18,7 @@ Key findings:
   - Shares the same parser as OneSite for the floorplans response format
   - Known gotchas: must navigate to the portal first (resolver Phase 4 handles this)
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -54,8 +55,11 @@ class RealPageOllAdapter:
         for resp in api_responses:
             body = resp.get("body")
             url = resp.get("url", "")
-            if isinstance(body, dict) and isinstance(body.get("response"), dict) \
-                    and "floorplans" in body["response"]:
+            if (
+                isinstance(body, dict)
+                and isinstance(body.get("response"), dict)
+                and "floorplans" in body["response"]
+            ):
                 units = parse_realpage_floorplans(body, url)
                 if units:
                     for u in units:

@@ -5,6 +5,7 @@ Discover API URL patterns by scraping a 50-property seed set, capturing all
 intercepted XHR/fetch responses, scoring them against required fields, and
 appending the best matches to config/api_catalogue.json under "discovered".
 """
+
 from __future__ import annotations
 
 import asyncio

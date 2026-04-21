@@ -3,12 +3,13 @@
 JSONL file at data/state/dlq.jsonl. Append-only, compacted nightly.
 Parking rule: consecutive_unreachable >= 3 (not just any failure).
 """
+
 from __future__ import annotations
 
 import json
 import logging
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -50,10 +51,7 @@ class Dlq:
                     continue
                 try:
                     data = json.loads(line)
-                    entry = DlqEntry(**{
-                        k: v for k, v in data.items()
-                        if k in DlqEntry.__dataclass_fields__
-                    })
+                    entry = DlqEntry(**{k: v for k, v in data.items() if k in DlqEntry.__dataclass_fields__})
                     if entry.unparked:
                         self._entries.pop(entry.property_id, None)
                     else:
@@ -76,7 +74,7 @@ class Dlq:
             reason: Machine-readable reason code.
             err_sig: Last error signature.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         retry_at = now + timedelta(hours=1)
         entry = DlqEntry(
             property_id=property_id,
@@ -110,7 +108,7 @@ class Dlq:
             List of entries due for retry.
         """
         if now is None:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
         due: list[DlqEntry] = []
         for entry in self._entries.values():
             try:
@@ -149,7 +147,7 @@ class Dlq:
             return
         old = self._entries[property_id]
         parked_at = datetime.fromisoformat(old.parked_at)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         hours_parked = (now - parked_at).total_seconds() / 3600
 
         if hours_parked < 6:
@@ -172,9 +170,6 @@ class Dlq:
         if not self._entries:
             self._path.write_text("", encoding="utf-8")
             return
-        lines = [
-            json.dumps(asdict(e), default=str)
-            for e in self._entries.values()
-        ]
+        lines = [json.dumps(asdict(e), default=str) for e in self._entries.values()]
         self._path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         log.info("Compacted DLQ: %d entries", len(self._entries))

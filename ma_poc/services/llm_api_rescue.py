@@ -8,16 +8,16 @@ top-ranked response bodies to an LLM and extracts units + replay hints.
 The orchestrator (ma_poc/pms/scraper.py) is the ONLY caller. Adapters do not
 import this module — they remain deterministic by design.
 """
+
 from __future__ import annotations
 
-import asyncio
 import copy
 import json
 import logging
 import os
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -37,20 +37,52 @@ MAX_CANDIDATES = 3
 
 SUPPORTED_ADAPTERS: frozenset[str] = frozenset({"generic", "entrata", "appfolio"})
 
-KNOWN_PMS_HOSTS: frozenset[str] = frozenset({
-    "rentcafe.com", "entrata.com", "appfolio.com", "onesite.realpage.com",
-    "sightmap.com", "yardione.com", "rentmanager.com",
-})
+KNOWN_PMS_HOSTS: frozenset[str] = frozenset(
+    {
+        "rentcafe.com",
+        "entrata.com",
+        "appfolio.com",
+        "onesite.realpage.com",
+        "sightmap.com",
+        "yardione.com",
+        "rentmanager.com",
+    }
+)
 
-_NAV_MARKETING_KEYS = frozenset({
-    "nav", "navigation", "menu", "footer", "header", "banner", "promo",
-    "promotions", "gallery", "photos", "images", "amenities", "reviews",
-    "testimonials", "blog", "events", "seo", "meta", "_links",
-})
+_NAV_MARKETING_KEYS = frozenset(
+    {
+        "nav",
+        "navigation",
+        "menu",
+        "footer",
+        "header",
+        "banner",
+        "promo",
+        "promotions",
+        "gallery",
+        "photos",
+        "images",
+        "amenities",
+        "reviews",
+        "testimonials",
+        "blog",
+        "events",
+        "seo",
+        "meta",
+        "_links",
+    }
+)
 
-_UNIT_KEY_SIGNALS = frozenset({
-    "bed", "rent", "sqft", "floor", "unit", "plan",
-})
+_UNIT_KEY_SIGNALS = frozenset(
+    {
+        "bed",
+        "rent",
+        "sqft",
+        "floor",
+        "unit",
+        "plan",
+    }
+)
 
 _NUMERIC_SEGMENT_RE = re.compile(r"/\d+(?=/|$)")
 
@@ -61,9 +93,9 @@ class RescueInput:
 
     property_id: str
     property_context: dict[str, Any]  # keys: name, website, city, expected_units
-    source_adapter: str               # 'generic' | 'entrata' | 'appfolio'
-    api_responses: list[dict]         # each: {url, body, content_type}
-    profile_snapshot: dict | None     # current profile dict — for blocked_endpoints
+    source_adapter: str  # 'generic' | 'entrata' | 'appfolio'
+    api_responses: list[dict]  # each: {url, body, content_type}
+    profile_snapshot: dict | None  # current profile dict — for blocked_endpoints
 
 
 @dataclass
@@ -71,7 +103,7 @@ class RescueOutput:
     """Output from the LLM rescue service."""
 
     units: list[dict] = field(default_factory=list)
-    tier_used: str = ""               # empty on failure
+    tier_used: str = ""  # empty on failure
     winning_url: str | None = None
     llm_field_mappings: list[dict] = field(default_factory=list)
     blocked_endpoints: list[tuple[str, str]] = field(default_factory=list)
@@ -82,6 +114,7 @@ class RescueOutput:
 
 
 # ── Candidate filtering ───────────────────────────────────────────────────────
+
 
 def _registered_domain(url: str) -> str:
     """Extract the last two domain labels (registered domain)."""
@@ -143,6 +176,7 @@ def _filter_candidates(
 
 # ── Candidate ranking ─────────────────────────────────────────────────────────
 
+
 def _score(r: dict) -> float:
     """Score an API response by likelihood of containing unit data."""
     score = 0.0
@@ -171,6 +205,7 @@ def _rank_candidates(candidates: list[dict]) -> list[dict]:
 
 
 # ── Body trimming ─────────────────────────────────────────────────────────────
+
 
 def _find_units_array(obj: Any, depth: int = 0) -> list | None:
     """DFS search for the first array of dicts with unit-like keys."""
@@ -233,6 +268,7 @@ def _trim_body(body: Any) -> Any:
 
 # ── Prompt building ───────────────────────────────────────────────────────────
 
+
 def _load_prompt_template() -> str:
     """Load the api_rescue.txt prompt template."""
     prompt_path = Path(__file__).resolve().parent.parent.parent / "config" / "prompts" / "api_rescue.txt"
@@ -250,8 +286,7 @@ def _build_prompt(
     """Substitute template placeholders. Uses str.replace — not f-strings or .format()."""
     bodies_json = json.dumps([{"url": url, "body": trimmed_body}], indent=2)
     return (
-        template
-        .replace("{{property_name}}", inp.property_context.get("name", ""))
+        template.replace("{{property_name}}", inp.property_context.get("name", ""))
         .replace("{{website}}", inp.property_context.get("website", ""))
         .replace("{{city}}", inp.property_context.get("city", "unknown"))
         .replace("{{source_adapter}}", inp.source_adapter)
@@ -279,6 +314,7 @@ async def _call_llm(prompt: str, property_id: str) -> tuple[dict, float, str]:
         # Attempt to reuse the existing LLM client from llm_extractor
         try:
             from ma_poc.services.llm_extractor import _call_azure_llm  # type: ignore[attr-defined]
+
             raw, cost = await _call_azure_llm(prompt, property_id)
             parsed = _parse_json_response(raw)
             return parsed, cost, raw
@@ -292,6 +328,7 @@ async def _call_llm(prompt: str, property_id: str) -> tuple[dict, float, str]:
             current_prompt += "\nReturn ONLY a valid JSON object. No prose, no markdown."
         try:
             import httpx
+
             headers = {
                 "api-key": api_key,
                 "Content-Type": "application/json",
@@ -315,7 +352,9 @@ async def _call_llm(prompt: str, property_id: str) -> tuple[dict, float, str]:
             parsed = _parse_json_response(raw)
             return parsed, cost, raw
         except json.JSONDecodeError as exc:
-            log.warning("llm_api_rescue: JSON decode error (attempt %d) for %s: %s", attempt + 1, property_id, exc)
+            log.warning(
+                "llm_api_rescue: JSON decode error (attempt %d) for %s: %s", attempt + 1, property_id, exc
+            )
             if attempt == 1:
                 return {}, 0.0, ""
         except Exception as exc:
@@ -343,6 +382,7 @@ def _parse_json_response(raw: str) -> dict:
 
 
 # ── Unit normalization ────────────────────────────────────────────────────────
+
 
 def _normalize_units(raw_units: list[dict]) -> list[dict]:
     """Normalize LLM-extracted units to v2 unit dict shape.
@@ -404,6 +444,7 @@ def _date_str_or_none(v: Any) -> str | None:
     # Validate ISO-8601 date format
     try:
         from datetime import date
+
         date.fromisoformat(s[:10])
         return s[:10]
     except ValueError:
@@ -411,6 +452,7 @@ def _date_str_or_none(v: Any) -> str | None:
 
 
 # ── URL pattern helpers ───────────────────────────────────────────────────────
+
 
 def _url_to_pattern(url: str) -> str:
     """Strip query string and replace numeric path segments with '*'."""
@@ -423,7 +465,7 @@ def _url_to_pattern(url: str) -> str:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _tier_label_for(adapter: str) -> str:
@@ -435,6 +477,7 @@ def _tier_label_for(adapter: str) -> str:
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
+
 
 async def rescue_from_api_responses(inp: RescueInput) -> RescueOutput:
     """Attempt LLM-based unit extraction from captured API responses.

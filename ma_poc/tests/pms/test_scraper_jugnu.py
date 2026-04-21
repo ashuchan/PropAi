@@ -1,8 +1,8 @@
 """Tests for Jugnu J3 deltas on pms/scraper.py."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

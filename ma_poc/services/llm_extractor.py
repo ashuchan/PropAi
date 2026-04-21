@@ -6,6 +6,7 @@ unit data plus profile hints (CSS selectors, API paths, platform guess).
 
 Phase: claude-scrapper-arch.md Step 2.1
 """
+
 from __future__ import annotations
 
 import json
@@ -14,7 +15,7 @@ import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -24,12 +25,30 @@ log = logging.getLogger(__name__)
 _PROMPT_PATH = Path(__file__).resolve().parent.parent / "config" / "prompts" / "tier4_extraction.txt"
 
 # Unit-like field names used to rank API responses by relevance
-_UNIT_SIGNAL_KEYS = frozenset({
-    "rent", "price", "sqft", "bed", "bath", "available", "unit",
-    "floor", "plan", "bedroom", "bathroom", "floorplan", "floorPlan",
-    "unitNumber", "unit_number", "asking_rent", "market_rent",
-    "availability", "availableDate", "available_date",
-})
+_UNIT_SIGNAL_KEYS = frozenset(
+    {
+        "rent",
+        "price",
+        "sqft",
+        "bed",
+        "bath",
+        "available",
+        "unit",
+        "floor",
+        "plan",
+        "bedroom",
+        "bathroom",
+        "floorplan",
+        "floorPlan",
+        "unitNumber",
+        "unit_number",
+        "asking_rent",
+        "market_rent",
+        "availability",
+        "availableDate",
+        "available_date",
+    }
+)
 
 
 def _load_prompt_template() -> str:
@@ -186,12 +205,12 @@ def _build_prompt(llm_input: dict[str, Any]) -> str:
     ctx = llm_input.get("property_context", {})
     replacements = {
         "{property_name}": ctx.get("property_name", "Unknown") or "Unknown",
-        "{city}":          ctx.get("city", "") or "",
-        "{state}":         ctx.get("state", "") or "",
-        "{pmc}":           ctx.get("pmc", "") or "",
-        "{total_units}":   str(ctx.get("total_units") or "unknown"),
-        "{website}":       ctx.get("website", "") or "",
-        "{content_type}":  llm_input.get("content_type", "HTML"),
+        "{city}": ctx.get("city", "") or "",
+        "{state}": ctx.get("state", "") or "",
+        "{pmc}": ctx.get("pmc", "") or "",
+        "{total_units}": str(ctx.get("total_units") or "unknown"),
+        "{website}": ctx.get("website", "") or "",
+        "{content_type}": llm_input.get("content_type", "HTML"),
         "{trimmed_content}": llm_input.get("trimmed_content", ""),
     }
     result = template
@@ -337,12 +356,12 @@ async def extract_with_llm(
 
     # System prompt for structured extraction
     system = (
-        "You are a real estate data extraction agent. "
-        "Return ONLY valid JSON. No markdown, no commentary."
+        "You are a real estate data extraction agent. Return ONLY valid JSON. No markdown, no commentary."
     )
 
     try:
         from llm.factory import get_text_provider
+
         provider = get_text_provider()
     except Exception as exc:
         log.error("Failed to get LLM provider: %s", exc)
@@ -365,14 +384,15 @@ async def extract_with_llm(
 
     # Read token usage captured by the provider after the API call.
     usage: dict[str, Any] = getattr(provider, "_last_usage", {})
-    tokens_in  = int(usage.get("input_tokens",  0))
+    tokens_in = int(usage.get("input_tokens", 0))
     tokens_out = int(usage.get("output_tokens", 0))
-    model      = str(usage.get("model",    "unknown"))
-    prov_name  = str(usage.get("provider", "unknown"))
+    model = str(usage.get("model", "unknown"))
+    prov_name = str(usage.get("provider", "unknown"))
 
     # Build interaction record for cost accounting.
     try:
         from llm.interaction_logger import make_interaction
+
         interaction: dict[str, Any] | None = make_interaction(
             property_id=property_id,
             tier="TIER_6_LLM",
@@ -408,8 +428,12 @@ async def extract_with_llm(
     units = _normalize_units(raw_units)
     log.info(
         "Tier 4 LLM extracted %d units (raw: %d) | tokens=%d+%d | cost=$%.5f | latency=%dms",
-        len(units), len(raw_units), tokens_in, tokens_out,
-        (interaction or {}).get("cost_usd", 0.0), latency_ms,
+        len(units),
+        len(raw_units),
+        tokens_in,
+        tokens_out,
+        (interaction or {}).get("cost_usd", 0.0),
+        latency_ms,
     )
 
     return units, hints, raw_response, interaction
@@ -443,7 +467,7 @@ async def analyze_api_with_llm(
     api_response: dict,
     property_context: dict,
     property_id: str = "unknown",
-) -> tuple[list[dict], Optional[dict], bool, dict[str, Any] | None]:
+) -> tuple[list[dict], dict | None, bool, dict[str, Any] | None]:
     """Analyze a SINGLE API response with LLM to extract units and learn field mappings.
 
     Args:
@@ -485,6 +509,7 @@ async def analyze_api_with_llm(
 
     try:
         from llm.factory import get_text_provider
+
         provider = get_text_provider()
     except Exception as exc:
         log.error("Failed to get LLM provider for API analysis: %s", exc)
@@ -512,6 +537,7 @@ async def analyze_api_with_llm(
 
     try:
         from llm.interaction_logger import make_interaction
+
         interaction: dict[str, Any] | None = make_interaction(
             property_id=property_id,
             tier="API_ANALYSIS",
@@ -554,7 +580,7 @@ async def analyze_api_with_llm(
     # Build field mapping for profile persistence
     json_paths = parsed.get("json_paths", {})
     response_envelope = parsed.get("response_envelope", "")
-    mapping_dict: Optional[dict] = None
+    mapping_dict: dict | None = None
     if isinstance(json_paths, dict) and json_paths:
         mapping_dict = {
             "api_url_pattern": api_url,
@@ -564,8 +590,12 @@ async def analyze_api_with_llm(
 
     log.info(
         "API analysis: %s → %d units, mapping=%s | tokens=%d+%d | latency=%dms",
-        api_url[:80], len(units), "yes" if mapping_dict else "no",
-        tokens_in, tokens_out, latency_ms,
+        api_url[:80],
+        len(units),
+        "yes" if mapping_dict else "no",
+        tokens_in,
+        tokens_out,
+        latency_ms,
     )
     return units, mapping_dict, False, interaction
 
@@ -575,7 +605,7 @@ async def analyze_dom_with_llm(
     page_url: str,
     property_context: dict,
     property_id: str = "unknown",
-) -> tuple[list[dict], Optional[dict], dict[str, Any] | None]:
+) -> tuple[list[dict], dict | None, dict[str, Any] | None]:
     """Analyze a DOM section with LLM to extract units and learn CSS selectors.
 
     Args:
@@ -611,6 +641,7 @@ async def analyze_dom_with_llm(
 
     try:
         from llm.factory import get_text_provider
+
         provider = get_text_provider()
     except Exception as exc:
         log.error("Failed to get LLM provider for DOM analysis: %s", exc)
@@ -638,6 +669,7 @@ async def analyze_dom_with_llm(
 
     try:
         from llm.interaction_logger import make_interaction
+
         interaction: dict[str, Any] | None = make_interaction(
             property_id=property_id,
             tier="DOM_ANALYSIS",
@@ -669,14 +701,18 @@ async def analyze_dom_with_llm(
     units = _normalize_units(raw_units)
 
     css_selectors = parsed.get("css_selectors", {})
-    selectors_dict: Optional[dict] = None
+    selectors_dict: dict | None = None
     if isinstance(css_selectors, dict) and css_selectors.get("container"):
         selectors_dict = css_selectors
 
     log.info(
         "DOM analysis: %s → %d units, selectors=%s | tokens=%d+%d | latency=%dms",
-        page_url[:80], len(units), "yes" if selectors_dict else "no",
-        tokens_in, tokens_out, latency_ms,
+        page_url[:80],
+        len(units),
+        "yes" if selectors_dict else "no",
+        tokens_in,
+        tokens_out,
+        latency_ms,
     )
     return units, selectors_dict, interaction
 

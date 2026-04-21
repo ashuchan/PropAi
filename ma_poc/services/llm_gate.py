@@ -41,7 +41,13 @@ _MIN_BODY_BYTES = 1024
 # Tokens that indicate the page is at least about rentals. At least one must
 # appear (case-insensitive) for the body to count as "meaningful".
 _RENT_TOKENS: tuple[str, ...] = (
-    "rent", "apartment", "floor", "bed", "studio", "lease", "available",
+    "rent",
+    "apartment",
+    "floor",
+    "bed",
+    "studio",
+    "lease",
+    "available",
 )
 
 _RENT_TOKEN_RE = re.compile(
@@ -131,19 +137,19 @@ def should_escalate_to_llm(
     if _api_responses_of(tier1_result):
         return EscalationDecision(
             escalate=True,
-            reason=(f"{LLM_GATE_TIER1_SHAPE_MATCHED}: tier-1 captured ≥1 "
-                    "shape-matched response; LLM may recover units"),
+            reason=(
+                f"{LLM_GATE_TIER1_SHAPE_MATCHED}: tier-1 captured ≥1 "
+                "shape-matched response; LLM may recover units"
+            ),
         )
 
     if tier2_units or tier3_units:
         return EscalationDecision(
             escalate=False,
-            reason=(f"{LLM_GATE_DETERMINISTIC_TIERS_SUFFICED}: tier-2/3 "
-                    "produced units; LLM not needed"),
+            reason=(f"{LLM_GATE_DETERMINISTIC_TIERS_SUFFICED}: tier-2/3 produced units; LLM not needed"),
         )
 
     return EscalationDecision(
         escalate=True,
-        reason=(f"{LLM_GATE_FALLBACK_JUSTIFIED}: meaningful body, no "
-                "deterministic tier produced units"),
+        reason=(f"{LLM_GATE_FALLBACK_JUSTIFIED}: meaningful body, no deterministic tier produced units"),
     )

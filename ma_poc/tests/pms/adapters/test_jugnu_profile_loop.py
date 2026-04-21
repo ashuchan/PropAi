@@ -8,12 +8,11 @@ Covers:
   - update_profile_after_extraction is compatible with the Jugnu scrape
     result shape (no crash, promotes maturity on success)
 """
+
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-
-import pytest
 
 # Make ma_poc/ importable so services.profile_store works when running
 # these tests under the project venv.
@@ -61,9 +60,10 @@ def test_update_profile_after_extraction_accepts_jugnu_result_shape(tmp_path: Pa
         "extraction_tier_used": "TIER_1_API",
         "units": [{"unit_number": "101"}, {"unit_number": "102"}],
         "_raw_api_responses": [
-            {"url": "https://yardi.example.com/api/v1/floorplans",
-             "body": [{"unit_number": "101", "rent": 1500},
-                      {"unit_number": "102", "rent": 1600}]},
+            {
+                "url": "https://yardi.example.com/api/v1/floorplans",
+                "body": [{"unit_number": "101", "rent": 1500}, {"unit_number": "102", "rent": 1600}],
+            },
         ],
         "_winning_page_url": "https://yardi.example.com/api/v1/floorplans",
         "_llm_hints": None,
@@ -73,7 +73,10 @@ def test_update_profile_after_extraction_accepts_jugnu_result_shape(tmp_path: Pa
     }
 
     updated = update_profile_after_extraction(
-        profile, scrape_result, len(scrape_result["units"]), store.backing,
+        profile,
+        scrape_result,
+        len(scrape_result["units"]),
+        store.backing,
     )
     # After 1 success we should be WARM.
     assert updated.confidence.consecutive_successes == 1

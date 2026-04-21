@@ -2,13 +2,14 @@
 
 Per-property and per-PMS rollups for reporting and SLO checking.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -64,9 +65,17 @@ class CostLedger:
             model: Model name.
             tokens: Total tokens used.
         """
-        self._insert(property_id, pms, tier, "llm", cost, {
-            "model": model, "tokens": tokens,
-        })
+        self._insert(
+            property_id,
+            pms,
+            tier,
+            "llm",
+            cost,
+            {
+                "model": model,
+                "tokens": tokens,
+            },
+        )
 
     def record_vision(
         self,
@@ -85,9 +94,16 @@ class CostLedger:
             cost: Cost in USD.
             model: Model name.
         """
-        self._insert(property_id, pms, tier, "vision", cost, {
-            "model": model,
-        })
+        self._insert(
+            property_id,
+            pms,
+            tier,
+            "vision",
+            cost,
+            {
+                "model": model,
+            },
+        )
 
     def record_proxy_bytes(
         self,
@@ -105,9 +121,16 @@ class CostLedger:
             rate_per_mb: Cost per megabyte.
         """
         cost = (bytes_used / (1024 * 1024)) * rate_per_mb
-        self._insert(property_id, pms, "", "proxy_mb", cost, {
-            "bytes_used": bytes_used,
-        })
+        self._insert(
+            property_id,
+            pms,
+            "",
+            "proxy_mb",
+            cost,
+            {
+                "bytes_used": bytes_used,
+            },
+        )
 
     def rollup_by_pms(self) -> dict[str, dict[str, float]]:
         """Aggregate costs by PMS platform.
@@ -149,10 +172,7 @@ class CostLedger:
                FROM cost_entries WHERE category IN ('llm', 'vision')
                GROUP BY property_id HAVING total_cost > 0"""
         ).fetchall()
-        return [
-            {"property_id": row["property_id"], "cost_usd": round(row["total_cost"], 6)}
-            for row in rows
-        ]
+        return [{"property_id": row["property_id"], "cost_usd": round(row["total_cost"], 6)} for row in rows]
 
     def _insert(
         self,
@@ -164,7 +184,7 @@ class CostLedger:
         detail: dict[str, Any],
     ) -> None:
         """Insert a cost entry."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._lock:
             self._conn.execute(
                 """INSERT INTO cost_entries (ts, property_id, pms, tier_used, category, cost_usd, detail)

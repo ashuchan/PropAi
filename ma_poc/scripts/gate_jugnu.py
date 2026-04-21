@@ -6,6 +6,7 @@ Usage:
     python scripts/gate_jugnu.py phase 1   # Check J1 gate
     python scripts/gate_jugnu.py all       # Check all phases
 """
+
 from __future__ import annotations
 
 import argparse
@@ -45,9 +46,16 @@ def check_phase_1() -> list[str]:
     failures: list[str] = []
     fetch_dir = _PROJECT_ROOT / "fetch"
     required = [
-        "contracts.py", "fetcher.py", "retry_policy.py", "proxy_pool.py",
-        "rate_limiter.py", "stealth.py", "conditional.py",
-        "response_classifier.py", "captcha_detect.py", "browser_pool.py",
+        "contracts.py",
+        "fetcher.py",
+        "retry_policy.py",
+        "proxy_pool.py",
+        "rate_limiter.py",
+        "stealth.py",
+        "conditional.py",
+        "response_classifier.py",
+        "captcha_detect.py",
+        "browser_pool.py",
     ]
     for f in required:
         if not (fetch_dir / f).exists():
@@ -67,8 +75,13 @@ def check_phase_2() -> list[str]:
     failures: list[str] = []
     disc_dir = _PROJECT_ROOT / "discovery"
     required = [
-        "contracts.py", "frontier.py", "sitemap.py",
-        "change_detector.py", "dlq.py", "carry_forward.py", "scheduler.py",
+        "contracts.py",
+        "frontier.py",
+        "sitemap.py",
+        "change_detector.py",
+        "dlq.py",
+        "carry_forward.py",
+        "scheduler.py",
     ]
     for f in required:
         if not (disc_dir / f).exists():
@@ -84,8 +97,14 @@ def check_phase_3() -> list[str]:
     adapters_dir = _PROJECT_ROOT / "pms" / "adapters"
     if adapters_dir.exists():
         for adapter_file in adapters_dir.glob("*.py"):
-            if adapter_file.name in ("__init__.py", "base.py", "registry.py",
-                                      "generic.py", "_parsing.py", "_stub.py"):
+            if adapter_file.name in (
+                "__init__.py",
+                "base.py",
+                "registry.py",
+                "generic.py",
+                "_parsing.py",
+                "_stub.py",
+            ):
                 continue
             text = adapter_file.read_text(encoding="utf-8")
             if "openai" in text.lower() and "import" in text.lower():
@@ -108,8 +127,11 @@ def check_phase_4() -> list[str]:
     failures: list[str] = []
     val_dir = _PROJECT_ROOT / "validation"
     required = [
-        "contracts.py", "schema_gate.py", "identity_fallback.py",
-        "cross_run_sanity.py", "orchestrator.py",
+        "contracts.py",
+        "schema_gate.py",
+        "identity_fallback.py",
+        "cross_run_sanity.py",
+        "orchestrator.py",
     ]
     for f in required:
         if not (val_dir / f).exists():
@@ -122,8 +144,12 @@ def check_phase_5() -> list[str]:
     failures: list[str] = []
     obs_dir = _PROJECT_ROOT / "observability"
     required = [
-        "events.py", "event_ledger.py", "cost_ledger.py",
-        "replay_store.py", "slo_watcher.py", "dlq_controller.py",
+        "events.py",
+        "event_ledger.py",
+        "cost_ledger.py",
+        "replay_store.py",
+        "slo_watcher.py",
+        "dlq_controller.py",
     ]
     for f in required:
         if not (obs_dir / f).exists():
@@ -222,8 +248,16 @@ def run_tests(phase: int | None = None) -> tuple[int, int]:
         else:
             return 0, 0
     else:
-        cmd = [sys.executable, "-m", "pytest", "tests/", "-v", "--tb=short",
-               "--ignore=data", "--ignore=config"]
+        cmd = [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/",
+            "-v",
+            "--tb=short",
+            "--ignore=data",
+            "--ignore=config",
+        ]
 
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(_PROJECT_ROOT))
     # Parse pytest output

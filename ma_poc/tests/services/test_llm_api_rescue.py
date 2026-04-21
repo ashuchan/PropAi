@@ -2,12 +2,12 @@
 
 All LLM calls are mocked — no real network calls.
 """
+
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -18,7 +18,6 @@ from ma_poc.services.llm_api_rescue import (
     _build_prompt,
     _filter_candidates,
     _rank_candidates,
-    _score,
     _tier_label_for,
     _trim_body,
     _url_to_pattern,
@@ -29,12 +28,24 @@ FIXTURES = Path(__file__).parent / "fixtures" / "llm_rescue"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _inp(**kw: Any) -> RescueInput:
     defaults: dict[str, Any] = {
         "property_id": "TEST-001",
-        "property_context": {"name": "Test Property", "website": "https://test.com", "city": "Austin", "expected_units": 50},
+        "property_context": {
+            "name": "Test Property",
+            "website": "https://test.com",
+            "city": "Austin",
+            "expected_units": 50,
+        },
         "source_adapter": "generic",
-        "api_responses": [{"url": "https://test.com/api/units", "body": {"units": [{"beds": 1, "rent": 1200}]}, "content_type": "application/json"}],
+        "api_responses": [
+            {
+                "url": "https://test.com/api/units",
+                "body": {"units": [{"beds": 1, "rent": 1200}]},
+                "content_type": "application/json",
+            }
+        ],
         "profile_snapshot": None,
     }
     defaults.update(kw)
@@ -44,7 +55,18 @@ def _inp(**kw: Any) -> RescueInput:
 def _good_llm_response() -> dict:
     return {
         "units": [
-            {"unit_id": "101", "floor_plan_name": "1BR", "beds": 1, "baths": 1.0, "area": 750, "rent_low": 1200, "rent_high": 1200, "available_date": None, "lease_term": None, "move_in_date": None},
+            {
+                "unit_id": "101",
+                "floor_plan_name": "1BR",
+                "beds": 1,
+                "baths": 1.0,
+                "area": 750,
+                "rent_low": 1200,
+                "rent_high": 1200,
+                "available_date": None,
+                "lease_term": None,
+                "move_in_date": None,
+            },
         ],
         "winning_url": "https://test.com/api/units",
         "envelope": "$.units",
@@ -54,6 +76,7 @@ def _good_llm_response() -> dict:
 
 
 # ── rescue_from_api_responses — guard conditions ──────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_rescue_returns_empty_when_no_api_responses() -> None:
@@ -70,6 +93,7 @@ async def test_rescue_returns_empty_when_unsupported_adapter() -> None:
 
 
 # ── Filter ────────────────────────────────────────────────────────────────────
+
 
 def test_rescue_filter_drops_blocked_endpoints_from_profile() -> None:
     profile = {"api_hints": {"blocked_endpoints": [{"url_pattern": "/analytics/pixel"}]}}
@@ -96,6 +120,7 @@ def test_rescue_filter_keeps_known_pms_hosts() -> None:
 
 # ── Ranking ───────────────────────────────────────────────────────────────────
 
+
 def test_rescue_rank_prefers_availability_url_pattern() -> None:
     a = {"url": "https://x.com/availability", "body": {}}
     b = {"url": "https://x.com/config", "body": {}}
@@ -118,6 +143,7 @@ def test_rescue_rank_breaks_ties_by_url_length() -> None:
 
 
 # ── Trim ──────────────────────────────────────────────────────────────────────
+
 
 def test_rescue_trim_preserves_unit_array_truncates_to_200() -> None:
     big_body = {"units": [{"rent": i, "beds": 1} for i in range(300)]}
@@ -152,8 +178,9 @@ def test_rescue_trim_returns_deep_copy_never_mutates() -> None:
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
 
+
 def test_rescue_prompt_substitutes_placeholders_preserves_json_schema_braces() -> None:
-    template = "Property: {{property_name}}\nSchema: {\"units\": []}\nBody: {{bodies_as_json}}"
+    template = 'Property: {{property_name}}\nSchema: {"units": []}\nBody: {{bodies_as_json}}'
     inp = _inp()
     result = _build_prompt(template, inp, "https://test.com/api", {"x": 1})
     assert "{{property_name}}" not in result
@@ -164,30 +191,34 @@ def test_rescue_prompt_substitutes_placeholders_preserves_json_schema_braces() -
 
 # ── LLM call cap ─────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_rescue_respects_max_llm_calls_cap() -> None:
-    responses = [
-        {"url": f"https://test.com/api/{i}", "body": {"units": []}}
-        for i in range(5)
-    ]
+    responses = [{"url": f"https://test.com/api/{i}", "body": {"units": []}} for i in range(5)]
     call_count = 0
 
     async def fake_call(prompt: str, pid: str) -> tuple[dict, float, str]:
         nonlocal call_count
         call_count += 1
-        return {"units": [], "winning_url": None, "envelope": "", "json_paths": {}, "confidence": 0.0}, 0.01, ""
+        return (
+            {"units": [], "winning_url": None, "envelope": "", "json_paths": {}, "confidence": 0.0},
+            0.01,
+            "",
+        )
 
     with patch("ma_poc.services.llm_api_rescue._call_llm", side_effect=fake_call):
-        result = await rescue_from_api_responses(_inp(api_responses=responses))
+        await rescue_from_api_responses(_inp(api_responses=responses))
 
     assert call_count <= MAX_LLM_CALLS_PER_PROPERTY
 
 
 # ── Retry on JSON decode error ────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_rescue_retries_on_json_decode_error_once() -> None:
     import json as _json
+
     call_count = 0
 
     async def fake_call(prompt: str, pid: str) -> tuple[dict, float, str]:
@@ -198,7 +229,7 @@ async def test_rescue_retries_on_json_decode_error_once() -> None:
         return _good_llm_response(), 0.01, ""
 
     with patch("ma_poc.services.llm_api_rescue._call_llm", side_effect=fake_call):
-        result = await rescue_from_api_responses(_inp())
+        await rescue_from_api_responses(_inp())
 
     assert call_count >= 1
 
@@ -215,10 +246,24 @@ async def test_rescue_stops_retrying_after_second_json_decode_error() -> None:
 
 # ── Quality gate rejection ────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_rescue_rejects_llm_output_that_fails_quality_gate() -> None:
     hollow_response = {
-        "units": [{"unit_id": None, "floor_plan_name": None, "beds": None, "baths": None, "area": -1, "rent_low": None, "rent_high": None, "available_date": None, "lease_term": None, "move_in_date": None}],
+        "units": [
+            {
+                "unit_id": None,
+                "floor_plan_name": None,
+                "beds": None,
+                "baths": None,
+                "area": -1,
+                "rent_low": None,
+                "rent_high": None,
+                "available_date": None,
+                "lease_term": None,
+                "move_in_date": None,
+            }
+        ],
         "winning_url": "https://test.com/api",
         "envelope": "$.units",
         "json_paths": {},
@@ -237,6 +282,7 @@ async def test_rescue_rejects_llm_output_that_fails_quality_gate() -> None:
 
 # ── Tier labels ───────────────────────────────────────────────────────────────
 
+
 def test_rescue_tier_label_generic_returns_TIER_1_API_LLM_RESCUE() -> None:
     assert _tier_label_for("generic") == "TIER_1_API_LLM_RESCUE"
 
@@ -250,6 +296,7 @@ def test_rescue_tier_label_appfolio_returns_TIER_1_API_APPFOLIO_LLM_RESCUE() -> 
 
 
 # ── Persistence ───────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_rescue_persists_json_paths_to_llm_field_mappings() -> None:
@@ -269,7 +316,11 @@ async def test_rescue_persists_json_paths_to_llm_field_mappings() -> None:
 @pytest.mark.asyncio
 async def test_rescue_persists_noise_urls_to_blocked_endpoints() -> None:
     async def fake_call(prompt: str, pid: str) -> tuple[dict, float, str]:
-        return {"units": [], "winning_url": None, "envelope": "", "json_paths": {}, "confidence": 0.0}, 0.01, ""
+        return (
+            {"units": [], "winning_url": None, "envelope": "", "json_paths": {}, "confidence": 0.0},
+            0.01,
+            "",
+        )
 
     with patch("ma_poc.services.llm_api_rescue._call_llm", side_effect=fake_call):
         result = await rescue_from_api_responses(_inp())
@@ -280,6 +331,7 @@ async def test_rescue_persists_noise_urls_to_blocked_endpoints() -> None:
 
 # ── Cost accumulation ─────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_rescue_cost_accumulates_across_retries() -> None:
     call_count = 0
@@ -287,7 +339,11 @@ async def test_rescue_cost_accumulates_across_retries() -> None:
     async def fake_call(prompt: str, pid: str) -> tuple[dict, float, str]:
         nonlocal call_count
         call_count += 1
-        return {"units": [], "winning_url": None, "envelope": "", "json_paths": {}, "confidence": 0.0}, 0.05, ""
+        return (
+            {"units": [], "winning_url": None, "envelope": "", "json_paths": {}, "confidence": 0.0},
+            0.05,
+            "",
+        )
 
     responses = [
         {"url": "https://test.com/api/1", "body": {"units": [{"beds": 1}]}},
@@ -301,6 +357,7 @@ async def test_rescue_cost_accumulates_across_retries() -> None:
 
 # ── Never raises ─────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_rescue_never_raises_on_internal_exception() -> None:
     async def exploding_call(prompt: str, pid: str) -> tuple[dict, float, str]:
@@ -313,6 +370,7 @@ async def test_rescue_never_raises_on_internal_exception() -> None:
 
 
 # ── URL pattern helpers ───────────────────────────────────────────────────────
+
 
 def test_rescue_url_to_pattern_replaces_numeric_ids() -> None:
     url = "https://api.entrata.com/properties/12345/units"

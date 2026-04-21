@@ -1,4 +1,5 @@
 """Tests for cross_run_sanity — historical comparison checks."""
+
 from __future__ import annotations
 
 from ma_poc.validation.cross_run_sanity import check

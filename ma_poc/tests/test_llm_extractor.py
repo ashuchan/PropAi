@@ -1,4 +1,5 @@
 """Tests for the LLM extractor service — claude-scrapper-arch.md Step 6.3."""
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,6 @@ from services.llm_extractor import (
     extract_with_llm,
     prepare_llm_input,
 )
-
 
 # ── prepare_llm_input tests ─────────────────────────────────────────────────
 
@@ -118,21 +118,23 @@ def test_normalize_units_filters_empty() -> None:
 
 @pytest.mark.asyncio
 async def test_successful_extraction_returns_units_and_hints() -> None:
-    llm_response = json.dumps({
-        "units": [
-            {
-                "unit_id": "201",
-                "floor_plan_name": "Studio",
-                "market_rent_low": 1200,
-                "availability_status": "AVAILABLE",
-                "confidence": 0.9,
-            }
-        ],
-        "profile_hints": {
-            "platform_guess": "entrata",
-            "css_selectors": {"container": ".unit-card"},
-        },
-    })
+    llm_response = json.dumps(
+        {
+            "units": [
+                {
+                    "unit_id": "201",
+                    "floor_plan_name": "Studio",
+                    "market_rent_low": 1200,
+                    "availability_status": "AVAILABLE",
+                    "confidence": 0.9,
+                }
+            ],
+            "profile_hints": {
+                "platform_guess": "entrata",
+                "css_selectors": {"container": ".unit-card"},
+            },
+        }
+    )
 
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock(return_value=llm_response)

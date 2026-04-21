@@ -1,9 +1,8 @@
 """Tests for the ScrapeProfile model — claude-scrapper-arch.md Step 6.1."""
+
 from __future__ import annotations
 
 import json
-
-import pytest
 
 from models.scrape_profile import (
     ApiEndpoint,

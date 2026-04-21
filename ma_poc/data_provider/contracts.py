@@ -12,11 +12,13 @@ Design rules:
   - Writes are eventually-consistent *within* a provider; consumers should
     call `transaction()` when they need a multi-call atomic boundary.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from contextlib import AbstractContextManager
-from typing import Any, Iterator
+from typing import Any
 
 from data_provider.dtos import (
     ExtractionResult,
@@ -41,9 +43,7 @@ class IPropertyStateStore(ABC):
     def exists(self, canonical_id: str) -> bool: ...
 
     @abstractmethod
-    def upsert(
-        self, canonical_id: str, snapshot: dict[str, Any], run_date: str
-    ) -> bool:
+    def upsert(self, canonical_id: str, snapshot: dict[str, Any], run_date: str) -> bool:
         """Insert-or-update snapshot. Returns True if canonical_id is new."""
 
     @abstractmethod
@@ -65,18 +65,14 @@ class IUnitStateStore(ABC):
     ) -> UnitDiff: ...
 
     @abstractmethod
-    def carry_forward_units(
-        self, canonical_id: str, run_date: str
-    ) -> list[dict[str, Any]]: ...
+    def carry_forward_units(self, canonical_id: str, run_date: str) -> list[dict[str, Any]]: ...
 
 
 class IRunStore(ABC):
     """Per-run artifacts under data/runs/{run_date}/ in the FS layout."""
 
     @abstractmethod
-    def write_properties(
-        self, run_date: str, properties: list[dict[str, Any]]
-    ) -> None: ...
+    def write_properties(self, run_date: str, properties: list[dict[str, Any]]) -> None: ...
 
     @abstractmethod
     def read_properties(self, run_date: str) -> list[dict[str, Any]]: ...
@@ -140,9 +136,7 @@ class IExtractionResultStore(ABC):
     def write(self, run_date: str, result: ExtractionResult) -> None: ...
 
     @abstractmethod
-    def read(
-        self, run_date: str, property_id: str
-    ) -> ExtractionResult | None: ...
+    def read(self, run_date: str, property_id: str) -> ExtractionResult | None: ...
 
 
 class DataProvider(ABC):

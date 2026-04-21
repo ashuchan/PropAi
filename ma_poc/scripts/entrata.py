@@ -45,6 +45,7 @@ from typing import Any
 # instantiated (needed when Tier 6/7 LLM calls are triggered).
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -98,9 +99,9 @@ ENTRATA_PRIORITY_PATHS = [
     "/floorplans",
     "/apartments",
     "/availability",
-    "/vacancies",            # vacancy listing pages (e.g. projectmanagementinc.net)
+    "/vacancies",  # vacancy listing pages (e.g. projectmanagementinc.net)
     "/rent",
-    "/conventional",        # Entrata "conventional" lease page
+    "/conventional",  # Entrata "conventional" lease page
 ]
 
 # Buttons to click to reveal unit data
@@ -129,8 +130,10 @@ USER_AGENT = (
 
 # ── URL helpers ────────────────────────────────────────────────────────────────
 
+
 def _norm_host(host: str) -> str:
     return host.lower().lstrip(".").removeprefix("www.")
+
 
 def normalise_url(base: str, href: str | None) -> str | None:
     if not href:
@@ -151,12 +154,23 @@ def normalise_url(base: str, href: str | None) -> str | None:
         return None
     return urllib.parse.urljoin(base, href)
 
+
 def is_property_link(url: str) -> bool:
     path = urllib.parse.urlparse(url).path.lower()
     keywords = [
-        "floor-plan", "floorplan", "apartment", "unit", "bedroom",
-        "studio", "availability", "lease", "rent", "plan",
-        "conventional", "pricing", "available",
+        "floor-plan",
+        "floorplan",
+        "apartment",
+        "unit",
+        "bedroom",
+        "studio",
+        "availability",
+        "lease",
+        "rent",
+        "plan",
+        "conventional",
+        "pricing",
+        "available",
     ]
     return any(k in path for k in keywords)
 
@@ -219,31 +233,44 @@ def is_exploratory_candidate(url: str, base_url: str) -> bool:
         return False
     return True
 
+
 # Hosts whose API responses are never apartment data — these get captured
 # because their URLs happen to match broad patterns like "/api/" or "/units".
 _FALSE_POSITIVE_HOSTS = {
-    "googleapis.com", "maps.googleapis.com",
-    "go-mpulse.net", "c.go-mpulse.net",
-    "visitor-analytics.io", "visits.visitor-analytics.io",
-    "google-analytics.com", "www.google-analytics.com",
-    "googletagmanager.com", "www.googletagmanager.com",
+    "googleapis.com",
+    "maps.googleapis.com",
+    "go-mpulse.net",
+    "c.go-mpulse.net",
+    "visitor-analytics.io",
+    "visits.visitor-analytics.io",
+    "google-analytics.com",
+    "www.google-analytics.com",
+    "googletagmanager.com",
+    "www.googletagmanager.com",
     "doubleclick.net",
-    "facebook.com", "connect.facebook.net",
+    "facebook.com",
+    "connect.facebook.net",
     "hotjar.com",
     "sentry.io",
     # Chatbot / leasing assistant widgets — config & tour scheduling only
-    "meetelise.com", "app.meetelise.com",
+    "meetelise.com",
+    "app.meetelise.com",
     "sierra.chat",
-    "theconversioncloud.com", "api.theconversioncloud.com",
+    "theconversioncloud.com",
+    "api.theconversioncloud.com",
     # Lead-gen / referral / review widgets — no unit data
     "nestiolistings.com",
-    "rentgrata.com", "api.rentgrata.com",
-    "g5marketingcloud.com", "client-leads.g5marketingcloud.com",
+    "rentgrata.com",
+    "api.rentgrata.com",
+    "g5marketingcloud.com",
+    "client-leads.g5marketingcloud.com",
     "g5-api-proxy.g5marketingcloud.com",
     # Accessibility widgets
-    "userway.org", "api.userway.org",
+    "userway.org",
+    "api.userway.org",
     # Chat widgets
-    "omni.cafe", "webchat.omni.cafe",
+    "omni.cafe",
+    "webchat.omni.cafe",
     # Entrata communications/chat widget API
     "comms.entrata.com",
 }
@@ -251,8 +278,8 @@ _FALSE_POSITIVE_HOSTS = {
 # Subdomains of blocked hosts that actually serve unit/floor-plan data.
 # Checked BEFORE _FALSE_POSITIVE_HOSTS — an allowlisted host is never blocked.
 _ALLOWLIST_OVERRIDES = {
-    "api.ws.realpage.com",          # /v2/property/{id}/floorplans, /v2/units
-    "onlineleasing.realpage.com",   # leasing portal with unit data
+    "api.ws.realpage.com",  # /v2/property/{id}/floorplans, /v2/units
+    "onlineleasing.realpage.com",  # leasing portal with unit data
 }
 
 # URL path fragments that are never unit/availability data.
@@ -315,8 +342,17 @@ _ENTRATA_PROPERTY_WIDGET_TYPES = {"floor_plans", "availability"}
 
 # Entrata widget types that are known to NOT contain unit data.
 _ENTRATA_NOISE_WIDGET_TYPES = {
-    "custom", "directions", "events", "specials", "resident_login",
-    "gallery", "contact", "reviews", "social", "blog", "amenities",
+    "custom",
+    "directions",
+    "events",
+    "specials",
+    "resident_login",
+    "gallery",
+    "contact",
+    "reviews",
+    "social",
+    "blog",
+    "amenities",
 }
 
 
@@ -362,14 +398,38 @@ def _response_looks_like_units(body) -> bool:
     we skip sub-page crawling.
     """
     _SIGNAL_KEYS = {
-        "rent", "minRent", "maxRent", "min_rent", "max_rent",
-        "price", "askingRent", "monthlyRent",
-        "baseRent", "base_rent", "display_price", "startingPrice",
-        "bedrooms", "beds", "bedRooms", "sqft", "squareFeet", "square_feet",
-        "square_footage", "no_of_bedroom", "no_of_bathroom",
-        "unitNumber", "unit_number", "unitId", "unit_id",
-        "floorPlanName", "floor_plan_name", "floorplan_name", "floorplan-name",
-        "availableDate", "available_date", "availableCount",
+        "rent",
+        "minRent",
+        "maxRent",
+        "min_rent",
+        "max_rent",
+        "price",
+        "askingRent",
+        "monthlyRent",
+        "baseRent",
+        "base_rent",
+        "display_price",
+        "startingPrice",
+        "bedrooms",
+        "beds",
+        "bedRooms",
+        "sqft",
+        "squareFeet",
+        "square_feet",
+        "square_footage",
+        "no_of_bedroom",
+        "no_of_bathroom",
+        "unitNumber",
+        "unit_number",
+        "unitId",
+        "unit_id",
+        "floorPlanName",
+        "floor_plan_name",
+        "floorplan_name",
+        "floorplan-name",
+        "availableDate",
+        "available_date",
+        "availableCount",
     }
 
     def _has_signals(lst: list) -> bool:
@@ -391,7 +451,9 @@ def _response_looks_like_units(body) -> bool:
                         return True
     return False
 
+
 # ── Entrata API response parser ────────────────────────────────────────────────
+
 
 def _get(d: dict, *keys) -> str:
     """Try multiple key names, return first non-empty string found.
@@ -408,14 +470,14 @@ def _get(d: dict, *keys) -> str:
             continue
         # Nested dict: try to extract a scalar (e.g. rent: {min: X, max: Y}).
         if isinstance(v, dict):
-            for sub_k in ("min", "low", "amount", "value", "effectiveRent",
-                          "max", "high"):
+            for sub_k in ("min", "low", "amount", "value", "effectiveRent", "max", "high"):
                 sv = v.get(sub_k)
                 if sv is not None and sv != "":
                     return str(sv)
             continue
         return str(v)
     return ""
+
 
 def _money_to_int(s: str) -> int | None:
     """Parse '$1,450', '1450.00', '1,450 USD' → 1450. Returns None on failure."""
@@ -429,6 +491,7 @@ def _money_to_int(s: str) -> int | None:
     except ValueError:
         return None
 
+
 def _find_list(obj, keys: tuple[str, ...]) -> list:
     """Return the first non-empty list found at any of the given keys in obj (dict only)."""
     if not isinstance(obj, dict):
@@ -438,6 +501,7 @@ def _find_list(obj, keys: tuple[str, ...]) -> list:
         if isinstance(v, list) and v:
             return v
     return []
+
 
 def _parse_sightmap_payload(body, url: str) -> list[dict]:
     """
@@ -451,7 +515,7 @@ def _parse_sightmap_payload(body, url: str) -> list[dict]:
         return units_out
 
     raw_units = data.get("units") or []
-    raw_fps   = data.get("floor_plans") or []
+    raw_fps = data.get("floor_plans") or []
     if not isinstance(raw_units, list) or not raw_units:
         return units_out
 
@@ -489,25 +553,28 @@ def _parse_sightmap_payload(body, url: str) -> list[dict]:
         else:
             bed_label = ""
 
-        units_out.append({
-            "floor_plan_name":    str(name),
-            "bed_label":          bed_label,
-            "bedrooms":           str(beds) if beds is not None else "",
-            "bathrooms":          str(baths) if baths is not None else "",
-            "sqft":               sqft,
-            "unit_number":        str(u.get("unit_number") or u.get("label") or ""),
-            "floor":              str(u.get("floor_id") or ""),
-            "building":           str(u.get("building") or ""),
-            "rent_range":         f"${price_i:,}" if price_i else (str(u.get("display_price") or "")),
-            "deposit":            "",
-            "concession":         str(u.get("specials_description") or ""),
-            "availability_status":"AVAILABLE",  # SightMap only lists leasable inventory
-            "available_units":    "1",
-            "availability_date":  str(u.get("available_on") or u.get("display_available_on") or ""),
-            "source_api_url":     url,
-            "extraction_tier":    "TIER_1_API_SIGHTMAP",
-        })
+        units_out.append(
+            {
+                "floor_plan_name": str(name),
+                "bed_label": bed_label,
+                "bedrooms": str(beds) if beds is not None else "",
+                "bathrooms": str(baths) if baths is not None else "",
+                "sqft": sqft,
+                "unit_number": str(u.get("unit_number") or u.get("label") or ""),
+                "floor": str(u.get("floor_id") or ""),
+                "building": str(u.get("building") or ""),
+                "rent_range": f"${price_i:,}" if price_i else (str(u.get("display_price") or "")),
+                "deposit": "",
+                "concession": str(u.get("specials_description") or ""),
+                "availability_status": "AVAILABLE",  # SightMap only lists leasable inventory
+                "available_units": "1",
+                "availability_date": str(u.get("available_on") or u.get("display_available_on") or ""),
+                "source_api_url": url,
+                "extraction_tier": "TIER_1_API_SIGHTMAP",
+            }
+        )
     return units_out
+
 
 def parse_api_responses(api_responses: list[dict]) -> list[dict]:
     """
@@ -520,7 +587,7 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
     skipped_no_fields = 0  # candidates rejected by "no name/beds/sqft/rent" gate
 
     for resp in api_responses:
-        url  = resp["url"]
+        url = resp["url"]
         data = resp["body"]
 
         # ── Dedicated parsers by host ─────────────────────────────────────
@@ -544,11 +611,17 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
             candidates = data
         elif isinstance(data, dict):
             LIST_KEYS = (
-                "floorPlans", "floor_plans", "FloorPlans",
-                "units", "Units",
-                "apartments", "Apartments",
-                "availabilities", "Availabilities",
-                "results", "items",
+                "floorPlans",
+                "floor_plans",
+                "FloorPlans",
+                "units",
+                "Units",
+                "apartments",
+                "Apartments",
+                "availabilities",
+                "Availabilities",
+                "results",
+                "items",
             )
             candidates = _find_list(data, LIST_KEYS)
             if not candidates:
@@ -569,39 +642,150 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
             if not isinstance(item, dict):
                 continue
 
-            name      = _get(item, "floorPlanName","floor_plan_name","name","planName",
-                              "unitType","unit_type","title","FloorPlanName","floorplan_name",
-                              "floorplan-name")
-            rent_lo   = _get(item, "minRent","rent_min","min_rent","startingFrom","starting_rent",
-                              "askingRent","rent","minPrice","startingPrice","MinRent",
-                              "price","base_rent","baseRent","display_price","displayPrice",
-                              "monthlyRent","monthly_rent")
-            rent_hi   = _get(item, "maxRent","rent_max","max_rent","maxAskingRent","endingAt","MaxRent",
-                              "max_price","maxPrice","price_max")
-            beds      = _get(item, "bedrooms","beds","bedroom_count","numBedrooms",
-                              "bd","Bedrooms","BedroomCount","bedroomCount","num_bedrooms",
-                              "no_of_bedroom","no_of_bedrooms","bedroomNumber","BedroomNumber")
-            baths     = _get(item, "bathrooms","baths","bathroom_count","numBathrooms",
-                              "ba","Bathrooms","BathroomCount","bathroomCount","num_bathrooms",
-                              "no_of_bathroom","no_of_bathrooms","bathroomNumber","BathroomNumber")
-            sqft      = _get(item, "sqft","squareFeet","square_feet","minSqft",
-                              "size","SquareFeet","Sqft","sqftMin","area","square_footage",
-                              "squareFootage","display_area","displayArea")
-            sqft_max  = _get(item, "maxSqft","sqftMax","squareFeetMax","SquareFeetMax","max_area")
-            avail     = _get(item, "availableCount","available_count","numAvailable",
-                              "unitsAvailable","AvailableCount","units_available")
-            avail_dt  = _get(item, "availableDate","available_date","moveInDate",
-                              "moveInReady","availableFrom","AvailableDate","NextAvailDate",
-                              "available_on","availableOn","display_available_on","readyDate")
-            status    = _get(item, "status","availability_status","leaseStatus","Status","unit_status")
-            unit_num  = _get(item, "unitNumber","unit_number","unitId","unit_id","UnitNumber",
-                              "label","display_unit_number","unitCode","unit_code")
-            floor_num = _get(item, "floor","floorNumber","FloorNumber","floor_id","floorId")
-            building  = _get(item, "building","buildingName","BuildingName","building_name")
-            plan_type = _get(item, "floorPlanType","type","bedBath","BedBath")
-            deposit   = _get(item, "deposit","securityDeposit","SecurityDeposit","security_deposit")
-            concession= _get(item, "concession","special","promotion","Concession","Special",
-                              "specials_description","specialsDescription")
+            name = _get(
+                item,
+                "floorPlanName",
+                "floor_plan_name",
+                "name",
+                "planName",
+                "unitType",
+                "unit_type",
+                "title",
+                "FloorPlanName",
+                "floorplan_name",
+                "floorplan-name",
+            )
+            rent_lo = _get(
+                item,
+                "minRent",
+                "rent_min",
+                "min_rent",
+                "startingFrom",
+                "starting_rent",
+                "askingRent",
+                "rent",
+                "minPrice",
+                "startingPrice",
+                "MinRent",
+                "price",
+                "base_rent",
+                "baseRent",
+                "display_price",
+                "displayPrice",
+                "monthlyRent",
+                "monthly_rent",
+            )
+            rent_hi = _get(
+                item,
+                "maxRent",
+                "rent_max",
+                "max_rent",
+                "maxAskingRent",
+                "endingAt",
+                "MaxRent",
+                "max_price",
+                "maxPrice",
+                "price_max",
+            )
+            beds = _get(
+                item,
+                "bedrooms",
+                "beds",
+                "bedroom_count",
+                "numBedrooms",
+                "bd",
+                "Bedrooms",
+                "BedroomCount",
+                "bedroomCount",
+                "num_bedrooms",
+                "no_of_bedroom",
+                "no_of_bedrooms",
+                "bedroomNumber",
+                "BedroomNumber",
+            )
+            baths = _get(
+                item,
+                "bathrooms",
+                "baths",
+                "bathroom_count",
+                "numBathrooms",
+                "ba",
+                "Bathrooms",
+                "BathroomCount",
+                "bathroomCount",
+                "num_bathrooms",
+                "no_of_bathroom",
+                "no_of_bathrooms",
+                "bathroomNumber",
+                "BathroomNumber",
+            )
+            sqft = _get(
+                item,
+                "sqft",
+                "squareFeet",
+                "square_feet",
+                "minSqft",
+                "size",
+                "SquareFeet",
+                "Sqft",
+                "sqftMin",
+                "area",
+                "square_footage",
+                "squareFootage",
+                "display_area",
+                "displayArea",
+            )
+            sqft_max = _get(item, "maxSqft", "sqftMax", "squareFeetMax", "SquareFeetMax", "max_area")
+            avail = _get(
+                item,
+                "availableCount",
+                "available_count",
+                "numAvailable",
+                "unitsAvailable",
+                "AvailableCount",
+                "units_available",
+            )
+            avail_dt = _get(
+                item,
+                "availableDate",
+                "available_date",
+                "moveInDate",
+                "moveInReady",
+                "availableFrom",
+                "AvailableDate",
+                "NextAvailDate",
+                "available_on",
+                "availableOn",
+                "display_available_on",
+                "readyDate",
+            )
+            status = _get(item, "status", "availability_status", "leaseStatus", "Status", "unit_status")
+            unit_num = _get(
+                item,
+                "unitNumber",
+                "unit_number",
+                "unitId",
+                "unit_id",
+                "UnitNumber",
+                "label",
+                "display_unit_number",
+                "unitCode",
+                "unit_code",
+            )
+            floor_num = _get(item, "floor", "floorNumber", "FloorNumber", "floor_id", "floorId")
+            building = _get(item, "building", "buildingName", "BuildingName", "building_name")
+            plan_type = _get(item, "floorPlanType", "type", "bedBath", "BedBath")
+            deposit = _get(item, "deposit", "securityDeposit", "SecurityDeposit", "security_deposit")
+            concession = _get(
+                item,
+                "concession",
+                "special",
+                "promotion",
+                "Concession",
+                "Special",
+                "specials_description",
+                "specialsDescription",
+            )
 
             # Skip if we can't identify the record at all
             if not any([name, beds, sqft, rent_lo]):
@@ -637,24 +821,26 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
             else:
                 bed_label = plan_type or "?"
 
-            units.append({
-                "floor_plan_name":    name,
-                "bed_label":          bed_label,
-                "bedrooms":           beds,
-                "bathrooms":          baths,
-                "sqft":               sqft_display,
-                "unit_number":        unit_num,
-                "floor":              floor_num,
-                "building":           building,
-                "rent_range":         rent_display,
-                "deposit":            deposit,
-                "concession":         concession,
-                "availability_status": status or ("AVAILABLE" if (avail and avail != "0") else ""),
-                "available_units":    avail,
-                "availability_date":  avail_dt,
-                "source_api_url":     url,
-                "extraction_tier":    "TIER_1_API",
-            })
+            units.append(
+                {
+                    "floor_plan_name": name,
+                    "bed_label": bed_label,
+                    "bedrooms": beds,
+                    "bathrooms": baths,
+                    "sqft": sqft_display,
+                    "unit_number": unit_num,
+                    "floor": floor_num,
+                    "building": building,
+                    "rent_range": rent_display,
+                    "deposit": deposit,
+                    "concession": concession,
+                    "availability_status": status or ("AVAILABLE" if (avail and avail != "0") else ""),
+                    "available_units": avail,
+                    "availability_date": avail_dt,
+                    "source_api_url": url,
+                    "extraction_tier": "TIER_1_API",
+                }
+            )
 
     # Drop floor-plan stub records (no rent, no unit#) if any real unit records exist.
     has_real = any(u.get("unit_number") or u.get("rent_range") for u in units)
@@ -665,16 +851,26 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
         stub_count = before - len(units)
 
     # Summary log — diagnose extraction failures from this line alone.
-    print(f"    parse_api_responses: {len(api_responses)} APIs → "
-          f"{len(units)} units extracted "
-          f"(skipped: {skipped_no_fields} no-fields, {stub_count} stubs, "
-          f"{len(seen) - len(units)} deduped)")
+    print(
+        f"    parse_api_responses: {len(api_responses)} APIs → "
+        f"{len(units)} units extracted "
+        f"(skipped: {skipped_no_fields} no-fields, {stub_count} stubs, "
+        f"{len(seen) - len(units)} deduped)"
+    )
 
     return units
 
+
 # ── JSON-LD parser ─────────────────────────────────────────────────────────────
 
-TARGET_JSONLD_TYPES = {"Apartment", "ApartmentComplex", "Offer", "FloorPlan", "Residence", "SingleFamilyResidence"}
+TARGET_JSONLD_TYPES = {
+    "Apartment",
+    "ApartmentComplex",
+    "Offer",
+    "FloorPlan",
+    "Residence",
+    "SingleFamilyResidence",
+}
 
 
 def _is_low_signal_units(units: list[dict]) -> bool:
@@ -689,20 +885,15 @@ def _is_low_signal_units(units: list[dict]) -> bool:
         return True
     for u in units:
         has_rent = bool(
-            u.get("rent_range") or u.get("market_rent_low")
-            or u.get("market_rent_high") or u.get("rent")
+            u.get("rent_range") or u.get("market_rent_low") or u.get("market_rent_high") or u.get("rent")
         )
-        has_id = bool(
-            (u.get("unit_number") or "").strip()
-            or (u.get("unit_id") or "").strip()
-        )
+        has_id = bool((u.get("unit_number") or "").strip() or (u.get("unit_id") or "").strip())
         if has_rent or has_id:
             return False
     return True
 
 
-def _units_below_expected(units: list[dict], expected: int | None,
-                          floor_ratio: float = 0.2) -> bool:
+def _units_below_expected(units: list[dict], expected: int | None, floor_ratio: float = 0.2) -> bool:
     """True if ``units`` is materially smaller than the known expected count.
 
     Used to reject premature Phase 3 success when the prior run or the CSV
@@ -716,16 +907,15 @@ def _units_below_expected(units: list[dict], expected: int | None,
         return False
     # Only veto if rents are also missing — a 2-unit result with real rents
     # may legitimately be the only availability.
-    return all(
-        not (u.get("rent_range") or u.get("market_rent_low") or u.get("rent"))
-        for u in units
-    )
+    return all(not (u.get("rent_range") or u.get("market_rent_low") or u.get("rent")) for u in units)
+
 
 def _jsonld_type_matches(item: dict) -> bool:
     t = item.get("@type")
     if isinstance(t, list):
         return any(isinstance(x, str) and x in TARGET_JSONLD_TYPES for x in t)
     return isinstance(t, str) and t in TARGET_JSONLD_TYPES
+
 
 def _jsonld_floor_size(item: dict) -> str:
     # schema.org floorSize may be a QuantitativeValue dict OR a plain number/string.
@@ -736,6 +926,7 @@ def _jsonld_floor_size(item: dict) -> str:
     if fs in (None, ""):
         return ""
     return str(fs)
+
 
 def _walk_jsonld(node, out: list[dict]) -> None:
     """JSON-LD may nest matching items inside @graph, itemListElement, etc."""
@@ -748,6 +939,7 @@ def _walk_jsonld(node, out: list[dict]) -> None:
         for v in node:
             _walk_jsonld(v, out)
 
+
 async def extract_property_metadata(page: Page) -> dict:
     """
     Pull property-level metadata from the loaded page: OpenGraph tags, JSON-LD
@@ -755,23 +947,23 @@ async def extract_property_metadata(page: Page) -> dict:
     and a footer-text phone heuristic. All fields are best-effort and may be empty.
     """
     md: dict = {
-        "title":       "",
-        "h1":          "",
+        "title": "",
+        "h1": "",
         "description": "",
-        "site_name":   "",
-        "name":        "",
-        "address":     "",
-        "city":        "",
-        "state":       "",
-        "zip":         "",
-        "country":     "",
-        "telephone":   "",
-        "latitude":    None,
-        "longitude":   None,
-        "year_built":  None,
-        "stories":     None,
+        "site_name": "",
+        "name": "",
+        "address": "",
+        "city": "",
+        "state": "",
+        "zip": "",
+        "country": "",
+        "telephone": "",
+        "latitude": None,
+        "longitude": None,
+        "year_built": None,
+        "stories": None,
         "total_units": None,
-        "image_url":   None,
+        "image_url": None,
         "gallery_urls": [],
     }
 
@@ -799,17 +991,22 @@ async def extract_property_metadata(page: Page) -> dict:
     except Exception:
         return md
 
-    md["title"]       = (raw.get("title") or "").strip()
-    md["h1"]          = (raw.get("h1") or "").strip()
-    ogs               = raw.get("ogs") or {}
+    md["title"] = (raw.get("title") or "").strip()
+    md["h1"] = (raw.get("h1") or "").strip()
+    ogs = raw.get("ogs") or {}
     md["description"] = (ogs.get("og:description") or ogs.get("description") or "").strip()
-    md["site_name"]   = (ogs.get("og:site_name") or "").strip()
+    md["site_name"] = (ogs.get("og:site_name") or "").strip()
     if not md["name"]:
         md["name"] = md["site_name"] or (ogs.get("og:title") or "").strip() or md["title"]
 
     # Property hero image — prefer og:image, fall back to twitter:image.
-    _hero = (ogs.get("og:image") or ogs.get("og:image:secure_url")
-             or ogs.get("twitter:image") or ogs.get("twitter:image:src") or "").strip()
+    _hero = (
+        ogs.get("og:image")
+        or ogs.get("og:image:secure_url")
+        or ogs.get("twitter:image")
+        or ogs.get("twitter:image:src")
+        or ""
+    ).strip()
     if _hero:
         md["image_url"] = _hero
         md["gallery_urls"].append(_hero)
@@ -822,7 +1019,7 @@ async def extract_property_metadata(page: Page) -> dict:
         # geo.position / ICBM are typically "lat;lng" or "lat, lng".
         m = re.search(r"(-?\d+\.\d+)[\s,;]+(-?\d+\.\d+)", v)
         if m:
-            md["latitude"]  = float(m.group(1))
+            md["latitude"] = float(m.group(1))
             md["longitude"] = float(m.group(2))
             break
         try:
@@ -839,21 +1036,33 @@ async def extract_property_metadata(page: Page) -> dict:
         if isinstance(node, dict):
             t = node.get("@type")
             types = t if isinstance(t, list) else ([t] if t else [])
-            if any(isinstance(x, str) and x in (
-                "ApartmentComplex", "Apartment", "Residence", "RealEstateListing",
-                "Place", "LocalBusiness", "Organization", "Hotel", "LodgingBusiness"
-            ) for x in types):
+            if any(
+                isinstance(x, str)
+                and x
+                in (
+                    "ApartmentComplex",
+                    "Apartment",
+                    "Residence",
+                    "RealEstateListing",
+                    "Place",
+                    "LocalBusiness",
+                    "Organization",
+                    "Hotel",
+                    "LodgingBusiness",
+                )
+                for x in types
+            ):
                 if not md["name"] and isinstance(node.get("name"), str):
                     md["name"] = node["name"].strip()
                 if not md["telephone"] and isinstance(node.get("telephone"), str):
                     md["telephone"] = re.sub(r"\s+", " ", node["telephone"]).strip()
                 addr = node.get("address")
                 if isinstance(addr, dict):
-                    md["address"] = (addr.get("streetAddress") or md["address"] or "")
-                    md["city"]    = (addr.get("addressLocality") or md["city"] or "")
-                    md["state"]   = (addr.get("addressRegion") or md["state"] or "")
-                    md["zip"]     = (addr.get("postalCode") or md["zip"] or "")
-                    md["country"] = (addr.get("addressCountry") or md["country"] or "")
+                    md["address"] = addr.get("streetAddress") or md["address"] or ""
+                    md["city"] = addr.get("addressLocality") or md["city"] or ""
+                    md["state"] = addr.get("addressRegion") or md["state"] or ""
+                    md["zip"] = addr.get("postalCode") or md["zip"] or ""
+                    md["country"] = addr.get("addressCountry") or md["country"] or ""
                 geo = node.get("geo")
                 if isinstance(geo, dict):
                     try:
@@ -869,7 +1078,7 @@ async def extract_property_metadata(page: Page) -> dict:
                 img = node.get("image") or node.get("photo")
                 if img:
                     _urls: list[str] = []
-                    for item in (img if isinstance(img, list) else [img]):
+                    for item in img if isinstance(img, list) else [img]:
                         if isinstance(item, str) and item.strip():
                             _urls.append(item.strip())
                         elif isinstance(item, dict):
@@ -901,6 +1110,7 @@ async def extract_property_metadata(page: Page) -> dict:
 
     return md
 
+
 def _jsonld_item_has_unit_signal(item: dict) -> bool:
     """True if a JSON-LD node has offers/pricing/rooms data — i.e. unit-level.
 
@@ -928,8 +1138,11 @@ def _jsonld_item_has_unit_signal(item: dict) -> bool:
         return True
     t = item.get("@type")
     t_list = t if isinstance(t, list) else [t]
-    return any(x in ("Apartment", "FloorPlan", "Residence", "Offer",
-                     "SingleFamilyResidence") for x in t_list if isinstance(x, str))
+    return any(
+        x in ("Apartment", "FloorPlan", "Residence", "Offer", "SingleFamilyResidence")
+        for x in t_list
+        if isinstance(x, str)
+    )
 
 
 async def parse_jsonld(page: Page) -> list[dict]:
@@ -937,8 +1150,7 @@ async def parse_jsonld(page: Page) -> list[dict]:
     units: list[dict] = []
     try:
         blocks = await page.eval_on_selector_all(
-            'script[type="application/ld+json"]',
-            "els => els.map(e => e.textContent)"
+            'script[type="application/ld+json"]', "els => els.map(e => e.textContent)"
         )
     except Exception as e:
         print(f"  JSON-LD selector error: {e}")
@@ -996,27 +1208,31 @@ async def parse_jsonld(page: Page) -> list[dict]:
             if isinstance(num_rooms, dict):
                 num_rooms = num_rooms.get("value", "")
 
-            units.append({
-                "floor_plan_name":    name,
-                "bed_label":          "",
-                "bedrooms":           str(num_rooms) if num_rooms not in (None, "") else "",
-                "bathrooms":          "",
-                "sqft":               _jsonld_floor_size(item),
-                "unit_number":        "",
-                "floor":              "",
-                "building":           "",
-                "rent_range":         rent_range,
-                "deposit":            "",
-                "concession":         "",
-                "availability_status":"",
-                "available_units":    "",
-                "availability_date":  "",
-                "source_api_url":     page.url,
-                "extraction_tier":    "TIER_2_JSONLD",
-            })
+            units.append(
+                {
+                    "floor_plan_name": name,
+                    "bed_label": "",
+                    "bedrooms": str(num_rooms) if num_rooms not in (None, "") else "",
+                    "bathrooms": "",
+                    "sqft": _jsonld_floor_size(item),
+                    "unit_number": "",
+                    "floor": "",
+                    "building": "",
+                    "rent_range": rent_range,
+                    "deposit": "",
+                    "concession": "",
+                    "availability_status": "",
+                    "available_units": "",
+                    "availability_date": "",
+                    "source_api_url": page.url,
+                    "extraction_tier": "TIER_2_JSONLD",
+                }
+            )
     return units
 
+
 # ── DOM parser ────────────────────────────────────────────────────────────────
+
 
 async def parse_dom(page: Page, base_url: str) -> list[dict]:
     """
@@ -1087,27 +1303,34 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
                 continue
 
             unit: dict = {
-                "floor_plan_name":    "",
-                "bed_label":          "",
-                "bedrooms":           "",
-                "bathrooms":          "",
-                "sqft":               "",
-                "unit_number":        "",
-                "floor":              "",
-                "building":           "",
-                "rent_range":         "",
-                "deposit":            "",
-                "concession":         "",
-                "availability_status":"",
-                "available_units":    "",
-                "availability_date":  "",
-                "source_api_url":     page.url,
-                "extraction_tier":    "TIER_3_DOM",
+                "floor_plan_name": "",
+                "bed_label": "",
+                "bedrooms": "",
+                "bathrooms": "",
+                "sqft": "",
+                "unit_number": "",
+                "floor": "",
+                "building": "",
+                "rent_range": "",
+                "deposit": "",
+                "concession": "",
+                "availability_status": "",
+                "available_units": "",
+                "availability_date": "",
+                "source_api_url": page.url,
+                "extraction_tier": "TIER_3_DOM",
             }
 
             # Name: first heading-like element
-            for name_sel in ["h1","h2","h3","h4",
-                              "[class*='name']","[class*='title']","[class*='plan']"]:
+            for name_sel in [
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "[class*='name']",
+                "[class*='title']",
+                "[class*='plan']",
+            ]:
                 el = await card.query_selector(name_sel)
                 if el:
                     t = (await el.inner_text()).strip()
@@ -1116,18 +1339,18 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
                         break
 
             # Bed/bath/sqft from text
-            bed_m   = re.search(r"(\d+(?:\.\d)?)\s*(?:bed|bd|bedroom)s?", text, re.I)
-            bath_m  = re.search(r"(\d+(?:\.\d)?)\s*(?:bath|ba)s?", text, re.I)
-            sqft_m  = re.search(r"([\d,]+)\s*(?:sq\.?\s*ft|sqft|sf)\b", text, re.I)
+            bed_m = re.search(r"(\d+(?:\.\d)?)\s*(?:bed|bd|bedroom)s?", text, re.I)
+            bath_m = re.search(r"(\d+(?:\.\d)?)\s*(?:bath|ba)s?", text, re.I)
+            sqft_m = re.search(r"([\d,]+)\s*(?:sq\.?\s*ft|sqft|sf)\b", text, re.I)
             sqft2_m = re.search(r"([\d,]+)\s*[-–]\s*([\d,]+)\s*(?:sq\.?\s*ft|sqft|sf)", text, re.I)
-            studio  = bool(re.search(r"\bstudio\b", text, re.I))
+            studio = bool(re.search(r"\bstudio\b", text, re.I))
 
-            unit["bedrooms"]  = bed_m.group(1) if bed_m else ("0" if studio else "")
+            unit["bedrooms"] = bed_m.group(1) if bed_m else ("0" if studio else "")
             unit["bathrooms"] = bath_m.group(1) if bath_m else ""
             if sqft2_m:
                 unit["sqft"] = f"{sqft2_m.group(1)} - {sqft2_m.group(2)}"
             elif sqft_m:
-                unit["sqft"] = sqft_m.group(1).replace(",","")
+                unit["sqft"] = sqft_m.group(1).replace(",", "")
 
             if studio:
                 unit["bed_label"] = "Studio"
@@ -1135,9 +1358,7 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
                 unit["bed_label"] = f"{unit['bedrooms']} Bedroom"
 
             # Rent
-            rent_m = re.search(
-                r"\$([\d,]+)(?:/mo)?(?:\s*[-–]\s*\$([\d,]+))?", text
-            )
+            rent_m = re.search(r"\$([\d,]+)(?:/mo)?(?:\s*[-–]\s*\$([\d,]+))?", text)
             if rent_m:
                 lo = "$" + rent_m.group(1)
                 hi = ("$" + rent_m.group(2)) if rent_m.group(2) else ""
@@ -1151,7 +1372,8 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
             date_m = re.search(
                 r"(?:available|avail\.?|move.in)\s*(?:date|now|:)?\s*"
                 r"((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s*\d{0,4})",
-                text, re.I
+                text,
+                re.I,
             )
             if not date_m:
                 date_m = re.search(r"\b(\d{1,2}/\d{1,2}/\d{2,4})\b", text)
@@ -1182,7 +1404,10 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
                 continue
 
             # Dedup
-            key = unit["unit_number"] or f"{unit['floor_plan_name']}|{unit['bedrooms']}|{unit['sqft']}|{unit['rent_range']}"
+            key = (
+                unit["unit_number"]
+                or f"{unit['floor_plan_name']}|{unit['bedrooms']}|{unit['sqft']}|{unit['rent_range']}"
+            )
             if key in seen:
                 continue
             seen.add(key)
@@ -1193,7 +1418,9 @@ async def parse_dom(page: Page, base_url: str) -> list[dict]:
 
     return units
 
+
 # ── Click expanders ────────────────────────────────────────────────────────────
+
 
 async def click_expanders(page: Page, deep: bool = False):
     """Click 'View Available Units', 'See All', etc. — restricted to actually-clickable elements.
@@ -1226,9 +1453,9 @@ async def click_expanders(page: Page, deep: bool = False):
         _FP_SELECTORS = (
             '[class*="floor-plan"] a, [class*="floor-plan"] button, '
             '[class*="floorplan"] a, [class*="floorplan"] button, '
-            '.plan-card, .fp-card, [data-floor-plan], '
+            ".plan-card, .fp-card, [data-floor-plan], "
             '[class*="FloorPlan"] a, [class*="FloorPlan"] button, '
-            '.floor-plan-card a, .floor-plan-card button'
+            ".floor-plan-card a, .floor-plan-card button"
         )
         try:
             fp_cards = await page.query_selector_all(_FP_SELECTORS)
@@ -1247,33 +1474,36 @@ async def click_expanders(page: Page, deep: bool = False):
         except Exception:
             pass
 
+
 # ── Embedded JSON extraction (Tier 1.5) ──────────────────────────────────────
 
 # Known JS globals where SSR frameworks embed page data.
 _EMBEDDED_JS_GLOBALS = [
-    "__NEXT_DATA__",           # Next.js
-    "__INITIAL_STATE__",       # Redux SSR / generic SSR
-    "__NUXT__",                # Nuxt.js
-    "__remixContext",          # Remix
-    "__APP_DATA__",            # Various
-    "pageData",               # Custom CMS
-    "__data__",                # Custom CMS
-    "initialState",           # Generic
-    "serverData",             # Generic
+    "__NEXT_DATA__",  # Next.js
+    "__INITIAL_STATE__",  # Redux SSR / generic SSR
+    "__NUXT__",  # Nuxt.js
+    "__remixContext",  # Remix
+    "__APP_DATA__",  # Various
+    "pageData",  # Custom CMS
+    "__data__",  # Custom CMS
+    "initialState",  # Generic
+    "serverData",  # Generic
 ]
 
 # Domains that host leasing portals inside iframes or via redirects.
-_LEASING_PORTAL_DOMAINS = frozenset({
-    "sightmap.com",
-    "realpage.com",
-    "loftliving.com",
-    "on-site.com",
-    "rentcafe.com",
-    "entrata.com",
-    "yardi.com",
-    "smartrent.com",
-    "onlineleasing.realpage.com",
-})
+_LEASING_PORTAL_DOMAINS = frozenset(
+    {
+        "sightmap.com",
+        "realpage.com",
+        "loftliving.com",
+        "on-site.com",
+        "rentcafe.com",
+        "entrata.com",
+        "yardi.com",
+        "smartrent.com",
+        "onlineleasing.realpage.com",
+    }
+)
 
 
 async def extract_embedded_json(page: Page) -> list[dict]:
@@ -1297,9 +1527,7 @@ async def extract_embedded_json(page: Page) -> list[dict]:
     for var in _EMBEDDED_JS_GLOBALS:
         try:
             raw = await page.evaluate(
-                f"typeof window['{var}'] !== 'undefined'"
-                f" ? JSON.stringify(window['{var}'])"
-                f" : null"
+                f"typeof window['{var}'] !== 'undefined' ? JSON.stringify(window['{var}']) : null"
             )
             if raw and len(raw) > 200:
                 data = json.loads(raw)
@@ -1319,15 +1547,19 @@ async def extract_embedded_json(page: Page) -> list[dict]:
                 .map(s => ({id: s.id || s.getAttribute('data-id') || '', text: s.textContent}))
                 .filter(s => s.text && s.text.length > 200 && s.text.length < 1000000);
         }""")
-        for block in (json_blocks or []):
+        for block in json_blocks or []:
             try:
                 data = json.loads(block["text"])
-                found.append({
-                    "url": f"embedded:json-block:{block['id'] or 'anon'}",
-                    "body": data,
-                })
-                print(f"  📦 Embedded: <script type=application/json> "
-                      f"id={block['id']!r} ({len(block['text']):,} chars)")
+                found.append(
+                    {
+                        "url": f"embedded:json-block:{block['id'] or 'anon'}",
+                        "body": data,
+                    }
+                )
+                print(
+                    f"  📦 Embedded: <script type=application/json> "
+                    f"id={block['id']!r} ({len(block['text']):,} chars)"
+                )
             except (json.JSONDecodeError, ValueError):
                 continue
     except Exception:
@@ -1359,10 +1591,12 @@ async def extract_embedded_json(page: Page) -> list[dict]:
                     continue
                 try:
                     data = json.loads(json_str)
-                    found.append({
-                        "url": f"embedded:script-var:{var_name}",
-                        "body": data,
-                    })
+                    found.append(
+                        {
+                            "url": f"embedded:script-var:{var_name}",
+                            "body": data,
+                        }
+                    )
                     print(f"  📦 Embedded: var {var_name} ({len(json_str):,} chars)")
                 except (json.JSONDecodeError, ValueError):
                     # Regex-extracted snippet may not be valid JSON — expected.
@@ -1378,10 +1612,18 @@ async def extract_embedded_json(page: Page) -> list[dict]:
     # them directly in the browser context.
     if not found:
         _PROPERTY_VARS = [
-            "floorPlans", "floorplans", "floor_plans",
-            "unitData", "units", "propertyData", "propertyInfo",
-            "availableUnits", "apartmentData", "pricingData",
-            "communityData", "buildingData",
+            "floorPlans",
+            "floorplans",
+            "floor_plans",
+            "unitData",
+            "units",
+            "propertyData",
+            "propertyInfo",
+            "availableUnits",
+            "apartmentData",
+            "pricingData",
+            "communityData",
+            "buildingData",
         ]
         for var in _PROPERTY_VARS:
             try:
@@ -1431,7 +1673,7 @@ async def detect_leasing_portals(page: Page) -> list[str]:
                 .map(f => f.src)
                 .filter(s => s && s.startsWith('http'));
         }""")
-        for src in (iframe_srcs or []):
+        for src in iframe_srcs or []:
             host = urllib.parse.urlparse(src).netloc.lower()
             for domain in _LEASING_PORTAL_DOMAINS:
                 if domain in host:
@@ -1449,7 +1691,7 @@ async def detect_leasing_portals(page: Page) -> list[str]:
             );
             return Array.from(links).map(a => a.href).filter(h => h.startsWith('http'));
         }""")
-        for href in (leasing_links or []):
+        for href in leasing_links or []:
             if href not in portal_urls:
                 portal_urls.append(href)
     except Exception:
@@ -1472,11 +1714,27 @@ async def detect_leasing_portals(page: Page) -> list[str]:
     if not portal_urls:
         try:
             page_title = await page.title()
-            _stop = {"the", "apartments", "apartment", "community", "communities",
-                     "home", "homes", "welcome", "living", "residences",
-                     "properties", "property", "www", "com", "net", "org"}
-            name_words = [w.lower() for w in re.findall(r'[a-zA-Z]{4,}', page_title or '')
-                         if w.lower() not in _stop]
+            _stop = {
+                "the",
+                "apartments",
+                "apartment",
+                "community",
+                "communities",
+                "home",
+                "homes",
+                "welcome",
+                "living",
+                "residences",
+                "properties",
+                "property",
+                "www",
+                "com",
+                "net",
+                "org",
+            }
+            name_words = [
+                w.lower() for w in re.findall(r"[a-zA-Z]{4,}", page_title or "") if w.lower() not in _stop
+            ]
             if name_words:
                 all_links = await page.evaluate("""() => {
                     return Array.from(document.querySelectorAll('a[href]'))
@@ -1484,13 +1742,13 @@ async def detect_leasing_portals(page: Page) -> list[str]:
                         .filter(l => l.href.startsWith('http'));
                 }""")
                 current_domain = urllib.parse.urlparse(page.url).netloc.lower()
-                for link_info in (all_links or []):
-                    link_domain = urllib.parse.urlparse(link_info['href']).netloc.lower()
+                for link_info in all_links or []:
+                    link_domain = urllib.parse.urlparse(link_info["href"]).netloc.lower()
                     if link_domain == current_domain:
                         continue
                     for word in name_words:
                         if word in link_domain:
-                            portal_urls.append(link_info['href'])
+                            portal_urls.append(link_info["href"])
                             print(f"  External property domain detected: {link_info['href'][:100]}")
                             break
                     if portal_urls:
@@ -1679,6 +1937,7 @@ async def probe_entrata_api(page: Page, base_url: str) -> list[dict]:
 
 # ── Main scraper ───────────────────────────────────────────────────────────────
 
+
 def _proxy_config(proxy: str | None) -> dict | None:
     if not proxy:
         return None
@@ -1695,6 +1954,7 @@ def _proxy_config(proxy: str | None) -> dict | None:
         cfg["password"] = urllib.parse.unquote(parsed.password or "")
     return cfg
 
+
 async def _goto_robust(page: Page, url: str, timeout_ms: int = 45000) -> None:
     """
     `networkidle` hangs on sites with analytics polling or chat widgets — use
@@ -1710,6 +1970,7 @@ async def _goto_robust(page: Page, url: str, timeout_ms: int = 45000) -> None:
     except Exception:
         pass
     await asyncio.sleep(1.0)
+
 
 # ── Helper functions for the 7-phase pipeline ────────────────────────────────
 
@@ -1861,6 +2122,7 @@ def try_known_patterns(
                         if resp and resp.get("body"):
                             try:
                                 from services.llm_extractor import apply_saved_mapping
+
                                 units = apply_saved_mapping(
                                     resp["body"],
                                     {
@@ -1869,7 +2131,9 @@ def try_known_patterns(
                                     },
                                 )
                                 if units:
-                                    print(f"  ✅ Profile LLM mapping matched: {url[:80]} → {len(units)} units")
+                                    print(
+                                        f"  ✅ Profile LLM mapping matched: {url[:80]} → {len(units)} units"
+                                    )
                                     return units
                             except Exception as e:
                                 print(f"  ⚠ Profile mapping replay failed: {e}")
@@ -2017,15 +2281,18 @@ async def _extract_dom_sections_with_rent_signals(page: Page) -> list[str]:
         return []
 
 
-async def scrape(base_url: str, proxy: str | None = None,
-                 profile: Any | None = None,
-                 expected_total_units: int | None = None,
-                 property_city: str | None = None) -> dict:
+async def scrape(
+    base_url: str,
+    proxy: str | None = None,
+    profile: Any | None = None,
+    expected_total_units: int | None = None,
+    property_city: str | None = None,
+) -> dict:
     # Normalize http → https.  Nearly all property sites support HTTPS;
     # plain HTTP causes redirect stalls (3-5s wasted per page) or hangs
     # entirely when the server forces HSTS but the redirect chain is slow.
     if base_url.startswith("http://"):
-        base_url = "https://" + base_url[len("http://"):]
+        base_url = "https://" + base_url[len("http://") :]
 
     # ── Profile-guided routing ───────────────────────────────────────────
     # Determines which tiers to skip based on past extraction success.
@@ -2037,38 +2304,41 @@ async def scrape(base_url: str, proxy: str | None = None,
     if profile is not None:
         try:
             from services.profile_router import route
+
             decision = route(profile)
             skip_to_tier = decision.skip_to_tier
             run_full_cascade = decision.run_full_cascade
             maturity = getattr(profile, "confidence", None)
             mat_label = getattr(maturity, "maturity", "COLD") if maturity else "COLD"
             if skip_to_tier:
-                print(f"  📋 Profile: maturity={mat_label}, "
-                      f"preferred_tier={skip_to_tier}, "
-                      f"cascade={'yes' if run_full_cascade else 'no'}")
+                print(
+                    f"  📋 Profile: maturity={mat_label}, "
+                    f"preferred_tier={skip_to_tier}, "
+                    f"cascade={'yes' if run_full_cascade else 'no'}"
+                )
         except Exception as e:
             print(f"  ⚠ Profile routing failed: {e}")
 
     results = {
-        "scraped_at":             datetime.now(UTC).isoformat(),
-        "property_name":          urllib.parse.urlparse(base_url).netloc or base_url,
-        "base_url":               base_url,
-        "links_found":            [],
+        "scraped_at": datetime.now(UTC).isoformat(),
+        "property_name": urllib.parse.urlparse(base_url).netloc or base_url,
+        "base_url": base_url,
+        "links_found": [],
         "property_links_crawled": [],
-        "api_calls_intercepted":  [],
-        "units":                  [],
-        "extraction_tier_used":   None,
-        "_winning_page_url":      None,   # URL/endpoint that actually produced units
-        "errors":                 [],
+        "api_calls_intercepted": [],
+        "units": [],
+        "extraction_tier_used": None,
+        "_winning_page_url": None,  # URL/endpoint that actually produced units
+        "errors": [],
         # Populated by caller (daily_runner) so LLM interaction records can
         # carry the canonical property ID for cost accounting.
-        "_property_id":           "unknown",
+        "_property_id": "unknown",
         # Interaction records from Tier 6 (LLM) and Tier 7 (Vision) calls.
         # Each element is a dict produced by llm.interaction_logger.make_interaction().
-        "_llm_interactions":      [],
+        "_llm_interactions": [],
         # Profile routing metadata for debugging.
-        "_profile_skip_to_tier":  skip_to_tier,
-        "_profile_cascade":       run_full_cascade,
+        "_profile_skip_to_tier": skip_to_tier,
+        "_profile_cascade": run_full_cascade,
     }
 
     launch_args: dict = {
@@ -2131,8 +2401,10 @@ async def scrape(base_url: str, proxy: str | None = None,
                             fp_list = fp_list.get("floor_plans", [])
                         if isinstance(fp_list, list) and fp_list:
                             body = fp_list
-                            print(f"  📡 Widget floor_plans extracted: "
-                                  f"{len(fp_list)} floor plans from {url[:80]}")
+                            print(
+                                f"  📡 Widget floor_plans extracted: "
+                                f"{len(fp_list)} floor plans from {url[:80]}"
+                            )
 
                     api_responses.append({"url": url, "body": body})
                     # Log body shape so failed extractions can be diagnosed.
@@ -2152,9 +2424,9 @@ async def scrape(base_url: str, proxy: str | None = None,
             page.on("response", handle_response)
 
             # ── 1. Homepage — collect all links ───────────────────────────
-            print(f"\n{'='*65}")
+            print(f"\n{'=' * 65}")
             print(f"  STEP 1: Load homepage — {base_url}")
-            print(f"{'='*65}")
+            print(f"{'=' * 65}")
             _page_unreachable = False
             try:
                 await _goto_robust(page, base_url, timeout_ms=60000)
@@ -2165,19 +2437,30 @@ async def scrape(base_url: str, proxy: str | None = None,
                 # Mark page as unreachable so LLM/Vision phases are skipped
                 # (no point analyzing a browser error page).
                 err_str = str(e).lower()
-                if any(sig in err_str for sig in (
-                    "err_ssl", "err_name_not_resolved", "err_connection_refused",
-                    "err_connection_timed_out", "err_too_many_redirects",
-                    "err_cert", "net::err_", "timeout",
-                )):
+                if any(
+                    sig in err_str
+                    for sig in (
+                        "err_ssl",
+                        "err_name_not_resolved",
+                        "err_connection_refused",
+                        "err_connection_timed_out",
+                        "err_too_many_redirects",
+                        "err_cert",
+                        "net::err_",
+                        "timeout",
+                    )
+                ):
                     _page_unreachable = True
-                    print(f"  ⛔ Page unreachable — will skip LLM/Vision phases")
+                    print("  ⛔ Page unreachable — will skip LLM/Vision phases")
 
             # Extract property-level metadata from the loaded homepage.
             try:
                 results["property_metadata"] = await extract_property_metadata(page)
-                pname = (results["property_metadata"].get("name")
-                         or results["property_metadata"].get("title") or "").strip()
+                pname = (
+                    results["property_metadata"].get("name")
+                    or results["property_metadata"].get("title")
+                    or ""
+                ).strip()
                 if pname:
                     results["property_name"] = pname
             except Exception as e:
@@ -2235,17 +2518,19 @@ async def scrape(base_url: str, proxy: str | None = None,
             # Apply profile-specific blocklist on top of global filters
             filtered_responses = filter_network_noise(api_responses, profile)
             if len(filtered_responses) < len(api_responses):
-                print(f"\n  🔇 Noise filter: {len(api_responses)} → {len(filtered_responses)} "
-                      f"API responses (profile blocklist removed {len(api_responses) - len(filtered_responses)})")
+                print(
+                    f"\n  🔇 Noise filter: {len(api_responses)} → {len(filtered_responses)} "
+                    f"API responses (profile blocklist removed {len(api_responses) - len(filtered_responses)})"
+                )
 
             # ════════════════════════════════════════════════════════════
             # PHASE 3: Known Pattern Extraction
             # ════════════════════════════════════════════════════════════
             # Try profile-learned patterns, then global patterns, then
             # embedded JSON, JSON-LD, DOM — all on homepage data.
-            print(f"\n{'='*65}")
+            print(f"\n{'=' * 65}")
             print(f"  PHASE 3: Known Pattern Extraction — {len(filtered_responses)} API responses")
-            print(f"{'='*65}")
+            print(f"{'=' * 65}")
 
             # Effective expected unit count — CSV's "Total Units" wins if
             # provided, otherwise fall back to last successful scrape.
@@ -2264,12 +2549,16 @@ async def scrape(base_url: str, proxy: str | None = None,
                   3. CSV Total Units is known and result is <20% of it.
                 """
                 if _is_low_signal_units(candidate):
-                    print(f"  ✗ {tier_name}: rejected — all units have no rent "
-                          f"and no unit_id (continuing cascade)")
+                    print(
+                        f"  ✗ {tier_name}: rejected — all units have no rent "
+                        f"and no unit_id (continuing cascade)"
+                    )
                     return False
                 if _units_below_expected(candidate, _expected_units):
-                    print(f"  ✗ {tier_name}: rejected — {len(candidate)} units "
-                          f"<< expected {_expected_units} (continuing cascade)")
+                    print(
+                        f"  ✗ {tier_name}: rejected — {len(candidate)} units "
+                        f"<< expected {_expected_units} (continuing cascade)"
+                    )
                     return False
                 return True
 
@@ -2285,8 +2574,9 @@ async def scrape(base_url: str, proxy: str | None = None,
                         tier_label = "TIER_1_PROFILE_MAPPING"
                 print(f"  ✅ {tier_label}: {len(units)} units/floor plans")
                 results["extraction_tier_used"] = tier_label
-                unit_api_srcs = [r["url"] for r in filtered_responses
-                                 if _response_looks_like_units(r["body"])]
+                unit_api_srcs = [
+                    r["url"] for r in filtered_responses if _response_looks_like_units(r["body"])
+                ]
                 results["_winning_page_url"] = unit_api_srcs[0] if unit_api_srcs else base_url
 
             # Tier 1.5 — Embedded JSON on homepage
@@ -2297,8 +2587,7 @@ async def scrape(base_url: str, proxy: str | None = None,
                     candidate = parse_api_responses(embedded_blobs)
                     if candidate and _phase3_accept(candidate, "TIER_1_5_EMBEDDED"):
                         units = candidate
-                        print(f"  ✅ TIER 1.5 (Embedded JSON — homepage): "
-                              f"{len(units)} units/floor plans")
+                        print(f"  ✅ TIER 1.5 (Embedded JSON — homepage): {len(units)} units/floor plans")
                         results["extraction_tier_used"] = "TIER_1_5_EMBEDDED"
 
             # Tier 2 — JSON-LD on homepage
@@ -2330,20 +2619,19 @@ async def scrape(base_url: str, proxy: str | None = None,
             visited: set[str] = set()
 
             # Profile skip: if profile says only LLM/Vision works, skip crawl
-            _profile_skip_crawl = (
-                skip_to_tier is not None
-                and skip_to_tier >= 4
-                and not run_full_cascade
-            )
+            _profile_skip_crawl = skip_to_tier is not None and skip_to_tier >= 4 and not run_full_cascade
 
             if not units and not _profile_skip_crawl:
                 crawl_queue = prioritize_links(
-                    internal_links, anchor_text_links, profile, base_url,
+                    internal_links,
+                    anchor_text_links,
+                    profile,
+                    base_url,
                     property_city=property_city,
                 )
-                print(f"\n{'='*65}")
+                print(f"\n{'=' * 65}")
                 print(f"  PHASE 4: Link Exploration — {len(crawl_queue)} links to visit")
-                print(f"{'='*65}")
+                print(f"{'=' * 65}")
                 for link in crawl_queue[:5]:
                     print(f"     {link}")
                 if len(crawl_queue) > 5:
@@ -2357,7 +2645,7 @@ async def scrape(base_url: str, proxy: str | None = None,
                         continue
                     visited.add(target)
 
-                    print(f"\n{'─'*65}")
+                    print(f"\n{'─' * 65}")
                     print(f"  PHASE 4 [{len(visited)}/{MAX_CRAWL_PAGES}]: {target}")
 
                     # Use deep clicking for COLD profiles to discover
@@ -2366,9 +2654,12 @@ async def scrape(base_url: str, proxy: str | None = None,
                     if profile is not None:
                         _conf = getattr(profile, "confidence", None)
                         _mat = getattr(_conf, "maturity", "COLD") if _conf else "COLD"
-                        _is_cold = (_mat == "COLD")
+                        _is_cold = _mat == "COLD"
                     link_units, new_resps, llm_cands = await explore_link_with_observation(
-                        page, target, api_responses, base_url,
+                        page,
+                        target,
+                        api_responses,
+                        base_url,
                         deep_click=_is_cold,
                     )
 
@@ -2396,8 +2687,7 @@ async def scrape(base_url: str, proxy: str | None = None,
                             api_responses.extend(entrata_blobs)
                             units = parse_api_responses(entrata_blobs)
                             if units:
-                                print(f"  ✅ TIER 4 (Entrata API probe): "
-                                      f"{len(units)} units/floor plans")
+                                print(f"  ✅ TIER 4 (Entrata API probe): {len(units)} units/floor plans")
                                 results["extraction_tier_used"] = "TIER_4_ENTRATA_API"
                                 explored_links_status[target] = True
                                 break
@@ -2445,8 +2735,10 @@ async def scrape(base_url: str, proxy: str | None = None,
                         break
 
                 if not units:
-                    print(f"\n  ↳ Phase 4: explored {len(visited)} pages, "
-                          f"collected {len(all_llm_candidates)} LLM candidates")
+                    print(
+                        f"\n  ↳ Phase 4: explored {len(visited)} pages, "
+                        f"collected {len(all_llm_candidates)} LLM candidates"
+                    )
 
             results["property_links_crawled"] = list(visited)
             results["api_calls_intercepted"] = [r["url"] for r in api_responses]
@@ -2456,18 +2748,22 @@ async def scrape(base_url: str, proxy: str | None = None,
             # ════════════════════════════════════════════════════════════
             # For COLD profiles with 0 units and no LLM candidates after
             # Phase 4, use vision LLM to suggest navigation actions.
-            if (not units and not all_llm_candidates and not _page_unreachable
-                    and len(visited) < MAX_CRAWL_PAGES):
+            if (
+                not units
+                and not all_llm_candidates
+                and not _page_unreachable
+                and len(visited) < MAX_CRAWL_PAGES
+            ):
                 _is_cold_4_5 = True
                 if profile is not None:
                     _c45 = getattr(profile, "confidence", None)
                     _m45 = getattr(_c45, "maturity", "COLD") if _c45 else "COLD"
-                    _is_cold_4_5 = (_m45 == "COLD")
+                    _is_cold_4_5 = _m45 == "COLD"
 
                 if _is_cold_4_5:
-                    print(f"\n{'='*65}")
-                    print(f"  PHASE 4.5: LLM Navigation Discovery")
-                    print(f"{'='*65}")
+                    print(f"\n{'=' * 65}")
+                    print("  PHASE 4.5: LLM Navigation Discovery")
+                    print(f"{'=' * 65}")
                     try:
                         screenshot = await page.screenshot(full_page=True)
                         from services.vision_extractor import suggest_navigation
@@ -2490,8 +2786,15 @@ async def scrape(base_url: str, proxy: str | None = None,
                                     if target_url and target_url not in visited:
                                         print(f"    Navigate → {target_url[:80]}")
                                         visited.add(target_url)
-                                        link_units, new_resps, llm_cands = await explore_link_with_observation(
-                                            page, target_url, api_responses, base_url,
+                                        (
+                                            link_units,
+                                            new_resps,
+                                            llm_cands,
+                                        ) = await explore_link_with_observation(
+                                            page,
+                                            target_url,
+                                            api_responses,
+                                            base_url,
                                             deep_click=True,
                                         )
                                         if new_resps:
@@ -2522,8 +2825,11 @@ async def scrape(base_url: str, proxy: str | None = None,
                                                     print(f"  PHASE 4.5: {len(units)} units from click")
                                                     break
                                                 all_llm_candidates.extend(
-                                                    [r for r in new_apis
-                                                     if _response_looks_like_units(r.get("body"))]
+                                                    [
+                                                        r
+                                                        for r in new_apis
+                                                        if _response_looks_like_units(r.get("body"))
+                                                    ]
                                                 )
                                         except Exception as e:
                                             print(f"    Click failed: {e}")
@@ -2544,19 +2850,16 @@ async def scrape(base_url: str, proxy: str | None = None,
 
             # HOT profiles with run_full_cascade=False skip LLM phases —
             # the profile says only the known-good tier works for this property.
-            _skip_llm = (
-                not run_full_cascade
-                and skip_to_tier is not None
-                and skip_to_tier <= 3
-            )
+            _skip_llm = not run_full_cascade and skip_to_tier is not None and skip_to_tier <= 3
             if _skip_llm:
-                print(f"  📋 Profile: HOT with preferred_tier={skip_to_tier}, "
-                      "skipping LLM/Vision (no cascade)")
+                print(
+                    f"  📋 Profile: HOT with preferred_tier={skip_to_tier}, skipping LLM/Vision (no cascade)"
+                )
 
             if not units and all_llm_candidates and not _page_unreachable and not _skip_llm:
-                print(f"\n{'='*65}")
+                print(f"\n{'=' * 65}")
                 print(f"  PHASE 5: LLM API Analysis — {len(all_llm_candidates)} candidates (max 3)")
-                print(f"{'='*65}")
+                print(f"{'=' * 65}")
 
                 _property_ctx = {
                     "property_name": results.get("property_name", ""),
@@ -2569,16 +2872,18 @@ async def scrape(base_url: str, proxy: str | None = None,
 
                     for i, candidate in enumerate(all_llm_candidates[:3]):
                         api_url = candidate.get("url", "unknown")
-                        print(f"\n  LLM [{i+1}/3]: Analyzing {api_url[:100]}")
+                        print(f"\n  LLM [{i + 1}/3]: Analyzing {api_url[:100]}")
 
                         llm_units, mapping_dict, is_noise, interaction = await _analyze_api(
-                            candidate, _property_ctx, property_id=_prop_id,
+                            candidate,
+                            _property_ctx,
+                            property_id=_prop_id,
                         )
                         if interaction is not None:
                             results.setdefault("_llm_interactions", []).append(interaction)
 
                         if is_noise:
-                            print(f"    → Noise (will blocklist)")
+                            print("    → Noise (will blocklist)")
                             llm_analysis_results[api_url] = f"noise: {candidate.get('url', '')}"
                             continue
 
@@ -2591,7 +2896,7 @@ async def scrape(base_url: str, proxy: str | None = None,
                                 results["_llm_hints"] = {"json_paths": mapping_dict.get("json_paths", {})}
                             break
                         else:
-                            print(f"    → No units extracted")
+                            print("    → No units extracted")
                             llm_analysis_results[api_url] = "noise: llm_returned_empty"
 
                 except Exception as e:
@@ -2603,9 +2908,9 @@ async def scrape(base_url: str, proxy: str | None = None,
             # If no APIs worked, find DOM sections with rent signals and
             # analyze them with LLM. Falls back to Vision LLM last.
             if not units and not _page_unreachable and not _skip_llm:
-                print(f"\n{'='*65}")
-                print(f"  PHASE 6: DOM Fallback + LLM")
-                print(f"{'='*65}")
+                print(f"\n{'=' * 65}")
+                print("  PHASE 6: DOM Fallback + LLM")
+                print(f"{'=' * 65}")
 
                 # 6a: Try to find DOM sections with rent signals
                 dom_sections = await _extract_dom_sections_with_rent_signals(page)
@@ -2623,7 +2928,9 @@ async def scrape(base_url: str, proxy: str | None = None,
 
                         # Analyze the first section (budget: 1 DOM LLM call)
                         dom_units, css_selectors, dom_interaction = await _analyze_dom(
-                            dom_sections[0], current_url, _property_ctx,
+                            dom_sections[0],
+                            current_url,
+                            _property_ctx,
                             property_id=_prop_id,
                         )
                         if dom_interaction is not None:
@@ -2639,7 +2946,7 @@ async def scrape(base_url: str, proxy: str | None = None,
                     except Exception as e:
                         print(f"  ⚠ Phase 6a (DOM LLM) error: {e}")
                 else:
-                    print(f"  ↳ No DOM sections with rent signals found")
+                    print("  ↳ No DOM sections with rent signals found")
 
                 # 6b: Fallback to legacy LLM (full page + APIs) if targeted approach failed
                 if not units:
@@ -2734,19 +3041,33 @@ async def scrape(base_url: str, proxy: str | None = None,
 
     return results
 
+
 # ── Output ─────────────────────────────────────────────────────────────────────
 
 CSV_FIELDS = [
-    "floor_plan_name", "bed_label", "bedrooms", "bathrooms",
-    "sqft", "unit_number", "floor", "building",
-    "rent_range", "deposit", "concession",
-    "availability_status", "available_units", "availability_date",
-    "extraction_tier", "source_api_url",
+    "floor_plan_name",
+    "bed_label",
+    "bedrooms",
+    "bathrooms",
+    "sqft",
+    "unit_number",
+    "floor",
+    "building",
+    "rent_range",
+    "deposit",
+    "concession",
+    "availability_status",
+    "available_units",
+    "availability_date",
+    "extraction_tier",
+    "source_api_url",
 ]
+
 
 def _slugify(s: str) -> str:
     s = re.sub(r"[^A-Za-z0-9]+", "_", s).strip("_").lower()
     return s[:60] or "site"
+
 
 def save_results(results: dict, output_dir: Path):
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -2755,8 +3076,8 @@ def save_results(results: dict, output_dir: Path):
     host = urllib.parse.urlparse(results.get("base_url") or "").netloc
     slug = _slugify(host or str(results.get("property_name") or "site"))
 
-    json_path    = output_dir / f"{slug}_units_{ts}.json"
-    csv_path     = output_dir / f"{slug}_units_{ts}.csv"
+    json_path = output_dir / f"{slug}_units_{ts}.json"
+    csv_path = output_dir / f"{slug}_units_{ts}.csv"
     raw_api_path = output_dir / f"{slug}_raw_api_{ts}.json"
 
     # Split raw API bodies into their own file so the main result stays readable.
@@ -2778,7 +3099,7 @@ def save_results(results: dict, output_dir: Path):
         writer.writeheader()
         writer.writerows(units)
 
-    print(f"\n{'='*65}")
+    print(f"\n{'=' * 65}")
     print(f"  📄 JSON: {json_path}")
     print(f"  📊 CSV:  {csv_path}")
     print("\n  ── SUMMARY ──────────────────────────────────────────────")
@@ -2797,35 +3118,38 @@ def save_results(results: dict, output_dir: Path):
     if units:
         print("\n  ── UNITS / FLOOR PLANS ──────────────────────────────────")
         print(f"  {'Plan Name':30s} {'Type':12s} {'Sqft':12s} {'Rent':22s} {'Avail':6s} {'Date'}")
-        print(f"  {'─'*30} {'─'*12} {'─'*12} {'─'*22} {'─'*6} {'─'*12}")
+        print(f"  {'─' * 30} {'─' * 12} {'─' * 12} {'─' * 22} {'─' * 6} {'─' * 12}")
         for u in units:
-            name  = (u.get("floor_plan_name") or "")[:29]
+            name = (u.get("floor_plan_name") or "")[:29]
             label = (u.get("bed_label") or "")[:11]
-            sqft  = (u.get("sqft") or "")[:11]
-            rent  = (u.get("rent_range") or "N/A")[:21]
+            sqft = (u.get("sqft") or "")[:11]
+            rent = (u.get("rent_range") or "N/A")[:21]
             avail = str(u.get("available_units") or "")[:5]
-            dt    = (u.get("availability_date") or "")[:12]
+            dt = (u.get("availability_date") or "")[:12]
             print(f"  {name:30s} {label:12s} {sqft:12s} {rent:22s} {avail:6s} {dt}")
 
     return json_path, csv_path
 
+
 # ── Entry point ────────────────────────────────────────────────────────────────
+
 
 def main():
     parser = argparse.ArgumentParser(description="Entrata / multifamily property scraper")
-    parser.add_argument("--url",   default=DEFAULT_URL, help="Property website URL")
-    parser.add_argument("--proxy", default=None,        help="Proxy URL (e.g. http://user:pass@host:port)")
-    parser.add_argument("--out",   default="./output",  help="Output directory")
+    parser.add_argument("--url", default=DEFAULT_URL, help="Property website URL")
+    parser.add_argument("--proxy", default=None, help="Proxy URL (e.g. http://user:pass@host:port)")
+    parser.add_argument("--out", default="./output", help="Output directory")
     args = parser.parse_args()
 
-    print(f"\n{'='*65}")
+    print(f"\n{'=' * 65}")
     print("  Property Scraper")
     print(f"  Target: {args.url}")
     print(f"  Proxy:  {args.proxy or 'None (direct)'}")
-    print(f"{'='*65}")
+    print(f"{'=' * 65}")
 
     results = asyncio.run(scrape(args.url, args.proxy))
     save_results(results, Path(args.out))
+
 
 if __name__ == "__main__":
     main()

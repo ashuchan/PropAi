@@ -1,4 +1,5 @@
 """Tests for retry_policy — pure retry decision logic."""
+
 from __future__ import annotations
 
 from ma_poc.fetch.contracts import FetchOutcome

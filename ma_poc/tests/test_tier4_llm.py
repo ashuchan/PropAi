@@ -1,4 +1,5 @@
 """Tests for extraction/tier4_llm.py — 7+ tests."""
+
 from __future__ import annotations
 
 import json
@@ -39,13 +40,22 @@ async def test_disabled_by_feature_flag(monkeypatch: pytest.MonkeyPatch, rentcaf
 
 
 async def test_valid_json_response_yields_units(monkeypatch: pytest.MonkeyPatch, rentcafe_html: str) -> None:
-    payload = json.dumps({
-        "units": [
-            {"unit_number": "101", "floor_plan_type": "1/1", "asking_rent": 3250,
-             "availability_status": "AVAILABLE", "availability_date": None, "sqft": 750},
-        ],
-        "property_name": "Test", "extraction_notes": ""
-    })
+    payload = json.dumps(
+        {
+            "units": [
+                {
+                    "unit_number": "101",
+                    "floor_plan_type": "1/1",
+                    "asking_rent": 3250,
+                    "availability_status": "AVAILABLE",
+                    "availability_date": None,
+                    "sqft": 750,
+                },
+            ],
+            "property_name": "Test",
+            "extraction_notes": "",
+        }
+    )
     _patch_provider(monkeypatch, [payload])
     result = await tier4_llm.extract(_session(rentcafe_html))
     assert result.status == ExtractionStatus.SUCCESS
@@ -54,8 +64,20 @@ async def test_valid_json_response_yields_units(monkeypatch: pytest.MonkeyPatch,
 
 async def test_invalid_json_then_fixup_succeeds(monkeypatch: pytest.MonkeyPatch, rentcafe_html: str) -> None:
     bad = "this is not json"
-    good = json.dumps({"units": [{"unit_number": "1", "asking_rent": 1, "availability_status": "AVAILABLE",
-                                  "floor_plan_type": "1/1", "availability_date": None, "sqft": 500}]})
+    good = json.dumps(
+        {
+            "units": [
+                {
+                    "unit_number": "1",
+                    "asking_rent": 1,
+                    "availability_status": "AVAILABLE",
+                    "floor_plan_type": "1/1",
+                    "availability_date": None,
+                    "sqft": 500,
+                }
+            ]
+        }
+    )
     _patch_provider(monkeypatch, [bad, good])
     result = await tier4_llm.extract(_session(rentcafe_html))
     assert result.raw_fields["units"][0]["unit_number"] == "1"
@@ -63,8 +85,20 @@ async def test_invalid_json_then_fixup_succeeds(monkeypatch: pytest.MonkeyPatch,
 
 async def test_429_backoff_retries(monkeypatch: pytest.MonkeyPatch, rentcafe_html: str) -> None:
     """Provider.complete() raises on rate limit, then succeeds — tier4 should still succeed."""
-    payload = json.dumps({"units": [{"unit_number": "X", "asking_rent": 1, "availability_status": "AVAILABLE",
-                                     "floor_plan_type": "1/1", "availability_date": None, "sqft": 500}]})
+    payload = json.dumps(
+        {
+            "units": [
+                {
+                    "unit_number": "X",
+                    "asking_rent": 1,
+                    "availability_status": "AVAILABLE",
+                    "floor_plan_type": "1/1",
+                    "availability_date": None,
+                    "sqft": 500,
+                }
+            ]
+        }
+    )
     provider = MagicMock()
     provider.complete = AsyncMock(side_effect=[RuntimeError("rate limit"), payload])
     monkeypatch.setattr(tier4_llm, "_get_provider", lambda: provider)
@@ -76,8 +110,20 @@ async def test_429_backoff_retries(monkeypatch: pytest.MonkeyPatch, rentcafe_htm
 
 
 async def test_token_count_logged(monkeypatch: pytest.MonkeyPatch, rentcafe_html: str) -> None:
-    payload = json.dumps({"units": [{"unit_number": "A", "asking_rent": 1, "availability_status": "AVAILABLE",
-                                     "floor_plan_type": "1/1", "availability_date": None, "sqft": 500}]})
+    payload = json.dumps(
+        {
+            "units": [
+                {
+                    "unit_number": "A",
+                    "asking_rent": 1,
+                    "availability_status": "AVAILABLE",
+                    "floor_plan_type": "1/1",
+                    "availability_date": None,
+                    "sqft": 500,
+                }
+            ]
+        }
+    )
     _patch_provider(monkeypatch, [payload])
     result = await tier4_llm.extract(_session(rentcafe_html))
     assert "tokens_in" in result.raw_fields
@@ -85,7 +131,9 @@ async def test_token_count_logged(monkeypatch: pytest.MonkeyPatch, rentcafe_html
 
 
 def test_html_stripped_before_send(rentcafe_html: str) -> None:
-    html_with_script = "<html><head><script>alert('x');</script><style>.a{}</style></head>" + rentcafe_html + "</html>"
+    html_with_script = (
+        "<html><head><script>alert('x');</script><style>.a{}</style></head>" + rentcafe_html + "</html>"
+    )
     text, truncated = tier4_llm.prepare_html(html_with_script)
     assert "alert" not in text
     assert ".a{}" not in text

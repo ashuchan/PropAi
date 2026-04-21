@@ -3,6 +3,7 @@
 Uses mock pages and monkeypatched adapters to verify the detect -> resolve -> adapt
 pipeline without requiring Playwright or real network access.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -14,10 +15,10 @@ from ma_poc.pms.detector import DetectedPMS
 from ma_poc.pms.resolver import ResolvedTarget
 from ma_poc.pms.scraper import scrape
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_page(
     *,
@@ -32,9 +33,11 @@ def _make_page(
         page.content = AsyncMock(side_effect=content_raises)
     else:
         page.content = AsyncMock(return_value=content)
+
     # resolve_target calls page.evaluate; default to empty results
     async def _evaluate(script: str) -> list:
         return []
+
     page.evaluate = AsyncMock(side_effect=_evaluate)
     return page
 
@@ -79,6 +82,7 @@ def _make_adapter_result(
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_orchestrator_detects_then_calls_correct_adapter() -> None:
     """Detection identifies entrata -> entrata adapter.extract() is called."""
@@ -114,9 +118,7 @@ async def test_orchestrator_falls_through_to_generic_when_adapter_empty() -> Non
 
     generic_adapter = AsyncMock()
     generic_adapter.pms_name = "generic"
-    generic_adapter.extract = AsyncMock(
-        return_value=_make_adapter_result(units=fallback_units)
-    )
+    generic_adapter.extract = AsyncMock(return_value=_make_adapter_result(units=fallback_units))
 
     call_count = 0
 
@@ -161,7 +163,6 @@ async def test_orchestrator_runs_llm_only_for_unknown_pms() -> None:
     mock_adapter.extract = AsyncMock(return_value=_make_adapter_result(units=units))
 
     captured_ctx: list[AdapterContext] = []
-    original_extract = mock_adapter.extract
 
     async def _capture_extract(p: object, ctx: AdapterContext) -> AdapterResult:
         captured_ctx.append(ctx)
@@ -227,9 +228,7 @@ async def test_orchestrator_never_runs_llm_for_detected_pms_failure() -> None:
 @pytest.mark.asyncio
 async def test_orchestrator_skips_everything_on_ssl_error() -> None:
     """SSL error during page.content() -> return FAILED_UNREACHABLE immediately."""
-    page = _make_page(
-        content_raises=Exception("net::ERR_SSL_PROTOCOL_ERROR at https://example.com/")
-    )
+    page = _make_page(content_raises=Exception("net::ERR_SSL_PROTOCOL_ERROR at https://example.com/"))
 
     with patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)):
         result = await scrape("https://bad-ssl.example.com/", page=page)
@@ -241,9 +240,7 @@ async def test_orchestrator_skips_everything_on_ssl_error() -> None:
 @pytest.mark.asyncio
 async def test_orchestrator_skips_everything_on_dns_error() -> None:
     """DNS resolution failure -> return FAILED_UNREACHABLE immediately."""
-    page = _make_page(
-        content_raises=Exception("net::ERR_NAME_NOT_RESOLVED")
-    )
+    page = _make_page(content_raises=Exception("net::ERR_NAME_NOT_RESOLVED"))
 
     with patch("ma_poc.pms.scraper.detect_pms", return_value=_make_detection("unknown", 0.0)):
         result = await scrape("https://nonexistent.example.com/", page=page)
@@ -327,9 +324,7 @@ async def test_orchestrator_preserves_legacy_result_keys() -> None:
         "_adapter_used",
         "_fallback_chain",
     }
-    assert expected_keys.issubset(set(result.keys())), (
-        f"Missing keys: {expected_keys - set(result.keys())}"
-    )
+    assert expected_keys.issubset(set(result.keys())), f"Missing keys: {expected_keys - set(result.keys())}"
 
 
 @pytest.mark.asyncio

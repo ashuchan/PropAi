@@ -13,11 +13,10 @@ Usage (called by daily_runner.py / retry_runner.py):
     generate_property_report(scrape_result, property_record, unit_diff,
                              per_prop_issues, run_dir, canonical_id, run_date)
 """
+
 from __future__ import annotations
 
 import json
-import textwrap
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -52,8 +51,12 @@ def generate_property_report(
         out_path = report_dir / f"{safe_cid}.md"
 
         md = _build_report(
-            scrape_result, property_record, unit_diff,
-            per_prop_issues, canonical_id, run_date,
+            scrape_result,
+            property_record,
+            unit_diff,
+            per_prop_issues,
+            canonical_id,
+            run_date,
         )
 
         with open(out_path, "w", encoding="utf-8") as f:
@@ -67,6 +70,7 @@ def generate_property_report(
 # ---------------------------------------------------------------------------
 # Report builder
 # ---------------------------------------------------------------------------
+
 
 def _build_report(
     sr: dict[str, Any],
@@ -156,6 +160,7 @@ def _build_report(
 # Section builders
 # ---------------------------------------------------------------------------
 
+
 def _summary_box(sr: dict, unit_diff: dict) -> str:
     """Quick overview at the top."""
     lines = ["## Summary", ""]
@@ -184,8 +189,10 @@ def _summary_box(sr: dict, unit_diff: dict) -> str:
     updated = unit_diff.get("updated", [])
     unchanged = unit_diff.get("unchanged", [])
     disappeared = unit_diff.get("disappeared", [])
-    lines.append(f"| State Diff | new={len(new)}, updated={len(updated)}, "
-                 f"unchanged={len(unchanged)}, disappeared={len(disappeared)} |")
+    lines.append(
+        f"| State Diff | new={len(new)}, updated={len(updated)}, "
+        f"unchanged={len(unchanged)}, disappeared={len(disappeared)} |"
+    )
     lines.append("")
     return "\n".join(lines)
 
@@ -207,8 +214,7 @@ def _metadata_section(sr: dict, rec: dict | None) -> str:
     lines.append("|---|---|")
 
     # From scrape metadata (schema-independent)
-    for key in ("name", "title", "address", "city", "state", "zip",
-                "lat", "lng", "phone", "total_units"):
+    for key in ("name", "title", "address", "city", "state", "zip", "lat", "lng", "phone", "total_units"):
         val = meta.get(key)
         if val:
             lines.append(f"| {key} | {val} |")
@@ -236,8 +242,15 @@ def _metadata_section(sr: dict, rec: dict | None) -> str:
                 if val:
                     lines.append(f"| {label} (record) | {val} |")
         else:
-            for key in ("Property Name", "City", "State", "ZIP Code",
-                        "Management Company", "Type", "Property Address"):
+            for key in (
+                "Property Name",
+                "City",
+                "State",
+                "ZIP Code",
+                "Management Company",
+                "Type",
+                "Property Address",
+            ):
                 val = rec.get(key)
                 if val:
                     lines.append(f"| {key} (record) | {val} |")
@@ -489,8 +502,7 @@ def _phase2_section(sr: dict) -> str:
 
         # Show which URLs were filtered out
         intercepted_set = set(intercepted)
-        blocked_urls = [r.get("url", "") for r in all_apis
-                        if r.get("url", "") not in intercepted_set]
+        blocked_urls = [r.get("url", "") for r in all_apis if r.get("url", "") not in intercepted_set]
         if blocked_urls:
             lines.append("")
             lines.append("### Blocked APIs (noise)")
@@ -504,8 +516,11 @@ def _phase2_section(sr: dict) -> str:
 def _phase3_section(sr: dict, tier_used: str) -> str:
     """Phase 3: Known pattern extraction."""
     phase3_tiers = {
-        "TIER_1_API", "TIER_1_PROFILE_MAPPING", "TIER_1_5_EMBEDDED",
-        "TIER_2_JSONLD", "TIER_3_DOM",
+        "TIER_1_API",
+        "TIER_1_PROFILE_MAPPING",
+        "TIER_1_5_EMBEDDED",
+        "TIER_2_JSONLD",
+        "TIER_3_DOM",
     }
     hit_phase3 = tier_used in phase3_tiers
 
@@ -520,8 +535,10 @@ def _phase3_section(sr: dict, tier_used: str) -> str:
         lines.append("Pipeline stopped here — Phases 4-6 were skipped.")
     else:
         lines.append("**Result:** No units found from homepage data.  ")
-        lines.append("Tried: profile mappings, known endpoints, global API parser, "
-                     "embedded JSON, JSON-LD, DOM parsing.")
+        lines.append(
+            "Tried: profile mappings, known endpoints, global API parser, "
+            "embedded JSON, JSON-LD, DOM parsing."
+        )
         lines.append("")
         lines.append("Proceeding to Phase 4 (link exploration).")
     lines.append("")
@@ -536,8 +553,11 @@ def _phase4_section(sr: dict, tier_used: str) -> str:
 
     # If Phase 3 succeeded, Phase 4 was skipped
     phase3_tiers = {
-        "TIER_1_API", "TIER_1_PROFILE_MAPPING", "TIER_1_5_EMBEDDED",
-        "TIER_2_JSONLD", "TIER_3_DOM",
+        "TIER_1_API",
+        "TIER_1_PROFILE_MAPPING",
+        "TIER_1_5_EMBEDDED",
+        "TIER_2_JSONLD",
+        "TIER_3_DOM",
     }
     if tier_used in phase3_tiers:
         return ""
@@ -590,7 +610,7 @@ def _phase4_section(sr: dict, tier_used: str) -> str:
             lines.append(f"**Winning page:** {winning}  ")
     else:
         llm_candidates = sr.get("_llm_analysis_results") or {}
-        lines.append(f"**Result:** No units from deterministic extraction.  ")
+        lines.append("**Result:** No units from deterministic extraction.  ")
         if llm_candidates:
             lines.append(f"Collected {len(llm_candidates)} LLM candidate APIs for Phase 5.")
 
@@ -619,8 +639,9 @@ def _phase5_section(sr: dict, tier_used: str) -> str:
         elif isinstance(result, dict):
             jp = result.get("json_paths", {})
             env = result.get("response_envelope", "")
-            lines.append(f"| {idx} | `{_trunc(url, 80)}` | UNITS FOUND — "
-                         f"envelope=`{env}`, {len(jp)} field mappings |")
+            lines.append(
+                f"| {idx} | `{_trunc(url, 80)}` | UNITS FOUND — envelope=`{env}`, {len(jp)} field mappings |"
+            )
         else:
             lines.append(f"| {idx} | `{_trunc(url, 80)}` | {result} |")
     lines.append("")
@@ -646,9 +667,14 @@ def _phase6_section(sr: dict, tier_used: str) -> str:
     phase6_tiers = {"TIER_3_DOM_LLM", "TIER_4_LLM", "TIER_5_VISION"}
     # Only show if we got to Phase 6 or all failed
     earlier_tiers = {
-        "TIER_1_API", "TIER_1_PROFILE_MAPPING", "TIER_1_5_EMBEDDED",
-        "TIER_2_JSONLD", "TIER_3_DOM", "TIER_5_5_EXPLORATORY",
-        "TIER_4_ENTRATA_API", "TIER_5_PORTAL",
+        "TIER_1_API",
+        "TIER_1_PROFILE_MAPPING",
+        "TIER_1_5_EMBEDDED",
+        "TIER_2_JSONLD",
+        "TIER_3_DOM",
+        "TIER_5_5_EXPLORATORY",
+        "TIER_4_ENTRATA_API",
+        "TIER_5_PORTAL",
     }
     if tier_used in earlier_tiers:
         return ""
@@ -734,8 +760,10 @@ def _llm_interactions_section(sr: dict) -> str:
     total_output = sum(i.get("tokens_output", 0) for i in interactions)
 
     lines.append(f"**Total calls:** {len(interactions)}  ")
-    lines.append(f"**Total tokens:** {total_input:,} input + {total_output:,} output "
-                 f"= {total_input + total_output:,} total  ")
+    lines.append(
+        f"**Total tokens:** {total_input:,} input + {total_output:,} output "
+        f"= {total_input + total_output:,} total  "
+    )
     lines.append(f"**Total cost:** ${total_cost:.5f}  ")
     lines.append("")
 
@@ -838,13 +866,26 @@ def _units_section(sr: dict) -> str:
     # the same table renders cleanly whether the units are the raw scrape
     # output or the v2-formatted record units.
     priority_cols = [
-        "unit_number", "unit_id", "floor_plan_name",
-        "beds", "baths", "bedrooms", "bathrooms",
-        "area", "sqft",
-        "rent_low", "rent_high", "asking_rent",
-        "market_rent_low", "market_rent_high",
-        "availability_status", "availability_date", "available_date",
-        "move_in_date", "lease_term", "date_captured",
+        "unit_number",
+        "unit_id",
+        "floor_plan_name",
+        "beds",
+        "baths",
+        "bedrooms",
+        "bathrooms",
+        "area",
+        "sqft",
+        "rent_low",
+        "rent_high",
+        "asking_rent",
+        "market_rent_low",
+        "market_rent_high",
+        "availability_status",
+        "availability_date",
+        "available_date",
+        "move_in_date",
+        "lease_term",
+        "date_captured",
     ]
     # Use only columns that exist in the data
     cols = [c for c in priority_cols if c in all_keys]
@@ -945,8 +986,7 @@ def _api_inventory_section(sr: dict) -> str:
         body_str = json.dumps(body, indent=2, default=str)
 
         lines.append("<details>")
-        lines.append(f"<summary>API {idx}: {_trunc(url, 100)} "
-                     f"({_human_size(len(body_str))})</summary>")
+        lines.append(f"<summary>API {idx}: {_trunc(url, 100)} ({_human_size(len(body_str))})</summary>")
         lines.append("")
         lines.append("```json")
         lines.append(_trunc(body_str, 3000))
@@ -962,6 +1002,7 @@ def _api_inventory_section(sr: dict) -> str:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _safe_filename(s: str, max_len: int = 80) -> str:
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in s)[:max_len]
 
@@ -969,7 +1010,7 @@ def _safe_filename(s: str, max_len: int = 80) -> str:
 def _trunc(s: str, max_len: int) -> str:
     if len(s) <= max_len:
         return s
-    return s[:max_len - 3] + "..."
+    return s[: max_len - 3] + "..."
 
 
 def _human_size(byte_count: int) -> str:
