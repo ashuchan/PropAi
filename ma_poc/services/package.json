@@ -14,11 +14,13 @@
     "pino": "^9.0.0",
     "pino-pretty": "^11.0.0",
     "glob": "^10.3.0",
-    "chokidar": "^3.6.0"
+    "chokidar": "^3.6.0",
+    "pg": "^8.11.5"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
     "vitest": "^1.6.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.6"
   }
 }

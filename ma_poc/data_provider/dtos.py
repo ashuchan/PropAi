@@ -58,42 +58,60 @@ __all__ = [
 
 
 class PropertyIndexEntry(BaseModel):
-    """Row in data/state/property_index.json (one per canonical_id)."""
+    """Canonical property-state DTO. Field names follow the V2 schema
+    (`scripts/schema_v2.build_v2_property`); state-tracking fields
+    (`first_seen_date`, etc.) have no V2 equivalent and are operational."""
 
     model_config = ConfigDict(extra="allow")
 
     canonical_id: str
-    name: str | None = None
-    website: str | None = None
+
+    # V2 data fields
+    apartment_id: int | None = None
+    proj_name: str | None = None
     address: str | None = None
     city: str | None = None
     state: str | None = None
-    zip: str | None = None
+    zip_code: str | None = None
+    country: str | None = None
+    phone: str | None = None
+    email_address: str | None = None
+    website: str | None = None
+    pmc: str | None = None
+    website_design: str | None = None
+    concessions: str | None = None
+
+    # State-tracking (derive a YYYY-MM-DD by slicing last_seen_at[:10] if needed)
     first_seen_date: str | None = None
-    last_seen_date: str | None = None
     last_seen_at: str | None = None
     last_scrape_status: str | None = None
     last_units_count: int | None = None
 
 
 class UnitIndexEntry(BaseModel):
-    """Row in data/state/unit_index.json (canonical_id → unit_id → this)."""
+    """Canonical unit-state DTO. Field names follow the V2 schema
+    (`scripts/schema_v2._format_v2_unit`); state-tracking fields
+    (`first_seen_date`, `carryforward_days`, etc.) are operational."""
 
     model_config = ConfigDict(extra="allow")
 
     unit_id: str
-    unit_number: str | None = None
-    market_rent_low: float | int | None = None
-    market_rent_high: float | int | None = None
-    available_date: str | None = None
-    concessions: Any = None
-    bedrooms: float | int | None = None
-    bathrooms: float | int | None = None
-    sqft: int | None = None
+
+    # V2 data fields
+    beds: int | None = None
+    baths: float | None = None
     floor_plan_name: str | None = None
-    availability_status: str | None = None
+    area: int | None = None
+    rent_low: float | int | None = None
+    rent_high: float | int | None = None
+    date_captured: str | None = None
+    available_date: str | None = None
+    lease_term: int | None = None
+    move_in_date: str | None = None
+    concessions: Any = None
+
+    # State-tracking
     first_seen_date: str | None = None
-    last_seen_date: str | None = None
     last_seen_at: str | None = None
     carryforward_days: int = 0
     disappeared_since: str | None = None

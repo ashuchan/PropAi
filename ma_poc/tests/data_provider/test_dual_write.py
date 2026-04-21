@@ -44,7 +44,7 @@ def dual(primary, secondary) -> DualWriteDataProvider:
 
 def test_writes_land_in_both(dual, primary, secondary) -> None:
     with dual.transaction():
-        dual.property_state.upsert("D-1", {"name": "Dual"}, "2026-04-19")
+        dual.property_state.upsert("D-1", {"proj_name": "Dual"}, "2026-04-19")
     assert primary.property_state.exists("D-1") is True
     assert secondary.property_state.exists("D-1") is True
 
@@ -52,7 +52,7 @@ def test_writes_land_in_both(dual, primary, secondary) -> None:
 def test_reads_come_from_primary_only(dual, primary, secondary) -> None:
     # Write directly to secondary — dual's read should NOT see it.
     with secondary.transaction():
-        secondary.property_state.upsert("SECRET", {"name": "x"}, "2026-04-19")
+        secondary.property_state.upsert("SECRET", {"proj_name": "x"}, "2026-04-19")
     assert dual.property_state.exists("SECRET") is False
     assert dual.property_state.get("SECRET") is None
 
@@ -104,7 +104,7 @@ def test_secondary_write_failure_does_not_break_primary(dual, primary) -> None:
     dual.property_state._s = _BrokenStore()  # type: ignore[attr-defined]
     # Primary should succeed despite secondary raising.
     with dual.transaction():
-        is_new = dual.property_state.upsert("RESILIENT", {"name": "Y"}, "2026-04-19")
+        is_new = dual.property_state.upsert("RESILIENT", {"proj_name": "Y"}, "2026-04-19")
     assert is_new is True
     assert primary.property_state.exists("RESILIENT") is True
 

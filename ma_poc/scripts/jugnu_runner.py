@@ -186,6 +186,11 @@ async def run_jugnu(
     log.info("System resources: %s → pool_size=%d", res.summary(), pool_size)
     pool = AsyncPool(pool_size)
 
+    # Accumulator for LLM interactions across the whole run. Safe to share
+    # across `_process_one` coroutines because AsyncPool runs them on the
+    # same event loop thread — list.append / extend are atomic under asyncio.
+    all_llm_interactions: list[dict[str, Any]] = []
+
     async def _process_one(task: Any) -> dict[str, Any]:
         log.info("Processing %s (%s)", task.property_id, task.url)
         try:
@@ -210,6 +215,23 @@ async def run_jugnu(
             _write_property_report(
                 result, formatted, run_dir, task.property_id, today,
             )
+
+            # LLM cost accounting — write per-property llm_report/{id}.json
+            # and accumulate onto the shared list for the run-wide summary
+            # below. The raw scrape_result carries _llm_interactions emitted
+            # by the GenericAdapter sub-tiers (api/dom/monolithic) and the
+            # F1 adapter_debugger hook. Never let a report-write failure
+            # crash the scrape.
+            interactions = result.get("_llm_interactions") or []
+            if interactions:
+                try:
+                    from ma_poc.llm.interaction_logger import write_property_report as _write_llm_report
+                    _write_llm_report(task.property_id, interactions, run_dir)
+                except Exception as exc:
+                    log.warning("LLM per-property report failed for %s: %s",
+                                task.property_id, exc)
+                all_llm_interactions.extend(interactions)
+
             return formatted
         except Exception as exc:
             log.error("Property %s crashed: %s", task.property_id, exc)
@@ -234,6 +256,25 @@ async def run_jugnu(
     properties_path = run_dir / "properties.json"
     merged_properties = _merge_with_existing_properties(properties_path, properties)
     _write_properties_incremental(properties_path, merged_properties)
+
+    # Run-wide LLM aggregate — writes {run_dir}/llm_report.json with the
+    # per-property cost breakdown the frontend reads. No-op when no LLM
+    # calls fired. Must run before report.json so any future SLO consumers
+    # can pick up LLM totals from a single source of truth.
+    if all_llm_interactions:
+        try:
+            from ma_poc.llm.interaction_logger import write_run_summary as _write_llm_run_summary
+            _write_llm_run_summary(all_llm_interactions, run_dir)
+            _total_cost = sum(i.get("cost_usd", 0.0) for i in all_llm_interactions)
+            _unique_props = len({i.get("property_id") for i in all_llm_interactions})
+            log.info(
+                "LLM report: %d calls across %d propert%s | total cost=$%.5f | → %s",
+                len(all_llm_interactions), _unique_props,
+                "y" if _unique_props == 1 else "ies",
+                _total_cost, run_dir / "llm_report.json",
+            )
+        except Exception as exc:
+            log.warning("LLM run summary write failed: %s", exc)
 
     # Run-level reporting
     cost_rollup = cost_ledger.total()

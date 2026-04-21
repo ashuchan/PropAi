@@ -72,9 +72,10 @@ def copy_state(src: DataProvider, dst: DataProvider, dry_run: bool) -> None:
         if entry is None:
             continue
         snap = entry.model_dump(exclude={"canonical_id"})
-        # Use the entry's own last_seen_date as the run_date so the SQL
-        # row carries the same provenance as the FS row.
-        run_date = entry.last_seen_date or entry.first_seen_date or "backfill"
+        # Use the entry's own last_seen_at (date portion) as the run_date so
+        # the SQL row carries the same provenance as the FS row.
+        seen_at_date = (entry.last_seen_at or "")[:10]
+        run_date = seen_at_date or entry.first_seen_date or "backfill"
         dst.property_state.upsert(cid, snap, run_date)
 
         units = src.unit_state.get_units(cid)

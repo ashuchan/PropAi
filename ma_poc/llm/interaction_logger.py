@@ -28,31 +28,55 @@ from typing import Any
 # Token pricing (USD per million tokens).
 # Keys are the model deployment name as returned by each provider.
 # Update this table when provider pricing changes.
-# Sources: Anthropic pricing page / Azure OpenAI pricing — April 2026.
+# Sources: OpenRouter + Anthropic + Azure OpenAI pricing pages — April 2026.
 # ---------------------------------------------------------------------------
 _MODEL_PRICING: dict[str, dict[str, float]] = {
-    # Anthropic — Claude 4 series
+    # ── OpenRouter slugs (provider/model) — current default route ────────────
+    # Google Gemini via OpenRouter
+    "google/gemini-2.5-flash":         {"input":  0.30, "output":  2.50},
+    "google/gemini-2.5-flash-lite":    {"input":  0.10, "output":  0.40},
+    "google/gemini-2.5-pro":           {"input":  1.25, "output": 10.00},
+    "google/gemini-2.0-flash-001":     {"input":  0.10, "output":  0.40},
+    "google/gemini-flash-1.5":         {"input":  0.075, "output": 0.30},
+    # OpenAI via OpenRouter
+    "openai/gpt-4o":                   {"input":  2.50, "output": 10.00},
+    "openai/gpt-4o-mini":              {"input":  0.15, "output":  0.60},
+    "openai/gpt-4.1":                  {"input":  2.00, "output":  8.00},
+    "openai/gpt-4.1-mini":             {"input":  0.40, "output":  1.60},
+    "openai/gpt-4.1-nano":             {"input":  0.10, "output":  0.40},
+    # Anthropic via OpenRouter
+    "anthropic/claude-sonnet-4":       {"input":  3.00, "output": 15.00},
+    "anthropic/claude-opus-4":         {"input": 15.00, "output": 75.00},
+    "anthropic/claude-haiku-4.5":      {"input":  1.00, "output":  5.00},
+    "anthropic/claude-3.5-sonnet":     {"input":  3.00, "output": 15.00},
+    "anthropic/claude-3-haiku":        {"input":  0.25, "output":  1.25},
+    # Meta / Mistral / DeepSeek via OpenRouter (common fallbacks)
+    "meta-llama/llama-3.3-70b-instruct": {"input": 0.12, "output": 0.30},
+    "mistralai/mistral-small-3.1-24b-instruct": {"input": 0.10, "output": 0.30},
+    "deepseek/deepseek-chat":          {"input":  0.27, "output":  1.10},
+
+    # ── Anthropic native (direct API) ────────────────────────────────────────
     "claude-opus-4-20250514":     {"input": 15.00, "output": 75.00},
     "claude-sonnet-4-20250514":   {"input":  3.00, "output": 15.00},
     "claude-haiku-4-20250514":    {"input":  0.80, "output":  4.00},
-    # Anthropic — Claude 3.5 series
     "claude-3-5-sonnet-20241022": {"input":  3.00, "output": 15.00},
     "claude-3-5-haiku-20241022":  {"input":  0.80, "output":  4.00},
-    # Anthropic — Claude 3 series
     "claude-3-opus-20240229":     {"input": 15.00, "output": 75.00},
     "claude-3-sonnet-20240229":   {"input":  3.00, "output": 15.00},
     "claude-3-haiku-20240307":    {"input":  0.25, "output":  1.25},
-    # Azure OpenAI — GPT-4o family
+
+    # ── Azure OpenAI deployment names ────────────────────────────────────────
     "gpt-4o":                     {"input":  2.50, "output": 10.00},
     "gpt-4o-mini":                {"input":  0.15, "output":  0.60},
-    # Azure OpenAI — legacy
     "gpt-4-turbo":                {"input": 10.00, "output": 30.00},
     "gpt-4":                      {"input": 30.00, "output": 60.00},
     "gpt-35-turbo":               {"input":  0.50, "output":  1.50},
 }
 
 # Conservative fallback when the model name is not in the table.
-_DEFAULT_PRICING: dict[str, float] = {"input": 3.00, "output": 15.00}
+# Picked to match OpenRouter Gemini Flash rather than Claude Sonnet, since
+# OpenRouter is now the default provider.
+_DEFAULT_PRICING: dict[str, float] = {"input": 0.30, "output": 2.50}
 
 
 # ---------------------------------------------------------------------------

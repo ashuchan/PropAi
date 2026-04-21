@@ -1,14 +1,23 @@
-"""SQLAlchemy 2.0 models for the data-provider SQL backend.
+"""SQLAlchemy 2.0 models for the data-provider SQL backend (v2 schema strict).
 
-One `Base` subclass per logical store — 9 tables total. Types are chosen for
-portability (String/Integer/Float/Boolean/JSON/DateTime) so the same DDL
-works on Postgres and SQLite. Dialect-specific UPSERT is handled in
-`stores.py` via `_upsert()` helper.
+Column names on `properties` and `units` follow the V2 output schema
+defined in `scripts/schema_v2.py` — `proj_name`, `zip_code`, `beds`,
+`baths`, `area`, `rent_low`, `rent_high`, etc. State-tracking columns
+(`first_seen_date`, `last_seen_at`, `carryforward_days`,
+`disappeared_since`, etc.) are operational and have no v2 equivalent;
+they are kept so the SQL provider can replicate the FS provider's diff +
+carry-forward behaviour. Anything the writer passes that is neither a
+v2 data field nor a state-tracking column lands in the `extra` JSON
+column.
+
+Types are chosen for portability (String/Integer/Float/Boolean/JSON/
+DateTime) so the same DDL runs on Postgres and SQLite. Dialect-specific
+UPSERT is handled in `stores.py` via `dialect_insert()`.
 
 Naming:
-  - `properties`         — current-state row per canonical_id (mirrors property_index.json)
-  - `units`              — current-state row per (canonical_id, unit_id) (mirrors unit_index.json)
-  - `property_snapshots` — per-run 46-key payload (mirrors runs/{date}/properties.json)
+  - `properties`         — current-state row per canonical_id (V2 columns)
+  - `units`              — current-state row per (canonical_id, unit_id) (V2 columns)
+  - `property_snapshots` — per-run V2 payload (mirrors runs/{date}/properties.json)
   - `run_reports`        — one row per run_date (mirrors runs/{date}/report.json)
   - `run_issues`         — JSONL rows for runs/{date}/issues.jsonl
   - `run_ledger`         — JSONL rows for runs/{date}/ledger.jsonl
@@ -42,50 +51,71 @@ class Base(DeclarativeBase):
 
 
 class PropertyRow(Base):
-    """Current state per canonical_id. Mirrors data/state/property_index.json."""
+    """Current state per canonical_id. Columns mirror the V2 property schema
+    (`scripts/schema_v2.build_v2_property`) plus internal state-tracking."""
 
     __tablename__ = "properties"
 
+    # Internal stable id (same string used as PK in property_index / unit_index).
     canonical_id: Mapped[str] = mapped_column(String(256), primary_key=True)
-    name: Mapped[str | None] = mapped_column(String(512))
-    website: Mapped[str | None] = mapped_column(String(1024))
+
+    # ── V2 data fields ──────────────────────────────────────────────────
+    apartment_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    proj_name: Mapped[str | None] = mapped_column(String(512))
     address: Mapped[str | None] = mapped_column(String(512))
     city: Mapped[str | None] = mapped_column(String(128))
     state: Mapped[str | None] = mapped_column(String(64))
-    zip: Mapped[str | None] = mapped_column(String(32))
+    zip_code: Mapped[str | None] = mapped_column(String(16))
+    country: Mapped[str | None] = mapped_column(String(64), server_default="US")
+    phone: Mapped[str | None] = mapped_column(String(64))
+    email_address: Mapped[str | None] = mapped_column(String(256))
+    website: Mapped[str | None] = mapped_column(String(1024))
+    pmc: Mapped[str | None] = mapped_column(String(256))
+    website_design: Mapped[str | None] = mapped_column(String(128))
+    concessions: Mapped[str | None] = mapped_column(Text)
+
+    # ── State-tracking (no v2 equivalent — used for diff + carry-forward) ─
     first_seen_date: Mapped[str | None] = mapped_column(String(16))
-    last_seen_date: Mapped[str | None] = mapped_column(String(16))
+    # last_seen_at is the full ISO timestamp of the most recent upsert.
+    # Take `left(last_seen_at, 10)` if you need a YYYY-MM-DD string.
     last_seen_at: Mapped[str | None] = mapped_column(String(64))
     last_scrape_status: Mapped[str | None] = mapped_column(String(64))
     last_units_count: Mapped[int | None] = mapped_column(Integer)
-    # Catch-all for fields the scraper writes but the schema hasn't formalised.
+
+    # Catch-all for fields the writer passes that don't fit any column above.
     extra: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
 class UnitRow(Base):
-    """Current state per (canonical_id, unit_id). Mirrors data/state/unit_index.json."""
+    """Current state per (canonical_id, unit_id). Columns mirror the V2 unit
+    schema (`scripts/schema_v2._format_v2_unit`) plus internal state-tracking."""
 
     __tablename__ = "units"
 
     canonical_id: Mapped[str] = mapped_column(String(256), primary_key=True)
     unit_id: Mapped[str] = mapped_column(String(256), primary_key=True)
-    unit_number: Mapped[str | None] = mapped_column(String(128))
-    market_rent_low: Mapped[float | None] = mapped_column(Float)
-    market_rent_high: Mapped[float | None] = mapped_column(Float)
-    available_date: Mapped[str | None] = mapped_column(String(32))
-    bedrooms: Mapped[float | None] = mapped_column(Float)
-    bathrooms: Mapped[float | None] = mapped_column(Float)
-    sqft: Mapped[int | None] = mapped_column(Integer)
+
+    # ── V2 data fields ──────────────────────────────────────────────────
+    beds: Mapped[int | None] = mapped_column(Integer)
+    baths: Mapped[float | None] = mapped_column(Float)
     floor_plan_name: Mapped[str | None] = mapped_column(String(256))
-    availability_status: Mapped[str | None] = mapped_column(String(32))
+    area: Mapped[int | None] = mapped_column(Integer)
+    rent_low: Mapped[float | None] = mapped_column(Float)
+    rent_high: Mapped[float | None] = mapped_column(Float)
+    date_captured: Mapped[str | None] = mapped_column(String(32))
+    available_date: Mapped[str | None] = mapped_column(String(32))
+    lease_term: Mapped[int | None] = mapped_column(Integer)
+    move_in_date: Mapped[str | None] = mapped_column(String(32))
+
+    # ── State-tracking (no v2 equivalent) ───────────────────────────────
     first_seen_date: Mapped[str | None] = mapped_column(String(16))
-    last_seen_date: Mapped[str | None] = mapped_column(String(16))
     last_seen_at: Mapped[str | None] = mapped_column(String(64))
     carryforward_days: Mapped[int] = mapped_column(Integer, default=0)
     disappeared_since: Mapped[str | None] = mapped_column(String(16))
     last_absent_date: Mapped[str | None] = mapped_column(String(16))
     concessions: Mapped[Any | None] = mapped_column(JSON)
     changed_fields: Mapped[list[str]] = mapped_column(JSON, default=list)
+
     extra: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
@@ -234,3 +264,63 @@ class ScrapeProfileRow(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime)
     updated_by: Mapped[str] = mapped_column(String(32))
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+
+# ── Run artifacts (migrated from runs/{date}/property_reports/, llm_report*, …) ─
+
+
+class PropertyReportRow(Base):
+    """Per-property markdown report (runs/{date}/property_reports/{cid}.md)."""
+
+    __tablename__ = "property_reports"
+
+    run_date: Mapped[str] = mapped_column(String(16), primary_key=True)
+    canonical_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    markdown: Mapped[str] = mapped_column(Text)
+    written_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_property_reports_run", "run_date"),
+    )
+
+
+class LlmReportRow(Base):
+    """Aggregated LLM report for a run (runs/{date}/llm_report.json)."""
+
+    __tablename__ = "llm_reports"
+
+    run_date: Mapped[str] = mapped_column(String(16), primary_key=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    written_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class LlmPropertyDetailRow(Base):
+    """Per-property LLM detail (runs/{date}/llm_report/{property_id}.json)."""
+
+    __tablename__ = "llm_property_details"
+
+    run_date: Mapped[str] = mapped_column(String(16), primary_key=True)
+    property_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    written_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_llm_property_details_run", "run_date"),
+    )
+
+
+class LlmDiagnosticRow(Base):
+    """Per-property diagnostic blob. `kind` distinguishes multiple artifact
+    types per property per run (e.g. 'field_recovery', 'tier_trace')."""
+
+    __tablename__ = "llm_diagnostics"
+
+    run_date: Mapped[str] = mapped_column(String(16), primary_key=True)
+    property_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(64), primary_key=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    written_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_llm_diagnostics_run_prop", "run_date", "property_id"),
+    )
