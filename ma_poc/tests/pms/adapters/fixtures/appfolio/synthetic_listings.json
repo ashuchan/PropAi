@@ -1,0 +1,29 @@
+[
+  {
+    "url": "https://example.appfolio.com/api/listings",
+    "body": {
+      "objects": [
+        {
+          "id": "1001",
+          "name": "1BR Suite",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 650,
+          "price": 1400,
+          "status": "available",
+          "available_date": "2026-05-01"
+        },
+        {
+          "id": "1002",
+          "name": "2BR Deluxe",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 950,
+          "price": 2200,
+          "status": "available",
+          "available_date": "2026-06-01"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,55 @@
+[
+  {
+    "url": "https://www.avaloncommunities.com/pf/api/v3/content/fetch/community-units",
+    "body": {
+      "unitsSummary": {
+        "totalPricesStartingAt": {
+          "0": {
+            "unfurnished": 2776
+          },
+          "1": {
+            "unfurnished": 2431
+          },
+          "2": {
+            "unfurnished": 3024
+          }
+        }
+      },
+      "units": [
+        {
+          "unitId": "AVB-NJ034-500-1043",
+          "unitName": "1043",
+          "bedroomNumber": 1,
+          "bathroomNumber": 1,
+          "squareFeet": 711,
+          "floorPlan": {
+            "name": "AM12-alt a-Upgrade"
+          },
+          "floorNumber": "1",
+          "availableDateUnfurnished": "2026-06-11T04:00:00+00:00",
+          "unitStatus": "VacantAvailable",
+          "promotions": [
+            {
+              "promotionTitle": "1 month free!"
+            }
+          ]
+        },
+        {
+          "unitId": "AVB-NJ034-500-2015",
+          "unitName": "2015",
+          "bedroomNumber": 2,
+          "bathroomNumber": 2,
+          "squareFeet": 1050,
+          "floorPlan": {
+            "name": "BM22-Upgrade"
+          },
+          "floorNumber": "2",
+          "availableDateUnfurnished": "2026-07-01T04:00:00+00:00",
+          "unitStatus": "VacantAvailable",
+          "promotions": []
+        }
+      ],
+      "_id": "abc123"
+    }
+  }
+]

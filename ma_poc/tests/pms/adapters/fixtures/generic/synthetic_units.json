@@ -1,0 +1,27 @@
+[
+  {
+    "url": "https://example.com/api/v1/units",
+    "body": [
+      {
+        "name": "1BR",
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "sqft": 700,
+        "minRent": 1500,
+        "maxRent": 1800,
+        "unitNumber": "101",
+        "availableDate": "2026-05-01"
+      },
+      {
+        "name": "2BR",
+        "bedrooms": 2,
+        "bathrooms": 2,
+        "sqft": 1000,
+        "minRent": 2200,
+        "maxRent": 2500,
+        "unitNumber": "201",
+        "availableDate": "2026-06-01"
+      }
+    ]
+  }
+]
