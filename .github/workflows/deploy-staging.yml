@@ -1,0 +1,23 @@
+name: Deploy to staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never cancel a deploy mid-apply — cancel-in-progress: false is critical
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      env: staging
+      git-ref: ${{ github.sha }}
+      require-approval: false
+    secrets:
+      WIF_PROVIDER:   ${{ secrets.WIF_PROVIDER }}
+      WIF_SA:         ${{ secrets.WIF_SA_STAGING }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID_STAGING }}

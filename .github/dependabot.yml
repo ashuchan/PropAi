@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/ma_poc"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      pip-minor:
+        update-types: ["minor", "patch"]
+    ignore:
+      # Playwright version is pinned to match the Dockerfile base image.
+      # Upgrade requires a coordinated Dockerfile change (see gcp/CLAUDE_DOCKERFILE.md §2).
+      - dependency-name: "playwright"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions-minor:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Base image updates — expect these to break things occasionally; review carefully.
