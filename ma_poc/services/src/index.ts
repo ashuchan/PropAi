@@ -19,8 +19,11 @@ export type { IDiffService } from './interfaces/IDiffService.js';
 export type { IHealthService } from './interfaces/IHealthService.js';
 
 // Factory
-export { createServices } from './factory.js';
-export type { ServiceConfig, ServiceImplementation } from './factory.js';
+export { createServices, resolveProviderConfig, createDataProvider } from './factory.js';
+export type { Services, ServiceFactoryConfig, ProviderConfig, ProviderName } from './factory.js';
+
+// Data-provider (expose for advanced consumers / tests)
+export type { IDataProvider } from './data-provider/contracts.js';
 
 // Logger
 export { logger } from './logger.js';

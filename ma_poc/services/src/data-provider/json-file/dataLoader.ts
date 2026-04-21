@@ -1,8 +1,13 @@
 /**
  * @file dataLoader.ts
- * @description Centralized file I/O with caching for JSON data files.
- * Supports schema-versioned directory layout (data/{v1|v2}/runs/, data/{v1|v2}/state/)
- * with automatic fallback to legacy flat layout (data/runs/, data/state/).
+ * @description Centralized file I/O with 60s cache for JSON / text / JSONL.
+ *
+ * Handles SCHEMA_VERSION-aware data root resolution: tries
+ * `data/{version}/runs/` first, falls back to the flat `data/runs/` layout.
+ *
+ * This is the json-file adapter's shared I/O layer — stores built on top
+ * (`PropertyStore`, `RunStore`, …) call these helpers rather than touching
+ * the filesystem directly.
  */
 
 import { readFile, readdir, stat } from 'node:fs/promises';
@@ -19,13 +24,6 @@ interface CacheEntry<T> {
 const cache = new Map<string, CacheEntry<unknown>>();
 const DEFAULT_TTL_MS = 60_000;
 
-/**
- * Get cached data or load from file.
- * @param key - Cache key
- * @param loader - Function to load data
- * @param ttl - Cache TTL in ms
- * @returns Cached or freshly loaded data
- */
 async function cached<T>(key: string, loader: () => Promise<T>, ttl: number = DEFAULT_TTL_MS): Promise<T> {
   const existing = cache.get(key) as CacheEntry<T> | undefined;
   if (existing && Date.now() - existing.timestamp < existing.ttl) {
@@ -39,11 +37,6 @@ async function cached<T>(key: string, loader: () => Promise<T>, ttl: number = DE
   return data;
 }
 
-/**
- * Read and parse a JSON file.
- * @param filePath - Absolute path to JSON file
- * @returns Parsed JSON data or null if file not found
- */
 export async function readJsonFile<T>(filePath: string): Promise<T | null> {
   return cached<T | null>(`json:${filePath}`, async () => {
     try {
@@ -61,32 +54,19 @@ export async function readJsonFile<T>(filePath: string): Promise<T | null> {
   });
 }
 
-/**
- * Read a plain text file (e.g., markdown reports).
- * @param filePath - Absolute path to file
- * @returns File contents or null if not found
- */
 export async function readTextFile(filePath: string): Promise<string | null> {
   return cached<string | null>(`text:${filePath}`, async () => {
     try {
       return await readFile(filePath, 'utf-8');
     } catch (err) {
       const error = err as NodeJS.ErrnoException;
-      if (error.code === 'ENOENT') {
-        logger.warn({ file: filePath }, 'text file not found');
-        return null;
-      }
+      if (error.code === 'ENOENT') return null;
       logger.error({ file: filePath, error: error.message }, 'failed to read text');
       return null;
     }
   });
 }
 
-/**
- * Read and parse a JSONL file (one JSON object per line).
- * @param filePath - Absolute path to JSONL file
- * @returns Array of parsed objects
- */
 export async function readJsonlFile<T>(filePath: string): Promise<T[]> {
   return cached<T[]>(`jsonl:${filePath}`, async () => {
     try {
@@ -103,22 +83,14 @@ export async function readJsonlFile<T>(filePath: string): Promise<T[]> {
       return results;
     } catch (err) {
       const error = err as NodeJS.ErrnoException;
-      if (error.code === 'ENOENT') {
-        logger.warn({ file: filePath }, 'JSONL file not found');
-        return [];
-      }
+      if (error.code === 'ENOENT') return [];
       logger.error({ file: filePath, error: error.message }, 'failed to read JSONL');
       return [];
     }
   });
 }
 
-/**
- * Resolve the effective data root for the current schema version.
- * Checks data/{version}/runs/ first — if it exists, uses the versioned layout.
- * Otherwise falls back to the legacy flat layout (data/runs/).
- * Result is cached per dataDir so the check runs only once per process.
- */
+/** SCHEMA_VERSION-aware data root. `data/{v1|v2}/runs/` if it exists, else flat layout. */
 const resolvedRoots = new Map<string, string>();
 
 function resolveDataRoot(dataDir: string): string {
@@ -134,7 +106,6 @@ function resolveDataRoot(dataDir: string): string {
     root = versioned;
     logger.info({ root, version }, 'using schema-versioned data directory');
   } else {
-    // No versioned directory yet — use legacy flat layout
     root = dataDir;
     logger.info({ root, version, checked: versionedRunsDir }, 'versioned data dir not found, using legacy flat layout');
   }
@@ -143,11 +114,6 @@ function resolveDataRoot(dataDir: string): string {
   return root;
 }
 
-/**
- * Get sorted list of available run dates.
- * @param dataDir - Base data directory
- * @returns Array of date strings sorted descending
- */
 export async function getRunDates(dataDir: string): Promise<string[]> {
   const root = resolveDataRoot(dataDir);
   return cached<string[]>(`runs:${root}`, async () => {
@@ -158,9 +124,7 @@ export async function getRunDates(dataDir: string): Promise<string[]> {
       for (const entry of entries) {
         if (/^\d{4}-\d{2}-\d{2}$/.test(entry)) {
           const stats = await stat(join(runsDir, entry));
-          if (stats.isDirectory()) {
-            dateDirs.push(entry);
-          }
+          if (stats.isDirectory()) dateDirs.push(entry);
         }
       }
       return dateDirs.sort().reverse();
@@ -171,40 +135,31 @@ export async function getRunDates(dataDir: string): Promise<string[]> {
   }, 30_000);
 }
 
-/**
- * Get the latest run date.
- * @param dataDir - Base data directory
- * @returns Latest date string or null
- */
 export async function getLatestRunDate(dataDir: string): Promise<string | null> {
   const dates = await getRunDates(dataDir);
   return dates[0] ?? null;
 }
 
-/**
- * Build path to a run file.
- * @param dataDir - Base data directory
- * @param date - Run date
- * @param filename - File name within the run directory
- * @returns Absolute file path
- */
+export function getRunDir(dataDir: string, date: string): string {
+  return join(resolveDataRoot(dataDir), 'runs', date);
+}
+
 export function runPath(dataDir: string, date: string, filename: string): string {
-  const root = resolveDataRoot(dataDir);
-  return join(root, 'runs', date, filename);
+  return join(resolveDataRoot(dataDir), 'runs', date, filename);
 }
 
-/**
- * Build path to a state file.
- * @param dataDir - Base data directory
- * @param filename - File name within the state directory
- * @returns Absolute file path
- */
+/** State files live under the non-versioned data root (shared across schemas). */
 export function statePath(dataDir: string, filename: string): string {
-  const root = resolveDataRoot(dataDir);
-  return join(root, 'state', filename);
+  return join(dataDir, 'state', filename);
 }
 
-/** Clear all cached data and resolved roots. Useful for testing. */
+/** Config directory (profiles live here), sibling of the data dir. */
+export function configPath(dataDir: string, ...segments: string[]): string {
+  // data dir is typically `{ma_poc}/data`; config is `{ma_poc}/config`.
+  const maPocRoot = join(dataDir, '..');
+  return join(maPocRoot, 'config', ...segments);
+}
+
 export function clearCache(): void {
   cache.clear();
   resolvedRoots.clear();

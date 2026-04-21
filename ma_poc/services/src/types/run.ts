@@ -63,3 +63,69 @@ export interface RunDetail extends RunSummary {
     reason: string;
   }>;
 }
+
+/** Per-property summary row inside a run-wide LLM report */
+export interface LlmPropertySummary {
+  propertyId: string;
+  calls: number;
+  tokensInput: number;
+  tokensOutput: number;
+  tokensTotal: number;
+  costUsd: number;
+  successful: number;
+  failed: number;
+}
+
+/** Aggregate LLM report for a single run (shape returned by `getLlmReport`). */
+export interface LlmRunReport {
+  date: string;
+  generatedAt: string;
+  totalPropertiesWithLlm: number;
+  totalCalls: number;
+  successfulCalls: number;
+  failedCalls: number;
+  tokensInput: number;
+  tokensOutput: number;
+  tokensTotal: number;
+  totalCostUsd: number;
+  byTier: Record<string, { calls: number; costUsd: number; tokensTotal: number }>;
+  byProvider: Record<string, { calls: number; costUsd: number; tokensTotal: number }>;
+  byModel: Record<string, { calls: number; costUsd: number; tokensTotal: number }>;
+  byProperty: LlmPropertySummary[];
+}
+
+/** Single LLM call record surfaced to the UI (from per-property report). */
+export interface LlmInteraction {
+  tier: string;
+  callType: string;
+  provider: string;
+  model: string;
+  tokensInput: number;
+  tokensOutput: number;
+  tokensTotal: number;
+  costUsd: number;
+  latencyMs: number;
+  timestamp: string;
+  success: boolean;
+  error: string | null;
+  systemPrompt?: string;
+  userPrompt?: string;
+  rawResponse?: string;
+}
+
+/** Per-property LLM detail (one property's file under `llm_report/`). */
+export interface LlmPropertyDetail {
+  propertyId: string;
+  generatedAt: string;
+  totalCalls: number;
+  successfulCalls: number;
+  failedCalls: number;
+  tokensInput: number;
+  tokensOutput: number;
+  tokensTotal: number;
+  totalCostUsd: number;
+  byTier: Record<string, { calls: number; costUsd: number; tokensTotal: number }>;
+  byProvider: Record<string, { calls: number; costUsd: number; tokensTotal: number }>;
+  byModel: Record<string, { calls: number; costUsd: number; tokensTotal: number }>;
+  interactions: LlmInteraction[];
+}

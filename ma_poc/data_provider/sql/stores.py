@@ -98,19 +98,28 @@ class _SessionHolder:
 
 
 # Columns on PropertyRow that the upsert treats as first-class (everything
-# else on the snapshot dict falls into the JSON `extra` column).
+# else on the snapshot dict falls into the JSON `extra` column). Names match
+# the V2 property schema (`scripts/schema_v2.build_v2_property`) plus internal
+# state-tracking columns.
 _PROPERTY_COLS = {
-    "canonical_id", "name", "website", "address", "city", "state", "zip",
-    "first_seen_date", "last_seen_date", "last_seen_at",
+    "canonical_id",
+    # V2 data fields
+    "apartment_id", "proj_name", "address", "city", "state", "zip_code",
+    "country", "phone", "email_address", "website", "pmc",
+    "website_design", "concessions",
+    # State-tracking (use left(last_seen_at, 10) if you need a date string)
+    "first_seen_date", "last_seen_at",
     "last_scrape_status", "last_units_count",
 }
 
 _UNIT_COLS = {
-    "canonical_id", "unit_id", "unit_number",
-    "market_rent_low", "market_rent_high", "available_date",
-    "bedrooms", "bathrooms", "sqft", "floor_plan_name",
-    "availability_status",
-    "first_seen_date", "last_seen_date", "last_seen_at",
+    "canonical_id", "unit_id",
+    # V2 data fields
+    "beds", "baths", "floor_plan_name", "area",
+    "rent_low", "rent_high", "date_captured", "available_date",
+    "lease_term", "move_in_date",
+    # State-tracking
+    "first_seen_date", "last_seen_at",
     "carryforward_days", "disappeared_since", "last_absent_date",
     "concessions", "changed_fields",
 }
@@ -125,10 +134,22 @@ def _split_known_extra(data: dict[str, Any], known: set[str]) -> tuple[dict[str,
 def _hydrate_property(row: PropertyRow) -> PropertyIndexEntry:
     base = {
         "canonical_id": row.canonical_id,
-        "name": row.name, "website": row.website,
-        "address": row.address, "city": row.city, "state": row.state, "zip": row.zip,
+        # V2 data fields
+        "apartment_id": row.apartment_id,
+        "proj_name": row.proj_name,
+        "address": row.address,
+        "city": row.city,
+        "state": row.state,
+        "zip_code": row.zip_code,
+        "country": row.country,
+        "phone": row.phone,
+        "email_address": row.email_address,
+        "website": row.website,
+        "pmc": row.pmc,
+        "website_design": row.website_design,
+        "concessions": row.concessions,
+        # State-tracking
         "first_seen_date": row.first_seen_date,
-        "last_seen_date": row.last_seen_date,
         "last_seen_at": row.last_seen_at,
         "last_scrape_status": row.last_scrape_status,
         "last_units_count": row.last_units_count,
@@ -141,15 +162,19 @@ def _hydrate_property(row: PropertyRow) -> PropertyIndexEntry:
 def _hydrate_unit(row: UnitRow) -> UnitIndexEntry:
     base = {
         "unit_id": row.unit_id,
-        "unit_number": row.unit_number,
-        "market_rent_low": row.market_rent_low,
-        "market_rent_high": row.market_rent_high,
+        # V2 data fields
+        "beds": row.beds,
+        "baths": row.baths,
+        "floor_plan_name": row.floor_plan_name,
+        "area": row.area,
+        "rent_low": row.rent_low,
+        "rent_high": row.rent_high,
+        "date_captured": row.date_captured,
         "available_date": row.available_date,
-        "bedrooms": row.bedrooms, "bathrooms": row.bathrooms,
-        "sqft": row.sqft, "floor_plan_name": row.floor_plan_name,
-        "availability_status": row.availability_status,
+        "lease_term": row.lease_term,
+        "move_in_date": row.move_in_date,
+        # State-tracking
         "first_seen_date": row.first_seen_date,
-        "last_seen_date": row.last_seen_date,
         "last_seen_at": row.last_seen_at,
         "carryforward_days": row.carryforward_days or 0,
         "disappeared_since": row.disappeared_since,
@@ -190,8 +215,16 @@ class SqlPropertyStateStore(IPropertyStateStore):
             is_new = existing is None
 
             merged = dict(snapshot)
+            # Drop `country=None` so the column's server_default ('US') wins.
+            # Scraper payloads often emit `country: null` because property
+            # websites rarely echo the country; NULL in the table isn't
+            # meaningful for our US-only dataset.
+            if merged.get("country") is None:
+                merged.pop("country", None)
+            # Upstream callers may still pass `last_seen_date` from legacy FS
+            # payloads — it's no longer a column, drop it silently.
+            merged.pop("last_seen_date", None)
             merged["canonical_id"] = canonical_id
-            merged["last_seen_date"] = run_date
             merged["last_seen_at"] = _utc_now_iso()
             if is_new:
                 merged["first_seen_date"] = run_date
@@ -231,19 +264,24 @@ class SqlUnitStateStore(IUnitStateStore):
     reappear today; those rows are kept so a re-appearance can be detected.
     """
 
-    _CHANGE_KEYS = ("market_rent_low", "market_rent_high", "available_date", "concessions")
-    # Extended snapshot — mirrors StateStore.upsert_units field list.
+    # Fields whose change between runs counts as "updated" in the diff.
+    _CHANGE_KEYS = ("rent_low", "rent_high", "available_date", "concessions")
+    # Maps each V2 column to the source-key fallback chain we accept on input.
+    # Source dicts may already be V2-shaped (preferred) or carry legacy v1
+    # names from older callers — we look up both so adapters don't have to
+    # rename every field before calling upsert_units.
     _SNAPSHOT_SOURCES: dict[str, tuple[str, ...]] = {
-        "unit_number": ("unit_number", "_unit_number"),
-        "market_rent_low": ("market_rent_low",),
-        "market_rent_high": ("market_rent_high",),
-        "available_date": ("available_date",),
-        "concessions": ("concessions",),
-        "bedrooms": ("bedrooms", "_bedrooms"),
-        "bathrooms": ("bathrooms", "_bathrooms"),
-        "sqft": ("sqft", "_sqft", "area"),
+        "beds": ("beds", "bedrooms", "_bedrooms"),
+        "baths": ("baths", "bathrooms", "_bathrooms"),
         "floor_plan_name": ("floor_plan_name", "_floor_plan"),
-        "availability_status": ("availability_status",),
+        "area": ("area", "sqft", "_sqft"),
+        "rent_low": ("rent_low", "market_rent_low"),
+        "rent_high": ("rent_high", "market_rent_high"),
+        "date_captured": ("date_captured",),
+        "available_date": ("available_date",),
+        "lease_term": ("lease_term", "_lease_term"),
+        "move_in_date": ("move_in_date", "_move_in_date"),
+        "concessions": ("concessions",),
     }
 
     def __init__(self, holder: _SessionHolder) -> None:
@@ -287,7 +325,6 @@ class SqlUnitStateStore(IUnitStateStore):
                 snap: dict[str, Any] = {
                     "canonical_id": canonical_id,
                     "unit_id": uid,
-                    "last_seen_date": run_date,
                     "last_seen_at": _utc_now_iso(),
                     "carryforward_days": 0,
                 }
@@ -346,21 +383,22 @@ class SqlUnitStateStore(IUnitStateStore):
                 if r.disappeared_since:
                     continue
                 r.carryforward_days = (r.carryforward_days or 0) + 1
-                r.last_seen_date = run_date
+                r.last_seen_at = _utc_now_iso()
                 out.append({
                     "unit_id": r.unit_id,
-                    "unit_number": r.unit_number or r.unit_id,
-                    "market_rent_low": r.market_rent_low,
-                    "market_rent_high": r.market_rent_high,
-                    "available_date": r.available_date,
-                    "lease_link": None,
-                    "concessions": r.concessions,
-                    "amenities": None,
-                    "bedrooms": r.bedrooms,
-                    "bathrooms": r.bathrooms,
-                    "sqft": r.sqft,
+                    # V2 data fields
+                    "beds": r.beds,
+                    "baths": r.baths,
                     "floor_plan_name": r.floor_plan_name,
-                    "availability_status": r.availability_status,
+                    "area": r.area,
+                    "rent_low": r.rent_low,
+                    "rent_high": r.rent_high,
+                    "date_captured": r.date_captured,
+                    "available_date": r.available_date,
+                    "lease_term": r.lease_term,
+                    "move_in_date": r.move_in_date,
+                    "concessions": r.concessions,
+                    # State-tracking
                     "carryforward_days": r.carryforward_days,
                 })
             return out

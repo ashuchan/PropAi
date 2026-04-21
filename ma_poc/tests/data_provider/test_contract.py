@@ -84,7 +84,7 @@ providers = pytest.mark.parametrize(
 
 @providers
 def test_property_state_roundtrip(provider: DataProvider) -> None:
-    snap = {"name": "San Artes", "website": "https://example.com", "city": "Phoenix"}
+    snap = {"proj_name": "San Artes", "website": "https://example.com", "city": "Phoenix"}
     with provider.transaction():
         is_new = provider.property_state.upsert("SMOKE-001", snap, "2026-04-19")
     assert is_new is True
@@ -93,22 +93,26 @@ def test_property_state_roundtrip(provider: DataProvider) -> None:
     got = provider.property_state.get("SMOKE-001")
     assert got is not None
     assert got.canonical_id == "SMOKE-001"
-    assert got.name == "San Artes"
-    assert got.last_seen_date == "2026-04-19"
+    assert got.proj_name == "San Artes"
+    # last_seen_at is set to wall-clock UTC on upsert — assert it's a plausible
+    # ISO timestamp; run_date is persisted separately via first_seen_date.
+    assert got.last_seen_at is not None and len(got.last_seen_at) >= 19
     assert got.first_seen_date == "2026-04-19"
 
 
 @providers
 def test_property_state_upsert_existing_is_not_new(provider: DataProvider) -> None:
     with provider.transaction():
-        provider.property_state.upsert("P-1", {"name": "Foo"}, "2026-04-18")
-        second = provider.property_state.upsert("P-1", {"name": "Foo v2"}, "2026-04-19")
+        provider.property_state.upsert("P-1", {"proj_name": "Foo"}, "2026-04-18")
+        second = provider.property_state.upsert("P-1", {"proj_name": "Foo v2"}, "2026-04-19")
     assert second is False
     got = provider.property_state.get("P-1")
     assert got is not None
-    assert got.name == "Foo v2"
+    assert got.proj_name == "Foo v2"
     assert got.first_seen_date == "2026-04-18"
-    assert got.last_seen_date == "2026-04-19"
+    # last_seen_at is refreshed on each upsert to the call-time UTC timestamp;
+    # its date prefix is today's date, not necessarily the run_date argument.
+    assert got.last_seen_at is not None and len(got.last_seen_at) >= 10
 
 
 @providers
@@ -116,8 +120,8 @@ def test_unit_state_diff_new_updated_unchanged_disappeared(
     provider: DataProvider,
 ) -> None:
     today = [
-        {"unit_id": "101", "market_rent_low": 1500, "market_rent_high": 1500},
-        {"unit_id": "102", "market_rent_low": 1800, "market_rent_high": 1800},
+        {"unit_id": "101", "rent_low": 1500, "rent_high": 1500},
+        {"unit_id": "102", "rent_low": 1800, "rent_high": 1800},
     ]
     with provider.transaction():
         diff1 = provider.unit_state.upsert_units("P-1", today, "2026-04-18")
@@ -127,9 +131,9 @@ def test_unit_state_diff_new_updated_unchanged_disappeared(
 
     # Day 2: 101 unchanged, 102 price drop, 103 new, 104 disappears
     tomorrow = [
-        {"unit_id": "101", "market_rent_low": 1500, "market_rent_high": 1500},
-        {"unit_id": "102", "market_rent_low": 1700, "market_rent_high": 1700},
-        {"unit_id": "103", "market_rent_low": 2000, "market_rent_high": 2000},
+        {"unit_id": "101", "rent_low": 1500, "rent_high": 1500},
+        {"unit_id": "102", "rent_low": 1700, "rent_high": 1700},
+        {"unit_id": "103", "rent_low": 2000, "rent_high": 2000},
     ]
     with provider.transaction():
         diff2 = provider.unit_state.upsert_units("P-1", tomorrow, "2026-04-19")
@@ -141,7 +145,7 @@ def test_unit_state_diff_new_updated_unchanged_disappeared(
 
 @providers
 def test_unit_state_carry_forward(provider: DataProvider) -> None:
-    today = [{"unit_id": "200", "market_rent_low": 2400, "market_rent_high": 2400}]
+    today = [{"unit_id": "200", "rent_low": 2400, "rent_high": 2400}]
     with provider.transaction():
         provider.unit_state.upsert_units("P-CF", today, "2026-04-18")
         carried = provider.unit_state.carry_forward_units("P-CF", "2026-04-19")
@@ -322,7 +326,7 @@ def test_extraction_result_roundtrip(provider: DataProvider) -> None:
 @providers
 def test_transaction_commits_state_on_clean_exit(provider: DataProvider) -> None:
     with provider.transaction():
-        provider.property_state.upsert("T-OK", {"name": "Ok"}, "2026-04-19")
+        provider.property_state.upsert("T-OK", {"proj_name": "Ok"}, "2026-04-19")
     # Same provider should still see the row after the txn exits cleanly.
     assert provider.property_state.exists("T-OK") is True
 
@@ -331,7 +335,7 @@ def test_transaction_commits_state_on_clean_exit(provider: DataProvider) -> None
 def test_transaction_drops_state_on_error(provider: DataProvider) -> None:
     with pytest.raises(RuntimeError):
         with provider.transaction():
-            provider.property_state.upsert("T-ROLLBACK", {"name": "x"}, "2026-04-19")
+            provider.property_state.upsert("T-ROLLBACK", {"proj_name": "x"}, "2026-04-19")
             raise RuntimeError("boom")
     assert provider.property_state.exists("T-ROLLBACK") is False
 

@@ -96,6 +96,62 @@ def _read_jsonl(path: Path) -> Iterator[dict[str, Any]]:
                 continue
 
 
+# ── V1 → V2 key translation for the on-disk state files ─────────────────────
+#
+# property_index.json and unit_index.json were written before the V2 schema
+# rename. The DTOs returned by this provider are V2-shaped, so we translate
+# at the read boundary. Keys not present in the map pass through unchanged
+# (and end up on the DTO's `extra` allow-list when there's no field for them).
+
+_V1_TO_V2_PROPERTY_KEYS: dict[str, str] = {
+    "name": "proj_name",
+    "zip": "zip_code",
+}
+
+_V1_TO_V2_UNIT_KEYS: dict[str, str] = {
+    "bedrooms": "beds",
+    "bathrooms": "baths",
+    "sqft": "area",
+    "market_rent_low": "rent_low",
+    "market_rent_high": "rent_high",
+}
+
+# Keys the legacy JSON state files still include but that were removed from
+# the DTO / DB schema. Strip on read so they don't leak into pydantic extras.
+_DROPPED_STATE_KEYS: frozenset[str] = frozenset({"last_seen_date"})
+
+
+def _v1_to_v2_property_keys(body: dict[str, Any]) -> dict[str, Any]:
+    return {
+        _V1_TO_V2_PROPERTY_KEYS.get(k, k): v
+        for k, v in body.items()
+        if k not in _DROPPED_STATE_KEYS
+    }
+
+
+def _v1_to_v2_unit_keys(body: dict[str, Any]) -> dict[str, Any]:
+    return {
+        _V1_TO_V2_UNIT_KEYS.get(k, k): v
+        for k, v in body.items()
+        if k not in _DROPPED_STATE_KEYS
+    }
+
+
+# Inverse maps for the write path — callers pass V2-shaped dicts but the
+# underlying StateStore (scripts/state_store.py) writes the legacy V1 file
+# format and diffs on V1 keys, so we translate back at the boundary.
+_V2_TO_V1_PROPERTY_KEYS: dict[str, str] = {v: k for k, v in _V1_TO_V2_PROPERTY_KEYS.items()}
+_V2_TO_V1_UNIT_KEYS: dict[str, str] = {v: k for k, v in _V1_TO_V2_UNIT_KEYS.items()}
+
+
+def _v2_to_v1_property_keys(body: dict[str, Any]) -> dict[str, Any]:
+    return {_V2_TO_V1_PROPERTY_KEYS.get(k, k): v for k, v in body.items()}
+
+
+def _v2_to_v1_unit_keys(body: dict[str, Any]) -> dict[str, Any]:
+    return {_V2_TO_V1_UNIT_KEYS.get(k, k): v for k, v in body.items()}
+
+
 # ── IPropertyStateStore / IUnitStateStore ────────────────────────────────────
 
 
@@ -116,9 +172,12 @@ class FsPropertyStateStore(IPropertyStateStore):
         raw = self._s.get_property(canonical_id)
         if raw is None:
             return None
-        # Legacy property_index.json entries sometimes embed `canonical_id`
-        # in the body — strip it so the kwarg we pass in doesn't collide.
+        # property_index.json was written with V1 field names (`name`, `zip`).
+        # The PropertyIndexEntry DTO is V2-shaped, so translate at the boundary
+        # — anything we don't translate explicitly is passed through and ends
+        # up on the DTO's `extra` allow-list.
         body = {k: v for k, v in raw.items() if k != "canonical_id"}
+        body = _v1_to_v2_property_keys(body)
         return PropertyIndexEntry(canonical_id=canonical_id, **body)
 
     def exists(self, canonical_id: str) -> bool:
@@ -129,7 +188,11 @@ class FsPropertyStateStore(IPropertyStateStore):
         self, canonical_id: str, snapshot: dict[str, Any], run_date: str
     ) -> bool:
         self._ensure_loaded()
-        is_new = self._s.upsert_property(canonical_id, snapshot, run_date)
+        # property_index.json is still V1-shaped on disk; translate the
+        # V2-named snapshot back to V1 before delegating to StateStore.
+        is_new = self._s.upsert_property(
+            canonical_id, _v2_to_v1_property_keys(snapshot), run_date,
+        )
         self._owner._dirty = True
         return is_new
 
@@ -153,8 +216,15 @@ class FsUnitStateStore(IUnitStateStore):
     def get_units(self, canonical_id: str) -> dict[str, UnitIndexEntry]:
         self._ensure_loaded()
         raw = self._s.get_units(canonical_id)
+        # unit_index.json was written with V1 field names; translate to V2 at
+        # the boundary (see FsPropertyStateStore.get for the rationale).
         return {
-            uid: UnitIndexEntry(unit_id=uid, **{k: v for k, v in rec.items() if k != "unit_id"})
+            uid: UnitIndexEntry(
+                unit_id=uid,
+                **_v1_to_v2_unit_keys(
+                    {k: v for k, v in rec.items() if k != "unit_id"}
+                ),
+            )
             for uid, rec in raw.items()
         }
 
@@ -165,7 +235,10 @@ class FsUnitStateStore(IUnitStateStore):
         run_date: str,
     ) -> UnitDiff:
         self._ensure_loaded()
-        diff = self._s.upsert_units(canonical_id, today_units, run_date)
+        # unit_index.json is still V1-shaped on disk and StateStore diffs on
+        # V1 keys (`market_rent_low/high`), so translate V2 → V1 inbound.
+        v1_units = [_v2_to_v1_unit_keys(u) for u in today_units]
+        diff = self._s.upsert_units(canonical_id, v1_units, run_date)
         self._owner._dirty = True
         return UnitDiff(**diff)
 
@@ -173,9 +246,11 @@ class FsUnitStateStore(IUnitStateStore):
         self, canonical_id: str, run_date: str
     ) -> list[dict[str, Any]]:
         self._ensure_loaded()
+        # StateStore returns V1-keyed dicts; translate outbound so callers
+        # see the V2 contract (`rent_low/high`, `beds`, `baths`, `area`, …).
         result = self._s.carry_forward_units(canonical_id, run_date)
         self._owner._dirty = True
-        return result
+        return [_v1_to_v2_unit_keys(u) for u in result]
 
 
 # ── IRunStore ────────────────────────────────────────────────────────────────
