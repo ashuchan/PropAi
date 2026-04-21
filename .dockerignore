@@ -1,0 +1,47 @@
+# State and output — never want these in the image
+data/
+config/profiles/
+logs/
+*.db
+*.sqlite
+
+# Dev artifacts
+.venv/
+.env
+.env.*
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Git and CI
+.git/
+.github/
+.gitignore
+
+# Documentation — doesn't belong at runtime
+docs/
+*.md
+!requirements.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Large test data that shouldn't ship
+tests/fixtures/large/
+
+# Jugnu-specific runtime state (profiles are in Postgres in deployed system)
+ma_poc/config/profiles/
+ma_poc/data/
+ma_poc/logs/

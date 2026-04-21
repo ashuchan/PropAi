@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel in-progress runs on the same PR when a new push arrives
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minimal permissions
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  python-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ma_poc/requirements.txt
+      - run: pip install ruff
+      - run: ruff check ma_poc/
+      - run: ruff format --check ma_poc/
+
+  python-type:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ma_poc/requirements.txt
+      - run: pip install -r ma_poc/requirements.txt
+      - name: mypy strict on key modules
+        run: |
+          cd ma_poc
+          mypy --strict ma_poc/pms/ ma_poc/reporting/ scripts/_trigger_common.py
+
+  python-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: jugnu_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ma_poc/requirements.txt
+      - run: pip install -r ma_poc/requirements.txt testcontainers[postgres] pytest-cov
+      - name: Run tests with coverage gates
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/jugnu_test
+        run: |
+          cd ma_poc
+          pytest tests/ \
+            --cov=ma_poc.pms \
+            --cov=ma_poc.reporting \
+            --cov=scripts._trigger_common \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=80 \
+            --ignore=tests/triggers \
+            -m "not llm" \
+            -q
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: ma_poc/coverage.xml
+
+  trigger-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ma_poc/requirements.txt
+      - run: pip install -r ma_poc/requirements.txt pytest pytest-cov
+      - name: Run trigger unit tests
+        run: |
+          cd ma_poc
+          pytest tests/triggers/ \
+            --cov=scripts._trigger_common \
+            --cov-fail-under=80 \
+            -v
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: jugnu:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test the built image
+        run: |
+          docker run --rm jugnu:ci
+          docker run --rm \
+            -e CLOUD_RUN_TASK_INDEX=0 \
+            -e CLOUD_RUN_TASK_COUNT=1 \
+            jugnu:ci python ma_poc/scripts/jugnu_shard_entry.py
+      - name: Image size check
+        run: |
+          size_bytes=$(docker image inspect jugnu:ci --format='{{.Size}}')
+          size_mb=$((size_bytes / 1024 / 1024))
+          echo "Image size: ${size_mb}MB"
+          if [ "$size_mb" -gt 1500 ]; then
+            echo "FAIL: image exceeds 1500MB budget"
+            exit 1
+          fi
+
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+      - run: terraform fmt -recursive -check
+      - name: Init (no backend — validating config only)
+        run: terraform init -backend=false
+      - run: terraform validate
+      - name: Validate each environment
+        run: |
+          for env in staging prod; do
+            echo "::group::Validating $env"
+            terraform validate \
+              -var-file=envs/${env}.tfvars \
+              -var="image_tag=ci-validation" \
+              -var="vpc_self_link=projects/dummy/global/networks/default" \
+              -var="deployer_sa_email=dummy@example.com"
+            echo "::endgroup::"
+          done
+
+  migration-round-trip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ma_poc/requirements.txt
+      - run: pip install -r ma_poc/requirements.txt testcontainers[postgres]
+      - run: pytest ma_poc/tests/migrations/ -v
+
+  gate-summary:
+    # Single "required status check" for branch protection
+    needs:
+      - python-lint
+      - python-type
+      - python-test
+      - trigger-tests
+      - docker-build
+      - terraform
+      - migration-round-trip
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more required jobs failed"
+            exit 1
+          fi
+          echo "All gates passed"

@@ -1,0 +1,8 @@
+# Require review from the infra owner for infrastructure changes
+infra/                  @infra-owner
+.github/workflows/      @infra-owner
+Dockerfile              @infra-owner
+Makefile                @infra-owner
+
+# All other changes — default team reviewers
+*                       @jugnu-team

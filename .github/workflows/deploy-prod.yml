@@ -1,0 +1,56 @@
+name: Deploy to production
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag to deploy (must match v*.*.*)"
+        required: true
+        type: string
+
+# Never cancel a deploy mid-apply
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  verify-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.resolve.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - id: resolve
+        run: |
+          REF="${{ github.event.inputs.ref || github.ref_name }}"
+          if ! [[ "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Ref '$REF' does not match v*.*.*" && exit 1
+          fi
+          echo "ref=${REF}" >> $GITHUB_OUTPUT
+
+      - name: Verify tag is signed
+        run: |
+          REF="${{ steps.resolve.outputs.ref }}"
+          if ! git verify-tag "$REF" 2>/dev/null; then
+            echo "Tag $REF is not signed. Prod deploys require GPG-signed tags."
+            echo "Create with: git tag -s vX.Y.Z -m 'release notes'"
+            exit 1
+          fi
+
+  deploy:
+    needs: [verify-tag]
+    uses: ./.github/workflows/reusable-deploy.yml
+    with:
+      env: prod
+      git-ref: ${{ needs.verify-tag.outputs.ref }}
+      require-approval: true
+    secrets:
+      WIF_PROVIDER:   ${{ secrets.WIF_PROVIDER }}
+      WIF_SA:         ${{ secrets.WIF_SA_PROD }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID_PROD }}
