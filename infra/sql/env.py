@@ -1,21 +1,31 @@
 """Alembic environment — reads connection from DATABASE_URL env var.
 
-autogenerate is explicitly disabled (target_metadata = None) to prevent
-accidental migration generation via 'alembic revision --autogenerate'.
-Every migration in this project is hand-written.
+target_metadata is sourced from data_provider.sql.models.Base so that
+autogenerate detects drift against the authoritative SQLAlchemy model file.
 """
+from __future__ import annotations
+
 import os
+import sys
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+# Ensure ma_poc/ is on sys.path so data_provider.* resolves regardless of cwd.
+_here = Path(__file__).resolve().parent          # infra/sql/
+_ma_poc = _here.parent.parent / "ma_poc"        # <repo_root>/ma_poc/
+if str(_ma_poc) not in sys.path:
+    sys.path.insert(0, str(_ma_poc))
+
+from data_provider.sql.models import Base  # noqa: E402
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# No ORM metadata — autogenerate is disabled intentionally.
-target_metadata = None
+target_metadata = Base.metadata
 
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
@@ -31,8 +41,10 @@ def run_migrations_offline() -> None:
     """Emit SQL to stdout for review — used in CI's dry-run gate."""
     context.configure(
         url=database_url,
+        target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -48,9 +60,9 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
-            # Transactional DDL: each migration runs in its own transaction.
-            # Postgres supports this; MySQL would not.
+            target_metadata=target_metadata,
             transaction_per_migration=True,
+            compare_type=True,
         )
         with context.begin_transaction():
             context.run_migrations()
