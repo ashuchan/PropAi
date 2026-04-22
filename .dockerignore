@@ -49,3 +49,25 @@ ma_poc/logs/
 
 # Worktrees and agent scratch space (can live under ma_poc/)
 ma_poc/.claude/
+
+# Nested Node.js / frontend projects that happen to live under ma_poc/
+# Not part of the Python runtime image. The Python modules in ma_poc/services/
+# (*.py) are kept; only the TS/Node sub-tree is excluded.
+ma_poc/frontend/
+ma_poc/services/node_modules/
+ma_poc/services/src/
+ma_poc/services/dist/
+ma_poc/services/package.json
+ma_poc/services/package-lock.json
+ma_poc/services/tsconfig*.json
+ma_poc/services/vite.config.*
+ma_poc/services/*.lock
+
+# Data files in config/ — loaded at runtime from Postgres/GCS or via the
+# sync-csv deploy step. Small YAML/JSON config (business_rules, api_catalogue,
+# prompts/) stays; bulk CSVs do not.
+ma_poc/config/*.csv
+
+# Misc large/irrelevant-to-runtime dirs under ma_poc/
+ma_poc/output/
+ma_poc/brightdata/
