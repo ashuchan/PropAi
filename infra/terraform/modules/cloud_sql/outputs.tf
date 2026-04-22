@@ -15,5 +15,5 @@ output "instance_name" {
 }
 
 output "vpc_connector_id" {
-  value = google_vpc_access_connector.jugnu_connector.id
+  value = google_vpc_access_connector.jugnu-con.id
 }

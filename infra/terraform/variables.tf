@@ -1,9 +1,9 @@
 variable "env" {
   type        = string
-  description = "Deployment environment: 'staging' or 'prod'"
+  description = "Deployment environment: 'staging' or 'production'"
   validation {
-    condition     = contains(["staging", "prod"], var.env)
-    error_message = "env must be 'staging' or 'prod'"
+    condition     = contains(["staging", "production"], var.env)
+    error_message = "env must be 'staging' or 'production'"
   }
 }
 

@@ -219,3 +219,10 @@ data/*
 ma_poc/tests/pms/adapters/fixtures/*/*.json
 !ma_poc/tests/pms/adapters/fixtures/*/synthetic_*.json
 ma_poc/frontend/api/package-lock.json
+infra/terraform/.terraform.lock.hcl
+.gitignore
+infra/terraform/.terraform/terraform.tfstate
+infra/terraform/.terraform/providers/registry.terraform.io/hashicorp/google/5.45.2/windows_amd64/terraform-provider-google_v5.45.2_x5.exe
+infra/terraform/.terraform/providers/registry.terraform.io/hashicorp/google/5.45.2/windows_amd64/LICENSE.txt
+.gitignore
+infra/terraform/.terraform/providers/registry.terraform.io/hashicorp/google-beta/5.45.2/windows_amd64/terraform-provider-google-beta_v5.45.2_x5.exe

@@ -1,7 +1,14 @@
-env        = "prod"
+env        = "production"
 project_id = "jugnu-494013"
-# image_tag supplied by CI at apply time via -var="image_tag=..."
-default_task_count = 10
-db_tier            = "db-f1-micro"
-developer_emails   = ["ashu@surgexdigital.com"]
-# vpc_self_link and deployer_sa_email supplied via CI secrets or manual apply
+region              = "us-central1"
+
+vpc_self_link       = "projects/jugnu-494013/global/networks/default"
+
+deployer_sa_email   = "github-deployer@jugnu-494013.iam.gserviceaccount.com"
+developer_emails    = ["ashu@surgexdigital.com"]  # your gcloud account email
+
+default_task_count  = 10   # smaller for staging
+browsers_per_task   = 10
+task_cpu            = "2"
+task_memory         = "4Gi"
+db_tier             = "db-f1-micro"
