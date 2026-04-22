@@ -38,10 +38,14 @@ dist/
 build/
 *.egg-info/
 
-# Large test data that shouldn't ship
-tests/fixtures/large/
+# Tests and fixtures — never executed inside the production image
+tests/
+ma_poc/tests/
 
 # Jugnu-specific runtime state (profiles are in Postgres in deployed system)
 ma_poc/config/profiles/
 ma_poc/data/
 ma_poc/logs/
+
+# Worktrees and agent scratch space (can live under ma_poc/)
+ma_poc/.claude/

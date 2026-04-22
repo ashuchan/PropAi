@@ -1,3 +1,6 @@
+# Runtime dependencies only. Dev/test/lint tooling lives in requirements-dev.txt
+# so it never ships inside the production Docker image.
+#
 # Windows ARM64 compatible — using >= to get the latest binary wheel available.
 # CLAUDE.md originally specified exact pins; relaxed here because many C-extension
 # packages lack Windows ARM64 wheels at older versions.
@@ -14,13 +17,6 @@ pydantic>=2.7.0
 pyyaml>=6.0.1
 python-dateutil>=2.8.2
 python-dotenv>=1.0.1
-pytest>=8.2.0
-pytest-asyncio>=0.23.6
-pytest-mock>=3.14.0
-respx>=0.21.0
-pytest-cov>=5.0.0
-ruff>=0.4.7
-mypy>=1.10.0
 structlog>=24.2.0
 rich>=13.7.1
 # timezonefinder dropped — no ARM64 binary wheel. Timezone derivation falls

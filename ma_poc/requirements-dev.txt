@@ -1,0 +1,11 @@
+# Dev/test/lint tooling. Installed in CI on top of requirements.txt.
+# Never installed inside the production Docker image — see Dockerfile.
+-r requirements.txt
+
+pytest>=8.2.0
+pytest-asyncio>=0.23.6
+pytest-mock>=3.14.0
+pytest-cov>=5.0.0
+respx>=0.21.0
+ruff>=0.4.7
+mypy>=1.10.0

@@ -1,27 +1,48 @@
-FROM mcr.microsoft.com/playwright/python:v1.55.0-noble
+# ── Stage 1: builder — install Python deps into an isolated venv ─────────────
+FROM python:3.11-slim-bookworm AS builder
 
-# Non-root user for runtime — Playwright image ships with 'pwuser'; reuse it.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY ma_poc/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ── Stage 2: runtime — slim base + chromium only + prebuilt venv + app ───────
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 WORKDIR /app
 
-# Layer 1: system deps (rarely change — cached aggressively)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Layer 2: Python deps (change when requirements.txt changes)
-COPY ma_poc/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=builder /opt/venv /opt/venv
 
-# Layer 3: source code (changes on every commit — last)
+# Chromium + its apt dependencies. --with-deps must run as root; Firefox and
+# WebKit are intentionally omitted — scraper/browser.py only launches Chromium.
+RUN playwright install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --system --gid 1001 pwuser \
+    && useradd --system --uid 1001 --gid pwuser --create-home pwuser \
+    && chown -R pwuser:pwuser /ms-playwright
+
 COPY ma_poc/ ./ma_poc/
+RUN chown -R pwuser:pwuser /app
 
-# Layer 4: drop privileges
 USER pwuser
 
 # No CMD — ENTRYPOINT is provided per-job by Cloud Run (container command override).
