@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright/python:v1.55.0-noble
+FROM mcr.microsoft.com/playwright/python:v1.58.0-noble
 
 # Non-root user for runtime — Playwright image ships with 'pwuser'; reuse it.
 ENV PYTHONDONTWRITEBYTECODE=1 \
