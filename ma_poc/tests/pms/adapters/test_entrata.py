@@ -1,4 +1,5 @@
 """Phase 3 — Entrata adapter tests."""
+
 from __future__ import annotations
 
 import json
@@ -35,6 +36,7 @@ def _make_ctx(api_responses: list[dict]) -> AdapterContext:
 
 class _DummyPage:
     """Minimal mock for Playwright Page."""
+
     pass
 
 
@@ -70,7 +72,9 @@ async def test_entrata_extract_from_stored_fixture() -> None:
 @pytest.mark.asyncio
 async def test_entrata_extract_returns_empty_list_on_no_data() -> None:
     """Noise-only responses produce empty units, not an exception."""
-    responses = [{"url": "https://example.com/Apartments/module/widgets/", "body": {"widget_name": "directions"}}]
+    responses = [
+        {"url": "https://example.com/Apartments/module/widgets/", "body": {"widget_name": "directions"}}
+    ]
     adapter = EntrataAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -81,8 +85,15 @@ async def test_entrata_extract_returns_empty_list_on_no_data() -> None:
 def test_parse_entrata_floorplans_basic() -> None:
     """Parse a minimal Entrata floorplan list."""
     items = [
-        {"id": 100, "floorplan-name": "A1", "no_of_bedroom": 1, "no_of_bathroom": 1,
-         "square_footage": 750, "min_rent": "$1,500", "max_rent": "$1,800"},
+        {
+            "id": 100,
+            "floorplan-name": "A1",
+            "no_of_bedroom": 1,
+            "no_of_bathroom": 1,
+            "square_footage": 750,
+            "min_rent": "$1,500",
+            "max_rent": "$1,800",
+        },
     ]
     units = parse_entrata_floorplans(items, "https://test.com/widgets/")
     assert len(units) == 1
@@ -99,13 +110,19 @@ def test_parse_entrata_widget_envelope() -> None:
             "content": {
                 "floor_plans": {
                     "floor_plans": [
-                        {"id": 1, "floorplan-name": "B2", "no_of_bedroom": 2,
-                         "no_of_bathroom": 2, "square_footage": 1000,
-                         "min_rent": "$2,000", "max_rent": "$2,500"},
+                        {
+                            "id": 1,
+                            "floorplan-name": "B2",
+                            "no_of_bedroom": 2,
+                            "no_of_bathroom": 2,
+                            "square_footage": 1000,
+                            "min_rent": "$2,000",
+                            "max_rent": "$2,500",
+                        },
                     ]
                 }
             }
-        }
+        },
     }
     units = parse_entrata_widget_envelope(body, "https://test.com/widgets/")
     assert len(units) == 1
@@ -120,8 +137,17 @@ def test_static_fingerprints_nonempty() -> None:
 
 
 def test_tier_used_label_is_pms_specific() -> None:
-    items = [{"id": 1, "floorplan-name": "X", "no_of_bedroom": 1, "no_of_bathroom": 1,
-              "square_footage": 500, "min_rent": "$1,000", "max_rent": "$1,000"}]
+    items = [
+        {
+            "id": 1,
+            "floorplan-name": "X",
+            "no_of_bedroom": 1,
+            "no_of_bathroom": 1,
+            "square_footage": 500,
+            "min_rent": "$1,000",
+            "max_rent": "$1,000",
+        }
+    ]
     units = parse_entrata_floorplans(items, "test")
     assert "ENTRATA" in units[0]["extraction_tier"]
 
@@ -137,6 +163,7 @@ def test_rent_within_sanity_range() -> None:
                 if u["rent_range"]:
                     # Extract numeric rent from range
                     import re
+
                     nums = re.findall(r"\d[\d,]*", u["rent_range"])
                     for n in nums:
                         val = int(n.replace(",", ""))

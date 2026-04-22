@@ -7,12 +7,13 @@ a result with extraction_tier_used="FAILED". This module triggers on ANY
 failure outcome (FAILED tier, empty units, or fetch hard-fail), not only
 on exceptions.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -68,19 +69,18 @@ def carry_forward_property(
             search_roots = []
         if search_roots:
             prior, source_date = _load_prior_record_from_runs(
-                property_id, search_roots,
+                property_id,
+                search_roots,
             )
     if prior is None:
-        log.info(
-            "No prior record for %s, cannot carry forward", property_id
-        )
+        log.info("No prior record for %s, cannot carry forward", property_id)
         return None
 
     # Tag the record as carried forward
     meta = prior.get("_meta", {}) or {}
     meta["scrape_outcome"] = "CARRY_FORWARD"
     meta["carry_forward_reason"] = reason
-    meta["carry_forward_at"] = datetime.now(timezone.utc).isoformat()
+    meta["carry_forward_at"] = datetime.now(UTC).isoformat()
     meta["carry_forward_used"] = True
     if source_date:
         meta["carry_forward_source_date"] = source_date
@@ -141,9 +141,7 @@ def should_carry_forward(
     return False, ""
 
 
-def _load_prior_record(
-    property_id: str, state_store: Any
-) -> dict[str, Any] | None:
+def _load_prior_record(property_id: str, state_store: Any) -> dict[str, Any] | None:
     """Load the most recent successful record from state.
 
     Args:
@@ -168,7 +166,8 @@ def _load_prior_record(
 
 
 def _load_prior_record_from_runs(
-    property_id: str, search_roots: list[Path],
+    property_id: str,
+    search_roots: list[Path],
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Walk ``{root}/runs/{date}/properties.json`` newest-first for a record.
 
@@ -187,8 +186,7 @@ def _load_prior_record_from_runs(
             continue
         try:
             date_dirs = sorted(
-                (p for p in runs_dir.iterdir()
-                 if p.is_dir() and _DATE_DIR_RE.match(p.name)),
+                (p for p in runs_dir.iterdir() if p.is_dir() and _DATE_DIR_RE.match(p.name)),
                 key=lambda p: p.name,
                 reverse=True,
             )

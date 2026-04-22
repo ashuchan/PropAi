@@ -1,7 +1,7 @@
 """Tests for run_report — run-level markdown + JSON generation."""
+
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from ma_poc.reporting.run_report import build
@@ -13,7 +13,7 @@ def _make_prop(tier: str = "TIER_1_API") -> dict:
 
 def test_run_report_writes_both_files(tmp_path: Path) -> None:
     props = [_make_prop("TIER_1_API") for _ in range(5)]
-    report = build(props, tmp_path, "2026-04-18")
+    build(props, tmp_path, "2026-04-18")
     assert (tmp_path / "report.json").exists()
     assert (tmp_path / "report.md").exists()
 

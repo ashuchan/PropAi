@@ -17,6 +17,7 @@ Usage:
     python scripts/backfill_artifacts_pg.py --run-date 2026-04-21 --data-root data/v2
     python scripts/backfill_artifacts_pg.py --run-date 2026-04-21 --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
@@ -32,7 +33,6 @@ _MA_POC_ROOT = Path(__file__).resolve().parent.parent
 if str(_MA_POC_ROOT) not in sys.path:
     sys.path.insert(0, str(_MA_POC_ROOT))
 
-from sqlalchemy import text  # noqa: E402
 
 from data_provider.sql.engine import dialect_insert, make_engine  # noqa: E402
 from data_provider.sql.models import (  # noqa: E402
@@ -72,8 +72,10 @@ def _upsert_property_reports(engine, run_date: str, dir_: Path, dry: bool) -> in
             cid = path.stem
             markdown = path.read_text(encoding="utf-8")
             stmt = dialect_insert(engine, PropertyReportRow).values(
-                run_date=run_date, canonical_id=cid,
-                markdown=markdown, written_at=now,
+                run_date=run_date,
+                canonical_id=cid,
+                markdown=markdown,
+                written_at=now,
             )
             stmt = stmt.on_conflict_do_update(
                 index_elements=[PropertyReportRow.run_date, PropertyReportRow.canonical_id],
@@ -99,7 +101,9 @@ def _upsert_llm_report(engine, run_date: str, path: Path, dry: bool) -> int:
     now = datetime.now(UTC).replace(tzinfo=None)
     with engine.begin() as conn:
         stmt = dialect_insert(engine, LlmReportRow).values(
-            run_date=run_date, payload=payload, written_at=now,
+            run_date=run_date,
+            payload=payload,
+            written_at=now,
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=[LlmReportRow.run_date],
@@ -126,8 +130,10 @@ def _upsert_llm_property_details(engine, run_date: str, dir_: Path, dry: bool) -
                 continue
             pid = path.stem
             stmt = dialect_insert(engine, LlmPropertyDetailRow).values(
-                run_date=run_date, property_id=pid,
-                payload=payload, written_at=now,
+                run_date=run_date,
+                property_id=pid,
+                payload=payload,
+                written_at=now,
             )
             stmt = stmt.on_conflict_do_update(
                 index_elements=[LlmPropertyDetailRow.run_date, LlmPropertyDetailRow.property_id],
@@ -160,8 +166,11 @@ def _upsert_llm_diagnostics(engine, run_date: str, dir_: Path, dry: bool) -> int
             if payload is None:
                 continue
             stmt = dialect_insert(engine, LlmDiagnosticRow).values(
-                run_date=run_date, property_id=cid, kind=kind,
-                payload=payload, written_at=now,
+                run_date=run_date,
+                property_id=cid,
+                kind=kind,
+                payload=payload,
+                written_at=now,
             )
             stmt = stmt.on_conflict_do_update(
                 index_elements=[
@@ -183,7 +192,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Copy run artifact files into Postgres.")
     ap.add_argument("--run-date", required=True, help="e.g. 2026-04-21")
     ap.add_argument(
-        "--data-root", default=None,
+        "--data-root",
+        default=None,
         help="Root containing runs/{date}/… (default: resolves DATA_DIR then data/v2 then data/)",
     )
     ap.add_argument("--url", default=None, help="DATABASE_URL override")
@@ -210,7 +220,8 @@ def main() -> int:
     if run_dir is None:
         log.error(
             "no runs/%s directory found under any of: %s",
-            args.run_date, [str(c) for c in candidates],
+            args.run_date,
+            [str(c) for c in candidates],
         )
         return 2
 
@@ -223,7 +234,10 @@ def main() -> int:
 
     log.info(
         "Done. property_reports=%d llm_reports=%d llm_property_details=%d llm_diagnostics=%d",
-        pr, lr, lp, ld,
+        pr,
+        lr,
+        lp,
+        ld,
     )
     return 0
 

@@ -16,6 +16,7 @@ Key findings:
   - Captured payloads are all site configuration / analytics — no unit data
   - Strategy is syndication_only, same as Squarespace
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

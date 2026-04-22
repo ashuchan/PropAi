@@ -2,16 +2,17 @@
 
 CrawlTask is the single output contract produced by L2 and consumed by L1.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from ..fetch.contracts import RenderMode
 
 
-class TaskReason(str, Enum):
+class TaskReason(StrEnum):
     """Why this task was created."""
 
     SCHEDULED = "SCHEDULED"

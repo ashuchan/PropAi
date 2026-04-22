@@ -23,6 +23,7 @@ Key findings:
     with rent but no unit_number. Split-endpoint pattern: floorplans + units are
     separate API calls. OneSite URLs have numeric prefix: {id}.onlineleasing.realpage.com
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -72,20 +73,22 @@ def parse_realpage_floorplans(body: dict[str, Any], url: str) -> list[dict[str, 
         deposit = str(fp.get("depositAmount") or "")
         num_units = str(fp.get("numberOfUnitsDisplay") or "")
 
-        units.append(make_unit_dict(
-            floor_plan_name=name,
-            bed_label=bed_label_from(beds, name),
-            bedrooms=str(beds) if beds is not None else "",
-            bathrooms=str(baths) if baths is not None else "",
-            sqft=sqft,
-            unit_number=str(fp.get("id") or ""),
-            rent_range=format_rent_range(rent_lo, rent_hi),
-            deposit=deposit,
-            availability_status="AVAILABLE",
-            available_units=num_units,
-            source_api_url=url,
-            extraction_tier="TIER_1_API_ONESITE",
-        ))
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft=sqft,
+                unit_number=str(fp.get("id") or ""),
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                deposit=deposit,
+                availability_status="AVAILABLE",
+                available_units=num_units,
+                source_api_url=url,
+                extraction_tier="TIER_1_API_ONESITE",
+            )
+        )
     return units
 
 

@@ -3,6 +3,7 @@ Jugnu J0 — capture baseline metrics from the latest run.
 
 Usage: python scripts/jugnu_baseline.py [--run-dir data/runs/2026-04-17]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -11,7 +12,7 @@ import logging
 import os
 from collections import Counter
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -112,15 +113,12 @@ def compute_tier_distribution(props: list[dict[str, Any]]) -> dict[str, Any]:
         counter[tier] += 1
     total = len(props) or 1
     distribution = {
-        tier: {"count": count, "pct": round(count / total * 100, 1)}
-        for tier, count in counter.most_common()
+        tier: {"count": count, "pct": round(count / total * 100, 1)} for tier, count in counter.most_common()
     }
     return distribution
 
 
-def compute_llm_cost(
-    props: list[dict[str, Any]], run_dir: Path
-) -> dict[str, Any]:
+def compute_llm_cost(props: list[dict[str, Any]], run_dir: Path) -> dict[str, Any]:
     """Compute LLM cost breakdown from llm_report.json or property records."""
     result: dict[str, Any] = {
         "total_cost_usd": 0.0,
@@ -136,32 +134,23 @@ def compute_llm_cost(
             lr = json.loads(llm_report_path.read_text(encoding="utf-8"))
             summary = lr.get("summary", {})
             result["total_cost_usd"] = summary.get("total_cost_usd", 0.0)
-            result["properties_with_llm_calls"] = summary.get(
-                "properties_with_calls", 0
-            )
+            result["properties_with_llm_calls"] = summary.get("properties_with_calls", 0)
             by_prop = lr.get("by_property", [])
             # by_property can be a list of dicts or a dict keyed by pid
             items: list[tuple[str, dict]] = []
             if isinstance(by_prop, dict):
                 items = list(by_prop.items())
             elif isinstance(by_prop, list):
-                items = [
-                    (p.get("property_id", "unknown"), p) for p in by_prop
-                ]
+                items = [(p.get("property_id", "unknown"), p) for p in by_prop]
             for pid, pdata in items:
                 cost = pdata.get("cost_usd", 0.0)
                 if not isinstance(cost, (int, float)):
                     cost = 0.0
-                matching = [
-                    p for p in props
-                    if p.get("_meta", {}).get("canonical_id") == pid
-                ]
+                matching = [p for p in props if p.get("_meta", {}).get("canonical_id") == pid]
                 if matching:
                     units = matching[0].get("units", [])
                     if not units and cost > 0:
-                        result["wasted_llm_calls"].append(
-                            {"canonical_id": pid, "cost_usd": cost}
-                        )
+                        result["wasted_llm_calls"].append({"canonical_id": pid, "cost_usd": cost})
         except (json.JSONDecodeError, KeyError) as exc:
             log.warning("Failed to parse llm_report.json: %s", exc)
     else:
@@ -174,15 +163,11 @@ def compute_llm_cost(
                 result["total_cost_usd"] += cost
                 if not p.get("units") and cost > 0:
                     cid = p.get("_meta", {}).get("canonical_id", "unknown")
-                    result["wasted_llm_calls"].append(
-                        {"canonical_id": cid, "cost_usd": cost}
-                    )
+                    result["wasted_llm_calls"].append({"canonical_id": cid, "cost_usd": cost})
 
     result["wasted_count"] = len(result["wasted_llm_calls"])
     llm_count = result["properties_with_llm_calls"] or 1
-    result["avg_cost_per_llm_property"] = round(
-        result["total_cost_usd"] / llm_count, 4
-    )
+    result["avg_cost_per_llm_property"] = round(result["total_cost_usd"] / llm_count, 4)
     return result
 
 
@@ -241,15 +226,11 @@ def compute_profile_maturity(profiles_dir: Path) -> dict[str, Any]:
         except (json.JSONDecodeError, KeyError):
             result["COLD"] += 1
     total = result["total"] or 1
-    result["api_provider_null_pct"] = round(
-        result["api_provider_null"] / total * 100, 1
-    )
+    result["api_provider_null_pct"] = round(result["api_provider_null"] / total * 100, 1)
     return result
 
 
-def compute_timing(
-    props: list[dict[str, Any]], run_dir: Path
-) -> dict[str, Any]:
+def compute_timing(props: list[dict[str, Any]], run_dir: Path) -> dict[str, Any]:
     """Compute p50/p95 scrape durations if timing data is available."""
     durations: list[float] = []
     for p in props:
@@ -273,7 +254,7 @@ def compute_timing(
 def write_markdown(metrics: BaselineMetrics, out_path: Path) -> None:
     """Write the baseline markdown report to disk."""
     t = metrics.totals
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     lines = [
         f"# Jugnu Baseline — captured {now}",
         "",
@@ -301,19 +282,21 @@ def write_markdown(metrics: BaselineMetrics, out_path: Path) -> None:
     lines.append("## 3. LLM cost")
     lines.append("")
     lc = metrics.llm_cost
-    lines.extend([
-        "| Metric | Value |",
-        "|---|---|",
-        f"| Total cost | ${lc['total_cost_usd']:.4f} |",
-        f"| Properties with LLM calls | {lc['properties_with_llm_calls']} |",
-        f"| Properties with Vision calls | {lc['properties_with_vision_calls']} |",
-        f"| Avg cost per LLM property | ${lc['avg_cost_per_llm_property']:.4f} |",
-        "",
-        "### Wasted LLM calls",
-        "",
-        f"Count: {lc['wasted_count']}",
-        "",
-    ])
+    lines.extend(
+        [
+            "| Metric | Value |",
+            "|---|---|",
+            f"| Total cost | ${lc['total_cost_usd']:.4f} |",
+            f"| Properties with LLM calls | {lc['properties_with_llm_calls']} |",
+            f"| Properties with Vision calls | {lc['properties_with_vision_calls']} |",
+            f"| Avg cost per LLM property | ${lc['avg_cost_per_llm_property']:.4f} |",
+            "",
+            "### Wasted LLM calls",
+            "",
+            f"Count: {lc['wasted_count']}",
+            "",
+        ]
+    )
     for w in lc["wasted_llm_calls"][:10]:
         lines.append(f"- `{w['canonical_id']}` — ${w['cost_usd']:.4f}")
     lines.append("")
@@ -329,17 +312,19 @@ def write_markdown(metrics: BaselineMetrics, out_path: Path) -> None:
     lines.append("")
     pm = metrics.profile_maturity
     total_p = pm["total"] or 1
-    lines.extend([
-        "| Maturity | Count | % |",
-        "|---|---|---|",
-        f"| COLD | {pm['COLD']} | {pm['COLD']/total_p*100:.1f}% |",
-        f"| WARM | {pm['WARM']} | {pm['WARM']/total_p*100:.1f}% |",
-        f"| HOT | {pm['HOT']} | {pm['HOT']/total_p*100:.1f}% |",
-        "",
-        f"Properties with `api_provider == null`: {pm['api_provider_null']}"
-        f" ({pm['api_provider_null_pct']}%).",
-        "",
-    ])
+    lines.extend(
+        [
+            "| Maturity | Count | % |",
+            "|---|---|---|",
+            f"| COLD | {pm['COLD']} | {pm['COLD'] / total_p * 100:.1f}% |",
+            f"| WARM | {pm['WARM']} | {pm['WARM'] / total_p * 100:.1f}% |",
+            f"| HOT | {pm['HOT']} | {pm['HOT'] / total_p * 100:.1f}% |",
+            "",
+            f"Properties with `api_provider == null`: {pm['api_provider_null']}"
+            f" ({pm['api_provider_null_pct']}%).",
+            "",
+        ]
+    )
     lines.append("## 6. Timing")
     lines.append("")
     tm = metrics.timing
@@ -356,18 +341,19 @@ def write_markdown(metrics: BaselineMetrics, out_path: Path) -> None:
     lines.append("")
     lines.append("## 8. Targets for Jugnu (to be filled by the human)")
     lines.append("")
-    lines.extend([
-        "| Metric | Current (J0) | Target (post-J9) |",
-        "|---|---|---|",
-        f"| Success rate | {100 - t['failure_rate_pct']}% | >= 95% |",
-        f"| LLM cost / run | ${lc['total_cost_usd']:.4f} |"
-        f" <= ${lc['total_cost_usd'] * 0.1:.4f} |",
-        f"| Wasted LLM calls | {lc['wasted_count']} | 0 |",
-        f"| api_provider == null | {pm['api_provider_null_pct']}% | < 10% |",
-        "| Change-detection skip | 0% | >= 30% |",
-        f"| Failure rate | {t['failure_rate_pct']}% | <= 5% |",
-        "",
-    ])
+    lines.extend(
+        [
+            "| Metric | Current (J0) | Target (post-J9) |",
+            "|---|---|---|",
+            f"| Success rate | {100 - t['failure_rate_pct']}% | >= 95% |",
+            f"| LLM cost / run | ${lc['total_cost_usd']:.4f} | <= ${lc['total_cost_usd'] * 0.1:.4f} |",
+            f"| Wasted LLM calls | {lc['wasted_count']} | 0 |",
+            f"| api_provider == null | {pm['api_provider_null_pct']}% | < 10% |",
+            "| Change-detection skip | 0% | >= 30% |",
+            f"| Failure rate | {t['failure_rate_pct']}% | <= 5% |",
+            "",
+        ]
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines), encoding="utf-8")
     log.info("Wrote baseline markdown to %s", out_path)
@@ -398,7 +384,7 @@ def main() -> int:
         type=Path,
         default=_schema_data_root(_MA_POC_ROOT / "data") / "runs",
         help="Root directory containing run directories (default: "
-             "ma_poc/data/runs or ma_poc/data/v2/runs per SCHEMA_VERSION env)",
+        "ma_poc/data/runs or ma_poc/data/v2/runs per SCHEMA_VERSION env)",
     )
     parser.add_argument(
         "--profiles-dir",

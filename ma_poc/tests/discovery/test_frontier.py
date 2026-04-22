@@ -1,4 +1,5 @@
 """Tests for frontier — persistent URL store."""
+
 from __future__ import annotations
 
 from pathlib import Path

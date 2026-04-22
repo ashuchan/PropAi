@@ -22,6 +22,7 @@ Key findings:
     gallery, amenities, contact, reviews) must be filtered; ppConfig contains property_id but no
     unit data; fee_calculator URL contains property[id] and floorplan[id] params
 """
+
 from __future__ import annotations
 
 import re
@@ -43,8 +44,17 @@ _PROPERTY_WIDGET_TYPES = {"floor_plans", "availability"}
 
 # Entrata widget types that are known to NOT contain unit data.
 _NOISE_WIDGET_TYPES = {
-    "custom", "directions", "events", "specials", "resident_login",
-    "gallery", "contact", "reviews", "social", "blog", "amenities",
+    "custom",
+    "directions",
+    "events",
+    "specials",
+    "resident_login",
+    "gallery",
+    "contact",
+    "reviews",
+    "social",
+    "blog",
+    "amenities",
 }
 
 # Regex to extract property_id from fee_calculator URLs.
@@ -91,24 +101,27 @@ def parse_entrata_floorplans(items: list[dict[str, Any]], url: str) -> list[dict
         rent_hi = money_to_int(str(item.get("max_rent") or ""))
         rent_range = format_rent_range(rent_lo, rent_hi)
 
-        units.append(make_unit_dict(
-            floor_plan_name=name,
-            bed_label=bed_label_from(beds, name),
-            bedrooms=str(beds) if beds is not None else "",
-            bathrooms=str(baths) if baths is not None else "",
-            sqft=sqft,
-            unit_number=str(item.get("id") or ""),
-            rent_range=rent_range,
-            availability_status="AVAILABLE",
-            available_units="1",
-            source_api_url=url,
-            extraction_tier="TIER_1_API_ENTRATA",
-        ))
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft=sqft,
+                unit_number=str(item.get("id") or ""),
+                rent_range=rent_range,
+                availability_status="AVAILABLE",
+                available_units="1",
+                source_api_url=url,
+                extraction_tier="TIER_1_API_ENTRATA",
+            )
+        )
     return units
 
 
 def parse_entrata_widget_envelope(
-    body: dict[str, Any], url: str,
+    body: dict[str, Any],
+    url: str,
 ) -> list[dict[str, str]]:
     """Extract units from the widget_data.content.floor_plans envelope."""
     widget_data = body.get("widget_data", {})

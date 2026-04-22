@@ -2,11 +2,13 @@
 
 Decides retry schedule and parking rules. Keeps the DLQ data structure pure.
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from ..discovery.dlq import Dlq
 
@@ -25,9 +27,7 @@ class DlqController:
         self._dlq = dlq
         self._emit = emit_fn
 
-    def schedule_retries_for(
-        self, run_date: datetime | None = None
-    ) -> list[str]:
+    def schedule_retries_for(self, run_date: datetime | None = None) -> list[str]:
         """Get property IDs due for retry in this run.
 
         Args:
@@ -37,7 +37,7 @@ class DlqController:
             List of property_ids to retry.
         """
         if run_date is None:
-            run_date = datetime.now(timezone.utc)
+            run_date = datetime.now(UTC)
         due = self._dlq.due_for_retry(run_date)
         ids = [e.property_id for e in due]
         for pid in ids:

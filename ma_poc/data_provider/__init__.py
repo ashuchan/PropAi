@@ -4,6 +4,7 @@ New code should obtain the active provider via `get_data_provider()`; existing
 scraper and API-serving code is unaffected. Source is selected by the
 `DATA_PROVIDER` env var (`filesystem` | `postgres`, default `filesystem`).
 """
+
 from data_provider.contracts import (
     DataProvider,
     IExtractionResultStore,

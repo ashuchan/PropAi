@@ -23,6 +23,7 @@ Key findings:
     layout with .js-listing-card containers. Less than 3 real payloads with unit data
     available — adapter handles API where present and falls through to DOM parsing.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -64,19 +65,23 @@ def parse_appfolio_listings(items: list[dict[str, Any]], url: str) -> list[dict[
         avail_date = get_field(item, "available_date", "availableDate", "move_in_date")
         status = get_field(item, "status", "availability_status")
 
-        units.append(make_unit_dict(
-            floor_plan_name=name,
-            bed_label=bed_label_from(beds, name),
-            bedrooms=str(beds) if beds is not None else "",
-            bathrooms=str(baths) if baths is not None else "",
-            sqft=sqft,
-            unit_number=unit_num,
-            rent_range=format_rent_range(rent_lo, rent_hi),
-            availability_status="AVAILABLE" if not status or "avail" in status.lower() else status.upper(),
-            availability_date=avail_date,
-            source_api_url=url,
-            extraction_tier="TIER_1_API_APPFOLIO",
-        ))
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft=sqft,
+                unit_number=unit_num,
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                availability_status="AVAILABLE"
+                if not status or "avail" in status.lower()
+                else status.upper(),
+                availability_date=avail_date,
+                source_api_url=url,
+                extraction_tier="TIER_1_API_APPFOLIO",
+            )
+        )
     return units
 
 
@@ -89,9 +94,21 @@ def _is_appfolio_response(body: Any) -> bool:
     AppFolio/Apts247 uses: bed, bath, rent, sq_ft, name (floorplans endpoint)
     or bedrooms, price, sqft (listings endpoint).
     """
-    _UNIT_SIGNAL_KEYS = {"sqft", "bedrooms", "price", "rent", "listing_type",
-                         "square_feet", "asking_rent", "beds", "bathrooms",
-                         "bed", "bath", "sq_ft", "rent_from"}
+    _UNIT_SIGNAL_KEYS = {
+        "sqft",
+        "bedrooms",
+        "price",
+        "rent",
+        "listing_type",
+        "square_feet",
+        "asking_rent",
+        "beds",
+        "bathrooms",
+        "bed",
+        "bath",
+        "sq_ft",
+        "rent_from",
+    }
 
     def _has_signals(items: list[dict[str, Any]]) -> bool:
         if not items or not isinstance(items[0], dict):

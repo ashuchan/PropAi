@@ -25,6 +25,7 @@ Naming:
   - `extraction_results` — per (run_date, property_id) extraction output
   - `scrape_profiles`    — per-property learning profile (JSON payload)
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -143,9 +144,7 @@ class PropertySnapshotRow(Base):
     ordinal: Mapped[int] = mapped_column(Integer)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
 
-    __table_args__ = (
-        Index("ix_property_snapshots_run_ord", "run_date", "ordinal"),
-    )
+    __table_args__ = (Index("ix_property_snapshots_run_ord", "run_date", "ordinal"),)
 
 
 class RunReportRow(Base):
@@ -178,9 +177,7 @@ class RunIssueRow(Base):
     details: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     timestamp: Mapped[str | None] = mapped_column(String(64))
 
-    __table_args__ = (
-        Index("ix_run_issues_run_seq", "run_date", "seq"),
-    )
+    __table_args__ = (Index("ix_run_issues_run_seq", "run_date", "seq"),)
 
 
 class RunLedgerRow(Base):
@@ -203,9 +200,7 @@ class RunLedgerRow(Base):
     timestamp: Mapped[str | None] = mapped_column(String(64))
     extra: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
-    __table_args__ = (
-        Index("ix_run_ledger_run_seq", "run_date", "seq"),
-    )
+    __table_args__ = (Index("ix_run_ledger_run_seq", "run_date", "seq"),)
 
 
 # ── Audit + profiles ─────────────────────────────────────────────────────────
@@ -279,9 +274,7 @@ class PropertyReportRow(Base):
     markdown: Mapped[str] = mapped_column(Text)
     written_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    __table_args__ = (
-        Index("ix_property_reports_run", "run_date"),
-    )
+    __table_args__ = (Index("ix_property_reports_run", "run_date"),)
 
 
 class LlmReportRow(Base):
@@ -304,9 +297,7 @@ class LlmPropertyDetailRow(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
     written_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    __table_args__ = (
-        Index("ix_llm_property_details_run", "run_date"),
-    )
+    __table_args__ = (Index("ix_llm_property_details_run", "run_date"),)
 
 
 class LlmDiagnosticRow(Base):
@@ -321,6 +312,4 @@ class LlmDiagnosticRow(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
     written_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    __table_args__ = (
-        Index("ix_llm_diagnostics_run_prop", "run_date", "property_id"),
-    )
+    __table_args__ = (Index("ix_llm_diagnostics_run_prop", "run_date", "property_id"),)

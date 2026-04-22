@@ -1,4 +1,5 @@
 """Phase 3 — SightMap adapter tests."""
+
 from __future__ import annotations
 
 import json
@@ -74,8 +75,9 @@ async def test_sightmap_extract_real_fixture_268836() -> None:
 
 @pytest.mark.asyncio
 async def test_sightmap_extract_returns_empty_on_no_data() -> None:
-    responses = [{"url": "https://sightmap.com/app/api/v1/x/sightmaps/1",
-                  "body": {"data": {"amenities": []}}}]
+    responses = [
+        {"url": "https://sightmap.com/app/api/v1/x/sightmaps/1", "body": {"data": {"amenities": []}}}
+    ]
     adapter = SightMapAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -121,6 +123,7 @@ def test_rent_within_sanity_range() -> None:
     body = responses[0]["body"]
     units, _ = parse_sightmap_payload(body, "test")
     import re
+
     for u in units:
         if u["rent_range"]:
             nums = re.findall(r"\d[\d,]*", u["rent_range"])
@@ -132,8 +135,16 @@ def test_rent_within_sanity_range() -> None:
 def test_parse_sightmap_display_price_fallback() -> None:
     body = {
         "data": {
-            "units": [{"id": "1", "floor_plan_id": "1", "unit_number": "X1",
-                        "price": None, "display_price": "$1,300", "area": 600}],
+            "units": [
+                {
+                    "id": "1",
+                    "floor_plan_id": "1",
+                    "unit_number": "X1",
+                    "price": None,
+                    "display_price": "$1,300",
+                    "area": 600,
+                }
+            ],
             "floor_plans": [{"id": "1", "name": "Test", "bedroom_count": 1, "bathroom_count": 1}],
         }
     }
@@ -148,13 +159,23 @@ def test_parse_sightmap_display_price_fallback() -> None:
 def _sm_valid_body() -> dict:
     return {
         "data": {
-            "units": [{
-                "floor_plan_id": 1, "price": 1800, "unit_number": "101",
-                "area": 720, "available_on": "2026-05-01",
-            }],
-            "floor_plans": [{
-                "id": 1, "name": "1BR", "bedroom_count": 1, "bathroom_count": 1,
-            }],
+            "units": [
+                {
+                    "floor_plan_id": 1,
+                    "price": 1800,
+                    "unit_number": "101",
+                    "area": 720,
+                    "available_on": "2026-05-01",
+                }
+            ],
+            "floor_plans": [
+                {
+                    "id": 1,
+                    "name": "1BR",
+                    "bedroom_count": 1,
+                    "bathroom_count": 1,
+                }
+            ],
         }
     }
 
@@ -163,10 +184,12 @@ def _sm_valid_body() -> dict:
 async def test_sm_t01_sightmap_url_still_works() -> None:
     body = _sm_valid_body()
     assert _is_sightmap_response(body) is True
-    responses = [{
-        "url": "https://sightmap.com/app/api/v1/abc/sightmaps/123",
-        "body": body,
-    }]
+    responses = [
+        {
+            "url": "https://sightmap.com/app/api/v1/abc/sightmaps/123",
+            "body": body,
+        }
+    ]
     adapter = SightMapAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -181,10 +204,12 @@ async def test_sm_t01_sightmap_url_still_works() -> None:
 async def test_sm_t02_proxied_url_is_matched() -> None:
     body = _sm_valid_body()
     assert _is_sightmap_response(body) is True
-    responses = [{
-        "url": "https://lasvegasliving.com/api/properties/123/availability",
-        "body": body,
-    }]
+    responses = [
+        {
+            "url": "https://lasvegasliving.com/api/properties/123/availability",
+            "body": body,
+        }
+    ]
     adapter = SightMapAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -193,11 +218,12 @@ async def test_sm_t02_proxied_url_is_matched() -> None:
 
 @pytest.mark.asyncio
 async def test_sm_t03_amenities_only_error() -> None:
-    responses = [{
-        "url": "https://sightmap.com/app/api/v1/abc/sightmaps/456",
-        "body": {"data": {"amenities": [{"id": 1, "name": "Pool"}],
-                          "floor_plans": [], "units": []}},
-    }]
+    responses = [
+        {
+            "url": "https://sightmap.com/app/api/v1/abc/sightmaps/456",
+            "body": {"data": {"amenities": [{"id": 1, "name": "Pool"}], "floor_plans": [], "units": []}},
+        }
+    ]
     adapter = SightMapAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -224,11 +250,12 @@ async def test_sm_t04_no_sightmap_response_error() -> None:
 
 @pytest.mark.asyncio
 async def test_sm_t05_units_but_empty_fps_parse_failed() -> None:
-    responses = [{
-        "url": "https://sightmap.com/app/api/v1/x/sightmaps/1",
-        "body": {"data": {"units": [{"floor_plan_id": 99, "price": 1500}],
-                          "floor_plans": []}},
-    }]
+    responses = [
+        {
+            "url": "https://sightmap.com/app/api/v1/x/sightmaps/1",
+            "body": {"data": {"units": [{"floor_plan_id": 99, "price": 1500}], "floor_plans": []}},
+        }
+    ]
     adapter = SightMapAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -246,14 +273,17 @@ def test_sm_t07_is_sightmap_response_matches_sightmap_id_alone() -> None:
 
 @pytest.mark.asyncio
 async def test_sm_t08_unmatched_floor_plan_join_fails() -> None:
-    responses = [{
-        "url": "https://sightmap.com/app/api/v1/x/sightmaps/9",
-        "body": {"data": {
-            "units": [{"floor_plan_id": 999, "price": 2000,
-                        "unit_number": "A1", "area": 800}],
-            "floor_plans": [],
-        }},
-    }]
+    responses = [
+        {
+            "url": "https://sightmap.com/app/api/v1/x/sightmaps/9",
+            "body": {
+                "data": {
+                    "units": [{"floor_plan_id": 999, "price": 2000, "unit_number": "A1", "area": 800}],
+                    "floor_plans": [],
+                }
+            },
+        }
+    ]
     adapter = SightMapAdapter()
     ctx = _make_ctx(responses)
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -294,16 +324,18 @@ def test_sightmap_shape_check_accepts_real_fp_envelope() -> None:
 @pytest.mark.asyncio
 async def test_sightmap_tier_re_stamped_on_partial_parse() -> None:
     """SightMap success with >20% join drops emits SIGHTMAP_PARTIAL_JOIN warning."""
-    body = {"data": {
-        "units": [
-            {"floor_plan_id": 1, "price": 1500, "unit_number": "101", "area": 700},
-            {"floor_plan_id": 999, "price": 1500, "unit_number": "102", "area": 700},
-            {"floor_plan_id": 999, "price": 1500, "unit_number": "103", "area": 700},
-            {"floor_plan_id": 999, "price": 1500, "unit_number": "104", "area": 700},
-            {"floor_plan_id": 999, "price": 1500, "unit_number": "105", "area": 700},
-        ],
-        "floor_plans": [{"id": 1, "name": "1BR", "bedroom_count": 1, "bathroom_count": 1}],
-    }}
+    body = {
+        "data": {
+            "units": [
+                {"floor_plan_id": 1, "price": 1500, "unit_number": "101", "area": 700},
+                {"floor_plan_id": 999, "price": 1500, "unit_number": "102", "area": 700},
+                {"floor_plan_id": 999, "price": 1500, "unit_number": "103", "area": 700},
+                {"floor_plan_id": 999, "price": 1500, "unit_number": "104", "area": 700},
+                {"floor_plan_id": 999, "price": 1500, "unit_number": "105", "area": 700},
+            ],
+            "floor_plans": [{"id": 1, "name": "1BR", "bedroom_count": 1, "bathroom_count": 1}],
+        }
+    }
     adapter = SightMapAdapter()
     ctx = _make_ctx([{"url": "https://sightmap.com/api", "body": body}])
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
@@ -314,9 +346,10 @@ async def test_sightmap_tier_re_stamped_on_partial_parse() -> None:
 def test_sightmap_matches_response_body_protocol() -> None:
     """``matches_response_body`` is implemented and reuses the predicate."""
     adapter = SightMapAdapter()
-    assert adapter.matches_response_body(
-        {"data": {"units": [{"id": "1"}], "floor_plans": [
-            {"id": 1, "bedroom_count": 1}
-        ]}}
-    ) is True
+    assert (
+        adapter.matches_response_body(
+            {"data": {"units": [{"id": "1"}], "floor_plans": [{"id": 1, "bedroom_count": 1}]}}
+        )
+        is True
+    )
     assert adapter.matches_response_body({"random": "not-sightmap"}) is False

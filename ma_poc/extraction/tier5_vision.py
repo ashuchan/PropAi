@@ -8,6 +8,7 @@ Acceptance criteria (CLAUDE.md PR-04):
 - Bug-hunt #6: check base64 size before every call (handled by llm providers)
 - Returns unit records with method=VISION_FALLBACK; target ≤5% of properties
 """
+
 from __future__ import annotations
 
 from extraction.confidence import composite, low_confidence_fields
@@ -43,8 +44,13 @@ async def _capture_targeted_sections(session: BrowserSession) -> list[bytes]:
         return images
 
     section_selectors = (
-        ".pricing", ".pricingWrapper", ".availability", "#availability",
-        "#pricing", "table.units", ".unitContainer",
+        ".pricing",
+        ".pricingWrapper",
+        ".availability",
+        "#availability",
+        "#pricing",
+        "table.units",
+        ".unitContainer",
     )
     for sel in section_selectors:
         try:

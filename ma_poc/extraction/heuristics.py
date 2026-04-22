@@ -3,20 +3,40 @@
 Consolidated from duplicates that existed in scripts/entrata.py and various
 adapter files. All callers should import from here — do not duplicate.
 """
+
 from __future__ import annotations
 
-import re
 from typing import Any
 
 _AVAILABILITY_URL_SIGNALS = (
-    "/availab", "/floor-plan", "/floorplan", "/pricing", "/units",
-    "/apartments", "/rent", "/leasing", "/availability",
+    "/availab",
+    "/floor-plan",
+    "/floorplan",
+    "/pricing",
+    "/units",
+    "/apartments",
+    "/rent",
+    "/leasing",
+    "/availability",
 )
 
-_UNIT_KEY_SIGNALS = frozenset({
-    "unit", "floor", "plan", "rent", "price", "sqft", "bed", "bath",
-    "available", "lease", "bedroom", "bathroom", "apartment",
-})
+_UNIT_KEY_SIGNALS = frozenset(
+    {
+        "unit",
+        "floor",
+        "plan",
+        "rent",
+        "price",
+        "sqft",
+        "bed",
+        "bath",
+        "available",
+        "lease",
+        "bedroom",
+        "bathroom",
+        "apartment",
+    }
+)
 
 
 def looks_like_availability_api(url: str) -> bool:

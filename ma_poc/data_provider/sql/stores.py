@@ -9,12 +9,14 @@ Dialect assumptions: Postgres or SQLite (via `engine.dialect_insert()`). No
 raw SQL — everything goes through SQLAlchemy core/ORM so the same code
 runs on both dialects.
 """
+
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from typing import Any, Iterator
+from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -104,24 +106,48 @@ class _SessionHolder:
 _PROPERTY_COLS = {
     "canonical_id",
     # V2 data fields
-    "apartment_id", "proj_name", "address", "city", "state", "zip_code",
-    "country", "phone", "email_address", "website", "pmc",
-    "website_design", "concessions",
+    "apartment_id",
+    "proj_name",
+    "address",
+    "city",
+    "state",
+    "zip_code",
+    "country",
+    "phone",
+    "email_address",
+    "website",
+    "pmc",
+    "website_design",
+    "concessions",
     # State-tracking (use left(last_seen_at, 10) if you need a date string)
-    "first_seen_date", "last_seen_at",
-    "last_scrape_status", "last_units_count",
+    "first_seen_date",
+    "last_seen_at",
+    "last_scrape_status",
+    "last_units_count",
 }
 
 _UNIT_COLS = {
-    "canonical_id", "unit_id",
+    "canonical_id",
+    "unit_id",
     # V2 data fields
-    "beds", "baths", "floor_plan_name", "area",
-    "rent_low", "rent_high", "date_captured", "available_date",
-    "lease_term", "move_in_date",
+    "beds",
+    "baths",
+    "floor_plan_name",
+    "area",
+    "rent_low",
+    "rent_high",
+    "date_captured",
+    "available_date",
+    "lease_term",
+    "move_in_date",
     # State-tracking
-    "first_seen_date", "last_seen_at",
-    "carryforward_days", "disappeared_since", "last_absent_date",
-    "concessions", "changed_fields",
+    "first_seen_date",
+    "last_seen_at",
+    "carryforward_days",
+    "disappeared_since",
+    "last_absent_date",
+    "concessions",
+    "changed_fields",
 }
 
 
@@ -207,9 +233,7 @@ class SqlPropertyStateStore(IPropertyStateStore):
         with self._h.scope() as s:
             return s.get(PropertyRow, canonical_id) is not None
 
-    def upsert(
-        self, canonical_id: str, snapshot: dict[str, Any], run_date: str
-    ) -> bool:
+    def upsert(self, canonical_id: str, snapshot: dict[str, Any], run_date: str) -> bool:
         with self._h.scope() as s:
             existing = s.get(PropertyRow, canonical_id)
             is_new = existing is None
@@ -296,9 +320,7 @@ class SqlUnitStateStore(IUnitStateStore):
 
     def get_units(self, canonical_id: str) -> dict[str, UnitIndexEntry]:
         with self._h.scope() as s:
-            rows = s.execute(
-                select(UnitRow).where(UnitRow.canonical_id == canonical_id)
-            ).scalars().all()
+            rows = s.execute(select(UnitRow).where(UnitRow.canonical_id == canonical_id)).scalars().all()
             return {r.unit_id: _hydrate_unit(r) for r in rows}
 
     def upsert_units(
@@ -308,9 +330,9 @@ class SqlUnitStateStore(IUnitStateStore):
         run_date: str,
     ) -> UnitDiff:
         with self._h.scope() as s:
-            prior_rows = s.execute(
-                select(UnitRow).where(UnitRow.canonical_id == canonical_id)
-            ).scalars().all()
+            prior_rows = (
+                s.execute(select(UnitRow).where(UnitRow.canonical_id == canonical_id)).scalars().all()
+            )
             prior_by_id: dict[str, UnitRow] = {r.unit_id: r for r in prior_rows}
 
             diff = UnitDiff()
@@ -337,10 +359,7 @@ class SqlUnitStateStore(IUnitStateStore):
                     snap["first_seen_date"] = run_date
                     snap["changed_fields"] = []
                 else:
-                    changed = [
-                        k for k in self._CHANGE_KEYS
-                        if getattr(prior, k) != snap.get(k)
-                    ]
+                    changed = [k for k in self._CHANGE_KEYS if getattr(prior, k) != snap.get(k)]
                     if changed:
                         diff.updated.append(uid)
                     else:
@@ -351,10 +370,7 @@ class SqlUnitStateStore(IUnitStateStore):
                 known, extra = _split_known_extra(snap, _UNIT_COLS)
                 values = {**known, "extra": extra}
                 stmt = dialect_insert(self._h.engine, UnitRow).values(**values)
-                update_cols = {
-                    k: stmt.excluded[k] for k in values
-                    if k not in ("canonical_id", "unit_id")
-                }
+                update_cols = {k: stmt.excluded[k] for k in values if k not in ("canonical_id", "unit_id")}
                 stmt = stmt.on_conflict_do_update(
                     index_elements=[UnitRow.canonical_id, UnitRow.unit_id],
                     set_=update_cols,
@@ -371,36 +387,34 @@ class SqlUnitStateStore(IUnitStateStore):
 
             return diff
 
-    def carry_forward_units(
-        self, canonical_id: str, run_date: str
-    ) -> list[dict[str, Any]]:
+    def carry_forward_units(self, canonical_id: str, run_date: str) -> list[dict[str, Any]]:
         with self._h.scope() as s:
-            rows = s.execute(
-                select(UnitRow).where(UnitRow.canonical_id == canonical_id)
-            ).scalars().all()
+            rows = s.execute(select(UnitRow).where(UnitRow.canonical_id == canonical_id)).scalars().all()
             out: list[dict[str, Any]] = []
             for r in rows:
                 if r.disappeared_since:
                     continue
                 r.carryforward_days = (r.carryforward_days or 0) + 1
                 r.last_seen_at = _utc_now_iso()
-                out.append({
-                    "unit_id": r.unit_id,
-                    # V2 data fields
-                    "beds": r.beds,
-                    "baths": r.baths,
-                    "floor_plan_name": r.floor_plan_name,
-                    "area": r.area,
-                    "rent_low": r.rent_low,
-                    "rent_high": r.rent_high,
-                    "date_captured": r.date_captured,
-                    "available_date": r.available_date,
-                    "lease_term": r.lease_term,
-                    "move_in_date": r.move_in_date,
-                    "concessions": r.concessions,
-                    # State-tracking
-                    "carryforward_days": r.carryforward_days,
-                })
+                out.append(
+                    {
+                        "unit_id": r.unit_id,
+                        # V2 data fields
+                        "beds": r.beds,
+                        "baths": r.baths,
+                        "floor_plan_name": r.floor_plan_name,
+                        "area": r.area,
+                        "rent_low": r.rent_low,
+                        "rent_high": r.rent_high,
+                        "date_captured": r.date_captured,
+                        "available_date": r.available_date,
+                        "lease_term": r.lease_term,
+                        "move_in_date": r.move_in_date,
+                        "concessions": r.concessions,
+                        # State-tracking
+                        "carryforward_days": r.carryforward_days,
+                    }
+                )
             return out
 
 
@@ -416,20 +430,20 @@ class SqlRunStore(IRunStore):
         if session.get(RunRow, run_date) is None:
             session.add(RunRow(run_date=run_date))
 
-    def write_properties(
-        self, run_date: str, properties: list[dict[str, Any]]
-    ) -> None:
+    def write_properties(self, run_date: str, properties: list[dict[str, Any]]) -> None:
         with self._h.scope() as s:
             self._touch_run(s, run_date)
-            s.execute(
-                delete(PropertySnapshotRow).where(PropertySnapshotRow.run_date == run_date)
-            )
+            s.execute(delete(PropertySnapshotRow).where(PropertySnapshotRow.run_date == run_date))
             for ordinal, payload in enumerate(properties):
                 cid = self._extract_canonical_id(payload)
-                s.add(PropertySnapshotRow(
-                    run_date=run_date, canonical_id=cid,
-                    ordinal=ordinal, payload=payload,
-                ))
+                s.add(
+                    PropertySnapshotRow(
+                        run_date=run_date,
+                        canonical_id=cid,
+                        ordinal=ordinal,
+                        payload=payload,
+                    )
+                )
 
     @staticmethod
     def _extract_canonical_id(payload: dict[str, Any]) -> str | None:
@@ -445,11 +459,15 @@ class SqlRunStore(IRunStore):
 
     def read_properties(self, run_date: str) -> list[dict[str, Any]]:
         with self._h.scope() as s:
-            rows = s.execute(
-                select(PropertySnapshotRow)
-                .where(PropertySnapshotRow.run_date == run_date)
-                .order_by(PropertySnapshotRow.ordinal)
-            ).scalars().all()
+            rows = (
+                s.execute(
+                    select(PropertySnapshotRow)
+                    .where(PropertySnapshotRow.run_date == run_date)
+                    .order_by(PropertySnapshotRow.ordinal)
+                )
+                .scalars()
+                .all()
+            )
             return [r.payload for r in rows]
 
     def write_report(self, run_date: str, report: RunReport) -> None:
@@ -457,8 +475,12 @@ class SqlRunStore(IRunStore):
             self._touch_run(s, run_date)
             totals = report.totals.model_dump(mode="json")
             known_keys = {
-                "run_date", "generated_at", "totals",
-                "tier_distribution", "cost", "slo_violations",
+                "run_date",
+                "generated_at",
+                "totals",
+                "tier_distribution",
+                "cost",
+                "slo_violations",
             }
             body = report.model_dump(mode="json")
             extra = {k: v for k, v in body.items() if k not in known_keys}
@@ -502,26 +524,38 @@ class SqlRunStore(IRunStore):
             next_seq = self._next_seq(s, RunIssueRow, run_date)
             data = issue.model_dump(mode="json")
             ts = data.get("timestamp")
-            s.add(RunIssueRow(
-                run_date=run_date, seq=next_seq,
-                severity=issue.severity, code=issue.code,
-                message=issue.message, canonical_id=issue.canonical_id,
-                row_index=issue.row_index, details=issue.details,
-                timestamp=str(ts) if ts else None,
-            ))
+            s.add(
+                RunIssueRow(
+                    run_date=run_date,
+                    seq=next_seq,
+                    severity=issue.severity,
+                    code=issue.code,
+                    message=issue.message,
+                    canonical_id=issue.canonical_id,
+                    row_index=issue.row_index,
+                    details=issue.details,
+                    timestamp=str(ts) if ts else None,
+                )
+            )
 
     def read_issues(self, run_date: str) -> Iterator[IssueEntry]:
         with self._h.scope() as s:
-            rows = s.execute(
-                select(RunIssueRow)
-                .where(RunIssueRow.run_date == run_date)
-                .order_by(RunIssueRow.seq)
-            ).scalars().all()
+            rows = (
+                s.execute(
+                    select(RunIssueRow).where(RunIssueRow.run_date == run_date).order_by(RunIssueRow.seq)
+                )
+                .scalars()
+                .all()
+            )
         for r in rows:
             yield IssueEntry(
-                severity=r.severity, code=r.code, message=r.message,
-                canonical_id=r.canonical_id, row_index=r.row_index,
-                details=r.details, timestamp=r.timestamp,
+                severity=r.severity,
+                code=r.code,
+                message=r.message,
+                canonical_id=r.canonical_id,
+                row_index=r.row_index,
+                details=r.details,
+                timestamp=r.timestamp,
             )
 
     def append_ledger_entry(self, run_date: str, entry: LedgerEntry) -> None:
@@ -530,38 +564,58 @@ class SqlRunStore(IRunStore):
             next_seq = self._next_seq(s, RunLedgerRow, run_date)
             data = entry.model_dump(mode="json")
             known = {
-                "canonical_id", "row_index", "status", "units_count",
-                "carry_forward_used", "scrape_failed", "error_count",
-                "warning_count", "url", "timestamp",
+                "canonical_id",
+                "row_index",
+                "status",
+                "units_count",
+                "carry_forward_used",
+                "scrape_failed",
+                "error_count",
+                "warning_count",
+                "url",
+                "timestamp",
             }
             extra = {k: v for k, v in data.items() if k not in known}
             ts = data.get("timestamp")
-            s.add(RunLedgerRow(
-                run_date=run_date, seq=next_seq,
-                canonical_id=entry.canonical_id, row_index=entry.row_index,
-                status=entry.status, units_count=entry.units_count,
-                carry_forward_used=entry.carry_forward_used,
-                scrape_failed=entry.scrape_failed,
-                error_count=entry.error_count, warning_count=entry.warning_count,
-                url=entry.url, timestamp=str(ts) if ts else None,
-                extra=extra or None,
-            ))
+            s.add(
+                RunLedgerRow(
+                    run_date=run_date,
+                    seq=next_seq,
+                    canonical_id=entry.canonical_id,
+                    row_index=entry.row_index,
+                    status=entry.status,
+                    units_count=entry.units_count,
+                    carry_forward_used=entry.carry_forward_used,
+                    scrape_failed=entry.scrape_failed,
+                    error_count=entry.error_count,
+                    warning_count=entry.warning_count,
+                    url=entry.url,
+                    timestamp=str(ts) if ts else None,
+                    extra=extra or None,
+                )
+            )
 
     def read_ledger(self, run_date: str) -> Iterator[LedgerEntry]:
         with self._h.scope() as s:
-            rows = s.execute(
-                select(RunLedgerRow)
-                .where(RunLedgerRow.run_date == run_date)
-                .order_by(RunLedgerRow.seq)
-            ).scalars().all()
+            rows = (
+                s.execute(
+                    select(RunLedgerRow).where(RunLedgerRow.run_date == run_date).order_by(RunLedgerRow.seq)
+                )
+                .scalars()
+                .all()
+            )
         for r in rows:
             base = {
-                "canonical_id": r.canonical_id, "row_index": r.row_index,
-                "status": r.status, "units_count": r.units_count,
+                "canonical_id": r.canonical_id,
+                "row_index": r.row_index,
+                "status": r.status,
+                "units_count": r.units_count,
                 "carry_forward_used": r.carry_forward_used,
                 "scrape_failed": r.scrape_failed,
-                "error_count": r.error_count, "warning_count": r.warning_count,
-                "url": r.url, "timestamp": r.timestamp,
+                "error_count": r.error_count,
+                "warning_count": r.warning_count,
+                "url": r.url,
+                "timestamp": r.timestamp,
             }
             if r.extra:
                 base.update(r.extra)
@@ -569,19 +623,14 @@ class SqlRunStore(IRunStore):
 
     def list_runs(self) -> list[str]:
         with self._h.scope() as s:
-            rows = s.execute(
-                select(RunRow.run_date).order_by(RunRow.run_date)
-            ).scalars().all()
+            rows = s.execute(select(RunRow.run_date).order_by(RunRow.run_date)).scalars().all()
             return list(rows)
 
     @staticmethod
     def _next_seq(session: Session, row_cls: type, run_date: str) -> int:
         """Return the next `seq` value for an append-only per-run table."""
         current = session.execute(
-            select(row_cls.seq)
-            .where(row_cls.run_date == run_date)
-            .order_by(row_cls.seq.desc())
-            .limit(1)
+            select(row_cls.seq).where(row_cls.run_date == run_date).order_by(row_cls.seq.desc()).limit(1)
         ).scalar()
         return (current or 0) + 1
 
@@ -605,8 +654,7 @@ class SqlScrapeEventStore(IScrapeEventStore):
                 scrape_timestamp=ts,
                 extraction_tier=event.extraction_tier,
                 change_detection_result=(
-                    event.change_detection_result.value
-                    if event.change_detection_result else None
+                    event.change_detection_result.value if event.change_detection_result else None
                 ),
                 scrape_outcome=event.scrape_outcome.value,
                 failure_reason=event.failure_reason,
@@ -625,26 +673,29 @@ class SqlScrapeEventStore(IScrapeEventStore):
 
     def read_all(self) -> Iterator[ScrapeEvent]:
         with self._h.scope() as s:
-            rows = s.execute(
-                select(ScrapeEventRow).order_by(ScrapeEventRow.scrape_timestamp)
-            ).scalars().all()
+            rows = s.execute(select(ScrapeEventRow).order_by(ScrapeEventRow.scrape_timestamp)).scalars().all()
         for r in rows:
             yield self._hydrate(r)
 
     def read_for_property(self, property_id: str) -> Iterator[ScrapeEvent]:
         with self._h.scope() as s:
-            rows = s.execute(
-                select(ScrapeEventRow)
-                .where(ScrapeEventRow.property_id == property_id)
-                .order_by(ScrapeEventRow.scrape_timestamp)
-            ).scalars().all()
+            rows = (
+                s.execute(
+                    select(ScrapeEventRow)
+                    .where(ScrapeEventRow.property_id == property_id)
+                    .order_by(ScrapeEventRow.scrape_timestamp)
+                )
+                .scalars()
+                .all()
+            )
         for r in rows:
             yield self._hydrate(r)
 
     @staticmethod
     def _hydrate(r: ScrapeEventRow) -> ScrapeEvent:
         return ScrapeEvent(
-            event_id=r.event_id, property_id=r.property_id,
+            event_id=r.event_id,
+            property_id=r.property_id,
             scrape_timestamp=r.scrape_timestamp,
             extraction_tier=r.extraction_tier,
             change_detection_result=r.change_detection_result,  # type: ignore[arg-type]
@@ -698,9 +749,11 @@ class SqlProfileStore(IProfileStore):
 
     def list_ids(self) -> list[str]:
         with self._h.scope() as s:
-            rows = s.execute(
-                select(ScrapeProfileRow.canonical_id).order_by(ScrapeProfileRow.canonical_id)
-            ).scalars().all()
+            rows = (
+                s.execute(select(ScrapeProfileRow.canonical_id).order_by(ScrapeProfileRow.canonical_id))
+                .scalars()
+                .all()
+            )
             return list(rows)
 
     def delete(self, canonical_id: str) -> bool:
@@ -739,16 +792,11 @@ class SqlExtractionResultStore(IExtractionResultStore):
                     ExtractionResultRow.run_date,
                     ExtractionResultRow.property_id,
                 ],
-                set_={
-                    k: stmt.excluded[k] for k in values
-                    if k not in ("run_date", "property_id")
-                },
+                set_={k: stmt.excluded[k] for k in values if k not in ("run_date", "property_id")},
             )
             s.execute(stmt)
 
-    def read(
-        self, run_date: str, property_id: str
-    ) -> ExtractionResult | None:
+    def read(self, run_date: str, property_id: str) -> ExtractionResult | None:
         with self._h.scope() as s:
             row = s.get(ExtractionResultRow, (run_date, property_id))
             if row is None:

@@ -1,4 +1,5 @@
 """Tests for F6 — cluster_retry.py."""
+
 from __future__ import annotations
 
 import json
@@ -15,6 +16,7 @@ def _prop(website: str, verdict: str = "FAILED_NO_DATA") -> dict:
 
 
 # ── registered_domain ─────────────────────────────────────────────────────────
+
 
 def test_cluster_analysis_groups_by_registered_domain_not_full_host() -> None:
     """www.gscapts.com and gscapts.com should group as gscapts.com."""
@@ -69,6 +71,7 @@ def test_cluster_analysis_includes_sample_body_truncated_to_500(tmp_path: Path) 
 
 
 # ── filter_by_domain ─────────────────────────────────────────────────────────
+
 
 def test_cluster_retry_filters_properties_by_domain() -> None:
     props = [

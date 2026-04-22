@@ -3,6 +3,7 @@
 Extracted from ``scripts/entrata.py`` so that each adapter can import
 lightweight helpers without depending on the full scraper engine.
 """
+
 from __future__ import annotations
 
 import re
@@ -35,8 +36,7 @@ def get_field(d: dict[str, Any], *keys: str) -> str:
         if isinstance(v, list):
             continue
         if isinstance(v, dict):
-            for sub_k in ("min", "low", "amount", "value", "effectiveRent",
-                          "max", "high"):
+            for sub_k in ("min", "low", "amount", "value", "effectiveRent", "max", "high"):
                 sv = v.get(sub_k)
                 if sv is not None and sv != "":
                     return str(sv)
@@ -88,12 +88,34 @@ _JUNK_PLAN_PATTERNS = (
 # real unit identifiers. Observed DOM-scan false positives: "Left", "s",
 # "Right", "new". All-lowercase single-word matches only — real unit IDs
 # are alphanumeric with digits.
-_JUNK_UNIT_TOKENS = frozenset({
-    "left", "right", "up", "down", "top", "bottom",
-    "new", "more", "view", "learn", "click", "here", "now",
-    "all", "one", "any", "unit", "home", "page", "menu",
-    "s", "a", "an", "the",
-})
+_JUNK_UNIT_TOKENS = frozenset(
+    {
+        "left",
+        "right",
+        "up",
+        "down",
+        "top",
+        "bottom",
+        "new",
+        "more",
+        "view",
+        "learn",
+        "click",
+        "here",
+        "now",
+        "all",
+        "one",
+        "any",
+        "unit",
+        "home",
+        "page",
+        "menu",
+        "s",
+        "a",
+        "an",
+        "the",
+    }
+)
 
 
 def is_junk_floor_plan(name: Any) -> bool:
@@ -147,9 +169,9 @@ def parse_rent_range(rent_range: str) -> tuple[int | None, int | None]:
     if not rent_range or not isinstance(rent_range, str):
         return None, None
     # Find all numeric tokens; drop thousands separators.
-    nums = [int(float(n.replace(",", "")))
-            for n in re.findall(r"\d[\d,]*", rent_range)
-            if n and n[0].isdigit()]
+    nums = [
+        int(float(n.replace(",", ""))) for n in re.findall(r"\d[\d,]*", rent_range) if n and n[0].isdigit()
+    ]
     if not nums:
         return None, None
     # Rent sanity: reject anything outside the sane band so we don't

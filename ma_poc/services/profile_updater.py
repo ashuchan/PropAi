@@ -6,6 +6,7 @@ Promotes/demotes maturity based on consecutive success/failure streaks.
 
 Phase: claude-scrapper-arch.md Step 3.1
 """
+
 from __future__ import annotations
 
 import logging
@@ -36,8 +37,8 @@ _TIER_MAP: dict[str, int] = {
     "TIER_3_DOM": 3,
     "TIER_3_DOM_LLM": 3,
     "TIER_4_LLM": 4,
-    "TIER_4_LLM_API": 4,   # Phase 3: targeted analyze_api_with_llm
-    "TIER_4_LLM_DOM": 4,   # Phase 3: targeted analyze_dom_with_llm
+    "TIER_4_LLM_API": 4,  # Phase 3: targeted analyze_api_with_llm
+    "TIER_4_LLM_DOM": 4,  # Phase 3: targeted analyze_dom_with_llm
     "TIER_4_ENTRATA_API": 4,
     "TIER_5_PORTAL": 5,
     "TIER_5_5_EXPLORATORY": 5,
@@ -73,9 +74,7 @@ def update_profile_blocklist(
             ep.attempts += 1
             ep.blocked_at = datetime.utcnow()
             return
-    profile.api_hints.blocked_endpoints.append(
-        BlockedEndpoint(url_pattern=api_url, reason=reason)
-    )
+    profile.api_hints.blocked_endpoints.append(BlockedEndpoint(url_pattern=api_url, reason=reason))
     # Trim oldest entries if over cap
     if len(profile.api_hints.blocked_endpoints) > _MAX_BLOCKED_ENDPOINTS:
         profile.api_hints.blocked_endpoints = profile.api_hints.blocked_endpoints[-_MAX_BLOCKED_ENDPOINTS:]
@@ -157,10 +156,7 @@ def update_profile_after_extraction(
         tier_num = _TIER_MAP.get(tier)
         if tier_num:
             profile.confidence.last_success_tier = tier_num
-            if (
-                profile.confidence.preferred_tier is None
-                or tier_num < profile.confidence.preferred_tier
-            ):
+            if profile.confidence.preferred_tier is None or tier_num < profile.confidence.preferred_tier:
                 profile.confidence.preferred_tier = tier_num
         profile.confidence.last_unit_count = units_extracted
     else:
@@ -186,8 +182,13 @@ def update_profile_after_extraction(
             profile.navigation.availability_page_path = path
 
     # ── Record API URLs that had data (Tier 1 / widget) ──────────────
-    if tier in ("TIER_1_API", "TIER_1_PROFILE_MAPPING", "TIER_1_5_EMBEDDED",
-                "TIER_1_WIDGET", "TIER_5_5_EXPLORATORY"):
+    if tier in (
+        "TIER_1_API",
+        "TIER_1_PROFILE_MAPPING",
+        "TIER_1_5_EMBEDDED",
+        "TIER_1_WIDGET",
+        "TIER_5_5_EXPLORATORY",
+    ):
         raw_apis = scrape_result.get("_raw_api_responses", [])
         for api in raw_apis:
             url = api.get("url", "")
@@ -247,9 +248,17 @@ def update_profile_after_extraction(
         if crawled and units_extracted > 0:
             for url in crawled:
                 path = urllib.parse.urlparse(url).path
-                if any(k in path.lower() for k in [
-                    "floor", "plan", "avail", "rent", "unit", "conventional",
-                ]):
+                if any(
+                    k in path.lower()
+                    for k in [
+                        "floor",
+                        "plan",
+                        "avail",
+                        "rent",
+                        "unit",
+                        "conventional",
+                    ]
+                ):
                     profile.navigation.availability_page_path = path
                     break
 

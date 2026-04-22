@@ -8,11 +8,12 @@ Callers (Postgres, SQLite, dual-write) should not instantiate this directly
 outside of wiring — use `data_provider.get_data_provider()` with
 `DATA_PROVIDER=postgres` (or `sqlite`) + `DATABASE_URL`.
 """
+
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 from sqlalchemy import Engine
 

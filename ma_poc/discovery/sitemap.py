@@ -3,6 +3,7 @@
 Handles both flat sitemap.xml and sitemap index variants.
 Uses xml.etree.ElementTree — no external dependency.
 """
+
 from __future__ import annotations
 
 import logging
@@ -36,9 +37,7 @@ class SitemapConsumer:
         cond_cache: Conditional cache for ETag/Last-Modified.
     """
 
-    def __init__(
-        self, fetcher: Any, cond_cache: ConditionalCache
-    ) -> None:
+    def __init__(self, fetcher: Any, cond_cache: ConditionalCache) -> None:
         self._fetcher = fetcher
         self._cond_cache = cond_cache
 
@@ -76,9 +75,7 @@ class SitemapConsumer:
 
             # Update cache
             if result.etag or result.last_modified:
-                self._cond_cache.write(
-                    sitemap_url, result.etag, result.last_modified
-                )
+                self._cond_cache.write(sitemap_url, result.etag, result.last_modified)
 
             return self._parse(result.body, depth=0)
         except Exception as exc:
@@ -106,7 +103,7 @@ class SitemapConsumer:
         # Check if this is a sitemap index
         index_tags = root.findall(f"{{{_SITEMAP_NS}}}sitemap")
         if index_tags and depth == 0:
-            for i, st in enumerate(index_tags[:_MAX_CHILD_SITEMAPS]):
+            for _i, st in enumerate(index_tags[:_MAX_CHILD_SITEMAPS]):
                 loc = st.find(f"{{{_SITEMAP_NS}}}loc")
                 if loc is not None and loc.text:
                     log.debug("Following sitemap index child: %s", loc.text)
@@ -122,9 +119,7 @@ class SitemapConsumer:
             lastmod: datetime | None = None
             if lastmod_tag is not None and lastmod_tag.text:
                 try:
-                    lastmod = datetime.fromisoformat(
-                        lastmod_tag.text.replace("Z", "+00:00")
-                    )
+                    lastmod = datetime.fromisoformat(lastmod_tag.text.replace("Z", "+00:00"))
                 except ValueError:
                     pass
 
@@ -136,10 +131,12 @@ class SitemapConsumer:
                 except ValueError:
                     pass
 
-            entries.append(SitemapEntry(
-                url=loc.text.strip(),
-                lastmod=lastmod,
-                priority=priority,
-            ))
+            entries.append(
+                SitemapEntry(
+                    url=loc.text.strip(),
+                    lastmod=lastmod,
+                    priority=priority,
+                )
+            )
 
         return entries

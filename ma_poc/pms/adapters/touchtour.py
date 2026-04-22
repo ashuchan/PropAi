@@ -30,6 +30,7 @@ Key findings (preliminary, pending real captures):
     with the source-of-truth TouchTour data. Those are 3rd-party rollups,
     not TouchTour payloads.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any

@@ -1,4 +1,5 @@
 """Tests for F3 — compute_fallback_unit_id (v2 field names)."""
+
 from __future__ import annotations
 
 from ma_poc.validation.identity_fallback import compute_fallback_unit_id
@@ -106,7 +107,15 @@ def test_orchestrator_preserves_natural_unit_ids() -> None:
 
     class FakeExtract:
         property_id = "P1"
-        records = [{"unit_id": "NATURAL-001", "floor_plan_type": "2BR", "bedrooms": 2, "asking_rent": 2000, "sqft": 900}]
+        records = [
+            {
+                "unit_id": "NATURAL-001",
+                "floor_plan_type": "2BR",
+                "bedrooms": 2,
+                "asking_rent": 2000,
+                "sqft": 900,
+            }
+        ]
 
     result = validate(FakeExtract())
     assert result.accepted[0]["unit_id"] == "NATURAL-001"

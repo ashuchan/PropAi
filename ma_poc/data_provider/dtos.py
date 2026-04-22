@@ -10,6 +10,7 @@ Unknown-key tolerance (`extra="allow"` where appropriate) preserves forward
 compatibility with fields the scraper already writes but that aren't yet
 formalised.
 """
+
 from __future__ import annotations
 
 from datetime import datetime

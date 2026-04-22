@@ -2,6 +2,7 @@
 
 Uses mock pages instead of real Playwright to avoid network calls.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
@@ -9,7 +10,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ma_poc.pms.detector import detect_pms
-from ma_poc.pms.resolver import ResolvedTarget, resolve_target
+from ma_poc.pms.resolver import resolve_target
 
 
 def _make_mock_page(
@@ -26,12 +27,14 @@ def _make_mock_page(
     if evaluate_side_effects is not None:
         page.evaluate = AsyncMock(side_effect=evaluate_side_effects)
     else:
+
         async def _evaluate(script: str) -> list:
             if "querySelectorAll('a[href]')" in script:
                 return links or []
             if "querySelectorAll('iframe[src]')" in script:
                 return iframes or []
             return []
+
         page.evaluate = AsyncMock(side_effect=_evaluate)
 
     return page
@@ -106,10 +109,7 @@ async def test_resolver_returns_failed_when_nothing_found() -> None:
 async def test_resolver_caps_candidates_at_5() -> None:
     """Only first 5 candidates should be checked."""
     # Create 20 CTA links, all with availability text
-    links = [
-        {"href": f"https://example{i}.com/", "text": f"View Availability {i}"}
-        for i in range(20)
-    ]
+    links = [{"href": f"https://example{i}.com/", "text": f"View Availability {i}"} for i in range(20)]
     page = _make_mock_page(links=links, url="https://vanity.example/")
     detection = detect_pms("https://vanity.example/")
     result = await resolve_target(page, "https://vanity.example/", detection)
@@ -120,9 +120,7 @@ async def test_resolver_caps_candidates_at_5() -> None:
 @pytest.mark.asyncio
 async def test_resolver_handles_playwright_timeout() -> None:
     """TimeoutError from page.evaluate should not propagate."""
-    page = _make_mock_page(
-        evaluate_side_effects=[TimeoutError("page timeout"), TimeoutError("page timeout")]
-    )
+    page = _make_mock_page(evaluate_side_effects=[TimeoutError("page timeout"), TimeoutError("page timeout")])
     detection = detect_pms("https://vanity.example/")
     result = await resolve_target(page, "https://vanity.example/", detection)
     assert result.method == "failed"

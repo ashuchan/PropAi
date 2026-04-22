@@ -9,6 +9,7 @@ Acceptance criteria (CLAUDE.md PR-03 / Tier 2):
 - Confidence: 1.0 if all required fields present; degrade 0.15 per missing required
 - Bug-hunt #3: tolerate parse errors (extruct raises on malformed pages)
 """
+
 from __future__ import annotations
 
 import json
@@ -22,6 +23,7 @@ from scraper.browser import BrowserSession
 
 try:
     import extruct
+
     _EXTRUCT_OK = True
 except Exception:
     _EXTRUCT_OK = False

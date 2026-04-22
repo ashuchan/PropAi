@@ -1,13 +1,15 @@
 """Tests for scheduler — task assembly and prioritisation."""
+
 from __future__ import annotations
 
+from datetime import UTC
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from ma_poc.discovery.change_detector import ChangeDecision
-from ma_poc.discovery.contracts import CrawlTask, TaskReason
+from ma_poc.discovery.contracts import TaskReason
 from ma_poc.discovery.dlq import Dlq
 from ma_poc.discovery.frontier import Frontier
 from ma_poc.discovery.scheduler import Scheduler
@@ -58,13 +60,17 @@ async def test_scheduler_emits_dlq_revive_for_due_properties(tmp_path: Path) -> 
     s._frontier.upsert_url("https://a.com/1", "p1", 0, "csv")
     s._dlq.park("p1", "unreachable", "ERR")
     # Force retry_at to past
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
+
     entry = s._dlq._entries["p1"]
-    past = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+    past = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
     from ma_poc.discovery.dlq import DlqEntry
+
     s._dlq._entries["p1"] = DlqEntry(
-        property_id="p1", parked_at=entry.parked_at,
-        reason=entry.reason, last_error_signature=entry.last_error_signature,
+        property_id="p1",
+        parked_at=entry.parked_at,
+        reason=entry.reason,
+        last_error_signature=entry.last_error_signature,
         retry_at=past,
     )
     rows: list[dict] = []  # No CSV rows
@@ -88,12 +94,16 @@ async def test_scheduler_prioritises_dlq_revive_over_scheduled(tmp_path: Path) -
     s = _make_scheduler(tmp_path)
     s._frontier.upsert_url("https://dlq.com/1", "dlq1", 0, "csv")
     s._dlq.park("dlq1", "unreachable", "ERR")
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
+
     from ma_poc.discovery.dlq import DlqEntry
-    past = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+
+    past = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
     s._dlq._entries["dlq1"] = DlqEntry(
-        property_id="dlq1", parked_at=past,
-        reason="unreachable", last_error_signature="ERR",
+        property_id="dlq1",
+        parked_at=past,
+        reason="unreachable",
+        last_error_signature="ERR",
         retry_at=past,
     )
     rows = [{"property_id": "p2", "url": "https://a.com/2"}]
@@ -104,10 +114,7 @@ async def test_scheduler_prioritises_dlq_revive_over_scheduled(tmp_path: Path) -
 @pytest.mark.asyncio
 async def test_scheduler_shuffles_within_priority_by_host(tmp_path: Path) -> None:
     s = _make_scheduler(tmp_path)
-    rows = [
-        {"property_id": f"p{i}", "url": f"https://host{i % 3}.com/{i}"}
-        for i in range(9)
-    ]
+    rows = [{"property_id": f"p{i}", "url": f"https://host{i % 3}.com/{i}"} for i in range(9)]
     tasks = [t async for t in s.build_tasks(rows)]
     assert len(tasks) == 9
     # Verify tasks exist (shuffling is random, can't assert order)

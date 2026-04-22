@@ -6,6 +6,7 @@ Configure via env vars:
   OPENROUTER_MODEL         — text model (default: google/gemini-2.5-flash)
   OPENROUTER_VISION_MODEL  — vision model (default: google/gemini-2.5-flash)
 """
+
 from __future__ import annotations
 
 import base64
@@ -42,11 +43,15 @@ class OpenRouterLLMProvider(LLMProvider):
         )
         self._text_model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
         self._vision_model = os.getenv(
-            "OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash",
+            "OPENROUTER_VISION_MODEL",
+            "google/gemini-2.5-flash",
         )
 
     async def _complete_once(
-        self, system: str, user: str, max_tokens: int,
+        self,
+        system: str,
+        user: str,
+        max_tokens: int,
     ) -> str:
         resp = await self._client.chat.completions.create(
             model=self._text_model,
@@ -68,7 +73,10 @@ class OpenRouterLLMProvider(LLMProvider):
         return resp.choices[0].message.content or ""
 
     async def _extract_images_once(
-        self, images: list[bytes], prompt: str, max_tokens: int,
+        self,
+        images: list[bytes],
+        prompt: str,
+        max_tokens: int,
     ) -> dict[str, Any]:
         from llm.images import check_size
 
@@ -76,10 +84,12 @@ class OpenRouterLLMProvider(LLMProvider):
         for img in images:
             sized = check_size(img, OPENROUTER_IMAGE_LIMIT_BYTES)
             b64 = base64.b64encode(sized).decode("ascii")
-            content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/png;base64,{b64}"},
-            })
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{b64}"},
+                }
+            )
         resp = await self._client.chat.completions.create(
             model=self._vision_model,
             messages=[{"role": "user", "content": content}],  # type: ignore[list-item]

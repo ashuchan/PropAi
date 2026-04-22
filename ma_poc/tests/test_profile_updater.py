@@ -1,4 +1,5 @@
 """Tests for profile updater — claude-scrapper-arch.md Step 6.4."""
+
 from __future__ import annotations
 
 import pytest

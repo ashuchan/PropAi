@@ -15,6 +15,7 @@ Usage:
     python scripts/backfill_pg.py --run-dates 2026-04-14,2026-04-19
     python scripts/backfill_pg.py --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
@@ -42,6 +43,7 @@ SECTIONS = ("state", "profiles", "events", "runs", "extractions")
 
 def _build_source() -> FileSystemDataProvider:
     import os
+
     data_dir = Path(os.getenv("DATA_DIR", "./data"))
     config_dir = Path(os.getenv("CONFIG_DIR", "./config"))
     if not data_dir.is_absolute():
@@ -115,8 +117,10 @@ def copy_events(src: DataProvider, dst: DataProvider, dry_run: bool) -> None:
 
 
 def copy_runs(
-    src: DataProvider, dst: DataProvider,
-    dry_run: bool, only_dates: set[str] | None,
+    src: DataProvider,
+    dst: DataProvider,
+    dry_run: bool,
+    only_dates: set[str] | None,
 ) -> None:
     all_dates = src.runs.list_runs()
     dates = [d for d in all_dates if not only_dates or d in only_dates]
@@ -139,23 +143,26 @@ def copy_runs(
             dst.runs.append_ledger_entry(rd, entry)
         log.info(
             "runs: %s — %d properties, %d issues, %d ledger rows (%.1fs)",
-            rd, len(props), len(issues), len(ledger), time.time() - t0,
+            rd,
+            len(props),
+            len(issues),
+            len(ledger),
+            time.time() - t0,
         )
 
 
 def copy_extractions(
-    src: DataProvider, dst: DataProvider,
-    dry_run: bool, only_dates: set[str] | None,
+    src: DataProvider,
+    dst: DataProvider,
+    dry_run: bool,
+    only_dates: set[str] | None,
 ) -> None:
     """FS layout stores extraction results under extraction_output/{pid}/{date}.json.
 
     Since there's no per-store `list_all()`, we iterate runs × canonical_ids.
     This is a best-effort copy; missing files are skipped silently.
     """
-    dates = [
-        d for d in src.runs.list_runs()
-        if not only_dates or d in only_dates
-    ]
+    dates = [d for d in src.runs.list_runs() if not only_dates or d in only_dates]
     ids = src.property_state.all_canonical_ids()
     log.info("extractions: scanning %d runs × %d properties", len(dates), len(ids))
     if dry_run:
@@ -181,11 +188,13 @@ def main() -> int:
     ap.add_argument("--target", choices=("postgres", "sqlite"), default="postgres")
     ap.add_argument("--url", default=None, help="DATABASE_URL override")
     ap.add_argument(
-        "--only", default=",".join(SECTIONS),
+        "--only",
+        default=",".join(SECTIONS),
         help=f"Comma-separated section list (default: all). Options: {SECTIONS}",
     )
     ap.add_argument(
-        "--run-dates", default=None,
+        "--run-dates",
+        default=None,
         help="Comma-separated run_dates; restricts runs+extractions sections",
     )
     ap.add_argument("--dry-run", action="store_true")
@@ -203,8 +212,11 @@ def main() -> int:
 
     log.info(
         "Backfill %s→%s  sections=%s  dates=%s  dry_run=%s",
-        "filesystem", args.target, sorted(sections),
-        sorted(only_dates) if only_dates else "all", args.dry_run,
+        "filesystem",
+        args.target,
+        sorted(sections),
+        sorted(only_dates) if only_dates else "all",
+        args.dry_run,
     )
 
     src = _build_source()

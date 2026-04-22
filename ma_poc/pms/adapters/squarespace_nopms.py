@@ -17,6 +17,7 @@ Key findings:
   - The adapter returns empty units with an informative error, signaling to the
     orchestrator that no extraction is possible from this site type
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

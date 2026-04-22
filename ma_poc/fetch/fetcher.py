@@ -5,6 +5,7 @@ conditional GET, robots.txt, CAPTCHA detection, and Playwright rendering.
 
 Never raises on transient errors. Always returns a FetchResult.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -12,7 +13,7 @@ import gzip
 import logging
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -22,18 +23,18 @@ import httpx
 from ..discovery.contracts import CrawlTask
 from ..observability.events import EventKind, emit
 from .browser_pool import BrowserContextPool
-
-_MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
-_DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
 from .captcha_detect import looks_like_captcha
 from .conditional import ConditionalCache
 from .contracts import FetchOutcome, FetchResult, RenderMode
 from .proxy_pool import ProxyPool
 from .rate_limiter import HostRateLimiter
 from .response_classifier import classify
-from .retry_policy import RetryDecision, RetryPolicy
+from .retry_policy import RetryPolicy
 from .robots import RobotsConsumer
 from .stealth import Identity, IdentityPool
+
+_MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
+_DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
 
 log = logging.getLogger(__name__)
 
@@ -96,18 +97,28 @@ class Fetcher:
         identity = self._identities.pick(sticky_key=task.property_id)
         proxy = self._proxy_pool.pick(sticky_key=task.property_id)
 
-        emit(EventKind.FETCH_STARTED, task.property_id,
-             url=task.url, render_mode=task.render_mode.value, attempt=1)
+        emit(
+            EventKind.FETCH_STARTED,
+            task.property_id,
+            url=task.url,
+            render_mode=task.render_mode.value,
+            attempt=1,
+        )
 
         # 1. robots check
         try:
             allowed = await self._robots.is_allowed(task.url, identity.user_agent)
             if not allowed:
                 return FetchResult(
-                    url=task.url, outcome=FetchOutcome.HARD_FAIL,
-                    status=None, body=None, headers={},
-                    render_mode=task.render_mode, final_url=task.url,
-                    attempts=0, elapsed_ms=_now_ms() - start_ms,
+                    url=task.url,
+                    outcome=FetchOutcome.HARD_FAIL,
+                    status=None,
+                    body=None,
+                    headers={},
+                    render_mode=task.render_mode,
+                    final_url=task.url,
+                    attempts=0,
+                    elapsed_ms=_now_ms() - start_ms,
                     error_signature="ROBOTS_DISALLOWED",
                 )
         except Exception:
@@ -133,25 +144,35 @@ class Fetcher:
             attempt += 1
             # 3. Rate limit
             try:
-                await asyncio.wait_for(
-                    self._rate_limiter.acquire(host), timeout=30.0
-                )
-            except asyncio.TimeoutError:
+                await asyncio.wait_for(self._rate_limiter.acquire(host), timeout=30.0)
+            except TimeoutError:
                 pass
 
             # 4-5. Issue request
             try:
                 result = await self._do_request(
-                    task, identity, proxy, cached_etag, cached_lm, attempt, start_ms,
+                    task,
+                    identity,
+                    proxy,
+                    cached_etag,
+                    cached_lm,
+                    attempt,
+                    start_ms,
                 )
             except Exception as exc:
                 outcome, sig = classify(None, {}, None, exception=exc)
                 result = FetchResult(
-                    url=task.url, outcome=outcome, status=None,
-                    body=None, headers={}, render_mode=task.render_mode,
-                    final_url=task.url, attempts=attempt,
+                    url=task.url,
+                    outcome=outcome,
+                    status=None,
+                    body=None,
+                    headers={},
+                    render_mode=task.render_mode,
+                    final_url=task.url,
+                    attempts=attempt,
                     elapsed_ms=_now_ms() - start_ms,
-                    error_signature=sig, proxy_used=_redact_proxy(proxy),
+                    error_signature=sig,
+                    proxy_used=_redact_proxy(proxy),
                 )
 
             # Telemetry B + F: emit diagnostic-rich FETCH_COMPLETED so the
@@ -167,33 +188,41 @@ class Fetcher:
                 except Exception:
                     captcha_detected, captcha_provider = False, None
 
-            emit(EventKind.FETCH_COMPLETED, task.property_id,
-                 outcome=result.outcome.value, status=result.status,
-                 elapsed_ms=result.elapsed_ms, attempt=attempt,
-                 error_signature=result.error_signature,
-                 final_url=result.final_url,
-                 body_bytes=body_bytes_len,
-                 content_type=content_type,
-                 captcha_detected=captcha_detected,
-                 captcha_provider=captcha_provider,
-                 proxy_used=result.proxy_used,
-                 identity_ua_hash=_short_hash(identity.user_agent),
-                 render_mode=result.render_mode.value)
+            emit(
+                EventKind.FETCH_COMPLETED,
+                task.property_id,
+                outcome=result.outcome.value,
+                status=result.status,
+                elapsed_ms=result.elapsed_ms,
+                attempt=attempt,
+                error_signature=result.error_signature,
+                final_url=result.final_url,
+                body_bytes=body_bytes_len,
+                content_type=content_type,
+                captcha_detected=captcha_detected,
+                captcha_provider=captcha_provider,
+                proxy_used=result.proxy_used,
+                identity_ua_hash=_short_hash(identity.user_agent),
+                render_mode=result.render_mode.value,
+            )
 
             if captcha_detected:
-                emit(EventKind.FETCH_CAPTCHA_DETECTED, task.property_id,
-                     provider=captcha_provider, url=task.url, attempt=attempt)
+                emit(
+                    EventKind.FETCH_CAPTCHA_DETECTED,
+                    task.property_id,
+                    provider=captcha_provider,
+                    url=task.url,
+                    attempt=attempt,
+                )
 
             last_result = result
 
             # 6. Check if we got a good result
-            if result.outcome in (FetchOutcome.OK, FetchOutcome.NOT_MODIFIED,
-                                  FetchOutcome.HARD_FAIL):
+            if result.outcome in (FetchOutcome.OK, FetchOutcome.NOT_MODIFIED, FetchOutcome.HARD_FAIL):
                 break
 
             if result.outcome == FetchOutcome.BOT_BLOCKED:
-                emit(EventKind.FETCH_BOT_BLOCKED, task.property_id,
-                     url=task.url, attempt=attempt)
+                emit(EventKind.FETCH_BOT_BLOCKED, task.property_id, url=task.url, attempt=attempt)
 
             # 7. Retry decision
             retry_after = result.headers.get("retry-after")
@@ -215,17 +244,22 @@ class Fetcher:
                 and attempt >= 2
                 and is_timeout_class
             ):
-                emit(EventKind.FETCH_RETRY, task.property_id,
-                     wait_ms=0, reason="TRANSIENT_RENDER_TIMEOUT_CAP_2",
-                     skipped_further_retries=True,
-                     error_signature=result.error_signature)
+                emit(
+                    EventKind.FETCH_RETRY,
+                    task.property_id,
+                    wait_ms=0,
+                    reason="TRANSIENT_RENDER_TIMEOUT_CAP_2",
+                    skipped_further_retries=True,
+                    error_signature=result.error_signature,
+                )
                 break
 
             if not decision.should_retry:
                 break
 
-            emit(EventKind.FETCH_RETRY, task.property_id,
-                 wait_ms=decision.wait_ms, reason=result.outcome.value)
+            emit(
+                EventKind.FETCH_RETRY, task.property_id, wait_ms=decision.wait_ms, reason=result.outcome.value
+            )
 
             if decision.rotate_identity:
                 self._identities.rotate(task.property_id)
@@ -244,9 +278,7 @@ class Fetcher:
         if last_result.ok():
             try:
                 if last_result.etag or last_result.last_modified:
-                    self._cond_cache.write(
-                        task.url, last_result.etag, last_result.last_modified
-                    )
+                    self._cond_cache.write(task.url, last_result.etag, last_result.last_modified)
             except Exception as exc:
                 log.warning("Failed to write cond cache: %s", exc)
 
@@ -315,11 +347,15 @@ class Fetcher:
                 outcome, sig = classify(resp.status_code, resp_headers, body_head)
 
                 return FetchResult(
-                    url=task.url, outcome=outcome, status=resp.status_code,
-                    body=body, headers=resp_headers,
+                    url=task.url,
+                    outcome=outcome,
+                    status=resp.status_code,
+                    body=body,
+                    headers=resp_headers,
                     render_mode=task.render_mode,
                     final_url=str(resp.url),
-                    attempts=attempt, elapsed_ms=_now_ms() - start_ms,
+                    attempts=attempt,
+                    elapsed_ms=_now_ms() - start_ms,
                     etag=resp_headers.get("etag"),
                     last_modified=resp_headers.get("last-modified"),
                     error_signature=sig,
@@ -328,11 +364,17 @@ class Fetcher:
         except Exception as exc:
             outcome, sig = classify(None, {}, None, exception=exc)
             return FetchResult(
-                url=task.url, outcome=outcome, status=None,
-                body=None, headers={}, render_mode=task.render_mode,
-                final_url=task.url, attempts=attempt,
+                url=task.url,
+                outcome=outcome,
+                status=None,
+                body=None,
+                headers={},
+                render_mode=task.render_mode,
+                final_url=task.url,
+                attempts=attempt,
                 elapsed_ms=_now_ms() - start_ms,
-                error_signature=sig, proxy_used=_redact_proxy(proxy),
+                error_signature=sig,
+                proxy_used=_redact_proxy(proxy),
             )
 
     async def _do_render(
@@ -376,13 +418,15 @@ class Fetcher:
                         # adapters reject the response as a string. 256KB
                         # covers every real-world unit-API body we've seen
                         # while still capping image/HTML page captures.
-                        network_log.append({
-                            "url": url,
-                            "status": response.status,
-                            "content_type": content_type,
-                            "body_size": len(body),
-                            "body": body.decode("utf-8", errors="replace")[:262_144],
-                        })
+                        network_log.append(
+                            {
+                                "url": url,
+                                "status": response.status,
+                                "content_type": content_type,
+                                "body_size": len(body),
+                                "body": body.decode("utf-8", errors="replace")[:262_144],
+                            }
+                        )
                 except Exception:
                     pass
 
@@ -400,7 +444,9 @@ class Fetcher:
             nav_exc: Exception | None = None
             try:
                 resp = await page.goto(
-                    task.url, wait_until="domcontentloaded", timeout=timeout_ms,
+                    task.url,
+                    wait_until="domcontentloaded",
+                    timeout=timeout_ms,
                 )
             except Exception as exc:
                 nav_exc = exc
@@ -427,12 +473,18 @@ class Fetcher:
 
             if body_text is None or len(body_text) < 512:
                 outcome, sig = classify(
-                    resp.status if resp else None, {}, None, exception=nav_exc,
+                    resp.status if resp else None,
+                    {},
+                    None,
+                    exception=nav_exc,
                 )
                 return FetchResult(
-                    url=task.url, outcome=outcome,
+                    url=task.url,
+                    outcome=outcome,
                     status=resp.status if resp else None,
-                    body=None, headers={}, render_mode=RenderMode.RENDER,
+                    body=None,
+                    headers={},
+                    render_mode=RenderMode.RENDER,
                     final_url=page.url if nav_exc is None else task.url,
                     attempts=attempt,
                     elapsed_ms=_now_ms() - start_ms,
@@ -460,8 +512,11 @@ class Fetcher:
                 status = resp.status if resp else 200
                 if is_captcha:
                     outcome = FetchOutcome.BOT_BLOCKED
-                    sig = "CF_CHALLENGE" if provider == "cloudflare" \
+                    sig = (
+                        "CF_CHALLENGE"
+                        if provider == "cloudflare"
                         else f"CAPTCHA_{(provider or 'unknown').upper()}"
+                    )
                 else:
                     outcome = FetchOutcome.OK
                     sig = "TIMEOUT_SALVAGED"
@@ -470,10 +525,14 @@ class Fetcher:
                 outcome, sig = classify(status, resp_headers, body_head)
 
             return FetchResult(
-                url=task.url, outcome=outcome, status=status,
-                body=body, headers=resp_headers,
+                url=task.url,
+                outcome=outcome,
+                status=status,
+                body=body,
+                headers=resp_headers,
                 render_mode=RenderMode.RENDER,
-                final_url=final_url, attempts=attempt,
+                final_url=final_url,
+                attempts=attempt,
                 elapsed_ms=_now_ms() - start_ms,
                 network_log=network_log,
                 etag=resp_headers.get("etag"),
@@ -484,9 +543,14 @@ class Fetcher:
         except Exception as exc:
             outcome, sig = classify(None, {}, None, exception=exc)
             return FetchResult(
-                url=task.url, outcome=outcome, status=None,
-                body=None, headers={}, render_mode=RenderMode.RENDER,
-                final_url=task.url, attempts=attempt,
+                url=task.url,
+                outcome=outcome,
+                status=None,
+                body=None,
+                headers={},
+                render_mode=RenderMode.RENDER,
+                final_url=task.url,
+                attempts=attempt,
                 elapsed_ms=_now_ms() - start_ms,
                 network_log=network_log,
                 error_signature=sig,
@@ -506,6 +570,7 @@ def _redact_proxy(proxy: str | None) -> str | None:
     if proxy is None:
         return None
     import re
+
     return re.sub(r"://[^@]+@", "://***@", proxy)
 
 
@@ -514,6 +579,7 @@ def _short_hash(value: str | None) -> str | None:
     if not value:
         return None
     import hashlib
+
     return hashlib.sha256(value.encode("utf-8", errors="ignore")).hexdigest()[:10]
 
 
@@ -525,7 +591,7 @@ def _persist_raw_html(property_id: str, body: bytes) -> None:
         body: Raw HTML bytes.
     """
     try:
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
         data_dir = Path(os.getenv("DATA_DIR", _DEFAULT_DATA_DIR))
         out_dir = data_dir / "raw_html" / date_str
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -558,9 +624,7 @@ def get_default_fetcher() -> Fetcher:
             robots=RobotsConsumer(),
             cond_cache=ConditionalCache(cache_dir / "conditional.sqlite"),
             identities=IdentityPool(),
-            browsers=BrowserContextPool(
-                max_contexts=int(os.getenv("MAX_CONCURRENT_BROWSERS", "5"))
-            ),
+            browsers=BrowserContextPool(max_contexts=int(os.getenv("MAX_CONCURRENT_BROWSERS", "5"))),
             retry=RetryPolicy(),
         )
     return _default

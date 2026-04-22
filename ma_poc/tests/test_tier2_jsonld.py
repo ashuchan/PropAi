@@ -1,4 +1,5 @@
 """Tests for extraction/tier2_jsonld.py — 5+ tests."""
+
 from __future__ import annotations
 
 from extraction import tier2_jsonld

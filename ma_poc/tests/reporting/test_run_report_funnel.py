@@ -1,4 +1,5 @@
 """Tests for F7 — run_report funnel and pre-extraction termination separation."""
+
 from __future__ import annotations
 
 from pathlib import Path

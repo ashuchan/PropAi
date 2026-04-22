@@ -7,6 +7,7 @@ Acceptance criteria (CLAUDE.md PR-04 / Role B):
 - 100% of non-SKIPPED properties — banner_capture_attempted=True in ScrapeEvent
 - Output: {type, value, conditions, start_date, end_date, source="IMAGE_BANNER"}
 """
+
 from __future__ import annotations
 
 import re
@@ -16,12 +17,25 @@ from llm.factory import get_vision_provider
 from scraper.browser import BrowserSession
 
 _BANNER_KEYWORDS = (
-    "free", "off", "concession", "special", "limited", "weeks free",
-    "months free", "move in", "look and lease",
+    "free",
+    "off",
+    "concession",
+    "special",
+    "limited",
+    "weeks free",
+    "months free",
+    "move in",
+    "look and lease",
 )
 _BANNER_SELECTORS = (
-    ".banner", ".promo", ".specials", ".concession", "#promo",
-    "[class*=banner]", "[class*=promo]", "[class*=special]",
+    ".banner",
+    ".promo",
+    ".specials",
+    ".concession",
+    "#promo",
+    "[class*=banner]",
+    "[class*=promo]",
+    "[class*=special]",
 )
 
 _PROMPT = (
@@ -29,7 +43,7 @@ _PROMPT = (
     "website. If it advertises a concession, return JSON: "
     '{"type": "free_rent"|"discount"|"other", "value": str, "conditions": str|null, '
     '"start_date": str|null, "end_date": str|null, "source": "IMAGE_BANNER"}. '
-    "If there is no concession, return {\"type\": null}."
+    'If there is no concession, return {"type": null}.'
 )
 
 

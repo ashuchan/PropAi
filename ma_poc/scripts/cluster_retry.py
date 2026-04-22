@@ -7,6 +7,7 @@ Usage:
   # Retry properties from a specific registered domain
   python scripts/cluster_retry.py --retry gscapts.com --run-date 2026-04-21
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,6 +23,7 @@ log = logging.getLogger(__name__)
 
 try:
     import tldextract  # type: ignore[import]
+
     _HAS_TLDEXTRACT = True
 except ImportError:
     _HAS_TLDEXTRACT = False
@@ -65,8 +67,7 @@ def analyze(properties_json_path: Path) -> dict[str, Any]:
     by_domain: dict[str, list[dict]] = defaultdict(list)
     for prop in data:
         website = (
-            prop.get("Website") or prop.get("website") or
-            prop.get("base_url") or prop.get("_base_url") or ""
+            prop.get("Website") or prop.get("website") or prop.get("base_url") or prop.get("_base_url") or ""
         )
         domain = registered_domain(website)
         if domain:
@@ -76,10 +77,7 @@ def analyze(properties_json_path: Path) -> dict[str, Any]:
     domain_stats: list[dict[str, Any]] = []
     for domain, props in sorted(by_domain.items()):
         meta_list = [p.get("_meta", {}) or {} for p in props]
-        failure_count = sum(
-            1 for m in meta_list
-            if str(m.get("verdict", "")).startswith("FAILED")
-        )
+        failure_count = sum(1 for m in meta_list if str(m.get("verdict", "")).startswith("FAILED"))
         if failure_count == 0:
             continue
         # Tier distribution
@@ -101,18 +99,22 @@ def analyze(properties_json_path: Path) -> dict[str, Any]:
                 if sample_body:
                     break
         recommendation = (
-            "dedicated_adapter" if failure_count >= 3 and not sample_body else
-            "pms_hints_needed" if failure_count >= 3 else
-            "generic_adapter_fix"
+            "dedicated_adapter"
+            if failure_count >= 3 and not sample_body
+            else "pms_hints_needed"
+            if failure_count >= 3
+            else "generic_adapter_fix"
         )
-        domain_stats.append({
-            "domain": domain,
-            "total_properties": len(props),
-            "failure_count": failure_count,
-            "tier_distribution": dict(tier_counter.most_common()),
-            "sample_body": sample_body,
-            "recommendation": recommendation,
-        })
+        domain_stats.append(
+            {
+                "domain": domain,
+                "total_properties": len(props),
+                "failure_count": failure_count,
+                "tier_distribution": dict(tier_counter.most_common()),
+                "sample_body": sample_body,
+                "recommendation": recommendation,
+            }
+        )
 
     # Sort by failure_count descending
     domain_stats.sort(key=lambda d: -d["failure_count"])
@@ -130,21 +132,25 @@ def analyze(properties_json_path: Path) -> dict[str, Any]:
         "",
     ]
     for stat in domain_stats:
-        lines.extend([
-            f"### {stat['domain']} — {stat['failure_count']} failures / {stat['total_properties']} total",
-            "",
-            f"**Tier distribution:** {stat['tier_distribution']}",
-            "",
-            f"**Recommendation:** {stat['recommendation']}",
-            "",
-        ])
+        lines.extend(
+            [
+                f"### {stat['domain']} — {stat['failure_count']} failures / {stat['total_properties']} total",
+                "",
+                f"**Tier distribution:** {stat['tier_distribution']}",
+                "",
+                f"**Recommendation:** {stat['recommendation']}",
+                "",
+            ]
+        )
         if stat["sample_body"]:
-            lines.extend([
-                "**Sample API body (first 500 chars):**",
-                "",
-                f"```\n{stat['sample_body']}\n```",
-                "",
-            ])
+            lines.extend(
+                [
+                    "**Sample API body (first 500 chars):**",
+                    "",
+                    f"```\n{stat['sample_body']}\n```",
+                    "",
+                ]
+            )
 
     report_path.write_text("\n".join(lines), encoding="utf-8")
     log.info("Cluster analysis written to %s", report_path)
@@ -184,8 +190,7 @@ def filter_by_domain(properties: list[dict], domain: str) -> list[dict]:
     result = []
     for prop in properties:
         website = (
-            prop.get("Website") or prop.get("website") or
-            prop.get("base_url") or prop.get("_base_url") or ""
+            prop.get("Website") or prop.get("website") or prop.get("base_url") or prop.get("_base_url") or ""
         )
         if registered_domain(website) == domain:
             result.append(prop)

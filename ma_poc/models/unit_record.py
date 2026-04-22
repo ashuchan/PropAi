@@ -8,6 +8,7 @@ Acceptance criteria (CLAUDE.md):
 - Field names are FROZEN — Phase B imports this model directly
 - confidence_score in [0.0, 1.0]
 """
+
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Any

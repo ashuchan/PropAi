@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 # Ensure the ma_poc package root is importable
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
@@ -129,9 +129,7 @@ class TestChanges:
             {"unit_id": "U103", "asking_rent": 1600, "sqft": 900},
         ]
         result = _base_result(units=current_units)
-        report = generate_property_report(
-            result, "P001", "2026-04-17", prior_units=prior
-        )
+        report = generate_property_report(result, "P001", "2026-04-17", prior_units=prior)
         assert "## Changes since last run" in report
         assert "New units" in report
         assert "U103" in report
@@ -141,9 +139,7 @@ class TestChanges:
 
     def test_report_omits_changes_for_new_property(self):
         result = _base_result(units=[{"unit_number": "101"}])
-        report = generate_property_report(
-            result, "P001", "2026-04-17", prior_units=None
-        )
+        report = generate_property_report(result, "P001", "2026-04-17", prior_units=None)
         assert "## Changes since last run" not in report
 
 

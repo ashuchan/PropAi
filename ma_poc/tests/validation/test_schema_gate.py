@@ -1,4 +1,5 @@
 """Tests for schema_gate — unit record validation."""
+
 from __future__ import annotations
 
 from ma_poc.validation.schema_gate import check

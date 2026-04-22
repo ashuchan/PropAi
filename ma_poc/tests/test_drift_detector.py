@@ -1,4 +1,5 @@
 """Tests for drift detector — claude-scrapper-arch.md Step 6.5."""
+
 from __future__ import annotations
 
 from models.scrape_profile import ProfileMaturity, ScrapeProfile

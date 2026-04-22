@@ -1,4 +1,5 @@
 """Tests for ma_poc.services.llm_diagnostics (F1 + F2)."""
+
 from __future__ import annotations
 
 import json
@@ -87,7 +88,7 @@ async def test_dg_t04b_adapter_debugger_returns_valid_diagnosis_on_good_llm_resp
         "payload_url": "https://example.com/api",
         "diagnosis_summary": "Parser expects lowercase keys but payload uses PascalCase.",
         "failure_category": "case_mismatch",
-        "wrapper_fix": {"wrapper_key_path": ["data"], "evidence": "{\"data\": [...]}"},
+        "wrapper_fix": {"wrapper_key_path": ["data"], "evidence": '{"data": [...]}'},
         "field_fixes": [
             {
                 "original_key": "floorplanname",
@@ -111,8 +112,10 @@ async def test_dg_t04b_adapter_debugger_returns_valid_diagnosis_on_good_llm_resp
     fake_provider = AsyncMock()
     fake_provider.complete = AsyncMock(return_value=json.dumps(llm_json))
     fake_provider._last_usage = {
-        "input_tokens": 100, "output_tokens": 50,
-        "model": "gpt-4o-mini", "provider": "azure",
+        "input_tokens": 100,
+        "output_tokens": 50,
+        "model": "gpt-4o-mini",
+        "provider": "azure",
     }
 
     with patch("llm.factory.get_text_provider", return_value=fake_provider):
@@ -370,7 +373,10 @@ async def test_nf_t06_high_confidence_recovery_applied_in_jugnu_hook(
         AsyncMock(return_value=fake_recovery),
     ):
         await _run_null_field_recovery(
-            scrape_result, formatted, tmp_path, "P001",
+            scrape_result,
+            formatted,
+            tmp_path,
+            "P001",
         )
 
     assert unit["rent_low"] == 2195

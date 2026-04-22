@@ -17,6 +17,7 @@ Changes applied:
 Keeps v1 copy under config/profiles/_audit/<cid>_v1.json.
 If api_provider is null/unknown: runs detect_pms(entry_url) to populate it.
 """
+
 from __future__ import annotations
 
 import json
@@ -75,17 +76,20 @@ def _migrate_one(raw: dict[str, Any]) -> dict[str, Any]:
     confidence.setdefault("consecutive_unreachable", 0)
 
     # --- stats: initialize ---
-    raw.setdefault("stats", {
-        "total_scrapes": 0,
-        "total_successes": 0,
-        "total_failures": 0,
-        "total_llm_calls": 0,
-        "total_llm_cost_usd": 0.0,
-        "last_tier_used": None,
-        "last_unit_count": 0,
-        "p50_scrape_duration_ms": None,
-        "p95_scrape_duration_ms": None,
-    })
+    raw.setdefault(
+        "stats",
+        {
+            "total_scrapes": 0,
+            "total_successes": 0,
+            "total_failures": 0,
+            "total_llm_calls": 0,
+            "total_llm_cost_usd": 0.0,
+            "last_tier_used": None,
+            "last_unit_count": 0,
+            "p50_scrape_duration_ms": None,
+            "p95_scrape_duration_ms": None,
+        },
+    )
 
     # --- Detect PMS if api_provider is unknown ---
     entry_url = raw.get("navigation", {}).get("entry_url", "")

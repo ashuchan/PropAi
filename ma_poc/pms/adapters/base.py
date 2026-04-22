@@ -1,4 +1,5 @@
 """Adapter protocol + shared dataclasses. See claude_refactor.md Phase 2."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

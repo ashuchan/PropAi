@@ -3,6 +3,7 @@
 Flags suspicious changes but does NOT reject. Flags feed into L5
 observability and per-property reports.
 """
+
 from __future__ import annotations
 
 import logging

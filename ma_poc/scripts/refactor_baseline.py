@@ -16,6 +16,7 @@ Metrics (see ``claude_refactor.md`` Phase 0):
     also made at least one LLM call. Matches the property-5317 failure mode
     where LLM ran on an SSL-error page and burned $0.01375.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -222,7 +223,9 @@ def build_duration_block(avg_s: float | None, p95_s: float | None) -> str:
     def fmt(v: float | None) -> str:
         return f"{v:.1f}s" if v is not None else "n/a"
 
-    return _table(["Metric", "Value"], [("Avg scrape duration", fmt(avg_s)), ("P95 scrape duration", fmt(p95_s))])
+    return _table(
+        ["Metric", "Value"], [("Avg scrape duration", fmt(avg_s)), ("P95 scrape duration", fmt(p95_s))]
+    )
 
 
 def produce_report(run_dir: Path, profiles_dir: Path) -> str:

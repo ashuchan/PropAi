@@ -1,4 +1,5 @@
 """Tests for proxy_pool — health-weighted proxy selection."""
+
 from __future__ import annotations
 
 from ma_poc.fetch.proxy_pool import ProxyPool

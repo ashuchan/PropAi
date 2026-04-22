@@ -7,6 +7,7 @@ Acceptance criteria (CLAUDE.md PR-01):
 - Always serialize via model.model_dump(mode="json") — never .dict()
 - Per-property extraction output written to data/extraction_output/{property_id}/{date}.json
 """
+
 from __future__ import annotations
 
 import asyncio

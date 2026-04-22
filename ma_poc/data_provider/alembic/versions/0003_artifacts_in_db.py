@@ -18,17 +18,18 @@ without falling back to the filesystem:
 
 Profiles already live in `scrape_profiles` from `0001_initial`.
 """
+
 from __future__ import annotations
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0003_artifacts"
-down_revision: Union[str, None] = "0002_v2_strict"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0002_v2_strict"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -40,7 +41,9 @@ def upgrade() -> None:
         sa.Column("written_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
     )
     op.create_index(
-        "ix_property_reports_run", "property_reports", ["run_date"],
+        "ix_property_reports_run",
+        "property_reports",
+        ["run_date"],
     )
 
     op.create_table(
@@ -58,7 +61,9 @@ def upgrade() -> None:
         sa.Column("written_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
     )
     op.create_index(
-        "ix_llm_property_details_run", "llm_property_details", ["run_date"],
+        "ix_llm_property_details_run",
+        "llm_property_details",
+        ["run_date"],
     )
 
     op.create_table(
@@ -70,7 +75,8 @@ def upgrade() -> None:
         sa.Column("written_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
     )
     op.create_index(
-        "ix_llm_diagnostics_run_prop", "llm_diagnostics",
+        "ix_llm_diagnostics_run_prop",
+        "llm_diagnostics",
         ["run_date", "property_id"],
     )
 

@@ -3,6 +3,7 @@
 Addresses the 1,014 UNIT_MISSING_ID warnings from the 04-17 run by computing
 a stable fingerprint from floor_plan + bedrooms + bathrooms + sqft + rent.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -43,12 +44,7 @@ def compute_fallback_id(record: dict[str, Any]) -> str | None:
     sqft = record.get("sqft") or record.get("square_feet") or 0
     sqft_rounded = _round_to(int(sqft), 10)
 
-    rent = (
-        record.get("asking_rent")
-        or record.get("market_rent_low")
-        or record.get("rent")
-        or 0
-    )
+    rent = record.get("asking_rent") or record.get("market_rent_low") or record.get("rent") or 0
     rent_rounded = _round_to(int(rent), 25)
 
     hash_input = (
@@ -71,6 +67,7 @@ def compute_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | No
 
     Prefix 'inferred_' marks the ID as non-natural for downstream consumers.
     """
+
     def _n(v: Any) -> str:
         if v is None:
             return ""

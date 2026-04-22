@@ -2,6 +2,7 @@
 
 Pure function. No I/O. Decision rules applied in order, first match wins.
 """
+
 from __future__ import annotations
 
 import logging
@@ -71,9 +72,7 @@ def decide(
             try:
                 last_dt = datetime.fromisoformat(last_attempted)
                 if sitemap_lastmod < last_dt:
-                    return ChangeDecision(
-                        RenderMode.GET, "sitemap_unchanged", True
-                    )
+                    return ChangeDecision(RenderMode.GET, "sitemap_unchanged", True)
             except ValueError:
                 pass
 

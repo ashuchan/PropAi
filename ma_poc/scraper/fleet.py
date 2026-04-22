@@ -11,6 +11,7 @@ Acceptance criteria (CLAUDE.md PR-01):
 - One ScrapeEvent per scrape, written via EventLog
 - Per-property extraction output written to data/extraction_output/{pid}/{date}.json
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -22,9 +23,6 @@ from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Any
 
-_MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
-_DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
-
 from extraction.pipeline import run_extraction_pipeline
 from extraction.tier5_vision import maybe_run_vision_fallback
 from extraction.vision_banner import capture_banner
@@ -35,6 +33,9 @@ from scraper.browser import BrowserFleet
 from scraper.change_detection import ChangeDetector, StateStore
 from scraper.proxy_manager import ProxyManager
 from storage.event_log import EventLog, write_extraction_output
+
+_MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
+_DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
 
 try:
     from zoneinfo import ZoneInfo
@@ -90,8 +91,7 @@ def load_properties(csv_path: Path | str) -> list[PropertyRow]:
             header = next(reader)
         except StopIteration:
             return rows
-        col_map = {i: _HEADER_ALIASES.get(h.strip().lower(), h.strip().lower())
-                   for i, h in enumerate(header)}
+        col_map = {i: _HEADER_ALIASES.get(h.strip().lower(), h.strip().lower()) for i, h in enumerate(header)}
         for raw in reader:
             if not raw:
                 continue
@@ -101,7 +101,9 @@ def load_properties(csv_path: Path | str) -> list[PropertyRow]:
                 if key:
                     row[key] = (value or "").strip()
             raw_type = row.get("type", "").lower()
-            type_norm = "LEASE_UP" if raw_type in ("lease-up", "lease up", "lease_up", "leaseup") else "STABILISED"
+            type_norm = (
+                "LEASE_UP" if raw_type in ("lease-up", "lease up", "lease_up", "leaseup") else "STABILISED"
+            )
             pid = row.get("property_id", "")
             url = row.get("url", "")
             if not pid or not url:
@@ -126,10 +128,18 @@ def _local_tz_for(row: PropertyRow) -> Any:
         return ZoneInfo("America/New_York") if ZoneInfo is not None else None
     # We do not have lat/lng — fall back to state-based approximation.
     state_tz = {
-        "NY": "America/New_York", "NJ": "America/New_York", "PA": "America/New_York",
-        "MA": "America/New_York", "CT": "America/New_York", "FL": "America/New_York",
-        "IL": "America/Chicago", "TX": "America/Chicago", "CO": "America/Denver",
-        "CA": "America/Los_Angeles", "WA": "America/Los_Angeles", "OR": "America/Los_Angeles",
+        "NY": "America/New_York",
+        "NJ": "America/New_York",
+        "PA": "America/New_York",
+        "MA": "America/New_York",
+        "CT": "America/New_York",
+        "FL": "America/New_York",
+        "IL": "America/Chicago",
+        "TX": "America/Chicago",
+        "CO": "America/Denver",
+        "CA": "America/Los_Angeles",
+        "WA": "America/Los_Angeles",
+        "OR": "America/Los_Angeles",
         "AZ": "America/Phoenix",
     }
     tz_name = state_tz.get((row.state or "").upper(), "America/New_York")
@@ -172,7 +182,9 @@ class ScrapeFleet:
     ) -> None:
         self.properties = properties
         self.data_dir = Path(data_dir if data_dir is not None else os.getenv("DATA_DIR", _DEFAULT_DATA_DIR))
-        self.max_concurrent = int(max_concurrent if max_concurrent is not None else os.getenv("MAX_CONCURRENT_BROWSERS", "10"))
+        self.max_concurrent = int(
+            max_concurrent if max_concurrent is not None else os.getenv("MAX_CONCURRENT_BROWSERS", "10")
+        )
         self.api_catalogue = api_catalogue or {}
         self.proxy_manager = ProxyManager()
         self.browser_fleet = BrowserFleet(
@@ -212,8 +224,10 @@ class ScrapeFleet:
                         print(f"  [{done_count}/{total}] {batch[i].property_id} CRASHED: {r}")
                     else:
                         events.append(r)
-                        print(f"  [{done_count}/{total}] {r.property_id} → {r.scrape_outcome}"
-                              f" (tier={r.extraction_tier}, conf={r.confidence_score})")
+                        print(
+                            f"  [{done_count}/{total}] {r.property_id} → {r.scrape_outcome}"
+                            f" (tier={r.extraction_tier}, conf={r.confidence_score})"
+                        )
                 # Let Playwright drain between batches
                 await asyncio.sleep(1.0)
 
@@ -225,9 +239,7 @@ class ScrapeFleet:
     async def _scrape_one(self, row: PropertyRow) -> ScrapeEvent:
         per_property_timeout = int(os.getenv("PER_PROPERTY_TIMEOUT_S", "120"))
         try:
-            return await asyncio.wait_for(
-                self._scrape_one_inner(row), timeout=per_property_timeout
-            )
+            return await asyncio.wait_for(self._scrape_one_inner(row), timeout=per_property_timeout)
         except TimeoutError:
             print(f"  [timeout] {row.property_id} exceeded {per_property_timeout}s")
             evt = ScrapeEvent(
@@ -273,7 +285,9 @@ class ScrapeFleet:
                         failure_reason=None,
                         page_load_ms=None,
                         proxy_used=False,
-                        proxy_provider=self.proxy_manager.creds.provider if self.proxy_manager.creds else None,
+                        proxy_provider=self.proxy_manager.creds.provider
+                        if self.proxy_manager.creds
+                        else None,
                         vision_fallback_used=False,
                         banner_capture_attempted=False,
                         banner_concession_found=False,
@@ -281,13 +295,13 @@ class ScrapeFleet:
                         confidence_score=None,
                     )
                     await self.event_log.append(evt)
-                    await self._write_carryforward_output(row.property_id, scrape_ts.date(), state.carryforward_days)
+                    await self._write_carryforward_output(
+                        row.property_id, scrape_ts.date(), state.carryforward_days
+                    )
                     return evt
 
             # Full scrape path
-            session = await self.browser_fleet.scrape(
-                row.property_id, row.url, pms_platform=row.pms_platform
-            )
+            session = await self.browser_fleet.scrape(row.property_id, row.url, pms_platform=row.pms_platform)
             page_load_ms = session.page_load_ms
             raw_html_path = str(session.raw_html_path) if session.raw_html_path else None
             screenshot_path = str(session.screenshot_path) if session.screenshot_path else None

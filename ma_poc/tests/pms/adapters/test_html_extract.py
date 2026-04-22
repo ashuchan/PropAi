@@ -1,4 +1,5 @@
 """Tests for HTML-based JSON-LD + embedded-JSON extractors (step 4)."""
+
 from __future__ import annotations
 
 import json
@@ -13,8 +14,8 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.adapters.generic import GenericAdapter
 from ma_poc.pms.detector import detect_pms
 
-
 # ── JSON-LD ──────────────────────────────────────────────────────────────────
+
 
 def test_jsonld_apartment_with_offers() -> None:
     html = """<html><head>
@@ -80,17 +81,29 @@ def test_jsonld_empty_html_returns_empty() -> None:
 
 # ── Embedded JSON / SSR globals ──────────────────────────────────────────────
 
+
 def test_embedded_next_data_block() -> None:
     # Pad payload over the 200-char length threshold — production pages are
     # always many KB; the threshold filters noise-scale inline configs.
-    payload = {"props": {"pageProps": {
-        "floorPlans": [
-            {"id": i, "name": f"Plan{i}", "beds": 1 + (i % 3),
-             "minRent": 1500 + 50 * i, "maxRent": 1600 + 50 * i,
-             "sqft": 650 + 50 * i, "building": "Main", "floor": i // 4}
-            for i in range(6)
-        ]
-    }}}
+    payload = {
+        "props": {
+            "pageProps": {
+                "floorPlans": [
+                    {
+                        "id": i,
+                        "name": f"Plan{i}",
+                        "beds": 1 + (i % 3),
+                        "minRent": 1500 + 50 * i,
+                        "maxRent": 1600 + 50 * i,
+                        "sqft": 650 + 50 * i,
+                        "building": "Main",
+                        "floor": i // 4,
+                    }
+                    for i in range(6)
+                ]
+            }
+        }
+    }
     html = f"""<html><body>
     <script id="__NEXT_DATA__" type="application/json">
     {json.dumps(payload)}
@@ -102,9 +115,15 @@ def test_embedded_next_data_block() -> None:
 
 def test_embedded_script_var_assignment() -> None:
     plans = [
-        {"id": i, "name": f"A{i}", "bedrooms": 1 + (i % 3),
-         "rent": 1500 + 100 * i, "sqft": 650 + 50 * i,
-         "building": "Main", "availableDate": "2026-05-01"}
+        {
+            "id": i,
+            "name": f"A{i}",
+            "bedrooms": 1 + (i % 3),
+            "rent": 1500 + 100 * i,
+            "sqft": 650 + 50 * i,
+            "building": "Main",
+            "availableDate": "2026-05-01",
+        }
         for i in range(8)
     ]
     html = f"""<html><body>
@@ -127,11 +146,23 @@ def test_embedded_gates_unit_keyword_presence() -> None:
 
 
 def test_embedded_window_nextdata_inline() -> None:
-    payload = {"buildId": "x", "props": {"pageProps": {"floorplans": [
-        {"id": i, "name": f"B{i}", "beds": 1 + (i % 2),
-         "rent": 1400 + 100 * i, "sqft": 700 + 40 * i}
-        for i in range(5)
-    ]}}}
+    payload = {
+        "buildId": "x",
+        "props": {
+            "pageProps": {
+                "floorplans": [
+                    {
+                        "id": i,
+                        "name": f"B{i}",
+                        "beds": 1 + (i % 2),
+                        "rent": 1400 + 100 * i,
+                        "sqft": 700 + 40 * i,
+                    }
+                    for i in range(5)
+                ]
+            }
+        },
+    }
     html = f"""<html><body>
     <script>window.__NEXT_DATA__ = {json.dumps(payload)};</script>
     </body></html>"""
@@ -141,8 +172,10 @@ def test_embedded_window_nextdata_inline() -> None:
 
 # ── Generic adapter end-to-end (fetch_result.body only, no page) ─────────────
 
+
 class _FetchResult:
     """Minimal stand-in for the Jugnu FetchResult (only .body is needed here)."""
+
     def __init__(self, body: bytes) -> None:
         self.body = body
 
@@ -183,9 +216,15 @@ async def test_generic_adapter_recovers_units_from_jsonld_without_page() -> None
 async def test_generic_adapter_recovers_units_from_embedded_json() -> None:
     """Raw HTML with inline floorPlans assignment — no API, no JSON-LD."""
     plans = [
-        {"id": f"A{i}", "name": f"A{i}", "bedrooms": 1 + (i % 2),
-         "rent": 1500 + 50 * i, "sqft": 650 + 25 * i,
-         "availableDate": "2026-05-01", "building": "Main"}
+        {
+            "id": f"A{i}",
+            "name": f"A{i}",
+            "bedrooms": 1 + (i % 2),
+            "rent": 1500 + 50 * i,
+            "sqft": 650 + 25 * i,
+            "availableDate": "2026-05-01",
+            "building": "Main",
+        }
         for i in range(6)
     ]
     html = f"""<html><body>

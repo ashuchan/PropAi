@@ -1,4 +1,5 @@
 """Phase 2 — adapter registry tests."""
+
 from __future__ import annotations
 
 import typing as t
@@ -17,8 +18,15 @@ from ma_poc.pms.detector import DetectedPMS
 
 # Literals that must resolve to a concrete, non-generic adapter.
 _CONCRETE_PMS_LITERALS = [
-    "rentcafe", "entrata", "appfolio", "onesite", "sightmap",
-    "realpage_oll", "avalonbay", "squarespace_nopms", "wix_nopms",
+    "rentcafe",
+    "entrata",
+    "appfolio",
+    "onesite",
+    "sightmap",
+    "realpage_oll",
+    "avalonbay",
+    "squarespace_nopms",
+    "wix_nopms",
 ]
 
 
@@ -82,6 +90,7 @@ def test_every_concrete_adapter_returns_adapter_result() -> None:
 
     async def _call() -> AdapterResult:
         from ma_poc.pms.detector import detect_pms
+
         ctx = AdapterContext(
             base_url="https://example.com",
             detected=detect_pms("https://example.com"),

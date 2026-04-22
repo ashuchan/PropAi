@@ -59,6 +59,7 @@ from typing import Any
 # Load .env early so API keys are available for LLM providers.
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -76,7 +77,6 @@ for _p in (_HERE, _PROJECT_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-import validation as V  # noqa: E402
 from concurrency import SystemResources  # noqa: E402
 from daily_runner import (  # noqa: E402
     TARGET_PROPERTY_FIELDS,
@@ -103,10 +103,13 @@ from scrape_properties import (  # noqa: E402
 )
 from state_store import StateStore  # noqa: E402
 
+import validation as V  # noqa: E402
+
 try:
+    from services.drift_detector import apply_drift_demotion, detect_drift
     from services.profile_store import ProfileStore
     from services.profile_updater import update_profile_after_extraction
-    from services.drift_detector import detect_drift, apply_drift_demotion
+
     _PROFILES_AVAILABLE = True
 except ImportError:
     _PROFILES_AVAILABLE = False
@@ -147,11 +150,13 @@ def _write_retry_markdown(path: Path, report: dict) -> None:
     lines.append("## State diff")
     sd = report.get("state_diff", {})
     lines.append(f"- Carry-forward used: **{sd.get('carry_forward_count', 0)}** properties")
-    lines.append(f"- Unit totals — extracted: {sd.get('units_extracted', 0)}, "
-                 f"new: {sd.get('units_new', 0)}, updated: {sd.get('units_updated', 0)}, "
-                 f"unchanged: {sd.get('units_unchanged', 0)}, "
-                 f"disappeared: {sd.get('units_disappeared', 0)}, "
-                 f"carried-forward: {sd.get('units_carried_forward', 0)}")
+    lines.append(
+        f"- Unit totals — extracted: {sd.get('units_extracted', 0)}, "
+        f"new: {sd.get('units_new', 0)}, updated: {sd.get('units_updated', 0)}, "
+        f"unchanged: {sd.get('units_unchanged', 0)}, "
+        f"disappeared: {sd.get('units_disappeared', 0)}, "
+        f"carried-forward: {sd.get('units_carried_forward', 0)}"
+    )
     lines.append("")
     if report.get("failed_properties"):
         lines.append("## Failed properties (first 50)")
@@ -272,11 +277,14 @@ def _merge_properties(
 
     Match key: _meta.canonical_id (preferred) or Unique ID.
     """
+
     def _get_cid(rec: dict) -> str | None:
         meta = rec.get("_meta") or {}
-        return (meta.get("canonical_id")
-                or rec.get("Unique ID")
-                or str(rec["apartment_id"]) if rec.get("apartment_id") else None)
+        return (
+            meta.get("canonical_id") or rec.get("Unique ID") or str(rec["apartment_id"])
+            if rec.get("apartment_id")
+            else None
+        )
 
     # Index new records by canonical_id for O(1) lookup.
     new_by_cid: dict[str, dict] = {}
@@ -336,8 +344,8 @@ async def run_retry(
     _configure_logging(run_dir)
 
     properties_path = run_dir / "properties.json"
-    ledger_path     = run_dir / "ledger.jsonl"
-    issues_path     = run_dir / "issues.jsonl"
+    ledger_path = run_dir / "ledger.jsonl"
+    issues_path = run_dir / "issues.jsonl"
 
     all_issues: list[V.ValidationIssue] = []
     failed_properties: list[dict] = []
@@ -364,17 +372,23 @@ async def run_retry(
     # ── 3. Filter rows based on mode ────────────────────────────────────
     if mode == "resume":
         eligible = _filter_rows_resume(rows, identities, ledger)
-        log.info(f"RESUME mode: {len(eligible)} rows to process "
-                 f"({len(rows) - len(eligible)} already succeeded)")
+        log.info(
+            f"RESUME mode: {len(eligible)} rows to process ({len(rows) - len(eligible)} already succeeded)"
+        )
     elif mode == "retry_errors":
         eligible = _filter_rows_retry_errors(rows, identities, ledger)
         # Break down WHY each row is eligible so the operator can see
         # the distribution of failure types.
-        n_failed = sum(1 for _, _, ident in eligible
-                       if ledger.get(ident.canonical_id or "", {}).get("status") == "FAILED")
+        n_failed = sum(
+            1
+            for _, _, ident in eligible
+            if ledger.get(ident.canonical_id or "", {}).get("status") == "FAILED"
+        )
         n_zero_units = len(eligible) - n_failed
-        log.info(f"RETRY-ERRORS mode: {len(eligible)} rows to retry "
-                 f"({n_failed} FAILED, {n_zero_units} SUCCESS/SUCCESS_WITH_ERRORS with 0 units)")
+        log.info(
+            f"RETRY-ERRORS mode: {len(eligible)} rows to retry "
+            f"({n_failed} FAILED, {n_zero_units} SUCCESS/SUCCESS_WITH_ERRORS with 0 units)"
+        )
     else:
         log.error(f"Unknown mode: {mode}")
         return {"exit_status": "FATAL", "error": f"unknown mode: {mode}"}
@@ -406,8 +420,14 @@ async def run_retry(
     processed_count = 0
     success_count = 0
 
-    units_total = {"extracted": 0, "new": 0, "updated": 0, "unchanged": 0,
-                   "disappeared": 0, "carried_forward": 0}
+    units_total = {
+        "extracted": 0,
+        "new": 0,
+        "updated": 0,
+        "unchanged": 0,
+        "disappeared": 0,
+        "carried_forward": 0,
+    }
     carry_forward_count = 0
 
     profile_store = None
@@ -426,40 +446,54 @@ async def run_retry(
         cid = ident.canonical_id
 
         if cid is None:
-            failed_properties.append({
-                "row_index": orig_idx, "canonical_id": None,
-                "reason": "IDENTITY_UNRESOLVED",
-            })
+            failed_properties.append(
+                {
+                    "row_index": orig_idx,
+                    "canonical_id": None,
+                    "reason": "IDENTITY_UNRESOLVED",
+                }
+            )
             minimal = {f: None for f in TARGET_PROPERTY_FIELDS}
             minimal["Property Name"] = csv_get(row, *NAME_KEYS) or None
-            minimal["Website"]       = url or None
-            minimal["Update Date"]   = date.today().isoformat()
-            minimal["units"]         = []
+            minimal["Website"] = url or None
+            minimal["Update Date"] = date.today().isoformat()
+            minimal["units"] = []
             minimal["_meta"] = {
-                "canonical_id": None, "identity_source": "unresolved",
-                "scrape_tier_used": None, "units_extracted": 0,
-                "carry_forward_used": False, "was_known": False,
+                "canonical_id": None,
+                "identity_source": "unresolved",
+                "scrape_tier_used": None,
+                "units_extracted": 0,
+                "carry_forward_used": False,
+                "was_known": False,
                 "error": "could not resolve canonical_id from CSV row",
             }
             new_records.append(minimal)
-            _append_ledger(ledger_path, {
-                "canonical_id": None, "row_index": orig_idx,
-                "status": "UNRESOLVED",
-                "reason": "IDENTITY_UNRESOLVED",
-                "retry_mode": mode,
-                "timestamp": datetime.now(UTC).isoformat(),
-            })
+            _append_ledger(
+                ledger_path,
+                {
+                    "canonical_id": None,
+                    "row_index": orig_idx,
+                    "status": "UNRESOLVED",
+                    "reason": "IDENTITY_UNRESOLVED",
+                    "retry_mode": mode,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+            )
             continue
 
         if cid in seen_cids:
             log.warning(f"  ↳ skipping duplicate canonical_id {cid} at row {orig_idx}")
-            _append_ledger(ledger_path, {
-                "canonical_id": cid, "row_index": orig_idx,
-                "status": "SKIPPED",
-                "reason": "DUPLICATE_CANONICAL_ID",
-                "retry_mode": mode,
-                "timestamp": datetime.now(UTC).isoformat(),
-            })
+            _append_ledger(
+                ledger_path,
+                {
+                    "canonical_id": cid,
+                    "row_index": orig_idx,
+                    "status": "SKIPPED",
+                    "reason": "DUPLICATE_CANONICAL_ID",
+                    "retry_mode": mode,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+            )
             continue
         seen_cids.add(cid)
 
@@ -468,7 +502,7 @@ async def run_retry(
     # ── 6b. Load profiles for each property (non-fatal) ──────────────────
     scrape_profiles: list[Any] = [None] * len(scrapeable)
     if profile_store is not None:
-        for si, (orig_idx, row, ident, url) in enumerate(scrapeable):
+        for si, (_orig_idx, _row, ident, _url) in enumerate(scrapeable):
             cid = ident.canonical_id
             if cid:
                 try:
@@ -494,19 +528,17 @@ async def run_retry(
     loop = asyncio.get_running_loop()
     scrape_results_raw: list[Any] = [None] * len(scrapeable)
 
-    with ThreadPoolExecutor(
-        max_workers=pool_size, thread_name_prefix="scrape"
-    ) as executor:
+    with ThreadPoolExecutor(max_workers=pool_size, thread_name_prefix="scrape") as executor:
         futures = [
             loop.run_in_executor(
                 executor,
                 _scrape_in_thread,
-                item[3],          # url
+                item[3],  # url
                 proxy,
                 scrape_timeout_s,
                 item[2].canonical_id or "unknown",  # property_id for LLM logging
-                scrape_profiles[si],                 # profile for tier-skip routing
-                _expected_units_for(item[1]),         # expected Total Units from CSV
+                scrape_profiles[si],  # profile for tier-skip routing
+                _expected_units_for(item[1]),  # expected Total Units from CSV
             )
             for si, item in enumerate(scrapeable)
         ]
@@ -519,17 +551,19 @@ async def run_retry(
         row_name = csv_get(row, *NAME_KEYS) or csv_get(row, *WEBSITE_KEYS) or f"row{orig_idx}"
 
         processed_count += 1
-        log.info(f"[{processed_count}/{len(scrapeable)}] (row {orig_idx}) "
-                 f"{cid} — {row_name}")
+        log.info(f"[{processed_count}/{len(scrapeable)}] (row {orig_idx}) {cid} — {row_name}")
 
         per_prop_issues: list[V.ValidationIssue] = []
 
         if not url:
-            per_prop_issues.append(V.error(
-                V.CSV_MISSING_URL,
-                f"row {orig_idx} has no Website/URL column",
-                canonical_id=cid, row_index=orig_idx,
-            ))
+            per_prop_issues.append(
+                V.error(
+                    V.CSV_MISSING_URL,
+                    f"row {orig_idx} has no Website/URL column",
+                    canonical_id=cid,
+                    row_index=orig_idx,
+                )
+            )
 
         # ── Collect scrape result ─────────────────────────────────────
         scrape_result_or_exc = scrape_results_raw[task_idx]
@@ -539,23 +573,29 @@ async def run_retry(
         if isinstance(scrape_result_or_exc, Exception):
             e = scrape_result_or_exc
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            per_prop_issues.append(V.error(
-                V.PIPELINE_EXCEPTION,
-                f"exception during scrape: {e}",
-                canonical_id=cid, row_index=orig_idx,
-                details={"exception": str(e), "traceback": tb[-1500:]},
-            ))
+            per_prop_issues.append(
+                V.error(
+                    V.PIPELINE_EXCEPTION,
+                    f"exception during scrape: {e}",
+                    canonical_id=cid,
+                    row_index=orig_idx,
+                    details={"exception": str(e), "traceback": tb[-1500:]},
+                )
+            )
             scrape_result = {"errors": [str(e)], "base_url": url}
             scrape_failed = True
         elif isinstance(scrape_result_or_exc, dict) and scrape_result_or_exc.get("_exception"):
             e = scrape_result_or_exc["_exception"]
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            per_prop_issues.append(V.error(
-                V.PIPELINE_EXCEPTION,
-                f"exception during scrape: {e}",
-                canonical_id=cid, row_index=orig_idx,
-                details={"exception": str(e), "traceback": tb[-1500:]},
-            ))
+            per_prop_issues.append(
+                V.error(
+                    V.PIPELINE_EXCEPTION,
+                    f"exception during scrape: {e}",
+                    canonical_id=cid,
+                    row_index=orig_idx,
+                    details={"exception": str(e), "traceback": tb[-1500:]},
+                )
+            )
             scrape_result = scrape_result_or_exc
             scrape_failed = True
         elif not url:
@@ -564,44 +604,58 @@ async def run_retry(
         else:
             scrape_result = scrape_result_or_exc
             if scrape_result.get("_timeout"):
-                per_prop_issues.append(V.error(
-                    V.SCRAPE_TIMEOUT,
-                    f"scrape timed out after {scrape_timeout_s}s",
-                    canonical_id=cid, row_index=orig_idx,
-                    details={"url": url},
-                ))
+                per_prop_issues.append(
+                    V.error(
+                        V.SCRAPE_TIMEOUT,
+                        f"scrape timed out after {scrape_timeout_s}s",
+                        canonical_id=cid,
+                        row_index=orig_idx,
+                        details={"url": url},
+                    )
+                )
                 scrape_failed = True
             elif scrape_result.get("errors"):
-                per_prop_issues.append(V.warning(
-                    V.SCRAPE_FAILED,
-                    f"scrape returned errors: {scrape_result['errors'][:2]}",
-                    canonical_id=cid, row_index=orig_idx,
-                    details={"errors": scrape_result["errors"]},
-                ))
+                per_prop_issues.append(
+                    V.warning(
+                        V.SCRAPE_FAILED,
+                        f"scrape returned errors: {scrape_result['errors'][:2]}",
+                        canonical_id=cid,
+                        row_index=orig_idx,
+                        details={"errors": scrape_result["errors"]},
+                    )
+                )
             if not scrape_failed and not scrape_result.get("_raw_api_responses"):
-                per_prop_issues.append(V.warning(
-                    V.SCRAPE_NO_APIS,
-                    "no API responses intercepted — fallback tiers would be used",
-                    canonical_id=cid, row_index=orig_idx,
-                ))
+                per_prop_issues.append(
+                    V.warning(
+                        V.SCRAPE_NO_APIS,
+                        "no API responses intercepted — fallback tiers would be used",
+                        canonical_id=cid,
+                        row_index=orig_idx,
+                    )
+                )
 
-        scrape_apis = len(scrape_result.get('_raw_api_responses') or [])
-        scrape_tier = scrape_result.get('extraction_tier_used')
-        scrape_errs = scrape_result.get('errors') or []
-        log.info(f"  scrape: apis={scrape_apis}, tier={scrape_tier}, failed={scrape_failed}"
-                 + (f", errors={scrape_errs[:2]}" if scrape_errs else ""))
+        scrape_apis = len(scrape_result.get("_raw_api_responses") or [])
+        scrape_tier = scrape_result.get("extraction_tier_used")
+        scrape_errs = scrape_result.get("errors") or []
+        log.info(
+            f"  scrape: apis={scrape_apis}, tier={scrape_tier}, failed={scrape_failed}"
+            + (f", errors={scrape_errs[:2]}" if scrape_errs else "")
+        )
 
         # ── Transform ─────────────────────────────────────────────────
         target_units: list[dict] = []
         try:
             target_units = transform_units_from_scrape(scrape_result)
         except Exception as e:
-            per_prop_issues.append(V.error(
-                V.PIPELINE_EXCEPTION,
-                f"exception during unit transform: {e}",
-                canonical_id=cid, row_index=orig_idx,
-                details={"exception": str(e), "traceback": traceback.format_exc()[-1500:]},
-            ))
+            per_prop_issues.append(
+                V.error(
+                    V.PIPELINE_EXCEPTION,
+                    f"exception during unit transform: {e}",
+                    canonical_id=cid,
+                    row_index=orig_idx,
+                    details={"exception": str(e), "traceback": traceback.format_exc()[-1500:]},
+                )
+            )
 
         # Infer tier from API responses if transform found units but scraper didn't set one.
         if target_units and not scrape_result.get("extraction_tier_used"):
@@ -623,12 +677,15 @@ async def run_retry(
         per_prop_issues.extend(V.validate_units(public_units, cid))
 
         if not public_units and not scrape_failed:
-            per_prop_issues.append(V.warning(
-                V.UNITS_EMPTY,
-                "scrape succeeded but no units were extracted",
-                canonical_id=cid, row_index=orig_idx,
-                details={"apis": len(scrape_result.get("_raw_api_responses") or [])},
-            ))
+            per_prop_issues.append(
+                V.warning(
+                    V.UNITS_EMPTY,
+                    "scrape succeeded but no units were extracted",
+                    canonical_id=cid,
+                    row_index=orig_idx,
+                    details={"apis": len(scrape_result.get("_raw_api_responses") or [])},
+                )
+            )
 
         # ── Carry-forward ─────────────────────────────────────────────
         carry_forward_used = False
@@ -639,49 +696,62 @@ async def run_retry(
                 carry_forward_count += 1
                 units_total["carried_forward"] += len(cf_units)
                 public_units = cf_units
-                per_prop_issues.append(V.info(
-                    V.UNITS_CARRIED_FORWARD,
-                    f"carried forward {len(cf_units)} units from prior state",
-                    canonical_id=cid, row_index=orig_idx,
-                    details={"count": len(cf_units)},
-                ))
+                per_prop_issues.append(
+                    V.info(
+                        V.UNITS_CARRIED_FORWARD,
+                        f"carried forward {len(cf_units)} units from prior state",
+                        canonical_id=cid,
+                        row_index=orig_idx,
+                        details={"count": len(cf_units)},
+                    )
+                )
 
         # ── Diff against unit state ───────────────────────────────────
         unit_diff = {"new": [], "updated": [], "unchanged": [], "disappeared": []}
         try:
             unit_diff = state.upsert_units(cid, public_units, run_date)
-            units_total["extracted"]   += len(public_units)
-            units_total["new"]         += len(unit_diff["new"])
-            units_total["updated"]     += len(unit_diff["updated"])
-            units_total["unchanged"]   += len(unit_diff["unchanged"])
+            units_total["extracted"] += len(public_units)
+            units_total["new"] += len(unit_diff["new"])
+            units_total["updated"] += len(unit_diff["updated"])
+            units_total["unchanged"] += len(unit_diff["unchanged"])
             units_total["disappeared"] += len(unit_diff["disappeared"])
         except Exception as e:
-            per_prop_issues.append(V.error(
-                V.PIPELINE_EXCEPTION,
-                f"exception during unit diff: {e}",
-                canonical_id=cid, row_index=orig_idx,
-                details={"exception": str(e)},
-            ))
+            per_prop_issues.append(
+                V.error(
+                    V.PIPELINE_EXCEPTION,
+                    f"exception during unit diff: {e}",
+                    canonical_id=cid,
+                    row_index=orig_idx,
+                    details={"exception": str(e)},
+                )
+            )
 
         # ── Upsert property state ─────────────────────────────────────
         try:
-            state.upsert_property(cid, {
-                "canonical_id": cid,
-                "name":         csv_get(row, *NAME_KEYS),
-                "address":      csv_get(row, *ADDRESS_KEYS),
-                "city":         csv_get(row, *CITY_KEYS),
-                "state":        csv_get(row, *STATE_KEYS),
-                "zip":          csv_get(row, *ZIP_KEYS),
-                "website":      url,
-                "last_scrape_status": "FAILED" if scrape_failed else "SUCCESS",
-                "last_units_count":   len(public_units),
-            }, run_date)
+            state.upsert_property(
+                cid,
+                {
+                    "canonical_id": cid,
+                    "name": csv_get(row, *NAME_KEYS),
+                    "address": csv_get(row, *ADDRESS_KEYS),
+                    "city": csv_get(row, *CITY_KEYS),
+                    "state": csv_get(row, *STATE_KEYS),
+                    "zip": csv_get(row, *ZIP_KEYS),
+                    "website": url,
+                    "last_scrape_status": "FAILED" if scrape_failed else "SUCCESS",
+                    "last_units_count": len(public_units),
+                },
+                run_date,
+            )
         except Exception as e:
-            per_prop_issues.append(V.error(
-                V.PIPELINE_EXCEPTION,
-                f"exception during property upsert: {e}",
-                canonical_id=cid, row_index=orig_idx,
-            ))
+            per_prop_issues.append(
+                V.error(
+                    V.PIPELINE_EXCEPTION,
+                    f"exception during property upsert: {e}",
+                    canonical_id=cid,
+                    row_index=orig_idx,
+                )
+            )
 
         # ── Profile update (non-fatal) ────────────────────────────────
         if profile_store is not None and _PROFILES_AVAILABLE:
@@ -689,22 +759,32 @@ async def run_retry(
                 prof = profile_store.load(cid)
                 if prof is None:
                     prof = profile_store.bootstrap_from_meta(
-                        cid, dict(row), url or "",
+                        cid,
+                        dict(row),
+                        url or "",
                     )
                 prof = update_profile_after_extraction(
-                    prof, scrape_result, len(public_units), profile_store,
+                    prof,
+                    scrape_result,
+                    len(public_units),
+                    profile_store,
                 )
                 drift_detected, drift_reasons = detect_drift(
-                    prof, len(public_units), scrape_result,
+                    prof,
+                    len(public_units),
+                    scrape_result,
                 )
                 if drift_detected:
                     prof = apply_drift_demotion(prof, drift_reasons)
                     profile_store.save(prof)
-                    per_prop_issues.append(V.warning(
-                        "PROFILE_DRIFT_DETECTED",
-                        f"drift detected: {'; '.join(drift_reasons)}",
-                        canonical_id=cid, row_index=orig_idx,
-                    ))
+                    per_prop_issues.append(
+                        V.warning(
+                            "PROFILE_DRIFT_DETECTED",
+                            f"drift detected: {'; '.join(drift_reasons)}",
+                            canonical_id=cid,
+                            row_index=orig_idx,
+                        )
+                    )
             except Exception as e:
                 log.warning(f"  profile update failed for {cid}: {e}")
 
@@ -713,9 +793,12 @@ async def run_retry(
         if llm_interactions:
             try:
                 from llm.interaction_logger import write_property_report
+
                 write_property_report(cid, llm_interactions, run_dir)
-                log.info(f"  LLM interactions: {len(llm_interactions)} call(s), "
-                         f"total cost=${sum(i.get('cost_usd', 0) for i in llm_interactions):.5f}")
+                log.info(
+                    f"  LLM interactions: {len(llm_interactions)} call(s), "
+                    f"total cost=${sum(i.get('cost_usd', 0) for i in llm_interactions):.5f}"
+                )
             except Exception as e:
                 log.warning(f"  could not write LLM report for {cid}: {e}")
 
@@ -735,36 +818,56 @@ async def run_retry(
         try:
             if schema_version == "v2":
                 from schema_v2 import build_v2_property, validate_v2_property
+
                 rec = build_v2_property(
-                    row, ident, scrape_result, public_units,
+                    row,
+                    ident,
+                    scrape_result,
+                    public_units,
                     scrape_ts=datetime.now(UTC),
                 )
                 v2_issues = validate_v2_property(rec, canonical_id=cid)
                 per_prop_issues.extend(v2_issues)
             else:
                 rec = build_property_record(
-                    row, ident, scrape_result, public_units,
-                    state_snapshot, carry_forward_used,
+                    row,
+                    ident,
+                    scrape_result,
+                    public_units,
+                    state_snapshot,
+                    carry_forward_used,
                 )
             new_records.append(rec)
         except Exception as e:
-            per_prop_issues.append(V.error(
-                V.PIPELINE_EXCEPTION,
-                f"exception building property record: {e}",
-                canonical_id=cid, row_index=orig_idx,
-                details={"exception": str(e), "traceback": traceback.format_exc()[-1500:]},
-            ))
-            failed_properties.append({
-                "row_index": orig_idx, "canonical_id": cid,
-                "reason": f"build_property_record exception: {e}",
-            })
+            per_prop_issues.append(
+                V.error(
+                    V.PIPELINE_EXCEPTION,
+                    f"exception building property record: {e}",
+                    canonical_id=cid,
+                    row_index=orig_idx,
+                    details={"exception": str(e), "traceback": traceback.format_exc()[-1500:]},
+                )
+            )
+            failed_properties.append(
+                {
+                    "row_index": orig_idx,
+                    "canonical_id": cid,
+                    "reason": f"build_property_record exception: {e}",
+                }
+            )
 
         # ── Per-property scrape report (markdown) ────────────────────
         try:
             from scrape_report import generate_property_report
+
             rpt_path = generate_property_report(
-                scrape_result, rec, unit_diff,
-                per_prop_issues, run_dir, cid, run_date,
+                scrape_result,
+                rec,
+                unit_diff,
+                per_prop_issues,
+                run_dir,
+                cid,
+                run_date,
             )
             if rpt_path:
                 log.info(f"  scrape report: {rpt_path.name}")
@@ -773,10 +876,13 @@ async def run_retry(
 
         # Track failed properties.
         if scrape_failed and not carry_forward_used:
-            failed_properties.append({
-                "row_index": orig_idx, "canonical_id": cid,
-                "reason": "SCRAPE_FAILED_NO_CARRY_FORWARD",
-            })
+            failed_properties.append(
+                {
+                    "row_index": orig_idx,
+                    "canonical_id": cid,
+                    "reason": "SCRAPE_FAILED_NO_CARRY_FORWARD",
+                }
+            )
 
         # Flush issues.
         all_issues.extend(per_prop_issues)
@@ -787,26 +893,32 @@ async def run_retry(
         has_errors = any(i.severity == "ERROR" for i in per_prop_issues)
         if has_errors and ledger_status == "SUCCESS":
             ledger_status = "SUCCESS_WITH_ERRORS"
-        _append_ledger(ledger_path, {
-            "canonical_id": cid, "row_index": orig_idx,
-            "status": ledger_status,
-            "units_count": len(public_units),
-            "carry_forward_used": carry_forward_used,
-            "scrape_failed": scrape_failed,
-            "error_count": sum(1 for i in per_prop_issues if i.severity == "ERROR"),
-            "warning_count": sum(1 for i in per_prop_issues if i.severity == "WARNING"),
-            "url": url,
-            "retry_mode": mode,
-            "timestamp": datetime.now(UTC).isoformat(),
-        })
+        _append_ledger(
+            ledger_path,
+            {
+                "canonical_id": cid,
+                "row_index": orig_idx,
+                "status": ledger_status,
+                "units_count": len(public_units),
+                "carry_forward_used": carry_forward_used,
+                "scrape_failed": scrape_failed,
+                "error_count": sum(1 for i in per_prop_issues if i.severity == "ERROR"),
+                "warning_count": sum(1 for i in per_prop_issues if i.severity == "WARNING"),
+                "url": url,
+                "retry_mode": mode,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
 
         if ledger_status in ("SUCCESS", "SUCCESS_WITH_ERRORS"):
             success_count += 1
 
-        log.info(f"  -> {ledger_status} | units={len(public_units)} "
-                 f"(new={len(unit_diff['new'])}), "
-                 f"issues={len(per_prop_issues)}, carry_forward={carry_forward_used}, "
-                 f"url={url[:60] if url else 'none'}")
+        log.info(
+            f"  -> {ledger_status} | units={len(public_units)} "
+            f"(new={len(unit_diff['new'])}), "
+            f"issues={len(per_prop_issues)}, carry_forward={carry_forward_used}, "
+            f"url={url[:60] if url else 'none'}"
+        )
 
         # ── Incremental merge + save ──────────────────────────────────
         try:
@@ -828,8 +940,10 @@ async def run_retry(
     # ── 8. Save state ───────────────────────────────────────────────────
     try:
         state.save()
-        log.info(f"State saved: {len(state.property_index)} properties, "
-                 f"{sum(len(u) for u in state.unit_index.values())} tracked units")
+        log.info(
+            f"State saved: {len(state.property_index)} properties, "
+            f"{sum(len(u) for u in state.unit_index.values())} tracked units"
+        )
     except Exception as e:
         log.error(f"failed to save state: {e}")
 
@@ -844,32 +958,32 @@ async def run_retry(
         final_summary[s] = final_summary.get(s, 0) + 1
 
     report = {
-        "run_date":     run_date,
-        "retry_mode":   mode,
-        "started_at":   started_at.isoformat(),
-        "finished_at":  finished_at.isoformat(),
-        "duration_s":   (finished_at - started_at).total_seconds(),
-        "exit_status":  "OK",
-        "csv_path":     str(csv_path),
-        "data_dir":     str(data_dir),
+        "run_date": run_date,
+        "retry_mode": mode,
+        "started_at": started_at.isoformat(),
+        "finished_at": finished_at.isoformat(),
+        "duration_s": (finished_at - started_at).total_seconds(),
+        "exit_status": "OK",
+        "csv_path": str(csv_path),
+        "data_dir": str(data_dir),
         "totals": {
-            "csv_rows_total":       len(rows),
-            "rows_eligible":        len(eligible),
-            "rows_processed":       processed_count,
-            "rows_succeeded":       success_count,
-            "rows_failed":          processed_count - success_count,
+            "csv_rows_total": len(rows),
+            "rows_eligible": len(eligible),
+            "rows_processed": processed_count,
+            "rows_succeeded": success_count,
+            "rows_failed": processed_count - success_count,
             "properties_in_output": len(merged_final),
         },
         "ledger_after_retry": final_summary,
-        "issues":           V.summarise_issues(all_issues),
+        "issues": V.summarise_issues(all_issues),
         "state_diff": {
-            "carry_forward_count":    carry_forward_count,
-            "units_extracted":        units_total["extracted"],
-            "units_new":              units_total["new"],
-            "units_updated":          units_total["updated"],
-            "units_unchanged":        units_total["unchanged"],
-            "units_disappeared":      units_total["disappeared"],
-            "units_carried_forward":  units_total["carried_forward"],
+            "carry_forward_count": carry_forward_count,
+            "units_extracted": units_total["extracted"],
+            "units_new": units_total["new"],
+            "units_updated": units_total["updated"],
+            "units_unchanged": units_total["unchanged"],
+            "units_disappeared": units_total["disappeared"],
+            "units_carried_forward": units_total["carried_forward"],
         },
         "failed_properties": failed_properties,
     }
@@ -886,15 +1000,18 @@ async def run_retry(
     except Exception as e:
         log.error(f"report write failed: {e}")
 
-    log.info(f"=== Retry ({mode}) done in {report['duration_s']:.1f}s: "
-             f"{success_count}/{processed_count} succeeded, "
-             f"{len(merged_final)} total properties in output ===")
+    log.info(
+        f"=== Retry ({mode}) done in {report['duration_s']:.1f}s: "
+        f"{success_count}/{processed_count} succeeded, "
+        f"{len(merged_final)} total properties in output ==="
+    )
     log.info(f"Ledger state: {final_summary}")
 
     return report
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
+
 
 def main():
     p = argparse.ArgumentParser(
@@ -910,26 +1027,33 @@ Examples:
     )
     mode_group = p.add_mutually_exclusive_group(required=True)
     mode_group.add_argument(
-        "--resume", action="store_true",
+        "--resume",
+        action="store_true",
         help="Resume: skip successes, process everything else",
     )
     mode_group.add_argument(
-        "--retry-errors", action="store_true",
+        "--retry-errors",
+        action="store_true",
         help="Retry FAILED + SUCCESS/SUCCESS_WITH_ERRORS that have 0 units",
     )
-    p.add_argument("--csv",      default=str(_PROJECT_ROOT / "config" / "properties.csv"),
-                   help="Path to properties CSV (default: ma_poc/config/properties.csv)")
-    p.add_argument("--data-dir", default=str(_PROJECT_ROOT / "data"),
-                   help="Root data directory (default: ma_poc/data)")
-    p.add_argument("--run-date", default=None,
-                   help="Target run date (YYYY-MM-DD); defaults to today")
-    p.add_argument("--limit",    type=int, default=None,
-                   help="Process at most N eligible rows")
-    p.add_argument("--proxy",    default=None)
-    p.add_argument("--scrape-timeout", type=int, default=180,
-                   help="Per-property scrape timeout (seconds)")
-    p.add_argument("--schema-version", choices=["v1", "v2"], default=None,
-                   help="Output schema version (default: env SCHEMA_VERSION or v1)")
+    p.add_argument(
+        "--csv",
+        default=str(_PROJECT_ROOT / "config" / "properties.csv"),
+        help="Path to properties CSV (default: ma_poc/config/properties.csv)",
+    )
+    p.add_argument(
+        "--data-dir", default=str(_PROJECT_ROOT / "data"), help="Root data directory (default: ma_poc/data)"
+    )
+    p.add_argument("--run-date", default=None, help="Target run date (YYYY-MM-DD); defaults to today")
+    p.add_argument("--limit", type=int, default=None, help="Process at most N eligible rows")
+    p.add_argument("--proxy", default=None)
+    p.add_argument("--scrape-timeout", type=int, default=180, help="Per-property scrape timeout (seconds)")
+    p.add_argument(
+        "--schema-version",
+        choices=["v1", "v2"],
+        default=None,
+        help="Output schema version (default: env SCHEMA_VERSION or v1)",
+    )
     args = p.parse_args()
 
     csv_path = Path(args.csv)
@@ -938,14 +1062,22 @@ Examples:
     mode = "resume" if args.resume else "retry_errors"
 
     from schema_v2 import get_schema_version
+
     schema_version = get_schema_version(args)
 
     try:
-        report = asyncio.run(run_retry(
-            csv_path, run_date, data_dir, mode,
-            args.limit, args.proxy, args.scrape_timeout,
-            schema_version=schema_version,
-        ))
+        report = asyncio.run(
+            run_retry(
+                csv_path,
+                run_date,
+                data_dir,
+                mode,
+                args.limit,
+                args.proxy,
+                args.scrape_timeout,
+                schema_version=schema_version,
+            )
+        )
         if report.get("exit_status") == "FATAL":
             sys.exit(2)
         if report.get("exit_status") == "OK_NOTHING_TO_DO":

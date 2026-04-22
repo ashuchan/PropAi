@@ -3,6 +3,7 @@
 Phase 2 ships stubs. Phase 3 replaces each stub with a real implementation;
 the registry wiring in this file does not change.
 """
+
 from __future__ import annotations
 
 from ma_poc.pms.adapters.appfolio import AppFolioAdapter

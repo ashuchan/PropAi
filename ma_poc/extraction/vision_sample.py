@@ -7,6 +7,7 @@ Acceptance criteria (CLAUDE.md PR-04 / Role C):
 - Field-by-field diff vs primary output, written to {date}_vision_comparison.json
 - Must NOT modify the primary extraction result (isolation)
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -140,15 +141,17 @@ async def write_sample_comparison(
 
     vision_units = [u for u in payload.get("units", []) if isinstance(u, dict)]
     diff = _diff_units(primary_units, vision_units)
-    comparison.update({
-        "vision_units": len(vision_units),
-        "agreement_rate": diff["agreement_rate"],
-        "comparisons": diff["comparisons"],
-        "agreements": diff["agreements"],
-        "only_in_primary": diff["only_in_primary"],
-        "only_in_vision": diff["only_in_vision"],
-        "diffs": diff["diffs"],
-    })
+    comparison.update(
+        {
+            "vision_units": len(vision_units),
+            "agreement_rate": diff["agreement_rate"],
+            "comparisons": diff["comparisons"],
+            "agreements": diff["agreements"],
+            "only_in_primary": diff["only_in_primary"],
+            "only_in_vision": diff["only_in_vision"],
+            "diffs": diff["diffs"],
+        }
+    )
     out_path.write_text(json.dumps(comparison, indent=2), encoding="utf-8")
     return out_path
 

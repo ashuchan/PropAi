@@ -8,6 +8,7 @@ Sources consulted:
 - hCaptcha integration docs (https://docs.hcaptcha.com)
 - PerimeterX bot detection patterns (public analysis)
 """
+
 from __future__ import annotations
 
 import logging

@@ -8,6 +8,7 @@ Verifies:
     daily_runner._realpage_units_from_body (incl. null response handling)
   - the bridge module imports cleanly without pulling Playwright eagerly
 """
+
 from __future__ import annotations
 
 import pytest
@@ -37,6 +38,7 @@ def _ctx(url: str, api_responses: list[dict]) -> AdapterContext:
 
 # ── Bridge module sanity ─────────────────────────────────────────────────────
 
+
 def test_bridge_imports_cleanly() -> None:
     """_daily_runner_parsers should import without error and expose the lift."""
     from ma_poc.pms.adapters import _daily_runner_parsers as bridge
@@ -49,6 +51,7 @@ def test_bridge_imports_cleanly() -> None:
 
 
 # ── Generic adapter — nested-rent handling from daily_runner ──────────────────
+
 
 @pytest.mark.asyncio
 async def test_generic_falls_through_to_daily_runner_on_nested_rent() -> None:
@@ -69,11 +72,13 @@ async def test_generic_falls_through_to_daily_runner_on_nested_rent() -> None:
     result = await GenericAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
 
     assert isinstance(result, AdapterResult)
-    assert len(result.units) >= 1, \
+    assert len(result.units) >= 1, (
         f"daily_runner fallthrough should catch nested-rent shape; errors={result.errors}"
+    )
 
 
 # ── Generic adapter — SightMap host routing ───────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_generic_routes_sightmap_to_dedicated_parser() -> None:
@@ -85,14 +90,25 @@ async def test_generic_routes_sightmap_to_dedicated_parser() -> None:
     sightmap_body = {
         "data": {
             "floor_plans": [
-                {"id": 1, "name": "A1", "filter_label": "1 Bed",
-                 "bedroom_count": 1, "bathroom_count": 1},
+                {"id": 1, "name": "A1", "filter_label": "1 Bed", "bedroom_count": 1, "bathroom_count": 1},
             ],
             "units": [
-                {"floor_plan_id": 1, "price": 1500, "display_price": "$1,500",
-                 "area": 650, "unit_number": "101", "available_on": "2026-05-01"},
-                {"floor_plan_id": 1, "price": 1525, "display_price": "$1,525",
-                 "area": 650, "unit_number": "102", "available_on": "2026-05-15"},
+                {
+                    "floor_plan_id": 1,
+                    "price": 1500,
+                    "display_price": "$1,500",
+                    "area": 650,
+                    "unit_number": "101",
+                    "available_on": "2026-05-01",
+                },
+                {
+                    "floor_plan_id": 1,
+                    "price": 1525,
+                    "display_price": "$1,525",
+                    "area": 650,
+                    "unit_number": "102",
+                    "available_on": "2026-05-15",
+                },
             ],
         }
     }
@@ -101,23 +117,39 @@ async def test_generic_routes_sightmap_to_dedicated_parser() -> None:
     result = await GenericAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
 
     assert isinstance(result, AdapterResult)
-    assert len(result.units) >= 1, \
+    assert len(result.units) >= 1, (
         f"SightMap bodies should route to daily_runner parser; errors={result.errors}"
+    )
 
 
 # ── RealPage /units endpoint via onesite adapter ─────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_onesite_handles_units_endpoint_with_data() -> None:
     """RealPage /units endpoint returning actual unit rows."""
     units_body = {
         "response": [
-            {"id": 1001, "unitNumber": "A101", "minRent": 1500, "maxRent": 1500,
-             "sqft": 750, "bedRooms": 1, "bathRooms": 1,
-             "availableDate": "2026-05-01"},
-            {"id": 1002, "unitNumber": "A102", "minRent": 1550, "maxRent": 1550,
-             "sqft": 750, "bedRooms": 1, "bathRooms": 1,
-             "availableDate": "2026-05-15"},
+            {
+                "id": 1001,
+                "unitNumber": "A101",
+                "minRent": 1500,
+                "maxRent": 1500,
+                "sqft": 750,
+                "bedRooms": 1,
+                "bathRooms": 1,
+                "availableDate": "2026-05-01",
+            },
+            {
+                "id": 1002,
+                "unitNumber": "A102",
+                "minRent": 1550,
+                "maxRent": 1550,
+                "sqft": 750,
+                "bedRooms": 1,
+                "bathRooms": 1,
+                "availableDate": "2026-05-15",
+            },
         ]
     }
     url = "https://api.ws.realpage.com/v2/property/7824595/units"
@@ -126,8 +158,7 @@ async def test_onesite_handles_units_endpoint_with_data() -> None:
 
     assert isinstance(result, AdapterResult)
     # The /units endpoint should produce at least one unit record.
-    assert len(result.units) >= 1, \
-        f"RealPage /units body should parse; errors={result.errors}"
+    assert len(result.units) >= 1, f"RealPage /units body should parse; errors={result.errors}"
 
 
 @pytest.mark.asyncio
@@ -147,9 +178,16 @@ async def test_realpage_oll_handles_units_endpoint() -> None:
     """Same /units handling for the non-OneSite portal."""
     units_body = {
         "response": [
-            {"id": 2001, "unitNumber": "B201", "minRent": 2100, "maxRent": 2100,
-             "sqft": 900, "bedRooms": 2, "bathRooms": 2,
-             "availableDate": "2026-06-01"},
+            {
+                "id": 2001,
+                "unitNumber": "B201",
+                "minRent": 2100,
+                "maxRent": 2100,
+                "sqft": 900,
+                "bedRooms": 2,
+                "bathRooms": 2,
+                "availableDate": "2026-06-01",
+            },
         ]
     }
     url = "https://api.ws.realpage.com/v2/property/1234/units"

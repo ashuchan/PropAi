@@ -2,6 +2,7 @@
 
 Enables reproduction of parser failures from stored artifacts.
 """
+
 from __future__ import annotations
 
 import gzip

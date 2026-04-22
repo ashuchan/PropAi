@@ -43,6 +43,7 @@ Key findings:
     payloads (unlike RentCafe's ``"api": "rentcafe"``), so shape detection
     relies on structural keys (listingId / marketRent / rentals).
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -80,14 +81,31 @@ _FUNNEL_DICT_LIST_KEYS = ("listings", "results", "data", "rentals")
 
 # Rental-level (flat) keys that identify a Funnel rental row.
 _FUNNEL_RENTAL_KEYS = {
-    "marketRent", "marketrent", "availabilityDate", "availabilitydate",
-    "floorPlanName", "floorplanname", "bedrooms", "bathrooms", "squareFeet",
-    "squarefeet", "unit", "listingId", "listingid",
+    "marketRent",
+    "marketrent",
+    "availabilityDate",
+    "availabilitydate",
+    "floorPlanName",
+    "floorplanname",
+    "bedrooms",
+    "bathrooms",
+    "squareFeet",
+    "squarefeet",
+    "unit",
+    "listingId",
+    "listingid",
 }
 
 # Listing-level keys that identify a Funnel listing (the outer envelope).
-_FUNNEL_LISTING_KEYS = {"listingId", "listingid", "rentals", "marketRent",
-                        "marketrent", "availabilityDate", "availabilitydate"}
+_FUNNEL_LISTING_KEYS = {
+    "listingId",
+    "listingid",
+    "rentals",
+    "marketRent",
+    "marketrent",
+    "availabilityDate",
+    "availabilitydate",
+}
 
 
 def _is_funnel_response_url(url: str) -> bool:
@@ -130,6 +148,7 @@ def _unwrap_funnel_list(body: Any) -> list[Any] | None:
     well as dict-wrapped envelopes whose list may be either listings or
     flat rentals. Returns None when no rentals can be found.
     """
+
     def _flatten_listings(listings: list[Any]) -> list[Any]:
         flat: list[Any] = []
         for listing in listings:
@@ -173,6 +192,7 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
 
     Source envelope reference: see research log at top of file.
     """
+
     def _pick(source: dict[str, Any], *keys: str) -> Any:
         """Return the first non-empty value in *source* for *keys*."""
         for k in keys:
@@ -193,8 +213,9 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
         else:
             unit_number = str(unit_id or "")
 
-        floor_plan_name = str(_pick(row, "floorPlanName", "floorplanname",
-                                    "floor_plan_name", "floorPlan", "name") or "")
+        floor_plan_name = str(
+            _pick(row, "floorPlanName", "floorplanname", "floor_plan_name", "floorPlan", "name") or ""
+        )
 
         beds_raw = _pick(row, "bedrooms", "beds")
         try:
@@ -225,28 +246,29 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
             rent_lo = money_to_int(str(rent_flat))
             rent_hi = rent_lo
 
-        avail_date = str(_pick(row, "availabilityDate", "availabilitydate",
-                               "available_on") or "")
+        avail_date = str(_pick(row, "availabilityDate", "availabilitydate", "available_on") or "")
         floor = str(_pick(row, "floor", "floorNumber") or "")
 
-        units.append(make_unit_dict(
-            floor_plan_name=floor_plan_name,
-            bed_label=bed_label_from(beds, floor_plan_name),
-            bedrooms=str(beds) if beds is not None else "",
-            bathrooms=str(baths) if baths is not None else "",
-            sqft=sqft,
-            unit_number=unit_number,
-            floor=floor,
-            building=str(building or ""),
-            rent_range=format_rent_range(rent_lo, rent_hi),
-            rent_low=rent_lo,
-            rent_high=rent_hi,
-            availability_status="AVAILABLE" if avail_date else "AVAILABLE",
-            available_units="1",
-            availability_date=avail_date,
-            source_api_url=url,
-            extraction_tier=_TIER_BASE,
-        ))
+        units.append(
+            make_unit_dict(
+                floor_plan_name=floor_plan_name,
+                bed_label=bed_label_from(beds, floor_plan_name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft=sqft,
+                unit_number=unit_number,
+                floor=floor,
+                building=str(building or ""),
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                availability_status="AVAILABLE" if avail_date else "AVAILABLE",
+                available_units="1",
+                availability_date=avail_date,
+                source_api_url=url,
+                extraction_tier=_TIER_BASE,
+            )
+        )
     return units
 
 
@@ -255,32 +277,35 @@ def _classify_funnel_failure(
 ) -> tuple[str, str]:
     """Same pattern as Change 1. Returns (tier_code, error_message)."""
     if not api_responses:
-        return (_TIER_NO_RESPONSE,
-                "FUNNEL_NO_RESPONSE: no network responses captured during page load; "
-                "check if page is making calls to nestiolistings.com at all")
-    url_matches = [
-        r for r in api_responses
-        if _is_funnel_response_url(r.get("url", ""))
-    ]
-    shape_matches = [
-        r for r in api_responses if _is_funnel_response_body(r.get("body"))
-    ]
+        return (
+            _TIER_NO_RESPONSE,
+            "FUNNEL_NO_RESPONSE: no network responses captured during page load; "
+            "check if page is making calls to nestiolistings.com at all",
+        )
+    url_matches = [r for r in api_responses if _is_funnel_response_url(r.get("url", ""))]
+    shape_matches = [r for r in api_responses if _is_funnel_response_body(r.get("body"))]
     if not url_matches and not shape_matches:
-        return (_TIER_SHAPE_REJECTED,
-                f"FUNNEL_SHAPE_REJECTED: {len(api_responses)} responses captured, "
-                "none to nestiolistings.com and none matched Funnel envelope")
+        return (
+            _TIER_SHAPE_REJECTED,
+            f"FUNNEL_SHAPE_REJECTED: {len(api_responses)} responses captured, "
+            "none to nestiolistings.com and none matched Funnel envelope",
+        )
     relevant = shape_matches or url_matches
     total_items = 0
     for r in relevant:
         items = _unwrap_funnel_list(r.get("body")) or []
         total_items += len(items)
     if total_items == 0:
-        return (_TIER_LIST_EMPTY,
-                f"FUNNEL_LIST_EMPTY: {len(relevant)} relevant responses, "
-                "listings list empty in all (property may have 0 availability)")
-    return (_TIER_PARSE_ZERO,
-            f"FUNNEL_PARSE_ZERO: {total_items} listing items present but parser "
-            "emitted zero units (field-name mismatch)")
+        return (
+            _TIER_LIST_EMPTY,
+            f"FUNNEL_LIST_EMPTY: {len(relevant)} relevant responses, "
+            "listings list empty in all (property may have 0 availability)",
+        )
+    return (
+        _TIER_PARSE_ZERO,
+        f"FUNNEL_PARSE_ZERO: {total_items} listing items present but parser "
+        "emitted zero units (field-name mismatch)",
+    )
 
 
 class FunnelAdapter:
@@ -315,9 +340,7 @@ class FunnelAdapter:
 
         if all_units:
             result.units = all_units
-            result.winning_url = (
-                result.api_responses[0].get("url") if result.api_responses else None
-            )
+            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
             result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
             result.tier_used = _TIER_BASE
             return result

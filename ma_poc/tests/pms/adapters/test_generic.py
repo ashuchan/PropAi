@@ -1,4 +1,5 @@
 """Phase 3 — Generic adapter tests."""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
-from ma_poc.pms.adapters.generic import GenericAdapter, parse_generic_api, _find_unit_list
+from ma_poc.pms.adapters.generic import GenericAdapter, _find_unit_list, parse_generic_api
 from ma_poc.pms.detector import detect_pms
 
 FIXTURES = Path(__file__).parent / "fixtures" / "generic"

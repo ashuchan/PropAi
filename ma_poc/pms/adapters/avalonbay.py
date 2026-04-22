@@ -19,6 +19,7 @@ Key findings:
     a generic API response parser for the expected field patterns. Research-blocked
     until real captures are available.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -94,21 +95,23 @@ def parse_avalonbay_units(
         if isinstance(promos, list) and promos:
             concession = promos[0].get("promotionTitle", "")
 
-        units.append(make_unit_dict(
-            floor_plan_name=fp_name,
-            bed_label=bed_label_from(beds, fp_name),
-            bedrooms=str(beds) if beds is not None else "",
-            bathrooms=str(baths) if baths is not None else "",
-            sqft=sqft,
-            unit_number=unit_name,
-            floor=floor,
-            rent_range=format_rent_range(rent_lo, rent_hi),
-            concession=concession,
-            availability_status="AVAILABLE",
-            availability_date=avail_date,
-            source_api_url=url,
-            extraction_tier="TIER_1_API_AVALONBAY",
-        ))
+        units.append(
+            make_unit_dict(
+                floor_plan_name=fp_name,
+                bed_label=bed_label_from(beds, fp_name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft=sqft,
+                unit_number=unit_name,
+                floor=floor,
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                concession=concession,
+                availability_status="AVAILABLE",
+                availability_date=avail_date,
+                source_api_url=url,
+                extraction_tier="TIER_1_API_AVALONBAY",
+            )
+        )
     return units
 
 

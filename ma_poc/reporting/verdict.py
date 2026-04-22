@@ -7,17 +7,18 @@ Decision rules (first match wins):
 4. majority rejected → PARTIAL
 5. else → SUCCESS
 """
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Literal
+from enum import StrEnum
+from typing import Any
 
 log = logging.getLogger(__name__)
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     """Property-level outcome verdict."""
 
     SUCCESS = "SUCCESS"

@@ -2,6 +2,7 @@
 
 Uses urllib.robotparser. On fetch failure, defaults to allow.
 """
+
 from __future__ import annotations
 
 import logging

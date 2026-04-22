@@ -3,14 +3,14 @@
 Each proxy starts at health=1.0. Failures degrade health; successes restore it.
 Proxies below health<0.25 are quarantined (skipped).
 """
+
 from __future__ import annotations
 
-import hashlib
 import logging
 import random
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 log = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class ProxyHealth:
     url: str
     health: float = 1.0
     consecutive_failures: int = 0
-    last_used: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_used: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __repr__(self) -> str:
         """Repr with credentials redacted."""
@@ -42,9 +42,7 @@ class ProxyPool:
     """
 
     def __init__(self, urls: list[str]) -> None:
-        self._proxies: dict[str, ProxyHealth] = {
-            url: ProxyHealth(url=url) for url in urls
-        }
+        self._proxies: dict[str, ProxyHealth] = {url: ProxyHealth(url=url) for url in urls}
         self._sticky: dict[str, str] = {}
 
     def pick(self, sticky_key: str | None = None) -> str | None:
@@ -73,7 +71,7 @@ class ProxyPool:
         # Weighted random selection by health
         weights = [p.health for p in healthy]
         chosen = random.choices(healthy, weights=weights, k=1)[0]
-        chosen.last_used = datetime.now(timezone.utc)
+        chosen.last_used = datetime.now(UTC)
 
         if sticky_key:
             self._sticky[sticky_key] = chosen.url
@@ -104,7 +102,10 @@ class ProxyPool:
             p.consecutive_failures += 1
             log.warning(
                 "Proxy %s failure (%s), health=%.2f, consecutive=%d",
-                _redact(proxy_url), reason, p.health, p.consecutive_failures,
+                _redact(proxy_url),
+                reason,
+                p.health,
+                p.consecutive_failures,
             )
 
     def health_snapshot(self) -> list[dict[str, object]]:

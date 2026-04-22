@@ -1,4 +1,5 @@
 """Tests for slo_watcher — SLO threshold checks."""
+
 from __future__ import annotations
 
 from ma_poc.observability.slo_watcher import SloThresholds, check

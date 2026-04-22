@@ -11,6 +11,7 @@ Jugnu deltas applied:
 - Delta 4: event emission via observability.events
 - Delta 7: cost accounting on ExtractResult
 """
+
 from __future__ import annotations
 
 import logging
@@ -205,9 +206,8 @@ async def scrape(
         result["_detector_signals"] = _signals
         try:
             from ma_poc.observability.events import EventKind, emit
-            emit(EventKind.DETECTOR_SIGNALS,
-                 result.get("_property_id") or "unknown",
-                 **_signals)
+
+            emit(EventKind.DETECTOR_SIGNALS, result.get("_property_id") or "unknown", **_signals)
         except Exception:
             pass  # observability is best-effort
     except Exception:
@@ -223,9 +223,8 @@ async def scrape(
             result["_html_characterization"] = _html_char
             try:
                 from ma_poc.observability.events import EventKind, emit
-                emit(EventKind.HTML_CHARACTERIZED,
-                     result.get("_property_id") or "unknown",
-                     **_html_char)
+
+                emit(EventKind.HTML_CHARACTERIZED, result.get("_property_id") or "unknown", **_html_char)
             except Exception:
                 pass
         except Exception:
@@ -316,6 +315,7 @@ async def scrape(
         # already handle both string and dict bodies. Parse JSON bodies so
         # the generic parser sees dicts/lists, not stringified payloads.
         import json as _json
+
         prepared: list[dict[str, Any]] = []
         for entry in network_log:
             if not isinstance(entry, dict):
@@ -327,12 +327,14 @@ async def scrape(
                     parsed_body = _json.loads(raw_body)
                 except Exception:
                     parsed_body = raw_body
-            prepared.append({
-                "url": entry.get("url", ""),
-                "body": parsed_body,
-                "status": entry.get("status"),
-                "content_type": entry.get("content_type"),
-            })
+            prepared.append(
+                {
+                    "url": entry.get("url", ""),
+                    "body": parsed_body,
+                    "status": entry.get("status"),
+                    "content_type": entry.get("content_type"),
+                }
+            )
         ctx._api_responses = prepared  # type: ignore[attr-defined]
 
     # --- Step 6b: Router invariant (Change 2) ------------------------------
@@ -380,13 +382,11 @@ async def scrape(
     # When the adapter captures API responses but produces no substantive units,
     # hand the bodies to the LLM rescue service. Adapters never import this module.
     try:
-        from ma_poc.validation.schema_gate import property_passes_quality_gate
         from ma_poc.observability.events import EventKind, emit
+        from ma_poc.validation.schema_gate import property_passes_quality_gate
 
         profile_stats = getattr(getattr(ctx, "profile", None), "stats", None)
-        consecutive_rescue_failures = getattr(
-            profile_stats, "consecutive_llm_rescue_failures", 0
-        )
+        consecutive_rescue_failures = getattr(profile_stats, "consecutive_llm_rescue_failures", 0)
         raw_api_responses = getattr(ctx, "_api_responses", []) or []
         page_unreachable = any("FAILED_UNREACHABLE" in str(e) for e in adapter_result.errors)
 
@@ -408,21 +408,22 @@ async def scrape(
                 n_candidates=len(raw_api_responses),
             )
 
-            rescue = await rescue_from_api_responses(RescueInput(
-                property_id=ctx.property_id,
-                property_context={
-                    "name": getattr(ctx, "property_name", ""),
-                    "website": ctx.base_url,
-                    "city": getattr(ctx, "city", ""),
-                    "expected_units": ctx.expected_total_units,
-                },
-                source_adapter=pms_name,
-                api_responses=raw_api_responses,
-                profile_snapshot=(
-                    ctx.profile.model_dump(mode="json")
-                    if ctx.profile is not None else None
-                ),
-            ))
+            rescue = await rescue_from_api_responses(
+                RescueInput(
+                    property_id=ctx.property_id,
+                    property_context={
+                        "name": getattr(ctx, "property_name", ""),
+                        "website": ctx.base_url,
+                        "city": getattr(ctx, "city", ""),
+                        "expected_units": ctx.expected_total_units,
+                    },
+                    source_adapter=pms_name,
+                    api_responses=raw_api_responses,
+                    profile_snapshot=(
+                        ctx.profile.model_dump(mode="json") if ctx.profile is not None else None
+                    ),
+                )
+            )
 
             result["_rescue_cost_usd"] = rescue.cost_usd
 
@@ -431,15 +432,13 @@ async def scrape(
                 adapter_result.tier_used = rescue.tier_used
                 if rescue.winning_url:
                     adapter_result.winning_url = rescue.winning_url
-                adapter_result.llm_field_mappings = list(
-                    getattr(adapter_result, "llm_field_mappings", [])
-                ) + rescue.llm_field_mappings
-                adapter_result.blocked_endpoints = list(
-                    getattr(adapter_result, "blocked_endpoints", [])
-                ) + [{"url_pattern": u, "reason": r} for u, r in rescue.blocked_endpoints]
-                adapter_result.confidence = max(
-                    getattr(adapter_result, "confidence", 0.0), rescue.confidence
+                adapter_result.llm_field_mappings = (
+                    list(getattr(adapter_result, "llm_field_mappings", [])) + rescue.llm_field_mappings
                 )
+                adapter_result.blocked_endpoints = list(getattr(adapter_result, "blocked_endpoints", [])) + [
+                    {"url_pattern": u, "reason": r} for u, r in rescue.blocked_endpoints
+                ]
+                adapter_result.confidence = max(getattr(adapter_result, "confidence", 0.0), rescue.confidence)
                 emit(
                     EventKind.LLM_RESCUE_SUCCEEDED,
                     ctx.property_id,
@@ -495,9 +494,7 @@ async def scrape(
     result["units"] = adapter_result.units
     result["extraction_tier_used"] = adapter_result.tier_used or None
     result["errors"].extend(adapter_result.errors)
-    result["api_calls_intercepted"] = [
-        r.get("url", "") for r in adapter_result.api_responses
-    ]
+    result["api_calls_intercepted"] = [r.get("url", "") for r in adapter_result.api_responses]
     # Surface full {url, body} records and the winning URL so downstream
     # (profile_updater, reporting) can learn from what worked.
     result["_raw_api_responses"] = list(adapter_result.api_responses)
@@ -566,7 +563,9 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
     # Strip scripts/styles/comments to estimate "real" rendered text size.
     stripped = re.sub(
         r"<script.*?</script>|<style.*?</style>|<!--.*?-->",
-        "", page_html, flags=re.IGNORECASE | re.DOTALL,
+        "",
+        page_html,
+        flags=re.IGNORECASE | re.DOTALL,
     )
     text_bytes = len(re.sub(r"<[^>]+>", "", stripped).encode("utf-8", errors="ignore"))
 
@@ -575,7 +574,8 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
     jsonld_types: list[str] = []
     for m in re.finditer(
         r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        page_html, flags=re.IGNORECASE | re.DOTALL,
+        page_html,
+        flags=re.IGNORECASE | re.DOTALL,
     ):
         snippet = m.group(1)[:2000]
         types = re.findall(r'"@type"\s*:\s*"([^"]+)"', snippet)
@@ -618,6 +618,7 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
 # tracking scripts but don't carry unit data — the real portal is one
 # "View Availability" click away.
 
+
 def _augment_ranked_with_hints(
     ranked: list[tuple[str, int, str]],
     hints: list[str],
@@ -656,39 +657,81 @@ def _augment_ranked_with_hints(
 
 _LINK_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
     # (keyword, score) — anchor text, lowercased, substring match
-    ("availability", 100), ("floor plan", 90), ("floor-plan", 90),
-    ("floorplan", 85), ("pricing", 80), ("rent", 70), ("apartment", 60),
-    ("unit", 55), ("lease", 50), ("tour", 40), ("apply", 30),
+    ("availability", 100),
+    ("floor plan", 90),
+    ("floor-plan", 90),
+    ("floorplan", 85),
+    ("pricing", 80),
+    ("rent", 70),
+    ("apartment", 60),
+    ("unit", 55),
+    ("lease", 50),
+    ("tour", 40),
+    ("apply", 30),
     ("schedule", 20),
 )
 
 _LINK_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (
     # (substring, score) — matched against url path, lowercased
-    ("/floor-plan", 95), ("/floorplan", 90), ("/availability", 95),
-    ("/pricing", 80), ("/apartments", 70), ("/rent", 60), ("/units", 85),
-    ("/leasing", 50), ("/lease", 45), ("/floorplans", 90),
+    ("/floor-plan", 95),
+    ("/floorplan", 90),
+    ("/availability", 95),
+    ("/pricing", 80),
+    ("/apartments", 70),
+    ("/rent", 60),
+    ("/units", 85),
+    ("/leasing", 50),
+    ("/lease", 45),
+    ("/floorplans", 90),
     ("/availabilities", 95),
 )
 
 _LINK_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
     # (host suffix, score) — portals run on known subdomains
-    (".rentcafe.com", 120), (".appfolio.com", 120),
-    (".onlineleasing.realpage.com", 120), ("sightmap.com", 110),
-    (".entrata.com", 115), ("commoncf.entrata.com", 115),
+    (".rentcafe.com", 120),
+    (".appfolio.com", 120),
+    (".onlineleasing.realpage.com", 120),
+    ("sightmap.com", 110),
+    (".entrata.com", 115),
+    ("commoncf.entrata.com", 115),
 )
 
 # Skip these link shapes outright — they're never availability pages.
 _LINK_SKIP_PATTERNS: tuple[str, ...] = (
-    "tel:", "mailto:", "javascript:", "#", ".pdf", ".jpg", ".jpeg",
-    ".png", ".gif", ".webp", ".svg", ".mp4", ".mov", "/blog/",
-    "/news/", "/privacy", "/terms", "/accessibility", "/sitemap",
-    "facebook.com/", "twitter.com/", "instagram.com/", "linkedin.com/",
-    "youtube.com/", "/contact", "/careers", "/jobs",
+    "tel:",
+    "mailto:",
+    "javascript:",
+    "#",
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".mp4",
+    ".mov",
+    "/blog/",
+    "/news/",
+    "/privacy",
+    "/terms",
+    "/accessibility",
+    "/sitemap",
+    "facebook.com/",
+    "twitter.com/",
+    "instagram.com/",
+    "linkedin.com/",
+    "youtube.com/",
+    "/contact",
+    "/careers",
+    "/jobs",
 )
 
 
 def _rank_internal_links(
-    page_html: str, base_url: str, limit: int = 5,
+    page_html: str,
+    base_url: str,
+    limit: int = 5,
 ) -> list[tuple[str, int, str]]:
     """Rank internal links on a page for likelihood of carrying unit data.
 
@@ -754,7 +797,11 @@ def _rank_internal_links(
                 score += weight
 
         # Stay on-site or go to a known portal subdomain
-        is_same_site = link_host == base_host or link_host.endswith("." + base_host) or base_host.endswith("." + link_host)
+        is_same_site = (
+            link_host == base_host
+            or link_host.endswith("." + base_host)
+            or base_host.endswith("." + link_host)
+        )
         is_portal = any(link_host.endswith(suf) for suf, _ in _LINK_HOST_KEYWORDS)
         if not (is_same_site or is_portal):
             continue
@@ -780,7 +827,7 @@ def _rank_internal_links(
 async def _try_link_hop(
     entry_url: str,
     entry_page_html: str,
-    detected: "DetectedPMS",
+    detected: DetectedPMS,
     profile: Any,
     expected_total_units: int | None,
     property_id: str,
@@ -817,9 +864,12 @@ async def _try_link_hop(
     from ma_poc.fetch.contracts import RenderMode
     from ma_poc.observability.events import EventKind, emit
 
-    emit(EventKind.LINK_HOP_STARTED, property_id,
-         entry_url=entry_url,
-         candidates=[{"url": u, "score": s, "anchor": a[:60]} for u, s, a in ranked])
+    emit(
+        EventKind.LINK_HOP_STARTED,
+        property_id,
+        entry_url=entry_url,
+        candidates=[{"url": u, "score": s, "anchor": a[:60]} for u, s, a in ranked],
+    )
 
     # Phase 4: track which sub-URLs were tried and whether they produced
     # data. profile_updater consumes this dict to persist
@@ -840,19 +890,23 @@ async def _try_link_hop(
         try:
             sub_fetch = await jugnu_fetch(sub_task)
         except Exception as exc:
-            emit(EventKind.LINK_HOP_FETCHED, property_id,
-                 url=sub_url, error=str(exc)[:200], hop_index=idx)
+            emit(EventKind.LINK_HOP_FETCHED, property_id, url=sub_url, error=str(exc)[:200], hop_index=idx)
             continue
 
         outcome_val = (
-            sub_fetch.outcome.value if hasattr(sub_fetch.outcome, "value")
-            else str(sub_fetch.outcome)
+            sub_fetch.outcome.value if hasattr(sub_fetch.outcome, "value") else str(sub_fetch.outcome)
         )
-        emit(EventKind.LINK_HOP_FETCHED, property_id,
-             url=sub_url, outcome=outcome_val,
-             elapsed_ms=sub_fetch.elapsed_ms,
-             body_bytes=len(sub_fetch.body) if sub_fetch.body else 0,
-             hop_index=idx, score=score, anchor=anchor[:60])
+        emit(
+            EventKind.LINK_HOP_FETCHED,
+            property_id,
+            url=sub_url,
+            outcome=outcome_val,
+            elapsed_ms=sub_fetch.elapsed_ms,
+            body_bytes=len(sub_fetch.body) if sub_fetch.body else 0,
+            hop_index=idx,
+            score=score,
+            anchor=anchor[:60],
+        )
 
         if outcome_val != "OK":
             explored[sub_url] = False
@@ -888,10 +942,16 @@ async def _try_link_hop(
             existing_explored = sub_result.get("_explored_links") or {}
             existing_explored.update(explored)
             sub_result["_explored_links"] = existing_explored
-            emit(EventKind.LINK_HOP_RECOVERED, property_id,
-                 entry_url=entry_url, sub_url=sub_url, units=len(sub_result["units"]),
-                 tier=sub_result.get("extraction_tier_used"),
-                 hop_index=idx, score=score)
+            emit(
+                EventKind.LINK_HOP_RECOVERED,
+                property_id,
+                entry_url=entry_url,
+                sub_url=sub_url,
+                units=len(sub_result["units"]),
+                tier=sub_result.get("extraction_tier_used"),
+                hop_index=idx,
+                score=score,
+            )
             return sub_result
 
     # No hop recovered — return None but stash the explored map on the
@@ -936,14 +996,18 @@ async def scrape_jugnu(
         Legacy-compatible 46-key result dict.
     """
     from ma_poc.observability.events import EventKind, emit
-    from ma_poc.pms.contracts import ExtractResult, ProfileHints
+    from ma_poc.pms.contracts import ExtractResult
 
     base_url = task.url if hasattr(task, "url") else str(task)
     property_id = task.property_id if hasattr(task, "property_id") else "unknown"
 
     # Delta 2: short-circuit on non-OK fetch
     if hasattr(fetch_result, "outcome"):
-        outcome_val = fetch_result.outcome.value if hasattr(fetch_result.outcome, "value") else str(fetch_result.outcome)
+        outcome_val = (
+            fetch_result.outcome.value
+            if hasattr(fetch_result.outcome, "value")
+            else str(fetch_result.outcome)
+        )
         if outcome_val != "OK":
             result = _empty_result(base_url)
             result["_property_id"] = property_id
@@ -999,6 +1063,7 @@ async def scrape_jugnu(
         if body:
             try:
                 from ma_poc.fetch.captcha_detect import looks_like_captcha
+
                 captcha_flag, captcha_provider = looks_like_captcha(body)
             except Exception:
                 pass
@@ -1008,9 +1073,12 @@ async def scrape_jugnu(
 
     # Delta 4: emit events
     detected_pms = result.get("_detected_pms", {})
-    emit(EventKind.PMS_DETECTED, property_id,
-         pms=detected_pms.get("pms", "unknown"),
-         confidence=detected_pms.get("confidence", 0.0))
+    emit(
+        EventKind.PMS_DETECTED,
+        property_id,
+        pms=detected_pms.get("pms", "unknown"),
+        confidence=detected_pms.get("confidence", 0.0),
+    )
 
     adapter_name = result.get("_adapter_used", "unknown")
     emit(EventKind.ADAPTER_SELECTED, property_id, adapter_name=adapter_name)
@@ -1053,25 +1121,31 @@ async def scrape_jugnu(
                     llm_navigation_hints=result.get("_llm_navigation_hints"),
                 )
             except Exception as exc:
-                log.warning("link-hop orchestration failed for %s: %s",
-                            property_id, exc)
+                log.warning("link-hop orchestration failed for %s: %s", property_id, exc)
                 hop_result = None
 
             if hop_result and hop_result.get("units"):
                 # Merge: keep the entry-URL telemetry (detector signals,
                 # html characterization, fetch diagnostic), but replace
                 # extraction fields with the sub-page's.
-                for k in ("units", "extraction_tier_used",
-                          "api_calls_intercepted", "_winning_page_url",
-                          "_raw_api_responses", "_adapter_used",
-                          "_fallback_chain", "_tier_attempts",
-                          "_llm_interactions", "_llm_hints",
-                          "_llm_analysis_results", "_llm_field_mappings",
-                          "_explored_links"):
+                for k in (
+                    "units",
+                    "extraction_tier_used",
+                    "api_calls_intercepted",
+                    "_winning_page_url",
+                    "_raw_api_responses",
+                    "_adapter_used",
+                    "_fallback_chain",
+                    "_tier_attempts",
+                    "_llm_interactions",
+                    "_llm_hints",
+                    "_llm_analysis_results",
+                    "_llm_field_mappings",
+                    "_explored_links",
+                ):
                     if k in hop_result:
                         result[k] = hop_result[k]
-                for k in ("_link_hop_from", "_link_hop_depth",
-                          "_link_hop_score", "_link_hop_anchor"):
+                for k in ("_link_hop_from", "_link_hop_depth", "_link_hop_score", "_link_hop_anchor"):
                     if k in hop_result:
                         result[k] = hop_result[k]
                 result["_link_hop_success"] = True
@@ -1097,10 +1171,7 @@ async def scrape_jugnu(
         adapter_name=adapter_name,
         winning_url=base_url,
         confidence=1.0 if result.get("units") else 0.0,
-        llm_cost_usd=sum(
-            i.get("cost_usd", 0)
-            for i in result.get("_llm_interactions", [])
-        ),
+        llm_cost_usd=sum(i.get("cost_usd", 0) for i in result.get("_llm_interactions", [])),
         llm_calls=len(result.get("_llm_interactions", [])),
         errors=result.get("errors", []),
     )

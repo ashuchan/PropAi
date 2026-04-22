@@ -1,4 +1,5 @@
 """Adapter registry. See claude_refactor.md Phase 2."""
+
 from __future__ import annotations
 
 from ma_poc.pms.adapters.base import PmsAdapter
@@ -32,9 +33,7 @@ def get_adapter(pms: str) -> PmsAdapter:
         try:
             return _REGISTRY["generic"]
         except KeyError:
-            raise KeyError(
-                f"no adapter for pms={pms!r} and 'generic' fallback is not registered"
-            ) from None
+            raise KeyError(f"no adapter for pms={pms!r} and 'generic' fallback is not registered") from None
     # Unreachable — kept for mypy strict-completeness.
     raise KeyError(pms)
 

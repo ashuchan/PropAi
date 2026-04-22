@@ -3,19 +3,22 @@
 Every layer emits events through emit(). In J1-J4, this is a stub that logs
 to the standard logger. J5 replaces the implementation with a real ledger writer.
 """
+
 from __future__ import annotations
 
 import logging
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
 
 
-class EventKind(str, Enum):
+class EventKind(StrEnum):
     """All event types emitted across the five layers."""
 
     # Fetch (L1)
@@ -108,9 +111,6 @@ class Event:
 
 
 # --- Real emission (promoted from stub in J5) ---
-
-import threading
-from pathlib import Path
 
 _run_id: str = ""
 _ledger: Any = None  # EventLedger | None — typed Any to avoid import cycle at load

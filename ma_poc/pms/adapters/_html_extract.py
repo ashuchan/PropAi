@@ -24,6 +24,7 @@ The JSON-LD walking / type-matching / unit-signal logic is reused from
 daily_runner via the ``_daily_runner_parsers`` bridge so both pipelines
 agree on what a unit-shaped JSON-LD block looks like.
 """
+
 from __future__ import annotations
 
 import json
@@ -58,10 +59,18 @@ _EMBEDDED_JS_GLOBALS: tuple[str, ...] = (
 # Strategy 1-3 yield nothing. For HTML-only parsing we only match by regex
 # against inline script bodies, so the list is used as a priority filter.
 _PROPERTY_VARS: tuple[str, ...] = (
-    "floorPlans", "floorplans", "floor_plans",
-    "unitData", "units", "propertyData", "propertyInfo",
-    "availableUnits", "apartmentData", "pricingData",
-    "communityData", "buildingData",
+    "floorPlans",
+    "floorplans",
+    "floor_plans",
+    "unitData",
+    "units",
+    "propertyData",
+    "propertyInfo",
+    "availableUnits",
+    "apartmentData",
+    "pricingData",
+    "communityData",
+    "buildingData",
 )
 
 # Signal keywords that make an inline script worth JSON-extracting.
@@ -139,9 +148,9 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
             # is a property-level node slipping through. Emitting it as a
             # "1 unit" result fools the pipeline into claiming success.
             offers = item.get("offers") if isinstance(item.get("offers"), dict) else {}
-            has_price = bool(
-                offers.get("price") or offers.get("lowPrice") or offers.get("highPrice")
-            ) or (isinstance(item.get("offers"), list) and item.get("offers"))
+            has_price = bool(offers.get("price") or offers.get("lowPrice") or offers.get("highPrice")) or (
+                isinstance(item.get("offers"), list) and item.get("offers")
+            )
             has_name = bool(item.get("name"))
             has_size = bool(item.get("floorSize"))
             has_rooms = bool(item.get("numberOfRooms"))
@@ -182,31 +191,33 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
             if isinstance(num_rooms, dict):
                 num_rooms = num_rooms.get("value", "")
 
-            units.append({
-                "floor_plan_name":    name,
-                "bed_label":          "",
-                "bedrooms":           str(num_rooms) if num_rooms not in (None, "") else "",
-                "bathrooms":          "",
-                "sqft":               _jsonld_floor_size(item),
-                "unit_number":        "",
-                "floor":              "",
-                "building":           "",
-                "rent_range":         rent_range,
-                # Surface numeric rent so the v2 transform doesn't have to
-                # re-parse the human-readable string. Fall back to ``lo_i``
-                # for both when the high price is missing (single-value rent).
-                "market_rent_low":    lo_i,
-                "market_rent_high":   hi_i if hi_i is not None else lo_i,
-                "deposit":            "",
-                "concession":         "",
-                "availability_status": "",
-                "available_units":    "",
-                "availability_date":  "",
-                "lease_term":         "",
-                "move_in_date":       "",
-                "source_api_url":     source_url,
-                "extraction_tier":    "TIER_2_JSONLD",
-            })
+            units.append(
+                {
+                    "floor_plan_name": name,
+                    "bed_label": "",
+                    "bedrooms": str(num_rooms) if num_rooms not in (None, "") else "",
+                    "bathrooms": "",
+                    "sqft": _jsonld_floor_size(item),
+                    "unit_number": "",
+                    "floor": "",
+                    "building": "",
+                    "rent_range": rent_range,
+                    # Surface numeric rent so the v2 transform doesn't have to
+                    # re-parse the human-readable string. Fall back to ``lo_i``
+                    # for both when the high price is missing (single-value rent).
+                    "market_rent_low": lo_i,
+                    "market_rent_high": hi_i if hi_i is not None else lo_i,
+                    "deposit": "",
+                    "concession": "",
+                    "availability_status": "",
+                    "available_units": "",
+                    "availability_date": "",
+                    "lease_term": "",
+                    "move_in_date": "",
+                    "source_api_url": source_url,
+                    "extraction_tier": "TIER_2_JSONLD",
+                }
+            )
 
     return units
 
@@ -336,7 +347,7 @@ def parse_jsonld(html: str, source_url: str = "") -> tuple[dict[str, Any], list[
         collection_units = extract_jsonld_from_html(
             # Fake an HTML wrapper so extract_jsonld_from_html can parse the items
             # Re-emit as JSON-LD for the existing parser to handle
-            "<script type=\"application/ld+json\">"
+            '<script type="application/ld+json">'
             + json.dumps({"@type": "ItemList", "itemListElement": collection})
             + "</script>",
             source_url,
@@ -409,10 +420,12 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
             except (json.JSONDecodeError, ValueError):
                 # Regex-extracted fragment may not be valid JSON — expected.
                 continue
-            found.append({
-                "url": f"embedded:script-var:{var_name}",
-                "body": data,
-            })
+            found.append(
+                {
+                    "url": f"embedded:script-var:{var_name}",
+                    "body": data,
+                }
+            )
 
         # Also accept ``window.__NEXT_DATA__ = {...};`` and similar known globals
         # where the regex above might not match due to multi-line templates.
@@ -443,15 +456,39 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
 _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
     # Common PMS / CMS container patterns. Specific-first, generic-last so a
     # site with both `.unit-card` and `.card` prefers the specific one.
-    ".unit-card", ".unit-row", ".unit-item", ".unitContainer",
-    ".floorplan", ".floor-plan", ".floorplan-card", ".floor-plan-card",
-    ".floorplan-row", ".floor-plan-row", ".floorplanItem", ".fp-card",
-    ".apartment", ".apartment-card", ".apartment-row",
-    ".listing", ".listing-card", ".listing-item",
-    ".pricing-card", ".pricing-item", ".pricing-row", ".plan-card",
-    "[data-unit]", "[data-floorplan]", "[data-floor-plan]", "[data-apartment]",
-    "article.unit", "article.floorplan", "article.apartment",
-    "div.unit", "div.floorplan", "div.apartment", "div.listing",
+    ".unit-card",
+    ".unit-row",
+    ".unit-item",
+    ".unitContainer",
+    ".floorplan",
+    ".floor-plan",
+    ".floorplan-card",
+    ".floor-plan-card",
+    ".floorplan-row",
+    ".floor-plan-row",
+    ".floorplanItem",
+    ".fp-card",
+    ".apartment",
+    ".apartment-card",
+    ".apartment-row",
+    ".listing",
+    ".listing-card",
+    ".listing-item",
+    ".pricing-card",
+    ".pricing-item",
+    ".pricing-row",
+    ".plan-card",
+    "[data-unit]",
+    "[data-floorplan]",
+    "[data-floor-plan]",
+    "[data-apartment]",
+    "article.unit",
+    "article.floorplan",
+    "article.apartment",
+    "div.unit",
+    "div.floorplan",
+    "div.apartment",
+    "div.listing",
 )
 
 _RENT_PATTERN = re.compile(
@@ -525,9 +562,7 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
 
     return {
         "floor_plan_name": "",
-        "bed_label": f"{beds_val}BR" if beds_val and beds_val != "0" else (
-            "Studio" if is_studio else ""
-        ),
+        "bed_label": f"{beds_val}BR" if beds_val and beds_val != "0" else ("Studio" if is_studio else ""),
         "bedrooms": beds_val,
         "bathrooms": baths_val,
         "sqft": sqft_val,
@@ -585,10 +620,7 @@ def extract_units_from_dom(html: str, source_url: str) -> list[dict[str, Any]]:
                 continue
             unit["source_api_url"] = f"dom:{selector}"
             unit["_source_url"] = source_url
-            dedup = (
-                unit["unit_number"]
-                or f"{unit['rent_range']}|{unit['sqft']}|{unit['bedrooms']}"
-            )
+            dedup = unit["unit_number"] or f"{unit['rent_range']}|{unit['sqft']}|{unit['bedrooms']}"
             if dedup in seen:
                 continue
             seen.add(dedup)

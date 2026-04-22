@@ -9,24 +9,20 @@ These tests validate that:
   - Missing _detected_pms key does not crash
   - Run report includes a PMS breakdown section
 """
+
 from __future__ import annotations
 
-import copy
 import json
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any
-
-import pytest
 
 # Ensure the pms package is importable regardless of working directory.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from ma_poc.pms.integration_helpers import (
-    PMS_CONFIDENCE_THRESHOLD,
+from ma_poc.pms.integration_helpers import (  # noqa: E402
     add_pms_metrics_to_report,
     update_profile_from_scrape,
 )
@@ -38,19 +34,45 @@ from ma_poc.pms.integration_helpers import (
 # The 46 top-level property fields that daily_runner.build_property_record
 # is expected to produce (plus "units" and "_meta" which are always present).
 TARGET_PROPERTY_FIELDS = [
-    "Property Name", "Type", "Unique ID", "Average Unit Size (SF)",
-    "Property ID", "Census Block Id", "City",
-    "Construction Finish Date", "Construction Start Date",
-    "Development Company", "Latitude", "Longitude",
-    "Management Company", "Market Name", "Property Owner",
-    "Property Address", "Property Status", "Property Type",
-    "Region", "Renovation Finish", "Renovation Start",
-    "State", "Stories", "Submarket Name", "Total Units",
-    "Tract Code", "Year Built", "ZIP Code", "Lease Start Date",
-    "First Move-In Date", "Property Style", "Update Date", "Unit Mix",
-    "Asset Grade in Submarket", "Asset Grade in Market",
-    "Phone", "Website",
-    "Property Image URL", "Property Gallery URLs",
+    "Property Name",
+    "Type",
+    "Unique ID",
+    "Average Unit Size (SF)",
+    "Property ID",
+    "Census Block Id",
+    "City",
+    "Construction Finish Date",
+    "Construction Start Date",
+    "Development Company",
+    "Latitude",
+    "Longitude",
+    "Management Company",
+    "Market Name",
+    "Property Owner",
+    "Property Address",
+    "Property Status",
+    "Property Type",
+    "Region",
+    "Renovation Finish",
+    "Renovation Start",
+    "State",
+    "Stories",
+    "Submarket Name",
+    "Total Units",
+    "Tract Code",
+    "Year Built",
+    "ZIP Code",
+    "Lease Start Date",
+    "First Move-In Date",
+    "Property Style",
+    "Update Date",
+    "Unit Mix",
+    "Asset Grade in Submarket",
+    "Asset Grade in Market",
+    "Phone",
+    "Website",
+    "Property Image URL",
+    "Property Gallery URLs",
 ]
 
 
@@ -87,10 +109,17 @@ def _make_scrape_result(
         "links_found": [],
         "property_links_crawled": [],
         "api_calls_intercepted": [],
-        "units": units or [
-            {"unit_id": "101", "market_rent_low": 1450, "market_rent_high": 1450,
-             "available_date": "2026-05-01", "lease_link": None,
-             "concessions": None, "amenities": None},
+        "units": units
+        or [
+            {
+                "unit_id": "101",
+                "market_rent_low": 1450,
+                "market_rent_high": 1450,
+                "available_date": "2026-05-01",
+                "lease_link": None,
+                "concessions": None,
+                "amenities": None,
+            },
         ],
         "extraction_tier_used": 1,
         "errors": errors or [],
@@ -223,9 +252,15 @@ class TestDailyRunner46KeyOutputPreserved:
         # Build a minimal property record matching daily_runner output shape.
         record: dict[str, Any] = {f: None for f in TARGET_PROPERTY_FIELDS}
         record["units"] = [
-            {"unit_id": "101", "market_rent_low": 1450, "market_rent_high": 1450,
-             "available_date": "2026-05-01", "lease_link": None,
-             "concessions": None, "amenities": None},
+            {
+                "unit_id": "101",
+                "market_rent_low": 1450,
+                "market_rent_high": 1450,
+                "available_date": "2026-05-01",
+                "lease_link": None,
+                "concessions": None,
+                "amenities": None,
+            },
         ]
         record["_meta"] = {
             "canonical_id": "TEST-001",
@@ -247,8 +282,13 @@ class TestDailyRunner46KeyOutputPreserved:
     def test_unit_has_required_keys(self) -> None:
         """Each unit dict must have the standard unit schema keys."""
         required_unit_keys = {
-            "unit_id", "market_rent_low", "market_rent_high",
-            "available_date", "lease_link", "concessions", "amenities",
+            "unit_id",
+            "market_rent_low",
+            "market_rent_high",
+            "available_date",
+            "lease_link",
+            "concessions",
+            "amenities",
         }
         unit = {
             "unit_id": "205",
@@ -351,20 +391,23 @@ class TestDailyRunnerReportHasPmsBreakdown:
         report: dict[str, Any] = {"run_date": "2026-04-17"}
         scrape_results = [
             _make_scrape_result(
-                pms="entrata", confidence=0.90,
+                pms="entrata",
+                confidence=0.90,
                 llm_interactions=[
                     {"cost_usd": 0.005, "model": "gpt-4o-mini"},
                     {"cost_usd": 0.003, "model": "gpt-4o-mini"},
                 ],
             ),
             _make_scrape_result(
-                pms="entrata", confidence=0.85,
+                pms="entrata",
+                confidence=0.85,
                 llm_interactions=[
                     {"cost_usd": 0.010, "model": "gpt-4o"},
                 ],
             ),
             _make_scrape_result(
-                pms="rentcafe", confidence=0.90,
+                pms="rentcafe",
+                confidence=0.90,
                 llm_interactions=[],
             ),
         ]

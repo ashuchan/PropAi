@@ -12,6 +12,7 @@ Usage::
     python scripts/gate_refactor.py phase 2
     python scripts/gate_refactor.py all
 """
+
 from __future__ import annotations
 
 import argparse
@@ -174,9 +175,12 @@ def check_phase_3() -> GateResult:
             continue
         content = py.read_text(encoding="utf-8")
         for line in content.splitlines():
-            if "from ma_poc.pms.adapters" in line and "from ma_poc.pms.adapters.base" not in line \
-                    and "from ma_poc.pms.adapters._parsing" not in line \
-                    and "from ma_poc.pms.adapters._stub" not in line:
+            if (
+                "from ma_poc.pms.adapters" in line
+                and "from ma_poc.pms.adapters.base" not in line
+                and "from ma_poc.pms.adapters._parsing" not in line
+                and "from ma_poc.pms.adapters._stub" not in line
+            ):
                 # realpage_oll importing onesite is acceptable (shared parser)
                 if py.name == "realpage_oll.py" and "onesite" in line:
                     continue
@@ -193,6 +197,7 @@ def check_phase_3() -> GateResult:
 
     # Research log comment at top of each adapter.
     from ma_poc.pms.detector import DetectedPMS
+
     literals = t.get_args(t.get_type_hints(DetectedPMS)["pms"])
     missing_log: list[str] = []
     for lit in literals:

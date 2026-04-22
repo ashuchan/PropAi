@@ -74,7 +74,8 @@ from entrata import scrape  # noqa: E402
 # ── Unit transformation ────────────────────────────────────────────────────────
 
 ISO_DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
-US_DATE_RE  = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})$")
+US_DATE_RE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})$")
+
 
 def _to_iso_date(s: Any) -> str | None:
     if s is None:
@@ -98,6 +99,7 @@ def _to_iso_date(s: Any) -> str | None:
     except (ValueError, TypeError):
         return None
 
+
 def _money_to_int(s: Any) -> int | None:
     if s is None:
         return None
@@ -109,19 +111,21 @@ def _money_to_int(s: Any) -> int | None:
     except ValueError:
         return None
 
+
 def _sightmap_lease_link(unit: dict, fp: dict) -> str | None:
     """First non-null leasing URL we can find on the SightMap unit/floor plan."""
     for key in ("leasing_price_url", "leasing_start_dates_url"):
         v = unit.get(key)
         if isinstance(v, str) and v:
             return v
-    for ol in (unit.get("outbound_links") or []):
+    for ol in unit.get("outbound_links") or []:
         if isinstance(ol, dict) and ol.get("url"):
             return str(ol["url"])
-    for ol in (fp.get("outbound_links") or []):
+    for ol in fp.get("outbound_links") or []:
         if isinstance(ol, dict) and ol.get("url"):
             return str(ol["url"])
     return None
+
 
 def _sightmap_units_from_body(body: dict, source_url: str) -> list[dict]:
     """Extract target-schema units directly from a SightMap API body."""
@@ -130,7 +134,7 @@ def _sightmap_units_from_body(body: dict, source_url: str) -> list[dict]:
     if not isinstance(data, dict):
         return out
     raw_units = data.get("units") or []
-    raw_fps   = data.get("floor_plans") or []
+    raw_fps = data.get("floor_plans") or []
     if not isinstance(raw_units, list) or not raw_units:
         return out
     fp_by_id: dict[str, dict] = {}
@@ -144,7 +148,11 @@ def _sightmap_units_from_body(body: dict, source_url: str) -> list[dict]:
         # SightMap "price" is a flat scalar; "total_price" is a [lo, hi] range
         # representing min/max with available specials.
         price = u.get("price")
-        lo = int(price) if isinstance(price, (int, float)) and price > 0 else _money_to_int(u.get("display_price"))
+        lo = (
+            int(price)
+            if isinstance(price, (int, float)) and price > 0
+            else _money_to_int(u.get("display_price"))
+        )
         hi = lo
         tp = u.get("total_price")
         if isinstance(tp, list) and len(tp) == 2:
@@ -156,22 +164,30 @@ def _sightmap_units_from_body(body: dict, source_url: str) -> list[dict]:
                     hi = tp_hi
             except (TypeError, ValueError):
                 pass
-        out.append({
-            "unit_id":          str(u.get("unit_number") or u.get("label") or u.get("id") or ""),
-            "market_rent_low":  lo,
-            "market_rent_high": hi,
-            "available_date":   _to_iso_date(u.get("available_on")),
-            "lease_link":       _sightmap_lease_link(u, fp),
-            "concessions":      (u.get("specials_description") or None),
-            "amenities":        None,  # SightMap stores amenities as filter IDs only.
-            # Floor plan diagram image (SightMap exposes directly on the floor_plan).
-            "floorplan_image_url": fp.get("image") or fp.get("image_3d") or fp.get("image_secondary") or None,
-            # Carry sqft for property-level Average Unit Size aggregate.
-            "_sqft":            int(u["area"]) if isinstance(u.get("area"), (int, float)) and u["area"] > 0 else None,
-            "_floor_plan":      fp.get("name") or fp.get("filter_label") or "",
-            "_bedrooms":        fp.get("bedroom_count"),
-        })
+        out.append(
+            {
+                "unit_id": str(u.get("unit_number") or u.get("label") or u.get("id") or ""),
+                "market_rent_low": lo,
+                "market_rent_high": hi,
+                "available_date": _to_iso_date(u.get("available_on")),
+                "lease_link": _sightmap_lease_link(u, fp),
+                "concessions": (u.get("specials_description") or None),
+                "amenities": None,  # SightMap stores amenities as filter IDs only.
+                # Floor plan diagram image (SightMap exposes directly on the floor_plan).
+                "floorplan_image_url": fp.get("image")
+                or fp.get("image_3d")
+                or fp.get("image_secondary")
+                or None,
+                # Carry sqft for property-level Average Unit Size aggregate.
+                "_sqft": int(u["area"])
+                if isinstance(u.get("area"), (int, float)) and u["area"] > 0
+                else None,
+                "_floor_plan": fp.get("name") or fp.get("filter_label") or "",
+                "_bedrooms": fp.get("bedroom_count"),
+            }
+        )
     return out
+
 
 # Apartment rent sanity bounds (USD/month). Rejects garbage like "rent=14" that
 # pops out of misidentified fields, while still allowing low-cost markets.
@@ -182,14 +198,39 @@ _RENT_MAX = 50000
 # APIs (e.g. ResMan, Yardi) use plain "id" for unit identifiers.  The gate
 # at line ~203 requires BOTH an id-key AND a rent-key to be present, so
 # "id" alone won't cause false positives on non-unit lists.
-_UNIT_ID_KEYS  = {"unit_number", "unitNumber", "unit_id", "unitId", "UnitNumber",
-                  "id", "label", "name", "ID", "unit_name", "unitName"}
+_UNIT_ID_KEYS = {
+    "unit_number",
+    "unitNumber",
+    "unit_id",
+    "unitId",
+    "UnitNumber",
+    "id",
+    "label",
+    "name",
+    "ID",
+    "unit_name",
+    "unitName",
+}
 # Extended: some APIs nest rent inside an object (e.g. rent: {min, max})
 # rather than flat keys.  The _extract_rent() helper handles both.
-_RENT_KEYS     = {"price", "minRent", "askingRent", "rent", "monthlyRent",
-                  "minPrice", "startingPrice", "base_rent", "baseRent",
-                  "display_price", "displayPrice", "monthly_rent",
-                  "rentTerms", "pricing", "market_rent"}
+_RENT_KEYS = {
+    "price",
+    "minRent",
+    "askingRent",
+    "rent",
+    "monthlyRent",
+    "minPrice",
+    "startingPrice",
+    "base_rent",
+    "baseRent",
+    "display_price",
+    "displayPrice",
+    "monthly_rent",
+    "rentTerms",
+    "pricing",
+    "market_rent",
+}
+
 
 def _extract_rent(u: dict) -> tuple[int | None, int | None]:
     """Extract (rent_low, rent_high) from a unit/floorplan dict.
@@ -201,10 +242,22 @@ def _extract_rent(u: dict) -> tuple[int | None, int | None]:
                       {"pricing": {"effectiveRent": 1500}}
     Returns (None, None) if no rent found.
     """
-    _LO_KEYS = ("price", "minRent", "askingRent", "rent", "monthlyRent",
-                 "minPrice", "startingPrice", "base_rent", "baseRent",
-                 "display_price", "monthly_rent", "market_rent",
-                 "rentTerms", "pricing")
+    _LO_KEYS = (
+        "price",
+        "minRent",
+        "askingRent",
+        "rent",
+        "monthlyRent",
+        "minPrice",
+        "startingPrice",
+        "base_rent",
+        "baseRent",
+        "display_price",
+        "monthly_rent",
+        "market_rent",
+        "rentTerms",
+        "pricing",
+    )
     _HI_KEYS = ("maxRent", "price_max", "max_price", "maxPrice", "rent_max")
 
     lo: int | None = None
@@ -217,8 +270,9 @@ def _extract_rent(u: dict) -> tuple[int | None, int | None]:
             continue
         # Nested dict: rent: {min: X, max: Y}
         if isinstance(v, dict):
-            lo = _money_to_int(v.get("min") or v.get("low") or v.get("amount")
-                               or v.get("effectiveRent") or v.get("value"))
+            lo = _money_to_int(
+                v.get("min") or v.get("low") or v.get("amount") or v.get("effectiveRent") or v.get("value")
+            )
             hi = _money_to_int(v.get("max") or v.get("high"))
             if lo:
                 break
@@ -272,7 +326,7 @@ def _generic_units_from_body(body, source_url: str) -> list[dict]:
         if isinstance(node, list) and len(node) >= 3 and isinstance(node[0], dict):
             lists_checked += 1
             sample = node[0]
-            has_id   = any(k in sample for k in _UNIT_ID_KEYS)
+            has_id = any(k in sample for k in _UNIT_ID_KEYS)
             has_rent = any(k in sample for k in _RENT_KEYS)
             if has_id and has_rent:
                 candidates.extend(node)
@@ -309,41 +363,68 @@ def _generic_units_from_body(body, source_url: str) -> list[dict]:
 
         sqft_v = u.get("area") or u.get("sqft") or u.get("square_feet") or u.get("squareFeet")
         # Floor plan / unit image — many PMS APIs expose one of these keys.
-        fp_img = (u.get("floorplan_image") or u.get("floorplanImage") or u.get("floorPlanImage")
-                  or u.get("floor_plan_image") or u.get("floorplan_image_url") or u.get("floorPlanImageUrl")
-                  or u.get("image") or u.get("imageUrl") or u.get("image_url")
-                  or u.get("thumbnail") or u.get("photoUrl") or None)
+        fp_img = (
+            u.get("floorplan_image")
+            or u.get("floorplanImage")
+            or u.get("floorPlanImage")
+            or u.get("floor_plan_image")
+            or u.get("floorplan_image_url")
+            or u.get("floorPlanImageUrl")
+            or u.get("image")
+            or u.get("imageUrl")
+            or u.get("image_url")
+            or u.get("thumbnail")
+            or u.get("photoUrl")
+            or None
+        )
         if isinstance(fp_img, dict):
             fp_img = fp_img.get("url") or fp_img.get("src") or None
-        out.append({
-            "unit_id":          unit_id,
-            "market_rent_low":  lo,
-            "market_rent_high": hi,
-            "available_date":   _to_iso_date(u.get("available_on") or u.get("availableDate")
-                                             or u.get("available_date") or u.get("moveInDate")),
-            "lease_link":       u.get("leasing_price_url") or u.get("applyUrl") or None,
-            "concessions":      u.get("specials_description") or u.get("concession")
-                                or u.get("special") or u.get("specials") or None,
-            "amenities":        None,
-            "floorplan_image_url": fp_img if isinstance(fp_img, str) and fp_img.startswith("http") else None,
-            "_sqft":            int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
-            "_floor_plan":      u.get("floorPlanName") or u.get("floor_plan_name")
-                                or u.get("model_id") or u.get("name") or "",
-            "_bedrooms":        u.get("bedroom_count") or u.get("bedrooms") or u.get("beds"),
-        })
+        out.append(
+            {
+                "unit_id": unit_id,
+                "market_rent_low": lo,
+                "market_rent_high": hi,
+                "available_date": _to_iso_date(
+                    u.get("available_on")
+                    or u.get("availableDate")
+                    or u.get("available_date")
+                    or u.get("moveInDate")
+                ),
+                "lease_link": u.get("leasing_price_url") or u.get("applyUrl") or None,
+                "concessions": u.get("specials_description")
+                or u.get("concession")
+                or u.get("special")
+                or u.get("specials")
+                or None,
+                "amenities": None,
+                "floorplan_image_url": fp_img
+                if isinstance(fp_img, str) and fp_img.startswith("http")
+                else None,
+                "_sqft": int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
+                "_floor_plan": u.get("floorPlanName")
+                or u.get("floor_plan_name")
+                or u.get("model_id")
+                or u.get("name")
+                or "",
+                "_bedrooms": u.get("bedroom_count") or u.get("bedrooms") or u.get("beds"),
+            }
+        )
 
     # Diagnostic summary for debugging extraction failures.
     if lists_checked or candidates or out:
-        print(f"    generic_parser({source_url[:60]}): "
-              f"{lists_checked} lists checked, "
-              f"{len(candidates)} candidates "
-              f"({lists_rejected_no_id} lists had no id-key, "
-              f"{lists_rejected_no_rent} no rent-key), "
-              f"{skipped_no_id} skipped no-id, "
-              f"{skipped_rent_bounds} skipped rent-bounds "
-              f"→ {len(out)} units emitted")
+        print(
+            f"    generic_parser({source_url[:60]}): "
+            f"{lists_checked} lists checked, "
+            f"{len(candidates)} candidates "
+            f"({lists_rejected_no_id} lists had no id-key, "
+            f"{lists_rejected_no_rent} no rent-key), "
+            f"{skipped_no_id} skipped no-id, "
+            f"{skipped_rent_bounds} skipped rent-bounds "
+            f"→ {len(out)} units emitted"
+        )
 
     return out
+
 
 def _realpage_units_from_body(body, source_url: str) -> list[dict]:
     """Parse RealPage API responses (api.ws.realpage.com).
@@ -361,15 +442,13 @@ def _realpage_units_from_body(body, source_url: str) -> list[dict]:
         return out
     resp = body.get("response")
     if resp is None:
-        print(f"    realpage_parser({source_url[:60]}): response is null — "
-              f"no available units at this time")
+        print(f"    realpage_parser({source_url[:60]}): response is null — no available units at this time")
         return out
 
     # Case 1: response is a dict with "floorplans" key → /floorplans endpoint
     if isinstance(resp, dict) and "floorplans" in resp:
         fp_list = resp.get("floorplans") or []
-        print(f"    realpage_parser({source_url[:60]}): "
-              f"/floorplans endpoint, {len(fp_list)} floor plans")
+        print(f"    realpage_parser({source_url[:60]}): /floorplans endpoint, {len(fp_list)} floor plans")
         for fp in resp.get("floorplans") or []:
             if not isinstance(fp, dict):
                 continue
@@ -385,25 +464,29 @@ def _realpage_units_from_body(body, source_url: str) -> list[dict]:
             hi = _money_to_int(fp.get("maxRent") or fp.get("rentMax"))
             if hi is None:
                 hi = lo
-            out.append({
-                "unit_id":          fp_id,
-                "market_rent_low":  lo,
-                "market_rent_high": hi,
-                "available_date":   None,
-                "lease_link":       None,
-                "concessions":      None,
-                "amenities":        None,
-                "floorplan_image_url": fp.get("imageUrl") or fp.get("image") or fp.get("floorPlanImage") or None,
-                "_sqft":            sqft_v,
-                "_floor_plan":      fp.get("name") or fp_id,
-                "_bedrooms":        beds,
-            })
+            out.append(
+                {
+                    "unit_id": fp_id,
+                    "market_rent_low": lo,
+                    "market_rent_high": hi,
+                    "available_date": None,
+                    "lease_link": None,
+                    "concessions": None,
+                    "amenities": None,
+                    "floorplan_image_url": fp.get("imageUrl")
+                    or fp.get("image")
+                    or fp.get("floorPlanImage")
+                    or None,
+                    "_sqft": sqft_v,
+                    "_floor_plan": fp.get("name") or fp_id,
+                    "_bedrooms": beds,
+                }
+            )
         return out
 
     # Case 2: response is a list → /units endpoint
     if isinstance(resp, list):
-        print(f"    realpage_parser({source_url[:60]}): "
-              f"/units endpoint, {len(resp)} raw units")
+        print(f"    realpage_parser({source_url[:60]}): /units endpoint, {len(resp)} raw units")
         for u in resp:
             if not isinstance(u, dict):
                 continue
@@ -417,19 +500,24 @@ def _realpage_units_from_body(body, source_url: str) -> list[dict]:
             if lo is not None and (lo < _RENT_MIN or lo > _RENT_MAX):
                 continue
             sqft_v = u.get("sqft") or u.get("squareFeet")
-            out.append({
-                "unit_id":          uid,
-                "market_rent_low":  lo,
-                "market_rent_high": hi,
-                "available_date":   _to_iso_date(u.get("availableDate") or u.get("available_date")),
-                "lease_link":       u.get("applyOnlineUrl") or None,
-                "concessions":      u.get("concessions") or u.get("specials") or None,
-                "amenities":        None,
-                "floorplan_image_url": u.get("floorPlanImage") or u.get("floorplanImage") or u.get("imageUrl") or None,
-                "_sqft":            int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
-                "_floor_plan":      u.get("floorPlanName") or u.get("floorplanName") or "",
-                "_bedrooms":        u.get("bedrooms") or u.get("bedRooms"),
-            })
+            out.append(
+                {
+                    "unit_id": uid,
+                    "market_rent_low": lo,
+                    "market_rent_high": hi,
+                    "available_date": _to_iso_date(u.get("availableDate") or u.get("available_date")),
+                    "lease_link": u.get("applyOnlineUrl") or None,
+                    "concessions": u.get("concessions") or u.get("specials") or None,
+                    "amenities": None,
+                    "floorplan_image_url": u.get("floorPlanImage")
+                    or u.get("floorplanImage")
+                    or u.get("imageUrl")
+                    or None,
+                    "_sqft": int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
+                    "_floor_plan": u.get("floorPlanName") or u.get("floorplanName") or "",
+                    "_bedrooms": u.get("bedrooms") or u.get("bedRooms"),
+                }
+            )
         return out
 
     return out
@@ -455,8 +543,7 @@ def _avalon_units_from_body(body, source_url: str) -> list[dict]:
     if not isinstance(raw_units, list) or not raw_units:
         return out
 
-    print(f"    avalon_parser({source_url[:60]}): "
-          f"{len(raw_units)} raw units")
+    print(f"    avalon_parser({source_url[:60]}): {len(raw_units)} raw units")
 
     for u in raw_units:
         if not isinstance(u, dict):
@@ -470,8 +557,9 @@ def _avalon_units_from_body(body, source_url: str) -> list[dict]:
         if lo is None:
             pricing = u.get("pricing")
             if isinstance(pricing, dict):
-                lo = _money_to_int(pricing.get("effectiveRent") or pricing.get("minRent")
-                                   or pricing.get("rent"))
+                lo = _money_to_int(
+                    pricing.get("effectiveRent") or pricing.get("minRent") or pricing.get("rent")
+                )
                 hi = _money_to_int(pricing.get("maxRent")) or lo
         if hi is None:
             hi = lo
@@ -481,20 +569,23 @@ def _avalon_units_from_body(body, source_url: str) -> list[dict]:
         sqft = u.get("squareFeet") or u.get("sqft")
         sqft_v = int(sqft) if isinstance(sqft, (int, float)) and sqft > 0 else None
 
-        out.append({
-            "unit_id":          uid,
-            "market_rent_low":  lo,
-            "market_rent_high": hi,
-            "available_date":   _to_iso_date(u.get("availableDate") or u.get("moveInDate")
-                                             or u.get("available_date")),
-            "lease_link":       u.get("applyUrl") or u.get("applyOnlineUrl") or None,
-            "concessions":      u.get("promotionTitle") or u.get("concession") or None,
-            "amenities":        None,
-            "floorplan_image_url": u.get("floorPlanImage") or u.get("imageUrl") or None,
-            "_sqft":            sqft_v,
-            "_floor_plan":      u.get("floorPlanName") or u.get("floorplanName") or "",
-            "_bedrooms":        u.get("bedroomNumber") or u.get("bedrooms"),
-        })
+        out.append(
+            {
+                "unit_id": uid,
+                "market_rent_low": lo,
+                "market_rent_high": hi,
+                "available_date": _to_iso_date(
+                    u.get("availableDate") or u.get("moveInDate") or u.get("available_date")
+                ),
+                "lease_link": u.get("applyUrl") or u.get("applyOnlineUrl") or None,
+                "concessions": u.get("promotionTitle") or u.get("concession") or None,
+                "amenities": None,
+                "floorplan_image_url": u.get("floorPlanImage") or u.get("imageUrl") or None,
+                "_sqft": sqft_v,
+                "_floor_plan": u.get("floorPlanName") or u.get("floorplanName") or "",
+                "_bedrooms": u.get("bedroomNumber") or u.get("bedrooms"),
+            }
+        )
     return out
 
 
@@ -507,7 +598,9 @@ def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
     seen: set[str] = set()
 
     def _add(rec: dict) -> None:
-        key = rec.get("unit_id") or f"{rec.get('_floor_plan')}|{rec.get('_sqft')}|{rec.get('market_rent_low')}"
+        key = (
+            rec.get("unit_id") or f"{rec.get('_floor_plan')}|{rec.get('_sqft')}|{rec.get('market_rent_low')}"
+        )
         if not key or key in seen:
             return
         seen.add(key)
@@ -538,8 +631,7 @@ def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
             if len(target) > before:
                 parser_used = "realpage"
                 print(f"  transform: RealPage parser → {len(target) - before} units from {url[:60]}")
-        elif ("avaloncommunities" in host or "avalonbay" in host
-              or "community-units" in url.lower()):
+        elif "avaloncommunities" in host or "avalonbay" in host or "community-units" in url.lower():
             before = len(target)
             for u in _avalon_units_from_body(body, url):
                 _add(u)
@@ -563,8 +655,10 @@ def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
     # Fallback: if no API-level matches, use the parser's normalised units list.
     if not target and (scrape_result.get("units") or []):
         parser_used = "fallback_entrata_units"
-        print(f"  transform: no API-level units — falling back to entrata.py "
-              f"normalised units ({len(scrape_result.get('units', []))} raw)")
+        print(
+            f"  transform: no API-level units — falling back to entrata.py "
+            f"normalised units ({len(scrape_result.get('units', []))} raw)"
+        )
     if not target:
         for u in scrape_result.get("units") or []:
             rent_lo = _money_to_int(u.get("rent_range"))
@@ -575,29 +669,35 @@ def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
                 rent_lo = _money_to_int(m.group(1))
                 rent_hi = _money_to_int(m.group(2))
             sqft_v = _money_to_int(u.get("sqft"))
-            _add({
-                "unit_id":          u.get("unit_number") or "",
-                "market_rent_low":  rent_lo,
-                "market_rent_high": rent_hi,
-                "available_date":   _to_iso_date(u.get("availability_date")),
-                "lease_link":       u.get("source_api_url") or None,
-                "concessions":      u.get("concession") or None,
-                "amenities":        None,
-                "floorplan_image_url": u.get("floorplan_image_url") or u.get("floor_plan_image") or None,
-                "_sqft":            sqft_v,
-                "_floor_plan":      u.get("floor_plan_name") or "",
-                "_bedrooms":        u.get("bedrooms") or None,
-            })
+            _add(
+                {
+                    "unit_id": u.get("unit_number") or "",
+                    "market_rent_low": rent_lo,
+                    "market_rent_high": rent_hi,
+                    "available_date": _to_iso_date(u.get("availability_date")),
+                    "lease_link": u.get("source_api_url") or None,
+                    "concessions": u.get("concession") or None,
+                    "amenities": None,
+                    "floorplan_image_url": u.get("floorplan_image_url") or u.get("floor_plan_image") or None,
+                    "_sqft": sqft_v,
+                    "_floor_plan": u.get("floor_plan_name") or "",
+                    "_bedrooms": u.get("bedrooms") or None,
+                }
+            )
 
     # Final summary — single line to diagnose "0 units" from logs.
-    print(f"  transform_units: {len(raw_responses)} API responses, "
-          f"parser={parser_used}, "
-          f"{len(target)} units emitted "
-          f"({len(seen) - len(target)} deduped)")
+    print(
+        f"  transform_units: {len(raw_responses)} API responses, "
+        f"parser={parser_used}, "
+        f"{len(target)} units emitted "
+        f"({len(seen) - len(target)} deduped)"
+    )
 
     return target
 
+
 # ── Aggregates ────────────────────────────────────────────────────────────────
+
 
 def aggregate_unit_stats(units: list[dict]) -> dict:
     """Compute Average Unit Size, Unit Mix, First Move-In Date, total count."""
@@ -632,12 +732,14 @@ def aggregate_unit_stats(units: list[dict]) -> dict:
 
     return {
         "average_unit_size_sf": avg_sqft,
-        "unit_mix":             unit_mix,
-        "first_move_in_date":   first_move_in,
-        "total_units_found":    len(units),
+        "unit_mix": unit_mix,
+        "first_move_in_date": first_move_in,
+        "total_units_found": len(units),
     }
 
+
 # ── CSV row → output property record ──────────────────────────────────────────
+
 
 def _csv_get(row: dict, *keys: str) -> str:
     for k in keys:
@@ -645,6 +747,7 @@ def _csv_get(row: dict, *keys: str) -> str:
         if v is not None and str(v).strip():
             return str(v).strip()
     return ""
+
 
 def _clean(v: Any) -> Any:
     """Coerce literal 'null'/'none'/'' strings to real None."""
@@ -654,90 +757,84 @@ def _clean(v: Any) -> Any:
         return None
     return v
 
+
 def _strip_internal(units: list[dict]) -> list[dict]:
     """Remove the underscore-prefixed helper fields before emitting."""
     return [{k: v for k, v in u.items() if not k.startswith("_")} for u in units]
+
 
 def build_property_record(csv_row: dict, scrape_result: dict, target_units: list[dict]) -> dict:
     md = scrape_result.get("property_metadata") or {}
     stats = aggregate_unit_stats(target_units)
 
     csv_url = _csv_get(csv_row, "Property URL", "URL", "url")
-    pid     = _csv_get(csv_row, "Property ID", "property_id", "id")
+    pid = _csv_get(csv_row, "Property ID", "property_id", "id")
 
     # Prefer scraped name if it's a real property name; CSV name is reliable so default to it.
     property_name = _csv_get(csv_row, "Property Name", "name") or md.get("name") or ""
 
     # Prefer CSV address but fall back to JSON-LD.
     address = _csv_get(csv_row, "Address") or md.get("address") or ""
-    city    = _csv_get(csv_row, "City") or md.get("city") or ""
-    state   = _csv_get(csv_row, "State") or md.get("state") or ""
-    zipc    = _csv_get(csv_row, "ZIP", "Zip", "Zip Code", "ZIP Code") or md.get("zip") or ""
+    city = _csv_get(csv_row, "City") or md.get("city") or ""
+    state = _csv_get(csv_row, "State") or md.get("state") or ""
+    zipc = _csv_get(csv_row, "ZIP", "Zip", "Zip Code", "ZIP Code") or md.get("zip") or ""
 
     return {
         # Identity
-        "Property Name":             property_name or None,
-        "Type":                      _csv_get(csv_row, "Property Type") or "Multifamily",
-        "Unique ID":                 pid or None,
-        "Property ID":               pid or None,
-
+        "Property Name": property_name or None,
+        "Type": _csv_get(csv_row, "Property Type") or "Multifamily",
+        "Unique ID": pid or None,
+        "Property ID": pid or None,
         # Aggregates from scraped units
-        "Average Unit Size (SF)":    stats["average_unit_size_sf"],
-        "Total Units":               stats["total_units_found"] or _money_to_int(_csv_get(csv_row, "Total Units (Est.)")),
-        "Unit Mix":                  stats["unit_mix"] or _csv_get(csv_row, "Unit Mix") or None,
-        "First Move-In Date":        stats["first_move_in_date"],
-
+        "Average Unit Size (SF)": stats["average_unit_size_sf"],
+        "Total Units": stats["total_units_found"] or _money_to_int(_csv_get(csv_row, "Total Units (Est.)")),
+        "Unit Mix": stats["unit_mix"] or _csv_get(csv_row, "Unit Mix") or None,
+        "First Move-In Date": stats["first_move_in_date"],
         # Location (CSV first, scraped fallback)
-        "City":                      city or None,
-        "State":                     state or None,
-        "ZIP Code":                  zipc or None,
-        "Property Address":          address or None,
-        "Latitude":                  md.get("latitude"),
-        "Longitude":                 md.get("longitude"),
-
+        "City": city or None,
+        "State": state or None,
+        "ZIP Code": zipc or None,
+        "Property Address": address or None,
+        "Latitude": md.get("latitude"),
+        "Longitude": md.get("longitude"),
         # Classification
-        "Property Type":             _csv_get(csv_row, "Building Type") or None,
-        "Property Status":           _csv_get(csv_row, "Property Type") or None,
-        "Property Style":            _csv_get(csv_row, "Building Type") or None,
-
+        "Property Type": _csv_get(csv_row, "Building Type") or None,
+        "Property Status": _csv_get(csv_row, "Property Type") or None,
+        "Property Style": _csv_get(csv_row, "Building Type") or None,
         # Operations
-        "Management Company":        _clean(_csv_get(csv_row, "Management Company")) or None,
-        "Phone":                     _clean(md.get("telephone")),
-        "Website":                   csv_url or scrape_result.get("base_url"),
-
+        "Management Company": _clean(_csv_get(csv_row, "Management Company")) or None,
+        "Phone": _clean(md.get("telephone")),
+        "Website": csv_url or scrape_result.get("base_url"),
         # Scraped from website (best effort)
-        "Year Built":                md.get("year_built"),
-        "Stories":                   md.get("stories"),
-
+        "Year Built": md.get("year_built"),
+        "Stories": md.get("stories"),
         # External-source-only fields — set to null
-        "Census Block Id":           None,
-        "Tract Code":                None,
-        "Construction Start Date":   None,
-        "Construction Finish Date":  None,
-        "Renovation Start":          None,
-        "Renovation Finish":         None,
-        "Development Company":       None,
-        "Property Owner":            None,
-        "Region":                    None,
-        "Market Name":               None,
-        "Submarket Name":            None,
-        "Asset Grade in Submarket":  None,
-        "Asset Grade in Market":     None,
-        "Lease Start Date":          None,
-
-        "Property Image URL":        md.get("image_url") or None,
-        "Property Gallery URLs":     md.get("gallery_urls") or [],
-
-        "Update Date":               date.today().isoformat(),
-
+        "Census Block Id": None,
+        "Tract Code": None,
+        "Construction Start Date": None,
+        "Construction Finish Date": None,
+        "Renovation Start": None,
+        "Renovation Finish": None,
+        "Development Company": None,
+        "Property Owner": None,
+        "Region": None,
+        "Market Name": None,
+        "Submarket Name": None,
+        "Asset Grade in Submarket": None,
+        "Asset Grade in Market": None,
+        "Lease Start Date": None,
+        "Property Image URL": md.get("image_url") or None,
+        "Property Gallery URLs": md.get("gallery_urls") or [],
+        "Update Date": date.today().isoformat(),
         # Run diagnostics
-        "_scrape_status":            scrape_result.get("extraction_tier_used"),
-        "_scrape_errors":            scrape_result.get("errors") or [],
-
-        "units":                     _strip_internal(target_units),
+        "_scrape_status": scrape_result.get("extraction_tier_used"),
+        "_scrape_errors": scrape_result.get("errors") or [],
+        "units": _strip_internal(target_units),
     }
 
+
 # ── CSV reading ───────────────────────────────────────────────────────────────
+
 
 def read_properties_csv(path: Path) -> list[dict]:
     """Read CSV with BOM-tolerant UTF-8. Returns list of dict rows."""
@@ -745,10 +842,11 @@ def read_properties_csv(path: Path) -> list[dict]:
         reader = csv.DictReader(f)
         return list(reader)
 
+
 # ── Orchestration ─────────────────────────────────────────────────────────────
 
-async def run(csv_path: Path, out_path: Path, limit: int | None,
-              start_at: int, proxy: str | None) -> None:
+
+async def run(csv_path: Path, out_path: Path, limit: int | None, start_at: int, proxy: str | None) -> None:
     rows = read_properties_csv(csv_path)
     print(f"\nLoaded {len(rows)} properties from {csv_path}")
 
@@ -765,10 +863,10 @@ async def run(csv_path: Path, out_path: Path, limit: int | None,
         url = _csv_get(row, "Property URL", "URL", "url")
         pid = _csv_get(row, "Property ID", "property_id", "id")
         name = _csv_get(row, "Property Name", "name")
-        print(f"\n{'#'*70}")
+        print(f"\n{'#' * 70}")
         print(f"# [{i}/{len(rows)}] {pid} — {name}")
         print(f"# {url}")
-        print(f"{'#'*70}")
+        print(f"{'#' * 70}")
 
         if not url:
             print("  ⚠ Skipping: no URL in CSV row")
@@ -784,8 +882,10 @@ async def run(csv_path: Path, out_path: Path, limit: int | None,
         target_units = transform_units_from_scrape(scrape_result)
         prop = build_property_record(row, scrape_result, target_units)
         properties_out.append(prop)
-        print(f"  → {len(target_units)} units, avg sqft={prop['Average Unit Size (SF)']}, "
-              f"mix={prop['Unit Mix']}")
+        print(
+            f"  → {len(target_units)} units, avg sqft={prop['Average Unit Size (SF)']}, "
+            f"mix={prop['Unit Mix']}"
+        )
 
         # Incremental write so a long run can be inspected mid-flight and an
         # interrupted run still leaves a usable file behind.
@@ -796,18 +896,22 @@ async def run(csv_path: Path, out_path: Path, limit: int | None,
     total_units = sum(len(p.get("units") or []) for p in properties_out)
     print(f"   Total units across all properties: {total_units}")
 
+
 def main():
     p = argparse.ArgumentParser(description="Multi-property scraper (CSV-driven)")
-    p.add_argument("--csv",      default=str(_MA_POC_ROOT / "config" / "properties.csv"),
-                   help="Path to properties CSV (default: ma_poc/config/properties.csv)")
-    p.add_argument("--out",      default=str(_MA_POC_ROOT / "data" / "output" / "properties.json"),
-                   help="Output JSON path (default: ma_poc/data/output/properties.json)")
-    p.add_argument("--limit",    type=int, default=None,
-                   help="Process at most N rows")
-    p.add_argument("--start-at", type=int, default=0,
-                   help="Skip first N rows")
-    p.add_argument("--proxy",    default=None,
-                   help="Proxy URL (e.g. http://user:pass@host:port)")
+    p.add_argument(
+        "--csv",
+        default=str(_MA_POC_ROOT / "config" / "properties.csv"),
+        help="Path to properties CSV (default: ma_poc/config/properties.csv)",
+    )
+    p.add_argument(
+        "--out",
+        default=str(_MA_POC_ROOT / "data" / "output" / "properties.json"),
+        help="Output JSON path (default: ma_poc/data/output/properties.json)",
+    )
+    p.add_argument("--limit", type=int, default=None, help="Process at most N rows")
+    p.add_argument("--start-at", type=int, default=0, help="Skip first N rows")
+    p.add_argument("--proxy", default=None, help="Proxy URL (e.g. http://user:pass@host:port)")
     args = p.parse_args()
 
     csv_path = Path(args.csv)
@@ -818,6 +922,7 @@ def main():
         sys.exit(1)
 
     asyncio.run(run(csv_path, out_path, args.limit, args.start_at, args.proxy))
+
 
 if __name__ == "__main__":
     main()

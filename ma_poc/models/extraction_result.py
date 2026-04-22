@@ -9,6 +9,7 @@ Acceptance criteria (CLAUDE.md PR-03):
 - field_confidences and low_confidence_fields populated by tiers that report
   per-field confidence
 """
+
 from datetime import UTC, datetime
 from enum import IntEnum, StrEnum
 from typing import Any

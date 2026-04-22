@@ -30,6 +30,7 @@ Key findings:
   - RentCafe vanity URLs historically expose ``.aspx`` paths. We treat this as
     a 0.70-confidence heuristic, not a definitive match.
 """
+
 from __future__ import annotations
 
 import re
@@ -83,9 +84,9 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
 # Sources: CLAUDE.md + claude_refactor.md handoff notes. Each entry's rationale
 # is in the trailing comment so future maintainers can see provenance.
 MGMT_TO_PMS_PRIOR: dict[str, PmsName] = {
-    "mark-taylor": "entrata",              # Handoff: Mark-Taylor is an Entrata only shop
-    "mark taylor": "entrata",              # Same, alt spelling
-    "lindsey management": "rentcafe",      # Handoff: Lindsey is Yardi/RentCafe
+    "mark-taylor": "entrata",  # Handoff: Mark-Taylor is an Entrata only shop
+    "mark taylor": "entrata",  # Same, alt spelling
+    "lindsey management": "rentcafe",  # Handoff: Lindsey is Yardi/RentCafe
     "avalonbay communities": "avalonbay",  # AvalonBay properties use the REIT's custom stack
     # 2026-04-20: live-fetch of windsorcommunities.com showed Apply buttons
     # pointing at nestiolistings.com/api/v2/onlineleasing-link — Windsor runs
@@ -99,7 +100,12 @@ MGMT_TO_PMS_PRIOR: dict[str, PmsName] = {
 
 # Host-suffix patterns that are definitive. First match wins.
 _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
-    (re.compile(r"^\d{3,9}\.onlineleasing\.realpage\.com$"), "onesite", 0.95, "host matches OneSite numeric-prefix pattern"),
+    (
+        re.compile(r"^\d{3,9}\.onlineleasing\.realpage\.com$"),
+        "onesite",
+        0.95,
+        "host matches OneSite numeric-prefix pattern",
+    ),
     (re.compile(r"(?:^|\.)rentcafe\.com$"), "rentcafe", 0.95, "host ends in rentcafe.com"),
     (re.compile(r"(?:^|\.)sightmap\.com$"), "sightmap", 0.95, "host ends in sightmap.com"),
     (re.compile(r"(?:^|\.)avaloncommunities\.com$"), "avalonbay", 0.95, "host ends in avaloncommunities.com"),
@@ -108,17 +114,37 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
     # RealPage portals that are NOT the OneSite OLL subdomain shape — e.g.
     # portal.realpage.com, api.ws.realpage.com. Lower confidence because the
     # RealPage domain covers multiple products.
-    (re.compile(r"(?:^|\.)realpage\.com$"), "realpage_oll", 0.80, "host ends in realpage.com (non-OneSite RealPage product)"),
+    (
+        re.compile(r"(?:^|\.)realpage\.com$"),
+        "realpage_oll",
+        0.80,
+        "host ends in realpage.com (non-OneSite RealPage product)",
+    ),
     # Funnel / Nestio — the listings API always serves from nestiolistings.com
     # regardless of customer marketing domain.
-    (re.compile(r"(?:^|\.)nestiolistings\.com$"), "funnel", 0.95, "host ends in nestiolistings.com (Funnel/Nestio listings API)"),
+    (
+        re.compile(r"(?:^|\.)nestiolistings\.com$"),
+        "funnel",
+        0.95,
+        "host ends in nestiolistings.com (Funnel/Nestio listings API)",
+    ),
     # TouchTour / Ovation — proprietary multifamily platform. Customer
     # domains look like ``<market>.mytouchtour.com`` or ``liveovation.com``
     # (the Ovation parent portfolio site). liveovation.com is lower-confidence
     # because it's the parent brand portal, which may link out to multiple
     # PMSes depending on the property.
-    (re.compile(r"(?:^|\.)mytouchtour\.com$"), "touchtour", 0.95, "host ends in mytouchtour.com (TouchTour platform)"),
-    (re.compile(r"(?:^|\.)liveovation\.com$"), "touchtour", 0.85, "host ends in liveovation.com (Ovation parent portfolio)"),
+    (
+        re.compile(r"(?:^|\.)mytouchtour\.com$"),
+        "touchtour",
+        0.95,
+        "host ends in mytouchtour.com (TouchTour platform)",
+    ),
+    (
+        re.compile(r"(?:^|\.)liveovation\.com$"),
+        "touchtour",
+        0.85,
+        "host ends in liveovation.com (Ovation parent portfolio)",
+    ),
 ]
 
 _ONESITE_CLIENT_ID_RE = re.compile(r"^(?P<id>\d{3,9})\.onlineleasing\.realpage\.com$")
@@ -158,10 +184,19 @@ def _parse_host(url: str) -> str | None:
     return host or None
 
 
-_KNOWN_LITERALS: frozenset[str] = frozenset({
-    "rentcafe", "entrata", "appfolio", "onesite", "sightmap",
-    "realpage_oll", "avalonbay", "squarespace_nopms", "wix_nopms",
-})
+_KNOWN_LITERALS: frozenset[str] = frozenset(
+    {
+        "rentcafe",
+        "entrata",
+        "appfolio",
+        "onesite",
+        "sightmap",
+        "realpage_oll",
+        "avalonbay",
+        "squarespace_nopms",
+        "wix_nopms",
+    }
+)
 
 
 def _lookup_csv_pms_override(csv_row: dict[str, object] | None) -> tuple[PmsName, float, str] | None:
@@ -261,7 +296,11 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # Squarespace site with a linked "rentcafe.com" image asset doesn't
     # misfire as RentCafe.
     if "entrata.com" in h or "/apartments/module/" in h or "entrata-widget" in h:
-        return "entrata", 0.85, ["Entrata marker in HTML (entrata.com / /Apartments/module/ / entrata-widget)"]
+        return (
+            "entrata",
+            0.85,
+            ["Entrata marker in HTML (entrata.com / /Apartments/module/ / entrata-widget)"],
+        )
     if "rentcafe" in h or "yardi" in h:
         return "rentcafe", 0.80, ["RentCafe/Yardi marker in HTML"]
     if "onlineleasing.realpage.com" in h:
@@ -272,10 +311,12 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         return "appfolio", 0.80, ["AppFolio marker in HTML"]
     # Funnel / Nestio — script hosts, JS globals, data- attributes. Observed
     # on windsorcommunities.com property subpages (04-20 live fetch).
-    if ("nestiolistings.com" in h
-            or "nestio_" in h
-            or "data-nestio-" in h):
-        return "funnel", 0.90, ["Funnel/Nestio marker in HTML (nestiolistings.com / NESTIO_* / data-nestio-*)"]
+    if "nestiolistings.com" in h or "nestio_" in h or "data-nestio-" in h:
+        return (
+            "funnel",
+            0.90,
+            ["Funnel/Nestio marker in HTML (nestiolistings.com / NESTIO_* / data-nestio-*)"],
+        )
     # TouchTour / Ovation — marketing subdomains under mytouchtour.com, or
     # the liveovation.com parent portfolio.
     if "mytouchtour.com" in h or "liveovation.com" in h:
@@ -307,21 +348,21 @@ _META_APP_RE = re.compile(
 # GenericAdapter HTML/LLM cascade — but knowing the stack is present means
 # future work can add dedicated portal resolvers for these vendors.
 _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
-    "entrata":            ("entrata.com", "/apartments/module/", "entrata-widget"),
-    "rentcafe":           ("rentcafe", "yardi"),
-    "sightmap":           ("sightmap.com",),
-    "appfolio":           (".appfolio.com",),
-    "onesite":            ("onlineleasing.realpage.com",),
-    "wix":                ("static.parastorage.com", "wix.com"),
-    "squarespace":        ("squarespace.com",),
-    "realpage":           ("api.ws.realpage.com", "realpage.com"),
-    "avalonbay":          ("avaloncommunities.com",),
-    "funnel":             ("nestiolistings.com", "nestio_", "data-nestio-"),
-    "touchtour":          ("mytouchtour.com", "liveovation.com"),
+    "entrata": ("entrata.com", "/apartments/module/", "entrata-widget"),
+    "rentcafe": ("rentcafe", "yardi"),
+    "sightmap": ("sightmap.com",),
+    "appfolio": (".appfolio.com",),
+    "onesite": ("onlineleasing.realpage.com",),
+    "wix": ("static.parastorage.com", "wix.com"),
+    "squarespace": ("squarespace.com",),
+    "realpage": ("api.ws.realpage.com", "realpage.com"),
+    "avalonbay": ("avaloncommunities.com",),
+    "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
+    "touchtour": ("mytouchtour.com", "liveovation.com"),
     # Marketing / lead-capture stacks — observed in 10-property roll-up
     # (doorway.knck.io, cdn-media.hy.ly, chat.hyly.ai, marketapts.com).
-    "marketing_knock":    ("doorway.knck.io", "knockrentals.com"),
-    "marketing_hyly":     ("hy.ly", "hyly.ai"),
+    "marketing_knock": ("doorway.knck.io", "knockrentals.com"),
+    "marketing_hyly": ("hy.ly", "hyly.ai"),
     "marketing_marketapts": ("marketapts.com",),
 }
 
@@ -347,7 +388,7 @@ def collect_detector_signals(
     url: str,
     csv_row: dict[str, object] | None,
     page_html: str | None,
-) -> dict[str, Any]:
+) -> dict[str, t.Any]:
     """Collect the raw signals ``detect_pms`` examines, without classifying.
 
     Returned dict is emitted as ``EventKind.DETECTOR_SIGNALS`` and rendered in
@@ -361,9 +402,13 @@ def collect_detector_signals(
         parsed = urllib.parse.urlparse("")
     host = (parsed.hostname or "").lower()
     path = (parsed.path or "").lower()
-    aspx_detected = path.endswith(".aspx") and not host.endswith((
-        "microsoft.com", "live.com", "sharepoint.com",
-    ))
+    aspx_detected = path.endswith(".aspx") and not host.endswith(
+        (
+            "microsoft.com",
+            "live.com",
+            "sharepoint.com",
+        )
+    )
 
     script_srcs: list[str] = []
     iframe_srcs: list[str] = []
@@ -465,9 +510,8 @@ def confirm_detection(
     return DetectedPMS(
         pms="unknown",
         confidence=0.0,
-        evidence=list(initial.evidence) + [
-            f"demoted_from_{initial.pms}:no_matching_body_in_{len(responses)}_captures"
-        ],
+        evidence=list(initial.evidence)
+        + [f"demoted_from_{initial.pms}:no_matching_body_in_{len(responses)}_captures"],
         pms_client_account_id=None,
         recommended_strategy=_STRATEGY_BY_PMS["unknown"],
     )

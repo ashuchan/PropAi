@@ -3,6 +3,7 @@
 Bug-hunt #6: check base64-encoded size before every API call.
 Azure <= 20 MB, Anthropic <= 5 MB. Downsample or crop if oversized.
 """
+
 from __future__ import annotations
 
 

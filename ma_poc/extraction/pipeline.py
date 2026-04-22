@@ -7,6 +7,7 @@ Acceptance criteria (CLAUDE.md PR-03 / pipeline.py — exact logic):
 - If none succeed, return the best result with status=FAILED for Vision signal
 - Tier and confidence are always logged on the returned ExtractionResult
 """
+
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable

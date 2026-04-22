@@ -1,9 +1,10 @@
 """Tests for F7 — verdict carry-forward reason fix."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ma_poc.reporting.verdict import Verdict, VerdictResult, compute
+from ma_poc.reporting.verdict import Verdict, compute
 
 
 @dataclass

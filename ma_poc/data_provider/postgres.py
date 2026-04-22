@@ -8,6 +8,7 @@ idempotent and safe to leave on during bring-up.
 This file used to stub `NotImplementedError` — Phase 4 replaces that with
 a real implementation that reuses every store in `data_provider/sql/`.
 """
+
 from __future__ import annotations
 
 from data_provider.sql.provider import SqlDataProvider

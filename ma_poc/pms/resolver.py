@@ -4,6 +4,7 @@ CTA-hop + leasing-portal resolver (Phase 4).
 Turns vanity marketing-site URLs into PMS-hosted URLs by following CTAs,
 detecting iframes to leasing portals, and capturing redirect chains.
 """
+
 from __future__ import annotations
 
 import re
@@ -47,17 +48,19 @@ _PRIORITY_MAP = {
 }
 
 # Leasing portal domains — ported from scripts/entrata.py _LEASING_PORTAL_DOMAINS.
-_LEASING_PORTAL_DOMAINS = frozenset({
-    "sightmap.com",
-    "realpage.com",
-    "loftliving.com",
-    "on-site.com",
-    "rentcafe.com",
-    "entrata.com",
-    "yardi.com",
-    "smartrent.com",
-    "onlineleasing.realpage.com",
-})
+_LEASING_PORTAL_DOMAINS = frozenset(
+    {
+        "sightmap.com",
+        "realpage.com",
+        "loftliving.com",
+        "on-site.com",
+        "rentcafe.com",
+        "entrata.com",
+        "yardi.com",
+        "smartrent.com",
+        "onlineleasing.realpage.com",
+    }
+)
 
 
 @dataclass
@@ -112,10 +115,7 @@ async def resolve_target(
 
     try:
         # Step 1: Already on PMS host?
-        if (
-            initial_detection.confidence >= 0.85
-            and _url_matches_pms_fingerprints(original_url)
-        ):
+        if initial_detection.confidence >= 0.85 and _url_matches_pms_fingerprints(original_url):
             result.method = "no_hop"
             result.hop_path = [original_url]
             return result

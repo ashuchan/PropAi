@@ -1,9 +1,10 @@
 """Tests for change_detector — render mode decisions."""
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from ma_poc.discovery.change_detector import ChangeDecision, decide
+from ma_poc.discovery.change_detector import decide
 from ma_poc.fetch.contracts import RenderMode
 
 
@@ -26,7 +27,7 @@ def test_change_hot_profile_fresh_is_head() -> None:
 
 
 def test_change_sitemap_unchanged_is_head() -> None:
-    old_lastmod = datetime(2026, 4, 10, tzinfo=timezone.utc)
+    old_lastmod = datetime(2026, 4, 10, tzinfo=UTC)
     frontier_entry = {"last_attempted": "2026-04-15T00:00:00+00:00"}
     d = decide("WARM", frontier_entry, old_lastmod, 2)
     assert d.render_mode == RenderMode.HEAD

@@ -11,17 +11,18 @@ confuse readers. Dropping `last_seen_date`; callers that need a day-
 level value should take `left(last_seen_at::text, 10)` or
 `last_seen_at::date`.
 """
+
 from __future__ import annotations
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0005_drop_lsdate"
-down_revision: Union[str, None] = "0004_country_us"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0004_country_us"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -33,11 +34,5 @@ def downgrade() -> None:
     op.add_column("properties", sa.Column("last_seen_date", sa.String(16)))
     op.add_column("units", sa.Column("last_seen_date", sa.String(16)))
     # Best-effort backfill from last_seen_at.
-    op.execute(
-        "UPDATE properties SET last_seen_date = LEFT(last_seen_at, 10) "
-        "WHERE last_seen_at IS NOT NULL"
-    )
-    op.execute(
-        "UPDATE units SET last_seen_date = LEFT(last_seen_at, 10) "
-        "WHERE last_seen_at IS NOT NULL"
-    )
+    op.execute("UPDATE properties SET last_seen_date = LEFT(last_seen_at, 10) WHERE last_seen_at IS NOT NULL")
+    op.execute("UPDATE units SET last_seen_date = LEFT(last_seen_at, 10) WHERE last_seen_at IS NOT NULL")

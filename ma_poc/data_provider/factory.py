@@ -13,12 +13,12 @@ Path overrides:
 The returned provider is cached per-process. Use `reset_cached_provider()`
 in tests to pick up env-var changes.
 """
+
 from __future__ import annotations
 
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 from data_provider.contracts import DataProvider
 from data_provider.dual_write import DualWriteDataProvider
@@ -29,7 +29,7 @@ from data_provider.sqlite import SqliteDataProvider
 log = logging.getLogger(__name__)
 
 _SUPPORTED = {"filesystem", "fs", "postgres", "pg", "sqlite", "dual"}
-_cached: Optional[DataProvider] = None
+_cached: DataProvider | None = None
 
 
 def _resolve_base_dirs() -> tuple[Path, Path]:
@@ -67,8 +67,7 @@ def get_data_provider(
     name = (override or os.getenv("DATA_PROVIDER") or "filesystem").strip().lower()
     if name not in _SUPPORTED:
         log.warning(
-            "Unknown DATA_PROVIDER=%r; falling back to filesystem. "
-            "Supported: %s",
+            "Unknown DATA_PROVIDER=%r; falling back to filesystem. Supported: %s",
             name,
             sorted(_SUPPORTED),
         )
@@ -101,7 +100,9 @@ def get_data_provider(
 
     log.info(
         "Data provider initialised: name=%s data_dir=%s config_dir=%s",
-        provider.name, data_dir, config_dir,
+        provider.name,
+        data_dir,
+        config_dir,
     )
 
     if not force_new and override is None:

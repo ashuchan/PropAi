@@ -34,6 +34,7 @@ Usage:
   python scripts/jugnu_retry_runner.py --retry-errors --run-date 2026-04-17 \\
       --csv config/properties.csv
 """
+
 from __future__ import annotations
 
 import argparse
@@ -54,6 +55,7 @@ if str(_repo_root) not in sys.path:
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -64,6 +66,7 @@ log = logging.getLogger("jugnu_retry")
 # ---------------------------------------------------------------------------
 # Failure detection
 # ---------------------------------------------------------------------------
+
 
 def _is_failure(prop: dict[str, Any]) -> bool:
     """Return True if a property result should be retried.
@@ -111,6 +114,7 @@ def _is_not_success(prop: dict[str, Any]) -> bool:
 # Load candidates from prior run
 # ---------------------------------------------------------------------------
 
+
 def _load_jugnu_candidates(
     run_dir: Path,
     mode: str,
@@ -149,12 +153,14 @@ def _load_jugnu_candidates(
         url = prop.get("Website") or prop.get("website") or prop.get("url") or ""
         if not pid:
             continue
-        candidates.append({
-            "property_id": pid,
-            "url": url,
-            "prior_tier": meta.get("scrape_tier_used"),
-            "prior_errors": meta.get("scrape_errors", []),
-        })
+        candidates.append(
+            {
+                "property_id": pid,
+                "url": url,
+                "prior_tier": meta.get("scrape_tier_used"),
+                "prior_errors": meta.get("scrape_errors", []),
+            }
+        )
 
     return candidates
 
@@ -217,10 +223,7 @@ def _load_legacy_candidates(
         units = entry.get("units_count", 0)
 
         if mode == "retry_errors":
-            should_retry = (
-                status == "FAILED"
-                or (status in ("SUCCESS", "SUCCESS_WITH_ERRORS") and units == 0)
-            )
+            should_retry = status == "FAILED" or (status in ("SUCCESS", "SUCCESS_WITH_ERRORS") and units == 0)
         else:  # resume
             should_retry = status not in ("SUCCESS", "SUCCESS_WITH_ERRORS", "SKIPPED")
 
@@ -232,12 +235,14 @@ def _load_legacy_candidates(
             log.warning("No URL for %s — skipping (provide --csv to resolve)", cid)
             continue
 
-        candidates.append({
-            "property_id": cid,
-            "url": url,
-            "prior_status": status,
-            "prior_units": units,
-        })
+        candidates.append(
+            {
+                "property_id": cid,
+                "url": url,
+                "prior_status": status,
+                "prior_units": units,
+            }
+        )
 
     return candidates
 
@@ -265,12 +270,7 @@ def _load_csv_lookup(csv_path: Path) -> dict[str, str]:
                     or row.get("apartmentid")
                     or ""
                 )
-                url = (
-                    row.get("url")
-                    or row.get("Website")
-                    or row.get("website")
-                    or ""
-                )
+                url = row.get("url") or row.get("Website") or row.get("website") or ""
                 if pid and url:
                     lookup[pid] = url
     except (OSError, KeyError) as exc:
@@ -312,6 +312,7 @@ def _find_latest_run_dir(data_dir: Path) -> Path | None:
 # ---------------------------------------------------------------------------
 # Merge
 # ---------------------------------------------------------------------------
+
 
 def _merge_properties(
     existing: list[dict[str, Any]],
@@ -362,6 +363,7 @@ def _merge_properties(
 # Main retry pipeline
 # ---------------------------------------------------------------------------
 
+
 async def run_retry(
     data_dir: Path,
     mode: str,
@@ -384,7 +386,6 @@ async def run_retry(
         Report dict.
     """
     from ma_poc.discovery.contracts import CrawlTask, TaskReason
-    from ma_poc.fetch import fetch as jugnu_fetch
     from ma_poc.fetch.conditional import ConditionalCache
     from ma_poc.fetch.contracts import RenderMode
     from ma_poc.observability import events
@@ -420,11 +421,17 @@ async def run_retry(
     csv_rows: dict[str, dict[str, Any]] = {}
     if csv_path:
         import csv as csv_mod
+
         try:
             with open(csv_path, encoding="utf-8-sig", newline="") as f:
                 for row in csv_mod.DictReader(f):
-                    pid = (row.get("property_id") or row.get("Unique ID")
-                           or row.get("Property ID") or row.get("apartmentid") or "")
+                    pid = (
+                        row.get("property_id")
+                        or row.get("Unique ID")
+                        or row.get("Property ID")
+                        or row.get("apartmentid")
+                        or ""
+                    )
                     if pid:
                         csv_rows[pid] = dict(row)
         except OSError:
@@ -458,8 +465,9 @@ async def run_retry(
     if limit:
         candidates = candidates[:limit]
 
-    log.info("Retrying %d properties (%s mode, schema %s) from %s",
-             len(candidates), mode, schema_version, run_date)
+    log.info(
+        "Retrying %d properties (%s mode, schema %s) from %s", len(candidates), mode, schema_version, run_date
+    )
     for c in candidates[:10]:
         log.info("  %s — %s", c["property_id"], c["url"][:60])
     if len(candidates) > 10:
@@ -468,8 +476,11 @@ async def run_retry(
     # -- Setup output directory (schema-namespaced) --
     today = date.today().isoformat()
     from ma_poc.scripts.jugnu_runner import _resolve_data_dirs
+
     output_run_dir, state_dir, cache_dir, schema_root = _resolve_data_dirs(
-        data_dir, schema_version, today,
+        data_dir,
+        schema_version,
+        today,
     )
     run_id = f"retry_{today}_{uuid.uuid4().hex[:8]}"
 
@@ -477,14 +488,15 @@ async def run_retry(
     events.configure(output_run_dir, run_id)
     cost_ledger = CostLedger(output_run_dir / "cost_ledger.db")
 
-    from ma_poc.discovery.frontier import Frontier
     from ma_poc.discovery.dlq import Dlq
+    from ma_poc.discovery.frontier import Frontier
 
     frontier = Frontier(state_dir / "frontier.sqlite")
     dlq = Dlq(state_dir / "dlq.jsonl")
     cond_cache = ConditionalCache(cache_dir / "conditional.sqlite")
 
     from ma_poc.scripts.jugnu_runner import _SimpleProfileStore
+
     profile_store = _SimpleProfileStore(_MA_POC_ROOT / "config" / "profiles")
 
     # -- Create CrawlTasks --
@@ -497,21 +509,25 @@ async def run_retry(
         # Normalise HTTP to HTTPS.
         if url.startswith("http://"):
             url = "https://" + url[7:]
-        tasks.append(CrawlTask(
-            url=url,
-            property_id=c["property_id"],
-            priority=0,
-            budget_ms=45_000,
-            reason=TaskReason.RETRY,
-            render_mode=RenderMode.RENDER,
-        ))
+        tasks.append(
+            CrawlTask(
+                url=url,
+                property_id=c["property_id"],
+                priority=0,
+                budget_ms=45_000,
+                reason=TaskReason.RETRY,
+                render_mode=RenderMode.RENDER,
+            )
+        )
 
     log.info("Created %d retry tasks", len(tasks))
 
     # -- Process tasks through L1-L4 concurrently --
     from ma_poc.scripts.concurrency import AsyncPool, SystemResources
     from ma_poc.scripts.jugnu_runner import (
-        _format_output, _make_failed_record, _process_property,
+        _format_output,
+        _make_failed_record,
+        _process_property,
     )
 
     res = SystemResources.detect()
@@ -523,7 +539,12 @@ async def run_retry(
         log.info("Retrying %s (%s)", task.property_id, task.url)
         try:
             result = await _process_property(
-                task, cost_ledger, profile_store, frontier, dlq, data_dir,
+                task,
+                cost_ledger,
+                profile_store,
+                frontier,
+                dlq,
+                data_dir,
             )
             meta = result.setdefault("_meta", {})
             meta["retry"] = True
@@ -534,7 +555,10 @@ async def run_retry(
         except Exception as exc:
             log.error("Property %s crashed on retry: %s", task.property_id, exc)
             failed = _make_failed_record(
-                task.property_id, task.url, str(exc), schema_version,
+                task.property_id,
+                task.url,
+                str(exc),
+                schema_version,
             )
             failed_meta = failed.setdefault("_meta", {})
             failed_meta["retry"] = True
@@ -586,9 +610,9 @@ async def run_retry(
 
     # Also write a retry-specific summary.
     retry_succeeded = sum(
-        1 for p in retried_properties
-        if "FAIL" not in str(p.get("_meta", {}).get("scrape_tier_used", "")).upper()
-        and p.get("units")
+        1
+        for p in retried_properties
+        if "FAIL" not in str(p.get("_meta", {}).get("scrape_tier_used", "")).upper() and p.get("units")
     )
     retry_failed = len(retried_properties) - retry_succeeded
 
@@ -640,16 +664,18 @@ async def run_retry(
         prior = candidates[i].get("prior_tier") or candidates[i].get("prior_status", "?")
         md_lines.append(f"| `{pid}` | {prior} | {verdict} ({tier}) | {units} |")
 
-    md_lines.extend([
-        "",
-        "## Merged Run Totals",
-        "",
-        f"- Properties: {report['totals']['properties']}",
-        f"- Succeeded: {report['totals']['succeeded']}",
-        f"- Failed: {report['totals']['failed']}",
-        f"- Success rate: {report['totals']['success_rate_pct']}%",
-        "",
-    ])
+    md_lines.extend(
+        [
+            "",
+            "## Merged Run Totals",
+            "",
+            f"- Properties: {report['totals']['properties']}",
+            f"- Succeeded: {report['totals']['succeeded']}",
+            f"- Failed: {report['totals']['failed']}",
+            f"- Success rate: {report['totals']['success_rate_pct']}%",
+            "",
+        ]
+    )
     retry_md_path.write_text("\n".join(md_lines), encoding="utf-8")
 
     log.info("Retry report: %s", retry_report_path)
@@ -660,14 +686,19 @@ async def run_retry(
     cond_cache.close()
     events.shutdown()
 
-    log.info("Retry complete: %d/%d recovered, %d still failed",
-             retry_succeeded, len(retried_properties), retry_failed)
+    log.info(
+        "Retry complete: %d/%d recovered, %d still failed",
+        retry_succeeded,
+        len(retried_properties),
+        retry_failed,
+    )
     return retry_summary
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     """CLI entry point."""
@@ -689,25 +720,33 @@ Examples:
     )
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument(
-        "--retry-errors", action="store_true",
+        "--retry-errors",
+        action="store_true",
         help="Retry FAILED + 0-unit properties",
     )
     mode_group.add_argument(
-        "--resume", action="store_true",
+        "--resume",
+        action="store_true",
         help="Re-process everything that isn't a clean success",
     )
     parser.add_argument(
-        "--run-date", type=str, default=None,
+        "--run-date",
+        type=str,
+        default=None,
         help="Source run date to retry (YYYY-MM-DD). Default: latest run.",
     )
     parser.add_argument(
-        "--csv", type=Path, default=None,
+        "--csv",
+        type=Path,
+        default=None,
         help="CSV for URL lookup (needed when retrying legacy runs without URLs in output)",
     )
     parser.add_argument("--data-dir", type=Path, default=_MA_POC_ROOT / "data")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument(
-        "--schema-version", choices=["v1", "v2"], default=None,
+        "--schema-version",
+        choices=["v1", "v2"],
+        default=None,
         help="Output schema version (default: env SCHEMA_VERSION or v1)",
     )
     args = parser.parse_args()
@@ -715,16 +754,19 @@ Examples:
     mode = "retry_errors" if args.retry_errors else "resume"
 
     from ma_poc.scripts.jugnu_runner import _resolve_schema_version
+
     schema_version = _resolve_schema_version(args)
 
-    report = asyncio.run(run_retry(
-        data_dir=args.data_dir,
-        mode=mode,
-        run_date=args.run_date,
-        csv_path=args.csv,
-        limit=args.limit,
-        schema_version=schema_version,
-    ))
+    report = asyncio.run(
+        run_retry(
+            data_dir=args.data_dir,
+            mode=mode,
+            run_date=args.run_date,
+            csv_path=args.csv,
+            limit=args.limit,
+            schema_version=schema_version,
+        )
+    )
 
     exit_status = report.get("exit_status", "")
     if exit_status == "FATAL":

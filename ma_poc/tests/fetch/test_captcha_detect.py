@@ -1,4 +1,5 @@
 """Tests for captcha_detect — CAPTCHA fingerprint detection."""
+
 from __future__ import annotations
 
 from ma_poc.fetch.captcha_detect import looks_like_captcha

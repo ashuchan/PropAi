@@ -1,4 +1,5 @@
 """Tests for rate_limiter — per-host token bucket."""
+
 from __future__ import annotations
 
 import asyncio

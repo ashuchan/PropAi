@@ -1,4 +1,5 @@
 """Tests for F4 — available_date DOM extraction."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -9,11 +10,13 @@ from ma_poc.pms.adapters._html_extract import extract_available_date_from_card
 
 def _future_iso(days: int = 30) -> str:
     from datetime import timedelta
+
     return (date.today() + timedelta(days=days)).isoformat()
 
 
 def _past_iso(days: int = 5) -> str:
     from datetime import timedelta
+
     return (date.today() - timedelta(days=days)).isoformat()
 
 
@@ -53,7 +56,7 @@ def test_available_date_regex_handles_1_15_2026() -> None:
 
 
 def test_available_date_regex_case_insensitive() -> None:
-    html = '<div>AVAILABLE: Jan 15, 2026</div>'
+    html = "<div>AVAILABLE: Jan 15, 2026</div>"
     with patch("ma_poc.pms.adapters._html_extract._today_date", return_value=date(2026, 1, 1)):
         result = extract_available_date_from_card(html)
     assert result == "2026-01-15"
@@ -78,6 +81,7 @@ def test_available_date_normalizes_to_iso_yyyy_mm_dd() -> None:
 
 def test_run_report_annotates_non_extracted_fields() -> None:
     from pathlib import Path
+
     from ma_poc.reporting import run_report
 
     with patch.object(Path, "write_text"):

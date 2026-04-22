@@ -10,6 +10,7 @@ Acceptance criteria (CLAUDE.md PR-03 / Tier 1):
 - Per-field confidence populates field_confidences
 - Bug-hunt #3: every json.loads is wrapped in try/except JSONDecodeError
 """
+
 from __future__ import annotations
 
 import json

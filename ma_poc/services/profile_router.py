@@ -7,9 +7,8 @@ COLD profiles run the full cascade.
 
 Phase: claude-scrapper-arch.md Step 4.1
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 from models.scrape_profile import ProfileMaturity, ScrapeProfile
 
@@ -19,10 +18,10 @@ class RouteDecision:
 
     def __init__(
         self,
-        skip_to_tier: Optional[int] = None,
+        skip_to_tier: int | None = None,
         run_full_cascade: bool = True,
-        custom_timeout_ms: Optional[int] = None,
-        entry_url: Optional[str] = None,
+        custom_timeout_ms: int | None = None,
+        entry_url: str | None = None,
         block_domains: list[str] | None = None,
     ) -> None:
         self.skip_to_tier = skip_to_tier
@@ -55,10 +54,6 @@ def route(profile: ScrapeProfile) -> RouteDecision:
     # COLD: full cascade, no shortcuts
     return RouteDecision(
         run_full_cascade=True,
-        custom_timeout_ms=(
-            profile.navigation.timeout_ms
-            if profile.navigation.timeout_ms != 60000
-            else None
-        ),
+        custom_timeout_ms=(profile.navigation.timeout_ms if profile.navigation.timeout_ms != 60000 else None),
         block_domains=profile.navigation.block_resource_domains,
     )

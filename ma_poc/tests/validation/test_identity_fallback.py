@@ -1,4 +1,5 @@
 """Tests for identity_fallback — deterministic SHA256 unit ID computation."""
+
 from __future__ import annotations
 
 from ma_poc.validation.identity_fallback import compute_fallback_id

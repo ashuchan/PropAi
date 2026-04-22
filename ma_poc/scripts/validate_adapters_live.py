@@ -7,11 +7,11 @@ runs detect_pms + the appropriate adapter, and reports results.
 Usage:
     python scripts/validate_adapters_live.py
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
-import re
 import sys
 import urllib.parse
 from pathlib import Path
@@ -20,9 +20,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
-from ma_poc.pms.adapters.registry import get_adapter
-from ma_poc.pms.detector import detect_pms
+from ma_poc.pms.adapters.base import AdapterContext  # noqa: E402
+from ma_poc.pms.adapters.registry import get_adapter  # noqa: E402
+from ma_poc.pms.detector import detect_pms  # noqa: E402
 
 # Real property URLs grouped by expected PMS.
 # Each tuple: (canonical_id, expected_pms, url)
@@ -38,33 +38,74 @@ TEST_PROPERTIES = [
     # OneSite / RealPage
     ("293707", "onesite", "https://www.deltastreetapts.com/"),
     # AvalonBay
-    ("238997", "avalonbay", "https://www.avaloncommunities.com/new-jersey/west-windsor-apartments/avalon-w-squared-at-princeton-junction/"),
+    (
+        "238997",
+        "avalonbay",
+        "https://www.avaloncommunities.com/new-jersey/west-windsor-apartments/avalon-w-squared-at-princeton-junction/",
+    ),
     # AppFolio
     ("12807", "appfolio", "https://www.sagecanyonaz.com/"),
 ]
 
 # Known API patterns to capture (same as scripts/entrata.py).
 _API_PATTERNS = (
-    "/api/", "/availab", "/floor", "/pricing", "/units", "/apartments",
-    "/floorplans", "/floorPlan", "/listings", "/propertyunits",
-    "getFloorplans", "getUnits", "sightmap.com/app/api",
-    "/Apartments/module/", "wp-json/middleware",
-    "realpage.com", "rentcafe.com", "securecafe.com",
+    "/api/",
+    "/availab",
+    "/floor",
+    "/pricing",
+    "/units",
+    "/apartments",
+    "/floorplans",
+    "/floorPlan",
+    "/listings",
+    "/propertyunits",
+    "getFloorplans",
+    "getUnits",
+    "sightmap.com/app/api",
+    "/Apartments/module/",
+    "wp-json/middleware",
+    "realpage.com",
+    "rentcafe.com",
+    "securecafe.com",
 )
 
-_FALSE_POSITIVE_HOSTS = frozenset({
-    "googleapis.com", "maps.googleapis.com", "go-mpulse.net",
-    "google-analytics.com", "googletagmanager.com", "doubleclick.net",
-    "facebook.com", "connect.facebook.net", "hotjar.com", "sentry.io",
-    "meetelise.com", "sierra.chat", "theconversioncloud.com",
-    "nestiolistings.com", "rentgrata.com", "g5marketingcloud.com",
-    "userway.org", "omni.cafe", "visitor-analytics.io",
-})
+_FALSE_POSITIVE_HOSTS = frozenset(
+    {
+        "googleapis.com",
+        "maps.googleapis.com",
+        "go-mpulse.net",
+        "google-analytics.com",
+        "googletagmanager.com",
+        "doubleclick.net",
+        "facebook.com",
+        "connect.facebook.net",
+        "hotjar.com",
+        "sentry.io",
+        "meetelise.com",
+        "sierra.chat",
+        "theconversioncloud.com",
+        "nestiolistings.com",
+        "rentgrata.com",
+        "g5marketingcloud.com",
+        "userway.org",
+        "omni.cafe",
+        "visitor-analytics.io",
+    }
+)
 
-_FALSE_POSITIVE_PATHS = frozenset({
-    "/tag-manager/", "/mapsjs/", "/gen_204", "/analytics/", "/gtag/",
-    "/pixel", "/beacon", "/widget/inbox", "/widget/contact",
-})
+_FALSE_POSITIVE_PATHS = frozenset(
+    {
+        "/tag-manager/",
+        "/mapsjs/",
+        "/gen_204",
+        "/analytics/",
+        "/gtag/",
+        "/pixel",
+        "/beacon",
+        "/widget/inbox",
+        "/widget/contact",
+    }
+)
 
 
 def _looks_like_api(url: str) -> bool:
@@ -205,7 +246,7 @@ def _print_result(r: dict) -> None:
     pms_match = "OK" if r["detected_pms"] == r["expected_pms"] else f"MISMATCH (got {r['detected_pms']})"
     units_ok = "OK" if r["units_extracted"] > 0 else "FAIL (0 units)"
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"Property: {r['canonical_id']}  |  URL: {r['url'][:60]}")
     print(f"  Expected PMS:  {r['expected_pms']}")
     print(f"  Detected PMS:  {r['detected_pms']} (conf={r['detection_confidence']:.2f})  [{pms_match}]")
@@ -217,10 +258,12 @@ def _print_result(r: dict) -> None:
         print(f"    - {api_url}")
     if r["sample_unit"]:
         u = r["sample_unit"]
-        print(f"  Sample unit:   {u.get('floor_plan_name', '?')} | "
-              f"beds={u.get('bedrooms', '?')} | "
-              f"rent={u.get('rent_range', '?')} | "
-              f"sqft={u.get('sqft', '?')}")
+        print(
+            f"  Sample unit:   {u.get('floor_plan_name', '?')} | "
+            f"beds={u.get('bedrooms', '?')} | "
+            f"rent={u.get('rent_range', '?')} | "
+            f"sqft={u.get('sqft', '?')}"
+        )
     if r["errors"]:
         for err in r["errors"][:3]:
             print(f"  ERROR: {err[:100]}")
@@ -238,19 +281,25 @@ async def main() -> int:
             r = await scrape_one(cid, expected, url)
         except Exception as e:
             r = {
-                "canonical_id": cid, "url": url, "expected_pms": expected,
-                "detected_pms": "error", "detection_confidence": 0.0,
-                "adapter_used": "", "units_extracted": 0,
-                "adapter_confidence": 0.0, "sample_unit": None,
-                "api_urls_captured": [], "errors": [str(e)[:200]],
+                "canonical_id": cid,
+                "url": url,
+                "expected_pms": expected,
+                "detected_pms": "error",
+                "detection_confidence": 0.0,
+                "adapter_used": "",
+                "units_extracted": 0,
+                "adapter_confidence": 0.0,
+                "sample_unit": None,
+                "api_urls_captured": [],
+                "errors": [str(e)[:200]],
             }
         results.append(r)
         _print_result(r)
 
     # Summary
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SUMMARY")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     total = len(results)
     pms_correct = sum(1 for r in results if r["detected_pms"] == r["expected_pms"])
     units_found = sum(1 for r in results if r["units_extracted"] > 0)
@@ -260,8 +309,10 @@ async def main() -> int:
     for r in results:
         status = "PASS" if r["units_extracted"] > 0 else "FAIL"
         pms_ok = "ok" if r["detected_pms"] == r["expected_pms"] else "MISMATCH"
-        print(f"  [{status}] {r['canonical_id']:>8} {r['expected_pms']:>15} -> "
-              f"{r['detected_pms']:>15} ({pms_ok}) units={r['units_extracted']}")
+        print(
+            f"  [{status}] {r['canonical_id']:>8} {r['expected_pms']:>15} -> "
+            f"{r['detected_pms']:>15} ({pms_ok}) units={r['units_extracted']}"
+        )
 
     # Write results to file
     out_path = ROOT / "data" / "adapter_validation.json"

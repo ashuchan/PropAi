@@ -1,4 +1,5 @@
 """Tests for validation orchestrator — end-to-end validation pipeline."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -35,11 +36,13 @@ def test_validate_all_accept_no_next_tier() -> None:
 
 
 def test_validate_majority_reject_requests_next_tier() -> None:
-    er = FakeExtractResult(records=[
-        {"asking_rent": -100},  # reject
-        {"asking_rent": -200},  # reject
-        _valid_unit("u1"),  # accept
-    ])
+    er = FakeExtractResult(
+        records=[
+            {"asking_rent": -100},  # reject
+            {"asking_rent": -200},  # reject
+            _valid_unit("u1"),  # accept
+        ]
+    )
     vr = validate(er)
     assert len(vr.rejected) == 2
     assert len(vr.accepted) == 1
@@ -47,10 +50,12 @@ def test_validate_majority_reject_requests_next_tier() -> None:
 
 
 def test_validate_exactly_half_reject_does_not_request_next_tier() -> None:
-    er = FakeExtractResult(records=[
-        {"asking_rent": -100},  # reject
-        _valid_unit("u1"),  # accept
-    ])
+    er = FakeExtractResult(
+        records=[
+            {"asking_rent": -100},  # reject
+            _valid_unit("u1"),  # accept
+        ]
+    )
     vr = validate(er)
     assert len(vr.rejected) == 1
     assert len(vr.accepted) == 1
@@ -73,9 +78,11 @@ def test_validate_preserves_source_extract_reference() -> None:
 
 
 def test_validate_inferred_ids_counted() -> None:
-    er = FakeExtractResult(records=[
-        {"floor_plan_type": "1BR", "bedrooms": 1, "asking_rent": 1500, "sqft": 750},
-    ])
+    er = FakeExtractResult(
+        records=[
+            {"floor_plan_type": "1BR", "bedrooms": 1, "asking_rent": 1500, "sqft": 750},
+        ]
+    )
     vr = validate(er)
     assert vr.identity_fallback_used_count == 1
 
@@ -88,13 +95,15 @@ def test_validate_emits_events_per_record() -> None:
 
 
 def test_validate_never_raises_on_malformed_record() -> None:
-    er = FakeExtractResult(records=[
-        {},  # Completely empty
-        None,  # type: ignore
-    ])
+    er = FakeExtractResult(
+        records=[
+            {},  # Completely empty
+            None,  # type: ignore
+        ]
+    )
     # Should not raise
     try:
-        vr = validate(er)
+        validate(er)
     except TypeError:
         # None record may cause TypeError, that's acceptable to catch
         pass

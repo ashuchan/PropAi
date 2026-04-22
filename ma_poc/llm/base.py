@@ -1,4 +1,5 @@
 """Abstract base class for LLM providers."""
+
 from __future__ import annotations
 
 import asyncio
@@ -17,14 +18,20 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def _complete_once(
-        self, system: str, user: str, max_tokens: int,
+        self,
+        system: str,
+        user: str,
+        max_tokens: int,
     ) -> str:
         """Single attempt at a text completion. Must raise rate-limit errors."""
         ...
 
     @abstractmethod
     async def _extract_images_once(
-        self, images: list[bytes], prompt: str, max_tokens: int,
+        self,
+        images: list[bytes],
+        prompt: str,
+        max_tokens: int,
     ) -> dict[str, Any]:
         """Single attempt at a vision extraction. Must raise rate-limit errors."""
         ...
@@ -45,14 +52,22 @@ class LLMProvider(ABC):
     # ------------------------------------------------------------------
 
     async def complete(
-        self, system: str, user: str, *, max_tokens: int = 4096,
+        self,
+        system: str,
+        user: str,
+        *,
+        max_tokens: int = 4096,
     ) -> str:
         """Text completion with jitter-based retry on rate limits."""
         result: str = await self._with_retry(self._complete_once, system, user, max_tokens)
         return result
 
     async def extract_from_images(
-        self, images: list[bytes], prompt: str, *, max_tokens: int = 4096,
+        self,
+        images: list[bytes],
+        prompt: str,
+        *,
+        max_tokens: int = 4096,
     ) -> dict[str, Any]:
         """Vision extraction with jitter-based retry on rate limits."""
         result: dict[str, Any] = await self._with_retry(self._extract_images_once, images, prompt, max_tokens)

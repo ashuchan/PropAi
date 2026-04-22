@@ -1,9 +1,9 @@
 """Tests for Jugnu J0 — baseline metrics script."""
+
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -16,8 +16,6 @@ from scripts.jugnu_baseline import (
     compute_timing,
     compute_totals,
     find_latest_run_dir,
-    load_properties_json,
-    main,
     write_json,
     write_markdown,
 )
@@ -98,15 +96,9 @@ class TestFailureSignatures:
         """5 SSL errors + 3 Timeouts produce two signature groups."""
         props = []
         for i in range(5):
-            props.append(
-                _make_prop("FAILED", errors=["ERR_SSL_PROTOCOL_ERROR"],
-                           canonical_id=f"ssl_{i}")
-            )
+            props.append(_make_prop("FAILED", errors=["ERR_SSL_PROTOCOL_ERROR"], canonical_id=f"ssl_{i}"))
         for i in range(3):
-            props.append(
-                _make_prop("FAILED", errors=["Timeout waiting for page"],
-                           canonical_id=f"to_{i}")
-            )
+            props.append(_make_prop("FAILED", errors=["Timeout waiting for page"], canonical_id=f"to_{i}"))
         sigs = compute_failure_signatures(props)
         assert len(sigs) == 2
         assert sigs[0]["count"] == 5  # SSL is more common
@@ -114,9 +106,7 @@ class TestFailureSignatures:
 
 
 class TestProfileMaturity:
-    def test_baseline_profile_maturity_counts_null_providers(
-        self, tmp_path: Path
-    ) -> None:
+    def test_baseline_profile_maturity_counts_null_providers(self, tmp_path: Path) -> None:
         """3 profiles where 2 have api_provider==null."""
         for i, provider in enumerate([None, None, "entrata"]):
             profile = {
@@ -128,9 +118,7 @@ class TestProfileMaturity:
         assert result["api_provider_null"] == 2
         assert result["WARM"] == 3
 
-    def test_baseline_handles_missing_profiles_dir(
-        self, tmp_path: Path
-    ) -> None:
+    def test_baseline_handles_missing_profiles_dir(self, tmp_path: Path) -> None:
         """Non-existent profiles dir returns zeros, doesn't raise."""
         result = compute_profile_maturity(tmp_path / "missing")
         assert result["total"] == 0
@@ -170,10 +158,7 @@ class TestOutputFiles:
 
     def test_baseline_is_idempotent(self, tmp_path: Path) -> None:
         """Running twice on same data produces same numbers."""
-        props = [
-            _make_prop("TIER_1_API", canonical_id=f"p{i}")
-            for i in range(3)
-        ]
+        props = [_make_prop("TIER_1_API", canonical_id=f"p{i}") for i in range(3)]
         runs = tmp_path / "runs" / "2026-04-17"
         runs.mkdir(parents=True)
 

@@ -4,6 +4,7 @@ scripts/validate_outputs.py — required Phase A metrics.
 Reads data/scrape_events.jsonl. Computes the 10 metrics from CLAUDE.md and
 prints a structured summary. Exit non-zero if any hard target is missed.
 """
+
 from __future__ import annotations
 
 import json
@@ -71,8 +72,7 @@ def main() -> int:
     # Last 24h
     cutoff = datetime.now(UTC) - timedelta(hours=24)
     recent = [
-        e for e in events
-        if datetime.fromisoformat(e["scrape_timestamp"].replace("Z", "+00:00")) >= cutoff
+        e for e in events if datetime.fromisoformat(e["scrape_timestamp"].replace("Z", "+00:00")) >= cutoff
     ]
     properties_24h = {e["property_id"] for e in recent}
 
@@ -99,7 +99,8 @@ def main() -> int:
     non_skipped = [e for e in recent if e["scrape_outcome"] != "SKIPPED"]
     banner_rate = (
         sum(1 for e in non_skipped if e.get("banner_capture_attempted")) / len(non_skipped)
-        if non_skipped else 0.0
+        if non_skipped
+        else 0.0
     )
 
     page_loads = [float(e["page_load_ms"]) for e in recent if e.get("page_load_ms")]
@@ -116,7 +117,8 @@ def main() -> int:
             continue
         per_dom[dom].append(e["scrape_outcome"] != "FAILED")
     bad_domains = [
-        d for d, oks in per_dom.items()
+        d
+        for d, oks in per_dom.items()
         if oks and ((sum(1 for ok in oks if not ok) / len(oks)) > TARGET_PER_DOMAIN_FAIL)
     ]
 
@@ -138,26 +140,61 @@ def main() -> int:
 
     # Print + status
     rows = [
-        ("Total properties scraped (24h)", len(properties_24h), f">= {TARGET_TOTAL}",
-         len(properties_24h) >= TARGET_TOTAL),
-        ("Overall scrape success rate", f"{success_rate:.1%}", f">= {TARGET_SUCCESS_RATE:.0%}",
-         success_rate >= TARGET_SUCCESS_RATE),
-        ("Tier1+2 share of successes", f"{tier12_share:.1%}", f">= {TARGET_TIER12_SHARE:.0%}",
-         tier12_share >= TARGET_TIER12_SHARE),
-        ("Change-detection skip rate", f"{skip_rate:.1%}", f">= {TARGET_SKIP_RATE_STABILISED:.0%} (STABILISED proxy)",
-         skip_rate >= TARGET_SKIP_RATE_STABILISED),
-        ("Vision Tier 5 fallback rate", f"{vision_rate:.1%}", f"<= {TARGET_VISION_FALLBACK_RATE:.0%}",
-         vision_rate <= TARGET_VISION_FALLBACK_RATE),
-        ("Banner capture attempted (non-skipped)", f"{banner_rate:.1%}", f"== {TARGET_BANNER_ATTEMPTED:.0%}",
-         banner_rate >= TARGET_BANNER_ATTEMPTED),
-        ("P95 page load (ms)", int(p95), f"< {TARGET_P95_PAGE_LOAD_MS}",
-         p95 < TARGET_P95_PAGE_LOAD_MS or p95 == 0),
+        (
+            "Total properties scraped (24h)",
+            len(properties_24h),
+            f">= {TARGET_TOTAL}",
+            len(properties_24h) >= TARGET_TOTAL,
+        ),
+        (
+            "Overall scrape success rate",
+            f"{success_rate:.1%}",
+            f">= {TARGET_SUCCESS_RATE:.0%}",
+            success_rate >= TARGET_SUCCESS_RATE,
+        ),
+        (
+            "Tier1+2 share of successes",
+            f"{tier12_share:.1%}",
+            f">= {TARGET_TIER12_SHARE:.0%}",
+            tier12_share >= TARGET_TIER12_SHARE,
+        ),
+        (
+            "Change-detection skip rate",
+            f"{skip_rate:.1%}",
+            f">= {TARGET_SKIP_RATE_STABILISED:.0%} (STABILISED proxy)",
+            skip_rate >= TARGET_SKIP_RATE_STABILISED,
+        ),
+        (
+            "Vision Tier 5 fallback rate",
+            f"{vision_rate:.1%}",
+            f"<= {TARGET_VISION_FALLBACK_RATE:.0%}",
+            vision_rate <= TARGET_VISION_FALLBACK_RATE,
+        ),
+        (
+            "Banner capture attempted (non-skipped)",
+            f"{banner_rate:.1%}",
+            f"== {TARGET_BANNER_ATTEMPTED:.0%}",
+            banner_rate >= TARGET_BANNER_ATTEMPTED,
+        ),
+        (
+            "P95 page load (ms)",
+            int(p95),
+            f"< {TARGET_P95_PAGE_LOAD_MS}",
+            p95 < TARGET_P95_PAGE_LOAD_MS or p95 == 0,
+        ),
         ("Domains over 5% failure (7d)", bad_domains, "[]", not bad_domains),
-        ("Vision sample rate", f"{sample_rate:.1%}",
-         f"in [{TARGET_VISION_SAMPLE_RATE[0]:.0%}, {TARGET_VISION_SAMPLE_RATE[1]:.0%}]",
-         TARGET_VISION_SAMPLE_RATE[0] <= sample_rate <= TARGET_VISION_SAMPLE_RATE[1]),
-        ("Vision agreement rate", f"{avg_agreement:.1%}" if avg_agreement is not None else "n/a",
-         f">= {TARGET_VISION_AGREEMENT:.0%}", avg_agreement is None or avg_agreement >= TARGET_VISION_AGREEMENT),
+        (
+            "Vision sample rate",
+            f"{sample_rate:.1%}",
+            f"in [{TARGET_VISION_SAMPLE_RATE[0]:.0%}, {TARGET_VISION_SAMPLE_RATE[1]:.0%}]",
+            TARGET_VISION_SAMPLE_RATE[0] <= sample_rate <= TARGET_VISION_SAMPLE_RATE[1],
+        ),
+        (
+            "Vision agreement rate",
+            f"{avg_agreement:.1%}" if avg_agreement is not None else "n/a",
+            f">= {TARGET_VISION_AGREEMENT:.0%}",
+            avg_agreement is None or avg_agreement >= TARGET_VISION_AGREEMENT,
+        ),
     ]
 
     print("=" * 78)

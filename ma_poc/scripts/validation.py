@@ -24,47 +24,47 @@ from typing import Any
 # ── Issue codes (machine-readable) ────────────────────────────────────────────
 
 # Identity
-IDENTITY_UNRESOLVED   = "IDENTITY_UNRESOLVED"
+IDENTITY_UNRESOLVED = "IDENTITY_UNRESOLVED"
 IDENTITY_LOW_CONFIDENCE = "IDENTITY_LOW_CONFIDENCE"
-DUPLICATE_IDENTITY    = "DUPLICATE_IDENTITY"          # two rows → same canonical_id
-SOFT_DUPLICATE_ADDRESS = "SOFT_DUPLICATE_ADDRESS"     # same address, different canonical_id
-SOFT_DUPLICATE_GEO    = "SOFT_DUPLICATE_GEO"          # same lat/lng, different canonical_id
+DUPLICATE_IDENTITY = "DUPLICATE_IDENTITY"  # two rows → same canonical_id
+SOFT_DUPLICATE_ADDRESS = "SOFT_DUPLICATE_ADDRESS"  # same address, different canonical_id
+SOFT_DUPLICATE_GEO = "SOFT_DUPLICATE_GEO"  # same lat/lng, different canonical_id
 
 # CSV input
-CSV_MISSING_URL       = "CSV_MISSING_URL"
-CSV_MISSING_REQUIRED  = "CSV_MISSING_REQUIRED"
+CSV_MISSING_URL = "CSV_MISSING_URL"
+CSV_MISSING_REQUIRED = "CSV_MISSING_REQUIRED"
 
 # Scrape
-SCRAPE_FAILED         = "SCRAPE_FAILED"
-SCRAPE_NO_APIS        = "SCRAPE_NO_APIS"
-SCRAPE_TIMEOUT        = "SCRAPE_TIMEOUT"
+SCRAPE_FAILED = "SCRAPE_FAILED"
+SCRAPE_NO_APIS = "SCRAPE_NO_APIS"
+SCRAPE_TIMEOUT = "SCRAPE_TIMEOUT"
 
 # Unit extraction
-UNITS_EMPTY           = "UNITS_EMPTY"                 # scrape succeeded, 0 units found
-UNIT_INVALID_SCHEMA   = "UNIT_INVALID_SCHEMA"
-UNIT_INVALID_RENT     = "UNIT_INVALID_RENT"
-UNIT_INVALID_DATE     = "UNIT_INVALID_DATE"
-UNIT_MISSING_ID       = "UNIT_MISSING_ID"
-UNIT_DUPLICATE_ID     = "UNIT_DUPLICATE_ID"
+UNITS_EMPTY = "UNITS_EMPTY"  # scrape succeeded, 0 units found
+UNIT_INVALID_SCHEMA = "UNIT_INVALID_SCHEMA"
+UNIT_INVALID_RENT = "UNIT_INVALID_RENT"
+UNIT_INVALID_DATE = "UNIT_INVALID_DATE"
+UNIT_MISSING_ID = "UNIT_MISSING_ID"
+UNIT_DUPLICATE_ID = "UNIT_DUPLICATE_ID"
 
 # Carry-forward
 UNITS_CARRIED_FORWARD = "UNITS_CARRIED_FORWARD"
-UNITS_DISAPPEARED     = "UNITS_DISAPPEARED"
-PROPERTY_DISAPPEARED  = "PROPERTY_DISAPPEARED"        # in state yesterday, not in today's CSV
-PROPERTY_NEW          = "PROPERTY_NEW"                # not in state, first time seeing it
+UNITS_DISAPPEARED = "UNITS_DISAPPEARED"
+PROPERTY_DISAPPEARED = "PROPERTY_DISAPPEARED"  # in state yesterday, not in today's CSV
+PROPERTY_NEW = "PROPERTY_NEW"  # not in state, first time seeing it
 
 # Pipeline
-PIPELINE_EXCEPTION    = "PIPELINE_EXCEPTION"
+PIPELINE_EXCEPTION = "PIPELINE_EXCEPTION"
 
 # V2 schema validation
-V2_MISSING_REQUIRED    = "V2_MISSING_REQUIRED"
+V2_MISSING_REQUIRED = "V2_MISSING_REQUIRED"
 V2_INVALID_APARTMENT_ID = "V2_INVALID_APARTMENT_ID"
-V2_INVALID_ZIP         = "V2_INVALID_ZIP"
-V2_INVALID_BEDS        = "V2_INVALID_BEDS"
-V2_INVALID_BATHS       = "V2_INVALID_BATHS"
-V2_INVALID_AREA        = "V2_INVALID_AREA"
-V2_INVALID_RENT        = "V2_INVALID_RENT"
-V2_INVALID_LEASE_TERM  = "V2_INVALID_LEASE_TERM"
+V2_INVALID_ZIP = "V2_INVALID_ZIP"
+V2_INVALID_BEDS = "V2_INVALID_BEDS"
+V2_INVALID_BATHS = "V2_INVALID_BATHS"
+V2_INVALID_AREA = "V2_INVALID_AREA"
+V2_INVALID_RENT = "V2_INVALID_RENT"
+V2_INVALID_LEASE_TERM = "V2_INVALID_LEASE_TERM"
 
 # Rent sanity bounds (USD/month) — used to flag extraction drift.
 RENT_MIN_USD = 200
@@ -72,40 +72,52 @@ RENT_MAX_USD = 50000
 
 # ── Dataclass ─────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ValidationIssue:
-    severity:    str                                  # ERROR | WARNING | INFO
-    code:        str
-    message:     str
+    severity: str  # ERROR | WARNING | INFO
+    code: str
+    message: str
     canonical_id: str | None = None
-    row_index:   int | None  = None
-    details:     dict[str, Any] = field(default_factory=dict)
-    timestamp:   str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    row_index: int | None = None
+    details: dict[str, Any] = field(default_factory=dict)
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def to_dict(self) -> dict:
         return asdict(self)
+
 
 # Convenience constructors — keeps orchestrator code readable.
 def _issue(severity: str, code: str, message: str, **kw) -> ValidationIssue:
     return ValidationIssue(severity=severity, code=code, message=message, **kw)
 
+
 def error(code: str, message: str, **kw) -> ValidationIssue:
     return _issue("ERROR", code, message, **kw)
+
 
 def warning(code: str, message: str, **kw) -> ValidationIssue:
     return _issue("WARNING", code, message, **kw)
 
+
 def info(code: str, message: str, **kw) -> ValidationIssue:
     return _issue("INFO", code, message, **kw)
+
 
 # ── Unit-level validation ─────────────────────────────────────────────────────
 
 REQUIRED_UNIT_KEYS = {
-    "unit_id", "market_rent_low", "market_rent_high",
-    "available_date", "lease_link", "concessions", "amenities",
+    "unit_id",
+    "market_rent_low",
+    "market_rent_high",
+    "available_date",
+    "lease_link",
+    "concessions",
+    "amenities",
 }
 
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
 
 def validate_unit(unit: dict, canonical_id: str, idx: int) -> list[ValidationIssue]:
     """
@@ -118,35 +130,41 @@ def validate_unit(unit: dict, canonical_id: str, idx: int) -> list[ValidationIss
 
     # Schema: every required key must be present, no unknown keys.
     if not isinstance(unit, dict):
-        issues.append(error(
-            UNIT_INVALID_SCHEMA,
-            f"unit at index {idx} is not a dict",
-            canonical_id=canonical_id,
-            details={"unit_index": idx, "type": type(unit).__name__},
-        ))
+        issues.append(
+            error(
+                UNIT_INVALID_SCHEMA,
+                f"unit at index {idx} is not a dict",
+                canonical_id=canonical_id,
+                details={"unit_index": idx, "type": type(unit).__name__},
+            )
+        )
         return issues
 
     missing = REQUIRED_UNIT_KEYS - set(unit.keys())
-    extra   = set(unit.keys()) - REQUIRED_UNIT_KEYS
+    extra = set(unit.keys()) - REQUIRED_UNIT_KEYS
     if missing:
-        issues.append(error(
-            UNIT_INVALID_SCHEMA,
-            f"unit {unit.get('unit_id')} missing required keys: {sorted(missing)}",
-            canonical_id=canonical_id,
-            details={"unit_index": idx, "missing": sorted(missing), "extra": sorted(extra)},
-        ))
+        issues.append(
+            error(
+                UNIT_INVALID_SCHEMA,
+                f"unit {unit.get('unit_id')} missing required keys: {sorted(missing)}",
+                canonical_id=canonical_id,
+                details={"unit_index": idx, "missing": sorted(missing), "extra": sorted(extra)},
+            )
+        )
     # Extra fields beyond the required set are harmless — APIs often return
     # more fields than we need (e.g. floorplan_image_url, _sqft, _floor_plan).
     # No warning emitted for extra keys.
 
     uid = unit.get("unit_id")
     if not uid or not str(uid).strip():
-        issues.append(error(
-            UNIT_MISSING_ID,
-            f"unit at index {idx} has empty unit_id",
-            canonical_id=canonical_id,
-            details={"unit_index": idx},
-        ))
+        issues.append(
+            error(
+                UNIT_MISSING_ID,
+                f"unit at index {idx} has empty unit_id",
+                canonical_id=canonical_id,
+                details={"unit_index": idx},
+            )
+        )
 
     lo = unit.get("market_rent_low")
     hi = unit.get("market_rent_high")
@@ -154,38 +172,46 @@ def validate_unit(unit: dict, canonical_id: str, idx: int) -> list[ValidationIss
         if v is None:
             continue
         if not isinstance(v, (int, float)):
-            issues.append(warning(
-                UNIT_INVALID_RENT,
-                f"{label} is not numeric: {v!r}",
-                canonical_id=canonical_id,
-                details={"unit_id": uid, "field": label, "value": v},
-            ))
+            issues.append(
+                warning(
+                    UNIT_INVALID_RENT,
+                    f"{label} is not numeric: {v!r}",
+                    canonical_id=canonical_id,
+                    details={"unit_id": uid, "field": label, "value": v},
+                )
+            )
         elif v < RENT_MIN_USD or v > RENT_MAX_USD:
-            issues.append(warning(
+            issues.append(
+                warning(
+                    UNIT_INVALID_RENT,
+                    f"{label}={v} is outside apartment rent range [{RENT_MIN_USD}, {RENT_MAX_USD}]",
+                    canonical_id=canonical_id,
+                    details={"unit_id": uid, "field": label, "value": v},
+                )
+            )
+    if isinstance(lo, (int, float)) and isinstance(hi, (int, float)) and lo > hi:
+        issues.append(
+            warning(
                 UNIT_INVALID_RENT,
-                f"{label}={v} is outside apartment rent range [{RENT_MIN_USD}, {RENT_MAX_USD}]",
+                f"market_rent_low ({lo}) > market_rent_high ({hi})",
                 canonical_id=canonical_id,
-                details={"unit_id": uid, "field": label, "value": v},
-            ))
-    if (isinstance(lo, (int, float)) and isinstance(hi, (int, float))
-            and lo > hi):
-        issues.append(warning(
-            UNIT_INVALID_RENT,
-            f"market_rent_low ({lo}) > market_rent_high ({hi})",
-            canonical_id=canonical_id,
-            details={"unit_id": uid, "low": lo, "high": hi},
-        ))
+                details={"unit_id": uid, "low": lo, "high": hi},
+            )
+        )
 
     d = unit.get("available_date")
     if d is not None and not (isinstance(d, str) and _ISO_DATE.match(d)):
-        issues.append(warning(
-            UNIT_INVALID_DATE,
-            f"available_date is not YYYY-MM-DD: {d!r}",
-            canonical_id=canonical_id,
-            details={"unit_id": uid, "value": d},
-        ))
+        issues.append(
+            warning(
+                UNIT_INVALID_DATE,
+                f"available_date is not YYYY-MM-DD: {d!r}",
+                canonical_id=canonical_id,
+                details={"unit_id": uid, "value": d},
+            )
+        )
 
     return issues
+
 
 def validate_units(units: list[dict], canonical_id: str) -> list[ValidationIssue]:
     """Run per-unit validation plus cross-unit duplicate-id detection."""
@@ -196,17 +222,21 @@ def validate_units(units: list[dict], canonical_id: str) -> list[ValidationIssue
         uid = str(u.get("unit_id") or "")
         if uid:
             if uid in seen_ids:
-                issues.append(error(
-                    UNIT_DUPLICATE_ID,
-                    f"duplicate unit_id {uid} within property",
-                    canonical_id=canonical_id,
-                    details={"unit_id": uid, "first_index": seen_ids[uid], "second_index": i},
-                ))
+                issues.append(
+                    error(
+                        UNIT_DUPLICATE_ID,
+                        f"duplicate unit_id {uid} within property",
+                        canonical_id=canonical_id,
+                        details={"unit_id": uid, "first_index": seen_ids[uid], "second_index": i},
+                    )
+                )
             else:
                 seen_ids[uid] = i
     return issues
 
+
 # ── Issue aggregation helpers ─────────────────────────────────────────────────
+
 
 def summarise_issues(issues: list[ValidationIssue]) -> dict:
     """Group issues by severity and code for the run report."""
@@ -216,7 +246,7 @@ def summarise_issues(issues: list[ValidationIssue]) -> dict:
         by_severity[iss.severity] = by_severity.get(iss.severity, 0) + 1
         by_code[iss.code] = by_code.get(iss.code, 0) + 1
     return {
-        "total":       len(issues),
+        "total": len(issues),
         "by_severity": by_severity,
-        "by_code":     dict(sorted(by_code.items(), key=lambda kv: -kv[1])),
+        "by_code": dict(sorted(by_code.items(), key=lambda kv: -kv[1])),
     }

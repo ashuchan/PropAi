@@ -3,11 +3,12 @@
 Survives crashes and process restarts. Tracks per-URL fetch state,
 consecutive failures, and parking status.
 """
+
 from __future__ import annotations
 
 import logging
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -48,9 +49,7 @@ class Frontier:
         )
         self._conn.commit()
 
-    def upsert_url(
-        self, url: str, property_id: str, depth: int, source: str
-    ) -> None:
+    def upsert_url(self, url: str, property_id: str, depth: int, source: str) -> None:
         """Insert or update a URL in the frontier.
 
         Args:
@@ -60,7 +59,7 @@ class Frontier:
             source: 'csv', 'sitemap', or 'link_exploration'.
         """
         host = urlparse(url).netloc
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self._conn.execute(
             """INSERT INTO frontier (url, host, property_id, first_seen, depth, source)
                VALUES (?, ?, ?, ?, ?, ?)
@@ -78,7 +77,7 @@ class Frontier:
             url: The URL that was fetched.
             outcome: The fetch outcome.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         if outcome == FetchOutcome.OK or outcome == FetchOutcome.NOT_MODIFIED:
             self._conn.execute(
                 """UPDATE frontier SET last_attempted = ?, last_outcome = ?,
@@ -126,9 +125,7 @@ class Frontier:
         Returns:
             List of frontier entry dicts.
         """
-        rows = self._conn.execute(
-            "SELECT * FROM frontier WHERE property_id = ?", (property_id,)
-        ).fetchall()
+        rows = self._conn.execute("SELECT * FROM frontier WHERE property_id = ?", (property_id,)).fetchall()
         return [dict(r) for r in rows]
 
     def by_host(self, host: str) -> list[dict[str, object]]:
@@ -140,9 +137,7 @@ class Frontier:
         Returns:
             List of frontier entry dicts.
         """
-        rows = self._conn.execute(
-            "SELECT * FROM frontier WHERE host = ?", (host,)
-        ).fetchall()
+        rows = self._conn.execute("SELECT * FROM frontier WHERE host = ?", (host,)).fetchall()
         return [dict(r) for r in rows]
 
     def get_entry(self, url: str) -> dict[str, object] | None:
@@ -154,9 +149,7 @@ class Frontier:
         Returns:
             Dict of the entry, or None if not found.
         """
-        row = self._conn.execute(
-            "SELECT * FROM frontier WHERE url = ?", (url,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM frontier WHERE url = ?", (url,)).fetchone()
         return dict(row) if row else None
 
     def close(self) -> None:

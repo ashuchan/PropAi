@@ -1,4 +1,5 @@
 """Tests for conditional — ETag/Last-Modified SQLite cache."""
+
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor

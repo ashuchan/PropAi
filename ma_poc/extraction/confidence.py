@@ -8,6 +8,7 @@ Acceptance criteria:
 - Per-required-field weighting: required fields drive the score; preferred
   fields raise it; missing required fields degrade it by a fixed step.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping

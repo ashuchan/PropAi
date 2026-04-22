@@ -1,4 +1,5 @@
 """Tests for event_ledger — append-only JSONL writer."""
+
 from __future__ import annotations
 
 import json

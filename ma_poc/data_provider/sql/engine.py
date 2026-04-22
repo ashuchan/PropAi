@@ -8,6 +8,7 @@ We resolve the URL in this priority order:
 Postgres expects `postgresql+psycopg://user:pass@host:port/dbname`. The
 `psycopg` driver (v3) is the current recommendation.
 """
+
 from __future__ import annotations
 
 import logging
@@ -82,10 +83,7 @@ def dialect_insert(engine: Engine, table: Any) -> Insert:
         return pg_insert(table)
     if name == "sqlite":
         return sqlite_insert(table)
-    raise NotImplementedError(
-        f"UPSERT not implemented for dialect {name!r}. "
-        "Use postgresql or sqlite."
-    )
+    raise NotImplementedError(f"UPSERT not implemented for dialect {name!r}. Use postgresql or sqlite.")
 
 
 def _redact(url: str) -> str:

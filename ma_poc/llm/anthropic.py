@@ -1,4 +1,5 @@
 """Anthropic (Claude) LLM provider implementation."""
+
 from __future__ import annotations
 
 import base64
@@ -42,7 +43,10 @@ class AnthropicLLMProvider(LLMProvider):
         self._vision_model = os.getenv("ANTHROPIC_VISION_MODEL", "claude-sonnet-4-20250514")
 
     async def _complete_once(
-        self, system: str, user: str, max_tokens: int,
+        self,
+        system: str,
+        user: str,
+        max_tokens: int,
     ) -> str:
         resp = await self._client.messages.create(
             model=self._text_model,
@@ -53,30 +57,35 @@ class AnthropicLLMProvider(LLMProvider):
         # Capture usage for interaction logging (bug-hunt #14: _last_usage is
         # instance-scoped so concurrent providers don't cross-contaminate).
         self._last_usage: dict[str, object] = {
-            "input_tokens":  resp.usage.input_tokens,
+            "input_tokens": resp.usage.input_tokens,
             "output_tokens": resp.usage.output_tokens,
-            "model":         self._text_model,
-            "call_type":     "text",
-            "provider":      "anthropic",
+            "model": self._text_model,
+            "call_type": "text",
+            "provider": "anthropic",
         }
         return "".join(getattr(blk, "text", "") for blk in resp.content)
 
     async def _extract_images_once(
-        self, images: list[bytes], prompt: str, max_tokens: int,
+        self,
+        images: list[bytes],
+        prompt: str,
+        max_tokens: int,
     ) -> dict[str, Any]:
         from llm.images import check_size
 
         content: list[dict[str, Any]] = []
         for img in images:
             sized = check_size(img, ANTHROPIC_IMAGE_LIMIT_BYTES)
-            content.append({
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": "image/png",
-                    "data": base64.b64encode(sized).decode("ascii"),
-                },
-            })
+            content.append(
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": base64.b64encode(sized).decode("ascii"),
+                    },
+                }
+            )
         content.append({"type": "text", "text": prompt})
         resp = await self._client.messages.create(
             model=self._vision_model,
@@ -85,11 +94,11 @@ class AnthropicLLMProvider(LLMProvider):
         )
         # Capture usage for interaction logging.
         self._last_usage = {
-            "input_tokens":  resp.usage.input_tokens,
+            "input_tokens": resp.usage.input_tokens,
             "output_tokens": resp.usage.output_tokens,
-            "model":         self._vision_model,
-            "call_type":     "vision",
-            "provider":      "anthropic",
+            "model": self._vision_model,
+            "call_type": "vision",
+            "provider": "anthropic",
         }
         text = "".join(getattr(blk, "text", "") for blk in resp.content)
         try:

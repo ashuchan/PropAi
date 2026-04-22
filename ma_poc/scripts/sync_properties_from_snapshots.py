@@ -15,11 +15,11 @@ Usage:
     python scripts/sync_properties_from_snapshots.py --run-date 2026-04-21
     python scripts/sync_properties_from_snapshots.py --run-date 2026-04-21 --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -60,10 +60,7 @@ def main() -> int:
 
     with engine.connect() as c:
         rows = c.execute(
-            text(
-                "select canonical_id, payload from property_snapshots "
-                "where run_date = :d order by ordinal"
-            ),
+            text("select canonical_id, payload from property_snapshots where run_date = :d order by ordinal"),
             {"d": args.run_date},
         ).all()
 
@@ -79,10 +76,7 @@ def main() -> int:
                 skipped += 1
                 continue
             # Snapshot-level fields only — drop `units` and any `_*` private keys.
-            snap = {
-                k: v for k, v in payload.items()
-                if not k.startswith("_") and k != "units"
-            }
+            snap = {k: v for k, v in payload.items() if not k.startswith("_") and k != "units"}
             meta = payload.get("_meta") or {}
             status = _verdict_to_status(meta.get("verdict"))
             if status:
@@ -101,7 +95,10 @@ def main() -> int:
     dst.close()
     log.info(
         "done. upserted=%d new=%d existed=%d skipped_no_cid=%d",
-        upserted, new_count, existing, skipped,
+        upserted,
+        new_count,
+        existing,
+        skipped,
     )
 
     # Summary query for operator visibility

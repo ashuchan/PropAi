@@ -11,6 +11,7 @@ Output shape matches what Jugnu adapters already emit (`floor_plan_name`,
 `unit_id`/`market_rent_low`/`market_rent_high` internal shape used by
 daily_runner's property-record builder.
 """
+
 from __future__ import annotations
 
 import sys
@@ -29,9 +30,11 @@ from entrata import (  # noqa: E402
     TARGET_JSONLD_TYPES,
     _jsonld_floor_size,
     _jsonld_item_has_unit_signal,
-    _parse_sightmap_payload as _sightmap_adapter_shape,
     _walk_jsonld,
     parse_api_responses,
+)
+from entrata import (  # noqa: E402
+    _parse_sightmap_payload as _sightmap_adapter_shape,
 )
 
 # _realpage_units_from_body lives in scrape_properties.py and handles the
@@ -39,12 +42,14 @@ from entrata import (  # noqa: E402
 # It emits the *internal* shape (unit_id / market_rent_low / market_rent_high),
 # not the adapter shape. Callers must translate before adding to AdapterResult.
 from scrape_properties import (  # noqa: E402
+    _RENT_KEYS,
     _RENT_MAX,
     _RENT_MIN,
-    _RENT_KEYS,
     _UNIT_ID_KEYS,
     _extract_rent,
     _money_to_int,
+)
+from scrape_properties import (  # noqa: E402
     _realpage_units_from_body as _realpage_units_internal_shape,
 )
 
@@ -87,24 +92,26 @@ def realpage_units_to_adapter_shape(body: Any, url: str) -> list[dict[str, Any]]
             bed_label = ""
 
         sqft = u.get("_sqft")
-        out.append({
-            "floor_plan_name":    str(name),
-            "bed_label":          bed_label,
-            "bedrooms":           str(beds) if beds not in (None, "") else "",
-            "bathrooms":          "",
-            "sqft":               str(sqft) if sqft is not None else "",
-            "unit_number":        str(u.get("unit_id") or ""),
-            "floor":              "",
-            "building":           "",
-            "rent_range":         rent_range,
-            "deposit":            "",
-            "concession":         str(u.get("concessions") or ""),
-            "availability_status": "AVAILABLE",
-            "available_units":    "",
-            "availability_date":  str(u.get("available_date") or ""),
-            "source_api_url":     url,
-            "extraction_tier":    "TIER_1_API",
-        })
+        out.append(
+            {
+                "floor_plan_name": str(name),
+                "bed_label": bed_label,
+                "bedrooms": str(beds) if beds not in (None, "") else "",
+                "bathrooms": "",
+                "sqft": str(sqft) if sqft is not None else "",
+                "unit_number": str(u.get("unit_id") or ""),
+                "floor": "",
+                "building": "",
+                "rent_range": rent_range,
+                "deposit": "",
+                "concession": str(u.get("concessions") or ""),
+                "availability_status": "AVAILABLE",
+                "available_units": "",
+                "availability_date": str(u.get("available_date") or ""),
+                "source_api_url": url,
+                "extraction_tier": "TIER_1_API",
+            }
+        )
     return out
 
 
