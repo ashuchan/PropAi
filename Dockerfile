@@ -24,24 +24,24 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-    && rm -rf /var/lib/apt/lists/*
+# Non-root runtime user, created up front so later COPY --chown works.
+RUN groupadd --system --gid 1001 pwuser \
+    && useradd --system --uid 1001 --gid pwuser --create-home pwuser
 
+# Python environment from the builder stage.
 COPY --from=builder /opt/venv /opt/venv
 
-# Chromium + its apt dependencies. --with-deps must run as root; Firefox and
-# WebKit are intentionally omitted — scraper/browser.py only launches Chromium.
-RUN playwright install --with-deps chromium \
-    && rm -rf /var/lib/apt/lists/*
+# All root-only work fused into a single layer so the chromium download (~350 MB)
+# and its final chown don't produce a second full-size layer. Firefox and WebKit
+# are intentionally omitted — scraper/browser.py only launches Chromium.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
+ && playwright install --with-deps chromium \
+ && chown -R pwuser:pwuser /ms-playwright \
+ && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache
 
-RUN groupadd --system --gid 1001 pwuser \
-    && useradd --system --uid 1001 --gid pwuser --create-home pwuser \
-    && chown -R pwuser:pwuser /ms-playwright
-
-COPY ma_poc/ ./ma_poc/
-RUN chown -R pwuser:pwuser /app
+# Source code — ownership set during copy so no duplicate layer.
+COPY --chown=pwuser:pwuser ma_poc/ ./ma_poc/
 
 USER pwuser
 
