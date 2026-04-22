@@ -1,0 +1,7 @@
+# SSH / GPG public keys authorized to sign production deploy tags (v*.*.*).
+# Used by .github/workflows/deploy-prod.yml via `git verify-tag`.
+#
+# Format: <principal> <key-type> <base64-key> [comment]
+# The principal is matched against the signer identity; email form is fine.
+# Add one line per human who may cut a prod release.
+ashusaxe007@gmail.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEEPbzO9EgEnqLifpuLkDlfnkf8vPF0IVR4nq2wL/8wc ashuchan

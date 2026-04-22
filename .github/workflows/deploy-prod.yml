@@ -40,12 +40,18 @@ jobs:
           fi
           echo "ref=${REF}" >> $GITHUB_OUTPUT
 
-      - name: Verify tag is signed
+      - name: Verify tag is signed by an allowed signer
         run: |
           REF="${{ steps.resolve.outputs.ref }}"
-          if ! git verify-tag "$REF" 2>/dev/null; then
-            echo "Tag $REF is not signed. Prod deploys require GPG-signed tags."
-            echo "Create with: git tag -s vX.Y.Z -m 'release notes'"
+          # Configure git to verify SSH signatures against the keys committed
+          # in .github/allowed_signers. GPG signatures still verify via the
+          # system keyring; both paths produce a single green/red result.
+          git config --global gpg.format ssh
+          git config --global gpg.ssh.allowedSignersFile "$GITHUB_WORKSPACE/.github/allowed_signers"
+          if ! git verify-tag "$REF"; then
+            echo "Tag $REF signature could not be verified."
+            echo "Either the tag is unsigned or the signing key is not in .github/allowed_signers."
+            echo "Create a signed tag with: git tag -s vX.Y.Z -m 'release notes'"
             exit 1
           fi
 
