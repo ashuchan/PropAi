@@ -83,7 +83,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
 # Sources: CLAUDE.md + claude_refactor.md handoff notes. Each entry's rationale
 # is in the trailing comment so future maintainers can see provenance.
 MGMT_TO_PMS_PRIOR: dict[str, PmsName] = {
-    "mark-taylor": "entrata",              # Handoff: Mark-Taylor is an Entrata-only shop
+    "mark-taylor": "entrata",              # Handoff: Mark-Taylor is an Entrata only shop
     "mark taylor": "entrata",              # Same, alt spelling
     "lindsey management": "rentcafe",      # Handoff: Lindsey is Yardi/RentCafe
     "avalonbay communities": "avalonbay",  # Direct — AvalonBay properties use the REIT's custom stack
