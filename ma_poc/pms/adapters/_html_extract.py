@@ -114,7 +114,7 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
         except (json.JSONDecodeError, ValueError):
             continue
 
-        matched: list[dict] = []
+        matched: list[dict[str, Any]] = []
         _walk_jsonld(data, matched)
 
         for item in matched:
@@ -147,9 +147,10 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
             # (no name, no offers price, no floorSize, no numberOfRooms)
             # is a property-level node slipping through. Emitting it as a
             # "1 unit" result fools the pipeline into claiming success.
-            offers = item.get("offers") if isinstance(item.get("offers"), dict) else {}
+            offers_raw = item.get("offers")
+            offers: dict[str, Any] = offers_raw if isinstance(offers_raw, dict) else {}
             has_price = bool(offers.get("price") or offers.get("lowPrice") or offers.get("highPrice")) or (
-                isinstance(item.get("offers"), list) and item.get("offers")
+                isinstance(offers_raw, list) and bool(offers_raw)
             )
             has_name = bool(item.get("name"))
             has_size = bool(item.get("floorSize"))
@@ -243,7 +244,7 @@ def parse_jsonld(html: str, source_url: str = "") -> tuple[dict[str, Any], list[
     except Exception:
         soup = BeautifulSoup(html, "html.parser")
 
-    candidate_collections: list[list[dict]] = []
+    candidate_collections: list[list[dict[str, Any]]] = []
 
     for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
         text = script.string or script.get_text()
@@ -301,7 +302,7 @@ def parse_jsonld(html: str, source_url: str = "") -> tuple[dict[str, Any], list[
         _find_collections(data)
 
     # Evaluate candidate collections for discriminating distinctness
-    def _field_val(item: dict, field: str) -> str:
+    def _field_val(item: dict[str, Any], field: str) -> str:
         v = item.get(field)
         if v is None:
             return ""
@@ -315,7 +316,7 @@ def parse_jsonld(html: str, source_url: str = "") -> tuple[dict[str, Any], list[
     _DISCRIMINATING = ("numberOfRooms", "floorSize", "name")
     _PRICE_KEYS = ("price", "lowPrice", "highPrice")
 
-    def _has_distinct_fields(collection: list[dict]) -> bool:
+    def _has_distinct_fields(collection: list[dict[str, Any]]) -> bool:
         distinct_dimensions = 0
         for field in _DISCRIMINATING:
             vals = {_field_val(i, field) for i in collection if _field_val(i, field)}
@@ -400,7 +401,10 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
     for script in soup.find_all("script"):
         if script.get("src"):
             continue
-        script_type = (script.get("type") or "").lower()
+        script_type_raw = script.get("type") or ""
+        script_type = (
+            script_type_raw if isinstance(script_type_raw, str) else " ".join(script_type_raw)
+        ).lower()
         if script_type and script_type not in ("", "text/javascript", "application/javascript"):
             continue
         text = script.string or script.get_text()
@@ -434,11 +438,11 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
                 rf"window\.{re.escape(gvar)}\s*=\s*(\{{[\s\S]*?\}})\s*;",
                 re.MULTILINE,
             )
-            m = pattern.search(text)
-            if not m:
+            gmatch = pattern.search(text)
+            if not gmatch:
                 continue
             try:
-                data = json.loads(m.group(1))
+                data = json.loads(gmatch.group(1))
             except (json.JSONDecodeError, ValueError):
                 continue
             found.append({"url": f"embedded:js:{gvar}", "body": data})
@@ -663,7 +667,7 @@ def extract_available_date_from_card(card_html: str) -> str | None:
     if not card_html:
         return None
     try:
-        from dateutil import parser as du_parser  # type: ignore[import]
+        from dateutil import parser as du_parser  # type: ignore[import-untyped]
     except ImportError:
         return None
 
@@ -692,7 +696,7 @@ def extract_available_date_from_card(card_html: str) -> str | None:
             today = _today_date()
             if d < today and not available_now:
                 return None
-            return d.isoformat()
+            return str(d.isoformat())
         except Exception:
             return None
 
@@ -714,7 +718,8 @@ def extract_available_date_from_card(card_html: str) -> str | None:
 
     # 3. Class-based selectors
     for el in soup.find_all(class_=True):
-        classes = " ".join(el.get("class", []))
+        class_attr: Any = el.get("class") or []
+        classes = " ".join(class_attr) if isinstance(class_attr, list) else str(class_attr)
         if any(k in classes.lower() for k in ("available", "availability", "avail-date")):
             raw = el.get_text(" ", strip=True)
             result = _parse_date_str(raw)

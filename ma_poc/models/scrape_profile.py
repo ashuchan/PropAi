@@ -140,6 +140,7 @@ class DomHints(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+    platform_detected: str | None = None  # "entrata" | "rentcafe" | ... — set by bootstrap_from_meta
     field_selectors: FieldSelectorMap = Field(default_factory=FieldSelectorMap)
     jsonld_present: bool = False
     availability_page_sections: list[str] = Field(default_factory=list)  # CSS selectors for unit sections

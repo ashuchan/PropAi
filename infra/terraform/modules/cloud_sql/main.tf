@@ -54,7 +54,7 @@ resource "google_sql_user" "worker_sa" {
 }
 
 # VPC access connector for Cloud Run → Cloud SQL private IP
-resource "google_vpc_access_connector" "jugnu-con"{
+resource "google_vpc_access_connector" "jugnu-con" {
   name          = "jugnu-con-${var.env}"
   region        = var.region
   network       = var.vpc_self_link

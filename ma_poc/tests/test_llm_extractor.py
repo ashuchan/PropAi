@@ -138,10 +138,11 @@ async def test_successful_extraction_returns_units_and_hints() -> None:
 
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock(return_value=llm_response)
+    mock_provider._last_usage = {}  # plain dict — extract_with_llm reads tokens via .get()
 
     with patch("llm.factory.get_text_provider", return_value=mock_provider):
         llm_input = prepare_llm_input("<html><body>Units here</body></html>", [], {})
-        units, hints, raw = await extract_with_llm(llm_input)
+        units, hints, raw, _ = await extract_with_llm(llm_input)
 
     assert len(units) == 1
     assert units[0]["unit_id"] == "201"
@@ -152,10 +153,11 @@ async def test_successful_extraction_returns_units_and_hints() -> None:
 async def test_llm_returns_invalid_json_handled_gracefully() -> None:
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock(return_value="Not valid JSON at all")
+    mock_provider._last_usage = {}
 
     with patch("llm.factory.get_text_provider", return_value=mock_provider):
         llm_input = prepare_llm_input("<html><body>Test</body></html>", [], {})
-        units, hints, raw = await extract_with_llm(llm_input)
+        units, hints, raw, _ = await extract_with_llm(llm_input)
 
     assert units == []
 
@@ -165,10 +167,11 @@ async def test_llm_returns_empty_units_array() -> None:
     llm_response = json.dumps({"units": [], "profile_hints": {"field_mapping_notes": "No data found"}})
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock(return_value=llm_response)
+    mock_provider._last_usage = {}
 
     with patch("llm.factory.get_text_provider", return_value=mock_provider):
         llm_input = prepare_llm_input("<html><body>Empty</body></html>", [], {})
-        units, hints, raw = await extract_with_llm(llm_input)
+        units, hints, raw, _ = await extract_with_llm(llm_input)
 
     assert units == []
     assert hints.get("field_mapping_notes") == "No data found"

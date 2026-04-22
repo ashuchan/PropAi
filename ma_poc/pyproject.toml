@@ -34,6 +34,20 @@ module = [
 ]
 ignore_missing_imports = true
 
+# Legacy modules reused by the strict-checked layers. pms/ and reporting/
+# import a few helpers from these modules, but the source files themselves
+# carry a lot of untyped Playwright / LLM / Azure code we don't strict-check
+# today. Treat them as opaque so the adapter & reporting layers stay strict
+# while the legacy code can be typed incrementally.
+[[tool.mypy.overrides]]
+module = [
+    "ma_poc.scripts.entrata",
+    "ma_poc.scripts.scrape_properties",
+    "ma_poc.services.*",
+]
+ignore_errors = true
+follow_imports = "skip"
+
 [tool.ruff]
 line-length = 110
 target-version = "py312"

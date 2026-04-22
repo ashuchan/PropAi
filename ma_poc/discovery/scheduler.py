@@ -181,7 +181,8 @@ class Scheduler:
                 if profile and hasattr(profile, "confidence"):
                     return getattr(profile.confidence, "maturity", None)
                 if isinstance(profile, dict):
-                    return profile.get("confidence", {}).get("maturity")
+                    maturity = profile.get("confidence", {}).get("maturity")
+                    return str(maturity) if maturity is not None else None
         except Exception:
             pass
         return None
@@ -201,7 +202,8 @@ class Scheduler:
                 if profile and hasattr(profile, "api_hints"):
                     return getattr(profile.api_hints, "api_provider", None)
                 if isinstance(profile, dict):
-                    return profile.get("api_hints", {}).get("api_provider")
+                    provider = profile.get("api_hints", {}).get("api_provider")
+                    return str(provider) if provider is not None else None
         except Exception:
             pass
         return None

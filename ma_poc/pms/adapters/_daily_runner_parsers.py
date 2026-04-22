@@ -14,26 +14,19 @@ daily_runner's property-record builder.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from typing import Any
-
-# Ensure scripts/ is importable (scripts live at ma_poc/scripts/…).
-_SCRIPTS = Path(__file__).resolve().parent.parent.parent / "scripts"
-if str(_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS))
 
 # parse_api_responses is the 50+ key-variant parser with SightMap host
 # routing and nested-envelope unwrapping. Lives in entrata.py. Emits the
 # adapter-compatible shape.
-from entrata import (  # noqa: E402
+from ma_poc.scripts.entrata import (
     TARGET_JSONLD_TYPES,
     _jsonld_floor_size,
     _jsonld_item_has_unit_signal,
     _walk_jsonld,
     parse_api_responses,
 )
-from entrata import (  # noqa: E402
+from ma_poc.scripts.entrata import (
     _parse_sightmap_payload as _sightmap_adapter_shape,
 )
 
@@ -41,7 +34,7 @@ from entrata import (  # noqa: E402
 # RealPage /units endpoint (which can return null / [] / {response: [...]}).
 # It emits the *internal* shape (unit_id / market_rent_low / market_rent_high),
 # not the adapter shape. Callers must translate before adding to AdapterResult.
-from scrape_properties import (  # noqa: E402
+from ma_poc.scripts.scrape_properties import (
     _RENT_KEYS,
     _RENT_MAX,
     _RENT_MIN,
@@ -49,14 +42,15 @@ from scrape_properties import (  # noqa: E402
     _extract_rent,
     _money_to_int,
 )
-from scrape_properties import (  # noqa: E402
+from ma_poc.scripts.scrape_properties import (
     _realpage_units_from_body as _realpage_units_internal_shape,
 )
 
 
 def parse_sightmap_payload(body: Any, url: str) -> list[dict[str, Any]]:
     """SightMap floorplan+unit join, adapter-compatible output shape."""
-    return _sightmap_adapter_shape(body, url)
+    result: list[dict[str, Any]] = _sightmap_adapter_shape(body, url)
+    return result
 
 
 def realpage_units_to_adapter_shape(body: Any, url: str) -> list[dict[str, Any]]:

@@ -21,16 +21,20 @@ def test_change_stale_render_after_7_days() -> None:
 
 
 def test_change_hot_profile_fresh_is_head() -> None:
+    # Historically returned HEAD; we now emit GET because the L1 fetcher has
+    # no HEAD→GET escalation and an empty HEAD body causes downstream
+    # FAILED_NO_DATA. Name kept for git history grep-ability.
     d = decide("HOT", None, None, 0)
-    assert d.render_mode == RenderMode.HEAD
+    assert d.render_mode == RenderMode.GET
     assert d.reason == "hot_profile_fresh"
 
 
 def test_change_sitemap_unchanged_is_head() -> None:
+    # Same rationale as above — sitemap-unchanged now returns GET, not HEAD.
     old_lastmod = datetime(2026, 4, 10, tzinfo=UTC)
     frontier_entry = {"last_attempted": "2026-04-15T00:00:00+00:00"}
     d = decide("WARM", frontier_entry, old_lastmod, 2)
-    assert d.render_mode == RenderMode.HEAD
+    assert d.render_mode == RenderMode.GET
     assert d.reason == "sitemap_unchanged"
 
 

@@ -40,7 +40,10 @@ async def test_azure_provider_image_format(monkeypatch: pytest.MonkeyPatch) -> N
 
     async def fake_create(**kwargs: Any) -> Any:
         captured.update(kwargs)
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{"units":[]}'))])
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content='{"units":[]}'))],
+            usage=SimpleNamespace(prompt_tokens=0, completion_tokens=0),
+        )
 
     provider._client.chat.completions.create = fake_create  # type: ignore[method-assign]
     await provider.extract_from_images([b"PNGDATA"], "prompt")
@@ -58,7 +61,10 @@ async def test_anthropic_provider_image_format(monkeypatch: pytest.MonkeyPatch) 
 
     async def fake_create(**kwargs: Any) -> Any:
         captured.update(kwargs)
-        return SimpleNamespace(content=[SimpleNamespace(text='{"units":[]}')])
+        return SimpleNamespace(
+            content=[SimpleNamespace(text='{"units":[]}')],
+            usage=SimpleNamespace(input_tokens=0, output_tokens=0),
+        )
 
     provider._client.messages.create = fake_create  # type: ignore[method-assign]
     await provider.extract_from_images([b"PNG"], "prompt")

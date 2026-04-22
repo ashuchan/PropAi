@@ -44,9 +44,12 @@ def pg():  # type: ignore[no-untyped-def]
 
 
 def _url(pg) -> str:  # type: ignore[no-untyped-def]
-    """Return a plain postgresql:// URL (not psycopg2 dialect)."""
+    """Return a psycopg (v3) dialect URL — the driver in requirements.txt."""
     url: str = pg.get_connection_url()
-    return url.replace("postgresql+psycopg2://", "postgresql://")
+    # testcontainers defaults to psycopg2 dialect; swap to v3 since that's
+    # what we ship. Plain `postgresql://` would make SQLAlchemy import
+    # psycopg2 by default, which is not installed.
+    return url.replace("postgresql+psycopg2://", "postgresql+psycopg://")
 
 
 def _alembic(pg, *args: str) -> subprocess.CompletedProcess[str]:  # type: ignore[no-untyped-def]

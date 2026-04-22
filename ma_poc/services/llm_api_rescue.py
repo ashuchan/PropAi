@@ -271,7 +271,7 @@ def _trim_body(body: Any) -> Any:
 
 def _load_prompt_template() -> str:
     """Load the api_rescue.txt prompt template."""
-    prompt_path = Path(__file__).resolve().parent.parent.parent / "config" / "prompts" / "api_rescue.txt"
+    prompt_path = Path(__file__).resolve().parent.parent / "config" / "prompts" / "api_rescue.txt"
     if not prompt_path.exists():
         raise FileNotFoundError(f"api_rescue.txt not found at {prompt_path}")
     return prompt_path.read_text(encoding="utf-8")

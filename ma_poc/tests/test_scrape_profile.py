@@ -19,7 +19,8 @@ def test_default_profile_is_cold() -> None:
     assert p.confidence.maturity == ProfileMaturity.COLD
     assert p.confidence.consecutive_successes == 0
     assert p.confidence.consecutive_failures == 0
-    assert p.version == 1
+    # Profile schema bumped to v2 (schema_version="v2") in the Jugnu refactor.
+    assert p.version == 2
     assert p.updated_by == "BOOTSTRAP"
 
 

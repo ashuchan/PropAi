@@ -180,9 +180,9 @@ async def _get_page_html(page: Any, ctx: AdapterContext) -> str | None:
     # Prefer live page content — it reflects post-render DOM.
     if page is not None and hasattr(page, "content"):
         try:
-            content = await page.content()
-            if content:
-                return content
+            content: Any = await page.content()
+            if content and isinstance(content, str):
+                return str(content)
         except Exception:
             pass
 
@@ -446,7 +446,7 @@ class GenericAdapter:
             from ma_poc.observability.events import EventKind
             from ma_poc.observability.events import emit as _emit
         except Exception:
-            _emit, EventKind = None, None  # type: ignore[assignment]
+            _emit, EventKind = None, None  # type: ignore[assignment, misc]
 
         attempts: list[dict[str, Any]] = []
 
@@ -521,12 +521,9 @@ class GenericAdapter:
                 saved = []
             if saved:
                 try:
-                    try:
-                        from ma_poc.services.llm_extractor import apply_saved_mapping
-                    except ImportError:
-                        from services.llm_extractor import apply_saved_mapping  # type: ignore[no-redef]
+                    from ma_poc.services.llm_extractor import apply_saved_mapping
                 except ImportError:
-                    apply_saved_mapping = None  # type: ignore[assignment]
+                    apply_saved_mapping = None
                 if apply_saved_mapping is not None:
                     for mapping in saved:
                         try:
@@ -865,20 +862,12 @@ class GenericAdapter:
         # Import the targeted LLM helpers; fall through cleanly if unavailable
         # so the adapter degrades gracefully (monolithic call still runs).
         try:
-            try:
-                from ma_poc.services.llm_extractor import (
-                    analyze_api_with_llm,
-                    analyze_dom_with_llm,
-                    extract_with_llm,
-                    prepare_llm_input,
-                )
-            except ImportError:
-                from services.llm_extractor import (  # type: ignore[no-redef]
-                    analyze_api_with_llm,
-                    analyze_dom_with_llm,
-                    extract_with_llm,
-                    prepare_llm_input,
-                )
+            from ma_poc.services.llm_extractor import (
+                analyze_api_with_llm,
+                analyze_dom_with_llm,
+                extract_with_llm,
+                prepare_llm_input,
+            )
         except ImportError as exc:
             _log_attempt("generic:llm", "errored", reason=f"llm_extractor import: {exc}")
             result.errors.append(f"llm-import-error: {exc}")
@@ -974,7 +963,7 @@ class GenericAdapter:
         # Sub-tier 6b: targeted DOM analysis ------------------------------
         # Extract the rent-bearing DOM section (not the full page) and ask
         # the LLM to return units AND CSS selectors we can replay next run.
-        dom_units: list[dict[str, Any]] = []
+        dom_units = []
         dom_section_html = _extract_rent_dom_section(html) if html else None
         if dom_section_html and dom_llm_budget > 0:
             t0 = _time.monotonic()

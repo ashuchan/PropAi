@@ -865,6 +865,7 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
 
 TARGET_JSONLD_TYPES = {
     "Apartment",
+    "ApartmentUnit",  # Schema.org ApartmentUnit — some PMS emit this (more specific than Apartment)
     "ApartmentComplex",
     "Offer",
     "FloorPlan",

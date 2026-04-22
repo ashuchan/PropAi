@@ -69,7 +69,7 @@ class ResolvedTarget:
     resolved_url: str
     hop_path: list[str] = field(default_factory=list)
     final_detection: DetectedPMS = field(default_factory=lambda: detect_pms(""))
-    method: Literal["no_hop", "cta_link", "iframe", "redirect", "failed"] = "failed"
+    method: Literal["no_hop", "cta_link", "iframe", "redirect", "failed", "fetch_only"] = "failed"
 
 
 def _get_priority(text: str) -> int:

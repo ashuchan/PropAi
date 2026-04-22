@@ -163,10 +163,11 @@ async def scrape(
     # Jugnu path: page may be None but fetch_result.body may carry raw HTML.
     # Adapters (via _get_page_html) now handle both modes — continue to
     # dispatch so HTML-only extractors can still run. Only short-circuit
-    # when we have neither.
+    # when we have neither HTML nor pre-captured API responses (the LLM
+    # rescue path works from api_responses alone, no page HTML needed).
     page_html: str | None = None
-    if page is None and fetch_result is None:
-        result["errors"].append("no page and no fetch_result provided")
+    if page is None and fetch_result is None and not api_responses:
+        result["errors"].append("no page, no fetch_result, no api_responses provided")
         return result
 
     # --- Step 3: Check for unreachable errors ---
@@ -370,7 +371,7 @@ async def scrape(
 
     adapter_result: AdapterResult
     try:
-        adapter_result = await adapter.extract(page, ctx)
+        adapter_result = await adapter.extract(page, ctx)  # type: ignore[arg-type]
     except Exception as exc:
         if _is_unreachable_error(exc):
             result["errors"].append(f"FAILED_UNREACHABLE: {exc}")
@@ -483,7 +484,7 @@ async def scrape(
         fallback_ctx._api_responses = getattr(ctx, "_api_responses", [])  # type: ignore[attr-defined]
 
         try:
-            fallback_result = await generic.extract(page, fallback_ctx)
+            fallback_result = await generic.extract(page, fallback_ctx)  # type: ignore[arg-type]
             if fallback_result.units:
                 adapter_result = fallback_result
                 result["_adapter_used"] = generic_name
@@ -761,7 +762,8 @@ def _rank_internal_links(
 
     candidates: dict[str, tuple[int, str]] = {}
     for a in soup.find_all("a", href=True):
-        href = (a.get("href") or "").strip()
+        raw_href = a.get("href") or ""
+        href = (raw_href if isinstance(raw_href, str) else " ".join(raw_href)).strip()
         if not href:
             continue
         lower = href.lower()
@@ -856,10 +858,7 @@ async def _try_link_hop(
     try:
         from ma_poc.fetch import fetch as jugnu_fetch
     except ImportError:
-        try:
-            from fetch import fetch as jugnu_fetch  # type: ignore[import-not-found]
-        except ImportError:
-            return None
+        return None
     from ma_poc.discovery.contracts import CrawlTask, TaskReason
     from ma_poc.fetch.contracts import RenderMode
     from ma_poc.observability.events import EventKind, emit

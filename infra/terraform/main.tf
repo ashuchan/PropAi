@@ -1,9 +1,9 @@
 module "artifact_registry" {
-  source       = "./modules/artifact_registry"
-  env          = var.env
-  project_id   = var.project_id
-  region       = var.region
-  deployer_sa  = var.deployer_sa_email
+  source      = "./modules/artifact_registry"
+  env         = var.env
+  project_id  = var.project_id
+  region      = var.region
+  deployer_sa = var.deployer_sa_email
 }
 
 module "iam" {
