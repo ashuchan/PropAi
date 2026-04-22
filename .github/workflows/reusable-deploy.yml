@@ -39,7 +39,11 @@ jobs:
     steps:
       - run: echo "Approved for production deploy of ${{ inputs.git-ref }}"
 
-  # ── Steps 1-3: auth, ensure SQL, build and push image ─────────────────────────
+  # ── Steps 1-3: auth, build and push image ────────────────────────────────────
+  # The Cloud SQL wake-up step used to live here, but on a first-time deploy the
+  # instance is created by terraform-apply *after* build-and-push — so the wake
+  # step hit 404s. It now lives in ensure-sql (below), between terraform-apply
+  # and migrate, which is where it's actually needed.
   build-and-push:
     needs: [approval]
     if: always() && (needs.approval.result == 'success' || needs.approval.result == 'skipped')
@@ -59,29 +63,6 @@ jobs:
           service_account: ${{ secrets.WIF_SA }}
 
       - uses: google-github-actions/setup-gcloud@v2
-
-      - name: Ensure Cloud SQL is running
-        run: |
-          INSTANCE="jugnu-db-${{ inputs.env }}"
-          state=$(gcloud sql instances describe $INSTANCE \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --format='value(state)' 2>/dev/null || echo "UNKNOWN")
-          if [ "$state" != "RUNNABLE" ]; then
-            echo "SQL state: $state — starting..."
-            gcloud sql instances patch $INSTANCE \
-              --project=${{ secrets.GCP_PROJECT_ID }} \
-              --activation-policy=ALWAYS --quiet
-            for i in $(seq 1 36); do
-              sleep 5
-              state=$(gcloud sql instances describe $INSTANCE \
-                --project=${{ secrets.GCP_PROJECT_ID }} \
-                --format='value(state)')
-              [ "$state" = "RUNNABLE" ] && echo "SQL is RUNNABLE" && break
-            done
-            [ "$state" = "RUNNABLE" ] || (echo "SQL did not start in time" && exit 1)
-          else
-            echo "SQL is already RUNNABLE"
-          fi
 
       - id: tag
         run: |
@@ -160,9 +141,46 @@ jobs:
       - name: Apply
         run: terraform apply -auto-approve tfplan
 
+  # ── Step 5a: wake Cloud SQL (instance exists now; may be STOPPED at rest) ────
+  ensure-sql:
+    needs: [terraform-apply]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Wake Cloud SQL
+        run: |
+          INSTANCE="jugnu-db-${{ inputs.env }}"
+          # No 2>/dev/null here — if describe fails we want to see the reason,
+          # not coerce it to "UNKNOWN" and then fail opaquely at patch.
+          state=$(gcloud sql instances describe "$INSTANCE" \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --format='value(state)')
+          if [ "$state" != "RUNNABLE" ]; then
+            echo "SQL state: $state — starting..."
+            gcloud sql instances patch "$INSTANCE" \
+              --project=${{ secrets.GCP_PROJECT_ID }} \
+              --activation-policy=ALWAYS --quiet
+            for i in $(seq 1 36); do
+              sleep 5
+              state=$(gcloud sql instances describe "$INSTANCE" \
+                --project=${{ secrets.GCP_PROJECT_ID }} \
+                --format='value(state)')
+              [ "$state" = "RUNNABLE" ] && echo "SQL is RUNNABLE" && break
+            done
+            [ "$state" = "RUNNABLE" ] || { echo "SQL did not start in time"; exit 1; }
+          else
+            echo "SQL is already RUNNABLE"
+          fi
+
   # ── Step 6: migrations ─────────────────────────────────────────────────────────
   migrate:
-    needs: [terraform-apply]
+    needs: [ensure-sql]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
