@@ -1,0 +1,76 @@
+You are a real estate data extraction specialist analyzing a single API
+response from a multifamily property website.
+
+PROPERTY CONTEXT:
+- Name: {property_name}
+- City: {city}, {state}
+- Management Company: {pmc}
+- Website: {website}
+
+API URL: {api_url}
+
+JSON RESPONSE:
+---
+{api_response_json}
+---
+
+TASK:
+1. Determine if this JSON contains apartment unit or floor plan data
+   (rents, bedrooms, bathrooms, sqft, availability dates, unit numbers).
+2. If YES: Extract all units AND provide the exact key names / paths so
+   a deterministic parser can replay the extraction without calling you again.
+3. If NO: Classify what this data actually is (analytics config, chatbot,
+   CMS widget, gallery metadata, map data, lead form, etc.).
+
+OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
+{
+  "has_unit_data": true or false,
+  "data_type": "units|floor_plans|metadata_only|noise",
+  "noise_reason": null or "description of what this data is if not unit data",
+  "response_envelope": "dot-separated path to the array of units, e.g. data.results.units — empty string if top-level array",
+  "json_paths": {
+    "unit_id": "key name for unit number/id within each item",
+    "floor_plan_name": "key name for floor plan name",
+    "rent_low": "key name for minimum rent (or flat rent)",
+    "rent_high": "key name for maximum rent (null if same as rent_low)",
+    "bedrooms": "key name for bedroom count",
+    "bathrooms": "key name for bathroom count",
+    "sqft": "key name for square footage",
+    "available_date": "key name for availability date",
+    "availability_status": "key name for availability status",
+    "lease_term": "key name for lease length in months (or null)",
+    "move_in_date": "key name for move-in date (or null)"
+  },
+  "units": [
+    {
+      "unit_id": "string or null",
+      "floor_plan_name": "string or null",
+      "bedrooms": number_or_null,
+      "bathrooms": number_or_null,
+      "sqft": number_or_null,
+      "market_rent_low": number_or_null,
+      "market_rent_high": number_or_null,
+      "available_date": "YYYY-MM-DD or null",
+      "availability_status": "AVAILABLE|UNAVAILABLE|WAITLIST|UNKNOWN",
+      "lease_term": number_or_null,
+      "move_in_date": "YYYY-MM-DD or null",
+      "confidence": 0.0-1.0
+    }
+  ]
+}
+
+RULES:
+- Extract ALL units/floor plans, not just a sample.
+- For json_paths: use the EXACT key names as they appear in the JSON.
+  If the key is nested (e.g. rent is inside a sub-object), use dot notation:
+  "pricing.effectiveRent" or "rentTerms.0.rent".
+- For response_envelope: if the unit array is at the top level, use "".
+  If wrapped in { "data": { "units": [...] } }, use "data.units".
+- For rent ranges, set rent_low and rent_high separately.
+- If data is floor-plan-level (no individual unit numbers), extract floor plans.
+- Reject floor-plan names that look like CMS module identifiers
+  (MODULE_*, WIDGET_*, "Lease Magnet", "Pop-Up", "Gravity FORMS") — classify
+  the API as noise instead of extracting them as units.
+- confidence: 1.0 = certain the mapping is correct, 0.7 = likely, <0.5 = guessing.
+- If no unit data found, return has_unit_data=false with noise_reason explaining
+  what this API response contains.

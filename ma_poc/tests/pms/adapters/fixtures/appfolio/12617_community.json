@@ -1,0 +1,1639 @@
+[
+  {
+    "url": "https://www.stoneybrookhouston.com/api/v1/community_extra_info/?api_key=49f93f904d79607ea84b2439d8e49f8a286dd521",
+    "body": {
+      "meta": {
+        "limit": 1000,
+        "next": null,
+        "offset": 0,
+        "previous": null,
+        "total_count": 1
+      },
+      "objects": [
+        {
+          "address": "2717 Stoney Brook Drive",
+          "address2": "",
+          "available_unit_count": 0,
+          "display_tty_on_api_phone": true,
+          "fax": "",
+          "office_closures": {
+            "custom_closures": [],
+            "holiday_closures": {
+              "holidays": {},
+              "show_dates": false,
+              "show_days": false,
+              "show_holiday": true
+            }
+          },
+          "office_hours": "Mon-Fri: 9:00 AM-6:00 PM\r\nSat: 10:00 AM-5:00 PM\r\nSun: Closed",
+          "pet_policy": "Pets Welcome Upon Approval.\r\n\r\nPlease Call Office For Details.",
+          "phone": "713-780-8014",
+          "refer_a_friend_text": "",
+          "referrer_params": [],
+          "referrer_phones": [],
+          "resource_uri": "/api/v1/community_extra_info/9535/",
+          "seo_text": {},
+          "sisters": []
+        }
+      ]
+    }
+  },
+  {
+    "url": "https://www.stoneybrookhouston.com/api/v1/community_info/",
+    "body": {
+      "meta": {
+        "limit": 1,
+        "next": null,
+        "offset": 0,
+        "previous": null,
+        "total_count": 1
+      },
+      "objects": [
+        {
+          "address": "2717 Stoney Brook Drive",
+          "address2": "",
+          "alternative_url": "",
+          "api_key": "49f93f904d79607ea84b2439d8e49f8a286dd521",
+          "bing_conversion_code": "",
+          "cats": true,
+          "city": "Houston",
+          "community_category": "none",
+          "corporate": false,
+          "craigslist_phone": null,
+          "custom_popup_dark_mode": false,
+          "custom_popup_image": null,
+          "custom_popup_image_description": "",
+          "custom_popup_link": "",
+          "custom_popup_max_width": 480,
+          "custom_popup_text": "",
+          "description": "Our pet-friendly community is located near the 59 Freeway and 610 Freeway. Stoney Brook apartments in Houston, Texas, offers 1, 2, & 3 bedroom apartment homes for rent. Amenities include granite countertops, washer and dyer in homes, a clubhouse, and on-site laundry facilities.",
+          "display_ada_logo": false,
+          "display_domain": "www.StoneyBrookHouston.com",
+          "dogs": true,
+          "enable_custom_popup": false,
+          "enable_custom_popup_text_image": true,
+          "fax": null,
+          "facebook_pixel_id": "",
+          "feed_id": "",
+          "gateway_email": "",
+          "gateway_listing_disclaimer": "",
+          "gateway_listing_name": "",
+          "gateway_phone": null,
+          "google_analytics_click_conversion_code": "",
+          "google_analytics_click_conversion_code_label": "",
+          "google_analytics_conversion_code": "",
+          "google_analytics_gtag_id": "UA-6262655-64",
+          "google_analytics_urchin_id": "",
+          "use_utm_cookies": false,
+          "google_map_api_key": "",
+          "google_map_project": "",
+          "google_translate_customization_id": "",
+          "hide_community_phone": false,
+          "id": 9535,
+          "ils_description": "",
+          "is_live": true,
+          "is_ssl": false,
+          "is_visible": true,
+          "launch_time": "2023-02-17T23:28:30.682461+00:00",
+          "legal_name": "",
+          "manager_name": "",
+          "market_rate": false,
+          "military": false,
+          "name": "Stoney Brook",
+          "need_photos": false,
+          "office_hours": "Mon-Fri: 9:00 AM-6:00 PM\r\nSat: 10:00 AM-5:00 PM\r\nSun: Closed",
+          "office_closures": "",
+          "order": 0,
+          "pet_policy": "Pets Welcome Upon Approval.\r\n\r\nPlease Call Office For Details.",
+          "phone": "713-780-8014",
+          "piwik_site_id": null,
+          "rating": null,
+          "refer_a_friend_text": "",
+          "region_id": null,
+          "screening_disclaimer_pdf": null,
+          "rental_criteria_pdf": null,
+          "section8": false,
+          "senior": false,
+          "senior_62": false,
+          "sms_text": "",
+          "state": "TX",
+          "student": false,
+          "total_unit_count": 113,
+          "tty_message": "",
+          "tty_number": "",
+          "uuid": "ee1264641ec64c46aca2792b4f105772",
+          "vimeo_community_tour_id": "",
+          "youtube": "",
+          "youtube_alt_text": "",
+          "zip_code": "77063",
+          "integration_has_knock_contact": false,
+          "integration_knock_community_id": "",
+          "has_appfolio": false,
+          "appfolio_training_url": "",
+          "appfolio_host_url": "",
+          "appfolio_property_group": "",
+          "appfolio_order_by": "",
+          "appfolio_height": "",
+          "appfolio_width": "",
+          "timezone": "America/Chicago",
+          "show_preferred_method_of_contact": false,
+          "enable_inline_appointment_datepicker": false,
+          "original_image_disclaimer_text": "This image has been enhanced.",
+          "integration": {
+            "feed_type": "none",
+            "enable_rentcafe_availability_alerts": false,
+            "force_rentcafe_availability_alerts": false,
+            "enable_guest_card": false,
+            "has_knock_contact": ""
+          },
+          "resource_uri": "/api/v1/community_info/9535/",
+          "screen_reader_template": "community",
+          "logo": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/logo/community/logo.png",
+          "application": null,
+          "analytics": {
+            "ga4_id": "G-WPLV6BPXDE",
+            "gtm_id": "",
+            "google_analytics_config_key": "",
+            "google_analytics_value_animated_headline": null,
+            "google_analytics_value_apply_click": null,
+            "google_analytics_value_appointment": null,
+            "google_analytics_value_contact_submit": null,
+            "google_analytics_value_chatbot_lead": null,
+            "google_analytics_value_promo_submit": null,
+            "google_analytics_value_phone_click": null,
+            "google_analytics_value_maps_directions": null
+          },
+          "settings": {
+            "display_ada_logo": false,
+            "has_dni_phone": false,
+            "display_phone_number_format": "0-1-2",
+            "display_fax_number_format": "0-1-2",
+            "display_unit_lease_terms": false,
+            "hide_unit_apply_now_links": false,
+            "hide_unit_numbers": false,
+            "select_units_text": "* In Select Apartment Homes",
+            "enable_third_party_cookie_consent": true,
+            "third_party_cookie_consent_header": "",
+            "third_party_cookie_consent_text": "",
+            "third_party_cookie_consent_link": "",
+            "third_party_cookie_consent_use_modal": false,
+            "realpage_realtime": false,
+            "enable_realpage_online_leasing_page": false,
+            "show_preferred_method_of_contact": false,
+            "fees": {
+              "header": "Fees",
+              "required_label": "",
+              "disclaimers": {
+                "top": "",
+                "bottom": ""
+              },
+              "show_fees": true
+            },
+            "rent_label": "Rent",
+            "floorplans_header_subtext": "",
+            "allow_skipping_to_fees": false,
+            "currency_force_two_decimal_places": false,
+            "custom_unit_disclaimer": "",
+            "call_for_details_text": "Call for details.",
+            "call_for_details_text_affordable": "",
+            "enable_appointment_system": false,
+            "appointment_move_in_date_required": false,
+            "show_appointment_form_first": false,
+            "hide_appointment_form": false,
+            "scheduled_appointment_length": 15,
+            "appointment_floor_plan_display_count": 4,
+            "show_contact_form": true,
+            "contact_us_require_appointment_date": true,
+            "contact_us_require_phone_number": false,
+            "contact_us_require_desired_bedrooms": false,
+            "contact_us_require_recaptcha": true,
+            "comment_require_message": false,
+            "appointment_require_message": false,
+            "appointment_allow_same_day": true,
+            "show_tour_type": false,
+            "show_how_did_you_hear_about_us": false,
+            "how_did_you_hear_about_us_custom_choices": "",
+            "require_how_did_you_hear_about_us": false,
+            "custom_floorplan_disclaimer": "",
+            "require_phone_on_promotion_form": false,
+            "contact_us_single_input_name": true,
+            "contact_us_custom_disclaimer": "",
+            "comment_show_move_in_date": false,
+            "comment_require_move_in_date": false,
+            "recaptcha_version": "v3.0"
+          },
+          "coords": [
+            29.735723,
+            -95.504792
+          ],
+          "available_unit_count": 0,
+          "blog_recent": null,
+          "promotion_recent": null,
+          "pep_promotion_recent": null,
+          "links": {
+            "availability_third_party": "",
+            "availability_third_party_mobile": "",
+            "application": "https://www.on-site.com/apply/property/692070",
+            "application_third_party": "https://www.on-site.com/apply/property/692070",
+            "contact_us": "/contact_us/",
+            "third_party_dog_criteria": "",
+            "third_party_dog_criteria_text": "",
+            "floor_plans": "/floorplans/",
+            "data_erasure_url": "",
+            "covid_19_resources": "",
+            "privacy_policy": ""
+          },
+          "corporation": {
+            "id": 210,
+            "name": "Oak Leaf Management",
+            "url": "http://www.oakleaf.aptdemo.com",
+            "real_estate_license_number": ""
+          },
+          "toolbox": {},
+          "maps": [
+            {
+              "id": 8370,
+              "name": "Site Map",
+              "width": 1500,
+              "height": 1500,
+              "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/maps/site-map.png",
+              "svg": "",
+              "floor": null,
+              "building_id": null,
+              "image_alt_text": "",
+              "show_on_ebrochure": false
+            }
+          ],
+          "region": "",
+          "url": "https://www.stoneybrookhouston.com",
+          "fee_categories": []
+        }
+      ]
+    }
+  },
+  {
+    "url": "https://www.stoneybrookhouston.com/api/v1/community_info/?api_key=49f93f904d79607ea84b2439d8e49f8a286dd521",
+    "body": {
+      "meta": {
+        "limit": 1,
+        "next": null,
+        "offset": 0,
+        "previous": null,
+        "total_count": 1
+      },
+      "objects": [
+        {
+          "address": "2717 Stoney Brook Drive",
+          "address2": "",
+          "alternative_url": "",
+          "api_key": "49f93f904d79607ea84b2439d8e49f8a286dd521",
+          "bing_conversion_code": "",
+          "cats": true,
+          "city": "Houston",
+          "community_category": "none",
+          "corporate": false,
+          "craigslist_phone": null,
+          "custom_popup_dark_mode": false,
+          "custom_popup_image": null,
+          "custom_popup_image_description": "",
+          "custom_popup_link": "",
+          "custom_popup_max_width": 480,
+          "custom_popup_text": "",
+          "description": "Our pet-friendly community is located near the 59 Freeway and 610 Freeway. Stoney Brook apartments in Houston, Texas, offers 1, 2, & 3 bedroom apartment homes for rent. Amenities include granite countertops, washer and dyer in homes, a clubhouse, and on-site laundry facilities.",
+          "display_ada_logo": false,
+          "display_domain": "www.StoneyBrookHouston.com",
+          "dogs": true,
+          "enable_custom_popup": false,
+          "enable_custom_popup_text_image": true,
+          "fax": null,
+          "facebook_pixel_id": "",
+          "feed_id": "",
+          "gateway_email": "",
+          "gateway_listing_disclaimer": "",
+          "gateway_listing_name": "",
+          "gateway_phone": null,
+          "google_analytics_click_conversion_code": "",
+          "google_analytics_click_conversion_code_label": "",
+          "google_analytics_conversion_code": "",
+          "google_analytics_gtag_id": "UA-6262655-64",
+          "google_analytics_urchin_id": "",
+          "use_utm_cookies": false,
+          "google_map_api_key": "",
+          "google_map_project": "",
+          "google_translate_customization_id": "",
+          "hide_community_phone": false,
+          "id": 9535,
+          "ils_description": "",
+          "is_live": true,
+          "is_ssl": false,
+          "is_visible": true,
+          "launch_time": "2023-02-17T23:28:30.682461+00:00",
+          "legal_name": "",
+          "manager_name": "",
+          "market_rate": false,
+          "military": false,
+          "name": "Stoney Brook",
+          "need_photos": false,
+          "office_hours": "Mon-Fri: 9:00 AM-6:00 PM\r\nSat: 10:00 AM-5:00 PM\r\nSun: Closed",
+          "office_closures": "",
+          "order": 0,
+          "pet_policy": "Pets Welcome Upon Approval.\r\n\r\nPlease Call Office For Details.",
+          "phone": "713-780-8014",
+          "piwik_site_id": null,
+          "rating": null,
+          "refer_a_friend_text": "",
+          "region_id": null,
+          "screening_disclaimer_pdf": null,
+          "rental_criteria_pdf": null,
+          "section8": false,
+          "senior": false,
+          "senior_62": false,
+          "sms_text": "",
+          "state": "TX",
+          "student": false,
+          "total_unit_count": 113,
+          "tty_message": "",
+          "tty_number": "",
+          "uuid": "ee1264641ec64c46aca2792b4f105772",
+          "vimeo_community_tour_id": "",
+          "youtube": "",
+          "youtube_alt_text": "",
+          "zip_code": "77063",
+          "integration_has_knock_contact": false,
+          "integration_knock_community_id": "",
+          "has_appfolio": false,
+          "appfolio_training_url": "",
+          "appfolio_host_url": "",
+          "appfolio_property_group": "",
+          "appfolio_order_by": "",
+          "appfolio_height": "",
+          "appfolio_width": "",
+          "timezone": "America/Chicago",
+          "show_preferred_method_of_contact": false,
+          "enable_inline_appointment_datepicker": false,
+          "original_image_disclaimer_text": "This image has been enhanced.",
+          "integration": {
+            "feed_type": "none",
+            "enable_rentcafe_availability_alerts": false,
+            "force_rentcafe_availability_alerts": false,
+            "enable_guest_card": false,
+            "has_knock_contact": ""
+          },
+          "resource_uri": "/api/v1/community_info/9535/",
+          "screen_reader_template": "community",
+          "logo": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/logo/community/logo.png",
+          "application": null,
+          "analytics": {
+            "ga4_id": "G-WPLV6BPXDE",
+            "gtm_id": "",
+            "google_analytics_config_key": "",
+            "google_analytics_value_animated_headline": null,
+            "google_analytics_value_apply_click": null,
+            "google_analytics_value_appointment": null,
+            "google_analytics_value_contact_submit": null,
+            "google_analytics_value_chatbot_lead": null,
+            "google_analytics_value_promo_submit": null,
+            "google_analytics_value_phone_click": null,
+            "google_analytics_value_maps_directions": null
+          },
+          "settings": {
+            "display_ada_logo": false,
+            "has_dni_phone": false,
+            "display_phone_number_format": "0-1-2",
+            "display_fax_number_format": "0-1-2",
+            "display_unit_lease_terms": false,
+            "hide_unit_apply_now_links": false,
+            "hide_unit_numbers": false,
+            "select_units_text": "* In Select Apartment Homes",
+            "enable_third_party_cookie_consent": true,
+            "third_party_cookie_consent_header": "",
+            "third_party_cookie_consent_text": "",
+            "third_party_cookie_consent_link": "",
+            "third_party_cookie_consent_use_modal": false,
+            "realpage_realtime": false,
+            "enable_realpage_online_leasing_page": false,
+            "show_preferred_method_of_contact": false,
+            "fees": {
+              "header": "Fees",
+              "required_label": "",
+              "disclaimers": {
+                "top": "",
+                "bottom": ""
+              },
+              "show_fees": true
+            },
+            "rent_label": "Rent",
+            "floorplans_header_subtext": "",
+            "allow_skipping_to_fees": false,
+            "currency_force_two_decimal_places": false,
+            "custom_unit_disclaimer": "",
+            "call_for_details_text": "Call for details.",
+            "call_for_details_text_affordable": "",
+            "enable_appointment_system": false,
+            "appointment_move_in_date_required": false,
+            "show_appointment_form_first": false,
+            "hide_appointment_form": false,
+            "scheduled_appointment_length": 15,
+            "appointment_floor_plan_display_count": 4,
+            "show_contact_form": true,
+            "contact_us_require_appointment_date": true,
+            "contact_us_require_phone_number": false,
+            "contact_us_require_desired_bedrooms": false,
+            "contact_us_require_recaptcha": true,
+            "comment_require_message": false,
+            "appointment_require_message": false,
+            "appointment_allow_same_day": true,
+            "show_tour_type": false,
+            "show_how_did_you_hear_about_us": false,
+            "how_did_you_hear_about_us_custom_choices": "",
+            "require_how_did_you_hear_about_us": false,
+            "custom_floorplan_disclaimer": "",
+            "require_phone_on_promotion_form": false,
+            "contact_us_single_input_name": true,
+            "contact_us_custom_disclaimer": "",
+            "comment_show_move_in_date": false,
+            "comment_require_move_in_date": false,
+            "recaptcha_version": "v3.0"
+          },
+          "coords": [
+            29.735723,
+            -95.504792
+          ],
+          "available_unit_count": 0,
+          "blog_recent": null,
+          "promotion_recent": null,
+          "pep_promotion_recent": null,
+          "links": {
+            "availability_third_party": "",
+            "availability_third_party_mobile": "",
+            "application": "https://www.on-site.com/apply/property/692070",
+            "application_third_party": "https://www.on-site.com/apply/property/692070",
+            "contact_us": "/contact_us/",
+            "third_party_dog_criteria": "",
+            "third_party_dog_criteria_text": "",
+            "floor_plans": "/floorplans/",
+            "data_erasure_url": "",
+            "covid_19_resources": "",
+            "privacy_policy": ""
+          },
+          "corporation": {
+            "id": 210,
+            "name": "Oak Leaf Management",
+            "url": "http://www.oakleaf.aptdemo.com",
+            "real_estate_license_number": ""
+          },
+          "toolbox": {},
+          "maps": [
+            {
+              "id": 8370,
+              "name": "Site Map",
+              "width": 1500,
+              "height": 1500,
+              "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/maps/site-map.png",
+              "svg": "",
+              "floor": null,
+              "building_id": null,
+              "image_alt_text": "",
+              "show_on_ebrochure": false
+            }
+          ],
+          "region": "",
+          "url": "https://www.stoneybrookhouston.com",
+          "fee_categories": []
+        }
+      ]
+    }
+  },
+  {
+    "url": "https://www.stoneybrookhouston.com/api/v3/animated_headline/?api_key=49f93f904d79607ea84b2439d8e49f8a286dd521",
+    "body": [
+      {
+        "headline": "",
+        "headline_color": "",
+        "headline_background_color": "",
+        "glow_background_color": "",
+        "animation_effect": "slide",
+        "link_to": "",
+        "link_target": "currentframe",
+        "position_vertical": "bottom",
+        "position_horizontal": "left",
+        "display_icon_on_close": false
+      }
+    ]
+  },
+  {
+    "url": "https://www.stoneybrookhouston.com/api/v1/communitypeppromotion/?api_key=49f93f904d79607ea84b2439d8e49f8a286dd521",
+    "body": {
+      "meta": {
+        "limit": 20,
+        "next": null,
+        "offset": 0,
+        "previous": null,
+        "total_count": 0
+      },
+      "objects": []
+    }
+  },
+  {
+    "url": "https://www.stoneybrookhouston.com/api/v1/communitypromotion/?api_key=49f93f904d79607ea84b2439d8e49f8a286dd521",
+    "body": {
+      "meta": {
+        "limit": 20,
+        "next": null,
+        "offset": 0,
+        "previous": null,
+        "total_count": 0
+      },
+      "objects": []
+    }
+  },
+  {
+    "url": "https://www.stoneybrookhouston.com/api/v1/communitypromotion/?format=json&api_key=49f93f904d79607ea84b2439d8e49f8a286dd521",
+    "body": {
+      "meta": {
+        "limit": 20,
+        "next": null,
+        "offset": 0,
+        "previous": null,
+        "total_count": 0
+      },
+      "objects": []
+    }
+  },
+  {
+    "url": "https://www.stoneybrookhouston.com/api/v1/communitypeppromotion/?format=json&api_key=49f93f904d79607ea84b2439d8e49f8a286dd521",
+    "body": {
+      "meta": {
+        "limit": 20,
+        "next": null,
+        "offset": 0,
+        "previous": null,
+        "total_count": 0
+      },
+      "objects": []
+    }
+  },
+  {
+    "url": "https://www.stoneybrookhouston.com/api/affordable/",
+    "body": []
+  },
+  {
+    "url": "https://www.stoneybrookhouston.com/api/v3/floorplans/all/?api_key=49f93f904d79607ea84b2439d8e49f8a286dd521&show_all_units=True",
+    "body": [
+      {
+        "id": 42544,
+        "alt_text": "",
+        "availability_link": "",
+        "bath": 1.0,
+        "bed": 1,
+        "bed_has_den": false,
+        "bed_has_study": false,
+        "custom_link": "",
+        "custom_link_text": "Virtual Tour",
+        "custom_mobile_link": "",
+        "custom_mobile_link_text": "Virtual Tour",
+        "custom_wait_list_link": "",
+        "custom_wait_list_link_text": "",
+        "featured": false,
+        "feed_id": "",
+        "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/floorplans/SB_1B1b_796_367268.png",
+        "image_secondary": null,
+        "image_3d": null,
+        "image_accent": null,
+        "interior_decorator_image": null,
+        "is_townhome": false,
+        "mobile_availability_link": "",
+        "name": "One Bedroom/One Bath",
+        "name_alt": "",
+        "order": 1,
+        "slug": "one-bedroomone-bath-2",
+        "units_to_show": null,
+        "units_to_show_relative_date": null,
+        "apartment_type": "Apartment",
+        "show_furnish_floor_plans": false,
+        "uuid": "78d2798f4b8b475587a3505c752d4d60",
+        "display_bath": "1",
+        "group_name": "",
+        "parent_id": null,
+        "promo_description": "",
+        "rent_from": true,
+        "rent_from_text": "",
+        "is_affordable": false,
+        "community": {
+          "address": "2717 Stoney Brook Drive",
+          "address2": "",
+          "city": "Houston",
+          "state": "TX",
+          "zip_code": "77063",
+          "fax": null,
+          "phone": "713-780-8014",
+          "name": "Stoney Brook",
+          "application_link": "https://www.on-site.com/apply/property/692070",
+          "lat": -95.504792,
+          "lng": 29.735723,
+          "map": [
+            {
+              "id": 8370,
+              "name": "Site Map",
+              "width": 1500,
+              "height": 1500,
+              "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/maps/site-map.png",
+              "svg": "",
+              "floor": null,
+              "building_id": null,
+              "image_alt_text": "",
+              "show_on_ebrochure": false
+            }
+          ],
+          "building": [],
+          "settings": {
+            "hide_unit_numbers": false,
+            "move_in_window_days": 14,
+            "lease_term_list": "",
+            "hide_unit_availability": false,
+            "use_pdf_for_ebrochure": false
+          },
+          "pets": {
+            "cats": true,
+            "dogs": true
+          }
+        },
+        "flythrough": false,
+        "panorama": {
+          "is_enabled": false
+        },
+        "galleries": false,
+        "units": [],
+        "wait_units": [],
+        "amenities": [
+          "All-electric Kitchen",
+          "Balcony or Patio",
+          "Carpeted Floors",
+          "Ceiling Fans",
+          "Central Air and Heating",
+          "Granite Countertops",
+          "Hardwood Floors",
+          "Microwave",
+          "Pantry",
+          "Refrigerator",
+          "Stainless Steel Appliances",
+          "Tile Floors",
+          "Washer and Dryer in Home"
+        ],
+        "amenities_detail": [
+          {
+            "select_units": false,
+            "custom_amenity_name": "All-electric Kitchen",
+            "base_amenity_name": "Kitchen",
+            "base_amenity_slug": "kitchen"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Balcony or Patio",
+            "base_amenity_name": "Patio",
+            "base_amenity_slug": "patio"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Carpeted Floors",
+            "base_amenity_name": "Carpeted Floors",
+            "base_amenity_slug": "carpeted-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Ceiling Fans",
+            "base_amenity_name": "Ceiling Fans",
+            "base_amenity_slug": "ceiling-fans"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Central Air and Heating",
+            "base_amenity_name": "Air Conditioning",
+            "base_amenity_slug": "air-conditioning"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Granite Countertops",
+            "base_amenity_name": "Countertops",
+            "base_amenity_slug": "countertops"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Hardwood Floors",
+            "base_amenity_name": "Hardwood Floors",
+            "base_amenity_slug": "hardwood-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Microwave",
+            "base_amenity_name": "Microwave",
+            "base_amenity_slug": "microwave"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Pantry",
+            "base_amenity_name": "Pantry",
+            "base_amenity_slug": "pantry"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Refrigerator",
+            "base_amenity_name": "Refrigerator",
+            "base_amenity_slug": "refrigerator"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Stainless Steel Appliances",
+            "base_amenity_name": "Appliances",
+            "base_amenity_slug": "appliances"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Tile Floors",
+            "base_amenity_name": "Tile Floors",
+            "base_amenity_slug": "tile-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Washer and Dryer in Home",
+            "base_amenity_name": "Washer and Dryer in Home",
+            "base_amenity_slug": "washer-and-dryer-in-home"
+          }
+        ],
+        "amenities_in_select_units": 0,
+        "tours": {},
+        "description": "",
+        "deposit": "$200",
+        "rent": "From $1170",
+        "promo": "",
+        "sq_ft": "796",
+        "actual_bed": "1 Bedroom",
+        "display_bed": "1 Bedroom",
+        "roommates": []
+      },
+      {
+        "id": 42546,
+        "alt_text": "",
+        "availability_link": "",
+        "bath": 1.0,
+        "bed": 2,
+        "bed_has_den": false,
+        "bed_has_study": false,
+        "custom_link": "",
+        "custom_link_text": "Virtual Tour",
+        "custom_mobile_link": "",
+        "custom_mobile_link_text": "Virtual Tour",
+        "custom_wait_list_link": "",
+        "custom_wait_list_link_text": "",
+        "featured": false,
+        "feed_id": "",
+        "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/floorplans/Stoney_2B1b_991_686870.png",
+        "image_secondary": null,
+        "image_3d": null,
+        "image_accent": null,
+        "interior_decorator_image": null,
+        "is_townhome": false,
+        "mobile_availability_link": "",
+        "name": "Two Bedroom/One Bath",
+        "name_alt": "",
+        "order": 3,
+        "slug": "two-bedroomone-bath-2",
+        "units_to_show": null,
+        "units_to_show_relative_date": null,
+        "apartment_type": "Apartment",
+        "show_furnish_floor_plans": false,
+        "uuid": "2b1d80549715475cacc69a15cb194f8d",
+        "display_bath": "1",
+        "group_name": "",
+        "parent_id": null,
+        "promo_description": "",
+        "rent_from": true,
+        "rent_from_text": "",
+        "is_affordable": false,
+        "community": {
+          "address": "2717 Stoney Brook Drive",
+          "address2": "",
+          "city": "Houston",
+          "state": "TX",
+          "zip_code": "77063",
+          "fax": null,
+          "phone": "713-780-8014",
+          "name": "Stoney Brook",
+          "application_link": "https://www.on-site.com/apply/property/692070",
+          "lat": -95.504792,
+          "lng": 29.735723,
+          "map": [
+            {
+              "id": 8370,
+              "name": "Site Map",
+              "width": 1500,
+              "height": 1500,
+              "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/maps/site-map.png",
+              "svg": "",
+              "floor": null,
+              "building_id": null,
+              "image_alt_text": "",
+              "show_on_ebrochure": false
+            }
+          ],
+          "building": [],
+          "settings": {
+            "hide_unit_numbers": false,
+            "move_in_window_days": 14,
+            "lease_term_list": "",
+            "hide_unit_availability": false,
+            "use_pdf_for_ebrochure": false
+          },
+          "pets": {
+            "cats": true,
+            "dogs": true
+          }
+        },
+        "flythrough": false,
+        "panorama": {
+          "is_enabled": false
+        },
+        "galleries": false,
+        "units": [],
+        "wait_units": [],
+        "amenities": [
+          "All-electric Kitchen",
+          "Balcony or Patio",
+          "Central Air and Heating",
+          "Granite Countertops",
+          "Hardwood Floors",
+          "Microwave",
+          "Pantry",
+          "Refrigerator",
+          "Stainless Steel Appliances",
+          "Tile Floors",
+          "Walk-in Closets",
+          "Washer and Dryer in Home"
+        ],
+        "amenities_detail": [
+          {
+            "select_units": false,
+            "custom_amenity_name": "All-electric Kitchen",
+            "base_amenity_name": "Kitchen",
+            "base_amenity_slug": "kitchen"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Balcony or Patio",
+            "base_amenity_name": "Patio",
+            "base_amenity_slug": "patio"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Central Air and Heating",
+            "base_amenity_name": "Air Conditioning",
+            "base_amenity_slug": "air-conditioning"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Granite Countertops",
+            "base_amenity_name": "Countertops",
+            "base_amenity_slug": "countertops"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Hardwood Floors",
+            "base_amenity_name": "Hardwood Floors",
+            "base_amenity_slug": "hardwood-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Microwave",
+            "base_amenity_name": "Microwave",
+            "base_amenity_slug": "microwave"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Pantry",
+            "base_amenity_name": "Pantry",
+            "base_amenity_slug": "pantry"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Refrigerator",
+            "base_amenity_name": "Refrigerator",
+            "base_amenity_slug": "refrigerator"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Stainless Steel Appliances",
+            "base_amenity_name": "Appliances",
+            "base_amenity_slug": "appliances"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Tile Floors",
+            "base_amenity_name": "Tile Floors",
+            "base_amenity_slug": "tile-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Walk-in Closets",
+            "base_amenity_name": "Walk-in Closets",
+            "base_amenity_slug": "walk-in-closets"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Washer and Dryer in Home",
+            "base_amenity_name": "Washer and Dryer in Home",
+            "base_amenity_slug": "washer-and-dryer-in-home"
+          }
+        ],
+        "amenities_in_select_units": 0,
+        "tours": {},
+        "description": "",
+        "deposit": "$250",
+        "rent": "Call for details.",
+        "promo": "",
+        "sq_ft": "991",
+        "actual_bed": "2 Bedrooms",
+        "display_bed": "2 Bedrooms",
+        "roommates": []
+      },
+      {
+        "id": 42548,
+        "alt_text": "",
+        "availability_link": "",
+        "bath": 2.0,
+        "bed": 2,
+        "bed_has_den": false,
+        "bed_has_study": false,
+        "custom_link": "",
+        "custom_link_text": "Virtual Tour",
+        "custom_mobile_link": "",
+        "custom_mobile_link_text": "Virtual Tour",
+        "custom_wait_list_link": "",
+        "custom_wait_list_link_text": "",
+        "featured": false,
+        "feed_id": "",
+        "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/floorplans/SB_2B2b_1100_129906.png",
+        "image_secondary": null,
+        "image_3d": null,
+        "image_accent": null,
+        "interior_decorator_image": null,
+        "is_townhome": false,
+        "mobile_availability_link": "",
+        "name": "Two Bedroom/Two Bath",
+        "name_alt": "",
+        "order": 5,
+        "slug": "two-bedroomtwo-bath-2",
+        "units_to_show": null,
+        "units_to_show_relative_date": null,
+        "apartment_type": "Apartment",
+        "show_furnish_floor_plans": false,
+        "uuid": "6a9af1be0407450db8f33e0d2f73487b",
+        "display_bath": "2",
+        "group_name": "",
+        "parent_id": null,
+        "promo_description": "",
+        "rent_from": false,
+        "rent_from_text": "",
+        "is_affordable": false,
+        "community": {
+          "address": "2717 Stoney Brook Drive",
+          "address2": "",
+          "city": "Houston",
+          "state": "TX",
+          "zip_code": "77063",
+          "fax": null,
+          "phone": "713-780-8014",
+          "name": "Stoney Brook",
+          "application_link": "https://www.on-site.com/apply/property/692070",
+          "lat": -95.504792,
+          "lng": 29.735723,
+          "map": [
+            {
+              "id": 8370,
+              "name": "Site Map",
+              "width": 1500,
+              "height": 1500,
+              "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/maps/site-map.png",
+              "svg": "",
+              "floor": null,
+              "building_id": null,
+              "image_alt_text": "",
+              "show_on_ebrochure": false
+            }
+          ],
+          "building": [],
+          "settings": {
+            "hide_unit_numbers": false,
+            "move_in_window_days": 14,
+            "lease_term_list": "",
+            "hide_unit_availability": false,
+            "use_pdf_for_ebrochure": false
+          },
+          "pets": {
+            "cats": true,
+            "dogs": true
+          }
+        },
+        "flythrough": false,
+        "panorama": {
+          "is_enabled": false
+        },
+        "galleries": false,
+        "units": [],
+        "wait_units": [],
+        "amenities": [
+          "All-electric Kitchen",
+          "Balcony or Patio",
+          "Carpeted Floors",
+          "Central Air and Heating",
+          "Granite Countertops",
+          "Hardwood Floors",
+          "Microwave",
+          "Pantry",
+          "Refrigerator",
+          "Stainless Steel Appliances",
+          "Tile Floors",
+          "Walk-in Closets",
+          "Washer and Dryer in Home"
+        ],
+        "amenities_detail": [
+          {
+            "select_units": false,
+            "custom_amenity_name": "All-electric Kitchen",
+            "base_amenity_name": "Kitchen",
+            "base_amenity_slug": "kitchen"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Balcony or Patio",
+            "base_amenity_name": "Patio",
+            "base_amenity_slug": "patio"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Carpeted Floors",
+            "base_amenity_name": "Carpeted Floors",
+            "base_amenity_slug": "carpeted-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Central Air and Heating",
+            "base_amenity_name": "Air Conditioning",
+            "base_amenity_slug": "air-conditioning"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Granite Countertops",
+            "base_amenity_name": "Countertops",
+            "base_amenity_slug": "countertops"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Hardwood Floors",
+            "base_amenity_name": "Hardwood Floors",
+            "base_amenity_slug": "hardwood-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Microwave",
+            "base_amenity_name": "Microwave",
+            "base_amenity_slug": "microwave"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Pantry",
+            "base_amenity_name": "Pantry",
+            "base_amenity_slug": "pantry"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Refrigerator",
+            "base_amenity_name": "Refrigerator",
+            "base_amenity_slug": "refrigerator"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Stainless Steel Appliances",
+            "base_amenity_name": "Appliances",
+            "base_amenity_slug": "appliances"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Tile Floors",
+            "base_amenity_name": "Tile Floors",
+            "base_amenity_slug": "tile-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Walk-in Closets",
+            "base_amenity_name": "Walk-in Closets",
+            "base_amenity_slug": "walk-in-closets"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Washer and Dryer in Home",
+            "base_amenity_name": "Washer and Dryer in Home",
+            "base_amenity_slug": "washer-and-dryer-in-home"
+          }
+        ],
+        "amenities_in_select_units": 0,
+        "tours": {},
+        "description": "",
+        "deposit": "$300",
+        "rent": "Call for details.",
+        "promo": "",
+        "sq_ft": "1100",
+        "actual_bed": "2 Bedrooms",
+        "display_bed": "2 Bedrooms",
+        "roommates": []
+      },
+      {
+        "id": 42550,
+        "alt_text": "",
+        "availability_link": "",
+        "bath": 2.5,
+        "bed": 2,
+        "bed_has_den": false,
+        "bed_has_study": false,
+        "custom_link": "",
+        "custom_link_text": "Virtual Tour",
+        "custom_mobile_link": "",
+        "custom_mobile_link_text": "Virtual Tour",
+        "custom_wait_list_link": "",
+        "custom_wait_list_link_text": "",
+        "featured": false,
+        "feed_id": "",
+        "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/floorplans/Stoney_2B22b_1319_680483.png",
+        "image_secondary": null,
+        "image_3d": null,
+        "image_accent": null,
+        "interior_decorator_image": null,
+        "is_townhome": false,
+        "mobile_availability_link": "",
+        "name": "Two Bedroom/Two and a Half Bath",
+        "name_alt": "",
+        "order": 7,
+        "slug": "two-bedroomtwo-and-a-half-bath",
+        "units_to_show": null,
+        "units_to_show_relative_date": null,
+        "apartment_type": "Apartment",
+        "show_furnish_floor_plans": false,
+        "uuid": "6ed5431c06cb499b96cd778d7b522e17",
+        "display_bath": "2.5",
+        "group_name": "",
+        "parent_id": null,
+        "promo_description": "",
+        "rent_from": false,
+        "rent_from_text": "",
+        "is_affordable": false,
+        "community": {
+          "address": "2717 Stoney Brook Drive",
+          "address2": "",
+          "city": "Houston",
+          "state": "TX",
+          "zip_code": "77063",
+          "fax": null,
+          "phone": "713-780-8014",
+          "name": "Stoney Brook",
+          "application_link": "https://www.on-site.com/apply/property/692070",
+          "lat": -95.504792,
+          "lng": 29.735723,
+          "map": [
+            {
+              "id": 8370,
+              "name": "Site Map",
+              "width": 1500,
+              "height": 1500,
+              "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/maps/site-map.png",
+              "svg": "",
+              "floor": null,
+              "building_id": null,
+              "image_alt_text": "",
+              "show_on_ebrochure": false
+            }
+          ],
+          "building": [],
+          "settings": {
+            "hide_unit_numbers": false,
+            "move_in_window_days": 14,
+            "lease_term_list": "",
+            "hide_unit_availability": false,
+            "use_pdf_for_ebrochure": false
+          },
+          "pets": {
+            "cats": true,
+            "dogs": true
+          }
+        },
+        "flythrough": false,
+        "panorama": {
+          "is_enabled": false
+        },
+        "galleries": false,
+        "units": [],
+        "wait_units": [],
+        "amenities": [
+          "All-electric Kitchen",
+          "Balcony or Patio",
+          "Carpeted Floors",
+          "Central Air and Heating",
+          "Granite Countertops",
+          "Hardwood Floors",
+          "Pantry",
+          "Refrigerator",
+          "Stainless Steel Appliances",
+          "Tile Floors",
+          "Walk-in Closets",
+          "Washer and Dryer in Home"
+        ],
+        "amenities_detail": [
+          {
+            "select_units": false,
+            "custom_amenity_name": "All-electric Kitchen",
+            "base_amenity_name": "Kitchen",
+            "base_amenity_slug": "kitchen"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Balcony or Patio",
+            "base_amenity_name": "Patio",
+            "base_amenity_slug": "patio"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Carpeted Floors",
+            "base_amenity_name": "Carpeted Floors",
+            "base_amenity_slug": "carpeted-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Central Air and Heating",
+            "base_amenity_name": "Air Conditioning",
+            "base_amenity_slug": "air-conditioning"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Granite Countertops",
+            "base_amenity_name": "Countertops",
+            "base_amenity_slug": "countertops"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Hardwood Floors",
+            "base_amenity_name": "Hardwood Floors",
+            "base_amenity_slug": "hardwood-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Pantry",
+            "base_amenity_name": "Pantry",
+            "base_amenity_slug": "pantry"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Refrigerator",
+            "base_amenity_name": "Refrigerator",
+            "base_amenity_slug": "refrigerator"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Stainless Steel Appliances",
+            "base_amenity_name": "Appliances",
+            "base_amenity_slug": "appliances"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Tile Floors",
+            "base_amenity_name": "Tile Floors",
+            "base_amenity_slug": "tile-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Walk-in Closets",
+            "base_amenity_name": "Walk-in Closets",
+            "base_amenity_slug": "walk-in-closets"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Washer and Dryer in Home",
+            "base_amenity_name": "Washer and Dryer in Home",
+            "base_amenity_slug": "washer-and-dryer-in-home"
+          }
+        ],
+        "amenities_in_select_units": 0,
+        "tours": {},
+        "description": "",
+        "deposit": "$300",
+        "rent": "Call for details.",
+        "promo": "",
+        "sq_ft": "1320",
+        "actual_bed": "2 Bedrooms",
+        "display_bed": "2 Bedrooms",
+        "roommates": []
+      },
+      {
+        "id": 42552,
+        "alt_text": "",
+        "availability_link": "",
+        "bath": 2.0,
+        "bed": 3,
+        "bed_has_den": false,
+        "bed_has_study": false,
+        "custom_link": "",
+        "custom_link_text": "Virtual Tour",
+        "custom_mobile_link": "",
+        "custom_mobile_link_text": "Virtual Tour",
+        "custom_wait_list_link": "",
+        "custom_wait_list_link_text": "",
+        "featured": false,
+        "feed_id": "",
+        "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/floorplans/Stoney_3B2b_1400_463861.png",
+        "image_secondary": null,
+        "image_3d": null,
+        "image_accent": null,
+        "interior_decorator_image": null,
+        "is_townhome": false,
+        "mobile_availability_link": "",
+        "name": "Three Bedroom/Two Bath",
+        "name_alt": "",
+        "order": 9,
+        "slug": "three-bedroomtwo-bath",
+        "units_to_show": null,
+        "units_to_show_relative_date": null,
+        "apartment_type": "Apartment",
+        "show_furnish_floor_plans": false,
+        "uuid": "bae2c20c95b34e81af150ac2d62aa439",
+        "display_bath": "2",
+        "group_name": "",
+        "parent_id": null,
+        "promo_description": "",
+        "rent_from": true,
+        "rent_from_text": "",
+        "is_affordable": false,
+        "community": {
+          "address": "2717 Stoney Brook Drive",
+          "address2": "",
+          "city": "Houston",
+          "state": "TX",
+          "zip_code": "77063",
+          "fax": null,
+          "phone": "713-780-8014",
+          "name": "Stoney Brook",
+          "application_link": "https://www.on-site.com/apply/property/692070",
+          "lat": -95.504792,
+          "lng": 29.735723,
+          "map": [
+            {
+              "id": 8370,
+              "name": "Site Map",
+              "width": 1500,
+              "height": 1500,
+              "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/maps/site-map.png",
+              "svg": "",
+              "floor": null,
+              "building_id": null,
+              "image_alt_text": "",
+              "show_on_ebrochure": false
+            }
+          ],
+          "building": [],
+          "settings": {
+            "hide_unit_numbers": false,
+            "move_in_window_days": 14,
+            "lease_term_list": "",
+            "hide_unit_availability": false,
+            "use_pdf_for_ebrochure": false
+          },
+          "pets": {
+            "cats": true,
+            "dogs": true
+          }
+        },
+        "flythrough": false,
+        "panorama": {
+          "is_enabled": false
+        },
+        "galleries": [
+          {
+            "id": 25077,
+            "name": "Three Bedroom/Two Bath",
+            "slug": "three-bedroomtwo-bath",
+            "order": 1,
+            "photos": [
+              {
+                "id": 525044,
+                "name": "01d.jpg",
+                "caption": "",
+                "slug": "01djpg",
+                "order": 0,
+                "alt_text": "A spacious, modern living area featuring light gray walls and a wood-like laminate floor. There is a doorway leading to a kitchen area with a counter and a refrigerator visible. The room is well-lit with a circular ceiling light, and there are two doors leading to other rooms.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/01d_88758.jpg",
+                "locales": []
+              },
+              {
+                "id": 525046,
+                "name": "04a.jpg",
+                "caption": "",
+                "slug": "04ajpg",
+                "order": 0,
+                "alt_text": "A spacious, empty room with light gray walls and a ceiling fan. The floor features dark wood-like laminate. A window with horizontal blinds allows natural light in, revealing a view of an exterior structure. The room has no furniture, providing a blank canvas for various uses.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/04a_539697.jpg",
+                "locales": []
+              },
+              {
+                "id": 525050,
+                "name": "05b.jpg",
+                "caption": "",
+                "slug": "05bjpg",
+                "order": 0,
+                "alt_text": "A clean and modern bathroom featuring a bathtub with a showerhead, a white sink cabinet with a countertop, a large mirror above the sink, and light grey walls. The space is well-lit and has a simple, minimalist design.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/05b_345291.jpg",
+                "locales": []
+              },
+              {
+                "id": 525052,
+                "name": "08.jpg",
+                "caption": "",
+                "slug": "08jpg",
+                "order": 0,
+                "alt_text": "A close-up view of a white washing machine in a light-colored laundry room. The machine has a control panel with knobs for settings, and the wall is plain with a smooth finish.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/08_45468.jpg",
+                "locales": []
+              },
+              {
+                "id": 525048,
+                "name": "04c.jpg",
+                "caption": "",
+                "slug": "04cjpg",
+                "order": 0,
+                "alt_text": "A clean and modern bathroom featuring a white shower and bathtub combo, a simple countertop with a sink, a mirror above the sink, and light grey walls. The floor has a wood-like appearance, and there's a toilet visible near the wall. Natural light is coming in from an adjacent room.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/04c_438601.jpg",
+                "locales": []
+              },
+              {
+                "id": 525042,
+                "name": "01a.jpg",
+                "caption": "",
+                "slug": "01ajpg",
+                "order": 0,
+                "alt_text": "A spacious, empty room with light gray walls and wooden flooring. It features an open layout, with a doorway leading to another area, a small opening to a kitchen, and a white door on the right. Natural light brightens the space, creating a clean and inviting atmosphere.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/01a_822738.jpg",
+                "locales": []
+              },
+              {
+                "id": 525043,
+                "name": "01c.jpg",
+                "caption": "",
+                "slug": "01cjpg",
+                "order": 0,
+                "alt_text": "Spacious, empty room featuring light gray walls and wooden flooring. A window with white blinds allows natural light to enter, illuminating the space. There are no furnishings or decorations, creating a clean and minimalist atmosphere. Ideal for customization or renovation.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/01c_600993.jpg",
+                "locales": []
+              },
+              {
+                "id": 525045,
+                "name": "02.jpg",
+                "caption": "",
+                "slug": "02jpg",
+                "order": 0,
+                "alt_text": "A modern kitchen featuring white cabinetry, a stove with four burners, a dishwasher, and a large refrigerator. The space is well-lit with a ceiling light and has a neutral color palette, creating a clean and bright atmosphere. The countertops are light-colored, enhancing the overall spacious feel.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/02_555388.jpg",
+                "locales": []
+              },
+              {
+                "id": 525047,
+                "name": "04b.jpg",
+                "caption": "",
+                "slug": "04bjpg",
+                "order": 0,
+                "alt_text": "A spacious, empty room with light gray walls and a wooden floor. The room has a ceiling fan with wooden blades, and there are four white doors along the walls, suggesting multiple entrances or closets. Natural light brightens the room, creating a clean and airy atmosphere.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/04b_352676.jpg",
+                "locales": []
+              },
+              {
+                "id": 525049,
+                "name": "05a.jpg",
+                "caption": "",
+                "slug": "05ajpg",
+                "order": 0,
+                "alt_text": "A spacious room with wooden flooring, featuring a ceiling fan, light-colored walls, and large windows allowing natural light. One wall showcases a prominent slanted section. There are electrical outlets, and the overall ambiance is bright and inviting.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/05a_658741.jpg",
+                "locales": []
+              },
+              {
+                "id": 525051,
+                "name": "06.jpg",
+                "caption": "",
+                "slug": "06jpg",
+                "order": 0,
+                "alt_text": "Empty room with light gray walls and wooden flooring. A window with blinds allows natural light to enter, creating a bright atmosphere. Ceiling fan visible above, adding a modern touch to the space. The overall ambiance is clean and minimalistic, ideal for various decorating styles.",
+                "image": "https://media.apts247.info/ee/ee1264641ec64c46aca2792b4f105772/galleries/floorplan/three-bedroomtwo-bath/06_606315.jpg",
+                "locales": []
+              }
+            ],
+            "locales": []
+          }
+        ],
+        "units": [],
+        "wait_units": [],
+        "amenities": [
+          "All-electric Kitchen",
+          "Balcony or Patio",
+          "Carpeted Floors",
+          "Central Air and Heating",
+          "Hardwood Floors",
+          "Granite Countertops",
+          "Pantry",
+          "Refrigerator",
+          "Stainless Steel Appliances",
+          "Tile Floors",
+          "Walk-in Closets",
+          "Washer and Dryer in Home"
+        ],
+        "amenities_detail": [
+          {
+            "select_units": false,
+            "custom_amenity_name": "All-electric Kitchen",
+            "base_amenity_name": "Kitchen",
+            "base_amenity_slug": "kitchen"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Balcony or Patio",
+            "base_amenity_name": "Patio",
+            "base_amenity_slug": "patio"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Carpeted Floors",
+            "base_amenity_name": "Carpeted Floors",
+            "base_amenity_slug": "carpeted-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Central Air and Heating",
+            "base_amenity_name": "Air Conditioning",
+            "base_amenity_slug": "air-conditioning"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Hardwood Floors",
+            "base_amenity_name": "Hardwood Floors",
+            "base_amenity_slug": "hardwood-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Granite Countertops",
+            "base_amenity_name": "Countertops",
+            "base_amenity_slug": "countertops"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Pantry",
+            "base_amenity_name": "Pantry",
+            "base_amenity_slug": "pantry"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Refrigerator",
+            "base_amenity_name": "Refrigerator",
+            "base_amenity_slug": "refrigerator"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Stainless Steel Appliances",
+            "base_amenity_name": "Appliances",
+            "base_amenity_slug": "appliances"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Tile Floors",
+            "base_amenity_name": "Tile Floors",
+            "base_amenity_slug": "tile-floors"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Walk-in Closets",
+            "base_amenity_name": "Walk-in Closets",
+            "base_amenity_slug": "walk-in-closets"
+          },
+          {
+            "select_units": false,
+            "custom_amenity_name": "Washer and Dryer in Home",
+            "base_amenity_name": "Washer and Dryer in Home",
+            "base_amenity_slug": "washer-and-dryer-in-home"
+          }
+        ],
+        "amenities_in_select_units": 0,
+        "tours": {},
+        "description": "",
+        "deposit": "$349",
+        "rent": "From $1665",
+        "promo": "",
+        "sq_ft": "1400",
+        "actual_bed": "3 Bedrooms",
+        "display_bed": "3 Bedrooms",
+        "roommates": []
+      }
+    ]
+  }
+]

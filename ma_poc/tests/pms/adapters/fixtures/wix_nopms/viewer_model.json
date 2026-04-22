@@ -1,0 +1,8 @@
+[
+  {
+    "url": "embedded:json-block:wix-essential-viewer-model",
+    "body": {
+      "viewer": true
+    }
+  }
+]

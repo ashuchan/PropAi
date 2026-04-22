@@ -1,0 +1,27 @@
+[
+  {
+    "url": "https://example.com/api/data",
+    "body": {
+      "data": {
+        "results": [
+          {
+            "floorPlanName": "Studio",
+            "beds": 0,
+            "baths": 1,
+            "sqft": 450,
+            "price": 1200,
+            "unit_id": "S01"
+          },
+          {
+            "floorPlanName": "Penthouse",
+            "beds": 3,
+            "baths": 2,
+            "sqft": 1500,
+            "price": 4500,
+            "unit_id": "PH01"
+          }
+        ]
+      }
+    }
+  }
+]

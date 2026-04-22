@@ -1,0 +1,35 @@
+You are a web navigation specialist analyzing a screenshot of a multifamily apartment property website.
+
+GOAL: Identify the navigation path to find apartment unit availability and pricing data.
+
+PROPERTY CONTEXT:
+- Name: {property_name}
+- Website: {website}
+
+Look at the screenshot and identify:
+1. Buttons, tabs, or links labeled "Floor Plans", "Availability", "Units", "Pricing", "Check Availability", "View Apartments", "See All Plans" or similar
+2. Navigation menu items that lead to unit/apartment listings
+3. Interactive elements (accordions, tabs, dropdowns) that reveal unit data when clicked
+4. Links to external leasing portals or separate property websites
+
+OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
+{{
+  "suggestions": [
+    {{
+      "action": "click" or "navigate",
+      "selector": "CSS selector for the element to click (only for action=click)",
+      "url": "full URL to navigate to (only for action=navigate)",
+      "text": "visible text of the element",
+      "reasoning": "why this action would lead to unit data"
+    }}
+  ],
+  "page_analysis": "brief description of what the page shows and where unit data likely lives"
+}}
+
+RULES:
+- Return at most 5 suggestions, ordered by likelihood of finding unit data
+- For "click" actions, provide a specific CSS selector (prefer class-based over positional)
+- For "navigate" actions, provide the full URL visible in a link or button
+- If the page already shows unit data (rent prices, floor plans with pricing), return empty suggestions
+- Focus on PRIMARY navigation — avoid footer links, social media, contact pages
+- If you see a "Floor Plans" tab or section, suggest clicking it first

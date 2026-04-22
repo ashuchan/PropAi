@@ -207,7 +207,8 @@ marimo/_lsp/
 __marimo__/
 .claude/settings.json
 config/Properties.csv
-ma_poc/config/
+ma_poc/config/*
+!ma_poc/config/prompts/
 ma_poc/data/
 ma_poc/output/properties_smoke.json
 ma_poc/frontend/node_modules/
@@ -216,8 +217,8 @@ ma_poc/services/node_modules/
 
 config/*
 data/*
-ma_poc/tests/pms/adapters/fixtures/*/*.json
-!ma_poc/tests/pms/adapters/fixtures/*/synthetic_*.json
+# Test fixtures — all checked in so CI can load them. Individual files are
+# small (<250KB); anything larger should be generated in-test instead.
 ma_poc/frontend/api/package-lock.json
 infra/terraform/.terraform.lock.hcl
 .gitignore
