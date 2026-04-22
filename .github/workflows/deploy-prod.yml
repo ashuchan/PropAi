@@ -15,6 +15,12 @@ concurrency:
   group: deploy-prod
   cancel-in-progress: false
 
+# Caller must grant every permission the reusable workflow requests
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
 jobs:
   verify-tag:
     runs-on: ubuntu-latest
