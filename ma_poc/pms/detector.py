@@ -86,7 +86,7 @@ MGMT_TO_PMS_PRIOR: dict[str, PmsName] = {
     "mark-taylor": "entrata",              # Handoff: Mark-Taylor is an Entrata only shop
     "mark taylor": "entrata",              # Same, alt spelling
     "lindsey management": "rentcafe",      # Handoff: Lindsey is Yardi/RentCafe
-    "avalonbay communities": "avalonbay",  # Direct — AvalonBay properties use the REIT's custom stack
+    "avalonbay communities": "avalonbay",  # AvalonBay properties use the REIT's custom stack
     # 2026-04-20: live-fetch of windsorcommunities.com showed Apply buttons
     # pointing at nestiolistings.com/api/v2/onlineleasing-link — Windsor runs
     # on Funnel (Nestio), not RentCafe, despite mgmt priors suggesting Yardi.
