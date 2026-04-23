@@ -132,17 +132,40 @@ def _drain_stream_to_queue(
 
 
 @contextmanager
-def cloud_sql_proxy(project: str, instance: str, region: str = "us-central1") -> Generator[None, None, None]:
+def cloud_sql_proxy(
+    project: str,
+    instance: str,
+    region: str = "us-central1",
+    *,
+    auto_iam_authn: bool = True,
+    private_ip: bool = False,
+) -> Generator[None, None, None]:
     """Spawn cloud-sql-proxy; yield when ready; terminate on exit.
 
     BOTH stdout and stderr are drained on background threads (cloud-sql-proxy
     v2 writes its ready message to stdout; v1 wrote to stderr). Times out
     after ``_PROXY_READY_TIMEOUT_SEC``; also exits early if the proxy
     process dies before writing "ready for new connections".
+
+    Args:
+        auto_iam_authn: Pass ``--auto-iam-authn`` so the proxy injects the
+            caller's OAuth access token as the Postgres password. Required
+            whenever ``cloudsql.iam_authentication=on`` on the instance,
+            i.e. every case this script is used in.
+        private_ip: Pass ``--private-ip`` so the proxy routes to the
+            instance over its VPC IP. Only works when the process has a
+            route into the instance's VPC (e.g. a Cloud Run job with the
+            right VPC connector). Useless from a GitHub-hosted runner.
     """
     conn_name = f"{project}:{region}:{instance}"
+    argv = ["cloud-sql-proxy", "--port=5432"]
+    if auto_iam_authn:
+        argv.append("--auto-iam-authn")
+    if private_ip:
+        argv.append("--private-ip")
+    argv.append(conn_name)
     proc = subprocess.Popen(
-        ["cloud-sql-proxy", "--port=5432", conn_name],
+        argv,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -257,6 +280,17 @@ def main() -> None:
     )
     iam_user = result.stdout.strip()
 
+    # Cloud SQL IAM users have a specific name format:
+    #   CLOUD_IAM_USER            : the email as-is (ashu@company.com)
+    #   CLOUD_IAM_SERVICE_ACCOUNT : email with `.gserviceaccount.com` stripped
+    #                               (e.g. deployer@proj.iam)
+    # terraform mirrors this in cloud_sql/main.tf with a trimsuffix(). If the
+    # full email is sent as the Postgres user, auth fails silently ("server
+    # closed the connection unexpectedly").
+    db_user = iam_user
+    if db_user.endswith(".gserviceaccount.com"):
+        db_user = db_user[: -len(".gserviceaccount.com")]
+
     with cloud_sql_proxy(cfg["project"], cfg["instance"], cfg["region"]):
         env = os.environ.copy()
         # Scheme must be `postgresql+psycopg://` — the project installs
@@ -265,7 +299,7 @@ def main() -> None:
         # SQLAlchemy and fails with ModuleNotFoundError at engine_from_config.
         # Matches the rest of the data_provider layer.
         env["DATABASE_URL"] = (
-            f"postgresql+psycopg://{iam_user}@localhost:5432/jugnu?sslmode=disable"
+            f"postgresql+psycopg://{db_user}@localhost:5432/jugnu?sslmode=disable"
         )
         cmd = ["alembic", "-c", str(ALEMBIC_CONFIG)]
         if args.cmd == "up":

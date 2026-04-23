@@ -16,8 +16,25 @@ resource "google_sql_database_instance" "jugnu_db" {
     }
 
     ip_configuration {
-      ipv4_enabled    = false
+      # Dual-stack: private IP for Cloud Run workers (via VPC connector) is
+      # the hot path for scrape/retry jobs. Public IP is opened *only* so
+      # GitHub-hosted migration runners — which have no route into the VPC —
+      # can reach the instance via the Cloud SQL Auth Proxy.
+      #
+      # Public exposure is acceptable here because:
+      #   - cloudsql.iam_authentication=on (below): passwords are ignored;
+      #     only short-lived OAuth tokens authenticate.
+      #   - ssl_mode=ENCRYPTED_ONLY: plaintext connections are rejected.
+      #   - authorized_networks=0.0.0.0/0: required because GHA runner IPs
+      #     are not predictable. IAM auth is the real gate, not the CIDR.
+      ipv4_enabled    = true
       private_network = var.vpc_self_link
+      ssl_mode        = "ENCRYPTED_ONLY"
+
+      authorized_networks {
+        name  = "iam-auth-gated"
+        value = "0.0.0.0/0"
+      }
     }
 
     database_flags {
