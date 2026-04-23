@@ -332,7 +332,12 @@ def main() -> None:
         elif args.cmd == "status":
             cmd += ["current", "-v"]
         elif args.cmd == "stamp":
-            cmd += ["stamp", args.revision]
+            # --purge truncates alembic_version before writing the new value.
+            # Required when the current stored revision is not resolvable in
+            # the active tree (e.g. the legacy '000_initial_schema' stub from
+            # the old infra/sql/ tree). Without --purge, alembic refuses with
+            # "Can't locate revision identified by '<orphan_id>'".
+            cmd += ["stamp", "--purge", args.revision]
         sys.exit(subprocess.call(cmd, env=env, cwd=str(ALEMBIC_CWD)))
 
 
