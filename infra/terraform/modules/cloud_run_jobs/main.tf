@@ -46,6 +46,15 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
           name  = "DATABASE_URL"
           value = "postgresql://${var.worker_sa_email}@${var.sql_private_ip}:5432/jugnu?sslmode=require"
         }
+        # Selects the text LLM provider in ma_poc/llm/factory.py. Default
+        # there is "anthropic", which reads ANTHROPIC_API_KEY — not the
+        # key this job has. Without this override the canary's LLM
+        # fallback path fails with "Could not resolve authentication
+        # method" and the shard exits 1.
+        env {
+          name  = "LLM_PROVIDER"
+          value = "openrouter"
+        }
         env {
           name = "OPENROUTER_API_KEY"
           value_source {
@@ -117,6 +126,11 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
         env {
           name  = "DATABASE_URL"
           value = "postgresql://${var.worker_sa_email}@${var.sql_private_ip}:5432/jugnu?sslmode=require"
+        }
+        # See scrape-job comment above — same reason.
+        env {
+          name  = "LLM_PROVIDER"
+          value = "openrouter"
         }
         env {
           name = "OPENROUTER_API_KEY"

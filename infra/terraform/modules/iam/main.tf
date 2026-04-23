@@ -38,15 +38,15 @@ resource "google_project_iam_member" "worker_secret_accessor" {
   member  = "serviceAccount:${google_service_account.worker.email}"
 }
 
-resource "google_project_iam_member" "worker_storage_creator" {
+# Replaces the old objectCreator + objectViewer pair. objectCreator can only
+# create NEW objects, not overwrite existing ones (overwrite = delete + create,
+# and delete was missing). Every re-run on the same day hit 403 on artifact
+# upload because ``events.jsonl`` / ``cost_ledger.db`` already existed from
+# an earlier run. objectUser adds list + read + create + delete so the
+# artifact upload path is idempotent across re-runs.
+resource "google_project_iam_member" "worker_storage_user" {
   project = var.project_id
-  role    = "roles/storage.objectCreator"
-  member  = "serviceAccount:${google_service_account.worker.email}"
-}
-
-resource "google_project_iam_member" "worker_storage_viewer" {
-  project = var.project_id
-  role    = "roles/storage.objectViewer"
+  role    = "roles/storage.objectUser"
   member  = "serviceAccount:${google_service_account.worker.email}"
 }
 
