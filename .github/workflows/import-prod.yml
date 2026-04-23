@@ -172,13 +172,17 @@ jobs:
             'module.scheduler.google_cloud_scheduler_job.sql_stop' \
             "projects/${PROJECT_ID}/locations/${REGION}/jobs/jugnu-sql-stop-${TF_ENV}" \
             || failed=1
-          # daily_scrape may or may not exist (depends on how far the original
-          # local apply got). Tolerate skip — plan will show "to be created"
-          # on the next deploy if it's missing.
+          # daily_scrape / daily_retry may or may not exist (depends on how
+          # far the original local apply got). Tolerate skip — plan will
+          # show "to be created" on the next deploy if they're absent.
           tf_import \
             'module.scheduler.google_cloud_scheduler_job.daily_scrape' \
             "projects/${PROJECT_ID}/locations/${REGION}/jobs/jugnu-daily-scrape-${TF_ENV}" \
             || echo "(daily_scrape not imported — TF will create on next apply if absent)"
+          tf_import \
+            'module.scheduler.google_cloud_scheduler_job.daily_retry' \
+            "projects/${PROJECT_ID}/locations/${REGION}/jobs/jugnu-daily-retry-${TF_ENV}" \
+            || echo "(daily_retry not imported — TF will create on next apply if absent)"
 
           if [ "$failed" -ne 0 ]; then
             echo "One or more required imports failed. See log above."
