@@ -28,6 +28,7 @@ import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import IO
 
 # Mapping from env to (project_id, sql_instance_name).
 # Keep in sync with infra/terraform/envs/*.tfvars.
@@ -110,9 +111,9 @@ _PROXY_READY_TIMEOUT_SEC = 30.0
 
 
 def _drain_stream_to_queue(
-    stream: "subprocess.IO[bytes] | None",
+    stream: IO[bytes] | None,
     label: str,
-    q: "queue.Queue[tuple[str, str] | None]",
+    q: queue.Queue[tuple[str, str] | None],
 ) -> None:
     """Pump lines from *stream* onto *q* as (label, text) tuples.
 
@@ -258,7 +259,14 @@ def main() -> None:
 
     with cloud_sql_proxy(cfg["project"], cfg["instance"], cfg["region"]):
         env = os.environ.copy()
-        env["DATABASE_URL"] = f"postgresql://{iam_user}@localhost:5432/jugnu?sslmode=disable"
+        # Scheme must be `postgresql+psycopg://` — the project installs
+        # psycopg v3 (`psycopg[binary]` in requirements.txt), not psycopg2.
+        # A bare `postgresql://` URL resolves to the psycopg2 dialect in
+        # SQLAlchemy and fails with ModuleNotFoundError at engine_from_config.
+        # Matches the rest of the data_provider layer.
+        env["DATABASE_URL"] = (
+            f"postgresql+psycopg://{iam_user}@localhost:5432/jugnu?sslmode=disable"
+        )
         cmd = ["alembic", "-c", str(ALEMBIC_CONFIG)]
         if args.cmd == "up":
             cmd += ["upgrade", "head"]
