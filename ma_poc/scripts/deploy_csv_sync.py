@@ -69,8 +69,17 @@ def validate(path: Path) -> None:
     print(f"✓ {n} properties, no duplicates", file=sys.stderr)
 
 
+# CI passes the short env name ("prod"/"staging") to match image-tag
+# conventions, but the GCS bucket is named from the TF var `env`, which
+# is "production" in prod.tfvars. Mirrors _trigger_common.tf_env_for —
+# kept local here to avoid pulling the CLI shim into a simple gsutil
+# script. Keep in sync with infra/terraform/envs/*.tfvars.
+_TF_ENV: dict[str, str] = {"staging": "staging", "prod": "production"}
+
+
 def upload(path: Path, env: str) -> None:
-    target = f"gs://jugnu-raw-{env}/property-list/properties.csv"
+    tf_env = _TF_ENV.get(env, env)
+    target = f"gs://jugnu-raw-{tf_env}/property-list/properties.csv"
     subprocess.check_call(
         [
             "gsutil",

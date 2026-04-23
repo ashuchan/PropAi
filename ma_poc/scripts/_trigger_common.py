@@ -37,6 +37,16 @@ _ENV_PROJECTS: dict[str, str] = {
     "prod": "jugnu-prod-<unique>",
 }
 
+# The short env name ("prod"/"staging") matches image-tag conventions and
+# appears in CI inputs, but Terraform-created resource names embed the
+# long form from envs/*.tfvars (`env = "production"` in prod.tfvars).
+# Anything that references a TF-created resource (Cloud Run jobs, SQL
+# instances, GCS buckets, secrets, etc.) must translate through this map.
+_TF_ENV_NAMES: dict[str, str] = {
+    "staging": "staging",
+    "prod": "production",
+}
+
 REGION: str = "us-central1"
 
 
@@ -98,6 +108,19 @@ def project_for_env(env: str) -> str:
     if env not in _ENV_PROJECTS:
         raise ValueError(f"Unknown environment {env!r}; expected 'staging' or 'prod'")
     return _ENV_PROJECTS[env]
+
+
+def tf_env_for(env: str) -> str:
+    """Return the Terraform env suffix used in TF-created resource names.
+
+    Use this when constructing the name of a resource Terraform created —
+    e.g., ``jugnu-scrape-{tf_env_for(env)}``. The CLI/CI layer speaks the
+    short form ("prod"), but the resource names embed the long form
+    ("production") from envs/*.tfvars.
+    """
+    if env not in _TF_ENV_NAMES:
+        raise ValueError(f"Unknown environment {env!r}; expected 'staging' or 'prod'")
+    return _TF_ENV_NAMES[env]
 
 
 def verify_gcloud_auth(required_project: str) -> None:

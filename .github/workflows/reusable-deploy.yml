@@ -155,7 +155,15 @@ jobs:
 
       - name: Wake Cloud SQL
         run: |
-          INSTANCE="jugnu-db-${{ inputs.env }}"
+          # Workflow input is the short name (prod/staging) so it matches
+          # image tag conventions, but the Cloud SQL instance name comes
+          # from the TF var `env`, which is "production" in prod.tfvars.
+          # Map here so the instance lookup uses the long form.
+          case "${{ inputs.env }}" in
+            prod) TF_ENV="production" ;;
+            *)    TF_ENV="${{ inputs.env }}" ;;
+          esac
+          INSTANCE="jugnu-db-${TF_ENV}"
           # No 2>/dev/null here — if describe fails we want to see the reason,
           # not coerce it to "UNKNOWN" and then fail opaquely at patch.
           state=$(gcloud sql instances describe "$INSTANCE" \

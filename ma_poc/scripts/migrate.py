@@ -37,8 +37,12 @@ ENV_CONFIG: dict[str, dict[str, str]] = {
         "region": "us-central1",
     },
     "prod": {
+        # Instance name is "jugnu-db-production" to match prod.tfvars where
+        # env = "production". The CI workflow input is the short form "prod";
+        # the Terraform env string is the long form. Keep them in sync with
+        # infra/terraform/envs/prod.tfvars.
         "project": os.environ.get("GCP_PROJECT_ID_PROD", "jugnu-prod-<unique>"),
-        "instance": "jugnu-db-prod",
+        "instance": "jugnu-db-production",
         "region": "us-central1",
     },
 }

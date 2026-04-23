@@ -39,6 +39,7 @@ from scripts._trigger_common import (  # noqa: E402
     emit_structured_result,
     project_for_env,
     run_gcloud,
+    tf_env_for,
     verify_gcloud_auth,
 )
 
@@ -86,8 +87,9 @@ def main() -> None:
     project = project_for_env(args.env)
     verify_gcloud_auth(project)
 
-    job_name = f"jugnu-scrape-{args.env}"
-    bucket_name = f"jugnu-raw-{args.env}"
+    tf_env = tf_env_for(args.env)
+    job_name = f"jugnu-scrape-{tf_env}"
+    bucket_name = f"jugnu-raw-{tf_env}"
     canary_csv = f"gs://{bucket_name}/canary/properties.csv"
     run_date = date.today().isoformat()
 

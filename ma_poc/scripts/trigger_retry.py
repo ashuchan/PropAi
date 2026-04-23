@@ -48,6 +48,7 @@ from scripts._trigger_common import (  # noqa: E402
     emit_structured_result,
     project_for_env,
     run_gcloud,
+    tf_env_for,
     verify_gcloud_auth,
 )
 
@@ -89,8 +90,9 @@ def main() -> None:
     if not args.dry_run:
         verify_gcloud_auth(project)
 
-    job_name = f"jugnu-retry-{args.env}"
-    bucket_name = f"jugnu-raw-{args.env}"
+    tf_env = tf_env_for(args.env)
+    job_name = f"jugnu-retry-{tf_env}"
+    bucket_name = f"jugnu-raw-{tf_env}"
     run_date = args.run_date or date.today().isoformat()
     csv_uri = f"gs://{bucket_name}/property-list/properties.csv"
 
