@@ -31,6 +31,8 @@ module = [
     "lxml.*",
     "bs4.*",
     "PIL.*",
+    "google.cloud.*",
+    "google.cloud.storage.*",
 ]
 ignore_missing_imports = true
 

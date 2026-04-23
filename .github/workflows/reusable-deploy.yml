@@ -349,11 +349,17 @@ jobs:
       - run: pip install -r ma_poc/requirements.txt
 
       - name: Upload property list
+        # The CSV lives at the repo root and is committed so every deploy sees
+        # the same source of truth. Previously the workflow pointed at
+        # `data/property-list/properties.csv`, which was never populated, so
+        # sync-csv silently skipped and prod started every run with no
+        # property list.
         run: |
-          if [ -f data/property-list/properties.csv ]; then
-            python ma_poc/scripts/deploy_csv_sync.py --env ${{ inputs.env }}
+          if [ -f properties.csv ]; then
+            python ma_poc/scripts/deploy_csv_sync.py --env ${{ inputs.env }} --path properties.csv
           else
-            echo "No property list CSV found at data/property-list/properties.csv — skipping"
+            echo "::error::properties.csv missing at repo root — deploy cannot seed the prod bucket."
+            exit 1
           fi
 
   # ── Steps 8-9: smoke test + mark known-good ───────────────────────────────────

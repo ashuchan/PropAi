@@ -39,6 +39,8 @@ for _p in (_app_root, _ma_poc_root):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+from ma_poc.storage import gcs  # noqa: E402
+
 
 def _require_env(name: str) -> str:
     val = os.environ.get(name)
@@ -48,12 +50,13 @@ def _require_env(name: str) -> str:
 
 
 def _download_gcs_dir(gcs_prefix: str, local_dir: Path) -> None:
-    """Download a GCS prefix recursively to a local directory."""
-    local_dir.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
-        ["gsutil", "-m", "cp", "-r", gcs_prefix.rstrip("/") + "/*", str(local_dir)],
-        check=False,  # dir may not exist for a fresh day — tolerate
-    )
+    """Download a GCS prefix recursively to a local directory.
+
+    Was ``gsutil -m cp -r``; the slim prod image no longer ships gsutil.
+    Uses the google-cloud-storage client instead. Missing prefix is
+    tolerated (fresh-day run): download_prefix returns 0.
+    """
+    gcs.download_prefix(gcs_prefix, local_dir)
 
 
 def _upload_artifacts(bucket_name: str, run_date: str, timestamp: str) -> None:
@@ -61,10 +64,7 @@ def _upload_artifacts(bucket_name: str, run_date: str, timestamp: str) -> None:
     if not local_run_dir.exists():
         return
     dest = f"gs://{bucket_name}/runs/{run_date}/retry-{timestamp}/"
-    subprocess.run(
-        ["gsutil", "-m", "cp", "-r", str(local_run_dir) + "/*", dest],
-        check=False,
-    )
+    gcs.upload_prefix(local_run_dir, dest)
     print(f"[retry_entry] Uploaded retry artifacts → {dest}", file=sys.stderr)
 
 
@@ -88,7 +88,7 @@ def main() -> None:
 
     # 4. Download CSV
     csv_local = Path("/tmp/properties.csv")
-    subprocess.run(["gsutil", "cp", csv_gcs_uri, str(csv_local)], check=True)
+    gcs.download_object(csv_gcs_uri, csv_local)
 
     # 5. Run the retry runner
     runner = _app_root / "ma_poc" / "scripts" / "jugnu_retry_runner.py"

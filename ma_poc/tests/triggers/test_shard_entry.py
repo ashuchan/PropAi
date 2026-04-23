@@ -92,38 +92,47 @@ class TestSliceCsv:
 
 class TestUploadArtifacts:
     def test_uploads_existing_artifacts(self, tmp_path: Path) -> None:
-        """When artifacts exist, gsutil cp is called for each one."""
+        """When artifacts exist, gcs.upload_object is called for each one.
+
+        Previously this test patched subprocess.run to observe gsutil
+        invocations; the entry script now uses google-cloud-storage
+        directly (gsutil is no longer in the prod image), so the mock
+        target moved to ma_poc.storage.gcs.upload_object.
+        """
         run_date = "2026-04-21"
         run_dir = tmp_path / "data" / "runs" / run_date
         run_dir.mkdir(parents=True)
         for fname in ("events.jsonl", "dlq.jsonl", "cost_ledger.db"):
             (run_dir / fname).write_text("data")
 
-        uploaded_srcs: list[str] = []
+        uploaded_pairs: list[tuple[Path, str]] = []
 
-        def fake_run(cmd: list[str], **kwargs: object) -> MagicMock:
-            if "gsutil" in cmd and "cp" in cmd:
-                uploaded_srcs.append(cmd[2])
-            return MagicMock(returncode=0)
+        def fake_upload(src: Path, uri: str, **kwargs: object) -> None:
+            uploaded_pairs.append((src, uri))
 
         import scripts.jugnu_shard_entry as m
 
         original_path_cls = m.Path
 
         def patched_path(s: str) -> Path:
-            # Redirect /tmp/data/... to our tmp_path/data/...
             if s.startswith("/tmp/"):
                 return tmp_path / s[len("/tmp/") :]
             return original_path_cls(s)
 
-        with patch("subprocess.run", side_effect=fake_run):
+        with patch("scripts.jugnu_shard_entry.gcs.upload_object", side_effect=fake_upload):
             m.Path = patched_path  # type: ignore[assignment]
             try:
                 _upload_artifacts("jugnu-raw-staging", run_date, 0)
             finally:
                 m.Path = original_path_cls  # type: ignore[assignment]
 
-        assert len(uploaded_srcs) == 3
+        assert len(uploaded_pairs) == 3
+        uris = {uri for _, uri in uploaded_pairs}
+        assert uris == {
+            f"gs://jugnu-raw-staging/runs/{run_date}/shard_0/events.jsonl",
+            f"gs://jugnu-raw-staging/runs/{run_date}/shard_0/dlq.jsonl",
+            f"gs://jugnu-raw-staging/runs/{run_date}/shard_0/cost_ledger.db",
+        }
 
     def test_missing_run_dir_does_not_crash(self, tmp_path: Path) -> None:
         """If the run dir doesn't exist, upload logs a warning but does not raise."""

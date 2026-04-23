@@ -41,6 +41,8 @@ for _p in (_app_root, _ma_poc_root):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+from ma_poc.storage import gcs  # noqa: E402
+
 
 def _require_env(name: str) -> str:
     val = os.environ.get(name)
@@ -50,10 +52,11 @@ def _require_env(name: str) -> str:
 
 
 def _download_csv(gcs_uri: str, dest: Path) -> None:
-    subprocess.run(
-        ["gsutil", "cp", gcs_uri, str(dest)],
-        check=True,
-    )
+    # Was ``subprocess.run(["gsutil", ...])`` — the slim prod image no
+    # longer ships gcloud/gsutil (see commit 4728b57 "Compacted docker
+    # image"), so the shell-out was failing at runtime with
+    # FileNotFoundError. Use the google-cloud-storage Python client.
+    gcs.download_object(gcs_uri, dest)
 
 
 def _slice_csv(src: Path, task_idx: int, task_count: int, limit: int | None) -> tuple[Path, int]:
@@ -95,11 +98,14 @@ def _upload_artifacts(bucket_name: str, run_date: str, task_idx: int) -> None:
     for artifact in ("events.jsonl", "dlq.jsonl", "cost_ledger.db"):
         local_path = local_run_dir / artifact
         if local_path.exists():
-            subprocess.run(
-                ["gsutil", "cp", str(local_path), dest_prefix + artifact],
-                check=False,  # don't abort on upload failures; log instead
-            )
-            print(f"[shard_entry] Uploaded {artifact} → {dest_prefix}", file=sys.stderr)
+            try:
+                gcs.upload_object(local_path, dest_prefix + artifact)
+                print(f"[shard_entry] Uploaded {artifact} → {dest_prefix}", file=sys.stderr)
+            except Exception as exc:  # noqa: BLE001 — must not mask runner exit
+                print(
+                    f"[shard_entry] Failed to upload {artifact}: {exc}",
+                    file=sys.stderr,
+                )
         else:
             print(f"[shard_entry] {artifact} not found; skipping", file=sys.stderr)
 

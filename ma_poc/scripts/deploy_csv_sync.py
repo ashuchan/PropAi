@@ -1,4 +1,4 @@
-"""deploy_csv_sync.py — sync data/property-list/properties.csv to GCS.
+"""deploy_csv_sync.py — sync the committed properties.csv to GCS.
 
 Called from the deploy workflow. Also runnable locally for testing.
 
@@ -10,7 +10,7 @@ Validates before uploading:
 
 Usage:
   python scripts/deploy_csv_sync.py --env staging
-  python scripts/deploy_csv_sync.py --env prod --path data/property-list/properties.csv
+  python scripts/deploy_csv_sync.py --env prod --path properties.csv
 """
 
 from __future__ import annotations
@@ -98,8 +98,8 @@ def main() -> None:
     p.add_argument("--env", choices=["staging", "prod"], required=True)
     p.add_argument(
         "--path",
-        default="data/property-list/properties.csv",
-        help="Local CSV path (default: data/property-list/properties.csv)",
+        default="properties.csv",
+        help="Local CSV path (default: properties.csv at repo root)",
     )
     args = p.parse_args()
     csv_path = Path(args.path)

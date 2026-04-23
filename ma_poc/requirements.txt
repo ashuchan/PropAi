@@ -27,3 +27,9 @@ rich>=13.7.1
 sqlalchemy>=2.0.30
 alembic>=1.13.0
 psycopg[binary]>=3.1.18
+
+# Required by Cloud Run entrypoints (jugnu_shard_entry.py,
+# jugnu_retry_entry.py) for GCS upload/download. The prod image no
+# longer ships gsutil, so shell-outs were replaced with the Python
+# client — see ma_poc/storage/gcs.py.
+google-cloud-storage>=2.10.0
