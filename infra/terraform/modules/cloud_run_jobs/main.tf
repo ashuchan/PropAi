@@ -46,6 +46,23 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
           name  = "DATABASE_URL"
           value = "postgresql://${var.worker_sa_email}@${var.sql_private_ip}:5432/jugnu?sslmode=require"
         }
+        # ma_poc/data_provider/factory.py defaults to "filesystem", which
+        # writes events.jsonl + cost_ledger.db to GCS instead of the
+        # Postgres tables alembic created. Set "postgres" so scrape
+        # output lands in the DB. Swap to "dual" temporarily if you want
+        # belt-and-braces GCS + PG writes during a cutover.
+        env {
+          name  = "DATA_PROVIDER"
+          value = "postgres"
+        }
+        # The Postgres schema this deploy's migrations created is v2
+        # (alembic 0002_v2_strict). Jugnu runner reads SCHEMA_VERSION to
+        # pick the correct unit-dict shape and output directory
+        # (ma_poc/scripts/jugnu_runner.py:_resolve_data_dirs).
+        env {
+          name  = "SCHEMA_VERSION"
+          value = "v2"
+        }
         # Selects the text LLM provider in ma_poc/llm/factory.py. Default
         # there is "anthropic", which reads ANTHROPIC_API_KEY — not the
         # key this job has. Without this override the canary's LLM
@@ -137,7 +154,15 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
           name  = "DATABASE_URL"
           value = "postgresql://${var.worker_sa_email}@${var.sql_private_ip}:5432/jugnu?sslmode=require"
         }
-        # See scrape-job comment above — same reason.
+        # See scrape-job block above — same rationale for all three.
+        env {
+          name  = "DATA_PROVIDER"
+          value = "postgres"
+        }
+        env {
+          name  = "SCHEMA_VERSION"
+          value = "v2"
+        }
         env {
           name  = "LLM_PROVIDER"
           value = "openrouter"
