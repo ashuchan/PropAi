@@ -38,12 +38,26 @@ resource "google_project_iam_member" "worker_secret_accessor" {
   member  = "serviceAccount:${google_service_account.worker.email}"
 }
 
-# Replaces the old objectCreator + objectViewer pair. objectCreator can only
-# create NEW objects, not overwrite existing ones (overwrite = delete + create,
-# and delete was missing). Every re-run on the same day hit 403 on artifact
-# upload because ``events.jsonl`` / ``cost_ledger.db`` already existed from
-# an earlier run. objectUser adds list + read + create + delete so the
-# artifact upload path is idempotent across re-runs.
+resource "google_project_iam_member" "worker_storage_creator" {
+  project = var.project_id
+  role    = "roles/storage.objectCreator"
+  member  = "serviceAccount:${google_service_account.worker.email}"
+}
+
+resource "google_project_iam_member" "worker_storage_viewer" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${google_service_account.worker.email}"
+}
+
+# objectCreator can only create NEW objects — overwrite is delete + create,
+# and delete wasn't granted by the creator+viewer pair above. Every re-run
+# on the same day hit 403 on artifact upload (events.jsonl already existed
+# from an earlier run). Added objectUser here to cover delete/update without
+# removing the existing roles, because removing a google_project_iam_member
+# shows in the plan as "will be destroyed" and the deploy workflow blocks
+# any destructive change on prod. objectUser + creator + viewer is
+# redundant but harmless — IAM is additive — and leaves the plan clean.
 resource "google_project_iam_member" "worker_storage_user" {
   project = var.project_id
   role    = "roles/storage.objectUser"
