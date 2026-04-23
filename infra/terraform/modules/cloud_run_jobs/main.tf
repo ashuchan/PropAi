@@ -55,6 +55,16 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
           name  = "LLM_PROVIDER"
           value = "openrouter"
         }
+        # Model IDs — read by ma_poc/llm/openrouter.py. Tune per env in
+        # envs/*.tfvars if staging should differ from prod.
+        env {
+          name  = "OPENROUTER_MODEL"
+          value = var.openrouter_model
+        }
+        env {
+          name  = "OPENROUTER_VISION_MODEL"
+          value = var.openrouter_vision_model
+        }
         env {
           name = "OPENROUTER_API_KEY"
           value_source {
@@ -131,6 +141,14 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
         env {
           name  = "LLM_PROVIDER"
           value = "openrouter"
+        }
+        env {
+          name  = "OPENROUTER_MODEL"
+          value = var.openrouter_model
+        }
+        env {
+          name  = "OPENROUTER_VISION_MODEL"
+          value = var.openrouter_vision_model
         }
         env {
           name = "OPENROUTER_API_KEY"

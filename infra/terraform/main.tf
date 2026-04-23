@@ -47,6 +47,8 @@ module "cloud_run_jobs" {
   bucket_name                 = module.storage.bucket_name
   openrouter_secret_id        = module.secrets.openrouter_secret_id
   proxy_credentials_secret_id = module.secrets.proxy_credentials_secret_id
+  openrouter_model            = var.openrouter_model
+  openrouter_vision_model     = var.openrouter_vision_model
   default_task_count          = var.default_task_count
   browsers_per_task           = var.browsers_per_task
   task_cpu                    = var.task_cpu

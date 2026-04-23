@@ -67,3 +67,19 @@ variable "db_tier" {
   default     = "db-f1-micro"
   description = "Cloud SQL machine tier; upgrade to db-g1-small when task_count > 15"
 }
+
+# LLM model ids passed through to the Cloud Run jobs as env vars.
+# These are public identifiers (see openrouter.ai/models), not secrets.
+# Override per environment in envs/*.tfvars when staging should differ
+# from prod. Defaults match ma_poc/llm/openrouter.py.
+variable "openrouter_model" {
+  type        = string
+  default     = "tencent/hy3-preview:free"
+  description = "OpenRouter text model id for ma_poc.llm.openrouter."
+}
+
+variable "openrouter_vision_model" {
+  type        = string
+  default     = "tencent/hy3-preview:free"
+  description = "OpenRouter vision model id for ma_poc.llm.openrouter."
+}

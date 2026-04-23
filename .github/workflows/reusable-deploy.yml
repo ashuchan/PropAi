@@ -399,9 +399,23 @@ jobs:
 
       - name: Tag image as known-good
         run: |
-          SOURCE_URI="${{ needs.build-and-push.outputs.image-uri }}"
+          # Reconstruct the source URI from the deterministic parts used
+          # by build-and-push (same env + SHA formula). This used to read
+          # ``needs.build-and-push.outputs.image-uri`` directly, but that
+          # expression comes back empty when someone clicks "Re-run failed
+          # jobs" in the GitHub UI — upstream outputs aren't always
+          # rehydrated, and gcloud then fails with "Invalid Docker image".
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-12)
+          SOURCE_TAG="${{ inputs.env }}-${SHORT_SHA}"
+          SOURCE_URI="${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/jugnu:${SOURCE_TAG}"
           TARGET_TAG="${{ inputs.env }}-known-good"
           TARGET_URI="${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/jugnu:${TARGET_TAG}"
+
+          if [[ -z "$SHORT_SHA" ]]; then
+            echo "::error::github.sha expanded to empty; cannot construct image URI."
+            exit 1
+          fi
+
           gcloud artifacts docker tags add "$SOURCE_URI" "$TARGET_URI" \
             --project=${{ secrets.GCP_PROJECT_ID }}
           echo "Tagged $SOURCE_URI as $TARGET_URI"
