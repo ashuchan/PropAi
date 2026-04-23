@@ -8,6 +8,11 @@ Validates before uploading:
   - Non-empty rows
   - No duplicate canonical_ids
 
+Uploads two objects:
+  - ``property-list/properties.csv`` — the full CSV the nightly scrape reads.
+  - ``canary/properties.csv``        — the first ``CANARY_ROWS`` rows,
+    consumed by ``trigger_smoke.py`` for the deploy-time canary run.
+
 Usage:
   python scripts/deploy_csv_sync.py --env staging
   python scripts/deploy_csv_sync.py --env prod --path properties.csv
@@ -19,6 +24,7 @@ import argparse
 import csv
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 # Canonical header for the property-list CSV
@@ -49,10 +55,10 @@ def validate(path: Path) -> None:
 
     # Second pass: count rows and check for duplicate canonical_ids
     with path.open(newline="") as f:
-        reader = csv.DictReader(f)
+        dict_reader = csv.DictReader(f)
         seen: set[str] = set()
         n = 0
-        for row_num, row in enumerate(reader, start=2):
+        for row_num, row in enumerate(dict_reader, start=2):
             # Skip blank rows
             if not any(row.values()):
                 continue
@@ -77,20 +83,55 @@ def validate(path: Path) -> None:
 _TF_ENV: dict[str, str] = {"staging": "staging", "prod": "production"}
 
 
-def upload(path: Path, env: str) -> None:
-    tf_env = _TF_ENV.get(env, env)
-    target = f"gs://jugnu-raw-{tf_env}/property-list/properties.csv"
+# Number of data rows (excluding header) pushed into canary/properties.csv.
+# trigger_smoke.py sets LIMIT=3 on the smoke run, so 5 is a conservative
+# buffer that keeps the canary small without risk of a bad-row shadow.
+CANARY_ROWS = 5
+
+
+def _gsutil_cp(src: Path, dest_uri: str) -> None:
     subprocess.check_call(
         [
             "gsutil",
             "-h",
             "Cache-Control:no-cache",
             "cp",
-            str(path),
-            target,
+            str(src),
+            dest_uri,
         ]
     )
-    print(f"✓ uploaded to {target}", file=sys.stderr)
+    print(f"✓ uploaded to {dest_uri}", file=sys.stderr)
+
+
+def upload(path: Path, env: str) -> None:
+    tf_env = _TF_ENV.get(env, env)
+    bucket = f"gs://jugnu-raw-{tf_env}"
+    _gsutil_cp(path, f"{bucket}/property-list/properties.csv")
+
+    # Also refresh the canary file that trigger_smoke.py reads. The smoke
+    # job fails with 404 at fetch time if this object is missing, so it
+    # has to be written on every deploy — not just once by hand.
+    with tempfile.NamedTemporaryFile(
+        mode="w", newline="", suffix=".csv", delete=False
+    ) as tmp:
+        canary_path = Path(tmp.name)
+        try:
+            with path.open(newline="") as src:
+                reader = csv.reader(src)
+                writer = csv.writer(tmp)
+                # Preserve the header exactly as-is.
+                header = next(reader, None)
+                if header is not None:
+                    writer.writerow(header)
+                for i, row in enumerate(reader):
+                    if i >= CANARY_ROWS:
+                        break
+                    writer.writerow(row)
+            tmp.flush()
+            tmp.close()
+            _gsutil_cp(canary_path, f"{bucket}/canary/properties.csv")
+        finally:
+            canary_path.unlink(missing_ok=True)
 
 
 def main() -> None:
