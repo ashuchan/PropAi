@@ -145,16 +145,39 @@ jobs:
             echo "Instance $INSTANCE is already RUNNABLE."
             exit 0
           fi
-          echo "Instance $INSTANCE state: $state — starting..."
+
+          # Fire-and-forget the patch. `gcloud sql instances patch` without
+          # --async blocks synchronously for however long Cloud SQL takes
+          # to wake (observed: 5+ min on cold starts). Submit the op, then
+          # poll state ourselves with a real deadline.
+          echo "Instance $INSTANCE state: $state — submitting wake operation..."
           gcloud sql instances patch "$INSTANCE" \
-            --project="$PROJECT" --activation-policy=ALWAYS --quiet
-          for i in $(seq 1 36); do
-            sleep 5
+            --project="$PROJECT" --activation-policy=ALWAYS --async --quiet
+
+          # Poll up to 10 min. Valid transient states: MAINTENANCE,
+          # PENDING_CREATE, PENDING_DELETE. Anything else terminal we bail.
+          deadline=$(( $(date +%s) + 600 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            sleep 10
             state=$(gcloud sql instances describe "$INSTANCE" \
-              --project="$PROJECT" --format='value(state)')
-            [ "$state" = "RUNNABLE" ] && echo "Instance is RUNNABLE" && break
+              --project="$PROJECT" --format='value(state)' 2>/dev/null || echo "UNKNOWN")
+            echo "  state=$state"
+            case "$state" in
+              RUNNABLE)
+                echo "Instance is RUNNABLE."
+                exit 0
+                ;;
+              MAINTENANCE|PENDING_CREATE|UNKNOWN)
+                continue
+                ;;
+              *)
+                echo "::error::Instance entered unexpected state '$state' during wake. Aborting."
+                exit 1
+                ;;
+            esac
           done
-          [ "$state" = "RUNNABLE" ] || { echo "Instance did not start in time"; exit 1; }
+          echo "::error::Instance $INSTANCE still not RUNNABLE after 10 minutes (last state: $state)."
+          exit 1
 
       - name: Plan
         id: plan
@@ -208,6 +231,8 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
 
       - name: Wake Cloud SQL
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
         run: |
           # Workflow input is the short name (prod/staging) so it matches
           # image tag conventions, but the Cloud SQL instance name comes
@@ -218,27 +243,43 @@ jobs:
             *)    TF_ENV="${{ inputs.env }}" ;;
           esac
           INSTANCE="jugnu-db-${TF_ENV}"
-          # No 2>/dev/null here — if describe fails we want to see the reason,
-          # not coerce it to "UNKNOWN" and then fail opaquely at patch.
+
           state=$(gcloud sql instances describe "$INSTANCE" \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --format='value(state)')
-          if [ "$state" != "RUNNABLE" ]; then
-            echo "SQL state: $state — starting..."
-            gcloud sql instances patch "$INSTANCE" \
-              --project=${{ secrets.GCP_PROJECT_ID }} \
-              --activation-policy=ALWAYS --quiet
-            for i in $(seq 1 36); do
-              sleep 5
-              state=$(gcloud sql instances describe "$INSTANCE" \
-                --project=${{ secrets.GCP_PROJECT_ID }} \
-                --format='value(state)')
-              [ "$state" = "RUNNABLE" ] && echo "SQL is RUNNABLE" && break
-            done
-            [ "$state" = "RUNNABLE" ] || { echo "SQL did not start in time"; exit 1; }
-          else
+            --project="$PROJECT" --format='value(state)')
+          if [ "$state" = "RUNNABLE" ]; then
             echo "SQL is already RUNNABLE"
+            exit 0
           fi
+
+          # --async: submit the patch and return immediately. A synchronous
+          # patch can block for 5+ min on cold starts; poll explicitly
+          # instead with a deadline we control.
+          echo "SQL state: $state — submitting wake operation..."
+          gcloud sql instances patch "$INSTANCE" \
+            --project="$PROJECT" --activation-policy=ALWAYS --async --quiet
+
+          deadline=$(( $(date +%s) + 600 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            sleep 10
+            state=$(gcloud sql instances describe "$INSTANCE" \
+              --project="$PROJECT" --format='value(state)' 2>/dev/null || echo "UNKNOWN")
+            echo "  state=$state"
+            case "$state" in
+              RUNNABLE)
+                echo "SQL is RUNNABLE."
+                exit 0
+                ;;
+              MAINTENANCE|PENDING_CREATE|UNKNOWN)
+                continue
+                ;;
+              *)
+                echo "::error::Instance entered unexpected state '$state' during wake. Aborting."
+                exit 1
+                ;;
+            esac
+          done
+          echo "::error::SQL instance $INSTANCE still not RUNNABLE after 10 minutes (last state: $state)."
+          exit 1
 
   # ── Step 6: migrations ─────────────────────────────────────────────────────────
   migrate:
