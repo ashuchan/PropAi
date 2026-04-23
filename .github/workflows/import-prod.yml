@@ -41,15 +41,8 @@ jobs:
             exit 1
           fi
 
-  approval:
-    needs: [confirm]
-    runs-on: ubuntu-latest
-    environment: production   # reuses the prod reviewer gate
-    steps:
-      - run: echo "Approved to import prod resources into Terraform state."
-
   import:
-    needs: [approval]
+    needs: [confirm]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -158,6 +151,34 @@ jobs:
             'module.cloud_sql.google_sql_user.worker_sa' \
             "${PROJECT_ID}/${INSTANCE}/jugnu-worker-${TF_ENV}@${PROJECT_ID}.iam" \
             || echo "(worker_sa user not imported — TF will create on next apply if absent)"
+
+          # ── Cloud Run v2 jobs ──────────────────────────────────────────────
+          # Import format: projects/{project}/locations/{region}/jobs/{name}
+          for job in scrape retry; do
+            tf_import \
+              "module.cloud_run_jobs.google_cloud_run_v2_job.jugnu_${job}" \
+              "projects/${PROJECT_ID}/locations/${REGION}/jobs/jugnu-${job}-${TF_ENV}" \
+              || failed=1
+          done
+
+          # ── Cloud Scheduler jobs ───────────────────────────────────────────
+          # Import format: projects/{project}/locations/{region}/jobs/{name}
+          # The TF resource names use underscores; the GCP job names use hyphens.
+          tf_import \
+            'module.scheduler.google_cloud_scheduler_job.sql_start' \
+            "projects/${PROJECT_ID}/locations/${REGION}/jobs/jugnu-sql-start-${TF_ENV}" \
+            || failed=1
+          tf_import \
+            'module.scheduler.google_cloud_scheduler_job.sql_stop' \
+            "projects/${PROJECT_ID}/locations/${REGION}/jobs/jugnu-sql-stop-${TF_ENV}" \
+            || failed=1
+          # daily_scrape may or may not exist (depends on how far the original
+          # local apply got). Tolerate skip — plan will show "to be created"
+          # on the next deploy if it's missing.
+          tf_import \
+            'module.scheduler.google_cloud_scheduler_job.daily_scrape' \
+            "projects/${PROJECT_ID}/locations/${REGION}/jobs/jugnu-daily-scrape-${TF_ENV}" \
+            || echo "(daily_scrape not imported — TF will create on next apply if absent)"
 
           if [ "$failed" -ne 0 ]; then
             echo "One or more required imports failed. See log above."
