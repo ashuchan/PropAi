@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -32,9 +33,17 @@ MAX_TASKS_G1_SMALL: int = 20  # db-g1-small: ~50 connections
 ABSOLUTE_MAX_TASKS: int = 40  # Cloud Run parallelism ceiling we're willing to pay for
 
 # Environment → GCP project mapping.  Keep in sync with infra/terraform/envs/*.tfvars.
+# Resolution order: GCP_PROJECT_ID_{STAGING,PROD} → GCP_PROJECT_ID → placeholder.
+# Placeholders are left so `--help` works without env; any real use must override.
 _ENV_PROJECTS: dict[str, str] = {
-    "staging": "jugnu-staging-<unique>",
-    "prod": "jugnu-prod-<unique>",
+    "staging": os.environ.get(
+        "GCP_PROJECT_ID_STAGING",
+        os.environ.get("GCP_PROJECT_ID", "jugnu-staging-<unique>"),
+    ),
+    "prod": os.environ.get(
+        "GCP_PROJECT_ID_PROD",
+        os.environ.get("GCP_PROJECT_ID", "jugnu-prod-<unique>"),
+    ),
 }
 
 # The short env name ("prod"/"staging") matches image-tag conventions and

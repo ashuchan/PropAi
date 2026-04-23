@@ -381,7 +381,15 @@ jobs:
       - run: pip install -r ma_poc/requirements.txt
 
       - name: Run smoke test
-        run: python ma_poc/scripts/trigger_smoke.py --env ${{ inputs.env }} --yes
+        # trigger_smoke.py is CI-only and has no confirmation prompt, so no
+        # --yes (that flag lives on trigger_run.py / trigger_retry.py).
+        # _trigger_common resolves the project from GCP_PROJECT_ID_{STAGING,PROD}
+        # with GCP_PROJECT_ID as a fallback; forward the single CI secret so
+        # the lookup doesn't hit its placeholder.
+        env:
+          GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID }}
+        run: python ma_poc/scripts/trigger_smoke.py --env ${{ inputs.env }}
 
       - name: Tag image as known-good
         run: |
