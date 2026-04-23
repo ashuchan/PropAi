@@ -1,0 +1,182 @@
+name: Import existing prod resources into Terraform state
+
+# One-shot workflow to reconcile Terraform state with resources that already
+# exist in GCP (created by an earlier local `terraform apply` whose state was
+# lost). Manually triggered, guarded by production environment approval.
+#
+# After a successful run, re-run Deploy to production — the 409 errors should
+# be gone. If `terraform plan` still reports "to be created" for a resource
+# listed here, check the Import step output for a skipped/failed import.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "import-prod" to confirm'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-prod          # share the deploy-prod lock; never race an apply
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write             # required for WIF
+
+env:
+  REGION: us-central1
+  TF_ENV: production          # matches envs/prod.tfvars `env`
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID_PROD }}
+  INSTANCE: jugnu-db-production
+
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify confirmation string
+        run: |
+          if [ "${{ inputs.confirm }}" != "import-prod" ]; then
+            echo "Confirmation string did not match. Aborting."
+            exit 1
+          fi
+
+  approval:
+    needs: [confirm]
+    runs-on: ubuntu-latest
+    environment: production   # reuses the prod reviewer gate
+    steps:
+      - run: echo "Approved to import prod resources into Terraform state."
+
+  import:
+    needs: [approval]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SA_PROD }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+
+      - name: Init (prod backend)
+        run: |
+          terraform init \
+            -backend-config="bucket=jugnu-tfstate-prod" \
+            -backend-config="prefix=terraform/state"
+
+      - name: Import existing resources
+        env:
+          # image_tag is required by variables.tf but unused by imports
+          TF_VAR_ARGS: >-
+            -var-file=envs/prod.tfvars
+            -var=project_id=${{ env.PROJECT_ID }}
+            -var=image_tag=placeholder
+        run: |
+          set -u
+
+          # Idempotent import: skip if address already tracked in state.
+          tf_import() {
+            local addr="$1"
+            local id="$2"
+            if terraform state show "$addr" >/dev/null 2>&1; then
+              echo "SKIP  $addr (already in state)"
+              return 0
+            fi
+            echo "IMPORT $addr  <-  $id"
+            # shellcheck disable=SC2086
+            terraform import $TF_VAR_ARGS "$addr" "$id" || {
+              echo "FAIL  $addr (see error above)"
+              return 1
+            }
+          }
+
+          failed=0
+
+          # ── Artifact Registry ──────────────────────────────────────────────
+          tf_import \
+            'module.artifact_registry.google_artifact_registry_repository.jugnu_images' \
+            "projects/${PROJECT_ID}/locations/${REGION}/repositories/jugnu-images" \
+            || failed=1
+
+          # ── IAM service accounts ───────────────────────────────────────────
+          for sa in worker scheduler cleanup; do
+            tf_import \
+              "module.iam.google_service_account.${sa}" \
+              "projects/${PROJECT_ID}/serviceAccounts/jugnu-${sa}-${TF_ENV}@${PROJECT_ID}.iam.gserviceaccount.com" \
+              || failed=1
+          done
+
+          # ── Secrets ────────────────────────────────────────────────────────
+          tf_import \
+            'module.secrets.google_secret_manager_secret.openrouter_api_key' \
+            "projects/${PROJECT_ID}/secrets/openrouter-api-key-${TF_ENV}" \
+            || failed=1
+          tf_import \
+            'module.secrets.google_secret_manager_secret.proxy_credentials' \
+            "projects/${PROJECT_ID}/secrets/proxy-credentials-${TF_ENV}" \
+            || failed=1
+
+          # ── GCS bucket ─────────────────────────────────────────────────────
+          tf_import \
+            'module.storage.google_storage_bucket.jugnu_raw' \
+            "jugnu-raw-${TF_ENV}" \
+            || failed=1
+
+          # ── Cloud SQL instance + VPC connector ─────────────────────────────
+          tf_import \
+            'module.cloud_sql.google_sql_database_instance.jugnu_db' \
+            "${PROJECT_ID}/${INSTANCE}" \
+            || failed=1
+          tf_import \
+            'module.cloud_sql.google_vpc_access_connector.jugnu-con' \
+            "projects/${PROJECT_ID}/locations/${REGION}/connectors/jugnu-con-${TF_ENV}" \
+            || failed=1
+
+          # ── Cloud SQL database + users (may or may not exist; tolerate skip) ─
+          # If these were created by the local apply, they'll import.
+          # If they weren't, plan will show them as "to be created" and the
+          # next deploy-prod run will create them normally.
+          tf_import \
+            'module.cloud_sql.google_sql_database.jugnu' \
+            "${PROJECT_ID}/${INSTANCE}/jugnu" \
+            || echo "(google_sql_database.jugnu not imported — TF will create on next apply if absent)"
+
+          tf_import \
+            'module.cloud_sql.google_sql_user.developers["ashu@surgexdigital.com"]' \
+            "${PROJECT_ID}/${INSTANCE}/ashu@surgexdigital.com" \
+            || echo "(developers[ashu] not imported — TF will create on next apply if absent)"
+
+          tf_import \
+            'module.cloud_sql.google_sql_user.worker_sa' \
+            "${PROJECT_ID}/${INSTANCE}/jugnu-worker-${TF_ENV}@${PROJECT_ID}.iam" \
+            || echo "(worker_sa user not imported — TF will create on next apply if absent)"
+
+          if [ "$failed" -ne 0 ]; then
+            echo "One or more required imports failed. See log above."
+            exit 1
+          fi
+
+      - name: Plan (read-only verification)
+        env:
+          TF_VAR_ARGS: >-
+            -var-file=envs/prod.tfvars
+            -var=project_id=${{ env.PROJECT_ID }}
+            -var=image_tag=placeholder
+        run: |
+          echo "::group::terraform plan after import"
+          # shellcheck disable=SC2086
+          terraform plan $TF_VAR_ARGS -no-color || true
+          echo "::endgroup::"
+          echo ""
+          echo "Review the plan above. Remaining 'will be created' entries are"
+          echo "expected for IAM members (additive, safe) and possibly the"
+          echo "Cloud SQL database/users if they weren't created locally."
+          echo "Trigger Deploy to production to apply."
