@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import argparse
 import os
+import queue
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -104,27 +106,88 @@ def ensure_sql_running(project: str, instance: str) -> None:
     sys.exit(f"Timeout waiting for {instance} to become RUNNABLE")
 
 
+_PROXY_READY_TIMEOUT_SEC = 30.0
+
+
+def _drain_stderr_to_queue(
+    proc: subprocess.Popen[bytes], q: queue.Queue[str | None]
+) -> None:
+    """Pump proc.stderr lines onto *q* in a thread, sentinel None on EOF."""
+    assert proc.stderr is not None
+    try:
+        for raw in iter(proc.stderr.readline, b""):
+            q.put(raw.decode("utf-8", errors="replace"))
+    finally:
+        q.put(None)
+
+
 @contextmanager
 def cloud_sql_proxy(project: str, instance: str, region: str = "us-central1") -> Generator[None, None, None]:
-    """Spawn cloud-sql-proxy; yield when ready; terminate on exit."""
+    """Spawn cloud-sql-proxy; yield when ready; terminate on exit.
+
+    stderr is drained on a background thread so a silent-retry in the proxy
+    (e.g. missing roles/cloudsql.client on the caller's SA) cannot hang the
+    ready-wait via a blocking readline. Times out after
+    ``_PROXY_READY_TIMEOUT_SEC``; also exits early if the proxy process
+    dies before writing "ready for new connections".
+    """
     conn_name = f"{project}:{region}:{instance}"
     proc = subprocess.Popen(
         ["cloud-sql-proxy", "--port=5432", conn_name],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+    lines: queue.Queue[str | None] = queue.Queue()
+    pump = threading.Thread(
+        target=_drain_stderr_to_queue, args=(proc, lines), daemon=True
+    )
+    pump.start()
+
     try:
         ready = False
-        for _ in range(20):
-            assert proc.stderr is not None
-            line = proc.stderr.readline().decode("utf-8", errors="replace")
+        seen: list[str] = []
+        deadline = time.monotonic() + _PROXY_READY_TIMEOUT_SEC
+        while time.monotonic() < deadline:
+            # Proxy crashed before becoming ready → surface its output.
+            if proc.poll() is not None:
+                while True:
+                    try:
+                        ln = lines.get_nowait()
+                    except queue.Empty:
+                        break
+                    if ln is None:
+                        break
+                    seen.append(ln.rstrip())
+                sys.exit(
+                    f"cloud-sql-proxy exited with code {proc.returncode} "
+                    f"before becoming ready. stderr:\n" + "\n".join(seen)
+                )
+            try:
+                line = lines.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            if line is None:
+                break
+            seen.append(line.rstrip())
             if "ready for new connections" in line.lower():
                 ready = True
                 break
-            time.sleep(0.5)
+
         if not ready:
             proc.terminate()
-            sys.exit("cloud-sql-proxy failed to become ready")
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            sys.exit(
+                "cloud-sql-proxy did not become ready in "
+                f"{_PROXY_READY_TIMEOUT_SEC:.0f}s. Common causes:\n"
+                "  - the caller's SA lacks roles/cloudsql.client on the project\n"
+                "  - the caller's SA has no CLOUD_IAM_SERVICE_ACCOUNT user on "
+                f"instance {instance}\n"
+                "  - the instance is not RUNNABLE\n"
+                "stderr so far:\n" + "\n".join(seen)
+            )
         yield
     finally:
         proc.terminate()
