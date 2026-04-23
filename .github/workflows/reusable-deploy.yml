@@ -115,18 +115,72 @@ jobs:
             -backend-config="bucket=jugnu-tfstate-${{ inputs.env }}" \
             -backend-config="prefix=terraform/state"
 
+      # terraform plan refreshes the google_sql_user resources, which the
+      # Google provider cannot read while the instance has
+      # activation_policy=NEVER ("instance is not running"). On a repeat
+      # deploy the instance already exists but is stopped by the nightly
+      # stop-cron — wake it here. On a genuine first-time deploy the
+      # instance doesn't exist yet and this step is a no-op (404 tolerated);
+      # terraform-apply creates it, and the post-apply ensure-sql job below
+      # handles waking it for subsequent steps.
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Wake Cloud SQL before plan (if instance exists)
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          case "${{ inputs.env }}" in
+            prod) TF_ENV="production" ;;
+            *)    TF_ENV="${{ inputs.env }}" ;;
+          esac
+          INSTANCE="jugnu-db-${TF_ENV}"
+
+          state=$(gcloud sql instances describe "$INSTANCE" \
+            --project="$PROJECT" --format='value(state)' 2>/dev/null || echo "NOT_FOUND")
+          if [ "$state" = "NOT_FOUND" ]; then
+            echo "Instance $INSTANCE does not exist yet — first-time deploy. Skipping wake."
+            exit 0
+          fi
+          if [ "$state" = "RUNNABLE" ]; then
+            echo "Instance $INSTANCE is already RUNNABLE."
+            exit 0
+          fi
+          echo "Instance $INSTANCE state: $state — starting..."
+          gcloud sql instances patch "$INSTANCE" \
+            --project="$PROJECT" --activation-policy=ALWAYS --quiet
+          for i in $(seq 1 36); do
+            sleep 5
+            state=$(gcloud sql instances describe "$INSTANCE" \
+              --project="$PROJECT" --format='value(state)')
+            [ "$state" = "RUNNABLE" ] && echo "Instance is RUNNABLE" && break
+          done
+          [ "$state" = "RUNNABLE" ] || { echo "Instance did not start in time"; exit 1; }
+
       - name: Plan
         id: plan
         run: |
+          # -detailed-exitcode: 0=no changes, 1=plan error, 2=changes present.
+          # The old script swallowed all exit codes via `|| true`, which let
+          # plan errors fall through to `terraform apply` — which then failed
+          # with the unhelpful "Cannot apply incomplete plan". Capture the
+          # exit code, print the plan, and fail fast on 1.
+          set +e
           terraform plan \
             -var-file=envs/${{ inputs.env }}.tfvars \
             -var="image_tag=${{ needs.build-and-push.outputs.image-tag }}" \
             -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
             -out=tfplan \
             -detailed-exitcode \
-            -no-color > plan.txt 2>&1 || true
+            -no-color > plan.txt 2>&1
+          rc=$?
+          set -e
           cat plan.txt
-          # Flag destructive changes
+          if [ "$rc" -eq 1 ]; then
+            echo ""
+            echo "::error::terraform plan failed (exit 1). See plan.txt output above."
+            exit 1
+          fi
+          # Flag destructive changes (only relevant when rc=2, i.e. changes)
           if grep -qE '# .+ will be destroyed' plan.txt; then
             echo "destructive=true" >> $GITHUB_OUTPUT
           fi
