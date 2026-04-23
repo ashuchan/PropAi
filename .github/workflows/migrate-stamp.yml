@@ -1,0 +1,85 @@
+name: migrate-stamp
+
+# One-shot `alembic stamp` for the Cloud SQL DB.
+#
+# Use this when the DB's alembic_version column holds a revision ID that no
+# longer exists in the migrations tree (e.g. the legacy '000_initial_schema'
+# stub from the old infra/sql/ tree) but the physical schema already matches
+# a known revision. Stamping rewrites alembic_version without running any
+# DDL. NEVER use this to skip a real migration.
+#
+# Normal deploys (deploy-staging.yml / deploy-prod.yml) keep using
+# `migrate.py up` — this workflow is deliberately separate so a stamp can
+# never fire by accident on merge.
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, prod]
+      revision:
+        description: "Alembic revision to stamp to (e.g. 0005_drop_lsdate)"
+        required: true
+        type: string
+
+concurrency:
+  group: migrate-stamp-${{ inputs.env }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write    # required for Workload Identity Federation
+
+jobs:
+  stamp:
+    runs-on: ubuntu-latest
+    # `production` Environment has required reviewers — human approval gate
+    # before the DB is touched. Staging uses the same env for simplicity;
+    # if you want a separate unsatisfied gate for staging, create an
+    # Environment named 'staging' with reviewers and wire it below.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ inputs.env == 'prod' && secrets.WIF_SA_PROD || secrets.WIF_SA_STAGING }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ma_poc/requirements.txt
+
+      - run: pip install -r ma_poc/requirements.txt
+
+      - name: Install cloud-sql-proxy
+        run: |
+          curl -o cloud-sql-proxy \
+            https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.2/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+          sudo mv cloud-sql-proxy /usr/local/bin/
+
+      - name: Show current revision (before stamp)
+        env:
+          GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID_STAGING }}
+          GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID_PROD }}
+        run: python ma_poc/scripts/migrate.py --env ${{ inputs.env }} status || true
+
+      - name: Stamp alembic_version
+        env:
+          GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID_STAGING }}
+          GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID_PROD }}
+        run: python ma_poc/scripts/migrate.py --env ${{ inputs.env }} stamp ${{ inputs.revision }}
+
+      - name: Show current revision (after stamp)
+        env:
+          GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID_STAGING }}
+          GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID_PROD }}
+        run: python ma_poc/scripts/migrate.py --env ${{ inputs.env }} status

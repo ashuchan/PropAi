@@ -50,9 +50,20 @@ ENV_CONFIG: dict[str, dict[str, str]] = {
     },
 }
 
-# Repo root (2 levels up from ma_poc/scripts/)
+# Repo root (2 levels up from ma_poc/scripts/).
+#
+# The authoritative alembic tree lives at ma_poc/data_provider/alembic/ with
+# its ini at ma_poc/alembic.ini (script_location is relative). The older
+# infra/sql/ tree only contains the initial-schema stub and is no longer the
+# source of truth — pointing here used to apply migrations against a tree
+# that did not include 0002_v2_strict onwards, so prod sat at
+# "000_initial_schema" forever while the app wrote v2-shaped rows.
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-ALEMBIC_CONFIG = _REPO_ROOT / "infra" / "sql" / "alembic.ini"
+_MA_POC_DIR = _REPO_ROOT / "ma_poc"
+ALEMBIC_CONFIG = _MA_POC_DIR / "alembic.ini"
+# Relative paths in ma_poc/alembic.ini (script_location, prepend_sys_path) are
+# resolved against the process cwd, so alembic must be invoked from here.
+ALEMBIC_CWD = _MA_POC_DIR
 
 
 def ensure_sql_running(project: str, instance: str) -> None:
@@ -266,6 +277,16 @@ def main() -> None:
     down_p.add_argument("--steps", type=int, default=1)
     upto_p = sub.add_parser("up-to", help="Upgrade to a specific revision")
     upto_p.add_argument("revision")
+    # One-shot repair for envs whose alembic_version is an ID that no longer
+    # exists in the current tree (e.g. the legacy "000_initial_schema" stub
+    # from infra/sql/). Stamps the DB to an existing revision WITHOUT running
+    # any DDL — use when you know the physical schema already matches that
+    # revision's end-state.
+    stamp_p = sub.add_parser(
+        "stamp",
+        help="Force alembic_version to a revision without running migrations.",
+    )
+    stamp_p.add_argument("revision")
     args = p.parse_args()
 
     cfg = ENV_CONFIG[args.env]
@@ -310,7 +331,9 @@ def main() -> None:
             cmd += ["downgrade", f"-{args.steps}"]
         elif args.cmd == "status":
             cmd += ["current", "-v"]
-        sys.exit(subprocess.call(cmd, env=env))
+        elif args.cmd == "stamp":
+            cmd += ["stamp", args.revision]
+        sys.exit(subprocess.call(cmd, env=env, cwd=str(ALEMBIC_CWD)))
 
 
 if __name__ == "__main__":
