@@ -150,7 +150,10 @@ def _build_smoke_csv(run_date: str) -> tuple[bytes, list[str]]:
     so two smoke runs in parallel don't collide, and cleanup can target
     exactly these rows.
     """
-    suffix = run_date.replace("smoke-", "").replace("-", "")
+    # run_date is ``s-YYYYMMDDHHMMSS`` (16 chars) — the compact form is
+    # required because properties.first_seen_date is VARCHAR(16) and a
+    # longer run_date overflows the column at sync time.
+    suffix = run_date.removeprefix("s-").replace("-", "")
     cids: list[str] = []
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -438,9 +441,9 @@ def main() -> int:
             return 2
         # Only GCS to clean up — DB cleanup requires direct Cloud SQL
         # access that's out of scope for CI. Prod DB rows are scoped by
-        # the ``smoke-{ts}`` run_date prefix; drop them manually with a
+        # the ``s-{ts}`` run_date prefix; drop them manually with a
         # psql one-liner after a leaked run.
-        ts_suffix = args.run_date.replace("smoke-", "")
+        ts_suffix = args.run_date.removeprefix("s-")
         gcs_prefix = f"smoke-test/{ts_suffix}/"
         print(
             f"[smoke] Cleanup-only: GCS prefix {gcs_prefix}; for DB rows "
@@ -461,8 +464,13 @@ def main() -> int:
 
     check_job_exists(job_name, REGION, project)
 
-    ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-    run_date = args.run_date or f"smoke-{ts}"
+    # Compact 14-char timestamp — paired with ``s-`` prefix gives a
+    # 16-char run_date that fits properties.first_seen_date (VARCHAR(16)).
+    # Older ``smoke-YYYYMMDD-HHMMSS`` (21 chars) overflowed the column and
+    # broke the PG sync with "value too long for type character
+    # varying(16)".
+    ts = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+    run_date = args.run_date or f"s-{ts}"
     gcs_key = f"smoke-test/{ts}/properties.csv"
 
     csv_body, expected_cids = _build_smoke_csv(run_date)
@@ -541,7 +549,7 @@ def main() -> int:
         if not args.skip_cleanup:
             _cleanup_gcs(bucket, gcs_key)
             # Prod DB cleanup is intentionally left to operators — the
-            # rows are scoped by run_date='smoke-{ts}' and canonical_id
+            # rows are scoped by run_date='s-{ts}' and canonical_id
             # prefix 'SMOKE-{ts}-*' so they're easy to drop manually
             # and never collide with real data.
             print(

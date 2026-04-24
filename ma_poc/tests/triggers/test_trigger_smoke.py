@@ -31,7 +31,7 @@ from scripts import trigger_smoke as mod  # noqa: E402
 
 class TestBuildSmokeCsv:
     def test_produces_six_rows_across_three_shards(self) -> None:
-        body, cids = mod._build_smoke_csv("smoke-20260424-120000")
+        body, cids = mod._build_smoke_csv("s-20260424120000")
         assert len(cids) == mod.TOTAL_PROPS == 6
         reader = csv.reader(io.StringIO(body.decode("utf-8")))
         rows = list(reader)
@@ -42,21 +42,21 @@ class TestBuildSmokeCsv:
     def test_cids_are_stable_per_run_date(self) -> None:
         """Two calls with the same run_date produce the same cids so
         cleanup can reliably target the rows the execute step created."""
-        _, cids1 = mod._build_smoke_csv("smoke-20260424-120000")
-        _, cids2 = mod._build_smoke_csv("smoke-20260424-120000")
+        _, cids1 = mod._build_smoke_csv("s-20260424120000")
+        _, cids2 = mod._build_smoke_csv("s-20260424120000")
         assert cids1 == cids2
 
     def test_cids_differ_across_run_dates(self) -> None:
         """Two smoke runs at different timestamps must not collide in
         the ``properties`` table (which has no run_date scope)."""
-        _, cids_a = mod._build_smoke_csv("smoke-20260424-120000")
-        _, cids_b = mod._build_smoke_csv("smoke-20260425-010000")
+        _, cids_a = mod._build_smoke_csv("s-20260424120000")
+        _, cids_b = mod._build_smoke_csv("s-20260425010000")
         assert set(cids_a).isdisjoint(set(cids_b))
 
     def test_urls_use_invalid_tld(self) -> None:
         """RFC 2606 .invalid — guarantees DNS NXDOMAIN so the scrape
         fails fast without hitting real hosts or burning LLM credits."""
-        body, _ = mod._build_smoke_csv("smoke-20260424-120000")
+        body, _ = mod._build_smoke_csv("s-20260424120000")
         reader = csv.reader(io.StringIO(body.decode("utf-8")))
         next(reader)  # skip header
         for row in reader:
@@ -68,7 +68,7 @@ class TestBuildSmokeCsv:
         premise of the multi-shard test."""
         import re
 
-        _, cids = mod._build_smoke_csv("smoke-20260424-120000")
+        _, cids = mod._build_smoke_csv("s-20260424120000")
         shard_re = re.compile(r"-S(\d+)-P\d+$")
         by_shard: dict[int, int] = {}
         for cid in cids:
