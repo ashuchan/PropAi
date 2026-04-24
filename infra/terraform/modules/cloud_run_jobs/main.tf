@@ -42,15 +42,34 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
           name  = "BUCKET_NAME"
           value = var.bucket_name
         }
+        # Scheme must be ``postgresql+psycopg://`` — SQLAlchemy maps the
+        # bare ``postgresql://`` prefix to the psycopg2 dialect, which is
+        # not installed (requirements.txt only has psycopg v3). The
+        # connector overrides host+port at runtime, but we still parse
+        # user/db from this URL — keep them correct.
         env {
           name  = "DATABASE_URL"
-          value = "postgresql://${var.worker_sa_email}@${var.sql_private_ip}:5432/jugnu?sslmode=require"
+          value = "postgresql+psycopg://${var.worker_sa_email}@${var.sql_private_ip}:5432/jugnu?sslmode=require"
         }
-        # ma_poc/data_provider/factory.py defaults to "filesystem", which
-        # writes events.jsonl + cost_ledger.db to GCS instead of the
-        # Postgres tables alembic created. Set "postgres" so scrape
-        # output lands in the DB. Swap to "dual" temporarily if you want
-        # belt-and-braces GCS + PG writes during a cutover.
+        # Routes every SQLAlchemy connection through the Cloud SQL
+        # Python Connector (see data_provider/sql/engine.py). The
+        # connector fetches a short-lived OAuth token from the worker SA
+        # and hands it to psycopg as the Postgres password — required
+        # because ``cloudsql.iam_authentication=on`` rejects password
+        # auth outright.
+        env {
+          name  = "CLOUD_SQL_INSTANCE"
+          value = var.sql_instance_connection_name
+        }
+        env {
+          name  = "CLOUD_SQL_IP_TYPE"
+          value = "PRIVATE"
+        }
+        # Kept for downstream consumers that still read it (e.g. the
+        # data-provider factory in contexts that don't go through the
+        # shard entry's explicit sync). The scrape runner itself now
+        # writes to FS first and calls sync_run_to_pg.py after the run
+        # completes, regardless of this value.
         env {
           name  = "DATA_PROVIDER"
           value = "postgres"

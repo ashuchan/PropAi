@@ -28,6 +28,13 @@ sqlalchemy>=2.0.30
 alembic>=1.13.0
 psycopg[binary]>=3.1.18
 
+# Cloud SQL IAM auth from inside Cloud Run (no proxy sidecar required).
+# The connector obtains + refreshes a short-lived OAuth token, hands it
+# to psycopg as the Postgres password, and handles the TLS handshake
+# against the instance's private IP. Wired through data_provider.sql.
+# engine when CLOUD_SQL_INSTANCE is set.
+cloud-sql-python-connector[psycopg3]>=1.9.0
+
 # Required by Cloud Run entrypoints (jugnu_shard_entry.py,
 # jugnu_retry_entry.py) for GCS upload/download. The prod image no
 # longer ships gsutil, so shell-outs were replaced with the Python

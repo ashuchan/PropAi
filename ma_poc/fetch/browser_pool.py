@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Page
 
+from .proxy.base import ProxyConfig
 from .stealth import Identity
 
 log = logging.getLogger(__name__)
@@ -47,12 +48,21 @@ class BrowserContextPool:
                     log.info("Launched Playwright browser")
         return self._browser
 
-    async def acquire(self, identity: Identity, proxy: str | None = None) -> Page:
+    async def acquire(
+        self,
+        identity: Identity,
+        proxy: str | ProxyConfig | None = None,
+    ) -> Page:
         """Acquire a new page in an isolated browser context.
 
         Args:
             identity: Browser identity (UA, viewport, etc.).
-            proxy: Optional proxy URL.
+            proxy: Either a legacy proxy URL string, a ``ProxyConfig``, or
+                None for direct. When a ``ProxyConfig`` routes through
+                Bright Data, ``ignore_https_errors`` is flipped on so the
+                proxy's TLS termination doesn't abort requests with
+                ``ERR_CERT_AUTHORITY_INVALID``. For direct fetches, TLS is
+                verified normally.
 
         Returns:
             A Playwright Page ready for navigation.
@@ -65,7 +75,15 @@ class BrowserContextPool:
             "viewport": {"width": identity.viewport[0], "height": identity.viewport[1]},
             "locale": identity.accept_language.split(",")[0],
         }
-        if proxy:
+        if isinstance(proxy, ProxyConfig):
+            pw_proxy = proxy.to_playwright()
+            if pw_proxy is not None:
+                context_opts["proxy"] = pw_proxy
+                # Bright Data terminates TLS at the proxy; its proxy cert
+                # is not the target site's cert. Only relax verification
+                # when a non-direct proxy is in use.
+                context_opts["ignore_https_errors"] = True
+        elif isinstance(proxy, str) and proxy:
             context_opts["proxy"] = {"server": proxy}
 
         context = await browser.new_context(**context_opts)  # type: ignore[arg-type]

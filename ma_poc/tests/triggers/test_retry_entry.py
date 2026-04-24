@@ -39,16 +39,26 @@ class TestRetryModeTranslation:
             calls.append(list(cmd))
             return MagicMock(returncode=0)
 
-        with patch("subprocess.run", side_effect=fake_run):
-            with patch("subprocess.Popen") as _:
-                with pytest.raises(SystemExit):
-                    # Re-import to pick up fresh env
-                    import importlib
+        # Re-import so we patch the *reloaded* module's symbol bindings.
+        import importlib
 
-                    import scripts.jugnu_retry_entry as m  # noqa: PLC0415
+        import scripts.jugnu_retry_entry as m  # noqa: PLC0415
 
-                    importlib.reload(m)
-                    m.main()
+        importlib.reload(m)
+
+        # Was patching subprocess.run to capture gsutil calls. The entry
+        # script now uses google-cloud-storage via ma_poc.storage.gcs, so
+        # stub those to no-ops and patch subprocess.run only to observe
+        # the runner invocation.
+        with (
+            patch.object(m.gcs, "download_object") as _dl_obj,
+            patch.object(m.gcs, "download_prefix") as _dl_pfx,
+            patch.object(m.gcs, "upload_prefix") as _up_pfx,
+            patch("subprocess.run", side_effect=fake_run),
+            patch("subprocess.Popen"),
+        ):
+            with pytest.raises(SystemExit):
+                m.main()
 
         return calls
 

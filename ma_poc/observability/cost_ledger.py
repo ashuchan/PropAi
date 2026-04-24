@@ -132,6 +132,40 @@ class CostLedger:
             },
         )
 
+    def record_proxy_fetch(
+        self,
+        property_id: str,
+        pms: str,
+        proxy_tier: str,
+        bytes_through_proxy: int,
+        cost_usd: float,
+    ) -> None:
+        """Record a proxy-tiered fetch, tagging by Bright Data tier.
+
+        Separate from ``record_proxy_bytes`` so the tier is stored in
+        ``tier_used`` and queries like "how much did RESIDENTIAL cost us
+        today" are a single GROUP BY.
+
+        Args:
+            property_id: Canonical property ID.
+            pms: Detected PMS name.
+            proxy_tier: One of direct/datacenter/residential/unblocker.
+            bytes_through_proxy: Bytes that flowed through the proxy.
+            cost_usd: Estimated cost for this fetch; see
+                ``ma_poc.fetch.proxy.pricing.estimate_cost_usd``.
+        """
+        self._insert(
+            property_id,
+            pms,
+            proxy_tier,
+            "proxy_mb",
+            cost_usd,
+            {
+                "bytes_through_proxy": bytes_through_proxy,
+                "proxy_tier": proxy_tier,
+            },
+        )
+
     def rollup_by_pms(self) -> dict[str, dict[str, float]]:
         """Aggregate costs by PMS platform.
 

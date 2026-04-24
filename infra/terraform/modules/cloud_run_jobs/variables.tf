@@ -6,6 +6,15 @@ variable "worker_sa_email" { type = string }
 variable "scheduler_sa_email" { type = string }
 variable "vpc_connector_id" { type = string }
 variable "sql_private_ip" { type = string }
+
+# Full instance id in ``project:region:instance`` form (from
+# ``module.cloud_sql.instance_connection_name``). Read by
+# ``data_provider/sql/engine.py:_make_cloud_sql_engine`` so Cloud Run
+# tasks authenticate via the Cloud SQL Python Connector (IAM OAuth
+# tokens). Required because ``cloudsql.iam_authentication=on`` rejects
+# password auth outright — a bare ``postgresql://user@host`` URL gets
+# "no password supplied" and nothing lands in Postgres.
+variable "sql_instance_connection_name" { type = string }
 variable "bucket_name" { type = string }
 variable "openrouter_secret_id" { type = string }
 variable "proxy_credentials_secret_id" { type = string }

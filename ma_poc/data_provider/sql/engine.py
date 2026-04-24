@@ -47,7 +47,17 @@ def make_engine(url: str | None = None, **kwargs: Any) -> Engine:
     SQLite gets `check_same_thread=False` so multi-thread test harnesses
     work; Postgres gets a small connection pool suitable for the scraper
     pool sizes we use in production.
+
+    When ``CLOUD_SQL_INSTANCE`` is set we route Postgres through the Cloud
+    SQL Python Connector so Cloud Run tasks authenticate via short-lived
+    OAuth tokens (``cloudsql.iam_authentication=on`` on the instance
+    rejects passwords). Any explicit URL/DATABASE_URL is ignored for
+    host+password in that case — only the database name, username, and
+    scheme are taken from the URL.
     """
+    if os.getenv("CLOUD_SQL_INSTANCE"):
+        return _make_cloud_sql_engine(url, **kwargs)
+
     resolved = resolve_database_url(url)
     connect_args: dict[str, Any] = {}
     engine_kwargs: dict[str, Any] = {"future": True}
@@ -65,6 +75,71 @@ def make_engine(url: str | None = None, **kwargs: Any) -> Engine:
 
     log.info("Creating SQLAlchemy engine: %s", _redact(resolved))
     return create_engine(resolved, **engine_kwargs)
+
+
+def _make_cloud_sql_engine(url: str | None, **kwargs: Any) -> Engine:
+    """Build an engine that authenticates to Cloud SQL via the connector.
+
+    Reads ``CLOUD_SQL_INSTANCE`` (``project:region:instance``) and optional
+    ``CLOUD_SQL_IP_TYPE`` (``PRIVATE`` | ``PUBLIC``; default ``PRIVATE``).
+    The user and database name still come from ``DATABASE_URL`` so callers
+    keep one config surface — only the transport and auth change.
+    """
+    # Lazy-imported so local dev / migrate.py do not need the connector
+    # package installed when CLOUD_SQL_INSTANCE is unset.
+    from google.cloud.sql.connector import Connector, IPTypes
+
+    instance = os.environ["CLOUD_SQL_INSTANCE"]
+    ip_raw = os.getenv("CLOUD_SQL_IP_TYPE", "PRIVATE").upper()
+    ip_type = IPTypes.PUBLIC if ip_raw == "PUBLIC" else IPTypes.PRIVATE
+
+    from sqlalchemy.engine.url import make_url
+
+    parsed = make_url(resolve_database_url(url))
+    # make_url coerces missing URL pieces to empty strings, not None — so
+    # `postgresql://@host/` parses to username='' / database=''. Treat
+    # both shapes as "missing" and fail fast; silently connecting as an
+    # empty user is how we'd ship another zero-rows-in-prod regression.
+    if not parsed.username or not parsed.database:
+        raise RuntimeError(
+            "DATABASE_URL must supply at least user + database when "
+            "CLOUD_SQL_INSTANCE is set (got "
+            f"{parsed.render_as_string(hide_password=True)!r})"
+        )
+
+    connector = Connector()
+
+    def _connect() -> Any:
+        # Connector manages the token refresh loop; driver is fixed to
+        # psycopg v3 to match the rest of the project.
+        return connector.connect(
+            instance,
+            "psycopg",
+            user=parsed.username,
+            db=parsed.database,
+            enable_iam_auth=True,
+            ip_type=ip_type,
+        )
+
+    engine_kwargs: dict[str, Any] = {
+        "future": True,
+        "creator": _connect,
+        "pool_pre_ping": True,
+        "pool_size": 5,
+        "max_overflow": 10,
+    }
+    engine_kwargs.update(kwargs)
+
+    log.info(
+        "Creating Cloud SQL engine via connector: instance=%s user=%s db=%s ip=%s",
+        instance,
+        parsed.username,
+        parsed.database,
+        ip_raw,
+    )
+    # Use postgresql+psycopg:// dialect string; the creator supplies the
+    # actual DBAPI connection so host/port in the URL are ignored.
+    return create_engine("postgresql+psycopg://", **engine_kwargs)
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:
