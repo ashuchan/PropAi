@@ -431,11 +431,35 @@ class SqlRunStore(IRunStore):
             session.add(RunRow(run_date=run_date))
 
     def write_properties(self, run_date: str, properties: list[dict[str, Any]]) -> None:
+        """Write/replace this batch's property snapshots for ``run_date``.
+
+        Semantics (multi-shard safe): delete rows for THIS BATCH's
+        canonical_ids at ``run_date``, then insert the batch. Rows
+        belonging to other shards (different canonical_ids) are left
+        untouched.
+
+        The previous implementation did ``DELETE WHERE run_date=X`` before
+        insert — correct for a single-shard writer, catastrophic in the
+        10-shard Cloud Run job where every shard wiped the prior shard's
+        rows. The result was ~50 snapshots surviving a run that produced
+        500, i.e. a 10× data-loss bug.
+
+        Rows whose canonical_id is None can't be deduped across retries
+        (no natural key) — we still insert them so the data isn't lost,
+        but callers are expected to always emit a canonical_id.
+        """
         with self._h.scope() as s:
             self._touch_run(s, run_date)
-            s.execute(delete(PropertySnapshotRow).where(PropertySnapshotRow.run_date == run_date))
-            for ordinal, payload in enumerate(properties):
-                cid = self._extract_canonical_id(payload)
+            cids = [self._extract_canonical_id(p) for p in properties]
+            my_cids = {c for c in cids if c is not None}
+            if my_cids:
+                s.execute(
+                    delete(PropertySnapshotRow).where(
+                        PropertySnapshotRow.run_date == run_date,
+                        PropertySnapshotRow.canonical_id.in_(my_cids),
+                    )
+                )
+            for ordinal, (cid, payload) in enumerate(zip(cids, properties)):
                 s.add(
                     PropertySnapshotRow(
                         run_date=run_date,

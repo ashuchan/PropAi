@@ -92,31 +92,50 @@ class TestSliceCsv:
 
 class TestUploadArtifacts:
     def test_uploads_existing_artifacts(self, tmp_path: Path) -> None:
-        """When artifacts exist, gcs.upload_object is called for each one.
+        """When artifacts exist, the whole run dir is uploaded via
+        gcs.upload_prefix, and dlq.jsonl (cross-run state, lives above
+        runs/) is uploaded separately via gcs.upload_object.
 
-        Previously this test patched subprocess.run to observe gsutil
-        invocations; the entry script now uses google-cloud-storage
-        directly (gsutil is no longer in the prod image), so the mock
-        target moved to ma_poc.storage.gcs.upload_object.
+        Previously the uploader shipped only events.jsonl + cost_ledger.db
+        + dlq.jsonl; a shard that exited 1 lost properties.json and every
+        report to /tmp teardown. The uploader now tarballs the whole
+        run_dir so failed shards leave debuggable artifacts in GCS.
         """
         run_date = "2026-04-21"
-        # events.jsonl + cost_ledger.db are per-run artifacts; dlq.jsonl
-        # is cross-run state written to state_dir by jugnu_runner.
-        # Splitting the fixture catches regressions where the uploader
-        # pulls dlq.jsonl from the wrong directory (shipped in prod and
-        # silently skipped every upload).
+        # Write a representative set of run-dir artifacts so we exercise
+        # the full set the runner emits: properties.json, report.json,
+        # report.md, llm_report.json, events.jsonl, cost_ledger.db,
+        # per-property reports, llm_report/{cid}.json, llm_diagnostics.
         run_dir = tmp_path / "data" / "runs" / run_date
         run_dir.mkdir(parents=True)
-        for fname in ("events.jsonl", "cost_ledger.db"):
-            (run_dir / fname).write_text("data")
+        (run_dir / "events.jsonl").write_text("data")
+        (run_dir / "cost_ledger.db").write_text("data")
+        (run_dir / "properties.json").write_text("[]")
+        (run_dir / "report.json").write_text("{}")
+        (run_dir / "report.md").write_text("# r")
+        (run_dir / "llm_report.json").write_text("{}")
+        (run_dir / "property_reports").mkdir()
+        (run_dir / "property_reports" / "P-1.md").write_text("# p-1")
+        (run_dir / "llm_report").mkdir()
+        (run_dir / "llm_report" / "P-1.json").write_text("{}")
         state_dir = tmp_path / "data" / "state"
         state_dir.mkdir(parents=True)
         (state_dir / "dlq.jsonl").write_text("data")
 
-        uploaded_pairs: list[tuple[Path, str]] = []
+        uploaded_objects: list[tuple[Path, str]] = []
+        uploaded_prefixes: list[tuple[Path, str]] = []
 
-        def fake_upload(src: Path, uri: str, **kwargs: object) -> None:
-            uploaded_pairs.append((src, uri))
+        def fake_upload_object(src: Path, uri: str, **kwargs: object) -> None:
+            uploaded_objects.append((src, uri))
+
+        def fake_upload_prefix(src_dir: Path, uri_prefix: str, **kwargs: object) -> int:
+            # Simulate walking the dir — count files and capture (src_dir, uri_prefix).
+            uploaded_prefixes.append((src_dir, uri_prefix))
+            count = 0
+            for p in src_dir.rglob("*"):
+                if p.is_file():
+                    count += 1
+            return count
 
         import scripts.jugnu_shard_entry as m
 
@@ -127,20 +146,27 @@ class TestUploadArtifacts:
                 return tmp_path / s[len("/tmp/") :]
             return original_path_cls(s)
 
-        with patch("scripts.jugnu_shard_entry.gcs.upload_object", side_effect=fake_upload):
+        with (
+            patch("scripts.jugnu_shard_entry.gcs.upload_object", side_effect=fake_upload_object),
+            patch("scripts.jugnu_shard_entry.gcs.upload_prefix", side_effect=fake_upload_prefix),
+        ):
             m.Path = patched_path  # type: ignore[assignment]
             try:
                 _upload_artifacts("jugnu-raw-staging", run_date, 0, "v1")
             finally:
                 m.Path = original_path_cls  # type: ignore[assignment]
 
-        assert len(uploaded_pairs) == 3
-        uris = {uri for _, uri in uploaded_pairs}
-        assert uris == {
-            f"gs://jugnu-raw-staging/runs/{run_date}/shard_0/events.jsonl",
-            f"gs://jugnu-raw-staging/runs/{run_date}/shard_0/dlq.jsonl",
-            f"gs://jugnu-raw-staging/runs/{run_date}/shard_0/cost_ledger.db",
-        }
+        # Whole run dir goes via upload_prefix exactly once.
+        assert len(uploaded_prefixes) == 1
+        src_dir, dest_prefix = uploaded_prefixes[0]
+        assert src_dir == run_dir
+        assert dest_prefix == f"gs://jugnu-raw-staging/runs/{run_date}/shard_0/"
+
+        # dlq.jsonl rides on upload_object (cross-run state, separate from run dir).
+        assert len(uploaded_objects) == 1
+        dlq_src, dlq_uri = uploaded_objects[0]
+        assert dlq_src == state_dir / "dlq.jsonl"
+        assert dlq_uri == f"gs://jugnu-raw-staging/runs/{run_date}/shard_0/dlq.jsonl"
 
     def test_missing_run_dir_does_not_crash(self, tmp_path: Path) -> None:
         """If the run dir doesn't exist, upload logs a warning but does not raise."""

@@ -15,17 +15,24 @@ Flow:
   2. Slice rows for this shard (ceiling division)
   3. Write slice to /tmp/shard_{idx}.csv
   4. Exec: python ma_poc/scripts/jugnu_runner.py --csv /tmp/shard_{idx}.csv ...
-  5. On runner success: sync every written artifact (runs, snapshots,
-     reports, profiles, scrape_events, LLM reports + diagnostics,
-     extraction results, property reports) into Cloud SQL via
-     ``sync_run_to_pg.sync_run_to_postgres``. The runner itself writes
-     only to the local FS; without this step Postgres stays empty.
-  6. Upload /tmp/data/v2/runs/{run_date}/events.jsonl, dlq.jsonl,
-     cost_ledger.db to gs://{bucket}/runs/{run_date}/shard_{idx}/.
-  7. Exit with the runner's exit code (or 1 if the PG sync failed).
+  5. Sync every written artifact (runs, snapshots, reports, profiles,
+     scrape_events, LLM reports + diagnostics, extraction results, property
+     reports, current-state properties/units) into Cloud SQL via
+     ``sync_run_to_pg.sync_run_to_postgres``. The sync runs whenever the
+     runner produced ``runs/{date}/properties.json`` — we do NOT gate it
+     on runner_exit==0. The runner exits 1 whenever any property fails
+     (common with 500-property shards), and gating sync on that turned
+     every partial run into a zero-rows-in-DB deploy.
+  6. Upload the ENTIRE /tmp/data/{v2/}runs/{run_date}/ tree plus the
+     cross-run dlq.jsonl to gs://{bucket}/runs/{run_date}/shard_{idx}/.
+     Uploading the whole run dir (not just events.jsonl) is what makes
+     failed shards debuggable after /tmp is torn down.
+  7. Exit with max(runner_exit, sync_exit) — surface either failure to
+     Cloud Run so the retry job can pick up failed shards.
 
-Artifact upload happens in a try/finally — ensures artifacts exist even when
-the runner crashes. This is how Claude Code debugs failed shards.
+Artifact upload + PG sync both happen in a try/finally — the runner's
+exit code must never suppress them, and the sync must run even when the
+runner exited non-zero (that is the whole reason we're here).
 """
 
 from __future__ import annotations
@@ -110,19 +117,24 @@ def _schema_root(schema_version: str) -> Path:
 
 
 def _upload_artifacts(bucket_name: str, run_date: str, task_idx: int, schema_version: str) -> None:
-    """Upload per-shard artifacts to GCS; called in finally so failures don't suppress runner exit code."""
+    """Upload the whole shard run dir + cross-run dlq.jsonl to GCS.
+
+    Uploads EVERY file under ``runs/{date}/`` preserving relative paths
+    (properties.json, report.json/md, property_reports/*.md,
+    llm_report.json, llm_report/*.json, llm_diagnostics/*.json,
+    events.jsonl, cost_ledger.db, …). Previously we uploaded only
+    events.jsonl + cost_ledger.db + dlq.jsonl — which meant a shard that
+    exited 1 lost properties.json and all reports to /tmp teardown, and
+    we had no way to post-mortem the failure.
+
+    dlq.jsonl lives outside the run dir (it's cross-run state), so it's
+    uploaded separately. Called from a finally block — per-file errors
+    are logged and swallowed by ``gcs.upload_prefix`` so nothing here
+    masks the runner's or sync's exit code.
+    """
     local_run_dir = _resolve_run_dir(schema_version, run_date)
     state_dir = _schema_root(schema_version) / "state"
     dest_prefix = f"gs://{bucket_name}/runs/{run_date}/shard_{task_idx}/"
-
-    # dlq.jsonl is append-only cross-run state — jugnu_runner writes it
-    # to state_dir, not the per-run dir. Pulling it from local_run_dir
-    # silently skipped every upload.
-    artifacts: tuple[tuple[str, Path], ...] = (
-        ("events.jsonl", local_run_dir / "events.jsonl"),
-        ("cost_ledger.db", local_run_dir / "cost_ledger.db"),
-        ("dlq.jsonl", state_dir / "dlq.jsonl"),
-    )
 
     if not local_run_dir.exists() and not state_dir.exists():
         print(
@@ -131,34 +143,69 @@ def _upload_artifacts(bucket_name: str, run_date: str, task_idx: int, schema_ver
         )
         return
 
-    for artifact, local_path in artifacts:
-        if local_path.exists():
-            try:
-                gcs.upload_object(local_path, dest_prefix + artifact)
-                print(f"[shard_entry] Uploaded {artifact} → {dest_prefix}", file=sys.stderr)
-            except Exception as exc:  # noqa: BLE001 — must not mask runner exit
-                print(
-                    f"[shard_entry] Failed to upload {artifact}: {exc}",
-                    file=sys.stderr,
-                )
-        else:
-            print(f"[shard_entry] {artifact} not found at {local_path}; skipping", file=sys.stderr)
+    if local_run_dir.exists():
+        try:
+            count = gcs.upload_prefix(local_run_dir, dest_prefix)
+            print(
+                f"[shard_entry] Uploaded {count} files from {local_run_dir} → {dest_prefix}",
+                file=sys.stderr,
+            )
+        except Exception as exc:  # noqa: BLE001 — must not mask runner exit
+            print(
+                f"[shard_entry] Failed to upload run dir {local_run_dir}: {exc}",
+                file=sys.stderr,
+            )
+    else:
+        print(f"[shard_entry] {local_run_dir} not found; skipping run-dir upload", file=sys.stderr)
+
+    # dlq.jsonl is cross-run state (``state/`` sits above ``runs/``), so
+    # it rides on this shard's upload path but isn't part of the run dir.
+    dlq_local = state_dir / "dlq.jsonl"
+    if dlq_local.exists():
+        try:
+            gcs.upload_object(dlq_local, dest_prefix + "dlq.jsonl")
+            print(f"[shard_entry] Uploaded dlq.jsonl → {dest_prefix}", file=sys.stderr)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[shard_entry] Failed to upload dlq.jsonl: {exc}", file=sys.stderr)
+    else:
+        print(f"[shard_entry] dlq.jsonl not found at {dlq_local}; skipping", file=sys.stderr)
 
 
-def _sync_to_postgres(run_date: str, schema_version: str) -> int:
+def _sync_to_postgres(run_date: str, schema_version: str, shard_id: str) -> int:
     """Copy the shard's FS output into Cloud SQL.
 
-    Returns 0 on success, 1 on any failure. Callers should treat a sync
-    failure as a shard failure: the DB is the authoritative destination
-    for this job and a silent drop here is exactly the class of bug that
-    left prod at 0 rows. Run logs already contain the full traceback.
+    Returns 0 on success, 1 on any failure. Callers treat a sync failure
+    as a shard failure: the DB is the authoritative destination and a
+    silent drop here is exactly the class of bug that left prod at 0
+    rows. Run logs already contain the full traceback.
+
+    Requires ``runs/{run_date}/properties.json`` to exist (the runner
+    actually ran to completion writing the report). Fast-returns 0 if
+    the file is missing — nothing to sync, not a sync failure.
 
     No-op if ``DATABASE_URL`` is unset — that's the local-dev path where
     Postgres isn't configured. In prod terraform always sets it.
+
+    ``shard_id`` scopes per-shard aggregation in run_reports / llm_reports
+    so concurrent shards don't clobber each other's totals. Pass the
+    Cloud Run task index (or any unique string per shard).
     """
     if not os.environ.get("DATABASE_URL"):
         print(
             "[shard_entry] DATABASE_URL unset; skipping PG sync (local-dev path)",
+            file=sys.stderr,
+        )
+        return 0
+
+    data_dir = _schema_root(schema_version)
+    run_dir = _resolve_run_dir(schema_version, run_date)
+    properties_json = run_dir / "properties.json"
+    if not properties_json.exists():
+        # Runner crashed before writing output. Nothing to sync.
+        # Still return 0 — this isn't a sync failure, it's an upstream
+        # failure that's already reflected in runner_exit.
+        print(
+            f"[shard_entry] {properties_json} missing; runner did not produce output. Skipping PG sync.",
             file=sys.stderr,
         )
         return 0
@@ -171,7 +218,6 @@ def _sync_to_postgres(run_date: str, schema_version: str) -> int:
         print(f"[shard_entry] Failed to import sync module: {exc}", file=sys.stderr)
         return 1
 
-    data_dir = _schema_root(schema_version)
     # Profiles are written by services/profile_store.py into
     # _MA_POC_ROOT / "config" / "profiles" — see jugnu_runner._SimpleProfileStore.
     # That resolves to /app/ma_poc/config inside the Cloud Run container.
@@ -182,6 +228,7 @@ def _sync_to_postgres(run_date: str, schema_version: str) -> int:
             run_date=run_date,
             data_dir=data_dir,
             config_dir=config_dir,
+            shard_id=shard_id,
         )
         print(f"[shard_entry] PG sync complete: {summary}", file=sys.stderr)
         return 0
@@ -239,18 +286,24 @@ def main() -> None:
     try:
         result = subprocess.run(cmd, check=False)
         runner_exit = result.returncode
-        # Only attempt the PG sync when the scrape itself succeeded.
-        # Syncing a partial/failed run would copy a mix of today's
-        # rows and half-written JSON; safer to let the retry job
-        # rerun from scratch and re-sync.
-        if runner_exit == 0:
-            sync_exit = _sync_to_postgres(run_date, schema_version)
+        # Always attempt PG sync when the runner finished — partial runs
+        # (e.g. 140/499 succeeded) still have useful data that MUST land
+        # in Postgres. The runner returns 1 whenever any property fails,
+        # which is every real 500-property shard; gating sync on
+        # runner_exit==0 was the bug that left prod at 0 rows despite
+        # scrapes actually producing per-property output.
+        #
+        # ``_sync_to_postgres`` fast-returns 0 when no properties.json
+        # exists (runner crashed before writing output), so this is
+        # still safe when the runner dies mid-startup.
+        sync_exit = _sync_to_postgres(run_date, schema_version, shard_id=str(task_idx))
     finally:
         _upload_artifacts(bucket_name, run_date, task_idx, schema_version)
 
-    # A sync failure is a shard failure — the DB is the destination of
-    # record. Surfacing it as exit 1 lets the retry job (jugnu-retry)
-    # pick this shard back up instead of marking it silently good.
+    # Propagate either failure to Cloud Run. A sync failure is a shard
+    # failure (the DB is the destination of record). A runner failure is
+    # a shard failure (some properties didn't scrape). Either way the
+    # retry job (jugnu-retry) should pick this shard back up.
     sys.exit(runner_exit or sync_exit)
 
 

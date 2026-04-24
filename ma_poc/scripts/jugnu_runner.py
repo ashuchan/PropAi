@@ -1267,7 +1267,13 @@ def _merge_with_existing_properties(
 
 
 def _write_properties_incremental(path: Path, properties: list[dict[str, Any]]) -> None:
-    """Write properties JSON.
+    """Atomically write properties JSON.
+
+    Writes to ``{path}.tmp`` then ``os.replace()`` — so a SIGKILL mid-
+    write leaves either the prior complete file or nothing, never a
+    half-written (unparseable) JSON. The sync step reads this file
+    and the shard's data is lost if the parser raises, so atomicity
+    matters even though this is normally called once at end-of-run.
 
     Args:
         path: Output file path.
@@ -1275,10 +1281,14 @@ def _write_properties_incremental(path: Path, properties: list[dict[str, Any]]) 
             by the caller — this writer is a plain overwrite).
     """
     try:
-        path.write_text(
+        import os as _os
+
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(
             json.dumps(properties, indent=2, default=str),
             encoding="utf-8",
         )
+        _os.replace(tmp, path)
     except Exception as exc:
         log.warning("Failed to write incremental properties: %s", exc)
 

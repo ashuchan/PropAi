@@ -177,10 +177,18 @@ def test_sync_round_trip_populates_every_artifact(tmp_path: Path) -> None:
             assert sync_run_to_pg._copy_events(src2, target) == 1
             run_out = sync_run_to_pg._copy_run(src2, target, RUN_DATE)
             assert sync_run_to_pg._copy_extractions(src2, target, RUN_DATE, canonical_ids) == 1
+        # _copy_run handles properties + issues + ledger inside the
+        # session txn. The report lives in Stage 2 (engine.begin
+        # path) so it's exercised by the top-level sync_run_to_postgres
+        # — or by calling the store directly, as here.
         assert run_out["properties"] == 2
-        assert run_out["report"] == 1
         assert run_out["issues"] == 1
         assert run_out["ledger"] == 1
+        # Drive the report write via the store contract (legacy
+        # replace semantics — backfill_pg.py uses this path).
+        report = src2.runs.read_report(RUN_DATE)
+        assert report is not None
+        target.runs.write_report(RUN_DATE, report)
 
         engine = target.engine
         run_dir = data_dir / "runs" / RUN_DATE
@@ -214,6 +222,10 @@ def test_sync_is_idempotent(tmp_path: Path) -> None:
                     sync_run_to_pg._copy_profiles(src2, target)
                     sync_run_to_pg._copy_run(src2, target, RUN_DATE)
                     sync_run_to_pg._copy_extractions(src2, target, RUN_DATE, canonical_ids)
+                # Report + artifact tables run Stage-2 (engine.begin).
+                report = src2.runs.read_report(RUN_DATE)
+                if report is not None:
+                    target.runs.write_report(RUN_DATE, report)
                 engine = target.engine
                 run_dir = data_dir / "runs" / RUN_DATE
                 sync_run_to_pg._upsert_property_reports(engine, RUN_DATE, run_dir / "property_reports")
@@ -230,19 +242,30 @@ def test_sync_is_idempotent(tmp_path: Path) -> None:
         # run_reports is keyed by run_date → single row.
         engine = target.engine
         from sqlalchemy import select
+        from sqlalchemy.orm import Session
         from data_provider.sql.models import (
             LlmReportRow,
             PropertyReportRow,
             RunReportRow,
         )
 
-        with engine.connect() as conn:
-            assert conn.execute(select(RunReportRow).where(RunReportRow.run_date == RUN_DATE)).all().__len__() == 1
-            assert conn.execute(select(LlmReportRow).where(LlmReportRow.run_date == RUN_DATE)).all().__len__() == 1
+        with Session(engine) as session:
+            assert (
+                len(list(session.execute(
+                    select(RunReportRow).where(RunReportRow.run_date == RUN_DATE)
+                ).scalars()))
+                == 1
+            )
+            assert (
+                len(list(session.execute(
+                    select(LlmReportRow).where(LlmReportRow.run_date == RUN_DATE)
+                ).scalars()))
+                == 1
+            )
             # property_reports is keyed by (run_date, cid) → 2 rows, not 4.
-            rows = conn.execute(
+            rows = list(session.execute(
                 select(PropertyReportRow).where(PropertyReportRow.run_date == RUN_DATE)
-            ).all()
+            ).scalars())
             assert len(rows) == 2
     finally:
         target.close()
@@ -547,3 +570,518 @@ def test_sync_run_to_postgres_includes_dlq(tmp_path: Path) -> None:
         assert _dlq_row(verify.engine, "P-PARKED") is not None
     finally:
         verify.close()
+
+
+# ── Multi-shard + derive-from-snapshots ────────────────────────────────────
+
+
+def _jugnu_v2_property(
+    canonical_id: str,
+    *,
+    tier: str = "TIER_4_LLM_DOM",
+    verdict: str = "SUCCESS",
+    units: list[dict[str, Any]] | None = None,
+    proj_name: str | None = None,
+    city: str | None = None,
+    website: str | None = None,
+) -> dict[str, Any]:
+    """Build a V2 property dict shaped like what jugnu_runner writes.
+
+    Mirrors the structure of ``ma_poc/scripts/jugnu_runner.py::_format_v2``
+    — the minimum keys the sync layer reads. If this drifts from the
+    runner's actual output, the sync test is a false positive.
+    """
+    return {
+        "apartment_id": None,
+        "proj_name": proj_name or f"Property {canonical_id}",
+        "address": None,
+        "city": city,
+        "state": None,
+        "zip_code": None,
+        "country": None,
+        "phone": None,
+        "email_address": None,
+        "website": website or f"https://{canonical_id}.example.com",
+        "pmc": None,
+        "website_design": None,
+        "concessions": None,
+        "units": units or [],
+        "_meta": {
+            "canonical_id": canonical_id,
+            "verdict": verdict,
+            "scrape_tier_used": tier,
+        },
+        "_extract_result": {"tier_used": tier, "llm_cost_usd": 0.0},
+    }
+
+
+def _seed_shard_fs(
+    tmp_path: Path,
+    shard_name: str,
+    properties: list[dict[str, Any]],
+) -> tuple[Path, Path]:
+    """Write one shard's filesystem layout under ``tmp_path/shard_name/``.
+
+    Returns (data_dir, config_dir). Each shard is a standalone /tmp so
+    the test can drive concurrent sync_run_to_postgres invocations
+    against the same SQLite DB — exactly like Cloud Run runs 10 tasks
+    with isolated /tmp.
+    """
+    data_dir = tmp_path / shard_name / "data"
+    config_dir = tmp_path / shard_name / "config"
+    (data_dir / "runs" / RUN_DATE).mkdir(parents=True, exist_ok=True)
+    (data_dir / "state").mkdir(parents=True, exist_ok=True)
+
+    # Write properties.json directly (jugnu runner writes it incrementally;
+    # a single final write is functionally equivalent for the sync layer).
+    import json as _json
+
+    (data_dir / "runs" / RUN_DATE / "properties.json").write_text(
+        _json.dumps(properties), encoding="utf-8"
+    )
+    # Minimal report.json so _copy_run's report path fires.
+    (data_dir / "runs" / RUN_DATE / "report.json").write_text(
+        _json.dumps(
+            {
+                "run_date": RUN_DATE,
+                "generated_at": datetime.now(UTC).isoformat(),
+                "totals": {
+                    "properties": len(properties),
+                    "succeeded": sum(
+                        1 for p in properties if (p.get("_meta") or {}).get("verdict") == "SUCCESS"
+                    ),
+                    "failed": sum(
+                        1
+                        for p in properties
+                        if str((p.get("_meta") or {}).get("verdict") or "").startswith("FAIL")
+                    ),
+                    "carry_forward": 0,
+                    "success_rate_pct": 0.0,
+                },
+                "tier_distribution": {
+                    str((p.get("_meta") or {}).get("scrape_tier_used") or "UNKNOWN"): 1
+                    for p in properties
+                },
+                "cost": {"openrouter": 0.001 * len(properties)},
+                "slo_violations": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    # Minimal llm_report.json so the shard-merge path fires.
+    (data_dir / "runs" / RUN_DATE / "llm_report.json").write_text(
+        _json.dumps(
+            {
+                "calls": len(properties),
+                "total_cost_usd": 0.001 * len(properties),
+                "total_tokens_in": 100 * len(properties),
+                "total_tokens_out": 50 * len(properties),
+                "by_property": {
+                    (p.get("_meta") or {}).get("canonical_id", "?"): {"calls": 1}
+                    for p in properties
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return data_dir, config_dir
+
+
+def test_multi_shard_sync_does_not_clobber_other_shards_snapshots(tmp_path: Path) -> None:
+    """Two shards syncing to the same run_date keep BOTH sets of property_snapshots.
+
+    Regression for the "all shards wipe each other" bug: previously
+    ``SqlRunStore.write_properties`` did ``DELETE WHERE run_date = X``
+    before inserting, so a 10-shard run produced only the last shard's
+    ~50 rows in ``property_snapshots``. With the fix, the delete is
+    scoped to THIS batch's canonical_ids, leaving other shards alone.
+    """
+    shard_a_props = [
+        _jugnu_v2_property(f"A-{i}", units=[{"unit_id": f"a{i}", "rent_low": 1000 + i}])
+        for i in range(3)
+    ]
+    shard_b_props = [
+        _jugnu_v2_property(f"B-{i}", units=[{"unit_id": f"b{i}", "rent_low": 2000 + i}])
+        for i in range(3)
+    ]
+    data_a, config_a = _seed_shard_fs(tmp_path, "shard_a", shard_a_props)
+    data_b, config_b = _seed_shard_fs(tmp_path, "shard_b", shard_b_props)
+
+    url = _sqlite_url(tmp_path)
+    sync_run_to_pg.sync_run_to_postgres(
+        run_date=RUN_DATE, data_dir=data_a, config_dir=config_a,
+        database_url=url, shard_id="0",
+    )
+    sync_run_to_pg.sync_run_to_postgres(
+        run_date=RUN_DATE, data_dir=data_b, config_dir=config_b,
+        database_url=url, shard_id="1",
+    )
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from data_provider.sql.models import PropertyRow, PropertySnapshotRow, UnitRow
+    from data_provider.sqlite import SqliteDataProvider as _Sqlite
+
+    verify = _Sqlite(url=url)
+    try:
+        with Session(verify.engine) as session:
+            # All 6 snapshots survive (3 from each shard, not 3 total).
+            snap_cids = {
+                row.canonical_id
+                for row in session.execute(
+                    select(PropertySnapshotRow).where(PropertySnapshotRow.run_date == RUN_DATE)
+                ).scalars()
+            }
+            assert snap_cids == {f"A-{i}" for i in range(3)} | {f"B-{i}" for i in range(3)}
+
+            # Current-state tables (the TS frontend reads these).
+            prop_cids = {
+                r.canonical_id
+                for r in session.execute(select(PropertyRow)).scalars()
+            }
+            assert prop_cids == snap_cids
+
+            # Units populated too — previously ``state: 0`` in the summary
+            # because property_index.json was never written.
+            unit_rows = list(session.execute(select(UnitRow)).scalars())
+            assert len(unit_rows) == 6  # one unit per property in this fixture
+    finally:
+        verify.close()
+
+
+def test_multi_shard_sync_merges_report_totals(tmp_path: Path) -> None:
+    """Two shards each reporting 3/3 success produce an aggregate 6/6.
+
+    Previously ``write_report`` upserted by run_date, last-writer-wins,
+    so ten shards reporting ~50/50 each left the run_reports row holding
+    just one shard's totals. The fix routes each shard's report through
+    ``_merge_run_report`` which stores per-shard contributions under
+    ``extra.shards[shard_id]`` and recomputes aggregate totals.
+    """
+    shard_a_props = [_jugnu_v2_property(f"A-{i}") for i in range(3)]
+    shard_b_props = [_jugnu_v2_property(f"B-{i}") for i in range(3)]
+    data_a, config_a = _seed_shard_fs(tmp_path, "shard_a", shard_a_props)
+    data_b, config_b = _seed_shard_fs(tmp_path, "shard_b", shard_b_props)
+
+    url = _sqlite_url(tmp_path)
+    sync_run_to_pg.sync_run_to_postgres(
+        run_date=RUN_DATE, data_dir=data_a, config_dir=config_a,
+        database_url=url, shard_id="0",
+    )
+    sync_run_to_pg.sync_run_to_postgres(
+        run_date=RUN_DATE, data_dir=data_b, config_dir=config_b,
+        database_url=url, shard_id="1",
+    )
+
+    from sqlalchemy.orm import Session
+
+    from data_provider.sql.models import LlmReportRow, RunReportRow
+    from data_provider.sqlite import SqliteDataProvider as _Sqlite
+
+    verify = _Sqlite(url=url)
+    try:
+        with Session(verify.engine) as session:
+            row = session.get(RunReportRow, RUN_DATE)
+            assert row is not None
+            totals = row.totals or {}
+            assert totals.get("properties") == 6
+            assert totals.get("succeeded") == 6
+            assert totals.get("failed") == 0
+            assert totals.get("success_rate_pct") == 100.0
+            # Cost summed across shards.
+            assert abs((row.cost or {}).get("openrouter", 0.0) - 0.006) < 1e-6
+            # Per-shard contributions preserved for debugging.
+            shards = (row.extra or {}).get("shards") or {}
+            assert set(shards.keys()) == {"0", "1"}
+
+            # LLM report merged.
+            llm = session.get(LlmReportRow, RUN_DATE)
+            assert llm is not None
+            body = llm.payload or {}
+            assert body.get("calls") == 6
+            assert abs(body.get("total_cost_usd", 0.0) - 0.006) < 1e-6
+            assert set((body.get("shards") or {}).keys()) == {"0", "1"}
+    finally:
+        verify.close()
+
+
+def test_shard_retry_is_idempotent_on_report_merge(tmp_path: Path) -> None:
+    """A shard retrying with the same shard_id must not double-count.
+
+    Cloud Run retries failed shards up to ``max_retries``. Each retry
+    should replace its prior contribution under ``shards[shard_id]``
+    rather than append. The aggregate must stay consistent with the
+    union of live shards.
+    """
+    props = [_jugnu_v2_property(f"R-{i}") for i in range(4)]
+    data_dir, config_dir = _seed_shard_fs(tmp_path, "shard_r", props)
+    url = _sqlite_url(tmp_path)
+
+    # Fire the same shard's sync twice.
+    sync_run_to_pg.sync_run_to_postgres(
+        run_date=RUN_DATE, data_dir=data_dir, config_dir=config_dir,
+        database_url=url, shard_id="0",
+    )
+    sync_run_to_pg.sync_run_to_postgres(
+        run_date=RUN_DATE, data_dir=data_dir, config_dir=config_dir,
+        database_url=url, shard_id="0",
+    )
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from data_provider.sql.models import (
+        PropertyRow,
+        RunLedgerRow,
+        RunReportRow,
+        ScrapeEventRow,
+    )
+    from data_provider.sqlite import SqliteDataProvider as _Sqlite
+
+    verify = _Sqlite(url=url)
+    try:
+        with Session(verify.engine) as session:
+            # Totals are still 4/4, not 8/8.
+            row = session.get(RunReportRow, RUN_DATE)
+            assert row is not None
+            assert row.totals.get("properties") == 4
+
+            # Current state: 4 rows, not 4 (identical) on a retry.
+            assert len(list(session.execute(select(PropertyRow)).scalars())) == 4
+
+            # Ledger: 4 rows per cid, not 8.
+            ledger_rows = list(session.execute(select(RunLedgerRow)).scalars())
+            assert len(ledger_rows) == 4
+            assert {r.canonical_id for r in ledger_rows} == {f"R-{i}" for i in range(4)}
+
+            # scrape_events keyed on (property_id, run_date) via stable
+            # event_id — 4 rows, not 8.
+            ev_rows = list(session.execute(select(ScrapeEventRow)).scalars())
+            assert len(ev_rows) == 4
+    finally:
+        verify.close()
+
+
+def test_derived_state_populates_previously_empty_tables(tmp_path: Path) -> None:
+    """properties, units, run_ledger, scrape_events, extraction_results —
+    all derived from properties.json during sync.
+
+    These tables stayed empty because jugnu_runner never writes
+    property_index.json / unit_index.json / issues.jsonl / ledger.jsonl /
+    extraction_output/. Without this derive-from-snapshots step, the TS
+    frontend's ``properties`` + ``units`` endpoints returned no data
+    even when property_snapshots had rows.
+    """
+    units_a = [
+        {"unit_id": "101", "rent_low": 1500, "rent_high": 1500, "beds": 1, "baths": 1.0, "area": 700},
+        {"unit_id": "102", "rent_low": 1800, "rent_high": 1800, "beds": 2, "baths": 2.0, "area": 950},
+    ]
+    props = [
+        _jugnu_v2_property("P-ok", tier="TIER_1_API_RENTCAFE", units=units_a),
+        _jugnu_v2_property("P-fail", tier="generic:no_body_short_circuit", verdict="FAILED_UNREACHABLE"),
+    ]
+    data_dir, config_dir = _seed_shard_fs(tmp_path, "derive_shard", props)
+    url = _sqlite_url(tmp_path)
+
+    summary = sync_run_to_pg.sync_run_to_postgres(
+        run_date=RUN_DATE, data_dir=data_dir, config_dir=config_dir,
+        database_url=url, shard_id="0",
+    )
+
+    # Every derive-from-snapshots counter must have work to show.
+    assert summary["state_from_snapshots"] == 2
+    assert summary["ledger_from_snapshots"] == 2
+    assert summary["scrape_events_from_snapshots"] == 2
+    assert summary["extractions_from_snapshots"] == 2
+    # P-fail emits a synthetic FAILED_* issue; P-ok has no validation data.
+    assert summary["issues_from_snapshots"] >= 1
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from data_provider.sql.models import (
+        ExtractionResultRow,
+        PropertyRow,
+        RunIssueRow,
+        RunLedgerRow,
+        ScrapeEventRow,
+        UnitRow,
+    )
+    from data_provider.sqlite import SqliteDataProvider as _Sqlite
+
+    verify = _Sqlite(url=url)
+    try:
+        with Session(verify.engine) as session:
+            # properties: both.
+            assert {
+                r.canonical_id for r in session.execute(select(PropertyRow)).scalars()
+            } == {"P-ok", "P-fail"}
+            # units: two units for P-ok.
+            unit_rows = list(session.execute(select(UnitRow)).scalars())
+            assert {(r.canonical_id, r.unit_id) for r in unit_rows} == {
+                ("P-ok", "101"),
+                ("P-ok", "102"),
+            }
+            # Unit data flows through the V2 upsert (beds/baths/rent_low/area).
+            unit_101 = next(r for r in unit_rows if r.unit_id == "101")
+            assert unit_101.rent_low == 1500
+            assert unit_101.beds == 1
+            assert unit_101.area == 700
+
+            # run_ledger: 2 rows.
+            lrows = list(
+                session.execute(select(RunLedgerRow).where(RunLedgerRow.run_date == RUN_DATE)).scalars()
+            )
+            assert {r.canonical_id for r in lrows} == {"P-ok", "P-fail"}
+            ok_row = next(r for r in lrows if r.canonical_id == "P-ok")
+            assert ok_row.status == "SUCCESS"
+            assert ok_row.units_count == 2
+            fail_row = next(r for r in lrows if r.canonical_id == "P-fail")
+            assert fail_row.scrape_failed is True
+
+            # scrape_events: 2 rows, stable event_ids so a re-sync upserts.
+            events = list(session.execute(select(ScrapeEventRow)).scalars())
+            assert {e.property_id for e in events} == {"P-ok", "P-fail"}
+            # Tier string to int mapping: TIER_1_API_* → 1
+            ok_event = next(e for e in events if e.property_id == "P-ok")
+            assert ok_event.extraction_tier == 1
+            assert ok_event.scrape_outcome == "SUCCESS"
+
+            # extraction_results: 2 rows.
+            xrows = list(session.execute(select(ExtractionResultRow)).scalars())
+            assert {r.property_id for r in xrows} == {"P-ok", "P-fail"}
+            ok_x = next(r for r in xrows if r.property_id == "P-ok")
+            assert ok_x.status == "SUCCESS"
+            assert ok_x.tier == 1
+
+            # run_issues: at least the synthetic failure for P-fail.
+            issue_rows = list(
+                session.execute(
+                    select(RunIssueRow).where(RunIssueRow.run_date == RUN_DATE)
+                ).scalars()
+            )
+            assert any(i.canonical_id == "P-fail" and i.severity == "ERROR" for i in issue_rows)
+    finally:
+        verify.close()
+
+
+def test_crashed_property_record_is_still_persisted_everywhere(tmp_path: Path) -> None:
+    """A property whose scrape threw (and was rescued by the crash-catcher
+    in ``jugnu_runner._make_failed_record``) has NO ``_meta.verdict``.
+    The sync must still land it in every downstream table — otherwise a
+    hard crash at scrape time drops the property off the reporting
+    surface even though it's present in properties.json.
+
+    This mirrors what jugnu_runner._make_failed_record emits: only
+    ``_meta.scrape_tier_used = "FAILED"`` and ``_meta.scrape_errors``.
+    """
+    crashed = {
+        "apartment_id": None,
+        "proj_name": None,
+        "website": "https://broken.example.com",
+        "units": [],
+        "_meta": {
+            "canonical_id": "P-crash",
+            "scrape_tier_used": "FAILED",
+            "scrape_errors": ["Playwright timeout after 180s"],
+            "carry_forward_used": False,
+            # Note: NO verdict key — the crash path never writes one.
+        },
+    }
+    ok = _jugnu_v2_property("P-ok", tier="TIER_1_API_RENTCAFE")
+    data_dir, config_dir = _seed_shard_fs(tmp_path, "crash_shard", [crashed, ok])
+    url = _sqlite_url(tmp_path)
+
+    sync_run_to_pg.sync_run_to_postgres(
+        run_date=RUN_DATE, data_dir=data_dir, config_dir=config_dir,
+        database_url=url, shard_id="0",
+    )
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from data_provider.sql.models import (
+        ExtractionResultRow,
+        PropertyRow,
+        PropertySnapshotRow,
+        RunIssueRow,
+        RunLedgerRow,
+        ScrapeEventRow,
+    )
+    from data_provider.sqlite import SqliteDataProvider as _Sqlite
+
+    verify = _Sqlite(url=url)
+    try:
+        with Session(verify.engine) as s:
+            # Current-state row exists.
+            assert s.get(PropertyRow, "P-crash") is not None
+
+            # Snapshot row exists.
+            snap = next(
+                s.execute(
+                    select(PropertySnapshotRow)
+                    .where(PropertySnapshotRow.run_date == RUN_DATE)
+                    .where(PropertySnapshotRow.canonical_id == "P-crash")
+                ).scalars()
+            )
+            assert snap.payload["_meta"]["scrape_tier_used"] == "FAILED"
+
+            # Ledger entry marked scrape_failed=True.
+            lrow = next(
+                s.execute(
+                    select(RunLedgerRow).where(RunLedgerRow.canonical_id == "P-crash")
+                ).scalars()
+            )
+            assert lrow.scrape_failed is True
+            assert lrow.error_count == 1
+
+            # Synthetic issue recorded (previously the sync only looked
+            # at ``_meta.verdict`` and silently skipped crash-path
+            # records that had no verdict).
+            issues = list(
+                s.execute(
+                    select(RunIssueRow).where(RunIssueRow.canonical_id == "P-crash")
+                ).scalars()
+            )
+            assert any(i.severity == "ERROR" for i in issues)
+
+            # scrape_events.outcome == FAILED.
+            ev = next(
+                s.execute(
+                    select(ScrapeEventRow).where(ScrapeEventRow.property_id == "P-crash")
+                ).scalars()
+            )
+            assert ev.scrape_outcome == "FAILED"
+
+            # extraction_results.status == FAILED.
+            xr = next(
+                s.execute(
+                    select(ExtractionResultRow)
+                    .where(ExtractionResultRow.run_date == RUN_DATE)
+                    .where(ExtractionResultRow.property_id == "P-crash")
+                ).scalars()
+            )
+            assert xr.status == "FAILED"
+    finally:
+        verify.close()
+
+
+def test_stable_event_id_is_deterministic(tmp_path: Path) -> None:
+    """Same (property_id, run_date) pair always yields the same event_id.
+
+    CLAUDE.md bug-hunt #15: must use hashlib.sha256, never built-in
+    ``hash()`` — the latter is non-deterministic across Python
+    processes, which would break upsert semantics on scrape_events.
+    """
+    a1 = sync_run_to_pg._stable_event_id("P-1", "2026-04-24")
+    a2 = sync_run_to_pg._stable_event_id("P-1", "2026-04-24")
+    b = sync_run_to_pg._stable_event_id("P-1", "2026-04-25")
+    c = sync_run_to_pg._stable_event_id("P-2", "2026-04-24")
+    assert a1 == a2
+    assert a1 != b
+    assert a1 != c
+    # Is valid UUID shape so downstream consumers that parse UUIDs work.
+    import uuid as _uuid
+
+    _uuid.UUID(a1)

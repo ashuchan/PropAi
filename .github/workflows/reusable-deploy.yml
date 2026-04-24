@@ -366,6 +366,14 @@ jobs:
   smoke:
     needs: [sync-csv, build-and-push]
     runs-on: ubuntu-latest
+    # 3 tasks × 2 properties each with .invalid URLs: each task hits
+    # DNS NXDOMAIN in <1s but the runner still writes properties.json,
+    # per-property report, and triggers the post-run PG sync. Observed
+    # wall-clock including gcloud submit + execute + log fetch is ~3-5
+    # min; 25 min gives plenty of slack for a cold-start container
+    # build or transient Cloud SQL wake delay without letting a truly
+    # stuck deploy burn CI minutes.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -386,12 +394,38 @@ jobs:
 
       - run: pip install -r ma_poc/requirements.txt
 
-      - name: Run smoke test
-        # trigger_smoke.py is CI-only and has no confirmation prompt, so no
-        # --yes (that flag lives on trigger_run.py / trigger_retry.py).
-        # _trigger_common resolves the project from GCP_PROJECT_ID_{STAGING,PROD}
-        # with GCP_PROJECT_ID as a fallback; forward the single CI secret so
-        # the lookup doesn't hit its placeholder.
+      - name: Run multi-shard smoke test
+        # What this validates (see ma_poc/scripts/trigger_smoke.py):
+        #
+        #   1. Uploads a 6-row smoke CSV (.invalid URLs — no DNS resolution,
+        #      no LLM cost) to gs://{bucket}/smoke-test/{ts}/properties.csv.
+        #   2. Executes jugnu-scrape-{env} with --tasks=3 --parallelism=3
+        #      and LIMIT=2, so 3 tasks run concurrently on 2 properties each.
+        #   3. Waits for terminal state. The execution is EXPECTED to report
+        #      task failures — invalid URLs can't scrape — but the runner
+        #      still writes properties.json and the shard_entry sync still
+        #      runs (that's the exit-code-gate fix this test is here to
+        #      protect).
+        #   4. Fetches structured logs, groups "PG sync complete" entries
+        #      by run.googleapis.com/task_index (dedup past Cloud Run's
+        #      max_retries=1 retries), and asserts:
+        #        - All 3 task_indices {0,1,2} produced a sync summary.
+        #        - Each summary has state_from_snapshots=2, ledger=2,
+        #          events=2, extractions=2. Any missing counter means one
+        #          of the six derive-from-snapshots paths regressed.
+        #   5. Cleans up the smoke CSV from GCS. DB rows remain (scoped by
+        #      run_date='smoke-{ts}' and canonical_id 'SMOKE-{ts}-*', so
+        #      they never collide with real data and can be dropped
+        #      manually if operators need it.
+        #
+        # Regression this guards: "zero rows in DB despite a green scrape"
+        # — the exit-code gate + multi-shard DELETE clobber combo that
+        # shipped silently into prod and made the scrape look healthy
+        # while the data warehouse stayed empty.
+        #
+        # _trigger_common resolves the project from
+        # GCP_PROJECT_ID_{STAGING,PROD} with GCP_PROJECT_ID as a fallback;
+        # forward the single CI secret so the lookup hits the right project.
         env:
           GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID }}
           GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID }}
