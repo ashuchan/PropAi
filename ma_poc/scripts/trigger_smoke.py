@@ -238,6 +238,12 @@ def _execute_job(
         file=sys.stderr,
     )
 
+    # ``gcloud run jobs execute`` accepts ``--tasks`` for per-execution
+    # task-count override but has no ``--parallelism`` flag — parallelism
+    # is a property of the job itself (set in terraform via
+    # ``parallelism = var.default_task_count``). Prod's job already has
+    # parallelism=10, so SHARD_COUNT=3 tasks run fully in parallel
+    # without overriding here.
     result = run_gcloud(
         "gcloud",
         "run",
@@ -247,7 +253,6 @@ def _execute_job(
         f"--project={project}",
         f"--region={REGION}",
         f"--tasks={SHARD_COUNT}",
-        f"--parallelism={SHARD_COUNT}",
         f"--update-env-vars={env_vars}",
         "--async",
         "--format=value(metadata.name)",

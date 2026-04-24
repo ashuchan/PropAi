@@ -68,10 +68,20 @@ variable "db_tier" {
   description = "Cloud SQL machine tier; upgrade to db-g1-small when task_count > 15"
 }
 
-# LLM model ids passed through to the Cloud Run jobs as env vars.
-# These are public identifiers (see openrouter.ai/models), not secrets.
-# Override per environment in envs/*.tfvars when staging should differ
-# from prod. Defaults match ma_poc/llm/openrouter.py.
+# LLM provider + model ids passed through to the Cloud Run jobs as env
+# vars. These are public identifiers, not secrets — the API keys live
+# in Secret Manager and are mounted separately (see modules/secrets).
+# Override per environment in envs/*.tfvars.
+variable "llm_provider" {
+  type        = string
+  default     = "anthropic"
+  description = "LLM provider for ma_poc.llm.factory: anthropic | openrouter | azure."
+  validation {
+    condition     = contains(["anthropic", "openrouter", "azure"], var.llm_provider)
+    error_message = "llm_provider must be one of: anthropic, openrouter, azure"
+  }
+}
+
 variable "openrouter_model" {
   type        = string
   default     = "qwen/qwen3-235b-a22b-2507"
@@ -82,4 +92,19 @@ variable "openrouter_vision_model" {
   type        = string
   default     = "qwen/qwen3-235b-a22b-2507"
   description = "OpenRouter vision model id for ma_poc.llm.openrouter."
+}
+
+# Claude Haiku 4.5 is currently the cheapest Anthropic model and supports
+# vision, so both defaults use it. Override vision to a Sonnet model in
+# envs/*.tfvars if you need higher screenshot accuracy.
+variable "anthropic_model" {
+  type        = string
+  default     = "claude-haiku-4-5-20251001"
+  description = "Anthropic text model id for ma_poc.llm.anthropic."
+}
+
+variable "anthropic_vision_model" {
+  type        = string
+  default     = "claude-haiku-4-5-20251001"
+  description = "Anthropic vision model id for ma_poc.llm.anthropic."
 }

@@ -1,9 +1,17 @@
 # Secret slots only — values are written manually via:
 #   echo -n "$KEY" | gcloud secrets versions add openrouter-api-key-{env} --data-file=-
+#   echo -n "$KEY" | gcloud secrets versions add anthropic-api-key-{env} --data-file=-
 # Never put secret values in Terraform or tfvars.
 
 resource "google_secret_manager_secret" "openrouter_api_key" {
   secret_id = "openrouter-api-key-${var.env}"
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret" "anthropic_api_key" {
+  secret_id = "anthropic-api-key-${var.env}"
   replication {
     auto {}
   }
@@ -16,9 +24,15 @@ resource "google_secret_manager_secret" "proxy_credentials" {
   }
 }
 
-# Grant worker SA access to both secrets
+# Grant worker SA access to all secrets
 resource "google_secret_manager_secret_iam_member" "worker_openrouter" {
   secret_id = google_secret_manager_secret.openrouter_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${var.worker_sa_email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "worker_anthropic" {
+  secret_id = google_secret_manager_secret.anthropic_api_key.id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${var.worker_sa_email}"
 }

@@ -39,8 +39,12 @@ class AnthropicLLMProvider(LLMProvider):
         if AsyncAnthropic is None:
             raise RuntimeError("anthropic package not installed")
         self._client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+        # Haiku 4.5 is currently the cheapest Anthropic model and
+        # supports vision — default both text and vision to it. Override
+        # via ANTHROPIC_VISION_MODEL=claude-sonnet-... if higher vision
+        # accuracy is needed.
         self._text_model = os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
-        self._vision_model = os.getenv("ANTHROPIC_VISION_MODEL", "claude-sonnet-4-20250514")
+        self._vision_model = os.getenv("ANTHROPIC_VISION_MODEL", "claude-haiku-4-5-20251001")
 
     async def _complete_once(
         self,

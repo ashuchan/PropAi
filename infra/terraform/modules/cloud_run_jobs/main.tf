@@ -82,17 +82,18 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
           name  = "SCHEMA_VERSION"
           value = "v2"
         }
-        # Selects the text LLM provider in ma_poc/llm/factory.py. Default
-        # there is "anthropic", which reads ANTHROPIC_API_KEY — not the
-        # key this job has. Without this override the canary's LLM
-        # fallback path fails with "Could not resolve authentication
-        # method" and the shard exits 1.
+        # Selects the text/vision LLM provider in ma_poc/llm/factory.py.
+        # Driven by var.llm_provider (anthropic | openrouter | azure).
+        # Both API keys are mounted below so switching providers is just
+        # a tfvars change — no infra rewrite required.
         env {
           name  = "LLM_PROVIDER"
-          value = "openrouter"
+          value = var.llm_provider
         }
-        # Model IDs — read by ma_poc/llm/openrouter.py. Tune per env in
-        # envs/*.tfvars if staging should differ from prod.
+        # Model IDs — read by ma_poc/llm/openrouter.py and
+        # ma_poc/llm/anthropic.py. Tune per env in envs/*.tfvars if
+        # staging should differ from prod. Keys are injected for both
+        # providers; only the one matching LLM_PROVIDER is actually used.
         env {
           name  = "OPENROUTER_MODEL"
           value = var.openrouter_model
@@ -102,10 +103,27 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
           value = var.openrouter_vision_model
         }
         env {
+          name  = "ANTHROPIC_MODEL"
+          value = var.anthropic_model
+        }
+        env {
+          name  = "ANTHROPIC_VISION_MODEL"
+          value = var.anthropic_vision_model
+        }
+        env {
           name = "OPENROUTER_API_KEY"
           value_source {
             secret_key_ref {
               secret  = var.openrouter_secret_id
+              version = "latest"
+            }
+          }
+        }
+        env {
+          name = "ANTHROPIC_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = var.anthropic_secret_id
               version = "latest"
             }
           }
@@ -192,7 +210,7 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
         }
         env {
           name  = "LLM_PROVIDER"
-          value = "openrouter"
+          value = var.llm_provider
         }
         env {
           name  = "OPENROUTER_MODEL"
@@ -203,10 +221,27 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
           value = var.openrouter_vision_model
         }
         env {
+          name  = "ANTHROPIC_MODEL"
+          value = var.anthropic_model
+        }
+        env {
+          name  = "ANTHROPIC_VISION_MODEL"
+          value = var.anthropic_vision_model
+        }
+        env {
           name = "OPENROUTER_API_KEY"
           value_source {
             secret_key_ref {
               secret  = var.openrouter_secret_id
+              version = "latest"
+            }
+          }
+        }
+        env {
+          name = "ANTHROPIC_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = var.anthropic_secret_id
               version = "latest"
             }
           }

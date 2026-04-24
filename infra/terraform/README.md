@@ -48,10 +48,52 @@ Same as staging but with `envs/prod.tfvars` and the prod project.
 
 ## Writing secret values (after first apply)
 
+Terraform creates empty secret *slots*; values are written manually so they
+never land in tfstate. Replace `{env}` with `staging` or `production`.
+
 ```bash
-echo -n "$OPENROUTER_KEY" | gcloud secrets versions add openrouter-api-key-{env} --data-file=-
-echo -n "$PROXY_CREDS" | gcloud secrets versions add proxy-credentials-{env} --data-file=-
+# Anthropic (default provider — set this at minimum)
+echo -n "$ANTHROPIC_KEY" | gcloud secrets versions add anthropic-api-key-{env} \
+  --data-file=- --project={project_id}
+
+# OpenRouter (only needed if you switch llm_provider to "openrouter")
+echo -n "$OPENROUTER_KEY" | gcloud secrets versions add openrouter-api-key-{env} \
+  --data-file=- --project={project_id}
+
+# Proxy credentials (always required)
+echo -n "$PROXY_CREDS" | gcloud secrets versions add proxy-credentials-{env} \
+  --data-file=- --project={project_id}
 ```
+
+Verify the latest version landed:
+```bash
+gcloud secrets versions list anthropic-api-key-{env} --project={project_id}
+```
+
+## Switching LLM provider
+
+The default is **Anthropic Claude Haiku 4.5** (cheapest current Anthropic
+model, supports vision). Both Anthropic and OpenRouter API keys are mounted
+into every Cloud Run job; `LLM_PROVIDER` selects which one
+`ma_poc/llm/factory.py` actually instantiates.
+
+Override per environment in `envs/{env}.tfvars`:
+
+```hcl
+# Keep default (Anthropic Haiku 4.5) — nothing to set.
+
+# Switch to a more capable Anthropic model for vision only
+anthropic_vision_model = "claude-sonnet-4-5-20250929"
+
+# Switch provider entirely
+llm_provider            = "openrouter"
+openrouter_model        = "qwen/qwen3-235b-a22b-2507"
+openrouter_vision_model = "qwen/qwen3-235b-a22b-2507"
+```
+
+Then `terraform apply` — Cloud Run jobs pick up the new env vars on the
+next execution. If you switch providers, make sure the corresponding
+secret has a version written (see block above).
 
 ## State recovery
 
