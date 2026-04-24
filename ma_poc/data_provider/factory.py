@@ -83,7 +83,11 @@ def get_data_provider(
                 scrape_events_path=os.getenv("SCRAPE_EVENTS_PATH"),
             )
         if kind in ("postgres", "pg"):
-            return PostgresDataProvider(url=os.getenv("DATABASE_URL"))
+            # Defer schema creation to alembic in any Postgres deploy —
+            # matches the worker SA's least-privilege setup (no CREATE
+            # on schema public). Sqlite retains create_all() because
+            # local/test DBs start empty with no migration runner.
+            return PostgresDataProvider(url=os.getenv("DATABASE_URL"), create_schema=False)
         if kind == "sqlite":
             return SqliteDataProvider(url=os.getenv("DATABASE_URL"))
         raise ValueError(f"Unknown provider kind: {kind!r}")

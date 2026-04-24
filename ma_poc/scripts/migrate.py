@@ -312,6 +312,13 @@ def main() -> None:
     if db_user.endswith(".gserviceaccount.com"):
         db_user = db_user[: -len(".gserviceaccount.com")]
 
+    # Terraform names the worker SA as ``jugnu-worker-{long_env}`` where
+    # long_env = "production" for prod and "staging" for staging (mirrors
+    # infra/terraform/envs/*.tfvars). Build the Postgres IAM user name
+    # here — trimsuffix(".gserviceaccount.com") matches cloud_sql/main.tf.
+    long_env = "production" if args.env == "prod" else args.env
+    worker_db_user = f"jugnu-worker-{long_env}@{cfg['project']}.iam"
+
     with cloud_sql_proxy(cfg["project"], cfg["instance"], cfg["region"]):
         env = os.environ.copy()
         # Scheme must be `postgresql+psycopg://` — the project installs
@@ -322,6 +329,10 @@ def main() -> None:
         env["DATABASE_URL"] = (
             f"postgresql+psycopg://{db_user}@localhost:5432/jugnu?sslmode=disable"
         )
+        # Consumed by 0007_grant_worker_access.py to target the right
+        # worker role. Unset → the migration raises, which is what we
+        # want: no silent default.
+        env["JUGNU_WORKER_DB_USER"] = worker_db_user
         cmd = ["alembic", "-c", str(ALEMBIC_CONFIG)]
         if args.cmd == "up":
             cmd += ["upgrade", "head"]

@@ -134,6 +134,13 @@ def _make_cloud_sql_engine(url: str | None, **kwargs: Any) -> Engine:
         "pool_pre_ping": True,
         "pool_size": 5,
         "max_overflow": 10,
+        # Cloud SQL IAM access tokens last 60 min. A pooled connection
+        # that sat idle for an hour holds an expired token and will
+        # fail on the next checkout. pool_pre_ping catches most of
+        # that, but recycling under the token TTL is cheaper and
+        # avoids the wasted round-trip per checkout. 50 min leaves
+        # headroom for clock skew and in-flight refresh.
+        "pool_recycle": 3000,
     }
     engine_kwargs.update(kwargs)
 

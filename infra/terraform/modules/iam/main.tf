@@ -26,6 +26,18 @@ resource "google_project_iam_member" "worker_cloudsql_client" {
   member  = "serviceAccount:${google_service_account.worker.email}"
 }
 
+# cloudsql.client alone lets the SA *reach* the instance via the Connector;
+# IAM database authentication additionally needs cloudsql.instanceUser,
+# which authorises logging in as an IAM user. Without it Postgres rejects
+# the auth handshake with SQLSTATE 28000 ("Cloud SQL IAM service account
+# authentication failed for user …") — which is what burned the first
+# prod deploy of the Connector-backed sync path on 2026-04-24.
+resource "google_project_iam_member" "worker_cloudsql_instance_user" {
+  project = var.project_id
+  role    = "roles/cloudsql.instanceUser"
+  member  = "serviceAccount:${google_service_account.worker.email}"
+}
+
 resource "google_project_iam_member" "worker_log_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"

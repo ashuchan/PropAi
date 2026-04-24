@@ -104,7 +104,9 @@ def _hydrate_dlq_from_db(schema_version: str) -> int:
 
     state_dir = _schema_root(schema_version) / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
-    provider = PostgresDataProvider()
+    # create_schema=False: alembic owns DDL in prod; the worker SA has
+    # no CREATE on schema public (by design). Matches sync_run_to_pg.
+    provider = PostgresDataProvider(create_schema=False)
     try:
         n = load_dlq_from_db_to_file(engine=provider.engine, path=state_dir / "dlq.jsonl")
     finally:
@@ -137,7 +139,9 @@ def _sync_dlq_to_db(schema_version: str) -> int:
         print("[retry_entry] No local DLQ file after run; skipping sync", file=sys.stderr)
         return 0
 
-    provider = PostgresDataProvider()
+    # create_schema=False: see _hydrate_dlq_from_db above. The worker
+    # SA has no CREATE on schema public.
+    provider = PostgresDataProvider(create_schema=False)
     try:
         summary = _sync_dlq(provider.engine, dlq_path)
         print(f"[retry_entry] DLQ synced to DB: {summary}", file=sys.stderr)

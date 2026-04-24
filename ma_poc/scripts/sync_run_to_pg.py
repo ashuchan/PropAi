@@ -471,7 +471,14 @@ def sync_run_to_postgres(
     )
 
     src = FileSystemDataProvider(base_dir=data_dir, config_dir=config_dir)
-    dst = PostgresDataProvider(url=database_url)
+    # Skip runtime create_all() for real Postgres — alembic owns the
+    # schema and the Cloud Run worker SA doesn't have CREATE on schema
+    # public (least privilege). For sqlite we still want create_all()
+    # because the tests and local-dev fallbacks start from a fresh DB
+    # with no alembic run.
+    resolved_url = database_url or os.environ.get("DATABASE_URL") or ""
+    is_postgres = resolved_url.startswith("postgresql")
+    dst = PostgresDataProvider(url=database_url, create_schema=not is_postgres)
     summary: dict[str, Any] = {}
     try:
         # Stage 1 — everything that has a store interface goes inside a
