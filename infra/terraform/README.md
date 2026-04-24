@@ -48,8 +48,14 @@ Same as staging but with `envs/prod.tfvars` and the prod project.
 
 ## Writing secret values (after first apply)
 
-Terraform creates empty secret *slots*; values are written manually so they
-never land in tfstate. Replace `{env}` with `staging` or `production`.
+Terraform creates secret *slots* (and a placeholder version for the
+Anthropic secret so the Cloud Run jobs can mount it at apply time);
+real values are written manually so they never land in tfstate. Replace
+`{env}` with `staging` or `production`.
+
+> ⚠️ After the first apply, `anthropic-api-key-{env}` holds a literal
+> `PLACEHOLDER_REPLACE_VIA_GCLOUD` string — overwrite it **before** you
+> execute any Cloud Run job that uses Anthropic, or LLM calls will 401.
 
 ```bash
 # Anthropic (default provider — set this at minimum)

@@ -17,6 +17,21 @@ resource "google_secret_manager_secret" "anthropic_api_key" {
   }
 }
 
+# Bootstrap placeholder so the first ``terraform apply`` that also wires
+# this secret into the Cloud Run jobs doesn't fail with "Secret ...
+# /versions/latest was not found". Operator overwrites with the real
+# key via ``gcloud secrets versions add`` — Cloud Run resolves ``latest``
+# at each execution, so new executions pick up the real value
+# immediately. ``lifecycle.ignore_changes`` keeps Terraform from fighting
+# the operator's manually-added versions on subsequent applies.
+resource "google_secret_manager_secret_version" "anthropic_api_key_placeholder" {
+  secret      = google_secret_manager_secret.anthropic_api_key.id
+  secret_data = "PLACEHOLDER_REPLACE_VIA_GCLOUD"
+  lifecycle {
+    ignore_changes = [secret_data, enabled]
+  }
+}
+
 resource "google_secret_manager_secret" "proxy_credentials" {
   secret_id = "proxy-credentials-${var.env}"
   replication {
