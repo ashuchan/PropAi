@@ -22,13 +22,32 @@ resource "google_secret_manager_secret" "anthropic_api_key" {
 # /versions/latest was not found". Operator overwrites with the real
 # key via ``gcloud secrets versions add`` — Cloud Run resolves ``latest``
 # at each execution, so new executions pick up the real value
-# immediately. ``lifecycle.ignore_changes`` keeps Terraform from fighting
-# the operator's manually-added versions on subsequent applies.
-resource "google_secret_manager_secret_version" "anthropic_api_key_placeholder" {
-  secret      = google_secret_manager_secret.anthropic_api_key.id
-  secret_data = "PLACEHOLDER_REPLACE_VIA_GCLOUD"
-  lifecycle {
-    ignore_changes = [secret_data, enabled]
+# immediately.
+#
+# Why not ``google_secret_manager_secret_version``? The provider does a
+# read-after-create on that resource, which requires
+# ``secretmanager.versions.access``. The deployer SA in this project has
+# ``versions.add`` but not ``versions.access`` (intentional — deployer
+# can rotate infra without ever reading payloads), so the managed
+# resource fails on first apply. Going through ``gcloud`` keeps the
+# privilege boundary intact.
+#
+# Idempotency: ``null_resource.triggers`` only fires when the underlying
+# secret is (re)created, so re-running ``terraform apply`` after the
+# operator has written a real version will NOT re-add the placeholder.
+resource "null_resource" "anthropic_api_key_placeholder" {
+  triggers = {
+    secret_name = google_secret_manager_secret.anthropic_api_key.name
+  }
+  provisioner "local-exec" {
+    interpreter = ["bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      printf 'PLACEHOLDER_REPLACE_VIA_GCLOUD' | \
+        gcloud secrets versions add ${google_secret_manager_secret.anthropic_api_key.secret_id} \
+          --project=${google_secret_manager_secret.anthropic_api_key.project} \
+          --data-file=-
+    EOT
   }
 }
 

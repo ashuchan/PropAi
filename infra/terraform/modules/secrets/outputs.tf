@@ -9,7 +9,7 @@ output "anthropic_secret_id" {
   # Without this, Terraform schedules the Cloud Run job update in
   # parallel with the version create and the update fails with
   # "Secret .../versions/latest was not found".
-  depends_on = [google_secret_manager_secret_version.anthropic_api_key_placeholder]
+  depends_on = [null_resource.anthropic_api_key_placeholder]
 }
 
 output "proxy_credentials_secret_id" {
