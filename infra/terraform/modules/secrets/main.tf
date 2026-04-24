@@ -35,6 +35,22 @@ resource "google_secret_manager_secret" "anthropic_api_key" {
 # Idempotency: ``null_resource.triggers`` only fires when the underlying
 # secret is (re)created, so re-running ``terraform apply`` after the
 # operator has written a real version will NOT re-add the placeholder.
+# A previous (failed) apply left a managed
+# ``google_secret_manager_secret_version.anthropic_api_key_placeholder``
+# in tfstate even though its post-create read returned 403. Every
+# subsequent ``terraform plan`` then re-issues that read during refresh
+# and fails the same way, blocking all infra changes. This block drops
+# the resource from state without destroying the actual version
+# (``destroy = false``), so the existing Secret Manager version stays
+# intact and Cloud Run keeps mounting ``latest``. Safe to leave in place
+# permanently — once state is clean it's a no-op.
+removed {
+  from = google_secret_manager_secret_version.anthropic_api_key_placeholder
+  lifecycle {
+    destroy = false
+  }
+}
+
 resource "null_resource" "anthropic_api_key_placeholder" {
   triggers = {
     secret_name = google_secret_manager_secret.anthropic_api_key.name
