@@ -29,11 +29,13 @@ alembic>=1.13.0
 psycopg[binary]>=3.1.18
 
 # Cloud SQL IAM auth from inside Cloud Run (no proxy sidecar required).
-# The connector obtains + refreshes a short-lived OAuth token, hands it
-# to psycopg as the Postgres password, and handles the TLS handshake
-# against the instance's private IP. Wired through data_provider.sql.
-# engine when CLOUD_SQL_INSTANCE is set.
-cloud-sql-python-connector[psycopg3]>=1.9.0
+# The connector obtains + refreshes a short-lived OAuth token, opens the
+# TLS handshake against the instance's private IP, and hands back a DBAPI
+# connection. The sync path only dispatches to pg8000/asyncpg/pymysql/
+# pytds — psycopg is NOT accepted — so we use the [pg8000] extra here
+# even though direct (non-connector) connections still use psycopg3.
+# Wired through data_provider.sql.engine when CLOUD_SQL_INSTANCE is set.
+cloud-sql-python-connector[pg8000]>=1.9.0
 
 # Required by Cloud Run entrypoints (jugnu_shard_entry.py,
 # jugnu_retry_entry.py) for GCS upload/download. The prod image no

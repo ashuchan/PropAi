@@ -100,10 +100,18 @@ class TestUploadArtifacts:
         target moved to ma_poc.storage.gcs.upload_object.
         """
         run_date = "2026-04-21"
+        # events.jsonl + cost_ledger.db are per-run artifacts; dlq.jsonl
+        # is cross-run state written to state_dir by jugnu_runner.
+        # Splitting the fixture catches regressions where the uploader
+        # pulls dlq.jsonl from the wrong directory (shipped in prod and
+        # silently skipped every upload).
         run_dir = tmp_path / "data" / "runs" / run_date
         run_dir.mkdir(parents=True)
-        for fname in ("events.jsonl", "dlq.jsonl", "cost_ledger.db"):
+        for fname in ("events.jsonl", "cost_ledger.db"):
             (run_dir / fname).write_text("data")
+        state_dir = tmp_path / "data" / "state"
+        state_dir.mkdir(parents=True)
+        (state_dir / "dlq.jsonl").write_text("data")
 
         uploaded_pairs: list[tuple[Path, str]] = []
 

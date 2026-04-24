@@ -1,14 +1,15 @@
 """Unit tests for ``data_provider.sql.engine._make_cloud_sql_engine``.
 
 The connector path can't be driven end-to-end in CI without a live
-Cloud SQL instance (and on ARM64 Windows the psycopg v3 binary wheel
-doesn't exist, so we can't even call ``create_engine`` with the
-psycopg dialect). These tests mock both the connector module and
+Cloud SQL instance. These tests mock both the connector module and
 SQLAlchemy's ``create_engine`` and assert the builder:
   - only fires when ``CLOUD_SQL_INSTANCE`` is set
   - passes the parsed user + db to the connector
   - forwards the connector's connection object to SQLAlchemy as a
     ``creator=`` callable
+  - requests the pg8000 driver — the connector's sync dispatch rejects
+    ``psycopg`` with a KeyError regardless of the ``[psycopg3]`` extra
+  - uses the ``postgresql+pg8000://`` dialect to match the driver
   - reads ``CLOUD_SQL_IP_TYPE`` (default PRIVATE; PUBLIC when set)
 
 Covers every failure mode that would land zero rows in prod with a
@@ -99,7 +100,9 @@ def test_connector_path_activates_on_env_var(monkeypatch: pytest.MonkeyPatch) ->
 
     Asserts the right scheme is used, a ``creator`` is wired, and that
     calling the creator invokes the connector with user/db from
-    DATABASE_URL + IAM auth on + driver = psycopg.
+    DATABASE_URL + IAM auth on + driver = pg8000. psycopg here would
+    raise KeyError at runtime because the connector's sync dispatch
+    doesn't include it.
     """
     rec_conn = _install_connector_stub(monkeypatch)
     rec_eng = _stub_create_engine(monkeypatch)
@@ -113,8 +116,10 @@ def test_connector_path_activates_on_env_var(monkeypatch: pytest.MonkeyPatch) ->
 
     make_engine()
 
-    # Scheme carries no host/port — the connector overrides the transport.
-    assert rec_eng["url"] == "postgresql+psycopg://"
+    # Scheme must match the driver the connector returns — pg8000 — so
+    # SQLAlchemy loads the matching dialect. Host/port are stripped;
+    # the connector overrides the transport.
+    assert rec_eng["url"] == "postgresql+pg8000://"
     assert callable(rec_eng["kwargs"]["creator"])
     assert rec_eng["kwargs"]["pool_pre_ping"] is True
 
@@ -123,7 +128,7 @@ def test_connector_path_activates_on_env_var(monkeypatch: pytest.MonkeyPatch) ->
     assert len(rec_conn["connect_calls"]) == 1
     call = rec_conn["connect_calls"][0]
     assert call["instance"] == "jugnu-494013:us-central1:jugnu-db-production"
-    assert call["driver"] == "psycopg"
+    assert call["driver"] == "pg8000"
     assert call["enable_iam_auth"] is True
     assert call["ip_type"] == "PRIVATE"
     assert call["db"] == "jugnu"
@@ -160,3 +165,29 @@ def test_connector_path_fails_if_user_or_db_missing(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(RuntimeError, match="DATABASE_URL must supply"):
         make_engine()
+
+
+def test_connector_driver_name_is_one_the_library_accepts() -> None:
+    """The driver string we hand to Connector.connect() must exist in
+    connect_func, otherwise production raises KeyError at the first
+    DB call (as it did on 2026-04-24 after the psycopg3 switch).
+
+    This test runs the real connector source without opening a network
+    connection, so it fails fast if the library drops a driver or we
+    rename one.
+    """
+    try:
+        from google.cloud.sql.connector import connector as _connector_mod
+    except ImportError:
+        pytest.skip("cloud-sql-python-connector not installed")
+
+    import inspect
+
+    src = inspect.getsource(_connector_mod)
+    # The dispatch is a dict literal inside Connector.connect. Assert
+    # the string we use in _make_cloud_sql_engine appears as a key.
+    assert '"pg8000"' in src or "'pg8000'" in src, (
+        "Cloud SQL Connector source no longer references 'pg8000' — "
+        "engine.py picks this driver for Connector.connect(); if the "
+        "library changed, pick one of the names it now supports."
+    )

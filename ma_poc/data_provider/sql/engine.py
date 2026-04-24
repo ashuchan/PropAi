@@ -5,8 +5,12 @@ We resolve the URL in this priority order:
   2. DATABASE_URL env var
   3. sqlite:///{DATA_DIR}/propai.db  — last-resort local fallback
 
-Postgres expects `postgresql+psycopg://user:pass@host:port/dbname`. The
-`psycopg` driver (v3) is the current recommendation.
+Postgres expects `postgresql+psycopg://user:pass@host:port/dbname` for
+direct connections; psycopg v3 is the default driver. The Cloud SQL
+Connector path uses pg8000 instead — `Connector.connect()`'s sync
+dispatch only accepts {pymysql, pg8000, asyncpg, pytds}, never psycopg,
+regardless of the `[psycopg3]` extra (that extra just installs psycopg3
+as a dep for the Python side, not as a connector driver).
 """
 
 from __future__ import annotations
@@ -110,11 +114,14 @@ def _make_cloud_sql_engine(url: str | None, **kwargs: Any) -> Engine:
     connector = Connector()
 
     def _connect() -> Any:
-        # Connector manages the token refresh loop; driver is fixed to
-        # psycopg v3 to match the rest of the project.
+        # Connector manages the token refresh loop. Driver must be one of
+        # {pymysql, pg8000, asyncpg, pytds} — the connector's sync
+        # dispatch does not accept "psycopg" even with the [psycopg3]
+        # extra installed (confirmed against v1.20.2). pg8000 is pure
+        # Python, works on every arch, and supports everything we need.
         return connector.connect(
             instance,
-            "psycopg",
+            "pg8000",
             user=parsed.username,
             db=parsed.database,
             enable_iam_auth=True,
@@ -137,9 +144,11 @@ def _make_cloud_sql_engine(url: str | None, **kwargs: Any) -> Engine:
         parsed.database,
         ip_raw,
     )
-    # Use postgresql+psycopg:// dialect string; the creator supplies the
-    # actual DBAPI connection so host/port in the URL are ignored.
-    return create_engine("postgresql+psycopg://", **engine_kwargs)
+    # Use postgresql+pg8000:// to match the driver the connector returns;
+    # SQLAlchemy must load the pg8000 dialect so its cursor/param-style
+    # calls match the DBAPI the `creator` hands back. Host/port in the
+    # URL are ignored — the creator supplies the actual connection.
+    return create_engine("postgresql+pg8000://", **engine_kwargs)
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:

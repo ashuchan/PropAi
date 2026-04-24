@@ -112,14 +112,26 @@ def _schema_root(schema_version: str) -> Path:
 def _upload_artifacts(bucket_name: str, run_date: str, task_idx: int, schema_version: str) -> None:
     """Upload per-shard artifacts to GCS; called in finally so failures don't suppress runner exit code."""
     local_run_dir = _resolve_run_dir(schema_version, run_date)
+    state_dir = _schema_root(schema_version) / "state"
     dest_prefix = f"gs://{bucket_name}/runs/{run_date}/shard_{task_idx}/"
 
-    if not local_run_dir.exists():
-        print(f"[shard_entry] No local run dir {local_run_dir}; skipping upload", file=sys.stderr)
+    # dlq.jsonl is append-only cross-run state — jugnu_runner writes it
+    # to state_dir, not the per-run dir. Pulling it from local_run_dir
+    # silently skipped every upload.
+    artifacts: tuple[tuple[str, Path], ...] = (
+        ("events.jsonl", local_run_dir / "events.jsonl"),
+        ("cost_ledger.db", local_run_dir / "cost_ledger.db"),
+        ("dlq.jsonl", state_dir / "dlq.jsonl"),
+    )
+
+    if not local_run_dir.exists() and not state_dir.exists():
+        print(
+            f"[shard_entry] Neither {local_run_dir} nor {state_dir} exists; skipping upload",
+            file=sys.stderr,
+        )
         return
 
-    for artifact in ("events.jsonl", "dlq.jsonl", "cost_ledger.db"):
-        local_path = local_run_dir / artifact
+    for artifact, local_path in artifacts:
         if local_path.exists():
             try:
                 gcs.upload_object(local_path, dest_prefix + artifact)
@@ -130,7 +142,7 @@ def _upload_artifacts(bucket_name: str, run_date: str, task_idx: int, schema_ver
                     file=sys.stderr,
                 )
         else:
-            print(f"[shard_entry] {artifact} not found; skipping", file=sys.stderr)
+            print(f"[shard_entry] {artifact} not found at {local_path}; skipping", file=sys.stderr)
 
 
 def _sync_to_postgres(run_date: str, schema_version: str) -> int:
