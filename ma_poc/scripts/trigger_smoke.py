@@ -1,11 +1,10 @@
 """trigger_smoke.py — deploy-time canary smoke test.
 
 Exit codes:
-  0  Success (all post-conditions passed)
+  0  Success (job exited 0 and post-conditions passed)
   1  Job failed (execution exit code non-zero)
   2  Usage error
   3  Precondition failed
-  5  Post-condition failed (job succeeded but validation checks didn't)
   6  Timeout
   130 SIGINT
 
@@ -14,14 +13,19 @@ Usage:
 
 Options:
   --timeout-seconds N   Fail if run takes longer than N seconds (default: 600)
-  --min-rows N          Fail if fewer than N rows written to DB (default: 3)
+
+Previously this script also checked GCS ``runs/{date}/shard_0/dlq.jsonl``
+for emptiness. That gate was tautological: shard_entry never uploads to
+that path, and the DLQ is now durable cross-run state mirrored to
+Postgres via alembic 0006_dlq_entries — a per-run DLQ view no longer
+exists. The real "did this canary succeed?" signal is the Cloud Run
+job's own exit code, which ``gcloud run jobs execute --wait`` reports.
 """
 
 from __future__ import annotations
 
 import argparse
 import signal
-import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -56,30 +60,7 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Deploy-time canary smoke test.")
     p.add_argument("--env", choices=["staging", "prod"], required=True)
     p.add_argument("--timeout-seconds", type=int, default=600)
-    p.add_argument("--min-rows", type=int, default=3)
     return p.parse_args()
-
-
-def _check_gcs_dlq_empty(bucket_name: str, run_date: str) -> bool:
-    """Return True if the canary shard's DLQ is absent or empty."""
-    gcs_path = f"gs://{bucket_name}/runs/{run_date}/shard_0/dlq.jsonl"
-    result = subprocess.run(
-        ["gsutil", "stat", gcs_path],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        return True  # file absent → no DLQ entries → OK
-
-    cat_result = subprocess.run(
-        ["gsutil", "cat", gcs_path],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    content = cat_result.stdout.strip()
-    return not content  # empty file → OK
 
 
 def main() -> None:
@@ -130,20 +111,11 @@ def main() -> None:
         )
         sys.exit(1)
 
-    # Post-condition 1: DLQ is empty
-    if not _check_gcs_dlq_empty(bucket_name, run_date):
-        print("[smoke] FAILED: DLQ is non-empty", file=sys.stderr)
-        emit_structured_result(
-            {
-                "status": "FAILED",
-                "failed_check": "dlq_non_empty",
-                "env": args.env,
-            }
-        )
-        sys.exit(5)
-
-    # All checks passed
-    print("[smoke] All post-conditions passed", file=sys.stderr)
+    # Job exit 0 is the canary signal. shard_entry fails the task if
+    # either the scrape or the post-run Postgres sync failed, so a
+    # green exit already implies rows landed — no separate DB gate
+    # needed here.
+    print("[smoke] Canary job exited 0", file=sys.stderr)
     emit_structured_result({"status": "SUCCESS", "env": args.env})
     sys.exit(0)
 

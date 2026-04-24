@@ -303,3 +303,247 @@ def test_sync_handles_empty_artifact_dirs(tmp_path: Path) -> None:
         assert sync_run_to_pg._upsert_llm_diagnostics(engine, RUN_DATE, run_dir / "llm_diagnostics") == 0
     finally:
         target.close()
+
+
+# ── DLQ sync ────────────────────────────────────────────────────────────────
+
+
+def _dlq_count(engine) -> int:
+    from sqlalchemy import select
+    from data_provider.sql.models import DlqEntryRow
+
+    with engine.connect() as conn:
+        return conn.execute(select(DlqEntryRow)).all().__len__()
+
+
+def _dlq_row(engine, pid: str):
+    from sqlalchemy import select
+    from data_provider.sql.models import DlqEntryRow
+
+    with engine.connect() as conn:
+        return conn.execute(select(DlqEntryRow).where(DlqEntryRow.property_id == pid)).first()
+
+
+def test_dlq_load_live_entries_honors_tombstones(tmp_path: Path) -> None:
+    """_load_dlq_live_entries matches Dlq._load's compaction semantics.
+
+    A property parked → unparked → parked sequence produces one live
+    entry (the final park). An orphan unpark at end produces no entry.
+    """
+    path = tmp_path / "dlq.jsonl"
+    path.write_text(
+        '\n'.join([
+            '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+            '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+            '{"property_id":"P-1","parked_at":"t0","reason":"","last_error_signature":"","retry_at":"","unparked":true}',
+            '{"property_id":"P-1","parked_at":"t2","reason":"timeout","last_error_signature":"sig2","retry_at":"t3","unparked":false}',
+            '{"property_id":"P-3","parked_at":"","reason":"","last_error_signature":"","retry_at":"","unparked":true}',
+        ]) + "\n",
+        encoding="utf-8",
+    )
+    live = sync_run_to_pg._load_dlq_live_entries(path)
+    assert set(live.keys()) == {"P-1", "P-2"}
+    # Re-park should win over the earlier version, carrying the newer signature.
+    assert live["P-1"]["last_error_signature"] == "sig2"
+
+
+def test_dlq_sync_upserts_parked_and_deletes_unparked(tmp_path: Path) -> None:
+    """DB mirrors the post-compaction live set.
+
+    Regression: without the DELETE step, unparking a property in the
+    JSONL log would leave a ghost row in dlq_entries — the retry job
+    would keep processing a property that's no longer parked locally.
+    """
+    target = SqliteDataProvider(url=_sqlite_url(tmp_path))
+    dlq_path = tmp_path / "dlq.jsonl"
+    try:
+        # Round 1: two properties parked.
+        dlq_path.write_text(
+            '\n'.join([
+                '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        summary = sync_run_to_pg._sync_dlq(target.engine, dlq_path)
+        assert summary == {"upserted": 2, "deleted": 0}
+        assert _dlq_count(target.engine) == 2
+
+        # Round 2: P-1 unparked. DB must drop it.
+        dlq_path.write_text(
+            '\n'.join([
+                '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                '{"property_id":"P-1","parked_at":"","reason":"","last_error_signature":"","retry_at":"","unparked":true}',
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        summary = sync_run_to_pg._sync_dlq(target.engine, dlq_path)
+        assert summary == {"upserted": 1, "deleted": 1}
+        assert _dlq_count(target.engine) == 1
+        assert _dlq_row(target.engine, "P-1") is None
+        assert _dlq_row(target.engine, "P-2") is not None
+
+        # Round 3: re-parking P-1 with new reason overwrites in-place.
+        dlq_path.write_text(
+            '\n'.join([
+                '{"property_id":"P-1","parked_at":"t5","reason":"blocked","last_error_signature":"newsig","retry_at":"t6","unparked":false}',
+                '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        summary = sync_run_to_pg._sync_dlq(target.engine, dlq_path)
+        assert summary == {"upserted": 2, "deleted": 0}
+        row = _dlq_row(target.engine, "P-1")
+        assert row is not None
+        assert row.reason == "blocked"
+        assert row.last_error_signature == "newsig"
+    finally:
+        target.close()
+
+
+def test_dlq_sync_missing_file_is_noop(tmp_path: Path) -> None:
+    """A fresh data dir with no DLQ file yet must not crash the sync.
+
+    Happens on the very first run of a brand-new environment.
+    """
+    target = SqliteDataProvider(url=_sqlite_url(tmp_path))
+    try:
+        summary = sync_run_to_pg._sync_dlq(target.engine, tmp_path / "does-not-exist.jsonl")
+        assert summary == {"upserted": 0, "deleted": 0}
+    finally:
+        target.close()
+
+
+def test_load_dlq_from_db_to_file_writes_compacted_jsonl(tmp_path: Path) -> None:
+    """retry_entry's pre-hydration step reproduces the JSONL format Dlq expects.
+
+    Regression: if the produced file isn't valid JSONL, ``Dlq._load()``
+    silently skips every line (``try/except (JSONDecodeError, TypeError)``)
+    and the retry runner sees an empty DLQ — identical user-visible
+    symptom to the bug we're fixing.
+    """
+    import json
+
+    target = SqliteDataProvider(url=_sqlite_url(tmp_path))
+    dlq_path_src = tmp_path / "src.jsonl"
+    dlq_path_dst = tmp_path / "dst.jsonl"
+    try:
+        dlq_path_src.write_text(
+            '\n'.join([
+                '{"property_id":"P-1","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+                '{"property_id":"P-2","parked_at":"t0","reason":"blocked","last_error_signature":"sig","retry_at":"t1","unparked":false}',
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        sync_run_to_pg._sync_dlq(target.engine, dlq_path_src)
+
+        n = sync_run_to_pg.load_dlq_from_db_to_file(engine=target.engine, path=dlq_path_dst)
+        assert n == 2
+
+        # Round-trip: feed the written file back through _load_dlq_live_entries
+        # and confirm Dlq._load would see both properties.
+        round_trip = sync_run_to_pg._load_dlq_live_entries(dlq_path_dst)
+        assert set(round_trip.keys()) == {"P-1", "P-2"}
+
+        # Every line must be a valid JSON object with the Dlq field names.
+        for raw in dlq_path_dst.read_text(encoding="utf-8").splitlines():
+            entry = json.loads(raw)
+            assert set(entry.keys()) == {
+                "property_id", "parked_at", "reason",
+                "last_error_signature", "retry_at", "unparked",
+            }
+            assert entry["unparked"] is False
+    finally:
+        target.close()
+
+
+def test_load_dlq_from_db_to_file_creates_empty_file_when_db_empty(tmp_path: Path) -> None:
+    """Fresh environments with no parked properties still get a valid empty file."""
+    target = SqliteDataProvider(url=_sqlite_url(tmp_path))
+    dlq_path = tmp_path / "fresh" / "dlq.jsonl"
+    try:
+        n = sync_run_to_pg.load_dlq_from_db_to_file(engine=target.engine, path=dlq_path)
+    finally:
+        target.close()
+    assert n == 0
+    assert dlq_path.exists()
+    assert dlq_path.read_text(encoding="utf-8") == ""
+
+
+def test_dlq_round_trip_with_real_dlq_class(tmp_path: Path) -> None:
+    """End-to-end: Dlq instance → sync → load_from_db → new Dlq instance sees same state.
+
+    This is the contract retry_entry relies on: we take the current
+    Dlq's live entries, push them to DB, then the retry job fetches
+    them back into a brand-new Dlq and sees the same entries. Any
+    schema drift between sync and Dlq._load breaks this.
+    """
+    from ma_poc.discovery.dlq import Dlq
+
+    target = SqliteDataProvider(url=_sqlite_url(tmp_path))
+    try:
+        # 1. Scrape-side: populate a Dlq.
+        src_path = tmp_path / "scrape_state" / "dlq.jsonl"
+        dlq = Dlq(src_path)
+        dlq.park("P-A", reason="timeout", err_sig="ETIMEDOUT")
+        dlq.park("P-B", reason="blocked", err_sig="HTTP 403")
+
+        # 2. Scrape-side sync to DB.
+        sync_run_to_pg._sync_dlq(target.engine, src_path)
+        assert _dlq_count(target.engine) == 2
+
+        # 3. Retry-side hydrate: DB → fresh /tmp file.
+        dst_path = tmp_path / "retry_state" / "dlq.jsonl"
+        sync_run_to_pg.load_dlq_from_db_to_file(engine=target.engine, path=dst_path)
+
+        # 4. Retry-side: fresh Dlq instance reads the hydrated file.
+        retry_dlq = Dlq(dst_path)
+        assert retry_dlq.is_parked("P-A")
+        assert retry_dlq.is_parked("P-B")
+        assert not retry_dlq.is_parked("P-NONEXISTENT")
+
+        # 5. Retry-side unparks P-A and re-syncs. DB must reflect it.
+        retry_dlq.unpark("P-A")
+        sync_run_to_pg._sync_dlq(target.engine, dst_path)
+        assert _dlq_count(target.engine) == 1
+        assert _dlq_row(target.engine, "P-A") is None
+        assert _dlq_row(target.engine, "P-B") is not None
+    finally:
+        target.close()
+
+
+def test_sync_run_to_postgres_includes_dlq(tmp_path: Path) -> None:
+    """The top-level sync_run_to_postgres must call _sync_dlq too.
+
+    Regression: if anyone refactors sync_run_to_postgres and drops the
+    DLQ call, the scrape-side DLQ stops persisting and we silently
+    regress to the pre-fix state. Check it's wired end-to-end.
+    """
+    src, data_dir, config_dir = _seed_fs_provider(tmp_path)
+    src.close()
+
+    # Seed a DLQ entry in the state dir the runner would use.
+    state_dir = data_dir / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "dlq.jsonl").write_text(
+        '{"property_id":"P-PARKED","parked_at":"t0","reason":"timeout","last_error_signature":"sig","retry_at":"t1","unparked":false}\n',
+        encoding="utf-8",
+    )
+
+    url = _sqlite_url(tmp_path)
+    summary = sync_run_to_pg.sync_run_to_postgres(
+        run_date=RUN_DATE,
+        data_dir=data_dir,
+        config_dir=config_dir,
+        database_url=url,
+    )
+    assert summary["dlq"] == {"upserted": 1, "deleted": 0}
+
+    from data_provider.sqlite import SqliteDataProvider as _Sqlite
+    verify = _Sqlite(url=url)
+    try:
+        assert _dlq_count(verify.engine) == 1
+        assert _dlq_row(verify.engine, "P-PARKED") is not None
+    finally:
+        verify.close()

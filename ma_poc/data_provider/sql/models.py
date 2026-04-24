@@ -313,3 +313,33 @@ class LlmDiagnosticRow(Base):
     written_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (Index("ix_llm_diagnostics_run_prop", "run_date", "property_id"),)
+
+
+# ── Dead-letter queue (global state, not per-run) ────────────────────────────
+
+
+class DlqEntryRow(Base):
+    """Live state of the dead-letter queue.
+
+    Mirrors the post-compaction view of ``data/state/dlq.jsonl``. The
+    JSONL file is an append-only log with an ``unparked`` tombstone
+    convention; this table only holds currently-parked entries (one row
+    per property_id). Unparking a property DELETEs the row rather than
+    writing a tombstone — DB semantics already give us "not present" as
+    the absence signal.
+
+    ``retry_at`` is indexed because the retry runner's hot query is
+    ``WHERE retry_at <= now()`` and even a few hundred parked properties
+    make that a seq scan without it.
+    """
+
+    __tablename__ = "dlq_entries"
+
+    property_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    parked_at: Mapped[str] = mapped_column(String(64))
+    reason: Mapped[str] = mapped_column(String(128))
+    last_error_signature: Mapped[str] = mapped_column(String(512))
+    retry_at: Mapped[str] = mapped_column(String(64))
+    last_synced_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (Index("ix_dlq_entries_retry_at", "retry_at"),)

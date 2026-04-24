@@ -171,7 +171,15 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
         }
         env {
           name  = "DATABASE_URL"
-          value = "postgresql://${var.worker_sa_email}@${var.sql_private_ip}:5432/jugnu?sslmode=require"
+          value = "postgresql+psycopg://${var.worker_sa_email}@${var.sql_private_ip}:5432/jugnu?sslmode=require"
+        }
+        env {
+          name  = "CLOUD_SQL_INSTANCE"
+          value = var.sql_instance_connection_name
+        }
+        env {
+          name  = "CLOUD_SQL_IP_TYPE"
+          value = "PRIVATE"
         }
         # See scrape-job block above — same rationale for all three.
         env {

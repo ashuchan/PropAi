@@ -25,13 +25,13 @@ variable "proxy_credentials_secret_id" { type = string }
 variable "openrouter_model" {
   type        = string
   description = "OpenRouter text model id (e.g. 'google/gemini-2.5-flash')."
-  default     = "tencent/hy3-preview:free"
+  default     = "qwen/qwen3-235b-a22b-2507"
 }
 
 variable "openrouter_vision_model" {
   type        = string
   description = "OpenRouter vision model id."
-  default     = "tencent/hy3-preview:free"
+  default     = "qwen/qwen3-235b-a22b-2507"
 }
 variable "default_task_count" {
   type    = number

@@ -74,12 +74,12 @@ variable "db_tier" {
 # from prod. Defaults match ma_poc/llm/openrouter.py.
 variable "openrouter_model" {
   type        = string
-  default     = "tencent/hy3-preview:free"
+  default     = "qwen/qwen3-235b-a22b-2507"
   description = "OpenRouter text model id for ma_poc.llm.openrouter."
 }
 
 variable "openrouter_vision_model" {
   type        = string
-  default     = "tencent/hy3-preview:free"
+  default     = "qwen/qwen3-235b-a22b-2507"
   description = "OpenRouter vision model id for ma_poc.llm.openrouter."
 }

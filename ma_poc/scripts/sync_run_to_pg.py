@@ -32,6 +32,13 @@ Write surface (keep in sync with ``scripts/CLAUDE.md`` and
     - llm_property_details   from runs/{date}/llm_report/{cid}.json
     - llm_diagnostics        from runs/{date}/llm_diagnostics/{cid}_{kind}.json
 
+  durable cross-run state (table added in alembic 0006_dlq_entries)
+    - dlq_entries            from state/dlq.jsonl (not per-run — ``state/``
+                             lives above ``runs/`` and holds the global
+                             retry queue, frontier, conditional cache).
+                             Without this mirror the DLQ is lost every
+                             time Cloud Run tears down the container.
+
 Idempotent: every insert uses ``on_conflict_do_update`` on the table's
 natural key. Re-running the sync for the same run_date replaces rows in
 place — safe to invoke on Cloud Run retry.
@@ -65,6 +72,7 @@ from data_provider import (  # noqa: E402
 )
 from data_provider.sql.engine import dialect_insert  # noqa: E402
 from data_provider.sql.models import (  # noqa: E402
+    DlqEntryRow,
     LlmDiagnosticRow,
     LlmPropertyDetailRow,
     LlmReportRow,
@@ -255,6 +263,128 @@ def _upsert_llm_property_details(engine: Any, run_date: str, dir_: Path) -> int:
     return count
 
 
+# ── DLQ (cross-run, not per-run) ─────────────────────────────────────────────
+
+
+def _load_dlq_live_entries(path: Path) -> dict[str, dict[str, Any]]:
+    """Read ``state/dlq.jsonl`` and return the post-compaction live state.
+
+    The JSONL file is an append-only log with ``unparked`` tombstones —
+    re-parking a property adds a new line, unparking writes a tombstone.
+    We walk every line in order and keep only the latest non-unparked
+    entry per property_id, matching ``Dlq._load()`` exactly.
+    """
+    if not path.exists():
+        return {}
+    live: dict[str, dict[str, Any]] = {}
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        pid = data.get("property_id")
+        if not pid:
+            continue
+        if data.get("unparked"):
+            live.pop(pid, None)
+        else:
+            live[pid] = data
+    return live
+
+
+def _sync_dlq(engine: Any, path: Path) -> dict[str, int]:
+    """Mirror ``state/dlq.jsonl`` into the ``dlq_entries`` table.
+
+    Live entries are UPSERTed; any row in the DB whose property_id is
+    not in the live set is DELETEd (the property was unparked locally
+    since the last sync). Returns counts so the caller can log them.
+    """
+    live = _load_dlq_live_entries(path)
+    from sqlalchemy import delete, select
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    upserted = 0
+    deleted = 0
+    with engine.begin() as conn:
+        # Snapshot current DB property_ids so we can delete the ones that
+        # disappeared from the local log (i.e. were unparked).
+        db_ids = {row[0] for row in conn.execute(select(DlqEntryRow.property_id)).all()}
+
+        for pid, data in live.items():
+            stmt = dialect_insert(engine, DlqEntryRow).values(
+                property_id=pid,
+                parked_at=data.get("parked_at", ""),
+                reason=data.get("reason", ""),
+                last_error_signature=data.get("last_error_signature", ""),
+                retry_at=data.get("retry_at", ""),
+                last_synced_at=now,
+            )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[DlqEntryRow.property_id],
+                set_={
+                    "parked_at": stmt.excluded.parked_at,
+                    "reason": stmt.excluded.reason,
+                    "last_error_signature": stmt.excluded.last_error_signature,
+                    "retry_at": stmt.excluded.retry_at,
+                    "last_synced_at": stmt.excluded.last_synced_at,
+                },
+            )
+            conn.execute(stmt)
+            upserted += 1
+
+        to_delete = db_ids - set(live.keys())
+        if to_delete:
+            conn.execute(
+                delete(DlqEntryRow).where(DlqEntryRow.property_id.in_(to_delete))
+            )
+            deleted = len(to_delete)
+
+    return {"upserted": upserted, "deleted": deleted}
+
+
+def load_dlq_from_db_to_file(*, engine: Any, path: Path) -> int:
+    """Materialise the DB DLQ into a local JSONL file.
+
+    Called by ``jugnu_retry_entry`` before invoking the retry runner so
+    that ``Dlq(state_dir / "dlq.jsonl")._load()`` sees the cross-run
+    state instead of the empty /tmp it would otherwise get in a fresh
+    Cloud Run container. Writes a compacted file (one line per live
+    entry, no tombstones) so ``Dlq._load()`` sees it as pre-compacted.
+
+    If the DB has zero entries we still create an empty file so the
+    caller doesn't need to special-case the "no DLQ yet" condition.
+    """
+    from sqlalchemy import select
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with engine.connect() as conn:
+        rows = conn.execute(
+            select(
+                DlqEntryRow.property_id,
+                DlqEntryRow.parked_at,
+                DlqEntryRow.reason,
+                DlqEntryRow.last_error_signature,
+                DlqEntryRow.retry_at,
+            )
+        ).all()
+
+    with path.open("w", encoding="utf-8") as f:
+        for row in rows:
+            entry = {
+                "property_id": row[0],
+                "parked_at": row[1],
+                "reason": row[2],
+                "last_error_signature": row[3],
+                "retry_at": row[4],
+                "unparked": False,
+            }
+            f.write(json.dumps(entry) + "\n")
+    return len(rows)
+
+
 def _upsert_llm_diagnostics(engine: Any, run_date: str, dir_: Path) -> int:
     if not dir_.exists():
         return 0
@@ -326,6 +456,7 @@ def sync_run_to_postgres(
     data_dir = Path(data_dir)
     config_dir = Path(config_dir)
     run_dir = data_dir / "runs" / run_date
+    state_dir = data_dir / "state"
     if not run_dir.exists():
         raise FileNotFoundError(
             f"run dir not found: {run_dir}. Did the runner exit successfully "
@@ -371,6 +502,10 @@ def sync_run_to_postgres(
         summary["llm_diagnostics"] = _upsert_llm_diagnostics(
             engine, run_date, run_dir / "llm_diagnostics"
         )
+        # DLQ is cross-run global state — lives under state/, not runs/.
+        # Without this mirror, Cloud Run's ephemeral /tmp loses every
+        # parked property the moment the container exits.
+        summary["dlq"] = _sync_dlq(engine, state_dir / "dlq.jsonl")
     finally:
         try:
             src.close()

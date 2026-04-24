@@ -122,7 +122,7 @@ class TestUploadArtifacts:
         with patch("scripts.jugnu_shard_entry.gcs.upload_object", side_effect=fake_upload):
             m.Path = patched_path  # type: ignore[assignment]
             try:
-                _upload_artifacts("jugnu-raw-staging", run_date, 0)
+                _upload_artifacts("jugnu-raw-staging", run_date, 0, "v1")
             finally:
                 m.Path = original_path_cls  # type: ignore[assignment]
 
@@ -148,7 +148,7 @@ class TestUploadArtifacts:
         with patch("subprocess.run") as mock_run:
             m.Path = patched_path  # type: ignore[assignment]
             try:
-                _upload_artifacts("jugnu-raw-staging", "2026-04-21", 0)
+                _upload_artifacts("jugnu-raw-staging", "2026-04-21", 0, "v1")
             finally:
                 m.Path = original_path_cls  # type: ignore[assignment]
             mock_run.assert_not_called()
