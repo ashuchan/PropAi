@@ -128,8 +128,14 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
             }
           }
         }
+        # L1 Fetcher (ma_poc/fetch/fetcher.py:616) reads PROXY_POOL_URLS
+        # — a comma-separated list of full proxy URLs with embedded
+        # creds, e.g. ``http://user:pass@brd.superproxy.io:33335``. The
+        # secret's string value is injected verbatim, so pre-format it
+        # that way with ``gcloud secrets versions add`` (one URL, or
+        # comma-separated for a pool).
         env {
-          name = "PROXY_CREDENTIALS"
+          name = "PROXY_POOL_URLS"
           value_source {
             secret_key_ref {
               secret  = var.proxy_credentials_secret_id
@@ -246,8 +252,14 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
             }
           }
         }
+        # L1 Fetcher (ma_poc/fetch/fetcher.py:616) reads PROXY_POOL_URLS
+        # — a comma-separated list of full proxy URLs with embedded
+        # creds, e.g. ``http://user:pass@brd.superproxy.io:33335``. The
+        # secret's string value is injected verbatim, so pre-format it
+        # that way with ``gcloud secrets versions add`` (one URL, or
+        # comma-separated for a pool).
         env {
-          name = "PROXY_CREDENTIALS"
+          name = "PROXY_POOL_URLS"
           value_source {
             secret_key_ref {
               secret  = var.proxy_credentials_secret_id

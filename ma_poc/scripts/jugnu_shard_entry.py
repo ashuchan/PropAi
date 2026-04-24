@@ -241,6 +241,16 @@ def _sync_to_postgres(run_date: str, schema_version: str, shard_id: str) -> int:
 
 
 def main() -> None:
+    # Diagnostic dispatch — SMOKE_MODE=proxy_check short-circuits to
+    # check_proxy.py. Avoids a separate Cloud Run job just to verify
+    # PROXY_POOL_URLS is wired; trigger_proxy_smoke.py sets this env
+    # var via --update-env-vars and relies on the exit code.
+    smoke_mode = os.environ.get("SMOKE_MODE", "").strip().lower()
+    if smoke_mode == "proxy_check":
+        from ma_poc.scripts import check_proxy
+
+        sys.exit(check_proxy.main())
+
     task_idx = int(os.environ.get("CLOUD_RUN_TASK_INDEX", "0"))
     task_count = int(os.environ.get("CLOUD_RUN_TASK_COUNT", "1"))
     csv_gcs_uri = _require_env("CSV_GCS_URI")

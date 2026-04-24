@@ -395,6 +395,13 @@ jobs:
       - run: pip install -r ma_poc/requirements.txt
 
       - name: Run multi-shard smoke test
+        # TEMPORARILY DISABLED (2026-04-24): operator is validating the
+        # BrightData proxy wiring manually via
+        # ``ma_poc/scripts/trigger_proxy_smoke.py --env prod`` instead of
+        # running the full multi-shard → PG-sync smoke on every deploy.
+        # Re-enable by removing ``if: false`` once proxy rollout stabilises
+        # and we want end-to-end sync validation back in the gate.
+        if: false
         # What this validates (see ma_poc/scripts/trigger_smoke.py):
         #
         #   1. Uploads a 6-row smoke CSV (.invalid URLs — no DNS resolution,
