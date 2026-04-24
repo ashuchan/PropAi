@@ -295,17 +295,19 @@ def _execute_job(
             f"running={status.get('runningCount', 0)}",
             file=sys.stderr,
         )
-        if completed is not None:
-            # Either True (all tasks succeeded) or False (some failed) —
-            # both are valid terminal states for this smoke test, which
-            # uses invalid URLs that the runner marks as failed. What
-            # matters is that the sync ran per task, which we verify
-            # from logs.
-            status_str = completed.get("status")
-            msg = completed.get("message", "")
+        # Cloud Run v2 attaches the "Completed" condition at execution
+        # creation with status="Unknown", then flips it to "True" or
+        # "False" only at genuine terminal state. Treating the mere
+        # presence of the condition as terminal makes the smoke test
+        # exit on its first 20-second poll with 0/0/0 task counts —
+        # what the 2026-04-24 prod run showed. Only True/False are
+        # terminal; Unknown means still running.
+        status_str = (completed or {}).get("status")
+        if status_str in ("True", "False"):
+            msg = (completed or {}).get("message", "")
             if status_str == "True":
                 print("[smoke] Execution completed OK", file=sys.stderr)
-            elif status_str == "False":
+            else:
                 print(
                     f"[smoke] Execution completed with task failures "
                     f"(expected — smoke fixture: {msg})",
