@@ -79,3 +79,25 @@ variable "task_memory" {
   type    = string
   default = "4Gi"
 }
+
+# Default parallelism for jugnu-retry. Setting this >1 enables sharded
+# retries: Cloud Run spawns N parallel tasks, each picks a disjoint slice
+# of the failure list (CLOUD_RUN_TASK_INDEX/COUNT round-robin) and writes
+# to its own shard file. The merge job (jugnu_retry_merge.py) consolidates
+# afterwards. 1 = legacy single-task behaviour.
+# Override at execution time without re-applying via:
+#   gcloud run jobs execute jugnu-retry-{env} --tasks=N --parallelism=N
+variable "retry_task_count" {
+  type        = number
+  default     = 1
+  description = "Default tasks/parallelism for jugnu-retry. 1 = single shard."
+}
+
+# Wall-clock timeout per retry task. Default 1h is generous for ~100
+# properties per shard. Bump if shards run more or browser launches
+# trend slow.
+variable "retry_timeout" {
+  type        = string
+  default     = "3600s"
+  description = "Per-task timeout for jugnu-retry, e.g. '3600s' or '7200s'."
+}

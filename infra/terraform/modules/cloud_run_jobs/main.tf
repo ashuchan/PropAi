@@ -156,12 +156,17 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
   location = var.region
 
   template {
-    parallelism = 1 # retry volume is small; no sharding needed
-    task_count  = 1
+    # Sharded retry: parallelism > 1 spawns N parallel tasks, each
+    # processing a disjoint slice of the failure list via
+    # CLOUD_RUN_TASK_INDEX/COUNT round-robin in jugnu_retry_runner.py.
+    # The merge job (jugnu_retry_merge.py) consolidates shard outputs.
+    # 1 = legacy single-task behaviour.
+    parallelism = var.retry_task_count
+    task_count  = var.retry_task_count
 
     template {
       service_account       = var.worker_sa_email
-      timeout               = "3600s" # 1h is generous for 50-100 retries
+      timeout               = var.retry_timeout
       max_retries           = 0
       execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
 

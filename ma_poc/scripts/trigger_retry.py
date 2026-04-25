@@ -16,7 +16,11 @@ Options:
   --env {staging|prod}       Target environment (required)
   --mode {errors|resume}     errors = retry failed properties; resume = resume interrupted run
   --run-date YYYY-MM-DD      Which run to retry (default: most recent)
-  --limit N                  Cap retry attempts
+  --limit N                  Cap retried properties per shard
+  --tasks N                  Cloud Run task count for sharded retry (1-10).
+                             Requires terraform retry_task_count >= N applied.
+                             After the job finishes, run jugnu_retry_merge.py
+                             with --expect-shards N to consolidate.
   --wait / --no-wait         Wait for completion (default: --wait)
   --dry-run                  Print plan, do not submit
   --yes                      Skip confirmation prompt
@@ -24,6 +28,7 @@ Options:
 Examples:
   python scripts/trigger_retry.py --env prod --mode errors --run-date 2026-04-18
   python scripts/trigger_retry.py --env staging --mode resume
+  python scripts/trigger_retry.py --env prod --mode errors --tasks 10 --limit 200
 """
 
 from __future__ import annotations
@@ -75,7 +80,19 @@ def _parse_args() -> argparse.Namespace:
         help="errors = retry failed properties; resume = resume interrupted run",
     )
     p.add_argument("--run-date", metavar="YYYY-MM-DD", help="Target run date (default: most recent)")
-    p.add_argument("--limit", type=int, metavar="N")
+    p.add_argument("--limit", type=int, metavar="N", help="Cap retried properties per shard.")
+    p.add_argument(
+        "--tasks",
+        type=int,
+        metavar="N",
+        default=None,
+        help=(
+            "Cloud Run task count (sharding). Each task takes a disjoint "
+            "slice of the failure list via CLOUD_RUN_TASK_INDEX/COUNT. "
+            "Default: use the job's terraform-configured value (likely 1). "
+            "Use 5-10 for ~2000 retries."
+        ),
+    )
     p.add_argument("--wait", dest="wait", action="store_true", default=True)
     p.add_argument("--no-wait", dest="wait", action="store_false")
     p.add_argument("--dry-run", action="store_true")
@@ -96,13 +113,18 @@ def main() -> None:
     run_date = args.run_date or date.today().isoformat()
     csv_uri = f"gs://{bucket_name}/property-list/properties.csv"
 
+    sharding_line = (
+        f"  Tasks:        {args.tasks} (sharded)\n"
+        if args.tasks and args.tasks > 1
+        else "  Tasks:        1 (single shard, terraform default)\n"
+    )
     print(f"""
 Plan:
   Environment:  {args.env}
   Job:          {job_name}
   Mode:         {args.mode}
   Run date:     {run_date}
-""")
+{sharding_line}""")
 
     if args.dry_run:
         emit_structured_result({"status": "DRY_RUN", "mode": args.mode, "env": args.env})
@@ -139,6 +161,14 @@ Plan:
         f"--update-env-vars={','.join(env_vars)}",
         "--format=json",
     ]
+    if args.tasks and args.tasks > 0:
+        # NOTE: --tasks overrides task_count for this execution, but the
+        # job's *parallelism* (set in terraform via var.retry_task_count)
+        # is still the cap on concurrent tasks. To run N tasks in
+        # parallel, terraform must have applied with retry_task_count >= N
+        # at least once. If parallelism is 1 and --tasks=10, the 10 tasks
+        # run sequentially in a single container — no speedup.
+        gcloud_cmd.append(f"--tasks={args.tasks}")
     if args.wait:
         gcloud_cmd.append("--wait")
 

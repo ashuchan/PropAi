@@ -79,7 +79,19 @@ def _upload_artifacts(bucket_name: str, run_date: str, timestamp: str, schema_ve
     local_run_dir = _schema_root(schema_version) / "runs" / run_date
     if not local_run_dir.exists():
         return
-    dest = f"gs://{bucket_name}/runs/{run_date}/retry-{timestamp}/"
+
+    # All shards in one Cloud Run execution must upload to the same GCS
+    # prefix so the merge job can find every shard's
+    # ``properties.retry.shard{NN}.json``. CLOUD_RUN_EXECUTION is auto-
+    # injected by Cloud Run and is identical across the parallel tasks
+    # of one execution. When unset (local dev or single-task), fall back
+    # to per-task timestamp — preserves the legacy behaviour exactly.
+    execution = os.environ.get("CLOUD_RUN_EXECUTION")
+    task_count = os.environ.get("CLOUD_RUN_TASK_COUNT", "1")
+    if execution and int(task_count) > 1:
+        dest = f"gs://{bucket_name}/runs/{run_date}/retry-{execution}/"
+    else:
+        dest = f"gs://{bucket_name}/runs/{run_date}/retry-{timestamp}/"
     gcs.upload_prefix(local_run_dir, dest)
     print(f"[retry_entry] Uploaded retry artifacts → {dest}", file=sys.stderr)
 

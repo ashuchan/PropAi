@@ -41,6 +41,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import sys
 import uuid
 from datetime import UTC, date, datetime
@@ -245,6 +246,35 @@ def _load_legacy_candidates(
         )
 
     return candidates
+
+
+def _shard_candidates(
+    candidates: list[dict[str, Any]],
+    task_index: int,
+    task_count: int,
+) -> list[dict[str, Any]]:
+    """Slice candidates for one Cloud Run task in a sharded retry execution.
+
+    Sorts by property_id then takes every Nth row (round-robin) so that
+    failure clusters by PMS platform — which sit together in
+    properties.json — get spread across shards instead of concentrated
+    in one. Disjoint across shards; union covers all candidates.
+
+    Args:
+        candidates: Full candidate list from _load_jugnu_candidates / _load_legacy_candidates.
+        task_index: This task's CLOUD_RUN_TASK_INDEX (0-based).
+        task_count: Total CLOUD_RUN_TASK_COUNT.
+
+    Returns:
+        Subset of candidates for this shard. Empty if task_index >= task_count
+        or candidates is empty.
+    """
+    if task_count <= 1:
+        return list(candidates)
+    if task_index < 0 or task_index >= task_count:
+        return []
+    ordered = sorted(candidates, key=lambda c: str(c.get("property_id") or ""))
+    return [c for i, c in enumerate(ordered) if i % task_count == task_index]
 
 
 def _load_csv_lookup(csv_path: Path) -> dict[str, str]:
@@ -462,6 +492,27 @@ async def run_retry(
             if c["property_id"] in csv_lookup:
                 c["url"] = csv_lookup[c["property_id"]]
 
+    # Sharding: when running under Cloud Run with task_count > 1, take only
+    # this shard's slice of the candidate list. CLOUD_RUN_TASK_INDEX and
+    # CLOUD_RUN_TASK_COUNT are auto-injected by Cloud Run; outside of cloud
+    # they default to 0/1 (single-shard, original behaviour).
+    try:
+        task_index = int(os.environ.get("CLOUD_RUN_TASK_INDEX", "0"))
+        task_count = int(os.environ.get("CLOUD_RUN_TASK_COUNT", "1"))
+    except ValueError:
+        task_index, task_count = 0, 1
+    pre_shard_count = len(candidates)
+    candidates = _shard_candidates(candidates, task_index, task_count)
+    if task_count > 1:
+        log.info(
+            "Shard %d/%d: %d/%d candidates after sharding",
+            task_index,
+            task_count,
+            len(candidates),
+            pre_shard_count,
+        )
+
+    # --limit is applied per-shard (each shard processes up to N).
     if limit:
         candidates = candidates[:limit]
 
@@ -574,34 +625,60 @@ async def run_retry(
             continue
         retried_properties.append(r)
 
-    # -- Merge into existing output --
-    existing_props: list[dict[str, Any]] = []
-    output_props_path = output_run_dir / "properties.json"
-    # If retrying into the same day's directory, load the existing file.
-    if output_props_path.exists():
+    # -- Write retried results --
+    # In sharded mode (task_count > 1), each shard writes ONLY its retried
+    # records to a per-shard file. The merge step (jugnu_retry_merge.py)
+    # consolidates all shards back into properties.json after the job
+    # finishes. This avoids torn writes from concurrent shards clobbering
+    # each other's successes.
+    #
+    # In single-shard mode (task_count == 1, the legacy behaviour), we
+    # merge in-place into properties.json exactly as before.
+    if task_count > 1:
+        shard_path = output_run_dir / f"properties.retry.shard{task_index:02d}.json"
         try:
-            existing_props = json.loads(output_props_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            existing_props = []
-    # Also load from the source run if it's a different directory.
-    elif source_run_dir != output_run_dir:
-        source_props_path = source_run_dir / "properties.json"
-        if source_props_path.exists():
+            shard_path.write_text(
+                json.dumps(retried_properties, indent=2, default=str),
+                encoding="utf-8",
+            )
+            log.info(
+                "Shard %d/%d wrote %d retried records to %s",
+                task_index,
+                task_count,
+                len(retried_properties),
+                shard_path,
+            )
+        except OSError as exc:
+            log.error("Failed to write shard file %s: %s", shard_path, exc)
+        merged = retried_properties  # report scope: this shard only
+    else:
+        existing_props: list[dict[str, Any]] = []
+        output_props_path = output_run_dir / "properties.json"
+        # If retrying into the same day's directory, load the existing file.
+        if output_props_path.exists():
             try:
-                existing_props = json.loads(source_props_path.read_text(encoding="utf-8"))
+                existing_props = json.loads(output_props_path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 existing_props = []
+        # Also load from the source run if it's a different directory.
+        elif source_run_dir != output_run_dir:
+            source_props_path = source_run_dir / "properties.json"
+            if source_props_path.exists():
+                try:
+                    existing_props = json.loads(source_props_path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    existing_props = []
 
-    merged = _merge_properties(existing_props, retried_properties)
+        merged = _merge_properties(existing_props, retried_properties)
 
-    try:
-        output_props_path.write_text(
-            json.dumps(merged, indent=2, default=str),
-            encoding="utf-8",
-        )
-        log.info("Wrote %d properties to %s", len(merged), output_props_path)
-    except OSError as exc:
-        log.error("Failed to write properties.json: %s", exc)
+        try:
+            output_props_path.write_text(
+                json.dumps(merged, indent=2, default=str),
+                encoding="utf-8",
+            )
+            log.info("Wrote %d properties to %s", len(merged), output_props_path)
+        except OSError as exc:
+            log.error("Failed to write properties.json: %s", exc)
 
     # -- Report --
     cost_rollup = cost_ledger.total()
@@ -632,14 +709,15 @@ async def run_retry(
         "merged_totals": report["totals"],
     }
 
-    retry_report_path = output_run_dir / f"report_retry_{mode}.json"
+    shard_suffix = f".shard{task_index:02d}" if task_count > 1 else ""
+    retry_report_path = output_run_dir / f"report_retry_{mode}{shard_suffix}.json"
     retry_report_path.write_text(
         json.dumps(retry_summary, indent=2, default=str),
         encoding="utf-8",
     )
 
     # Retry markdown.
-    retry_md_path = output_run_dir / f"report_retry_{mode}.md"
+    retry_md_path = output_run_dir / f"report_retry_{mode}{shard_suffix}.md"
     md_lines = [
         f"# Jugnu Retry Report — {today}",
         "",

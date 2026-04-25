@@ -12,3 +12,10 @@ browsers_per_task  = 10
 task_cpu           = "2"
 task_memory        = "4Gi"
 db_tier            = "db-f1-micro"
+
+# Sharded retry: ceiling on concurrent retry tasks. Operators choose
+# how many to actually use at execution time via --tasks N (must be
+# <= retry_task_count). 10 is enough for a 2000-property retry batch
+# at 200 properties/shard.
+retry_task_count = 10
+retry_timeout    = "3600s"

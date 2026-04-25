@@ -1,0 +1,232 @@
+name: Retry failed properties (sharded)
+
+# Manual-only — operators trigger this from the GitHub Actions UI when a
+# scrape run leaves a backlog of failed properties to retry. The workflow:
+#   1. Authenticates to GCP via WIF.
+#   2. Submits the jugnu-retry Cloud Run job with --tasks N --parallelism N
+#      so failures are sharded across N parallel containers (round-robin
+#      slice in jugnu_retry_runner.py via CLOUD_RUN_TASK_INDEX/COUNT).
+#   3. Waits for the execution to terminate.
+#   4. Downloads every shard's properties.retry.shard{NN}.json from GCS
+#      and runs jugnu_retry_merge.py to consolidate into properties.json.
+#   5. Uploads the merged result back to GCS, optionally syncs to Postgres.
+#
+# Prerequisite: terraform must have applied with retry_task_count >= the
+# --tasks N you choose here, otherwise Cloud Run caps parallelism at the
+# job's configured value and shards run sequentially. retry_task_count
+# is set in infra/terraform/envs/{staging,prod}.tfvars.
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, prod]
+      mode:
+        description: "errors = retry FAILED + 0-unit; resume = re-process anything not clean"
+        required: true
+        type: choice
+        options: [errors, resume]
+        default: errors
+      tasks:
+        description: "Cloud Run shard count (must be <= retry_task_count in tfvars)"
+        required: true
+        type: string
+        default: "5"
+      limit:
+        description: "Max properties per shard (blank = all)"
+        required: false
+        type: string
+      run_date:
+        description: "Source run date YYYY-MM-DD (blank = today)"
+        required: false
+        type: string
+
+# One retry execution at a time per env. Don't cancel a running retry —
+# midway-killed shards leave the DLQ in an inconsistent state.
+concurrency:
+  group: retry-${{ inputs.env }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write   # WIF
+  actions: read
+
+env:
+  REGION: us-central1
+
+jobs:
+  trigger-and-merge:
+    runs-on: ubuntu-latest
+    # Hard ceiling: terraform sets per-task timeout to 3600s (1h). With
+    # 10 shards and the merge step + GCS download, give 1h45m end-to-end.
+    timeout-minutes: 105
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          tasks="${{ inputs.tasks }}"
+          if ! [[ "$tasks" =~ ^[0-9]+$ ]] || [ "$tasks" -lt 1 ] || [ "$tasks" -gt 20 ]; then
+            echo "::error::tasks must be an integer in [1, 20]; got '$tasks'"
+            exit 2
+          fi
+          if [ -n "${{ inputs.limit }}" ]; then
+            if ! [[ "${{ inputs.limit }}" =~ ^[0-9]+$ ]]; then
+              echo "::error::limit must be an integer; got '${{ inputs.limit }}'"
+              exit 2
+            fi
+          fi
+          if [ -n "${{ inputs.run_date }}" ]; then
+            if ! [[ "${{ inputs.run_date }}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+              echo "::error::run_date must be YYYY-MM-DD; got '${{ inputs.run_date }}'"
+              exit 2
+            fi
+          fi
+
+      - name: Pick GCP project + WIF SA
+        id: env_pick
+        run: |
+          if [ "${{ inputs.env }}" = "prod" ]; then
+            echo "wif_sa=${{ secrets.WIF_SA_PROD }}"               >> $GITHUB_OUTPUT
+            echo "project=${{ secrets.GCP_PROJECT_ID_PROD }}"      >> $GITHUB_OUTPUT
+            echo "tf_env=production"                                >> $GITHUB_OUTPUT
+          else
+            echo "wif_sa=${{ secrets.WIF_SA_STAGING }}"            >> $GITHUB_OUTPUT
+            echo "project=${{ secrets.GCP_PROJECT_ID_STAGING }}"   >> $GITHUB_OUTPUT
+            echo "tf_env=staging"                                   >> $GITHUB_OUTPUT
+          fi
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ steps.env_pick.outputs.wif_sa }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ma_poc/requirements.txt
+
+      - run: pip install -r ma_poc/requirements.txt
+
+      - name: Resolve run_date
+        id: run_date
+        run: |
+          rd="${{ inputs.run_date }}"
+          if [ -z "$rd" ]; then
+            rd=$(date -u +%Y-%m-%d)
+          fi
+          echo "value=${rd}" >> $GITHUB_OUTPUT
+          echo "Using run_date=${rd}"
+
+      - name: Trigger sharded retry execution
+        id: trigger
+        env:
+          GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID_STAGING }}
+          GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID_PROD }}
+        run: |
+          set -euo pipefail
+          ARGS=(--env "${{ inputs.env }}"
+                --mode "${{ inputs.mode }}"
+                --tasks "${{ inputs.tasks }}"
+                --run-date "${{ steps.run_date.outputs.value }}"
+                --wait
+                --yes)
+          if [ -n "${{ inputs.limit }}" ]; then
+            ARGS+=(--limit "${{ inputs.limit }}")
+          fi
+          # trigger_retry.py emits "RESULT: {...}" structured JSON to stderr
+          # on completion; capture both streams so we can scrape the
+          # execution name even on failure.
+          set +e
+          python ma_poc/scripts/trigger_retry.py "${ARGS[@]}" 2> trigger.err
+          rc=$?
+          set -e
+          cat trigger.err
+          # Pull the execution name from the structured RESULT line.
+          # Format (see _trigger_common.emit_structured_result):
+          #   RESULT:{"status":"SUCCESS","execution_name":"...","mode":"errors",...}
+          exec_name=$(grep -E '^RESULT:' trigger.err | tail -1 | sed -E 's/^RESULT://' | python -c "import sys,json; d=json.load(sys.stdin); print(d.get('execution_name',''))" || true)
+          echo "execution_name=${exec_name}" >> $GITHUB_OUTPUT
+          echo "rc=${rc}" >> $GITHUB_OUTPUT
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::trigger_retry.py exited $rc — retry execution failed; merge step will be skipped."
+            exit "$rc"
+          fi
+
+      - name: Download shard outputs from GCS
+        if: steps.trigger.outputs.rc == '0' && steps.trigger.outputs.execution_name != ''
+        env:
+          BUCKET: jugnu-raw-${{ steps.env_pick.outputs.tf_env }}
+          RUN_DATE: ${{ steps.run_date.outputs.value }}
+          EXEC: ${{ steps.trigger.outputs.execution_name }}
+        run: |
+          set -euo pipefail
+          # Each shard uploaded to gs://{bucket}/runs/{run_date}/retry-{execution}/
+          # which contains its properties.retry.shard{NN}.json plus the
+          # base properties.json. Pull everything into ma_poc/data/runs/{run_date}/
+          # so jugnu_retry_merge.py can find shards next to properties.json.
+          mkdir -p ma_poc/data/runs/$RUN_DATE
+          gcloud storage cp -r \
+            "gs://$BUCKET/runs/$RUN_DATE/retry-$EXEC/*" \
+            ma_poc/data/runs/$RUN_DATE/ \
+            --project="${{ steps.env_pick.outputs.project }}"
+          echo "Downloaded shard files:"
+          ls -la ma_poc/data/runs/$RUN_DATE/properties.retry.shard*.json || {
+            echo "::error::No shard files found in retry-$EXEC/. Cannot merge."
+            exit 1
+          }
+
+      - name: Merge shards
+        if: steps.trigger.outputs.rc == '0' && steps.trigger.outputs.execution_name != ''
+        run: |
+          set -euo pipefail
+          # The merge step runs on the GitHub runner, which has no Cloud
+          # SQL connectivity — always pass --skip-sync. Per-shard DLQ
+          # state is already synced to Postgres inside each Cloud Run
+          # task (see jugnu_retry_entry._sync_dlq_to_db). The merge here
+          # consolidates JSON only; properties.json gets uploaded back
+          # to GCS in the next step. If you need a Postgres refresh
+          # from the merged result, run sync_run_to_pg as a follow-up
+          # Cloud Run job — not from GitHub Actions.
+          python ma_poc/scripts/jugnu_retry_merge.py \
+            --run-date "${{ steps.run_date.outputs.value }}" \
+            --expect-shards "${{ inputs.tasks }}" \
+            --mode "${{ inputs.mode }}" \
+            --data-dir ma_poc/data \
+            --skip-sync
+
+      - name: Upload merged properties.json back to GCS
+        if: steps.trigger.outputs.rc == '0' && steps.trigger.outputs.execution_name != ''
+        env:
+          BUCKET: jugnu-raw-${{ steps.env_pick.outputs.tf_env }}
+          RUN_DATE: ${{ steps.run_date.outputs.value }}
+        run: |
+          set -euo pipefail
+          gcloud storage cp \
+            ma_poc/data/runs/$RUN_DATE/properties.json \
+            "gs://$BUCKET/runs/$RUN_DATE/properties.json" \
+            --project="${{ steps.env_pick.outputs.project }}"
+          gcloud storage cp \
+            "ma_poc/data/runs/$RUN_DATE/report_retry_${{ inputs.mode }}.merged.json" \
+            "gs://$BUCKET/runs/$RUN_DATE/report_retry_${{ inputs.mode }}.merged.json" \
+            --project="${{ steps.env_pick.outputs.project }}"
+
+      - name: Upload merged artifacts to workflow run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retry-merge-${{ inputs.env }}-${{ steps.run_date.outputs.value }}
+          path: |
+            ma_poc/data/runs/${{ steps.run_date.outputs.value }}/properties.json
+            ma_poc/data/runs/${{ steps.run_date.outputs.value }}/report_retry_*.json
+            ma_poc/data/runs/${{ steps.run_date.outputs.value }}/properties.retry.shard*.json
+          if-no-files-found: warn
+          retention-days: 14
