@@ -58,6 +58,8 @@ module "cloud_run_jobs" {
   browsers_per_task            = var.browsers_per_task
   task_cpu                     = var.task_cpu
   task_memory                  = var.task_memory
+  retry_task_count             = var.retry_task_count
+  retry_timeout                = var.retry_timeout
 }
 
 module "scheduler" {

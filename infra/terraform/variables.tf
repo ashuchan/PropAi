@@ -62,6 +62,22 @@ variable "task_memory" {
   default = "4Gi"
 }
 
+# Sharded retry knobs — passed through to module.cloud_run_jobs.
+# parallelism on jugnu-retry-{env} is set to retry_task_count, so the
+# operator can run up to that many shards concurrently via
+# `gcloud run jobs execute --tasks=N`. 1 = legacy single-task retry.
+variable "retry_task_count" {
+  type        = number
+  default     = 1
+  description = "Default tasks/parallelism for jugnu-retry. 1 = single shard."
+}
+
+variable "retry_timeout" {
+  type        = string
+  default     = "3600s"
+  description = "Per-task timeout for jugnu-retry, e.g. '3600s' or '7200s'."
+}
+
 variable "db_tier" {
   type        = string
   default     = "db-f1-micro"
