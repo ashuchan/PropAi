@@ -46,6 +46,10 @@ def main() -> int:
 
     # PROXY_POOL_URLS can be a comma-separated list (see ProxyPool).
     # The check itself only needs one working proxy — use the first.
+    # Deliberately NOT stripping a leading BOM here: if the secret was
+    # written with a BOM (PowerShell Out-File default), the production
+    # fetcher fails too, and we want smoke to surface that loudly rather
+    # than hide it and ship the broken secret.
     proxy_url = raw.split(",")[0].strip()
     print(f"[proxy-check] using proxy: {_redact(proxy_url)}", file=sys.stderr)
     print(f"[proxy-check] hitting: {IP_CHECK_URL}", file=sys.stderr)

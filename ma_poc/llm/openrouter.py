@@ -39,7 +39,7 @@ class OpenRouterLLMProvider(LLMProvider):
             raise RuntimeError("openai package not installed")
         self._client = AsyncOpenAI(
             base_url=OPENROUTER_BASE_URL,
-            api_key=os.getenv("OPENROUTER_API_KEY", ""),
+            api_key=os.getenv("OPENROUTER_API_KEY", "").strip().lstrip("﻿"),
         )
         self._text_model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
         self._vision_model = os.getenv(

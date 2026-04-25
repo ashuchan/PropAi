@@ -35,8 +35,8 @@ class AzureLLMProvider(LLMProvider):
         if AsyncAzureOpenAI is None:
             raise RuntimeError("openai package not installed")
         self._client = AsyncAzureOpenAI(
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
-            api_key=os.getenv("AZURE_OPENAI_API_KEY", ""),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", "").strip().lstrip("﻿"),
+            api_key=os.getenv("AZURE_OPENAI_API_KEY", "").strip().lstrip("﻿"),
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview"),
         )
         self._text_model = os.getenv("AZURE_OPENAI_DEPLOYMENT_GPT4O_MINI", "gpt-4o-mini")

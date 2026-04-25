@@ -4,6 +4,10 @@
  * DATA_PROVIDER env var (via data-provider/factory.ts), then composes the
  * five high-level services on top of it. All services are impl-agnostic —
  * they only touch the provider's stores.
+ *
+ * Async because the postgres provider's Cloud SQL Connector path resolves
+ * TLS + IAM auth before the first query. Callers (api/server.ts, tests)
+ * must await the factory.
  */
 
 import type { IPropertyService } from './interfaces/IPropertyService.js';
@@ -44,10 +48,10 @@ export interface ServiceFactoryConfig {
   provider?: IDataProvider;
 }
 
-export function createServices(cfg: ServiceFactoryConfig): Services {
+export async function createServices(cfg: ServiceFactoryConfig): Promise<Services> {
   const provider =
     cfg.provider ??
-    createDataProvider(resolveProviderConfig(cfg.dataDir, cfg.env ?? process.env));
+    (await createDataProvider(resolveProviderConfig(cfg.dataDir, cfg.env ?? process.env)));
   return {
     properties: new PropertyService(provider),
     units: new UnitService(provider),

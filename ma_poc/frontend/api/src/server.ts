@@ -11,8 +11,10 @@ import { createHealthRoutes } from './routes/health.js';
 async function startServer() {
   const { createServices } = await import('../../../services/src/factory.js');
   // Provider kind (filesystem vs postgres) is resolved inside createServices
-  // from the DATA_PROVIDER env var. server.ts stays backend-agnostic.
-  const services = createServices({ dataDir: config.dataDir });
+  // from the DATA_PROVIDER env var. Postgres provider construction is async
+  // so it can resolve IAM auth through the Cloud SQL Connector when
+  // CLOUD_SQL_INSTANCE is set — server.ts stays backend-agnostic.
+  const services = await createServices({ dataDir: config.dataDir });
   const providerName = services.dataProvider.name;
 
   const app = express();
@@ -32,6 +34,15 @@ async function startServer() {
     console.log(`API server listening on http://localhost:${config.port}`);
     console.log(`Data provider: ${providerName}`);
     console.log(`Data directory: ${config.dataDir}`);
+  });
+
+  // Pre-warm the property summary cache. The first /api/properties* call
+  // triggers a multi-table aggregate over Cloud SQL; doing it now means
+  // the user's first dashboard load is a cache hit, not a 1-2s wait.
+  // Errors are logged but never block startup — a cold cache on Cloud
+  // SQL outage shouldn't take the API down.
+  void services.properties.getAggregateStats().catch((err) => {
+    console.warn('[startup] property cache pre-warm failed:', err.message);
   });
 
   const shutdown = async (signal: string) => {

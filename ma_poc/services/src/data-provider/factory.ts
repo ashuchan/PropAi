@@ -5,6 +5,10 @@
  * Accepted values (matches the Python side):
  *   - filesystem (default)  → JsonFileDataProvider
  *   - postgres              → PostgresDataProvider  (requires DATABASE_URL)
+ *                             When CLOUD_SQL_INSTANCE is also set, the pool
+ *                             is brokered through the Cloud SQL Connector
+ *                             with IAM auth — mirrors the Python engine's
+ *                             _make_cloud_sql_engine() branch.
  *
  * sqlite / dual are not implemented on the TS side yet; they'll throw.
  */
@@ -23,6 +27,9 @@ export interface ProviderConfig {
   dataDir: string;
   /** DATABASE_URL (needed by postgres). */
   databaseUrl?: string;
+  /** Full env snapshot — threaded through so the postgres adapter can
+   *  read CLOUD_SQL_INSTANCE / CLOUD_SQL_IP_TYPE. */
+  env?: NodeJS.ProcessEnv;
 }
 
 export function resolveProviderConfig(
@@ -32,16 +39,17 @@ export function resolveProviderConfig(
   const raw = (env.DATA_PROVIDER ?? 'filesystem').trim().toLowerCase();
   if (!['filesystem', 'postgres', 'sqlite', 'dual'].includes(raw)) {
     logger.warn({ raw }, 'unknown DATA_PROVIDER, falling back to filesystem');
-    return { provider: 'filesystem', dataDir };
+    return { provider: 'filesystem', dataDir, env };
   }
   return {
     provider: raw as ProviderName,
     dataDir,
     databaseUrl: env.DATABASE_URL,
+    env,
   };
 }
 
-export function createDataProvider(cfg: ProviderConfig): IDataProvider {
+export async function createDataProvider(cfg: ProviderConfig): Promise<IDataProvider> {
   switch (cfg.provider) {
     case 'filesystem':
       return new JsonFileDataProvider(cfg.dataDir);
@@ -52,7 +60,7 @@ export function createDataProvider(cfg: ProviderConfig): IDataProvider {
           'Example: postgresql://user:pass@host:5432/db',
         );
       }
-      return new PostgresDataProvider(cfg.databaseUrl);
+      return await PostgresDataProvider.create(cfg.databaseUrl, cfg.env);
     }
     case 'sqlite':
     case 'dual':

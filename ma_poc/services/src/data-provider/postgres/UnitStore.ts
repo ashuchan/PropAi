@@ -49,6 +49,11 @@ export class PgUnitStore implements IUnitStore {
     return rows.map(this.toRecord);
   }
 
+  async count(): Promise<number> {
+    const { rows } = await this.pool.query<{ n: string }>('select count(*)::text as n from units');
+    return Number(rows[0]?.n ?? 0);
+  }
+
   private toRecord(row: Row): UnitStateRecord {
     return {
       canonicalId: row.canonical_id,

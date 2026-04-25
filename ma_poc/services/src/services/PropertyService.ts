@@ -121,11 +121,66 @@ export class PropertyService implements IPropertyService {
 
   private detectedSchema: SchemaVersion = 'v1';
 
+  // Memoize the materialized PropertySummary[] for the latest run.
+  // Without this, each call to /api/properties, /api/properties/stats,
+  // /api/properties/search, and /api/properties/ranked re-issues 5 Cloud
+  // SQL round-trips (listForRun, propertyState.all, runs.readLedger,
+  // getLlmReport) — ~15s each over the public Cloud SQL Connector for the
+  // 4482-row prod dataset. Parallel requests caused the pg pool to back
+  // up, the API process to hit per-request timeouts, and Vite to log
+  // ECONNRESET / ECONNREFUSED. The single-flight promise also dedupes
+  // concurrent loads so the "page-load fires N queries at once" pattern
+  // costs one Cloud SQL trip, not N.
+  private propertyCache: { date: string; expires: number; items: PropertySummary[] } | null = null;
+  private propertyCacheInflight: Promise<PropertySummary[]> | null = null;
+  private static readonly PROPERTY_CACHE_TTL_MS = 60_000;
+
   private async loadProperties(): Promise<PropertySummary[]> {
+    const now = Date.now();
+    if (this.propertyCache && this.propertyCache.expires > now) {
+      return this.propertyCache.items;
+    }
+    if (this.propertyCacheInflight) {
+      return this.propertyCacheInflight;
+    }
+    this.propertyCacheInflight = this.loadPropertiesUncached().finally(() => {
+      this.propertyCacheInflight = null;
+    });
+    const items = await this.propertyCacheInflight;
+    return items;
+  }
+
+  private async loadPropertiesUncached(): Promise<PropertySummary[]> {
+    // Fast path: providers that can compute summaries via SQL (postgres)
+    // skip the per-snapshot JSONB load entirely. This is what makes the
+    // /api/properties* endpoints sub-second AND correct — counts come from
+    // the `units` table (~20K) rather than from per-snapshot len(units)
+    // (which inflates to ~39K because JSONB payloads include duplicates,
+    // lease-term variants, and carry-forward entries). It also surfaces
+    // ALL canonical properties (4981) instead of just today's scrape
+    // subset (4482).
+    if (this.provider.properties.listSummariesFast) {
+      const fast = await this.provider.properties.listSummariesFast();
+      const items: PropertySummary[] = fast.map((r) => this.fastRowToSummary(r));
+      this.propertyCache = {
+        date: 'fast', expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS, items,
+      };
+      this.detectedSchema = 'v2';
+      return items;
+    }
+
+    // Slow path: json-file (and any future adapter without the fast hook)
+    // — load the per-run JSONB payload list and project it in JS.
     const latestDate = await this.provider.runs.getLatestDate();
-    if (!latestDate) return [];
+    if (!latestDate) {
+      this.propertyCache = { date: '', expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS, items: [] };
+      return [];
+    }
     const raw = await this.provider.properties.listForRun(latestDate);
-    if (raw.length === 0) return [];
+    if (raw.length === 0) {
+      this.propertyCache = { date: latestDate, expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS, items: [] };
+      return [];
+    }
 
     this.detectedSchema = detectSchemaVersion(raw);
 
@@ -137,10 +192,78 @@ export class PropertyService implements IPropertyService {
     );
     const llmMap = await this.loadLlmCosts(latestDate);
 
-    if (this.detectedSchema === 'v2') {
-      return (raw as unknown as RawV2Property[]).map((p) => this.toSummaryV2(p, stateMap, ledgerMap, llmMap));
+    const items: PropertySummary[] = this.detectedSchema === 'v2'
+      ? (raw as unknown as RawV2Property[]).map((p) => this.toSummaryV2(p, stateMap, ledgerMap, llmMap))
+      : (raw as unknown as RawV1Property[]).map((p) => this.toSummaryV1(p, stateMap, ledgerMap, llmMap));
+
+    this.propertyCache = {
+      date: latestDate,
+      expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS,
+      items,
+    };
+    return items;
+  }
+
+  /**
+   * Translate a denormalised SQL row into the PropertySummary the API
+   * contract expects. Field names map 1:1 except for tier — when the
+   * ledger doesn't carry an explicit extraction_tier we infer FAILED
+   * vs TIER_3_DOM vs TIER_1_API the same way `inferTierFromUnitsV2` does.
+   */
+  private fastRowToSummary(r: import('../data-provider/contracts.js').PropertySummaryRow): PropertySummary {
+    const ledgerStatus = (r.ledgerStatus ?? '').toUpperCase();
+    const stateStatus = (r.lastScrapeStatus ?? '').toUpperCase();
+    const status = ledgerStatus || stateStatus || 'UNKNOWN';
+    const isSuccess = status === 'SUCCESS' || status === 'SUCCESS_WITH_ERRORS';
+
+    let tier: ExtractionTier;
+    const tierStr = (r.extractionTier ?? '').toUpperCase();
+    if (tierStr.startsWith('TIER_') || tierStr === 'FAILED') {
+      tier = tierStr as ExtractionTier;
+    } else if (!isSuccess) {
+      tier = 'FAILED';
+    } else if (r.totalUnits === 0 || r.avgRent === 0) {
+      tier = 'TIER_3_DOM';
+    } else {
+      tier = 'TIER_1_API';
     }
-    return (raw as unknown as RawV1Property[]).map((p) => this.toSummaryV1(p, stateMap, ledgerMap, llmMap));
+
+    const scrapeStatus: ScrapeStatus = isSuccess
+      ? 'SUCCESS'
+      : status === 'CARRIED_FORWARD' ? 'CARRIED_FORWARD'
+      : status === 'SKIPPED' ? 'SKIPPED'
+      : 'FAILED';
+
+    return {
+      id: r.apartmentId != null ? String(r.apartmentId) : r.canonicalId,
+      name: r.name,
+      address: r.address,
+      city: r.city,
+      state: r.state,
+      zip: r.zip,
+      latitude: 0,
+      longitude: 0,
+      managementCompany: r.pmc,
+      totalUnits: r.totalUnits,
+      avgAskingRent: Math.round(r.avgRent),
+      medianAskingRent: Math.round(r.medianRent),
+      availabilityRate: r.totalUnits > 0 ? r.availableUnits / r.totalUnits : 0,
+      availableUnits: r.availableUnits,
+      extractionTier: tier,
+      scrapeStatus,
+      propertyStatus: 'ACTIVE',
+      yearBuilt: null,
+      stories: null,
+      activeConcession: r.concessions ?? null,
+      lastScrapeTimestamp: r.lastSeenAt ?? '',
+      carryForwardDays: 0,
+      imageUrl: null,
+      galleryUrls: [],
+      websiteUrl: r.website,
+      llmCostUsd: 0,
+      llmCallCount: 0,
+      llmTokensTotal: 0,
+    };
   }
 
   private async loadLlmCosts(date: string): Promise<Map<string, LlmCostEntry>> {

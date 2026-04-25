@@ -100,10 +100,47 @@ export interface UnitStateRecord {
 
 // ── Store interfaces ─────────────────────────────────────────────────────────
 
+/**
+ * Denormalised per-property row for list/aggregate endpoints. Built from
+ * `properties` ⨝ aggregated `units` ⨝ latest `run_ledger` so we can render
+ * /api/properties* without ever loading the per-run `property_snapshots`
+ * JSONB payloads. Counts are authoritative because they come from the
+ * `units` table, not from per-snapshot `len(payload.units)` (which
+ * inflates totals by including duplicates / lease-term variants).
+ */
+export interface PropertySummaryRow {
+  canonicalId: string;
+  apartmentId: number | null;
+  name: string;            // proj_name
+  address: string;
+  city: string;
+  state: string;
+  zip: string;             // zip_code
+  pmc: string;             // management company
+  phone: string;
+  website: string;
+  totalUnits: number;
+  availableUnits: number;
+  avgRent: number;
+  medianRent: number;
+  lastSeenAt: string | null;
+  lastScrapeStatus: string | null;
+  ledgerStatus: string | null;
+  extractionTier: string | null;  // from ledger.extra->>'extraction_tier'
+  concessions: string | null;
+}
+
 /** Per-run property payloads (properties.json / `property_snapshots` table). */
 export interface IPropertyStore {
   listForRun(runDate: string): Promise<RawRunProperty[]>;
   getForRun(runDate: string, canonicalId: string): Promise<RawRunProperty | null>;
+  /**
+   * Fast path: one SQL round-trip returning lightweight summary rows
+   * for ALL canonical properties (not just the latest-run subset).
+   * Optional — adapters that can't compute it (json-file) leave it
+   * undefined and PropertyService falls back to the JSONB-snapshot path.
+   */
+  listSummariesFast?(): Promise<PropertySummaryRow[]>;
 }
 
 /** Per-property cumulative state. Mirrors IPropertyStateStore on the Py side. */
@@ -115,6 +152,8 @@ export interface IPropertyStateStore {
 /** Per-property state-tracked units. */
 export interface IUnitStore {
   listStateForProperty(canonicalId: string): Promise<UnitStateRecord[]>;
+  /** Total unit count across all properties (`select count(*) from units`). */
+  count(): Promise<number>;
 }
 
 /** Run registry + per-run report + ledger. */

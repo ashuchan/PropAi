@@ -15,6 +15,11 @@ interface LedgerEntry {
   canonical_id: string;
   status: string;
   units_count: number;
+  // run_ledger.extra may carry the original tier label (TIER_1_API, etc.).
+  // Without it we have to infer FAILED vs TIER_1_API vs TIER_3_DOM, which
+  // is what the legacy code did and why /api/health/tiers used to show
+  // a 2-bucket distribution while /api/properties/stats showed 3.
+  extra?: Record<string, unknown> | null;
 }
 
 export class HealthService implements IHealthService {
@@ -30,13 +35,19 @@ export class HealthService implements IHealthService {
       };
     }
 
+    // Authoritative counts come from the catalogue tables, not from the
+    // run report — the report only reflects what was scraped today (4482),
+    // not what's in the DB (4981 properties / ~20K units). This is what
+    // the user noticed was off in the dashboard.
+    const stateList = await this.provider.propertyState.all();
+    const totalProperties = stateList.length;
+    const totalUnits = await this.provider.units.count();
+
     const report = (await this.provider.runs.getReport(latestDate)) as Record<string, unknown> | null;
     const alerts: HealthAlert[] = [];
 
     if (report) {
       const totals = (report.totals ?? {}) as Record<string, unknown>;
-      // Support both new (`properties`/`succeeded`) and legacy
-      // (`rows_processed`/`rows_succeeded`) shapes.
       const total = Number(totals.properties ?? totals.rows_processed ?? 0);
       const succeeded = Number(totals.succeeded ?? totals.rows_succeeded ?? 0);
       const successRate = total > 0 ? succeeded / total : 0;
@@ -59,13 +70,12 @@ export class HealthService implements IHealthService {
           timestamp: latestDate,
         });
       }
-      const stateDiff = (report.state_diff ?? {}) as Record<string, unknown>;
       return {
         lastRunDate: latestDate,
         lastRunStatus: String(report.exit_status ?? 'UNKNOWN'),
         successRate,
-        totalProperties: total,
-        totalUnits: Number(stateDiff.units_extracted ?? 0),
+        totalProperties,
+        totalUnits,
         avgDurationSeconds: Number(report.duration_s ?? 0),
         consecutiveFailureDays: 0,
         alerts,
@@ -74,7 +84,7 @@ export class HealthService implements IHealthService {
 
     return {
       lastRunDate: latestDate, lastRunStatus: 'UNKNOWN', successRate: 0,
-      totalProperties: 0, totalUnits: 0, avgDurationSeconds: 0,
+      totalProperties, totalUnits, avgDurationSeconds: 0,
       consecutiveFailureDays: 0, alerts,
     };
   }
@@ -87,7 +97,19 @@ export class HealthService implements IHealthService {
     const counts: Record<string, number> = {};
     let total = 0;
     for (const entry of ledger) {
-      const tier = entry.status === 'FAILED' ? 'FAILED' : entry.units_count > 0 ? 'TIER_1_API' : 'FAILED';
+      let tier: ExtractionTier;
+      const rawTier = String(entry.extra?.extraction_tier ?? '').toUpperCase();
+      if (rawTier.startsWith('TIER_') || rawTier === 'FAILED') {
+        tier = rawTier as ExtractionTier;
+      } else if (entry.status === 'FAILED') {
+        tier = 'FAILED';
+      } else if ((entry.units_count ?? 0) > 0) {
+        // Same fallback as PropertyService.fastRowToSummary — agree across
+        // endpoints so /api/properties/stats and /api/health/tiers match.
+        tier = 'TIER_1_API';
+      } else {
+        tier = 'TIER_3_DOM';
+      }
       counts[tier] = (counts[tier] || 0) + 1;
       total++;
     }

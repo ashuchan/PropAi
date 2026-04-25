@@ -16,10 +16,20 @@ from __future__ import annotations
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from typing import Literal
+
+# On Windows, ``gcloud`` ships as ``gcloud.cmd`` (a batch file). Python's
+# ``subprocess.run`` with shell=False doesn't consult PATHEXT when
+# resolving the executable — only an exact filename match — so passing
+# ``"gcloud"`` raises FileNotFoundError despite the .cmd being on PATH.
+# ``shutil.which`` DOES honor PATHEXT on Windows, so resolving once at
+# import and using the full path fixes local-dev runs without breaking
+# Linux CI (where ``gcloud`` resolves to a plain ELF binary).
+_GCLOUD = shutil.which("gcloud") or "gcloud"
 
 # ---------------------------------------------------------------------------
 # Calibration constants (from arch doc §3)
@@ -135,7 +145,7 @@ def tf_env_for(env: str) -> str:
 def verify_gcloud_auth(required_project: str) -> None:
     """Fail fast (exit 3) if gcloud is not authenticated or pointed at the wrong project."""
     result = subprocess.run(
-        ["gcloud", "config", "get-value", "project"],
+        [_GCLOUD, "config", "get-value", "project"],
         capture_output=True,
         text=True,
         check=False,
@@ -157,7 +167,7 @@ def check_job_exists(job_name: str, region: str, project: str) -> None:
     """Exit 3 with a clear message if the Cloud Run job does not exist."""
     result = subprocess.run(
         [
-            "gcloud",
+            _GCLOUD,
             "run",
             "jobs",
             "describe",
@@ -180,8 +190,15 @@ def check_job_exists(job_name: str, region: str, project: str) -> None:
 
 
 def run_gcloud(*args: str) -> subprocess.CompletedProcess[str]:
-    """Run a gcloud command; all gcloud calls go through here so they can be mocked in tests."""
-    return subprocess.run(list(args), capture_output=True, text=True, check=False)
+    """Run a gcloud command; all gcloud calls go through here so they can be mocked in tests.
+
+    Callers pass ``"gcloud"`` as argv[0] for readability; we swap it for
+    the resolved path so Windows (.cmd) works without shell=True.
+    """
+    argv = list(args)
+    if argv and argv[0] == "gcloud":
+        argv[0] = _GCLOUD
+    return subprocess.run(argv, capture_output=True, text=True, check=False)
 
 
 def emit_structured_result(result: dict) -> None:  # type: ignore[type-arg]

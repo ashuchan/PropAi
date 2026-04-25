@@ -39,6 +39,13 @@ export class JsonFileUnitStore implements IUnitStore {
     return Object.entries(units).map(([uid, raw]) => this.toRecord(canonicalId, uid, raw));
   }
 
+  async count(): Promise<number> {
+    const index = (await readJsonFile<RawUnitIndex>(statePath(this.dataDir, 'unit_index.json'))) ?? {};
+    let n = 0;
+    for (const units of Object.values(index)) n += Object.keys(units).length;
+    return n;
+  }
+
   private toRecord(canonicalId: string, unitId: string, raw: RawUnit): UnitStateRecord {
     const {
       unit_id: _uid,
