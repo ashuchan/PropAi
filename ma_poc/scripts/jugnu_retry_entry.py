@@ -36,11 +36,13 @@ Flow:
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 
 # Ensure ma_poc is importable
 _script_dir = Path(__file__).resolve().parent
@@ -73,6 +75,74 @@ def _download_gcs_dir(gcs_prefix: str, local_dir: Path) -> None:
 def _schema_root(schema_version: str) -> Path:
     root = Path("/tmp/data")
     return root / "v2" if schema_version == "v2" else root
+
+
+def _coalesce_scrape_shards(local_run_dir: Path) -> None:
+    """Concatenate per-shard ``properties.json`` files into one at the run-date root.
+
+    The scrape job runs as a sharded Cloud Run execution; each task
+    writes its disjoint slice of the input CSV to
+    ``shard_{N}/properties.json``. The retry runner reads
+    ``properties.json`` at the run-date root, so without this step it
+    sees no candidates and exits with OK_NOTHING_TO_DO.
+
+    No-op when:
+      - A top-level ``properties.json`` already exists (older single-task
+        scrapes, or a prior coalesce in this same container).
+      - No ``shard_*/properties.json`` files are present.
+
+    Shards are disjoint by construction. We still dedup by canonical_id
+    (last-shard-wins, in shard-numeric order) to tolerate the edge case
+    of two scrapes writing into the same prefix.
+    """
+    target = local_run_dir / "properties.json"
+    if target.exists():
+        return
+
+    shard_files = sorted(local_run_dir.glob("shard_*/properties.json"))
+    if not shard_files:
+        return
+
+    by_id: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    extras: list[dict[str, Any]] = []  # records with no canonical_id — preserve as-is
+    for shard_path in shard_files:
+        try:
+            data = json.loads(shard_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            print(
+                f"[retry_entry] skipping unreadable shard {shard_path}: {exc}",
+                file=sys.stderr,
+            )
+            continue
+        if not isinstance(data, list):
+            print(
+                f"[retry_entry] shard {shard_path} did not contain a JSON array; skipping",
+                file=sys.stderr,
+            )
+            continue
+        for rec in data:
+            if not isinstance(rec, dict):
+                continue
+            cid = (rec.get("_meta") or {}).get("canonical_id")
+            if cid:
+                if cid not in by_id:
+                    order.append(cid)
+                by_id[cid] = rec
+            else:
+                extras.append(rec)
+
+    merged = [by_id[cid] for cid in order] + extras
+    try:
+        target.write_text(json.dumps(merged, indent=2, default=str), encoding="utf-8")
+    except OSError as exc:
+        print(f"[retry_entry] failed to write coalesced {target}: {exc}", file=sys.stderr)
+        return
+    print(
+        f"[retry_entry] coalesced {len(shard_files)} shard(s) → {target} "
+        f"({len(merged)} records)",
+        file=sys.stderr,
+    )
 
 
 def _upload_artifacts(bucket_name: str, run_date: str, timestamp: str, schema_version: str) -> None:
@@ -188,6 +258,11 @@ def main() -> None:
     run_gcs_prefix = f"gs://{bucket_name}/runs/{run_date}"
     local_run_dir = _schema_root(schema_version) / "runs" / run_date
     _download_gcs_dir(run_gcs_prefix, local_run_dir)
+
+    # 3b. Coalesce per-shard scrape outputs into a single top-level
+    #     properties.json. Sharded scrape runs write to shard_{N}/...
+    #     and never produce the top-level file the retry runner reads.
+    _coalesce_scrape_shards(local_run_dir)
 
     # 4. Download CSV
     csv_local = Path("/tmp/properties.csv")
