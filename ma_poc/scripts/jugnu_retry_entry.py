@@ -2,7 +2,9 @@
 scripts/jugnu_retry_entry.py — Cloud Run retry job entry point.
 
 Environment variables consumed:
-  RETRY_MODE      (required) — "errors" or "resume"
+  RETRY_MODE      (required) — "errors", "resume", or "unprocessed"
+                  ("unprocessed" diffs the CSV against the prior run's
+                  properties.json to recover stuck-shard slices)
   RUN_DATE        (optional) — YYYY-MM-DD; defaults to UTC today
   LIMIT           (optional) — cap retry attempts
   CSV_GCS_URI     (required) — gs:// URI of the properties CSV
@@ -239,8 +241,10 @@ def _sync_dlq_to_db(schema_version: str) -> int:
 
 def main() -> None:
     retry_mode = os.environ.get("RETRY_MODE", "errors").lower()
-    if retry_mode not in ("errors", "resume"):
-        sys.exit(f"Invalid RETRY_MODE={retry_mode!r}; expected 'errors' or 'resume'")
+    if retry_mode not in ("errors", "resume", "unprocessed"):
+        sys.exit(
+            f"Invalid RETRY_MODE={retry_mode!r}; expected 'errors', 'resume', or 'unprocessed'"
+        )
 
     csv_gcs_uri = _require_env("CSV_GCS_URI")
     bucket_name = _require_env("BUCKET_NAME")
@@ -283,7 +287,11 @@ def main() -> None:
 
     # 6. Run the retry runner
     runner = _app_root / "ma_poc" / "scripts" / "jugnu_retry_runner.py"
-    mode_flag = "--retry-errors" if retry_mode == "errors" else "--resume"
+    mode_flag = {
+        "errors": "--retry-errors",
+        "resume": "--resume",
+        "unprocessed": "--unprocessed",
+    }[retry_mode]
     cmd = [
         sys.executable,
         str(runner),

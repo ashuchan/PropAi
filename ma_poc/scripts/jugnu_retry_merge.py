@@ -153,7 +153,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--mode",
-        choices=["errors", "resume"],
+        choices=["errors", "resume", "unprocessed"],
         default="errors",
         help="Used for naming the consolidated retry report.",
     )
