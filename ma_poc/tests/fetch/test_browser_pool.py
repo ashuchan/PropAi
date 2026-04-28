@@ -131,3 +131,19 @@ def test_proxy_config_direct_produces_no_proxy_key() -> None:
     cfg = ProxyConfig(tier=ProxyTier.DIRECT, server=None)
     opts = _run(BrowserContextPool(max_contexts=1), cfg)
     assert "proxy" not in opts
+
+
+# ── Real BrightData PROXY_POOL_URLS format ────────────────────────────────────
+
+
+def test_real_brightdata_url_format_parses_correctly() -> None:
+    """Exercises the exact URL shape stored in the proxy-credentials-production
+    GCP Secret Manager secret and injected as PROXY_POOL_URLS on Cloud Run."""
+    url = "http://brd-customer-hl_6785472d-zone-residential_proxy1:0owuh5392unq@brd.superproxy.io:33335"
+    opts = _run(BrowserContextPool(max_contexts=1), url)
+    assert opts["proxy"] == {
+        "server": "http://brd.superproxy.io:33335",
+        "username": "brd-customer-hl_6785472d-zone-residential_proxy1",
+        "password": "0owuh5392unq",
+    }
+    assert opts.get("ignore_https_errors") is True
