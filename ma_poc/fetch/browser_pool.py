@@ -84,7 +84,20 @@ class BrowserContextPool:
                 # when a non-direct proxy is in use.
                 context_opts["ignore_https_errors"] = True
         elif isinstance(proxy, str) and proxy:
-            context_opts["proxy"] = {"server": proxy}
+            from urllib.parse import urlparse
+
+            _parsed = urlparse(proxy)
+            _port = f":{_parsed.port}" if _parsed.port else ""
+            _server = f"{_parsed.scheme}://{_parsed.hostname}{_port}"
+            _pw_proxy: dict[str, str] = {"server": _server}
+            if _parsed.username:
+                _pw_proxy["username"] = _parsed.username
+            if _parsed.password:
+                _pw_proxy["password"] = _parsed.password
+            context_opts["proxy"] = _pw_proxy
+            # BrightData terminates TLS at the proxy edge; without this flag
+            # Chromium aborts HTTPS navigations with ERR_CERT_AUTHORITY_INVALID.
+            context_opts["ignore_https_errors"] = True
 
         context = await browser.new_context(**context_opts)  # type: ignore[arg-type]
         self._active_contexts.append(context)

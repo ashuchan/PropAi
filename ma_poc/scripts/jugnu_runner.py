@@ -103,7 +103,6 @@ async def run_jugnu(
     csv_path: Path,
     data_dir: Path = _MA_POC_ROOT / "data",
     limit: int | None = None,
-    proxy: str | None = None,
     run_date: str | None = None,
     schema_version: str = "v1",
     start_index: int = 0,
@@ -114,9 +113,6 @@ async def run_jugnu(
         csv_path: Path to properties CSV.
         data_dir: Base data directory.
         limit: Max properties to process.
-        proxy: Tier-name override (``direct``/``datacenter``/``residential``/
-            ``unblocker``), or None to let the per-property profile pick.
-            The old URL form is removed; validation lives in ``main()``.
         run_date: Override run date (YYYY-MM-DD).
         schema_version: "v1" or "v2" output format.
         start_index: Zero-based row index in the CSV to start scraping from.
@@ -1385,18 +1381,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Jugnu integrated runner")
     parser.add_argument("--csv", type=Path, default=_MA_POC_ROOT / "config" / "properties.csv")
     parser.add_argument("--limit", type=int, default=None)
-    parser.add_argument(
-        "--proxy",
-        type=str,
-        default=None,
-        help=(
-            "Tier-name override: direct | datacenter | residential | unblocker. "
-            "Forces every fetch in this run to use the named tier regardless "
-            "of the per-property profile. The old URL form "
-            "(--proxy http://user:pass@host:port) was removed — see "
-            "docs/OPERATOR_RUNBOOK.md for the migration."
-        ),
-    )
     parser.add_argument("--data-dir", type=Path, default=_MA_POC_ROOT / "data")
     parser.add_argument("--run-date", type=str, default=None)
     parser.add_argument(
@@ -1415,31 +1399,11 @@ def main() -> int:
 
     schema_version = _resolve_schema_version(args)
 
-    # Validate --proxy: accepts a tier name, not a URL. This is a breaking
-    # change from the previous URL form; fail loudly rather than silently
-    # ignoring so an operator doesn't think their proxy is active when it
-    # isn't. Tier selection flows through ma_poc.fetch.proxy.selector.
-    if args.proxy is not None:
-        val = args.proxy.strip().lower()
-        valid = {"direct", "datacenter", "residential", "unblocker"}
-        if "://" in val or val.startswith(("http", "socks")):
-            raise SystemExit(
-                "--proxy no longer accepts a URL. Pass a tier name instead: "
-                "direct | datacenter | residential | unblocker. "
-                "See docs/OPERATOR_RUNBOOK.md for the migration."
-            )
-        if val not in valid:
-            raise SystemExit(
-                f"--proxy must be one of {sorted(valid)}, got {args.proxy!r}."
-            )
-        args.proxy = val
-
     report = asyncio.run(
         run_jugnu(
             csv_path=args.csv,
             data_dir=args.data_dir,
             limit=args.limit,
-            proxy=args.proxy,
             run_date=args.run_date,
             schema_version=schema_version,
             start_index=args.start_index,
