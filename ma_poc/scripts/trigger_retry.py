@@ -10,11 +10,14 @@ Exit codes:
   130 SIGINT
 
 Usage:
-  python scripts/trigger_retry.py --env {staging|prod} --mode {errors|resume} [OPTIONS]
+  python scripts/trigger_retry.py --env {staging|prod} --mode {errors|resume|unprocessed} [OPTIONS]
 
 Options:
-  --env {staging|prod}       Target environment (required)
-  --mode {errors|resume}     errors = retry failed properties; resume = resume interrupted run
+  --env {staging|prod}                 Target environment (required)
+  --mode {errors|resume|unprocessed}   errors = retry failed properties;
+                                       resume = re-process anything not a clean success;
+                                       unprocessed = process CSV rows missing from
+                                       properties.json (recover stuck-shard slices).
   --run-date YYYY-MM-DD      Which run to retry (default: most recent)
   --limit N                  Cap retried properties per shard
   --tasks N                  Cloud Run task count for sharded retry (1-10).
@@ -29,6 +32,7 @@ Examples:
   python scripts/trigger_retry.py --env prod --mode errors --run-date 2026-04-18
   python scripts/trigger_retry.py --env staging --mode resume
   python scripts/trigger_retry.py --env prod --mode errors --tasks 10 --limit 200
+  python scripts/trigger_retry.py --env prod --mode unprocessed --run-date 2026-04-28 --tasks 5
 """
 
 from __future__ import annotations
@@ -75,9 +79,14 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--env", choices=["staging", "prod"], required=True)
     p.add_argument(
         "--mode",
-        choices=["errors", "resume"],
+        choices=["errors", "resume", "unprocessed"],
         required=True,
-        help="errors = retry failed properties; resume = resume interrupted run",
+        help=(
+            "errors = retry failed properties; "
+            "resume = re-process anything that isn't a clean success; "
+            "unprocessed = process CSV rows missing from properties.json "
+            "(recover slices left behind by a stuck/timed-out shard)"
+        ),
     )
     p.add_argument("--run-date", metavar="YYYY-MM-DD", help="Target run date (default: most recent)")
     p.add_argument("--limit", type=int, metavar="N", help="Cap retried properties per shard.")

@@ -1,7 +1,7 @@
 """
 Jugnu retry runner — retry failed properties from a prior run.
 
-Two modes:
+Three modes:
 
   --retry-errors   Retry properties that FAILED or produced 0 units in a
                    prior run.  Reads the prior run's properties.json (Jugnu
@@ -11,10 +11,18 @@ Two modes:
   --resume         Re-process everything that isn't a clean success.  Useful
                    after an interrupted run.
 
-Both modes:
+  --unprocessed    Pick up properties that are present in the source CSV but
+                   absent from the prior run's properties.json.  Used when
+                   one or more scrape shards never finished (e.g. a stuck
+                   Cloud Run task) so their slice of the CSV produced no
+                   record at all — neither --retry-errors nor --resume can
+                   see those properties because they iterate properties.json.
+                   Requires --csv.
+
+All modes:
   - Create CrawlTasks with reason=RETRY and feed them through L1-L5.
   - Merge new results into the existing properties.json (replacing stale
-    records, keeping untouched successes).
+    records by canonical_id, appending records that weren't there before).
   - Produce an updated report.json / report.md.
 
 Usage:
@@ -26,6 +34,10 @@ Usage:
 
   # Resume an interrupted run
   python scripts/jugnu_retry_runner.py --resume --run-date 2026-04-18
+
+  # Recover properties from a stuck shard (CSV vs properties.json diff)
+  python scripts/jugnu_retry_runner.py --unprocessed --run-date 2026-04-28 \\
+      --csv config/properties.csv
 
   # Retry with a limit
   python scripts/jugnu_retry_runner.py --retry-errors --limit 10
@@ -163,6 +175,103 @@ def _load_jugnu_candidates(
             }
         )
 
+    return candidates
+
+
+def _load_unprocessed_candidates(
+    run_dir: Path,
+    csv_path: Path,
+) -> list[dict[str, Any]]:
+    """Load CSV rows whose canonical_id has NO record in properties.json.
+
+    Used by --unprocessed mode to recover properties from a scrape run
+    where one or more shards never completed (stuck task, OOM kill, 4h
+    timeout). The retry runner's other modes only see properties that
+    already have a record; this loader closes the gap by diffing the
+    source CSV against the prior run's output.
+
+    Match key is the raw CSV property identifier compared against
+    ``_meta.canonical_id`` in properties.json — Jugnu writes the CSV id
+    straight through as canonical_id, so a string equality match
+    correctly identifies untouched rows.
+
+    Args:
+        run_dir: Path to the prior run directory (holds properties.json).
+        csv_path: Path to the source CSV (the original full population).
+
+    Returns:
+        List of dicts (property_id, url, prior_status="UNPROCESSED") for
+        every CSV row not present in properties.json. Empty if the CSV is
+        unreadable or has no usable rows.
+    """
+    if not csv_path or not csv_path.exists():
+        log.error("--unprocessed requires --csv pointing at the source CSV")
+        return []
+
+    seen_ids: set[str] = set()
+    props_path = run_dir / "properties.json"
+    if props_path.exists():
+        try:
+            props = json.loads(props_path.read_text(encoding="utf-8"))
+            if isinstance(props, list):
+                for prop in props:
+                    pid = (prop.get("_meta") or {}).get("canonical_id") or ""
+                    if pid:
+                        seen_ids.add(str(pid))
+        except (json.JSONDecodeError, OSError) as exc:
+            log.warning(
+                "Could not read %s: %s — treating run as fully unprocessed",
+                props_path,
+                exc,
+            )
+    else:
+        log.warning(
+            "No properties.json at %s — treating every CSV row as unprocessed",
+            props_path,
+        )
+
+    import csv as csv_mod
+
+    candidates: list[dict[str, Any]] = []
+    skipped_no_id = 0
+    skipped_no_url = 0
+    try:
+        with open(csv_path, encoding="utf-8-sig", newline="") as f:
+            for row in csv_mod.DictReader(f):
+                pid = (
+                    row.get("property_id")
+                    or row.get("Unique ID")
+                    or row.get("Property ID")
+                    or row.get("apartmentid")
+                    or ""
+                ).strip()
+                url = (row.get("url") or row.get("Website") or row.get("website") or "").strip()
+                if not pid:
+                    skipped_no_id += 1
+                    continue
+                if not url:
+                    skipped_no_url += 1
+                    continue
+                if pid in seen_ids:
+                    continue
+                candidates.append(
+                    {
+                        "property_id": pid,
+                        "url": url,
+                        "prior_status": "UNPROCESSED",
+                    }
+                )
+    except OSError as exc:
+        log.error("Could not read CSV %s: %s", csv_path, exc)
+        return []
+
+    log.info(
+        "Unprocessed diff: %d processed in run, %d candidates from CSV (skipped %d no-id, %d no-url)",
+        len(seen_ids),
+        len(candidates),
+        skipped_no_id,
+        skipped_no_url,
+    )
     return candidates
 
 
@@ -406,9 +515,9 @@ async def run_retry(
 
     Args:
         data_dir: Base data directory.
-        mode: 'retry_errors' or 'resume'.
+        mode: 'retry_errors', 'resume', or 'unprocessed'.
         run_date: Target run date (YYYY-MM-DD). None = latest.
-        csv_path: Optional CSV for URL lookup (needed for legacy runs).
+        csv_path: Optional CSV for URL lookup (REQUIRED for 'unprocessed').
         limit: Max properties to retry.
         schema_version: "v1" or "v2" output format.
 
@@ -468,14 +577,28 @@ async def run_retry(
             pass
 
     # -- Load candidates --
-    # Try Jugnu format first (properties.json with _meta), fall back to legacy.
-    candidates = _load_jugnu_candidates(source_run_dir, mode)
-    if not candidates:
-        candidates = _load_legacy_candidates(source_run_dir, mode, csv_lookup)
-    if not candidates and csv_lookup:
-        # Last resort: if properties.json exists but has no _meta, try to
-        # match by URL from CSV.
-        candidates = _load_legacy_candidates(source_run_dir, mode, csv_lookup)
+    if mode == "unprocessed":
+        # CSV-vs-properties.json diff. Distinct loader because the other
+        # two modes iterate properties.json, which by definition does NOT
+        # contain the records we need to find here.
+        if csv_path is None:
+            log.error("unprocessed mode requires --csv pointing at the source CSV")
+            return {
+                "exit_status": "FATAL",
+                "error": "unprocessed mode requires --csv",
+                "run_date": run_date,
+                "mode": mode,
+            }
+        candidates = _load_unprocessed_candidates(source_run_dir, csv_path)
+    else:
+        # Try Jugnu format first (properties.json with _meta), fall back to legacy.
+        candidates = _load_jugnu_candidates(source_run_dir, mode)
+        if not candidates:
+            candidates = _load_legacy_candidates(source_run_dir, mode, csv_lookup)
+        if not candidates and csv_lookup:
+            # Last resort: if properties.json exists but has no _meta, try to
+            # match by URL from CSV.
+            candidates = _load_legacy_candidates(source_run_dir, mode, csv_lookup)
 
     if not candidates:
         log.info("No candidates to retry.")
@@ -807,6 +930,15 @@ Examples:
         action="store_true",
         help="Re-process everything that isn't a clean success",
     )
+    mode_group.add_argument(
+        "--unprocessed",
+        action="store_true",
+        help=(
+            "Process CSV rows that are missing from properties.json — "
+            "recovers properties from a stuck/timed-out shard whose slice "
+            "never reached the output file. Requires --csv."
+        ),
+    )
     parser.add_argument(
         "--run-date",
         type=str,
@@ -829,7 +961,12 @@ Examples:
     )
     args = parser.parse_args()
 
-    mode = "retry_errors" if args.retry_errors else "resume"
+    if args.retry_errors:
+        mode = "retry_errors"
+    elif args.resume:
+        mode = "resume"
+    else:
+        mode = "unprocessed"
 
     from ma_poc.scripts.jugnu_runner import _resolve_schema_version
 
