@@ -42,3 +42,9 @@ cloud-sql-python-connector[pg8000]>=1.9.0
 # longer ships gsutil, so shell-outs were replaced with the Python
 # client — see ma_poc/storage/gcs.py.
 google-cloud-storage>=2.10.0
+
+# Model Context Protocol client. Used by scripts/email_daily_report.py
+# to spawn the Gmail MCP server (`@gongrzhe/server-gmail-autoauth-mcp`)
+# over stdio and invoke its `send_email` tool. Local-only — not used
+# inside the production Cloud Run image.
+mcp>=1.2.0

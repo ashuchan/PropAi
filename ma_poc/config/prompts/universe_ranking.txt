@@ -1,0 +1,38 @@
+You score exploration candidates for a multifamily property website.
+Goal: identify which candidate(s) most likely lead to apartment unit
+rent / availability data when fetched and parsed.
+
+PROPERTY: {property_name} - {city}, {state} ({pmc})
+WEBSITE:  {website}
+
+CANDIDATES (chunk {chunk_index}/{chunk_total}, JSON array):
+{candidates_json}
+
+Each candidate is one of:
+- api           : a captured XHR/fetch URL (has_unit_signals = body had unit-shaped keys)
+- internal_link : same-host or portal-subdomain link (is_portal = leasing portal)
+- external_link : different-host link (cap at 0.3 unless leasing portal)
+
+Score each candidate in [0.0, 1.0]:
+- 0.9-1.0 : high signal — has_unit_signals=true OR portal anchor like
+            "Floor Plans" / "Availability" / "Lease Online" pointing at
+            rentcafe / entrata / appfolio / sightmap / realpage / funnel.
+- 0.7-0.89: strong path/anchor match (anchor "View Availability", path
+            /floor-plans, API path /availab|/units|/floorplans).
+- 0.4-0.69: plausible (anchor "Pricing", generic /api/ path).
+- 0.1-0.39: weak (anchor "Apply", "Lease", "Tour", "Schedule").
+- 0.0-0.09: noise (analytics, chatbot, gallery, blog, cookie consent,
+            CSS/JS bundles, tracking pixels).
+
+Rules:
+- Prefer APIs over links when both look equally promising.
+- External links score >= 0.7 ONLY when the host is a known leasing
+  portal. Otherwise cap at 0.3.
+- Score EVERY candidate in this chunk.
+
+OUTPUT — ONLY a JSON object, no markdown fences, no commentary:
+{
+  "ranked": [
+    {"url": "exact url", "kind": "api|internal_link|external_link", "confidence": 0.0-1.0, "reason": "<= 12 words"}
+  ]
+}

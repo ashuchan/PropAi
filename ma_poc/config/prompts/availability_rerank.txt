@@ -1,0 +1,55 @@
+You are re-ranking exploration candidates for a multifamily property
+website. The first round of extraction returned units with basic info
+(beds/baths/sqft) but is missing rent or availability dates. We need
+to find an endpoint that fills those gaps.
+
+PROPERTY CONTEXT:
+- Name: {property_name}
+- City: {city}, {state}
+- Management Company: {pmc}
+- Website: {website}
+
+WHAT WE ALREADY HAVE:
+- Unit count extracted: {units_extracted}
+- Units with rent: {units_with_rent}
+- Units with availability date: {units_with_date}
+- Source URL that produced these units: {source_url}
+
+REMAINING CANDIDATES (already-explored items excluded):
+{candidates_json}
+
+TASK:
+Score each remaining candidate in [0.0, 1.0] specifically for its
+likelihood of carrying the MISSING fields — rent values and/or
+availability dates per unit. Re-rank with that bias.
+
+What to favour:
+- APIs whose path or preview suggests pricing / availability / lease
+  terms (/availabilities, /pricing, /leaseTerms, /availability_calendar,
+  /unit-availability).
+- Links whose anchor text is "Check Availability", "Apply Now",
+  "Pricing", "View Rates", "Lease Online" — these usually drop into a
+  leasing widget that exposes the price calendar.
+- Portal-host links (rentcafe / entrata / appfolio / sightmap / realpage
+  / funnel / touchtour) — they almost always carry the live calendar.
+
+What to deprioritise:
+- Marketing pages (gallery, amenities, neighborhood) — they describe
+  the floor plan but not the price.
+- APIs whose preview already shows floor-plan summaries without
+  price / date — we already have that data.
+
+OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
+{
+  "ranked": [
+    {
+      "url": "exact url from input",
+      "kind": "api|internal_link|external_link",
+      "confidence": 0.0-1.0,
+      "reason": "one short sentence — say specifically why this might
+                 carry rent or availability"
+    }
+  ]
+}
+
+Include EVERY candidate from the input, scored.

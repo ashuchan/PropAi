@@ -203,6 +203,168 @@ async def _get_page_html(page: Any, ctx: AdapterContext) -> str | None:
     return None
 
 
+async def _run_universe_explorer(
+    *,
+    html: str | None,
+    api_responses: list[dict[str, Any]],
+    ctx: AdapterContext,
+    property_context: dict[str, Any],
+    result: AdapterResult,
+    llm_interactions: list[dict[str, Any]],
+    llm_field_mappings: list[dict[str, Any]],
+    llm_analysis_results: dict[str, Any],
+    llm_navigation_hints: list[str],
+    log_attempt: Any,
+) -> None:
+    """Sub-tier 6d entry point — runs the new explorer when the mode flag asks.
+
+    Builds the site-universe from the entry page + captured APIs, ranks it
+    with the LLM, and explores high-confidence candidates until either the
+    quality gate clears or the budget is exhausted. Mutates ``result``
+    directly and merges any ``llm_interactions`` / ``llm_field_mappings``
+    so the existing self-learning payload at the end of ``extract`` still
+    flows back to the profile updater unchanged.
+
+    Sub-page link exploration is intentionally NOT wired here: this helper
+    runs inside the adapter's single-page context. The legacy
+    ``_try_link_hop`` in :mod:`ma_poc.pms.scraper` continues to handle
+    second-page fetches outside the adapter — once we're confident in 6d
+    we can fold link-hop into ``link_fetcher`` here.
+    """
+    try:
+        from ma_poc.services.site_universe import gather_universe
+        from ma_poc.services.universe_explorer import explore_universe
+        from ma_poc.services.llm_extractor import (
+            analyze_api_with_llm,
+            analyze_dom_with_llm,
+        )
+    except ImportError as exc:
+        log_attempt("universe:import_failed", "errored", reason=str(exc)[:200])
+        result.errors.append(f"universe-import-error: {exc}")
+        return
+
+    universe = gather_universe(
+        html=html,
+        base_url=ctx.base_url,
+        api_responses=api_responses,
+        profile=getattr(ctx, "profile", None),
+    )
+
+    # Build a link_fetcher that uses the L1 Jugnu fetcher so the explorer
+    # can follow internal/portal links and capture their network_log into
+    # a sub-universe. The legacy 6a/6b/6c path never had this — it ran
+    # only on the entry page. The explorer's reason for existing is
+    # exactly to chase the Floor Plans / Apply Now links to RentCafe /
+    # RealPage / Entrata sub-portals where the unit data actually lives.
+    async def _adapter_link_fetcher(sub_url: str, _parent: str) -> tuple[str | None, list[dict[str, Any]]]:
+        try:
+            from ma_poc.discovery.contracts import CrawlTask, TaskReason
+            from ma_poc.fetch import fetch as _jugnu_fetch
+            from ma_poc.fetch.contracts import RenderMode
+        except Exception:
+            return None, []
+        sub_task = CrawlTask(
+            url=sub_url,
+            property_id=ctx.property_id or "unknown",
+            priority=1,
+            budget_ms=60_000,
+            reason=TaskReason.SCHEDULED,
+            render_mode=RenderMode.RENDER,
+            parent_task_id=None,
+        )
+        try:
+            sub_result = await _jugnu_fetch(sub_task)
+        except Exception:
+            return None, []
+        sub_outcome = (
+            sub_result.outcome.value if hasattr(sub_result.outcome, "value") else str(sub_result.outcome)
+        )
+        if sub_outcome != "OK" or sub_result.body is None:
+            return None, []
+        try:
+            sub_html = sub_result.body.decode("utf-8", errors="replace") if isinstance(sub_result.body, bytes) else str(sub_result.body)
+        except Exception:
+            sub_html = ""
+        # Mirror pms.scraper's network_log → api_responses prep so the
+        # sub-universe sees the same dict shape the entry-page universe got.
+        import json as _json
+        sub_apis: list[dict[str, Any]] = []
+        for entry in sub_result.network_log or []:
+            if not isinstance(entry, dict):
+                continue
+            raw_body = entry.get("body")
+            parsed_body: Any = raw_body
+            if isinstance(raw_body, str) and raw_body.strip().startswith(("{", "[")):
+                try:
+                    parsed_body = _json.loads(raw_body)
+                except Exception:
+                    parsed_body = raw_body
+            sub_apis.append(
+                {
+                    "url": entry.get("url", ""),
+                    "body": parsed_body,
+                    "status": entry.get("status"),
+                    "content_type": entry.get("content_type"),
+                }
+            )
+        return sub_html, sub_apis
+
+    try:
+        outcome = await explore_universe(
+            universe=universe,
+            property_context=property_context,
+            property_id=ctx.property_id or "unknown",
+            api_extractor=analyze_api_with_llm,
+            dom_extractor=analyze_dom_with_llm,
+            link_fetcher=_adapter_link_fetcher,
+            entry_html=html,
+            profile=getattr(ctx, "profile", None),
+        )
+    except Exception as exc:  # pragma: no cover — defensive guard
+        log_attempt("universe:explore_failed", "errored", reason=str(exc)[:200])
+        result.errors.append(f"universe-explore-error: {exc}")
+        return
+
+    # Merge explorer telemetry into the adapter-level lists so the existing
+    # post-extraction wiring (profile updater, cost ledger, run report)
+    # picks them up without changes.
+    llm_interactions.extend(outcome.llm_interactions)
+    llm_field_mappings.extend(outcome.llm_field_mappings)
+    llm_analysis_results.update(outcome.llm_analysis_results)
+    llm_navigation_hints.extend(outcome.llm_navigation_hints)
+
+    # Forward the explorer's tier_attempts as adapter tier_attempts so the
+    # per-property report shows the new path as just more sub-tiers.
+    for attempt in outcome.tier_attempts:
+        log_attempt(
+            attempt.get("tier_key", "universe:unknown"),
+            attempt.get("outcome", "ran_empty"),
+            units=int(attempt.get("units_found") or 0),
+            reason=str(attempt.get("reason") or ""),
+            duration_ms=int(attempt.get("duration_ms") or 0),
+        )
+
+    # Forward debug payload (only populated when JUGNU_UNIVERSE_DEBUG is on)
+    # so the experiment harness can dump it per property.
+    if getattr(outcome, "debug", None):
+        result._universe_debug = outcome.debug  # type: ignore[attr-defined]
+
+    if outcome.units:
+        result.units = outcome.units
+        result.tier_used = "TIER_4_UNIVERSE"
+        result.winning_url = outcome.winning_url or ctx.base_url
+        if outcome.quality is not None:
+            # Carry the explorer's averaged confidence through, but cap at
+            # 0.85 so universe-derived results never outrank a deterministic
+            # tier on confidence-based downstream decisions.
+            result.confidence = min(0.85, max(0.5, outcome.quality.confidence))
+        else:
+            result.confidence = 0.6
+        result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
+        result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
+        result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
+
+
 def _has_unit_signals(items: list[dict[str, Any]]) -> bool:
     """Check if a list of dicts has enough unit/floorplan signals to be worth parsing."""
     if not items:
@@ -888,13 +1050,30 @@ class GenericAdapter:
         llm_css_selectors: dict[str, Any] | None = None
         llm_navigation_hints: list[str] = []
 
+        # ── JUGNU_LLM_TIER_MODE mode dispatch ─────────────────────────────
+        # legacy   = run only 6a/6b/6c (default — zero behaviour change)
+        # dual     = run 6a/6b/6c first; if empty, fall through to 6d
+        # universe = skip 6a/6b/6c entirely and run only 6d
+        # HOT-profile bypass: a HOT profile with a working deterministic
+        # tier already returned at the profile_replay block above. If we're
+        # past that point and the profile is HOT, the deterministic path
+        # missed — drift case — and we treat the explorer as needed
+        # regardless of mode (per spec §13.5).
+        import os as _os
+        _mode = (_os.getenv("JUGNU_LLM_TIER_MODE") or "legacy").strip().lower()
+        if _mode not in ("legacy", "dual", "universe"):
+            _mode = "legacy"
+        _log_attempt(f"generic:llm_mode_{_mode}", "ran_units", reason=f"mode={_mode}")
+
         # Sub-tier 6a: targeted API analysis ------------------------------
         # For each captured API response with unit-like signals that the
         # deterministic parsers couldn't unwrap, ask the LLM to both
         # extract units AND return json_paths + response_envelope that we
         # can replay deterministically on the next run (zero LLM cost).
         targeted_units: list[dict[str, Any]] = []
-        if api_responses and api_llm_budget > 0:
+        # In universe-only mode we skip 6a/6b/6c entirely — the explorer
+        # block below handles all LLM extraction.
+        if _mode != "universe" and api_responses and api_llm_budget > 0:
             t0 = _time.monotonic()
             api_calls_made = 0
             for resp in api_responses:
@@ -965,7 +1144,7 @@ class GenericAdapter:
         # the LLM to return units AND CSS selectors we can replay next run.
         dom_units = []
         dom_section_html = _extract_rent_dom_section(html) if html else None
-        if dom_section_html and dom_llm_budget > 0:
+        if _mode != "universe" and dom_section_html and dom_llm_budget > 0:
             t0 = _time.monotonic()
             try:
                 dom_units, selectors, interaction = await analyze_dom_with_llm(
@@ -1004,48 +1183,71 @@ class GenericAdapter:
         # Sub-tier 6c: monolithic fallback --------------------------------
         # Only fires when 6a + 6b both returned empty. This is the legacy
         # "send full HTML + top-3 APIs" prompt — broadest coverage, highest
-        # token cost, so it runs last.
-        t0 = _time.monotonic()
-        try:
-            llm_input = prepare_llm_input(html, api_responses, property_context)
-            llm_units, hints, _raw, interaction = await extract_with_llm(
-                llm_input,
-                property_id=ctx.property_id or "unknown",
+        # token cost, so it runs last. Skipped in universe-only mode.
+        if _mode != "universe":
+            t0 = _time.monotonic()
+            try:
+                llm_input = prepare_llm_input(html, api_responses, property_context)
+                llm_units, hints, _raw, interaction = await extract_with_llm(
+                    llm_input,
+                    property_id=ctx.property_id or "unknown",
+                )
+                if interaction:
+                    llm_interactions.append(interaction)
+                # Capture navigation_hint (Phase 3 + Phase 5) so scrape_jugnu's
+                # link-hop can prioritise the URL the LLM just told us about.
+                if isinstance(hints, dict):
+                    nav = hints.get("navigation_hint") or ""
+                    if nav:
+                        llm_navigation_hints.append(str(nav))
+                _log_attempt(
+                    "generic:llm",
+                    "ran_units" if llm_units else "ran_empty",
+                    units=len(llm_units or []),
+                    reason="" if llm_units else "LLM returned no structured units",
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if llm_units:
+                    result.units = llm_units
+                    result.tier_used = "TIER_4_LLM"
+                    result.winning_url = ctx.base_url
+                    result.confidence = min(0.75, 0.5 + 0.04 * len(llm_units))
+                    result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
+                    result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
+                    result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
+                    if hints:
+                        result._llm_hints = hints  # type: ignore[attr-defined]
+                    return result
+            except Exception as exc:
+                _log_attempt(
+                    "generic:llm",
+                    "errored",
+                    reason=str(exc)[:200],
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                result.errors.append(f"llm-tier-error: {exc}")
+
+        # ── Sub-tier 6d: site-universe explorer (new — JUGNU_LLM_TIER_MODE) ──
+        # Triggered in:
+        #   - "universe" mode: always (no 6a/6b/6c above ran).
+        #   - "dual"     mode: only if 6a/6b/6c all returned empty.
+        # In "legacy" mode this whole block is a no-op so behaviour matches
+        # the pre-enhancement adapter exactly.
+        if _mode in ("dual", "universe"):
+            await _run_universe_explorer(
+                html=html,
+                api_responses=api_responses,
+                ctx=ctx,
+                property_context=property_context,
+                result=result,
+                llm_interactions=llm_interactions,
+                llm_field_mappings=llm_field_mappings,
+                llm_analysis_results=llm_analysis_results,
+                llm_navigation_hints=llm_navigation_hints,
+                log_attempt=_log_attempt,
             )
-            if interaction:
-                llm_interactions.append(interaction)
-            # Capture navigation_hint (Phase 3 + Phase 5) so scrape_jugnu's
-            # link-hop can prioritise the URL the LLM just told us about.
-            if isinstance(hints, dict):
-                nav = hints.get("navigation_hint") or ""
-                if nav:
-                    llm_navigation_hints.append(str(nav))
-            _log_attempt(
-                "generic:llm",
-                "ran_units" if llm_units else "ran_empty",
-                units=len(llm_units or []),
-                reason="" if llm_units else "LLM returned no structured units",
-                duration_ms=int((_time.monotonic() - t0) * 1000),
-            )
-            if llm_units:
-                result.units = llm_units
-                result.tier_used = "TIER_4_LLM"
-                result.winning_url = ctx.base_url
-                result.confidence = min(0.75, 0.5 + 0.04 * len(llm_units))
-                result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
-                result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
-                result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
-                if hints:
-                    result._llm_hints = hints  # type: ignore[attr-defined]
+            if result.units:
                 return result
-        except Exception as exc:
-            _log_attempt(
-                "generic:llm",
-                "errored",
-                reason=str(exc)[:200],
-                duration_ms=int((_time.monotonic() - t0) * 1000),
-            )
-            result.errors.append(f"llm-tier-error: {exc}")
 
         # All LLM sub-tiers empty — surface everything we learned so the
         # profile updater (Phase 4) can still record blocked endpoints and

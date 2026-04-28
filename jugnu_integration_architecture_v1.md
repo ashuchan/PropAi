@@ -1,8 +1,10 @@
 # PropAi × Jugnu — Integration Architecture v1
 
 **Author:** ashuchan
-**Date:** 2026-04-25
+**Date:** 2026-04-25 (rev 2026-04-26 — all jugnu-side gaps shipped)
 **Scope:** Replace PropAi's in-tree scraper (`ma_poc/scripts/jugnu_runner.py` + `entrata.py` + `extraction/` + `templates/` + `pms/adapters/`) with a thin shell around the standalone Jugnu library, while preserving PropAi's V2 output contract, identity resolution, state diff, carry-forward, and reporting.
+
+> **Status (rev 2026-04-26):** all five jugnu library changes proposed in §4 have landed. PropAi-side scaffolding (`ma_poc/jugnu_poc/`) is the next step.
 
 ---
 
@@ -240,88 +242,99 @@ Per direction: no `parent_record` concept inside Jugnu. The schema IS a property
 
 ### Solvable via prompt enrichment
 
-These are gaps the library would normally close with new fields, but where threading more context into the existing prompts achieves the same outcome at zero cost to Jugnu's surface area.
+These are gaps the library would normally close with new fields, but where threading more context into the existing prompts achieves the same outcome at zero cost to Jugnu's surface area. **All entries shipped 2026-04-26.**
 
-| # | PropAi need | Prompt-enrichment fix | Library change still needed? |
+| # | PropAi need | What landed in jugnu | Status |
 |---|---|---|---|
-| 4 | **Per-property context in LLM prompts** (city, state, pmc, property_name, expected_total_units) | Inject `CrawlInput.metadata` as a dedicated `{input_metadata}` block in **every** Spark prompt. The prompt sees: "You are extracting from a property the caller already knows is named 'San Artes Apartments' in Scottsdale AZ 85255, managed by Mark-Taylor, with ~46 units expected." This anchors `proj_name`, suppresses LLM hallucination of address fields, and lets the model sanity-check unit counts against the expected total. | YES — small: thread `CrawlInput.metadata` through `discovery_llm`, `extraction_llm`, `external_ranker_llm` as a template variable. ~30 LOC. |
-| 6 | **Blocked-endpoint learning** ("this API is noise, don't reanalyze") | Prompt-1 (discovery) already accepts `{known_noise_patterns}` from SkillMemory. Per-URL noise can ride in the per-URL ScrapeProfile and be passed into Prompt-1 as `{url_specific_noise}`. The LLM downranks them deterministically. Smart-trigger consolidation already promotes confirmed noise to skill-wide. | NO library schema change — just include the per-URL profile's `api_hints.confirmed_endpoints` (negated set) as another prompt fragment. |
-| 9 | **Junk filters** (`MODULE_*`, "Lease Magnet", `[Riedman]`, stop-word unit numbers) | `Skill.negative_keywords` is plumbed into all extraction prompts as: "REJECT any record whose floor_plan_name or unit_id matches these substrings: {negative_keywords}". Already drafted into the `custom_instructions` above. The LLM filters at extraction time; deterministic adapters (`schema_normalizer`) also apply the list as a final safety net. | YES — small: wire `Skill.negative_keywords` into both Spark prompt templates AND `glow/schema_normalizer.py`. The wiring exists in the schema; it just isn't consumed yet. |
-| 10 | **Per-field validators** (beds [0,7], baths step 0.5, area [150,10000], rent>1, zip 5 digits) | Embed bounds + reject rules directly in `custom_instructions` (already drafted above) AND in the `OutputSchema.json_schema`. Prompt-2 already receives `{output_schema_json}` — passing the json_schema with `minimum`/`maximum`/`pattern` constraints lets the LLM self-correct. | NO library change required if we treat `custom_instructions` as the contract. **Optional improvement**: have `validation/schema_gate.py` actually run `jsonschema` against `OutputSchema.json_schema` (it's currently unused). One PR, ~15 LOC. |
-| 5 | **Deterministic LLM-mapping replay** (`json_paths`, `response_envelope`, `success_count`) — saves dollars per run after warm-up | Cannot be solved by prompt enrichment alone — replay is by definition zero-LLM. **However**, prompt enrichment makes Prompt-2 EMIT richer mappings: the prompt template already requires `field_mappings.api.json_paths` + `response_envelope` in the response. We just need the post-Prompt-2 crystallizer to write those onto the per-URL `ScrapeProfile`, and a Tier-1 replay adapter to consume them next run. | YES — this is the single highest-cost gap. Extend `LlmFieldMapping` with `api_url_pattern`/`json_paths`/`response_envelope`/`success_count`, and wire `glow/tiers/tier1_profile.py` to apply them. Already in Jugnu's P4/P5 plan per `context.md` §6.1 — **confirm it's actually wired** during M1. |
-| 7 | **Multi-page CTA-hop + iframe-resolve + leasing-portal redirect** (50%+ of PropAi success comes from here) | **Partially** by prompt enrichment: Prompt-1's response includes `navigation_hint`. We can have the runner act on `navigation_hint` between Jugnu calls — issue a second `Jugnu.crawl()` for the hinted URL with the parent's context preserved. This gets us the right behavior without a Jugnu library change, at the cost of two crawl roundtrips per CTA-hop site. | EVENTUALLY YES — Jugnu's `GlowResolver` is documented in §6.1 to do CTA-hop/iframe/redirect, but the current `crawler.py:107-113` only calls it once on a single fetch. Long-term fix: wire `GlowResolver` to BFS over `SkillMemory.high_confidence_link_keywords` with per-page network re-observation, capped by a new `max_internal_pages` setting. **Workable without this for M1-M2 via the navigation_hint loop.** |
+| 4 | **Per-property context in LLM prompts** (city, state, pmc, property_name, expected_total_units) | New `jugnu/spark/input_metadata.py` formatter. `CrawlInput.metadata` is read by `crawler._crawl_url` and threaded into Prompt-1/2/3/4 as `{input_metadata}`. Templates updated. Coverage in `tests/test_spark/test_prompt_enrichment.py`. | ✅ shipped |
+| 6 | **Blocked-endpoint learning** ("this API is noise, don't reanalyze") | New `ApiHints.blocked_endpoints` list. Prompt-1's `improvement_signal.misleading_patterns` are promoted into the per-URL profile by `crawler._record_blocked_endpoints`. Discovery prompt receives them as `{url_specific_noise}`. `KnownApiAdapter` gains a `blocked_endpoints` short-circuit and `GenericAdapter` plumbs the per-URL list through. Coverage in `tests/test_glow/test_replay_and_filters.py`. | ✅ shipped |
+| 9 | **Junk filters** (`MODULE_*`, "Lease Magnet", `[Riedman]`, stop-word unit numbers) | `Skill.negative_keywords` rendered into all six prompt templates. New `filter_records_by_negative_keywords` in `glow/schema_normalizer.py` runs as a final safety net after extraction AND after merge in `crawler._crawl_url`. `WarmupOrchestrator` and `MemoryConsolidator` also re-add caller-supplied keywords as a noise floor so an LLM can't silently drop them. | ✅ shipped |
+| 10 | **Per-field validators** (beds [0,7], baths step 0.5, area [150,10000], rent>1, zip 5 digits) | `passes_schema_gate` now also runs `jsonschema` (Draft 2020-12) per-record against `OutputSchema.json_schema`. Soft-imports `jsonschema` so the gate degrades to the prior minimum_fields check if the dep is missing. `jsonschema>=4.0.0` added to `pyproject.toml`. | ✅ shipped |
+| 5 | **Deterministic LLM-mapping replay** (`json_paths`, `response_envelope`, `success_count`) — saves dollars per run after warm-up | `LlmFieldMapping` extended with `api_url_pattern`, `json_paths`, `response_envelope`, `dom_selector`, `success_count`. `crystallizer` now writes per-mapping payloads (no longer collapses everything into `extraction_hint`). `ProfileReplayAdapter` gains an active `_replay_api_active` step that re-issues the stored `api_url_pattern` via httpx, walks `response_envelope`, and projects each record through the per-field `json_paths`. `success_count`/`confidence` increment on every Tier-1a hit. Coverage in `test_replay_and_filters.py`. | ✅ shipped |
+| 7 | **Multi-page CTA-hop + iframe-resolve + leasing-portal redirect** (50%+ of PropAi success comes from here) | DiscoveryLLM (Prompt-1) is now wired into `_crawl_url` between fetch and Prompt-2 — `Lantern.discover` runs once and feeds Prompt-1 with split api/link candidates. Discovery's `navigation_hint`, `ranked_apis`, `ranked_links`, `platform_guess` are exposed on `Blink.llm_interactions["discovery"]`. **Multi-page BFS itself stays runner-side via the navigation_hint loop in PropAi's `jugnu_poc/runner.py` (M3) — Jugnu still issues one fetch per `Jugnu.crawl()` call.** | ✅ Prompt-1 wired; runner-side hop loop is M3 |
 
-### Net library changes proposed to Jugnu
+### Net library changes shipped in jugnu
 
-Down from 6 in the original plan to **4 small + 1 large**:
+All five proposed changes landed. Code locations for traceability:
 
-1. **(small)** Thread `CrawlInput.metadata` into every Spark prompt as `{input_metadata}` — gap 4
-2. **(small)** Consume `Skill.negative_keywords` in Spark prompts AND `schema_normalizer` — gap 9
-3. **(small)** Run `OutputSchema.json_schema` in `validation/schema_gate.py` — gap 10 (optional)
-4. **(small)** Pass per-URL `ScrapeProfile.api_hints.blocked_endpoints` into Prompt-1 as `{url_specific_noise}` — gap 6
-5. **(large)** Confirm/wire `LlmFieldMapping` with `json_paths`/`response_envelope`/`success_count` + Tier-1 replay adapter — gap 5
+1. ✅ Thread `CrawlInput.metadata` into every Spark prompt — gap 4
+   `jugnu/spark/input_metadata.py`, `crawler.py`, all four Spark `*_llm.py` modules, all four prompt templates
+2. ✅ Consume `Skill.negative_keywords` in Spark prompts + `schema_normalizer` — gap 9
+   All six prompt templates, `crawler.py` (post-extract + post-merge filter), `glow/schema_normalizer.py`, `spark/warmup.py`, `spark/consolidator.py`
+3. ✅ Run `OutputSchema.json_schema` in `validation/schema_gate.py` — gap 10
+   Per-record validation; `jsonschema>=4.0.0` added to `pyproject.toml`
+4. ✅ `ApiHints.blocked_endpoints` + `{url_specific_noise}` in Prompt-1 + `KnownApiAdapter` short-circuit — gap 6
+   `profile.py`, `crawler._record_blocked_endpoints`, `glow/tiers/tier1_api.py`, `glow/generic_adapter.py`, `discovery.txt`
+5. ✅ `LlmFieldMapping` extension + active API replay in `tier1_profile` — gap 5
+   `profile.py`, `spark/crystallizer.py`, `glow/tiers/tier1_profile.py`
 
-Items 1, 2, 3, 4 are all "thread one more variable into a prompt template." The only design discussion is item 5, and that's already in Jugnu's own plan.
+**Side fixes that landed with the gap work:**
+- DiscoveryLLM (Prompt-1) was previously dead code — now invoked between fetch and Prompt-2 whenever deterministic extraction came back empty. `navigation_hint` lands on `Blink.llm_interactions["discovery"]` so the runner-side hop loop has signal to act on.
+- `Blink.llm_interactions` now reliably carries a structured `discovery` block (with `ranked_apis`, `ranked_links`, `navigation_hint`, `platform_guess`) plus `external_candidates` and `merge_decisions` when those tiers fire.
+
+**Test coverage delta:** 109 → 129 tests (10 new replay/filter tests, 10 new prompt-enrichment tests). All green.
 
 The previously-proposed `Blink.parent_record` is **dropped** per direction.
 The previously-proposed multi-page BFS in `GlowResolver` is **deferred** — handled in the runner via the `navigation_hint` loop until Jugnu's resolver is wired.
 
 ---
 
-## 5. Prompt enrichment — concrete additions per prompt
+## 5. Prompt enrichment — what each prompt now receives
 
-Where each enrichment lands, so Jugnu maintainers see exactly what to thread through.
+All enrichments below shipped 2026-04-26. Variable names are the literal `{placeholder}` keys in the templates under `jugnu/spark/prompts/`.
 
-### Prompt-1 (Discovery)
-- `{input_metadata}` — property name, city, state, pmc, expected_total_units (NEW)
-- `{url_specific_noise}` — per-URL ScrapeProfile blocked_endpoints (NEW)
-- `{known_noise_patterns}` — already from SkillMemory
-- `{skill_memory_prompt1_context}` — already from SkillMemory
-- `{negative_keywords}` — Skill.negative_keywords (NEW, downrank links/APIs matching these)
+### Prompt-1 (Discovery) — `discovery.txt` ✅ wired into crawler
+- `{input_metadata}` — caller-supplied per-URL JSON (property name, city, state, pmc, expected_total_units)
+- `{url_specific_noise}` — per-URL `ScrapeProfile.api_hints.blocked_endpoints` (learned from prior runs' `improvement_signal.misleading_patterns`)
+- `{known_noise_patterns}` — skill-wide noise from SkillMemory
+- `{prompt1_context}` — dense paragraph from SkillMemory.prompt1_context
+- `{negative_keywords}` — `Skill.negative_keywords` (downrank links/APIs matching these substrings)
+- `{api_candidates_json}` / `{link_candidates_json}` — populated from `Lantern.discover()` (api_endpoints + ranked_links) so Prompt-1 has real candidates to score
 
-### Prompt-2 (Extraction)
-- `{input_metadata}` — same property context (NEW). Anchors proj_name, suppresses address hallucination.
-- `{output_schema_json}` — already passed; ensure `json_schema` constraints (min/max/pattern) come through (NEW: enforce schema is the rich one)
-- `{negative_keywords}` — REJECT records matching these substrings (NEW)
-- `{custom_instructions}` — Skill.custom_instructions (already passed but verify it's the full text, not truncated)
-- `{confirmed_field_synonyms_json}` — already from SkillMemory
-- `{skill_memory_prompt2_context}` — already from SkillMemory
+### Prompt-2 (Extraction) — `extraction.txt`
+- `{input_metadata}` — anchors proj_name and address fields against caller-known truth
+- `{output_schema_json}` — full `OutputSchema.model_dump()` including the rich `json_schema` constraints (min/max/pattern) so the LLM self-corrects
+- `{negative_keywords}` — explicit REJECT directive
+- `{custom_instructions}` — full `Skill.custom_instructions` text
+- `{confirmed_field_synonyms_json}` / `{field_extraction_hints_json}` — from SkillMemory
+- `{prompt2_context}` — dense paragraph from SkillMemory.prompt2_context
 
-### Prompt-3 (Merge)
-- `{input_metadata}` — same property context (NEW). Helps disambiguate "is unit 101 in this run the same unit 101 from last run, or did we crawl a different building."
-- `{merging_keys}` — already passed
+### Prompt-3 (Merge) — `merge.txt`
+- `{input_metadata}` — disambiguates "same property as last run vs different building"
+- `{negative_keywords}` — REJECT during merge
+- `{primary_key}`, `{merging_keys}`, `{confirmed_field_synonyms_json}`, `{field_extraction_hints_json}` — already in template
 
-### Prompt-4 (External)
-- `{input_metadata}` (NEW) — same as above
-- `{negative_keywords}` (NEW)
-- Already gets `{known_noise_patterns}` and `{skill_memory_prompt4_context}`
+### Prompt-4 (External) — `external_rank.txt`
+- `{input_metadata}` — context for "is this external link plausibly about *this* property"
+- `{negative_keywords}` — never recommend a link matching these
+- `{known_noise_patterns}`, `{prompt4_context}` — already in template
 
-### Prompt-5 (Warmup)
-- No per-URL context (it's pre-URL by design)
-- `{negative_keywords}` (NEW) so Prompt-5 can seed `known_noise_patterns` from the skill's own blocklist
+### Prompt-5 (Warmup) — `warmup.txt`
+- No per-URL context (pre-URL by design)
+- `{negative_keywords}` — seeds the skill's noise floor; `WarmupOrchestrator` re-adds them post-LLM so a forgetful model can't drop them
 
-### Prompt-6 (Consolidation)
-- No per-URL context (it's a batch summarizer)
-- Already aware of negative_keywords via SkillMemory
+### Prompt-6 (Consolidation) — `consolidation.txt`
+- No per-URL context (batch summarizer)
+- `{negative_keywords}` — kept in `known_noise_patterns` as a floor; `MemoryConsolidator` re-adds them after applying the LLM's response, same defensive pattern as Prompt-5
 
 ---
 
 ## 6. Suggested milestones
 
-- **M1 — wire dependency, run hello-world** (1-2 days)
-  Add Jugnu as path dep; define `PROPAI_SKILL`; run `jugnu_poc_runner.py --limit 1` against one known-good RentCafe property; verify `Blink.records[0]` contains property + nested units; document gaps observed in practice; verify `LlmFieldMapping` replay actually works (gap 5).
+- **M1 — scaffold `ma_poc/jugnu_poc/` and run hello-world** (1-2 days) — *next*
+  Add Jugnu as path dep; create `jugnu_poc/{skill,runner,property_transform,memory_store,profile_store_adapter}.py`; define `PROPAI_SKILL`; run `jugnu_poc_runner.py --limit 1` against one known-good RentCafe property; verify `Blink.records[0]` contains property + nested units; verify `Blink.llm_interactions["discovery"]` exposes `navigation_hint` when extraction comes back empty.
 
-- **M2 — close caller-side gaps + ship prompt enrichments upstream** (3-5 days)
-  Build `property_transform`, `memory_store`, `profile_store_adapter`; port V2 normalization; open Jugnu PRs for prompt-enrichment items 1, 2, 4 (small ones); land them; rerun `--limit 5` and compare output to `jugnu_runner.py --limit 5` byte-for-byte (or document the diffs).
+- **M2 — V2 normalization + parity comparison** (3-5 days)
+  Port V2 normalization into `property_transform.build_v2_property()`; rerun `--limit 5` and compare output to `jugnu_runner.py --limit 5` byte-for-byte (or document the diffs). Confirm the negative-keyword filter and json_schema gate actually drop the junk PropAi was previously dropping at write time.
 
 - **M3 — multi-page navigation via navigation_hint loop** (2-3 days)
-  Implement the runner-side hop: when `Blink.tier_used == "llm"` and `llm_interactions` shows a `navigation_hint`, issue a second `Jugnu.crawl()` for the hinted URL with the parent's metadata. This gives us multi-page support without waiting for Jugnu's `GlowResolver` BFS work.
+  Implement the runner-side hop: when `Blink.tier_used == "llm_extraction"` (or earlier tiers) returns empty AND `Blink.llm_interactions[0]["discovery"]["navigation_hint"]` is non-empty, issue a second `Jugnu.crawl()` for the hinted URL with the parent's metadata. The discovery payload also includes `ranked_apis` and `ranked_links` — runner can hop on the highest-confidence link/API instead of (or in addition to) the free-text hint. This gives us multi-page support without waiting for Jugnu's `GlowResolver` BFS work.
 
 - **M4 — soak test on full 500** (1 week)
-  Run both pipelines on the full CSV. Compare success rate, LLM cost, unit counts. Switch over only when Jugnu is at parity or better.
+  Run both pipelines on the full CSV. Compare success rate, LLM cost, unit counts. Watch the new `LlmFieldMapping.success_count` field — by run 3 it should be incrementing on the same per-URL mappings, proving Tier-1a replay is the bypass path for repeat crawls. Switch over only when Jugnu is at parity or better.
 
-- **M5 — propose Jugnu PR for `LlmFieldMapping` replay** (gap 5) if not already wired
-  This is the single biggest cost lever. After M4 we'll have data on how often we'd hit this fast path.
+- **M5 — internal multi-page BFS in jugnu** (deferred — runner-side hop is enough until we measure cost)
+  Optional follow-up: move the navigation_hint loop from PropAi's runner into jugnu's `GlowResolver` itself, capped by a new `JugnuSettings.max_internal_pages`. Only worth doing if multiple skills end up needing the same loop.
 
 - **M6 — eventual switch-off**
   Once Jugnu is at parity, delete `ma_poc/scripts/jugnu_runner.py`, `entrata.py`, `extraction/`, `templates/`, `pms/adapters/`. Keep `identity.py`, `state_store.py`, `schema_v2.py`, `validation.py`, `scripts/daily_runner.py` only if anything still depends on them — otherwise also retire.
@@ -332,7 +345,191 @@ Where each enrichment lands, so Jugnu maintainers see exactly what to thread thr
 
 1. **State directory layout during the POC** — share `data/state/` with the existing `jugnu_runner.py` (so they're directly comparable run-over-run) or use `data/jugnu_poc/state/` so they can run in parallel without colliding?
 2. **Jugnu dependency form** — local path install (`file:///c:/Users/.../Jugnu`) for the POC, or do you want to push Jugnu to a private git remote first and pin to a tag?
-3. **Where prompt enrichment PRs land** — do you own the Jugnu repo and merge directly, or do these go in as PRs that need review by someone else?
+3. **Vision (banner capture, accuracy sample, Tier-5 fallback)** — `Skill.vision_settings` and `Skill.screenshot_settings` exist on the schema but **no jugnu code path consumes them today**. `LLMProvider.from_settings(skill.llm_settings)` only constructs the text provider. Defer vision entirely for M1‑M4 (text-only pipeline). When PropAi needs PR-04 parity, we'll either (a) wire a `VisionLLMProvider` into a new Tier‑5 adapter inside jugnu, or (b) keep vision PropAi-side and call jugnu only for text extraction — TBD when we have soak data on text-only success rate.
+
+---
+
+## 8. LLM provider configuration
+
+PropAi today drives Anthropic and OpenRouter via dedicated provider classes (`ma_poc/llm/anthropic.py`, `ma_poc/llm/openrouter.py`). Jugnu wraps `litellm.acompletion()` once at `Jugnu.__init__` time via `LLMProvider.from_settings(skill.llm_settings)`. The two reconcile cleanly because litellm dispatches on the model-prefix in the `model` string.
+
+### Provider selection — via `Skill.llm_settings.model`
+
+| Provider | `model` string (litellm format) | Notes |
+|---|---|---|
+| Anthropic | `claude-haiku-4-5-20251001`, `claude-sonnet-4-6`, `claude-opus-4-7` | Native Anthropic API. No prefix required. |
+| OpenRouter | `openrouter/google/gemini-2.5-flash`, `openrouter/anthropic/claude-haiku-4-5` | `openrouter/` prefix triggers OpenRouter dispatch. |
+| Azure OpenAI | `azure/<deployment-name>` | Needs `AZURE_API_KEY` + `AZURE_API_BASE` env vars. |
+| Local Ollama | `ollama/llama3.1:70b` | Needs `OLLAMA_API_BASE`. |
+
+`PROPAI_SKILL` ships with Anthropic Haiku 4.5 as default. To switch a single run to OpenRouter without editing the skill, override via env at runner startup (in `jugnu_poc/skill.py` module scope):
+
+```python
+def _resolve_models() -> tuple[str, str]:
+    provider = os.getenv("LLM_PROVIDER", "anthropic").lower()
+    if provider == "openrouter":
+        return (
+            os.getenv("OPENROUTER_MODEL", "openrouter/google/gemini-2.5-flash"),
+            os.getenv("OPENROUTER_VISION_MODEL", "openrouter/google/gemini-2.5-flash"),
+        )
+    if provider == "azure":
+        return (
+            f"azure/{os.getenv('AZURE_OPENAI_DEPLOYMENT_GPT4O_MINI', 'gpt-4o-mini')}",
+            f"azure/{os.getenv('AZURE_OPENAI_DEPLOYMENT_GPT4O_VISION', 'gpt-4o')}",
+        )
+    return (
+        os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
+        os.getenv("ANTHROPIC_VISION_MODEL", "claude-haiku-4-5-20251001"),
+    )
+```
+
+### Env-key bridging for PropAi infra-style names (Option B)
+
+litellm only auto-discovers canonical names: `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `AZURE_API_KEY`, `AZURE_API_BASE`. PropAi infra deploys hyphenated names like `OPENROUTER-api-key-production`. PropAi's existing in-tree code already uses canonical names (`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`), so if your local dev env exports those, nothing to do. For deployed environments where only the hyphenated name is set, add a one-shot bridge at `jugnu_poc/skill.py` module load:
+
+```python
+def _bridge_keys() -> None:
+    aliases = {
+        "OPENROUTER_API_KEY":  ["OPENROUTER_API_KEY_PRODUCTION", "OPENROUTER-api-key-production"],
+        "ANTHROPIC_API_KEY":   ["ANTHROPIC_API_KEY_PRODUCTION",  "ANTHROPIC-api-key-production"],
+        "AZURE_API_KEY":       ["AZURE_OPENAI_API_KEY"],
+        "AZURE_API_BASE":      ["AZURE_OPENAI_ENDPOINT"],
+    }
+    for canonical, candidates in aliases.items():
+        if os.getenv(canonical):
+            continue
+        for alt in candidates:
+            val = os.getenv(alt)
+            if val:
+                os.environ[canonical] = val
+                break
+
+_bridge_keys()  # at import time, before Skill is constructed
+```
+
+This stays caller-side — no jugnu library change. Option A (rename at deploy-time injection) and Option C (pass `api_key` via `LiteLLMSettings.extra_params`) are also valid; Option B is preferred because it's the smallest behavioural surface and survives env-var renames in either direction.
+
+### Cost accounting
+
+Per the accepted decision, we leverage litellm's `completion_cost(completion_response=...)` even when it returns `0.0` (unknown OpenRouter pricing, off-catalog Azure deployments). `LLMProvider.complete()` already records this via `CostLedger.record(stage=..., cost_usd=...)`, keyed per-URL per-stage. PropAi-side `runner.py` aggregates by `inputs[url].metadata["canonical_id"]` for per-property cost reporting. No additional jugnu-side work needed; the inaccuracy is acceptable given the alternative (per-provider price tables maintained inside jugnu) is high-effort low-value.
+
+### Token management — chunking is jugnu's responsibility
+
+`jugnu/spark/content_cleaner.py:html_to_fit_markdown` is the contract: Spark prompts never see raw HTML, only fit-markdown that the cleaner sized to fit a target token budget. PropAi's `extraction/tier4_llm.py` 60K truncation is **obsolete** in the new pipeline — delete it during the M6 switch-off. Per the accepted decision, no jugnu changes for chunking.
+
+### Image size limits — applies only when vision is wired
+
+Anthropic image API limit: 5 MB base64. OpenRouter vision: 20 MB. Today neither matters (vision deferred per §7). If/when we wire jugnu vision in M5+, the caller (or a new `VisionLLMProvider` inside jugnu) must downsample/crop before the API call — same logic PropAi already has in `ma_poc/llm/images.py:check_size`.
+
+---
+
+## 9. Proxy configuration
+
+PropAi's existing pipeline depends on Bright Data residential proxies (per `.env.example`: `PROXY_PROVIDER=brightdata`, `PROXY_HOST/PORT/USERNAME/PASSWORD`). Jugnu now ships a matching abstraction so the same env vars (or a `Skill.proxy_settings` block) can drive proxy behaviour without any caller-side glue.
+
+### Architecture
+
+`jugnu/ember/proxy.py` defines a `ProxyConfig` value object plus a `ProxyProvider` ABC. Three implementations cover the common cases, and any custom selection / sessioning strategy can be plugged in by subclassing `ProxyProvider`:
+
+| Provider | When to use |
+|---|---|
+| `StaticProxyProvider(config)` | One proxy used for every fetch. The classic single-proxy case. |
+| `RotatingProxyProvider([cfg, ...])` | Health-scored pool. Picks the healthiest non-quarantined proxy per fetch; `severity="hard"` failures (403/captcha/auth) penalise faster than soft failures (timeouts, 5xx). Wraps the existing `ProxyPool`. |
+| `BrightDataProvider(customer_id, zone, password, ...)` | Bright Data residential / datacenter. Assembles their `brd-customer-X-zone-Y[-country-Z][-session-S]` username pattern. Optional `country` filter. With `sticky_session_per_url=True` (default) the session ID is `sha256(url)[:16]` so multi-page crawls of the same property reuse the same exit IP, but two different properties land on different IPs. |
+
+Ember calls `provider.select(url)` per fetch (Playwright via `new_context(proxy=...)` for per-context rotation, httpx via `AsyncClient(proxy=...)` with auth baked into the URL via `to_httpx_url()`), and reports outcomes back via `report_success` / `report_failure`. Failure severity is classified by `classify_failure_severity(status_code, error)` — 403/407/captcha → hard, everything else → soft.
+
+### How a caller wires it
+
+**Option A — declarative via Skill** (simplest; matches the Skill pattern for everything else):
+
+```python
+from jugnu.skill import ProxySettings, Skill
+
+PROPAI_SKILL = Skill(
+    name="propai_multifamily",
+    ...,
+    proxy_settings=ProxySettings(
+        brightdata_customer_id="hl_xxxxxxx",
+        brightdata_zone="residential1",
+        brightdata_password="...",
+        brightdata_country="us",
+        brightdata_sticky_per_url=True,   # default
+    ),
+)
+
+jugnu = Jugnu(PROPAI_SKILL, ...)         # provider built from settings automatically
+```
+
+`ProxySettings` selection precedence: `enabled=False` → no proxy; `brightdata_*` populated → BrightData; `rotating_servers` populated → RotatingProxyProvider; `server` populated → StaticProxyProvider; otherwise no proxy.
+
+**Option B — explicit provider injection** (use when you want a custom selection strategy or want to share one provider across multiple Skills/Jugnus):
+
+```python
+from jugnu.ember.proxy import BrightDataProvider, build_proxy_provider_from_env
+
+# Option B1: PropAi already configures Bright Data via env vars matching its
+# .env.example — pick them up directly, no Skill changes needed.
+provider = build_proxy_provider_from_env()
+
+# Option B2: explicit construction
+provider = BrightDataProvider(
+    customer_id=os.environ["PROXY_BRIGHTDATA_CUSTOMER_ID"],
+    zone=os.environ["PROXY_BRIGHTDATA_ZONE"],
+    password=os.environ["PROXY_PASSWORD"],
+    country="us",
+)
+
+jugnu = Jugnu(PROPAI_SKILL, proxy_provider=provider)   # explicit kwarg wins over Skill.proxy_settings
+```
+
+### Environment variables recognised by `build_proxy_provider_from_env`
+
+| Var | Purpose |
+|---|---|
+| `PROXY_PROVIDER` | `brightdata` \| `rotating` \| `static` (default) — selects the dispatch arm |
+| `PROXY_SERVER` | Static-mode server URL (e.g. `http://prox.example:8080`) |
+| `PROXY_USERNAME` / `PROXY_PASSWORD` | Static-mode credentials (also used as Bright Data password fallback) |
+| `PROXY_POOL_URLS` | Comma-separated list for rotating mode; entries may include `user:pass@host:port` |
+| `PROXY_BRIGHTDATA_CUSTOMER_ID` | Bright Data customer ID (or fall back to `PROXY_USERNAME`) |
+| `PROXY_BRIGHTDATA_ZONE` | Bright Data zone name (residential / datacenter / etc.) |
+| `PROXY_BRIGHTDATA_COUNTRY` | Optional country filter (e.g. `us`) |
+| `PROXY_BRIGHTDATA_STICKY_PER_URL` | `0` to disable URL-stickiness (per-request rotation) |
+| `PROXY_HOST` / `PROXY_PORT` | Override Bright Data endpoint (defaults `brd.superproxy.io:22225`) |
+
+PropAi's existing `.env.example` already defines `PROXY_PROVIDER=brightdata`, `PROXY_HOST`, `PROXY_PORT`, `PROXY_USERNAME`, `PROXY_PASSWORD`. To activate Bright Data through jugnu without changing PropAi infra, set additionally `PROXY_BRIGHTDATA_CUSTOMER_ID` (or rely on it falling back to `PROXY_USERNAME`) and `PROXY_BRIGHTDATA_ZONE`.
+
+### GCP Secret Manager — secrets to create
+
+Create one secret per credential in the project's Secret Manager and mount each as the matching env var on the worker (Cloud Run job / GKE pod / Cloud Build step) that runs the daily scrape. Existing PropAi infra-style hyphenated names are listed where they apply; map them to the canonical jugnu env var via the `_bridge_keys()` helper from §8 if your deployment requires keeping the hyphenated form.
+
+| Secret name (suggested) | Mounted as env var | Required for | Notes |
+|---|---|---|---|
+| `proxy-provider` | `PROXY_PROVIDER` | all proxy modes | Constant `"brightdata"` for the PropAi prod path. |
+| `proxy-brightdata-customer-id` | `PROXY_BRIGHTDATA_CUSTOMER_ID` | Bright Data | Bright Data dashboard → customer page. |
+| `proxy-brightdata-zone` | `PROXY_BRIGHTDATA_ZONE` | Bright Data | Bright Data dashboard → zone name (e.g. `residential1`). |
+| `proxy-brightdata-password` (or reuse `proxy-password`) | `PROXY_PASSWORD` | Bright Data | Zone password from Bright Data. Falls back to `PROXY_PASSWORD` if `PROXY_BRIGHTDATA_PASSWORD` is unset. |
+| `proxy-brightdata-country` | `PROXY_BRIGHTDATA_COUNTRY` | Bright Data (optional) | Country filter, e.g. `us`. Omit for any country. |
+| `proxy-brightdata-sticky-per-url` | `PROXY_BRIGHTDATA_STICKY_PER_URL` | Bright Data (optional) | `"0"` to disable URL-stickiness. Default on. |
+| `proxy-host` | `PROXY_HOST` | Bright Data (optional) | Defaults to `brd.superproxy.io`. |
+| `proxy-port` | `PROXY_PORT` | Bright Data (optional) | Defaults to `22225`. |
+| `proxy-server` | `PROXY_SERVER` | static mode | Single-proxy URL when not using Bright Data. |
+| `proxy-username` | `PROXY_USERNAME` | static mode (or Bright Data fallback for customer ID) | Static-mode auth. |
+| `proxy-pool-urls` | `PROXY_POOL_URLS` | rotating mode | Comma-separated `user:pass@host:port` list of pool members. Use this when running a multi-vendor pool instead of Bright Data. |
+
+Minimum set for the PropAi production path (Bright Data with sticky session per property): `proxy-provider`, `proxy-brightdata-customer-id`, `proxy-brightdata-zone`, `proxy-brightdata-password`. Everything else is optional with safe defaults.
+
+The worker's service account needs `roles/secretmanager.secretAccessor` on each secret (or on the parent project). For Cloud Run, mount each secret with `--set-secrets PROXY_BRIGHTDATA_ZONE=proxy-brightdata-zone:latest,...`; for GKE, use a `secretKeyRef` in the pod spec; for Cloud Build, use the `availableSecrets.secretManager` block. Never bake credentials into the container image or `properties.csv`.
+
+### Failure handling and quarantine
+
+The rotating pool penalises consistently-failing proxies and quarantines them when health drops below 0.25. Hard failures (403, 407, captcha, auth errors) drop health by 0.25 each; soft failures (timeouts, 5xx, connection errors) drop by 0.05. Recoveries above 0.5 lift the quarantine. PropAi's daily-runner can therefore start the day with a fresh pool and rely on jugnu to pull noisy IPs out of rotation automatically — same behaviour as `ma_poc/scraper/proxy_manager.py` but living one layer down.
+
+### What does NOT change in PropAi
+
+- `ma_poc/scraper/proxy_manager.py` and the existing PropAi proxy code stay in place during the POC; once `jugnu_poc/runner.py` proves parity it'll be retired in M6.
+- No PropAi-side Bright Data username assembly — that's now jugnu's responsibility.
+- `daily_runner.py --proxy http://user:pass@host:port` still works after M6: pass that string into `build_proxy_provider_from_env()` (set `PROXY_SERVER=...`) or wrap it in `StaticProxyProvider(ProxyConfig.parse(s))` and inject into `Jugnu(...)`.
 
 ---
 
