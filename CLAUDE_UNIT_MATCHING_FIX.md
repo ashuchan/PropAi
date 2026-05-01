@@ -60,7 +60,7 @@ PR removed `unit_name` and `unitName` alongside `name`. The latter was correctly
 removed (floor plan name). The former are real unit identifiers in ResMan and some
 Yardi configurations.
 **Fix:** restored `unit_name` and `unitName` between `unitId` and `label`.
-(Note: these were already present in the implementation — verified as non-issue.)
+(Note: confirmed present in implementation at `_UNIT_ID_KEYS` lines 207–208.)
 
 ### Bug 4 (Import risk) — duplicate `identity_fallback.py`
 PR created `ma_poc/scripts/identity_fallback.py` without removing or deprecating

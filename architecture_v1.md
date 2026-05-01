@@ -868,6 +868,7 @@ config/
 data/
 ├── runs/{date}/                 # Per-run outputs
 └── state/                       # Persistent state (frontier, DLQ, cache)
+```
 
 ---
 
@@ -896,4 +897,3 @@ immediately eligible.
 **Grace period:** units missing from a partial scrape are not immediately marked
 disappeared. `absent_streak` is incremented per run; `disappeared` is only appended
 to the diff after `absent_streak >= disappeared_grace_days` (default: 2).
-```
