@@ -199,23 +199,27 @@ The aggregate-merge tables (`run_reports`, `llm_reports`) run outside Stage 1 be
 
 ### Per-Table Concurrency Strategy
 
-| Table | Write pattern | Multi-shard safety mechanism |
-|---|---|---|
-| `properties` | `upsert` keyed on `canonical_id` | Safe: CSV slices are disjoint by property — no two shards write the same `canonical_id` |
-| `units` | `upsert_units` keyed on `(canonical_id, unit_key)` | Safe: same disjoint-by-property guarantee |
-| `scrape_profiles` | `put` (upsert) keyed on `canonical_id` | Safe: disjoint by property |
-| `scrape_events` | upsert keyed on `event_id = sha256(canonical_id \| run_date)` | Stable hash → shard retries upsert in place, no duplicates |
-| `extraction_results` | upsert keyed on `(run_date, property_id)` | Disjoint by property |
-| `property_snapshots` | Delete-then-insert scoped to **this batch's `canonical_ids`** only | `write_properties` deletes only the cids in this shard's `properties.json`, never `WHERE run_date=X` — other shards' rows untouched |
-| `run_issues` | Delete-then-append scoped to **this batch's `canonical_ids`** | `_delete_run_rows_in_session` deletes only this shard's cids before re-appending — uses shared session so delete + insert commit atomically |
-| `run_ledger` | Delete-then-append scoped to **this batch's `canonical_ids`** | Same as `run_issues` |
-| `llm_property_details` | `on_conflict_do_update` keyed on `(run_date, property_id)` | Disjoint by property |
-| `property_reports` | `on_conflict_do_update` keyed on `(run_date, canonical_id)` | Disjoint by property |
-| `llm_diagnostics` | `on_conflict_do_update` keyed on `(run_date, canonical_id, kind)` | Disjoint by property |
-| `run_reports` | `SELECT ... FOR UPDATE` + merge into `extra.shards[shard_id]` | Serialised at the DB row level — see below |
-| `llm_reports` | `SELECT ... FOR UPDATE` + merge into `payload.shards[shard_id]` | Serialised at the DB row level — see below |
-| `runs` (registry) | `INSERT ... ON CONFLICT DO NOTHING` | First shard creates the row; subsequent shards are no-ops |
-| `dlq_entries` | `on_conflict_do_update` keyed on `property_id` | DLQ is global cross-run state; last-writer-wins is acceptable (single source of truth is the JSONL file) |
+The **Retention** column captures the durability rule enforced by `_apply_retention()` at the end of every sync (see *Retention* below). Two values:
+* `Upsert only` — current state, never trimmed.
+* `3-day rolling` — anything older than 3 days is deleted at sync end.
+
+| Table | Write pattern | Multi-shard safety mechanism | Retention |
+|---|---|---|---|
+| `properties` | `upsert` keyed on `canonical_id` | Safe: CSV slices are disjoint by property — no two shards write the same `canonical_id` | Upsert only |
+| `units` | `upsert_units` keyed on `(canonical_id, unit_key)` | Safe: same disjoint-by-property guarantee | Upsert only |
+| `scrape_profiles` | `put` (upsert) keyed on `canonical_id` | Safe: disjoint by property | Upsert only |
+| `scrape_events` | upsert keyed on `event_id = sha256(canonical_id \| run_date)` | Stable hash → shard retries upsert in place, no duplicates | 3-day rolling (by `scrape_timestamp`) |
+| `extraction_results` | upsert keyed on `(run_date, property_id)` | Disjoint by property | Not currently swept (no entry in `_apply_retention`) |
+| `property_snapshots` | Delete-then-insert scoped to **this batch's `canonical_ids`** only | `write_properties` deletes only the cids in this shard's `properties.json`, never `WHERE run_date=X` — other shards' rows untouched | 3-day rolling |
+| `run_issues` | Delete-then-append scoped to **this batch's `canonical_ids`** | `_delete_run_rows_in_session` deletes only this shard's cids before re-appending — uses shared session so delete + insert commit atomically | 3-day rolling |
+| `run_ledger` | Delete-then-append scoped to **this batch's `canonical_ids`** | Same as `run_issues` | 3-day rolling |
+| `llm_property_details` | `on_conflict_do_update` keyed on `(run_date, property_id)` | Disjoint by property | 3-day rolling |
+| `property_reports` | `on_conflict_do_update` keyed on `(run_date, canonical_id)` | Disjoint by property | Not currently swept |
+| `llm_diagnostics` | `on_conflict_do_update` keyed on `(run_date, canonical_id, kind)` | Disjoint by property | 3-day rolling |
+| `run_reports` | `SELECT ... FOR UPDATE` + merge into `extra.shards[shard_id]` | Serialised at the DB row level — see below | Not currently swept |
+| `llm_reports` | `SELECT ... FOR UPDATE` + merge into `payload.shards[shard_id]` | Serialised at the DB row level — see below | 3-day rolling |
+| `runs` (registry) | `INSERT ... ON CONFLICT DO NOTHING` | First shard creates the row; subsequent shards are no-ops | Not swept (registry is the "did this run ever exist" source of truth) |
+| `dlq_entries` | `on_conflict_do_update` keyed on `property_id` | DLQ is global cross-run state; last-writer-wins is acceptable (single source of truth is the JSONL file) | 3-day rolling (by `parked_at`) |
 
 ### The `SELECT ... FOR UPDATE` Merge Pattern
 
@@ -267,9 +271,30 @@ For `llm_reports`, top-level fields recomputed similarly:
 
 The entire concurrency model rests on one invariant: **the CSV slicing in `jugnu_shard_entry._slice_csv()` produces disjoint property sets across shards.** Each `canonical_id` appears in exactly one shard's `properties.json`. This makes every property-keyed write inherently non-conflicting. The only tables that need special serialisation (`run_reports`, `llm_reports`) are the run-level aggregates that intentionally span all shards.
 
+### Retention
+
+Every per-run table is capped at a **3-day rolling window**. Upsert-only tables (`properties`, `units`, `scrape_profiles`) hold current state and are never trimmed. The sweep is implemented as `_apply_retention(engine)` in [`ma_poc/scripts/sync_run_to_pg.py`](ma_poc/scripts/sync_run_to_pg.py) and runs through `_run_stage2("retention", ...)` immediately after the DLQ block — last step of every sync.
+
+Why the cap exists:
+1. **Storage cost** — Cloud SQL fills up quickly: ~40 MB/run for `property_snapshots`, ~100 MB/run for `llm_diagnostics`, etc. At 500 properties/day the historical tail dominates the bill within weeks.
+2. **Frontend reads only the latest run** — every active route either uses `runs.getLatestDate()` or queries upsert-only tables. Per-run history beyond a few days has no live consumer.
+3. **Re-runnable backfills** — runs older than 3 days can be re-synced from GCS (`gs://{bucket}/runs/{date}/`) on demand; we don't need them resident in DB.
+
+The cleanup uses two cutoff strategies depending on the table's keying:
+* `run_date`-keyed tables (`llm_reports`, `llm_diagnostics`, `llm_property_details`, `property_snapshots`, `run_issues`, `run_ledger`): `WHERE run_date < (today - 3 days)`. ISO date strings sort lexicographically, so the comparison is dialect-portable across Postgres and SQLite.
+* timestamp-keyed tables (`scrape_events.scrape_timestamp` is `DateTime`; `dlq_entries.parked_at` is an ISO `String(64)`): `WHERE <ts_col> < (now() - 3 days)`.
+
+**Multi-shard safety:** every shard observes the same wall-clock cutoff, so concurrent calls converge on the same end state. The sweep is idempotent — re-running on already-clean state deletes nothing.
+
+**Read-side consequence:** API routes that take a `:date` parameter (`/runs/:date/llm`, `/diff/:date`, etc.) now return **HTTP 410 Gone** with `{ status: "purged", retentionDays: 3, ... }` when the requested date is outside the window. See [`ma_poc/frontend/api/src/middleware/retention.ts`](ma_poc/frontend/api/src/middleware/retention.ts) for the cutoff logic — it must stay in lock-step with `_apply_retention()`'s 3-day window.
+
+**Backfill caveat:** `daily_runner` invocations with `--run-date <older-than-3-days>` will write rows that the same sync immediately deletes. Backfills should hit GCS-only paths or set up an exemption — there is no current mechanism for pinning a historical run in DB.
+
 ### Known Concurrency Gap — DLQ
 
 `dlq.jsonl` is cross-run global state. Each shard uploads its own copy of `dlq.jsonl` to `gs://{bucket}/runs/{date}/shard_{idx}/dlq.jsonl`. The sync writes DLQ entries to `dlq_entries` with last-writer-wins semantics. This is correct for the current use case (the DLQ is written by `jugnu_runner` during the scrape, not during sync), but if two shards both attempted to park or unpark the same property in the same run, the last sync to complete would win. In practice this cannot happen because a property is processed by exactly one shard — but it is an undocumented assumption that breaks if the CSV slice invariant is ever violated (e.g. duplicate rows in the input CSV).
+
+`dlq_entries` is also subject to the 3-day rolling sweep — entries with `parked_at < now() - 3 days` are deleted at sync end. The retry runner reads `dlq_entries` to repopulate `state/dlq.jsonl` at startup, which means **any property parked longer than 3 days will silently disappear from the retry queue**. This is an explicit policy choice, not a bug: if a property has been failing for >3 days the DLQ tooling is the wrong layer to recover it; promote to a manual review or extend the window.
 
 ### LLM Provider Configuration
 

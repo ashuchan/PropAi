@@ -19,6 +19,7 @@ ma_poc/
 │   ├── property_transform.py                     # Blink.records[0] → 46-key V2 property record
 │   ├── memory_store.py                           # persist/load SkillMemory between runs
 │   ├── profile_store_adapter.py                  # jugnu ScrapeProfile ↔ per-canonical_id store
+│                                                 #   (writes to `scrape_profiles` table — upsert-only, never trimmed by the 3-day retention sweep)
 │   └── README.md
 └── scripts/
     └── jugnu_poc_runner.py                       # CLI entrypoint mirroring jugnu_runner.py UX

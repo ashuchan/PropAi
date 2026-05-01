@@ -157,6 +157,72 @@ def _split_known_extra(data: dict[str, Any], known: set[str]) -> tuple[dict[str,
     return k, x
 
 
+# Per-table cache of {column_name -> declared_max_length} for VARCHAR/String
+# columns. Built once on first use so we can clip oversize strings at the
+# write boundary instead of letting Postgres reject the row with
+# `value too long for type character varying(N)` (sqlstate 22001).
+#
+# Why clip rather than fail loudly: this layer is downstream of LLM
+# extractors and adapters that occasionally emit pathological values
+# (e.g. a 450-char marketing blurb mis-extracted into floor_plan_name).
+# A single bad row used to roll back the entire 499-property shard's
+# Stage 1 sync transaction, leaving the DB missing the whole shard for
+# days at a time. Clipping at 256 chars keeps the data flowing; the
+# raw value is still in the source GCS payload if anyone needs it.
+_VARCHAR_LIMITS: dict[type, dict[str, int]] = {}
+
+
+def _varchar_limits(model_cls: type) -> dict[str, int]:
+    cache = _VARCHAR_LIMITS.get(model_cls)
+    if cache is not None:
+        return cache
+    out: dict[str, int] = {}
+    table = getattr(model_cls, "__table__", None)
+    if table is not None:
+        for col in table.columns:
+            length = getattr(col.type, "length", None)
+            if isinstance(length, int) and length > 0:
+                out[col.name] = length
+    _VARCHAR_LIMITS[model_cls] = out
+    return out
+
+
+def _clip_to_column_limits(
+    values: dict[str, Any],
+    model_cls: type,
+    *,
+    log_prefix: str = "",
+) -> dict[str, Any]:
+    """Truncate string values whose length exceeds the column's declared max.
+
+    Returns the same dict (mutated). Logs a WARNING for each column we
+    clip so the upstream extractor bug is visible rather than silently
+    swallowed. The PK columns are clipped too — long unit_ids are real
+    (some portals emit URL-encoded blob keys); we'd rather have a
+    truncated id than no row at all.
+    """
+    limits = _varchar_limits(model_cls)
+    if not limits:
+        return values
+    for col, max_len in limits.items():
+        v = values.get(col)
+        if v is None or not isinstance(v, str):
+            continue
+        if len(v) <= max_len:
+            continue
+        log.warning(
+            "%s clipping oversize value for %s.%s: len=%d limit=%d sample=%r",
+            log_prefix or "_clip_to_column_limits",
+            model_cls.__name__,
+            col,
+            len(v),
+            max_len,
+            v[:80],
+        )
+        values[col] = v[:max_len]
+    return values
+
+
 def _hydrate_property(row: PropertyRow) -> PropertyIndexEntry:
     base = {
         "canonical_id": row.canonical_id,
@@ -260,6 +326,7 @@ class SqlPropertyStateStore(IPropertyStateStore):
 
             known, extra = _split_known_extra(merged, _PROPERTY_COLS)
             values = {**known, "extra": extra}
+            _clip_to_column_limits(values, PropertyRow, log_prefix=f"property upsert cid={canonical_id}")
 
             stmt = dialect_insert(self._h.engine, PropertyRow).values(**values)
             # On conflict, update every column except the PK.
@@ -369,6 +436,7 @@ class SqlUnitStateStore(IUnitStateStore):
 
                 known, extra = _split_known_extra(snap, _UNIT_COLS)
                 values = {**known, "extra": extra}
+                _clip_to_column_limits(values, UnitRow, log_prefix=f"upsert_units cid={canonical_id}")
                 stmt = dialect_insert(self._h.engine, UnitRow).values(**values)
                 update_cols = {k: stmt.excluded[k] for k in values if k not in ("canonical_id", "unit_id")}
                 stmt = stmt.on_conflict_do_update(

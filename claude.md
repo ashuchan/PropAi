@@ -405,8 +405,8 @@ class UnitRecord(BaseModel):
 | Property mix stratification | `properties.csv` required columns: `property_id`, `url`, `type` (STABILISED\|LEASE_UP), `pms_platform` (optional). |
 | Residential proxy | `proxy_manager.py` handles rotation. Auto-escalate domains with >2% bot-block failure rate. |
 | Raw HTML + screenshots 30-day TTL | Save to `data/raw_html/{property_id}/{date}.html` and `data/screenshots/{property_id}/{date}.png` after page load. Cleanup task enforces TTL. |
-| Failure rate <5% per domain / 7-day rolling | Tracked in `scrape_events.jsonl`. `validate_outputs.py` computes and alerts. |
-| All scrapes logged | One `ScrapeEvent` per scrape appended to `data/scrape_events.jsonl` via `event_log.py`. Serialise with `model.model_dump(mode="json")` — never `.dict()`. |
+| Failure rate <5% per domain / 7-day rolling | Tracked in `scrape_events.jsonl` (the on-disk file is per-run, append-only, kept until the 30-day raw cleanup runs). The DB-backed `scrape_events` table is on a 3-day rolling window — see `_apply_retention()` in `ma_poc/scripts/sync_run_to_pg.py`. Any 7-day failure-rate analysis must read the JSONL files (or the GCS-archived per-run dirs), not the DB. `validate_outputs.py` computes and alerts. |
+| All scrapes logged | One `ScrapeEvent` per scrape appended to `data/scrape_events.jsonl` via `event_log.py` (per-run JSONL, append-only on disk). The DB mirror in the `scrape_events` table is trimmed to the last 3 days at every sync. Serialise with `model.model_dump(mode="json")` — never `.dict()`. |
 | P95 page load <30s | Record actual `page_load_ms` in `ScrapeEvent`. `validate_outputs.py` computes P95 daily. |
 
 ### browser.py — critical rules
@@ -602,6 +602,8 @@ def get_vision_provider() -> VisionProvider:
 ## Phase A output format (no PostgreSQL until Phase B)
 
 ### data/scrape_events.jsonl — one ScrapeEvent per line
+
+The local JSONL file is per-run and append-only. The DB-backed `scrape_events` table (mirrored by `sync_run_to_pg.py`) is on a **3-day rolling window** — anything older than 3 days is deleted by `_apply_retention()` at sync end. Long-window analytics (7-day failure rate, cross-month trends) must read the JSONL files or the GCS-archived per-run dirs, not the DB.
 
 ```json
 {"event_id":"a1b2c3","property_id":"P001","scrape_timestamp":"2026-04-08T02:15:00Z","extraction_tier":3,"change_detection_result":"CHANGED","scrape_outcome":"SUCCESS","page_load_ms":4200,"proxy_used":false,"vision_fallback_used":false,"banner_capture_attempted":true,"banner_concession_found":false,"accuracy_sample_selected":false,"confidence_score":0.91}

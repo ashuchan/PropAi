@@ -1008,3 +1008,34 @@ pipeline writes. Jugnu runs therefore showed `tier=UNKNOWN`,
 you rename or move these keys, update both files together and keep the
 integration test in `ma_poc/tests/observability/test_slo_watcher.py`
 asserting against a Jugnu-shaped record.
+
+---
+
+## Postgres retention (2026-05-02)
+
+`sync_run_to_pg.py :: _apply_retention(engine)` runs as the last step of
+every sync (via `_run_stage2("retention", ...)`) and enforces a
+**3-day rolling window** on every per-run table. Upsert-only tables
+hold current state and are never trimmed.
+
+| Tier | Tables | Cutoff |
+|---|---|---|
+| 3-day rolling | `llm_reports`, `llm_diagnostics`, `llm_property_details`, `property_snapshots`, `run_issues`, `run_ledger` | `run_date < today - 3 days` |
+| 3-day rolling | `scrape_events` | `scrape_timestamp < now() - 3 days` |
+| 3-day rolling | `dlq_entries` | `parked_at < now() - 3 days` |
+| Upsert only | `properties`, `units`, `scrape_profiles` | never trimmed |
+
+When adding a new per-run table, add it to `_apply_retention()` as part of
+the same change — never reintroduce historical snapshots. The retention
+sweep is idempotent and shard-safe (every shard observes the same
+wall-clock cutoff).
+
+Read-side consequence: API routes that take a `:date` param respond with
+**HTTP 410 Gone** + `{ status: "purged", retentionDays: 3 }` for any date
+older than the window. The cutoff is mirrored in
+`ma_poc/frontend/api/src/middleware/retention.ts` and must stay in
+lock-step with the sweep's 3-day window.
+
+Backfill caveat: `daily_runner --run-date <older-than-3-days>` will write
+rows that the same sync immediately deletes. Backfills should be served
+from GCS-archived per-run dirs, not re-synced into DB.

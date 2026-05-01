@@ -90,7 +90,7 @@ variable "db_tier" {
 # Override per environment in envs/*.tfvars.
 variable "llm_provider" {
   type        = string
-  default     = "anthropic"
+  default     = "openrouter"
   description = "LLM provider for ma_poc.llm.factory: anthropic | openrouter | azure."
   validation {
     condition     = contains(["anthropic", "openrouter", "azure"], var.llm_provider)

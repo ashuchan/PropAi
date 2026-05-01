@@ -39,7 +39,14 @@ from models.scrape_profile import ScrapeProfile
 from scripts import sync_run_to_pg
 
 
-RUN_DATE = "2026-04-23"
+# Tests that exercise ``sync_run_to_postgres()`` end-to-end must use a
+# recent run_date — the orchestrator now invokes ``_apply_retention()``
+# at the end of every sync, which deletes anything older than 3 days.
+# A hard-coded fixed date would be silently swept after the calendar
+# moves past it, leaving the tests asserting against empty tables.
+from datetime import date as _date
+
+RUN_DATE = _date.today().isoformat()
 
 
 def _seed_fs_provider(tmp_path: Path) -> tuple[FileSystemDataProvider, Path, Path]:
@@ -1085,3 +1092,290 @@ def test_stable_event_id_is_deterministic(tmp_path: Path) -> None:
     import uuid as _uuid
 
     _uuid.UUID(a1)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Resilience regression: 2026-04-29 → 05-01 shard-0 incident.
+#
+# The original bug: a 455-char marketing blurb in
+# ``units.floor_plan_name`` (declared ``String(256)``) raised
+# ``DataError`` mid-shared-transaction. The whole shard's Stage 1 write
+# rolled back, dropping 499 properties × 3 days from Cloud SQL despite
+# the runner having scraped them successfully.
+#
+# Two-layer fix:
+#   1. ``_clip_to_column_limits`` trims oversize values at the boundary
+#      (covers most cases pre-emptively).
+#   2. ``isolate_row_writes`` puts each property's writes in a SAVEPOINT
+#      so anything that does slip past the clip is contained to its own
+#      row — the rest of the batch keeps committing.
+#
+# These tests fail loudly if either layer regresses.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _make_property_payload(cid: str, *, floor_plan_name: str = "1BR/1BA") -> dict[str, Any]:
+    return {
+        "apartment_id": int(cid.lstrip("P-")) if cid.lstrip("P-").isdigit() else None,
+        "proj_name": f"Property {cid}",
+        "city": "Phoenix",
+        "state": "AZ",
+        "website": f"https://prop-{cid}.example.com",
+        "_meta": {"canonical_id": cid, "verdict": "SUCCESS"},
+        "units": [
+            {
+                "unit_id": f"{cid}-101",
+                "floor_plan_name": floor_plan_name,
+                "rent_low": 1500,
+                "rent_high": 1700,
+                "beds": 1,
+                "baths": 1.0,
+            }
+        ],
+    }
+
+
+def test_oversize_floor_plan_does_not_drop_other_properties(tmp_path: Path) -> None:
+    """Reproduce the exact production failure mode end-to-end.
+
+    Build 5 properties where one has an over-256-char floor_plan_name.
+    Pre-fix: the DataError would roll back the shared transaction and
+    zero properties would land. Post-fix (clip + isolate_row_writes):
+    all 5 properties commit, with the bad one's floor_plan clipped.
+    """
+    target = SqliteDataProvider(url=_sqlite_url(tmp_path))
+    try:
+        bad = "Perfect luxury living space " * 20  # 560 chars > 256
+        properties = [
+            _make_property_payload(f"PROP-{i}", floor_plan_name=("1BR/1BA" if i != 2 else bad))
+            for i in range(5)
+        ]
+        with target.transaction():
+            count = sync_run_to_pg._sync_current_state_from_snapshots(
+                target, "2026-05-02", properties
+            )
+        # All five properties land — none is silently dropped.
+        assert count == 5, "the shard-0 incident regressed: a bad row killed the batch"
+        assert target.property_state.all_canonical_ids() == {
+            "PROP-0", "PROP-1", "PROP-2", "PROP-3", "PROP-4"
+        }
+        # The bad row is stored with a clipped floor_plan_name — the
+        # rest of its data (rent, beds, etc.) is intact.
+        bad_units = target.unit_state.get_units("PROP-2")
+        assert "PROP-2-101" in bad_units
+        assert len(bad_units["PROP-2-101"].floor_plan_name or "") <= 256
+        assert bad_units["PROP-2-101"].rent_low == 1500
+    finally:
+        target.close()
+
+
+def test_per_property_failure_is_logged_as_run_issue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When a property's writes do fail (e.g. an integrity violation
+    that the clip can't help with), the failure must show up in
+    ``run_issues`` so it's visible in the daily report — not silently
+    dropped from the DB."""
+    target = SqliteDataProvider(url=_sqlite_url(tmp_path))
+    try:
+        # Force a permanent error from upsert_units for one specific cid
+        # by monkeypatching the store. This simulates "a row that the
+        # clip helper couldn't save" — IntegrityError, FK violation, etc.
+        original = target.unit_state.upsert_units
+
+        def maybe_fail(cid: str, units: list[dict[str, Any]], rd: str) -> Any:
+            if cid == "PROP-BAD":
+                from sqlalchemy.exc import IntegrityError as _IE
+                raise _IE("INSERT", {}, Exception("simulated FK violation"))
+            return original(cid, units, rd)
+
+        monkeypatch.setattr(target.unit_state, "upsert_units", maybe_fail)
+
+        properties = [
+            _make_property_payload("PROP-OK1"),
+            _make_property_payload("PROP-BAD"),
+            _make_property_payload("PROP-OK2"),
+        ]
+        with target.transaction():
+            count = sync_run_to_pg._sync_current_state_from_snapshots(
+                target, "2026-05-02", properties
+            )
+        assert count == 2, "good rows must commit even when one row fails"
+        assert "PROP-OK1" in target.property_state.all_canonical_ids()
+        assert "PROP-OK2" in target.property_state.all_canonical_ids()
+        assert "PROP-BAD" not in target.property_state.all_canonical_ids()
+
+        # Failure must be visible in run_issues — NOT silently swallowed.
+        issues = list(target.runs.read_issues("2026-05-02"))
+        sync_failures = [i for i in issues if i.code == "SYNC_PROPERTY_FAILED"]
+        assert len(sync_failures) == 1
+        assert sync_failures[0].canonical_id == "PROP-BAD"
+        assert sync_failures[0].severity == "ERROR"
+        assert "IntegrityError" in sync_failures[0].message
+    finally:
+        target.close()
+
+
+def test_fallback_path_used_when_no_active_session(tmp_path: Path) -> None:
+    """``_sync_current_state_from_snapshots`` must work against the FS
+    provider too (used by the legacy backfill_pg.py path), where there
+    is no SQL session to attach a SAVEPOINT to. The non-isolation
+    fallback handles that case."""
+    fs_target = FileSystemDataProvider(base_dir=tmp_path / "data", config_dir=tmp_path / "config")
+    try:
+        properties = [_make_property_payload("PROP-A"), _make_property_payload("PROP-B")]
+        count = sync_run_to_pg._sync_current_state_from_snapshots(
+            fs_target, "2026-05-02", properties
+        )
+        assert count == 2
+        assert fs_target.property_state.exists("PROP-A")
+        assert fs_target.property_state.exists("PROP-B")
+    finally:
+        fs_target.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Retention sweep — _apply_retention enforces a 3-day rolling window on
+# every per-run table. Upsert-only tables (properties / units /
+# scrape_profiles) must remain untouched.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_apply_retention_drops_aged_rows_and_keeps_recent(tmp_path: Path) -> None:
+    from datetime import UTC, date, datetime, timedelta
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from data_provider.sql.models import (
+        DlqEntryRow,
+        LlmDiagnosticRow,
+        LlmPropertyDetailRow,
+        LlmReportRow,
+        PropertyRow,
+        PropertySnapshotRow,
+        RunIssueRow,
+        RunLedgerRow,
+        ScrapeEventRow,
+        ScrapeProfileRow,
+        UnitRow,
+    )
+
+    target = SqliteDataProvider(url=_sqlite_url(tmp_path))
+    try:
+        today = date.today().isoformat()
+        old_date = (date.today() - timedelta(days=5)).isoformat()
+        now = datetime.now(UTC).replace(tzinfo=None)
+        old_ts = now - timedelta(days=5)
+        old_iso = old_ts.isoformat()
+        now_iso = now.isoformat()
+
+        with Session(target.engine) as s:
+            # run_date-keyed rows: today + aged
+            for rd in (today, old_date):
+                s.add(LlmReportRow(run_date=rd, payload={"calls": 1}, written_at=now))
+                s.add(LlmPropertyDetailRow(run_date=rd, property_id="P1", payload={}, written_at=now))
+                s.add(LlmDiagnosticRow(run_date=rd, property_id="P1", kind="trace", payload={}, written_at=now))
+                s.add(PropertySnapshotRow(run_date=rd, canonical_id="P1", ordinal=0, payload={}))
+                s.add(RunIssueRow(run_date=rd, seq=0, severity="INFO", code="OK", message="m", canonical_id="P1"))
+                s.add(RunLedgerRow(run_date=rd, seq=0, canonical_id="P1", status="SUCCESS"))
+
+            # scrape_events keyed by scrape_timestamp
+            s.add(ScrapeEventRow(
+                event_id="ev-new", property_id="P1", scrape_timestamp=now,
+                scrape_outcome="SUCCESS",
+            ))
+            s.add(ScrapeEventRow(
+                event_id="ev-old", property_id="P1", scrape_timestamp=old_ts,
+                scrape_outcome="SUCCESS",
+            ))
+
+            # dlq_entries keyed by parked_at (ISO string)
+            s.add(DlqEntryRow(
+                property_id="P-NEW", parked_at=now_iso, reason="r",
+                last_error_signature="", retry_at="", last_synced_at=now,
+            ))
+            s.add(DlqEntryRow(
+                property_id="P-OLD", parked_at=old_iso, reason="r",
+                last_error_signature="", retry_at="", last_synced_at=now,
+            ))
+
+            # Upsert-only tables — must survive untouched even though
+            # the rows have no run_date / parked_at concept of recency.
+            s.add(PropertyRow(canonical_id="P1", proj_name="Recent"))
+            s.add(PropertyRow(canonical_id="P-OLD-PROP", proj_name="Long lived"))
+            s.add(UnitRow(canonical_id="P1", unit_id="U1", rent_low=1000))
+            s.add(ScrapeProfileRow(
+                canonical_id="P1", version=1, schema_version="2",
+                created_at=now, updated_at=now, updated_by="TEST", payload={},
+            ))
+            s.commit()
+
+        deleted = sync_run_to_pg._apply_retention(target.engine)
+
+        # Aged rows in the 3-day-window tables are gone.
+        assert deleted["llm_reports"] == 1
+        assert deleted["llm_property_details"] == 1
+        assert deleted["llm_diagnostics"] == 1
+        assert deleted["property_snapshots"] == 1
+        assert deleted["run_issues"] == 1
+        assert deleted["run_ledger"] == 1
+        assert deleted["scrape_events"] == 1
+        assert deleted["dlq_entries"] == 1
+
+        with Session(target.engine) as s:
+            # run_date tables: only today's row survives.
+            for cls in (LlmReportRow, LlmPropertyDetailRow, LlmDiagnosticRow,
+                        PropertySnapshotRow, RunIssueRow, RunLedgerRow):
+                rows = list(s.execute(select(cls)).scalars())
+                assert len(rows) == 1, f"{cls.__name__}: expected 1 row, got {len(rows)}"
+                assert rows[0].run_date == today
+
+            ev_ids = {r.event_id for r in s.execute(select(ScrapeEventRow)).scalars()}
+            assert ev_ids == {"ev-new"}
+
+            dlq_ids = {r.property_id for r in s.execute(select(DlqEntryRow)).scalars()}
+            assert dlq_ids == {"P-NEW"}
+
+            # Upsert-only tables: every row still present.
+            prop_ids = {r.canonical_id for r in s.execute(select(PropertyRow)).scalars()}
+            assert prop_ids == {"P1", "P-OLD-PROP"}
+            unit_ids = {(r.canonical_id, r.unit_id) for r in s.execute(select(UnitRow)).scalars()}
+            assert unit_ids == {("P1", "U1")}
+            prof_ids = {r.canonical_id for r in s.execute(select(ScrapeProfileRow)).scalars()}
+            assert prof_ids == {"P1"}
+    finally:
+        target.close()
+
+
+def test_apply_retention_is_idempotent(tmp_path: Path) -> None:
+    """Re-running on already-clean state must be a no-op (zero deletes)."""
+    target = SqliteDataProvider(url=_sqlite_url(tmp_path))
+    try:
+        first = sync_run_to_pg._apply_retention(target.engine)
+        # Fresh DB — nothing to delete.
+        assert all(v == 0 for v in first.values()), first
+
+        # Even with a row present, if it's recent the second call
+        # deletes nothing.
+        from datetime import UTC, date, datetime
+
+        from sqlalchemy.orm import Session
+
+        from data_provider.sql.models import LlmReportRow
+
+        with Session(target.engine) as s:
+            s.add(LlmReportRow(
+                run_date=date.today().isoformat(),
+                payload={},
+                written_at=datetime.now(UTC).replace(tzinfo=None),
+            ))
+            s.commit()
+
+        second = sync_run_to_pg._apply_retention(target.engine)
+        assert second["llm_reports"] == 0
+
+        third = sync_run_to_pg._apply_retention(target.engine)
+        assert third == second
+    finally:
+        target.close()

@@ -90,8 +90,8 @@ import os
 import re
 import sys
 import uuid
-from collections.abc import Iterable
-from datetime import UTC, datetime
+from collections.abc import Callable, Iterable
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -108,6 +108,12 @@ from data_provider import (  # noqa: E402
 )
 from data_provider.sql.provider import SqlDataProvider  # noqa: E402
 from data_provider.sql.engine import dialect_insert  # noqa: E402
+from data_provider.sql.resilience import (  # noqa: E402
+    PERMANENT_ROW_ERRORS,
+    TRANSIENT_DB_ERRORS,
+    isolate_row_writes,
+    with_db_retry,
+)
 from data_provider.sql.models import (  # noqa: E402
     DlqEntryRow,
     LlmDiagnosticRow,
@@ -591,14 +597,105 @@ def _sync_current_state_from_snapshots(
     state tables (which the TS frontend reads directly) stay empty even
     when property_snapshots has data. Returns the number of canonical_ids
     upserted.
+
+    Per-property writes are isolated via SAVEPOINTs (see
+    ``data_provider.sql.resilience.isolate_row_writes``) so a single bad
+    row (e.g. an over-length string from a misbehaving extractor) can no
+    longer roll back the entire shard. Failures are recorded in
+    ``run_issues`` with code ``SYNC_PROPERTY_FAILED`` so they're visible
+    in the daily report instead of silently dropped.
+
+    The 2026-04-29 → 05-01 incident: a 455-char marketing blurb in
+    ``floor_plan_name`` (declared ``String(256)``) raised ``DataError``
+    inside the shared shard transaction; everything for shard 0 — 499
+    properties × 3 days — rolled back. ``isolate_row_writes`` makes this
+    a per-row data-quality warning instead of a shard-wide outage.
+    """
+    sql_holder = getattr(dst, "_holder", None)
+    session = sql_holder.active if sql_holder else None
+    if session is None:
+        # Defensive: callers always wrap us in dst.transaction() so this
+        # branch is the FS provider / a misuse. Fall back to non-isolated
+        # writes for that case (FS provider has no rollback semantics).
+        return _sync_current_state_no_isolation(dst, run_date, properties)
+
+    eligible: list[tuple[str, dict[str, Any]]] = []
+    for p in properties:
+        cid = _extract_canonical_id(p)
+        if cid:
+            eligible.append((cid, p))
+
+    def _apply(item: tuple[str, dict[str, Any]]) -> None:
+        cid, p = item
+        snap = {
+            "apartment_id": p.get("apartment_id"),
+            "proj_name": p.get("proj_name") or p.get("Property Name"),
+            "address": p.get("address") or p.get("Property Address"),
+            "city": p.get("city") or p.get("City"),
+            "state": p.get("state") or p.get("State"),
+            "zip_code": p.get("zip_code") or p.get("ZIP Code"),
+            "country": p.get("country"),
+            "phone": p.get("phone") or p.get("Phone"),
+            "email_address": p.get("email_address"),
+            "website": p.get("website") or p.get("Website"),
+            "pmc": p.get("pmc") or p.get("Management Company"),
+            "website_design": p.get("website_design"),
+            "concessions": p.get("concessions"),
+        }
+        meta = p.get("_meta") or {}
+        verdict = meta.get("verdict")
+        units = p.get("units") or []
+        snap["last_scrape_status"] = verdict or meta.get("scrape_tier_used")
+        snap["last_units_count"] = len(units)
+        dst.property_state.upsert(cid, snap, run_date)
+        if units:
+            dst.unit_state.upsert_units(cid, units, run_date)
+
+    success, failures = isolate_row_writes(
+        session,
+        eligible,
+        _apply,
+        label_for=lambda item: f"cid={item[0]}",
+    )
+
+    # Surface skipped rows as run_issues so they show up in the report.
+    # Done outside the per-row savepoint because we want these issue
+    # rows themselves to commit even if some of them fail validation.
+    for label, exc in failures:
+        try:
+            cid = label.split("=", 1)[1] if "=" in label else None
+            dst.runs.append_issue(
+                run_date,
+                IssueEntry(
+                    severity="ERROR",
+                    code="SYNC_PROPERTY_FAILED",
+                    message=f"{type(exc).__name__}: {str(exc).splitlines()[0] if str(exc) else ''}",
+                    canonical_id=cid,
+                    details={"phase": "sync_current_state"},
+                ),
+            )
+        except Exception:  # noqa: BLE001 — issue logging must never fail the sync
+            log.exception("Failed to log sync failure issue for %s", label)
+
+    return success
+
+
+def _sync_current_state_no_isolation(
+    dst: DataProvider,
+    run_date: str,
+    properties: list[dict[str, Any]],
+) -> int:
+    """Fallback for the FS provider (no SAVEPOINT support).
+
+    Behaves like the original loop. Kept separate so the SQL path's
+    isolation wiring stays clean and so unit tests can target either
+    branch directly.
     """
     count = 0
     for p in properties:
         cid = _extract_canonical_id(p)
         if not cid:
             continue
-        # V2 fields come from the payload top level; fall back to v1
-        # "Property Name" shape so this works on either schema_version.
         snap = {
             "apartment_id": p.get("apartment_id"),
             "proj_name": p.get("proj_name") or p.get("Property Name"),
@@ -1189,6 +1286,73 @@ def load_dlq_from_db_to_file(*, engine: Any, path: Path) -> int:
     return len(rows)
 
 
+def _apply_retention(engine: Any) -> dict[str, int]:
+    """Enforce the 3-day retention window on all non-upsert tables.
+
+    Per project policy, every per-run table is capped at a 3-day rolling
+    window. Tables on this list:
+      - run_date-keyed (ISO date strings — sort lexicographically, so
+        ``WHERE run_date < :cutoff`` is dialect-portable):
+        ``llm_reports``, ``llm_diagnostics``, ``llm_property_details``,
+        ``property_snapshots``, ``run_issues``, ``run_ledger``.
+      - timestamp-keyed: ``scrape_events`` (``scrape_timestamp``,
+        ``DateTime``) and ``dlq_entries`` (``parked_at``, ISO string in
+        ``String(64)``).
+
+    ``properties``, ``units``, and ``scrape_profiles`` are upsert-only
+    and intentionally absent from this helper — they store current
+    state, not history.
+
+    Multi-shard safe: every shard observes the same wall-clock cutoff,
+    so concurrent calls converge on the same end state. Idempotent: a
+    second call with no new aged-out rows deletes nothing.
+
+    Returns ``{table_name: rows_deleted}`` so the run summary can log
+    what got swept.
+    """
+    from sqlalchemy import text
+
+    cutoff_date_iso = (date.today() - timedelta(days=3)).isoformat()
+    cutoff_dt = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=3)
+    cutoff_iso_ts = cutoff_dt.isoformat()
+
+    deleted: dict[str, int] = {}
+    with engine.begin() as conn:
+        for table in (
+            "llm_reports",
+            "llm_diagnostics",
+            "llm_property_details",
+            "property_snapshots",
+            "run_issues",
+            "run_ledger",
+        ):
+            r = conn.execute(
+                text(f"DELETE FROM {table} WHERE run_date < :cutoff"),
+                {"cutoff": cutoff_date_iso},
+            )
+            deleted[table] = r.rowcount or 0
+
+        # scrape_events.scrape_timestamp is a DateTime — pass a naive
+        # UTC datetime so SQLAlchemy adapts it identically for Postgres
+        # and SQLite.
+        r = conn.execute(
+            text("DELETE FROM scrape_events WHERE scrape_timestamp < :cutoff"),
+            {"cutoff": cutoff_dt},
+        )
+        deleted["scrape_events"] = r.rowcount or 0
+
+        # dlq_entries.parked_at is String(64) holding an ISO-8601 UTC
+        # timestamp; ISO-8601 strings sort lexicographically, so the
+        # text comparison is exact.
+        r = conn.execute(
+            text("DELETE FROM dlq_entries WHERE parked_at < :cutoff"),
+            {"cutoff": cutoff_iso_ts},
+        )
+        deleted["dlq_entries"] = r.rowcount or 0
+
+    return deleted
+
+
 def _upsert_llm_diagnostics(engine: Any, run_date: str, dir_: Path) -> int:
     if not dir_.exists():
         return 0
@@ -1300,47 +1464,56 @@ def sync_run_to_postgres(
             run_properties = []
 
         # Stage 1 — everything that has a store interface goes inside a
-        # single Postgres transaction. If any write fails the whole
-        # stage rolls back, leaving the DB in its pre-sync state.
+        # single Postgres transaction wrapped in retry-on-transient logic.
+        # If any per-row write fails with a *permanent* error (DataError,
+        # IntegrityError) the row is isolated via SAVEPOINT and the rest
+        # of the stage continues — see ``_sync_current_state_from_snapshots``.
+        # Transient errors (OperationalError, etc.) trigger a bounded
+        # exponential-backoff retry of the whole stage.
         fs_canonical_ids = sorted(src.property_state.all_canonical_ids())
-        with dst.transaction():
-            summary["profiles"] = _copy_profiles(src, dst)
-            summary["events_legacy"] = _copy_events(src, dst)
-            # _copy_state reads from property_index.json (legacy pipeline).
-            # For Jugnu that file is empty, so this is a no-op — the
-            # real work happens in _sync_current_state_from_snapshots
-            # below. We keep _copy_state for the backfill_pg.py path
-            # where property_index.json IS populated.
-            summary["state_legacy"] = _copy_state(src, dst)
-            summary["state_from_snapshots"] = _sync_current_state_from_snapshots(
-                dst, run_date, run_properties
-            )
-            summary["run"] = _copy_run(src, dst, run_date, shard_id=shard_id)
-            # Legacy path reads extraction_output/{cid}/{date}.json from
-            # disk; Jugnu never writes those. The derive-from-snapshots
-            # helper populates extraction_results directly from each
-            # property's ``_extract_result`` field instead.
-            summary["extractions_legacy"] = _copy_extractions(
-                src, dst, run_date, fs_canonical_ids
-            )
-            summary["extractions_from_snapshots"] = _sync_extraction_results_from_snapshots(
-                dst, run_date, run_properties
-            )
-            summary["scrape_events_from_snapshots"] = _sync_scrape_events_from_snapshots(
-                dst, run_date, run_properties
-            )
-            # run_ledger + run_issues are already partially populated by
-            # _copy_run if the runner wrote issues.jsonl / ledger.jsonl.
-            # Jugnu doesn't write those files, so we supplement here
-            # from the property snapshots. Idempotent: _copy_run deletes
-            # this batch's cids from the two tables before appending, so
-            # these helpers append fresh entries that won't duplicate.
-            summary["ledger_from_snapshots"] = _sync_run_ledger_from_snapshots(
-                dst, run_date, run_properties
-            )
-            summary["issues_from_snapshots"] = _sync_run_issues_from_snapshots(
-                dst, run_date, run_properties
-            )
+
+        @with_db_retry(attempts=3, initial_wait_s=1.0, max_wait_s=8.0)
+        def _stage1() -> None:
+            with dst.transaction():
+                summary["profiles"] = _copy_profiles(src, dst)
+                summary["events_legacy"] = _copy_events(src, dst)
+                # _copy_state reads from property_index.json (legacy pipeline).
+                # For Jugnu that file is empty, so this is a no-op — the
+                # real work happens in _sync_current_state_from_snapshots
+                # below. We keep _copy_state for the backfill_pg.py path
+                # where property_index.json IS populated.
+                summary["state_legacy"] = _copy_state(src, dst)
+                summary["state_from_snapshots"] = _sync_current_state_from_snapshots(
+                    dst, run_date, run_properties
+                )
+                summary["run"] = _copy_run(src, dst, run_date, shard_id=shard_id)
+                # Legacy path reads extraction_output/{cid}/{date}.json from
+                # disk; Jugnu never writes those. The derive-from-snapshots
+                # helper populates extraction_results directly from each
+                # property's ``_extract_result`` field instead.
+                summary["extractions_legacy"] = _copy_extractions(
+                    src, dst, run_date, fs_canonical_ids
+                )
+                summary["extractions_from_snapshots"] = _sync_extraction_results_from_snapshots(
+                    dst, run_date, run_properties
+                )
+                summary["scrape_events_from_snapshots"] = _sync_scrape_events_from_snapshots(
+                    dst, run_date, run_properties
+                )
+                # run_ledger + run_issues are already partially populated by
+                # _copy_run if the runner wrote issues.jsonl / ledger.jsonl.
+                # Jugnu doesn't write those files, so we supplement here
+                # from the property snapshots. Idempotent: _copy_run deletes
+                # this batch's cids from the two tables before appending, so
+                # these helpers append fresh entries that won't duplicate.
+                summary["ledger_from_snapshots"] = _sync_run_ledger_from_snapshots(
+                    dst, run_date, run_properties
+                )
+                summary["issues_from_snapshots"] = _sync_run_issues_from_snapshots(
+                    dst, run_date, run_properties
+                )
+
+        _stage1()
 
         # Stage 2 — raw-engine work. Each helper manages its own txn via
         # ``engine.begin()`` (the SQL provider exposes the engine). This
@@ -1350,37 +1523,81 @@ def sync_run_to_postgres(
         # deadlocks when ``engine.begin()`` is nested under an active
         # session.
         engine = dst.engine
+
+        # Each Stage 2 helper is independent — wrap each call in
+        # ``_run_stage2`` so a transient retry covers connection blips,
+        # and a permanent error in one helper (e.g. a malformed
+        # llm_diagnostics file) doesn't prevent the rest from running.
+        # The per-helper failure is recorded in ``summary[..._error]``
+        # so the caller can surface it.
+        def _run_stage2(name: str, fn: Callable[[], Any]) -> Any:
+            wrapped = with_db_retry(attempts=3, initial_wait_s=0.5)(fn)
+            try:
+                return wrapped()
+            except PERMANENT_ROW_ERRORS as exc:
+                log.warning(
+                    "stage2 %s permanent error — skipping. %s: %s",
+                    name,
+                    type(exc).__name__,
+                    str(exc).splitlines()[0] if str(exc) else "",
+                )
+                summary[f"{name}_error"] = f"{type(exc).__name__}: {exc}"
+                return None
+            except Exception as exc:  # noqa: BLE001
+                # Retries already exhausted for transient errors, or a
+                # genuine code bug. Don't kill the whole sync — record
+                # and continue. The caller (shard_entry) treats sync
+                # failure on a single helper as a soft warning.
+                log.exception("stage2 %s failed", name)
+                summary[f"{name}_error"] = f"{type(exc).__name__}: {exc}"
+                return None
+
         # Report merge must happen here (not in _copy_run) for the same
         # reason: it opens its own engine-level txn and can't live
         # inside the shared-session Stage 1 block.
         report = src.runs.read_report(run_date)
         if report is not None:
             if shard_id is not None:
-                _merge_run_report(engine, run_date, shard_id, report)
+                _run_stage2("report", lambda: _merge_run_report(engine, run_date, shard_id, report))
             else:
                 # Legacy single-writer path (e.g. CLI backfill without
                 # --shard-id). Open a throwaway provider to call the
                 # store's replace-semantics write_report.
-                _single_writer_report(dst, run_date, report)
+                _run_stage2("report", lambda: _single_writer_report(dst, run_date, report))
             summary["report"] = 1
         else:
             summary["report"] = 0
-        summary["property_reports"] = _upsert_property_reports(
-            engine, run_date, run_dir / "property_reports"
-        )
-        summary["llm_reports"] = _upsert_llm_report(
-            engine, run_date, run_dir / "llm_report.json", shard_id=shard_id
-        )
-        summary["llm_property_details"] = _upsert_llm_property_details(
-            engine, run_date, run_dir / "llm_report"
-        )
-        summary["llm_diagnostics"] = _upsert_llm_diagnostics(
-            engine, run_date, run_dir / "llm_diagnostics"
-        )
+        summary["property_reports"] = _run_stage2(
+            "property_reports",
+            lambda: _upsert_property_reports(engine, run_date, run_dir / "property_reports"),
+        ) or 0
+        summary["llm_reports"] = _run_stage2(
+            "llm_reports",
+            lambda: _upsert_llm_report(engine, run_date, run_dir / "llm_report.json", shard_id=shard_id),
+        ) or 0
+        summary["llm_property_details"] = _run_stage2(
+            "llm_property_details",
+            lambda: _upsert_llm_property_details(engine, run_date, run_dir / "llm_report"),
+        ) or 0
+        summary["llm_diagnostics"] = _run_stage2(
+            "llm_diagnostics",
+            lambda: _upsert_llm_diagnostics(engine, run_date, run_dir / "llm_diagnostics"),
+        ) or 0
         # DLQ is cross-run global state — lives under state/, not runs/.
         # Without this mirror, Cloud Run's ephemeral /tmp loses every
         # parked property the moment the container exits.
-        summary["dlq"] = _sync_dlq(engine, state_dir / "dlq.jsonl")
+        summary["dlq"] = _run_stage2(
+            "dlq",
+            lambda: _sync_dlq(engine, state_dir / "dlq.jsonl"),
+        ) or {"upserted": 0, "deleted": 0}
+        # Retention sweep — last step. Never let a janitorial failure
+        # block a successful run from reporting completion; _run_stage2
+        # already records the error in summary["retention_error"] if it
+        # fails so the daily report still surfaces it.
+        summary["retention"] = _run_stage2(
+            "retention",
+            lambda: _apply_retention(engine),
+        ) or {}
     finally:
         try:
             src.close()
