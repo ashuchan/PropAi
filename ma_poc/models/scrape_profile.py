@@ -17,7 +17,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ma_poc.models.fetch_tier import FetchTier
+from models.fetch_tier import FetchTier
 
 
 class ProfileMaturity(StrEnum):
