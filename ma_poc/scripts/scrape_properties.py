@@ -616,9 +616,10 @@ def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
     """
     target: list[dict] = []
     seen: set[str] = set()
+    _property_id: str = str(scrape_result.get("canonical_id") or scrape_result.get("property_id") or "")
 
     def _add(rec: dict) -> None:
-        key = _add_dedup_key_for_unit(rec)
+        key = _add_dedup_key_for_unit(rec, _property_id)
         if not key or key in seen:
             return
         seen.add(key)

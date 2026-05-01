@@ -56,12 +56,12 @@ def compute_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | No
     )
 
     raw_sqft = (
-        unit.get("area")
+        unit.get("_sqft")
+        if unit.get("_sqft") is not None
+        else unit.get("area")
         if unit.get("area") is not None
         else unit.get("sqft")
         if unit.get("sqft") is not None
-        else unit.get("_sqft")
-        if unit.get("_sqft") is not None
         else unit.get("square_feet")
     )
     sqft_bucket = ""

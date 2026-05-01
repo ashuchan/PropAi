@@ -868,4 +868,32 @@ config/
 data/
 ├── runs/{date}/                 # Per-run outputs
 └── state/                       # Persistent state (frontier, DLQ, cache)
+
+---
+
+### Unit Identity Resolution (Post PR #21)
+
+Unit identity uses a two-tier cascade:
+
+**Tier 1 — Natural key:** `unit_id` from the PMS API (e.g., unit number "101").
+Set by all API-level parsers in `scrape_properties.py`.
+
+**Tier 2 — Stable fallback:** `compute_fallback_unit_id(unit, property_id)` from
+`ma_poc/scripts/identity_fallback.py`. Called by `_add()` in `scrape_properties.py`
+when `unit_id` is absent. Hash inputs: `property_id | floor_plan | beds | baths | sqft±10`.
+**Rent and available_date are never hashed** — they are attributes, not identity.
+The resulting `inferred_{sha256[:16]}` ID is written onto the unit record before it
+reaches `upsert_units`.
+
+**Field stripping** (`_sqft`, `_floor_plan`, `_bedrooms`) now occurs AFTER
+`state.upsert_units()` so physical attributes are persisted in the state snapshot
+and available for carry-forward.
+
+**Carry-forward** fires when `scrape_failed OR not target_units AND state.is_known(cid)`.
+Properties are pre-registered before the first scrape so COLD properties are
+immediately eligible.
+
+**Grace period:** units missing from a partial scrape are not immediately marked
+disappeared. `absent_streak` is incremented per run; `disappeared` is only appended
+to the diff after `absent_streak >= disappeared_grace_days` (default: 2).
 ```

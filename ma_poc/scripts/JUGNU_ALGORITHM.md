@@ -354,10 +354,15 @@ Runs per-record, then computes property-level flags.
    - Date: try ISO, then plain date. Reject if neither parses (`INVALID_DATE_FORMAT`).
    - Unit ID: if missing → `compute_fallback_id(record)`; on failure (<2 identifying fields) → reject (`IDENTITY_FALLBACK_INSUFFICIENT`).
 
-2. **Identity fallback** (`identity_fallback.py::compute_fallback_id`):
-   - Hash inputs in fixed order: normalised floor_plan_name → bedrooms → bathrooms (default 0) → sqft rounded to nearest 10 → rent rounded to nearest 25.
-   - Require both `floor_plan` AND `bedrooms` — otherwise return None.
-   - Output: `inferred_{sha256[:12]}`. Never `hash()`.
+2. **Identity fallback** (`ma_poc/scripts/identity_fallback.py::compute_fallback_unit_id`):
+   - **Canonical location:** `ma_poc/scripts/identity_fallback.py` (moved from validation/ in PR #21).
+   - Hash inputs in fixed order: `property_id` → normalised `floor_plan_name` → `beds` → `baths` → `sqft` rounded to nearest 10.
+   - **Rent and available_date deliberately excluded** — these are mutable attributes, not physical identity.
+   - Field name aliases accepted: `floor_plan_name` or `_floor_plan`, `beds`/`bedrooms`/`_bedrooms`, `baths`/`bathrooms`/`_bathrooms`, `_sqft`/`area`/`sqft` (`_sqft` takes priority).
+   - `area = -1` sentinel treated as absent (coerced to empty string before hashing).
+   - Require `floor_plan` AND at least one other non-empty field — otherwise return None.
+   - Output: `inferred_{sha256[:16]}`. Never `hash()`.
+   - Legacy `compute_fallback_id` (v1) retained for backward compat with existing state files — still includes rent. Migrate all new callers to `compute_fallback_unit_id`.
    - If inferred: set `inferred_id=True`, accept, emit `IDENTITY_FALLBACK`.
 
 3. **Cross-run sanity** (`cross_run_sanity.py::sanity_check`): compared against historical record. **Flags only — never rejects:**
@@ -558,6 +563,12 @@ Persistent state in `data/{v2/?}state/`:
 ## 8. Known issues / areas to flag for review
 
 The items below are inconsistencies, ambiguities, or design trade-offs that surfaced while mapping the algorithm. They are intentionally listed for external feedback.
+
+~~**`identity_fallback.py` was dead code.**~~ Fixed in PR #21.
+  `compute_fallback_unit_id` is now wired into `scrape_properties._add()`
+  and produces stable, rent-free `inferred_` IDs for units without a natural key.
+  The function lives at `ma_poc/scripts/identity_fallback.py`.
+  `compute_fallback_id` (v1, rent-volatile) is retained as a deprecated shim only.
 
 1. **Carry-forward verdict mislabelling.** The Stage 3 branch stamps `_meta.verdict = "SUCCESS"` with `verdict_reason = "carry_forward_applied"` and returns without going through the Verdict layer. The `CARRY_FORWARD` verdict string defined in `verdict.py` is therefore never produced in this path. Downstream reporting that filters on `verdict == "CARRY_FORWARD"` will find zero matches. Expected behavior: should CF be a first-class verdict, or is "SUCCESS + reason tag" sufficient?
 
