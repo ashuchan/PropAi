@@ -16,6 +16,8 @@ from tests.unit_matching.conftest import (
     CID, D1, D2, D3, D4, store, stable_fallback_id, make_api_unit, make_no_id_unit
 )
 
+D5 = "2026-04-29"
+
 
 def scrape_to_state(store, scrape_result, canonical_id, run_date):
     """
@@ -327,3 +329,288 @@ class TestE2EMultiProperty:
         assert snap["absent_streak"] == 1
         assert snap["disappeared_since"] == D2
         assert snap["sqft"] is not None  # physical attrs survived
+
+
+# ── Helpers shared by extended tests ─────────────────────────────────────────
+
+def _sm_scrape(units_data, floor_plans_data):
+    """Build a minimal SightMap scrape_result from raw unit/floor-plan dicts."""
+    return {
+        "_raw_api_responses": [{
+            "url": "https://sightmap.com/app/api/v1/leasables",
+            "body": {"data": {"units": units_data, "floor_plans": floor_plans_data}},
+        }],
+        "units": [],
+    }
+
+
+def _entrata_scrape(units_list):
+    """Build a scrape_result using the entrata fallback path (no API responses)."""
+    return {"_raw_api_responses": [], "units": units_list}
+
+
+_FP1 = [{"id": "fp1", "bedroom_count": 1, "bathroom_count": 1, "area": 750, "name": "Plan A"}]
+_FP2 = [{"id": "fp1", "bedroom_count": 2, "bathroom_count": 1, "area": 950, "name": "Plan B"}]
+
+
+class TestE2ECarryForwardChain:
+
+    def test_e2e_11_cf_chain_then_real_scrape_resets_carryforward_days(self, store):
+        """
+        D1: real scrape, 3 units.
+        D2 + D3: scrape fails → CF fires for two consecutive days.
+        D4: real scrape succeeds with same 3 units at same prices.
+
+        Proves:
+        - carryforward_days increments (1, 2) through the chain.
+        - When real data resumes on D4, carryforward_days resets to 0.
+        - D4 units appear as 'unchanged' (not spurious 'updated') because
+          rent/availability have not changed — only the carryforward bookkeeping did.
+        """
+        store.upsert_property(CID, {"canonical_id": CID}, D1)
+
+        units_sm = [
+            {"unit_number": "101", "price": 1800, "floor_plan_id": "fp1"},
+            {"unit_number": "201", "price": 2100, "floor_plan_id": "fp1"},
+            {"unit_number": "301", "price": 1650, "floor_plan_id": "fp1"},
+        ]
+        sr_real = _sm_scrape(units_sm, _FP2)
+        sr_fail = {"_raw_api_responses": [], "units": []}
+
+        # D1: fresh scrape
+        scrape_to_state(store, sr_real, CID, D1)
+
+        # D2: fail → CF
+        _, out_d2, cf_d2 = scrape_to_state(store, sr_fail, CID, D2)
+        assert cf_d2, "CF must fire on D2"
+        assert all(u.get("carryforward_days") == 1 for u in out_d2), \
+            "CF output on D2 must have carryforward_days=1"
+
+        # D3: fail → CF again
+        _, out_d3, cf_d3 = scrape_to_state(store, sr_fail, CID, D3)
+        assert cf_d3, "CF must fire on D3"
+        assert all(u.get("carryforward_days") == 2 for u in out_d3), \
+            "CF output on D3 must have carryforward_days=2"
+
+        # D4: real scrape resumes with identical data
+        diff_d4, _, cf_d4 = scrape_to_state(store, sr_real, CID, D4)
+        assert not cf_d4, "D4 is a real scrape — CF must NOT fire"
+        assert set(diff_d4["unchanged"]) == {"101", "201", "301"}, \
+            "all units must be 'unchanged' after real scrape resumes"
+        assert diff_d4["updated"] == [], "no spurious 'updated' when carryforward_days resets"
+        assert diff_d4["disappeared"] == []
+
+        for uid in ("101", "201", "301"):
+            snap = store.unit_index[CID][uid]
+            assert snap["carryforward_days"] == 0, \
+                f"unit {uid}: carryforward_days must be 0 after real scrape"
+
+
+class TestE2EChangeDetection:
+
+    def test_e2e_12_available_date_change_alone_triggers_updated(self, store):
+        """
+        Unit 101: rent unchanged, but available_date moves forward.
+        Must appear in 'updated' with changed_fields=['available_date'].
+        Proves: change detection covers available_date, not just rent.
+        """
+        store.upsert_property(CID, {"canonical_id": CID}, D1)
+
+        sr_d1 = _sm_scrape(
+            [{"unit_number": "101", "price": 1800, "floor_plan_id": "fp1",
+              "available_on": "2026-06-01"}],
+            _FP2,
+        )
+        scrape_to_state(store, sr_d1, CID, D1)
+
+        sr_d2 = _sm_scrape(
+            [{"unit_number": "101", "price": 1800, "floor_plan_id": "fp1",
+              "available_on": "2026-07-15"}],  # later avail date, same rent
+            _FP2,
+        )
+        diff_d2, _, _ = scrape_to_state(store, sr_d2, CID, D2)
+
+        assert "101" in diff_d2["updated"], \
+            "unit with changed available_date must appear in 'updated'"
+        assert diff_d2["new"] == []
+        assert diff_d2["disappeared"] == []
+        snap = store.unit_index[CID]["101"]
+        assert "available_date" in snap.get("changed_fields", []), \
+            "changed_fields must record available_date"
+
+    def test_e2e_13_concession_change_triggers_updated(self, store):
+        """
+        Unit 201: rent and available_date unchanged, concession string added.
+        Must appear in 'updated' with changed_fields=['concessions'].
+        Proves: concessions field participates in change detection.
+        """
+        store.upsert_property(CID, {"canonical_id": CID}, D1)
+        store.upsert_units(CID, [make_api_unit("201", rent_lo=2000.0, rent_hi=2000.0)], D1)
+
+        unit_with_concession = {**make_api_unit("201", rent_lo=2000.0, rent_hi=2000.0),
+                                 "concessions": "1 month free"}
+        diff_d2 = store.upsert_units(CID, [unit_with_concession], D2)
+
+        assert "201" in diff_d2["updated"], "adding a concession must trigger 'updated'"
+        snap = store.unit_index[CID]["201"]
+        assert "concessions" in snap.get("changed_fields", [])
+
+
+class TestE2EDisappearAndReappear:
+
+    def test_e2e_14_unit_reappears_after_post_grace_disappear(self, store):
+        """
+        Unit 201 disappears at D3 (after grace_days=2 streak).
+        On D4 it returns at the same rent.
+
+        Expected: 201 in diff['unchanged'] — the index entry is preserved so
+        history (first_seen_date) is retained. absent_streak and disappeared_since
+        reset to 0 / None.
+
+        Proves: reappearance after full disappear clears the absent state
+        without discarding the unit's history.
+        """
+        store.upsert_property(CID, {"canonical_id": CID}, D1)
+
+        full_set = [make_api_unit("101"), make_api_unit("201"), make_api_unit("301")]
+        partial_set = [make_api_unit("101"), make_api_unit("301")]  # 201 absent
+
+        store.upsert_units(CID, full_set, D1)
+        store.upsert_units(CID, partial_set, D2)   # streak=1 for 201
+        diff_d3 = store.upsert_units(CID, partial_set, D3)  # streak=2 → disappeared
+
+        assert "201" in diff_d3["disappeared"], "201 must be disappeared on D3"
+
+        # D4: 201 comes back at same rent — same values, so 'unchanged'
+        diff_d4 = store.upsert_units(CID, full_set, D4)
+        assert "201" in diff_d4["unchanged"], \
+            "unit returning at same rent after disappear must be 'unchanged' (history preserved)"
+        assert "201" not in diff_d4["new"]
+        assert "201" not in diff_d4["updated"]
+
+        snap = store.unit_index[CID]["201"]
+        assert snap["absent_streak"] == 0, "absent_streak must reset to 0 on reappearance"
+        assert snap["disappeared_since"] is None, "disappeared_since must clear on reappearance"
+        assert snap["first_seen_date"] == D1, \
+            "first_seen_date must be preserved from original appearance, not reset"
+
+    def test_e2e_15_disappeared_unit_excluded_from_cf(self, store):
+        """
+        Unit 201 disappears on D3 (post-grace). On D4 the scrape fails.
+        CF must NOT resurrect 201 — only the still-active unit 101 appears in CF output.
+        Proves: carry_forward_units skips records with disappeared_since set.
+        """
+        store.upsert_property(CID, {"canonical_id": CID}, D1)
+
+        store.upsert_units(CID, [make_api_unit("101"), make_api_unit("201")], D1)
+        store.upsert_units(CID, [make_api_unit("101")], D2)   # 201 streak=1
+        store.upsert_units(CID, [make_api_unit("101")], D3)   # 201 streak=2 → disappeared
+
+        # Verify 201 is flagged
+        assert store.unit_index[CID]["201"]["disappeared_since"] == D2
+
+        # D4: scrape fails → CF fires
+        cf_units = store.carry_forward_units(CID, D4)
+        cf_ids = {u["unit_id"] for u in cf_units}
+        assert "101" in cf_ids, "active unit 101 must be in CF"
+        assert "201" not in cf_ids, \
+            "disappeared unit 201 must NOT be resurrected by carry-forward"
+
+
+class TestE2ESimultaneousDiff:
+
+    def test_e2e_16_new_and_disappeared_in_same_diff(self, store):
+        """
+        D1: [101, 201, 301]. D2: [101, 301, 401].
+        In the D2 diff:
+          - 401 appears in 'new'
+          - 201 is absent (streak=1, within grace=2) — NOT yet in 'disappeared'
+          - 101 and 301 are 'unchanged'
+        D3: [101, 301, 401] again. Now 201 streak=2 → 'disappeared'.
+        Proves: new arrivals and departures in the same run are correctly partitioned.
+        """
+        store.upsert_property(CID, {"canonical_id": CID}, D1)
+
+        d1_units = [make_api_unit("101"), make_api_unit("201"), make_api_unit("301")]
+        d2_units = [make_api_unit("101"), make_api_unit("301"), make_api_unit("401")]
+
+        store.upsert_units(CID, d1_units, D1)
+        diff_d2 = store.upsert_units(CID, d2_units, D2)
+
+        assert "401" in diff_d2["new"], "newly arrived unit must be in 'new'"
+        assert set(diff_d2["unchanged"]) == {"101", "301"}
+        assert diff_d2["disappeared"] == [], \
+            "201 is only at streak=1 on D2 — within grace, must NOT be in 'disappeared'"
+
+        diff_d3 = store.upsert_units(CID, d2_units, D3)
+        assert "201" in diff_d3["disappeared"], \
+            "201 at streak=2 on D3 must now be in 'disappeared'"
+        assert diff_d3["new"] == [], "no new units on D3"
+
+
+class TestE2ESqftNoise:
+
+    def test_e2e_17_sqft_noise_rounding_keeps_unit_stable(self, store):
+        """
+        Same physical unit: 948 sqft on D1, 952 sqft on D2 (measurement noise ±4).
+        Both round to the 10-bucket 950, so the fallback unit ID is the same.
+        Expected: D2 diff shows 'unchanged' (rent same), NOT 'new'.
+        Proves: sqft rounding in compute_fallback_unit_id absorbs minor measurement drift.
+        """
+        store.upsert_property(CID, {"canonical_id": CID}, D1)
+
+        def make_entrata_unit(sqft_str):
+            return {
+                "floor_plan_name": "Studio",
+                "bedrooms": "0",
+                "bathrooms": "1",
+                "sqft": sqft_str,
+                "rent_range": "$1,200",
+                "availability_date": D1,
+            }
+
+        sr_d1 = _entrata_scrape([make_entrata_unit("948")])
+        diff_d1, _, _ = scrape_to_state(store, sr_d1, CID, D1)
+        assert len(diff_d1["new"]) == 1
+        uid_d1 = diff_d1["new"][0]
+        assert uid_d1.startswith("inferred_"), "must use fallback identity"
+
+        # D2: same unit but API returns 952 instead of 948
+        sr_d2 = _entrata_scrape([make_entrata_unit("952")])
+        diff_d2, _, _ = scrape_to_state(store, sr_d2, CID, D2)
+
+        assert uid_d1 in diff_d2["unchanged"], \
+            "sqft 948→952 (same 10-bucket) must match as 'unchanged', not 'new'"
+        assert diff_d2["new"] == [], "no phantom new unit due to sqft noise"
+        assert diff_d2["disappeared"] == []
+
+    def test_e2e_18_sqft_different_bucket_creates_separate_unit(self, store):
+        """
+        Unit changes floor plan tier: 948 sqft (bucket 950) on D1, then 1048 sqft
+        (bucket 1050) on D2 — different buckets → different fallback IDs.
+        Expected: D2 diff has D2-unit as 'new' and D1-unit as absent (streak=1, no disappear).
+        Proves: sqft rounding discriminates genuinely different unit sizes.
+        """
+        store.upsert_property(CID, {"canonical_id": CID}, D1)
+
+        def make_unit(sqft_str):
+            return {
+                "floor_plan_name": "Studio",
+                "bedrooms": "0",
+                "bathrooms": "1",
+                "sqft": sqft_str,
+                "rent_range": "$1,200",
+                "availability_date": D1,
+            }
+
+        diff_d1, _, _ = scrape_to_state(
+            store, _entrata_scrape([make_unit("948")]), CID, D1)
+        uid_d1 = diff_d1["new"][0]
+
+        diff_d2, _, _ = scrape_to_state(
+            store, _entrata_scrape([make_unit("1048")]), CID, D2)
+
+        assert diff_d2["new"] != [], "1048-sqft unit must be treated as new"
+        uid_d2 = diff_d2["new"][0]
+        assert uid_d1 != uid_d2, "different sqft buckets must produce different fallback IDs"
+        assert diff_d2["disappeared"] == [], "D1 unit still within grace period on D2"
