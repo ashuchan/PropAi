@@ -14,6 +14,7 @@ import urllib.parse
 from datetime import datetime
 from typing import Any
 
+from config.feature_flags import ENABLE_TIER_ESCALATION  # E0: wired; used in E3
 from models.scrape_profile import (
     ApiEndpoint,
     BlockedEndpoint,

@@ -209,6 +209,8 @@ __marimo__/
 config/Properties.csv
 ma_poc/config/*
 !ma_poc/config/prompts/
+!ma_poc/config/__init__.py
+!ma_poc/config/feature_flags.py
 ma_poc/data/
 ma_poc/output/properties_smoke.json
 ma_poc/frontend/node_modules/

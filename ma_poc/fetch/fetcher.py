@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from ..config.feature_flags import ENABLE_TIER_ESCALATION
 from ..discovery.contracts import CrawlTask
 from ..observability.events import EventKind, emit
 from .browser_pool import BrowserContextPool
@@ -92,6 +93,8 @@ class Fetcher:
         Returns:
             A FetchResult. Never raises.
         """
+        # E0: flag imported above; escalation logic added in Phase E3
+        _ = ENABLE_TIER_ESCALATION
         start_ms = _now_ms()
         host = urlparse(task.url).netloc
         identity = self._identities.pick(sticky_key=task.property_id)
