@@ -166,6 +166,50 @@ class CostLedger:
             },
         )
 
+    def record_fetch_tier(
+        self,
+        property_id: str,
+        fetch_tier: str,
+        cost_usd: float,
+        body_bytes: int = 0,
+        escalation_count: int = 0,
+    ) -> None:
+        """Record a fetch-tier escalation cost entry.
+
+        Args:
+            property_id: Canonical property ID.
+            fetch_tier: FetchTier name (DIRECT, DC_PROXY, RESIDENTIAL, UNLOCKER).
+            cost_usd: Estimated cost for this fetch.
+            body_bytes: Response body size in bytes.
+            escalation_count: Number of escalation hops taken.
+        """
+        self._insert(
+            property_id,
+            "",
+            fetch_tier,
+            "proxy_fetch_tier",
+            cost_usd,
+            {
+                "fetch_tier": fetch_tier,
+                "body_bytes": body_bytes,
+                "escalation_count": escalation_count,
+            },
+        )
+
+    def rollup_by_fetch_tier(self) -> dict[str, float]:
+        """Aggregate proxy costs by fetch tier.
+
+        Returns:
+            Dict mapping fetch tier name to total cost in USD.
+        """
+        rows = self._conn.execute(
+            """SELECT tier_used, SUM(cost_usd) as total
+               FROM cost_entries
+               WHERE category = 'proxy_fetch_tier'
+               GROUP BY tier_used"""
+        ).fetchall()
+        return {row["tier_used"]: round(row["total"], 6) for row in rows}
+
     def rollup_by_pms(self) -> dict[str, dict[str, float]]:
         """Aggregate costs by PMS platform.
 

@@ -56,6 +56,10 @@ class FetchResult:
     # Populated by response_classifier on retriable outcomes
     error_signature: str | None = None
     proxy_used: str | None = None
+    # Fetch-tier escalation fields (Phase E1+)
+    fetch_tier_used: int = 0  # FetchTier value — int avoids circular import
+    fetch_tier_attempts: list[int] = field(default_factory=list)
+    block_signature: str | None = None
 
     def ok(self) -> bool:
         """True when fetch succeeded with a 2xx response."""

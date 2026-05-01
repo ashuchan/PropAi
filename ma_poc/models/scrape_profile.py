@@ -17,6 +17,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ma_poc.models.fetch_tier import FetchTier
+
 
 class ProfileMaturity(StrEnum):
     COLD = "COLD"
@@ -191,6 +193,27 @@ class ProfileStats(BaseModel):
     consecutive_llm_rescue_failures: int = 0
 
 
+class FetchProfile(BaseModel):
+    """Persisted fetch-tier state for a property.
+
+    Lives at ScrapeProfile.fetch. Updated by services/profile_updater.py
+    after every fetch (success or failure).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    tier_floor: FetchTier = FetchTier.DIRECT
+    last_success_tier: FetchTier | None = None
+    consecutive_successes_at_floor: int = 0
+    consecutive_failures_at_floor: int = 0
+    last_block_signature: str | None = None
+    last_demotion_probe_at: datetime | None = None
+    promoted_at: datetime | None = None
+    total_escalations: int = 0
+    daily_unlocker_count: int = 0
+    daily_unlocker_count_date: str | None = None  # ISO date of last reset
+
+
 class ScrapeProfile(BaseModel):
     """Per-property scraping profile that learns optimal extraction strategy."""
 
@@ -209,6 +232,7 @@ class ScrapeProfile(BaseModel):
     confidence: ExtractionConfidence = Field(default_factory=ExtractionConfidence)
     llm_artifacts: LlmArtifacts = Field(default_factory=LlmArtifacts)
     stats: ProfileStats = Field(default_factory=ProfileStats)
+    fetch: FetchProfile = Field(default_factory=FetchProfile)
 
 
 def detect_platform(url: str) -> str | None:

@@ -69,6 +69,15 @@ class EventKind(StrEnum):
     LLM_RESCUE_SUCCEEDED = "extract.llm_rescue_succeeded"
     LLM_RESCUE_FAILED = "extract.llm_rescue_failed"
 
+    # Fetch-tier escalation events (Phase E3+)
+    FETCH_TIER_ESCALATED = "fetch.tier_escalated"
+    FETCH_TIER_PERSISTED = "fetch.tier_persisted"
+    FETCH_TIER_DEMOTED = "fetch.tier_demoted"
+    FETCH_LADDER_EXHAUSTED = "fetch.ladder_exhausted"
+    FETCH_TIER_PROBE_SUCCESS = "fetch.tier_probe_success"
+    FETCH_TIER_PROBE_FAILED = "fetch.tier_probe_failed"
+    FETCH_LADDER_BUDGET_EXHAUSTED = "fetch.ladder_budget_exhausted"
+
 
 @dataclass(slots=True, frozen=True)
 class Event:

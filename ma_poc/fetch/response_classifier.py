@@ -14,6 +14,7 @@ import logging
 import ssl
 from socket import gaierror
 
+from .block_signatures import match_block_signature
 from .captcha_detect import looks_like_captcha
 from .contracts import FetchOutcome
 
@@ -51,6 +52,8 @@ def classify(
 
     Returns:
         Tuple of (FetchOutcome, error_signature_or_none).
+        Use match_block_signature() separately when outcome is BOT_BLOCKED
+        to get the block_signature (cf_turnstile, px_block, etc.).
     """
     # Exception-based classification first
     if exception is not None:
@@ -86,11 +89,10 @@ def classify(
     if status == 403:
         is_captcha, provider = looks_like_captcha(body_head or b"")
         if is_captcha:
-            return (
-                FetchOutcome.BOT_BLOCKED,
-                "CF_CHALLENGE" if provider == "cloudflare" else f"CAPTCHA_{(provider or 'unknown').upper()}",
-            )
-        return FetchOutcome.HARD_FAIL, "HTTP_403"
+            sig = "CF_CHALLENGE" if provider == "cloudflare" else f"CAPTCHA_{(provider or 'unknown').upper()}"
+            return FetchOutcome.BOT_BLOCKED, sig
+        # All 403s are bot-blocked — use match_block_signature at call site
+        return FetchOutcome.BOT_BLOCKED, "HTTP_403"
 
     if 500 <= status < 600:
         return FetchOutcome.TRANSIENT, f"HTTP_{status}"
