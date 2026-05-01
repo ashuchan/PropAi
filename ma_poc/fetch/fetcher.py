@@ -15,8 +15,11 @@ import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:
+    from ..models.scrape_profile import ScrapeProfile
 
 import httpx
 
@@ -73,8 +76,12 @@ class Fetcher:
         self._browsers = browsers
         self._retry = retry
 
-    async def fetch(self, task: CrawlTask) -> FetchResult:
+    async def fetch(self, task: CrawlTask, profile: "ScrapeProfile | None" = None) -> FetchResult:
         """Top-level entry. Never raises on transient errors.
+
+        When ENABLE_TIER_ESCALATION is True and a profile is supplied, delegates
+        to fetch_with_escalation() which runs the full tier ladder.  Otherwise
+        falls through to the existing single-tier fetch loop.
 
         Flow:
           1. robots allow-check
@@ -89,12 +96,14 @@ class Fetcher:
 
         Args:
             task: The CrawlTask describing what to fetch.
+            profile: ScrapeProfile for tier-escalation routing (optional).
 
         Returns:
             A FetchResult. Never raises.
         """
-        # E0: flag imported above; escalation logic added in Phase E3
-        _ = ENABLE_TIER_ESCALATION
+        if ENABLE_TIER_ESCALATION and profile is not None:
+            from .tier_escalator import fetch_with_escalation
+            return await fetch_with_escalation(task, profile)
         start_ms = _now_ms()
         host = urlparse(task.url).netloc
         identity = self._identities.pick(sticky_key=task.property_id)

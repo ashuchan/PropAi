@@ -282,3 +282,62 @@ def update_profile_after_extraction(
     profile.version += 1
     store.save(profile)
     return profile
+
+
+def update_fetch_profile_after_fetch(
+    profile: Any,
+    result: Any,
+) -> Any:
+    """Update profile.fetch based on a completed fetch. Never raises.
+
+    Called after every fetch when ENABLE_TIER_ESCALATION is True.
+    Handles promotion, demotion, and failure tracking.
+
+    Args:
+        profile: ScrapeProfile instance.
+        result: FetchResult instance.
+
+    Returns:
+        Updated ScrapeProfile (same object, mutated in place).
+    """
+    if not ENABLE_TIER_ESCALATION:
+        return profile
+    try:
+        from datetime import UTC
+        from ma_poc.models.fetch_tier import FetchTier
+        from ma_poc.observability.events import EventKind, emit
+
+        fp = profile.fetch
+        outcome = result.outcome if hasattr(result.outcome, "value") else str(result.outcome)
+        outcome_str = outcome.value if hasattr(outcome, "value") else str(outcome)
+        tier_used = int(result.fetch_tier_used)
+
+        if outcome_str in ("OK", "NOT_MODIFIED"):
+            fp.last_success_tier = FetchTier(tier_used)
+
+            if tier_used > int(fp.tier_floor):
+                # Promotion: property needed a higher tier today
+                fp.tier_floor = FetchTier(tier_used)
+                fp.promoted_at = datetime.now(UTC)
+                fp.total_escalations += 1
+                fp.consecutive_successes_at_floor = 1
+                fp.consecutive_failures_at_floor = 0
+                emit(EventKind.FETCH_TIER_PERSISTED, profile.canonical_id,
+                     new_floor=fp.tier_floor.name, reason="promotion")
+            elif tier_used == int(fp.tier_floor):
+                fp.consecutive_successes_at_floor += 1
+                fp.consecutive_failures_at_floor = 0
+            else:
+                # Demotion: probe at lower tier succeeded
+                fp.tier_floor = FetchTier(tier_used)
+                fp.consecutive_successes_at_floor = 1
+                fp.consecutive_failures_at_floor = 0
+                emit(EventKind.FETCH_TIER_DEMOTED, profile.canonical_id,
+                     new_floor=fp.tier_floor.name)
+        else:
+            fp.consecutive_failures_at_floor += 1
+            if outcome_str == "BOT_BLOCKED":
+                fp.last_block_signature = result.block_signature
+    except Exception as e:
+        log.warning("fetch profile update failed: %s", e)
+    return profile
