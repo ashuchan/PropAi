@@ -919,15 +919,14 @@ async def run_daily(
             else:
                 scrape_result["extraction_tier_used"] = "TIER_1_API"
 
-        # Strip the internal helper fields (underscore-prefixed) that the
-        # transformer uses for aggregates. We still need the originals for
-        # stats, so compute stats before stripping.
-        public_units = [{k: v for k, v in u.items() if not k.startswith("_")} for u in target_units]
-
+        # Validate using stripped units (schema check doesn't need _ fields).
+        public_units_for_validate = [
+            {k: v for k, v in u.items() if not k.startswith("_")} for u in target_units
+        ]
         # ── Validate ───────────────────────────────────────────────────────
-        per_prop_issues.extend(V.validate_units(public_units, cid))
+        per_prop_issues.extend(V.validate_units(public_units_for_validate, cid))
 
-        if not public_units and not scrape_failed:
+        if not target_units and not scrape_failed:
             per_prop_issues.append(
                 V.warning(
                     V.UNITS_EMPTY,
@@ -938,16 +937,24 @@ async def run_daily(
                 )
             )
 
+        # ── Pre-register property so CF fires on very first failure ───────
+        # Must happen BEFORE the CF check so is_known() returns True for COLD
+        # properties on their first ever failed scrape.
+        if not state.is_known(cid):
+            state.upsert_property(cid, {"canonical_id": cid}, run_date)
+
         # ── Carry-forward if we lost a previously-known property ───────────
+        # active_units tracks which set flows into upsert_units (full pre-strip
+        # units on success; CF units — already without _ prefix — on failure).
         carry_forward_used = False
-        if (scrape_failed or not public_units) and state.is_known(cid):
+        active_units: list[dict] = target_units  # full units with _ prefix
+        if (scrape_failed or not target_units) and state.is_known(cid):
             cf_units = state.carry_forward_units(cid, run_date)
             if cf_units:
                 carry_forward_used = True
                 carry_forward_count += 1
                 units_total["carried_forward"] += len(cf_units)
-                public_units = cf_units
-                # Recompute stats over the carry-forward set.
+                active_units = cf_units  # CF units have no _ prefix
                 per_prop_issues.append(
                     V.info(
                         V.UNITS_CARRIED_FORWARD,
@@ -959,10 +966,11 @@ async def run_daily(
                 )
 
         # ── Diff against unit state ────────────────────────────────────────
+        # Pass full pre-strip units so _sqft/_floor_plan/_bedrooms are stored.
         unit_diff: dict = {"new": [], "updated": [], "unchanged": [], "disappeared": []}
         try:
-            unit_diff = state.upsert_units(cid, public_units, run_date)
-            units_total["extracted"] += len(public_units)
+            unit_diff = state.upsert_units(cid, active_units, run_date)
+            units_total["extracted"] += len(active_units)
             units_total["new"] += len(unit_diff["new"])
             units_total["updated"] += len(unit_diff["updated"])
             units_total["unchanged"] += len(unit_diff["unchanged"])
@@ -987,6 +995,12 @@ async def run_daily(
                     details={"exception": str(e)},
                 )
             )
+
+        # Strip _-prefixed fields AFTER state write so output is clean.
+        # CF units have no _ prefix so stripping is a no-op for them.
+        public_units = [
+            {k: v for k, v in u.items() if not k.startswith("_")} for u in active_units
+        ]
 
         # ── Upsert property-level state ────────────────────────────────────
         try:
