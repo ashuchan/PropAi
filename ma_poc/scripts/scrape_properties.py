@@ -70,6 +70,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from entrata import scrape  # noqa: E402
+from identity_fallback import compute_fallback_unit_id  # noqa: E402
 
 # ── Unit transformation ────────────────────────────────────────────────────────
 
@@ -179,9 +180,10 @@ def _sightmap_units_from_body(body: dict, source_url: str) -> list[dict]:
                 or fp.get("image_secondary")
                 or None,
                 # Carry sqft for property-level Average Unit Size aggregate.
+                # Prefer unit-level area; fall back to floor plan area.
                 "_sqft": int(u["area"])
                 if isinstance(u.get("area"), (int, float)) and u["area"] > 0
-                else None,
+                else (int(fp["area"]) if isinstance(fp.get("area"), (int, float)) and fp["area"] > 0 else None),
                 "_floor_plan": fp.get("name") or fp.get("filter_label") or "",
                 "_bedrooms": fp.get("bedroom_count"),
             }
@@ -194,23 +196,20 @@ def _sightmap_units_from_body(body: dict, source_url: str) -> list[dict]:
 _RENT_MIN = 200
 _RENT_MAX = 50000
 
-# Extended to include generic keys like "id", "label", "name" — many PMS
-# APIs (e.g. ResMan, Yardi) use plain "id" for unit identifiers.  The gate
-# at line ~203 requires BOTH an id-key AND a rent-key to be present, so
-# "id" alone won't cause false positives on non-unit lists.
-_UNIT_ID_KEYS = {
+# Ordered tuple so iteration is deterministic — unit_number takes priority over
+# generic "id". "name" removed: it's a floor plan name, not a unit number.
+_UNIT_ID_KEYS = (
     "unit_number",
     "unitNumber",
+    "UnitNumber",
     "unit_id",
     "unitId",
-    "UnitNumber",
-    "id",
-    "label",
-    "name",
-    "ID",
     "unit_name",
     "unitName",
-}
+    "label",
+    "id",
+    "ID",
+)
 # Extended: some APIs nest rent inside an object (e.g. rent: {min, max})
 # rather than flat keys.  The _extract_rent() helper handles both.
 _RENT_KEYS = {
@@ -589,21 +588,44 @@ def _avalon_units_from_body(body, source_url: str) -> list[dict]:
     return out
 
 
+def _add_dedup_key_for_unit(rec: dict, property_id: str = "") -> str:
+    """Compute a stable within-run dedup key that excludes rent.
+
+    Priority:
+      1. unit_id (if non-empty)
+      2. compute_fallback_unit_id (physical attrs — rent-free)
+      3. last resort: floor_plan|beds|sqft string (no rent)
+    """
+    uid = str(rec.get("unit_id") or "").strip()
+    if uid:
+        return uid
+    fallback = compute_fallback_unit_id(rec, property_id) or ""
+    if fallback:
+        return fallback
+    # Last resort: stable physical key (no rent)
+    plan = str(rec.get("_floor_plan") or rec.get("floor_plan_name") or "")
+    beds = str(rec.get("_bedrooms") or rec.get("beds") or "")
+    sqft = str(rec.get("_sqft") or rec.get("area") or "")
+    return f"{plan}|{beds}|{sqft}"
+
+
 def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
     """
     Walk every captured raw API body and the parser's normalised units to
-    produce target-schema unit records, deduped by unit_id (or rent+sqft).
+    produce target-schema unit records, deduped by unit_id (or physical attrs).
     """
     target: list[dict] = []
     seen: set[str] = set()
 
     def _add(rec: dict) -> None:
-        key = (
-            rec.get("unit_id") or f"{rec.get('_floor_plan')}|{rec.get('_sqft')}|{rec.get('market_rent_low')}"
-        )
+        key = _add_dedup_key_for_unit(rec)
         if not key or key in seen:
             return
         seen.add(key)
+        # If unit_id was empty and we derived a stable fallback, write it onto the record
+        # so upsert_units can track the unit across runs by this ID.
+        if not str(rec.get("unit_id") or "").strip() and key.startswith("inferred_"):
+            rec = {**rec, "unit_id": key}
         target.append(rec)
 
     raw_responses = scrape_result.get("_raw_api_responses") or []
@@ -668,7 +690,14 @@ def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
             if m:
                 rent_lo = _money_to_int(m.group(1))
                 rent_hi = _money_to_int(m.group(2))
-            sqft_v = _money_to_int(u.get("sqft"))
+            sqft_raw = u.get("sqft")
+            sqft_v = None
+            if sqft_raw is not None:
+                try:
+                    n = int(float(str(sqft_raw)))
+                    sqft_v = n if n > 0 else None
+                except (ValueError, TypeError):
+                    pass
             _add(
                 {
                     "unit_id": u.get("unit_number") or "",
@@ -682,6 +711,7 @@ def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
                     "_sqft": sqft_v,
                     "_floor_plan": u.get("floor_plan_name") or "",
                     "_bedrooms": u.get("bedrooms") or None,
+                    "_bathrooms": u.get("bathrooms") or None,
                 }
             )
 

@@ -22,9 +22,17 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+# Ensure scripts/ is importable even when StateStore is imported from tests
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+from identity_fallback import compute_fallback_unit_id  # noqa: E402
 
 # ── File I/O helpers ──────────────────────────────────────────────────────────
 
@@ -57,6 +65,29 @@ def _safe_load(path: Path) -> dict:
             pass
         print(f"  ⚠ State file {path.name} unreadable ({e}); backed up to {backup.name}, starting fresh")
         return {}
+
+
+# ── Unit field helpers ────────────────────────────────────────────────────────
+
+
+def _first_not_none(record: dict, *keys: str) -> Any:
+    """Return the first value in record that is not None, across multiple key aliases."""
+    for k in keys:
+        v = record.get(k)
+        if v is not None:
+            return v
+    return None
+
+
+def _safe_sqft(v: Any) -> int | None:
+    """Coerce sqft value: return None for None, -1 (sentinel), or non-positive values."""
+    if v is None or v == -1:
+        return None
+    try:
+        n = int(float(str(v)))
+        return n if n > 0 else None
+    except (ValueError, TypeError):
+        return None
 
 
 # ── StateStore ────────────────────────────────────────────────────────────────
@@ -125,6 +156,7 @@ class StateStore:
         canonical_id: str,
         today_units: list[dict],
         run_date: str,
+        disappeared_grace_days: int = 2,
     ) -> dict:
         """
         Update the unit index with today's unit records and return a diff:
@@ -132,10 +164,13 @@ class StateStore:
             "new":          [unit_id, ...],   # new unit_ids not seen before
             "updated":      [unit_id, ...],   # seen before, rent/date changed
             "unchanged":    [unit_id, ...],
-            "disappeared":  [unit_id, ...],   # in yesterday's index but missing today
+            "disappeared":  [unit_id, ...],   # absent for >= disappeared_grace_days runs
           }
 
-        Only unit_ids whose schema includes a non-empty value are tracked.
+        When unit_id is empty, compute_fallback_unit_id() is used as key.
+        Units with no identity anchor (no unit_id, no physical fields) are skipped.
+        absent_streak tracks consecutive missing runs; units only enter disappeared
+        after streak >= disappeared_grace_days (default 2).
         """
         prior = dict(self.unit_index.get(canonical_id, {}))
         current_ids: set[str] = set()
@@ -144,34 +179,41 @@ class StateStore:
         for u in today_units:
             uid = str(u.get("unit_id") or "").strip()
             if not uid:
-                continue
+                # Try stable fallback from physical attributes
+                fallback = compute_fallback_unit_id(u, canonical_id)
+                if not fallback:
+                    continue  # no identity anchor — skip
+                uid = fallback
             current_ids.add(uid)
 
             # Persist the full unit snapshot (not just rent/availability) so
-            # a carry-forward on the next run produces a complete record
-            # instead of a stub with bedrooms/bathrooms/sqft/plan all null.
+            # a carry-forward on the next run produces a complete record.
             snapshot = {
                 "unit_id": uid,
                 "market_rent_low": u.get("market_rent_low"),
                 "market_rent_high": u.get("market_rent_high"),
                 "available_date": u.get("available_date"),
                 "concessions": u.get("concessions"),
-                # Extended fields — see carry_forward_units() below.
-                "bedrooms": u.get("bedrooms") or u.get("_bedrooms"),
-                "bathrooms": u.get("bathrooms") or u.get("_bathrooms"),
-                "sqft": u.get("sqft") or u.get("_sqft") or u.get("area"),
-                "floor_plan_name": u.get("floor_plan_name") or u.get("_floor_plan"),
-                "unit_number": u.get("unit_number") or u.get("_unit_number"),
+                # Extended fields — read both canonical and _-prefixed names.
+                "bedrooms": _first_not_none(u, "bedrooms", "_bedrooms"),
+                "bathrooms": _first_not_none(u, "bathrooms", "_bathrooms"),
+                "sqft": _safe_sqft(_first_not_none(u, "sqft", "_sqft", "area")),
+                "floor_plan_name": _first_not_none(u, "floor_plan_name", "_floor_plan"),
+                "unit_number": _first_not_none(u, "unit_number", "_unit_number"),
                 "bed_label": u.get("bed_label"),
                 "floor": u.get("floor"),
                 "building": u.get("building"),
                 "rent_range": u.get("rent_range"),
-                "lease_term": u.get("lease_term") or u.get("_lease_term"),
-                "move_in_date": u.get("move_in_date") or u.get("_move_in_date"),
+                "lease_term": _first_not_none(u, "lease_term", "_lease_term"),
+                "move_in_date": _first_not_none(u, "move_in_date", "_move_in_date"),
                 "availability_status": u.get("availability_status"),
                 "last_seen_date": run_date,
                 "last_seen_at": datetime.now(UTC).isoformat(),
-                "carryforward_days": 0,
+                # Preserve carryforward_days from incoming unit (not hardcoded 0).
+                "carryforward_days": int(u.get("carryforward_days") or 0),
+                # Reset absent state on each appearance.
+                "absent_streak": 0,
+                "disappeared_since": None,
             }
 
             if uid in prior:
@@ -194,12 +236,15 @@ class StateStore:
 
         for uid in list(prior.keys()):
             if uid not in current_ids:
-                diff["disappeared"].append(uid)
-                # Keep the stale record — flag it so the report can surface it and
-                # later runs can re-discover if it comes back.
                 rec = prior[uid]
-                rec.setdefault("disappeared_since", run_date)
+                streak = rec.get("absent_streak", 0) + 1
+                rec["absent_streak"] = streak
+                # setdefault would not update a key already present with None value
+                if rec.get("disappeared_since") is None:
+                    rec["disappeared_since"] = run_date
                 rec["last_absent_date"] = run_date
+                if streak >= disappeared_grace_days:
+                    diff["disappeared"].append(uid)
 
         self.unit_index[canonical_id] = prior
         return diff
