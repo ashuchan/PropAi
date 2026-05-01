@@ -49,8 +49,11 @@ def _make_task() -> MagicMock:
 
 def _make_profile(floor: FetchTier = FetchTier.DIRECT) -> MagicMock:
     profile = MagicMock()
-    profile.fetch = MagicMock()
-    profile.fetch.tier_floor = floor
+    fp = MagicMock()
+    fp.tier_floor = floor
+    fp.consecutive_successes_at_floor = 0  # no probe needed
+    fp.last_demotion_probe_at = None
+    profile.fetch = fp
     return profile
 
 

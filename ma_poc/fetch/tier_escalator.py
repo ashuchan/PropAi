@@ -7,14 +7,16 @@ MAX_ESCALATIONS_PER_RUN per call to fetch_with_escalation().
 Feature-flag gated: when ENABLE_TIER_ESCALATION is False the escalator is a
 no-op wrapper around DirectProvider.
 
-Phase E3 wires DIRECT → DC_PROXY (when ENABLE_DC_PROXY_TIER is True).
-Phase E4 adds RESIDENTIAL; Phase E5 adds UNLOCKER.
+Phase E3: DIRECT → DC_PROXY
+Phase E4: adds RESIDENTIAL + probe-demotion check
+Phase E5: adds UNLOCKER + DLQ_PARK terminal
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Sequence
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from ma_poc.config.feature_flags import (
     ENABLE_DC_PROXY_TIER,
@@ -36,10 +38,15 @@ log = logging.getLogger(__name__)
 # Hard cap on per-call escalation hops (prevents runaway cost on a bad actor)
 MAX_ESCALATIONS_PER_RUN: int = 3
 
+# After this many consecutive successes at a non-DIRECT floor, try probing lower
+PROBE_AFTER_N_SUCCESSES: int = 5
+
+# Minimum time between demotion probes for the same property
+PROBE_MIN_INTERVAL_HOURS: int = 24
+
 # Tiers that are allowed to skip directly to a higher tier (e.g. from profile floor)
 # Maps FetchTier → set of FetchTiers that may be skipped on the way up
 TIER_SKIP_RULES: dict[FetchTier, set[FetchTier]] = {
-    # If floor is already DC_PROXY, we don't retry DIRECT on BOT_BLOCKED
     FetchTier.DC_PROXY: {FetchTier.DIRECT},
     FetchTier.RESIDENTIAL: {FetchTier.DIRECT, FetchTier.DC_PROXY},
     FetchTier.UNLOCKER: {FetchTier.DIRECT, FetchTier.DC_PROXY, FetchTier.RESIDENTIAL},
@@ -50,18 +57,54 @@ def _build_ladder(floor: FetchTier) -> list[FetchTier]:
     """Return the ordered list of tiers to attempt, starting at floor.
 
     Only includes tiers that are enabled by feature flags.
+    DLQ_PARK is never included in the active ladder — it's signalled by
+    exhaustion.
     """
     all_tiers: list[tuple[FetchTier, bool]] = [
         (FetchTier.DIRECT, True),
         (FetchTier.DC_PROXY, ENABLE_DC_PROXY_TIER),
         (FetchTier.RESIDENTIAL, ENABLE_RESIDENTIAL_TIER),
         (FetchTier.UNLOCKER, ENABLE_UNLOCKER_TIER),
-        (FetchTier.DLQ_PARK, True),  # always available as terminal
     ]
-    return [
-        t for t, enabled in all_tiers
-        if enabled and t >= floor and t != FetchTier.DLQ_PARK
-    ]
+    return [t for t, enabled in all_tiers if enabled and t >= floor]
+
+
+def _should_probe_lower(profile: "ScrapeProfile") -> FetchTier | None:
+    """Return a lower tier to probe, or None if no probe is needed.
+
+    Conditions for a probe:
+    - floor > DIRECT (there's somewhere lower to probe)
+    - consecutive_successes_at_floor >= PROBE_AFTER_N_SUCCESSES
+    - last_demotion_probe_at is None, or >= PROBE_MIN_INTERVAL_HOURS ago
+    """
+    fp = profile.fetch
+    floor = fp.tier_floor
+    if floor == FetchTier.DIRECT or int(floor) == 0:
+        return None
+    if fp.consecutive_successes_at_floor < PROBE_AFTER_N_SUCCESSES:
+        return None
+
+    # Find the highest enabled tier strictly below the current floor.
+    # We iterate the enabled ladder in reverse and return the first tier < floor.
+    # This skips STEALTH_LOCAL if it's not in the enabled ladder.
+    lower_ladder = [t for t in _build_ladder(FetchTier.DIRECT) if t < floor]
+    if not lower_ladder:
+        return None
+    probe_tier = lower_ladder[-1]  # highest enabled tier below floor
+
+    # Check interval
+    last_probe = fp.last_demotion_probe_at
+    if last_probe is not None:
+        cutoff = datetime.now(UTC) - timedelta(hours=PROBE_MIN_INTERVAL_HOURS)
+        if hasattr(last_probe, "tzinfo") and last_probe.tzinfo is not None:
+            if last_probe > cutoff:
+                return None
+        else:
+            last_probe_aware = last_probe.replace(tzinfo=UTC)
+            if last_probe_aware > cutoff:
+                return None
+
+    return probe_tier
 
 
 def _make_provider(tier: FetchTier) -> "FetchProvider":
@@ -87,6 +130,10 @@ async def fetch_with_escalation(
 ) -> FetchResult:
     """Fetch *task* with automatic tier escalation on BOT_BLOCKED.
 
+    Also runs a periodic demotion probe: when a property has succeeded N times
+    at a non-DIRECT floor, try a lower tier first to see if bot-blocking has
+    relaxed.
+
     Args:
         task: The crawl task to fetch.
         profile: ScrapeProfile for this property (read: fetch.tier_floor).
@@ -101,14 +148,36 @@ async def fetch_with_escalation(
         return await DirectProvider().fetch(task, profile)
 
     floor = profile.fetch.tier_floor
+    all_attempts: list[int] = []
+
+    # ── Demotion probe (Phase E4/E5) ─────────────────────────────────────────
+    # Before the normal ladder, check if we should probe a lower tier.
+    # If the probe succeeds, the profile updater will demote the floor.
+    probe_tier = _should_probe_lower(profile)
+    if probe_tier is not None:
+        try:
+            profile.fetch.last_demotion_probe_at = datetime.now(UTC)
+            probe_provider = _make_provider(probe_tier)
+            probe_result = await probe_provider.fetch(task, profile)
+            all_attempts.extend(probe_result.fetch_tier_attempts or [int(probe_tier)])
+
+            if probe_result.outcome in (FetchOutcome.OK, FetchOutcome.NOT_MODIFIED):
+                emit(EventKind.FETCH_TIER_PROBE_SUCCESS, task.property_id,
+                     tier=probe_tier.name, probe=True)
+                return _merge_attempts(probe_result, all_attempts)
+
+            emit(EventKind.FETCH_TIER_PROBE_FAILED, task.property_id,
+                 tier=probe_tier.name, probe=True, block_sig=probe_result.block_signature)
+        except Exception as exc:
+            log.debug("Demotion probe failed for %s: %s", task.property_id, exc)
+
+    # ── Normal escalation ladder ──────────────────────────────────────────────
     ladder = _build_ladder(floor)
 
     if not ladder:
-        # Feature flags disabled everything — fall back to direct
         from ma_poc.fetch.providers.direct import DirectProvider
         return await DirectProvider().fetch(task, profile)
 
-    all_attempts: list[int] = []
     escalations = 0
     last_result: FetchResult | None = None
 
@@ -146,11 +215,9 @@ async def fetch_with_escalation(
         if outcome in (FetchOutcome.OK, FetchOutcome.NOT_MODIFIED):
             emit(EventKind.FETCH_TIER_PROBE_SUCCESS, task.property_id,
                  tier=tier.name, escalations=escalations)
-            # Return with the merged attempts list
             return _merge_attempts(result, all_attempts)
 
         if outcome == FetchOutcome.HARD_FAIL:
-            # No point escalating on a hard fail (DNS / SSL / 4xx)
             return _merge_attempts(result, all_attempts)
 
         if outcome == FetchOutcome.BOT_BLOCKED:
@@ -159,17 +226,17 @@ async def fetch_with_escalation(
             escalations += 1
             continue
 
-        # TRANSIENT / RATE_LIMITED / PROXY_ERROR — escalate anyway
+        # TRANSIENT / RATE_LIMITED / PROXY_ERROR — escalate
         escalations += 1
 
-    # Ladder exhausted
+    # ── Ladder exhausted → DLQ_PARK signal ───────────────────────────────────
     if last_result is not None:
         emit(EventKind.FETCH_LADDER_EXHAUSTED, task.property_id,
              escalations=escalations)
-        return _merge_attempts(last_result, all_attempts)
+        # Return with DLQ_PARK tier marker so callers can park the property
+        return _mark_dlq_park(last_result, all_attempts)
 
-    # Shouldn't happen — return a synthetic hard-fail
-    from ma_poc.fetch.contracts import RenderMode
+    # Synthetic hard-fail (ladder was empty)
     return FetchResult(
         url=task.url,
         outcome=FetchOutcome.HARD_FAIL,
@@ -181,8 +248,31 @@ async def fetch_with_escalation(
         attempts=0,
         elapsed_ms=0,
         error_signature="LADDER_EMPTY",
-        fetch_tier_used=int(floor),
+        fetch_tier_used=int(FetchTier.DLQ_PARK),
         fetch_tier_attempts=all_attempts,
+    )
+
+
+def _mark_dlq_park(result: FetchResult, all_attempts: list[int]) -> FetchResult:
+    """Return result with fetch_tier_used set to DLQ_PARK."""
+    return FetchResult(
+        url=result.url,
+        outcome=result.outcome,
+        status=result.status,
+        body=result.body,
+        headers=result.headers,
+        render_mode=result.render_mode,
+        final_url=result.final_url,
+        attempts=result.attempts,
+        elapsed_ms=result.elapsed_ms,
+        network_log=result.network_log,
+        etag=result.etag,
+        last_modified=result.last_modified,
+        error_signature=result.error_signature,
+        proxy_used=result.proxy_used,
+        fetch_tier_used=int(FetchTier.DLQ_PARK),
+        fetch_tier_attempts=all_attempts,
+        block_signature=result.block_signature,
     )
 
 
