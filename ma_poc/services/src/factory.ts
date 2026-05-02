@@ -15,11 +15,13 @@ import type { IUnitService } from './interfaces/IUnitService.js';
 import type { IRunService } from './interfaces/IRunService.js';
 import type { IDiffService } from './interfaces/IDiffService.js';
 import type { IHealthService } from './interfaces/IHealthService.js';
+import type { IFloorPlanComparisonService } from './interfaces/IFloorPlanComparisonService.js';
 import { PropertyService } from './services/PropertyService.js';
 import { UnitService } from './services/UnitService.js';
 import { RunService } from './services/RunService.js';
 import { DiffService } from './services/DiffService.js';
 import { HealthService } from './services/HealthService.js';
+import { FloorPlanComparisonService } from './services/FloorPlanComparisonService.js';
 import {
   createDataProvider,
   resolveProviderConfig,
@@ -34,6 +36,7 @@ export interface Services {
   runs: IRunService;
   diff: IDiffService;
   health: IHealthService;
+  floorPlanComparisons: IFloorPlanComparisonService;
   /** Backing provider — expose so the host can close the pool on shutdown. */
   dataProvider: IDataProvider;
 }
@@ -58,6 +61,7 @@ export async function createServices(cfg: ServiceFactoryConfig): Promise<Service
     runs: new RunService(provider),
     diff: new DiffService(provider),
     health: new HealthService(provider),
+    floorPlanComparisons: new FloorPlanComparisonService(provider),
     dataProvider: provider,
   };
 }

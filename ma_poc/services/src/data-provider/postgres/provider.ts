@@ -10,6 +10,7 @@
 import type { IDataProvider } from '../contracts.js';
 import { PgArtifactStore } from './ArtifactStore.js';
 import { buildPool, type PgPool, type PooledConnection } from './client.js';
+import { PgFloorPlanComparisonStore } from './FloorPlanComparisonStore.js';
 import { PgPropertyStateStore } from './PropertyStateStore.js';
 import { PgPropertyStore } from './PropertyStore.js';
 import { PgRunStore } from './RunStore.js';
@@ -22,6 +23,7 @@ export class PostgresDataProvider implements IDataProvider {
   readonly units: PgUnitStore;
   readonly runs: PgRunStore;
   readonly artifacts: PgArtifactStore;
+  readonly floorPlanComparisons: PgFloorPlanComparisonStore;
   private readonly pool: PgPool;
   private readonly closePool: () => Promise<void>;
 
@@ -33,6 +35,7 @@ export class PostgresDataProvider implements IDataProvider {
     this.units = new PgUnitStore(this.pool);
     this.runs = new PgRunStore(this.pool);
     this.artifacts = new PgArtifactStore(this.pool);
+    this.floorPlanComparisons = new PgFloorPlanComparisonStore(this.pool);
   }
 
   /**

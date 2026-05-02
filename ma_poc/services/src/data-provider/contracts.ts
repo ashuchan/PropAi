@@ -181,6 +181,71 @@ export interface IArtifactStore {
   getProfile(canonicalId: string): Promise<Record<string, unknown> | null>;
 }
 
+// ── Floor plan comparison ───────────────────────────────────────────────────
+
+/** One per (run_id, canonical_id) — populated by the
+ *  `compare_floor_plans_csv.py` util. */
+export interface FloorPlanComparisonRunRow {
+  runId: string;
+  canonicalId: string;
+  apartmentId: number | null;
+  projName: string | null;
+  csvRowsTotal: number;
+  dbFloorPlansTotal: number;
+  matchedTotal: number;
+  nameMatchCount: number;
+  bedBathSqftMatchCount: number;
+  bedBathOnlyMatchCount: number;
+  unmatchedCount: number;
+  sqftWithinBufferCount: number;
+  missingInCsvCount: number;
+  createdAt: string;
+}
+
+/** One per CSV input line. */
+export interface FloorPlanComparisonRowRow {
+  id: number;
+  runId: string;
+  canonicalId: string | null;
+  csvApartmentId: number | null;
+  csvFloorplanNumber: string | null;
+  csvDescription: string | null;
+  csvBed: number | null;
+  csvBath: number | null;
+  csvArea: number | null;
+  matchMethod: string;
+  matchScore: number | null;
+  sqftWithinBuffer: boolean | null;
+  sqftDelta: number | null;
+  dbFloorPlanName: string | null;
+  dbBeds: number | null;
+  dbBaths: number | null;
+  dbArea: number | null;
+  dbUnitCount: number | null;
+}
+
+/** All "extra" DB floor plans for a property — i.e. plans present in `units`
+ *  that no CSV row in this run matched against. Used by the deep-dive view
+ *  to show what's missing on the CSV side. */
+export interface FloorPlanComparisonExtraDbPlan {
+  floorPlanName: string | null;
+  beds: number | null;
+  baths: number | null;
+  area: number | null;
+  unitCount: number;
+}
+
+export interface IFloorPlanComparisonStore {
+  /** Latest comparison run_id, or null if none have been written. */
+  getLatestRunId(): Promise<string | null>;
+  listRunIds(): Promise<string[]>;
+  getRunSummaries(runId: string): Promise<FloorPlanComparisonRunRow[]>;
+  getRowsForProperty(runId: string, canonicalId: string): Promise<FloorPlanComparisonRowRow[]>;
+  /** DB floor plans for a property that did not get matched by any CSV row
+   *  in this run (i.e. floor plans the CSV is missing). */
+  getMissingInCsv(runId: string, canonicalId: string): Promise<FloorPlanComparisonExtraDbPlan[]>;
+}
+
 /** Composite data-provider facade. The API factory holds exactly one. */
 export interface IDataProvider {
   /** Short identifier for logs: 'json-file' | 'postgres'. */
@@ -190,6 +255,9 @@ export interface IDataProvider {
   readonly units: IUnitStore;
   readonly runs: IRunStore;
   readonly artifacts: IArtifactStore;
+  /** Optional — only the postgres provider implements floor-plan comparisons.
+   *  json-file callers should treat absence as "no comparison data". */
+  readonly floorPlanComparisons?: IFloorPlanComparisonStore;
   /** Release resources. Called on server shutdown. */
   close(): Promise<void>;
 }

@@ -7,6 +7,7 @@ import { createPropertyRoutes } from './routes/properties.js';
 import { createRunRoutes } from './routes/runs.js';
 import { createDiffRoutes } from './routes/diff.js';
 import { createHealthRoutes } from './routes/health.js';
+import { createFloorPlanComparisonRoutes } from './routes/floorPlanComparisons.js';
 
 async function startServer() {
   const { createServices } = await import('../../../services/src/factory.js');
@@ -28,6 +29,10 @@ async function startServer() {
   app.use('/api/runs', createRunRoutes(services.runs));
   app.use('/api/diff', createDiffRoutes(services.diff));
   app.use('/api/health', createHealthRoutes(services.health));
+  app.use(
+    '/api/floor-plan-comparisons',
+    createFloorPlanComparisonRoutes(services.floorPlanComparisons),
+  );
   app.use(errorHandler);
 
   const server = app.listen(config.port, () => {

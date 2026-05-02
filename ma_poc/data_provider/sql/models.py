@@ -343,3 +343,60 @@ class DlqEntryRow(Base):
     last_synced_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (Index("ix_dlq_entries_retry_at", "retry_at"),)
+
+
+# ── Floor plan comparison (CSV ↔ DB) ────────────────────────────────────────
+
+
+class FloorPlanComparisonRunRow(Base):
+    """One summary row per (run_id, canonical_id). Re-running the util with
+    the same run_id replaces the row via upsert."""
+
+    __tablename__ = "floor_plan_comparison_runs"
+
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    canonical_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    apartment_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    proj_name: Mapped[str | None] = mapped_column(String(512))
+    csv_rows_total: Mapped[int] = mapped_column(Integer, default=0)
+    db_floor_plans_total: Mapped[int] = mapped_column(Integer, default=0)
+    matched_total: Mapped[int] = mapped_column(Integer, default=0)
+    name_match_count: Mapped[int] = mapped_column(Integer, default=0)
+    bed_bath_sqft_match_count: Mapped[int] = mapped_column(Integer, default=0)
+    bed_bath_only_match_count: Mapped[int] = mapped_column(Integer, default=0)
+    unmatched_count: Mapped[int] = mapped_column(Integer, default=0)
+    sqft_within_buffer_count: Mapped[int] = mapped_column(Integer, default=0)
+    missing_in_csv_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (Index("ix_fpc_runs_run_id", "run_id"),)
+
+
+class FloorPlanComparisonRowRow(Base):
+    """One row per CSV input line — preserves the per-floor-plan match decision."""
+
+    __tablename__ = "floor_plan_comparison_rows"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64))
+    canonical_id: Mapped[str | None] = mapped_column(String(256))
+    csv_apartment_id: Mapped[int | None] = mapped_column(Integer)
+    csv_floorplan_number: Mapped[str | None] = mapped_column(String(64))
+    csv_description: Mapped[str | None] = mapped_column(String(512))
+    csv_bed: Mapped[int | None] = mapped_column(Integer)
+    csv_bath: Mapped[float | None] = mapped_column(Float)
+    csv_area: Mapped[int | None] = mapped_column(Integer)
+    match_method: Mapped[str] = mapped_column(String(32))
+    match_score: Mapped[float | None] = mapped_column(Float)
+    sqft_within_buffer: Mapped[bool | None] = mapped_column(Boolean)
+    sqft_delta: Mapped[int | None] = mapped_column(Integer)
+    db_floor_plan_name: Mapped[str | None] = mapped_column(String(256))
+    db_beds: Mapped[int | None] = mapped_column(Integer)
+    db_baths: Mapped[float | None] = mapped_column(Float)
+    db_area: Mapped[int | None] = mapped_column(Integer)
+    db_unit_count: Mapped[int | None] = mapped_column(Integer)
+
+    __table_args__ = (
+        Index("ix_fpc_rows_run_canonical", "run_id", "canonical_id"),
+        Index("ix_fpc_rows_run_method", "run_id", "match_method"),
+    )
