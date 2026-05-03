@@ -114,22 +114,32 @@ def merge_sources(
     other_buckets = {k: v for k, v in buckets.items() if k[0] in ("fuzzy", "alone")}
 
     out_units: list[ProvenancedUnit] = []
-    absorbed_fps: set[str] = set()
+    # absorbed_fps tracks (fp_name_lower, beds_str, baths_str) triples that
+    # were pulled into a rank-1 unit bucket so Pass 2 doesn't emit them again.
+    absorbed_fps: set[tuple[str, str, str]] = set()
 
     # Pass 1: rank-1 (unit_id) buckets, optionally pulling in matching rank-2 (floor-plan) entries
     for _key, entries in uid_buckets.items():
         fp_name = _extract_fp_name(entries)
         merged_entries = list(entries)
         if fp_name:
+            beds_s, baths_s = _unit_beds_baths(entries)
             for fp_key, fp_entries in fp_buckets.items():
-                if fp_key[1] == fp_name:
-                    merged_entries.extend(fp_entries)
-                    absorbed_fps.add(fp_name)
+                # fp_key = ("fp", fp_name_lower, beds_str, baths_str)
+                if fp_key[1] != fp_name:
+                    continue
+                # Absorb only when beds/baths agree (or rank-1 didn't supply them)
+                if beds_s and fp_key[2] and beds_s != fp_key[2]:
+                    continue
+                if baths_s and fp_key[3] and baths_s != fp_key[3]:
+                    continue
+                merged_entries.extend(fp_entries)
+                absorbed_fps.add((fp_key[1], fp_key[2], fp_key[3]))
         out_units.append(_merge_field_max_confidence(merged_entries))
 
     # Pass 2: rank-2 floor-plan-only buckets that weren't absorbed
     for fp_key, fp_entries in fp_buckets.items():
-        if fp_key[1] in absorbed_fps:
+        if (fp_key[1], fp_key[2], fp_key[3]) in absorbed_fps:
             continue
         out_units.append(_merge_field_max_confidence(fp_entries))
 
@@ -154,7 +164,7 @@ def merge_sources(
         if fb:
             unit["unit_id"] = FieldValue(
                 value=fb,
-                source=SourceId.API_GENERIC_NARROW,
+                source=SourceId.IDENTITY_FALLBACK,
                 confidence=0.65,
             )
 
@@ -167,6 +177,19 @@ def _fv_str(fv: Any) -> str:
     if isinstance(fv, FieldValue) and fv.value is not None:
         return str(fv.value).strip().lower()
     return ""
+
+
+def _unit_beds_baths(entries: list[tuple[SourceId, ProvenancedUnit, int]]) -> tuple[str, str]:
+    """Extract (beds_str, baths_str) from rank-1 unit entries.
+    Used to disambiguate which fan-out floor-plan bucket to absorb."""
+    for _src, unit, _rank in entries:
+        beds_fv = unit.get("beds") or unit.get("bedrooms")
+        baths_fv = unit.get("baths") or unit.get("bathrooms")
+        beds_s = _fv_str(beds_fv) if beds_fv else ""
+        baths_s = _fv_str(baths_fv) if baths_fv else ""
+        if beds_s or baths_s:
+            return (beds_s, baths_s)
+    return ("", "")
 
 
 def _extract_fp_name(entries: list[tuple[SourceId, ProvenancedUnit, int]]) -> str | None:

@@ -63,6 +63,40 @@ _re_strip_script = _re.compile(r"<script.*?</script>|<style.*?</style>", _re.IGN
 _re_strip_tag = _re.compile(r"<[^>]+>")
 _re_rent = _re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?", _re.IGNORECASE)
 
+# Physical field keys used by _looks_field_rich
+_PHYSICAL_KEYS = ("beds", "bedrooms", "baths", "bathrooms", "sqft", "floor_plan_name")
+_TRANSACTIONAL_KEYS = ("asking_rent", "market_rent_low", "market_rent_high", "rent_range")
+
+try:
+    from ma_poc.models.source import _ABSENT_VALUES as _SRC_ABSENT_VALUES
+    _FIELD_RICH_ABSENT: frozenset = _SRC_ABSENT_VALUES | frozenset({0, "0"})
+except Exception:
+    _FIELD_RICH_ABSENT: frozenset = frozenset({"", None, 0, "0", -1, "-1"})  # type: ignore[no-redef]
+
+
+def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
+    """Return True when units carry identity + physical (≥2 fields) + transactional.
+
+    A unit set that has only identity+rent (no physical) is not field-rich —
+    the cascade needs to keep running to collect physical fields from other pages.
+    """
+    if not units:
+        return False
+
+    def _is_set(v: Any) -> bool:
+        return v not in _FIELD_RICH_ABSENT
+
+    has_identity = any((u.get("unit_id") or u.get("unit_number")) for u in units)
+    has_physical = any(
+        sum(1 for k in _PHYSICAL_KEYS if _is_set(u.get(k))) >= 2
+        for u in units
+    )
+    has_transactional = any(
+        any(_is_set(u.get(k)) for k in _TRANSACTIONAL_KEYS)
+        for u in units
+    )
+    return has_identity and has_physical and has_transactional
+
 
 def _find_unit_list(body: Any) -> list[dict[str, Any]]:
     """Attempt to find a list of unit/floorplan dicts in an API response body.
@@ -463,14 +497,14 @@ class GenericAdapter:
         # NOTE: keep imports relative to the same root the merger uses internally
         # (models.source) so that FieldValue identity checks (isinstance) hold.
         try:
-            from models.source import (
+            from ma_poc.models.source import (
                 ExtractedSource,
                 SourceId,
                 envelope_hash_of,
                 from_legacy_unit,
                 to_legacy_unit,
             )
-            from services.source_merger import merge_sources
+            from ma_poc.services.source_merger import merge_sources
         except Exception:
             return
         winning_url = result.winning_url or ctx.base_url or ""
@@ -715,23 +749,6 @@ class GenericAdapter:
                 # If replay is field-incomplete (e.g. mapping learned only `beds`
                 # but missed rent / unit_id), let the cascade keep running — the
                 # post-merge step combines replay + cascade by max-confidence.
-                def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
-                    if not units:
-                        return False
-                    has_identity = any(
-                        (u.get("unit_id") or u.get("unit_number")) for u in units
-                    )
-                    has_transactional = any(
-                        (
-                            u.get("asking_rent")
-                            or u.get("market_rent_low")
-                            or u.get("market_rent_high")
-                            or u.get("rent_range")
-                        )
-                        for u in units
-                    )
-                    return has_identity and has_transactional
-
                 if _looks_field_rich(replayed_units):
                     _log_attempt(
                         "generic:profile_replay",

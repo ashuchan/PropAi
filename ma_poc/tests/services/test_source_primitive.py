@@ -148,6 +148,7 @@ def test_source_id_enum_is_closed() -> None:
         "mapping_replay",
         "field_patch",
         "cluster_mapping_replay",
+        "identity_fallback",
         "llm_api_targeted",
         "llm_dom_targeted",
         "llm_monolithic",

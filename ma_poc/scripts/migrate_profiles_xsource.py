@@ -22,7 +22,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 # Allow running as module or script
@@ -50,11 +52,38 @@ def migrate_one(path: Path, dry_run: bool = False) -> dict:
         return {"path": str(path), "status": "NO_CHANGE"}
 
     if not dry_run:
-        path.write_text(
-            json.dumps(new_data, indent=2, ensure_ascii=False, default=str),
-            encoding="utf-8",
-        )
+        content = json.dumps(new_data, indent=2, ensure_ascii=False, default=str)
+        _atomic_write(path, content)
     return {"path": str(path), "status": "UPGRADED" if not dry_run else "DRY_RUN_WOULD_UPGRADE"}
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """Write content to path atomically using a temp file + os.replace."""
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        delete=False,
+        dir=str(path.parent),
+        prefix=f".{path.stem}_",
+        suffix=".tmp",
+    )
+    try:
+        tmp.write(content)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+        tmp.close()
+        # Snapshot the previous file the first time we overwrite it
+        if path.exists():
+            backup = path.with_suffix(path.suffix + ".pre_xsource.bak")
+            if not backup.exists():
+                backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        os.replace(tmp.name, path)
+    except Exception:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+        raise
 
 
 def main() -> int:

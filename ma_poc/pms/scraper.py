@@ -1154,14 +1154,14 @@ async def scrape_jugnu(
                 # the active path. Both routes preserve telemetry additively.
                 if main_units and sub_units:
                     try:
-                        from models.source import (
+                        from ma_poc.models.source import (
                             ExtractedSource,
                             SourceId,
                             envelope_hash_of,
                             from_legacy_unit,
                             to_legacy_unit,
                         )
-                        from services.source_merger import merge_sources
+                        from ma_poc.services.source_merger import merge_sources
                         main_h = envelope_hash_of(main_units)
                         sub_h = envelope_hash_of(sub_units)
                         main_src = ExtractedSource(
