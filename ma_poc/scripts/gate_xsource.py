@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -135,7 +136,11 @@ def run_phase(phase: int) -> int:
 
     tests = PHASE_TESTS.get(phase, [])
     if tests:
-        cmd = [sys.executable, "-m", "pytest", "-v", "--tb=short", *tests]
+        pytest_exe = shutil.which("pytest") or sys.executable
+        if pytest_exe == sys.executable:
+            cmd = [pytest_exe, "-m", "pytest", "-v", "--tb=short", *tests]
+        else:
+            cmd = [pytest_exe, "-v", "--tb=short", *tests]
         rc = subprocess.run(cmd, cwd=str(MAPOC)).returncode
         if rc != 0:
             print(f"FAIL: pytest returned {rc}")

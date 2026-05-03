@@ -183,3 +183,40 @@ def test_b1_aggregate_min_quality_when_multiple_mappings() -> None:
         "aggregate min quality (0.5) below threshold must prevent short-circuit; "
         f"got tier_used={result.tier_used}"
     )
+
+
+def test_b1_low_quality_sole_source_replay_demotes_confidence() -> None:
+    """C2: when quality_score < 0.7 and the cascade produces nothing (sole-source),
+    _phase5_post_merge must assign a demoted confidence, not the default 0.0."""
+    # Keys not in _has_unit_signals → cascade narrow parser skips this body,
+    # so only the saved mapping can produce units from it.
+    api = [{
+        "url": "https://example.com/api/units",
+        "body": [{"unit_ref": "U1", "monthly_rate": 1500, "num_br": 1, "floor_area": 750}],
+    }]
+    p = ScrapeProfile(canonical_id="b1-sole")
+    p.api_hints.llm_field_mappings = [
+        LlmFieldMapping(
+            api_url_pattern="/api/units",
+            json_paths={
+                "unit_id": "unit_ref",
+                "rent_low": "monthly_rate",
+                "bedrooms": "num_br",
+                "sqft": "floor_area",
+            },
+            quality_score=0.4,  # below 0.7 → stashed, not short-circuited
+        )
+    ]
+    result = asyncio.run(GenericAdapter().extract(page=None, ctx=_make_ctx(p, api)))
+
+    assert result.units, "sole-source low-quality replay must still produce units"
+    # Before Fix 2, the cascade-empty branch returned without setting confidence → 0.0.
+    # After Fix 2: min(0.90, 0.7 + 0.03 * n) * 0.4 > 0.
+    assert result.confidence > 0.0, (
+        f"sole-source low-quality replay must not export confidence=0.0; "
+        f"got confidence={result.confidence}"
+    )
+    # quality_score=0.4 caps confidence below 0.4 * 0.90 = 0.36
+    assert result.confidence < 0.40, (
+        f"quality_score=0.4 must cap confidence below 0.40; got {result.confidence}"
+    )
