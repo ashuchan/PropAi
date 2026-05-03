@@ -233,6 +233,14 @@ def _merge_into_result_units(
     return result
 
 
+def _aggregate_quality(mappings: list[Any]) -> float:
+    """Min quality_score across contributing mappings; defaults to 1.0."""
+    if not mappings:
+        return 1.0
+    qs = [float(getattr(m, "quality_score", 1.0) or 1.0) for m in mappings]
+    return min(qs) if qs else 1.0
+
+
 def _apply_field_patches(
     units: list[dict[str, Any]],
     api_responses: list[dict[str, Any]],
@@ -277,6 +285,7 @@ def _apply_field_patches(
                 matched_body = resp.get("body")
                 break
         if matched_body is None:
+            _mark_patch_miss(patch, reason="no_url_match")
             continue
         # Extract the list of patch values from the body
         values = _get_path(matched_body, json_path)
@@ -285,8 +294,10 @@ def _apply_field_patches(
             if values is not None:
                 values = [values]
             else:
+                _mark_patch_miss(patch, reason="path_returned_none")
                 continue
         # Positional fill: units[i] gets values[i] if field is absent
+        any_filled = False
         for i, unit in enumerate(units):
             if i >= len(values):
                 break
@@ -295,7 +306,54 @@ def _apply_field_patches(
             v = values[i]
             if v not in (None, ""):
                 unit[field_name] = v
+                any_filled = True
+
+        if any_filled:
+            _mark_patch_hit(patch)
+        else:
+            _mark_patch_miss(patch, reason="no_unit_filled")
     return units
+
+
+def _mark_patch_hit(patch: Any) -> None:
+    """B2: bump success_count, reset consecutive_replay_failures, emit event."""
+    try:
+        if hasattr(patch, "success_count"):
+            patch.success_count += 1
+        if hasattr(patch, "consecutive_replay_failures"):
+            patch.consecutive_replay_failures = 0
+        try:
+            from ma_poc.observability.events import EventKind, emit
+            emit(
+                EventKind.FIELD_PATCH_HIT,
+                "unknown",
+                field=getattr(patch, "field_name", "") or "",
+                url=str(getattr(patch, "api_url_pattern", ""))[:80],
+            )
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _mark_patch_miss(patch: Any, reason: str) -> None:
+    """B2: bump consecutive_replay_failures, emit drift event."""
+    try:
+        if hasattr(patch, "consecutive_replay_failures"):
+            patch.consecutive_replay_failures += 1
+        try:
+            from ma_poc.observability.events import EventKind, emit
+            emit(
+                EventKind.FIELD_PATCH_DRIFT,
+                "unknown",
+                field=getattr(patch, "field_name", "") or "",
+                url=str(getattr(patch, "api_url_pattern", ""))[:80],
+                reason=reason,
+            )
+        except Exception:
+            pass
+    except Exception:
+        pass
 
 
 def _find_unit_list(body: Any) -> list[dict[str, Any]]:
@@ -726,6 +784,7 @@ class GenericAdapter:
         sidecar = getattr(result, "_phase5_replay_units", None)
         if not sidecar:
             return
+        agg_q = float(getattr(result, "_phase5_replay_quality", 1.0) or 1.0)
         if not result.units:
             # Cascade produced nothing — replay is the sole contributor.
             result.units = list(sidecar)
@@ -754,7 +813,7 @@ class GenericAdapter:
             source_url=winning_url,
             envelope_hash=replay_h,
             units=[
-                from_legacy_unit(u, SourceId.MAPPING_REPLAY, winning_url, replay_h, 0.85)
+                from_legacy_unit(u, SourceId.MAPPING_REPLAY, winning_url, replay_h, 0.85 * agg_q)
                 for u in sidecar
             ],
             has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in sidecar),
@@ -907,6 +966,7 @@ class GenericAdapter:
         if profile is not None and api_responses:
             t0 = _time.monotonic()
             replayed_units: list[dict[str, Any]] = []
+            replayed_mappings: list[Any] = []
             try:
                 saved = list(getattr(profile.api_hints, "llm_field_mappings", []) or [])
             except Exception:
@@ -980,6 +1040,7 @@ class GenericAdapter:
                                 if units:
                                     replayed_units.extend(units)
                                     result.api_responses.append(resp)
+                                    replayed_mappings.append(mapping)
                                     # Phase 1: increment success_count
                                     if hasattr(mapping, "success_count"):
                                         try:
@@ -1018,11 +1079,14 @@ class GenericAdapter:
                 except Exception:
                     pass
 
-                # Phase 5: only short-circuit when replay produced field-RICH units.
-                # If replay is field-incomplete (e.g. mapping learned only `beds`
-                # but missed rent / unit_id), let the cascade keep running — the
-                # post-merge step combines replay + cascade by max-confidence.
-                if _looks_field_rich(replayed_units):
+                # B1: compute aggregate quality across all mappings that contributed.
+                agg_q = _aggregate_quality(replayed_mappings)
+
+                # Phase 5: only short-circuit when replay produced field-RICH units
+                # AND aggregate mapping quality is sufficient (≥0.7).
+                # Low-quality mappings must not short-circuit — let the cascade run
+                # so the merger can prefer a higher-quality cascade source.
+                if _looks_field_rich(replayed_units) and agg_q >= 0.7:
                     _log_attempt(
                         "generic:profile_replay",
                         "ran_units",
@@ -1035,17 +1099,18 @@ class GenericAdapter:
                     result.winning_url = (
                         result.api_responses[0].get("url") if result.api_responses else ctx.base_url
                     )
-                    result.confidence = min(0.90, 0.7 + 0.03 * len(replayed_units))
+                    result.confidence = min(0.90, 0.7 + 0.03 * len(replayed_units)) * agg_q
                     return result
-                # Field-incomplete: stash for the post-merge step and continue cascade.
+                # Field-incomplete or low quality: stash for post-merge and continue cascade.
                 _log_attempt(
                     "generic:profile_replay",
                     "ran_units",
                     units=len(replayed_units),
-                    reason="replayed mapping field-incomplete; cascading + merging",
+                    reason="replayed mapping field-incomplete or low quality; cascading + merging",
                     duration_ms=int((_time.monotonic() - t0) * 1000),
                 )
                 result._phase5_replay_units = list(replayed_units)  # type: ignore[attr-defined]
+                result._phase5_replay_quality = agg_q  # type: ignore[attr-defined]
                 # Keep api_responses populated so downstream sub-tiers see them
                 # too — they may produce additional fields the merger fills in.
             _log_attempt(
