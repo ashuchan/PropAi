@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from models.scrape_profile import LlmFieldMapping, ProfileMaturity, ScrapeProfile
+from ma_poc.models.scrape_profile import LlmFieldMapping, ProfileMaturity, ScrapeProfile
 
 
 def find_cluster_mates(

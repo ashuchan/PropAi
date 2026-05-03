@@ -16,9 +16,9 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
-from models.scrape_profile import SourceObservation
-from models.source import FieldValue
-from services.source_planner import FIELD_GROUP
+from ma_poc.models.scrape_profile import SourceObservation
+from ma_poc.models.source import FieldValue
+from ma_poc.services.source_planner import FIELD_GROUP
 
 log = logging.getLogger(__name__)
 

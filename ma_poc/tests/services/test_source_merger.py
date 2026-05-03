@@ -6,14 +6,14 @@ from typing import Any
 
 import pytest
 
-from models.source import (
+from ma_poc.models.source import (
     ExtractedSource,
     FieldValue,
     ProvenancedUnit,
     SourceId,
     to_legacy_unit,
 )
-from services.source_merger import merge_sources
+from ma_poc.services.source_merger import merge_sources
 
 
 def _fv(value: Any, source: SourceId, conf: float = 0.9, url: str = "") -> FieldValue:

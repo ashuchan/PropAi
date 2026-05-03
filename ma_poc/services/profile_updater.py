@@ -14,8 +14,8 @@ import urllib.parse
 from datetime import datetime
 from typing import Any
 
-from config.feature_flags import ENABLE_TIER_ESCALATION  # E0: wired; used in E3
-from models.scrape_profile import (
+from ma_poc.config.feature_flags import ENABLE_TIER_ESCALATION  # E0: wired; used in E3
+from ma_poc.models.scrape_profile import (
     ApiEndpoint,
     BlockedEndpoint,
     FieldPatch,
@@ -24,7 +24,7 @@ from models.scrape_profile import (
     ProfileMaturity,
     ScrapeProfile,
 )
-from services.profile_store import ProfileStore
+from ma_poc.services.profile_store import ProfileStore
 
 log = logging.getLogger(__name__)
 
@@ -88,6 +88,7 @@ def save_llm_field_mapping(
     source_envelope_hash: str = "",
     expected_unit_count: int | None = None,
     body_for_validation: Any = None,
+    multi_source: bool = False,
 ) -> bool:
     """Save an LLM-generated field mapping to the profile for future replay.
 
@@ -103,6 +104,10 @@ def save_llm_field_mapping(
     immediately replay the mapping; if it produces fewer than 80% of
     expected units, demote quality_score (which then multiplies replay
     confidence in the cascade).
+
+    Fix 3: when multi_source=True (multiple API endpoints contributed to the
+    total unit count), skip per-endpoint self-validation since expected_unit_count
+    is not attributable to any single endpoint.
     """
     url_pattern = mapping_dict.get("api_url_pattern", "")
     json_paths = mapping_dict.get("json_paths") or {}
@@ -119,11 +124,11 @@ def save_llm_field_mapping(
         )
         return False
 
-    # Phase 10: self-validation
+    # Phase 10: self-validation (skipped when multi_source — count is not per-endpoint)
     quality_score = 1.0
-    if body_for_validation is not None and expected_unit_count is not None and expected_unit_count > 0:
+    if not multi_source and body_for_validation is not None and expected_unit_count is not None and expected_unit_count > 0:
         try:
-            from services.llm_extractor import apply_saved_mapping
+            from ma_poc.services.llm_extractor import apply_saved_mapping
             replayed = apply_saved_mapping(
                 body_for_validation,
                 {
@@ -389,6 +394,7 @@ def update_profile_after_extraction(
         _envelope_hash_of = None  # type: ignore[assignment]
 
     llm_analysis = scrape_result.get("_llm_analysis_results", {})
+    is_multi_source = len(llm_analysis) > 1
     for api_url, result in llm_analysis.items():
         if isinstance(result, dict) and result.get("api_url_pattern"):
             # Phase B: match the captured body by api_url_pattern substring
@@ -410,6 +416,7 @@ def update_profile_after_extraction(
                 source_envelope_hash=env_hash,
                 body_for_validation=matched_body,
                 expected_unit_count=expected_n,
+                multi_source=is_multi_source,
             )
         elif result == "blocked" or (isinstance(result, str) and result.startswith("noise:")):
             reason = result.replace("noise:", "").strip() if isinstance(result, str) else "no_unit_data"
@@ -491,7 +498,7 @@ def update_profile_after_extraction(
     merged_units = scrape_result.get("_merged_units", []) or []
     if merged_units:
         try:
-            from services.source_observer import record_source_observations
+            from ma_poc.services.source_observer import record_source_observations
             record_source_observations(profile, merged_units)
         except Exception as exc:
             log.warning("record_source_observations call failed: %s", exc)

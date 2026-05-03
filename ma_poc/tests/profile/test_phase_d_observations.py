@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from models.scrape_profile import ScrapeProfile
-from models.source import FieldValue, ProvenancedUnit, SourceId
-from services.profile_store import ProfileStore
-from services.profile_updater import update_profile_after_extraction
+from ma_poc.models.scrape_profile import ScrapeProfile
+from ma_poc.models.source import FieldValue, ProvenancedUnit, SourceId
+from ma_poc.services.profile_store import ProfileStore
+from ma_poc.services.profile_updater import update_profile_after_extraction
 
 
 @pytest.fixture
@@ -59,7 +59,7 @@ def test_d1_no_merged_units_no_observations(store: ProfileStore) -> None:
 
 def test_d2_last_sources_run_persisted(store: ProfileStore) -> None:
     """When _sources is populated, last_sources_run must be written."""
-    from models.source import ExtractedSource
+    from ma_poc.models.source import ExtractedSource
 
     p = ScrapeProfile(canonical_id="phase_d_003")
     store.save(p)

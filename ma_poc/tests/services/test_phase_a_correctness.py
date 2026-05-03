@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from models.source import (
+from ma_poc.models.source import (
     ExtractedSource,
     FieldValue,
     ProvenancedUnit,
@@ -22,8 +22,8 @@ from models.source import (
     _ZERO_IS_VALID_FIELDS,
     from_legacy_unit,
 )
-from services.source_merger import merge_sources
-from services.source_planner import evaluate_completeness
+from ma_poc.services.source_merger import merge_sources
+from ma_poc.services.source_planner import evaluate_completeness
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

@@ -8,14 +8,27 @@ Covers:
 from __future__ import annotations
 
 import asyncio
+import sys
+import types
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from models.scrape_profile import ScrapeProfile
-from pms.detector import DetectedPMS
+from ma_poc.models.scrape_profile import ScrapeProfile
+from ma_poc.pms.detector import DetectedPMS
+
+
+def _stub_playwright() -> None:
+    """Install lightweight playwright stubs so scraper.py can be imported."""
+    for name in ("playwright", "playwright.async_api"):
+        if name not in sys.modules:
+            mod = types.ModuleType(name)
+            mod.BrowserContext = object  # type: ignore[attr-defined]
+            mod.Page = object  # type: ignore[attr-defined]
+            mod.async_playwright = object  # type: ignore[attr-defined]
+            sys.modules[name] = mod
 
 
 def _ranked_links_stub(html: str, entry_url: str, limit: int = 3):
@@ -30,7 +43,8 @@ def _ranked_links_stub(html: str, entry_url: str, limit: int = 3):
 def test_h5_visited_urls_dedupe() -> None:
     """If entry URL is in visited_urls, it never re-fetches itself.
     If a candidate appears in visited_urls, it's skipped."""
-    from pms.scraper import _try_link_hop
+    _stub_playwright()
+    from ma_poc.pms.scraper import _try_link_hop
 
     # Build a fake fetch outcome that always returns OK
     @dataclass
@@ -56,9 +70,9 @@ def test_h5_visited_urls_dedupe() -> None:
         fetched_urls.append(task.url)
         return FakeFetch()
 
-    with patch("pms.scraper._rank_internal_links", _ranked_links_stub), \
+    with patch("ma_poc.pms.scraper._rank_internal_links", _ranked_links_stub), \
          patch("ma_poc.fetch.fetch", tracking_fetch), \
-         patch("pms.scraper.scrape", fake_scrape):
+         patch("ma_poc.pms.scraper.scrape", fake_scrape):
         asyncio.run(
             _try_link_hop(
                 entry_url="https://example.com",
@@ -85,7 +99,8 @@ def test_h5_visited_urls_dedupe() -> None:
 def test_h5_max_hops_caps_fetches() -> None:
     """No matter how many candidates the ranker returns, link-hop fetches
     at most `max_hops` of them."""
-    from pms.scraper import _try_link_hop
+    _stub_playwright()
+    from ma_poc.pms.scraper import _try_link_hop
 
     @dataclass
     class FakeFetch:
@@ -104,7 +119,7 @@ def test_h5_max_hops_caps_fetches() -> None:
 
     detected = DetectedPMS(pms="unknown", confidence=0.5)
 
-    with patch("pms.scraper._rank_internal_links", many_candidates), \
+    with patch("ma_poc.pms.scraper._rank_internal_links", many_candidates), \
          patch("ma_poc.fetch.fetch", tracking_fetch):
         asyncio.run(
             _try_link_hop(
@@ -127,7 +142,8 @@ def test_h5_max_hops_caps_fetches() -> None:
 def test_phase9_visited_urls_default_includes_entry_url() -> None:
     """If visited_urls is None, entry URL still gets added so it can't be
     re-fetched by a candidate that happens to equal it."""
-    from pms.scraper import _try_link_hop
+    _stub_playwright()
+    from ma_poc.pms.scraper import _try_link_hop
 
     @dataclass
     class FakeFetch:
@@ -149,7 +165,7 @@ def test_phase9_visited_urls_default_includes_entry_url() -> None:
 
     detected = DetectedPMS(pms="unknown", confidence=0.5)
 
-    with patch("pms.scraper._rank_internal_links", candidates_include_entry), \
+    with patch("ma_poc.pms.scraper._rank_internal_links", candidates_include_entry), \
          patch("ma_poc.fetch.fetch", tracking_fetch):
         asyncio.run(
             _try_link_hop(
@@ -170,14 +186,14 @@ def test_phase9_visited_urls_default_includes_entry_url() -> None:
 def test_phase9_cross_page_merge_helper_imports_succeed() -> None:
     """Smoke test — the merge imports inside scrape_jugnu work in this env.
     The full E2E scrape_jugnu test requires a real fetch_result fixture."""
-    from models.source import (
+    from ma_poc.models.source import (
         ExtractedSource,
         SourceId,
         envelope_hash_of,
         from_legacy_unit,
         to_legacy_unit,
     )
-    from services.source_merger import merge_sources
+    from ma_poc.services.source_merger import merge_sources
 
     main_units = [{"unit_number": "U1", "asking_rent": 1500}]
     sub_units = [{"unit_number": "U1", "sqft": 750}]

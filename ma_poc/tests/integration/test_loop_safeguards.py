@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import pytest
 
-from models.source import ExtractedSource, FieldValue, SourceId
-from services.source_merger import merge_sources
-from services.source_planner import (
+from ma_poc.models.source import ExtractedSource, FieldValue, SourceId
+from ma_poc.services.source_merger import merge_sources
+from ma_poc.services.source_planner import (
     CompletenessReport,
     Decision,
     plan_next_action,
@@ -73,7 +73,7 @@ def test_h2_planner_returns_single_decision() -> None:
         d = plan_next_action(
             r,
             sources_already_run=set(),
-            budget_remaining={"llm_targeted": 1, "link_hop": 1, "llm_monolithic": 1},
+            budget_remaining={"llm_api_calls": 1, "llm_dom_calls": 1, "link_hop": 1, "llm_monolithic": 1},
         )
         assert isinstance(d, Decision)
         assert d.action in (
@@ -96,7 +96,7 @@ def test_h3_budget_zero_blocks_all_escalations() -> None:
         d = plan_next_action(
             r,
             sources_already_run=set(),
-            budget_remaining={"llm_targeted": 0, "link_hop": 0, "llm_monolithic": 0},
+            budget_remaining={"llm_api_calls": 0, "llm_dom_calls": 0, "link_hop": 0, "llm_monolithic": 0},
         )
         assert d.action == "ACCEPT_PARTIAL"
 
@@ -110,7 +110,7 @@ def test_h3_targeted_then_monolithic_never_simultaneous() -> None:
     """
     r = CompletenessReport(10, 0.95, 0.95, 0.40, 0.55)
     d = plan_next_action(
-        r, set(), {"llm_targeted": 1, "link_hop": 0, "llm_monolithic": 1}
+        r, set(), {"llm_api_calls": 1, "llm_dom_calls": 0, "link_hop": 0, "llm_monolithic": 1}
     )
     # In the TARGET_GAP regime, the planner should escalate to LLM_TARGETED,
     # not LLM_MONOLITHIC (which is reserved for BROAD_RECOVERY).
@@ -121,7 +121,7 @@ def test_h3_targeted_then_monolithic_never_simultaneous() -> None:
 def test_h3_broad_recovery_prefers_link_hop_over_monolithic() -> None:
     r = CompletenessReport(10, 0.10, 0.10, 0.10, 0.05)
     d = plan_next_action(
-        r, set(), {"llm_targeted": 0, "link_hop": 1, "llm_monolithic": 1}
+        r, set(), {"llm_api_calls": 0, "llm_dom_calls": 0, "link_hop": 1, "llm_monolithic": 1}
     )
     assert d.action == "ESCALATE_LINK_HOP"
 

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from models.scrape_profile import ScrapeProfile, SourceObservation
-from models.source import FieldValue, ProvenancedUnit, SourceId
-from services.source_observer import record_source_observations
-from services.source_planner import rank_sources_for_field_group
+from ma_poc.models.scrape_profile import ScrapeProfile, SourceObservation
+from ma_poc.models.source import FieldValue, ProvenancedUnit, SourceId
+from ma_poc.services.source_observer import record_source_observations
+from ma_poc.services.source_planner import rank_sources_for_field_group
 
 
 def _make_unit(rent_source: SourceId, rent_conf: float = 0.85) -> ProvenancedUnit:

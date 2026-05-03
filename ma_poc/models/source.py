@@ -112,8 +112,12 @@ _ABSENT_VALUES: frozenset = frozenset({"", None, -1, "-1"})
 # carve-out applies only to actual numeric zeros.
 _ABSENT_UNLESS_FIELD_PERMITS_ZERO: frozenset = frozenset({0, "0"})
 
-# Fields where 0 / "0" are valid values (e.g. baths=0 = no separate bathroom).
-_ZERO_IS_VALID_FIELDS: frozenset[str] = frozenset({"baths", "bathrooms", "floor"})
+# Fields where 0 / "0" are valid values (e.g. baths=0 = no separate bathroom,
+# beds=0 = studio unit).
+_ZERO_IS_VALID_FIELDS: frozenset[str] = frozenset({
+    "baths", "bathrooms", "floor",
+    "beds", "bedrooms",  # studio = 0 beds, valid data
+})
 
 
 def envelope_hash_of(body: Any) -> str:

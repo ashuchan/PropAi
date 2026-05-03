@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from models.scrape_profile import FieldSelectorMap
-from pms.adapters._html_extract import extract_units_from_dom, extract_with_hints
+from ma_poc.models.scrape_profile import FieldSelectorMap
+from ma_poc.pms.adapters._html_extract import extract_units_from_dom, extract_with_hints
 
 
 _HTML_SAMPLE = """
@@ -44,19 +44,26 @@ def test_hint_miss_returns_empty() -> None:
 
 
 def test_extract_units_from_dom_back_compat_without_hints() -> None:
-    """Calling without `hints` kwarg behaves identically to pre-Phase-8."""
-    out = extract_units_from_dom(_HTML_SAMPLE, "https://x.com")
-    # The default cascade may or may not extract from this synthetic HTML;
-    # the test is just that the function accepts the no-kwarg form.
-    assert isinstance(out, list)
+    """Without hints, returns (units, hit_mode) tuple."""
+    units, hit_mode = extract_units_from_dom(_HTML_SAMPLE, "https://x.com")
+    assert isinstance(units, list)
+    assert hit_mode in ("default", "none")
 
 
 def test_extract_units_from_dom_with_hints_falls_back_on_miss() -> None:
-    """When hints don't match, default cascade still runs."""
+    """When hints don't match, default cascade runs and hit_mode is not 'hints'."""
     hints = FieldSelectorMap(container=".not-present")
-    # The function should fall back to default cascade and still try to extract.
-    out = extract_units_from_dom(_HTML_NO_HINT_MATCH, "https://x.com", hints=hints)
-    assert isinstance(out, list)
+    units, hit_mode = extract_units_from_dom(_HTML_NO_HINT_MATCH, "https://x.com", hints=hints)
+    assert isinstance(units, list)
+    assert hit_mode != "hints"
+
+
+def test_extract_units_from_dom_hints_hit_mode() -> None:
+    """When hints match, hit_mode is 'hints'."""
+    hints = FieldSelectorMap(container=".my-special-unit")
+    units, hit_mode = extract_units_from_dom(_HTML_SAMPLE, "https://x.com", hints=hints)
+    assert len(units) == 2
+    assert hit_mode == "hints"
 
 
 def test_extract_with_hints_no_container_returns_empty() -> None:
@@ -67,7 +74,7 @@ def test_extract_with_hints_no_container_returns_empty() -> None:
 
 def test_dom_hints_consecutive_misses_field_exists() -> None:
     """The ScrapeProfile.dom_hints model has the new consecutive_misses field."""
-    from models.scrape_profile import ScrapeProfile
+    from ma_poc.models.scrape_profile import ScrapeProfile
     p = ScrapeProfile(canonical_id="phase8-001")
     assert hasattr(p.dom_hints, "consecutive_misses")
     assert p.dom_hints.consecutive_misses == 0

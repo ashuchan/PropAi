@@ -589,7 +589,7 @@ def extract_units_from_dom(
     html: str,
     source_url: str,
     hints: Any | None = None,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], str]:
     """Extract units by scanning common container selectors for rent signals.
 
     Conservative on purpose: requires rent + at least one structural signal
@@ -599,9 +599,14 @@ def extract_units_from_dom(
     Phase 8: when ``hints`` (a FieldSelectorMap) is provided with a non-empty
     ``container``, that selector is tried FIRST. On miss, falls back to the
     default cascade.
+
+    Returns (units, hit_mode) where hit_mode is one of:
+      "hints"   — profile hint selectors fired
+      "default" — default cascade fired
+      "none"    — no units extracted
     """
     if not html:
-        return []
+        return [], "none"
 
     if hints is not None:
         try:
@@ -609,7 +614,7 @@ def extract_units_from_dom(
         except Exception:
             hint_units = []
         if hint_units:
-            return hint_units
+            return hint_units, "hints"
 
     try:
         soup = BeautifulSoup(html, "lxml")
@@ -617,7 +622,7 @@ def extract_units_from_dom(
         try:
             soup = BeautifulSoup(html, "html.parser")
         except Exception:
-            return []
+            return [], "none"
 
     units: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -650,7 +655,9 @@ def extract_units_from_dom(
             # First selector that produced usable units wins — keeps output
             # coherent (all units come from the same container pattern).
             break
-    return units
+    if units:
+        return units, "default"
+    return [], "none"
 
 
 def extract_with_hints(
