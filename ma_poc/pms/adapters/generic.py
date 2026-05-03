@@ -430,16 +430,109 @@ class GenericAdapter:
     _fingerprints: list[str] = []
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
-        """Run generic extraction cascade on captured API responses.
+        """Run generic extraction cascade. Phase 5 wrapper: post-merge sidecar.
 
-        For detected PMS failures (pms != "unknown"), only deterministic tiers run.
-        LLM/Vision are reserved for truly unknown sites.
-
-        Emits ``extract.tier_attempted`` for every sub-tier run so the report
-        shows exactly which sub-tiers fired, how long they took, and why empty
-        ones stopped — the existing single-bucket ``tier_used`` hides all of
-        that detail.
+        Calls _extract_inner (the legacy cascade) and, if sub-tier 0 stashed
+        partial replay units that need filling-in by other sub-tiers, runs
+        merge_sources on the combined source list and rewrites result.units.
         """
+        result = await self._extract_inner(page, ctx)
+        try:
+            self._phase5_post_merge(result, ctx)
+        except Exception:
+            # Never break the run on a merge-side error (H10 best-effort)
+            pass
+        return result
+
+    @staticmethod
+    def _phase5_post_merge(result: AdapterResult, ctx: AdapterContext) -> None:
+        """If sub-tier 0 stashed `_phase5_replay_units` AND a later cascade
+        sub-tier produced its own units, merge them via source_merger so
+        partial mappings can't shadow native cascade fields. No-op when
+        only one source produced units."""
+        sidecar = getattr(result, "_phase5_replay_units", None)
+        if not sidecar:
+            return
+        if not result.units:
+            # Cascade produced nothing — replay is the sole contributor.
+            result.units = list(sidecar)
+            if not result.tier_used or result.tier_used == "TIER_1_API":
+                result.tier_used = "TIER_1_PROFILE_MAPPING"
+            return
+        # Both sources produced units — merge by identity, max-confidence per field.
+        # NOTE: keep imports relative to the same root the merger uses internally
+        # (models.source) so that FieldValue identity checks (isinstance) hold.
+        try:
+            from models.source import (
+                ExtractedSource,
+                SourceId,
+                envelope_hash_of,
+                from_legacy_unit,
+                to_legacy_unit,
+            )
+            from services.source_merger import merge_sources
+        except Exception:
+            return
+        winning_url = result.winning_url or ctx.base_url or ""
+        replay_h = envelope_hash_of(sidecar)
+        cascade_h = envelope_hash_of(result.units)
+        replay_src = ExtractedSource(
+            source_id=SourceId.MAPPING_REPLAY,
+            source_url=winning_url,
+            envelope_hash=replay_h,
+            units=[
+                from_legacy_unit(u, SourceId.MAPPING_REPLAY, winning_url, replay_h, 0.85)
+                for u in sidecar
+            ],
+            has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in sidecar),
+            is_floor_plan_level=False,
+        )
+        # Map the cascade's tier_used to the closest SourceId for provenance.
+        cascade_source = {
+            "TIER_1_API": SourceId.API_GENERIC_NARROW,
+            "TIER_1_5_EMBEDDED": SourceId.EMBEDDED_JSON,
+            "TIER_2_JSONLD": SourceId.JSON_LD,
+            "TIER_3_DOM": SourceId.DOM_CASCADE,
+            "TIER_3_DOM_LLM": SourceId.LLM_DOM_TARGETED,
+            "TIER_4_LLM": SourceId.LLM_MONOLITHIC,
+            "TIER_4_LLM_API": SourceId.LLM_API_TARGETED,
+            "TIER_4_LLM_DOM": SourceId.LLM_DOM_TARGETED,
+        }.get(result.tier_used, SourceId.API_GENERIC_NARROW)
+        cascade_src = ExtractedSource(
+            source_id=cascade_source,
+            source_url=winning_url,
+            envelope_hash=cascade_h,
+            units=[
+                from_legacy_unit(u, cascade_source, winning_url, cascade_h, 0.90)
+                for u in result.units
+            ],
+            has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in result.units),
+            is_floor_plan_level=False,
+        )
+        merged = merge_sources([replay_src, cascade_src], ctx.property_id)
+        if not merged:
+            return
+        legacy = [to_legacy_unit(u) for u in merged]
+        # Strip _provenance before handing to legacy serializer; provenance
+        # lives on result._sources for downstream observers.
+        for u in legacy:
+            u.pop("_provenance", None)
+        result.units = legacy
+        result._sources = [replay_src, cascade_src]  # type: ignore[attr-defined]
+        # Tier label: deterministic merge unless an LLM source contributed.
+        if cascade_source in (
+            SourceId.LLM_API_TARGETED,
+            SourceId.LLM_DOM_TARGETED,
+            SourceId.LLM_MONOLITHIC,
+        ):
+            result.tier_used = "TIER_MERGED_HYBRID"
+        else:
+            result.tier_used = "TIER_MERGED_DETERMINISTIC"
+
+    async def _extract_inner(self, page: Page, ctx: AdapterContext) -> AdapterResult:
+        """Legacy cascade — unchanged from pre-Phase-5 except sub-tier 0 may
+        stash `_phase5_replay_units` instead of preempting the adapter when
+        the replayed units are field-incomplete. See _phase5_post_merge."""
         import time as _time
 
         try:
@@ -525,6 +618,13 @@ class GenericAdapter:
                 except ImportError:
                     apply_saved_mapping = None
                 if apply_saved_mapping is not None:
+                    # Phase 6: drift detection helper
+                    try:
+                        from ma_poc.models.source import envelope_hash_of as _env_hash
+                    except ImportError:
+                        _env_hash = None  # type: ignore[assignment]
+                    from datetime import datetime as _dt
+
                     for mapping in saved:
                         try:
                             pat = getattr(mapping, "api_url_pattern", None) or (
@@ -536,6 +636,30 @@ class GenericAdapter:
                             continue
                         for resp in api_responses:
                             if pat in resp.get("url", ""):
+                                # Phase 6: drift check
+                                body = resp.get("body")
+                                saved_hash = getattr(mapping, "source_envelope_hash", "") or ""
+                                if saved_hash and _env_hash is not None:
+                                    current_hash = _env_hash(body)
+                                    if current_hash != saved_hash:
+                                        # Drift — skip replay, count failure
+                                        if hasattr(mapping, "consecutive_replay_failures"):
+                                            try:
+                                                mapping.consecutive_replay_failures += 1
+                                            except Exception:
+                                                pass
+                                        try:
+                                            from ma_poc.observability.events import EventKind, emit
+                                            emit(
+                                                EventKind.MAPPING_DRIFT_DETECTED,
+                                                getattr(ctx, "property_id", "unknown"),
+                                                url=str(resp.get("url", ""))[:80],
+                                                saved_hash=saved_hash[:8],
+                                                current_hash=current_hash[:8],
+                                            )
+                                        except Exception:
+                                            pass
+                                        continue
                                 mdict = (
                                     mapping
                                     if isinstance(mapping, dict)
@@ -546,28 +670,94 @@ class GenericAdapter:
                                     }
                                 )
                                 try:
-                                    units = apply_saved_mapping(resp.get("body"), mdict) or []
+                                    units = apply_saved_mapping(body, mdict) or []
                                 except Exception:
                                     units = []
+                                if hasattr(mapping, "last_replayed_at"):
+                                    try:
+                                        mapping.last_replayed_at = _dt.utcnow()
+                                    except Exception:
+                                        pass
                                 if units:
                                     replayed_units.extend(units)
                                     result.api_responses.append(resp)
+                                    # Phase 1: increment success_count
+                                    if hasattr(mapping, "success_count"):
+                                        try:
+                                            mapping.success_count += 1
+                                        except Exception:
+                                            pass
+                                    # Phase 6: reset failure streak on success
+                                    if hasattr(mapping, "consecutive_replay_failures"):
+                                        try:
+                                            mapping.consecutive_replay_failures = 0
+                                        except Exception:
+                                            pass
                                     break
+                                else:
+                                    # Empty replay — count failure
+                                    if hasattr(mapping, "consecutive_replay_failures"):
+                                        try:
+                                            mapping.consecutive_replay_failures += 1
+                                        except Exception:
+                                            pass
+                                    try:
+                                        from ma_poc.observability.events import EventKind, emit
+                                        emit(
+                                            EventKind.MAPPING_REPLAY_EMPTY,
+                                            getattr(ctx, "property_id", "unknown"),
+                                            url=str(resp.get("url", ""))[:80],
+                                        )
+                                    except Exception:
+                                        pass
             if replayed_units:
+                # Phase 5: only short-circuit when replay produced field-RICH units.
+                # If replay is field-incomplete (e.g. mapping learned only `beds`
+                # but missed rent / unit_id), let the cascade keep running — the
+                # post-merge step combines replay + cascade by max-confidence.
+                def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
+                    if not units:
+                        return False
+                    has_identity = any(
+                        (u.get("unit_id") or u.get("unit_number")) for u in units
+                    )
+                    has_transactional = any(
+                        (
+                            u.get("asking_rent")
+                            or u.get("market_rent_low")
+                            or u.get("market_rent_high")
+                            or u.get("rent_range")
+                        )
+                        for u in units
+                    )
+                    return has_identity and has_transactional
+
+                if _looks_field_rich(replayed_units):
+                    _log_attempt(
+                        "generic:profile_replay",
+                        "ran_units",
+                        units=len(replayed_units),
+                        reason="replayed saved LlmFieldMapping (field-rich)",
+                        duration_ms=int((_time.monotonic() - t0) * 1000),
+                    )
+                    result.units = replayed_units
+                    result.tier_used = "TIER_1_PROFILE_MAPPING"
+                    result.winning_url = (
+                        result.api_responses[0].get("url") if result.api_responses else ctx.base_url
+                    )
+                    result.confidence = min(0.90, 0.7 + 0.03 * len(replayed_units))
+                    return result
+                # Field-incomplete: stash for the post-merge step and continue cascade.
                 _log_attempt(
                     "generic:profile_replay",
                     "ran_units",
                     units=len(replayed_units),
-                    reason="replayed saved LlmFieldMapping",
+                    reason="replayed mapping field-incomplete; cascading + merging",
                     duration_ms=int((_time.monotonic() - t0) * 1000),
                 )
-                result.units = replayed_units
-                result.tier_used = "TIER_1_PROFILE_MAPPING"
-                result.winning_url = (
-                    result.api_responses[0].get("url") if result.api_responses else ctx.base_url
-                )
-                result.confidence = min(0.90, 0.7 + 0.03 * len(replayed_units))
-                return result
+                result._phase5_replay_units = list(replayed_units)  # type: ignore[attr-defined]
+                # Keep api_responses populated so downstream sub-tiers see them
+                # too — they may produce additional fields the merger fills in.
             _log_attempt(
                 "generic:profile_replay",
                 "skipped" if not saved else "ran_empty",

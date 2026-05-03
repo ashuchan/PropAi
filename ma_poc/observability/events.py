@@ -78,6 +78,26 @@ class EventKind(StrEnum):
     FETCH_TIER_PROBE_FAILED = "fetch.tier_probe_failed"
     FETCH_LADDER_BUDGET_EXHAUSTED = "fetch.ladder_budget_exhausted"
 
+    # Cross-source + self-learning events (CLAUDE_XSOURCE_AND_LEARNING)
+    # Phase 6 / 7 / 8
+    MAPPING_DRIFT_DETECTED = "mapping.drift_detected"
+    MAPPING_REPLAY_EMPTY = "mapping.replay_empty"
+    MAPPING_EVICTED = "mapping.evicted"
+    DOM_HINTS_MISS = "dom_hints.miss"
+    DOM_HINTS_EVICTED = "dom_hints.evicted"
+    FIELD_PATCH_HIT = "field_patch.hit"
+    FIELD_PATCH_DRIFT = "field_patch.drift"
+    FIELD_PATCH_EVICTED = "field_patch.evicted"
+    # Phase 5 / 9
+    IDENTITY_FUZZY_LINK = "identity.fuzzy_link"
+    PLANNER_DECISION = "planner.decision"
+    SOURCE_CONTRIBUTED = "source.contributed"
+    SOURCES_MERGED = "sources.merged"
+    # Phase 12
+    CLUSTER_MAPPING_HIT = "cluster.mapping_hit"
+    # Phase 13 — periodic
+    SLO_REPORT = "slo.report"
+
 
 @dataclass(slots=True, frozen=True)
 class Event:
