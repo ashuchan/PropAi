@@ -1048,6 +1048,16 @@ async def scrape_jugnu(
     base_url = task.url if hasattr(task, "url") else str(task)
     property_id = task.property_id if hasattr(task, "property_id") else "unknown"
 
+    # Phase G2: compute budget here so link-hop guard can respect it.
+    _jugnu_budget: dict = {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3}
+    if profile is not None:
+        try:
+            from ma_poc.services.source_planner import compute_budget as _cb
+            from ma_poc.models.scrape_profile import ProfileMaturity as _PM
+            _jugnu_budget = _cb(profile, is_cold=profile.confidence.maturity == _PM.COLD)
+        except Exception:
+            pass
+
     # Delta 2: short-circuit on non-OK fetch
     if hasattr(fetch_result, "outcome"):
         outcome_val = (
@@ -1131,13 +1141,37 @@ async def scrape_jugnu(
     emit(EventKind.ADAPTER_SELECTED, property_id, adapter_name=adapter_name)
 
     # ── Option B: one-level link-hop when primary extraction is empty ──
-    # If scrape() returned no units but the fetch was successful and we have
-    # HTML, rank internal links by keyword + portal-subdomain and re-fetch
-    # the top candidates. This catches vanity-domain + portal-subpage sites
-    # (RentCafe/Entrata/AppFolio) where the home page references the PMS
-    # but the actual unit data lives at /floor-plans, /availability, or on
-    # a .rentcafe.com subdomain.
-    if not result.get("units") and fetch_result is not None:
+    # Fires when (a) main returned no units (legacy path) or (b) Phase G2:
+    # main produced units but the planner says they're incomplete — hop to a
+    # sub-page that might supply the missing field group (e.g. rent lives on
+    # /availability, floor-plan physical data lives on /floor-plans).
+    # Budget cap: _jugnu_budget["link_hop"] == 0 → never hop.
+    should_hop = False
+    if fetch_result is not None and _jugnu_budget.get("link_hop", 0) > 0:
+        if not result.get("units"):
+            should_hop = True
+        else:
+            # Phase G2: consult planner when main has units
+            try:
+                from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
+                from ma_poc.models.source import SourceId, from_legacy_unit
+                _pu = [
+                    from_legacy_unit(u, SourceId.API_GENERIC_NARROW, base_url, "", 0.85)
+                    for u in (result.get("units") or [])
+                ]
+                _report = evaluate_completeness(_pu)
+                _decision = plan_next_action(
+                    _report,
+                    sources_already_run=set(),
+                    budget_remaining=dict(_jugnu_budget),
+                    pms_name=detected_pms.get("pms", "unknown"),
+                )
+                if _decision.action == "ESCALATE_LINK_HOP":
+                    should_hop = True
+            except Exception:
+                pass
+
+    if should_hop:
         body = getattr(fetch_result, "body", None)
         entry_html: str | None = None
         if isinstance(body, bytes):
@@ -1177,10 +1211,7 @@ async def scrape_jugnu(
                 sub_units = hop_result.get("units") or []
                 # Phase 9: when both main and sub-page produced units, merge
                 # them by identity + max-confidence-per-field rather than
-                # destructively overwriting. Today the link-hop only fires
-                # when main is empty (line ~1092 guard), so the cross-page
-                # merge is a future-proofing path; the legacy overwrite is
-                # the active path. Both routes preserve telemetry additively.
+                # destructively overwriting. Both routes preserve telemetry.
                 if main_units and sub_units:
                     try:
                         from ma_poc.models.source import (

@@ -603,7 +603,15 @@ class GenericAdapter:
             has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in result.units),
             is_floor_plan_level=False,
         )
-        merged = merge_sources([replay_src, cascade_src], ctx.property_id)
+        # Phase I: emit IDENTITY_FUZZY_LINK events via callback; merger stays pure
+        def _emit_fuzzy(unit: Any, key: Any, conf: float) -> None:
+            try:
+                from ma_poc.observability.events import EventKind as _EK, emit as _ev
+                _ev(_EK.IDENTITY_FUZZY_LINK, ctx.property_id, bucket_key=str(key)[:80], confidence=conf)
+            except Exception:
+                pass
+
+        merged = merge_sources([replay_src, cascade_src], ctx.property_id, fuzzy_link_callback=_emit_fuzzy)
         if not merged:
             return
         legacy = [to_legacy_unit(u) for u in merged]
@@ -615,6 +623,18 @@ class GenericAdapter:
         result._sources = [replay_src, cascade_src]  # type: ignore[attr-defined]
         # Phase D: stash the provenanced merge output for downstream observers
         result._merged_units = list(merged)  # type: ignore[attr-defined]
+        # Phase I: emit SOURCES_MERGED telemetry
+        try:
+            from ma_poc.observability.events import EventKind as _EK2, emit as _ev2
+            _ev2(
+                _EK2.SOURCES_MERGED,
+                ctx.property_id,
+                source_count=2,
+                merged_unit_count=len(merged),
+                tier=result.tier_used,
+            )
+        except Exception:
+            pass
         # Tier label: deterministic merge unless an LLM source contributed.
         if cascade_source in (
             SourceId.LLM_API_TARGETED,
