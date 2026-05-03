@@ -790,6 +790,7 @@ class GenericAdapter:
             result.units = list(sidecar)
             if not result.tier_used or result.tier_used == "TIER_1_API":
                 result.tier_used = "TIER_1_PROFILE_MAPPING"
+            result.confidence = min(0.90, 0.7 + 0.03 * len(sidecar)) * agg_q
             return
         # Both sources produced units — merge by identity, max-confidence per field.
         # NOTE: keep imports relative to the same root the merger uses internally
@@ -808,6 +809,9 @@ class GenericAdapter:
         winning_url = result.winning_url or ctx.base_url or ""
         replay_h = envelope_hash_of(sidecar)
         cascade_h = envelope_hash_of(result.units)
+        # PR-FUTURE-WORK: when a FieldPatch is derived from a parent LlmFieldMapping,
+        # the patch should inherit the mapping's quality_score demotion so that
+        # patch-replay units also carry the reduced per-field confidence here.
         replay_src = ExtractedSource(
             source_id=SourceId.MAPPING_REPLAY,
             source_url=winning_url,
@@ -1082,16 +1086,15 @@ class GenericAdapter:
                 # B1: compute aggregate quality across all mappings that contributed.
                 agg_q = _aggregate_quality(replayed_mappings)
 
-                # Phase 5: only short-circuit when replay produced field-RICH units
-                # AND aggregate mapping quality is sufficient (≥0.7).
-                # Low-quality mappings must not short-circuit — let the cascade run
-                # so the merger can prefer a higher-quality cascade source.
-                if _looks_field_rich(replayed_units) and agg_q >= 0.7:
+                # Phase 5: short-circuit when aggregate mapping quality is sufficient
+                # (≥0.7). Low-quality mappings must not short-circuit — let the
+                # cascade run so the merger can prefer a higher-quality source.
+                if agg_q >= 0.7:
                     _log_attempt(
                         "generic:profile_replay",
                         "ran_units",
                         units=len(replayed_units),
-                        reason="replayed saved LlmFieldMapping (field-rich)",
+                        reason="replayed saved LlmFieldMapping (quality ok)",
                         duration_ms=int((_time.monotonic() - t0) * 1000),
                     )
                     result.units = replayed_units

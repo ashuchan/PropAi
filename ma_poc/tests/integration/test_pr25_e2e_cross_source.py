@@ -97,13 +97,19 @@ def test_e2e_physical_then_transactional_merge() -> None:
     # At least one unit must carry data from the cascade (transactional or identity)
     # and at least one from the mapping (physical). The merger unifies them.
     merged_unit = result.units[0]
-    # The cascade (narrow parser) should have added transactional/identity fields
-    has_rent = any(
-        merged_unit.get(k) for k in ("asking_rent", "market_rent_low", "market_rent_high", "rent_low")
+    # The cascade (narrow parser) should have added transactional fields (rent or
+    # availability). The mapping replay should have added physical fields.
+    has_transactional = any(
+        merged_unit.get(k) for k in (
+            "asking_rent", "market_rent_low", "market_rent_high", "rent_low",
+            "availability_date", "available_date", "availability_status",
+        )
     )
     has_physical = any(merged_unit.get(k) for k in ("beds", "bedrooms", "sqft"))
-    assert has_rent or has_physical, (
-        "merged unit must carry fields from at least one source"
+    assert has_transactional and has_physical, (
+        "cross-source merge must combine transactional (from cascade) and "
+        "physical (from mapping replay) on the same unit; "
+        f"got merged_unit={merged_unit}"
     )
 
 
@@ -138,8 +144,8 @@ def test_e2e_planner_target_group_routes_to_correct_tier() -> None:
     assert decision.action != "ACCEPT_PARTIAL", (
         f"planner must not ACCEPT_PARTIAL with budget remaining; got action={decision.action}"
     )
-    # The target_field_group should direct the cascade toward transactional data.
-    if decision.target_field_group is not None:
-        assert decision.target_field_group == "transactional", (
-            f"planner must target 'transactional' group; got {decision.target_field_group}"
-        )
+    # The target_field_group must unconditionally direct the cascade toward
+    # transactional data when that group is the one lacking coverage.
+    assert decision.target_field_group == "transactional", (
+        f"planner must target 'transactional' group; got {decision.target_field_group}"
+    )

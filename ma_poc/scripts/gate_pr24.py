@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -194,10 +195,12 @@ def _run_pytest(fix: str) -> tuple[bool, list[str]]:
     if not targets:
         return True, [f"  no pytest targets for fix {fix}"]
     log: list[str] = []
-    cmd = [
-        sys.executable, "-m", "pytest",
-        "--tb=short", "-q",
-    ] + [str(MAPOC / t) for t in targets]
+    pytest_exe = shutil.which("pytest") or sys.executable
+    if pytest_exe == sys.executable:
+        cmd = [pytest_exe, "-m", "pytest", "--tb=short", "-q"]
+    else:
+        cmd = [pytest_exe, "--tb=short", "-q"]
+    cmd += [str(MAPOC / t) for t in targets]
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
     log.append(result.stdout[-2000:] if result.stdout else "")
     if result.returncode != 0:
