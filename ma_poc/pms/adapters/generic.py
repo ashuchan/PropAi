@@ -98,6 +98,66 @@ def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
     return has_identity and has_physical and has_transactional
 
 
+def _assess_and_decide(
+    units_so_far: list[dict[str, Any]],
+    sources_already_run: set,
+    ctx: Any,
+    decision_log: list,
+) -> Any | None:
+    """Consult the planner after a sub-tier produces units.
+
+    Returns the Decision if planner fires; None if units are empty or import
+    fails. Appends every non-None decision to decision_log.
+    """
+    if not units_so_far:
+        return None
+    try:
+        from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
+        from ma_poc.models.source import SourceId, from_legacy_unit
+        from ma_poc.models.scrape_profile import ProfileMaturity
+    except Exception:
+        return None
+    try:
+        pu_units = [
+            from_legacy_unit(u, SourceId.API_GENERIC_NARROW, getattr(ctx, "base_url", ""), "", 0.85)
+            for u in units_so_far
+        ]
+        report = evaluate_completeness(pu_units)
+        floor: dict = {"complete": 0.85, "transactional": 0.70}
+        profile = getattr(ctx, "profile", None)
+        if profile is not None:
+            try:
+                if profile.confidence.maturity == ProfileMaturity.HOT:
+                    floor = {"complete": 0.90, "transactional": 0.80}
+            except Exception:
+                pass
+        decision = plan_next_action(
+            report,
+            sources_already_run=sources_already_run,
+            budget_remaining=dict(getattr(ctx, "budget", {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3})),
+            pms_name=getattr(getattr(ctx, "detected", None), "pms", "unknown"),
+            profile_completeness_floor=floor,
+            profile_preferences=(
+                list(profile.api_hints.source_observations) if profile is not None else []
+            ),
+        )
+        decision_log.append(decision)
+        try:
+            from ma_poc.observability.events import EventKind, emit
+            emit(
+                EventKind.PLANNER_DECISION,
+                getattr(ctx, "property_id", "unknown"),
+                action=decision.action,
+                target_field_group=decision.target_field_group or "",
+                rationale=decision.rationale[:120],
+            )
+        except Exception:
+            pass
+        return decision
+    except Exception:
+        return None
+
+
 def _find_unit_list(body: Any) -> list[dict[str, Any]]:
     """Attempt to find a list of unit/floorplan dicts in an API response body.
 
@@ -598,6 +658,10 @@ class GenericAdapter:
 
         result = AdapterResult(tier_used="TIER_1_API")
         result._tier_attempts = attempts  # type: ignore[attr-defined]
+        # Phase H: track which SourceIds have already run for the planner
+        sources_already_run: set = set()
+        # Phase H: decision log for telemetry / debugging
+        decision_log: list = []
         all_units: list[dict[str, str]] = []
         # Option C gate: default is skip LLM when the detected PMS is not
         # "unknown" (GenericAdapter runs as a fallback for a failed PMS
@@ -851,10 +915,20 @@ class GenericAdapter:
             )
 
         if all_units:
-            result.units = all_units
-            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
-            result.confidence = min(0.85, 0.6 + 0.05 * len(all_units))
-            return result
+            # Phase H: consult the planner before short-circuiting.
+            # If planner says STOP, return early. Otherwise fall through so
+            # LLM sub-tiers can fill completeness gaps — but only if budget allows.
+            from ma_poc.models.source import SourceId as _SI
+            sources_already_run.add(_SI.API_GENERIC_NARROW)
+            _decision = _assess_and_decide(all_units, sources_already_run, ctx, decision_log)
+            if _decision is None or _decision.action == "STOP":
+                result.units = all_units
+                result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
+                result.confidence = min(0.85, 0.6 + 0.05 * len(all_units))
+                result._decision_log = decision_log  # type: ignore[attr-defined]
+                return result
+            # Planner says escalate — fall through to LLM tiers with skip_llm guard
+            skip_llm = False  # override: planner explicitly requested escalation
 
         # ── HTML-based tiers ──────────────────────────────────────────────
         # If neither narrow nor broad API parsers produced units, fall through
@@ -1093,10 +1167,11 @@ class GenericAdapter:
             result.confidence = 0.0
             return result
 
-        # Budget: capped per property so a broken site can't burn unlimited
-        # tokens. Mirrors the legacy entrata.py budget (3 API + 1 DOM).
-        api_llm_budget = 3
-        dom_llm_budget = 1
+        # Phase H: use budget from ctx (computed per-property in scraper.py).
+        # Falls back to safe defaults when ctx.budget is absent (e.g. old callers).
+        _budget = getattr(ctx, "budget", None) or {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3}
+        api_llm_budget = int(_budget.get("llm_targeted", 1))
+        dom_llm_budget = int(_budget.get("llm_monolithic", 1))
         llm_interactions: list[dict[str, Any]] = getattr(result, "_llm_interactions", []) or []
         # Self-learning payload surfaced to scraper.py. Shape matches what
         # services.profile_updater.update_profile_after_extraction expects:
@@ -1274,6 +1349,7 @@ class GenericAdapter:
         result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
         if llm_navigation_hints:
             result._llm_navigation_hints = llm_navigation_hints  # type: ignore[attr-defined]
+        result._decision_log = decision_log  # type: ignore[attr-defined]
         result.confidence = 0.0
         result.errors.append("Generic parser found no units in captured API responses")
         return result

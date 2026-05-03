@@ -290,6 +290,17 @@ async def scrape(
             except (ValueError, TypeError):
                 expected_units = None
 
+    # Phase H: compute per-property LLM budget once, before adapter dispatch
+    budget: dict = {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3}
+    if profile is not None:
+        try:
+            from ma_poc.services.source_planner import compute_budget
+            from ma_poc.models.scrape_profile import ProfileMaturity
+            is_cold = profile.confidence.maturity == ProfileMaturity.COLD
+            budget = compute_budget(profile, is_cold=is_cold)
+        except Exception:
+            pass
+
     ctx = AdapterContext(
         base_url=resolved.resolved_url,
         detected=detection,
@@ -302,6 +313,7 @@ async def scrape(
         state=_from_csv("state", "State"),
         zip_code=_from_csv("zip", "Zip", "zip_code", "ZIP Code"),
         pmc=_from_csv("Management Company", "pmc"),
+        budget=budget,
     )
 
     # Phase F: populate cluster_key from PMS client account ID on first detection
