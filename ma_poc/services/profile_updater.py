@@ -373,11 +373,44 @@ def update_profile_after_extraction(
                     break
 
     # ── Record LLM API analysis results (new workflow) ─────────
+    # Build a url→body lookup from the raw captured responses once
+    raw_apis = scrape_result.get("_raw_api_responses", []) or []
+    url_to_body: dict[str, Any] = {
+        r.get("url", ""): r.get("body")
+        for r in raw_apis
+        if isinstance(r, dict)
+    }
+    # Use actual unit count from this run as the validation target
+    expected_n = max(len(scrape_result.get("units", []) or []), 1)
+
+    try:
+        from ma_poc.models.source import envelope_hash_of as _envelope_hash_of
+    except Exception:
+        _envelope_hash_of = None  # type: ignore[assignment]
+
     llm_analysis = scrape_result.get("_llm_analysis_results", {})
     for api_url, result in llm_analysis.items():
         if isinstance(result, dict) and result.get("api_url_pattern"):
-            # This is an LlmFieldMapping — API had unit data
-            save_llm_field_mapping(profile, result)
+            # Phase B: match the captured body by api_url_pattern substring
+            pattern = result.get("api_url_pattern", "")
+            matched_body = None
+            for url, body in url_to_body.items():
+                if pattern in url:
+                    matched_body = body
+                    break
+            env_hash = ""
+            if matched_body is not None and _envelope_hash_of is not None:
+                try:
+                    env_hash = _envelope_hash_of(matched_body)
+                except Exception:
+                    pass
+            save_llm_field_mapping(
+                profile,
+                result,
+                source_envelope_hash=env_hash,
+                body_for_validation=matched_body,
+                expected_unit_count=expected_n,
+            )
         elif result == "blocked" or (isinstance(result, str) and result.startswith("noise:")):
             reason = result.replace("noise:", "").strip() if isinstance(result, str) else "no_unit_data"
             update_profile_blocklist(profile, api_url, reason)
@@ -392,6 +425,36 @@ def update_profile_after_extraction(
     for patch_dict in patches_payload:
         if isinstance(patch_dict, dict):
             save_field_patch(profile, patch_dict)
+
+    # Phase 8: DOM hints miss tracking + eviction
+    if scrape_result.get("_dom_hints_attempted"):
+        if scrape_result.get("_dom_hints_hit"):
+            profile.dom_hints.consecutive_misses = 0
+        else:
+            profile.dom_hints.consecutive_misses = getattr(
+                profile.dom_hints, "consecutive_misses", 0
+            ) + 1
+            try:
+                from ma_poc.observability.events import EventKind, emit
+                emit(
+                    EventKind.DOM_HINTS_MISS,
+                    profile.canonical_id,
+                    count=profile.dom_hints.consecutive_misses,
+                )
+            except Exception:
+                pass
+            if profile.dom_hints.consecutive_misses >= 3:
+                log.info(
+                    "Evicting DOM field selectors for %s after 3 consecutive misses",
+                    profile.canonical_id,
+                )
+                profile.dom_hints.field_selectors = FieldSelectorMap()
+                profile.dom_hints.consecutive_misses = 0
+                try:
+                    from ma_poc.observability.events import EventKind, emit
+                    emit(EventKind.DOM_HINTS_EVICTED, profile.canonical_id)
+                except Exception:
+                    pass
 
     # Phase 6: evict stale LlmFieldMappings after 3 consecutive replay failures
     _EVICTION_THRESHOLD = 3
@@ -421,6 +484,26 @@ def update_profile_after_extraction(
         try:
             from ma_poc.observability.events import EventKind, emit
             emit(EventKind.FIELD_PATCH_EVICTED, profile.canonical_id, count=fp_evicted)
+        except Exception:
+            pass
+
+    # Phase 11: record source contribution telemetry
+    merged_units = scrape_result.get("_merged_units", []) or []
+    if merged_units:
+        try:
+            from services.source_observer import record_source_observations
+            record_source_observations(profile, merged_units)
+        except Exception as exc:
+            log.warning("record_source_observations call failed: %s", exc)
+
+    # Update last_sources_run for next-run failure-streak detection
+    sources_payload = scrape_result.get("_sources", []) or []
+    if sources_payload:
+        try:
+            profile.confidence.last_sources_run = [
+                s.source_id.value if hasattr(s.source_id, "value") else str(s.source_id)
+                for s in sources_payload
+            ][:20]
         except Exception:
             pass
 

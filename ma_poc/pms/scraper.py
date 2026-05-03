@@ -303,6 +303,17 @@ async def scrape(
         zip_code=_from_csv("zip", "Zip", "zip_code", "ZIP Code"),
         pmc=_from_csv("Management Company", "pmc"),
     )
+
+    # Phase F: populate cluster_key from PMS client account ID on first detection
+    if profile is not None and detection is not None:
+        pms_client_id = str(getattr(detection, "pms_client_account_id", "") or "")
+        if pms_client_id and not profile.cluster_key:
+            profile.cluster_key = pms_client_id
+            log.info(
+                "Cluster key set for %s: %s",
+                profile.canonical_id,
+                pms_client_id[:30],
+            )
     # Attach API responses to context for generic adapter. Prefer the
     # explicit ``api_responses`` arg (tests pass this directly); otherwise
     # promote the L1 fetcher's captured ``network_log`` so adapters can
@@ -506,6 +517,12 @@ async def scrape(
     # these as ``_tier_attempts``; PMS-specific adapters don't currently, so
     # an empty list is fine.
     result["_tier_attempts"] = getattr(adapter_result, "_tier_attempts", [])
+    # Phase D: provenanced merge output for source observers
+    result["_merged_units"] = getattr(adapter_result, "_merged_units", [])
+    result["_sources"] = getattr(adapter_result, "_sources", [])
+    # Phase E: DOM hints attempt/hit flags for miss-counter in profile_updater
+    result["_dom_hints_attempted"] = getattr(adapter_result, "_dom_hints_attempted", False)
+    result["_dom_hints_hit"] = getattr(adapter_result, "_dom_hints_hit", False)
     # Surface LLM interactions + hints if the generic:llm sub-tier ran. These
     # drive cost accounting, the LLM Interactions report section, and the
     # profile updater (css_selectors, api_urls_with_data, platform_guess).

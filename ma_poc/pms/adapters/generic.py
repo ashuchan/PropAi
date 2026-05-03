@@ -553,6 +553,8 @@ class GenericAdapter:
             u.pop("_provenance", None)
         result.units = legacy
         result._sources = [replay_src, cascade_src]  # type: ignore[attr-defined]
+        # Phase D: stash the provenanced merge output for downstream observers
+        result._merged_units = list(merged)  # type: ignore[attr-defined]
         # Tier label: deterministic merge unless an LLM source contributed.
         if cascade_source in (
             SourceId.LLM_API_TARGETED,
@@ -940,12 +942,22 @@ class GenericAdapter:
             # Scans container elements (.unit, .floor-plan, .pricing-card, …)
             # for visible rent + structural signals. Catches static HTML sites
             # where unit data lives in the markup, not in any JSON envelope.
+            # Phase E: pass saved field_selectors as hints when available.
             t0 = _time.monotonic()
+            dom_hints = None
+            if ctx.profile is not None:
+                fs = ctx.profile.dom_hints.field_selectors
+                if fs and getattr(fs, "container", None):
+                    dom_hints = fs
+            hints_attempted = dom_hints is not None
             try:
-                dom_units = extract_units_from_dom(html, ctx.base_url) or []
+                dom_units = extract_units_from_dom(html, ctx.base_url, hints=dom_hints) or []
             except Exception as exc:
                 dom_units = []
                 result.errors.append(f"dom-scan-error: {exc}")
+            hints_hit = hints_attempted and bool(dom_units)
+            result._dom_hints_attempted = hints_attempted  # type: ignore[attr-defined]
+            result._dom_hints_hit = hints_hit  # type: ignore[attr-defined]
             _log_attempt(
                 "generic:dom_scan",
                 "ran_units" if dom_units else "ran_empty",
