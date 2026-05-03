@@ -71,7 +71,10 @@ def test_decision_one_decision_per_call() -> None:
 def test_budget_zero_blocks_escalation() -> None:
     """H3 invariant — exhausted budget → ACCEPT_PARTIAL."""
     r = CompletenessReport(10, 0.95, 0.95, 0.40, 0.55)
-    d = plan_next_action(r, set(), {"llm_targeted": 0, "link_hop": 0, "llm_monolithic": 0})
+    d = plan_next_action(
+        r, set(),
+        {"llm_api_calls": 0, "llm_dom_calls": 0, "link_hop": 0, "llm_monolithic": 0},
+    )
     assert d.action == "ACCEPT_PARTIAL"
 
 
@@ -83,7 +86,10 @@ def test_decision_broad_recovery_prefers_link_hop() -> None:
 
 def test_decision_broad_recovery_falls_to_monolithic() -> None:
     r = CompletenessReport(10, 0.2, 0.2, 0.2, 0.1)
-    d = plan_next_action(r, set(), {"llm_targeted": 1, "link_hop": 0, "llm_monolithic": 1})
+    d = plan_next_action(
+        r, set(),
+        {"llm_api_calls": 1, "llm_dom_calls": 1, "link_hop": 0, "llm_monolithic": 1},
+    )
     assert d.action == "ESCALATE_LLM_MONOLITHIC"
 
 
