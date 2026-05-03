@@ -585,22 +585,44 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
     }
 
 
-def extract_units_from_dom(html: str, source_url: str) -> list[dict[str, Any]]:
+def extract_units_from_dom(
+    html: str,
+    source_url: str,
+    hints: Any | None = None,
+) -> tuple[list[dict[str, Any]], str]:
     """Extract units by scanning common container selectors for rent signals.
 
     Conservative on purpose: requires rent + at least one structural signal
     (sqft / beds / studio) per container. Prevents false positives on pages
     that show a single "Starting at $1,200" banner but no per-unit table.
+
+    Phase 8: when ``hints`` (a FieldSelectorMap) is provided with a non-empty
+    ``container``, that selector is tried FIRST. On miss, falls back to the
+    default cascade.
+
+    Returns (units, hit_mode) where hit_mode is one of:
+      "hints"   — profile hint selectors fired
+      "default" — default cascade fired
+      "none"    — no units extracted
     """
     if not html:
-        return []
+        return [], "none"
+
+    if hints is not None:
+        try:
+            hint_units = extract_with_hints(html, source_url, hints)
+        except Exception:
+            hint_units = []
+        if hint_units:
+            return hint_units, "hints"
+
     try:
         soup = BeautifulSoup(html, "lxml")
     except Exception:
         try:
             soup = BeautifulSoup(html, "html.parser")
         except Exception:
-            return []
+            return [], "none"
 
     units: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -633,6 +655,56 @@ def extract_units_from_dom(html: str, source_url: str) -> list[dict[str, Any]]:
             # First selector that produced usable units wins — keeps output
             # coherent (all units come from the same container pattern).
             break
+    if units:
+        return units, "default"
+    return [], "none"
+
+
+def extract_with_hints(
+    html: str,
+    source_url: str,
+    hints: Any,
+) -> list[dict[str, Any]]:
+    """Phase 8 — hint-only DOM extraction.
+
+    Honors ``hints.container`` (and optional rent / sqft / bedrooms / etc.
+    selectors). Returns ``[]`` if container doesn't match. Does NOT fall
+    back to the default cascade — callers can chain.
+    """
+    if not html or hints is None:
+        return []
+    container_sel = getattr(hints, "container", None)
+    if not container_sel:
+        return []
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+        except Exception:
+            return []
+    try:
+        nodes = soup.select(container_sel)
+    except Exception:
+        return []
+    if not nodes or len(nodes) > 200:
+        return []
+    units: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for node in nodes:
+        text = node.get_text(" ", strip=True)
+        if len(text) < 10 or len(text) > 3000:
+            continue
+        unit = _container_yields_unit(text)
+        if unit is None:
+            continue
+        unit["source_api_url"] = f"dom_hints:{container_sel}"
+        unit["_source_url"] = source_url
+        dedup = unit["unit_number"] or f"{unit['rent_range']}|{unit['sqft']}|{unit['bedrooms']}"
+        if dedup in seen:
+            continue
+        seen.add(dedup)
+        units.append(unit)
     return units
 
 

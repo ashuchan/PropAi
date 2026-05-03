@@ -806,6 +806,82 @@ def _format_v2_unit(unit: dict[str, Any], scrape_ts: datetime) -> dict[str, Any]
     }
 
 
+def _resolve_source_url(raw_apis: list[dict[str, Any]], target_unit: dict[str, Any]) -> tuple[str, Any]:
+    """Find the API response whose body most plausibly contains target_unit's data.
+
+    Searches for target_unit's unit_id / floor_plan_name / unit_number in each
+    response body. Falls back to the first non-empty response when no match found.
+
+    Fix 10: short needles (1-3 chars) must appear as a JSON value token, not
+    as a bare substring — prevents "1A" matching "availab**1A**ble" or "s"
+    matching every string body. Long needles (≥4 chars) use plain substring match.
+    """
+    if not raw_apis:
+        return ("", {})
+
+    long_needles: list[str] = []
+    short_needles: list[str] = []
+    for k in ("floor_plan_name", "unit_id", "unit_number"):
+        v = target_unit.get(k)
+        if not v:
+            continue
+        s = str(v).strip()
+        if not s:
+            continue
+        if len(s) >= 4:
+            long_needles.append(s)
+        else:
+            short_needles.append(s)
+
+    # Short-needle patterns: the value must appear as a JSON string/number value
+    # e.g. `": "1A"`, `": 1A,`, `": 1A}`, `":1A"` (whitespace-tolerant).
+    import re as _re
+    short_patterns = [
+        _re.compile(
+            r':\s*"' + _re.escape(n) + r'"'
+            r'|:\s*' + _re.escape(n) + r'[,}\]\n\r\s]',
+            _re.IGNORECASE,
+        )
+        for n in short_needles
+    ]
+
+    def _body_matches(body_str: str) -> bool:
+        if long_needles and any(n in body_str for n in long_needles):
+            return True
+        if short_patterns and any(p.search(body_str) for p in short_patterns):
+            return True
+        return False
+
+    has_needles = bool(long_needles or short_patterns)
+    for resp in raw_apis:
+        body = resp.get("body")
+        if body is None:
+            continue
+        try:
+            body_str = json.dumps(body) if isinstance(body, (dict, list)) else str(body)
+        except (TypeError, ValueError):
+            body_str = str(body)
+        if has_needles and _body_matches(body_str):
+            return (resp.get("url", ""), body)
+    # Fallback: first non-empty body
+    for resp in raw_apis:
+        if resp.get("body"):
+            return (resp.get("url", ""), resp.get("body"))
+    return ("", {})
+
+
+def _url_pattern_from(url: str) -> str:
+    """Strip scheme/host/query to extract a stable path-only pattern."""
+    if not url:
+        return ""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        return parsed.path or url
+    except Exception:
+        return url
+
+
 async def _run_null_field_recovery(
     scrape_result: dict[str, Any],
     formatted: dict[str, Any],
@@ -844,17 +920,6 @@ async def _run_null_field_recovery(
         adapter_name = tier.replace("TIER_1_API_", "").lower() or "generic"
         diag_dir = run_dir / "llm_diagnostics"
 
-        source_body = raw_apis[0].get("body") if raw_apis else {}
-        source_items: list[Any] = []
-        if isinstance(source_body, list):
-            source_items = source_body
-        elif isinstance(source_body, dict):
-            for k in ("data", "results", "floorplans", "FloorplanList", "Result"):
-                v = source_body.get(k)
-                if isinstance(v, list):
-                    source_items = v
-                    break
-
         property_context = {
             "property_name": str(formatted.get("proj_name") or ""),
             "website": str(formatted.get("website") or ""),
@@ -862,8 +927,27 @@ async def _run_null_field_recovery(
             "state": str(formatted.get("state") or ""),
         }
 
+        _PATCH_FIELDS = frozenset({
+            "rent_low", "rent_high", "asking_rent",
+            "market_rent_low", "market_rent_high",
+            "unit_id", "unit_number", "floor_plan_name",
+            "beds", "bedrooms", "baths", "bathrooms", "sqft",
+            "available_date", "availability_date",
+        })
+
         for i, unit in enumerate(null_units[:5]):
+            source_url, source_body = _resolve_source_url(raw_apis, unit)
+            source_items: list[Any] = []
+            if isinstance(source_body, list):
+                source_items = source_body
+            elif isinstance(source_body, dict):
+                for k in ("data", "results", "floorplans", "FloorplanList", "Result"):
+                    v = source_body.get(k)
+                    if isinstance(v, list):
+                        source_items = v
+                        break
             fragment = source_items[i] if i < len(source_items) else source_body
+
             recovery = await null_field_recovery(
                 property_id=canonical_id,
                 partial_unit=unit,
@@ -878,23 +962,48 @@ async def _run_null_field_recovery(
             interaction = getattr(recovery, "_llm_interaction", None)
             if isinstance(interaction, dict):
                 scrape_result.setdefault("_llm_interactions", []).append(interaction)
+
+            patch_payloads = scrape_result.setdefault("_field_patches", [])
             for rf in recovery.recovered_fields:
                 if rf.confidence < 0.85 or rf.recovered_value is None:
                     continue
-                if rf.field_name == "rent_low" and unit.get("rent_low") is None:
+                field_name = rf.field_name
+                # Apply in-memory patch
+                if field_name == "rent_low" and unit.get("rent_low") is None:
                     try:
                         unit["rent_low"] = _format_rent(rf.recovered_value)
                     except Exception:
                         pass
-                elif rf.field_name == "rent_high" and unit.get("rent_high") is None:
+                elif field_name == "rent_high" and unit.get("rent_high") is None:
                     try:
                         unit["rent_high"] = _format_rent(rf.recovered_value)
                     except Exception:
                         pass
-                elif rf.field_name == "unit_id" and unit.get("unit_id") is None:
+                elif field_name == "unit_id" and unit.get("unit_id") is None:
                     unit["unit_id"] = str(rf.recovered_value)
-                elif rf.field_name == "floor_plan_name" and unit.get("floor_plan_name") is None:
+                elif field_name == "floor_plan_name" and unit.get("floor_plan_name") is None:
                     unit["floor_plan_name"] = str(rf.recovered_value)
+
+                # Phase C2: persist patch for replay on future runs
+                if field_name not in _PATCH_FIELDS:
+                    continue
+                raw_path = (getattr(rf, "source_path", None) or "").lstrip("$").lstrip(".")
+                if not raw_path:
+                    continue
+                env_hash = ""
+                try:
+                    from ma_poc.models.source import envelope_hash_of
+                    env_hash = envelope_hash_of(source_body)
+                except Exception:
+                    pass
+                patch_payloads.append({
+                    "api_url_pattern": _url_pattern_from(source_url),
+                    "field_name": field_name,
+                    "json_path": raw_path,
+                    "confidence": float(rf.confidence),
+                    "parser_fix": getattr(rf, "parser_fix", None),
+                    "_envelope_hash": env_hash,
+                })
     except Exception as exc:
         log.debug("F2 null_field_recovery hook failed for %s: %s", canonical_id, exc)
 

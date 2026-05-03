@@ -33,6 +33,10 @@ class AdapterContext:
     state: str = ""
     zip_code: str = ""
     pmc: str = ""  # Management company
+    # Phase H: per-property LLM budget for this run (computed once in scraper.py)
+    budget: dict = field(default_factory=lambda: {
+        "llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3,
+    })
 
 
 @dataclass

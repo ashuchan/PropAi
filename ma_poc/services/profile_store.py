@@ -111,3 +111,27 @@ class ProfileStore:
             except Exception:
                 continue
         return results
+
+    def iter_profiles_by_cluster_key(
+        self, cluster_key: str, limit: int = 100
+    ) -> list[ScrapeProfile]:
+        """Phase 12 — yield profiles matching cluster_key. Bounded LIMIT.
+
+        File-backed implementation scans all profile JSONs. SQL-backed
+        ProfileStore implementations can override with an indexed query.
+        """
+        if not cluster_key:
+            return []
+        results: list[ScrapeProfile] = []
+        for path in self._base.glob("*.json"):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if data.get("cluster_key") != cluster_key:
+                    continue
+                profile = ScrapeProfile.model_validate(data)
+                results.append(profile)
+                if len(results) >= limit:
+                    break
+            except Exception:
+                continue
+        return results

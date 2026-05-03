@@ -122,6 +122,7 @@ async def scrape(
     fetch_result: Any | None = None,
     csv_row: dict[str, Any] | None = None,
     property_id: str | None = None,
+    shared_budget: dict | None = None,
 ) -> dict[str, Any]:
     """Scrape a property URL through detect -> resolve -> adapt pipeline.
 
@@ -290,6 +291,21 @@ async def scrape(
             except (ValueError, TypeError):
                 expected_units = None
 
+    # Phase H / Fix 8: use shared_budget if provided (avoids double-allocation
+    # when scrape_jugnu() has already computed the budget for this run).
+    if shared_budget is not None:
+        budget: dict = dict(shared_budget)
+    else:
+        budget = {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
+        if profile is not None:
+            try:
+                from ma_poc.services.source_planner import compute_budget
+                from ma_poc.models.scrape_profile import ProfileMaturity
+                is_cold = profile.confidence.maturity == ProfileMaturity.COLD
+                budget = compute_budget(profile, is_cold=is_cold)
+            except Exception:
+                pass
+
     ctx = AdapterContext(
         base_url=resolved.resolved_url,
         detected=detection,
@@ -302,7 +318,19 @@ async def scrape(
         state=_from_csv("state", "State"),
         zip_code=_from_csv("zip", "Zip", "zip_code", "ZIP Code"),
         pmc=_from_csv("Management Company", "pmc"),
+        budget=budget,
     )
+
+    # Phase F: populate cluster_key from PMS client account ID on first detection
+    if profile is not None and detection is not None:
+        pms_client_id = str(getattr(detection, "pms_client_account_id", "") or "")
+        if pms_client_id and not profile.cluster_key:
+            profile.cluster_key = pms_client_id
+            log.info(
+                "Cluster key set for %s: %s",
+                profile.canonical_id,
+                pms_client_id[:30],
+            )
     # Attach API responses to context for generic adapter. Prefer the
     # explicit ``api_responses`` arg (tests pass this directly); otherwise
     # promote the L1 fetcher's captured ``network_log`` so adapters can
@@ -506,6 +534,12 @@ async def scrape(
     # these as ``_tier_attempts``; PMS-specific adapters don't currently, so
     # an empty list is fine.
     result["_tier_attempts"] = getattr(adapter_result, "_tier_attempts", [])
+    # Phase D: provenanced merge output for source observers
+    result["_merged_units"] = getattr(adapter_result, "_merged_units", [])
+    result["_sources"] = getattr(adapter_result, "_sources", [])
+    # Phase E: DOM hints attempt/hit flags for miss-counter in profile_updater
+    result["_dom_hints_attempted"] = getattr(adapter_result, "_dom_hints_attempted", False)
+    result["_dom_hints_hit"] = getattr(adapter_result, "_dom_hints_hit", False)
     # Surface LLM interactions + hints if the generic:llm sub-tier ran. These
     # drive cost accounting, the LLM Interactions report section, and the
     # profile updater (css_selectors, api_urls_with_data, platform_guess).
@@ -836,6 +870,8 @@ async def _try_link_hop(
     csv_row: dict[str, Any] | None,
     max_hops: int = 3,
     llm_navigation_hints: list[str] | None = None,
+    visited_urls: set[str] | None = None,
+    shared_budget: dict | None = None,
 ) -> dict[str, Any] | None:
     """One-level BFS over home-page links when primary extraction is empty.
 
@@ -846,12 +882,25 @@ async def _try_link_hop(
     ``llm_navigation_hints`` (Phase 5) takes priority over keyword-ranked
     candidates — if the LLM already diagnosed where data lives, we try
     that URL first instead of guessing from anchor text.
+
+    Phase 9 — H5 invariant: ``visited_urls`` blocks fetch cycles. The
+    entry URL is auto-added to prevent re-fetching the home page.
+    ``max_hops`` caps the bounded BFS at 3 by default (never deeper).
     """
+    visited: set[str] = set(visited_urls) if visited_urls else set()
+    visited.add(entry_url)
+
     ranked = _rank_internal_links(entry_page_html, entry_url, limit=max_hops)
     if llm_navigation_hints:
         ranked = _augment_ranked_with_hints(ranked, llm_navigation_hints, entry_url)
         # Cap to keep budget bounded even with hints merged in.
         ranked = ranked[: max(max_hops, len(llm_navigation_hints) + 1)]
+    # Phase 9: drop URLs already visited (cycle break)
+    ranked = [(u, s, a) for (u, s, a) in ranked if u not in visited]
+    # Phase 9: hard-cap at max_hops (defensive — _rank_internal_links has
+    # its own limit, but enforcing here protects against augment-with-hints
+    # bypassing the limit).
+    ranked = ranked[:max_hops]
     if not ranked:
         return None
 
@@ -877,6 +926,11 @@ async def _try_link_hop(
     explored: dict[str, bool] = {}
 
     for idx, (sub_url, score, anchor) in enumerate(ranked, 1):
+        if sub_url in visited:
+            # Phase 9: defensive — should already be filtered above, but
+            # double-check to enforce H5 invariant under all code paths.
+            continue
+        visited.add(sub_url)
         sub_task = CrawlTask(
             url=sub_url,
             property_id=property_id,
@@ -923,6 +977,7 @@ async def _try_link_hop(
                 fetch_result=sub_fetch,
                 csv_row=csv_row,
                 property_id=property_id,
+                shared_budget=shared_budget,
             )
         except Exception as exc:
             log.warning("link-hop scrape failed for %s: %s", sub_url, exc)
@@ -1000,6 +1055,16 @@ async def scrape_jugnu(
     base_url = task.url if hasattr(task, "url") else str(task)
     property_id = task.property_id if hasattr(task, "property_id") else "unknown"
 
+    # Phase G2: compute budget here so link-hop guard can respect it.
+    _jugnu_budget: dict = {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
+    if profile is not None:
+        try:
+            from ma_poc.services.source_planner import compute_budget as _cb
+            from ma_poc.models.scrape_profile import ProfileMaturity as _PM
+            _jugnu_budget = _cb(profile, is_cold=profile.confidence.maturity == _PM.COLD)
+        except Exception:
+            pass
+
     # Delta 2: short-circuit on non-OK fetch
     if hasattr(fetch_result, "outcome"):
         outcome_val = (
@@ -1045,6 +1110,7 @@ async def scrape_jugnu(
         fetch_result=fetch_result,
         csv_row=csv_row,
         property_id=property_id,
+        shared_budget=_jugnu_budget,
     )
     result["_property_id"] = property_id
 
@@ -1083,13 +1149,37 @@ async def scrape_jugnu(
     emit(EventKind.ADAPTER_SELECTED, property_id, adapter_name=adapter_name)
 
     # ── Option B: one-level link-hop when primary extraction is empty ──
-    # If scrape() returned no units but the fetch was successful and we have
-    # HTML, rank internal links by keyword + portal-subdomain and re-fetch
-    # the top candidates. This catches vanity-domain + portal-subpage sites
-    # (RentCafe/Entrata/AppFolio) where the home page references the PMS
-    # but the actual unit data lives at /floor-plans, /availability, or on
-    # a .rentcafe.com subdomain.
-    if not result.get("units") and fetch_result is not None:
+    # Fires when (a) main returned no units (legacy path) or (b) Phase G2:
+    # main produced units but the planner says they're incomplete — hop to a
+    # sub-page that might supply the missing field group (e.g. rent lives on
+    # /availability, floor-plan physical data lives on /floor-plans).
+    # Budget cap: _jugnu_budget["link_hop"] == 0 → never hop.
+    should_hop = False
+    if fetch_result is not None and _jugnu_budget.get("link_hop", 0) > 0:
+        if not result.get("units"):
+            should_hop = True
+        else:
+            # Phase G2: consult planner when main has units
+            try:
+                from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
+                from ma_poc.models.source import SourceId, from_legacy_unit
+                _pu = [
+                    from_legacy_unit(u, SourceId.API_GENERIC_NARROW, base_url, "", 0.85)
+                    for u in (result.get("units") or [])
+                ]
+                _report = evaluate_completeness(_pu)
+                _decision = plan_next_action(
+                    _report,
+                    sources_already_run=set(),
+                    budget_remaining=dict(_jugnu_budget),
+                    pms_name=detected_pms.get("pms", "unknown"),
+                )
+                if _decision.action == "ESCALATE_LINK_HOP":
+                    should_hop = True
+            except Exception:
+                pass
+
+    if should_hop:
         body = getattr(fetch_result, "body", None)
         entry_html: str | None = None
         if isinstance(body, bytes):
@@ -1118,32 +1208,136 @@ async def scrape_jugnu(
                     csv_row=csv_row,
                     max_hops=3,
                     llm_navigation_hints=result.get("_llm_navigation_hints"),
+                    visited_urls={base_url},  # Phase 9: cycle protection (H5)
+                    shared_budget=_jugnu_budget,
                 )
             except Exception as exc:
                 log.warning("link-hop orchestration failed for %s: %s", property_id, exc)
                 hop_result = None
 
             if hop_result and hop_result.get("units"):
-                # Merge: keep the entry-URL telemetry (detector signals,
-                # html characterization, fetch diagnostic), but replace
-                # extraction fields with the sub-page's.
-                for k in (
-                    "units",
-                    "extraction_tier_used",
-                    "api_calls_intercepted",
-                    "_winning_page_url",
-                    "_raw_api_responses",
-                    "_adapter_used",
-                    "_fallback_chain",
-                    "_tier_attempts",
-                    "_llm_interactions",
-                    "_llm_hints",
-                    "_llm_analysis_results",
-                    "_llm_field_mappings",
-                    "_explored_links",
-                ):
-                    if k in hop_result:
-                        result[k] = hop_result[k]
+                main_units = result.get("units") or []
+                sub_units = hop_result.get("units") or []
+                # Phase 9: when both main and sub-page produced units, merge
+                # them by identity + max-confidence-per-field rather than
+                # destructively overwriting. Both routes preserve telemetry.
+                if main_units and sub_units:
+                    try:
+                        from ma_poc.models.source import (
+                            ExtractedSource,
+                            SourceId,
+                            envelope_hash_of,
+                            from_legacy_unit,
+                            to_legacy_unit,
+                        )
+                        from ma_poc.services.source_merger import merge_sources
+                        main_h = envelope_hash_of(main_units)
+                        sub_h = envelope_hash_of(sub_units)
+                        main_src = ExtractedSource(
+                            source_id=SourceId.API_GENERIC_NARROW,
+                            source_url=base_url,
+                            envelope_hash=main_h,
+                            units=[
+                                from_legacy_unit(u, SourceId.API_GENERIC_NARROW, base_url, main_h, 0.85)
+                                for u in main_units
+                            ],
+                            has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in main_units),
+                            is_floor_plan_level=False,
+                        )
+                        sub_url_winner = hop_result.get("_winning_page_url") or hop_result.get("_link_hop_from") or ""
+                        sub_src = ExtractedSource(
+                            source_id=SourceId.API_GENERIC_NARROW,
+                            source_url=str(sub_url_winner),
+                            envelope_hash=sub_h,
+                            units=[
+                                from_legacy_unit(u, SourceId.API_GENERIC_NARROW, str(sub_url_winner), sub_h, 0.85)
+                                for u in sub_units
+                            ],
+                            has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in sub_units),
+                            is_floor_plan_level=False,
+                        )
+                        merged = merge_sources([main_src, sub_src], property_id)
+                        if merged:
+                            legacy = [to_legacy_unit(u) for u in merged]
+                            for u in legacy:
+                                u.pop("_provenance", None)
+                            result["units"] = legacy
+                            result["extraction_tier_used"] = "TIER_MERGED_CROSS_PAGE"
+                            # Telemetry — additive (sub-page contributions appended).
+                            for k in (
+                                "_raw_api_responses",
+                                "_llm_interactions",
+                                "_llm_field_mappings",
+                                "_tier_attempts",
+                            ):
+                                main_v = result.get(k)
+                                sub_v = hop_result.get(k)
+                                if isinstance(main_v, list) and isinstance(sub_v, list):
+                                    result[k] = list(main_v) + list(sub_v)
+                                elif sub_v is not None and main_v is None:
+                                    result[k] = sub_v
+                            for k in ("_winning_page_url", "_adapter_used"):
+                                if hop_result.get(k) and not result.get(k):
+                                    result[k] = hop_result[k]
+                        else:
+                            # Merge produced nothing usable — fall back to overwrite path.
+                            for k in (
+                                "units",
+                                "extraction_tier_used",
+                                "api_calls_intercepted",
+                                "_winning_page_url",
+                                "_raw_api_responses",
+                                "_adapter_used",
+                                "_fallback_chain",
+                                "_tier_attempts",
+                                "_llm_interactions",
+                                "_llm_hints",
+                                "_llm_analysis_results",
+                                "_llm_field_mappings",
+                                "_explored_links",
+                            ):
+                                if k in hop_result:
+                                    result[k] = hop_result[k]
+                    except Exception as exc:
+                        log.warning("Phase 9 merge fallback for %s: %s", property_id, exc)
+                        for k in (
+                            "units",
+                            "extraction_tier_used",
+                            "api_calls_intercepted",
+                            "_winning_page_url",
+                            "_raw_api_responses",
+                            "_adapter_used",
+                            "_fallback_chain",
+                            "_tier_attempts",
+                            "_llm_interactions",
+                            "_llm_hints",
+                            "_llm_analysis_results",
+                            "_llm_field_mappings",
+                            "_explored_links",
+                        ):
+                            if k in hop_result:
+                                result[k] = hop_result[k]
+                else:
+                    # Main empty (active path today): copy sub-page extraction
+                    # fields wholesale. Telemetry from main is preserved
+                    # because we only copy the listed extraction keys.
+                    for k in (
+                        "units",
+                        "extraction_tier_used",
+                        "api_calls_intercepted",
+                        "_winning_page_url",
+                        "_raw_api_responses",
+                        "_adapter_used",
+                        "_fallback_chain",
+                        "_tier_attempts",
+                        "_llm_interactions",
+                        "_llm_hints",
+                        "_llm_analysis_results",
+                        "_llm_field_mappings",
+                        "_explored_links",
+                    ):
+                        if k in hop_result:
+                            result[k] = hop_result[k]
                 for k in ("_link_hop_from", "_link_hop_depth", "_link_hop_score", "_link_hop_anchor"):
                     if k in hop_result:
                         result[k] = hop_result[k]

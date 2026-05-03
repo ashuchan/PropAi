@@ -13,7 +13,7 @@ from __future__ import annotations
 import urllib.parse
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -47,6 +47,12 @@ class LlmFieldMapping(BaseModel):
     response_envelope: str = ""  # e.g., "data.results.units" — path to the unit list
     discovered_at: datetime = Field(default_factory=datetime.utcnow)
     success_count: int = 0
+
+    # Phase 6: drift detection + stale-mapping eviction
+    consecutive_replay_failures: int = 0
+    last_replayed_at: datetime | None = None
+    source_envelope_hash: str = ""  # sha256[:16] of body when mapping was learned
+    quality_score: float = 1.0  # demoted by Phase 10 self-validation; multiplies confidence
 
 
 class ApiEndpoint(BaseModel):
@@ -107,6 +113,57 @@ class NavigationConfig(BaseModel):
         return v
 
 
+class FieldPatch(BaseModel):
+    """Phase 7 — a learned single-field completion hint from null_field_recovery.
+
+    Patches replay deterministically against captured API responses on
+    subsequent runs as a low-priority source. JSONPath stored without
+    the leading $. (stripped at boundary).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    api_url_pattern: str
+    field_name: Literal[
+        "rent_low",
+        "rent_high",
+        "asking_rent",
+        "market_rent_low",
+        "market_rent_high",
+        "unit_id",
+        "unit_number",
+        "floor_plan_name",
+        "beds",
+        "bedrooms",
+        "baths",
+        "bathrooms",
+        "sqft",
+        "available_date",
+        "availability_date",
+    ]
+    json_path: str
+    confidence: float = Field(ge=0.0, le=1.0, default=0.85)
+    parser_fix: str | None = None
+    discovered_at: datetime = Field(default_factory=datetime.utcnow)
+    consecutive_replay_failures: int = 0
+    success_count: int = 0
+    source_envelope_hash: str = ""
+
+
+class SourceObservation(BaseModel):
+    """Phase 11 — per-source telemetry tracking how often a source contributed
+    the winning field value, and at what confidence."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    source_id: str  # SourceId.value (string form, since it's a closed enum)
+    field_group: str  # "identity" | "physical" | "transactional"
+    contribution_count: int = 0
+    last_contributed_at: datetime | None = None
+    avg_confidence_when_won: float = 0.0
+    consecutive_failures: int = 0
+
+
 class ApiHints(BaseModel):
     """Learned API interception hints."""
 
@@ -119,6 +176,10 @@ class ApiHints(BaseModel):
     wait_for_url_pattern: str | None = None
     blocked_endpoints: list[BlockedEndpoint] = Field(default_factory=list)  # Per-property noise blocklist
     llm_field_mappings: list[LlmFieldMapping] = Field(default_factory=list)  # Saved mappings for replay
+    # Phase 7
+    field_patches: list[FieldPatch] = Field(default_factory=list)
+    # Phase 11
+    source_observations: list[SourceObservation] = Field(default_factory=list)
 
     @field_validator("blocked_endpoints", mode="before")
     @classmethod
@@ -136,6 +197,20 @@ class ApiHints(BaseModel):
             return v[:20]
         return v
 
+    @field_validator("field_patches", mode="before")
+    @classmethod
+    def cap_field_patches(cls, v: list[object]) -> list[object]:
+        if isinstance(v, list) and len(v) > 50:
+            return v[-50:]
+        return v
+
+    @field_validator("source_observations", mode="before")
+    @classmethod
+    def cap_source_observations(cls, v: list[object]) -> list[object]:
+        if isinstance(v, list) and len(v) > 20:
+            return v[-20:]
+        return v
+
 
 class DomHints(BaseModel):
     """Learned DOM parsing hints."""
@@ -146,6 +221,8 @@ class DomHints(BaseModel):
     field_selectors: FieldSelectorMap = Field(default_factory=FieldSelectorMap)
     jsonld_present: bool = False
     availability_page_sections: list[str] = Field(default_factory=list)  # CSS selectors for unit sections
+    # Phase 8: drift eviction — clear field_selectors after 3 consecutive misses
+    consecutive_misses: int = 0
 
 
 class ExtractionConfidence(BaseModel):
@@ -161,6 +238,10 @@ class ExtractionConfidence(BaseModel):
     maturity: ProfileMaturity = ProfileMaturity.COLD
     last_success_detection: Any = None  # Stores DetectedPMS dict from ma_poc.pms.detector
     consecutive_unreachable: int = 0
+    # Phase 10: COLD-property LLM tier rotation counter (reset when promoted out)
+    cold_run_count: int = 0
+    # Phase 11: source observation telemetry — list of source_id strings that ran in last scrape
+    last_sources_run: list[str] = Field(default_factory=list)
 
 
 class LlmArtifacts(BaseModel):
@@ -233,6 +314,8 @@ class ScrapeProfile(BaseModel):
     llm_artifacts: LlmArtifacts = Field(default_factory=LlmArtifacts)
     stats: ProfileStats = Field(default_factory=ProfileStats)
     fetch: FetchProfile = Field(default_factory=FetchProfile)
+    # Phase 12: cluster bootstrap — populated from detector's pms_client_account_id
+    cluster_key: str = ""
 
 
 def detect_platform(url: str) -> str | None:

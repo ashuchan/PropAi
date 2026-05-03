@@ -63,6 +63,298 @@ _re_strip_script = _re.compile(r"<script.*?</script>|<style.*?</style>", _re.IGN
 _re_strip_tag = _re.compile(r"<[^>]+>")
 _re_rent = _re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?", _re.IGNORECASE)
 
+def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
+    """Return True when units carry identity + physical (≥2 fields) + transactional.
+
+    Uses the SAME absent-value semantics as services.source_planner.has_field_group
+    so planner completeness scoring and cascade short-circuit decisions agree.
+    """
+    if not units:
+        return False
+    try:
+        from ma_poc.services.source_planner import has_field_group
+    except Exception:
+        return False  # safety: never short-circuit if planner is unavailable
+    return (
+        any(has_field_group(u, "identity") for u in units)
+        and any(has_field_group(u, "physical") for u in units)
+        and any(has_field_group(u, "transactional") for u in units)
+    )
+
+
+def _assess_and_decide(
+    units_so_far: list[dict[str, Any]],
+    sources_already_run: set,
+    ctx: Any,
+    decision_log: list,
+) -> Any | None:
+    """Consult the planner after a sub-tier produces units.
+
+    Returns the Decision if planner fires; None if units are empty or import
+    fails. Appends every non-None decision to decision_log.
+    """
+    if not units_so_far:
+        return None
+    try:
+        from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
+        from ma_poc.models.source import SourceId, from_legacy_unit
+        from ma_poc.models.scrape_profile import ProfileMaturity
+    except Exception:
+        return None
+    try:
+        pu_units = [
+            from_legacy_unit(u, SourceId.API_GENERIC_NARROW, getattr(ctx, "base_url", ""), "", 0.85)
+            for u in units_so_far
+        ]
+        report = evaluate_completeness(pu_units)
+        floor: dict = {"complete": 0.85, "transactional": 0.70}
+        profile = getattr(ctx, "profile", None)
+        if profile is not None:
+            try:
+                if profile.confidence.maturity == ProfileMaturity.HOT:
+                    floor = {"complete": 0.90, "transactional": 0.80}
+            except Exception:
+                pass
+        decision = plan_next_action(
+            report,
+            sources_already_run=sources_already_run,
+            budget_remaining=dict(getattr(ctx, "budget", {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3})),
+            pms_name=getattr(getattr(ctx, "detected", None), "pms", "unknown"),
+            profile_completeness_floor=floor,
+            profile_preferences=(
+                list(profile.api_hints.source_observations) if profile is not None else []
+            ),
+        )
+        decision_log.append(decision)
+        try:
+            from ma_poc.observability.events import EventKind, emit
+            emit(
+                EventKind.PLANNER_DECISION,
+                getattr(ctx, "property_id", "unknown"),
+                action=decision.action,
+                target_field_group=decision.target_field_group or "",
+                rationale=decision.rationale[:120],
+            )
+        except Exception:
+            pass
+        return decision
+    except Exception:
+        return None
+
+
+def _merge_into_result_units(
+    existing: list[dict[str, Any]],
+    incoming: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Merge incoming units into existing using a 3-rank identity ladder.
+
+    Rank 1: unit_id match
+    Rank 2: floor_plan_name + beds + baths match
+    Rank 3: fuzzy beds + baths + sqft bucket (±15%) match
+
+    When a match is found, fill any absent/null fields on the existing unit
+    from the incoming unit. When no match is found, append the incoming unit.
+    Returns the merged list (existing modified in-place, new units appended).
+    """
+    if not existing:
+        return list(incoming)
+    if not incoming:
+        return existing
+
+    def _sqft_bucket(u: dict[str, Any]) -> int | None:
+        raw = u.get("sqft") or u.get("area")
+        if raw is None:
+            return None
+        try:
+            v = int(float(str(raw).replace(",", "")))
+            return v // 100  # 100-sqft buckets → ±50 sqft ~ ±10%
+        except (ValueError, TypeError):
+            return None
+
+    def _norm(v: Any) -> str:
+        if v is None:
+            return ""
+        return str(v).strip().lower()
+
+    def _fill_missing(target: dict[str, Any], source: dict[str, Any]) -> None:
+        for k, v in source.items():
+            if k.startswith("_"):
+                continue
+            if target.get(k) in (None, "", -1, "-1"):
+                target[k] = v
+
+    result = list(existing)
+    for inc in incoming:
+        matched = False
+        # Rank 1: unit_id
+        inc_uid = _norm(inc.get("unit_id") or inc.get("unit_number"))
+        if inc_uid:
+            for ex in result:
+                ex_uid = _norm(ex.get("unit_id") or ex.get("unit_number"))
+                if ex_uid and ex_uid == inc_uid:
+                    _fill_missing(ex, inc)
+                    matched = True
+                    break
+        if matched:
+            continue
+        # Rank 2: floor_plan_name + beds + baths
+        inc_fp = _norm(inc.get("floor_plan_name"))
+        inc_beds = _norm(inc.get("bedrooms") or inc.get("beds"))
+        inc_baths = _norm(inc.get("bathrooms") or inc.get("baths"))
+        if inc_fp and inc_beds:
+            for ex in result:
+                ex_fp = _norm(ex.get("floor_plan_name"))
+                ex_beds = _norm(ex.get("bedrooms") or ex.get("beds"))
+                ex_baths = _norm(ex.get("bathrooms") or ex.get("baths"))
+                if ex_fp == inc_fp and ex_beds == inc_beds and ex_baths == inc_baths:
+                    _fill_missing(ex, inc)
+                    matched = True
+                    break
+        if matched:
+            continue
+        # Rank 3: fuzzy beds + baths + sqft bucket
+        inc_bucket = _sqft_bucket(inc)
+        if inc_beds and inc_bucket is not None:
+            for ex in result:
+                ex_beds = _norm(ex.get("bedrooms") or ex.get("beds"))
+                ex_baths = _norm(ex.get("bathrooms") or ex.get("baths"))
+                ex_bucket = _sqft_bucket(ex)
+                if (
+                    ex_beds == inc_beds
+                    and ex_baths == inc_baths
+                    and ex_bucket is not None
+                    and abs(ex_bucket - inc_bucket) <= 1
+                ):
+                    _fill_missing(ex, inc)
+                    matched = True
+                    break
+        if not matched:
+            result.append(inc)
+    return result
+
+
+def _aggregate_quality(mappings: list[Any]) -> float:
+    """Min quality_score across contributing mappings; defaults to 1.0."""
+    if not mappings:
+        return 1.0
+    qs = [float(getattr(m, "quality_score", 1.0) or 1.0) for m in mappings]
+    return min(qs) if qs else 1.0
+
+
+def _apply_field_patches(
+    units: list[dict[str, Any]],
+    api_responses: list[dict[str, Any]],
+    field_patches: list[Any],
+) -> list[dict[str, Any]]:
+    """Sub-tier 0b: apply saved FieldPatches to replayed units via positional join.
+
+    For each patch, find the matching API response, navigate to the list of values
+    at json_path, then fill units[i][field_name] = values[i] where the field is
+    currently absent/null. Never overwrites non-null values.
+    Returns the (mutated) units list.
+    """
+    if not units or not api_responses or not field_patches:
+        return units
+
+    def _get_path(obj: Any, path: str) -> Any:
+        for part in path.split("."):
+            if isinstance(obj, dict):
+                obj = obj.get(part)
+            elif isinstance(obj, list) and part.isdigit():
+                idx = int(part)
+                obj = obj[idx] if idx < len(obj) else None
+            else:
+                return None
+            if obj is None:
+                return None
+        return obj
+
+    for patch in field_patches:
+        try:
+            url_pat = getattr(patch, "api_url_pattern", None) or ""
+            field_name = getattr(patch, "field_name", None) or ""
+            json_path = getattr(patch, "json_path", None) or ""
+        except Exception:
+            continue
+        if not (url_pat and field_name and json_path):
+            continue
+        # Find matching API response
+        matched_body = None
+        for resp in api_responses:
+            if url_pat in resp.get("url", ""):
+                matched_body = resp.get("body")
+                break
+        if matched_body is None:
+            _mark_patch_miss(patch, reason="no_url_match")
+            continue
+        # Extract the list of patch values from the body
+        values = _get_path(matched_body, json_path)
+        if not isinstance(values, list):
+            # Maybe it's a scalar — wrap it for single-unit case
+            if values is not None:
+                values = [values]
+            else:
+                _mark_patch_miss(patch, reason="path_returned_none")
+                continue
+        # Positional fill: units[i] gets values[i] if field is absent
+        any_filled = False
+        for i, unit in enumerate(units):
+            if i >= len(values):
+                break
+            if unit.get(field_name) not in (None, "", -1, "-1"):
+                continue
+            v = values[i]
+            if v not in (None, ""):
+                unit[field_name] = v
+                any_filled = True
+
+        if any_filled:
+            _mark_patch_hit(patch)
+        else:
+            _mark_patch_miss(patch, reason="no_unit_filled")
+    return units
+
+
+def _mark_patch_hit(patch: Any) -> None:
+    """B2: bump success_count, reset consecutive_replay_failures, emit event."""
+    try:
+        if hasattr(patch, "success_count"):
+            patch.success_count += 1
+        if hasattr(patch, "consecutive_replay_failures"):
+            patch.consecutive_replay_failures = 0
+        try:
+            from ma_poc.observability.events import EventKind, emit
+            emit(
+                EventKind.FIELD_PATCH_HIT,
+                "unknown",
+                field=getattr(patch, "field_name", "") or "",
+                url=str(getattr(patch, "api_url_pattern", ""))[:80],
+            )
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _mark_patch_miss(patch: Any, reason: str) -> None:
+    """B2: bump consecutive_replay_failures, emit drift event."""
+    try:
+        if hasattr(patch, "consecutive_replay_failures"):
+            patch.consecutive_replay_failures += 1
+        try:
+            from ma_poc.observability.events import EventKind, emit
+            emit(
+                EventKind.FIELD_PATCH_DRIFT,
+                "unknown",
+                field=getattr(patch, "field_name", "") or "",
+                url=str(getattr(patch, "api_url_pattern", ""))[:80],
+                reason=reason,
+            )
+        except Exception:
+            pass
+    except Exception:
+        pass
+
 
 def _find_unit_list(body: Any) -> list[dict[str, Any]]:
     """Attempt to find a list of unit/floorplan dicts in an API response body.
@@ -430,16 +722,175 @@ class GenericAdapter:
     _fingerprints: list[str] = []
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
-        """Run generic extraction cascade on captured API responses.
+        """Run generic extraction cascade. Phase 5 wrapper: post-merge sidecar.
 
-        For detected PMS failures (pms != "unknown"), only deterministic tiers run.
-        LLM/Vision are reserved for truly unknown sites.
-
-        Emits ``extract.tier_attempted`` for every sub-tier run so the report
-        shows exactly which sub-tiers fired, how long they took, and why empty
-        ones stopped — the existing single-bucket ``tier_used`` hides all of
-        that detail.
+        Calls _extract_inner (the legacy cascade) and, if sub-tier 0 stashed
+        partial replay units that need filling-in by other sub-tiers, runs
+        merge_sources on the combined source list and rewrites result.units.
         """
+        result = await self._extract_inner(page, ctx)
+        try:
+            self._phase5_post_merge(result, ctx)
+        except Exception:
+            # Never break the run on a merge-side error (H10 best-effort)
+            pass
+        # Fix 4: stash provenanced units for the Phase 11 self-learning loop
+        # when the merge step didn't already populate _merged_units (single-source path).
+        if not getattr(result, "_merged_units", None) and result.units:
+            try:
+                self._stash_provenanced_units(result, ctx)
+            except Exception:
+                pass
+        return result
+
+    @staticmethod
+    def _stash_provenanced_units(result: AdapterResult, ctx: AdapterContext) -> None:
+        """Wrap result.units as ProvenancedUnits for the Phase 11 self-learning loop.
+
+        Populates result._merged_units so downstream observers (e.g. the
+        cluster-store writer in jugnu_runner) have a consistent access path
+        regardless of whether a multi-source merge occurred.
+        """
+        try:
+            from ma_poc.models.source import SourceId, envelope_hash_of, from_legacy_unit
+        except Exception:
+            return
+        winning_url = result.winning_url or getattr(ctx, "base_url", "") or ""
+        tier_to_source = {
+            "TIER_1_PROFILE_MAPPING": SourceId.MAPPING_REPLAY,
+            "TIER_1_API": SourceId.API_GENERIC_NARROW,
+            "TIER_1_5_EMBEDDED": SourceId.EMBEDDED_JSON,
+            "TIER_2_JSONLD": SourceId.JSON_LD,
+            "TIER_3_DOM": SourceId.DOM_CASCADE,
+            "TIER_4_LLM_API": SourceId.LLM_API_TARGETED,
+            "TIER_4_LLM_DOM": SourceId.LLM_DOM_TARGETED,
+            "TIER_4_LLM": SourceId.LLM_MONOLITHIC,
+        }
+        source_id = tier_to_source.get(result.tier_used, SourceId.API_GENERIC_NARROW)
+        env_hash = envelope_hash_of(result.units)
+        conf = result.confidence if result.confidence > 0 else 0.80
+        provenanced = [
+            from_legacy_unit(u, source_id, winning_url, env_hash, conf)
+            for u in result.units
+        ]
+        result._merged_units = provenanced  # type: ignore[attr-defined]
+
+    @staticmethod
+    def _phase5_post_merge(result: AdapterResult, ctx: AdapterContext) -> None:
+        """If sub-tier 0 stashed `_phase5_replay_units` AND a later cascade
+        sub-tier produced its own units, merge them via source_merger so
+        partial mappings can't shadow native cascade fields. No-op when
+        only one source produced units."""
+        sidecar = getattr(result, "_phase5_replay_units", None)
+        if not sidecar:
+            return
+        agg_q = float(getattr(result, "_phase5_replay_quality", 1.0) or 1.0)
+        if not result.units:
+            # Cascade produced nothing — replay is the sole contributor.
+            result.units = list(sidecar)
+            if not result.tier_used or result.tier_used == "TIER_1_API":
+                result.tier_used = "TIER_1_PROFILE_MAPPING"
+            result.confidence = min(0.90, 0.7 + 0.03 * len(sidecar)) * agg_q
+            return
+        # Both sources produced units — merge by identity, max-confidence per field.
+        # NOTE: keep imports relative to the same root the merger uses internally
+        # (models.source) so that FieldValue identity checks (isinstance) hold.
+        try:
+            from ma_poc.models.source import (
+                ExtractedSource,
+                SourceId,
+                envelope_hash_of,
+                from_legacy_unit,
+                to_legacy_unit,
+            )
+            from ma_poc.services.source_merger import merge_sources
+        except Exception:
+            return
+        winning_url = result.winning_url or ctx.base_url or ""
+        replay_h = envelope_hash_of(sidecar)
+        cascade_h = envelope_hash_of(result.units)
+        # PR-FUTURE-WORK: when a FieldPatch is derived from a parent LlmFieldMapping,
+        # the patch should inherit the mapping's quality_score demotion so that
+        # patch-replay units also carry the reduced per-field confidence here.
+        replay_src = ExtractedSource(
+            source_id=SourceId.MAPPING_REPLAY,
+            source_url=winning_url,
+            envelope_hash=replay_h,
+            units=[
+                from_legacy_unit(u, SourceId.MAPPING_REPLAY, winning_url, replay_h, 0.85 * agg_q)
+                for u in sidecar
+            ],
+            has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in sidecar),
+            is_floor_plan_level=False,
+        )
+        # Map the cascade's tier_used to the closest SourceId for provenance.
+        cascade_source = {
+            "TIER_1_API": SourceId.API_GENERIC_NARROW,
+            "TIER_1_5_EMBEDDED": SourceId.EMBEDDED_JSON,
+            "TIER_2_JSONLD": SourceId.JSON_LD,
+            "TIER_3_DOM": SourceId.DOM_CASCADE,
+            "TIER_3_DOM_LLM": SourceId.LLM_DOM_TARGETED,
+            "TIER_4_LLM": SourceId.LLM_MONOLITHIC,
+            "TIER_4_LLM_API": SourceId.LLM_API_TARGETED,
+            "TIER_4_LLM_DOM": SourceId.LLM_DOM_TARGETED,
+        }.get(result.tier_used, SourceId.API_GENERIC_NARROW)
+        cascade_src = ExtractedSource(
+            source_id=cascade_source,
+            source_url=winning_url,
+            envelope_hash=cascade_h,
+            units=[
+                from_legacy_unit(u, cascade_source, winning_url, cascade_h, 0.90)
+                for u in result.units
+            ],
+            has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in result.units),
+            is_floor_plan_level=False,
+        )
+        # Phase I: emit IDENTITY_FUZZY_LINK events via callback; merger stays pure
+        def _emit_fuzzy(unit: Any, key: Any, conf: float) -> None:
+            try:
+                from ma_poc.observability.events import EventKind as _EK, emit as _ev
+                _ev(_EK.IDENTITY_FUZZY_LINK, ctx.property_id, bucket_key=str(key)[:80], confidence=conf)
+            except Exception:
+                pass
+
+        merged = merge_sources([replay_src, cascade_src], ctx.property_id, fuzzy_link_callback=_emit_fuzzy)
+        if not merged:
+            return
+        legacy = [to_legacy_unit(u) for u in merged]
+        # Strip _provenance before handing to legacy serializer; provenance
+        # lives on result._sources for downstream observers.
+        for u in legacy:
+            u.pop("_provenance", None)
+        result.units = legacy
+        result._sources = [replay_src, cascade_src]  # type: ignore[attr-defined]
+        # Phase D: stash the provenanced merge output for downstream observers
+        result._merged_units = list(merged)  # type: ignore[attr-defined]
+        # Phase I: emit SOURCES_MERGED telemetry
+        try:
+            from ma_poc.observability.events import EventKind as _EK2, emit as _ev2
+            _ev2(
+                _EK2.SOURCES_MERGED,
+                ctx.property_id,
+                source_count=2,
+                merged_unit_count=len(merged),
+                tier=result.tier_used,
+            )
+        except Exception:
+            pass
+        # Tier label: deterministic merge unless an LLM source contributed.
+        if cascade_source in (
+            SourceId.LLM_API_TARGETED,
+            SourceId.LLM_DOM_TARGETED,
+            SourceId.LLM_MONOLITHIC,
+        ):
+            result.tier_used = "TIER_MERGED_HYBRID"
+        else:
+            result.tier_used = "TIER_MERGED_DETERMINISTIC"
+
+    async def _extract_inner(self, page: Page, ctx: AdapterContext) -> AdapterResult:
+        """Legacy cascade — unchanged from pre-Phase-5 except sub-tier 0 may
+        stash `_phase5_replay_units` instead of preempting the adapter when
+        the replayed units are field-incomplete. See _phase5_post_merge."""
         import time as _time
 
         try:
@@ -469,6 +920,10 @@ class GenericAdapter:
 
         result = AdapterResult(tier_used="TIER_1_API")
         result._tier_attempts = attempts  # type: ignore[attr-defined]
+        # Phase H: track which SourceIds have already run for the planner
+        sources_already_run: set = set()
+        # Phase H: decision log for telemetry / debugging
+        decision_log: list = []
         all_units: list[dict[str, str]] = []
         # Option C gate: default is skip LLM when the detected PMS is not
         # "unknown" (GenericAdapter runs as a fallback for a failed PMS
@@ -515,6 +970,7 @@ class GenericAdapter:
         if profile is not None and api_responses:
             t0 = _time.monotonic()
             replayed_units: list[dict[str, Any]] = []
+            replayed_mappings: list[Any] = []
             try:
                 saved = list(getattr(profile.api_hints, "llm_field_mappings", []) or [])
             except Exception:
@@ -525,6 +981,13 @@ class GenericAdapter:
                 except ImportError:
                     apply_saved_mapping = None
                 if apply_saved_mapping is not None:
+                    # Phase 6: drift detection helper
+                    try:
+                        from ma_poc.models.source import envelope_hash_of as _env_hash
+                    except ImportError:
+                        _env_hash = None  # type: ignore[assignment]
+                    from datetime import datetime as _dt
+
                     for mapping in saved:
                         try:
                             pat = getattr(mapping, "api_url_pattern", None) or (
@@ -536,6 +999,30 @@ class GenericAdapter:
                             continue
                         for resp in api_responses:
                             if pat in resp.get("url", ""):
+                                # Phase 6: drift check
+                                body = resp.get("body")
+                                saved_hash = getattr(mapping, "source_envelope_hash", "") or ""
+                                if saved_hash and _env_hash is not None:
+                                    current_hash = _env_hash(body)
+                                    if current_hash != saved_hash:
+                                        # Drift — skip replay, count failure
+                                        if hasattr(mapping, "consecutive_replay_failures"):
+                                            try:
+                                                mapping.consecutive_replay_failures += 1
+                                            except Exception:
+                                                pass
+                                        try:
+                                            from ma_poc.observability.events import EventKind, emit
+                                            emit(
+                                                EventKind.MAPPING_DRIFT_DETECTED,
+                                                getattr(ctx, "property_id", "unknown"),
+                                                url=str(resp.get("url", ""))[:80],
+                                                saved_hash=saved_hash[:8],
+                                                current_hash=current_hash[:8],
+                                            )
+                                        except Exception:
+                                            pass
+                                        continue
                                 mdict = (
                                     mapping
                                     if isinstance(mapping, dict)
@@ -546,28 +1033,89 @@ class GenericAdapter:
                                     }
                                 )
                                 try:
-                                    units = apply_saved_mapping(resp.get("body"), mdict) or []
+                                    units = apply_saved_mapping(body, mdict) or []
                                 except Exception:
                                     units = []
+                                if hasattr(mapping, "last_replayed_at"):
+                                    try:
+                                        mapping.last_replayed_at = _dt.utcnow()
+                                    except Exception:
+                                        pass
                                 if units:
                                     replayed_units.extend(units)
                                     result.api_responses.append(resp)
+                                    replayed_mappings.append(mapping)
+                                    # Phase 1: increment success_count
+                                    if hasattr(mapping, "success_count"):
+                                        try:
+                                            mapping.success_count += 1
+                                        except Exception:
+                                            pass
+                                    # Phase 6: reset failure streak on success
+                                    if hasattr(mapping, "consecutive_replay_failures"):
+                                        try:
+                                            mapping.consecutive_replay_failures = 0
+                                        except Exception:
+                                            pass
                                     break
+                                else:
+                                    # Empty replay — count failure
+                                    if hasattr(mapping, "consecutive_replay_failures"):
+                                        try:
+                                            mapping.consecutive_replay_failures += 1
+                                        except Exception:
+                                            pass
+                                    try:
+                                        from ma_poc.observability.events import EventKind, emit
+                                        emit(
+                                            EventKind.MAPPING_REPLAY_EMPTY,
+                                            getattr(ctx, "property_id", "unknown"),
+                                            url=str(resp.get("url", ""))[:80],
+                                        )
+                                    except Exception:
+                                        pass
             if replayed_units:
+                # Sub-tier 0b: apply saved FieldPatches positionally to augment replay units.
+                try:
+                    _fp_list = list(getattr(profile.api_hints, "field_patches", []) or [])
+                    if _fp_list:
+                        replayed_units = _apply_field_patches(replayed_units, api_responses, _fp_list)
+                except Exception:
+                    pass
+
+                # B1: compute aggregate quality across all mappings that contributed.
+                agg_q = _aggregate_quality(replayed_mappings)
+
+                # Phase 5: short-circuit when aggregate mapping quality is sufficient
+                # (≥0.7). Low-quality mappings must not short-circuit — let the
+                # cascade run so the merger can prefer a higher-quality source.
+                if agg_q >= 0.7:
+                    _log_attempt(
+                        "generic:profile_replay",
+                        "ran_units",
+                        units=len(replayed_units),
+                        reason="replayed saved LlmFieldMapping (quality ok)",
+                        duration_ms=int((_time.monotonic() - t0) * 1000),
+                    )
+                    result.units = replayed_units
+                    result.tier_used = "TIER_1_PROFILE_MAPPING"
+                    result.winning_url = (
+                        result.api_responses[0].get("url") if result.api_responses else ctx.base_url
+                    )
+                    result.confidence = min(0.90, 0.7 + 0.03 * len(replayed_units)) * agg_q
+                    return result
+                # Field-incomplete or low quality: stash for post-merge and continue cascade.
                 _log_attempt(
                     "generic:profile_replay",
                     "ran_units",
                     units=len(replayed_units),
-                    reason="replayed saved LlmFieldMapping",
+                    reason="replayed mapping field-incomplete or low quality; cascading + merging",
                     duration_ms=int((_time.monotonic() - t0) * 1000),
                 )
-                result.units = replayed_units
-                result.tier_used = "TIER_1_PROFILE_MAPPING"
-                result.winning_url = (
-                    result.api_responses[0].get("url") if result.api_responses else ctx.base_url
-                )
-                result.confidence = min(0.90, 0.7 + 0.03 * len(replayed_units))
-                return result
+                result._phase5_replay_units = list(replayed_units)  # type: ignore[attr-defined]
+                result._phase5_replay_quality = agg_q  # type: ignore[attr-defined]
+                # Keep api_responses populated so downstream sub-tiers see them
+                # too — they may produce additional fields the merger fills in.
             _log_attempt(
                 "generic:profile_replay",
                 "skipped" if not saved else "ran_empty",
@@ -642,10 +1190,23 @@ class GenericAdapter:
             )
 
         if all_units:
-            result.units = all_units
+            # Phase H: consult the planner before short-circuiting.
+            # If planner says STOP, return early. Otherwise fall through so
+            # LLM sub-tiers can fill completeness gaps — but only if budget allows.
+            from ma_poc.models.source import SourceId as _SI
+            sources_already_run.add(_SI.API_GENERIC_NARROW)
+            _decision = _assess_and_decide(all_units, sources_already_run, ctx, decision_log)
+            if _decision is None or _decision.action == "STOP":
+                result.units = all_units
+                result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
+                result.confidence = min(0.85, 0.6 + 0.05 * len(all_units))
+                result._decision_log = decision_log  # type: ignore[attr-defined]
+                return result
+            # Planner says escalate — promote all_units into result so HTML tiers
+            # can merge into them rather than replacing them (Fix 2 / C2).
+            result.units = list(all_units)
             result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
-            result.confidence = min(0.85, 0.6 + 0.05 * len(all_units))
-            return result
+            skip_llm = False  # override: planner explicitly requested escalation
 
         # ── HTML-based tiers ──────────────────────────────────────────────
         # If neither narrow nor broad API parsers produced units, fall through
@@ -692,11 +1253,18 @@ class GenericAdapter:
                     duration_ms=int((_time.monotonic() - t0) * 1000),
                 )
             if jsonld_units:
-                result.units = jsonld_units
+                result.units = _merge_into_result_units(result.units, jsonld_units)
                 result.tier_used = "TIER_2_JSONLD"
                 result.winning_url = ctx.base_url
-                result.confidence = min(0.80, 0.55 + 0.05 * len(jsonld_units))
-                return result
+                result.confidence = min(0.80, 0.55 + 0.05 * len(result.units))
+                # Fix 13: planner gate — stop only if complete, else fall through to LLM
+                from ma_poc.models.source import SourceId as _SI2
+                sources_already_run.add(_SI2.JSON_LD)
+                _jd = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
+                if _jd is None or _jd.action == "STOP":
+                    result._decision_log = decision_log  # type: ignore[attr-defined]
+                    return result
+                skip_llm = False  # planner escalated — allow LLM
 
             # Sub-tier 4: Embedded JSON / SSR blobs -------------------------
             t0 = _time.monotonic()
@@ -723,22 +1291,39 @@ class GenericAdapter:
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
             if embedded_units:
-                result.units = embedded_units
+                result.units = _merge_into_result_units(result.units, embedded_units)
                 result.tier_used = "TIER_1_5_EMBEDDED"
                 result.winning_url = ctx.base_url
-                result.confidence = min(0.80, 0.55 + 0.05 * len(embedded_units))
-                return result
+                result.confidence = min(0.80, 0.55 + 0.05 * len(result.units))
+                # Fix 13: planner gate — stop only if complete, else fall through to LLM
+                from ma_poc.models.source import SourceId as _SI3
+                sources_already_run.add(_SI3.EMBEDDED_JSON)
+                _ed = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
+                if _ed is None or _ed.action == "STOP":
+                    result._decision_log = decision_log  # type: ignore[attr-defined]
+                    return result
+                skip_llm = False  # planner escalated — allow LLM
 
             # Sub-tier 5: DOM selector cascade ------------------------------
             # Scans container elements (.unit, .floor-plan, .pricing-card, …)
             # for visible rent + structural signals. Catches static HTML sites
             # where unit data lives in the markup, not in any JSON envelope.
+            # Phase E: pass saved field_selectors as hints when available.
             t0 = _time.monotonic()
+            dom_hints = None
+            if ctx.profile is not None:
+                fs = ctx.profile.dom_hints.field_selectors
+                if fs and getattr(fs, "container", None):
+                    dom_hints = fs
+            hints_attempted = dom_hints is not None
             try:
-                dom_units = extract_units_from_dom(html, ctx.base_url) or []
+                dom_units, _dom_hit_mode = extract_units_from_dom(html, ctx.base_url, hints=dom_hints)
             except Exception as exc:
-                dom_units = []
+                dom_units, _dom_hit_mode = [], "none"
                 result.errors.append(f"dom-scan-error: {exc}")
+            hints_hit = _dom_hit_mode == "hints"
+            result._dom_hints_attempted = hints_attempted  # type: ignore[attr-defined]
+            result._dom_hints_hit = hints_hit  # type: ignore[attr-defined]
             _log_attempt(
                 "generic:dom_scan",
                 "ran_units" if dom_units else "ran_empty",
@@ -747,11 +1332,18 @@ class GenericAdapter:
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
             if dom_units:
-                result.units = dom_units
+                result.units = _merge_into_result_units(result.units, dom_units)
                 result.tier_used = "TIER_3_DOM"
                 result.winning_url = ctx.base_url
-                result.confidence = min(0.75, 0.5 + 0.04 * len(dom_units))
-                return result
+                result.confidence = min(0.75, 0.5 + 0.04 * len(result.units))
+                # Fix 13: planner gate — stop only if complete, else fall through to LLM
+                from ma_poc.models.source import SourceId as _SI4
+                sources_already_run.add(_SI4.DOM_CASCADE)
+                _dd = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
+                if _dd is None or _dd.action == "STOP":
+                    result._decision_log = decision_log  # type: ignore[attr-defined]
+                    return result
+                skip_llm = False  # planner escalated — allow LLM
         else:
             _log_attempt("generic:jsonld", "skipped", reason="no HTML body available")
             _log_attempt("generic:embedded_json", "skipped", reason="no HTML body available")
@@ -874,10 +1466,11 @@ class GenericAdapter:
             result.confidence = 0.0
             return result
 
-        # Budget: capped per property so a broken site can't burn unlimited
-        # tokens. Mirrors the legacy entrata.py budget (3 API + 1 DOM).
-        api_llm_budget = 3
-        dom_llm_budget = 1
+        # Phase H: use budget from ctx (computed per-property in scraper.py).
+        # Falls back to safe defaults when ctx.budget is absent (e.g. old callers).
+        _budget = getattr(ctx, "budget", None) or {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
+        api_llm_budget = int(_budget.get("llm_api_calls", 3))
+        dom_llm_budget = int(_budget.get("llm_dom_calls", 1))
         llm_interactions: list[dict[str, Any]] = getattr(result, "_llm_interactions", []) or []
         # Self-learning payload surfaced to scraper.py. Shape matches what
         # services.profile_updater.update_profile_after_extraction expects:
@@ -1055,6 +1648,7 @@ class GenericAdapter:
         result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
         if llm_navigation_hints:
             result._llm_navigation_hints = llm_navigation_hints  # type: ignore[attr-defined]
+        result._decision_log = decision_log  # type: ignore[attr-defined]
         result.confidence = 0.0
         result.errors.append("Generic parser found no units in captured API responses")
         return result
