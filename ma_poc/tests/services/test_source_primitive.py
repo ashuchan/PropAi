@@ -148,6 +148,7 @@ def test_source_id_enum_is_closed() -> None:
         "mapping_replay",
         "field_patch",
         "cluster_mapping_replay",
+        "identity_fallback",
         "llm_api_targeted",
         "llm_dom_targeted",
         "llm_monolithic",
@@ -179,6 +180,11 @@ def test_source_id_enum_static_scan_no_string_literals() -> None:
         repo_root / "ma_poc" / "services" / "source_planner.py",
         repo_root / "ma_poc" / "services" / "source_merger.py",
         repo_root / "ma_poc" / "services" / "source_observer.py",
+        # Phase H: these files use "llm_targeted"/"llm_monolithic" as budget
+        # dict keys — same spelling as SourceId values but not SourceId usage.
+        repo_root / "ma_poc" / "pms" / "scraper.py",
+        repo_root / "ma_poc" / "pms" / "adapters" / "base.py",
+        repo_root / "ma_poc" / "pms" / "adapters" / "generic.py",
     }
     hits: list[str] = []
     for scan_dir in scan_dirs:

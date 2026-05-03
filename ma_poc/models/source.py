@@ -46,6 +46,9 @@ class SourceId(StrEnum):
     FIELD_PATCH = "field_patch"
     CLUSTER_MAPPING_REPLAY = "cluster_mapping_replay"
 
+    # Computed identity (not a real source — deterministic hash of physical attrs)
+    IDENTITY_FALLBACK = "identity_fallback"
+
     # LLM-tier sources (cost-bearing)
     LLM_API_TARGETED = "llm_api_targeted"
     LLM_DOM_TARGETED = "llm_dom_targeted"
@@ -101,12 +104,15 @@ class ProvenancedUnit(dict):
         return None
 
 
-# Fields whose make_unit_dict() defaults indicate "absent" — skip these when
-# wrapping a legacy unit dict into provenanced form.
-_ABSENT_VALUES: frozenset = frozenset({"", None, 0, "0", -1, "-1"})
+# Fields whose make_unit_dict() defaults indicate "absent" — always skip these.
+_ABSENT_VALUES: frozenset = frozenset({"", None, -1, "-1"})
 
-# Fields where 0 / "0" are valid values (e.g. baths=0 = no bath; sqft=0 is
-# typically absent but we keep this list narrow).
+# Zero and string-zero are absent UNLESS the field is in _ZERO_IS_VALID_FIELDS.
+# Split so empty-string/None are unconditionally rejected while the zero
+# carve-out applies only to actual numeric zeros.
+_ABSENT_UNLESS_FIELD_PERMITS_ZERO: frozenset = frozenset({0, "0"})
+
+# Fields where 0 / "0" are valid values (e.g. baths=0 = no separate bathroom).
 _ZERO_IS_VALID_FIELDS: frozenset[str] = frozenset({"baths", "bathrooms", "floor"})
 
 
@@ -146,7 +152,9 @@ def from_legacy_unit(
         if field_name.startswith("_"):
             # Skip private/transport fields like _provenance, _confidence
             continue
-        if value in _ABSENT_VALUES and field_name not in _ZERO_IS_VALID_FIELDS:
+        if value in _ABSENT_VALUES:
+            continue
+        if value in _ABSENT_UNLESS_FIELD_PERMITS_ZERO and field_name not in _ZERO_IS_VALID_FIELDS:
             continue
         # Reject types we cannot represent in FieldValue
         if not isinstance(value, (str, int, float)) and value is not None:

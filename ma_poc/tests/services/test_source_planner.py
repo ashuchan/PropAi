@@ -21,7 +21,9 @@ from services.source_planner import (
 def _full_unit() -> ProvenancedUnit:
     pu = ProvenancedUnit()
     pu["unit_id"] = FieldValue(value="U1", source=SourceId.API_SIGHTMAP, confidence=0.95)
+    # Physical requires ≥2 fields (A2 fix)
     pu["beds"] = FieldValue(value=1, source=SourceId.API_SIGHTMAP, confidence=0.95)
+    pu["sqft"] = FieldValue(value=750, source=SourceId.API_SIGHTMAP, confidence=0.95)
     pu["asking_rent"] = FieldValue(value=1500, source=SourceId.API_SIGHTMAP, confidence=0.95)
     return pu
 

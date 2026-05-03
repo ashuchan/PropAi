@@ -290,6 +290,17 @@ async def scrape(
             except (ValueError, TypeError):
                 expected_units = None
 
+    # Phase H: compute per-property LLM budget once, before adapter dispatch
+    budget: dict = {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3}
+    if profile is not None:
+        try:
+            from ma_poc.services.source_planner import compute_budget
+            from ma_poc.models.scrape_profile import ProfileMaturity
+            is_cold = profile.confidence.maturity == ProfileMaturity.COLD
+            budget = compute_budget(profile, is_cold=is_cold)
+        except Exception:
+            pass
+
     ctx = AdapterContext(
         base_url=resolved.resolved_url,
         detected=detection,
@@ -302,7 +313,19 @@ async def scrape(
         state=_from_csv("state", "State"),
         zip_code=_from_csv("zip", "Zip", "zip_code", "ZIP Code"),
         pmc=_from_csv("Management Company", "pmc"),
+        budget=budget,
     )
+
+    # Phase F: populate cluster_key from PMS client account ID on first detection
+    if profile is not None and detection is not None:
+        pms_client_id = str(getattr(detection, "pms_client_account_id", "") or "")
+        if pms_client_id and not profile.cluster_key:
+            profile.cluster_key = pms_client_id
+            log.info(
+                "Cluster key set for %s: %s",
+                profile.canonical_id,
+                pms_client_id[:30],
+            )
     # Attach API responses to context for generic adapter. Prefer the
     # explicit ``api_responses`` arg (tests pass this directly); otherwise
     # promote the L1 fetcher's captured ``network_log`` so adapters can
@@ -506,6 +529,12 @@ async def scrape(
     # these as ``_tier_attempts``; PMS-specific adapters don't currently, so
     # an empty list is fine.
     result["_tier_attempts"] = getattr(adapter_result, "_tier_attempts", [])
+    # Phase D: provenanced merge output for source observers
+    result["_merged_units"] = getattr(adapter_result, "_merged_units", [])
+    result["_sources"] = getattr(adapter_result, "_sources", [])
+    # Phase E: DOM hints attempt/hit flags for miss-counter in profile_updater
+    result["_dom_hints_attempted"] = getattr(adapter_result, "_dom_hints_attempted", False)
+    result["_dom_hints_hit"] = getattr(adapter_result, "_dom_hints_hit", False)
     # Surface LLM interactions + hints if the generic:llm sub-tier ran. These
     # drive cost accounting, the LLM Interactions report section, and the
     # profile updater (css_selectors, api_urls_with_data, platform_guess).
@@ -1019,6 +1048,16 @@ async def scrape_jugnu(
     base_url = task.url if hasattr(task, "url") else str(task)
     property_id = task.property_id if hasattr(task, "property_id") else "unknown"
 
+    # Phase G2: compute budget here so link-hop guard can respect it.
+    _jugnu_budget: dict = {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3}
+    if profile is not None:
+        try:
+            from ma_poc.services.source_planner import compute_budget as _cb
+            from ma_poc.models.scrape_profile import ProfileMaturity as _PM
+            _jugnu_budget = _cb(profile, is_cold=profile.confidence.maturity == _PM.COLD)
+        except Exception:
+            pass
+
     # Delta 2: short-circuit on non-OK fetch
     if hasattr(fetch_result, "outcome"):
         outcome_val = (
@@ -1102,13 +1141,37 @@ async def scrape_jugnu(
     emit(EventKind.ADAPTER_SELECTED, property_id, adapter_name=adapter_name)
 
     # ── Option B: one-level link-hop when primary extraction is empty ──
-    # If scrape() returned no units but the fetch was successful and we have
-    # HTML, rank internal links by keyword + portal-subdomain and re-fetch
-    # the top candidates. This catches vanity-domain + portal-subpage sites
-    # (RentCafe/Entrata/AppFolio) where the home page references the PMS
-    # but the actual unit data lives at /floor-plans, /availability, or on
-    # a .rentcafe.com subdomain.
-    if not result.get("units") and fetch_result is not None:
+    # Fires when (a) main returned no units (legacy path) or (b) Phase G2:
+    # main produced units but the planner says they're incomplete — hop to a
+    # sub-page that might supply the missing field group (e.g. rent lives on
+    # /availability, floor-plan physical data lives on /floor-plans).
+    # Budget cap: _jugnu_budget["link_hop"] == 0 → never hop.
+    should_hop = False
+    if fetch_result is not None and _jugnu_budget.get("link_hop", 0) > 0:
+        if not result.get("units"):
+            should_hop = True
+        else:
+            # Phase G2: consult planner when main has units
+            try:
+                from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
+                from ma_poc.models.source import SourceId, from_legacy_unit
+                _pu = [
+                    from_legacy_unit(u, SourceId.API_GENERIC_NARROW, base_url, "", 0.85)
+                    for u in (result.get("units") or [])
+                ]
+                _report = evaluate_completeness(_pu)
+                _decision = plan_next_action(
+                    _report,
+                    sources_already_run=set(),
+                    budget_remaining=dict(_jugnu_budget),
+                    pms_name=detected_pms.get("pms", "unknown"),
+                )
+                if _decision.action == "ESCALATE_LINK_HOP":
+                    should_hop = True
+            except Exception:
+                pass
+
+    if should_hop:
         body = getattr(fetch_result, "body", None)
         entry_html: str | None = None
         if isinstance(body, bytes):
@@ -1148,20 +1211,17 @@ async def scrape_jugnu(
                 sub_units = hop_result.get("units") or []
                 # Phase 9: when both main and sub-page produced units, merge
                 # them by identity + max-confidence-per-field rather than
-                # destructively overwriting. Today the link-hop only fires
-                # when main is empty (line ~1092 guard), so the cross-page
-                # merge is a future-proofing path; the legacy overwrite is
-                # the active path. Both routes preserve telemetry additively.
+                # destructively overwriting. Both routes preserve telemetry.
                 if main_units and sub_units:
                     try:
-                        from models.source import (
+                        from ma_poc.models.source import (
                             ExtractedSource,
                             SourceId,
                             envelope_hash_of,
                             from_legacy_unit,
                             to_legacy_unit,
                         )
-                        from services.source_merger import merge_sources
+                        from ma_poc.services.source_merger import merge_sources
                         main_h = envelope_hash_of(main_units)
                         sub_h = envelope_hash_of(sub_units)
                         main_src = ExtractedSource(

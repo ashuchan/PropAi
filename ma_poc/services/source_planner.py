@@ -133,9 +133,17 @@ def evaluate_completeness(units: list) -> CompletenessReport:
     )
 
 
+_PHYSICAL_REQUIRED_MIN = 2  # spec: ≥2 of {beds, baths, sqft, floor_plan_name}
+
+
 def _unit_has_group(unit, group: str) -> bool:
-    """Whether a ProvenancedUnit (or plain dict) has at least one field
-    in `group` whose value is set."""
+    """Whether a ProvenancedUnit (or plain dict) has enough fields in `group`.
+
+    Identity / transactional: ≥1 field present.
+    Physical: ≥2 fields present (single field like 'just floor_plan_name' is too sparse).
+    """
+    threshold = _PHYSICAL_REQUIRED_MIN if group == "physical" else 1
+    n = 0
     for field_name, fv in unit.items():
         if FIELD_GROUP.get(field_name) != group:
             continue
@@ -145,7 +153,9 @@ def _unit_has_group(unit, group: str) -> bool:
         except AttributeError:
             value = fv
         if value not in (None, "", -1, "-1"):
-            return True
+            n += 1
+            if n >= threshold:
+                return True
     return False
 
 

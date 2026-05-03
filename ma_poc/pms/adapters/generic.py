@@ -63,6 +63,100 @@ _re_strip_script = _re.compile(r"<script.*?</script>|<style.*?</style>", _re.IGN
 _re_strip_tag = _re.compile(r"<[^>]+>")
 _re_rent = _re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?", _re.IGNORECASE)
 
+# Physical field keys used by _looks_field_rich
+_PHYSICAL_KEYS = ("beds", "bedrooms", "baths", "bathrooms", "sqft", "floor_plan_name")
+_TRANSACTIONAL_KEYS = ("asking_rent", "market_rent_low", "market_rent_high", "rent_range")
+
+try:
+    from ma_poc.models.source import _ABSENT_VALUES as _SRC_ABSENT_VALUES
+    _FIELD_RICH_ABSENT: frozenset = _SRC_ABSENT_VALUES | frozenset({0, "0"})
+except Exception:
+    _FIELD_RICH_ABSENT: frozenset = frozenset({"", None, 0, "0", -1, "-1"})  # type: ignore[no-redef]
+
+
+def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
+    """Return True when units carry identity + physical (≥2 fields) + transactional.
+
+    A unit set that has only identity+rent (no physical) is not field-rich —
+    the cascade needs to keep running to collect physical fields from other pages.
+    """
+    if not units:
+        return False
+
+    def _is_set(v: Any) -> bool:
+        return v not in _FIELD_RICH_ABSENT
+
+    has_identity = any((u.get("unit_id") or u.get("unit_number")) for u in units)
+    has_physical = any(
+        sum(1 for k in _PHYSICAL_KEYS if _is_set(u.get(k))) >= 2
+        for u in units
+    )
+    has_transactional = any(
+        any(_is_set(u.get(k)) for k in _TRANSACTIONAL_KEYS)
+        for u in units
+    )
+    return has_identity and has_physical and has_transactional
+
+
+def _assess_and_decide(
+    units_so_far: list[dict[str, Any]],
+    sources_already_run: set,
+    ctx: Any,
+    decision_log: list,
+) -> Any | None:
+    """Consult the planner after a sub-tier produces units.
+
+    Returns the Decision if planner fires; None if units are empty or import
+    fails. Appends every non-None decision to decision_log.
+    """
+    if not units_so_far:
+        return None
+    try:
+        from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
+        from ma_poc.models.source import SourceId, from_legacy_unit
+        from ma_poc.models.scrape_profile import ProfileMaturity
+    except Exception:
+        return None
+    try:
+        pu_units = [
+            from_legacy_unit(u, SourceId.API_GENERIC_NARROW, getattr(ctx, "base_url", ""), "", 0.85)
+            for u in units_so_far
+        ]
+        report = evaluate_completeness(pu_units)
+        floor: dict = {"complete": 0.85, "transactional": 0.70}
+        profile = getattr(ctx, "profile", None)
+        if profile is not None:
+            try:
+                if profile.confidence.maturity == ProfileMaturity.HOT:
+                    floor = {"complete": 0.90, "transactional": 0.80}
+            except Exception:
+                pass
+        decision = plan_next_action(
+            report,
+            sources_already_run=sources_already_run,
+            budget_remaining=dict(getattr(ctx, "budget", {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3})),
+            pms_name=getattr(getattr(ctx, "detected", None), "pms", "unknown"),
+            profile_completeness_floor=floor,
+            profile_preferences=(
+                list(profile.api_hints.source_observations) if profile is not None else []
+            ),
+        )
+        decision_log.append(decision)
+        try:
+            from ma_poc.observability.events import EventKind, emit
+            emit(
+                EventKind.PLANNER_DECISION,
+                getattr(ctx, "property_id", "unknown"),
+                action=decision.action,
+                target_field_group=decision.target_field_group or "",
+                rationale=decision.rationale[:120],
+            )
+        except Exception:
+            pass
+        return decision
+    except Exception:
+        return None
+
 
 def _find_unit_list(body: Any) -> list[dict[str, Any]]:
     """Attempt to find a list of unit/floorplan dicts in an API response body.
@@ -463,14 +557,14 @@ class GenericAdapter:
         # NOTE: keep imports relative to the same root the merger uses internally
         # (models.source) so that FieldValue identity checks (isinstance) hold.
         try:
-            from models.source import (
+            from ma_poc.models.source import (
                 ExtractedSource,
                 SourceId,
                 envelope_hash_of,
                 from_legacy_unit,
                 to_legacy_unit,
             )
-            from services.source_merger import merge_sources
+            from ma_poc.services.source_merger import merge_sources
         except Exception:
             return
         winning_url = result.winning_url or ctx.base_url or ""
@@ -509,7 +603,15 @@ class GenericAdapter:
             has_unit_ids=any(u.get("unit_number") or u.get("unit_id") for u in result.units),
             is_floor_plan_level=False,
         )
-        merged = merge_sources([replay_src, cascade_src], ctx.property_id)
+        # Phase I: emit IDENTITY_FUZZY_LINK events via callback; merger stays pure
+        def _emit_fuzzy(unit: Any, key: Any, conf: float) -> None:
+            try:
+                from ma_poc.observability.events import EventKind as _EK, emit as _ev
+                _ev(_EK.IDENTITY_FUZZY_LINK, ctx.property_id, bucket_key=str(key)[:80], confidence=conf)
+            except Exception:
+                pass
+
+        merged = merge_sources([replay_src, cascade_src], ctx.property_id, fuzzy_link_callback=_emit_fuzzy)
         if not merged:
             return
         legacy = [to_legacy_unit(u) for u in merged]
@@ -519,6 +621,20 @@ class GenericAdapter:
             u.pop("_provenance", None)
         result.units = legacy
         result._sources = [replay_src, cascade_src]  # type: ignore[attr-defined]
+        # Phase D: stash the provenanced merge output for downstream observers
+        result._merged_units = list(merged)  # type: ignore[attr-defined]
+        # Phase I: emit SOURCES_MERGED telemetry
+        try:
+            from ma_poc.observability.events import EventKind as _EK2, emit as _ev2
+            _ev2(
+                _EK2.SOURCES_MERGED,
+                ctx.property_id,
+                source_count=2,
+                merged_unit_count=len(merged),
+                tier=result.tier_used,
+            )
+        except Exception:
+            pass
         # Tier label: deterministic merge unless an LLM source contributed.
         if cascade_source in (
             SourceId.LLM_API_TARGETED,
@@ -562,6 +678,10 @@ class GenericAdapter:
 
         result = AdapterResult(tier_used="TIER_1_API")
         result._tier_attempts = attempts  # type: ignore[attr-defined]
+        # Phase H: track which SourceIds have already run for the planner
+        sources_already_run: set = set()
+        # Phase H: decision log for telemetry / debugging
+        decision_log: list = []
         all_units: list[dict[str, str]] = []
         # Option C gate: default is skip LLM when the detected PMS is not
         # "unknown" (GenericAdapter runs as a fallback for a failed PMS
@@ -715,23 +835,6 @@ class GenericAdapter:
                 # If replay is field-incomplete (e.g. mapping learned only `beds`
                 # but missed rent / unit_id), let the cascade keep running — the
                 # post-merge step combines replay + cascade by max-confidence.
-                def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
-                    if not units:
-                        return False
-                    has_identity = any(
-                        (u.get("unit_id") or u.get("unit_number")) for u in units
-                    )
-                    has_transactional = any(
-                        (
-                            u.get("asking_rent")
-                            or u.get("market_rent_low")
-                            or u.get("market_rent_high")
-                            or u.get("rent_range")
-                        )
-                        for u in units
-                    )
-                    return has_identity and has_transactional
-
                 if _looks_field_rich(replayed_units):
                     _log_attempt(
                         "generic:profile_replay",
@@ -832,10 +935,20 @@ class GenericAdapter:
             )
 
         if all_units:
-            result.units = all_units
-            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
-            result.confidence = min(0.85, 0.6 + 0.05 * len(all_units))
-            return result
+            # Phase H: consult the planner before short-circuiting.
+            # If planner says STOP, return early. Otherwise fall through so
+            # LLM sub-tiers can fill completeness gaps — but only if budget allows.
+            from ma_poc.models.source import SourceId as _SI
+            sources_already_run.add(_SI.API_GENERIC_NARROW)
+            _decision = _assess_and_decide(all_units, sources_already_run, ctx, decision_log)
+            if _decision is None or _decision.action == "STOP":
+                result.units = all_units
+                result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
+                result.confidence = min(0.85, 0.6 + 0.05 * len(all_units))
+                result._decision_log = decision_log  # type: ignore[attr-defined]
+                return result
+            # Planner says escalate — fall through to LLM tiers with skip_llm guard
+            skip_llm = False  # override: planner explicitly requested escalation
 
         # ── HTML-based tiers ──────────────────────────────────────────────
         # If neither narrow nor broad API parsers produced units, fall through
@@ -923,12 +1036,22 @@ class GenericAdapter:
             # Scans container elements (.unit, .floor-plan, .pricing-card, …)
             # for visible rent + structural signals. Catches static HTML sites
             # where unit data lives in the markup, not in any JSON envelope.
+            # Phase E: pass saved field_selectors as hints when available.
             t0 = _time.monotonic()
+            dom_hints = None
+            if ctx.profile is not None:
+                fs = ctx.profile.dom_hints.field_selectors
+                if fs and getattr(fs, "container", None):
+                    dom_hints = fs
+            hints_attempted = dom_hints is not None
             try:
-                dom_units = extract_units_from_dom(html, ctx.base_url) or []
+                dom_units = extract_units_from_dom(html, ctx.base_url, hints=dom_hints) or []
             except Exception as exc:
                 dom_units = []
                 result.errors.append(f"dom-scan-error: {exc}")
+            hints_hit = hints_attempted and bool(dom_units)
+            result._dom_hints_attempted = hints_attempted  # type: ignore[attr-defined]
+            result._dom_hints_hit = hints_hit  # type: ignore[attr-defined]
             _log_attempt(
                 "generic:dom_scan",
                 "ran_units" if dom_units else "ran_empty",
@@ -1064,10 +1187,11 @@ class GenericAdapter:
             result.confidence = 0.0
             return result
 
-        # Budget: capped per property so a broken site can't burn unlimited
-        # tokens. Mirrors the legacy entrata.py budget (3 API + 1 DOM).
-        api_llm_budget = 3
-        dom_llm_budget = 1
+        # Phase H: use budget from ctx (computed per-property in scraper.py).
+        # Falls back to safe defaults when ctx.budget is absent (e.g. old callers).
+        _budget = getattr(ctx, "budget", None) or {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3}
+        api_llm_budget = int(_budget.get("llm_targeted", 1))
+        dom_llm_budget = int(_budget.get("llm_monolithic", 1))
         llm_interactions: list[dict[str, Any]] = getattr(result, "_llm_interactions", []) or []
         # Self-learning payload surfaced to scraper.py. Shape matches what
         # services.profile_updater.update_profile_after_extraction expects:
@@ -1245,6 +1369,7 @@ class GenericAdapter:
         result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
         if llm_navigation_hints:
             result._llm_navigation_hints = llm_navigation_hints  # type: ignore[attr-defined]
+        result._decision_log = decision_log  # type: ignore[attr-defined]
         result.confidence = 0.0
         result.errors.append("Generic parser found no units in captured API responses")
         return result
