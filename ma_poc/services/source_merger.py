@@ -20,13 +20,13 @@ import copy
 from collections.abc import Iterable
 from typing import Any, Callable
 
-from models.source import (
+from ma_poc.models.source import (
     ExtractedSource,
     FieldValue,
     ProvenancedUnit,
     SourceId,
 )
-from services.source_planner import CONFIDENCE_FLOORS, FIELD_GROUP
+from ma_poc.services.source_planner import CONFIDENCE_FLOORS, FIELD_GROUP
 
 
 def merge_sources(

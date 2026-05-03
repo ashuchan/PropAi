@@ -122,6 +122,7 @@ async def scrape(
     fetch_result: Any | None = None,
     csv_row: dict[str, Any] | None = None,
     property_id: str | None = None,
+    shared_budget: dict | None = None,
 ) -> dict[str, Any]:
     """Scrape a property URL through detect -> resolve -> adapt pipeline.
 
@@ -290,16 +291,20 @@ async def scrape(
             except (ValueError, TypeError):
                 expected_units = None
 
-    # Phase H: compute per-property LLM budget once, before adapter dispatch
-    budget: dict = {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3}
-    if profile is not None:
-        try:
-            from ma_poc.services.source_planner import compute_budget
-            from ma_poc.models.scrape_profile import ProfileMaturity
-            is_cold = profile.confidence.maturity == ProfileMaturity.COLD
-            budget = compute_budget(profile, is_cold=is_cold)
-        except Exception:
-            pass
+    # Phase H / Fix 8: use shared_budget if provided (avoids double-allocation
+    # when scrape_jugnu() has already computed the budget for this run).
+    if shared_budget is not None:
+        budget: dict = dict(shared_budget)
+    else:
+        budget = {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
+        if profile is not None:
+            try:
+                from ma_poc.services.source_planner import compute_budget
+                from ma_poc.models.scrape_profile import ProfileMaturity
+                is_cold = profile.confidence.maturity == ProfileMaturity.COLD
+                budget = compute_budget(profile, is_cold=is_cold)
+            except Exception:
+                pass
 
     ctx = AdapterContext(
         base_url=resolved.resolved_url,
@@ -866,6 +871,7 @@ async def _try_link_hop(
     max_hops: int = 3,
     llm_navigation_hints: list[str] | None = None,
     visited_urls: set[str] | None = None,
+    shared_budget: dict | None = None,
 ) -> dict[str, Any] | None:
     """One-level BFS over home-page links when primary extraction is empty.
 
@@ -971,6 +977,7 @@ async def _try_link_hop(
                 fetch_result=sub_fetch,
                 csv_row=csv_row,
                 property_id=property_id,
+                shared_budget=shared_budget,
             )
         except Exception as exc:
             log.warning("link-hop scrape failed for %s: %s", sub_url, exc)
@@ -1049,7 +1056,7 @@ async def scrape_jugnu(
     property_id = task.property_id if hasattr(task, "property_id") else "unknown"
 
     # Phase G2: compute budget here so link-hop guard can respect it.
-    _jugnu_budget: dict = {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3}
+    _jugnu_budget: dict = {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
     if profile is not None:
         try:
             from ma_poc.services.source_planner import compute_budget as _cb
@@ -1103,6 +1110,7 @@ async def scrape_jugnu(
         fetch_result=fetch_result,
         csv_row=csv_row,
         property_id=property_id,
+        shared_budget=_jugnu_budget,
     )
     result["_property_id"] = property_id
 
@@ -1201,6 +1209,7 @@ async def scrape_jugnu(
                     max_hops=3,
                     llm_navigation_hints=result.get("_llm_navigation_hints"),
                     visited_urls={base_url},  # Phase 9: cycle protection (H5)
+                    shared_budget=_jugnu_budget,
                 )
             except Exception as exc:
                 log.warning("link-hop orchestration failed for %s: %s", property_id, exc)

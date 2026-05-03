@@ -153,6 +153,44 @@ _RENTCAFE_CLIENT_ID_RE = re.compile(r"^(?P<id>[a-z0-9-]+)\.rentcafe\.com$")
 # Entrata property IDs are embedded in the URL path (handoff: entrata.py:1480)
 _ENTRATA_PATH_ID_RE = re.compile(r"/(?P<id>\d{3,8})(?:/|$)")
 
+# Fix 5: URL-embedded account-id patterns for 5 PMS platforms
+_RENTCAFE_PROPERTY_ID_RE = re.compile(r"propertyId(?:\[\])?=(\d+)", re.IGNORECASE)
+_ENTRATA_PROPERTY_ID_RE = re.compile(r"property\[id\]=(\d+)|/Apartments/(\d+)/", re.IGNORECASE)
+_SIGHTMAP_CLIENT_KEY_RE = re.compile(r"sightmap\.com/app/api/v1/([a-z0-9_-]+)/", re.IGNORECASE)
+_APPFOLIO_SUBDOMAIN_RE = re.compile(r"https?://([a-z0-9-]+)\.appfolio\.com", re.IGNORECASE)
+_AVALONBAY_SLUG_RE = re.compile(r"avaloncommunities\.com/[a-z]{2}/[^/]+/([a-z0-9-]+)", re.IGNORECASE)
+
+
+def _client_account_id_from_url(url: str, pms: str) -> str | None:
+    """Extract a stable client/property account ID from a URL for 5 PMS platforms.
+
+    Used when host-based extraction (_client_id_for) can't extract an ID —
+    e.g. when the PMS was detected via HTML markers rather than the primary host.
+    Returns None if no stable ID is found.
+    """
+    if not url:
+        return None
+    if pms == "rentcafe":
+        m = _RENTCAFE_PROPERTY_ID_RE.search(url)
+        return m.group(1) if m else None
+    if pms == "entrata":
+        m = _ENTRATA_PROPERTY_ID_RE.search(url)
+        if m:
+            return m.group(1) or m.group(2)
+        return None
+    if pms == "sightmap":
+        m = _SIGHTMAP_CLIENT_KEY_RE.search(url)
+        return m.group(1) if m else None
+    if pms == "appfolio":
+        m = _APPFOLIO_SUBDOMAIN_RE.search(url)
+        if m and m.group(1) not in {"www", "", "app"}:
+            return m.group(1)
+        return None
+    if pms == "avalonbay":
+        m = _AVALONBAY_SLUG_RE.search(url)
+        return m.group(1) if m else None
+    return None
+
 
 @dataclass
 class DetectedPMS:
@@ -609,10 +647,12 @@ def _detect_pms_impl(
     combined = min(0.95, base + 0.10 * (len(agreeing) - 1))
     evidence = pms_evidence[best_pms]
 
+    client_id = _client_account_id_from_url(url, best_pms) if isinstance(url, str) else None
+
     return DetectedPMS(
         pms=best_pms,
         confidence=combined,
         evidence=evidence,
-        pms_client_account_id=None,
+        pms_client_account_id=client_id,
         recommended_strategy=_STRATEGY_BY_PMS[best_pms],
     )

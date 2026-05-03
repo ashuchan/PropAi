@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from models.scrape_profile import ProfileMaturity, ScrapeProfile
-from services.source_planner import compute_budget
+from ma_poc.models.scrape_profile import ProfileMaturity, ScrapeProfile
+from ma_poc.services.source_planner import compute_budget
 
 
 def test_h1_compute_budget_called_for_cold_profile() -> None:
@@ -14,11 +14,11 @@ def test_h1_compute_budget_called_for_cold_profile() -> None:
     assert p.confidence.maturity == ProfileMaturity.COLD
     p.confidence.cold_run_count = 0
     budget = compute_budget(p, is_cold=True)
-    assert "llm_targeted" in budget
+    assert "llm_api_calls" in budget
     assert "llm_monolithic" in budget
     assert "link_hop" in budget
-    # COLD run 0 mod 3 == 0: targeted=1, monolithic=0, link_hop=1
-    assert budget["llm_targeted"] == 1
+    # COLD run 0 mod 3 == 0: api_calls=1, monolithic=0, link_hop=1
+    assert budget["llm_api_calls"] == 1
     assert budget["llm_monolithic"] == 0
 
 
@@ -27,7 +27,7 @@ def test_h1_compute_budget_hot_profile_gets_full_budget() -> None:
     p = ScrapeProfile(canonical_id="phase_h_002")
     p.confidence.maturity = ProfileMaturity.HOT
     budget = compute_budget(p, is_cold=False)
-    assert budget["llm_targeted"] == 1
+    assert budget["llm_api_calls"] == 3
     assert budget["llm_monolithic"] == 1
     assert budget["link_hop"] == 3
 
@@ -37,13 +37,13 @@ def test_h1_compute_budget_cold_rotates_by_run_count() -> None:
     p = ScrapeProfile(canonical_id="phase_h_003")
     p.confidence.cold_run_count = 1  # n % 3 == 1: monolithic=0, targeted=0, link_hop=3
     budget = compute_budget(p, is_cold=True)
-    assert budget["llm_targeted"] == 0
+    assert budget["llm_api_calls"] == 0
     assert budget["llm_monolithic"] == 0
     assert budget["link_hop"] == 3
 
-    p.confidence.cold_run_count = 2  # n % 3 == 2: targeted=0, monolithic=1, link_hop=1
+    p.confidence.cold_run_count = 2  # n % 3 == 2: api_calls=0, monolithic=1, link_hop=1
     budget = compute_budget(p, is_cold=True)
-    assert budget["llm_targeted"] == 0
+    assert budget["llm_api_calls"] == 0
     assert budget["llm_monolithic"] == 1
 
 
@@ -77,7 +77,7 @@ def test_h2_adapter_context_has_budget_field() -> None:
         property_id="test_001",
     )
     assert hasattr(ctx, "budget"), "AdapterContext must have a budget field"
-    assert "llm_targeted" in ctx.budget
+    assert "llm_api_calls" in ctx.budget
     assert "llm_monolithic" in ctx.budget
     assert "link_hop" in ctx.budget
 
@@ -112,7 +112,7 @@ def test_h2_planner_stop_respected_by_assess_and_decide() -> None:
         profile=None,
         expected_total_units=None,
         property_id="test_h2_001",
-        budget={"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3},
+        budget={"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3},
     )
 
     # Units with full identity + physical + transactional — planner should STOP

@@ -63,39 +63,23 @@ _re_strip_script = _re.compile(r"<script.*?</script>|<style.*?</style>", _re.IGN
 _re_strip_tag = _re.compile(r"<[^>]+>")
 _re_rent = _re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?", _re.IGNORECASE)
 
-# Physical field keys used by _looks_field_rich
-_PHYSICAL_KEYS = ("beds", "bedrooms", "baths", "bathrooms", "sqft", "floor_plan_name")
-_TRANSACTIONAL_KEYS = ("asking_rent", "market_rent_low", "market_rent_high", "rent_range")
-
-try:
-    from ma_poc.models.source import _ABSENT_VALUES as _SRC_ABSENT_VALUES
-    _FIELD_RICH_ABSENT: frozenset = _SRC_ABSENT_VALUES | frozenset({0, "0"})
-except Exception:
-    _FIELD_RICH_ABSENT: frozenset = frozenset({"", None, 0, "0", -1, "-1"})  # type: ignore[no-redef]
-
-
 def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
     """Return True when units carry identity + physical (≥2 fields) + transactional.
 
-    A unit set that has only identity+rent (no physical) is not field-rich —
-    the cascade needs to keep running to collect physical fields from other pages.
+    Uses the SAME absent-value semantics as services.source_planner.has_field_group
+    so planner completeness scoring and cascade short-circuit decisions agree.
     """
     if not units:
         return False
-
-    def _is_set(v: Any) -> bool:
-        return v not in _FIELD_RICH_ABSENT
-
-    has_identity = any((u.get("unit_id") or u.get("unit_number")) for u in units)
-    has_physical = any(
-        sum(1 for k in _PHYSICAL_KEYS if _is_set(u.get(k))) >= 2
-        for u in units
+    try:
+        from ma_poc.services.source_planner import has_field_group
+    except Exception:
+        return False  # safety: never short-circuit if planner is unavailable
+    return (
+        any(has_field_group(u, "identity") for u in units)
+        and any(has_field_group(u, "physical") for u in units)
+        and any(has_field_group(u, "transactional") for u in units)
     )
-    has_transactional = any(
-        any(_is_set(u.get(k)) for k in _TRANSACTIONAL_KEYS)
-        for u in units
-    )
-    return has_identity and has_physical and has_transactional
 
 
 def _assess_and_decide(
@@ -134,7 +118,7 @@ def _assess_and_decide(
         decision = plan_next_action(
             report,
             sources_already_run=sources_already_run,
-            budget_remaining=dict(getattr(ctx, "budget", {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3})),
+            budget_remaining=dict(getattr(ctx, "budget", {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3})),
             pms_name=getattr(getattr(ctx, "detected", None), "pms", "unknown"),
             profile_completeness_floor=floor,
             profile_preferences=(
@@ -156,6 +140,162 @@ def _assess_and_decide(
         return decision
     except Exception:
         return None
+
+
+def _merge_into_result_units(
+    existing: list[dict[str, Any]],
+    incoming: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Merge incoming units into existing using a 3-rank identity ladder.
+
+    Rank 1: unit_id match
+    Rank 2: floor_plan_name + beds + baths match
+    Rank 3: fuzzy beds + baths + sqft bucket (±15%) match
+
+    When a match is found, fill any absent/null fields on the existing unit
+    from the incoming unit. When no match is found, append the incoming unit.
+    Returns the merged list (existing modified in-place, new units appended).
+    """
+    if not existing:
+        return list(incoming)
+    if not incoming:
+        return existing
+
+    def _sqft_bucket(u: dict[str, Any]) -> int | None:
+        raw = u.get("sqft") or u.get("area")
+        if raw is None:
+            return None
+        try:
+            v = int(float(str(raw).replace(",", "")))
+            return v // 100  # 100-sqft buckets → ±50 sqft ~ ±10%
+        except (ValueError, TypeError):
+            return None
+
+    def _norm(v: Any) -> str:
+        if v is None:
+            return ""
+        return str(v).strip().lower()
+
+    def _fill_missing(target: dict[str, Any], source: dict[str, Any]) -> None:
+        for k, v in source.items():
+            if k.startswith("_"):
+                continue
+            if target.get(k) in (None, "", -1, "-1"):
+                target[k] = v
+
+    result = list(existing)
+    for inc in incoming:
+        matched = False
+        # Rank 1: unit_id
+        inc_uid = _norm(inc.get("unit_id") or inc.get("unit_number"))
+        if inc_uid:
+            for ex in result:
+                ex_uid = _norm(ex.get("unit_id") or ex.get("unit_number"))
+                if ex_uid and ex_uid == inc_uid:
+                    _fill_missing(ex, inc)
+                    matched = True
+                    break
+        if matched:
+            continue
+        # Rank 2: floor_plan_name + beds + baths
+        inc_fp = _norm(inc.get("floor_plan_name"))
+        inc_beds = _norm(inc.get("bedrooms") or inc.get("beds"))
+        inc_baths = _norm(inc.get("bathrooms") or inc.get("baths"))
+        if inc_fp and inc_beds:
+            for ex in result:
+                ex_fp = _norm(ex.get("floor_plan_name"))
+                ex_beds = _norm(ex.get("bedrooms") or ex.get("beds"))
+                ex_baths = _norm(ex.get("bathrooms") or ex.get("baths"))
+                if ex_fp == inc_fp and ex_beds == inc_beds and ex_baths == inc_baths:
+                    _fill_missing(ex, inc)
+                    matched = True
+                    break
+        if matched:
+            continue
+        # Rank 3: fuzzy beds + baths + sqft bucket
+        inc_bucket = _sqft_bucket(inc)
+        if inc_beds and inc_bucket is not None:
+            for ex in result:
+                ex_beds = _norm(ex.get("bedrooms") or ex.get("beds"))
+                ex_baths = _norm(ex.get("bathrooms") or ex.get("baths"))
+                ex_bucket = _sqft_bucket(ex)
+                if (
+                    ex_beds == inc_beds
+                    and ex_baths == inc_baths
+                    and ex_bucket is not None
+                    and abs(ex_bucket - inc_bucket) <= 1
+                ):
+                    _fill_missing(ex, inc)
+                    matched = True
+                    break
+        if not matched:
+            result.append(inc)
+    return result
+
+
+def _apply_field_patches(
+    units: list[dict[str, Any]],
+    api_responses: list[dict[str, Any]],
+    field_patches: list[Any],
+) -> list[dict[str, Any]]:
+    """Sub-tier 0b: apply saved FieldPatches to replayed units via positional join.
+
+    For each patch, find the matching API response, navigate to the list of values
+    at json_path, then fill units[i][field_name] = values[i] where the field is
+    currently absent/null. Never overwrites non-null values.
+    Returns the (mutated) units list.
+    """
+    if not units or not api_responses or not field_patches:
+        return units
+
+    def _get_path(obj: Any, path: str) -> Any:
+        for part in path.split("."):
+            if isinstance(obj, dict):
+                obj = obj.get(part)
+            elif isinstance(obj, list) and part.isdigit():
+                idx = int(part)
+                obj = obj[idx] if idx < len(obj) else None
+            else:
+                return None
+            if obj is None:
+                return None
+        return obj
+
+    for patch in field_patches:
+        try:
+            url_pat = getattr(patch, "api_url_pattern", None) or ""
+            field_name = getattr(patch, "field_name", None) or ""
+            json_path = getattr(patch, "json_path", None) or ""
+        except Exception:
+            continue
+        if not (url_pat and field_name and json_path):
+            continue
+        # Find matching API response
+        matched_body = None
+        for resp in api_responses:
+            if url_pat in resp.get("url", ""):
+                matched_body = resp.get("body")
+                break
+        if matched_body is None:
+            continue
+        # Extract the list of patch values from the body
+        values = _get_path(matched_body, json_path)
+        if not isinstance(values, list):
+            # Maybe it's a scalar — wrap it for single-unit case
+            if values is not None:
+                values = [values]
+            else:
+                continue
+        # Positional fill: units[i] gets values[i] if field is absent
+        for i, unit in enumerate(units):
+            if i >= len(values):
+                break
+            if unit.get(field_name) not in (None, "", -1, "-1"):
+                continue
+            v = values[i]
+            if v not in (None, ""):
+                unit[field_name] = v
+    return units
 
 
 def _find_unit_list(body: Any) -> list[dict[str, Any]]:
@@ -536,7 +676,46 @@ class GenericAdapter:
         except Exception:
             # Never break the run on a merge-side error (H10 best-effort)
             pass
+        # Fix 4: stash provenanced units for the Phase 11 self-learning loop
+        # when the merge step didn't already populate _merged_units (single-source path).
+        if not getattr(result, "_merged_units", None) and result.units:
+            try:
+                self._stash_provenanced_units(result, ctx)
+            except Exception:
+                pass
         return result
+
+    @staticmethod
+    def _stash_provenanced_units(result: AdapterResult, ctx: AdapterContext) -> None:
+        """Wrap result.units as ProvenancedUnits for the Phase 11 self-learning loop.
+
+        Populates result._merged_units so downstream observers (e.g. the
+        cluster-store writer in jugnu_runner) have a consistent access path
+        regardless of whether a multi-source merge occurred.
+        """
+        try:
+            from ma_poc.models.source import SourceId, envelope_hash_of, from_legacy_unit
+        except Exception:
+            return
+        winning_url = result.winning_url or getattr(ctx, "base_url", "") or ""
+        tier_to_source = {
+            "TIER_1_PROFILE_MAPPING": SourceId.MAPPING_REPLAY,
+            "TIER_1_API": SourceId.API_GENERIC_NARROW,
+            "TIER_1_5_EMBEDDED": SourceId.EMBEDDED_JSON,
+            "TIER_2_JSONLD": SourceId.JSON_LD,
+            "TIER_3_DOM": SourceId.DOM_CASCADE,
+            "TIER_4_LLM_API": SourceId.LLM_API_TARGETED,
+            "TIER_4_LLM_DOM": SourceId.LLM_DOM_TARGETED,
+            "TIER_4_LLM": SourceId.LLM_MONOLITHIC,
+        }
+        source_id = tier_to_source.get(result.tier_used, SourceId.API_GENERIC_NARROW)
+        env_hash = envelope_hash_of(result.units)
+        conf = result.confidence if result.confidence > 0 else 0.80
+        provenanced = [
+            from_legacy_unit(u, source_id, winning_url, env_hash, conf)
+            for u in result.units
+        ]
+        result._merged_units = provenanced  # type: ignore[attr-defined]
 
     @staticmethod
     def _phase5_post_merge(result: AdapterResult, ctx: AdapterContext) -> None:
@@ -831,6 +1010,14 @@ class GenericAdapter:
                                     except Exception:
                                         pass
             if replayed_units:
+                # Sub-tier 0b: apply saved FieldPatches positionally to augment replay units.
+                try:
+                    _fp_list = list(getattr(profile.api_hints, "field_patches", []) or [])
+                    if _fp_list:
+                        replayed_units = _apply_field_patches(replayed_units, api_responses, _fp_list)
+                except Exception:
+                    pass
+
                 # Phase 5: only short-circuit when replay produced field-RICH units.
                 # If replay is field-incomplete (e.g. mapping learned only `beds`
                 # but missed rent / unit_id), let the cascade keep running — the
@@ -947,7 +1134,10 @@ class GenericAdapter:
                 result.confidence = min(0.85, 0.6 + 0.05 * len(all_units))
                 result._decision_log = decision_log  # type: ignore[attr-defined]
                 return result
-            # Planner says escalate — fall through to LLM tiers with skip_llm guard
+            # Planner says escalate — promote all_units into result so HTML tiers
+            # can merge into them rather than replacing them (Fix 2 / C2).
+            result.units = list(all_units)
+            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
             skip_llm = False  # override: planner explicitly requested escalation
 
         # ── HTML-based tiers ──────────────────────────────────────────────
@@ -995,11 +1185,18 @@ class GenericAdapter:
                     duration_ms=int((_time.monotonic() - t0) * 1000),
                 )
             if jsonld_units:
-                result.units = jsonld_units
+                result.units = _merge_into_result_units(result.units, jsonld_units)
                 result.tier_used = "TIER_2_JSONLD"
                 result.winning_url = ctx.base_url
-                result.confidence = min(0.80, 0.55 + 0.05 * len(jsonld_units))
-                return result
+                result.confidence = min(0.80, 0.55 + 0.05 * len(result.units))
+                # Fix 13: planner gate — stop only if complete, else fall through to LLM
+                from ma_poc.models.source import SourceId as _SI2
+                sources_already_run.add(_SI2.JSON_LD)
+                _jd = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
+                if _jd is None or _jd.action == "STOP":
+                    result._decision_log = decision_log  # type: ignore[attr-defined]
+                    return result
+                skip_llm = False  # planner escalated — allow LLM
 
             # Sub-tier 4: Embedded JSON / SSR blobs -------------------------
             t0 = _time.monotonic()
@@ -1026,11 +1223,18 @@ class GenericAdapter:
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
             if embedded_units:
-                result.units = embedded_units
+                result.units = _merge_into_result_units(result.units, embedded_units)
                 result.tier_used = "TIER_1_5_EMBEDDED"
                 result.winning_url = ctx.base_url
-                result.confidence = min(0.80, 0.55 + 0.05 * len(embedded_units))
-                return result
+                result.confidence = min(0.80, 0.55 + 0.05 * len(result.units))
+                # Fix 13: planner gate — stop only if complete, else fall through to LLM
+                from ma_poc.models.source import SourceId as _SI3
+                sources_already_run.add(_SI3.EMBEDDED_JSON)
+                _ed = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
+                if _ed is None or _ed.action == "STOP":
+                    result._decision_log = decision_log  # type: ignore[attr-defined]
+                    return result
+                skip_llm = False  # planner escalated — allow LLM
 
             # Sub-tier 5: DOM selector cascade ------------------------------
             # Scans container elements (.unit, .floor-plan, .pricing-card, …)
@@ -1045,11 +1249,11 @@ class GenericAdapter:
                     dom_hints = fs
             hints_attempted = dom_hints is not None
             try:
-                dom_units = extract_units_from_dom(html, ctx.base_url, hints=dom_hints) or []
+                dom_units, _dom_hit_mode = extract_units_from_dom(html, ctx.base_url, hints=dom_hints)
             except Exception as exc:
-                dom_units = []
+                dom_units, _dom_hit_mode = [], "none"
                 result.errors.append(f"dom-scan-error: {exc}")
-            hints_hit = hints_attempted and bool(dom_units)
+            hints_hit = _dom_hit_mode == "hints"
             result._dom_hints_attempted = hints_attempted  # type: ignore[attr-defined]
             result._dom_hints_hit = hints_hit  # type: ignore[attr-defined]
             _log_attempt(
@@ -1060,11 +1264,18 @@ class GenericAdapter:
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
             if dom_units:
-                result.units = dom_units
+                result.units = _merge_into_result_units(result.units, dom_units)
                 result.tier_used = "TIER_3_DOM"
                 result.winning_url = ctx.base_url
-                result.confidence = min(0.75, 0.5 + 0.04 * len(dom_units))
-                return result
+                result.confidence = min(0.75, 0.5 + 0.04 * len(result.units))
+                # Fix 13: planner gate — stop only if complete, else fall through to LLM
+                from ma_poc.models.source import SourceId as _SI4
+                sources_already_run.add(_SI4.DOM_CASCADE)
+                _dd = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
+                if _dd is None or _dd.action == "STOP":
+                    result._decision_log = decision_log  # type: ignore[attr-defined]
+                    return result
+                skip_llm = False  # planner escalated — allow LLM
         else:
             _log_attempt("generic:jsonld", "skipped", reason="no HTML body available")
             _log_attempt("generic:embedded_json", "skipped", reason="no HTML body available")
@@ -1189,9 +1400,9 @@ class GenericAdapter:
 
         # Phase H: use budget from ctx (computed per-property in scraper.py).
         # Falls back to safe defaults when ctx.budget is absent (e.g. old callers).
-        _budget = getattr(ctx, "budget", None) or {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3}
-        api_llm_budget = int(_budget.get("llm_targeted", 1))
-        dom_llm_budget = int(_budget.get("llm_monolithic", 1))
+        _budget = getattr(ctx, "budget", None) or {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
+        api_llm_budget = int(_budget.get("llm_api_calls", 3))
+        dom_llm_budget = int(_budget.get("llm_dom_calls", 1))
         llm_interactions: list[dict[str, Any]] = getattr(result, "_llm_interactions", []) or []
         # Self-learning payload surfaced to scraper.py. Shape matches what
         # services.profile_updater.update_profile_after_extraction expects:

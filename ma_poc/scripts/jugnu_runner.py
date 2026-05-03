@@ -811,14 +811,48 @@ def _resolve_source_url(raw_apis: list[dict[str, Any]], target_unit: dict[str, A
 
     Searches for target_unit's unit_id / floor_plan_name / unit_number in each
     response body. Falls back to the first non-empty response when no match found.
+
+    Fix 10: short needles (1-3 chars) must appear as a JSON value token, not
+    as a bare substring — prevents "1A" matching "availab**1A**ble" or "s"
+    matching every string body. Long needles (≥4 chars) use plain substring match.
     """
     if not raw_apis:
         return ("", {})
-    needles = []
+
+    long_needles: list[str] = []
+    short_needles: list[str] = []
     for k in ("floor_plan_name", "unit_id", "unit_number"):
         v = target_unit.get(k)
-        if v:
-            needles.append(str(v))
+        if not v:
+            continue
+        s = str(v).strip()
+        if not s:
+            continue
+        if len(s) >= 4:
+            long_needles.append(s)
+        else:
+            short_needles.append(s)
+
+    # Short-needle patterns: the value must appear as a JSON string/number value
+    # e.g. `": "1A"`, `": 1A,`, `": 1A}`, `":1A"` (whitespace-tolerant).
+    import re as _re
+    short_patterns = [
+        _re.compile(
+            r':\s*"' + _re.escape(n) + r'"'
+            r'|:\s*' + _re.escape(n) + r'[,}\]\n\r\s]',
+            _re.IGNORECASE,
+        )
+        for n in short_needles
+    ]
+
+    def _body_matches(body_str: str) -> bool:
+        if long_needles and any(n in body_str for n in long_needles):
+            return True
+        if short_patterns and any(p.search(body_str) for p in short_patterns):
+            return True
+        return False
+
+    has_needles = bool(long_needles or short_patterns)
     for resp in raw_apis:
         body = resp.get("body")
         if body is None:
@@ -827,7 +861,7 @@ def _resolve_source_url(raw_apis: list[dict[str, Any]], target_unit: dict[str, A
             body_str = json.dumps(body) if isinstance(body, (dict, list)) else str(body)
         except (TypeError, ValueError):
             body_str = str(body)
-        if needles and any(n in body_str for n in needles):
+        if has_needles and _body_matches(body_str):
             return (resp.get("url", ""), body)
     # Fallback: first non-empty body
     for resp in raw_apis:

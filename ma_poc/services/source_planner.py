@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from models.source import SourceId
+from ma_poc.models.source import SourceId
 
 # Maps (field_group) -> ordered list of (SourceId, base_confidence)
 DEFAULT_SOURCE_RANKING: dict[str, list[tuple[SourceId, float]]] = {
@@ -136,27 +136,37 @@ def evaluate_completeness(units: list) -> CompletenessReport:
 _PHYSICAL_REQUIRED_MIN = 2  # spec: ≥2 of {beds, baths, sqft, floor_plan_name}
 
 
-def _unit_has_group(unit, group: str) -> bool:
-    """Whether a ProvenancedUnit (or plain dict) has enough fields in `group`.
+def has_field_group(unit: Any, group: str, min_fields: int | None = None) -> bool:
+    """Public version of _unit_has_group. Used by both planner and cascade.
 
-    Identity / transactional: ≥1 field present.
-    Physical: ≥2 fields present (single field like 'just floor_plan_name' is too sparse).
+    group: 'identity' | 'physical' | 'transactional'
+    min_fields: override the threshold (default: 1 for identity/transactional, 2 for physical)
+
+    Treats 0 and "0" as ABSENT (same as None/""/−1). This means sqft=0
+    does not count as "having physical", and beds=0 (studio) does not
+    count for completeness scoring — use _ZERO_IS_VALID_FIELDS in
+    models.source for the separate concern of preserving studio data.
     """
-    threshold = _PHYSICAL_REQUIRED_MIN if group == "physical" else 1
+    if min_fields is None:
+        min_fields = _PHYSICAL_REQUIRED_MIN if group == "physical" else 1
     n = 0
     for field_name, fv in unit.items():
         if FIELD_GROUP.get(field_name) != group:
             continue
-        # Accept both FieldValue and plain values for flexibility
         try:
             value = fv.value
         except AttributeError:
             value = fv
-        if value not in (None, "", -1, "-1"):
+        if value not in (None, "", -1, "-1", 0, "0"):
             n += 1
-            if n >= threshold:
+            if n >= min_fields:
                 return True
     return False
+
+
+def _unit_has_group(unit: Any, group: str) -> bool:
+    """Internal alias retained for back-compat in evaluate_completeness."""
+    return has_field_group(unit, group)
 
 
 # ── Phase 4: Decision dataclass + plan_next_action ──────────────────────
@@ -284,7 +294,7 @@ def plan_next_action(
         if source_id in sources_already_run:
             continue
         if source_id in _LLM_TARGETED_SOURCES:
-            if budget_remaining.get("llm_targeted", 0) > 0:
+            if (budget_remaining.get("llm_api_calls", 0) + budget_remaining.get("llm_dom_calls", 0)) > 0:
                 return Decision(
                     action="ESCALATE_LLM_TARGETED",
                     target_field_group=failing_group,
@@ -310,11 +320,19 @@ def plan_next_action(
 def compute_budget(profile: Any, is_cold: bool) -> dict:
     """Per-property LLM budget for this run.
 
-    HOT/WARM: full budget. COLD: 1 LLM tier per run, type rotates by
-    cold_run_count to avoid getting stuck on the same failing path.
+    Keys are PER-CALL caps, not per-run. The cascade decrements them
+    each time it makes an LLM call.
+
+    HOT/WARM: 3 API LLM probes + 1 DOM LLM probe + 1 monolithic + 3 link-hops.
+    COLD: rotates by cold_run_count to vary the failing path each retry.
     """
     if not is_cold:
-        return {"llm_targeted": 1, "llm_monolithic": 1, "link_hop": 3}
+        return {
+            "llm_api_calls": 3,   # per-response cap; mirrors legacy api_llm_budget
+            "llm_dom_calls": 1,   # per-page cap; mirrors legacy dom_llm_budget
+            "llm_monolithic": 1,  # one shot per run
+            "link_hop": 3,
+        }
 
     n = 0
     try:
@@ -322,7 +340,7 @@ def compute_budget(profile: Any, is_cold: bool) -> dict:
     except Exception:
         n = 0
     if n % 3 == 0:
-        return {"llm_targeted": 1, "llm_monolithic": 0, "link_hop": 1}
+        return {"llm_api_calls": 1, "llm_dom_calls": 0, "llm_monolithic": 0, "link_hop": 1}
     if n % 3 == 1:
-        return {"llm_targeted": 0, "llm_monolithic": 0, "link_hop": 3}
-    return {"llm_targeted": 0, "llm_monolithic": 1, "link_hop": 1}
+        return {"llm_api_calls": 0, "llm_dom_calls": 0, "llm_monolithic": 0, "link_hop": 3}
+    return {"llm_api_calls": 0, "llm_dom_calls": 0, "llm_monolithic": 1, "link_hop": 1}

@@ -49,13 +49,13 @@ def test_completeness_all_complete() -> None:
 
 def test_decision_stop_when_complete() -> None:
     r = CompletenessReport(10, 1.0, 1.0, 0.80, 0.95)
-    d = plan_next_action(r, set(), {"llm_targeted": 1, "link_hop": 1, "llm_monolithic": 1})
+    d = plan_next_action(r, set(), {"llm_api_calls": 1, "llm_dom_calls": 1, "link_hop": 1, "llm_monolithic": 1})
     assert d.action == "STOP"
 
 
 def test_decision_target_gap_picks_failing_axis() -> None:
     r = CompletenessReport(10, 0.95, 0.95, 0.40, 0.55)
-    d = plan_next_action(r, sources_already_run=set(), budget_remaining={"llm_targeted": 1, "link_hop": 0, "llm_monolithic": 1})
+    d = plan_next_action(r, sources_already_run=set(), budget_remaining={"llm_api_calls": 1, "llm_dom_calls": 1, "link_hop": 0, "llm_monolithic": 1})
     assert d.action == "ESCALATE_LLM_TARGETED"
     assert d.target_field_group == "transactional"
 
@@ -64,7 +64,7 @@ def test_decision_one_decision_per_call() -> None:
     """H2 invariant — every call returns exactly one Decision."""
     r = CompletenessReport(5, 0.4, 0.5, 0.3, 0.2)
     for _ in range(100):
-        d = plan_next_action(r, set(), {"llm_targeted": 1, "link_hop": 1, "llm_monolithic": 1})
+        d = plan_next_action(r, set(), {"llm_api_calls": 1, "llm_dom_calls": 1, "link_hop": 1, "llm_monolithic": 1})
         assert isinstance(d, Decision)
 
 
@@ -77,7 +77,7 @@ def test_budget_zero_blocks_escalation() -> None:
 
 def test_decision_broad_recovery_prefers_link_hop() -> None:
     r = CompletenessReport(10, 0.2, 0.2, 0.2, 0.1)
-    d = plan_next_action(r, set(), {"llm_targeted": 1, "link_hop": 1, "llm_monolithic": 1})
+    d = plan_next_action(r, set(), {"llm_api_calls": 1, "llm_dom_calls": 1, "link_hop": 1, "llm_monolithic": 1})
     assert d.action == "ESCALATE_LINK_HOP"
 
 
@@ -90,7 +90,7 @@ def test_decision_broad_recovery_falls_to_monolithic() -> None:
 def test_profile_floor_lowers_stop_threshold() -> None:
     r = CompletenessReport(10, 0.85, 0.85, 0.80, 0.75)
     d = plan_next_action(
-        r, set(), {"llm_targeted": 1, "link_hop": 1, "llm_monolithic": 1},
+        r, set(), {"llm_api_calls": 1, "llm_dom_calls": 1, "link_hop": 1, "llm_monolithic": 1},
         profile_completeness_floor={"complete": 0.70, "transactional": 0.70},
     )
     assert d.action == "STOP"
@@ -100,7 +100,7 @@ def test_profile_floor_below_50_pct_clamped() -> None:
     """Floor < 0.50 must be clamped to 0.50 — never emit garbage."""
     r = CompletenessReport(10, 0.40, 0.40, 0.40, 0.40)
     d = plan_next_action(
-        r, set(), {"llm_targeted": 1, "link_hop": 1, "llm_monolithic": 1},
+        r, set(), {"llm_api_calls": 1, "llm_dom_calls": 1, "link_hop": 1, "llm_monolithic": 1},
         profile_completeness_floor={"complete": 0.30, "transactional": 0.30},
     )
     # With pct_complete=0.40 < 0.50, BROAD_RECOVERY fires regardless of the
@@ -140,7 +140,8 @@ def test_compute_budget_warm_full() -> None:
         class confidence:
             cold_run_count = 0
     b = compute_budget(P(), is_cold=False)
-    assert b["llm_targeted"] == 1
+    assert b["llm_api_calls"] == 3
+    assert b["llm_dom_calls"] == 1
     assert b["llm_monolithic"] == 1
     assert b["link_hop"] >= 1
 
@@ -155,6 +156,6 @@ def test_compute_budget_cold_rotates() -> None:
     P.confidence.cold_run_count = 2
     b2 = compute_budget(P(), is_cold=True)
     # Each cold-rotation cycle picks one tier:
-    assert b0["llm_targeted"] == 1 and b0["llm_monolithic"] == 0
-    assert b1["llm_targeted"] == 0 and b1["llm_monolithic"] == 0 and b1["link_hop"] >= 1
-    assert b2["llm_targeted"] == 0 and b2["llm_monolithic"] == 1
+    assert b0["llm_api_calls"] == 1 and b0["llm_monolithic"] == 0
+    assert b1["llm_api_calls"] == 0 and b1["llm_monolithic"] == 0 and b1["link_hop"] >= 1
+    assert b2["llm_api_calls"] == 0 and b2["llm_monolithic"] == 1
