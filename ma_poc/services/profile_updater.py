@@ -83,32 +83,50 @@ def update_profile_blocklist(
 def save_llm_field_mapping(
     profile: ScrapeProfile,
     mapping_dict: dict,
-) -> None:
+) -> bool:
     """Save an LLM-generated field mapping to the profile for future replay.
 
-    If a mapping for the same URL pattern already exists, updates it and
-    increments success_count. Caps at _MAX_LLM_FIELD_MAPPINGS.
+    Returns True on save/upsert, False on rejection. Never raises.
+
+    If a mapping for the same URL pattern already exists, updates it.
+    NOTE: success_count is NOT incremented here — this is the "save" path.
+    success_count belongs to the replay path in the adapter cascade.
+    Caps at _MAX_LLM_FIELD_MAPPINGS.
     """
     url_pattern = mapping_dict.get("api_url_pattern", "")
     if not url_pattern:
-        return
+        log.warning(
+            "save_llm_field_mapping: dropped mapping with empty api_url_pattern (paths=%d)",
+            len(mapping_dict.get("json_paths") or {}),
+        )
+        return False
+
+    json_paths = mapping_dict.get("json_paths") or {}
+    if not json_paths:
+        log.warning(
+            "save_llm_field_mapping: dropped mapping with empty json_paths for url=%s",
+            url_pattern[:80],
+        )
+        return False
 
     for existing in profile.api_hints.llm_field_mappings:
         if existing.api_url_pattern == url_pattern:
-            existing.json_paths = mapping_dict.get("json_paths", existing.json_paths)
+            existing.json_paths = json_paths
             existing.response_envelope = mapping_dict.get("response_envelope", existing.response_envelope)
-            existing.success_count += 1
-            return
+            # NOTE: success_count is NOT incremented here. This is the
+            # "re-save" path. success_count belongs to the REPLAY path.
+            return True
 
     profile.api_hints.llm_field_mappings.append(
         LlmFieldMapping(
             api_url_pattern=url_pattern,
-            json_paths=mapping_dict.get("json_paths", {}),
+            json_paths=json_paths,
             response_envelope=mapping_dict.get("response_envelope", ""),
         )
     )
     if len(profile.api_hints.llm_field_mappings) > _MAX_LLM_FIELD_MAPPINGS:
         profile.api_hints.llm_field_mappings = profile.api_hints.llm_field_mappings[-_MAX_LLM_FIELD_MAPPINGS:]
+    return True
 
 
 def update_rescue_counter(profile: ScrapeProfile, rescue_succeeded: bool) -> ScrapeProfile:
@@ -147,7 +165,25 @@ def update_profile_after_extraction(
     store: ProfileStore,
 ) -> ScrapeProfile:
     """Update profile based on what worked during this scrape."""
-    tier = scrape_result.get("extraction_tier_used")
+    tier = scrape_result.get("extraction_tier_used") or ""
+
+    # Phase 1: monotonic stats — never go backward
+    profile.stats.total_scrapes += 1
+    profile.stats.last_tier_used = tier or None
+    profile.stats.last_unit_count = units_extracted
+
+    if units_extracted > 0 and tier and tier != "FAILED":
+        profile.stats.total_successes += 1
+    else:
+        profile.stats.total_failures += 1
+
+    # LLM cost accounting (_llm_interactions is attached by scraper.py)
+    llm_interactions = scrape_result.get("_llm_interactions") or []
+    if llm_interactions:
+        profile.stats.total_llm_calls += len(llm_interactions)
+        profile.stats.total_llm_cost_usd += sum(
+            i.get("cost_usd", 0.0) for i in llm_interactions
+        )
 
     # Record success/failure streak
     if units_extracted > 0 and tier and tier != "FAILED":

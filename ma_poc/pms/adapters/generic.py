@@ -552,6 +552,13 @@ class GenericAdapter:
                                 if units:
                                     replayed_units.extend(units)
                                     result.api_responses.append(resp)
+                                    # Phase 1: increment success_count on the
+                                    # mapping that was actually used.
+                                    if hasattr(mapping, "success_count"):
+                                        try:
+                                            mapping.success_count += 1
+                                        except Exception:
+                                            pass
                                     break
             if replayed_units:
                 _log_attempt(
