@@ -324,7 +324,10 @@ def compute_budget(profile: Any, is_cold: bool) -> dict:
     each time it makes an LLM call.
 
     HOT/WARM: 3 API LLM probes + 1 DOM LLM probe + 1 monolithic + 3 link-hops.
-    COLD: rotates by cold_run_count to vary the failing path each retry.
+    COLD: rotates by cold_run_count to vary the API/monolithic/link-hop path each
+    retry, but always keeps 1 DOM-LLM probe available — that tier is the only
+    extractor that works on marketing/boutique-CMS sites without API or JSON-LD,
+    and gating it caused a -15pp success-rate regression in May 2026.
     """
     if not is_cold:
         return {
@@ -340,7 +343,7 @@ def compute_budget(profile: Any, is_cold: bool) -> dict:
     except Exception:
         n = 0
     if n % 3 == 0:
-        return {"llm_api_calls": 1, "llm_dom_calls": 0, "llm_monolithic": 0, "link_hop": 1}
+        return {"llm_api_calls": 1, "llm_dom_calls": 1, "llm_monolithic": 0, "link_hop": 1}
     if n % 3 == 1:
-        return {"llm_api_calls": 0, "llm_dom_calls": 0, "llm_monolithic": 0, "link_hop": 3}
-    return {"llm_api_calls": 0, "llm_dom_calls": 0, "llm_monolithic": 1, "link_hop": 1}
+        return {"llm_api_calls": 0, "llm_dom_calls": 1, "llm_monolithic": 0, "link_hop": 3}
+    return {"llm_api_calls": 0, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 1}
