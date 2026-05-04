@@ -48,8 +48,15 @@ COPY --chown=pwuser:pwuser ma_poc/ ./ma_poc/
 # without re-running the verifier locally. Runs as root so the artifact
 # inherits the COPY ownership; verifier itself is read-only on the inputs.
 # Failure here is fatal — a bad mapping should fail the build, not ship.
+#
+# validate_deployment.py runs immediately after to confirm the artifact
+# is non-null, the FloorplanCatalog loads with ≥1 000 indexed properties,
+# all four prompt templates are present with the {known_floor_plans}
+# placeholder intact, and the modules wired into scrape_jugnu still
+# import cleanly under the runtime venv. Any failure exits the build.
 RUN python -m ma_poc.scripts.verify_csv_mapping \
- && chown pwuser:pwuser /app/ma_poc/config/csv_floorplan_mapping.json
+ && chown pwuser:pwuser /app/ma_poc/config/csv_floorplan_mapping.json \
+ && python -m ma_poc.scripts.validate_deployment
 
 USER pwuser
 

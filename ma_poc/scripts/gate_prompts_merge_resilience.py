@@ -68,6 +68,11 @@ PHASES: tuple[Phase, ...] = (
             "ma_poc/tests/reporting/test_concessions_report.py",
         ),
     ),
+    Phase(
+        label="Phase 8 — Deploy-time validator",
+        invariants=("H6",),
+        selectors=("ma_poc/tests/scripts/test_validate_deployment.py",),
+    ),
 )
 
 

@@ -4,8 +4,8 @@ Covers H4 (fallback), H5 (direct-before-vanity ordering), H6 (cache hit
 skips resolve), H11 (writer + reader present), H12 (best-effort write),
 H13 (no overwrite on failure).
 
-Mocks at the ``ma_poc.pms.rentcafe_direct.{resolve_property_id, fetch_direct}``
-boundary — the real httpx is never invoked.
+Mocks at the ``ma_poc.pms.rentcafe_direct.runner_dispatch.{resolve_property_id,
+fetch_direct}`` boundary — the real httpx is never invoked.
 """
 
 from __future__ import annotations

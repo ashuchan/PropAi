@@ -52,6 +52,7 @@ RENTCAFE_PERMITTED: frozenset[str] = frozenset(
         "ma_poc/pms/rentcafe_direct/__init__.py",
         "ma_poc/pms/rentcafe_direct/propertyid_resolver.py",
         "ma_poc/pms/rentcafe_direct/fetcher.py",
+        "ma_poc/pms/rentcafe_direct/runner_dispatch.py",
         "ma_poc/scripts/diagnostics/tls_vs_ip_diagnostic.py",
         "ma_poc/scripts/smoke_rentcafe_direct.py",
         "ma_poc/scripts/jugnu_runner.py",
