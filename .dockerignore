@@ -65,8 +65,13 @@ ma_poc/services/*.lock
 
 # Data files in config/ — loaded at runtime from Postgres/GCS or via the
 # sync-csv deploy step. Small YAML/JSON config (business_rules, api_catalogue,
-# prompts/) stays; bulk CSVs do not.
+# prompts/) stays; bulk CSVs do not — except the two CSVs the build itself
+# needs: verify_csv_mapping.py + validate_deployment.py read these at image
+# build time to produce csv_floorplan_mapping.json and assert the catalog
+# loads with ≥1 000 indexed properties, so they have to be in the context.
 ma_poc/config/*.csv
+!ma_poc/config/Floorplan- comparisons.csv
+!ma_poc/config/properties.csv
 
 # Misc large/irrelevant-to-runtime dirs under ma_poc/
 ma_poc/output/
