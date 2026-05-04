@@ -79,6 +79,135 @@ def test_jsonld_empty_html_returns_empty() -> None:
     assert extract_jsonld_from_html("<html></html>", "https://example.com/") == []
 
 
+# ── Container-with-multi-Offer patterns (added 2026-05) ─────────────────────
+# 368 of 689 still-failing properties in the May 2026 canary had JSON-LD blocks
+# present but used a Place / LocalBusiness / Product / RealEstateListing /
+# ApartmentComplex container with an offers[] array, which the original parser
+# only matched as Apartment-with-offers and missed.
+
+
+def test_jsonld_place_with_multi_offer_array() -> None:
+    """schema.org/Place with offers[] of length >= 2 emits one unit per Offer."""
+    html = """<html><script type="application/ld+json">
+    {"@type":"Place","name":"The Park",
+     "offers":[
+       {"@type":"Offer","name":"1BR","price":1850,
+        "itemOffered":{"@type":"Apartment","numberOfRooms":1,"floorSize":{"value":700}}},
+       {"@type":"Offer","name":"2BR","price":2450,
+        "itemOffered":{"@type":"Apartment","numberOfRooms":2,"floorSize":{"value":1000}}},
+       {"@type":"Offer","name":"3BR","price":3200,
+        "itemOffered":{"@type":"Apartment","numberOfRooms":3,"floorSize":{"value":1400}}}
+    ]}</script></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/")
+    assert len(units) == 3
+    assert {u["floor_plan_name"] for u in units} == {"1BR", "2BR", "3BR"}
+    assert {u["rent_range"] for u in units} == {"$1,850", "$2,450", "$3,200"}
+
+
+def test_jsonld_localbusiness_offers_with_low_high_price() -> None:
+    html = """<html><script type="application/ld+json">
+    {"@type":"LocalBusiness","name":"Apt Co",
+     "offers":[
+       {"@type":"Offer","lowPrice":1500,"highPrice":1700,"name":"Studio"},
+       {"@type":"Offer","lowPrice":1800,"highPrice":2100,"name":"1BR"}
+    ]}</script></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/")
+    assert len(units) == 2
+    rents = {u["rent_range"] for u in units}
+    assert "$1,500 - $1,700" in rents and "$1,800 - $2,100" in rents
+
+
+def test_jsonld_product_offers_with_itemoffered() -> None:
+    html = """<html><script type="application/ld+json">
+    {"@type":"Product","name":"Property",
+     "offers":[
+       {"@type":"Offer","price":2200,"itemOffered":{"name":"Plan A","numberOfRooms":1}},
+       {"@type":"Offer","price":2800,"itemOffered":{"name":"Plan B","numberOfRooms":2}}
+    ]}</script></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/")
+    assert len(units) == 2
+
+
+def test_jsonld_realestatelisting_makesoffer() -> None:
+    """``makesOffer`` is the schema.org alternate key for RealEstateListing."""
+    html = """<html><script type="application/ld+json">
+    {"@type":"RealEstateListing","name":"Listing",
+     "makesOffer":[
+       {"@type":"Offer","price":1800,"name":"Unit 101"},
+       {"@type":"Offer","price":1900,"name":"Unit 102"}
+    ]}</script></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/")
+    assert len(units) == 2
+
+
+def test_jsonld_apartment_complex_with_multi_offer_array() -> None:
+    """ApartmentComplex with offers[] of length >= 2 — historically suppressed
+    pass 2 by emitting a single fake aggregate unit. New code defers to pass 2.
+    """
+    html = """<html><script type="application/ld+json">
+    {"@type":"ApartmentComplex","name":"Test",
+     "offers":[
+       {"@type":"Offer","price":1500,"name":"Studio"},
+       {"@type":"Offer","price":1800,"name":"1BR"},
+       {"@type":"Offer","price":2200,"name":"2BR"}
+    ]}</script></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/")
+    assert len(units) == 3
+
+
+def test_jsonld_container_offers_in_graph_wrapper() -> None:
+    """``@graph`` wrapper used by sites built with Yoast / generic SEO tools."""
+    html = """<html><script type="application/ld+json">
+    {"@graph":[
+      {"@type":"Place","name":"X",
+       "offers":[
+         {"@type":"Offer","price":1500,"name":"A"},
+         {"@type":"Offer","price":1900,"name":"B"}
+      ]}
+    ]}</script></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/")
+    assert len(units) == 2
+
+
+def test_jsonld_container_pass2_skipped_when_pass1_finds_units() -> None:
+    """When BOTH Apartment AND Place-with-offers exist, the Apartment wins
+    (pass 1) and pass 2 is suppressed — avoids double-counting the same units.
+    """
+    html = """<html><script type="application/ld+json">
+    {"@type":"Place","name":"X",
+     "offers":[
+       {"@type":"Offer","price":1500,"name":"A"},
+       {"@type":"Offer","price":1900,"name":"B"}
+     ],
+     "containsPlace":{"@type":"Apartment","name":"Apt 1",
+                      "numberOfRooms":1,"offers":{"price":1700}}}
+    </script></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/")
+    assert len(units) == 1
+    assert units[0]["floor_plan_name"] == "Apt 1"
+
+
+def test_jsonld_container_single_offer_skipped() -> None:
+    """One-Offer container is property-level pricing, not a unit list."""
+    html = """<html><script type="application/ld+json">
+    {"@type":"Place","name":"X",
+     "offers":[{"@type":"Offer","price":1500,"name":"P"}]}
+    </script></html>"""
+    assert extract_jsonld_from_html(html, "https://example.com/") == []
+
+
+def test_jsonld_container_identical_offers_skipped() -> None:
+    """Distinguishing-fields guard: identical offers don't qualify as units."""
+    html = """<html><script type="application/ld+json">
+    {"@type":"Place","name":"X",
+     "offers":[
+       {"@type":"Offer","price":1500,"name":"P"},
+       {"@type":"Offer","price":1500,"name":"P"},
+       {"@type":"Offer","price":1500,"name":"P"}
+    ]}</script></html>"""
+    assert extract_jsonld_from_html(html, "https://example.com/") == []
+
+
 # ── Embedded JSON / SSR globals ──────────────────────────────────────────────
 
 

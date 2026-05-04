@@ -35,16 +35,34 @@ def test_h1_compute_budget_hot_profile_gets_full_budget() -> None:
 def test_h1_compute_budget_cold_rotates_by_run_count() -> None:
     """COLD budget must rotate based on cold_run_count."""
     p = ScrapeProfile(canonical_id="phase_h_003")
-    p.confidence.cold_run_count = 1  # n % 3 == 1: monolithic=0, targeted=0, link_hop=3
+    p.confidence.cold_run_count = 1  # n % 3 == 1: api=0, monolithic=0, dom=1, link_hop=3
     budget = compute_budget(p, is_cold=True)
     assert budget["llm_api_calls"] == 0
     assert budget["llm_monolithic"] == 0
     assert budget["link_hop"] == 3
 
-    p.confidence.cold_run_count = 2  # n % 3 == 2: api_calls=0, monolithic=1, link_hop=1
+    p.confidence.cold_run_count = 2  # n % 3 == 2: api=0, monolithic=1, dom=1, link_hop=1
     budget = compute_budget(p, is_cold=True)
     assert budget["llm_api_calls"] == 0
     assert budget["llm_monolithic"] == 1
+
+
+def test_h1_compute_budget_cold_always_keeps_dom_llm() -> None:
+    """COLD rotations must always keep llm_dom_calls >= 1.
+
+    The targeted-DOM-LLM tier is the only extractor that works on
+    marketing/boutique-CMS sites without API responses or JSON-LD. Gating
+    it for COLD profiles produced a -15pp success regression in May 2026
+    (commit c19bc86 / PR #23). Pin the invariant so it can't recur.
+    """
+    p = ScrapeProfile(canonical_id="phase_h_dom_invariant")
+    for cnt in (0, 1, 2, 3, 4, 5):
+        p.confidence.cold_run_count = cnt
+        budget = compute_budget(p, is_cold=True)
+        assert budget["llm_dom_calls"] >= 1, (
+            f"cold_run_count={cnt} dropped llm_dom_calls to "
+            f"{budget['llm_dom_calls']} — see source_planner.compute_budget"
+        )
 
 
 def _get_adapter_context():
