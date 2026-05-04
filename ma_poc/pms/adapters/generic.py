@@ -1357,23 +1357,51 @@ class GenericAdapter:
         # means the site shape drifted (or the data lives on a sub-page);
         # the LLM can sometimes recover from the home-page HTML that's
         # right there in front of us.
-        # PMS deny-list for the gate relaxation. RentCafe is excluded because
-        # the 2026-04-19 run relaxed the gate 39× for RentCafe properties
-        # (75% NO_DATA rate) but produced zero recovered units — RentCafe
-        # has a structured Tier-1 API and when our parser misses, throwing
-        # LLM at the home-page HTML doesn't recover the data; the rent lives
-        # behind a sub-page or in an API our parser didn't capture. Fix the
-        # parser, don't burn LLM budget. Add other PMSes here if the same
-        # signature appears (high relax count, zero recovered units).
-        _LLM_GATE_RELAX_DENY = {"rentcafe"}
+        #
+        # 2026-05 batch-3 relaxation (no deny-list, broader signal match):
+        # The previous deny-list excluded rentcafe and the trigger required
+        # ``$NNN`` formatted rent signals which many marketing sites don't
+        # emit. Investigation of 924 still-failing properties showed ~110
+        # entrata-detected sites where Tier-1 captured nothing AND LLM was
+        # gated off — so those sites had no fallback. We now relax the gate
+        # whenever:
+        #   • known-PMS adapter returned empty (skip_llm is True), AND
+        #   • page body has >= 3KB of visible text (any reasonable HTML page)
+        # Cost is bounded by the per-property LLM budget (3 API + 1 DOM + 1
+        # mono = 5 calls max), so worst-case impact is ~$0.05/property.
+        _RENT_KEYWORDS = (
+            "$",
+            "rent",
+            "/mo",
+            "/month",
+            "bedroom",
+            "studio",
+            "sqft",
+            "sq. ft",
+            "sq ft",
+            "floor plan",
+            "floorplan",
+            "available",
+        )
 
-        if skip_llm and html and ctx.detected.pms not in _LLM_GATE_RELAX_DENY:
+        if skip_llm and html:
             try:
                 _text = _re_strip_script.sub("", html)
                 _text = _re_strip_tag.sub(" ", _text)
-                _rent_hits = len(_re_rent.findall(html))
+                _text_lower = _text.lower()
                 _text_bytes = len(_text.encode("utf-8", errors="ignore"))
-                if _text_bytes >= 5000 and _rent_hits >= 1:
+                _rent_hits = len(_re_rent.findall(html))
+                _kw_hits = sum(1 for kw in _RENT_KEYWORDS if kw in _text_lower)
+
+                # Two relaxation triggers (any one suffices):
+                #   strict — body >= 5KB AND >= 1 dollar-formatted rent signal
+                #            (preserves original behavior — known-good cases)
+                #   broad  — body >= 3KB AND >= 2 rent-related keywords
+                #            (catches marketing sites with non-dollar pricing)
+                strict_match = _text_bytes >= 5000 and _rent_hits >= 1
+                broad_match = _text_bytes >= 3000 and _kw_hits >= 2
+
+                if strict_match or broad_match:
                     try:
                         from ma_poc.observability.events import EventKind
                         from ma_poc.observability.events import emit as _gate_emit
@@ -1384,7 +1412,12 @@ class GenericAdapter:
                             detected_pms=ctx.detected.pms,
                             text_bytes=_text_bytes,
                             rent_signals=_rent_hits,
-                            reason="detected_adapter_empty_html_has_signals",
+                            keyword_hits=_kw_hits,
+                            reason=(
+                                "detected_adapter_empty_strict"
+                                if strict_match
+                                else "detected_adapter_empty_broad_keywords"
+                            ),
                         )
                     except Exception:
                         pass
