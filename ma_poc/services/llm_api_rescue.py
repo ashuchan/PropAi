@@ -311,16 +311,64 @@ async def _call_llm(prompt: str, property_id: str) -> tuple[dict, float, str]:
     deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
 
     if not endpoint or not api_key:
-        # Attempt to reuse the existing LLM client from llm_extractor
+        # No Azure credentials → delegate to the configured provider
+        # (OpenRouter / Anthropic / etc.) via the shared text provider.
+        # This is the path that fires under the production env where
+        # LLM_PROVIDER=openrouter and AZURE_OPENAI_* are unset.
         try:
-            from ma_poc.services.llm_extractor import _call_azure_llm  # type: ignore[attr-defined]
-
-            raw, cost = await _call_azure_llm(prompt, property_id)
-            parsed = _parse_json_response(raw)
-            return parsed, cost, raw
+            from llm.factory import get_text_provider
+            from llm.interaction_logger import make_interaction
         except Exception as exc:
-            log.warning("llm_api_rescue: no Azure credentials and _call_azure_llm unavailable: %s", exc)
+            log.warning("llm_api_rescue: text provider unavailable: %s", exc)
             return {}, 0.0, ""
+
+        system = "You are a real estate data extraction agent. Return ONLY valid JSON. No markdown, no commentary."
+        for attempt in range(2):
+            try:
+                provider = get_text_provider()
+            except Exception as exc:
+                log.warning("llm_api_rescue: get_text_provider failed for %s: %s", property_id, exc)
+                return {}, 0.0, ""
+            current_prompt = prompt
+            if attempt == 1:
+                current_prompt += "\nReturn ONLY a valid JSON object. No prose, no markdown."
+            try:
+                raw = await provider.complete(system, current_prompt, max_tokens=4096)
+            except Exception as exc:
+                log.warning("llm_api_rescue: shared LLM call failed for %s: %s", property_id, exc)
+                return {}, 0.0, ""
+            usage = getattr(provider, "_last_usage", {}) or {}
+            try:
+                interaction = make_interaction(
+                    property_id=property_id,
+                    tier="TIER_6_LLM_RESCUE",
+                    call_type="text",
+                    provider=str(usage.get("provider", "unknown")),
+                    model=str(usage.get("model", "unknown")),
+                    system_prompt=system,
+                    user_prompt=current_prompt,
+                    raw_response=raw,
+                    tokens_input=int(usage.get("input_tokens", 0)),
+                    tokens_output=int(usage.get("output_tokens", 0)),
+                    latency_ms=0,
+                    timestamp="",
+                    success=True,
+                    error=None,
+                )
+                cost = float((interaction or {}).get("cost_usd", 0.0))
+            except Exception:
+                cost = 0.0
+            try:
+                parsed = _parse_json_response(raw)
+                return parsed, cost, raw
+            except json.JSONDecodeError as exc:
+                log.warning(
+                    "llm_api_rescue: JSON decode error (attempt %d) for %s: %s",
+                    attempt + 1, property_id, exc,
+                )
+                if attempt == 1:
+                    return {}, cost, raw
+        return {}, 0.0, ""
 
     for attempt in range(2):
         current_prompt = prompt

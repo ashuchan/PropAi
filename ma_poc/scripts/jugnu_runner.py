@@ -303,7 +303,16 @@ async def run_jugnu(
         except Exception as exc:
             log.warning("LLM run summary write failed: %s", exc)
 
-    # Run-level reporting
+    # Run-level reporting. Flush the event ledger first so events.jsonl
+    # contains every fetch.bot_blocked / fetch.captcha_detected emitted
+    # this run — the run report scans that file to produce the
+    # bot_blocked_properties.json artifact.
+    try:
+        ledger = getattr(events, "_ledger", None)
+        if ledger is not None:
+            ledger.flush()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("event ledger flush before reporting failed: %s", exc)
     cost_rollup = cost_ledger.total()
     slo_violations = slo_check(cost_rollup, merged_properties)
     report = build_run_report(merged_properties, run_dir, today, cost_rollup, slo_violations)

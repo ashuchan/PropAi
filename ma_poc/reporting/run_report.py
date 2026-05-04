@@ -16,6 +16,61 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 
+# Event kinds we use to classify failures. Source of truth:
+# ma_poc/observability/events.py.
+_BOT_KINDS = frozenset({"fetch.bot_blocked"})
+_CAPTCHA_KINDS = frozenset({"fetch.captcha_detected"})
+
+
+def _scan_event_ledger(
+    run_dir: Path,
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Read events.jsonl and return (bot_blocked_by_pid, captcha_by_pid).
+
+    Each value is keyed by property_id and holds the first-seen event
+    payload (url, attempt, ts, etc.) for downstream reporting. Returns
+    empty dicts when the ledger is missing or unreadable — never raises.
+    """
+    bot: dict[str, dict[str, Any]] = {}
+    captcha: dict[str, dict[str, Any]] = {}
+    events_path = run_dir / "events.jsonl"
+    if not events_path.exists():
+        return bot, captcha
+    try:
+        for line in events_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                evt = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            kind = evt.get("kind")
+            pid = evt.get("property_id")
+            if not pid:
+                continue
+            if kind in _BOT_KINDS and pid not in bot:
+                bot[pid] = {
+                    "property_id": pid,
+                    "url": evt.get("url"),
+                    "attempt": evt.get("attempt"),
+                    "ts": evt.get("ts"),
+                    "kind": kind,
+                }
+            elif kind in _CAPTCHA_KINDS and pid not in captcha:
+                captcha[pid] = {
+                    "property_id": pid,
+                    "url": evt.get("url"),
+                    "provider": evt.get("provider"),
+                    "attempt": evt.get("attempt"),
+                    "ts": evt.get("ts"),
+                    "kind": kind,
+                }
+    except Exception as exc:  # noqa: BLE001
+        log.warning("run_report: failed to scan event ledger %s: %s", events_path, exc)
+    return bot, captcha
+
+
 def build(
     properties: list[dict[str, Any]],
     run_dir: Path,
@@ -81,15 +136,32 @@ def build(
         else:
             real_tier_counts[tier] += count
 
-    # Map fetch-outcome short-circuit tiers to descriptive keys
+    # ── Authoritative bot/captcha classification from the event ledger ─────
+    # The verdict-string heuristic below is best-effort — the events.jsonl
+    # ledger is the source of truth for fetch outcomes. We use it to (a)
+    # produce a per-property list of bot/captcha-blocked properties, and (b)
+    # classify pre-extraction terminations precisely instead of dumping
+    # everything into "fetch_other".
+    bot_blocked_by_pid, captcha_by_pid = _scan_event_ledger(run_dir)
+
+    # Map fetch-outcome short-circuit tiers to descriptive keys.
     pre_extraction_terminations: dict[str, int] = {}
     for tier, _count in pre_extraction.items():
         if tier == "generic:no_body_short_circuit":
-            # Distribute across fetch outcome types by inspecting property _metas
+            # Distribute across fetch outcome types by inspecting property
+            # _metas + the event ledger. Event-ledger classification wins
+            # over verdict strings when both are present.
             for p in properties:
                 meta = p.get("_meta", {}) or {}
+                pid = str(meta.get("property_id") or p.get("property_id") or "")
                 err = " ".join(meta.get("errors", []) + (p.get("errors") or []))
-                if "TRANSIENT" in err:
+                if pid and pid in bot_blocked_by_pid:
+                    pre_extraction_terminations.setdefault("fetch_bot_blocked", 0)
+                    pre_extraction_terminations["fetch_bot_blocked"] += 1
+                elif pid and pid in captcha_by_pid:
+                    pre_extraction_terminations.setdefault("fetch_captcha_detected", 0)
+                    pre_extraction_terminations["fetch_captcha_detected"] += 1
+                elif "TRANSIENT" in err:
                     pre_extraction_terminations.setdefault("fetch_transient", 0)
                     pre_extraction_terminations["fetch_transient"] += 1
                 elif "HARD_FAIL" in err:
@@ -98,9 +170,15 @@ def build(
                 elif "BOT_BLOCKED" in err or "bot_blocked" in err.lower():
                     pre_extraction_terminations.setdefault("fetch_bot_blocked", 0)
                     pre_extraction_terminations["fetch_bot_blocked"] += 1
+                elif "CAPTCHA" in err.upper():
+                    pre_extraction_terminations.setdefault("fetch_captcha_detected", 0)
+                    pre_extraction_terminations["fetch_captcha_detected"] += 1
                 else:
                     pre_extraction_terminations.setdefault("fetch_other", 0)
                     pre_extraction_terminations["fetch_other"] += 1
+
+    bot_blocked_list = sorted(bot_blocked_by_pid.values(), key=lambda r: r["property_id"])
+    captcha_list = sorted(captcha_by_pid.values(), key=lambda r: r["property_id"])
 
     report = {
         "run_date": run_date,
@@ -115,6 +193,17 @@ def build(
         # F7: no_body_short_circuit removed — moved to pre_extraction_terminations
         "tier_distribution": dict(real_tier_counts.most_common()),
         "pre_extraction_terminations": pre_extraction_terminations,
+        # 2026-05-04: bot/captcha summaries at run-level. Full per-property
+        # detail is also written to bot_blocked_properties.json so the
+        # operator can grep / re-shard without parsing report.json.
+        "fetch_bot_blocked": {
+            "count": len(bot_blocked_list),
+            "property_ids": [r["property_id"] for r in bot_blocked_list],
+        },
+        "fetch_captcha_detected": {
+            "count": len(captcha_list),
+            "property_ids": [r["property_id"] for r in captcha_list],
+        },
         # F4: fields that are tracked in the schema but not currently extracted
         "non_extracted_fields": [
             "lease_term",
@@ -130,6 +219,19 @@ def build(
             {"name": v.name, "threshold": v.threshold, "observed": v.observed} for v in (slo_violations or [])
         ],
     }
+
+    # Standalone artifact: full per-property detail for blocked properties.
+    # This is the file the user asked for ("a separate list of all
+    # properties getting blocked due to bot or captcha"). Written even
+    # when the lists are empty so consumers can rely on its existence.
+    blocked_path = run_dir / "bot_blocked_properties.json"
+    blocked_payload = {
+        "run_date": run_date,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "bot_blocked": bot_blocked_list,
+        "captcha_detected": captcha_list,
+    }
+    blocked_path.write_text(json.dumps(blocked_payload, indent=2, default=str), encoding="utf-8")
 
     # Write JSON
     json_path = run_dir / "report.json"
@@ -155,6 +257,36 @@ def build(
     ]
     for tier, count in tier_counts.most_common():
         md_lines.append(f"| {tier} | {count} |")
+
+    md_lines.extend(
+        [
+            "",
+            "## Bot / CAPTCHA Blocked",
+            "",
+            f"- Bot-blocked properties: {len(bot_blocked_list)}",
+            f"- CAPTCHA-detected properties: {len(captcha_list)}",
+        ]
+    )
+    if bot_blocked_list:
+        md_lines.extend(
+            [
+                "",
+                "### Bot-blocked property IDs",
+                "",
+            ]
+        )
+        for r in bot_blocked_list:
+            md_lines.append(f"- {r['property_id']} — {r.get('url') or '(no url)'}")
+    if captcha_list:
+        md_lines.extend(
+            [
+                "",
+                "### CAPTCHA-detected property IDs",
+                "",
+            ]
+        )
+        for r in captcha_list:
+            md_lines.append(f"- {r['property_id']} — {r.get('url') or '(no url)'}")
 
     md_lines.extend(
         [

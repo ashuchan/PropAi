@@ -65,11 +65,15 @@ class RetryPolicy:
             return RetryDecision(should_retry=True, wait_ms=wait_ms, rotate_identity=False)
 
         if outcome == FetchOutcome.BOT_BLOCKED:
-            # Retry once with identity rotation
-            if attempt >= 2:
-                return RetryDecision(should_retry=False, wait_ms=0, rotate_identity=False)
-            wait_ms = self._jittered_backoff(attempt)
-            return RetryDecision(should_retry=True, wait_ms=wait_ms, rotate_identity=True)
+            # Do NOT retry on bot-block. The 2026-05-03 prod analysis showed
+            # 64% of fetches bot-blocked; retrying with rotated identity
+            # against a burned proxy pool just inflates per-property latency
+            # to the 4h Cloud Run task timeout without recovering data.
+            # When the pool is healthy we'll get OK on attempt 1; when it's
+            # not, attempt 2 won't help. Surface the block immediately so
+            # the property lands in the bot-blocked bucket of the run report
+            # and the operator can decide whether to rotate proxies.
+            return RetryDecision(should_retry=False, wait_ms=0, rotate_identity=False)
 
         if outcome == FetchOutcome.PROXY_ERROR:
             # Retry up to 2 times with fresh proxy

@@ -33,11 +33,14 @@ def test_retry_rate_limited_honours_retry_after() -> None:
     assert decision.wait_ms == 3000
 
 
-def test_retry_bot_blocked_rotates_identity() -> None:
+def test_retry_bot_blocked_does_not_retry() -> None:
+    # 2026-05-04: bot-block retries are disabled. Retrying with rotated
+    # identity against a burned proxy pool just inflates per-property
+    # latency to the 4h Cloud Run task timeout without recovering data.
     policy = RetryPolicy()
     decision = policy.decide(FetchOutcome.BOT_BLOCKED, 1)
-    assert decision.should_retry is True
-    assert decision.rotate_identity is True
+    assert decision.should_retry is False
+    assert decision.rotate_identity is False
 
 
 def test_retry_proxy_error_rotates_proxy_twice() -> None:

@@ -94,12 +94,14 @@ class UnitRow(Base):
     __tablename__ = "units"
 
     canonical_id: Mapped[str] = mapped_column(String(256), primary_key=True)
-    unit_id: Mapped[str] = mapped_column(String(256), primary_key=True)
+    unit_id: Mapped[str] = mapped_column(String(512), primary_key=True)
 
     # ── V2 data fields ──────────────────────────────────────────────────
     beds: Mapped[int | None] = mapped_column(Integer)
     baths: Mapped[float | None] = mapped_column(Float)
-    floor_plan_name: Mapped[str | None] = mapped_column(String(256))
+    # LLM-extracted floor plan names can be marketing copy ("The Grand Vista
+    # at Sunset Ridge — 1 Bed Den"); 256 chars overflowed in production.
+    floor_plan_name: Mapped[str | None] = mapped_column(String(1024))
     area: Mapped[int | None] = mapped_column(Integer)
     rent_low: Mapped[float | None] = mapped_column(Float)
     rent_high: Mapped[float | None] = mapped_column(Float)

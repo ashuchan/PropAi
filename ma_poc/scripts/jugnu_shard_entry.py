@@ -310,11 +310,46 @@ def main() -> None:
     finally:
         _upload_artifacts(bucket_name, run_date, task_idx, schema_version)
 
-    # Propagate either failure to Cloud Run. A sync failure is a shard
-    # failure (the DB is the destination of record). A runner failure is
-    # a shard failure (some properties didn't scrape). Either way the
-    # retry job (jugnu-retry) should pick this shard back up.
-    sys.exit(runner_exit or sync_exit)
+    # Cloud Run task exit policy (2026-05-04):
+    #
+    # The runner returns 1 whenever ANY property fails — which is every
+    # real 500-property shard, every day. Propagating that to Cloud Run
+    # marked the task as failed in the dashboard despite shards having
+    # produced and uploaded valid output. The canary observed exactly
+    # this: "Run complete: 24/87 succeeded" was followed by exit(1) and
+    # an X marker on the execution.
+    #
+    # New rule: a shard is FAILED only if the work itself didn't land —
+    #   • runner crashed before writing properties.json, OR
+    #   • PG sync raised an unhandled exception (data not durable).
+    # Per-property scrape failures are signalled via run_report.json,
+    # SLO violations, and the bot_blocked_properties.json artifact —
+    # not via Cloud Run task status. Operators see the same information,
+    # but the dashboard now reflects infra health, not data-quality
+    # health (which has its own dashboards).
+    run_dir = _resolve_run_dir(schema_version, run_date)
+    properties_json = run_dir / "properties.json"
+    runner_produced_output = properties_json.exists()
+
+    if not runner_produced_output:
+        print(
+            f"[shard_entry] runner did not produce {properties_json}; exiting 1",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if sync_exit != 0:
+        print(
+            "[shard_entry] PG sync failed — data not durable; exiting 1",
+            file=sys.stderr,
+        )
+        sys.exit(sync_exit)
+    if runner_exit != 0:
+        print(
+            f"[shard_entry] runner exited {runner_exit} but {properties_json} was written and synced; "
+            "treating as task SUCCESS (per-property failures are reported in run_report.json)",
+            file=sys.stderr,
+        )
+    sys.exit(0)
 
 
 if __name__ == "__main__":
