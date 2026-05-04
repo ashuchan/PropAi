@@ -82,6 +82,35 @@ def _coverage_for(properties_path: Path, candidate: str, floorplan_ids: set[str]
     return Coverage(candidate, matched, total, len(floorplan_ids))
 
 
+def _list_unmatched(
+    properties_csv: Path,
+    chosen_field: str,
+    floorplan_ids: set[str],
+) -> tuple[list[dict[str, str]], list[str]]:
+    """Return (properties_without_floorplan_match, floorplan_ids_unused).
+
+    First list: rows from ``properties_csv`` whose ``chosen_field`` value is
+    missing from the floor-plan CSV. Second list: floor-plan apartmentids
+    that don't appear in the property roster — these are the only
+    candidates an operator could re-bind the unmatched properties to.
+    """
+    unmatched_props: list[dict[str, str]] = []
+    used_ids: set[str] = set()
+    with properties_csv.open("r", encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        for row in reader:
+            v = (row.get(chosen_field) or "").strip()
+            if not v:
+                unmatched_props.append(dict(row))
+                continue
+            if v in floorplan_ids:
+                used_ids.add(v)
+            else:
+                unmatched_props.append(dict(row))
+    unused_ids = sorted(floorplan_ids - used_ids)
+    return unmatched_props, unused_ids
+
+
 def verify(
     floorplan_csv: Path = _FLOORPLAN_CSV,
     properties_csv: Path = _PROPERTIES_CSV,
@@ -98,7 +127,14 @@ def verify(
             "candidates": [<Coverage as dict>, ...],
             "min_coverage": float,
             "floorplan_apartmentids_total": int,
+            "unmatched_properties": [{<row>}, ...],
+            "floorplan_ids_unused_in_roster": [<id>, ...],
         }
+
+    The two trailing lists let an operator reconcile the long tail manually.
+    The floor-plan CSV does not carry name/address columns, so a name+address
+    fallback is not possible from the file alone — these lists are the
+    actionable handoff for a human pass.
     """
     if not floorplan_csv.exists():
         raise FileNotFoundError(f"Floor-plan CSV not found at {floorplan_csv}")
@@ -115,6 +151,13 @@ def verify(
         if cov.ratio >= min_coverage:
             chosen = cov
             break
+
+    unmatched_props: list[dict[str, str]] = []
+    unused_fp_ids: list[str] = []
+    if chosen is not None:
+        unmatched_props, unused_fp_ids = _list_unmatched(
+            properties_csv, chosen.field, floorplan_ids
+        )
 
     payload = {
         "chosen_field": chosen.field if chosen is not None else None,
@@ -139,6 +182,8 @@ def verify(
         ],
         "min_coverage": min_coverage,
         "floorplan_apartmentids_total": len(floorplan_ids),
+        "unmatched_properties": unmatched_props,
+        "floorplan_ids_unused_in_roster": unused_fp_ids,
     }
 
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

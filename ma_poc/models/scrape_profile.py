@@ -180,6 +180,12 @@ class ApiHints(BaseModel):
     field_patches: list[FieldPatch] = Field(default_factory=list)
     # Phase 11
     source_observations: list[SourceObservation] = Field(default_factory=list)
+    # F6 (rentcafe_direct) — cached RentCafe propertyId. Set by the
+    # profile_updater after a successful direct-path fetch; read by
+    # jugnu_runner to skip the resolver call on subsequent runs (H6
+    # cache hit). ``None`` means "not yet resolved" — the runner will
+    # call resolve_property_id once and persist the result.
+    rentcafe_property_id: str | None = None
 
     @field_validator("blocked_endpoints", mode="before")
     @classmethod

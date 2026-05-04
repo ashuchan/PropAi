@@ -1,0 +1,91 @@
+{
+  "chosen_field": "apartmentid",
+  "coverage": {
+    "field": "apartmentid",
+    "matched": 4978,
+    "total": 4982,
+    "ratio": 0.9992
+  },
+  "candidates": [
+    {
+      "field": "apartmentid",
+      "matched": 4978,
+      "total": 4982,
+      "ratio": 0.9992
+    },
+    {
+      "field": "Property ID",
+      "matched": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    {
+      "field": "Unique ID",
+      "matched": 0,
+      "total": 0,
+      "ratio": 0.0
+    }
+  ],
+  "min_coverage": 0.9,
+  "floorplan_apartmentids_total": 4998,
+  "unmatched_properties": [
+    {
+      "apartmentid": "278928",
+      "name": "The Grant",
+      "address": "2718 N 118th St",
+      "city": "Omaha",
+      "state": "NE",
+      "zip": "68164",
+      "website": "https://thegrantomaha.com/"
+    },
+    {
+      "apartmentid": "253381",
+      "name": "Felix",
+      "address": "420 Mendocino Ave",
+      "city": "Santa Rosa",
+      "state": "CA",
+      "zip": "95401",
+      "website": "https://www.felixliving.com/"
+    },
+    {
+      "apartmentid": "293735",
+      "name": "Pelican Crossing",
+      "address": "311 Hope Bird Ln",
+      "city": "Longs",
+      "state": "SC",
+      "zip": "29568",
+      "website": "https://pelicancrossingapartments.com/"
+    },
+    {
+      "apartmentid": "310522",
+      "name": "Market Stations Apartments",
+      "address": "5515 West Market St",
+      "city": "Greensboro",
+      "state": "NC",
+      "zip": "27409",
+      "website": "https://marketstationapartmentsnc.com/"
+    }
+  ],
+  "floorplan_ids_unused_in_roster": [
+    "254683",
+    "254703",
+    "254733",
+    "254739",
+    "254762",
+    "258512",
+    "258561",
+    "258580",
+    "258953",
+    "258962",
+    "271933",
+    "272185",
+    "272329",
+    "272788",
+    "283962",
+    "284505",
+    "301783",
+    "302739",
+    "302781",
+    "303128"
+  ]
+}

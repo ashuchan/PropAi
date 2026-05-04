@@ -1,0 +1,16 @@
+# Phase A defaults. Phase B replaces these with RealPage business rules.
+occupancy_inference_rule: 1
+move_in_lag_days: 14
+availability_reappearance_window_days: 7
+
+# Confidence thresholds
+extraction_confidence_threshold: 0.7
+vision_fallback_confidence_threshold: 0.6
+
+# Schedule
+stabilised_scrape_times_local: ["02:00"]   # 1× daily, property-local TZ
+lease_up_scrape_times_local: ["08:00", "12:00", "16:00", "20:00"]
+lease_up_scrape_window_local: ["08:00", "21:00"]
+
+# Change-detection
+forced_full_scrape_after_days: 7

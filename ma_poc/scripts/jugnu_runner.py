@@ -332,6 +332,26 @@ async def run_jugnu(
     return report
 
 
+async def _try_rentcafe_direct(
+    task: Any,
+    profile: Any,
+    csv_row: dict[str, Any] | None,
+) -> tuple[Any, str | None]:
+    """F6 — thin wrapper that delegates to the dispatch helper.
+
+    Lives here so the H11 reader-check sees the symbol in
+    ``jugnu_runner.py``. The actual logic lives in
+    :func:`ma_poc.pms.rentcafe_direct.runner_dispatch.try_rentcafe_direct`
+    so it can be tested without importing ``jugnu_runner`` (which would
+    trigger ``dotenv.load_dotenv()`` and pollute env vars).
+    """
+    from ma_poc.pms.rentcafe_direct.runner_dispatch import (
+        try_rentcafe_direct as _impl,
+    )
+
+    return await _impl(task, profile, csv_row)
+
+
 async def _process_property(
     task: Any,
     cost_ledger: Any,
@@ -362,8 +382,53 @@ async def _process_property(
     from ma_poc.reporting.verdict import compute as compute_verdict
     from ma_poc.validation.orchestrator import validate
 
-    # L1: Fetch
-    fetch_result = await jugnu_fetch(task)
+    # F6 — RentCafe direct-path dispatch (H4, H5, H6).
+    # Strategy: when the profile says this is a RentCafe property and
+    # we either have a cached propertyId or can resolve one, fetch the
+    # centralized aggregator API directly and synthesize a FetchResult
+    # so the existing scrape_jugnu pipeline + RentCafeAdapter parses
+    # the body unchanged (H7). Any failure path falls through to the
+    # vanity-domain L1 fetch — H4 invariant.
+    fetch_result = None
+    rc_direct_property_id: str | None = None
+
+    profile_for_dispatch = None
+    try:
+        profile_for_dispatch = profile_store.get_profile(task.property_id)
+    except Exception:
+        profile_for_dispatch = None
+
+    api_provider = ""
+    if profile_for_dispatch is not None:
+        try:
+            api_provider = (
+                profile_for_dispatch.api_hints.api_provider or ""
+            ).lower()
+        except Exception:
+            api_provider = ""
+
+    if api_provider == "rentcafe":
+        try:
+            fetch_result, rc_direct_property_id = await _try_rentcafe_direct(
+                task=task,
+                profile=profile_for_dispatch,
+                csv_row=csv_row,
+            )
+        except Exception as exc:
+            log.warning(
+                "rentcafe_direct dispatch failed for %s: %s — falling back",
+                task.property_id,
+                exc,
+            )
+            fetch_result = None
+            rc_direct_property_id = None
+
+    # H4 — unconditional vanity-domain fallback. Runs whenever the
+    # direct path didn't produce a usable result (any failure tier or
+    # routing skip).
+    if fetch_result is None:
+        # L1: Fetch
+        fetch_result = await jugnu_fetch(task)
     frontier.mark_attempt(task.url, fetch_result.outcome)
 
     # Check carry-forward need
@@ -407,6 +472,13 @@ async def _process_property(
         profile=profile,
         csv_row=csv_row,
     )
+
+    # F6 (H6/H11) — surface the propertyId we used (resolved or cached)
+    # so the profile_updater can persist it. Read by
+    # update_profile_after_extraction; only written there when the tier
+    # is one of the two RentCafe-direct success codes — H13.
+    if rc_direct_property_id is not None:
+        result["_rentcafe_property_id"] = rc_direct_property_id
 
     # ── Profile self-learning loop ────────────────────────────────────
     # After every scrape, update what the profile knows: winning URL,

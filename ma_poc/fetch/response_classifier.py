@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import ssl
+from collections.abc import Mapping
 from socket import gaierror
 
 from .block_signatures import match_block_signature
@@ -22,6 +23,58 @@ log = logging.getLogger(__name__)
 
 # Exceptions that indicate DNS resolution failure
 _DNS_ERRORS = (gaierror, OSError)
+
+# F3 — Cloudflare-edge response markers. ``server: cloudflare`` is the
+# canonical marker; ``cf-ray`` / ``cf-mitigated`` / ``cf-cache-status``
+# show up on edge-served responses even when the origin server header is
+# masked. Used by ``_is_silent_block`` to upgrade a 403 with no useful
+# body to BOT_BLOCKED so tier escalation fires.
+_CLOUDFLARE_HEADER_TOKENS: tuple[str, ...] = ("cf-ray", "cf-mitigated", "cf-cache-status")
+
+# Body length below which a 403 is considered "silent" (no login form,
+# no error page text, no CAPTCHA markup — just an empty or near-empty
+# wall). Set at 64 bytes which comfortably below any real login wall
+# but above the few-byte responses some edge services return.
+_SILENT_BLOCK_BODY_THRESHOLD = 64
+
+
+def _has_cloudflare_signature(headers: Mapping[str, str] | None) -> bool:
+    """True if *headers* show a Cloudflare-edge response.
+
+    Case-insensitive on both keys and the ``server`` value. Empty or
+    None headers return False.
+    """
+    if not headers:
+        return False
+    lower = {k.lower(): v for k, v in headers.items()}
+    if lower.get("server", "").lower() == "cloudflare":
+        return True
+    return any(t in lower for t in _CLOUDFLARE_HEADER_TOKENS)
+
+
+def _is_silent_block(
+    status_code: int | None,
+    headers: Mapping[str, str] | None,
+    body: bytes | str | None,
+) -> bool:
+    """A 403 with empty/short body OR Cloudflare-header signature is a silent bot block.
+
+    Discriminator (H14): legitimate 403 login walls have substantive
+    body content and no Cloudflare header — they fall through and get
+    classified as plain HTTP_403. Only ``status_code == 403`` triggers
+    this path; non-403 statuses are handled elsewhere.
+    """
+    if status_code != 403:
+        return False
+    if _has_cloudflare_signature(headers):
+        return True
+    if body is None:
+        return True
+    if isinstance(body, bytes):
+        return len(body) < _SILENT_BLOCK_BODY_THRESHOLD
+    # str body — strip whitespace before measuring so a body of "   "
+    # counts as silent.
+    return len(body.strip()) < _SILENT_BLOCK_BODY_THRESHOLD
 
 # Playwright's TimeoutError is its own hierarchy: playwright._impl._errors.Error
 # → Exception. It does NOT inherit from asyncio.TimeoutError or the builtin
@@ -91,6 +144,14 @@ def classify(
         if is_captcha:
             sig = "CF_CHALLENGE" if provider == "cloudflare" else f"CAPTCHA_{(provider or 'unknown').upper()}"
             return FetchOutcome.BOT_BLOCKED, sig
+        # F3 — silent-403 / Cloudflare-header detection BEFORE the generic
+        # HTTP_403 fallthrough. Silent blocks (empty body or CF headers)
+        # carry the BOT_BLOCKED signature so escalation reports + telemetry
+        # can distinguish them from substantive 403s (login walls etc.).
+        # Run AFTER ``_looks_like_captcha`` so 200-status interstitials are
+        # still classified as their CAPTCHA variant.
+        if _is_silent_block(status, headers, body_head):
+            return FetchOutcome.BOT_BLOCKED, "BOT_BLOCKED"
         # All 403s are bot-blocked — use match_block_signature at call site
         return FetchOutcome.BOT_BLOCKED, "HTTP_403"
 

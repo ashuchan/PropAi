@@ -1,0 +1,40 @@
+{
+  "data": [
+    {
+      "propertyId": "2001011",
+      "floorplanId": "ht-A1",
+      "floorplanName": "1 Bed A",
+      "beds": 1,
+      "baths": "1",
+      "minimumSQFT": "650",
+      "maximumSQFT": "650",
+      "minimumRent": "1599.00",
+      "maximumRent": "1599.00",
+      "min_price": 1599,
+      "max_price": 1599,
+      "availableUnitsCount": "1",
+      "availableDate": "2026-05-10",
+      "api": "rentcafe",
+      "availabilityURL": "https://highviewterrace.securecafe.com/onlineleasing/highview-terrace/availabilities.aspx",
+      "hasSpecials": false
+    },
+    {
+      "propertyId": "2001011",
+      "floorplanId": "ht-B2",
+      "floorplanName": "2 Bed Townhome",
+      "beds": 2,
+      "baths": "2.5",
+      "minimumSQFT": "1250",
+      "maximumSQFT": "1350",
+      "minimumRent": "2399.00",
+      "maximumRent": "2599.00",
+      "min_price": 2399,
+      "max_price": 2599,
+      "availableUnitsCount": "2",
+      "availableDate": "2026-07-01",
+      "api": "rentcafe",
+      "availabilityURL": "https://highviewterrace.securecafe.com/onlineleasing/highview-terrace/availabilities.aspx",
+      "hasSpecials": true
+    }
+  ]
+}

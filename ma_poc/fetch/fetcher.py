@@ -32,10 +32,50 @@ from .conditional import ConditionalCache
 from .contracts import FetchOutcome, FetchResult, RenderMode
 from .proxy_pool import ProxyPool
 from .rate_limiter import HostRateLimiter
-from .response_classifier import classify
+from .response_classifier import (
+    _has_cloudflare_signature,
+    _is_silent_block,
+    classify,
+)
 from .retry_policy import RetryPolicy
 from .robots import RobotsConsumer
 from .stealth import Identity, IdentityPool
+
+
+# F3 — re-exported so the spec-aligned test path
+# (tests/fetch/test_silent_403_classification.py) imports them from
+# ma_poc.fetch.fetcher. Single source of truth still lives in
+# response_classifier.py.
+__all__ = [
+    "Fetcher",
+    "FetchOutcome",
+    "_classify_fetch_outcome",
+    "_has_cloudflare_signature",
+    "_is_silent_block",
+    "get_default_fetcher",
+]
+
+
+def _classify_fetch_outcome(
+    status_code: int | None,
+    headers: dict[str, str] | None,
+    body: bytes | str | None,
+    error: Exception | None,
+) -> tuple[FetchOutcome, str | None]:
+    """F3 — thin wrapper around ``classify`` for the silent-403 test path.
+
+    Differs from ``classify`` only in argument order/naming so the spec
+    test reads naturally. ``body`` may be the full response body (str or
+    bytes) — the underlying classifier only inspects the head.
+    """
+    head: bytes | None
+    if isinstance(body, bytes):
+        head = body[:4096]
+    elif isinstance(body, str):
+        head = body[:4096].encode("utf-8", errors="replace")
+    else:
+        head = None
+    return classify(status_code, headers or {}, head, exception=error)
 
 _MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
 _DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")

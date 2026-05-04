@@ -1,0 +1,11 @@
+{
+  "property_name": "Hampshire Village",
+  "city": "San Francisco",
+  "state": "CA",
+  "zip": "94107",
+  "pmc": "ExampleManagement",
+  "expected_property_id": "1782238",
+  "capture_url": "https://www.rentcafe.com/wp-json/middleware/v1/getFloorplans/?propertyId%5B%5D=1782238",
+  "expected_unit_count": 3,
+  "notes": "Synthetic fixture modeled on the Brookfield/Continental schema documented in adapters/rentcafe.py. Used by H7 shape-equivalence test."
+}

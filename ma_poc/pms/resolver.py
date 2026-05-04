@@ -10,12 +10,46 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
+from urllib.parse import urlparse
 
 from ma_poc.pms.adapters.registry import all_adapters
 from ma_poc.pms.detector import DetectedPMS, detect_pms
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
+
+
+# Path-blacklist regex: URLs whose path matches are dropped before the
+# resolver hands them to a CTA hop. Single source of truth (H1 — F1
+# spec) — extend the alternation here, never start a parallel list.
+#
+# - tour / scheduletour / contact / apply / book — generic CTAs that
+#   trigger reCAPTCHA on most PMSes.
+# - /listings/rental_applications/ — AppFolio's tenant-application form
+#   path (added 2026-05-04 — eliminated a 10-property reCAPTCHA cluster
+#   in the production run analysis).
+_BLACKLISTED_PATH_RE = re.compile(
+    r"/(scheduletour|scheduleatour|schedule-tour|tour|contact|apply|book)/?(?:$|[?#])"
+    r"|/listings/rental_applications/",
+    re.IGNORECASE,
+)
+
+
+def is_blacklisted_path(url: str) -> bool:
+    """True if *url*'s path is on the resolver path blacklist.
+
+    Matching is case-insensitive and scoped to the URL path (query
+    string and fragment ignored). Non-URL inputs return False.
+    """
+    if not url:
+        return False
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    path = parsed.path or ""
+    return bool(_BLACKLISTED_PATH_RE.search(path))
+
 
 # Anchor text patterns suggesting links to availability/leasing pages.
 # Ported from scripts/entrata.py _AVAILABILITY_ANCHOR_RE.

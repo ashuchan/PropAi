@@ -1,0 +1,40 @@
+{
+  "Result": [
+    {
+      "PropertyId": "3050022",
+      "FloorplanId": "WC-S1",
+      "FloorplanName": "Studio Loft",
+      "Beds": 0,
+      "Baths": "1",
+      "MinimumSQFT": "480",
+      "MaximumSQFT": "510",
+      "MinimumRent": "1899.00",
+      "MaximumRent": "1949.00",
+      "Min_price": 1899,
+      "Max_price": 1949,
+      "AvailableUnitsCount": "4",
+      "AvailableDate": "2026-05-20",
+      "Api": "RentCafe",
+      "AvailabilityURL": "https://windsorprop.securecafe.com/onlineleasing/windsor-prop/availabilities.aspx",
+      "HasSpecials": false
+    },
+    {
+      "PropertyId": "3050022",
+      "FloorplanId": "WC-A2",
+      "FloorplanName": "1 Bed Premium",
+      "Beds": 1,
+      "Baths": "1",
+      "MinimumSQFT": "780",
+      "MaximumSQFT": "820",
+      "MinimumRent": "2499.00",
+      "MaximumRent": "2699.00",
+      "Min_price": 2499,
+      "Max_price": 2699,
+      "AvailableUnitsCount": "6",
+      "AvailableDate": "2026-06-05",
+      "Api": "RentCafe",
+      "AvailabilityURL": "https://windsorprop.securecafe.com/onlineleasing/windsor-prop/availabilities.aspx",
+      "HasSpecials": true
+    }
+  ]
+}

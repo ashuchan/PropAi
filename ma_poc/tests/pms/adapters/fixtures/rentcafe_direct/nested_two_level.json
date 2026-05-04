@@ -1,0 +1,60 @@
+{
+  "response": {
+    "result": [
+      {
+        "propertyId": "4000301",
+        "floorplanId": "fp-201",
+        "floorplanName": "1 Bed Garden",
+        "beds": 1,
+        "baths": "1",
+        "minimumSQFT": "700",
+        "maximumSQFT": "725",
+        "minimumRent": "1450.00",
+        "maximumRent": "1525.00",
+        "min_price": 1450,
+        "max_price": 1525,
+        "availableUnitsCount": "3",
+        "availableDate": "2026-05-25",
+        "api": "rentcafe",
+        "availabilityURL": "https://example.securecafe.com/onlineleasing/example/availabilities.aspx",
+        "hasSpecials": false
+      },
+      {
+        "propertyId": "4000301",
+        "floorplanId": "fp-202",
+        "floorplanName": "2 Bed Garden",
+        "beds": 2,
+        "baths": "1.5",
+        "minimumSQFT": "950",
+        "maximumSQFT": "1000",
+        "minimumRent": "1899.00",
+        "maximumRent": "1999.00",
+        "min_price": 1899,
+        "max_price": 1999,
+        "availableUnitsCount": "4",
+        "availableDate": "2026-06-12",
+        "api": "rentcafe",
+        "availabilityURL": "https://example.securecafe.com/onlineleasing/example/availabilities.aspx",
+        "hasSpecials": false
+      },
+      {
+        "propertyId": "4000301",
+        "floorplanId": "fp-203",
+        "floorplanName": "3 Bed Townhome",
+        "beds": 3,
+        "baths": "2.5",
+        "minimumSQFT": "1400",
+        "maximumSQFT": "1450",
+        "minimumRent": "2599.00",
+        "maximumRent": "2799.00",
+        "min_price": 2599,
+        "max_price": 2799,
+        "availableUnitsCount": "1",
+        "availableDate": "2026-08-01",
+        "api": "rentcafe",
+        "availabilityURL": "https://example.securecafe.com/onlineleasing/example/availabilities.aspx",
+        "hasSpecials": true
+      }
+    ]
+  }
+}

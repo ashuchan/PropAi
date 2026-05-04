@@ -1,0 +1,11 @@
+{
+  "property_name": "Windsor Premier Loft",
+  "city": "Boston",
+  "state": "MA",
+  "zip": "02110",
+  "pmc": "Windsor Communities",
+  "expected_property_id": "3050022",
+  "capture_url": "https://www.rentcafe.com/wp-json/middleware/v1/getFloorplans/?propertyId%5B%5D=3050022",
+  "expected_unit_count": 2,
+  "notes": "PascalCase keys (FloorplanName, MinimumRent, etc.) and 'Result' wrapper — exercises _normalise_item lowercasing and the 2026-04-19 fix in adapters/rentcafe.py."
+}

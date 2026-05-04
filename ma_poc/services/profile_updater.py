@@ -520,6 +520,28 @@ def update_profile_after_extraction(
     else:
         profile.confidence.cold_run_count = 0
 
+    # F6 — persist a successfully-used RentCafe propertyId so the next
+    # run skips resolver. Best-effort (H12); never raises. Only writes
+    # when the direct path actually produced units (H13: a failed direct
+    # fetch must NOT overwrite a previously-good id). The runner
+    # signals success by stashing the id under
+    # ``scrape_result["_rentcafe_property_id"]`` and stamping the tier
+    # as one of the two success codes.
+    try:
+        pid = scrape_result.get("_rentcafe_property_id")
+        rc_tier = scrape_result.get("extraction_tier_used", "")
+        if (
+            pid
+            and rc_tier
+            in (
+                "TIER_1_API_RENTCAFE_DIRECT",
+                "TIER_1_API_RENTCAFE_DIRECT_LIST_EMPTY",
+            )
+        ):
+            profile.api_hints.rentcafe_property_id = str(pid)
+    except Exception as exc:
+        log.warning("failed to persist rentcafe_property_id: %s", exc)
+
     profile.updated_at = datetime.utcnow()
     profile.version += 1
     store.save(profile)

@@ -13,8 +13,9 @@ Real payloads inspected (from data/runs/*/raw_api/):
 Key findings:
   - API endpoint: /api/v1/community_info/, /api/v1/community_extra_info/,
     /api/v3/tokens/lists/ — these return property-level metadata only
-  - AppFolio listing pages typically embed unit data in HTML or use
-    /listings/rental_applications endpoint for individual unit detail
+  - AppFolio listing pages typically embed unit data in HTML or use the
+    tenant-application form endpoint under /listings/ for individual unit
+    detail (path is on the resolver blacklist — see ma_poc/pms/resolver.py)
   - Response envelope: {meta: {limit, total_count, offset}, objects: [...]}
   - Unit ID field: not available in captured community-level APIs
   - Rent field(s): not available in community-level responses; unit pages have price in HTML

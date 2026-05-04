@@ -1,0 +1,12 @@
+{
+  "_comment": "Built by scripts/build_api_catalogue.py during Week 1 against 50 seed properties. Phase A starts with these well-known PMS API URL patterns; the discovery script appends per-property entries.",
+  "patterns": [
+    {"id": "rentcafe-availability", "pms": "rentcafe", "url_regex": "/(api|RENTCafeApi)/.*(availability|floorplans|units|pricing)", "method": "GET", "content_type_regex": "application/json"},
+    {"id": "entrata-units",         "pms": "entrata",  "url_regex": "/(api|services)/.*(units|availability|pricing|floorplans)", "method": "GET", "content_type_regex": "application/json"},
+    {"id": "appfolio-listings",     "pms": "appfolio", "url_regex": "/listings.*\\.json", "method": "GET", "content_type_regex": "application/json"},
+    {"id": "generic-api",           "pms": "generic",  "url_regex": "/api/.*(availability|floorplans|units|apartments|pricing)", "method": "GET", "content_type_regex": "application/json"}
+  ],
+  "required_fields": ["unit_number", "asking_rent", "availability_status"],
+  "preferred_fields": ["sqft", "floor_plan_type"],
+  "discovered": {}
+}
