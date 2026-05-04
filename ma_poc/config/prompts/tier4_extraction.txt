@@ -12,6 +12,8 @@ Use the property context to disambiguate — e.g. a floor-plan name like
 "Mark-Taylor Studio" likely reflects the PMC branding, and city/state
 help validate whether an extracted address snippet matches this property.
 
+{known_floor_plans}
+
 CONTENT TO ANALYZE:
 {content_type}: (HTML or API JSON or both — see below)
 
@@ -27,6 +29,7 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
     {
       "unit_id": "string or null",
       "floor_plan_name": "string or null",
+      "floor_plan_source": "page_label | section_heading | url_slug | inferred | null",
       "bedrooms": number_or_null,
       "bathrooms": number_or_null,
       "sqft": number_or_null,
@@ -34,11 +37,17 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
       "market_rent_high": number_or_null,
       "available_date": "YYYY-MM-DD or null",
       "availability_status": "AVAILABLE|UNAVAILABLE|WAITLIST|UNKNOWN",
+      "availability_count": number_or_null,
       "lease_term": number_or_null,
       "move_in_date": "YYYY-MM-DD or null",
+      "amenities": [],
+      "concession_text": "string or null",
+      "concession_value": number_or_null,
+      "concession_source": "strikethrough_dom | api_field | description_text | specials_section | null",
       "confidence": 0.0-1.0
     }
   ],
+  "property_amenities": [],
   "profile_hints": {
     "api_urls_with_data": ["URLs from the API JSON that contained unit data"],
     "json_paths": {"rent": "$.path.to.rent", "unit_id": "$.path.to.id"},
@@ -55,14 +64,149 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
   }
 }
 
-RULES:
+PER-FIELD INSTRUCTIONS — read carefully before extracting.
+
+unit_number / unit_id  (string | null, OPTIONAL)
+  WHAT:  The real apartment/unit number from the page (e.g. "412", "B-7", "2C").
+  WHERE: A column header "Unit"/"Apt", a tile heading, or the first cell of an
+         availability row. In APIs, fields like unit_number, unitNumber,
+         unit_id, name, label, id (only when clearly a unit identifier).
+  DO:    Copy the literal page value.
+  DON'T: Fabricate. Don't return CSS class strings ("Left", "right", "more").
+         Don't return floor-plan names here — those go in floor_plan_name.
+         If the page only lists floor plans without unit numbers, return null.
+
+floor_plan_name  (string | null, REQUIRED for every record)
+  WHAT:  Human-readable name of the floor plan (e.g. "The Aspen", "1BR Loft").
+  WHERE: Heading on the floor-plan card, the page section title, or the URL
+         slug when nothing else is labelled. KNOWN FLOOR PLANS list above
+         (when populated) is the canonical name set for this property.
+  DO:    Prefer the canonical name from the KNOWN FLOOR PLANS list when the
+         unit's beds + baths + sqft clearly match one of those plans.
+         Otherwise use the page's literal label.
+  DON'T: Copy a name from the KNOWN FLOOR PLANS list onto a unit whose beds,
+         baths, or sqft do not match. Don't return CMS module identifiers
+         (MODULE_*, "Lease Magnet", "Pop-Up", "Gravity FORMS").
+         Never "guess if unsure" — fall back to a section heading or URL
+         slug instead and tag the source accordingly.
+
+floor_plan_source  (enum, REQUIRED when floor_plan_name is non-null)
+  Set to one of:
+    - "page_label"      : the name appears as an explicit label on the page
+    - "section_heading" : derived from the surrounding section/heading
+    - "url_slug"        : derived from the page URL path
+    - "inferred"        : reconstructed from context with no direct label
+    - null              : when floor_plan_name itself is null
+
+bedrooms / beds  (integer | null)
+  WHAT:  Bedroom count.
+  DO:    Studio / efficiency = 0. Loft = whatever the listing says
+         (often 0 or 1). Whole numbers only.
+  DON'T: Combine bedrooms + dens into a single field; if the page lists "2BR
+         + Den", record bedrooms=2 (the den is not a bedroom).
+
+bathrooms / baths  (number | null)
+  WHAT:  Bathroom count, including half-baths as 0.5 (e.g. 1.5, 2.5).
+
+sqft  (integer | null)
+  WHAT:  Interior square footage of the unit.
+  DO:    Strip commas and units. "1,250 sqft" → 1250.
+  DON'T: Round, average, or output a range. If a range is shown, leave null
+         and note this in field_mapping_notes.
+
+market_rent_low / market_rent_high  (number | null)
+  WHAT:  Asking rent in USD per month.
+  DO:    For ranges like "$1,200 - $1,500" set low=1200, high=1500.
+         For a flat rent set both to the same value.
+  DON'T: Include security deposits, application fees, or per-bedroom prices.
+
+available_date  (YYYY-MM-DD or null)
+  WHAT:  Date the unit becomes available.
+  DO:    Use the literal date from the page when shown.
+         "Available now" / "Now" / "Immediate" → today's date.
+  DON'T: Default to today when the page says nothing — leave null.
+
+availability_status  (enum)
+  AVAILABLE | UNAVAILABLE | WAITLIST | UNKNOWN. Default UNKNOWN when the page
+  is silent.
+
+availability_count  (integer | null)
+  WHAT:  When the page shows "N available" for a floor plan rather than
+         listing N individual unit rows, set this to N and emit ONE record
+         per floor plan.
+  DON'T: Fabricate per-unit records to inflate the unit count. If the page
+         lists each unit explicitly, leave availability_count null and emit
+         one record per unit row.
+
+lease_term / move_in_date
+  Optional. Extract when explicit on the page; never infer.
+
+amenities  (array of lowercase strings, may be empty)
+  See the AMENITIES block below.
+
+concession_text / concession_value / concession_source
+  See the CONCESSIONS block below.
+
+property_amenities  (array, top-level)
+  Aggregated, deduplicated, lowercased amenities for the property as a whole.
+
+confidence  (0.0–1.0)
+  1.0 = certain, 0.7 = likely correct, <0.5 = guessing.
+
+AMENITIES (observation-only — extract if present, do not fabricate)
+  WHAT:  Property-level common facilities — pool, fitness center, dog park,
+         pet friendly, parking, EV charging, business center, package room,
+         clubhouse, in-unit washer/dryer, balcony, etc.
+  WHERE: Often a separate section labelled "Amenities", "Features", or
+         "Community" — sometimes a navigation tab, footer block, or icon
+         grid. In API responses, may appear as `amenities`, `features`,
+         `community_features`, `unit_features`, or similar — at root level
+         or nested under a unit/floorplan object. Sometimes lives behind a
+         separate API call.
+  DO:    Return as a flat array of strings, normalized to lowercase
+         ("swimming pool", not "Swimming Pool"). Include both unit-level
+         and community-level amenities — do not try to separate them.
+         Aggregate the union into property_amenities at the top level.
+  DON'T: Fabricate. Don't include marketing copy ("Live your best life!").
+         Don't include addresses, phone numbers, or office hours. If the
+         page has no amenity content, return [].
+
+CONCESSIONS (observation-only — extract if present, do not fabricate)
+  WHAT:  Discounts or promotions on rent. Examples:
+         - "1 month free on a 13-month lease"
+         - "$500 off first month"
+         - "Look-and-lease special: $1,000 off"
+         - Strikethrough rent in DOM (e.g., <s>$1,800</s> $1,650)
+         - API field `concession`, `discount`, `promotion`, `special`.
+  WHERE: Often near the rent display, in a banner or callout box, in the
+         floor-plan card description, in the property's general description,
+         or as a dedicated "Specials" section. In APIs, may be a structured
+         object with `amount`, `months`, `description` fields, or just a
+         freeform text field.
+  DO:    Set concession_text to the human-readable description, verbatim
+         from the page when possible.
+         Set concession_value to the numeric dollar value if extractable
+         (e.g., "$500 off" → 500; "1 month free" with rent $2,000 → 2000;
+         15% off → null because we need the rent context).
+         Apply concessions at the property or floor-plan level, not the
+         unit level, unless the page explicitly differentiates.
+         Set concession_source to one of:
+           - "strikethrough_dom"  : strike-through pricing in the DOM
+           - "api_field"          : explicit field in an API response
+           - "description_text"   : prose mention in a description
+           - "specials_section"   : dedicated specials/promotions section
+  DON'T: Fabricate. Don't infer concessions from rent-range bottom anchors.
+         If no concession is mentioned, all three concession fields are null.
+
+GENERAL RULES:
 - Extract ALL available units, not just a sample.
-- If data is floor-plan-level (not unit-level), extract floor plans.
-- For rent ranges like "$1,200 - $1,500", set market_rent_low=1200, market_rent_high=1500.
-- For CSS selectors: prefer class-based selectors over nth-child or positional selectors.
-- confidence: 1.0 = certain, 0.7 = likely correct, <0.5 = guessing.
+- If data is floor-plan-level (not unit-level), extract floor plans and use
+  availability_count for the per-plan count.
+- For CSS selectors: prefer class-based selectors over nth-child or positional
+  selectors.
 - If no units are found on THIS content but you can see a link/button pointing
   to where unit data lives (e.g. "Floor Plans" tab, "See Availability" button,
   portal iframe), put that URL path in "navigation_hint". The caller will
   follow it and re-run extraction there.
-- If no units are found, return {"units": [], "profile_hints": {...}} with notes explaining why.
+- If no units are found, return {"units": [], "property_amenities": [],
+  "profile_hints": {...}} with notes explaining why.

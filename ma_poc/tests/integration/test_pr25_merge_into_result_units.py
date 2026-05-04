@@ -57,29 +57,37 @@ def test_merge_rank2_blocks_when_beds_mismatch() -> None:
     assert result[1]["beds"] == 2
 
 
-def test_merge_rank3_fuzzy_by_beds_baths_sqft() -> None:
-    """Rank 3: sqft 752 and 748 bucket to the same 100-sqft bucket → fuzzy match fires."""
+def test_merge_strict_sqft_does_not_fuzzy_match() -> None:
+    """H2 (CLAUDE_PROMPTS_MERGE_RESILIENCE): sqft is strict equality at every
+    rung — no buckets, no thresholds. 752 and 748 do NOT merge under R1b.
+
+    Replaces the old R3 fuzzy-bucket test, which encoded the pre-H2
+    behaviour. The spec explicitly removes that bucket.
+    """
     existing = [{"beds": 1, "baths": 1, "sqft": 752, "rent_low": 1400}]
     incoming = [{"beds": 1, "baths": 1, "sqft": 748, "available_date": "2026-07-01"}]
     result = _merge_into_result_units(existing, incoming)
 
-    # 752 // 100 = 7, 748 // 100 = 7 → same bucket → fuzzy match
-    assert len(result) == 1, "same sqft bucket must fuzzy-match and merge"
-    assert result[0]["rent_low"] == 1400
-    assert result[0]["available_date"] == "2026-07-01"
+    assert len(result) == 2, "different sqft must not merge — H2 strict equality"
 
 
-def test_merge_field_union_preserves_both_sides() -> None:
-    """Existing wins on tie (field is not None); new fields from incoming are additive."""
+def test_merge_mutable_field_latest_wins_for_rent() -> None:
+    """H9: rent_low is mutable — incoming overwrites existing on conflict.
+
+    Replaces the old "existing wins on tie" test, which encoded the
+    pre-H9 fill-when-missing semantics for *all* fields. Under H9,
+    physical fields keep existing on conflict but mutable fields
+    (rent, availability, concessions) take the latest extracted value.
+    """
     existing = [{"unit_id": "U1", "rent_low": 9999}]
     incoming = [{"unit_id": "U1", "rent_low": 1500, "sqft": 800}]
     result = _merge_into_result_units(existing, incoming)
 
     assert len(result) == 1
-    # Existing non-null value must NOT be overwritten
-    assert result[0]["rent_low"] == 9999, "existing non-null field must not be overwritten"
-    # New field from incoming must be added
-    assert result[0]["sqft"] == 800, "new field from incoming must be appended"
+    # H9: rent_low (mutable) → latest wins.
+    assert result[0]["rent_low"] == 1500, "rent_low is mutable; latest must win (H9)"
+    # New field from incoming still gets added.
+    assert result[0]["sqft"] == 800
 
 
 def test_merge_no_match_appends() -> None:

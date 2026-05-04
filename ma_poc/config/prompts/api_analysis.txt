@@ -9,6 +9,8 @@ PROPERTY CONTEXT:
 
 API URL: {api_url}
 
+{known_floor_plans}
+
 JSON RESPONSE:
 ---
 {api_response_json}
@@ -38,13 +40,18 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
     "sqft": "key name for square footage",
     "available_date": "key name for availability date",
     "availability_status": "key name for availability status",
+    "availability_count": "key name for per-floor-plan unit count (or null)",
     "lease_term": "key name for lease length in months (or null)",
-    "move_in_date": "key name for move-in date (or null)"
+    "move_in_date": "key name for move-in date (or null)",
+    "amenities": "key name for amenity list (or null)",
+    "concession_text": "key name for concession/promo text (or null)",
+    "concession_value": "key name for concession dollar value (or null)"
   },
   "units": [
     {
       "unit_id": "string or null",
       "floor_plan_name": "string or null",
+      "floor_plan_source": "page_label | section_heading | url_slug | inferred | null",
       "bedrooms": number_or_null,
       "bathrooms": number_or_null,
       "sqft": number_or_null,
@@ -52,25 +59,111 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
       "market_rent_high": number_or_null,
       "available_date": "YYYY-MM-DD or null",
       "availability_status": "AVAILABLE|UNAVAILABLE|WAITLIST|UNKNOWN",
+      "availability_count": number_or_null,
       "lease_term": number_or_null,
       "move_in_date": "YYYY-MM-DD or null",
+      "amenities": [],
+      "concession_text": "string or null",
+      "concession_value": number_or_null,
+      "concession_source": "strikethrough_dom | api_field | description_text | specials_section | null",
       "confidence": 0.0-1.0
     }
-  ]
+  ],
+  "property_amenities": []
 }
 
-RULES:
+PER-FIELD INSTRUCTIONS — read carefully before extracting.
+
+unit_id  (string | null, OPTIONAL)
+  WHAT:  The literal unit/apartment number from the API response.
+  WHERE: Fields like unit_number, unitNumber, unit_id, id, name, label, when
+         the value is a real apartment identifier.
+  DON'T: Confuse with floorplan IDs, property IDs, or numeric primary keys
+         that are not the apartment number. If unsure, leave null.
+
+floor_plan_name  (string | null, REQUIRED for every record)
+  WHAT:  Human-readable plan name in the API ("Aspen", "1BR Loft").
+  DO:    When the KNOWN FLOOR PLANS list above is populated and a record's
+         beds/baths/sqft match one of them, prefer that canonical name.
+         Otherwise use the API's literal value.
+  DON'T: Copy a canonical name onto a record whose beds/baths/sqft do not
+         match. Reject CMS module identifiers (MODULE_*, WIDGET_*,
+         "Lease Magnet", "Pop-Up", "Gravity FORMS") — those are not floor
+         plans and should classify the API as noise.
+
+floor_plan_source  (enum, REQUIRED when floor_plan_name is non-null)
+  Set to one of "page_label" | "section_heading" | "url_slug" | "inferred"
+  | null.
+
+bedrooms / bathrooms / sqft  (numbers)
+  Strict numeric extraction. Studio = 0 bedrooms. Half-baths = 0.5.
+  If the API returns a range, leave null — never average.
+
+market_rent_low / market_rent_high  (numbers)
+  USD per month. For range responses (rent.min / rent.max, rentRange.low /
+  rentRange.high), populate both. For flat rents, copy the same value to
+  both keys.
+
+availability_status  (enum)
+  Map API values to AVAILABLE | UNAVAILABLE | WAITLIST | UNKNOWN. When the
+  API returns a boolean, true → AVAILABLE, false → UNAVAILABLE.
+
+availability_count  (integer | null)
+  WHAT:  Some APIs report a per-floor-plan count rather than per-unit rows
+         (e.g. {"floor_plan": "Aspen", "available": 5}). Populate this
+         field and emit ONE record per floor plan; do not fabricate per-unit
+         records.
+  DON'T: Inflate the unit count by treating availability_count as repeated
+         rows.
+
+lease_term, move_in_date
+  Extract when present; never invent.
+
+amenities  (array of lowercase strings)
+  See AMENITIES block below.
+
+concession_text / concession_value / concession_source
+  See CONCESSIONS block below.
+
+property_amenities  (top-level array)
+  Union of unit-level amenities or any property-level amenities the API
+  surfaces. Lowercased and deduplicated.
+
+AMENITIES (observation-only — extract if present, do not fabricate)
+  WHAT:  Property-level common facilities — pool, fitness center, dog park,
+         pet friendly, parking, EV charging, business center, package room,
+         clubhouse, in-unit washer/dryer, balcony, etc.
+  WHERE: API fields commonly named amenities, features, community_features,
+         unit_features. May be at root level or nested under a unit/floorplan
+         object.
+  DO:    Return as a flat array of lowercase strings. Aggregate the union
+         into property_amenities at the top level.
+  DON'T: Fabricate. Don't emit marketing copy, addresses, or office hours.
+
+CONCESSIONS (observation-only — extract if present, do not fabricate)
+  WHAT:  Rent discounts, look-and-lease specials, strikethrough rent.
+  WHERE: API fields commonly named concession, discount, promotion, special.
+         May be a structured object with amount/months/description, or a
+         freeform text field.
+  DO:    Set concession_text to the human-readable description (verbatim).
+         Set concession_value to the numeric dollar amount if extractable
+         (e.g., {"amount": 500, "type": "off_first_month"} → 500).
+         Set concession_source to "api_field" when the API exposes a
+         dedicated concession key, "description_text" when it lives inside
+         a description string.
+  DON'T: Fabricate. Don't infer concessions from rent ranges.
+
+GENERAL RULES:
 - Extract ALL units/floor plans, not just a sample.
-- For json_paths: use the EXACT key names as they appear in the JSON.
-  If the key is nested (e.g. rent is inside a sub-object), use dot notation:
-  "pricing.effectiveRent" or "rentTerms.0.rent".
-- For response_envelope: if the unit array is at the top level, use "".
-  If wrapped in { "data": { "units": [...] } }, use "data.units".
+- For json_paths: use the EXACT key names as they appear in the JSON. For
+  nested keys use dot notation: "pricing.effectiveRent" or
+  "rentTerms.0.rent".
+- For response_envelope: top-level array → "". Nested → "data.units" etc.
 - For rent ranges, set rent_low and rent_high separately.
-- If data is floor-plan-level (no individual unit numbers), extract floor plans.
-- Reject floor-plan names that look like CMS module identifiers
-  (MODULE_*, WIDGET_*, "Lease Magnet", "Pop-Up", "Gravity FORMS") — classify
-  the API as noise instead of extracting them as units.
-- confidence: 1.0 = certain the mapping is correct, 0.7 = likely, <0.5 = guessing.
-- If no unit data found, return has_unit_data=false with noise_reason explaining
-  what this API response contains.
+- If data is floor-plan-level (no individual unit numbers), extract floor
+  plans and set availability_count when the API exposes a per-plan count.
+- Reject floor-plan names that look like CMS module identifiers — classify
+  the API as noise instead of extracting them.
+- confidence: 1.0 = certain mapping, 0.7 = likely, <0.5 = guessing.
+- If no unit data found, return has_unit_data=false with noise_reason
+  explaining what this API response contains.

@@ -277,6 +277,24 @@ def _load_prompt_template() -> str:
     return prompt_path.read_text(encoding="utf-8")
 
 
+def _resolve_known_plans_block_for_rescue(property_id: str) -> str:
+    """Render the KNOWN FLOOR PLANS block for the rescue prompt.
+
+    Returns "" when the catalog is bypassed or the property has no plans.
+    Failures are swallowed so prompt construction can never crash.
+    """
+    if not property_id:
+        return ""
+    try:
+        from ma_poc.services.floorplan_catalog import get_default_catalog
+
+        text, _meta = get_default_catalog().known_plans_block(property_id)
+        return text
+    except Exception as exc:  # noqa: BLE001
+        log.warning("known-plans block unavailable for %s: %s", property_id, exc)
+        return ""
+
+
 def _build_prompt(
     template: str,
     inp: RescueInput,
@@ -292,6 +310,7 @@ def _build_prompt(
         .replace("{{source_adapter}}", inp.source_adapter)
         .replace("{{expected_units}}", str(inp.property_context.get("expected_units", "unknown")))
         .replace("{{bodies_as_json}}", bodies_json)
+        .replace("{{known_floor_plans}}", _resolve_known_plans_block_for_rescue(inp.property_id))
     )
 
 

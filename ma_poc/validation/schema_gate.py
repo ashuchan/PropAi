@@ -74,6 +74,40 @@ class SchemaGateResult:
     inferred_id: bool = False
 
 
+# H5: a record qualifies as having a physical signal when ANY of these
+# v2-canonical fields (or v1 aliases) carries a real (non-empty, non -1) value.
+_PHYSICAL_SIGNAL_FIELDS: tuple[str, ...] = (
+    "floor_plan_name",
+    "floor_plan_type",
+    "floorplan_name",
+    "floor_plan_id",
+    "beds",
+    "bedrooms",
+    "_bedrooms",
+    "baths",
+    "bathrooms",
+    "_bathrooms",
+    "sqft",
+    "area",
+    "_sqft",
+    "asking_rent",
+    "market_rent_low",
+    "market_rent_high",
+    "rent_low",
+    "rent_high",
+    "rent",
+)
+
+
+def _has_physical_signal(record: dict[str, Any]) -> bool:
+    """H5: True when at least one identity-bearing physical field is present.
+
+    A record carrying nothing but ``unit_id`` is rejected by ``check`` —
+    a unit number alone is not enough identity to merge confidently.
+    """
+    return any(_is_present(record.get(k)) for k in _PHYSICAL_SIGNAL_FIELDS)
+
+
 def check(record: dict[str, Any]) -> SchemaGateResult:
     """Validate a single unit record against the schema.
 
@@ -97,12 +131,18 @@ def check(record: dict[str, Any]) -> SchemaGateResult:
         except (ValueError, TypeError):
             reasons.append("INVALID_RENT_NEGATIVE")
 
-    # Sqft validation
-    sqft = record.get("sqft") or record.get("square_feet")
-    if sqft is not None:
+    # Sqft validation. H2: the -1 sentinel is "unknown sqft" — treat as null,
+    # not as a real negative value (which would otherwise fire
+    # INVALID_SQFT_NEGATIVE on every record where the source CSV omitted area).
+    sqft = record.get("sqft")
+    if sqft in (None, "", -1, "-1"):
+        sqft = record.get("square_feet")
+    if sqft not in (None, "", -1, "-1"):
         try:
             sqft_val = float(sqft)
-            if sqft_val < 0:
+            if sqft_val == -1:
+                pass  # sentinel → treat as null
+            elif sqft_val < 0:
                 reasons.append("INVALID_SQFT_NEGATIVE")
             elif sqft_val > _MAX_SQFT:
                 reasons.append("INVALID_SQFT_ABSURD")
@@ -131,6 +171,13 @@ def check(record: dict[str, Any]) -> SchemaGateResult:
             inferred = True
         else:
             reasons.append("IDENTITY_FALLBACK_INSUFFICIENT")
+    else:
+        # H5: a record carrying ONLY unit_id (no rent, no beds, no plan name,
+        # no sqft, no anything else identity-bearing) cannot be merged
+        # confidently. Reject before the IDENTITY_FALLBACK_INSUFFICIENT path
+        # so the failure is diagnosable.
+        if not _has_physical_signal(record):
+            reasons.append("IDENTITY_REQUIRES_PHYSICAL_SIGNAL")
 
     if reasons:
         return SchemaGateResult(accepted=None, rejection_reasons=reasons)

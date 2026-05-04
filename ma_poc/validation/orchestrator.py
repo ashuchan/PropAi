@@ -17,6 +17,38 @@ from .schema_gate import property_passes_quality_gate
 log = logging.getLogger(__name__)
 
 
+_IDENTITY_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    "unit_id": ("unit_id", "unit_number"),
+    "floor_plan_name": ("floor_plan_name", "_floor_plan", "floor_plan_type", "floorplan_name"),
+    "beds": ("beds", "bedrooms", "_bedrooms"),
+    "baths": ("baths", "bathrooms", "_bathrooms"),
+    "sqft": ("sqft", "_sqft", "area", "square_feet"),
+    "rent": ("asking_rent", "market_rent_low", "rent"),
+    "available_date": ("available_date", "availability_date"),
+}
+
+
+def _field_presence(record: dict[str, Any]) -> dict[str, bool]:
+    """Return a flat {field: present?} map for the identity-relevant fields.
+
+    Used to enrich validate.record_rejected events so post-hoc analysis can
+    group rejections by field signature without needing the raw record.
+    """
+    out: dict[str, bool] = {}
+    for canonical, aliases in _IDENTITY_FIELD_ALIASES.items():
+        present = False
+        for alias in aliases:
+            v = record.get(alias)
+            if v is None or v == -1:
+                continue
+            if isinstance(v, str) and not v.strip():
+                continue
+            present = True
+            break
+        out[canonical] = present
+    return out
+
+
 def validate(
     extract_result: Any,
     history: dict[str, dict[str, Any]] | None = None,
@@ -63,7 +95,12 @@ def validate(
                         human_message=", ".join(gate_result.rejection_reasons),
                     )
                 )
-                emit(EventKind.RECORD_REJECTED, property_id, reasons=gate_result.rejection_reasons)
+                emit(
+                    EventKind.RECORD_REJECTED,
+                    property_id,
+                    reasons=gate_result.rejection_reasons,
+                    field_presence=_field_presence(record),
+                )
                 continue
 
             if gate_result.inferred_id:

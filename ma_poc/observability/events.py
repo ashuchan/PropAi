@@ -98,6 +98,14 @@ class EventKind(StrEnum):
     # Phase 13 — periodic
     SLO_REPORT = "slo.report"
 
+    # CLAUDE_PROMPTS_MERGE_RESILIENCE — Phase 8 telemetry
+    EXTRACT_FLOOR_PLAN_SNAP = "extract.floor_plan_snap"
+    EXTRACT_PHYSICAL_ATTRIBUTE_CONFLICT = "extract.physical_attribute_conflict"
+    EXTRACT_AMBIGUOUS_MERGE_FAIL_CLOSED = "extract.ambiguous_merge_fail_closed"
+    EXTRACT_AMENITIES_OBSERVED = "extract.amenities_observed"
+    EXTRACT_CONCESSION_OBSERVED = "extract.concession_observed"
+    EXTRACT_AVAILABILITY_QUANTITY = "extract.availability_quantity_observed"
+
 
 @dataclass(slots=True, frozen=True)
 class Event:

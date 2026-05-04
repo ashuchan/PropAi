@@ -8,6 +8,8 @@ PROPERTY CONTEXT:
 - Website: {{website}}
 - Expected total units (hint, may be wrong): {{expected_units}}
 
+{{known_floor_plans}}
+
 API RESPONSE(S) TO ANALYZE:
 ---
 {{bodies_as_json}}
@@ -28,6 +30,7 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
     {
       "unit_id": "string or null",
       "floor_plan_name": "string or null",
+      "floor_plan_source": "page_label | section_heading | url_slug | inferred | null",
       "bedrooms": number_or_null,
       "bathrooms": number_or_null,
       "sqft": number_or_null,
@@ -35,10 +38,16 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
       "market_rent_high": number_or_null,
       "available_date": "YYYY-MM-DD or null",
       "availability_status": "AVAILABLE|UNAVAILABLE|WAITLIST|UNKNOWN",
+      "availability_count": number_or_null,
       "lease_term": number_or_null,
-      "move_in_date": "YYYY-MM-DD or null"
+      "move_in_date": "YYYY-MM-DD or null",
+      "amenities": [],
+      "concession_text": "string or null",
+      "concession_value": number_or_null,
+      "concession_source": "strikethrough_dom | api_field | description_text | specials_section | null"
     }
   ],
+  "property_amenities": [],
   "winning_url": "the URL from bodies_as_json whose body produced the units (null if none)",
   "envelope": "dot-separated path to the array of units inside that body (empty string if top-level list)",
   "json_paths": {
@@ -50,12 +59,78 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
     "bathrooms": "key name for bathroom count",
     "sqft": "key name for square footage",
     "available_date": "key name for availability date",
-    "availability_status": "key name for availability status"
+    "availability_status": "key name for availability status",
+    "availability_count": "key name for per-floor-plan unit count (or null)",
+    "amenities": "key name for amenity list (or null)",
+    "concession_text": "key name for concession/promo text (or null)",
+    "concession_value": "key name for concession dollar value (or null)"
   },
   "confidence": 0.0
 }
 
-RULES:
+PER-FIELD INSTRUCTIONS — read carefully before extracting.
+
+unit_id  (string | null, OPTIONAL)
+  WHAT:  The literal apartment/unit identifier from the API.
+  DON'T: Confuse with floorplan IDs, property IDs, or numeric primary keys
+         that are not the apartment number. If unsure, leave null.
+
+floor_plan_name  (string | null, REQUIRED for every record)
+  WHAT:  Human-readable plan name.
+  DO:    When the KNOWN FLOOR PLANS list above is populated and a record's
+         beds/baths/sqft match one of those plans, prefer that canonical
+         name. Otherwise use the API's literal value.
+  DON'T: Copy a canonical name onto a record whose beds/baths/sqft do not
+         match. Reject CMS module identifiers (MODULE_*, WIDGET_*,
+         "Lease Magnet", "Pop-Up") — those are not floor plans.
+
+floor_plan_source  (enum, REQUIRED when floor_plan_name is non-null)
+  "page_label" | "section_heading" | "url_slug" | "inferred" | null.
+
+bedrooms / bathrooms / sqft  (numbers)
+  Studio = 0. Half-baths = 0.5. Strict numeric extraction.
+
+market_rent_low / market_rent_high  (numbers)
+  USD per month. Range → low + high. Flat rent → both equal.
+
+availability_status  (enum)
+  Map API values to AVAILABLE | UNAVAILABLE | WAITLIST | UNKNOWN.
+
+availability_count  (integer | null)
+  WHAT:  Per-floor-plan availability count when the API exposes it
+         (e.g. {"floor_plan": "Aspen", "available": 5}).
+  DON'T: Fabricate per-unit records to inflate the unit count.
+
+amenities  (array of lowercase strings)
+  See AMENITIES block below.
+
+concession_text / concession_value / concession_source
+  See CONCESSIONS block below.
+
+property_amenities  (top-level array)
+  Union of all amenity strings found, lowercased and deduplicated.
+
+AMENITIES (observation-only — extract if present, do not fabricate)
+  WHAT:  Pool, fitness center, dog park, pet friendly, parking, EV charging,
+         business center, package room, clubhouse, in-unit washer/dryer,
+         balcony, etc.
+  WHERE: API fields named amenities, features, community_features,
+         unit_features. May be at root level or nested.
+  DO:    Lowercase, deduplicate, return as a flat array. Aggregate into
+         property_amenities at the top level.
+  DON'T: Fabricate. Don't emit marketing copy, addresses, or office hours.
+
+CONCESSIONS (observation-only — extract if present, do not fabricate)
+  WHAT:  Rent discounts (e.g., "1 month free", "$500 off first month").
+  WHERE: API fields named concession, discount, promotion, special. May be
+         a structured object with amount/months/description, or freeform
+         text.
+  DO:    concession_text = human-readable description (verbatim).
+         concession_value = numeric dollar amount when extractable.
+         concession_source = "api_field" or "description_text".
+  DON'T: Fabricate. Don't infer concessions from rent ranges.
+
+GENERAL RULES:
 - Extract ALL units/floor plans, not just a sample.
 - Use the EXACT key names from the JSON for json_paths; dotted notation for
   nested keys (e.g. "pricing.effectiveRent"); indexed notation for lists
@@ -65,5 +140,6 @@ RULES:
 - Reject floor-plan names that look like CMS module identifiers
   (MODULE_*, WIDGET_*, "Lease Magnet", "Pop-Up") — do not emit them as
   units.
-- confidence: 1.0 = certain the mapping is correct, 0.7 = likely, <0.5 = guessing.
-- If no unit data is present, return {"units": [], ...} with empty json_paths.
+- confidence: 1.0 = certain mapping, 0.7 = likely, <0.5 = guessing.
+- If no unit data is present, return {"units": [], "property_amenities":
+  [], ...} with empty json_paths.

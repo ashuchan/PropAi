@@ -8,6 +8,8 @@ PROPERTY CONTEXT:
 - Website: {website}
 - Page URL: {page_url}
 
+{known_floor_plans}
+
 HTML SECTION:
 ---
 {dom_section_html}
@@ -25,6 +27,7 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
     {
       "unit_id": "string or null",
       "floor_plan_name": "string or null",
+      "floor_plan_source": "page_label | section_heading | url_slug | inferred | null",
       "bedrooms": number_or_null,
       "bathrooms": number_or_null,
       "sqft": number_or_null,
@@ -32,11 +35,17 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
       "market_rent_high": number_or_null,
       "available_date": "YYYY-MM-DD or null",
       "availability_status": "AVAILABLE|UNAVAILABLE|WAITLIST|UNKNOWN",
+      "availability_count": number_or_null,
       "lease_term": number_or_null,
       "move_in_date": "YYYY-MM-DD or null",
+      "amenities": [],
+      "concession_text": "string or null",
+      "concession_value": number_or_null,
+      "concession_source": "strikethrough_dom | api_field | description_text | specials_section | null",
       "confidence": 0.0-1.0
     }
   ],
+  "property_amenities": [],
   "css_selectors": {
     "container": "CSS selector for the repeating unit/floor-plan card",
     "unit_id": "CSS selector for unit number within container",
@@ -46,20 +55,101 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
     "bedrooms": "CSS selector for bedroom count within container",
     "bathrooms": "CSS selector for bathroom count within container",
     "availability_date": "CSS selector for date within container",
-    "availability_status": "CSS selector for status within container"
+    "availability_status": "CSS selector for status within container",
+    "amenities": "CSS selector for amenities list/section (or null)",
+    "concession": "CSS selector for concession text or strikethrough rent (or null)"
   }
 }
 
-RULES:
+PER-FIELD INSTRUCTIONS — read carefully before extracting.
+
+unit_number / unit_id  (string | null, OPTIONAL)
+  WHAT:  The visible unit/apartment number on the card.
+  WHERE: A column "Unit"/"Apt", a tile heading, the first cell of a row.
+  DO:    Copy the literal page value.
+  DON'T: Return CSS class strings. Return null when no unit row is shown
+         and only floor plans are listed.
+
+floor_plan_name  (string | null, REQUIRED for every record)
+  WHAT:  Human-readable plan name as shown.
+  WHERE: Card heading, section title, or URL slug when nothing else is
+         labelled. KNOWN FLOOR PLANS list above (when populated) is the
+         canonical name set for this property.
+  DO:    Prefer the canonical name from the KNOWN FLOOR PLANS list when
+         beds + baths + sqft match. Otherwise use the page's literal label.
+         If the page truly has no floor-plan label, fall back to the
+         nearest section heading or URL slug and tag floor_plan_source.
+  DON'T: Copy a canonical name onto a record whose beds/baths/sqft do not
+         match. Don't return CMS module identifiers ("MODULE_*",
+         "Lease Magnet", "Pop-Up", "Gravity FORMS"), vendor prefixes
+         like "[Riedman]", or any guess.
+
+floor_plan_source  (enum, REQUIRED when floor_plan_name is non-null)
+  "page_label" | "section_heading" | "url_slug" | "inferred" | null.
+
+bedrooms / bathrooms / sqft  (numbers)
+  Studio = 0. Half-baths = 0.5. Strip commas + units from sqft.
+  Never round, average, or output a range.
+
+market_rent_low / market_rent_high  (numbers)
+  For "$1,200 - $1,500" set low=1200, high=1500. Flat rent → both equal.
+
+available_date  (YYYY-MM-DD or null)
+  Use the literal date when shown. "Available now" → today. Silent → null.
+
+availability_status, availability_count
+  As elsewhere. Use availability_count when the page shows "5 available"
+  rather than 5 individual unit rows; emit one record per floor plan.
+
+amenities, concession_text, concession_value, concession_source
+  See dedicated blocks below.
+
+property_amenities  (top-level array)
+  Aggregated, deduplicated, lowercased amenities for the property.
+
+confidence  (0.0–1.0)
+  1.0 = certain, 0.7 = likely, <0.5 = guessing.
+
+AMENITIES (observation-only — extract if present, do not fabricate)
+  WHAT:  Property-level common facilities — pool, fitness center, dog park,
+         pet friendly, parking, EV charging, business center, package room,
+         clubhouse, in-unit washer/dryer, balcony, etc.
+  WHERE: A separate "Amenities", "Features", or "Community" section,
+         navigation tab, footer block, or icon grid. Include both unit-level
+         and community-level amenities.
+  DO:    Lowercase, deduplicate, return as a flat array. Aggregate into
+         property_amenities at the top level.
+  DON'T: Fabricate. Don't include marketing copy, addresses, phone numbers,
+         or office hours. Empty section → [].
+
+CONCESSIONS (observation-only — extract if present, do not fabricate)
+  WHAT:  Rent discounts and promotions. Examples:
+         - "1 month free on a 13-month lease"
+         - "$500 off first month"
+         - "Look-and-lease special: $1,000 off"
+         - Strikethrough rent in DOM (e.g., <s>$1,800</s> $1,650)
+  WHERE: A banner/callout near rent, the floor-plan card description, the
+         general property description, or a dedicated "Specials" section.
+  DO:    Set concession_text to the human-readable description (verbatim).
+         Set concession_value to the numeric dollar value when extractable
+         ("$500 off" → 500; "1 month free" with rent $2,000 → 2000;
+         15% off → null because rent context is missing).
+         Set concession_source to:
+           - "strikethrough_dom" : strikethrough pricing in the DOM
+           - "description_text"  : prose mention in a description
+           - "specials_section"  : dedicated specials/promotions block
+  DON'T: Fabricate. Don't infer concessions from rent-range bottom anchors.
+         All three concession fields → null if no concession is mentioned.
+
+GENERAL RULES:
 - Extract ALL units/floor plans visible in this section, not just a sample.
 - For CSS selectors: prefer class-based selectors over positional/nth-child.
   Selectors should work when applied with querySelectorAll on the page.
-- The "container" selector should match the repeating element (one per
-  unit or floor plan). Other selectors are relative within that container.
-- For rent ranges like "$1,200 - $1,500", set market_rent_low=1200, market_rent_high=1500.
-- Reject floor-plan names that look like CMS module identifiers
-  (MODULE_*, "Lease Magnet", "Pop-Up", "Gravity FORMS", vendor prefixes
-  like "[Riedman]") — do not extract them as units.
-- If data is floor-plan-level (not unit-level), extract floor plans.
-- confidence: 1.0 = certain, 0.7 = likely correct, <0.5 = guessing.
-- If no units are visible in this HTML, return {"units": [], "css_selectors": {}}.
+- The "container" selector matches the repeating element; other selectors
+  are relative within that container.
+- For rent ranges like "$1,200 - $1,500", set market_rent_low=1200 and
+  market_rent_high=1500.
+- If data is floor-plan-level, extract floor plans and use
+  availability_count for the per-plan count.
+- If no units are visible in this HTML, return {"units": [],
+  "property_amenities": [], "css_selectors": {}}.

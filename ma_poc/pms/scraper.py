@@ -1350,6 +1350,96 @@ async def scrape_jugnu(
                 # Update adapter_name so downstream events see the real winner.
                 adapter_name = result.get("_adapter_used", adapter_name)
 
+    # Phase 3 — post-extraction CSV snap. Runs *after* extraction (H4) so
+    # any record that hits the canonical floor-plan list inherits the
+    # canonical name + a stable floor_plan_id. Records that don't snap fall
+    # through to the merge cascade with their attribute-only identity intact.
+    extracted_units = result.get("units") or []
+    if extracted_units:
+        try:
+            from ma_poc.services.floorplan_snap import snap_units
+
+            snapped = snap_units(extracted_units, property_id)
+            result["units"] = snapped
+            # Telemetry: how many rows snapped, and which reason set fired.
+            snap_reasons: dict[str, int] = {}
+            for u in snapped:
+                r = u.get("floor_plan_snap_reason")
+                if r:
+                    snap_reasons[r] = snap_reasons.get(r, 0) + 1
+            if snap_reasons:
+                # Surface a summary for the per-property report; observability
+                # below uses EventKind.EXTRACT_FLOOR_PLAN_SNAP per property.
+                result["_floor_plan_snap_summary"] = snap_reasons
+                try:
+                    emit(
+                        EventKind.EXTRACT_FLOOR_PLAN_SNAP,
+                        property_id,
+                        snap_reasons=snap_reasons,
+                        unit_count=len(snapped),
+                    )
+                except Exception:
+                    pass  # observability is best-effort
+        except Exception as exc:  # noqa: BLE001
+            log.warning("floorplan_snap failed for %s: %s", property_id, exc)
+
+    # Phase 6 — aggregate property-level amenities and emit observation event.
+    # Phase 7 — emit concessions observation event when present. Both are
+    # purely observation (H7); they cannot fail the scrape.
+    try:
+        from ma_poc.reporting.observation_reports import aggregate_property_amenities
+
+        units_now = result.get("units") or []
+        explicit = (
+            result.get("property_amenities")
+            if isinstance(result.get("property_amenities"), list)
+            else None
+        )
+        amenities = aggregate_property_amenities(units_now, explicit)
+        result["property_amenities"] = amenities
+        if amenities:
+            try:
+                emit(
+                    EventKind.EXTRACT_AMENITIES_OBSERVED,
+                    property_id,
+                    count=len(amenities),
+                    source_tier=result.get("extraction_tier_used") or "unknown",
+                )
+            except Exception:
+                pass
+
+        # Concession event — fires once per property when any unit carries
+        # a concession_text. The full per-property detail goes into the
+        # concessions report at run end.
+        for u in units_now:
+            text = u.get("concession_text")
+            if isinstance(text, str) and text.strip():
+                try:
+                    emit(
+                        EventKind.EXTRACT_CONCESSION_OBSERVED,
+                        property_id,
+                        source=u.get("concession_source") or "unspecified",
+                        has_value=u.get("concession_value") is not None,
+                    )
+                except Exception:
+                    pass
+                break
+
+        # Phase 4 — flag floor-plan-grain records for the report's
+        # availability_quantity_observed counter.
+        avail_records = sum(1 for u in units_now if u.get("availability_count"))
+        if avail_records:
+            try:
+                emit(
+                    EventKind.EXTRACT_AVAILABILITY_QUANTITY,
+                    property_id,
+                    record_count=avail_records,
+                )
+            except Exception:
+                pass
+    except Exception as exc:  # noqa: BLE001
+        log.warning("observation hook failed for %s: %s", property_id, exc)
+
     tier_used = result.get("extraction_tier_used") or "unknown"
     if result.get("units"):
         emit(EventKind.TIER_WON, property_id, tier_used=tier_used)

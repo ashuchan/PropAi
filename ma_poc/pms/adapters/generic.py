@@ -142,94 +142,416 @@ def _assess_and_decide(
         return None
 
 
+# ── Field categories used by the anchor-first merge (H9) ──────────────────
+# Mutable: latest extracted value wins on conflict.
+_MERGE_MUTABLE_FIELDS: frozenset[str] = frozenset(
+    {
+        "market_rent_low",
+        "market_rent_high",
+        "asking_rent",
+        "effective_rent",
+        "rent_low",
+        "rent_high",
+        "rent_range",
+        "available_date",
+        "availability_status",
+        "lease_term",
+        "concession_text",
+        "concession_value",
+        "concession_source",
+        "days_on_market",
+    }
+)
+# Physical / identity: existing wins on conflict; conflict is logged.
+_MERGE_PHYSICAL_FIELDS: frozenset[str] = frozenset(
+    {
+        "floor_plan_id",
+        "floor_plan_name",
+        "floor_plan_name_extracted",
+        "floor_plan_source",
+        "beds",
+        "bedrooms",
+        "_bedrooms",
+        "baths",
+        "bathrooms",
+        "_bathrooms",
+        "sqft",
+        "area",
+        "_sqft",
+        "unit_number",
+        "_unit_number",
+        "unit_id",
+        "apartmentid",
+        "floorplannumber",
+    }
+)
+# Multi-source: union/dedup. Insertion-order is preserved at this layer;
+# the run-end report sorts the aggregated property_amenities for stable
+# diffing.
+_MERGE_UNION_FIELDS: frozenset[str] = frozenset({"amenities"})
+
+
+def _merge_field_values(
+    target: dict[str, Any],
+    source: dict[str, Any],
+    *,
+    rank: str,
+    conflict_log: list[dict[str, Any]],
+) -> None:
+    """Merge ``source`` into ``target`` per the H9 field-category rules.
+
+    Mutable fields take the latest extracted value when both sides carry one.
+    Physical fields keep the existing value and emit a structured conflict
+    record. Multi-source fields union+dedupe. Anything else falls through
+    to fill-when-missing semantics.
+    """
+    for k, v in source.items():
+        if k.startswith("_"):
+            # Telemetry keys (e.g. _provenance) flow through the source
+            # merger, not this function. Skip them so they never collide.
+            continue
+        if v in (None, "", -1, "-1"):
+            continue
+
+        existing_val = target.get(k)
+        existing_present = existing_val not in (None, "", -1, "-1")
+
+        if k in _MERGE_UNION_FIELDS:
+            if isinstance(existing_val, list) or isinstance(v, list):
+                # Seed from existing — list values verbatim, scalars wrapped
+                # so a previous tier's single string isn't dropped when the
+                # next tier emits a list.
+                if isinstance(existing_val, list):
+                    merged: list[Any] = list(existing_val)
+                elif existing_present:
+                    merged = [existing_val]
+                else:
+                    merged = []
+                seen: set[Any] = set()
+                for x in merged:
+                    try:
+                        seen.add(x)
+                    except TypeError:
+                        # Non-hashable items (rare — e.g. dicts) can't seed
+                        # the dedup set. Fall back to value-equality check.
+                        pass
+                for item in v if isinstance(v, list) else [v]:
+                    try:
+                        if item in seen:
+                            continue
+                        seen.add(item)
+                    except TypeError:
+                        if any(item == m for m in merged):
+                            continue
+                    merged.append(item)
+                target[k] = merged
+            else:
+                if not existing_present:
+                    target[k] = v
+            continue
+
+        if k in _MERGE_MUTABLE_FIELDS:
+            target[k] = v  # latest wins
+            continue
+
+        if k in _MERGE_PHYSICAL_FIELDS:
+            if not existing_present:
+                target[k] = v
+            elif existing_val != v:
+                conflict_log.append(
+                    {
+                        "field": k,
+                        "existing": existing_val,
+                        "new": v,
+                        "rank_used": rank,
+                    }
+                )
+            continue
+
+        # Default: fill-when-missing (legacy behaviour for anything not
+        # explicitly categorised).
+        if not existing_present:
+            target[k] = v
+
+
+def _merge_norm(v: Any) -> str:
+    if v is None:
+        return ""
+    return str(v).strip().lower()
+
+
+def _merge_int_or_none(v: Any) -> int | None:
+    """Coerce to int or return None. Treats `-1` sentinel as None (H2)."""
+    if v is None or v == "" or v == -1:
+        return None
+    try:
+        return int(float(str(v).strip().replace(",", "")))
+    except (TypeError, ValueError):
+        return None
+
+
+def _merge_float_or_none(v: Any) -> float | None:
+    if v is None or v == "":
+        return None
+    try:
+        return float(str(v).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _merge_field_present(unit: dict[str, Any], *keys: str) -> Any:
+    for k in keys:
+        v = unit.get(k)
+        if v not in (None, "", -1, "-1"):
+            return v
+    return None
+
+
+def _merge_rank_signature(unit: dict[str, Any]) -> dict[str, Any]:
+    """Extract the comparable identity fields from a unit (H2 strict sqft)."""
+    fp_id = _merge_field_present(unit, "floor_plan_id")
+    uid = _merge_field_present(unit, "unit_id", "unit_number", "_unit_number")
+    fp_name = _merge_norm(_merge_field_present(unit, "floor_plan_name", "_floor_plan", "floorplan_name"))
+    beds = _merge_int_or_none(_merge_field_present(unit, "beds", "bedrooms", "_bedrooms"))
+    baths = _merge_float_or_none(_merge_field_present(unit, "baths", "bathrooms", "_bathrooms"))
+    sqft = _merge_int_or_none(_merge_field_present(unit, "sqft", "area", "_sqft"))
+    return {
+        "fp_id": str(fp_id) if fp_id else "",
+        "uid": _merge_norm(uid),
+        "fp_name": fp_name,
+        "beds": beds,
+        "baths": baths,
+        "sqft": sqft,
+    }
+
+
+# Rank predicate: each function returns True when the candidate matches at
+# this rank. The order of rank evaluation IS the priority ladder (R0 → R1f).
+def _rank_matches(rank: str, ex_sig: dict[str, Any], inc_sig: dict[str, Any]) -> bool:
+    if rank == "R0":
+        return bool(ex_sig["fp_id"]) and ex_sig["fp_id"] == inc_sig["fp_id"]
+    if rank == "R0a":
+        return bool(ex_sig["uid"]) and ex_sig["uid"] == inc_sig["uid"]
+    if rank == "R1a":
+        return (
+            bool(ex_sig["fp_name"])
+            and bool(inc_sig["fp_name"])
+            and ex_sig["fp_name"] == inc_sig["fp_name"]
+            and ex_sig["beds"] is not None
+            and inc_sig["beds"] is not None
+            and ex_sig["beds"] == inc_sig["beds"]
+            and ex_sig["baths"] is not None
+            and inc_sig["baths"] is not None
+            and ex_sig["baths"] == inc_sig["baths"]
+            and ex_sig["sqft"] is not None
+            and inc_sig["sqft"] is not None
+            and ex_sig["sqft"] == inc_sig["sqft"]  # H2 strict
+        )
+    if rank == "R1b":
+        return (
+            ex_sig["beds"] is not None
+            and inc_sig["beds"] is not None
+            and ex_sig["beds"] == inc_sig["beds"]
+            and ex_sig["baths"] is not None
+            and inc_sig["baths"] is not None
+            and ex_sig["baths"] == inc_sig["baths"]
+            and ex_sig["sqft"] is not None
+            and inc_sig["sqft"] is not None
+            and ex_sig["sqft"] == inc_sig["sqft"]  # H2 strict
+        )
+    if rank == "R1c":
+        return (
+            ex_sig["beds"] is not None
+            and inc_sig["beds"] is not None
+            and ex_sig["beds"] == inc_sig["beds"]
+            and ex_sig["baths"] is not None
+            and inc_sig["baths"] is not None
+            and ex_sig["baths"] == inc_sig["baths"]
+            and bool(ex_sig["fp_name"])
+            and bool(inc_sig["fp_name"])
+            and ex_sig["fp_name"] == inc_sig["fp_name"]
+        )
+    if rank == "R1d":
+        return (
+            ex_sig["beds"] is not None
+            and inc_sig["beds"] is not None
+            and ex_sig["beds"] == inc_sig["beds"]
+            and ex_sig["baths"] is not None
+            and inc_sig["baths"] is not None
+            and ex_sig["baths"] == inc_sig["baths"]
+            and ex_sig["sqft"] is None
+            and inc_sig["sqft"] is None
+            and not (ex_sig["fp_name"] and inc_sig["fp_name"])
+        )
+    if rank == "R1e":
+        return (
+            ex_sig["beds"] is not None
+            and inc_sig["beds"] is not None
+            and ex_sig["beds"] == inc_sig["beds"]
+            and (ex_sig["baths"] is None or inc_sig["baths"] is None)
+            and (ex_sig["sqft"] is None or inc_sig["sqft"] is None)
+            and not (ex_sig["fp_name"] and inc_sig["fp_name"])
+        )
+    if rank == "R1f":
+        return (
+            ex_sig["beds"] is not None
+            and inc_sig["beds"] is not None
+            and ex_sig["beds"] == inc_sig["beds"]
+            and bool(ex_sig["fp_name"])
+            and bool(inc_sig["fp_name"])
+            and ex_sig["fp_name"] == inc_sig["fp_name"]
+            and (ex_sig["baths"] is None or inc_sig["baths"] is None)
+            and (ex_sig["sqft"] is None or inc_sig["sqft"] is None)
+        )
+    return False
+
+
+_RANK_LADDER: tuple[str, ...] = ("R0", "R0a", "R1a", "R1b", "R1c", "R1d", "R1e", "R1f")
+# Ranks that allow the H8 fail-closed treatment for ambiguous matches (every
+# rank below R0 / R0a — the strong-identity rungs cannot be ambiguous given
+# fp_id and unit_id are unique).
+_AMBIGUITY_RANKS: frozenset[str] = frozenset({"R1a", "R1b", "R1c", "R1d", "R1e", "R1f"})
+
+
+def _emit_physical_conflicts(
+    property_id: str,
+    unit_index: int,
+    rank: str,
+    conflicts: list[dict[str, Any]],
+) -> None:
+    if not conflicts:
+        return
+    try:
+        from ma_poc.observability.events import EventKind, emit
+
+        for c in conflicts:
+            emit(
+                EventKind.EXTRACT_PHYSICAL_ATTRIBUTE_CONFLICT,
+                property_id,
+                unit_index=unit_index,
+                field=c["field"],
+                existing=c["existing"],
+                new=c["new"],
+                rank_used=rank,
+            )
+    except Exception:
+        pass  # observability is best-effort
+
+
+def _emit_ambiguous_fail_closed(property_id: str, rank: str, candidate_count: int) -> None:
+    try:
+        from ma_poc.observability.events import EventKind, emit
+
+        emit(
+            EventKind.EXTRACT_AMBIGUOUS_MERGE_FAIL_CLOSED,
+            property_id,
+            rank=rank,
+            candidate_count=candidate_count,
+        )
+    except Exception:
+        pass
+
+
+def _availability_count_aware_merge(
+    target: dict[str, Any],
+    source: dict[str, Any],
+    rank: str,
+) -> None:
+    """Sum availability_count when merging at R0 or R1a; latest-wins below."""
+    inc_count = source.get("availability_count")
+    if inc_count is None:
+        return
+    if rank in ("R0", "R0a", "R1a"):
+        ex_count = target.get("availability_count")
+        try:
+            ex_int = int(ex_count) if ex_count is not None else 0
+            inc_int = int(inc_count)
+        except (TypeError, ValueError):
+            target["availability_count"] = inc_count
+            return
+        target["availability_count"] = ex_int + inc_int
+    else:
+        target["availability_count"] = inc_count
+
+
 def _merge_into_result_units(
     existing: list[dict[str, Any]],
     incoming: list[dict[str, Any]],
+    *,
+    property_id: str = "unknown",
 ) -> list[dict[str, Any]]:
-    """Merge incoming units into existing using a 3-rank identity ladder.
+    """Anchor-first merge cascade (Phase 4 of CLAUDE_PROMPTS_MERGE_RESILIENCE).
 
-    Rank 1: unit_id match
-    Rank 2: floor_plan_name + beds + baths match
-    Rank 3: fuzzy beds + baths + sqft bucket (±15%) match
+    Walks the rank ladder R0 → R1f for each incoming record. The first rank
+    with a unique winner among the existing list takes the merge. Multiple
+    candidates at the same rank below R0/R0a fail closed (H8): the new
+    record is appended rather than silently merged.
 
-    When a match is found, fill any absent/null fields on the existing unit
-    from the incoming unit. When no match is found, append the incoming unit.
-    Returns the merged list (existing modified in-place, new units appended).
+    Field-level merge follows H9 — mutable fields take latest, physical
+    fields keep existing and emit a conflict event.
+
+    H10: this function never merges across properties; callers are
+    responsible for grouping by property_id, and the property_id is
+    forwarded only for telemetry.
     """
     if not existing:
         return list(incoming)
     if not incoming:
-        return existing
+        return list(existing)
 
-    def _sqft_bucket(u: dict[str, Any]) -> int | None:
-        raw = u.get("sqft") or u.get("area")
-        if raw is None:
-            return None
-        try:
-            v = int(float(str(raw).replace(",", "")))
-            return v // 100  # 100-sqft buckets → ±50 sqft ~ ±10%
-        except (ValueError, TypeError):
-            return None
+    # Pre-compute signatures for the existing list so we don't recompute
+    # them on every incoming row.
+    ex_sigs: list[dict[str, Any]] = [_merge_rank_signature(u) for u in existing]
+    result: list[dict[str, Any]] = list(existing)
 
-    def _norm(v: Any) -> str:
-        if v is None:
-            return ""
-        return str(v).strip().lower()
+    for inc_idx, inc in enumerate(incoming):
+        inc_sig = _merge_rank_signature(inc)
+        match_idx: int | None = None
+        match_rank: str | None = None
+        ambiguous = False
+        ambiguous_rank: str | None = None
+        ambiguous_count = 0
 
-    def _fill_missing(target: dict[str, Any], source: dict[str, Any]) -> None:
-        for k, v in source.items():
-            if k.startswith("_"):
-                continue
-            if target.get(k) in (None, "", -1, "-1"):
-                target[k] = v
-
-    result = list(existing)
-    for inc in incoming:
-        matched = False
-        # Rank 1: unit_id
-        inc_uid = _norm(inc.get("unit_id") or inc.get("unit_number"))
-        if inc_uid:
-            for ex in result:
-                ex_uid = _norm(ex.get("unit_id") or ex.get("unit_number"))
-                if ex_uid and ex_uid == inc_uid:
-                    _fill_missing(ex, inc)
-                    matched = True
+        for rank in _RANK_LADDER:
+            candidates: list[int] = []
+            for i, ex_sig in enumerate(ex_sigs):
+                if _rank_matches(rank, ex_sig, inc_sig):
+                    candidates.append(i)
+            if len(candidates) == 1:
+                match_idx = candidates[0]
+                match_rank = rank
+                break
+            if len(candidates) > 1:
+                # H8: ambiguous below the strong-identity rungs → fail closed.
+                if rank in _AMBIGUITY_RANKS:
+                    ambiguous = True
+                    ambiguous_rank = rank
+                    ambiguous_count = len(candidates)
                     break
-        if matched:
-            continue
-        # Rank 2: floor_plan_name + beds + baths
-        inc_fp = _norm(inc.get("floor_plan_name"))
-        inc_beds = _norm(inc.get("bedrooms") or inc.get("beds"))
-        inc_baths = _norm(inc.get("bathrooms") or inc.get("baths"))
-        if inc_fp and inc_beds:
-            for ex in result:
-                ex_fp = _norm(ex.get("floor_plan_name"))
-                ex_beds = _norm(ex.get("bedrooms") or ex.get("beds"))
-                ex_baths = _norm(ex.get("bathrooms") or ex.get("baths"))
-                if ex_fp == inc_fp and ex_beds == inc_beds and ex_baths == inc_baths:
-                    _fill_missing(ex, inc)
-                    matched = True
-                    break
-        if matched:
-            continue
-        # Rank 3: fuzzy beds + baths + sqft bucket
-        inc_bucket = _sqft_bucket(inc)
-        if inc_beds and inc_bucket is not None:
-            for ex in result:
-                ex_beds = _norm(ex.get("bedrooms") or ex.get("beds"))
-                ex_baths = _norm(ex.get("bathrooms") or ex.get("baths"))
-                ex_bucket = _sqft_bucket(ex)
-                if (
-                    ex_beds == inc_beds
-                    and ex_baths == inc_baths
-                    and ex_bucket is not None
-                    and abs(ex_bucket - inc_bucket) <= 1
-                ):
-                    _fill_missing(ex, inc)
-                    matched = True
-                    break
-        if not matched:
-            result.append(inc)
+                # R0/R0a should never be ambiguous (fp_id and unit_id unique
+                # within a property). If they are, prefer the first hit.
+                match_idx = candidates[0]
+                match_rank = rank
+                break
+
+        if match_idx is not None and match_rank is not None and not ambiguous:
+            target = result[match_idx]
+            conflict_log: list[dict[str, Any]] = []
+            _availability_count_aware_merge(target, inc, match_rank)
+            _merge_field_values(target, inc, rank=match_rank, conflict_log=conflict_log)
+            _emit_physical_conflicts(property_id, match_idx, match_rank, conflict_log)
+            # Refresh signature in case the merge added identity fields.
+            ex_sigs[match_idx] = _merge_rank_signature(target)
+        else:
+            if ambiguous and ambiguous_rank is not None:
+                _emit_ambiguous_fail_closed(
+                    property_id, ambiguous_rank, candidate_count=ambiguous_count
+                )
+            # Append as a fresh record — the original (existing) and the
+            # new record both stand on their own (H8).
+            result.append(dict(inc))
+            ex_sigs.append(_merge_rank_signature(inc))
+
     return result
 
 
@@ -1253,7 +1575,9 @@ class GenericAdapter:
                     duration_ms=int((_time.monotonic() - t0) * 1000),
                 )
             if jsonld_units:
-                result.units = _merge_into_result_units(result.units, jsonld_units)
+                result.units = _merge_into_result_units(
+                    result.units, jsonld_units, property_id=ctx.property_id
+                )
                 result.tier_used = "TIER_2_JSONLD"
                 result.winning_url = ctx.base_url
                 result.confidence = min(0.80, 0.55 + 0.05 * len(result.units))
@@ -1291,7 +1615,9 @@ class GenericAdapter:
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
             if embedded_units:
-                result.units = _merge_into_result_units(result.units, embedded_units)
+                result.units = _merge_into_result_units(
+                    result.units, embedded_units, property_id=ctx.property_id
+                )
                 result.tier_used = "TIER_1_5_EMBEDDED"
                 result.winning_url = ctx.base_url
                 result.confidence = min(0.80, 0.55 + 0.05 * len(result.units))
@@ -1332,7 +1658,9 @@ class GenericAdapter:
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
             if dom_units:
-                result.units = _merge_into_result_units(result.units, dom_units)
+                result.units = _merge_into_result_units(
+                    result.units, dom_units, property_id=ctx.property_id
+                )
                 result.tier_used = "TIER_3_DOM"
                 result.winning_url = ctx.base_url
                 result.confidence = min(0.75, 0.5 + 0.04 * len(result.units))
@@ -1475,7 +1803,10 @@ class GenericAdapter:
             _log_attempt("generic:llm_gate", "errored", reason=str(exc)[:200])
 
         # Phase 2: shared property context for every LLM call below.
+        # property_id is forwarded so the prompt can pull KNOWN FLOOR PLANS
+        # for this property from the FloorplanCatalog.
         property_context = {
+            "property_id": ctx.property_id or "",
             "property_name": getattr(ctx, "property_name", "") or "",
             "city": getattr(ctx, "city", "") or "",
             "state": getattr(ctx, "state", "") or "",

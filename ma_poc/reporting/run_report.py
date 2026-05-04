@@ -314,5 +314,18 @@ def build(
     md_lines.append("")
     md_path.write_text("\n".join(md_lines), encoding="utf-8")
 
+    # Phase 6/7: emit amenities and concessions observation reports
+    # (observation-only, no validation gates depend on them — H7).
+    try:
+        from ma_poc.reporting.observation_reports import (
+            build_amenities_report,
+            build_concessions_report,
+        )
+
+        build_amenities_report(properties, run_dir, run_date)
+        build_concessions_report(properties, run_dir, run_date)
+    except Exception as exc:  # noqa: BLE001 — never fail the run on a report
+        log.warning("observation reports failed: %s", exc)
+
     log.info("Run report written to %s", run_dir)
     return report

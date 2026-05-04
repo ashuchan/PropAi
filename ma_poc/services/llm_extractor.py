@@ -195,6 +195,31 @@ def prepare_llm_input(
     }
 
 
+def _resolve_known_plans_block(property_context: dict[str, Any]) -> str:
+    """Render the KNOWN FLOOR PLANS prompt block for this property.
+
+    Returns the empty string when the catalog is bypassed (H6) or when the
+    property has no plans on file. Failures are swallowed so prompt
+    construction can never crash.
+    """
+    pid = ""
+    for key in ("property_id", "apartmentid", "canonical_id"):
+        v = property_context.get(key)
+        if v:
+            pid = str(v)
+            break
+    if not pid:
+        return ""
+    try:
+        from ma_poc.services.floorplan_catalog import get_default_catalog
+
+        text, _meta = get_default_catalog().known_plans_block(pid)
+        return text
+    except Exception as exc:  # noqa: BLE001 — never break prompt rendering
+        log.warning("known-plans block unavailable for %s: %s", pid, exc)
+        return ""
+
+
 def _build_prompt(llm_input: dict[str, Any]) -> str:
     """Build the full prompt from template and input.
 
@@ -212,6 +237,7 @@ def _build_prompt(llm_input: dict[str, Any]) -> str:
         "{website}": ctx.get("website", "") or "",
         "{content_type}": llm_input.get("content_type", "HTML"),
         "{trimmed_content}": llm_input.get("trimmed_content", ""),
+        "{known_floor_plans}": _resolve_known_plans_block(ctx),
     }
     result = template
     for placeholder, value in replacements.items():
@@ -501,6 +527,7 @@ async def analyze_api_with_llm(
     prompt = prompt.replace("{website}", property_context.get("website", "") or "")
     prompt = prompt.replace("{api_url}", api_url)
     prompt = prompt.replace("{api_response_json}", body_str)
+    prompt = prompt.replace("{known_floor_plans}", _resolve_known_plans_block(property_context))
 
     system = (
         "You are a real estate data extraction agent analyzing API responses. "
@@ -633,6 +660,7 @@ async def analyze_dom_with_llm(
     prompt = prompt.replace("{website}", property_context.get("website", "") or "")
     prompt = prompt.replace("{page_url}", page_url)
     prompt = prompt.replace("{dom_section_html}", dom_html)
+    prompt = prompt.replace("{known_floor_plans}", _resolve_known_plans_block(property_context))
 
     system = (
         "You are a real estate data extraction agent analyzing website DOM. "
