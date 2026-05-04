@@ -88,12 +88,214 @@ _ASSIGNMENT_RE = re.compile(
 )
 
 
+# Schema.org container types that wrap a multi-Offer array where each Offer
+# represents a unit. Used by ``_extract_offers_as_units``. These types are
+# NOT in TARGET_JSONLD_TYPES (so they do not pollute _walk_jsonld output);
+# they are walked separately as a second pass.
+_OFFER_CONTAINER_TYPES: frozenset[str] = frozenset(
+    {
+        "Place",
+        "LocalBusiness",
+        "RealEstateListing",
+        "Product",
+        # ApartmentComplex appears here too — when it has a multi-Offer array
+        # it's the same pattern. The first-pass loop treats ApartmentComplex
+        # as property metadata only (no offers price means "skip"); the
+        # second pass below will emit per-Offer units when offers[] >= 2.
+        "ApartmentComplex",
+    }
+)
+
+
+def _money_int_or_none(v: Any) -> int | None:
+    """Helper: parse a money-shaped value to int, returning None on failure."""
+    if v is None or v == "":
+        return None
+    return _money_to_int(str(v))
+
+
+def _build_unit_from_offer(
+    offer: dict[str, Any], parent_name: str, source_url: str
+) -> dict[str, Any] | None:
+    """Build a unit-shape dict from a single Offer node nested under a Place /
+    LocalBusiness / Product / RealEstateListing / ApartmentComplex container.
+
+    Pulls floor_plan_name, rent, sqft, beds, availability from either the
+    Offer itself or its ``itemOffered`` sub-node. Returns None if the offer
+    has no rent at all (we do not emit phantom rows from offers without
+    pricing).
+    """
+    item: dict[str, Any] = (
+        offer.get("itemOffered") if isinstance(offer.get("itemOffered"), dict) else {}
+    )
+
+    name = offer.get("name") or item.get("name") or parent_name or ""
+    if not isinstance(name, str):
+        name = str(name)
+
+    lo_i = _money_int_or_none(offer.get("lowPrice") or offer.get("price"))
+    hi_i = _money_int_or_none(offer.get("highPrice"))
+    # Some Offers attach price under itemOffered instead of the offer itself
+    if lo_i is None and isinstance(item, dict):
+        lo_i = _money_int_or_none(item.get("price") or item.get("lowPrice"))
+        if hi_i is None:
+            hi_i = _money_int_or_none(item.get("highPrice"))
+
+    if lo_i is None and hi_i is None:
+        return None
+
+    if lo_i is not None and hi_i is not None and lo_i != hi_i:
+        rent_range = f"${lo_i:,} - ${hi_i:,}"
+    elif lo_i is not None:
+        rent_range = f"${lo_i:,}"
+    elif hi_i is not None:
+        rent_range = f"${hi_i:,}"
+    else:
+        return None
+
+    sqft = ""
+    if isinstance(item, dict):
+        sqft = _jsonld_floor_size(item)
+    if not sqft:
+        sqft = _jsonld_floor_size(offer)
+
+    bedrooms = ""
+    num_rooms = item.get("numberOfRooms") if isinstance(item, dict) else None
+    if num_rooms in (None, ""):
+        num_rooms = offer.get("numberOfRooms")
+    if isinstance(num_rooms, dict):
+        num_rooms = num_rooms.get("value", "")
+    if num_rooms not in (None, ""):
+        bedrooms = str(num_rooms)
+
+    avail = ""
+    if isinstance(item, dict):
+        avail = item.get("availability") or ""
+    if not avail:
+        avail = offer.get("availability") or ""
+    avail_date = ""
+    if isinstance(item, dict):
+        avail_date = item.get("availabilityStarts") or ""
+    if not avail_date:
+        avail_date = offer.get("validFrom") or ""
+
+    return {
+        "floor_plan_name": name,
+        "bed_label": "",
+        "bedrooms": bedrooms,
+        "bathrooms": "",
+        "sqft": sqft,
+        "unit_number": "",
+        "floor": "",
+        "building": "",
+        "rent_range": rent_range,
+        "market_rent_low": lo_i if lo_i is not None else hi_i,
+        "market_rent_high": hi_i if hi_i is not None else lo_i,
+        "deposit": "",
+        "concession": "",
+        "availability_status": str(avail) if avail else "",
+        "available_units": "",
+        "availability_date": str(avail_date) if avail_date else "",
+        "lease_term": "",
+        "move_in_date": "",
+        "source_api_url": source_url,
+        "extraction_tier": "TIER_2_JSONLD",
+    }
+
+
+def _extract_offers_as_units(data: Any, source_url: str) -> list[dict[str, Any]]:
+    """Find Place / LocalBusiness / Product / RealEstateListing / ApartmentComplex
+    containers in the JSON-LD tree that have a multi-Offer array, and emit
+    each Offer as a unit dict.
+
+    Many marketing-site JSON-LD blocks use this pattern — a single container
+    node describing the property + an ``offers`` (or ``makesOffer``) array
+    where each Offer corresponds to a unit/floor-plan. The original
+    extraction loop only handled the per-Apartment-with-offers case and
+    missed these container patterns, leaving ~50% of properties with
+    extractable JSON-LD failing extraction (May 2026 investigation).
+
+    Distinguishing-fields guard: the offers must have at least one
+    distinguishing dimension (≥2 distinct prices, names, or sqft values)
+    before we emit them. This protects against a single-offer-replicated
+    array masquerading as multiple units.
+    """
+    units: list[dict[str, Any]] = []
+
+    def _walk(node: Any) -> None:
+        if isinstance(node, dict):
+            t = node.get("@type")
+            t_list: list[str] = []
+            if isinstance(t, str):
+                t_list = [t]
+            elif isinstance(t, list):
+                t_list = [x for x in t if isinstance(x, str)]
+
+            if any(x in _OFFER_CONTAINER_TYPES for x in t_list):
+                parent_name = node.get("name") if isinstance(node.get("name"), str) else ""
+                for key in ("offers", "makesOffer", "itemListElement"):
+                    arr = node.get(key)
+                    if not isinstance(arr, list) or len(arr) < 2:
+                        continue
+                    # Distinguishing-fields guard: collect prices, names, sqft
+                    prices: set[str] = set()
+                    names: set[str] = set()
+                    sizes: set[str] = set()
+                    offer_dicts = [o for o in arr if isinstance(o, dict)]
+                    for o in offer_dicts:
+                        for pk in ("price", "lowPrice", "highPrice"):
+                            v = o.get(pk)
+                            if v not in (None, ""):
+                                prices.add(str(v))
+                        n = o.get("name")
+                        if n:
+                            names.add(str(n))
+                        io = o.get("itemOffered") if isinstance(o.get("itemOffered"), dict) else {}
+                        if io.get("name"):
+                            names.add(str(io["name"]))
+                        fs = _jsonld_floor_size(io) if io else ""
+                        if fs:
+                            sizes.add(fs)
+                    distinct_dims = sum(1 for s in (prices, names, sizes) if len(s) >= 2)
+                    if distinct_dims < 1:
+                        continue
+                    for o in offer_dicts:
+                        u = _build_unit_from_offer(o, parent_name, source_url)
+                        if u:
+                            units.append(u)
+
+            # Recurse into all children. node.values() already iterates @graph
+            # if present, so we do NOT walk it separately — doing so would
+            # double-emit when a container is referenced via both a regular key
+            # and an @graph entry.
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                _walk(v)
+
+    _walk(data)
+    return units
+
+
 def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]:
     """Extract unit records from ``<script type="application/ld+json">`` blocks.
 
     Emits the adapter-compatible dict shape (``floor_plan_name``,
     ``rent_range``, ``sqft``, etc.) with ``extraction_tier="TIER_2_JSONLD"``.
     Missing / malformed JSON-LD blocks are silently skipped.
+
+    Two extraction passes:
+      1. ``TARGET_JSONLD_TYPES`` items (Apartment, FloorPlan, etc.) — each
+         emitted as a unit. Existing behavior, preserved verbatim.
+      2. Container types with multi-Offer arrays (Place, LocalBusiness,
+         Product, RealEstateListing, ApartmentComplex) — each Offer in the
+         array emitted as a unit. Added 2026-05 to recover ~370 properties
+         that ship JSON-LD but use the container-with-offers pattern.
+
+    Pass 2 only fires when pass 1 returned no units, to avoid double-counting
+    when both patterns are present (e.g., a Place with offers AND nested
+    Apartment nodes).
     """
     if not html:
         return []
@@ -104,6 +306,7 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
         # lxml missing — BS4 will raise; fall back to the stdlib parser.
         soup = BeautifulSoup(html, "html.parser")
 
+    parsed_blocks: list[Any] = []
     units: list[dict[str, Any]] = []
     for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
         text = script.string or script.get_text()
@@ -113,6 +316,7 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
             data = json.loads(text)
         except (json.JSONDecodeError, ValueError):
             continue
+        parsed_blocks.append(data)
 
         matched: list[dict[str, Any]] = []
         _walk_jsonld(data, matched)
@@ -140,6 +344,15 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
                 continue
             if t == "Offer" or (isinstance(t, list) and "Offer" in t and len(t) == 1):
                 continue
+            # Skip ApartmentComplex when its offers field is a multi-Offer
+            # array — that pattern is the "container with per-unit Offers"
+            # case handled in pass 2 (_extract_offers_as_units). Emitting
+            # ApartmentComplex from pass 1 would compress the array into a
+            # single fake aggregate unit AND block pass 2 from running.
+            if "ApartmentComplex" in t_list:
+                offers_field = item.get("offers")
+                if isinstance(offers_field, list) and len(offers_field) >= 2:
+                    continue
             if not _jsonld_item_has_unit_signal(item):
                 continue
 
@@ -219,6 +432,14 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
                     "extraction_tier": "TIER_2_JSONLD",
                 }
             )
+
+    # Pass 2: Container-with-offers pattern (Place / LocalBusiness / Product /
+    # RealEstateListing / ApartmentComplex with multi-Offer array). Only fires
+    # when pass 1 returned nothing — avoids double-counting when both patterns
+    # coexist on the same page (typical RentCafe / SightMap layouts ship both).
+    if not units:
+        for data in parsed_blocks:
+            units.extend(_extract_offers_as_units(data, source_url))
 
     return units
 
