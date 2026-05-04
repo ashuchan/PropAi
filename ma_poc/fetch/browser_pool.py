@@ -14,7 +14,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from playwright.async_api import Browser, BrowserContext, Page
+    from patchright.async_api import Browser, BrowserContext, Page
 
 from .proxy.base import ProxyConfig
 from .stealth import Identity
@@ -41,7 +41,7 @@ class BrowserContextPool:
         if self._browser is None or not self._browser.is_connected():
             async with self._lock:
                 if self._browser is None or not self._browser.is_connected():
-                    from playwright.async_api import async_playwright
+                    from patchright.async_api import async_playwright
 
                     pw = await async_playwright().start()
                     self._browser = await pw.chromium.launch(headless=True)

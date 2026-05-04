@@ -24,6 +24,8 @@ exclude = ["tests/fixtures/.*"]
 [[tool.mypy.overrides]]
 module = [
     "playwright.*",
+    "patchright.*",
+    "curl_cffi.*",
     "extruct.*",
     "timezonefinder.*",
     "respx.*",

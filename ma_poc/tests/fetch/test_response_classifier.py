@@ -71,7 +71,7 @@ def test_classify_playwright_timeout_exception() -> None:
     # taught about it, render-mode navigation timeouts fell through to a
     # generic "TimeoutError" signature, which broke retry back-off that keyed
     # on the literal string "timeout".
-    from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
+    from patchright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
     exc = PlaywrightTimeoutError("Page.goto: Timeout 20000ms exceeded.")
     outcome, sig = classify(None, {}, None, exception=exc)

@@ -76,15 +76,12 @@ def _is_silent_block(
     # counts as silent.
     return len(body.strip()) < _SILENT_BLOCK_BODY_THRESHOLD
 
-# Playwright's TimeoutError is its own hierarchy: playwright._impl._errors.Error
-# → Exception. It does NOT inherit from asyncio.TimeoutError or the builtin
-# TimeoutError, so `isinstance(exc, TimeoutError)` misses it and the classifier
-# falls through to a generic "TimeoutError" signature instead of "timeout".
-# Downstream retry logic keys on "TIMEOUT" in the signature and happened to work
-# by accident, but diagnostic tooling and retry-after behavior break. Import
-# defensively so the classifier remains usable without Playwright installed.
+# patchright (our chosen shim) uses the same internal error hierarchy as playwright.
+# TimeoutError does NOT inherit from asyncio.TimeoutError or the builtin TimeoutError,
+# so `isinstance(exc, TimeoutError)` misses it and the classifier falls through to a
+# generic signature. Import defensively so the classifier is usable without patchright.
 try:  # pragma: no cover — import-time only
-    from playwright._impl._errors import TimeoutError as _PlaywrightTimeoutError
+    from patchright._impl._errors import TimeoutError as _PlaywrightTimeoutError
 except Exception:  # pragma: no cover
     _PlaywrightTimeoutError = None  # type: ignore[assignment,misc]
 

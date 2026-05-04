@@ -11,6 +11,10 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+# Re-exported so fetch-internal modules (e.g. http_client) can import FetchTier
+# from here without a circular dependency through ma_poc.models.
+from ma_poc.models.fetch_tier import FetchTier as FetchTier  # noqa: F401
+
 
 class RenderMode(StrEnum):
     """How the URL should be fetched."""
