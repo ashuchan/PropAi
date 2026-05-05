@@ -1,7 +1,7 @@
-"""Tests confirming the proxy URL flows from ProxyPool → httpx / browser_pool.
+"""Tests confirming the proxy URL flows from ProxyPool → http_client / browser_pool.
 
 These tests mock at the boundary where the proxy string is actually used —
-httpx.AsyncClient for GET/HEAD fetches and BrowserContextPool.acquire for
+make_http_client for GET/HEAD fetches and BrowserContextPool.acquire for
 RENDER fetches — verifying that the BrightData URL reaches the right call
 intact and that proxy_used in FetchResult is redacted.
 """
@@ -9,21 +9,16 @@ intact and that proxy_used in FetchResult is redacted.
 from __future__ import annotations
 
 import asyncio
-import sys
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
-# httpx is not installed in the test environment; stub it before any module
-# that imports it at the module level is imported.
-if "httpx" not in sys.modules:
-    sys.modules["httpx"] = MagicMock()
-
-from ma_poc.discovery.contracts import CrawlTask, TaskReason  # noqa: E402
-from ma_poc.fetch.browser_pool import BrowserContextPool  # noqa: E402
-from ma_poc.fetch.contracts import RenderMode  # noqa: E402
-from ma_poc.fetch.fetcher import Fetcher  # noqa: E402
-from ma_poc.fetch.proxy_pool import ProxyPool  # noqa: E402
-from ma_poc.fetch.stealth import Identity, IdentityPool  # noqa: E402
+from ma_poc.discovery.contracts import CrawlTask, TaskReason
+from ma_poc.fetch.browser_pool import BrowserContextPool
+from ma_poc.fetch.contracts import RenderMode
+from ma_poc.fetch.fetcher import Fetcher
+from ma_poc.fetch.http_client import _AdapterResponse
+from ma_poc.fetch.proxy_pool import ProxyPool
+from ma_poc.fetch.stealth import Identity, IdentityPool
 
 _BD_URL = "http://brd-customer-hl_6785472d-zone-residential_proxy1:0owuh5392unq@brd.superproxy.io:33335"
 
@@ -33,6 +28,20 @@ _IDENTITY = Identity(
     viewport=(1280, 720),
     platform="Windows",
 )
+
+
+def _make_mock_adapter(url: str) -> AsyncMock:
+    """Return a mock that looks like _HttpxAdapter / _CurlCffiAdapter."""
+    adapter = AsyncMock()
+    adapter.request = AsyncMock(return_value=_AdapterResponse(
+        status_code=200,
+        headers={},
+        content=b"<html></html>",
+        final_url=url,
+        cookies={},
+    ))
+    adapter.aclose = AsyncMock()
+    return adapter
 
 
 def _make_fetcher(proxy_url: str | None = _BD_URL) -> Fetcher:
@@ -61,32 +70,21 @@ def _get_task(render_mode: RenderMode = RenderMode.GET) -> CrawlTask:
     )
 
 
-# ── GET / HEAD path — httpx.AsyncClient proxy kwarg ───────────────────────────
+# ── GET / HEAD path — make_http_client proxy kwarg ────────────────────────────
 
 
 def test_get_request_passes_proxy_to_httpx() -> None:
-    """httpx.AsyncClient must receive proxy= equal to the BrightData URL."""
+    """make_http_client must receive the BrightData proxy URL."""
     fetcher = _make_fetcher(_BD_URL)
     task = _get_task(RenderMode.GET)
     captured: dict = {}
 
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.headers = {}
-    mock_resp.content = b"<html></html>"
-    mock_resp.url = task.url
-
-    mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client.request = AsyncMock(return_value=mock_resp)
-
-    def _fake_async_client(**kwargs: object) -> AsyncMock:
-        captured.update(kwargs)
-        return mock_client
+    def _fake_make_client(tier: object, proxy: object) -> AsyncMock:
+        captured["proxy"] = proxy
+        return _make_mock_adapter(task.url)
 
     async def _go() -> None:
-        with patch("ma_poc.fetch.fetcher.httpx.AsyncClient", side_effect=_fake_async_client):
+        with patch("ma_poc.fetch.fetcher.make_http_client", side_effect=_fake_make_client):
             await fetcher._do_request(task, _IDENTITY, _BD_URL, None, None, 1, int(time.time() * 1000))
 
     asyncio.run(_go())
@@ -94,28 +92,17 @@ def test_get_request_passes_proxy_to_httpx() -> None:
 
 
 def test_get_no_proxy_passes_none_to_httpx() -> None:
-    """When proxy=None, httpx.AsyncClient must receive proxy=None."""
+    """When proxy=None, make_http_client must receive proxy=None."""
     fetcher = _make_fetcher(None)
     task = _get_task(RenderMode.GET)
     captured: dict = {}
 
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.headers = {}
-    mock_resp.content = b"<html></html>"
-    mock_resp.url = task.url
-
-    mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client.request = AsyncMock(return_value=mock_resp)
-
-    def _fake_async_client(**kwargs: object) -> AsyncMock:
-        captured.update(kwargs)
-        return mock_client
+    def _fake_make_client(tier: object, proxy: object) -> AsyncMock:
+        captured["proxy"] = proxy
+        return _make_mock_adapter(task.url)
 
     async def _go() -> None:
-        with patch("ma_poc.fetch.fetcher.httpx.AsyncClient", side_effect=_fake_async_client):
+        with patch("ma_poc.fetch.fetcher.make_http_client", side_effect=_fake_make_client):
             await fetcher._do_request(task, _IDENTITY, None, None, None, 1, int(time.time() * 1000))
 
     asyncio.run(_go())
@@ -127,19 +114,8 @@ def test_proxy_used_field_is_redacted_in_result() -> None:
     fetcher = _make_fetcher(_BD_URL)
     task = _get_task(RenderMode.GET)
 
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.headers = {}
-    mock_resp.content = b"<html></html>"
-    mock_resp.url = task.url
-
-    mock_client = AsyncMock()
-    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client.__aexit__ = AsyncMock(return_value=False)
-    mock_client.request = AsyncMock(return_value=mock_resp)
-
-    async def _go():
-        with patch("ma_poc.fetch.fetcher.httpx.AsyncClient", return_value=mock_client):
+    async def _go() -> object:
+        with patch("ma_poc.fetch.fetcher.make_http_client", return_value=_make_mock_adapter(task.url)):
             return await fetcher._do_request(task, _IDENTITY, _BD_URL, None, None, 1, int(time.time() * 1000))
 
     result = asyncio.run(_go())

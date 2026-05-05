@@ -4,7 +4,11 @@
 # Windows ARM64 compatible — using >= to get the latest binary wheel available.
 # CLAUDE.md originally specified exact pins; relaxed here because many C-extension
 # packages lack Windows ARM64 wheels at older versions.
-playwright>=1.55.0
+# S1: patchright replaces vanilla playwright as the stealth shim (drop-in API).
+# playwright is kept as an indirect dep (patchright pulls it in).
+patchright>=1.55.0
+# S2: curl_cffi provides Chrome TLS impersonation for DC_PROXY+ tiers.
+curl_cffi>=0.7.0
 aiofiles>=23.2.0
 openai>=1.30.0
 anthropic>=0.26.0

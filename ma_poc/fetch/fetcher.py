@@ -21,15 +21,16 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     from ..models.scrape_profile import ScrapeProfile
 
-import httpx
-
 from ..config.feature_flags import ENABLE_TIER_ESCALATION
 from ..discovery.contracts import CrawlTask
 from ..observability.events import EventKind, emit
 from .browser_pool import BrowserContextPool
 from .captcha_detect import looks_like_captcha
 from .conditional import ConditionalCache
-from .contracts import FetchOutcome, FetchResult, RenderMode
+from .contracts import FetchOutcome, FetchResult, FetchTier, RenderMode
+from .cookie_jar import PropertyCookieJar
+from .headers import chrome_header_set
+from .http_client import make_http_client
 from .proxy_pool import ProxyPool
 from .rate_limiter import HostRateLimiter
 from .response_classifier import (
@@ -370,49 +371,60 @@ class Fetcher:
         if task.render_mode == RenderMode.RENDER:
             return await self._do_render(task, identity, proxy, attempt, start_ms)
 
-        # HEAD or GET via httpx
-        headers: dict[str, str] = {
-            "User-Agent": identity.user_agent,
-            "Accept-Language": identity.accept_language,
-        }
+        # HEAD or GET via tier-aware HTTP client (S2/S3/S4).
+        # This path is only reached when ENABLE_TIER_ESCALATION is False;
+        # DC_PROXY+ tiers are handled by providers/ when escalation is on.
+        tier = FetchTier.DIRECT
+
+        # S3 — full Chrome-equivalent header set (cold visit = no prior etag/lm).
+        cold_visit = etag is None and last_modified is None
+        headers = chrome_header_set(identity, cold_visit=cold_visit)
         if etag:
             headers["If-None-Match"] = etag
         if last_modified:
             headers["If-Modified-Since"] = last_modified
 
+        # S4 — per-property cookie persistence.
+        host = urlparse(task.url).netloc
+        identity_slot = self._identities.current_slot(task.property_id)
+        jar = PropertyCookieJar(task.property_id, identity_slot)
+        cookies = jar.cookies_for_host(host)
+
         timeout_sec = min(task.budget_ms / 1000.0, 30.0)
         method = "HEAD" if task.render_mode == RenderMode.HEAD else "GET"
 
+        # S2 — tier-aware client (httpx for DIRECT, curl_cffi for DC_PROXY+).
+        client = make_http_client(tier, proxy)
         try:
-            async with httpx.AsyncClient(
-                proxy=proxy,
-                timeout=timeout_sec,
-                follow_redirects=True,
-                verify=True,
-            ) as client:
-                resp = await client.request(method, task.url, headers=headers)
+            resp = await client.request(
+                method, task.url, headers=headers, cookies=cookies, timeout=timeout_sec
+            )
 
-                resp_headers = {k.lower(): v for k, v in resp.headers.items()}
-                body = resp.content if method == "GET" else None
-                body_head = body[:4096] if body else None
+            resp_headers = resp.headers
+            body = resp.content if method == "GET" else None
+            body_head = body[:4096] if body else None
 
-                outcome, sig = classify(resp.status_code, resp_headers, body_head)
+            outcome, sig = classify(resp.status_code, resp_headers, body_head)
 
-                return FetchResult(
-                    url=task.url,
-                    outcome=outcome,
-                    status=resp.status_code,
-                    body=body,
-                    headers=resp_headers,
-                    render_mode=task.render_mode,
-                    final_url=str(resp.url),
-                    attempts=attempt,
-                    elapsed_ms=_now_ms() - start_ms,
-                    etag=resp_headers.get("etag"),
-                    last_modified=resp_headers.get("last-modified"),
-                    error_signature=sig,
-                    proxy_used=_redact_proxy(proxy),
-                )
+            # S4 — persist any cookies the server issued (HEAD can also set cookies).
+            if resp.cookies:
+                jar.update_from_response(host, resp.cookies)
+
+            return FetchResult(
+                url=task.url,
+                outcome=outcome,
+                status=resp.status_code,
+                body=body,
+                headers=resp_headers,
+                render_mode=task.render_mode,
+                final_url=resp.final_url,
+                attempts=attempt,
+                elapsed_ms=_now_ms() - start_ms,
+                etag=resp_headers.get("etag"),
+                last_modified=resp_headers.get("last-modified"),
+                error_signature=sig,
+                proxy_used=_redact_proxy(proxy),
+            )
         except Exception as exc:
             outcome, sig = classify(None, {}, None, exception=exc)
             return FetchResult(
@@ -428,6 +440,8 @@ class Fetcher:
                 error_signature=sig,
                 proxy_used=_redact_proxy(proxy),
             )
+        finally:
+            await client.aclose()
 
     async def _do_render(
         self,

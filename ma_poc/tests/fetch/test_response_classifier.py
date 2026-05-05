@@ -71,7 +71,7 @@ def test_classify_playwright_timeout_exception() -> None:
     # taught about it, render-mode navigation timeouts fell through to a
     # generic "TimeoutError" signature, which broke retry back-off that keyed
     # on the literal string "timeout".
-    from playwright._impl._errors import TimeoutError as PlaywrightTimeoutError
+    from patchright._impl._errors import TimeoutError as PlaywrightTimeoutError
 
     exc = PlaywrightTimeoutError("Page.goto: Timeout 20000ms exceeded.")
     outcome, sig = classify(None, {}, None, exception=exc)
@@ -83,3 +83,14 @@ def test_classify_404_hard_fail() -> None:
     outcome, sig = classify(404, {}, b"")
     assert outcome == FetchOutcome.HARD_FAIL
     assert sig == "HTTP_404"
+
+
+def test_patchright_timeout_import_resolves() -> None:
+    """Catches patchright internal reorganisation that would silently degrade
+    classify() to generic 'TimeoutError' signatures, breaking retry back-off."""
+    from ma_poc.fetch.response_classifier import _PlaywrightTimeoutError
+    assert _PlaywrightTimeoutError is not None, (
+        "patchright._impl._errors.TimeoutError is not importable. "
+        "The classifier will fall back to generic 'TimeoutError' signatures, "
+        "breaking retry-after behaviour that keys on 'timeout' in the signature."
+    )

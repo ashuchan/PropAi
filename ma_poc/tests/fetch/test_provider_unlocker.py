@@ -7,15 +7,20 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ma_poc.fetch.contracts import FetchOutcome, RenderMode
+from ma_poc.fetch.http_client import _AdapterResponse
 from ma_poc.models.fetch_tier import FetchTier
+
+_URL = "https://example.com/apartments"
 
 
 def _make_task() -> MagicMock:
     task = MagicMock()
-    task.url = "https://example.com/apartments"
+    task.url = _URL
     task.property_id = "prop-ulk-001"
     task.render_mode = RenderMode.GET
     task.budget_ms = 10000
+    task.etag = None
+    task.last_modified = None
     return task
 
 
@@ -23,13 +28,21 @@ def _make_profile() -> MagicMock:
     return MagicMock()
 
 
-def _mock_response(status: int = 200, body: bytes = b"<html>ok</html>") -> MagicMock:
-    resp = MagicMock()
-    resp.status_code = status
-    resp.content = body
-    resp.headers = {"content-type": "text/html"}
-    resp.url = "https://example.com/apartments"
-    return resp
+def _adapter_resp(status: int = 200, body: bytes = b"<html>ok</html>") -> _AdapterResponse:
+    return _AdapterResponse(
+        status_code=status,
+        headers={"content-type": "text/html"},
+        content=body,
+        final_url=_URL,
+        cookies={},
+    )
+
+
+def _mock_adapter(resp: _AdapterResponse) -> AsyncMock:
+    adapter = AsyncMock()
+    adapter.request = AsyncMock(return_value=resp)
+    adapter.aclose = AsyncMock()
+    return adapter
 
 
 _UNLOCKER_ENV = {
@@ -43,17 +56,14 @@ _UNLOCKER_ENV = {
 async def test_unlocker_sets_tier() -> None:
     task = _make_task()
     profile = _make_profile()
-    mock_resp = _mock_response(200)
 
     with (
         patch.dict("os.environ", _UNLOCKER_ENV),
-        patch("httpx.AsyncClient") as mock_client_cls,
+        patch(
+            "ma_poc.fetch.providers.unlocker.make_http_client",
+            return_value=_mock_adapter(_adapter_resp(200)),
+        ),
     ):
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-        mock_client.request = AsyncMock(return_value=mock_resp)
-
         from ma_poc.fetch.providers.unlocker import UnlockerProvider
         provider = UnlockerProvider()
         result = await provider.fetch(task, profile)
@@ -80,17 +90,14 @@ async def test_unlocker_missing_env_raises() -> None:
 async def test_unlocker_redacts_proxy_in_result() -> None:
     task = _make_task()
     profile = _make_profile()
-    mock_resp = _mock_response(200)
 
     with (
         patch.dict("os.environ", _UNLOCKER_ENV),
-        patch("httpx.AsyncClient") as mock_client_cls,
+        patch(
+            "ma_poc.fetch.providers.unlocker.make_http_client",
+            return_value=_mock_adapter(_adapter_resp(200)),
+        ),
     ):
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-        mock_client.request = AsyncMock(return_value=mock_resp)
-
         from ma_poc.fetch.providers.unlocker import UnlockerProvider
         provider = UnlockerProvider()
         result = await provider.fetch(task, profile)

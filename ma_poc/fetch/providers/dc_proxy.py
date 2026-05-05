@@ -17,13 +17,15 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-import httpx
-
+from ma_poc.fetch._jar_helper import jar_for
 from ma_poc.fetch.block_signatures import match_block_signature
 from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
+from ma_poc.fetch.headers import chrome_header_set
+from ma_poc.fetch.http_client import make_http_client
 from ma_poc.fetch.proxy.base import ProxyTier
 from ma_poc.fetch.proxy.brightdata import BrightDataProvider
 from ma_poc.fetch.response_classifier import classify
+from ma_poc.fetch.stealth import IdentityPool
 from ma_poc.models.fetch_tier import FetchTier
 
 if TYPE_CHECKING:
@@ -35,6 +37,7 @@ log = logging.getLogger(__name__)
 _MAX_ATTEMPTS = 2
 _BASE_BACKOFF_MS = 800
 _TIER = FetchTier.DC_PROXY
+_IDENTITIES = IdentityPool()
 
 
 class DcProxyProvider:
@@ -86,39 +89,44 @@ async def _single_attempt(
 ) -> FetchResult:
     timeout_sec = min(task.budget_ms / 1000.0, 30.0)
     method = "HEAD" if task.render_mode == RenderMode.HEAD else "GET"
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; PropAi/1.0)"}
+    identity = _IDENTITIES.pick_chrome_only(sticky_key=task.property_id)
+    cold_visit = not (task.etag or task.last_modified)
+    headers = chrome_header_set(identity, cold_visit=cold_visit)
+    if task.etag:
+        headers["If-None-Match"] = task.etag
+    if task.last_modified:
+        headers["If-Modified-Since"] = task.last_modified
 
+    jar, host, cookies = jar_for(task, _IDENTITIES)
+    client = make_http_client(_TIER, proxy)
     try:
-        async with httpx.AsyncClient(
-            proxy=proxy,
-            timeout=timeout_sec,
-            follow_redirects=True,
-        ) as client:
-            resp = await client.request(method, task.url, headers=headers)
-            resp_headers = {k.lower(): v for k, v in resp.headers.items()}
-            body = resp.content if method == "GET" else None
-            body_head = body[:4096] if body else None
-            outcome, sig = classify(resp.status_code, resp_headers, body_head)
-            block_sig = None
-            if outcome == FetchOutcome.BOT_BLOCKED:
-                block_sig = match_block_signature(body_head or b"", resp_headers, resp.status_code)
-            proxy_display = _redact(proxy) if proxy else None
-            return FetchResult(
-                url=task.url,
-                outcome=outcome,
-                status=resp.status_code,
-                body=body,
-                headers=resp_headers,
-                render_mode=task.render_mode,
-                final_url=str(resp.url),
-                attempts=attempt,
-                elapsed_ms=_now_ms() - start_ms,
-                etag=resp_headers.get("etag"),
-                last_modified=resp_headers.get("last-modified"),
-                error_signature=sig,
-                proxy_used=proxy_display,
-                block_signature=block_sig,
-            )
+        resp = await client.request(method, task.url, headers=headers, cookies=cookies, timeout=timeout_sec)
+        resp_headers = resp.headers
+        body = resp.content if method == "GET" else None
+        body_head = body[:4096] if body else None
+        outcome, sig = classify(resp.status_code, resp_headers, body_head)
+        if resp.cookies:
+            jar.update_from_response(host, resp.cookies)
+        block_sig = None
+        if outcome == FetchOutcome.BOT_BLOCKED:
+            block_sig = match_block_signature(body_head or b"", resp_headers, resp.status_code)
+        proxy_display = _redact(proxy) if proxy else None
+        return FetchResult(
+            url=task.url,
+            outcome=outcome,
+            status=resp.status_code,
+            body=body,
+            headers=resp_headers,
+            render_mode=task.render_mode,
+            final_url=resp.final_url,
+            attempts=attempt,
+            elapsed_ms=_now_ms() - start_ms,
+            etag=resp_headers.get("etag"),
+            last_modified=resp_headers.get("last-modified"),
+            error_signature=sig,
+            proxy_used=proxy_display,
+            block_signature=block_sig,
+        )
     except Exception as exc:
         outcome, sig = classify(None, {}, None, exception=exc)
         return FetchResult(
@@ -134,6 +142,8 @@ async def _single_attempt(
             error_signature=sig,
             proxy_used=_redact(proxy) if proxy else None,
         )
+    finally:
+        await client.aclose()
 
 
 def _stamp(result: FetchResult, tier: FetchTier, attempts: list[int]) -> FetchResult:
