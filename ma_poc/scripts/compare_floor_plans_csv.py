@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import pandas as pd
+from dotenv import load_dotenv
 from rapidfuzz import fuzz
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -52,6 +53,8 @@ _HERE = Path(__file__).resolve()
 _MA_POC_ROOT = _HERE.parent.parent
 if str(_MA_POC_ROOT) not in sys.path:
     sys.path.insert(0, str(_MA_POC_ROOT))
+
+load_dotenv(_MA_POC_ROOT / ".env")
 
 from data_provider.sql.engine import make_engine, make_session_factory  # noqa: E402
 from data_provider.sql.models import (  # noqa: E402

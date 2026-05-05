@@ -36,7 +36,7 @@ COPY --from=builder /opt/venv /opt/venv
 # are intentionally omitted — scraper/browser.py only launches Chromium.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl \
- && playwright install --with-deps chromium \
+ && patchright install --with-deps chromium \
  && chown -R pwuser:pwuser /ms-playwright \
  && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache
 
