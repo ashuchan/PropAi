@@ -371,12 +371,10 @@ class Fetcher:
         if task.render_mode == RenderMode.RENDER:
             return await self._do_render(task, identity, proxy, attempt, start_ms)
 
-        # HEAD or GET via tier-aware HTTP client (S2/S3/S4)
-        # Determine fetch tier: use profile.fetch.tier_floor when available,
-        # else default to DIRECT so legacy single-tier callers are unaffected.
+        # HEAD or GET via tier-aware HTTP client (S2/S3/S4).
+        # This path is only reached when ENABLE_TIER_ESCALATION is False;
+        # DC_PROXY+ tiers are handled by providers/ when escalation is on.
         tier = FetchTier.DIRECT
-        if hasattr(task, "fetch_tier") and task.fetch_tier is not None:
-            tier = task.fetch_tier  # type: ignore[assignment]
 
         # S3 — full Chrome-equivalent header set (cold visit = no prior etag/lm).
         cold_visit = etag is None and last_modified is None
