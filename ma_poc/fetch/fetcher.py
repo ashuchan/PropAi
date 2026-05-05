@@ -523,43 +523,18 @@ class Fetcher:
                 if nav_exc is None:
                     nav_exc = exc
 
-            # 2026-05 Fix A (replaces Fix Q from batch-3) — late-render
-            # re-capture for ANY small JS-rendered body. Initial Fix Q
-            # required specific framework markers (__NEXT_DATA__ / __NUXT__
-            # / React / Angular) but most marketing-template sites use
-            # WordPress + Elementor + jQuery and have none of those
-            # markers. Probe (courtyardgretna.com): WordPress site with
-            # 213KB full HTML rendered but our canary captured only 12KB
-            # after the standard 2-sec sleep — none of the framework
-            # markers were present so Fix Q's trigger never fired.
-            #
-            # New trigger:
-            #   • initial body is small (< 30KB)
-            #   • no $NNN-formatted rent visible (so we know we're missing
-            #     content rather than already having what we need)
-            #   • >= 3 <script tags (confirms it's a JS-heavy page, not a
-            #     tiny error page)
-            # Action: wait 5 sec, re-capture; keep the larger body.
-            #
             # 2026-05 Fix B — portal-aware long wait on iframe-drilled
             # portal hosts. SightMap / RealPage onlineleasing / AppFolio
-            # iframe pages load units via XHR after the iframe loads. The
-            # initial 2-sec post-load sleep is way too short — XHR takes
-            # 5-10 seconds. Detect portal hosts and wait additional 8 sec.
-            # Fires on top of (or instead of) Fix A. Cost bounded by the
-            # narrow trigger.
+            # iframe pages load units via XHR after the iframe loads.
+            # The initial 2-sec post-load sleep is too short — XHR takes
+            # 5-10 sec. Detect portal hosts and wait additional 8 sec.
+            #
+            # NOTE: a broader "any small JS-heavy body" trigger (Fix A in
+            # batch-6) was tested and reverted — it fired on too many
+            # pages, the cumulative 5-sec waits pushed shards past the
+            # per-task timeout, and recovery DROPPED -18 vs v5. Keep the
+            # trigger narrow.
             if body_text is not None and len(body_text) >= 512:
-                import re as _re_q
-
-                tlc = body_text
-                # Cheap dollar-rent check — if visible, skip both A and B
-                has_dollar_rent = bool(
-                    _re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", tlc)
-                )
-
-                # ── Fix B: portal-aware long wait ──
-                # Check the actual landed URL — if it's a known portal,
-                # wait longer because XHR is what populates units.
                 portal_match = False
                 try:
                     landed = page.url or task.url
@@ -575,32 +550,20 @@ class Fetcher:
                 except Exception:
                     portal_match = False
 
-                if portal_match and not has_dollar_rent:
-                    try:
-                        await asyncio.sleep(8.0)
-                        body_text_2 = await page.content()
-                        if body_text_2 and len(body_text_2) > len(body_text):
-                            body_text = body_text_2
-                            tlc = body_text
-                            has_dollar_rent = bool(
-                                _re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", tlc)
-                            )
-                    except Exception:
-                        pass
+                if portal_match:
+                    import re as _re_q
 
-                # ── Fix A: small-body JS-heavy re-capture (broadened) ──
-                if (
-                    not has_dollar_rent
-                    and 512 <= len(body_text) < 30000
-                    and body_text.count("<script") >= 3
-                ):
-                    try:
-                        await asyncio.sleep(5.0)
-                        body_text_2 = await page.content()
-                        if body_text_2 and len(body_text_2) > len(body_text):
-                            body_text = body_text_2
-                    except Exception:
-                        pass
+                    has_dollar_rent = bool(
+                        _re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", body_text)
+                    )
+                    if not has_dollar_rent:
+                        try:
+                            await asyncio.sleep(8.0)
+                            body_text_2 = await page.content()
+                            if body_text_2 and len(body_text_2) > len(body_text):
+                                body_text = body_text_2
+                        except Exception:
+                            pass
 
             if body_text is None or len(body_text) < 512:
                 outcome, sig = classify(
