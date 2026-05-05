@@ -5,7 +5,11 @@
 # CLAUDE.md originally specified exact pins; relaxed here because many C-extension
 # packages lack Windows ARM64 wheels at older versions.
 # S1: patchright replaces vanilla playwright as the stealth shim (drop-in API).
-# playwright is kept as an indirect dep (patchright pulls it in).
+# Recent patchright (>=1.55) does NOT pull in `playwright` transitively, but
+# several modules still `from playwright.async_api import Page` (under
+# TYPE_CHECKING) and scraper/browser.py imports it with a try/except guard.
+# Pin both so the runtime venv has the playwright package available.
+playwright>=1.55.0
 patchright>=1.55.0
 # S2: curl_cffi provides Chrome TLS impersonation for DC_PROXY+ tiers.
 curl_cffi>=0.7.0
