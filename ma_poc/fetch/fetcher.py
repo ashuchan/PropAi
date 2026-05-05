@@ -523,6 +523,47 @@ class Fetcher:
                 if nav_exc is None:
                     nav_exc = exc
 
+            # 2026-05 Fix Q — late-render re-capture for JS-heavy marketing
+            # template sites. Investigation of the May 5 prod run found
+            # properties where curl returns 213KB of HTML with visible rents
+            # but the canary captured only 12KB after the standard 2-sec
+            # post-load sleep — the SPA hadn't finished hydrating. Trigger:
+            # initial body is small AND has SPA framework markers AND no
+            # dollar-formatted rent string is visible. Wait 5 more seconds
+            # and re-capture; keep the larger of the two bodies. Bounded:
+            # only fires once per fetch, only on small-body + framework-
+            # marker pages, so worst-case adds ~5 sec to the JS-rendered
+            # cohort which is also the cohort least likely to succeed
+            # without the wait. Cost is bounded.
+            if body_text is not None and 512 <= len(body_text) < 30000:
+                tlc = body_text  # already a string
+                has_framework = (
+                    "__NEXT_DATA__" in tlc
+                    or "window.__NUXT__" in tlc
+                    or "data-reactroot" in tlc
+                    or "ng-version=" in tlc
+                    or 'id="__nuxt"' in tlc
+                )
+                # Cheap dollar-rent check — if visible, no need to wait
+                has_dollar_rent = False
+                for i in range(0, len(tlc), 2048):
+                    chunk = tlc[i : i + 2048]
+                    if "$" in chunk:
+                        # Look for $NNN..NNNN with optional comma
+                        import re as _re_q
+
+                        if _re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", chunk):
+                            has_dollar_rent = True
+                            break
+                if has_framework and not has_dollar_rent:
+                    try:
+                        await asyncio.sleep(5.0)
+                        body_text_2 = await page.content()
+                        if body_text_2 and len(body_text_2) > len(body_text):
+                            body_text = body_text_2
+                    except Exception:
+                        pass
+
             if body_text is None or len(body_text) < 512:
                 outcome, sig = classify(
                     resp.status if resp else None,
