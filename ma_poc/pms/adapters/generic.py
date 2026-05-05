@@ -1763,8 +1763,19 @@ class GenericAdapter:
                 #             to catch smaller marketing-template homepages)
                 strict_match = _text_bytes >= 5000 and _rent_hits >= 1
                 broad_match = _text_bytes >= 2000 and _kw_hits >= 2
+                # Fix 4: third trigger — for very small pages (< 2KB stripped
+                # text) that look like AppFolio / Wix / SquareSpace marketing
+                # shells, allow LLM if there's at least 1 rent keyword. These
+                # are typically tiny landing pages that point to a hosted
+                # portal; the LLM may extract a "schedule a tour" hint or
+                # link the runner can follow. Threshold lowered to 1KB.
+                tiny_marketing_match = (
+                    _text_bytes >= 1000
+                    and _kw_hits >= 1
+                    and ctx.detected.pms in ("appfolio", "wix_nopms", "squarespace_nopms", "unknown")
+                )
 
-                if strict_match or broad_match:
+                if strict_match or broad_match or tiny_marketing_match:
                     try:
                         from ma_poc.observability.events import EventKind
                         from ma_poc.observability.events import emit as _gate_emit
@@ -1780,6 +1791,8 @@ class GenericAdapter:
                                 "detected_adapter_empty_strict"
                                 if strict_match
                                 else "detected_adapter_empty_broad_keywords"
+                                if broad_match
+                                else "detected_adapter_empty_tiny_marketing"
                             ),
                         )
                     except Exception:
@@ -2038,6 +2051,72 @@ class GenericAdapter:
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
             result.errors.append(f"llm-tier-error: {exc}")
+
+        # Fix 6 — Vision LLM as Tier 5 last-resort fallback.
+        # When all text-based LLM tiers (api_targeted, dom_targeted, monolithic)
+        # have returned empty, AND the page has rent-context keywords visible
+        # in the body, AND we have a live Playwright page, take a screenshot
+        # and send it to a vision-capable model. Catches sites where rent
+        # renders inside images, custom canvas elements, or DOM patterns the
+        # text-LLM can't navigate.
+        #
+        # Bounded: only fires once per property, only when text-LLM has
+        # exhausted, only when ENABLE_TIER5_VISION env allows it (default
+        # on; can be disabled to control cost). Cost ~$0.05/property when
+        # it fires; expected to fire on ~120 of 5000 properties per run
+        # → ~$6 added per run.
+        try:
+            import os as _os_q
+            vision_enabled = _os_q.getenv("ENABLE_TIER5_VISION", "true").lower() in ("1", "true", "yes")
+            page_obj = getattr(ctx, "_page", None) or getattr(ctx, "page", None)
+            # Cheap rent-keyword check on stripped html
+            has_rent_kw = False
+            if html:
+                _hl = html.lower()
+                has_rent_kw = any(kw in _hl for kw in ("rent", "bedroom", "studio", "sqft", "floor plan", "$"))
+            if vision_enabled and page_obj is not None and has_rent_kw and hasattr(page_obj, "screenshot"):
+                t_v = _time.monotonic()
+                try:
+                    screenshot_bytes = await page_obj.screenshot(full_page=True, type="png", timeout=10000)
+                except Exception as exc:
+                    screenshot_bytes = None
+                    _log_attempt("generic:vision_llm", "skipped", reason=f"screenshot-error: {str(exc)[:60]}")
+                if screenshot_bytes:
+                    from ma_poc.services.vision_extractor import extract_with_vision
+                    try:
+                        vision_units, vision_hints, _raw, vision_interaction = await extract_with_vision(
+                            screenshot_bytes,
+                            property_context,
+                            cropped_sections=None,
+                            property_id=ctx.property_id or "unknown",
+                        )
+                    except Exception as exc:
+                        vision_units, vision_hints, vision_interaction = [], {}, None
+                        _log_attempt("generic:vision_llm", "errored", reason=str(exc)[:120])
+                    else:
+                        _log_attempt(
+                            "generic:vision_llm",
+                            "ran_units" if vision_units else "ran_empty",
+                            units=len(vision_units or []),
+                            reason="" if vision_units else "vision LLM returned no units",
+                            duration_ms=int((_time.monotonic() - t_v) * 1000),
+                        )
+                        if vision_interaction:
+                            llm_interactions.append(vision_interaction)
+                        if vision_units:
+                            result.units = vision_units
+                            result.tier_used = "TIER_5_VISION"
+                            result.winning_url = ctx.base_url
+                            result.confidence = min(0.70, 0.5 + 0.03 * len(vision_units))
+                            result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
+                            result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
+                            result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
+                            if vision_hints:
+                                result._llm_hints = vision_hints  # type: ignore[attr-defined]
+                            return result
+        except Exception as exc:
+            # Vision tier must never crash the adapter; swallow and continue
+            _log_attempt("generic:vision_llm", "errored", reason=str(exc)[:120])
 
         # All LLM sub-tiers empty — surface everything we learned so the
         # profile updater (Phase 4) can still record blocked endpoints and

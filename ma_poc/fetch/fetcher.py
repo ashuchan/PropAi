@@ -56,6 +56,14 @@ __all__ = [
 ]
 
 
+# Fix 7 — in-memory per-host learning of which hosts need late-render
+# re-capture. Populated when a portal-aware re-capture (Fix B + Fix 5)
+# successfully grew the body. Subsequent fetches to the same host get
+# a 5-sec preemptive wait without needing portal-host detection. Set
+# is per-shard (process-local); each shard learns its own slice.
+_LATE_RENDER_HOSTS: set[str] = set()
+
+
 def _classify_fetch_outcome(
     status_code: int | None,
     headers: dict[str, str] | None,
@@ -523,34 +531,54 @@ class Fetcher:
                 if nav_exc is None:
                     nav_exc = exc
 
-            # 2026-05 Fix B — portal-aware long wait on iframe-drilled
-            # portal hosts. SightMap / RealPage onlineleasing / AppFolio
-            # iframe pages load units via XHR after the iframe loads.
-            # The initial 2-sec post-load sleep is too short — XHR takes
-            # 5-10 sec. Detect portal hosts and wait additional 8 sec.
+            # 2026-05 Fix B + Fix 5 + Fix 7 — portal-aware late-render wait
+            # with extended portal list and in-memory per-host learning.
+            #
+            # Trigger: landed URL is on a known portal host (XHR loads units
+            # ~5-12 sec after page-load fires) OR host has been observed
+            # before in this run as needing late-render. Extend the wait
+            # to 12 sec on portal hosts; keep 8 sec for learned-hosts.
             #
             # NOTE: a broader "any small JS-heavy body" trigger (Fix A in
-            # batch-6) was tested and reverted — it fired on too many
-            # pages, the cumulative 5-sec waits pushed shards past the
-            # per-task timeout, and recovery DROPPED -18 vs v5. Keep the
-            # trigger narrow.
+            # batch-6) was tested and reverted — it fired on too many pages,
+            # cumulative 5-sec waits pushed shards past the per-task timeout,
+            # and recovery DROPPED -18 vs v5. Keep the trigger narrow.
             if body_text is not None and len(body_text) >= 512:
                 portal_match = False
+                landed_host = ""
                 try:
                     landed = page.url or task.url
                     landed_lower = landed.lower() if landed else ""
+                    # Extract host for per-host tracking
+                    try:
+                        from urllib.parse import urlparse as _urlparse_q
+                        landed_host = _urlparse_q(landed_lower).netloc
+                    except Exception:
+                        landed_host = ""
                     portal_match = any(
                         m in landed_lower
                         for m in (
                             "sightmap.com",
                             ".onlineleasing.realpage.com",
                             ".appfolio.com",
+                            ".rentcafe.com",  # Fix 5 — added per cluster analysis
+                            "rlets.com",  # Fix 5 — Hyly's portal CDN
+                            "my.hy.ly",  # Fix 5 — Hyly portal
                         )
                     )
                 except Exception:
                     portal_match = False
+                    landed_host = ""
 
-                if portal_match:
+                # Fix 7 — per-host learned-wait (in-memory, per-shard)
+                # Hosts marked as "needed late-render" on a previous fetch
+                # this run get a shorter 5-sec preemptive wait next time.
+                # Module-level set; survives across fetches in the same
+                # shard process but not across shards. That's fine — each
+                # shard learns its own slice.
+                learned_wait = landed_host in _LATE_RENDER_HOSTS if landed_host else False
+
+                if portal_match or learned_wait:
                     import re as _re_q
 
                     has_dollar_rent = bool(
@@ -558,10 +586,14 @@ class Fetcher:
                     )
                     if not has_dollar_rent:
                         try:
-                            await asyncio.sleep(8.0)
+                            wait_sec = 12.0 if portal_match else 5.0
+                            await asyncio.sleep(wait_sec)
                             body_text_2 = await page.content()
                             if body_text_2 and len(body_text_2) > len(body_text):
                                 body_text = body_text_2
+                                # Fix 7 — record this host for future fetches
+                                if landed_host:
+                                    _LATE_RENDER_HOSTS.add(landed_host)
                         except Exception:
                             pass
 
