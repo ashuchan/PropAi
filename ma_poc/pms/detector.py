@@ -47,6 +47,7 @@ PmsName = Literal[
     "sightmap",
     "realpage_oll",
     "avalonbay",
+    "amli",
     "funnel",
     "touchtour",
     "squarespace_nopms",
@@ -72,6 +73,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "sightmap": "api_first",
     "realpage_oll": "portal_hop",
     "avalonbay": "api_first",
+    "amli": "api_first",
     "funnel": "api_first",
     "touchtour": "cascade",
     "squarespace_nopms": "syndication_only",
@@ -109,6 +111,17 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
     (re.compile(r"(?:^|\.)rentcafe\.com$"), "rentcafe", 0.95, "host ends in rentcafe.com"),
     (re.compile(r"(?:^|\.)sightmap\.com$"), "sightmap", 0.95, "host ends in sightmap.com"),
     (re.compile(r"(?:^|\.)avaloncommunities\.com$"), "avalonbay", 0.95, "host ends in avaloncommunities.com"),
+    # AMLI must beat entrata/sightmap — AMLI HTML embeds Entrata's
+    # commoncf widget URLs and SightMap iframe markers in its lease
+    # portal section. Without this guard the detector mis-routes to
+    # those adapters, which return empty, and falls into the LLM
+    # cascade. Single REIT, single host, definitive match.
+    (
+        re.compile(r"(?:^|\.)amli\.com$"),
+        "amli",
+        0.95,
+        "host ends in amli.com (AMLI Residential)",
+    ),
     (re.compile(r"(?:^|\.)entrata\.com$"), "entrata", 0.95, "host ends in entrata.com"),
     (re.compile(r"(?:^|\.)appfolio\.com$"), "appfolio", 0.95, "host ends in appfolio.com"),
     # RealPage portals that are NOT the OneSite OLL subdomain shape — e.g.
@@ -395,6 +408,7 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "squarespace": ("squarespace.com",),
     "realpage": ("api.ws.realpage.com", "realpage.com"),
     "avalonbay": ("avaloncommunities.com",),
+    "amli": ("amli.com",),
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
     # Marketing / lead-capture stacks — observed in 10-property roll-up

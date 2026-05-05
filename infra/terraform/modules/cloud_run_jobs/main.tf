@@ -10,7 +10,7 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
 
     template {
       service_account       = var.worker_sa_email
-      timeout               = "14400s" # 4h hard ceiling
+      timeout               = "7200s" # 2h hard ceiling
       max_retries           = 1
       execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
 

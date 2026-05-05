@@ -324,6 +324,12 @@ async def _call_llm(prompt: str, property_id: str) -> tuple[dict, float, str]:
 
     Retries once on JSONDecodeError with an explicit JSON-only reminder appended.
     Never raises — returns ({}, 0.0, "") on unrecoverable failure.
+
+    Empty-body short-circuit: when the upstream returns "" or whitespace-only
+    content (the ``char 0`` JSONDecodeError class), the second attempt is
+    skipped — retrying an empty body just doubles the latency cost with no
+    chance of success. Callers detect this case via ``raw == ""`` and surface
+    the source URL to the per-property blocklist.
     """
     endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
     api_key = os.environ.get("AZURE_OPENAI_API_KEY", "")
@@ -355,6 +361,15 @@ async def _call_llm(prompt: str, property_id: str) -> tuple[dict, float, str]:
                 raw = await provider.complete(system, current_prompt, max_tokens=4096)
             except Exception as exc:
                 log.warning("llm_api_rescue: shared LLM call failed for %s: %s", property_id, exc)
+                return {}, 0.0, ""
+            # Empty-body short-circuit: upstream returned nothing. Retry
+            # would just hit the same null response. Surface to caller via
+            # raw="" so it can blocklist the source URL.
+            if not raw or not raw.strip():
+                log.warning(
+                    "llm_api_rescue: empty body from provider for %s (attempt %d); not retrying",
+                    property_id, attempt + 1,
+                )
                 return {}, 0.0, ""
             usage = getattr(provider, "_last_usage", {}) or {}
             try:
@@ -411,6 +426,14 @@ async def _call_llm(prompt: str, property_id: str) -> tuple[dict, float, str]:
                 resp.raise_for_status()
                 data = resp.json()
             raw = data["choices"][0]["message"]["content"]
+            # Empty-body short-circuit (Azure path) — see shared-provider
+            # branch above for rationale.
+            if not raw or not raw.strip():
+                log.warning(
+                    "llm_api_rescue: empty body from Azure for %s (attempt %d); not retrying",
+                    property_id, attempt + 1,
+                )
+                return {}, 0.0, ""
             # Estimate cost: GPT-4o-mini ~$0.15/1M input + $0.60/1M output tokens
             usage = data.get("usage", {})
             in_tok = usage.get("prompt_tokens", 0)
@@ -593,6 +616,20 @@ async def rescue_from_api_responses(inp: RescueInput) -> RescueOutput:
             parsed, cost, _raw = await _call_llm(prompt, inp.property_id)
             out.n_llm_calls += 1
             out.cost_usd += cost
+
+            # Empty-body case: _call_llm short-circuited because upstream
+            # returned nothing. Persist the URL pattern (query string
+            # stripped, numeric segments collapsed) to the per-property
+            # blocklist so subsequent runs skip every variant of this
+            # endpoint via _filter_candidates AND so generic adapter
+            # Phase 2 filters it before tier dispatch. Distinct from
+            # llm_returned_no_units — that one means the LLM ran but
+            # classified the body as noise. Pattern-level (not raw URL)
+            # so /api/units?cursor=1 and /api/units?cursor=2 collapse
+            # into one blocklist entry.
+            if not parsed and not _raw:
+                out.blocked_endpoints.append((_url_to_pattern(cand["url"]), "llm_empty_response"))
+                continue
 
             llm_units = parsed.get("units") or []
             if not llm_units:

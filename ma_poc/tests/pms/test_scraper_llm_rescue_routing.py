@@ -270,6 +270,66 @@ def _make_scraper_mocks(pms_name: str, adapter_units: list, rescue_units: list):
 
 
 @pytest.mark.asyncio
+async def test_scraper_bridges_rescue_blocked_endpoints_into_llm_analysis_results() -> None:
+    """The empty-body / no-units blocklist returned by rescue must be mirrored
+    into ``result["_llm_analysis_results"]`` as ``"noise:<reason>"`` strings.
+
+    Without this bridge, ``profile_updater.update_profile_after_extraction``
+    never sees the entries — it iterates only ``_llm_analysis_results``,
+    not ``adapter_result.blocked_endpoints``. The pre-fix gap meant a URL
+    flagged as empty-body in run N would re-fire in run N+1 and burn
+    another LLM timeout.
+    """
+    from ma_poc.pms import scraper as scraper_mod
+    from ma_poc.services.llm_api_rescue import RescueOutput
+
+    empty_result = AdapterResult(units=_hollow_units(), tier_used="TIER_1_API")
+    rescue_out = RescueOutput(
+        units=[],  # rescue itself recovered nothing
+        tier_used="",
+        cost_usd=0.0,
+        n_llm_calls=2,
+        blocked_endpoints=[
+            ("https://amli.com/api/units", "llm_empty_response"),
+            ("https://amli.com/api/floorplans", "llm_returned_no_units"),
+        ],
+    )
+
+    with (
+        patch("ma_poc.pms.scraper.get_adapter") as mock_get_adapter,
+        patch("ma_poc.pms.scraper.resolve_target") as mock_resolve,
+        patch("ma_poc.pms.scraper.detect_pms") as mock_detect,
+        patch(
+            "ma_poc.services.llm_api_rescue.rescue_from_api_responses", return_value=rescue_out
+        ),
+    ):
+        mock_detect.return_value = _detected("generic")
+        mock_resolve.return_value = MagicMock(
+            resolved_url="https://test.com",
+            final_detection=_detected("generic"),
+            original_url="https://test.com",
+            hop_path=[],
+            method="noop",
+        )
+        mock_adapter = AsyncMock()
+        mock_adapter.pms_name = "generic"
+        mock_adapter.extract = AsyncMock(return_value=empty_result)
+        mock_get_adapter.return_value = mock_adapter
+
+        result = await scraper_mod.scrape(
+            "https://test.com",
+            api_responses=_api_responses(),
+            property_id="TEST-001",
+        )
+
+    analysis = result.get("_llm_analysis_results") or {}
+    # Both rescue blocklist URLs must be mirrored as noise:<reason> strings
+    # so profile_updater.update_profile_blocklist sees them.
+    assert analysis.get("https://amli.com/api/units") == "noise:llm_empty_response"
+    assert analysis.get("https://amli.com/api/floorplans") == "noise:llm_returned_no_units"
+
+
+@pytest.mark.asyncio
 async def test_scraper_invokes_rescue_for_generic_adapter_empty_units() -> None:
     from ma_poc.pms import scraper as scraper_mod
 

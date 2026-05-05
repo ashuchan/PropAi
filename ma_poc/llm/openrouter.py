@@ -14,7 +14,7 @@ import json
 import os
 from typing import Any
 
-from llm.base import LLMProvider
+from llm.base import LLM_REQUEST_TIMEOUT_SECONDS, LLMProvider
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_IMAGE_LIMIT_BYTES = 20 * 1024 * 1024  # 20 MB conservative default
@@ -40,6 +40,7 @@ class OpenRouterLLMProvider(LLMProvider):
         self._client = AsyncOpenAI(
             base_url=OPENROUTER_BASE_URL,
             api_key=os.getenv("OPENROUTER_API_KEY", "").strip().lstrip("﻿"),
+            timeout=LLM_REQUEST_TIMEOUT_SECONDS,
         )
         self._text_model = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
         self._vision_model = os.getenv(

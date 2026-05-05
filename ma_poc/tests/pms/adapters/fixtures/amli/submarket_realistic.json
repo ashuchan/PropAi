@@ -1,0 +1,160 @@
+{
+  "buildId": "t3KvGMirFu6g4xt9EDf_j",
+  "isFallback": false,
+  "page": "/apartments/[region]/[subregion]",
+  "pageProps": {
+    "region": "austin",
+    "subregion": "downtown-austin-apartments",
+    "trpcState": {
+      "json": {
+        "queries": [
+          {
+            "queryKey": ["prismic.region", { "region": "austin" }],
+            "state": {
+              "data": {
+                "id": "prismic-region-austin",
+                "type": "region",
+                "uid": "austin",
+                "data": {
+                  "title": "Austin",
+                  "subregions": [
+                    { "uid": "downtown-austin-apartments", "title": "Downtown Austin" }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "queryKey": ["prismic.subregion", { "subregion": "downtown-austin-apartments" }],
+            "state": {
+              "data": {
+                "id": "prismic-subregion-downtown-austin-apartments",
+                "type": "subregion",
+                "uid": "downtown-austin-apartments",
+                "data": {
+                  "title": "Downtown Austin Apartments",
+                  "properties": [
+                    { "uid": "amli-south-shore", "name": "AMLI South Shore" },
+                    { "uid": "amli-downtown", "name": "AMLI Downtown" }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "queryKey": ["floorplans.bySubregion", { "region": "austin", "subregion": "downtown-austin-apartments" }],
+            "state": {
+              "data": [
+                {
+                  "floorplanName": "A1a",
+                  "propertyUid": "amli-south-shore",
+                  "propertySlug": "amli-south-shore",
+                  "propertyName": "AMLI South Shore",
+                  "entrataPropertyId": 1357,
+                  "bedrooms": 1,
+                  "bathroomMin": 1,
+                  "bathroomMax": 1,
+                  "sqftMin": 712,
+                  "sqftMax": 712,
+                  "priceMin": 2750,
+                  "priceMax": 2920,
+                  "priceMinWithFees": 2818,
+                  "availableUnitCount": 2,
+                  "units": [
+                    {
+                      "unitNumber": "1515",
+                      "floor": "15",
+                      "rent": 2750.0,
+                      "rpAvailableDate": "2026-06-16",
+                      "entrataUnitId": "u-1515"
+                    },
+                    {
+                      "unitNumber": "0814",
+                      "floor": "8",
+                      "rent": 2920.5,
+                      "rpAvailableDate": "2026-07-02T00:00:00Z",
+                      "entrataUnitId": "u-0814"
+                    }
+                  ]
+                },
+                {
+                  "floorplanName": "B2",
+                  "propertyUid": "amli-south-shore",
+                  "propertySlug": "amli-south-shore",
+                  "propertyName": "AMLI South Shore",
+                  "entrataPropertyId": 1357,
+                  "bedrooms": 2,
+                  "bathroomMin": 2,
+                  "bathroomMax": 2,
+                  "sqftMin": 1100,
+                  "sqftMax": 1180,
+                  "priceMin": 4100,
+                  "priceMax": 4250,
+                  "availableUnitCount": 1,
+                  "units": [
+                    {
+                      "unitNumber": "2207",
+                      "floor": "22",
+                      "rent": 4100.0,
+                      "rpAvailableDate": "2026-06-01",
+                      "entrataUnitId": "u-2207"
+                    }
+                  ]
+                },
+                {
+                  "floorplanName": "S1",
+                  "propertyUid": "amli-south-shore",
+                  "propertySlug": "amli-south-shore",
+                  "propertyName": "AMLI South Shore",
+                  "entrataPropertyId": 1357,
+                  "bedrooms": 0,
+                  "bathroomMin": 1,
+                  "bathroomMax": 1,
+                  "sqftMin": 478,
+                  "sqftMax": 478,
+                  "priceMin": null,
+                  "priceMax": null,
+                  "availableUnitCount": 0,
+                  "units": []
+                },
+                {
+                  "floorplanName": "AD1",
+                  "propertyUid": "amli-downtown",
+                  "propertySlug": "amli-downtown",
+                  "propertyName": "AMLI Downtown",
+                  "entrataPropertyId": 9999,
+                  "bedrooms": 1,
+                  "bathroomMin": 1,
+                  "bathroomMax": 1,
+                  "sqftMin": 800,
+                  "sqftMax": 800,
+                  "priceMin": 3000,
+                  "priceMax": 3000,
+                  "availableUnitCount": 1,
+                  "units": [
+                    {
+                      "unitNumber": "AD-101",
+                      "floor": "1",
+                      "rent": 3000.0,
+                      "rpAvailableDate": "2026-08-01",
+                      "entrataUnitId": "u-ad-101"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "queryKey": ["prismic.amenities", {}],
+            "state": {
+              "data": [
+                { "id": "fitness", "label": "Fitness Center" },
+                { "id": "pool", "label": "Pool" }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

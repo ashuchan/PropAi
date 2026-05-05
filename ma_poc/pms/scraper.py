@@ -456,6 +456,19 @@ async def scrape(
 
             result["_rescue_cost_usd"] = rescue.cost_usd
 
+            # Bridge rescue's per-URL blocklist into _llm_analysis_results so
+            # profile_updater actually persists them. profile_updater reads
+            # only that dict (looking for "noise:<reason>" sentinels) — until
+            # this bridge existed, blocked_endpoints died at the rescue
+            # boundary on every run, defeating the whole point of the cache.
+            if rescue.blocked_endpoints:
+                analysis = result.setdefault("_llm_analysis_results", {})
+                for blocked_url, reason in rescue.blocked_endpoints:
+                    # Don't clobber a successful-mapping entry for the same URL.
+                    if blocked_url in analysis and isinstance(analysis[blocked_url], dict):
+                        continue
+                    analysis[blocked_url] = f"noise:{reason}"
+
             if rescue.units:
                 adapter_result.units = rescue.units
                 adapter_result.tier_used = rescue.tier_used

@@ -6,6 +6,7 @@ the registry wiring in this file does not change.
 
 from __future__ import annotations
 
+from ma_poc.pms.adapters.amli import AmliAdapter
 from ma_poc.pms.adapters.appfolio import AppFolioAdapter
 from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
@@ -45,6 +46,7 @@ def _bootstrap_registry() -> None:
         SightMapAdapter,
         RealPageOllAdapter,
         AvalonBayAdapter,
+        AmliAdapter,
         FunnelAdapter,
         TouchTourAdapter,
         SquarespaceNoPmsAdapter,

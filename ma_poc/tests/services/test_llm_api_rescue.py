@@ -244,6 +244,74 @@ async def test_rescue_stops_retrying_after_second_json_decode_error() -> None:
     assert result.units == []
 
 
+# ── Empty-body blocklist (2026-05-06) ────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_rescue_blocks_url_when_llm_returns_empty_body() -> None:
+    """When _call_llm returns ({}, 0, "") — the empty-body sentinel — the
+    candidate URL pattern is added to blocked_endpoints with reason
+    ``llm_empty_response`` so subsequent runs skip it via the per-property
+    profile filter.
+    """
+    async def empty_body(prompt: str, pid: str) -> tuple[dict, float, str]:
+        return {}, 0.0, ""
+
+    with patch("ma_poc.services.llm_api_rescue._call_llm", side_effect=empty_body):
+        result = await rescue_from_api_responses(
+            _inp(api_responses=[
+                {"url": "https://amli.com/api/empty?cursor=1", "body": {"units": [{"x": 1}]}},
+            ])
+        )
+
+    assert result.units == []
+    # Distinct reason — must NOT be misclassified as llm_returned_no_units.
+    reasons = {r for _, r in result.blocked_endpoints}
+    assert reasons == {"llm_empty_response"}
+    # URL pattern is stored — query string stripped — so the same endpoint
+    # with a different cursor matches the blocklist on the next run.
+    blocked_urls = [u for u, _ in result.blocked_endpoints]
+    assert blocked_urls == ["https://amli.com/api/empty"]
+
+
+@pytest.mark.asyncio
+async def test_rescue_empty_body_blocklist_collapses_query_variants() -> None:
+    """A flapping endpoint that returns empty bodies under multiple cursor
+    values should result in ONE pattern entry, not N raw-URL entries."""
+    async def empty_body(prompt: str, pid: str) -> tuple[dict, float, str]:
+        return {}, 0.0, ""
+
+    responses = [
+        {"url": "https://amli.com/api/units?cursor=1", "body": {"units": [{"x": 1}]}},
+        {"url": "https://amli.com/api/units?cursor=2", "body": {"units": [{"x": 2}]}},
+    ]
+    with patch("ma_poc.services.llm_api_rescue._call_llm", side_effect=empty_body):
+        result = await rescue_from_api_responses(_inp(api_responses=responses))
+
+    # Both candidates produced the same URL pattern → 2 entries with the
+    # same key. update_profile_blocklist will dedupe these by URL pattern.
+    blocked_urls = {u for u, _ in result.blocked_endpoints}
+    assert blocked_urls == {"https://amli.com/api/units"}
+
+
+@pytest.mark.asyncio
+async def test_rescue_distinguishes_empty_body_from_no_units_classification() -> None:
+    """``llm_returned_no_units`` is reserved for the case where the LLM
+    actually classified the body as noise. ``llm_empty_response`` is for the
+    case where the upstream returned nothing. They must NOT be conflated.
+    """
+    async def llm_says_no_units(prompt: str, pid: str) -> tuple[dict, float, str]:
+        return {"units": []}, 0.005, '{"units":[]}'
+
+    with patch("ma_poc.services.llm_api_rescue._call_llm", side_effect=llm_says_no_units):
+        result = await rescue_from_api_responses(_inp())
+
+    assert result.units == []
+    reasons = {r for _, r in result.blocked_endpoints}
+    assert reasons == {"llm_returned_no_units"}
+    assert "llm_empty_response" not in reasons
+
+
 # ── Quality gate rejection ────────────────────────────────────────────────────
 
 

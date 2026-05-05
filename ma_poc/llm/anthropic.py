@@ -7,7 +7,7 @@ import json
 import os
 from typing import Any
 
-from llm.base import LLMProvider
+from llm.base import LLM_REQUEST_TIMEOUT_SECONDS, LLMProvider
 
 try:
     from anthropic import (
@@ -38,7 +38,10 @@ class AnthropicLLMProvider(LLMProvider):
     def __init__(self) -> None:
         if AsyncAnthropic is None:
             raise RuntimeError("anthropic package not installed")
-        self._client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY", "").strip().lstrip("﻿"))
+        self._client = AsyncAnthropic(
+            api_key=os.getenv("ANTHROPIC_API_KEY", "").strip().lstrip("﻿"),
+            timeout=LLM_REQUEST_TIMEOUT_SECONDS,
+        )
         # Haiku 4.5 is currently the cheapest Anthropic model and
         # supports vision — default both text and vision to it. Override
         # via ANTHROPIC_VISION_MODEL=claude-sonnet-... if higher vision

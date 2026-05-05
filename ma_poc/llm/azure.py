@@ -7,7 +7,7 @@ import json
 import os
 from typing import Any
 
-from llm.base import LLMProvider
+from llm.base import LLM_REQUEST_TIMEOUT_SECONDS, LLMProvider
 
 try:
     from openai import (
@@ -38,6 +38,7 @@ class AzureLLMProvider(LLMProvider):
             azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", "").strip().lstrip("﻿"),
             api_key=os.getenv("AZURE_OPENAI_API_KEY", "").strip().lstrip("﻿"),
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview"),
+            timeout=LLM_REQUEST_TIMEOUT_SECONDS,
         )
         self._text_model = os.getenv("AZURE_OPENAI_DEPLOYMENT_GPT4O_MINI", "gpt-4o-mini")
         self._vision_model = os.getenv("AZURE_OPENAI_DEPLOYMENT_GPT4O_VISION", "gpt-4o")
