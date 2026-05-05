@@ -25,6 +25,9 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
+_MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
+_DEFAULT_BASE = _MA_POC_ROOT / "data" / "cache" / "cookies"
+
 # Module-level lock per-jar-path; avoids two parallel fetches racing the file.
 _locks: dict[str, threading.Lock] = {}
 _locks_guard = threading.Lock()
@@ -55,9 +58,12 @@ class PropertyCookieJar:
     ) -> None:
         self._property_id = property_id
         self._slot = identity_slot
-        self._base_dir = base_dir or Path(
-            os.getenv("DATA_DIR", "ma_poc/data")
-        ) / "cache" / "cookies"
+        if base_dir is not None:
+            self._base_dir = base_dir
+        elif os.getenv("DATA_DIR"):
+            self._base_dir = Path(os.environ["DATA_DIR"]) / "cache" / "cookies"
+        else:
+            self._base_dir = _DEFAULT_BASE
         self._path = self._base_dir / f"{property_id}_{identity_slot}.json"
         self._cache: dict[str, dict[str, str]] | None = None
 

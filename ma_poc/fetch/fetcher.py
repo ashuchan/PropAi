@@ -406,8 +406,8 @@ class Fetcher:
 
             outcome, sig = classify(resp.status_code, resp_headers, body_head)
 
-            # S4 — persist any cookies the server issued.
-            if method == "GET" and resp.cookies:
+            # S4 — persist any cookies the server issued (HEAD can also set cookies).
+            if resp.cookies:
                 jar.update_from_response(host, resp.cookies)
 
             return FetchResult(

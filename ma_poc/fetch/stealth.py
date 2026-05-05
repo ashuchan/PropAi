@@ -201,6 +201,19 @@ class IdentityPool:
         idx = (self._hash_key(sticky_key) + rotation) % len(self._identities)
         return self._identities[idx]
 
+    def pick_chrome_only(self, sticky_key: str) -> Identity:
+        """Like pick(), but restricted to Chrome/Edge family for proxy-tier
+        use where curl_cffi ships a Chrome JA3 fingerprint.
+
+        Edge is included because Edge is Chromium-based and shares the JA3.
+        """
+        chrome_ids = [i for i in self._identities if i.browser_family in ("chrome", "edge")]
+        if not chrome_ids:
+            return self._identities[0]
+        rotation = self._rotations.get(sticky_key, 0)
+        idx = (self._hash_key(sticky_key) + rotation) % len(chrome_ids)
+        return chrome_ids[idx]
+
     def rotate(self, sticky_key: str) -> None:
         """Rotate to a different identity for the given key.
 

@@ -95,3 +95,12 @@ def test_s3_edge_identity_sec_ch_ua_contains_edge() -> None:
     headers = chrome_header_set(edge_id, cold_visit=False)
     assert "Sec-Ch-Ua" in headers
     assert "microsoft edge" in headers["Sec-Ch-Ua"].lower()
+
+
+def test_pick_chrome_only_excludes_firefox_safari() -> None:
+    from ma_poc.fetch.stealth import IdentityPool
+    pool = IdentityPool()
+    seen_families = {pool.pick_chrome_only(f"prop_{i}").browser_family for i in range(40)}
+    assert seen_families <= {"chrome", "edge"}, (
+        f"pick_chrome_only returned non-Chromium families: {seen_families}"
+    )

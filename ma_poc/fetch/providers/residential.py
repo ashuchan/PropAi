@@ -15,6 +15,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
+from ma_poc.fetch._jar_helper import jar_for
 from ma_poc.fetch.block_signatures import match_block_signature
 from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
 from ma_poc.fetch.headers import chrome_header_set
@@ -93,7 +94,7 @@ async def _single_attempt(
 ) -> FetchResult:
     timeout_sec = min(task.budget_ms / 1000.0, 30.0)
     method = "HEAD" if task.render_mode == RenderMode.HEAD else "GET"
-    identity = _IDENTITIES.pick(sticky_key=task.property_id)
+    identity = _IDENTITIES.pick_chrome_only(sticky_key=task.property_id)
     cold_visit = not (task.etag or task.last_modified)
     headers = chrome_header_set(identity, cold_visit=cold_visit)
     if task.etag:
@@ -101,13 +102,16 @@ async def _single_attempt(
     if task.last_modified:
         headers["If-Modified-Since"] = task.last_modified
 
+    jar, host, cookies = jar_for(task, _IDENTITIES)
     client = make_http_client(_TIER, proxy)
     try:
-        resp = await client.request(method, task.url, headers=headers, timeout=timeout_sec)
+        resp = await client.request(method, task.url, headers=headers, cookies=cookies, timeout=timeout_sec)
         resp_headers = resp.headers
         body = resp.content if method == "GET" else None
         body_head = body[:4096] if body else None
         outcome, sig = classify(resp.status_code, resp_headers, body_head)
+        if resp.cookies:
+            jar.update_from_response(host, resp.cookies)
         block_sig = None
         if outcome == FetchOutcome.BOT_BLOCKED:
             block_sig = match_block_signature(body_head or b"", resp_headers, resp.status_code)

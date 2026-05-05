@@ -83,3 +83,14 @@ def test_classify_404_hard_fail() -> None:
     outcome, sig = classify(404, {}, b"")
     assert outcome == FetchOutcome.HARD_FAIL
     assert sig == "HTTP_404"
+
+
+def test_patchright_timeout_import_resolves() -> None:
+    """Catches patchright internal reorganisation that would silently degrade
+    classify() to generic 'TimeoutError' signatures, breaking retry back-off."""
+    from ma_poc.fetch.response_classifier import _PlaywrightTimeoutError
+    assert _PlaywrightTimeoutError is not None, (
+        "patchright._impl._errors.TimeoutError is not importable. "
+        "The classifier will fall back to generic 'TimeoutError' signatures, "
+        "breaking retry-after behaviour that keys on 'timeout' in the signature."
+    )

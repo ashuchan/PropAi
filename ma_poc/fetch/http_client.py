@@ -95,7 +95,10 @@ class _HttpxAdapter:
         )
 
     async def aclose(self) -> None:
-        await self._client.aclose()
+        try:
+            await self._client.aclose()
+        except Exception:
+            pass
 
 
 class _CurlCffiAdapter:
