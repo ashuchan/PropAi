@@ -63,6 +63,19 @@ _re_strip_script = _re.compile(r"<script.*?</script>|<style.*?</style>", _re.IGN
 _re_strip_tag = _re.compile(r"<[^>]+>")
 _re_rent = _re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?", _re.IGNORECASE)
 
+# Broader rent-shaped pattern: matches rent values that don't lead with $.
+# Examples: "Starting at 1,500", "1,500/mo", "from $1500/month", "1500 - 2000",
+# "Rent: 1500", "Lease: $1,500/month". Used as a SECONDARY signal in
+# ``_extract_rent_dom_section`` when the strict ``$NNN`` regex finds nothing
+# — common on marketing-CMS sites (Jonah Digital, Hyly templates, etc.) that
+# strip the dollar sign in display text.
+_re_rent_loose = _re.compile(
+    r"(?:starting\s+(?:at|from)|from|rent|lease|monthly|priced\s+at)\s*[:\-]?\s*"
+    r"\$?\s?\d{3,4}(?:[,.]\d{3})?(?:\s*[/\-]\s*\$?\s?\d{3,4}(?:[,.]\d{3})?)?"
+    r"(?:\s*/?\s*(?:mo|month|monthly))?",
+    _re.IGNORECASE,
+)
+
 def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
     """Return True when units carry identity + physical (≥2 fields) + transactional.
 
@@ -769,6 +782,26 @@ def _extract_rent_dom_section(html: str, max_bytes: int = 20_000) -> str | None:
         except Exception:
             continue
         if len(_re_rent.findall(text)) < 2:
+            continue
+        s = str(el)
+        if 500 <= len(s) <= max_bytes and len(s) < best_len:
+            best, best_len = el, len(s)
+
+    if best is not None:
+        return str(best)
+
+    # 2026-05 batch-3 broadened: try the loose rent-pattern (matches
+    # "Starting at 1,500", "1,500/mo" etc. without `$`). This catches
+    # marketing-CMS sites (Jonah Digital, Hyly templates) where rent
+    # is displayed without dollar signs and the strict regex misses.
+    best = None
+    best_len = 10**9
+    for el in soup.find_all(True):
+        try:
+            text = el.get_text(" ", strip=True)
+        except Exception:
+            continue
+        if len(_re_rent_loose.findall(text)) < 2:
             continue
         s = str(el)
         if 500 <= len(s) <= max_bytes and len(s) < best_len:
@@ -1724,10 +1757,12 @@ class GenericAdapter:
                 # Two relaxation triggers (any one suffices):
                 #   strict — body >= 5KB AND >= 1 dollar-formatted rent signal
                 #            (preserves original behavior — known-good cases)
-                #   broad  — body >= 3KB AND >= 2 rent-related keywords
-                #            (catches marketing sites with non-dollar pricing)
+                #   broad  — body >= 2KB AND >= 2 rent-related keywords
+                #            (catches marketing sites with non-dollar pricing;
+                #             threshold lowered from 3KB to 2KB in batch-3
+                #             to catch smaller marketing-template homepages)
                 strict_match = _text_bytes >= 5000 and _rent_hits >= 1
-                broad_match = _text_bytes >= 3000 and _kw_hits >= 2
+                broad_match = _text_bytes >= 2000 and _kw_hits >= 2
 
                 if strict_match or broad_match:
                     try:
