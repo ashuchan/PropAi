@@ -523,39 +523,77 @@ class Fetcher:
                 if nav_exc is None:
                     nav_exc = exc
 
-            # 2026-05 Fix Q — late-render re-capture for JS-heavy marketing
-            # template sites. Investigation of the May 5 prod run found
-            # properties where curl returns 213KB of HTML with visible rents
-            # but the canary captured only 12KB after the standard 2-sec
-            # post-load sleep — the SPA hadn't finished hydrating. Trigger:
-            # initial body is small AND has SPA framework markers AND no
-            # dollar-formatted rent string is visible. Wait 5 more seconds
-            # and re-capture; keep the larger of the two bodies. Bounded:
-            # only fires once per fetch, only on small-body + framework-
-            # marker pages, so worst-case adds ~5 sec to the JS-rendered
-            # cohort which is also the cohort least likely to succeed
-            # without the wait. Cost is bounded.
-            if body_text is not None and 512 <= len(body_text) < 30000:
-                tlc = body_text  # already a string
-                has_framework = (
-                    "__NEXT_DATA__" in tlc
-                    or "window.__NUXT__" in tlc
-                    or "data-reactroot" in tlc
-                    or "ng-version=" in tlc
-                    or 'id="__nuxt"' in tlc
-                )
-                # Cheap dollar-rent check — if visible, no need to wait
-                has_dollar_rent = False
-                for i in range(0, len(tlc), 2048):
-                    chunk = tlc[i : i + 2048]
-                    if "$" in chunk:
-                        # Look for $NNN..NNNN with optional comma
-                        import re as _re_q
+            # 2026-05 Fix A (replaces Fix Q from batch-3) — late-render
+            # re-capture for ANY small JS-rendered body. Initial Fix Q
+            # required specific framework markers (__NEXT_DATA__ / __NUXT__
+            # / React / Angular) but most marketing-template sites use
+            # WordPress + Elementor + jQuery and have none of those
+            # markers. Probe (courtyardgretna.com): WordPress site with
+            # 213KB full HTML rendered but our canary captured only 12KB
+            # after the standard 2-sec sleep — none of the framework
+            # markers were present so Fix Q's trigger never fired.
+            #
+            # New trigger:
+            #   • initial body is small (< 30KB)
+            #   • no $NNN-formatted rent visible (so we know we're missing
+            #     content rather than already having what we need)
+            #   • >= 3 <script tags (confirms it's a JS-heavy page, not a
+            #     tiny error page)
+            # Action: wait 5 sec, re-capture; keep the larger body.
+            #
+            # 2026-05 Fix B — portal-aware long wait on iframe-drilled
+            # portal hosts. SightMap / RealPage onlineleasing / AppFolio
+            # iframe pages load units via XHR after the iframe loads. The
+            # initial 2-sec post-load sleep is way too short — XHR takes
+            # 5-10 seconds. Detect portal hosts and wait additional 8 sec.
+            # Fires on top of (or instead of) Fix A. Cost bounded by the
+            # narrow trigger.
+            if body_text is not None and len(body_text) >= 512:
+                import re as _re_q
 
-                        if _re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", chunk):
-                            has_dollar_rent = True
-                            break
-                if has_framework and not has_dollar_rent:
+                tlc = body_text
+                # Cheap dollar-rent check — if visible, skip both A and B
+                has_dollar_rent = bool(
+                    _re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", tlc)
+                )
+
+                # ── Fix B: portal-aware long wait ──
+                # Check the actual landed URL — if it's a known portal,
+                # wait longer because XHR is what populates units.
+                portal_match = False
+                try:
+                    landed = page.url or task.url
+                    landed_lower = landed.lower() if landed else ""
+                    portal_match = any(
+                        m in landed_lower
+                        for m in (
+                            "sightmap.com",
+                            ".onlineleasing.realpage.com",
+                            ".appfolio.com",
+                        )
+                    )
+                except Exception:
+                    portal_match = False
+
+                if portal_match and not has_dollar_rent:
+                    try:
+                        await asyncio.sleep(8.0)
+                        body_text_2 = await page.content()
+                        if body_text_2 and len(body_text_2) > len(body_text):
+                            body_text = body_text_2
+                            tlc = body_text
+                            has_dollar_rent = bool(
+                                _re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", tlc)
+                            )
+                    except Exception:
+                        pass
+
+                # ── Fix A: small-body JS-heavy re-capture (broadened) ──
+                if (
+                    not has_dollar_rent
+                    and 512 <= len(body_text) < 30000
+                    and body_text.count("<script") >= 3
+                ):
                     try:
                         await asyncio.sleep(5.0)
                         body_text_2 = await page.content()
