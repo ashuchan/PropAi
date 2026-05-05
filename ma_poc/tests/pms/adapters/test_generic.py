@@ -68,8 +68,15 @@ async def test_generic_extract_returns_empty_on_no_data() -> None:
 
 
 @pytest.mark.asyncio
-async def test_generic_skips_llm_for_detected_pms() -> None:
-    """When pms != 'unknown', error message mentions LLM skipped."""
+async def test_generic_skips_llm_for_detected_pms_with_units() -> None:
+    """F12: when pms != 'unknown' AND the upstream adapter produced units
+    (adapter_unit_count > 0), the generic-fallback LLM tier is skipped.
+
+    Before F12 the gate fired purely on detected.pms; now it requires the
+    upstream adapter to have actually succeeded. This exercises the
+    "still skip" half of the post-F12 truth table — adapter_unit_count=5
+    means rentcafe found units, so spending generic-LLM budget is wasteful.
+    """
     responses = [{"url": "https://example.com/api", "body": {"config": True}}]
     ctx = AdapterContext(
         base_url="https://www.rentcafe.com/test/",
@@ -79,9 +86,34 @@ async def test_generic_skips_llm_for_detected_pms() -> None:
         property_id="TEST",
     )
     ctx._api_responses = responses  # type: ignore[attr-defined]
+    ctx.adapter_unit_count = 5  # F12: upstream had units → gate stays shut
     adapter = GenericAdapter()
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert any("LLM/Vision skipped" in e for e in result.errors)
+
+
+@pytest.mark.asyncio
+async def test_generic_does_not_skip_llm_when_upstream_returned_zero_units() -> None:
+    """F12 (the reverse half): when pms != 'unknown' but adapter_unit_count
+    is 0, the LLM gate stays open so the LLM can attempt rescue. Before
+    F12 the LLM was skipped here, producing the FAILED_NO_DATA cohort
+    (~100 properties/run on AppFolio + Entrata).
+    """
+    responses = [{"url": "https://example.com/api", "body": {"config": True}}]
+    ctx = AdapterContext(
+        base_url="https://www.rentcafe.com/test/",
+        detected=detect_pms("https://www.rentcafe.com/test/"),
+        profile=None,
+        expected_total_units=None,
+        property_id="TEST",
+    )
+    ctx._api_responses = responses  # type: ignore[attr-defined]
+    # adapter_unit_count defaults to 0 — gate stays open
+    adapter = GenericAdapter()
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert not any(
+        "LLM/Vision skipped for non-unknown PMS" in e for e in result.errors
+    ), f"F12 gate should be OPEN when adapter_unit_count=0; got errors: {result.errors}"
 
 
 def test_find_unit_list_direct_list() -> None:

@@ -1255,7 +1255,17 @@ class GenericAdapter:
         # the HTML had visible text + rent signals. The relaxation below
         # re-enables LLM for those — evaluated after we have ``html`` and
         # can inspect its shape.
-        skip_llm = ctx.detected.pms != "unknown"
+        #
+        # F12 (2026-05-05): the gate-off was firing on ~100 AppFolio /
+        # Entrata properties per run where the detected adapter returned
+        # zero units. Those cases ended FAILED_NO_DATA with no LLM tier
+        # to recover them. The condition now also requires that the
+        # PMS-specific adapter actually produced units before we trust it
+        # enough to skip the LLM. ``adapter_unit_count`` is the count of
+        # units the upstream PMS adapter handed in via ctx; when 0, the
+        # gate stays open regardless of detection confidence.
+        adapter_unit_count = int(getattr(ctx, "adapter_unit_count", 0) or 0)
+        skip_llm = ctx.detected.pms != "unknown" and adapter_unit_count > 0
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
 

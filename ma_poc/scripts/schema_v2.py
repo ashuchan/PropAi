@@ -179,6 +179,25 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime) -> dict:
             except Exception:
                 pass
 
+    # F10: pass-through unit-level concessions, amenities, and validation flags.
+    # Schema stability — keys are always present (None when unset) so downstream
+    # readers (observation_reports.build_concessions_report,
+    # build_amenities_report) see a consistent shape.
+    #
+    # The legacy ``concession`` key is occasionally a dict on older adapter
+    # paths (Phase A scrape_properties has historically emitted both string
+    # and dict shapes). build_concessions_report iterates string content, so
+    # coerce non-strings to None here rather than poisoning the report.
+    concession_text = unit.get("concession_text")
+    if not isinstance(concession_text, str) or not concession_text:
+        concession_text = None
+    if not concession_text:
+        legacy = unit.get("concession") or unit.get("specials_description")
+        if isinstance(legacy, str) and legacy.strip():
+            concession_text = legacy
+    raw_amenities = unit.get("amenities")
+    norm_amenities = _normalize_amenities(raw_amenities) if raw_amenities else None
+
     return {
         "beds": _normalize_beds(beds_raw),
         "baths": _normalize_baths(baths_raw),
@@ -191,7 +210,46 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime) -> dict:
         "available_date": _format_date(unit.get("available_date")),
         "lease_term": _safe_lease_term(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
+        # F10 additions — always present (None when unset).
+        "concession_text": concession_text or None,
+        "concession_value": _safe_float(unit.get("concession_value")),
+        "concession_source": unit.get("concession_source") or None,
+        "amenities": norm_amenities,
+        # Validation provenance flags (surfaced from schema_gate).
+        "_inferred_id": bool(unit.get("_inferred_id")) if "_inferred_id" in unit else None,
+        "_date_placeholder": unit.get("_date_placeholder") or None,
     }
+
+
+def _safe_float(val: Any) -> float | None:
+    """Coerce to float, return None on failure or empty/null."""
+    if val is None or val == "" or val == "null":
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
+
+
+def _normalize_amenities(raw: Any) -> list[str] | None:
+    """Normalize an amenities list: lowercase, strip, de-duplicate.
+
+    Returns None when input isn't a list or yields no items so the schema
+    distinguishes "not extracted" from "explicitly empty".
+    """
+    if not isinstance(raw, list):
+        return None
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        norm = re.sub(r"\s+", " ", item.strip().lower())
+        if not norm or norm in seen:
+            continue
+        seen.add(norm)
+        out.append(norm)
+    return out or None
 
 
 # ── Formatting helpers ───────────────────────────────────────────────────────

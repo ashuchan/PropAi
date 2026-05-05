@@ -126,6 +126,47 @@ def _url_matches_pms_fingerprints(url: str) -> bool:
     return False
 
 
+def normalize_appfolio_url(url: str) -> str:
+    """F11: when *url*'s host is `*.appfolio.com`, point at /listings.
+
+    The bare-tenant root (e.g. https://richelsonmanagement.appfolio.com/)
+    redirects to /users/oauth/login on most tenants — the L1 fetcher
+    treats that 302 as "no useful body" and the property looks blocked.
+    /listings is the public SSR data page on every tenant we've sampled
+    (becovic, pillarrei, blackrealtymanagement, plentyofplaces,
+    richelsonmanagement).
+
+    Pass-through:
+      - URLs already on /listings or any deeper /listings/<id> path.
+      - URLs whose host doesn't end in appfolio.com.
+      - The static AppFolio marketing site (www.appfolio.com).
+
+    Pablogroup-style offboarded tenants will still 302 to
+    appfolio.com/page-not-found-sub from /listings; the adapter handles
+    that signal separately (TENANT_OFFBOARDED).
+    """
+    if not url:
+        return url
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return url
+    host = (parsed.hostname or "").lower()
+    if not host.endswith(".appfolio.com"):
+        return url
+    if host == "www.appfolio.com":
+        return url
+    # urlparse separates path from query/fragment, so /listings?q=1 has
+    # path=="/listings". A startswith("/listings?") would be dead code.
+    path = parsed.path or "/"
+    if path == "/listings" or path.startswith("/listings/"):
+        return url
+    # Drop existing query/fragment when normalizing the entry path —
+    # AppFolio /listings ignores them and a stale `?source=...` from the
+    # vanity-site referral can break the SSR layout.
+    return f"{parsed.scheme}://{parsed.netloc}/listings"
+
+
 async def resolve_target(
     page: Page,
     original_url: str,
@@ -150,8 +191,12 @@ async def resolve_target(
     try:
         # Step 1: Already on PMS host?
         if initial_detection.confidence >= 0.85 and _url_matches_pms_fingerprints(original_url):
+            # F11: AppFolio entry-URL normalization. Tenant root 302s to
+            # /users/oauth/login (looks blocked); /listings is the data page.
+            normalized = normalize_appfolio_url(original_url)
+            result.resolved_url = normalized
             result.method = "no_hop"
-            result.hop_path = [original_url]
+            result.hop_path = [original_url] if normalized == original_url else [original_url, normalized]
             return result
 
         # Step 2: Extract CTA links from page
@@ -183,10 +228,14 @@ async def resolve_target(
         for _priority, href, _text in candidates:
             detection = detect_pms(href)
             if _url_matches_pms_fingerprints(href):
-                result.resolved_url = href
+                normalized = normalize_appfolio_url(href)
+                result.resolved_url = normalized
                 result.final_detection = detection
                 result.method = "cta_link"
-                result.hop_path = [original_url, href]
+                hops = [original_url, href]
+                if normalized != href:
+                    hops.append(normalized)
+                result.hop_path = hops
                 return result
 
         # Step 4: Check iframes for leasing portal domains
@@ -202,10 +251,14 @@ async def resolve_target(
             src_lower = src.lower()
             if any(domain in src_lower for domain in _LEASING_PORTAL_DOMAINS):
                 detection = detect_pms(src)
-                result.resolved_url = src
+                normalized = normalize_appfolio_url(src)
+                result.resolved_url = normalized
                 result.final_detection = detection
                 result.method = "iframe"
-                result.hop_path = [original_url, src]
+                hops = [original_url, src]
+                if normalized != src:
+                    hops.append(normalized)
+                result.hop_path = hops
                 return result
 
         # Step 5: Check if page URL changed (redirect)
@@ -216,10 +269,14 @@ async def resolve_target(
 
         if current_url != original_url and _url_matches_pms_fingerprints(current_url):
             detection = detect_pms(current_url)
-            result.resolved_url = current_url
+            normalized = normalize_appfolio_url(current_url)
+            result.resolved_url = normalized
             result.final_detection = detection
             result.method = "redirect"
-            result.hop_path = [original_url, current_url]
+            hops = [original_url, current_url]
+            if normalized != current_url:
+                hops.append(normalized)
+            result.hop_path = hops
             return result
 
         # Step 6: Nothing found

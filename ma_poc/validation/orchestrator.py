@@ -5,6 +5,7 @@ Pure function of its inputs. No hidden state, no global mutation.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any
 
@@ -23,9 +24,54 @@ _IDENTITY_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     "beds": ("beds", "bedrooms", "_bedrooms"),
     "baths": ("baths", "bathrooms", "_bathrooms"),
     "sqft": ("sqft", "_sqft", "area", "square_feet"),
-    "rent": ("asking_rent", "market_rent_low", "rent"),
+    # F9: extend rent aliases to recognise v2 canonical names. Without these
+    # the identity-gap dataset would mis-classify v2-strict records as
+    # rent-absent when they actually carry rent_low/rent_high.
+    "rent": ("asking_rent", "market_rent_low", "rent", "rent_low", "rent_high"),
     "available_date": ("available_date", "availability_date"),
 }
+
+
+def _normalize_for_signature(value: Any) -> Any:
+    """Normalize a field value for the F9 signature key.
+
+    Strings: lowercase + collapse whitespace so "Aspen 1BR" and "aspen  1br"
+    hash to the same signature. Numbers / other types are stringified raw.
+    Phase 1 cross-run matching depends on this stability — without it, the
+    identity-gap dataset would fragment across cosmetic re-formatting on
+    the source page.
+    """
+    if isinstance(value, str):
+        return " ".join(value.strip().lower().split())
+    return value
+
+
+def _signature_components(record: dict[str, Any]) -> dict[str, Any]:
+    """Compute a tentative identity signature from whatever identifying
+    fields ARE present. Used by F9's validate.identity_gap event payload —
+    no consumer in Phase 0; builds Phase 1 design dataset.
+    """
+    out: dict[str, Any] = {}
+    for canonical, aliases in _IDENTITY_FIELD_ALIASES.items():
+        if canonical in ("rent", "available_date"):
+            continue  # never part of identity
+        for alias in aliases:
+            v = record.get(alias)
+            if v is None or v == -1:
+                continue
+            if isinstance(v, str) and not v.strip():
+                continue
+            out[canonical] = _normalize_for_signature(v)
+            break
+    return out
+
+
+def _signature_key(property_id: str, components: dict[str, Any]) -> str:
+    """SHA16 of (property_id, sorted-component-keys) for cross-run matching."""
+    parts = [str(property_id)] + [
+        f"{k}={components[k]}" for k in sorted(components.keys())
+    ]
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
 def _field_presence(record: dict[str, Any]) -> dict[str, bool]:
@@ -75,7 +121,14 @@ def validate(
     if history is None:
         history = {}
 
-    property_id = extract_result.property_id if hasattr(extract_result, "property_id") else "unknown"
+    # F1: schema_gate.check() requires a non-empty property_id (raises ValueError
+    # otherwise). Coerce missing/empty to "unknown" so a malformed extract_result
+    # never crashes the whole property's validation — the orchestrator's per-record
+    # try/except below would otherwise swallow it as VALIDATION_EXCEPTION on every
+    # row, hiding the real failure mode.
+    property_id = (
+        getattr(extract_result, "property_id", None) or "unknown"
+    )
     records = extract_result.records if hasattr(extract_result, "records") else []
 
     accepted: list[dict[str, Any]] = []
@@ -85,7 +138,7 @@ def validate(
 
     for record in records:
         try:
-            gate_result = schema_check(record)
+            gate_result = schema_check(record, property_id)
 
             if gate_result.accepted is None:
                 rejected.append(
@@ -95,12 +148,28 @@ def validate(
                         human_message=", ".join(gate_result.rejection_reasons),
                     )
                 )
+                presence = _field_presence(record)
                 emit(
                     EventKind.RECORD_REJECTED,
                     property_id,
                     reasons=gate_result.rejection_reasons,
-                    field_presence=_field_presence(record),
+                    field_presence=presence,
                 )
+                # F9: emit a parallel identity_gap event for every
+                # IDENTITY_FALLBACK_INSUFFICIENT rejection. No consumer in
+                # Phase 0 — builds the dataset Phase 1 (tiered output) needs
+                # to design signature_key without re-deriving from logs.
+                if "IDENTITY_FALLBACK_INSUFFICIENT" in (gate_result.rejection_reasons or []):
+                    components = _signature_components(record)
+                    sig_key = _signature_key(property_id, components)
+                    emit(
+                        EventKind.IDENTITY_GAP,
+                        property_id,
+                        signature_key=sig_key,
+                        signature_components=components,
+                        field_presence=presence,
+                        reason="IDENTITY_FALLBACK_INSUFFICIENT",
+                    )
                 continue
 
             if gate_result.inferred_id:

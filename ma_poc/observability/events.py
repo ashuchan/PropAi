@@ -58,6 +58,9 @@ class EventKind(StrEnum):
     RECORD_FLAGGED = "validate.record_flagged"
     IDENTITY_FALLBACK = "validate.identity_fallback"
     NEXT_TIER_REQUESTED = "validate.next_tier_requested"
+    DATE_PLACEHOLDER_OBSERVED = "validate.date_placeholder_observed"
+    IDENTITY_GAP = "validate.identity_gap"
+    TENANT_OFFBOARDED = "fetch.tenant_offboarded"
 
     # Output
     PROPERTY_EMITTED = "output.property_emitted"

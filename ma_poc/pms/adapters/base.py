@@ -37,6 +37,10 @@ class AdapterContext:
     budget: dict = field(default_factory=lambda: {
         "llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3,
     })
+    # F12: count of units the PMS-specific adapter produced before the
+    # generic-fallback handoff. When 0, the generic LLM gate stays open
+    # even on detected (non-unknown) PMS hosts.
+    adapter_unit_count: int = 0
 
 
 @dataclass

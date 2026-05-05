@@ -27,6 +27,7 @@ Key findings:
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
@@ -40,6 +41,110 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
+
+
+# F11 — SSR DOM card extractors. Verified live against:
+#   richelsonmanagement.appfolio.com (8 cards), becovic (300), pillarrei (23),
+#   blackrealtymanagement (82), plentyofplaces (44).
+# All five tenants emit identical class names; absent classes survive as None.
+_LISTING_BLOCK_RE = re.compile(
+    r'<[^>]*data-listing-id="(?P<id>[0-9]+)"[^>]*>(?P<body>.*?)(?=<[^>]*data-listing-id="[0-9]+"|<footer|</main|$)',
+    re.IGNORECASE | re.DOTALL,
+)
+_RENT_RE = re.compile(r'js-listing-blurb-rent[^>]*>([^<]+)<', re.IGNORECASE)
+_BED_BATH_RE = re.compile(r'js-listing-blurb-bed-bath[^>]*>([^<]+)<', re.IGNORECASE)
+_SQFT_RE = re.compile(r'js-listing-square-feet[^>]*>([^<]+)<', re.IGNORECASE)
+_AVAIL_RE = re.compile(r'js-listing-available[^>]*>([^<]+)<', re.IGNORECASE)
+_ADDRESS_RE = re.compile(r'js-listing-address[^>]*>\s*<[^>]+>([^<]+)<', re.IGNORECASE)
+# Verified against pablogroup.appfolio.com on 2026-05-05: the redirect lands
+# on https://www.appfolio.com/page-not-found-sub which renders a page whose
+# <title> includes "AppFolio - Page Not Found" alongside the canonical URL.
+# Either signal alone is sufficient to classify the tenant as offboarded.
+_OFFBOARDED_RE = re.compile(
+    r'appfolio\.com/page-not-found-sub'
+    r'|<title>\s*AppFolio\s*-\s*Page\s+Not\s+Found',
+    re.IGNORECASE,
+)
+
+
+def _parse_bed_bath(text: str) -> tuple[int | None, float | None]:
+    """Parse 'X bd / Y ba' or 'Studio / Y ba' into (beds, baths).
+
+    AppFolio's bed_bath blurb is the only place beds/baths are reliable on
+    the SSR card; sqft and rent live in dedicated divs.
+    """
+    if not text:
+        return None, None
+    s = text.strip().lower()
+    beds: int | None = None
+    baths: float | None = None
+    if "studio" in s:
+        beds = 0
+    else:
+        m = re.search(r'(\d+)\s*bd', s)
+        if m:
+            try:
+                beds = int(m.group(1))
+            except ValueError:
+                beds = None
+    m = re.search(r'(\d+(?:\.\d+)?)\s*ba', s)
+    if m:
+        try:
+            baths = float(m.group(1))
+        except ValueError:
+            baths = None
+    return beds, baths
+
+
+def _parse_sqft_blurb(text: str) -> str:
+    """Parse 'Square Feet: 1,342' to '1342'."""
+    if not text:
+        return ""
+    m = re.search(r'([0-9][0-9,]*)', text)
+    if not m:
+        return ""
+    return m.group(1).replace(",", "")
+
+
+def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
+    """F11: parse AppFolio /listings SSR HTML into unit dicts.
+
+    Uses regex on stable `js-listing-*` class names — every AppFolio tenant
+    we sampled emits these identically. Skipping a full HTML parser keeps
+    the path dependency-free and fast.
+    """
+    units: list[dict[str, str]] = []
+    for m in _LISTING_BLOCK_RE.finditer(html):
+        body = m.group("body")
+        listing_id = m.group("id")
+        rent_m = _RENT_RE.search(body)
+        bb_m = _BED_BATH_RE.search(body)
+        sqft_m = _SQFT_RE.search(body)
+        avail_m = _AVAIL_RE.search(body)
+        addr_m = _ADDRESS_RE.search(body)
+
+        rent_val = money_to_int(rent_m.group(1).strip()) if rent_m else None
+        beds, baths = _parse_bed_bath(bb_m.group(1) if bb_m else "")
+        sqft = _parse_sqft_blurb(sqft_m.group(1) if sqft_m else "")
+        avail_raw = avail_m.group(1).strip() if avail_m else ""
+        address = addr_m.group(1).strip() if addr_m else ""
+
+        units.append(
+            make_unit_dict(
+                floor_plan_name=address or f"AppFolio listing {listing_id}",
+                bed_label=bed_label_from(beds, address),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft=sqft,
+                unit_number=listing_id,
+                rent_range=format_rent_range(rent_val, rent_val),
+                availability_status="AVAILABLE",
+                availability_date=avail_raw or "",
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_APPFOLIO_SSR",
+            )
+        )
+    return units
 
 
 def parse_appfolio_listings(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
@@ -132,7 +237,20 @@ class AppFolioAdapter:
     _fingerprints: list[str] = ["appfolio.com"]
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
-        """Extract units from AppFolio API responses captured during page load."""
+        """Extract units from AppFolio API or fall back to SSR DOM parse.
+
+        Path:
+          1. Try captured API responses (community_info etc.); succeeds on
+             tenants where the API tier serves unit data.
+          2. F11 fallback: when the API path returns 0 units, parse the SSR
+             /listings HTML using js-listing-* selectors. Production
+             verification: this path recovers ~449 units across the
+             becovic/pillarrei/blackrealtymanagement/plentyofplaces cohort
+             that today fails as BOT_BLOCKED.
+          3. Detect offboarded tenants (302 → page-not-found-sub) and emit
+             TENANT_OFFBOARDED so the run report distinguishes "tenant gone"
+             from a real fetch failure.
+        """
         result = AdapterResult(tier_used="TIER_1_API_APPFOLIO")
         all_units: list[dict[str, str]] = []
 
@@ -155,10 +273,53 @@ class AppFolioAdapter:
             result.units = all_units
             result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
             result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
-        else:
-            result.confidence = 0.0
-            result.errors.append("No AppFolio unit data found in captured API responses")
+            return result
 
+        # F11 SSR fallback. Pull HTML from fetch_result first (Jugnu's
+        # cached body avoids re-fetching), falling back to live page.
+        page_html: str | None = None
+        fetch_result = getattr(ctx, "fetch_result", None)
+        if fetch_result is not None:
+            body = getattr(fetch_result, "body", None)
+            if isinstance(body, bytes):
+                try:
+                    page_html = body.decode("utf-8", errors="replace")
+                except Exception:
+                    page_html = None
+            elif isinstance(body, str):
+                page_html = body
+        if page_html is None and page is not None:
+            try:
+                page_html = await page.content()
+            except Exception:
+                page_html = None
+
+        if page_html and _OFFBOARDED_RE.search(page_html):
+            try:
+                from ma_poc.observability.events import EventKind, emit
+                emit(
+                    EventKind.TENANT_OFFBOARDED,
+                    getattr(ctx, "property_id", "unknown"),
+                    base_url=getattr(ctx, "base_url", ""),
+                )
+            except (ImportError, AttributeError):
+                pass
+            result.confidence = 0.0
+            result.errors.append("AppFolio tenant offboarded (page-not-found-sub)")
+            result.tier_used = "TIER_1_APPFOLIO_TENANT_OFFBOARDED"
+            return result
+
+        if page_html and "data-listing-id=" in page_html:
+            ssr_units = parse_appfolio_listings_ssr(page_html, getattr(ctx, "base_url", ""))
+            if ssr_units:
+                result.units = ssr_units
+                result.tier_used = "TIER_1_DOM_APPFOLIO_SSR"
+                result.winning_url = getattr(ctx, "base_url", "") or None
+                result.confidence = min(0.95, 0.7 + 0.05 * len(ssr_units))
+                return result
+
+        result.confidence = 0.0
+        result.errors.append("No AppFolio unit data found in captured API responses or SSR DOM")
         return result
 
     def static_fingerprints(self) -> list[str]:

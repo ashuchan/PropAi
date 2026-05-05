@@ -495,7 +495,10 @@ async def scrape(
         generic_name = getattr(generic, "pms_name", "generic")
         fallback_chain.append(generic_name)
 
-        # For detected-PMS failures, skip LLM in generic adapter
+        # For detected-PMS failures, skip LLM in generic adapter UNLESS the
+        # detected adapter actually returned units (F12). Threading
+        # adapter_unit_count lets the generic adapter open the gate when the
+        # PMS-specific path produced nothing — recovers ~100 props/run.
         fallback_ctx = AdapterContext(
             base_url=resolved.resolved_url,
             detected=detection,  # keeps original PMS so generic knows to skip LLM
@@ -510,6 +513,12 @@ async def scrape(
             pmc=ctx.pmc,
         )
         fallback_ctx._api_responses = getattr(ctx, "_api_responses", [])  # type: ignore[attr-defined]
+        # F12: surface the upstream adapter's unit count so generic.extract
+        # can decide whether the gate should stay shut. We're inside the
+        # ``not adapter_result.units`` branch so this is always 0 here, but
+        # we set it explicitly for clarity and to keep the contract obvious
+        # to anyone reading.
+        fallback_ctx.adapter_unit_count = len(adapter_result.units)  # type: ignore[attr-defined]
 
         try:
             fallback_result = await generic.extract(page, fallback_ctx)  # type: ignore[arg-type]

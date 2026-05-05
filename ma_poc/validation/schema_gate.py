@@ -2,8 +2,8 @@
 
 Two paths:
   1. Strict: record has unit_id, rent, all required fields -> accept.
-  2. Soft: record missing unit_id -> call identity_fallback; if fallback
-     returns an id, accept with inferred_id=True; else reject.
+  2. Soft: record missing unit_id -> call compute_fallback_unit_id (v2);
+     if fallback returns an id, accept with inferred_id=True; else reject.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
-from .identity_fallback import compute_fallback_id
+from ma_poc.scripts.identity_fallback import compute_fallback_unit_id
 
 log = logging.getLogger(__name__)
 
@@ -108,19 +108,42 @@ def _has_physical_signal(record: dict[str, Any]) -> bool:
     return any(_is_present(record.get(k)) for k in _PHYSICAL_SIGNAL_FIELDS)
 
 
-def check(record: dict[str, Any]) -> SchemaGateResult:
+def check(record: dict[str, Any], property_id: str) -> SchemaGateResult:
     """Validate a single unit record against the schema.
 
     Args:
         record: Raw unit record dict from L3 extraction.
+        property_id: The property the record belongs to. REQUIRED — the v2
+            fallback hashes this into the inferred unit_id so two physically
+            different units in different properties cannot collide. Pass the
+            real property identifier; never an empty string.
 
     Returns:
         SchemaGateResult with accepted record or rejection reasons.
+
+    Raises:
+        ValueError: when property_id is empty. Earlier drafts allowed an
+            empty default for transition; that's been removed because an
+            empty namespace produces colliding fallback IDs across
+            properties — exactly the bug F1 was meant to eliminate.
     """
+    if not property_id:
+        raise ValueError(
+            "schema_gate.check() requires a non-empty property_id; "
+            "v2 fallback IDs depend on it for cross-property uniqueness"
+        )
     reasons: list[str] = []
 
-    # Rent validation
-    rent = record.get("asking_rent") or record.get("market_rent_low") or record.get("rent")
+    # F2: Rent validation. v1 names retain priority for back-compat (H15);
+    # v2 canonical names (rent_low/rent_high) appended so v2-strict DB rows
+    # do not bypass the absurd/negative checks.
+    rent = (
+        record.get("asking_rent")
+        or record.get("market_rent_low")
+        or record.get("rent")
+        or record.get("rent_low")
+        or record.get("rent_high")
+    )
     if rent is not None:
         try:
             rent_val = float(rent)
@@ -131,12 +154,14 @@ def check(record: dict[str, Any]) -> SchemaGateResult:
         except (ValueError, TypeError):
             reasons.append("INVALID_RENT_NEGATIVE")
 
-    # Sqft validation. H2: the -1 sentinel is "unknown sqft" — treat as null,
-    # not as a real negative value (which would otherwise fire
-    # INVALID_SQFT_NEGATIVE on every record where the source CSV omitted area).
+    # F3: Sqft validation. v1 names first (sqft/square_feet), v2 canonical
+    # `area` last. The -1 sentinel ("unknown sqft") is preserved across all
+    # name aliases — treated as null rather than triggering INVALID_SQFT_NEGATIVE.
     sqft = record.get("sqft")
     if sqft in (None, "", -1, "-1"):
         sqft = record.get("square_feet")
+    if sqft in (None, "", -1, "-1"):
+        sqft = record.get("area")
     if sqft not in (None, "", -1, "-1"):
         try:
             sqft_val = float(sqft)
@@ -149,22 +174,53 @@ def check(record: dict[str, Any]) -> SchemaGateResult:
         except (ValueError, TypeError):
             pass
 
-    # Date validation
+    # F4: Date validation. Unparseable strings re-route as placeholder
+    # pass-through (null both aliases, stash original in _date_placeholder,
+    # emit telemetry). Non-string corrupted types still reject.
     avail_date = record.get("availability_date") or record.get("available_date")
     if avail_date is not None and isinstance(avail_date, str):
-        try:
-            datetime.fromisoformat(avail_date.replace("Z", "+00:00"))
-        except ValueError:
+        stripped = avail_date.strip()
+        if not stripped:
+            # Empty / whitespace-only string is "absent", not a placeholder.
+            # Pre-F4 behavior was the same; treat it like None.
+            pass
+        else:
+            parsed = False
             try:
-                date.fromisoformat(avail_date)
+                datetime.fromisoformat(stripped.replace("Z", "+00:00"))
+                parsed = True
             except ValueError:
-                reasons.append("INVALID_DATE_FORMAT")
+                try:
+                    date.fromisoformat(stripped)
+                    parsed = True
+                except ValueError:
+                    parsed = False
+            if not parsed:
+                record = dict(record)
+                record["_date_placeholder"] = stripped
+                record["available_date"] = None
+                record["availability_date"] = None
+                try:
+                    from ma_poc.observability.events import EventKind, emit
+                    emit(
+                        EventKind.DATE_PLACEHOLDER_OBSERVED,
+                        property_id,
+                        placeholder_value=stripped[:64],
+                    )
+                except (ImportError, AttributeError):
+                    # Event module not yet upgraded with new EventKind.
+                    # Anything else (TypeError, OSError) must surface.
+                    pass
+    elif avail_date is not None and not isinstance(avail_date, str):
+        # H7: non-string date values (corrupted types, ints) still reject.
+        reasons.append("INVALID_DATE_FORMAT")
 
-    # Unit ID: if missing, try fallback
+    # F1: Unit ID — if missing, try v2 fallback. Stable across rent/date
+    # changes (rent and available_date deliberately excluded from the hash).
     unit_id = record.get("unit_id") or record.get("unit_number")
     inferred = False
     if not unit_id:
-        fallback_id = compute_fallback_id(record)
+        fallback_id = compute_fallback_unit_id(record, property_id)
         if fallback_id:
             record = dict(record)  # Don't mutate original
             record["unit_id"] = fallback_id
