@@ -50,6 +50,7 @@ PmsName = Literal[
     "amli",
     "funnel",
     "touchtour",
+    "rentmanager",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -76,6 +77,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "amli": "api_first",
     "funnel": "api_first",
     "touchtour": "cascade",
+    "rentmanager": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -372,6 +374,18 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # the liveovation.com parent portfolio.
     if "mytouchtour.com" in h or "liveovation.com" in h:
         return "touchtour", 0.85, ["TouchTour/Ovation marker in HTML (mytouchtour.com / liveovation.com)"]
+    # Rent Manager — vanity-website product (LCS Software). The footer link
+    # ``rentmanager.com/websites`` is the canonical fingerprint observed on
+    # KRC Apartments samples (norfolk-place, virginia-flats etc.); the
+    # ``unit_avail_container`` class on rendered table rows is the secondary
+    # signal that proves the property-detail page actually has unit data
+    # (vs the homepage / generic CMS page).
+    if "rentmanager.com/websites" in h or "unit_avail_container" in h:
+        return (
+            "rentmanager",
+            0.85,
+            ["Rent Manager marker in HTML (rentmanager.com/websites / unit_avail_container)"],
+        )
     return None
 
 
@@ -411,6 +425,7 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "amli": ("amli.com",),
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
+    "rentmanager": ("rentmanager.com/websites", "unit_avail_container"),
     # Marketing / lead-capture stacks — observed in 10-property roll-up
     # (doorway.knck.io, cdn-media.hy.ly, chat.hyly.ai, marketapts.com).
     "marketing_knock": ("doorway.knck.io", "knockrentals.com"),

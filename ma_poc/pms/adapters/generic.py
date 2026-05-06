@@ -37,10 +37,10 @@ from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_sightmap_payload as _dr_parse_sightmap,
 )
 from ma_poc.pms.adapters._html_extract import (  # noqa: I001
-    extract_units_from_text,
     extract_embedded_blobs_from_html,
     extract_jsonld_from_html,
     extract_units_from_dom,
+    extract_units_from_text,
 )
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -110,9 +110,9 @@ def _assess_and_decide(
     if not units_so_far:
         return None
     try:
-        from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
-        from ma_poc.models.source import SourceId, from_legacy_unit
         from ma_poc.models.scrape_profile import ProfileMaturity
+        from ma_poc.models.source import SourceId, from_legacy_unit
+        from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
     except Exception:
         return None
     try:
@@ -1204,7 +1204,8 @@ class GenericAdapter:
         # Phase I: emit IDENTITY_FUZZY_LINK events via callback; merger stays pure
         def _emit_fuzzy(unit: Any, key: Any, conf: float) -> None:
             try:
-                from ma_poc.observability.events import EventKind as _EK, emit as _ev
+                from ma_poc.observability.events import EventKind as _EK
+                from ma_poc.observability.events import emit as _ev
                 _ev(_EK.IDENTITY_FUZZY_LINK, ctx.property_id, bucket_key=str(key)[:80], confidence=conf)
             except Exception:
                 pass
@@ -1223,7 +1224,8 @@ class GenericAdapter:
         result._merged_units = list(merged)  # type: ignore[attr-defined]
         # Phase I: emit SOURCES_MERGED telemetry
         try:
-            from ma_poc.observability.events import EventKind as _EK2, emit as _ev2
+            from ma_poc.observability.events import EventKind as _EK2
+            from ma_poc.observability.events import emit as _ev2
             _ev2(
                 _EK2.SOURCES_MERGED,
                 ctx.property_id,
@@ -1716,6 +1718,56 @@ class GenericAdapter:
                     result._decision_log = decision_log  # type: ignore[attr-defined]
                     return result
                 skip_llm = False  # planner escalated — allow LLM
+
+            # 2026-05-06 — SightMap direct-fetch sub-tier. ~11% of failing
+            # properties (vinity-site → /floor-plans/ → SightMap iframe) have
+            # an embed URL in the page HTML, but the iframe-load timing race
+            # means no SightMap XHR was captured. Detector demoted them to
+            # "unknown" so SightMapAdapter never ran. Deterministic side-
+            # channel: fetch the embed → parse __APP_CONFIG__ → fetch JSON
+            # API → parse units. Gated on `not result.units` so it doesn't
+            # fire for properties where DOM/JSON-LD already extracted units.
+            if not result.units:
+                from ma_poc.pms.adapters.sightmap import (
+                    _TIER_DIRECT_FETCH as _SM_TIER_DIRECT,
+                )
+                from ma_poc.pms.adapters.sightmap import (
+                    _find_embed_hashid,
+                    fetch_sightmap_units_direct,
+                )
+
+                _embed_id = _find_embed_hashid(html)
+                if _embed_id:
+                    t_sm = _time.monotonic()
+                    sm_units, sm_url, sm_errors = await fetch_sightmap_units_direct(
+                        _embed_id
+                    )
+                    _log_attempt(
+                        "generic:sightmap_direct_fetch",
+                        "ran_units" if sm_units else "ran_empty",
+                        units=len(sm_units),
+                        reason=("; ".join(sm_errors)[:200]) if not sm_units else "",
+                        duration_ms=int((_time.monotonic() - t_sm) * 1000),
+                    )
+                    if sm_errors:
+                        result.errors.extend(sm_errors)
+                    if sm_units:
+                        result.units = _merge_into_result_units(
+                            result.units, sm_units, property_id=ctx.property_id
+                        )
+                        result.tier_used = _SM_TIER_DIRECT
+                        result.winning_url = sm_url
+                        result.confidence = min(0.85, 0.6 + 0.05 * len(result.units))
+                        from ma_poc.models.source import SourceId as _SI_SM
+
+                        sources_already_run.add(_SI_SM.API_GENERIC_NARROW)
+                        _dd_sm = _assess_and_decide(
+                            result.units, sources_already_run, ctx, decision_log
+                        )
+                        if _dd_sm is None or _dd_sm.action == "STOP":
+                            result._decision_log = decision_log  # type: ignore[attr-defined]
+                            return result
+                        skip_llm = False
 
             # 2026-05-06 — Plain-text regex extractor as a deterministic
             # fallback BEFORE LLM tiers. Targets the LLM_COULD_NOT_EXTRACT

@@ -82,6 +82,14 @@ _PRIORITY_MAP = {
 }
 
 # Leasing portal domains — ported from scripts/entrata.py _LEASING_PORTAL_DOMAINS.
+#
+# 2026-05-06: added securecafe.com / securecafenet.com (RentCafe leasing-portal
+# subdomains, observed on loftsatopop / livecantata / 215cstreet / rentmiro etc.),
+# prospectportal.com (Entrata leasing-portal subdomain), and appfolio.com (any
+# tenant subdomain). Bulk scan of 81 still-failing properties in canary v10
+# showed 19% link to *.securecafe.com / *.securecafenet.com and 7% to
+# *.appfolio.com/connect or /listings — both currently filtered out as
+# "non-PMS" because no adapter advertises them in static_fingerprints().
 _LEASING_PORTAL_DOMAINS = frozenset(
     {
         "sightmap.com",
@@ -93,6 +101,10 @@ _LEASING_PORTAL_DOMAINS = frozenset(
         "yardi.com",
         "smartrent.com",
         "onlineleasing.realpage.com",
+        "securecafe.com",
+        "securecafenet.com",
+        "prospectportal.com",
+        "appfolio.com",
     }
 )
 
@@ -106,24 +118,88 @@ class ResolvedTarget:
     method: Literal["no_hop", "cta_link", "iframe", "redirect", "failed", "fetch_only"] = "failed"
 
 
+# 2026-05-06: priority lookup is now word-boundary-anchored on the LEFT.
+# Substring-only matching produced false hits — e.g. "OneWall Communities works
+# with eRenterPlan" got priority 60 because the substring "uni" (the "unit"
+# keyword) appears inside "Communities". Anchor-on-the-left lets prefix matches
+# like "availab" still match "availability" / "available" while rejecting the
+# intra-word noise.
+_PRIORITY_RES: dict[str, re.Pattern[str]] = {
+    keyword: re.compile(r"\b" + re.escape(keyword), re.IGNORECASE)
+    for keyword in _PRIORITY_MAP
+}
+
+
 def _get_priority(text: str) -> int:
     """Score anchor text by availability-relevance."""
-    text_lower = text.lower()
     score = 0
     for keyword, priority in _PRIORITY_MAP.items():
-        if keyword in text_lower:
+        if _PRIORITY_RES[keyword].search(text):
             score = max(score, priority)
     return score
 
 
+def _url_is_known_portal(url: str) -> bool:
+    """True when *url* points to a known leasing-portal host.
+
+    Combines two sources:
+      - Adapter `static_fingerprints()` — the hosts each adapter explicitly claims.
+      - The `_LEASING_PORTAL_DOMAINS` set — leasing-portal subdomains that no
+        single adapter "owns" (e.g. *.securecafe.com is RentCafe sub-product;
+        *.prospectportal.com is Entrata's portal subdomain).
+
+    Pre-2026-05-06 only the first source was used in Step 3, so cross-domain
+    sublinks to *.securecafe.com / *.securecafenet.com / *.prospectportal.com
+    were silently dropped. ~25% of still-failing properties had such a sublink
+    on their homepage; this widens the gate so the resolver can land on the
+    portal and let the existing adapter cascade do its job.
+    """
+    url_lower = url.lower()
+    for adapter in all_adapters():
+        for fp in adapter.static_fingerprints():
+            if fp in url_lower:
+                return True
+    for domain in _LEASING_PORTAL_DOMAINS:
+        if domain in url_lower:
+            return True
+    return False
+
+
 def _url_matches_pms_fingerprints(url: str) -> bool:
-    """Check if a URL's host matches any adapter's static fingerprints."""
+    """Back-compat alias retained for existing callers (Step 1 / Step 5)."""
     url_lower = url.lower()
     for adapter in all_adapters():
         for fp in adapter.static_fingerprints():
             if fp in url_lower:
                 return True
     return False
+
+
+# 2026-05-06: link-hop candidate cap was 5, which dropped legitimate portal
+# sublinks when a homepage had >5 internal "/floor-plans/" candidates sharing
+# the top priority. Reproduced on hazelwoodhomesmd.com: 5 P=80–100 internal
+# floorplan links ate the cap; the AppFolio "Resident Portal" link at P=30 was
+# dropped before its URL was even checked. Raise cap and dedupe by canonical
+# URL so duplicate "Floor Plans" anchors don't crowd out real portal hops.
+_CANDIDATE_CAP = 8
+
+
+def _candidate_dedup_key(href: str) -> str:
+    """Dedup CTA candidates by netloc + path (drop scheme/query/fragment).
+
+    Many homepages emit the same /floor-plans/ link as a header-nav, footer,
+    and CTA button — three anchors with the same href but different surrounding
+    text. Without dedup they each take a candidate slot. Stripping the query
+    and fragment also de-duplicates "?utm_source=..." variants of the same
+    portal URL.
+    """
+    try:
+        parsed = urlparse(href)
+    except Exception:
+        return href.lower()
+    netloc = (parsed.netloc or "").lower()
+    path = (parsed.path or "/").rstrip("/") or "/"
+    return f"{netloc}{path}"
 
 
 def normalize_appfolio_url(url: str) -> str:
@@ -212,31 +288,44 @@ async def resolve_target(
         except Exception:
             links = []
 
+        seen_keys: set[str] = set()
         for link in links:
             href = link.get("href", "")
             text = link.get("text", "")
             if not href or not _CTA_TEXT_RE.search(text):
                 continue
+            # Dedupe by canonical (netloc + path) key — three anchors with the
+            # same href but different surrounding text shouldn't take three
+            # candidate slots. The first occurrence wins (preserves whatever
+            # text the page used for its primary CTA).
+            key = _candidate_dedup_key(href)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
             priority = _get_priority(text)
             candidates.append((priority, href, text))
 
-        # Sort by priority descending, cap at 5
+        # Sort by priority descending, cap at _CANDIDATE_CAP (8 since 2026-05-06).
         candidates.sort(key=lambda x: -x[0])
-        candidates = candidates[:5]
+        candidates = candidates[:_CANDIDATE_CAP]
 
-        # Step 3: Check each candidate for PMS fingerprint
+        # Step 3: Check each candidate for known portal host. Adapter
+        # fingerprints + leasing-portal-domain set are both consulted —
+        # the latter catches *.securecafe.com / *.prospectportal.com which
+        # no single adapter owns but which all resolve to a downstream PMS.
         for _priority, href, _text in candidates:
+            if not _url_is_known_portal(href):
+                continue
             detection = detect_pms(href)
-            if _url_matches_pms_fingerprints(href):
-                normalized = normalize_appfolio_url(href)
-                result.resolved_url = normalized
-                result.final_detection = detection
-                result.method = "cta_link"
-                hops = [original_url, href]
-                if normalized != href:
-                    hops.append(normalized)
-                result.hop_path = hops
-                return result
+            normalized = normalize_appfolio_url(href)
+            result.resolved_url = normalized
+            result.final_detection = detection
+            result.method = "cta_link"
+            hops = [original_url, href]
+            if normalized != href:
+                hops.append(normalized)
+            result.hop_path = hops
+            return result
 
         # Step 4: Check iframes for leasing portal domains
         try:
