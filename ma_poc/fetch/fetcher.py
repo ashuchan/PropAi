@@ -523,6 +523,50 @@ class Fetcher:
                 if nav_exc is None:
                     nav_exc = exc
 
+            # 2026-05 Fix B — portal-aware long wait on iframe-drilled
+            # portal hosts. SightMap / RealPage onlineleasing / AppFolio
+            # iframe pages load units via XHR after the iframe loads.
+            # The initial 2-sec post-load sleep is too short — XHR takes
+            # 5-10 sec. Detect portal hosts and wait additional 8 sec.
+            #
+            # NOTE: a broader "any small JS-heavy body" trigger (Fix A in
+            # batch-6) was tested and reverted — it fired on too many
+            # pages, the cumulative 5-sec waits pushed shards past the
+            # per-task timeout, and recovery DROPPED -18 vs v5. A wider
+            # portal-host list + per-host learning (Fix 5/7 in batch-8)
+            # was also tested and reverted — same timeout pressure,
+            # recovery dropped -14 vs v7. Keep the trigger narrow.
+            if body_text is not None and len(body_text) >= 512:
+                portal_match = False
+                try:
+                    landed = page.url or task.url
+                    landed_lower = landed.lower() if landed else ""
+                    portal_match = any(
+                        m in landed_lower
+                        for m in (
+                            "sightmap.com",
+                            ".onlineleasing.realpage.com",
+                            ".appfolio.com",
+                        )
+                    )
+                except Exception:
+                    portal_match = False
+
+                if portal_match:
+                    import re as _re_q
+
+                    has_dollar_rent = bool(
+                        _re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", body_text)
+                    )
+                    if not has_dollar_rent:
+                        try:
+                            await asyncio.sleep(8.0)
+                            body_text_2 = await page.content()
+                            if body_text_2 and len(body_text_2) > len(body_text):
+                                body_text = body_text_2
+                        except Exception:
+                            pass
+
             if body_text is None or len(body_text) < 512:
                 outcome, sig = classify(
                     resp.status if resp else None,
