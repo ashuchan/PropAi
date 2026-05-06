@@ -60,6 +60,26 @@ for _p in (_SCRIPT_DIR, _PROJECT_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+# PR-1: Import extracted modules — these replace inline definitions below.
+# The inline constants/functions are kept as re-exports for backward compat.
+from extraction.engine.noise_filter import (  # noqa: E402
+    _ALLOWLIST_OVERRIDES,
+    _ENTRATA_NOISE_WIDGET_TYPES,
+    _ENTRATA_PROPERTY_WIDGET_TYPES,
+    _FALSE_POSITIVE_HOSTS,
+    _FALSE_POSITIVE_PATH_FRAGMENTS,
+    _filter_entrata_widget_response,
+    filter_network_noise,
+    looks_like_availability_api,
+)
+from extraction.engine.network_capture import NetworkCapture  # noqa: E402
+from extraction.engine.browser_session import (  # noqa: E402
+    BrowserSession,
+    USER_AGENT as _ENGINE_USER_AGENT,
+    _proxy_config as _engine_proxy_config,
+    _goto_robust as _engine_goto_robust,
+)
+
 # Windows console defaults to cp1252 and will crash on emoji prints.
 # Force UTF-8 on stdout/stderr if the stream supports reconfigure().
 for _stream in (sys.stdout, sys.stderr):
@@ -122,11 +142,8 @@ EXPAND_BUTTON_PATTERNS = [
     r"see\s+pricing",
 ]
 
-USER_AGENT = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/122.0.0.0 Safari/537.36"
-)
+# Re-export from extraction.engine.browser_session for backward compatibility.
+USER_AGENT = _ENGINE_USER_AGENT
 
 # ── URL helpers ────────────────────────────────────────────────────────────────
 
@@ -234,161 +251,10 @@ def is_exploratory_candidate(url: str, base_url: str) -> bool:
     return True
 
 
-# Hosts whose API responses are never apartment data — these get captured
-# because their URLs happen to match broad patterns like "/api/" or "/units".
-_FALSE_POSITIVE_HOSTS = {
-    "googleapis.com",
-    "maps.googleapis.com",
-    "go-mpulse.net",
-    "c.go-mpulse.net",
-    "visitor-analytics.io",
-    "visits.visitor-analytics.io",
-    "google-analytics.com",
-    "www.google-analytics.com",
-    "googletagmanager.com",
-    "www.googletagmanager.com",
-    "doubleclick.net",
-    "facebook.com",
-    "connect.facebook.net",
-    "hotjar.com",
-    "sentry.io",
-    # Chatbot / leasing assistant widgets — config & tour scheduling only
-    "meetelise.com",
-    "app.meetelise.com",
-    "sierra.chat",
-    "theconversioncloud.com",
-    "api.theconversioncloud.com",
-    # Lead-gen / referral / review widgets — no unit data
-    "nestiolistings.com",
-    "rentgrata.com",
-    "api.rentgrata.com",
-    "g5marketingcloud.com",
-    "client-leads.g5marketingcloud.com",
-    "g5-api-proxy.g5marketingcloud.com",
-    # Accessibility widgets
-    "userway.org",
-    "api.userway.org",
-    # Chat widgets
-    "omni.cafe",
-    "webchat.omni.cafe",
-    # Entrata communications/chat widget API
-    "comms.entrata.com",
-}
-
-# Subdomains of blocked hosts that actually serve unit/floor-plan data.
-# Checked BEFORE _FALSE_POSITIVE_HOSTS — an allowlisted host is never blocked.
-_ALLOWLIST_OVERRIDES = {
-    "api.ws.realpage.com",  # /v2/property/{id}/floorplans, /v2/units
-    "onlineleasing.realpage.com",  # leasing portal with unit data
-}
-
-# URL path fragments that are never unit/availability data.
-_FALSE_POSITIVE_PATH_FRAGMENTS = {
-    "/tag-manager/",
-    "/mapsjs/",
-    "/gen_204",
-    "/analytics/",
-    "/gtag/",
-    "/pixel",
-    "/beacon",
-    # NOTE: /apartments/module/widgets/ is NOT blocked — some widget responses
-    # (floorPlanWidget, availabilityWidget) contain real floor plan data.
-    # Non-property widgets are filtered in _filter_entrata_widget_response().
-    # Entrata chat/messaging widget endpoints
-    "/widget/inbox_members",
-    "/widget/contact",
-    "/widget/messages",
-    "/widget/conversations",
-    "/widget/campaigns",
-    # Tour scheduling (no unit data)
-    "/tour/availabilities",
-    # G5 lead forms and review widgets
-    "/html_forms/",
-    "/yext_reviews/",
-    # RealPage blurb/marketing text endpoints (no unit data)
-    "/blurb/v1/",
-}
-
-
-def looks_like_availability_api(url: str) -> bool:
-    """Check if a URL looks like a property availability/units API call.
-
-    Returns False for known false-positive hosts (Google Maps, analytics
-    pixels, tag managers) that match broad patterns like '/api/' but never
-    contain apartment data.
-    """
-    url_lower = url.lower()
-
-    # Reject known false-positive hosts (unless allowlisted).
-    try:
-        host = urllib.parse.urlparse(url_lower).netloc
-        if host not in _ALLOWLIST_OVERRIDES:
-            for fp_host in _FALSE_POSITIVE_HOSTS:
-                if host == fp_host or host.endswith("." + fp_host):
-                    return False
-    except Exception:
-        pass
-
-    # Reject known false-positive path fragments.
-    for frag in _FALSE_POSITIVE_PATH_FRAGMENTS:
-        if frag in url_lower:
-            return False
-
-    return any(p.lower() in url_lower for p in ENTRATA_API_PATTERNS)
-
-
-# Entrata widget types that contain real floor plan / availability data.
-_ENTRATA_PROPERTY_WIDGET_TYPES = {"floor_plans", "availability"}
-
-# Entrata widget types that are known to NOT contain unit data.
-_ENTRATA_NOISE_WIDGET_TYPES = {
-    "custom",
-    "directions",
-    "events",
-    "specials",
-    "resident_login",
-    "gallery",
-    "contact",
-    "reviews",
-    "social",
-    "blog",
-    "amenities",
-}
-
-
-def _filter_entrata_widget_response(body: dict) -> dict | None:
-    """Filter Entrata /Apartments/module/widgets/ responses.
-
-    Returns the body unchanged if it contains floor plan / availability data,
-    or None if it's a non-property widget (directions, gallery, etc.).
-    """
-    widget_name = body.get("widget_name", "")
-    if widget_name in _ENTRATA_NOISE_WIDGET_TYPES:
-        return None
-    # Check if widget_data.content actually contains floor plan data
-    # (not just layout config). The floor_plans widget has a nested
-    # floor_plans list; the availability widget usually only has UI config.
-    widget_data = body.get("widget_data", {})
-    content = widget_data.get("content", {})
-    if isinstance(content, dict):
-        fp_section = content.get("floor_plans", {})
-        if isinstance(fp_section, dict):
-            fp_list = fp_section.get("floor_plans", [])
-            if isinstance(fp_list, list) and fp_list:
-                return body
-        # Check for availability section with actual unit data
-        avail_section = content.get("availability", {})
-        if isinstance(avail_section, dict):
-            avail_units = avail_section.get("units", [])
-            if isinstance(avail_units, list) and avail_units:
-                return body
-    # Unknown widget with no recognisable floor plan data.
-    if widget_name not in _ENTRATA_PROPERTY_WIDGET_TYPES:
-        return None
-    # Known property widget type but no data — still keep it for
-    # the parser to attempt (it might have a different structure).
-    return body
-
+# _FALSE_POSITIVE_HOSTS, _ALLOWLIST_OVERRIDES, _FALSE_POSITIVE_PATH_FRAGMENTS,
+# _ENTRATA_PROPERTY_WIDGET_TYPES, _ENTRATA_NOISE_WIDGET_TYPES,
+# looks_like_availability_api, _filter_entrata_widget_response
+# are now imported from extraction.engine.noise_filter above.
 
 def _response_looks_like_units(body) -> bool:
     """Quick heuristic: does this API response body contain unit/floorplan data?
@@ -1939,81 +1805,12 @@ async def probe_entrata_api(page: Page, base_url: str) -> list[dict]:
 # ── Main scraper ───────────────────────────────────────────────────────────────
 
 
-def _proxy_config(proxy: str | None) -> dict | None:
-    if not proxy:
-        return None
-    # Allow bare "host:port" by defaulting to http scheme.
-    if "://" not in proxy:
-        proxy = "http://" + proxy
-    parsed = urllib.parse.urlparse(proxy)
-    if not parsed.hostname or not parsed.port:
-        print(f"  ⚠ Ignoring malformed proxy URL: {proxy}")
-        return None
-    cfg: dict = {"server": f"{parsed.scheme or 'http'}://{parsed.hostname}:{parsed.port}"}
-    if parsed.username:
-        cfg["username"] = urllib.parse.unquote(parsed.username)
-        cfg["password"] = urllib.parse.unquote(parsed.password or "")
-    return cfg
-
-
-async def _goto_robust(page: Page, url: str, timeout_ms: int = 45000) -> None:
-    """
-    `networkidle` hangs on sites with analytics polling or chat widgets — use
-    `domcontentloaded` as the primary wait and then settle briefly.
-    """
-    await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
-    try:
-        await page.wait_for_load_state("load", timeout=5000)
-    except Exception:
-        pass
-    try:
-        await page.wait_for_load_state("networkidle", timeout=5000)
-    except Exception:
-        pass
-    await asyncio.sleep(1.0)
-
+# _proxy_config, _goto_robust, filter_network_noise are now imported from
+# extraction.engine.browser_session / extraction.engine.noise_filter above.
+_proxy_config = _engine_proxy_config
+_goto_robust = _engine_goto_robust
 
 # ── Helper functions for the 7-phase pipeline ────────────────────────────────
-
-
-def filter_network_noise(
-    api_responses: list[dict],
-    profile: Any | None = None,
-) -> list[dict]:
-    """Filter API responses through three layers: global blocklist, profile
-    blocklist, and unit-signal scoring. Returns filtered + sorted responses.
-    """
-    # Layer 1+3 are already handled by looks_like_availability_api() in the
-    # response handler. Here we apply the profile-specific blocklist.
-    if profile is None:
-        return api_responses
-
-    blocked_patterns: set[str] = set()
-    api_hints = getattr(profile, "api_hints", None)
-    if api_hints:
-        for ep in getattr(api_hints, "blocked_endpoints", []):
-            blocked_patterns.add(ep.url_pattern)
-
-    if not blocked_patterns:
-        return api_responses
-
-    filtered = []
-    for resp in api_responses:
-        url = resp.get("url", "")
-        if url in blocked_patterns:
-            print(f"  -- Profile blocklist: skipping {url[:80]}")
-            continue
-        # Also check if the URL matches any blocked pattern as a substring
-        blocked = False
-        for pattern in blocked_patterns:
-            if pattern in url:
-                print(f"  -- Profile blocklist (substring): skipping {url[:80]}")
-                blocked = True
-                break
-        if not blocked:
-            filtered.append(resp)
-
-    return filtered
 
 
 def prioritize_links(
@@ -2342,87 +2139,15 @@ async def scrape(
         "_profile_cascade": run_full_cascade,
     }
 
-    launch_args: dict = {
-        "headless": True,
-        "args": ["--no-sandbox", "--disable-dev-shm-usage"],
-    }
-    context_args = {
-        "user_agent": USER_AGENT,
-        "viewport": {"width": 1280, "height": 900},
-        "locale": "en-US",
-    }
-    proxy_cfg = _proxy_config(proxy)
-    if proxy_cfg:
-        launch_args["proxy"] = proxy_cfg
+    _nc = NetworkCapture()
 
-    api_responses: list[dict] = []
-    seen_api_urls: set[str] = set()
-
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(**launch_args)
-        context: BrowserContext = await browser.new_context(**context_args)
+    async with BrowserSession(proxy=proxy) as _session:
+        # Keep a local alias so downstream code can reference api_responses directly.
+        api_responses = _nc._api_responses
 
         try:
-            # ── Network interception ───────────────────────────────────────
-            async def handle_response(response):
-                try:
-                    url = response.url
-                    if not looks_like_availability_api(url):
-                        return
-                    # Entrata widget endpoints return multiple distinct responses
-                    # (one per widget type) on the same URL — don't deduplicate
-                    # those, otherwise we'd miss the floor_plans widget.
-                    is_widget_url = "/apartments/module/widgets/" in url.lower()
-                    if url in seen_api_urls and not is_widget_url:
-                        return
-                    ct = (response.headers or {}).get("content-type", "").lower()
-                    if "json" not in ct and not url.lower().endswith(".json"):
-                        print(f"  -- API skipped (non-JSON content-type: {ct[:40]}): {url[:80]}")
-                        return
-                    if not (200 <= response.status < 300):
-                        print(f"  -- API skipped (HTTP {response.status}): {url[:80]}")
-                        return
-                    body = await response.json()
-                    seen_api_urls.add(url)
-
-                    # Filter Entrata widget responses: keep floor_plans /
-                    # availability widgets, discard noise (directions, gallery, etc.)
-                    if "/apartments/module/widgets/" in url.lower() and isinstance(body, dict):
-                        filtered = _filter_entrata_widget_response(body)
-                        if filtered is None:
-                            wn = body.get("widget_name", "?")
-                            print(f"  -- Widget skipped ({wn}): {url[:80]}")
-                            return
-                        # Extract the floor_plans list from the widget wrapper so the
-                        # generic parser can process it like a normal API response.
-                        widget_data = body.get("widget_data", {})
-                        content = widget_data.get("content", {})
-                        fp_list = content.get("floor_plans", {})
-                        if isinstance(fp_list, dict):
-                            fp_list = fp_list.get("floor_plans", [])
-                        if isinstance(fp_list, list) and fp_list:
-                            body = fp_list
-                            print(
-                                f"  📡 Widget floor_plans extracted: "
-                                f"{len(fp_list)} floor plans from {url[:80]}"
-                            )
-
-                    api_responses.append({"url": url, "body": body})
-                    # Log body shape so failed extractions can be diagnosed.
-                    body_hint = ""
-                    if isinstance(body, dict):
-                        body_hint = f"dict keys={list(body.keys())[:6]}"
-                    elif isinstance(body, list):
-                        body_hint = f"list[{len(body)}]"
-                    print(f"  📡 API captured [{response.status}]: {url[:100]}  ({body_hint})")
-                except Exception as exc:
-                    # Body already consumed, non-JSON, navigation cancel, etc.
-                    exc_str = str(exc)
-                    if "was not received" not in exc_str and "Target closed" not in exc_str:
-                        print(f"  -- API response error: {exc_str[:80]}  url={response.url[:60]}")
-
-            page = await context.new_page()
-            page.on("response", handle_response)
+            page = await _session.new_page()
+            page.on("response", _nc.create_handler())
 
             # ── 1. Homepage — collect all links ───────────────────────────
             print(f"\n{'=' * 65}")
@@ -3030,15 +2755,9 @@ async def scrape(
             results["_raw_api_responses"] = api_responses
             results["api_calls_intercepted"] = [r["url"] for r in api_responses]
             results["units"] = units
-        finally:
-            try:
-                await context.close()
-            except Exception:
-                pass
-            try:
-                await browser.close()
-            except Exception:
-                pass
+        except Exception:
+            raise
+        # BrowserSession.__aexit__ handles context/browser close via finally.
 
     return results
 
