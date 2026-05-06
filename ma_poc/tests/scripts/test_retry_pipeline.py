@@ -48,13 +48,3 @@ def test_retry_pipeline_run_signature():
     )
 
 
-def test_retry_runner_still_importable():
-    """retry_runner module is still importable (backward compatibility)."""
-    import scripts.retry_runner  # noqa: F401
-
-
-def test_retry_runner_run_retry_still_importable():
-    """run_retry function is still importable from scripts.retry_runner."""
-    from scripts.retry_runner import run_retry  # noqa: F401
-
-    assert callable(run_retry), "run_retry must be callable"

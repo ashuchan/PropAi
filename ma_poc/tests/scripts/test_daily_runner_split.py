@@ -4,7 +4,11 @@ PR-7 — TDD tests for daily_runner.py decomposition.
 These tests verify:
 1. Each new sub-module is importable from its target package.
 2. The key functions are importable from their new canonical locations.
-3. Backward compat: all public names are still importable from scripts.daily_runner.
+
+Note (PR-9): Backward-compat tests that required scripts.daily_runner to
+exist have been removed.  daily_runner.py was deleted in PR-9; the
+canonical import locations in scripts.state / scripts.orchestration /
+scripts.reporting are the only supported paths going forward.
 """
 from __future__ import annotations
 
@@ -103,54 +107,3 @@ def test_scrape_in_thread_in_scrape_worker():
     assert callable(_scrape_in_thread)
 
 
-# ---------------------------------------------------------------------------
-# 3. Backward compat: all names still importable from scripts.daily_runner
-# ---------------------------------------------------------------------------
-
-
-def test_backward_compat_read_properties_csv():
-    from scripts.daily_runner import read_properties_csv  # noqa: F401
-
-    assert callable(read_properties_csv)
-
-
-def test_backward_compat_build_property_record():
-    from scripts.daily_runner import build_property_record  # noqa: F401
-
-    assert callable(build_property_record)
-
-
-def test_backward_compat_append_ledger():
-    from scripts.daily_runner import _append_ledger  # noqa: F401
-
-    assert callable(_append_ledger)
-
-
-def test_backward_compat_load_ledger():
-    from scripts.daily_runner import load_ledger  # noqa: F401
-
-    assert callable(load_ledger)
-
-
-def test_backward_compat_write_markdown_report():
-    from scripts.daily_runner import _write_markdown_report  # noqa: F401
-
-    assert callable(_write_markdown_report)
-
-
-def test_backward_compat_write_issues_jsonl():
-    from scripts.daily_runner import _write_issues_jsonl  # noqa: F401
-
-    assert callable(_write_issues_jsonl)
-
-
-def test_backward_compat_run_daily():
-    from scripts.daily_runner import run_daily  # noqa: F401
-
-    assert callable(run_daily)
-
-
-def test_backward_compat_main():
-    from scripts.daily_runner import main  # noqa: F401
-
-    assert callable(main)

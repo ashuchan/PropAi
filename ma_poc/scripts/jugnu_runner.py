@@ -1131,11 +1131,10 @@ def _write_property_report(
 ) -> None:
     """Write a per-property markdown report under ``{run_dir}/property_reports/``.
 
-    Delegates to :func:`scripts.scrape_report.generate_property_report`, the
-    same writer ``daily_runner`` uses, so report format stays consistent
-    across the two runners. Jugnu passes the formatted v1/v2 record as
-    ``property_record`` so the metadata section can render v2-specific
-    fields (apartment_id, pmc, website_design, concessions).
+    Delegates to :func:`scripts.scrape_report.generate_property_report`.
+    Passes the formatted v1/v2 record as ``property_record`` so the metadata
+    section can render v2-specific fields (apartment_id, pmc, website_design,
+    concessions).
 
     Jugnu has no legacy state-store diff, so ``unit_diff`` is empty. L4
     validation output (``scrape_result["_validated"]``) is translated into
@@ -1180,6 +1179,24 @@ def _write_property_report(
         "unchanged": [],
         "disappeared": [],
     }
+
+    # Post-merge yield gate: flag when >50% of formatted units have no unit_id
+    # (same signal as daily_runner's UNITS_KEYLESS_HIGH gate, mirrored here
+    # since Jugnu doesn't go through state_store.upsert_units).
+    formatted_units = property_record.get("units") or []
+    if formatted_units:
+        keyless = sum(1 for u in formatted_units if not u.get("unit_id"))
+        input_count = len(formatted_units)
+        if keyless / input_count > 0.5:
+            issues.append(
+                SimpleNamespace(
+                    severity="WARNING",
+                    code="UNITS_KEYLESS_HIGH",
+                    message=(
+                        f"{keyless}/{input_count} units could not be keyed"
+                    ),
+                )
+            )
 
     try:
         generate_property_report(
