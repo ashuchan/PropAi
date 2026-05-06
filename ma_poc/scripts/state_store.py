@@ -36,6 +36,8 @@ from identity_fallback import (  # noqa: E402
     assign_fallback_unit_id,
     compute_fallback_unit_id,
     compute_unit_data_sha256,
+    seen_at_iso,
+    synthesize_unkeyable_id,
 )
 
 # ── File I/O helpers ──────────────────────────────────────────────────────────
@@ -181,25 +183,31 @@ class StateStore:
         diff: dict[str, Any] = {
             "new": [], "updated": [], "unchanged": [], "disappeared": [],
             "skipped_no_identity": 0,
+            "synthetic_key_used": 0,
             "input_count": len(today_units),
         }
 
         for u in today_units:
+            # Stamp the data hash first so synthesize_unkeyable_id can
+            # reuse it. Explicit ``not in`` instead of ``setdefault`` so
+            # we don't recompute the SHA on records that already have one
+            # set upstream — Python evaluates the default argument
+            # unconditionally.
+            if "data_sha256" not in u:
+                u["data_sha256"] = compute_unit_data_sha256(u)
+
             uid = str(u.get("unit_id") or "").strip()
             if not uid:
-                # Use the unified helper — it tries compute_fallback_unit_id
-                # (physical attrs SHA256), then a last-resort floor-plan-only
-                # key, then unit-number-only. Mutates ``u['unit_id']`` so the
-                # snapshot below picks it up.
+                # No-drop contract: assign_fallback_unit_id walks the
+                # natural → fingerprint → floor-plan ladder, and if none
+                # of those bind we synthesize a stable id from the payload
+                # hash. Either way the record is inserted — never dropped.
                 derived = assign_fallback_unit_id(u, canonical_id)
                 if not derived:
-                    diff["skipped_no_identity"] += 1
-                    continue  # no identity anchor — skip
+                    derived = synthesize_unkeyable_id(u, canonical_id)
+                    diff["synthetic_key_used"] += 1
                 uid = derived
             current_ids.add(uid)
-            # Informational SHA256 of the entire unit dict — never compared
-            # for merge / dedup.
-            u.setdefault("data_sha256", compute_unit_data_sha256(u))
 
             # Persist the full unit snapshot (not just rent/availability) so
             # a carry-forward on the next run produces a complete record.
@@ -223,7 +231,11 @@ class StateStore:
                 "move_in_date": _first_not_none(u, "move_in_date", "_move_in_date"),
                 "availability_status": u.get("availability_status"),
                 "last_seen_date": run_date,
-                "last_seen_at": datetime.now(UTC).isoformat(),
+                # Date portion of the timestamp is anchored to ``run_date``
+                # via the shared :func:`seen_at_iso` helper so day-level
+                # queries match the logical run-day even when wall-clock
+                # disagrees (backfills, TZ edges).
+                "last_seen_at": seen_at_iso(run_date),
                 # Informational hash of the full incoming unit dict — never
                 # used for comparison, just stored for drift diagnostics.
                 "data_sha256": u.get("data_sha256"),

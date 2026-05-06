@@ -88,36 +88,143 @@ def test_floor_plan_only_record_gets_last_resort_id(provider: DataProvider) -> N
     assert diff.new[0].startswith("inferred_")
 
 
-def test_anchorless_record_increments_skipped_counter(provider: DataProvider) -> None:
-    """Empty record — no floor_plan, no unit_id, no unit_number — must skip."""
+def test_anchorless_record_inserts_with_synthetic_key(provider: DataProvider) -> None:
+    """No-drop contract: a record with no identifying anchor (no unit_id,
+    no floor_plan, no unit_number) must still land in the table. The
+    synthesized id is prefixed ``unkeyable_`` so it's filterable in SQL,
+    and ``synthetic_key_used`` increments for the yield gate."""
     diff = provider.unit_state.upsert_units(
         "P1",
         [_u(rent_low=1200.0)],  # rent alone is not an anchor
         "2026-05-06",
     )
-    assert diff.skipped_no_identity == 1
     assert diff.input_count == 1
-    assert diff.new == []
+    assert diff.skipped_no_identity == 0  # no-drop contract
+    assert diff.synthetic_key_used == 1
+    assert len(diff.new) == 1
+    assert diff.new[0].startswith("unkeyable_")
+
+
+def test_anchorless_record_persisted_in_units_table(provider: DataProvider) -> None:
+    """Smoke check: the row actually lands in ``units`` (not just buffered
+    into the diff and dropped before commit)."""
+    provider.unit_state.upsert_units(
+        "P_unkeyable",
+        [_u(rent_low=1200.0)],
+        "2026-05-06",
+    )
+    with provider.engine.connect() as c:
+        rows = list(
+            c.execute(
+                text("SELECT unit_id, last_seen_at FROM units WHERE canonical_id='P_unkeyable'")
+            )
+        )
+    assert len(rows) == 1
+    assert rows[0][0].startswith("unkeyable_")
+    # ``last_seen_at`` ISO timestamp begins with the run_date — confirms
+    # the day-level "was this unit seen on this day" signal works without
+    # a dedicated last_scrape_date column.
+    assert rows[0][1].startswith("2026-05-06")
+
+
+def test_synthetic_key_collides_for_byte_identical_payloads(provider: DataProvider) -> None:
+    """Two anchorless records with identical payloads must collapse to one
+    row. Distinct anchorless payloads must NOT collapse — that would be a
+    silent merge across genuinely different observations."""
+    # Same payload twice → one row.
+    diff_a = provider.unit_state.upsert_units(
+        "P_collide",
+        [_u(rent_low=1200.0), _u(rent_low=1200.0)],
+        "2026-05-06",
+    )
+    assert diff_a.input_count == 2
+    assert diff_a.synthetic_key_used == 2  # both went through the synthesis path
+    # But the two synthetic ids collide → one row in the DB.
+    with provider.engine.connect() as c:
+        n = c.execute(
+            text("SELECT COUNT(*) FROM units WHERE canonical_id='P_collide'")
+        ).scalar()
+    assert n == 1
+
+    # Distinct payloads → distinct rows.
+    diff_b = provider.unit_state.upsert_units(
+        "P_distinct",
+        [_u(rent_low=1200.0), _u(rent_low=1500.0)],
+        "2026-05-06",
+    )
+    assert diff_b.synthetic_key_used == 2
+    with provider.engine.connect() as c:
+        n = c.execute(
+            text("SELECT COUNT(*) FROM units WHERE canonical_id='P_distinct'")
+        ).scalar()
+    assert n == 2
+
+
+def test_synthetic_key_idempotent_across_runs(provider: DataProvider) -> None:
+    """Re-running the same anchorless record on a later run must update the
+    existing row (not create a second one). last_seen_at must advance."""
+    provider.unit_state.upsert_units(
+        "P_idem",
+        [_u(rent_low=1200.0)],
+        "2026-05-06",
+    )
+    diff = provider.unit_state.upsert_units(
+        "P_idem",
+        [_u(rent_low=1200.0)],
+        "2026-05-07",
+    )
+    # Second run sees the same synthetic id as already present → unchanged.
+    assert diff.unchanged and not diff.new
+    with provider.engine.connect() as c:
+        rows = list(
+            c.execute(text("SELECT last_seen_at FROM units WHERE canonical_id='P_idem'"))
+        )
+    assert len(rows) == 1
+    assert rows[0][0].startswith("2026-05-07")
 
 
 def test_mixed_batch_each_path_counted(provider: DataProvider) -> None:
-    """Batch of natural + sha256 + last-resort + anchorless."""
+    """Batch of natural + sha256 fingerprint + last-resort + anchorless.
+    Every record lands; counters reflect which path was taken."""
     diff = provider.unit_state.upsert_units(
         "P1",
         [
             _u(unit_id="101", floor_plan_name="A1", beds=1, baths=1.0, area=750, rent_low=1500.0),
             _u(floor_plan_name="A2", beds=2, baths=2.0, area=1100, rent_low=2200.0),
             _u(floor_plan_name="Studio", rent_low=900.0),
-            _u(rent_low=1500.0),  # anchorless
+            _u(rent_low=1500.0),  # anchorless → synthetic key
         ],
         "2026-05-06",
     )
     assert diff.input_count == 4
-    assert diff.skipped_no_identity == 1
-    assert len(diff.new) == 3
-    # First is the natural id; the other two are inferred.
+    assert diff.skipped_no_identity == 0  # no-drop contract
+    assert diff.synthetic_key_used == 1
+    assert len(diff.new) == 4
+    # One natural, two inferred (sha256 + last-resort), one unkeyable.
     assert "101" in diff.new
     assert sum(1 for u in diff.new if u.startswith("inferred_")) == 2
+    assert sum(1 for u in diff.new if u.startswith("unkeyable_")) == 1
+
+
+def test_last_seen_at_is_day_filterable(provider: DataProvider) -> None:
+    """last_seen_at is an ISO timestamp — its first 10 chars are the run-day,
+    so day-level "was this unit observed on day X?" queries work via
+    ``substring(last_seen_at, 1, 10) = '<run_date>'`` without a dedicated
+    column. This pins that contract."""
+    provider.unit_state.upsert_units(
+        "P_day",
+        [_u(unit_id="A", floor_plan_name="A1", beds=1, baths=1.0, area=750, rent_low=1500.0)],
+        "2026-05-06",
+    )
+    with provider.engine.connect() as c:
+        n = c.execute(
+            text(
+                "SELECT COUNT(*) FROM units "
+                "WHERE canonical_id='P_day' "
+                "AND substring(last_seen_at, 1, 10) = '2026-05-06'"
+            )
+        ).scalar()
+    assert n == 1
 
 
 # ── Plural-s collision (Fix #4) ─────────────────────────────────────────────

@@ -54,13 +54,24 @@ class YieldVerdict:
 def evaluate(diff: UnitDiff, *, threshold: float = 0.5) -> YieldVerdict:
     """Decide whether the merge yield is poor enough to retry the extractor.
 
+    "Keyless" combines two buckets:
+
+      * ``skipped_no_identity`` — historical drops (now always 0 under the
+        no-drop contract; retained so old callers still feed the gate).
+      * ``synthetic_key_used`` — records inserted under a payload-hash
+        synthetic id because no natural / fingerprint / floor-plan anchor
+        was available.
+
+    Both buckets indicate the extractor produced records without a usable
+    identity anchor — a clean "next tier please" signal regardless of
+    whether the record was dropped (legacy) or rescued (current contract).
+
     Parameters
     ----------
     diff:
         The :class:`UnitDiff` returned by ``IUnitStateStore.upsert_units``.
-        Must have ``input_count`` and ``skipped_no_identity`` populated —
-        both default to ``0`` on older callers, in which case this function
-        returns ``next_tier_requested=False`` (no signal).
+        Old callers that don't populate the counter fields default to ``0``
+        and the gate produces ``next_tier_requested=False`` (no signal).
     threshold:
         Strictly-greater-than threshold for the keyless ratio. ``0.5`` by
         default, matching the validation orchestrator.
@@ -73,8 +84,8 @@ def evaluate(diff: UnitDiff, *, threshold: float = 0.5) -> YieldVerdict:
     if n_in == 0:
         return YieldVerdict(next_tier_requested=False, keyless_ratio=0.0, threshold=threshold)
 
-    skipped = max(0, diff.skipped_no_identity)
-    ratio = skipped / n_in if n_in else 0.0
+    keyless = max(0, diff.skipped_no_identity) + max(0, diff.synthetic_key_used)
+    ratio = keyless / n_in if n_in else 0.0
     return YieldVerdict(
         next_tier_requested=ratio > threshold,
         keyless_ratio=ratio,

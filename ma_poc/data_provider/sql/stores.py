@@ -287,6 +287,19 @@ def _utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _seen_at_iso(run_date: str) -> str:
+    """Date-anchored ``last_seen_at`` timestamp.
+
+    Thin wrapper around :func:`ma_poc.scripts.identity_fallback.seen_at_iso`
+    — kept here under the underscore-prefixed legacy name so internal call
+    sites don't need updating. The lazy import preserves the
+    ``data_provider`` ↔ ``scripts`` boundary (the latter shouldn't be on
+    sys.path during alembic migrations).
+    """
+    from ma_poc.scripts.identity_fallback import seen_at_iso
+    return seen_at_iso(run_date)
+
+
 # ── IPropertyStateStore ──────────────────────────────────────────────────────
 
 
@@ -319,7 +332,10 @@ class SqlPropertyStateStore(IPropertyStateStore):
             # payloads — it's no longer a column, drop it silently.
             merged.pop("last_seen_date", None)
             merged["canonical_id"] = canonical_id
-            merged["last_seen_at"] = _utc_now_iso()
+            # Anchor the date portion to ``run_date`` so day-level queries
+            # against ``properties.last_seen_at`` agree with the same field
+            # on ``units`` (both populated via :func:`_seen_at_iso`).
+            merged["last_seen_at"] = _seen_at_iso(run_date)
             if is_new:
                 merged["first_seen_date"] = run_date
             else:
@@ -405,6 +421,7 @@ class SqlUnitStateStore(IUnitStateStore):
         from ma_poc.scripts.identity_fallback import (
             assign_fallback_unit_id,
             compute_unit_data_sha256,
+            synthesize_unkeyable_id,
         )
 
         with self._h.scope() as s:
@@ -417,28 +434,34 @@ class SqlUnitStateStore(IUnitStateStore):
             current_ids: set[str] = set()
 
             for u in today_units:
+                # Stamp the data hash first so synthesize_unkeyable_id can
+                # reuse it. Explicit ``not in`` instead of ``setdefault`` so
+                # we don't recompute a 50K-element-payload SHA on records
+                # that already have one set upstream — Python evaluates the
+                # default argument unconditionally.
+                if "data_sha256" not in u:
+                    u["data_sha256"] = compute_unit_data_sha256(u)
+
                 uid = str(u.get("unit_id") or "").strip()
                 if not uid:
-                    # Defense-in-depth: callers SHOULD assign unit_id at
-                    # extraction time (see jugnu_runner._format_v2_unit), but
-                    # if a record reaches the SQL upsert without one, derive
-                    # it here so we don't silently drop the record.
+                    # No-drop contract: try the natural / fingerprint /
+                    # floor-plan-only fallback first; if even that returns
+                    # None, synthesize a stable id from the payload hash and
+                    # insert as a new unit. Records never silently disappear.
                     derived = assign_fallback_unit_id(u, canonical_id)
                     if not derived:
-                        # Truly anchorless — nothing identifiable, skip.
-                        diff.skipped_no_identity += 1
-                        continue
+                        derived = synthesize_unkeyable_id(u, canonical_id)
+                        diff.synthetic_key_used += 1
                     uid = derived
-                # Informational SHA256 of the entire unit payload — never
-                # used for merge / dedup, just stored alongside for drift
-                # diagnostics.
-                u.setdefault("data_sha256", compute_unit_data_sha256(u))
                 current_ids.add(uid)
 
                 snap: dict[str, Any] = {
                     "canonical_id": canonical_id,
                     "unit_id": uid,
-                    "last_seen_at": _utc_now_iso(),
+                    # Date portion = run_date so day-level "was this unit
+                    # observed on day X?" queries are deterministic; time
+                    # portion = wall-clock for within-run ordering.
+                    "last_seen_at": _seen_at_iso(run_date),
                     "carryforward_days": 0,
                     "data_sha256": u["data_sha256"],
                 }
@@ -484,11 +507,15 @@ class SqlUnitStateStore(IUnitStateStore):
         with self._h.scope() as s:
             rows = s.execute(select(UnitRow).where(UnitRow.canonical_id == canonical_id)).scalars().all()
             out: list[dict[str, Any]] = []
+            seen_at = _seen_at_iso(run_date)
             for r in rows:
                 if r.disappeared_since:
                     continue
                 r.carryforward_days = (r.carryforward_days or 0) + 1
-                r.last_seen_at = _utc_now_iso()
+                # Anchor to run_date so a carry-forward on day X registers
+                # as "seen on day X" for day-level queries — same contract
+                # as a fresh upsert.
+                r.last_seen_at = seen_at
                 out.append(
                     {
                         "unit_id": r.unit_id,

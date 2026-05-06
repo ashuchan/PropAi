@@ -123,17 +123,30 @@ class UnitIndexEntry(BaseModel):
 class UnitDiff(BaseModel):
     """Output of IUnitStateStore.upsert_units — matches StateStore.upsert_units.
 
-    The four list fields are the canonical merge buckets. ``skipped_no_identity``
-    counts unkeyable records and ``input_count`` records the number of units
-    the caller handed in — both feed the post-merge yield gate
-    (``services.merge_yield.evaluate``) and are informational only; no
-    business rule reads them directly.
+    The four list fields are the canonical merge buckets. The counter
+    fields drive the post-merge yield gate (:func:`services.merge_yield.evaluate`)
+    and are informational only — no business rule reads them directly.
+
+    No-drop contract (2026-05): ``upsert_units`` never silently drops a
+    record. When even the floor-plan-only fallback can't produce an id,
+    ``synthesize_unkeyable_id`` mints one from the payload hash and the
+    record is inserted. ``synthetic_key_used`` counts those rescues;
+    ``skipped_no_identity`` is retained for back-compat and now stays
+    at 0 in normal operation.
     """
 
     new: list[str] = Field(default_factory=list)
     updated: list[str] = Field(default_factory=list)
     unchanged: list[str] = Field(default_factory=list)
     disappeared: list[str] = Field(default_factory=list)
+    # Records inserted under a payload-hash synthetic id because no
+    # natural / fingerprint / floor-plan anchor was available. They land
+    # in ``new`` (or ``updated`` if the same payload was seen before)
+    # but the counter exposes the rescue rate to the yield gate.
+    synthetic_key_used: int = 0
+    # Retained for back-compat. With the no-drop contract this is always
+    # 0 in healthy operation; non-zero indicates a bug in the synthesis
+    # path itself, not an extractor problem.
     skipped_no_identity: int = 0
     input_count: int = 0
 

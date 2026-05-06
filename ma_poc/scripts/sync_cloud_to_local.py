@@ -5,14 +5,20 @@ instance (defaults to the `proppy` database described in
 ma_poc/.env) so you can develop / debug against real production data
 without round-tripping through Cloud SQL on every query.
 
-Direction is one-way: Cloud SQL (source) -> local (destination). Every
-destination table is TRUNCATEd before the cloud rows are inserted, so
-the local DB ends up byte-identical to the cloud snapshot taken at
-script-start time. If you want additive merge semantics use
-`--mode=upsert` instead — that path keys on the PK for business-key
-tables and on `run_date` for surrogate-PK tables (`property_snapshots`,
-`run_issues`, `run_ledger`) so independent local rows for run_dates the
-cloud doesn't have are preserved.
+Direction is one-way: Cloud SQL (source) -> local (destination).
+
+Default mode (``--mode=mirror``) is destructive and atomic: every
+selected destination table is TRUNCATEd in a single statement (with
+``RESTART IDENTITY CASCADE``) BEFORE any rows are copied, then cloud
+rows are plain-inserted. The local DB ends up byte-identical to the
+cloud snapshot taken at script-start time and identity sequences are
+reset so post-sync local inserts don't collide with imported PKs.
+
+If you want additive merge semantics use ``--mode=upsert`` instead —
+that path keys on the PK for business-key tables and on ``run_date``
+for surrogate-PK tables (``property_snapshots``, ``run_issues``,
+``run_ledger``) so independent local rows for run_dates the cloud
+doesn't have are preserved.
 
 Connection paths
 ----------------
@@ -264,6 +270,39 @@ def _parse_database_url(url: str) -> tuple[str, str, str]:
     return user, password, db
 
 
+# ── Table truncate (upfront, mirror mode only) ───────────────────────────────
+
+
+def _truncate_tables(dst: Engine, tables: Sequence[Table]) -> None:
+    """TRUNCATE every selected destination table in a single statement.
+
+    Called once at the start of the run when ``--mode=mirror`` so that
+    the local DB is wiped atomically before any cloud rows are
+    inserted, instead of doing a per-table DELETE mid-copy. The single
+    ``TRUNCATE`` statement is also dramatically faster than 17
+    individual DELETEs on a 4M-row dataset (TRUNCATE scans the row
+    pages once; DELETE walks the heap + writes a tombstone per row).
+
+    ``RESTART IDENTITY`` resets autoincrement sequences for surrogate-PK
+    tables (``property_snapshots``, ``run_issues``, ``run_ledger``) so
+    we don't have to ``setval`` them after each copy.
+
+    ``CASCADE`` is harmless: the data_provider schema has no FK edges
+    between these tables today (verified in ma_poc/data_provider/sql/
+    models.py — every FK is implicit, enforced in application code).
+    The flag is included so a future migration that adds an FK doesn't
+    silently break this path.
+    """
+    if not tables:
+        return
+    from sqlalchemy import text
+
+    quoted = ", ".join(f'"{t.name}"' for t in tables)
+    log.info("Truncating %d table(s): %s", len(tables), [t.name for t in tables])
+    with dst.begin() as conn:
+        conn.execute(text(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE"))
+
+
 # ── Table copy ───────────────────────────────────────────────────────────────
 
 
@@ -281,8 +320,10 @@ def _copy_table(
     Returns {"source_rows": N, "written": M}.
 
     ``mode``:
-      - 'mirror': DELETE all local rows then plain-insert cloud rows.
-      - 'upsert' (default merge mode):
+      - 'mirror': caller has already TRUNCATEd every selected table
+        upfront (see ``_truncate_tables``); this function plain-inserts
+        cloud rows.
+      - 'upsert' (additive merge mode):
           * Tables with business-key PKs (``properties``, ``units``,
             ``run_reports``, ``scrape_events``, etc.): INSERT … ON
             CONFLICT DO UPDATE keyed on the PK. Idempotent on re-runs;
@@ -309,9 +350,9 @@ def _copy_table(
     surrogate_slice_col = _SURROGATE_PK_TABLES.get(table.name) if mode == "upsert" else None
     with dst.begin() as dst_conn:
         if mode == "mirror":
-            # Faster than DELETE + cheaper than TRUNCATE…CASCADE since
-            # the data_provider schema has no FKs between these tables.
-            dst_conn.execute(table.delete())
+            # The upfront TRUNCATE in main() already cleared this table
+            # — nothing to do here before the insert loop runs.
+            pass
         elif surrogate_slice_col is not None:
             # Surrogate-PK table: ON CONFLICT on `id` would corrupt local
             # rows that share an id with a cloud row by coincidence. Read
@@ -501,6 +542,14 @@ def main() -> int:
         dst = _build_dest_engine(args.local_url)
 
         try:
+            # Mirror mode: wipe every selected table in a single
+            # ``TRUNCATE … RESTART IDENTITY CASCADE`` before any cloud
+            # rows are inserted. Atomic — if the script crashes mid-sync
+            # the local DB is left empty (not half-old, half-new).
+            # Skipped in dry-run and in upsert mode (which preserves
+            # local rows the cloud doesn't have).
+            if args.mode == "mirror" and not args.dry_run:
+                _truncate_tables(dst, tables)
             for table in tables:
                 try:
                     summary[table.name] = _copy_table(

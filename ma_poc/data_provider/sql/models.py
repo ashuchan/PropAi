@@ -112,6 +112,10 @@ class UnitRow(Base):
 
     # ── State-tracking (no v2 equivalent) ───────────────────────────────
     first_seen_date: Mapped[str | None] = mapped_column(String(16))
+    # ISO timestamp of the most recent upsert for this (canonical_id, unit_id).
+    # Re-stamped by ``upsert_units`` on every appearance, so the first 10
+    # chars are the "day this unit was last seen" — usable directly as a
+    # day-level filter via ``substring(last_seen_at, 1, 10) = '<run_date>'``.
     last_seen_at: Mapped[str | None] = mapped_column(String(64))
     carryforward_days: Mapped[int] = mapped_column(Integer, default=0)
     disappeared_since: Mapped[str | None] = mapped_column(String(16))

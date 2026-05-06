@@ -19,11 +19,15 @@ import json
 
 import pytest
 
+from datetime import UTC, datetime
+
 from ma_poc.scripts.identity_fallback import (
     _normalize_token,
     assign_fallback_unit_id,
     compute_fallback_unit_id,
     compute_unit_data_sha256,
+    seen_at_iso,
+    synthesize_unkeyable_id,
 )
 
 
@@ -217,3 +221,143 @@ def test_unit_data_sha256_is_not_used_for_identity() -> None:
     u2 = {**u, "rent_low": 2000}
     assert compute_fallback_unit_id(u2, "P1") == fp_id  # rent excluded from identity
     assert compute_unit_data_sha256(u2) != full_hash  # rent flipped the data hash
+
+
+# ── synthesize_unkeyable_id (no-drop contract) ──────────────────────────────
+
+
+def test_synthesize_returns_unkeyable_prefixed_id() -> None:
+    """Synthesis result is filterable in SQL via the prefix."""
+    res = synthesize_unkeyable_id({}, "P1")
+    assert res.startswith("unkeyable_")
+    assert len(res) == 26  # "unkeyable_" (10) + 16 hex chars
+
+
+def test_synthesize_mutates_unit_in_place() -> None:
+    u: dict[str, object] = {"rent_low": 1200}
+    res = synthesize_unkeyable_id(u, "P1")
+    assert u["unit_id"] == res
+
+
+def test_synthesize_is_deterministic_across_calls() -> None:
+    """Same payload + same property → same id, every call."""
+    u1 = {"rent_low": 1200, "available_date": "2026-06-01"}
+    u2 = {"rent_low": 1200, "available_date": "2026-06-01"}
+    assert synthesize_unkeyable_id(u1, "P1") == synthesize_unkeyable_id(u2, "P1")
+
+
+def test_synthesize_namespaced_by_property_id() -> None:
+    """Same payload on different properties → different ids."""
+    u = {"rent_low": 1200}
+    assert synthesize_unkeyable_id(dict(u), "P1") != synthesize_unkeyable_id(dict(u), "P2")
+
+
+def test_synthesize_distinguishes_distinct_payloads() -> None:
+    """Different anchorless payloads must NOT collide."""
+    a = synthesize_unkeyable_id({"rent_low": 1200}, "P1")
+    b = synthesize_unkeyable_id({"rent_low": 1500}, "P1")
+    assert a != b
+
+
+def test_synthesize_reuses_precomputed_data_sha256() -> None:
+    """Optimization: when ``data_sha256`` is already set on the unit, the
+    helper must use it verbatim instead of recomputing — that's how the
+    upsert paths chain ``compute_unit_data_sha256`` once and feed both
+    the column and the synthesis."""
+    u = {"rent_low": 1200, "data_sha256": "fakehash"}
+    # Synthesize with the bogus hash baked in.
+    a = synthesize_unkeyable_id(u, "P1")
+    # Independently compute what we'd get if synthesize had used the real hash.
+    real_hash = compute_unit_data_sha256({"rent_low": 1200})
+    b_via_real = synthesize_unkeyable_id({"rent_low": 1200, "data_sha256": real_hash}, "P1")
+    # They must differ — proving ``a`` did NOT recompute.
+    assert a != b_via_real
+
+
+def test_synthesize_always_returns_string_even_on_empty_dict() -> None:
+    """No-drop contract guarantee: helper must return a non-empty string
+    for any input dict, including totally empty."""
+    res = synthesize_unkeyable_id({}, "P1")
+    assert isinstance(res, str) and res.startswith("unkeyable_")
+
+
+def test_synthesize_handles_empty_property_id() -> None:
+    """Empty property_id is allowed (caller's choice). The id is still
+    deterministic and stable — identity hashes within an unknown-property
+    bucket but doesn't crash."""
+    res = synthesize_unkeyable_id({"rent_low": 1200}, "")
+    assert res.startswith("unkeyable_")
+
+
+# ── seen_at_iso (date-anchored last_seen_at helper) ─────────────────────────
+
+
+def test_seen_at_iso_happy_path() -> None:
+    """The output's date portion is the run_date and the time portion is
+    a valid ISO timestamp."""
+    res = seen_at_iso("2026-05-06")
+    assert res.startswith("2026-05-06T")
+    # Should round-trip through ``datetime.fromisoformat`` — that's the
+    # contract every Postgres / SQLite consumer relies on.
+    parsed = datetime.fromisoformat(res)
+    assert parsed.tzinfo is not None
+    # Date matches the splice (not wall-clock).
+    assert parsed.date().isoformat() == "2026-05-06"
+
+
+def test_seen_at_iso_truncates_extra_chars() -> None:
+    """Callers passing a full ISO timestamp by accident get the date
+    portion only — the time/offset is replaced with wall-clock."""
+    res = seen_at_iso("2026-05-06T00:00:00+00:00")
+    assert res.startswith("2026-05-06T")
+    parsed = datetime.fromisoformat(res)
+    # Time portion came from wall-clock, NOT the input — so it's "now-ish".
+    delta = abs((datetime.now(UTC) - parsed).total_seconds())
+    assert delta < 5.0
+
+
+def test_seen_at_iso_falls_back_when_empty() -> None:
+    """Empty run_date → wall-clock fallback. Pins the no-corruption
+    guarantee against the bug the helper was introduced to fix."""
+    res = seen_at_iso("")
+    parsed = datetime.fromisoformat(res)
+    delta = abs((datetime.now(UTC) - parsed).total_seconds())
+    assert delta < 5.0
+
+
+def test_seen_at_iso_falls_back_when_none() -> None:
+    res = seen_at_iso(None)  # type: ignore[arg-type]
+    parsed = datetime.fromisoformat(res)
+    delta = abs((datetime.now(UTC) - parsed).total_seconds())
+    assert delta < 5.0
+
+
+@pytest.mark.parametrize(
+    "garbage",
+    [
+        "DROPTABLE0",        # 10 chars but not a date
+        "2026/05/06",        # slashes
+        "2026-5-6",          # missing zero-pads
+        "abcd-ef-gh",        # alpha
+        "    ",              # whitespace only
+        "2026",              # too short
+    ],
+)
+def test_seen_at_iso_rejects_malformed(garbage: str) -> None:
+    """Anything that fails the strict ``YYYY-MM-DD`` prefix check falls
+    back to wall-clock — never spliced into the column. We don't compare
+    the result to ``garbage`` directly (today's date legitimately starts
+    with ``"2026"``); instead we check the result is a valid ISO
+    timestamp whose date is today and whose time is within seconds of
+    wall-clock."""
+    res = seen_at_iso(garbage)
+    parsed = datetime.fromisoformat(res)
+    now = datetime.now(UTC)
+    assert parsed.date() == now.date()
+    assert abs((now - parsed).total_seconds()) < 5.0
+
+
+def test_seen_at_iso_strips_surrounding_whitespace() -> None:
+    """Common upstream issue — whitespace around the run_date string."""
+    res = seen_at_iso("  2026-05-06  ")
+    assert res.startswith("2026-05-06T")

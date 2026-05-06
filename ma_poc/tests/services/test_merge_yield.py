@@ -14,8 +14,18 @@ from ma_poc.data_provider.dtos import UnitDiff
 from ma_poc.services.merge_yield import evaluate
 
 
-def _diff(*, input_count: int, skipped: int) -> UnitDiff:
-    return UnitDiff(input_count=input_count, skipped_no_identity=skipped)
+def _diff(*, input_count: int, skipped: int = 0, synthetic: int = 0) -> UnitDiff:
+    """Build a UnitDiff with the keyless-bucket fields populated.
+
+    ``skipped`` and ``synthetic`` both feed the gate's keyless ratio —
+    the gate combines them since both indicate the extractor produced a
+    record without a usable identity anchor.
+    """
+    return UnitDiff(
+        input_count=input_count,
+        skipped_no_identity=skipped,
+        synthetic_key_used=synthetic,
+    )
 
 
 def test_empty_input_does_not_trigger() -> None:
@@ -87,3 +97,20 @@ def test_negative_counters_are_clamped_to_zero() -> None:
     v = evaluate(bogus)
     assert v.keyless_ratio == 0.0
     assert v.next_tier_requested is False
+
+
+def test_synthetic_keys_count_as_keyless() -> None:
+    """Records rescued via the no-drop synthesis path still indicate
+    extractor garbage — the gate must trigger when synthesized records
+    dominate, not just when records were dropped (legacy semantics)."""
+    v = evaluate(_diff(input_count=10, synthetic=6))
+    assert v.next_tier_requested is True
+    assert v.keyless_ratio == pytest.approx(0.6)
+
+
+def test_skipped_and_synthetic_combine() -> None:
+    """If a property somehow accumulates both buckets (legacy + new path),
+    the gate sums them. 3 skipped + 3 synthesized over 10 → 60% > threshold."""
+    v = evaluate(_diff(input_count=10, skipped=3, synthetic=3))
+    assert v.next_tier_requested is True
+    assert v.keyless_ratio == pytest.approx(0.6)

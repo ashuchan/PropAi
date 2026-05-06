@@ -22,9 +22,49 @@ import hashlib
 import json
 import logging
 import re
+from datetime import UTC, datetime
 from typing import Any
 
 log = logging.getLogger(__name__)
+
+
+# ── seen_at_iso — date-anchored ISO timestamp helper ────────────────────────
+#
+# Lives here (rather than in either store module) so the SQL and FS
+# upsert paths share one implementation. The function is generic — any
+# caller that wants ``last_seen_at`` rooted at a logical run-date can use
+# it.
+
+# Match the strict YYYY-MM-DD prefix. Ten-char prefix is enough for the
+# splice; anything more is silently truncated by ``rd[:10]`` so callers
+# accidentally passing an ISO timestamp ("2026-05-06T00:00:00") work too.
+_RUN_DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def seen_at_iso(run_date: str) -> str:
+    """Return an ISO timestamp whose date portion is ``run_date``.
+
+    ``last_seen_at`` is the day-level "this unit was observed on this
+    run" signal. Production runs typically execute on the same UTC day
+    they represent, so wall-clock and run_date agree. Backfills and
+    timezone edges can disagree — splicing run_date into the date
+    portion keeps day-level queries
+    (``substring(last_seen_at, 1, 10) = :rd``) deterministic, while the
+    time portion preserves wall-clock for within-run ordering when
+    operators inspect the row.
+
+    Falls back to wall-clock when ``run_date`` is empty, malformed, or
+    fails the ``YYYY-MM-DD`` prefix check — this guards against
+    accidental column corruption from buggy callers (e.g. an empty
+    string would otherwise produce ``"Tnn:nn:nn..."``).
+    """
+    rd = (run_date or "").strip()
+    if not _RUN_DATE_PREFIX_RE.match(rd):
+        return datetime.now(UTC).isoformat()
+    # ISO format is "YYYY-MM-DDTHH:MM:SS.ffffff+00:00" — replace the date
+    # with the run-date prefix; everything from index 10 onwards is the
+    # time + offset portion that we keep wall-clock-accurate.
+    return rd[:10] + datetime.now(UTC).isoformat()[10:]
 
 
 # Phenotype words emitted by extractors in many surface forms ("Bedrooms",
@@ -183,12 +223,12 @@ def assign_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | Non
 
       1. Existing non-empty ``unit_id`` / ``unit_number`` — keep it.
       2. ``compute_fallback_unit_id`` — SHA256 of physical attrs (preferred).
-      3. ``_last_resort_key`` — SHA256 of just floor_plan or unit_number.
-      4. None — unit has no identity anchor, leave ``unit_id`` empty.
+      3. ``_last_resort_key`` — SHA256 of just floor_plan.
+      4. None — unit has no identifying anchor at all.
 
-    Returns the assigned id (or the existing id if one was present),
-    or ``None`` when nothing could be derived. Callers can use the return
-    value to gate "skip this record" decisions.
+    Returns the assigned id, or ``None`` when nothing identifiable could be
+    derived. Callers that must persist every record (no-drop contract)
+    should chain :func:`synthesize_unkeyable_id` for the None case.
     """
     existing = str(
         unit.get("unit_id") or unit.get("unit_number") or ""
@@ -201,6 +241,36 @@ def assign_fallback_unit_id(unit: dict[str, Any], property_id: str) -> str | Non
     if derived:
         unit["unit_id"] = derived
     return derived
+
+
+def synthesize_unkeyable_id(unit: dict[str, Any], property_id: str) -> str:
+    """Absolute last-resort id for a unit with no identifying anchor.
+
+    Some extractor outputs are pure garbage (empty dicts, only-rent records,
+    CMS dropdown options) that have no floor_plan / unit_number / phenotype
+    fields. Those records still represent observed events and the no-drop
+    contract requires they land in the database — but they cannot be merged
+    against each other across runs because there's nothing to merge ON.
+
+    This helper produces a deterministic id from the canonical_id + the full
+    payload hash. Properties:
+
+      * Two byte-identical anchorless records on the same property hash to
+        the same id — within-batch dedup, cross-run idempotency.
+      * Different anchorless payloads → different ids — no false-merging.
+      * Always returns a non-empty string. Never raises.
+
+    Mutates ``unit['unit_id']`` in place to mirror :func:`assign_fallback_unit_id`.
+    The ``unkeyable_`` prefix lets SQL queries cleanly filter / count these
+    rows separately from the ``inferred_`` (semantic-fingerprint) bucket.
+    """
+    payload_hash = unit.get("data_sha256") or compute_unit_data_sha256(unit)
+    digest = hashlib.sha256(
+        f"{property_id or ''}|payload:{payload_hash}".encode("utf-8")
+    ).hexdigest()[:16]
+    uid = f"unkeyable_{digest}"
+    unit["unit_id"] = uid
+    return uid
 
 
 def compute_unit_data_sha256(unit: dict[str, Any]) -> str:
