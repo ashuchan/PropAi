@@ -132,6 +132,186 @@ def test_rent_within_sanity_range() -> None:
                 assert 200 <= val <= 50000
 
 
+# ---------------------------------------------------------------------------
+# 2026-05-06 — direct-fetch fallback path
+# ---------------------------------------------------------------------------
+
+
+def test_find_embed_hashid_handles_plain_url() -> None:
+    """`https://sightmap.com/embed/{id}` substring is the simple case."""
+    from ma_poc.pms.adapters.sightmap import _find_embed_hashid
+
+    html = '<a href="https://sightmap.com/embed/1ywyjz3ywq0">Open Map</a>'
+    assert _find_embed_hashid(html) == "1ywyjz3ywq0"
+
+
+def test_find_embed_hashid_handles_escaped_url_in_json_blob() -> None:
+    """ECS Spaces plugin emits the embed URL with escaped slashes inside JSON.
+
+    The pattern is ``"sightmap_url":"https:\\/\\/sightmap.com\\/embed\\/<id>"``.
+    The plain regex misses this — _EMBED_ESCAPED_RE picks it up.
+    """
+    from ma_poc.pms.adapters.sightmap import _find_embed_hashid
+
+    html = (
+        '<script>const spacesConfig = {"sightmap_url":"https:\\/\\/sightmap.com\\/embed\\/x1p8d9xovd6"}</script>'
+    )
+    assert _find_embed_hashid(html) == "x1p8d9xovd6"
+
+
+def test_find_embed_hashid_returns_none_when_absent() -> None:
+    from ma_poc.pms.adapters.sightmap import _find_embed_hashid
+
+    assert _find_embed_hashid("") is None
+    assert _find_embed_hashid("<html><body>nope</body></html>") is None
+
+
+@pytest.mark.asyncio
+async def test_sightmap_direct_fetch_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    """End-to-end: fingerprint embed substring → fetch embed → fetch API → parse units.
+
+    Uses respx-style monkeypatching of httpx.AsyncClient.get to avoid actual
+    network calls.
+    """
+    import httpx
+
+    from ma_poc.pms.adapters import sightmap as sm_mod
+
+    embed_html = (
+        "<html><body><script>"
+        'window.__APP_CONFIG__ = {"name":"Test","sightmaps":[{"href":"https://sightmap.com/app/api/v1/abc/sightmaps/123"}]}\n'
+        "</script></body></html>"
+    )
+    api_body = {
+        "data": {
+            "id": "123",
+            "sightmap_id": "123",
+            "units": [
+                {
+                    "id": "u1",
+                    "floor_plan_id": "fp1",
+                    "unit_number": "101",
+                    "price": 1500,
+                    "area": 700,
+                }
+            ],
+            "floor_plans": [
+                {"id": "fp1", "name": "A1", "bedroom_count": 1, "bathroom_count": 1}
+            ],
+        }
+    }
+
+    class _Resp:
+        def __init__(self, status_code: int, text: str = "", json_body: object = None) -> None:
+            self.status_code = status_code
+            self.text = text
+            self._json = json_body
+
+        def json(self) -> object:
+            if isinstance(self._json, Exception):
+                raise self._json
+            return self._json
+
+    class _Client:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> _Client:
+            return self
+
+        async def __aexit__(self, *exc_info: object) -> None:
+            return None
+
+        async def get(self, url: str, **kwargs: object) -> _Resp:
+            if url.endswith("/embed/abc123"):
+                return _Resp(200, text=embed_html)
+            if "/sightmaps/123" in url:
+                return _Resp(200, json_body=api_body)
+            return _Resp(404, text="not found")
+
+    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+
+    units, source_url, errors = await sm_mod.fetch_sightmap_units_direct("abc123")
+    assert errors == []
+    assert source_url.endswith("/sightmaps/123")
+    assert len(units) == 1
+    assert units[0]["unit_number"] == "101"
+    assert units[0]["bedrooms"] == "1"
+    assert "$1,500" in units[0]["rent_range"]
+
+
+@pytest.mark.asyncio
+async def test_sightmap_direct_fetch_surfaces_404(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the embed URL 404s, return empty + structured error code."""
+    import httpx
+
+    from ma_poc.pms.adapters import sightmap as sm_mod
+
+    class _Resp:
+        status_code = 404
+        text = "not found"
+
+        def json(self) -> object:
+            return {}
+
+    class _Client:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> _Client:
+            return self
+
+        async def __aexit__(self, *exc_info: object) -> None:
+            return None
+
+        async def get(self, url: str, **kwargs: object) -> _Resp:
+            return _Resp()
+
+    monkeypatch.setattr(httpx, "AsyncClient", _Client)
+
+    units, _src, errors = await sm_mod.fetch_sightmap_units_direct("abc123")
+    assert units == []
+    assert any("SIGHTMAP_DIRECT_FETCH_EMBED_HTTP_404" in e for e in errors)
+
+
+@pytest.mark.asyncio
+async def test_sightmap_extract_uses_direct_fetch_when_no_xhr_captured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The adapter's `extract` calls direct-fetch when api_responses is empty
+    AND the page HTML mentions an embed URL. This is the actual gap surfaced
+    by 2026-05-06 micro-dive: 9 of 81 failing properties had a real embed URL
+    in the HTML but the iframe-load timing meant no XHR was captured.
+    """
+    from ma_poc.pms.adapters import sightmap as sm_mod
+
+    class _StubFetchResult:
+        body = (
+            b"<html>... <iframe src='https://sightmap.com/embed/zz9abc'></iframe> ...</html>"
+        )
+
+    ctx = _make_ctx([])  # No XHR responses
+    ctx.fetch_result = _StubFetchResult()  # type: ignore[assignment]
+
+    async def _stub_direct(
+        embed_hashid: str, *, timeout: float = 12.0
+    ) -> tuple[list[dict[str, str]], str, list[str]]:
+        assert embed_hashid == "zz9abc"
+        return (
+            [{"unit_number": "101", "rent_range": "$1,500", "extraction_tier": "TIER_1_API_SIGHTMAP"}],
+            "https://sightmap.com/app/api/v1/x/sightmaps/1",
+            [],
+        )
+
+    monkeypatch.setattr(sm_mod, "fetch_sightmap_units_direct", _stub_direct)
+
+    adapter = SightMapAdapter()
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert len(result.units) == 1
+    assert result.tier_used == "TIER_1_API_SIGHTMAP_DIRECT_FETCH"
+    assert result.confidence > 0.6
+
+
 def test_parse_sightmap_display_price_fallback() -> None:
     body = {
         "data": {

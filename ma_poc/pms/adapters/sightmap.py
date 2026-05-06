@@ -35,10 +35,19 @@ Key findings:
       warning when >20% of units cannot be joined to a floor plan. Tightened
       _is_sightmap_response so a bare ``data.amenities`` array no longer
       false-matches as SightMap.
+    - 2026-05-06: added direct-fetch fallback. When the existing
+      ctx._api_responses loop yields no units AND the page HTML contains a
+      ``sightmap.com/embed/{hashid}`` reference, fetch the embed → parse
+      ``window.__APP_CONFIG__.sightmaps[0].href`` → fetch the JSON API and
+      run it through ``parse_sightmap_payload``. Bulk scan of 81 still-failing
+      properties showed 9 of 81 (11%) had a real SightMap embed on a sub-page
+      that the resolver/iframe-load timing didn't surface as an XHR.
 """
 
 from __future__ import annotations
 
+import json
+import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
@@ -57,10 +66,27 @@ if TYPE_CHECKING:
 # properties (e.g. Vegas TouchTour sites that aren't actually SightMap) from
 # genuine empty inventory or genuine field-name drift.
 _TIER_BASE = "TIER_1_API_SIGHTMAP"
+_TIER_DIRECT_FETCH = f"{_TIER_BASE}_DIRECT_FETCH"
 _TIER_NO_RESPONSE = f"{_TIER_BASE}_NO_RESPONSE"
 _TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
 _TIER_AMENITIES_ONLY = f"{_TIER_BASE}_AMENITIES_ONLY"
 _TIER_PARSE_FAILED = f"{_TIER_BASE}_PARSE_FAILED"
+
+# Embed shape: https://sightmap.com/embed/{hashid}. The hashid is 6+ chars of
+# [a-z0-9]; tested embeds in the 2026-05-06 dive ranged 9–13 chars.
+_EMBED_RE = re.compile(r"https?://(?:www\.)?sightmap\.com/embed/([a-z0-9]{6,})", re.IGNORECASE)
+# WordPress ECS-Spaces plugin emits the embed URL inside a JSON config blob
+# with escaped slashes — `"sightmap_url":"https:\/\/sightmap.com\/embed\/...".
+_EMBED_ESCAPED_RE = re.compile(
+    r"sightmap_url[\"']?\s*:\s*[\"']https?:\\?/\\?/(?:www\.)?sightmap\.com\\?/embed\\?/([a-z0-9]{6,})",
+    re.IGNORECASE,
+)
+# `__APP_CONFIG__` is set as a literal `window.__APP_CONFIG__ = {...}` JS
+# assignment inside the embed page. Capture the JSON object.
+_APP_CONFIG_RE = re.compile(
+    r"window\.__APP_CONFIG__\s*=\s*(\{.*?\})\s*\n",
+    re.DOTALL,
+)
 
 # Threshold above which a partial parse triggers a SIGHTMAP_PARTIAL_JOIN
 # warning even on a successful extract. 20% chosen because at ~64.9% missing-
@@ -186,6 +212,152 @@ def _is_sightmap_response(body: Any) -> bool:
     return False
 
 
+def _ctx_html(ctx: AdapterContext) -> str | None:
+    """Pull raw HTML out of ``ctx.fetch_result.body`` (bytes or str).
+
+    Used by the direct-fetch fallback to scan for SightMap embed URLs without
+    needing a live Playwright page handle. Returns None if no body is present.
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is None:
+        return None
+    body = getattr(fr, "body", None)
+    if body is None:
+        return None
+    if isinstance(body, bytes):
+        try:
+            return body.decode("utf-8", errors="replace")
+        except Exception:
+            return None
+    if isinstance(body, str):
+        return body
+    return None
+
+
+def _find_embed_hashid(html: str) -> str | None:
+    """First ``sightmap.com/embed/{hashid}`` reference found in *html*.
+
+    Checks both forward-slash and escaped-slash variants — Engrain's WordPress
+    plugin emits the URL JSON-escaped inside `spacesConfig`.
+    """
+    if not html:
+        return None
+    m = _EMBED_RE.search(html)
+    if m:
+        return m.group(1).lower()
+    m = _EMBED_ESCAPED_RE.search(html)
+    if m:
+        return m.group(1).lower()
+    return None
+
+
+async def fetch_sightmap_units_direct(
+    embed_hashid: str,
+    *,
+    timeout: float = 12.0,
+) -> tuple[list[dict[str, str]], str, list[str]]:
+    """Direct-fetch path: embed → __APP_CONFIG__ → JSON API → parsed units.
+
+    Returns ``(units, source_url, errors)``. ``units`` is empty on any failure;
+    ``errors`` carries a human-readable diagnostic so the caller can surface
+    why a property failed.
+
+    Steps:
+    1. GET ``https://sightmap.com/embed/{embed_hashid}`` — small HTML shell
+       containing ``window.__APP_CONFIG__`` JSON.
+    2. Parse the JSON; pick ``sightmaps[0].href`` (the per-property API URL).
+    3. GET that API URL with ``--compressed`` semantics (httpx auto-handles).
+       Body-shape-check it via ``_is_sightmap_response``.
+    4. Run ``parse_sightmap_payload`` and return the units.
+
+    The function only does network I/O — no logging, no metrics. Caller wires
+    the result into the AdapterResult tier_used / errors / api_responses.
+    """
+    import httpx  # lazy: keeps adapter import cheap when not exercised
+
+    errors: list[str] = []
+    embed_url = f"https://sightmap.com/embed/{embed_hashid}"
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json, text/html;q=0.8",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            embed_resp = await client.get(embed_url, headers=headers)
+            if embed_resp.status_code != 200:
+                errors.append(
+                    f"SIGHTMAP_DIRECT_FETCH_EMBED_HTTP_{embed_resp.status_code}: {embed_url}"
+                )
+                return [], embed_url, errors
+
+            embed_html = embed_resp.text
+            cfg_match = _APP_CONFIG_RE.search(embed_html)
+            if not cfg_match:
+                errors.append(
+                    f"SIGHTMAP_DIRECT_FETCH_NO_APP_CONFIG: embed at {embed_url} "
+                    "lacks window.__APP_CONFIG__ assignment"
+                )
+                return [], embed_url, errors
+
+            try:
+                cfg = json.loads(cfg_match.group(1))
+            except json.JSONDecodeError as exc:
+                errors.append(
+                    f"SIGHTMAP_DIRECT_FETCH_BAD_APP_CONFIG: {exc}; embed={embed_url}"
+                )
+                return [], embed_url, errors
+
+            sightmaps = cfg.get("sightmaps") if isinstance(cfg, dict) else None
+            if not isinstance(sightmaps, list) or not sightmaps:
+                errors.append(
+                    f"SIGHTMAP_DIRECT_FETCH_NO_SIGHTMAPS: __APP_CONFIG__ has no sightmaps[]; embed={embed_url}"
+                )
+                return [], embed_url, errors
+
+            first = sightmaps[0]
+            api_url = first.get("href") if isinstance(first, dict) else None
+            if not isinstance(api_url, str) or not api_url:
+                errors.append(
+                    f"SIGHTMAP_DIRECT_FETCH_NO_HREF: sightmaps[0] has no href; embed={embed_url}"
+                )
+                return [], embed_url, errors
+
+            api_resp = await client.get(api_url, headers=headers)
+            if api_resp.status_code != 200:
+                errors.append(
+                    f"SIGHTMAP_DIRECT_FETCH_API_HTTP_{api_resp.status_code}: {api_url}"
+                )
+                return [], api_url, errors
+
+            try:
+                body = api_resp.json()
+            except (json.JSONDecodeError, ValueError) as exc:
+                errors.append(f"SIGHTMAP_DIRECT_FETCH_BAD_JSON: {exc}; api={api_url}")
+                return [], api_url, errors
+
+            if not _is_sightmap_response(body):
+                errors.append(
+                    f"SIGHTMAP_DIRECT_FETCH_SHAPE_REJECTED: api={api_url} "
+                    "did not match SightMap envelope (data.{units|floor_plans|sightmap_id})"
+                )
+                return [], api_url, errors
+
+            units, _dropped = parse_sightmap_payload(body, api_url)
+            if not units:
+                errors.append(
+                    f"SIGHTMAP_DIRECT_FETCH_NO_UNITS: parsed envelope had no units; api={api_url}"
+                )
+            return units, api_url, errors
+    except Exception as exc:
+        # httpx exceptions, network errors, etc. — never propagate.
+        errors.append(f"SIGHTMAP_DIRECT_FETCH_EXC: {type(exc).__name__}: {exc}")
+        return [], embed_url, errors
+
+
 class SightMapAdapter:
     """SightMap PMS adapter. Parses sightmap.com API responses."""
 
@@ -234,6 +406,28 @@ class SightMapAdapter:
                     "inspect floor_plan_id field on dropped units for drift"
                 )
             return result
+
+        # 2026-05-06: direct-fetch fallback. Before classifying as failed,
+        # scan the page HTML for a `sightmap.com/embed/{hashid}` reference and
+        # fetch the embed → API directly. Bulk scan showed ~11% of failing
+        # properties have a real embed URL on a sub-page that the iframe-load
+        # timing race never surfaced as a captured XHR.
+        html = _ctx_html(ctx)
+        embed_hashid = _find_embed_hashid(html) if html else None
+        if embed_hashid:
+            direct_units, direct_url, direct_errors = await fetch_sightmap_units_direct(
+                embed_hashid
+            )
+            result.errors.extend(direct_errors)
+            if direct_units:
+                result.units = direct_units
+                result.winning_url = direct_url
+                result.tier_used = _TIER_DIRECT_FETCH
+                # Lower confidence ceiling than primary path (0.85 vs 0.95) to
+                # signal that this came from a side-channel rather than a
+                # network capture; planner can still STOP on it.
+                result.confidence = min(0.85, 0.6 + 0.05 * len(direct_units))
+                return result
 
         # Failure path: classify via structured sub-codes mirroring the RentCafe
         # adapter pattern.
