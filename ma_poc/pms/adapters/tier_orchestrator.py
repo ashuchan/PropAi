@@ -1853,9 +1853,16 @@ class GenericAdapter:
             )
             if not decision.escalate:
                 _log_attempt("generic:llm", "skipped", reason=decision.reason)
-                result.tier_used = decision.reason.split(":")[0]
+                # Only overwrite tier_used when no units were found by earlier
+                # deterministic tiers (JSON-LD, embedded JSON, DOM). If those
+                # tiers already set a meaningful tier_used, preserve it — the
+                # LLM gate "no body" is a routing decision, not an extraction
+                # outcome.
+                if not result.units:
+                    result.tier_used = decision.reason.split(":")[0]
                 result.errors.append(decision.reason)
-                result.confidence = 0.0
+                if not result.units:
+                    result.confidence = 0.0
                 return result
         except Exception as exc:
             _log_attempt("generic:llm_gate", "errored", reason=str(exc)[:200])

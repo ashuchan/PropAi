@@ -1180,12 +1180,16 @@ def _write_property_report(
         "disappeared": [],
     }
 
-    # Post-merge yield gate: flag when >50% of formatted units have no unit_id
-    # (same signal as daily_runner's UNITS_KEYLESS_HIGH gate, mirrored here
-    # since Jugnu doesn't go through state_store.upsert_units).
+    # Post-merge yield gate: flag when >50% of formatted units lack a natural
+    # or fingerprint-derived id. Counts both absent unit_ids AND synthetic
+    # unkeyable_ ids (which signal that assign_fallback_unit_id could not
+    # find any physical anchor — same poor-identity signal as a skip).
     formatted_units = property_record.get("units") or []
     if formatted_units:
-        keyless = sum(1 for u in formatted_units if not u.get("unit_id"))
+        keyless = sum(
+            1 for u in formatted_units
+            if not u.get("unit_id") or str(u.get("unit_id", "")).startswith("unkeyable_")
+        )
         input_count = len(formatted_units)
         if keyless / input_count > 0.5:
             issues.append(

@@ -2,19 +2,20 @@
 scripts/orchestration/retry_pipeline.py
 ========================================
 
-RetryPipeline — placeholder for the Jugnu retry path.
+RetryPipeline — thin delegation wrapper for the Jugnu retry path.
 
 The legacy ``retry_runner.py`` has been deleted (PR-9).  Retry/resume
-functionality is now handled by ``scripts/jugnu_retry_runner.py``.
-This class is kept as a thin interface shim so existing call-sites that
-reference ``RetryPipeline`` do not break at import time.
+functionality lives in ``scripts/jugnu_retry_runner.py``.
+This class delegates ``run()`` to that module so existing call-sites keep
+working without directly importing jugnu_retry_runner.
 
 Example usage::
 
     from scripts.orchestration.retry_pipeline import RetryPipeline
 
-    pipeline = RetryPipeline()
-    # Use jugnu_retry_runner directly for actual retry logic.
+    result = await RetryPipeline().run(
+        retry_errors=True, run_date="2026-05-06"
+    )
 """
 from __future__ import annotations
 
@@ -22,22 +23,25 @@ from typing import Any
 
 
 class RetryPipeline:
-    """Placeholder wrapper for the Jugnu retry pipeline.
+    """Thin delegation wrapper around ``scripts.jugnu_retry_runner``.
 
-    The legacy ``retry_runner.run_retry`` this class previously delegated
-    to has been removed (PR-9).  Callers should use
-    ``scripts.jugnu_retry_runner`` directly for retry/resume runs.
+    Provides a stable import path for callers that used to reference the
+    now-deleted ``retry_runner.py``.  All keyword arguments are forwarded
+    to :func:`jugnu_retry_runner.run_retry`.
     """
 
     async def run(self, **kwargs: Any) -> dict:
-        """Not implemented — use jugnu_retry_runner instead.
+        """Delegate to ``jugnu_retry_runner.run_retry(**kwargs)``.
 
-        Raises:
-            NotImplementedError: Always.  The legacy retry_runner backend
-                has been deleted.  Retry logic now lives in
-                ``scripts/jugnu_retry_runner.py``.
+        Accepted kwargs mirror ``jugnu_retry_runner``'s CLI flags:
+        ``retry_errors``, ``resume``, ``run_date``, ``limit``, ``csv``, etc.
+
+        Returns:
+            dict with ``properties``, ``run_dir``, and summary counters.
         """
-        raise NotImplementedError(
-            "RetryPipeline.run() is a stub.  "
-            "Use scripts/jugnu_retry_runner.py for retry/resume runs."
-        )
+        try:
+            from scripts import jugnu_retry_runner as _rr
+        except ImportError:
+            from ma_poc.scripts import jugnu_retry_runner as _rr  # type: ignore[no-redef]
+
+        return await _rr.run_retry(**kwargs)

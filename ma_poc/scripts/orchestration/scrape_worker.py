@@ -22,13 +22,14 @@ for _p in (_HERE, _PROJECT_ROOT):
 
 from entrata import scrape  # noqa: E402
 
-log = logging.getLogger("daily_runner")
+log = logging.getLogger("scrape_worker")
 
 
 async def _scrape_one(
     url: str,
     proxy: str | None,
     timeout_s: int,
+    property_id: str = "unknown",
     profile: Any = None,
     expected_total_units: int | None = None,
     property_city: str | None = None,
@@ -42,11 +43,12 @@ async def _scrape_one(
                 profile=profile,
                 expected_total_units=expected_total_units,
                 property_city=property_city,
+                property_id=property_id,
             ),
             timeout=timeout_s,
         )
     except TimeoutError:
-        return {"errors": [f"scrape timeout after {timeout_s}s"], "base_url": url, "_timeout": True}
+        return {"errors": [f"scrape timeout after {timeout_s}s"], "base_url": url, "_timeout": True, "_property_id": property_id}
 
 
 def _close_event_loop(loop: asyncio.AbstractEventLoop) -> None:
@@ -103,15 +105,12 @@ def _scrape_in_thread(
                 url,
                 proxy,
                 timeout_s,
+                property_id=property_id,
                 profile=profile,
                 expected_total_units=expected_total_units,
                 property_city=property_city,
             ),
         )
-        # Stamp the canonical property ID so entrata.py's LLM tiers can
-        # reference it when building interaction records.
-        if isinstance(result, dict):
-            result["_property_id"] = property_id
         return result
     except Exception as e:
         return {

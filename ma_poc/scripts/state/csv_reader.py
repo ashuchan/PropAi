@@ -19,7 +19,7 @@ for _p in (_HERE, _PROJECT_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-log = logging.getLogger("daily_runner")
+log = logging.getLogger("state.csv_reader")
 
 
 def read_properties_csv(path: Path) -> list[dict]:

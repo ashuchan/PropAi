@@ -371,6 +371,14 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
             if not (has_price or has_name or has_size or has_rooms):
                 continue
 
+            # itemOffered guard: an Apartment/FloorPlan node with no name
+            # and no offers price is a physical-spec descriptor embedded in
+            # a parent Offer via itemOffered (Place/LocalBusiness container
+            # pattern). Pass 2 (_extract_offers_as_units) handles that
+            # structure correctly — skip here so pass 2 can run.
+            if not has_name and not has_price and any(t in t_list for t in ("Apartment", "FloorPlan")):
+                continue
+
             name = item.get("name") or ""
             if not isinstance(name, str):
                 name = str(name)

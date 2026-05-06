@@ -2092,6 +2092,7 @@ async def scrape(
     profile: Any | None = None,
     expected_total_units: int | None = None,
     property_city: str | None = None,
+    property_id: str = "unknown",
 ) -> dict:
     # Normalize http → https.  Nearly all property sites support HTTPS;
     # plain HTTP causes redirect stalls (3-5s wasted per page) or hangs
@@ -2135,9 +2136,7 @@ async def scrape(
         "extraction_tier_used": None,
         "_winning_page_url": None,  # URL/endpoint that actually produced units
         "errors": [],
-        # Populated by caller (daily_runner) so LLM interaction records can
-        # carry the canonical property ID for cost accounting.
-        "_property_id": "unknown",
+        "_property_id": property_id,
         # Interaction records from Tier 6 (LLM) and Tier 7 (Vision) calls.
         # Each element is a dict produced by llm.interaction_logger.make_interaction().
         "_llm_interactions": [],
@@ -2234,8 +2233,10 @@ async def scrape(
             results["_raw_api_responses"] = api_responses
             results["units"] = _ctx.units
             results.setdefault("_llm_interactions", []).extend(_ctx.llm_interactions)
-        except Exception:
-            raise
+        except Exception as exc:
+            # Never-fail: an unhandled phase exception is logged as an error
+            # so the result dict is always returned, never raised to the caller.
+            results["errors"].append(f"Extraction pipeline error: {exc}")
         # BrowserSession.__aexit__ handles context/browser close via finally.
 
     return results
