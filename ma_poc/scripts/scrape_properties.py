@@ -70,7 +70,10 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from entrata import scrape  # noqa: E402
-from identity_fallback import compute_fallback_unit_id  # noqa: E402
+from identity_fallback import (  # noqa: E402
+    assign_fallback_unit_id,
+    compute_fallback_unit_id,
+)
 
 # ── Unit transformation ────────────────────────────────────────────────────────
 
@@ -593,16 +596,24 @@ def _add_dedup_key_for_unit(rec: dict, property_id: str = "") -> str:
 
     Priority:
       1. unit_id (if non-empty)
-      2. compute_fallback_unit_id (physical attrs — rent-free)
-      3. last resort: floor_plan|beds|sqft string (no rent)
+      2. assign_fallback_unit_id (physical attrs → SHA256, last-resort
+         floor_plan-only key) — writes the derived id back onto ``rec``
+         so downstream :func:`upsert_units` can use it as the merge key
+         instead of dropping the record.
+      3. Final dedup-only fallback: ``floor_plan|beds|sqft`` string when
+         even the floor plan is missing (rec stays without unit_id).
     """
     uid = str(rec.get("unit_id") or "").strip()
     if uid:
         return uid
-    fallback = compute_fallback_unit_id(rec, property_id) or ""
-    if fallback:
-        return fallback
-    # Last resort: stable physical key (no rent)
+
+    # Mutates rec["unit_id"] in place when a stable fallback exists.
+    derived = assign_fallback_unit_id(rec, property_id)
+    if derived:
+        return derived
+
+    # Final dedup-only key — used to suppress within-run duplicates of a
+    # record we cannot anchor across runs.
     plan = str(rec.get("_floor_plan") or rec.get("floor_plan_name") or "")
     beds = str(rec.get("_bedrooms") or rec.get("beds") or "")
     sqft = str(rec.get("_sqft") or rec.get("area") or "")
@@ -619,14 +630,13 @@ def transform_units_from_scrape(scrape_result: dict) -> list[dict]:
     _property_id: str = str(scrape_result.get("canonical_id") or scrape_result.get("property_id") or "")
 
     def _add(rec: dict) -> None:
+        # _add_dedup_key_for_unit already mutates rec["unit_id"] when it
+        # derives a stable fallback, so we no longer need to copy + set
+        # the id here.
         key = _add_dedup_key_for_unit(rec, _property_id)
         if not key or key in seen:
             return
         seen.add(key)
-        # If unit_id was empty and we derived a stable fallback, write it onto the record
-        # so upsert_units can track the unit across runs by this ID.
-        if not str(rec.get("unit_id") or "").strip() and key.startswith("inferred_"):
-            rec = {**rec, "unit_id": key}
         target.append(rec)
 
     raw_responses = scrape_result.get("_raw_api_responses") or []

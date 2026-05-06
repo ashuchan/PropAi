@@ -148,6 +148,10 @@ _UNIT_COLS = {
     "last_absent_date",
     "concessions",
     "changed_fields",
+    # Informational drift hash — never used for merge / dedup, written on
+    # every upsert so SQL drift queries don't have to unpack the JSON
+    # ``extra`` column.
+    "data_sha256",
 }
 
 
@@ -396,19 +400,39 @@ class SqlUnitStateStore(IUnitStateStore):
         today_units: list[dict[str, Any]],
         run_date: str,
     ) -> UnitDiff:
+        # Lazy import — keeps data_provider importable when scripts/ is not
+        # on sys.path (e.g. during alembic migrations).
+        from ma_poc.scripts.identity_fallback import (
+            assign_fallback_unit_id,
+            compute_unit_data_sha256,
+        )
+
         with self._h.scope() as s:
             prior_rows = (
                 s.execute(select(UnitRow).where(UnitRow.canonical_id == canonical_id)).scalars().all()
             )
             prior_by_id: dict[str, UnitRow] = {r.unit_id: r for r in prior_rows}
 
-            diff = UnitDiff()
+            diff = UnitDiff(input_count=len(today_units))
             current_ids: set[str] = set()
 
             for u in today_units:
                 uid = str(u.get("unit_id") or "").strip()
                 if not uid:
-                    continue
+                    # Defense-in-depth: callers SHOULD assign unit_id at
+                    # extraction time (see jugnu_runner._format_v2_unit), but
+                    # if a record reaches the SQL upsert without one, derive
+                    # it here so we don't silently drop the record.
+                    derived = assign_fallback_unit_id(u, canonical_id)
+                    if not derived:
+                        # Truly anchorless — nothing identifiable, skip.
+                        diff.skipped_no_identity += 1
+                        continue
+                    uid = derived
+                # Informational SHA256 of the entire unit payload — never
+                # used for merge / dedup, just stored alongside for drift
+                # diagnostics.
+                u.setdefault("data_sha256", compute_unit_data_sha256(u))
                 current_ids.add(uid)
 
                 snap: dict[str, Any] = {
@@ -416,6 +440,7 @@ class SqlUnitStateStore(IUnitStateStore):
                     "unit_id": uid,
                     "last_seen_at": _utc_now_iso(),
                     "carryforward_days": 0,
+                    "data_sha256": u["data_sha256"],
                 }
                 for col, sources in self._SNAPSHOT_SOURCES.items():
                     snap[col] = self._read_first(u, sources)

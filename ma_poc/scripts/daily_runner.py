@@ -985,6 +985,23 @@ async def run_daily(
                         details={"unit_ids": unit_diff["disappeared"]},
                     )
                 )
+            # Post-merge yield gate — flag if >50% of inputs failed to key.
+            keyless = int(unit_diff.get("skipped_no_identity", 0))
+            input_count = int(unit_diff.get("input_count", 0))
+            if input_count and keyless / input_count > 0.5:
+                per_prop_issues.append(
+                    V.warning(
+                        V.UNITS_KEYLESS_HIGH,
+                        f"{keyless}/{input_count} units could not be keyed",
+                        canonical_id=cid,
+                        row_index=idx,
+                        details={
+                            "keyless_ratio": round(keyless / input_count, 4),
+                            "skipped_no_identity": keyless,
+                            "input_count": input_count,
+                        },
+                    )
+                )
         except Exception as e:
             per_prop_issues.append(
                 V.error(

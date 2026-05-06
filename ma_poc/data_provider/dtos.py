@@ -121,12 +121,21 @@ class UnitIndexEntry(BaseModel):
 
 
 class UnitDiff(BaseModel):
-    """Output of IUnitStateStore.upsert_units — matches StateStore.upsert_units."""
+    """Output of IUnitStateStore.upsert_units — matches StateStore.upsert_units.
+
+    The four list fields are the canonical merge buckets. ``skipped_no_identity``
+    counts unkeyable records and ``input_count`` records the number of units
+    the caller handed in — both feed the post-merge yield gate
+    (``services.merge_yield.evaluate``) and are informational only; no
+    business rule reads them directly.
+    """
 
     new: list[str] = Field(default_factory=list)
     updated: list[str] = Field(default_factory=list)
     unchanged: list[str] = Field(default_factory=list)
     disappeared: list[str] = Field(default_factory=list)
+    skipped_no_identity: int = 0
+    input_count: int = 0
 
 
 class PropertyRecord(BaseModel):

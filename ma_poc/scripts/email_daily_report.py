@@ -980,8 +980,17 @@ async def _send_via_mcp(
     subject: str,
     html_body: str,
     sender_name: str | None,
+    attachments: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Spawn the Gmail MCP server over stdio and call its `send_email` tool."""
+    """Spawn the Gmail MCP server over stdio and call its `send_email` tool.
+
+    ``attachments`` — list of absolute file paths. The MCP server reads each
+    file from disk and attaches it (verified at the server's
+    ``send_email`` tool schema, which declares
+    ``attachments: array<string>`` of file paths). Paths must be readable
+    by the user that runs the MCP server (i.e. the same user that ran
+    ``npx @gongrzhe/server-gmail-autoauth-mcp auth``).
+    """
     # Lazy imports — keeps the rest of the script importable even if `mcp`
     # isn't installed yet (e.g. during initial setup).
     from mcp import ClientSession, StdioServerParameters
@@ -994,12 +1003,13 @@ async def _send_via_mcp(
     params = StdioServerParameters(command=cmd, args=args, env=None)
 
     # The autoauth server's `send_email` tool accepts:
-    #   to: list[str]       (required)
-    #   subject: str        (required)
-    #   body: str           (required — used as plain text)
-    #   htmlBody: str       (optional — HTML alternative)
+    #   to: list[str]            (required)
+    #   subject: str             (required)
+    #   body: str                (required — used as plain text)
+    #   htmlBody: str            (optional — HTML alternative)
     #   mimeType: "text/plain" | "text/html" | "multipart/alternative"
-    #   cc, bcc, attachments (optional, unused here)
+    #   cc, bcc                  (optional)
+    #   attachments: list[str]   (optional — absolute file paths)
     payload: dict[str, Any] = {
         "to": recipients,
         "subject": subject,
@@ -1012,6 +1022,8 @@ async def _send_via_mcp(
         # If the running version ignores it, the Gmail account's default
         # display name is used — harmless either way.
         payload["from"] = sender_name
+    if attachments:
+        payload["attachments"] = [str(p) for p in attachments]
 
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:

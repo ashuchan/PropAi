@@ -46,6 +46,11 @@ UNIT_INVALID_RENT = "UNIT_INVALID_RENT"
 UNIT_INVALID_DATE = "UNIT_INVALID_DATE"
 UNIT_MISSING_ID = "UNIT_MISSING_ID"
 UNIT_DUPLICATE_ID = "UNIT_DUPLICATE_ID"
+# Post-merge yield: more than half of captured units could not be keyed.
+# Informational warning emitted by the merge_yield gate; no business
+# rule reads it directly — surfaced so a future re-run can prioritize
+# a different extraction tier for the property.
+UNITS_KEYLESS_HIGH = "UNITS_KEYLESS_HIGH"
 
 # Carry-forward
 UNITS_CARRIED_FORWARD = "UNITS_CARRIED_FORWARD"

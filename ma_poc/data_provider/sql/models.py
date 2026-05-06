@@ -119,6 +119,12 @@ class UnitRow(Base):
     concessions: Mapped[Any | None] = mapped_column(JSON)
     changed_fields: Mapped[list[str]] = mapped_column(JSON, default=list)
 
+    # Informational SHA256 of the full incoming unit dict at upsert time.
+    # Never compared between rows for identity / merge / dedup — this is
+    # purely a drift-diagnostic fingerprint surfaced in the merge analysis.
+    # 64 hex chars = 32 bytes; column kept nullable for backfill compat.
+    data_sha256: Mapped[str | None] = mapped_column(String(64))
+
     extra: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 

@@ -26,8 +26,11 @@ def test_fallback_returns_none_when_only_one_field_present() -> None:
     assert compute_fallback_unit_id(_u(beds=1), "P1") is None
 
 
-def test_fallback_returns_id_when_two_fields_present() -> None:
-    result = compute_fallback_unit_id(_u(beds=1, rent_low=1200), "P1")
+def test_fallback_returns_id_when_floor_plan_plus_one_other_field_present() -> None:
+    # v2 contract: floor_plan_name is required, plus at least one of
+    # beds/baths/area. ``rent_low`` is mutable and intentionally NOT an
+    # identifying field, so it does not satisfy the second-anchor rule.
+    result = compute_fallback_unit_id(_u(floor_plan_name="1BR", beds=1), "P1")
     assert result is not None
     assert result.startswith("inferred_")
 
@@ -41,32 +44,33 @@ def test_fallback_id_is_stable_across_calls() -> None:
 
 
 def test_fallback_id_differs_for_different_content() -> None:
-    a = compute_fallback_unit_id(_u(beds=1, rent_low=1200), "P1")
-    b = compute_fallback_unit_id(_u(beds=2, rent_low=1200), "P1")
+    a = compute_fallback_unit_id(_u(floor_plan_name="1BR", beds=1), "P1")
+    b = compute_fallback_unit_id(_u(floor_plan_name="2BR", beds=2), "P1")
     assert a != b
 
 
 def test_fallback_id_differs_for_different_property_same_content() -> None:
-    u = _u(beds=1, rent_low=1200)
+    u = _u(floor_plan_name="1BR", beds=1)
     a = compute_fallback_unit_id(u, "P1")
     b = compute_fallback_unit_id(u, "P2")
     assert a != b
 
 
 def test_fallback_id_handles_area_sentinel_minus_one() -> None:
-    # area=-1 is treated as absent; need 2 other fields to get an id
-    result = compute_fallback_unit_id(_u(area=-1, beds=1), "P1")
-    assert result is None  # only 1 real field (beds), area is sentinel
+    # area=-1 is treated as absent; with only floor_plan + sentinel area,
+    # the function should still require a second real anchor and return None.
+    result = compute_fallback_unit_id(_u(floor_plan_name="1BR", area=-1), "P1")
+    assert result is None
 
 
 def test_fallback_id_prefix_is_inferred_() -> None:
-    result = compute_fallback_unit_id(_u(beds=1, rent_low=1200), "P1")
+    result = compute_fallback_unit_id(_u(floor_plan_name="1BR", beds=1), "P1")
     assert result is not None
     assert result.startswith("inferred_")
 
 
 def test_fallback_id_length_is_25_chars_inferred_plus_16_hex() -> None:
-    result = compute_fallback_unit_id(_u(beds=1, rent_low=1200), "P1")
+    result = compute_fallback_unit_id(_u(floor_plan_name="1BR", beds=1), "P1")
     assert result is not None
     # "inferred_" is 9 chars, digest is 16 hex chars = 25 total
     assert len(result) == 25

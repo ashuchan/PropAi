@@ -32,7 +32,11 @@ _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
-from identity_fallback import compute_fallback_unit_id  # noqa: E402
+from identity_fallback import (  # noqa: E402
+    assign_fallback_unit_id,
+    compute_fallback_unit_id,
+    compute_unit_data_sha256,
+)
 
 # ── File I/O helpers ──────────────────────────────────────────────────────────
 
@@ -174,17 +178,28 @@ class StateStore:
         """
         prior = dict(self.unit_index.get(canonical_id, {}))
         current_ids: set[str] = set()
-        diff = {"new": [], "updated": [], "unchanged": [], "disappeared": []}
+        diff: dict[str, Any] = {
+            "new": [], "updated": [], "unchanged": [], "disappeared": [],
+            "skipped_no_identity": 0,
+            "input_count": len(today_units),
+        }
 
         for u in today_units:
             uid = str(u.get("unit_id") or "").strip()
             if not uid:
-                # Try stable fallback from physical attributes
-                fallback = compute_fallback_unit_id(u, canonical_id)
-                if not fallback:
+                # Use the unified helper — it tries compute_fallback_unit_id
+                # (physical attrs SHA256), then a last-resort floor-plan-only
+                # key, then unit-number-only. Mutates ``u['unit_id']`` so the
+                # snapshot below picks it up.
+                derived = assign_fallback_unit_id(u, canonical_id)
+                if not derived:
+                    diff["skipped_no_identity"] += 1
                     continue  # no identity anchor — skip
-                uid = fallback
+                uid = derived
             current_ids.add(uid)
+            # Informational SHA256 of the entire unit dict — never compared
+            # for merge / dedup.
+            u.setdefault("data_sha256", compute_unit_data_sha256(u))
 
             # Persist the full unit snapshot (not just rent/availability) so
             # a carry-forward on the next run produces a complete record.
@@ -209,6 +224,9 @@ class StateStore:
                 "availability_status": u.get("availability_status"),
                 "last_seen_date": run_date,
                 "last_seen_at": datetime.now(UTC).isoformat(),
+                # Informational hash of the full incoming unit dict — never
+                # used for comparison, just stored for drift diagnostics.
+                "data_sha256": u.get("data_sha256"),
                 # Preserve carryforward_days from incoming unit (not hardcoded 0).
                 "carryforward_days": int(u.get("carryforward_days") or 0),
                 # Reset absent state on each appearance.

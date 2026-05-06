@@ -48,6 +48,11 @@ try:
 except ImportError:
     pass
 
+# Hoisted from inside _format_v2_unit; the merge-rescue path runs once per
+# unit (~50K calls per run) and import caching makes the repeated lookup
+# free, but module-level keeps the hot loop clean.
+from ma_poc.scripts.identity_fallback import assign_fallback_unit_id  # noqa: E402
+
 log = logging.getLogger("jugnu_runner")
 
 
@@ -817,7 +822,7 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "pmc": _pick(_csv("Management Company") or _csv("pmc"), md.get("management_company")),
         "website_design": website_design,
         "concessions": concessions_text,
-        "units": [_format_v2_unit(u, scrape_ts) for u in units],
+        "units": [_format_v2_unit(u, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)) for u in units],
         # Keep _meta for internal tracking (stripped on final delivery)
         "_meta": meta,
         "_extract_result": _extract_result_summary(result),
@@ -825,7 +830,20 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
     return prop
 
 
-def _format_v2_unit(unit: dict[str, Any], scrape_ts: datetime) -> dict[str, Any]:
+def _v2_property_id_for_unit(meta: dict[str, Any], apartment_id: int | None) -> str:
+    """Resolve the property_id used to seed the fallback-id hash.
+
+    Prefers ``_meta.canonical_id`` (always set by the Jugnu runner), falls
+    back to ``apartment_id`` from the CSV row, then to an empty string.
+    The hash collision risk of an empty property_id is bounded — every
+    unit in the same property still hashes consistently.
+    """
+    return str(meta.get("canonical_id") or apartment_id or "").strip()
+
+
+def _format_v2_unit(
+    unit: dict[str, Any], scrape_ts: datetime, property_id: str = ""
+) -> dict[str, Any]:
     """Format a single unit to v2 schema.
 
     Phase 1 fixes:
@@ -836,6 +854,12 @@ def _format_v2_unit(unit: dict[str, Any], scrape_ts: datetime) -> dict[str, Any]
       TIER_1_API and TIER_2_JSONLD extractions that only produce the string.
     - Plumb ``lease_term`` / ``move_in_date`` with a broader key fallback so
       parsers can start populating them without another format change.
+
+    Merge-rescue (2026-05): when neither ``unit_id`` nor ``unit_number`` is
+    set, derive a stable inferred id from the physical attributes via
+    :func:`assign_fallback_unit_id`. This is the single chokepoint for every
+    Jugnu unit on its way out, so JSON-LD / Tier-4-LLM / cross-page-merger
+    records that previously dropped at upsert time now keep an anchor.
     """
     beds_raw = unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds")
     baths_raw = unit.get("_bathrooms") or unit.get("bathrooms") or unit.get("baths")
@@ -872,7 +896,7 @@ def _format_v2_unit(unit: dict[str, Any], scrape_ts: datetime) -> dict[str, Any]
             except Exception:
                 pass
 
-    return {
+    out: dict[str, Any] = {
         "beds": _normalize_beds(beds_raw),
         "baths": _normalize_baths(baths_raw),
         "floor_plan_name": fp_name or None,
@@ -885,6 +909,15 @@ def _format_v2_unit(unit: dict[str, Any], scrape_ts: datetime) -> dict[str, Any]
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date_str(unit.get("move_in_date") or unit.get("_move_in_date")),
     }
+
+    # Merge-rescue: if no natural id survived, derive a stable inferred id
+    # from physical attributes. The helper mutates ``out['unit_id']`` in place
+    # and returns the resolved id (or None when even the floor plan is
+    # missing — those records still skip downstream, but the per-tier "no
+    # unit_id" rate drops by ~17K units/run for JSON-LD + LLM tiers).
+    if not out["unit_id"]:
+        assign_fallback_unit_id(out, property_id)
+    return out
 
 
 def _resolve_source_url(raw_apis: list[dict[str, Any]], target_unit: dict[str, Any]) -> tuple[str, Any]:
