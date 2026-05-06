@@ -47,12 +47,15 @@ class TestUnitIdMatching:
         store.upsert_units(CID, [u], D1)
         assert "101" in store.unit_index[CID], "unit_id must be the key, not inferred_"
 
-    def test_p2_05_no_id_no_physical_fields_unit_skipped(self, store):
-        """Unit with no unit_id and no physical attributes: skipped, not tracked."""
+    def test_p2_05_no_id_no_physical_fields_unit_gets_synthetic_key(self, store):
+        """No-drop contract: unit with no identity anchor gets an unkeyable_ synthetic id."""
         u = {"unit_id": "", "market_rent_low": 1800, "available_date": D1}
         diff = store.upsert_units(CID, [u], D1)
-        assert diff["new"] == [], "unit with no identity anchor must be skipped"
-        assert len(store.unit_index.get(CID, {})) == 0
+        # Under the no-drop contract the unit is inserted, not skipped.
+        assert len(diff["new"]) == 1, "anchorless unit must land in new under no-drop contract"
+        assert diff["new"][0].startswith("unkeyable_"), "synthetic id must have unkeyable_ prefix"
+        assert diff.get("synthetic_key_used", 0) == 1
+        assert len(store.unit_index.get(CID, {})) == 1
 
 
 class TestChangeDetection:

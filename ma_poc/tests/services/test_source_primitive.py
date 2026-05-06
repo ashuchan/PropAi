@@ -185,6 +185,9 @@ def test_source_id_enum_static_scan_no_string_literals() -> None:
         repo_root / "ma_poc" / "pms" / "scraper.py",
         repo_root / "ma_poc" / "pms" / "adapters" / "base.py",
         repo_root / "ma_poc" / "pms" / "adapters" / "generic.py",
+        # PR-4: tier_orchestrator.py took over generic.py's cascade logic
+        # (including the budget dict that uses "llm_monolithic" as a key).
+        repo_root / "ma_poc" / "pms" / "adapters" / "tier_orchestrator.py",
     }
     hits: list[str] = []
     for scan_dir in scan_dirs:
