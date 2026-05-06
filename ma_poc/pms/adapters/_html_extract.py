@@ -1028,3 +1028,168 @@ def extract_available_date_from_card(card_html: str) -> str | None:
             return result
 
     return None
+
+
+# ────────────────────────────────────────────────────────────────────
+# Plain-text regex unit extractor (added 2026-05-06)
+# ────────────────────────────────────────────────────────────────────
+# Targets the LLM_COULD_NOT_EXTRACT cohort: pages where rent is in
+# flowing marketing-copy text rather than structured DOM containers.
+# DOM scan (extract_units_from_dom) requires a CSS selector container
+# that holds rent + structural fields together. Marketing-CMS templates
+# (Jonah Digital, Hyly, WordPress + Elementor) often render rent as
+# free-form copy with bed/bath/sqft tokens nearby but no enclosing
+# container. Sample (cottagesatsanford.com): page has 11 ``$NNN``
+# matches + 3 "1 Bed 1 Bath" tokens + 4 sqft tokens but DOM scan
+# returns nothing.
+#
+# Strategy: strip HTML to plain text, find each rent-shaped ``$NNN``
+# occurrence, look for bed/bath OR sqft within 300 chars, dedup by
+# (rent, sqft, beds), require >= 2 distinct units to emit. Quality
+# gates filter phone numbers, deposit fees, and amenity prices.
+
+_TEXT_DOLLAR_RE = re.compile(
+    r"\$\s?(\d{1,2}[,.]?\d{3}|\d{3,4})(?:\.\d{2})?(?:\s*/\s*(?:mo|month))?",
+    re.IGNORECASE,
+)
+_TEXT_BEDBATH_RE = re.compile(
+    r"(\d+|studio|one|two|three|four)\s*(?:-|\s)*(?:bed|bd|br)(?:room)?s?\b\s*"
+    r"[\|/,•·\s]*\s*(\d+(?:\.\d+)?)\s*(?:bath|ba|bth)(?:room)?s?\b",
+    re.IGNORECASE,
+)
+# Standalone bedroom mention (no bath) — used when sqft is also present
+_TEXT_BEDS_ALONE_RE = re.compile(
+    r"\b(\d+|studio|one|two|three|four)\s*(?:-|\s)*(?:bed|bd|br)(?:room)?s?\b",
+    re.IGNORECASE,
+)
+_TEXT_SQFT_RE = re.compile(
+    r"(\d{2,4}(?:,\d{3})?)\s*(?:sq\.?\s*ft|sqft|square\s+feet)\b",
+    re.IGNORECASE,
+)
+_TEXT_PLAN_RE = re.compile(
+    r"(?:floor\s*plan|plan|model)\s*:?\s*([A-Za-z][\w\s\-]{1,28})",
+    re.IGNORECASE,
+)
+_NUM_WORD = {"studio": "0", "one": "1", "two": "2", "three": "3", "four": "4"}
+
+
+def extract_units_from_text(html: str, source_url: str = "") -> list[dict[str, Any]]:
+    """Plain-text rent-cluster extractor for marketing-template sites.
+
+    Falls back from DOM scan when the page has rent visible in flowing
+    copy but no CSS container holds it together. Emits 1 unit per
+    distinct (rent, sqft, beds) cluster found within 300-char proximity.
+
+    Quality gates:
+      - rent must be in $200..$50_000 range (filters phone numbers, deposit fees)
+      - rent must have bed/bath OR sqft within 300 chars (filters loose dollar mentions)
+      - >= 2 distinct units required (filters single-mention pages)
+    """
+    if not html:
+        return []
+
+    # Strip noise first
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+        except Exception:
+            return []
+    for tag in soup.find_all(["script", "style", "nav", "footer", "header", "noscript", "svg"]):
+        tag.decompose()
+    text = soup.get_text(" ", strip=True)
+    text = re.sub(r"\s+", " ", text)
+    if len(text) < 200:
+        return []
+
+    seen: set[tuple[int, str, str]] = set()
+    units: list[dict[str, Any]] = []
+
+    def _closest_match(pattern: re.Pattern, window: str, anchor_in_window: int) -> "re.Match[str] | None":
+        """Find the match in `window` whose start is closest to `anchor_in_window`."""
+        best = None
+        best_dist = 10**9
+        for mm in pattern.finditer(window):
+            d = abs(mm.start() - anchor_in_window)
+            if d < best_dist:
+                best, best_dist = mm, d
+        return best
+
+    for m in _TEXT_DOLLAR_RE.finditer(text):
+        rent_str = m.group(1).replace(",", "").replace(".", "")
+        try:
+            rent_int = int(rent_str)
+        except (ValueError, TypeError):
+            continue
+        if rent_int < 200 or rent_int > 50_000:
+            continue
+
+        # Tight 120-char window on each side — adjacent clusters in marketing
+        # copy are typically 100-200 chars apart, so a wider window picks up
+        # the wrong cluster's bed/bath.
+        ctx_start = max(0, m.start() - 120)
+        ctx_end = min(len(text), m.end() + 120)
+        ctx = text[ctx_start:ctx_end]
+        anchor = m.start() - ctx_start
+
+        bb_match = _closest_match(_TEXT_BEDBATH_RE, ctx, anchor)
+        sf_match = _closest_match(_TEXT_SQFT_RE, ctx, anchor)
+        # Standalone-beds qualifier (e.g. "Studio" or "1 bedroom" with no bath)
+        beds_alone = (
+            _closest_match(_TEXT_BEDS_ALONE_RE, ctx, anchor) if not bb_match else None
+        )
+
+        # Need bed/bath OR sqft (or both) — at least one structural signal
+        if not (bb_match or sf_match):
+            continue
+
+        beds = ""
+        baths = ""
+        if bb_match:
+            b_raw = bb_match.group(1).lower()
+            beds = _NUM_WORD.get(b_raw, b_raw)
+            baths = bb_match.group(2)
+        elif beds_alone:
+            b_raw = beds_alone.group(1).lower()
+            beds = _NUM_WORD.get(b_raw, b_raw)
+        sqft = sf_match.group(1).replace(",", "") if sf_match else ""
+        plan_match = _TEXT_PLAN_RE.search(ctx)
+        plan_name = plan_match.group(1).strip() if plan_match else ""
+
+        key = (rent_int, sqft, beds)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        units.append(
+            {
+                "floor_plan_name": plan_name,
+                "bed_label": "",
+                "bedrooms": beds,
+                "bathrooms": baths,
+                "sqft": sqft,
+                "unit_number": "",
+                "floor": "",
+                "building": "",
+                "rent_range": f"${rent_int:,}",
+                "market_rent_low": rent_int,
+                "market_rent_high": rent_int,
+                "deposit": "",
+                "concession": "",
+                "availability_status": "",
+                "available_units": "",
+                "availability_date": "",
+                "lease_term": "",
+                "move_in_date": "",
+                "source_api_url": source_url,
+                "extraction_tier": "TIER_3_TEXT_REGEX",
+            }
+        )
+
+    # Need at least 2 distinct units to qualify — protects against pages
+    # that mention a single deposit / amenity-pool / processing-fee dollar
+    # near a sqft amenity blurb.
+    if len(units) < 2:
+        return []
+    return units
