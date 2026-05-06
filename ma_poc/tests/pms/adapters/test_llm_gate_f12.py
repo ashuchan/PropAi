@@ -73,11 +73,12 @@ def test_adapter_context_default_adapter_unit_count_is_zero() -> None:
 
 def test_f12_condition_present_in_generic_adapter_source() -> None:
     """If a future refactor drops the adapter_unit_count check, this test
-    catches it before it ships."""
+    catches it before it ships. Logic lives in tier_orchestrator.py after PR-4."""
+    # Cascade logic moved from generic.py → tier_orchestrator.py in PR-4
     src = Path(
-        "ma_poc/pms/adapters/generic.py"
+        "ma_poc/pms/adapters/tier_orchestrator.py"
     ).read_text(encoding="utf-8")
-    assert "adapter_unit_count" in src, "F12 gate variable missing from generic.py"
+    assert "adapter_unit_count" in src, "F12 gate variable missing from tier_orchestrator.py"
     # Both halves of the AND must be present
     assert 'ctx.detected.pms != "unknown"' in src or "ctx.detected.pms != 'unknown'" in src
     assert "adapter_unit_count > 0" in src
