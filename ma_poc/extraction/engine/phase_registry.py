@@ -17,11 +17,21 @@ class PhaseRegistry:
 
     @classmethod
     def default(cls) -> "PhaseRegistry":
-        """Return the default PR-2 registry: Phase1 + Phase2 wired up."""
+        """Return the default full 7-phase registry."""
         from extraction.engine.phases.phase1_homepage_load import Phase1HomepageLoad
         from extraction.engine.phases.phase2_noise_filter import Phase2NoiseFilter
+        from extraction.engine.phases.phase3_known_patterns import Phase3KnownPatternExtraction
+        from extraction.engine.phases.phase4_link_exploration import Phase4LinkExploration
+        from extraction.engine.phases.phase5_llm_api import Phase5LlmApiAnalysis
+        from extraction.engine.phases.phase6_dom_fallback import Phase6DomFallback
+        from extraction.engine.phases.phase7_finalize import Phase7Finalize
 
         return cls([
             Phase1HomepageLoad(),
             Phase2NoiseFilter(),
+            Phase3KnownPatternExtraction(),
+            Phase4LinkExploration(),
+            Phase5LlmApiAnalysis(),
+            Phase6DomFallback(),
+            Phase7Finalize(),
         ])
