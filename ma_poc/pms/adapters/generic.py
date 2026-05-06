@@ -36,7 +36,8 @@ from ma_poc.pms.adapters._daily_runner_parsers import (
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_sightmap_payload as _dr_parse_sightmap,
 )
-from ma_poc.pms.adapters._html_extract import (
+from ma_poc.pms.adapters._html_extract import (  # noqa: I001
+    extract_units_from_text,
     extract_embedded_blobs_from_html,
     extract_jsonld_from_html,
     extract_units_from_dom,
@@ -1705,10 +1706,58 @@ class GenericAdapter:
                     result._decision_log = decision_log  # type: ignore[attr-defined]
                     return result
                 skip_llm = False  # planner escalated — allow LLM
+
+            # 2026-05-06 — Plain-text regex extractor as a deterministic
+            # fallback BEFORE LLM tiers. Targets the LLM_COULD_NOT_EXTRACT
+            # cohort: marketing-CMS sites where rent lives in flowing copy
+            # (e.g. "Starting at $1,095 — 1 Bed 1 Bath, 650 sqft") that
+            # neither DOM container scan nor JSON-LD can pick up. Quality
+            # gates inside the function require >= 2 distinct rent
+            # clusters with bed/bath OR sqft proximity, so phone numbers
+            # and isolated deposit fees don't slip through.
+            if not result.units:
+                t_tr = _time.monotonic()
+                try:
+                    text_units = extract_units_from_text(html, ctx.base_url)
+                except Exception as exc:
+                    text_units = []
+                    _log_attempt(
+                        "generic:text_regex",
+                        "errored",
+                        reason=str(exc)[:120],
+                        duration_ms=int((_time.monotonic() - t_tr) * 1000),
+                    )
+                else:
+                    _log_attempt(
+                        "generic:text_regex",
+                        "ran_units" if text_units else "ran_empty",
+                        units=len(text_units),
+                        reason=""
+                        if text_units
+                        else "no rent clusters with bed/bath or sqft proximity",
+                        duration_ms=int((_time.monotonic() - t_tr) * 1000),
+                    )
+                if text_units:
+                    result.units = _merge_into_result_units(
+                        result.units, text_units, property_id=ctx.property_id
+                    )
+                    result.tier_used = "TIER_3_TEXT_REGEX"
+                    result.winning_url = ctx.base_url
+                    result.confidence = min(0.65, 0.45 + 0.03 * len(result.units))
+                    from ma_poc.models.source import SourceId as _SI_TR
+                    sources_already_run.add(_SI_TR.DOM_CASCADE)
+                    _dd_tr = _assess_and_decide(
+                        result.units, sources_already_run, ctx, decision_log
+                    )
+                    if _dd_tr is None or _dd_tr.action == "STOP":
+                        result._decision_log = decision_log  # type: ignore[attr-defined]
+                        return result
+                    skip_llm = False
         else:
             _log_attempt("generic:jsonld", "skipped", reason="no HTML body available")
             _log_attempt("generic:embedded_json", "skipped", reason="no HTML body available")
             _log_attempt("generic:dom_scan", "skipped", reason="no HTML body available")
+            _log_attempt("generic:text_regex", "skipped", reason="no HTML body available")
 
         # Sub-tier 6: LLM extraction --------------------------------------
         # Originally gated ON only for ``pms=unknown``. Option C relaxes
