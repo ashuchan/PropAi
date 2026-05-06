@@ -11,7 +11,14 @@ import ast
 import pathlib
 
 
-_GENERIC_SRC = pathlib.Path("ma_poc/pms/adapters/generic.py").read_text(encoding="utf-8")
+# PR-4: GenericAdapter logic moved to tier_orchestrator.py; read from there.
+# generic.py is now a thin re-export shim so the structural checks apply to
+# the orchestrator file that actually contains the cascade implementation.
+# Use __file__-relative path so the test works regardless of cwd.
+_GENERIC_SRC = (
+    pathlib.Path(__file__).parent.parent.parent
+    / "pms/adapters/tier_orchestrator.py"
+).read_text(encoding="utf-8")
 
 
 def test_assess_and_decide_called_after_jsonld_tier() -> None:
