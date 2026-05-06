@@ -79,6 +79,11 @@ from extraction.engine.browser_session import (  # noqa: E402
     _proxy_config as _engine_proxy_config,
     _goto_robust as _engine_goto_robust,
 )
+# PR-2: Phase classes + PhaseContext
+from extraction.engine.phase_context import PhaseContext  # noqa: E402
+from extraction.engine.phases.phase1_homepage_load import Phase1HomepageLoad  # noqa: E402
+from extraction.engine.phases.phase2_noise_filter import Phase2NoiseFilter  # noqa: E402
+from extraction.engine.phase_registry import PhaseRegistry  # noqa: E402
 
 # Windows console defaults to cp1252 and will crash on emoji prints.
 # Force UTF-8 on stdout/stderr if the stream supports reconfigure().
@@ -2150,99 +2155,47 @@ async def scrape(
             page.on("response", _nc.create_handler())
 
             # ── 1. Homepage — collect all links ───────────────────────────
+            # ════════════════════════════════════════════════════════════
+            # PHASE 1: Homepage Load + Full Network Capture
+            # ════════════════════════════════════════════════════════════
             print(f"\n{'=' * 65}")
             print(f"  STEP 1: Load homepage — {base_url}")
             print(f"{'=' * 65}")
-            _page_unreachable = False
-            try:
-                await _goto_robust(page, base_url, timeout_ms=60000)
-            except Exception as e:
-                msg = f"Homepage load error: {e}"
-                print(f"  ⚠ {msg}")
-                results["errors"].append(msg)
-                # Mark page as unreachable so LLM/Vision phases are skipped
-                # (no point analyzing a browser error page).
-                err_str = str(e).lower()
-                if any(
-                    sig in err_str
-                    for sig in (
-                        "err_ssl",
-                        "err_name_not_resolved",
-                        "err_connection_refused",
-                        "err_connection_timed_out",
-                        "err_too_many_redirects",
-                        "err_cert",
-                        "net::err_",
-                        "timeout",
-                    )
-                ):
-                    _page_unreachable = True
-                    print("  ⛔ Page unreachable — will skip LLM/Vision phases")
 
-            # Extract property-level metadata from the loaded homepage.
-            try:
-                results["property_metadata"] = await extract_property_metadata(page)
-                pname = (
-                    results["property_metadata"].get("name")
-                    or results["property_metadata"].get("title")
-                    or ""
-                ).strip()
-                if pname:
-                    results["property_name"] = pname
-            except Exception as e:
-                print(f"  ⚠ Property metadata extraction error: {e}")
-                results["property_metadata"] = {}
+            _ctx = PhaseContext(
+                base_url=base_url,
+                profile=profile,
+                expected_total_units=expected_total_units,
+                property_city=property_city,
+                page=page,
+            )
+            # Give the PhaseContext a reference to the NetworkCapture buffer
+            # so Phase1 and Phase2 operate on the same list.
+            _ctx.api_responses = api_responses
 
-            all_hrefs: list[str | None] = []
-            # Collect both href and visible text for each link so we can
-            # use anchor text to identify availability links whose URL
-            # paths don't contain recognisable keywords.
-            all_links_with_text: list[dict] = []
-            try:
-                all_links_with_text = await page.eval_on_selector_all(
-                    "a[href]",
-                    """els => els.map(e => ({
-                        href: e.getAttribute('href'),
-                        text: (e.innerText || e.textContent || '').trim().substring(0, 120)
-                    }))""",
-                )
-                all_hrefs = [lnk["href"] for lnk in all_links_with_text]
-            except Exception:
-                pass
+            await Phase1HomepageLoad().run(_ctx)
 
-            internal_links: set[str] = set()
-            # Links whose anchor text matches availability-related phrases —
-            # these are high-priority crawl targets regardless of URL path.
-            anchor_text_links: list[str] = []
-            for link_info in all_links_with_text:
-                url = normalise_url(base_url, link_info.get("href"))
-                if url:
-                    internal_links.add(url)
-                    text = link_info.get("text", "")
-                    if text and _AVAILABILITY_ANCHOR_RE.search(text):
-                        anchor_text_links.append(url)
-            # Also normalise any plain hrefs not yet covered.
-            for href in all_hrefs:
-                url = normalise_url(base_url, href)
-                if url:
-                    internal_links.add(url)
+            # Propagate Phase 1 outputs back to results dict.
+            results["errors"].extend(_ctx.errors)
+            _page_unreachable = _ctx.page_unreachable
+            if _page_unreachable:
+                print("  ⛔ Page unreachable — will skip LLM/Vision phases")
+            results["property_metadata"] = _ctx.property_metadata
+            if _ctx.property_name:
+                results["property_name"] = _ctx.property_name
+            internal_links = _ctx.internal_links
+            anchor_text_links = _ctx.anchor_text_links
 
             results["links_found"] = sorted(internal_links)
             print(f"\n  🔗 Total internal links: {len(internal_links)}")
             for link in sorted(internal_links):
                 print(f"     {link}")
 
-            # Wait briefly for any in-flight XHR/fetch responses to arrive.
-            # SPA sites (SightMap, Entrata widgets) fire API calls AFTER
-            # domcontentloaded — a 2s settle catches most of them.
-            if not api_responses:
-                await asyncio.sleep(2.0)
-
             # ════════════════════════════════════════════════════════════
             # PHASE 2: Noise Filtering
             # ════════════════════════════════════════════════════════════
-            # Apply profile-specific blocklist on top of global filters
-            filtered_responses = filter_network_noise(api_responses, profile)
+            Phase2NoiseFilter().run(_ctx)
+            filtered_responses = _ctx.filtered_responses
             if len(filtered_responses) < len(api_responses):
                 print(
                     f"\n  🔇 Noise filter: {len(api_responses)} → {len(filtered_responses)} "
