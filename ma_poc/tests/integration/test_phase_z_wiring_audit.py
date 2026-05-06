@@ -15,8 +15,8 @@ def test_z_h11_compute_budget_has_production_caller() -> None:
 
 
 def test_z_h11_plan_next_action_has_production_caller() -> None:
-    """H11: plan_next_action() must be called from generic.py."""
-    src = (_MAPOC / "pms" / "adapters" / "generic.py").read_text()
+    """H11: plan_next_action() must be called from tier_orchestrator.py (cascade logic after PR-4)."""
+    src = (_MAPOC / "pms" / "adapters" / "tier_orchestrator.py").read_text()
     assert "plan_next_action(" in src
 
 
@@ -39,8 +39,8 @@ def test_z_h11_resolve_source_url_has_production_caller() -> None:
 
 
 def test_z_h11_merge_sources_has_production_caller() -> None:
-    """H11: merge_sources must be called from generic.py._phase5_post_merge."""
-    src = (_MAPOC / "pms" / "adapters" / "generic.py").read_text()
+    """H11: merge_sources must be called from tier_orchestrator.py._phase5_post_merge (after PR-4)."""
+    src = (_MAPOC / "pms" / "adapters" / "tier_orchestrator.py").read_text()
     assert "merge_sources(" in src
 
 

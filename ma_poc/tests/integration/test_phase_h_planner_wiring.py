@@ -172,9 +172,9 @@ def test_h3_budget_zero_llm_targeted_prevents_api_llm_tier() -> None:
     # Verifies that ctx.budget flows into the api_llm_budget variable.
     # We inspect the source rather than running the full async cascade.
     import ast, pathlib
-    src = pathlib.Path("ma_poc/pms/adapters/generic.py").read_text()
+    src = pathlib.Path("ma_poc/pms/adapters/tier_orchestrator.py").read_text()
     assert "ctx.budget" in src or "_budget.get(" in src, (
-        "generic.py must read budget from ctx, not use hardcoded values"
+        "tier_orchestrator.py must read budget from ctx, not use hardcoded values"
     )
     assert "api_llm_budget = 3" not in src, (
         "Hardcoded api_llm_budget = 3 must be replaced with ctx.budget lookup"
@@ -194,5 +194,5 @@ def test_h3_scraper_contains_compute_budget_call() -> None:
 def test_h3_generic_contains_plan_next_action_call() -> None:
     """generic.py must call plan_next_action(."""
     import pathlib
-    src = pathlib.Path("ma_poc/pms/adapters/generic.py").read_text()
-    assert "plan_next_action(" in src, "generic.py must call plan_next_action("
+    src = pathlib.Path("ma_poc/pms/adapters/tier_orchestrator.py").read_text()
+    assert "plan_next_action(" in src, "tier_orchestrator.py must call plan_next_action("
