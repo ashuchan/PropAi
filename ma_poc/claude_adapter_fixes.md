@@ -1,5 +1,9 @@
 # CLAUDE.md — Adapter Misrouting Fixes & New PMS Adapters
 
+> **Status (2026-05-06):** `daily_runner.py` and `retry_runner.py` have been deleted (PR-9 SRP refactor).
+> The Jugnu pipeline (`jugnu_runner.py`) is the sole production pipeline.
+> References to `daily_runner.py` below are historical context; apply any guidance to `jugnu_runner.py`.
+
 **Source of truth for this work**: the 2026-04-20 run (`data/runs/2026-04-20/`) produced 72 failures out of 200 properties. Live web fetches against representative failures established that:
 
 - **12 Windsor Communities failures** routed to `TIER_1_API_RENTCAFE` but actually run on **Funnel / Nestio** (`nestiolistings.com/api/v2/listings/residential/rentals/`)

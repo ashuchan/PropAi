@@ -6,9 +6,12 @@
 
 ---
 
-## Extraction cascade inside GenericAdapter (2026-04-19 refactor)
+## Extraction cascade inside GenericAdapter (2026-04-19 refactor; PR-4 split 2026-05-06)
 
-The Jugnu `GenericAdapter` (`ma_poc/pms/adapters/generic.py`) runs tiers in this order. Each tier emits `extract.tier_attempted` so the per-property report can show exactly what fired.
+The Jugnu `GenericAdapter` orchestration logic lives in `ma_poc/pms/adapters/tier_orchestrator.py`
+(split from the monolithic `generic.py` in PR-4). Individual sub-tiers are in
+`ma_poc/pms/adapters/tiers/`. Each tier emits `extract.tier_attempted` so the
+per-property report can show exactly what fired.
 
 | Sub-tier | Key | What it does |
 |---|---|---|
@@ -47,7 +50,7 @@ Every `scrape_jugnu` result dict now carries:
 
 ## Architecture overview
 
-The platform has **two pipeline implementations**. The Jugnu pipeline is the recommended architecture going forward.
+The platform uses the **Jugnu pipeline as its sole production pipeline** (`jugnu_runner.py`). `daily_runner.py` and `retry_runner.py` were deleted in the 2026-05-06 SRP refactor (PR-9).
 
 ### Jugnu Pipeline (`jugnu_runner.py`) — 5-Layer Architecture
 
@@ -106,50 +109,67 @@ jugnu_runner.py              # Integrated runner wiring all 5 layers
           data/state/dlq.jsonl               # Dead-letter queue
 ```
 
-### Legacy Pipeline (`daily_runner.py`) — 7-Phase Extraction
+### Extraction Engine — 7-Phase Pipeline (PR-1 through PR-3 refactor 2026-05-06)
+
+The 7-phase extraction logic has been extracted from `entrata.py` into focused classes
+under `extraction/engine/`. The `scrape()` function in `entrata.py` is now a 15-line
+orchestration shell:
 
 ```
-CSV input
-    |
-    v
-daily_runner.py          # Orchestrator: loads CSV, resolves identity, runs pipeline,
-    |                    # diffs against prior state, writes output + report
-    |
-    +-- concurrency.py   # System resource detection + concurrent pool management
-    |
-    +-- identity.py      # 5-tier canonical ID resolution (dedup across runs)
-    |
-    +-- entrata.py       # Core scraper engine (handles ALL platforms)
-    |     +-- Phase 1: Homepage load + full network capture
-    |     +-- Phase 2: Noise filtering (global + profile-specific blocklists)
-    |     +-- Phase 3: Known pattern extraction (profile mappings → API → JSON-LD → DOM)
-    |     +-- Phase 4: Link-by-link exploration with per-page network observation
-    |     +-- Phase 5: LLM-assisted API analysis (single API at a time, max 3 calls)
-    |     +-- Phase 6: DOM fallback with targeted LLM → legacy LLM → Vision LLM
-    |     +-- Phase 7: Availability defaults + profile learning persistence
-    |
-    +-- services/
-    |     +-- profile_store.py, profile_router.py, profile_updater.py
-    |     +-- drift_detector.py, llm_extractor.py, vision_extractor.py
-    |
-    +-- scrape_properties.py   # Unit transformation: raw API bodies -> target schema
-    +-- state_store.py         # Persistent JSON state: property_index + unit_index
-    +-- validation.py          # Structured issue logging (ERROR/WARNING/INFO + codes)
-    |
-    +-- Output:
-          data/runs/{date}/properties.json   # 46-key records
-          data/runs/{date}/report.json/md    # Run summary
-          data/runs/{date}/issues.jsonl      # Validation issues
-          data/state/property_index.json     # Persisted between runs
-          data/state/unit_index.json         # Unit history with diffs
-          config/profiles/{canonical_id}.json # Per-property learned extraction profiles
+extraction/engine/
+    +-- browser_session.py      # BrowserSession: async context manager (Playwright lifecycle)
+    +-- network_capture.py      # NetworkCapture: XHR/fetch interception buffer
+    +-- noise_filter.py         # Pure functions: global + profile blocklists
+    +-- phase_context.py        # PhaseContext: shared mutable state dataclass
+    +-- phase_registry.py       # PhaseRegistry: ordered phase collection
+    +-- phases/
+          +-- phase1_homepage_load.py   # Navigate, capture links + metadata
+          +-- phase2_noise_filter.py    # Filter API responses
+          +-- phase3_known_patterns.py  # Profile replay → API → JSON-LD → DOM
+          +-- phase4_link_exploration.py# Per-page network observation + crawl
+          +-- phase5_llm_api.py         # analyze_api_with_llm (max 3 candidates)
+          +-- phase6_dom_fallback.py    # DOM LLM → legacy LLM → Vision
+          +-- phase7_finalize.py        # Availability defaults + winning URL
 ```
 
 ---
 
-## The three pipeline paths (and when to use which)
+## Extraction parsers (PR-5 refactor 2026-05-06)
 
-### `jugnu_runner.py` — Jugnu pipeline (RECOMMENDED)
+Host-specific parsers consolidated under `extraction/parsers/` behind a `UnitParser` protocol:
+
+```
+extraction/parsers/
+    +-- protocol.py     # UnitParser(Protocol): parse(body, url) → list[dict]
+    +-- generic.py      # GenericApiParser — wraps parse_api_responses()
+    +-- sightmap.py     # SightMapParser — wraps _parse_sightmap_payload()
+    +-- realpage.py     # RealPageParser — wraps _realpage_units_from_body()
+```
+
+---
+
+## LLM services (PR-6 refactor 2026-05-06)
+
+`services/llm_extractor.py` is now a backward-compat re-export shim. Logic lives in:
+
+```
+services/llm/
+    +-- monolithic.py     # extract_with_llm(), prepare_llm_input()
+    +-- api_analyzer.py   # analyze_api_with_llm()
+    +-- dom_analyzer.py   # analyze_dom_with_llm()
+    +-- mapping_replay.py # apply_saved_mapping() — deterministic replay
+    +-- _shared.py        # _trim_html(), _rank_api_responses(), _normalize_units()
+```
+
+---
+
+## The sole pipeline path
+
+### `jugnu_runner.py` — Jugnu pipeline (ONLY production pipeline)
+
+> **Note (PR-9, 2026-05-06):** `daily_runner.py` and `retry_runner.py` have been deleted.
+> Jugnu is the sole scraper. The legacy pipeline sub-modules are preserved as utilities under
+> `scripts/state/`, `scripts/orchestration/`, and `scripts/reporting/`.
 
 The 5-layer architecture with hard contracts between layers. Uses L2 Scheduler for task generation, L1 Fetcher for stealth requests, L3 PMS adapters for extraction, L4 for validation, and L5 for observability. Produces per-property verdicts and run reports with SLO monitoring.
 
@@ -159,14 +179,19 @@ python scripts/jugnu_runner.py --csv config/properties.csv --limit 5
 python scripts/jugnu_runner.py --csv config/properties.csv --run-date 2026-04-18
 ```
 
-### `daily_runner.py` — Legacy pipeline
+### Shared utility modules (extracted from legacy runner in PR-7)
 
-The full pipeline with state tracking, identity resolution, carry-forward, validation, and the 46-key output schema. Uses `entrata.py` as its scraping engine. **Scraping runs concurrently** via `concurrency.py` — the pool size is auto-detected from system resources.
-
-```bash
-python scripts/daily_runner.py --csv config/properties.csv
-python scripts/daily_runner.py --csv config/properties.csv --limit 5
-python scripts/daily_runner.py --proxy http://user:pass@host:port
+```
+scripts/state/
+    +-- csv_reader.py       # read_properties_csv()
+    +-- ledger.py           # _append_ledger(), load_ledger()
+    +-- property_record.py  # build_property_record()
+scripts/orchestration/
+    +-- scrape_worker.py    # _scrape_one(), _scrape_in_thread()
+    +-- retry_pipeline.py   # RetryPipeline class (delegates to jugnu_retry_runner.py)
+scripts/reporting/
+    +-- markdown.py         # _write_markdown_report()
+    +-- issues.py           # _write_issues_jsonl()
 ```
 
 ### `scrape_properties.py` — Simpler batch scraper (no state tracking)
@@ -179,9 +204,9 @@ python scripts/scrape_properties.py --csv config/properties.csv --out output/pro
 
 ---
 
-## 7-Phase Extraction Pipeline (entrata.py)
+## 7-Phase Extraction Pipeline (extraction/engine/phases/)
 
-`entrata.py` is the core scraping engine. Despite the filename, it handles **all** multifamily property websites — Entrata, RentCafe, AppFolio, Yardi, custom sites. The pipeline uses a 7-phase approach that is **exploratory and self-learning**: it navigates links systematically, observes network calls per page, uses LLM surgically on individual API responses, and persists what works (and what doesn't) to per-property profiles.
+The pipeline's phases are implemented as classes under `extraction/engine/phases/`, orchestrated by `scrape()` in `entrata.py` via `PhaseContext` (shared mutable state) and `PhaseRegistry`. Despite the filename, `entrata.py` handles **all** multifamily property websites — Entrata, RentCafe, AppFolio, Yardi, custom sites. The pipeline is **exploratory and self-learning**: it navigates links systematically, observes network calls per page, uses LLM surgically on individual API responses, and persists what works (and what doesn't) to per-property profiles.
 
 ### Phase 1 — Homepage Load + Full Network Capture
 
@@ -531,15 +556,16 @@ Optional enrichment columns: `Management Company`, `Building Type`, `Total Units
 
 The `templates/` directory (`rentcafe.py`, `entrata.py`, `appfolio.py`) and `extraction/` pipeline (`tier1_api.py` through `tier5_vision.py`) are the **Phase A BRD-spec implementation**. They use BeautifulSoup on static HTML, operate from a `BrowserSession` dataclass, and output `UnitRecord` / `ExtractionResult` models.
 
-`scripts/entrata.py` is a **parallel implementation** that uses Playwright directly (live page interaction, `page.query_selector_all`, `page.evaluate`). It handles the same extraction tiers but with different code paths optimized for real-world scraping:
+`scripts/entrata.py` is the **Jugnu pipeline's extraction entry point** — uses Playwright directly (live page interaction, `page.query_selector_all`, `page.evaluate`). The 7-phase extraction logic has been refactored into classes under `extraction/engine/phases/`; `scrape()` is now a 15-line orchestration shell.
 
+`scripts/entrata.py` capabilities:
 - Multi-page crawling (BFS across internal links)
 - SightMap dedicated API parser (joins units to floor plans)
 - 50+ API key name variants in the generic parser
 - `page.evaluate()` for JSON-LD extraction (runs in browser context)
 - DOM parsing via live Playwright selectors + regex on `innerText`
 
-The two systems do not share extraction code. When adding new PMS platform support or fixing extraction bugs, changes need to be made in **both places** if you want both pipelines to benefit.
+The BRD-spec templates and the Jugnu extraction engine do not share extraction code. When adding new PMS platform support, target `scripts/entrata.py` and the `pms/adapters/` layer — these are the active production code paths.
 
 ---
 
@@ -720,29 +746,29 @@ Two targeted prompts replace the old "send entire page" approach:
 
 ```bash
 # Full daily run (all properties)
-python scripts/daily_runner.py --csv config/properties.csv
+python scripts/jugnu_runner.py --csv config/properties.csv
 
 # Test with N properties
-python scripts/daily_runner.py --csv config/properties.csv --limit 5
+python scripts/jugnu_runner.py --csv config/properties.csv --limit 5
 
-# Resume from row 10
-python scripts/daily_runner.py --start-at 10
+# Override run date (backfill)
+python scripts/jugnu_runner.py --csv config/properties.csv --run-date 2026-04-12
+
+# Retry failures from the latest run
+python scripts/jugnu_retry_runner.py --retry-errors
+
+# Retry failures from a specific date
+python scripts/jugnu_retry_runner.py --retry-errors --run-date 2026-04-17
 
 # Scrape a single property (debug)
 python scripts/entrata.py --url https://property-website.com
-
-# With proxy
-python scripts/daily_runner.py --proxy http://user:pass@host:port
-
-# Override run date (backfill)
-python scripts/daily_runner.py --run-date 2026-04-12
 ```
 
 ---
 
 ## Concurrency (concurrency.py)
 
-`daily_runner.py` and `retry_runner.py` scrape properties concurrently using `ThreadPoolExecutor` from `concurrent.futures`. The pipeline is split into three phases:
+`jugnu_runner.py` scrapes properties concurrently using `ThreadPoolExecutor` from `concurrent.futures`. The pipeline is split into three phases:
 
 1. **Pre-filter (sequential)** — handles unresolved identities and duplicate canonical_ids immediately, without launching a browser.
 2. **Concurrent scraping (thread pool)** — all scrapeable properties are dispatched to a `ThreadPoolExecutor` via `loop.run_in_executor()`. Each thread gets its own `asyncio` event loop and Playwright instance for true OS-level parallelism. Pool size is auto-detected by `concurrency.SystemResources`.
@@ -762,11 +788,11 @@ python scripts/daily_runner.py --run-date 2026-04-12
 
 Result is clamped to `[1, 32]`. To override auto-detection, set `MAX_CONCURRENT_BROWSERS` in `.env`.
 
-### Two pool strategies
+### Pool strategies
 
 | Strategy | Class | Use case |
 |---|---|---|
-| `AsyncPool` | Semaphore + `asyncio.gather` | I/O-bound Playwright scraping inside a running event loop (used by `daily_runner.py`) |
+| `AsyncPool` | Semaphore + `asyncio.gather` | I/O-bound Playwright scraping inside a running event loop |
 | `ThreadedPool` | `ThreadPoolExecutor` | Sync callers or CPU-bound post-processing; each thread can optionally spin up its own event loop via `map_async()` |
 
 ### Usage
@@ -879,7 +905,7 @@ Five sub-categories:
 - **External-source fields are always null**: 14 fields (Census Block, Tract Code, Construction dates, Market/Submarket names, Asset Grades, etc.) require external APIs. Phase B scope.
 - **Amenities extraction**: Not implemented. SightMap stores amenities as filter IDs only; other platforms embed them in free-form text.
 - **Effective rent / concession calculation**: Unit-level `concessions` field captures raw text from the website. Computing `effective_rent` (asking_rent minus concession value) is Phase B PR-07.
-- **Geo-based timezone for LEASE_UP scheduling**: Only implemented in `run_phase_a.py` via state-based approximation. `daily_runner.py` does not handle LEASE_UP multi-scrape schedules.
+- **Geo-based timezone for LEASE_UP scheduling**: Only implemented in `run_phase_a.py` via state-based approximation. `jugnu_runner.py` does not handle LEASE_UP multi-scrape schedules.
 - **StateStore is not concurrent**: Post-processing (state upsert, diff, carry-forward) runs sequentially after all scrapes complete. Making StateStore thread-safe would allow fully pipelined processing.
 - **No cross-property learning**: Profiles are per-property only. Sites with identical structure (same PMS, same template) each learn independently. The `cluster_id` field exists on `ScrapeProfile` but clustering logic is not implemented.
 - **LLM field mapping drift**: If a PMS API changes its response schema between runs, a saved `LlmFieldMapping` will fail to produce units. The mapping falls through to `parse_api_responses()` in that case, but the stale mapping is not automatically cleared — the drift detector handles this via unit-count-drop detection.
@@ -980,9 +1006,12 @@ Column mapping:
 - `property_id` ← `property_id` | `Unique ID` | `Property ID` | `apartmentid`
 - `url` ← `url` | `Website` | `website`
 
-### Key differences from legacy pipeline
+### Jugnu pipeline design principles (vs. legacy architecture)
 
-| Feature | Legacy (`daily_runner.py`) | Jugnu (`jugnu_runner.py`) |
+> **Note (PR-9, 2026-05-06):** `daily_runner.py` and `retry_runner.py` have been deleted.
+> The table below documents the architectural improvements that Jugnu introduced.
+
+| Feature | Legacy approach | Jugnu approach |
 |---|---|---|
 | Fetch | Playwright directly in entrata.py | L1 Fetcher with proxy pool, rate limiter, stealth |
 | Scheduling | Sequential CSV iteration | L2 Scheduler with frontier, DLQ, sitemap discovery |

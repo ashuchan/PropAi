@@ -1,10 +1,12 @@
 # CLAUDE_REFACTOR.md — PMS-First Scraping Pipeline Refactor
 
+> **Status (2026-05-06):** This document describes the *original* PMS-first refactor (Phases 0–9) that produced the Jugnu pipeline. A subsequent 9-PR SRP refactoring (see `ma_poc/README.md` Refactor history) has since been completed, deleting `daily_runner.py` and `retry_runner.py`. Jugnu is now the sole pipeline. Treat the non-negotiable principles below as still active for all future changes.
+
 > **Read this whole document before writing any code.** This refactor has hard ordering constraints across phases and cross-file invariants that will break if you skip ahead.
 
 ## What this document is
 
-A full refactor plan for the MA Rent Intelligence Platform scraping pipeline. The current pipeline (`scripts/daily_runner.py` + `scripts/entrata.py`) is PMS-agnostic by default and handles PMS-specific logic reactively, scattered across a 2,610-line file misleadingly named `entrata.py`. This refactor makes PMS detection the **first** operation per scrape, then routes to a dedicated per-PMS adapter, collapsing the cascade where possible and falling through to the existing generic extractor when needed.
+A full refactor plan for the MA Rent Intelligence Platform scraping pipeline. The original pipeline (`scripts/daily_runner.py` + `scripts/entrata.py`) was PMS-agnostic by default and handled PMS-specific logic reactively, scattered across a 2,610-line file misleadingly named `entrata.py`. This refactor made PMS detection the **first** operation per scrape, then routes to a dedicated per-PMS adapter, collapsing the cascade where possible and falling through to the existing generic extractor when needed. **This refactor is complete and its outputs (Jugnu pipeline) are in production.**
 
 This document is written for execution by Claude Code. You (Claude Code) are expected to:
 - Read requirements fully before writing code
@@ -14,7 +16,7 @@ This document is written for execution by Claude Code. You (Claude Code) are exp
 
 ## Non-negotiable principles
 
-1. **Never-fail contract is preserved.** Every change must keep `daily_runner.py`'s guarantee that a single property's failure cannot crash the run. All exception handling must remain.
+1. **Never-fail contract is preserved.** Every change must keep the Jugnu pipeline's guarantee that a single property's failure cannot crash the run. All exception handling must remain.
 2. **Backward compatibility on state files.** `data/state/property_index.json`, `data/state/unit_index.json`, and `config/profiles/*.json` written by the old pipeline must continue to load without error after the refactor. New fields get defaults. No schema-breaking renames.
 3. **The 46-key output schema is locked.** `data/runs/{date}/properties.json` shape is fixed by downstream consumers. Do not add or rename top-level keys without updating `scrape_properties.py` and flagging it in the report.
 4. **LLM is the teacher, not the worker.** After this refactor the median property should make **zero** LLM calls per scrape once its profile is warm. LLM calls at runtime signal either a new property, a site change, or a bug — never a routine state.

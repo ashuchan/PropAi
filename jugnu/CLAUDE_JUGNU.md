@@ -1,5 +1,10 @@
 # Jugnu — Master Implementation Guide for Claude Code
 
+> **Status (2026-05-06):** Jugnu is fully implemented and is the **sole production pipeline**.
+> `daily_runner.py` and `retry_runner.py` have been deleted (PR-9 SRP refactor, branch
+> `claude/analyze-refactoring-plan-9nMdw`). References to integrating with `daily_runner.py`
+> below (Phase J8) are historical — `jugnu_runner.py` is the standalone entry point.
+
 > Robust Crawler Architecture for MA Rent Intelligence — migration from the
 > current 7-phase `entrata.py` pipeline to a clean 5-layer system.
 >

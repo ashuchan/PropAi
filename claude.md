@@ -2,6 +2,10 @@
 **POC: 500 properties · 8 weeks · BRD v2.0 April 2, 2026**
 **Phase A scope: Weeks 1–3 · PR-01 PR-02 PR-03 PR-04**
 
+> **Status (2026-05-06):** Phase A is complete and superseded by the Jugnu pipeline (`jugnu_runner.py`).
+> `daily_runner.py` and `retry_runner.py` have been deleted (PR-9 SRP refactor).
+> This document is retained as the original BRD specification for reference only.
+
 ---
 
 ## Core question this implementation must answer

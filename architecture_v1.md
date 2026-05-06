@@ -288,7 +288,7 @@ The cleanup uses two cutoff strategies depending on the table's keying:
 
 **Read-side consequence:** API routes that take a `:date` parameter (`/runs/:date/llm`, `/diff/:date`, etc.) now return **HTTP 410 Gone** with `{ status: "purged", retentionDays: 3, ... }` when the requested date is outside the window. See [`ma_poc/frontend/api/src/middleware/retention.ts`](ma_poc/frontend/api/src/middleware/retention.ts) for the cutoff logic — it must stay in lock-step with `_apply_retention()`'s 3-day window.
 
-**Backfill caveat:** `daily_runner` invocations with `--run-date <older-than-3-days>` will write rows that the same sync immediately deletes. Backfills should hit GCS-only paths or set up an exemption — there is no current mechanism for pinning a historical run in DB.
+**Backfill caveat:** `jugnu_runner` invocations with `--run-date <older-than-3-days>` will write rows that the same sync immediately deletes. Backfills should hit GCS-only paths or set up an exemption — there is no current mechanism for pinning a historical run in DB.
 
 ### Known Concurrency Gap — DLQ
 

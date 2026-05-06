@@ -17,9 +17,10 @@ cp .env.example .env     # then fill in keys
 
 ## Architecture
 
-The platform has **two pipeline implementations** that share the same data models, config, and output format:
+The platform uses the **Jugnu Pipeline** as its sole production pipeline.
+`daily_runner.py` and `retry_runner.py` were deleted in the 2026-05-06 refactor (PR-9).
 
-### 1. Jugnu Pipeline (recommended)
+### Jugnu Pipeline
 
 A 5-layer horizontal architecture with hard contracts between layers:
 
@@ -38,19 +39,7 @@ jugnu_runner.py
 - Deterministic hashing (`hashlib.sha256`, never `hash()`)
 - Pydantic v2 serialisation (`model_dump(mode="json")`, never `.dict()`)
 
-### 2. Legacy Pipeline (daily_runner.py)
-
-The original 7-phase extraction pipeline using `entrata.py` as the scraping engine:
-
-```
-daily_runner.py → entrata.py (7-phase pipeline) → profile learning
-                                                 → state tracking
-                                                 → 46-key output
-```
-
 ## Running
-
-### Jugnu Pipeline
 
 ```bash
 # Full daily run (all properties)
@@ -90,19 +79,9 @@ python scripts/jugnu_retry_runner.py --retry-errors --run-date 2026-04-17 --csv 
 
 Results are merged into the existing `properties.json` — successful retries replace their prior failed records.
 
-### Legacy Pipeline
+### Single property debug
 
 ```bash
-# Full daily run
-python scripts/daily_runner.py --csv config/properties.csv
-
-# Test with N properties
-python scripts/daily_runner.py --csv config/properties.csv --limit 5
-
-# With proxy
-python scripts/daily_runner.py --proxy http://user:pass@host:port
-
-# Single property debug
 python scripts/entrata.py --url https://property-website.com
 ```
 
@@ -163,17 +142,30 @@ PMS-aware extraction with 10 adapters.
 | `resolver.py` | CTA-hop + leasing portal resolver (follows redirects to PMS pages) |
 | `scraper.py` | Orchestrator: detect → resolve → adapt. `scrape_jugnu()` entry point. Link-hop acts on LLM `navigation_hint` when extraction is empty. |
 | `adapters/` | RentCafe, Entrata, AppFolio, OneSite, SightMap, RealPage OLL, AvalonBay, Squarespace, Wix, Generic |
+| `adapters/tier_orchestrator.py` | `GenericAdapter` class (cascade orchestration, split from `generic.py` in PR-4) |
+| `adapters/tiers/` | Sub-tier classes: `blocked_filter`, `profile_replay`, `api_narrow`, `api_broad`, `html_tiers`, `llm_tiers` |
 
-`AdapterContext` now threads `property_name`, `city`, `state`, `zip_code`,
-`pmc` from the CSV row into every extraction call. Used by the generic
-adapter to populate LLM prompts with real property context (previously
-hard-coded to empty strings).
+`AdapterContext` threads `property_name`, `city`, `state`, `zip_code`,
+`pmc` from the CSV row into every extraction call. All three LLM prompt
+templates reference these placeholders.
 
 The generic adapter runs a profile-aware cascade: blocked-endpoint
 filter → saved `LlmFieldMapping` replay → narrow API → broad API →
 JSON-LD (rent/sqft-gated) → embedded JSON → DOM scan → targeted API
 LLM (max 3) → targeted DOM LLM (max 1) → monolithic LLM. See
 `scripts/CLAUDE.md` for the full table.
+
+**Extraction engine (PR-1–PR-3):** Phases 1–7 are implemented as classes in
+`extraction/engine/phases/`. `scrape()` in `entrata.py` is a 15-line
+orchestration shell using `PhaseContext` and `PhaseRegistry`.
+
+**Extraction parsers (PR-5):** Host-specific parsers (`GenericApiParser`,
+`SightMapParser`, `RealPageParser`) live in `extraction/parsers/` behind the
+`UnitParser` protocol.
+
+**LLM services (PR-6):** `services/llm/` contains `monolithic.py`,
+`api_analyzer.py`, `dom_analyzer.py`, `mapping_replay.py`. `llm_extractor.py`
+is a backward-compat re-export shim.
 
 ### L4 — Validation (`ma_poc/validation/`)
 
@@ -267,7 +259,23 @@ python scripts/gate_jugnu.py all
 
 ## Documentation
 
-- [scripts/CLAUDE.md](scripts/CLAUDE.md) — full implementation guide (7-phase extraction, Jugnu layers, profile system, failure modes)
+- [scripts/CLAUDE.md](scripts/CLAUDE.md) — full implementation guide (7-phase extraction engine, Jugnu layers, profile system, failure modes, refactor history)
 - [docs/BUG_HUNT_CHECKLIST.md](docs/BUG_HUNT_CHECKLIST.md) — 40-item bug hunt checklist across all layers
 - [docs/JUGNU_BASELINE.md](docs/JUGNU_BASELINE.md) — baseline metrics from pre-Jugnu runs
 - [../CLAUDE.md](../CLAUDE.md) — BRD Phase A spec (reference)
+
+## Refactor history (2026-05-06)
+
+9-PR SRP refactoring completed on branch `claude/analyze-refactoring-plan-9nMdw`:
+
+| PR | Change |
+|----|--------|
+| PR-1 | Extracted `BrowserSession`, `NetworkCapture`, `NoiseFilter` → `extraction/engine/` |
+| PR-2 | Extracted `Phase1HomepageLoad`, `Phase2NoiseFilter` as classes; wired `PhaseRegistry` |
+| PR-3 | Extracted Phases 3–7 as classes; `scrape()` → 15-line orchestrator |
+| PR-4 | Split `generic.py` → `tier_orchestrator.py` + `tiers/` sub-tier classes |
+| PR-5 | Added `extraction/parsers/` with `UnitParser` protocol + 3 concrete parsers |
+| PR-6 | Split `llm_extractor.py` → `services/llm/` with `monolithic`, `api_analyzer`, `dom_analyzer` |
+| PR-7 | Decomposed `daily_runner.py` utilities → `scripts/state/` + `orchestration/` + `reporting/` |
+| PR-8 | Added `RetryPipeline` class in `scripts/orchestration/` |
+| PR-9 | Deleted `daily_runner.py` + `retry_runner.py`; Jugnu is the sole pipeline |

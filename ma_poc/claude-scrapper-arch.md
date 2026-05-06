@@ -1,5 +1,9 @@
 # Self-Learning Scrape Profile — Architecture & Implementation Status
 
+> **Status (2026-05-06):** `daily_runner.py` and `retry_runner.py` have been deleted (PR-9 SRP refactor).
+> The Jugnu pipeline (`jugnu_runner.py`) is the sole production pipeline.
+> References to `daily_runner.py` / `retry_runner.py` below are historical spec context only.
+
 ## Implementation Status (2026-04-14)
 
 **All phases below are IMPLEMENTED.** The original instructions below served as the spec. Key changes from the original spec:
