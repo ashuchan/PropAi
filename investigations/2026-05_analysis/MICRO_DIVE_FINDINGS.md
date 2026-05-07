@@ -495,6 +495,48 @@ All 16 regressions follow the same pattern: v10 won via TIER_4_LLM_DOM/LLM, b12 
 
 ---
 
+## Canary-batch-13: LLM determinism + source-grounded validation
+
+Two follow-up fixes targeting the LLM-stochastic-variance failure mode that
+caused 16 b11→b12 regressions (verified pid=224888: identical fetched URLs,
+captures, and adapter selection — only LLM output differed run-to-run).
+
+**Fix #1**: `seed=42`, `top_p=0.1`, `temperature=0.0` (already pinned) on the OpenRouter call. qwen-235b respects all three — greedy sampling alone wasn't deterministic on multi-token paths.
+
+**Fix #3**: source-grounded validator. New helpers `is_rent_grounded()` and `filter_llm_units_grounded()` reject any LLM-emitted unit whose rent isn't in the union of (page HTML + captured API response bodies). Wired into all three LLM tier emission paths (TIER_4_LLM_API, TIER_4_LLM_DOM, TIER_4_LLM).
+
+### Quality impact (b12 vs b13)
+
+| Metric | b12 | b13 | Δ |
+|---|---:|---:|---:|
+| SUCCESS verdicts | 218 | 207 | -11 |
+| **Total units extracted** | 3,647 | **3,977** | **+330** |
+| **Units with rent** | 3,346 (91.7%) | **3,712 (93.3%)** | **+366 (+1.6 pp)** |
+| Units with beds | 3,264 (89.5%) | 3,531 (88.8%) | +267 |
+| **Phantom-success rate (SUCCESS with all-empty-rent units)** | 64/218 = **29.4%** | 46/207 = **22.2%** | **-7.2 pp** |
+
+Despite the -11 SUCCESS count, b13 emits **+330 more total units** with **+366 more rent-bearing units**. The properties that dropped from SUCCESS were ones where the LLM was hallucinating rents that don't exist anywhere in the source — they now correctly emit FAILED_NO_DATA rather than fabricated phantom successes.
+
+**Real successes (SUCCESS minus phantoms)**:
+- b12: 218 - 64 = 154
+- b13: 207 - 46 = 161
+- **Real-success delta: +7 properties** while total verdict count -11
+
+This is a system-trust improvement. The SUCCESS rate is more honest: when the pipeline says it extracted unit data, the rent values are now grounded in source HTML.
+
+### Per-property delta (b12 → b13)
+
+- Recovered (b12 FAILED → b13 SUCCESS): **13** — mostly TIER_4_LLM (6) + TIER_4_LLM_DOM (4); these are properties where the new determinism let the LLM converge on a stable answer it was previously oscillating on.
+- Regressed (b12 SUCCESS → b13 FAILED): **21** — all had LLM-hallucinated rents that the grounded filter dropped, leaving 0 units.
+
+Net regressed = -8 verdicts, but **net real successes = +7** after subtracting phantoms. Trade-off accepted: worse top-line metric, better data trust.
+
+### Caveat
+
+The grounded filter only validates `rent_low` / `rent_high`. It does NOT validate sqft, beds, baths, unit_number, or floor_plan_name — so an LLM that hallucinates one of those but gets rent right will still pass through. Future work: extend grounding to sqft + unit_number for tighter trust.
+
+---
+
 ## Final synthesis — exhaustive cohort breakdown
 
 After dive on every failure cohort:
