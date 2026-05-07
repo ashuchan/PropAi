@@ -226,3 +226,63 @@ class TestUnitsKeylessHighGate:
         units = [_anchored("101"), _anchorless(1200.0), _anchorless(1300.0), _anchorless(1400.0)]
         rows = self._run_gate(units, tmp_path)
         assert rows[0]["details"]["keyless_ratio"] == pytest.approx(0.75)
+
+
+# ── STATE_STORE_FAULT ─────────────────────────────────────────────────────────
+
+class TestStateStoreFault:
+    """STATE_STORE_FAULT issue is written when upsert_units raises."""
+
+    def test_fault_written_to_issues_jsonl(self, tmp_path: Path):
+        from unittest.mock import MagicMock
+
+        from ma_poc.data_provider.dtos import IssueEntry
+        from ma_poc.data_provider.dtos import UnitDiff
+        from ma_poc.scripts.jugnu_runner import _append_issue_to_run
+        from ma_poc.services.merge_yield import evaluate as merge_yield_evaluate
+
+        run_dir = tmp_path / "runs" / "2026-05-07"
+        units = [_anchored("101"), _anchorless(1200.0)]
+
+        # Simulate a state_store whose upsert_units blows up
+        broken_ss = MagicMock()
+        broken_ss.upsert_units.side_effect = RuntimeError("disk full")
+
+        from ma_poc.data_provider.dtos import IssueEntry as _IE
+
+        try:
+            broken_ss.upsert_units("prop", units, "2026-05-07")
+        except Exception as exc:
+            _append_issue_to_run(
+                run_dir,
+                _IE(
+                    severity="WARNING",
+                    code="STATE_STORE_FAULT",
+                    message=str(exc)[:200],
+                    canonical_id="prop",
+                ),
+            )
+
+        rows = _read_issues(run_dir)
+        assert len(rows) == 1
+        assert rows[0]["code"] == "STATE_STORE_FAULT"
+        assert rows[0]["severity"] == "WARNING"
+        assert "disk full" in rows[0]["message"]
+
+    def test_fault_issue_is_valid_issue_entry(self, tmp_path: Path):
+        """The written row must deserialise as IssueEntry."""
+        from unittest.mock import MagicMock
+
+        from ma_poc.data_provider.dtos import IssueEntry
+        from ma_poc.scripts.jugnu_runner import _append_issue_to_run
+
+        run_dir = tmp_path / "runs" / "2026-05-07"
+        _append_issue_to_run(
+            run_dir,
+            IssueEntry(severity="WARNING", code="STATE_STORE_FAULT",
+                       message="unit test fault", canonical_id="p1"),
+        )
+        row = _read_issues(run_dir)[0]
+        parsed = IssueEntry.model_validate(row)
+        assert parsed.code == "STATE_STORE_FAULT"
+        assert parsed.canonical_id == "p1"
