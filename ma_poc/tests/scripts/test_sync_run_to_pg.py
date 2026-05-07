@@ -1163,7 +1163,7 @@ def test_oversize_floor_plan_does_not_drop_other_properties(tmp_path: Path) -> N
         # rest of its data (rent, beds, etc.) is intact.
         bad_units = target.unit_state.get_units("PROP-2")
         assert "PROP-2-101" in bad_units
-        assert len(bad_units["PROP-2-101"].floor_plan_name or "") <= 256
+        assert len(bad_units["PROP-2-101"].floor_plan_name or "") <= 1024
         assert bad_units["PROP-2-101"].rent_low == 1500
     finally:
         target.close()

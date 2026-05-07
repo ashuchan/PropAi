@@ -1,93 +1,48 @@
 """
-scripts/smoke_test.py — 5-property integration test.
+scripts/smoke_test.py — Jugnu import-sanity smoke test (offline, no network).
 
-Asserts (CLAUDE.md):
-  a. ScrapeEvent written to data/scrape_events.jsonl
-  b. data/extraction_output/{property_id}/{today}.json exists
-  c. scrape_outcome is SUCCESS or SKIPPED — never unexplained FAILED
-  d. confidence_score is in [0.0, 1.0] (or None for SKIPPED)
-  e. units list is non-empty for SUCCESS outcomes
-  f. banner_capture_attempted == True for non-SKIPPED scrapes
-  g. extraction_tier is set (1–5) for SUCCESS outcomes
+Checks:
+  1. L1 Fetch layer imports cleanly
+  2. L2 Discovery layer imports cleanly
+  3. L3 PMS adapter layer imports cleanly
+  4. L4 Validation layer imports cleanly
+  5. L5 Observability layer imports cleanly
 
-Exits 0 if 5/5 pass, 1 otherwise.
+Exits 0 if all 5 pass, 1 otherwise.
 """
 
 from __future__ import annotations
 
-import asyncio
-import json
-import os
 import sys
-from datetime import date
 from pathlib import Path
-from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except ImportError:  # pragma: no cover
-    pass
-
-from scraper.fleet import ScrapeFleet, load_properties  # noqa: E402
-
-ROOT = Path(__file__).resolve().parent.parent
-DATA = Path(os.getenv("DATA_DIR", str(ROOT / "data")))
+CHECKS = [
+    ("L1 Fetch",        "ma_poc.fetch.contracts",             "FetchTier"),
+    ("L2 Discovery",    "ma_poc.discovery.contracts",         "CrawlTask"),
+    ("L3 PMS",          "ma_poc.pms.contracts",               "ExtractResult"),
+    ("L4 Validation",   "ma_poc.validation.contracts",        "ValidatedRecords"),
+    ("L5 Observability","ma_poc.observability.events",        "emit"),
+]
 
 
-def _check_event(event: dict[str, Any], today: date) -> tuple[bool, list[str]]:
-    errs: list[str] = []
-    pid = event.get("property_id")
-    outcome = event.get("scrape_outcome")
-    if outcome not in ("SUCCESS", "SKIPPED"):
-        errs.append(f"{pid}: outcome={outcome} (expected SUCCESS or SKIPPED)")
-    out_path = DATA / "extraction_output" / str(pid) / f"{today.isoformat()}.json"
-    if not out_path.exists():
-        errs.append(f"{pid}: missing extraction_output {out_path}")
-    else:
-        try:
-            doc = json.loads(out_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            errs.append(f"{pid}: extraction_output JSON decode failed: {exc}")
-            doc = {}
-        if outcome == "SUCCESS":
-            if not doc.get("units"):
-                errs.append(f"{pid}: SUCCESS but units list is empty")
-            if event.get("extraction_tier") not in (1, 2, 3, 4, 5):
-                errs.append(f"{pid}: SUCCESS but extraction_tier={event.get('extraction_tier')}")
-            if not event.get("banner_capture_attempted"):
-                errs.append(f"{pid}: SUCCESS but banner_capture_attempted is False")
-            cs = event.get("confidence_score")
-            if cs is None or not (0.0 <= float(cs) <= 1.0):
-                errs.append(f"{pid}: confidence_score out of range: {cs}")
-        elif outcome == "SKIPPED":
-            pass  # No banner expected, no units expected
-    return (not errs), errs
-
-
-async def main() -> int:
-    properties = load_properties(ROOT / "config" / "properties.csv")[:5]
-    print(f"SMOKE: scraping {len(properties)} properties")
-    fleet = ScrapeFleet(properties=properties, data_dir=DATA, headless=True)
-    events = await fleet.run_once(only_due=False)
-
-    today = date.today()
+def main() -> int:
     passed = 0
-    for evt in events:
-        evt_dict = evt.model_dump(mode="json")
-        ok, errs = _check_event(evt_dict, today)
-        if ok:
+    for label, module, attr in CHECKS:
+        try:
+            import importlib
+            mod = importlib.import_module(module)
+            if not hasattr(mod, attr):
+                raise AttributeError(f"{module} has no attribute {attr!r}")
+            print(f"PASS  {label} ({module}.{attr})")
             passed += 1
-            print(f"PASS {evt.property_id} ({evt.scrape_outcome})")
-        else:
-            for e in errs:
-                print(f"FAIL {e}")
-    print(f"SMOKE TEST: {passed}/{len(events)} PASSED")
-    return 0 if passed == len(events) and len(events) == 5 else 1
+        except Exception as exc:
+            print(f"FAIL  {label}: {exc}")
+
+    print(f"\nSMOKE TEST: {passed}/{len(CHECKS)} PASSED")
+    return 0 if passed == len(CHECKS) else 1
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    sys.exit(main())

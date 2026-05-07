@@ -22,12 +22,33 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from ma_poc.extraction.heuristics import (
-    looks_like_availability_api,
-    response_looks_like_units,
-)
-
 log = logging.getLogger(__name__)
+
+_AVAILABILITY_URL_SIGNALS = (
+    "/availab", "/floor-plan", "/floorplan", "/pricing", "/units",
+    "/apartments", "/rent", "/leasing", "/availability",
+)
+_UNIT_KEY_SIGNALS = frozenset({
+    "unit", "floor", "plan", "rent", "price", "sqft", "bed", "bath",
+    "available", "lease", "bedroom", "bathroom", "apartment",
+})
+
+
+def looks_like_availability_api(url: str) -> bool:
+    if not url:
+        return False
+    lower = url.lower()
+    return any(sig in lower for sig in _AVAILABILITY_URL_SIGNALS)
+
+
+def response_looks_like_units(body: Any) -> bool:
+    if not body:
+        return False
+    try:
+        text = str(body).lower()
+        return any(k in text for k in _UNIT_KEY_SIGNALS)
+    except Exception:
+        return False
 
 # Hard caps — do not make configurable without a design review.
 MAX_LLM_CALLS_PER_PROPERTY = 2

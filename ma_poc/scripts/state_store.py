@@ -198,14 +198,14 @@ class StateStore:
 
             uid = str(u.get("unit_id") or "").strip()
             if not uid:
-                # No-drop contract: assign_fallback_unit_id walks the
-                # natural → fingerprint → floor-plan ladder, and if none
-                # of those bind we synthesize a stable id from the payload
-                # hash. Either way the record is inserted — never dropped.
+                # Walk the natural → fingerprint → floor-plan ladder.
+                # If nothing binds (no physical fields at all), skip — a
+                # unit with only rent/date and no anchor cannot be merged
+                # across runs and pollutes the index.
                 derived = assign_fallback_unit_id(u, canonical_id)
                 if not derived:
-                    derived = synthesize_unkeyable_id(u, canonical_id)
-                    diff["synthetic_key_used"] += 1
+                    diff["skipped_no_identity"] += 1
+                    continue
                 uid = derived
             current_ids.add(uid)
 

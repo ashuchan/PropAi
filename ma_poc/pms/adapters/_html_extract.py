@@ -368,7 +368,11 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
             has_name = bool(item.get("name"))
             has_size = bool(item.get("floorSize"))
             has_rooms = bool(item.get("numberOfRooms"))
-            if not (has_price or has_name or has_size or has_rooms):
+            if not (has_price or has_name):
+                # Skip items that only have physical attributes (size/rooms)
+                # but no name and no price — these are itemOffered sub-nodes
+                # nested inside Offer elements and are handled by pass 2
+                # (_extract_offers_as_units) instead.
                 continue
 
             name = item.get("name") or ""
