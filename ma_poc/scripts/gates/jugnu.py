@@ -192,9 +192,9 @@ def check_phase_7() -> list[str]:
 def check_phase_8() -> list[str]:
     """J8 gate: integration runner exists."""
     failures: list[str] = []
-    runner = _PROJECT_ROOT / "scripts" / "jugnu_runner.py"
+    runner = _PROJECT_ROOT / "scripts" / "runners" / "jugnu.py"
     if not runner.exists():
-        failures.append("scripts/jugnu_runner.py missing")
+        failures.append("scripts/runners/jugnu.py missing")
     return failures
 
 
