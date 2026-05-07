@@ -20,7 +20,7 @@ import re
 from datetime import UTC, datetime
 from typing import Any
 
-import validation as V
+from ma_poc.core import issue_log as V
 
 # ── V2 CSV column mapping ────────────────────────────────────────────────────
 #

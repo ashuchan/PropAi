@@ -51,7 +51,7 @@ except ImportError:
 # Hoisted from inside _format_v2_unit; the merge-rescue path runs once per
 # unit (~50K calls per run) and import caching makes the repeated lookup
 # free, but module-level keeps the hot loop clean.
-from ma_poc.scripts.identity_fallback import assign_fallback_unit_id  # noqa: E402
+from ma_poc.core.identity import assign_fallback_unit_id
 
 log = logging.getLogger("jugnu_runner")
 
@@ -177,7 +177,7 @@ async def run_jugnu(
     # (no await between accesses) so in-memory mutations are linearised under
     # AsyncPool's single-thread event loop.  save() happens once after the pool
     # completes so we pay only two file-IO round-trips regardless of run size.
-    from ma_poc.scripts.state_store import StateStore as _RunStateStore
+    from ma_poc.core.state_store import StateStore as _RunStateStore
     run_state_store = _RunStateStore(state_dir)
     try:
         run_state_store.load()
@@ -206,7 +206,7 @@ async def run_jugnu(
     csv_lookup = {row["property_id"]: row for row in rows}
 
     # Determine concurrency pool size
-    from ma_poc.scripts.concurrency import AsyncPool, SystemResources
+    from ma_poc.core.concurrency import AsyncPool, SystemResources
 
     res = SystemResources.detect()
     pool_size = res.optimal_pool_size()
@@ -487,7 +487,7 @@ async def _process_property(
                 # invocations that don't inject one.
                 _cf_ss = state_store
                 if _cf_ss is None:
-                    from ma_poc.scripts.state_store import StateStore as _SS
+                    from ma_poc.core.state_store import StateStore as _SS
                     _cf_ss = _SS(data_dir / "state")
                 # Prefer the concrete dated run_dir so carry_forward_property
                 # can derive the schema root reliably. Fall back to the

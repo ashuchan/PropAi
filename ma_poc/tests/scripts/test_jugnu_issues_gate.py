@@ -19,7 +19,7 @@ import pytest
 
 from ma_poc.data_provider.dtos import IssueEntry
 from ma_poc.scripts.jugnu_runner import _append_issue_to_run
-from ma_poc.scripts.state_store import StateStore
+from ma_poc.core.state_store import StateStore
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
