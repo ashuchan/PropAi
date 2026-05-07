@@ -170,7 +170,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    from ma_poc.scripts.jugnu_runner import _resolve_data_dirs, _resolve_schema_version
+    from ma_poc.scripts.runners.jugnu import _resolve_data_dirs, _resolve_schema_version
 
     schema_version = _resolve_schema_version(args)
     output_run_dir, _state_dir, _cache_dir, _root = _resolve_data_dirs(

@@ -649,7 +649,7 @@ async def run_retry(
 
     # -- Setup output directory (schema-namespaced) --
     today = date.today().isoformat()
-    from ma_poc.scripts.jugnu_runner import _resolve_data_dirs
+    from ma_poc.scripts.runners.jugnu import _resolve_data_dirs
 
     output_run_dir, state_dir, cache_dir, schema_root = _resolve_data_dirs(
         data_dir,
@@ -669,7 +669,7 @@ async def run_retry(
     dlq = Dlq(state_dir / "dlq.jsonl")
     cond_cache = ConditionalCache(cache_dir / "conditional.sqlite")
 
-    from ma_poc.scripts.jugnu_runner import _SimpleProfileStore
+    from ma_poc.scripts.runners.jugnu import _SimpleProfileStore
 
     profile_store = _SimpleProfileStore(_MA_POC_ROOT / "config" / "profiles")
 
@@ -698,7 +698,7 @@ async def run_retry(
 
     # -- Process tasks through L1-L4 concurrently --
     from ma_poc.core.concurrency import AsyncPool, SystemResources
-    from ma_poc.scripts.jugnu_runner import (
+    from ma_poc.scripts.runners.jugnu import (
         _format_output,
         _make_failed_record,
         _process_property,
@@ -968,7 +968,7 @@ Examples:
     else:
         mode = "unprocessed"
 
-    from ma_poc.scripts.jugnu_runner import _resolve_schema_version
+    from ma_poc.scripts.runners.jugnu import _resolve_schema_version
 
     schema_version = _resolve_schema_version(args)
 

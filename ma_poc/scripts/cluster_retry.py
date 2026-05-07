@@ -166,9 +166,9 @@ def retry(domain: str, run_date: str | None = None) -> None:
     so the process stays in-tree and environment is shared.
     """
     try:
-        import scripts.jugnu_runner as runner  # type: ignore[import]
+        import scripts.runners.jugnu as runner  # type: ignore[import]
     except ImportError:
-        print("Error: scripts/jugnu_runner.py not importable. Run from the ma_poc/ directory.")
+        print("Error: scripts/runners/jugnu.py not importable. Run from the ma_poc/ directory.")
         sys.exit(1)
 
     print(f"Retry: filtering to domain '{domain}'")

@@ -16,7 +16,7 @@ for _p in (_app, _here):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from scripts.jugnu_shard_entry import _slice_csv, _upload_artifacts  # noqa: E402
+from scripts.runners.shard_entry import _slice_csv, _upload_artifacts  # noqa: E402
 
 # ── CSV slicing ──────────────────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ class TestUploadArtifacts:
                     count += 1
             return count
 
-        import scripts.jugnu_shard_entry as m
+        import scripts.runners.shard_entry as m
 
         original_path_cls = m.Path
 
@@ -147,8 +147,8 @@ class TestUploadArtifacts:
             return original_path_cls(s)
 
         with (
-            patch("scripts.jugnu_shard_entry.gcs.upload_object", side_effect=fake_upload_object),
-            patch("scripts.jugnu_shard_entry.gcs.upload_prefix", side_effect=fake_upload_prefix),
+            patch("scripts.runners.shard_entry.gcs.upload_object", side_effect=fake_upload_object),
+            patch("scripts.runners.shard_entry.gcs.upload_prefix", side_effect=fake_upload_prefix),
         ):
             m.Path = patched_path  # type: ignore[assignment]
             try:
@@ -170,7 +170,7 @@ class TestUploadArtifacts:
 
     def test_missing_run_dir_does_not_crash(self, tmp_path: Path) -> None:
         """If the run dir doesn't exist, upload logs a warning but does not raise."""
-        import scripts.jugnu_shard_entry as m
+        import scripts.runners.shard_entry as m
 
         original_path_cls = m.Path
 

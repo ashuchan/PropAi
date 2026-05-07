@@ -361,9 +361,11 @@ def _iter_scripts_python_files() -> list[Path]:
             continue
         if p.name == "__init__.py":
             continue
-        # Files starting with `_` (e.g. scripts/_common/trigger.py) are
-        # private helpers, not entrypoints.
+        # Files starting with `_` OR living inside a `_`-prefixed directory
+        # (e.g. scripts/_common/trigger.py) are private helpers, not entrypoints.
         if p.name.startswith("_"):
+            continue
+        if any(part.startswith("_") for part in p.relative_to(SCRIPTS).parts[:-1]):
             continue
         files.append(p)
     return files

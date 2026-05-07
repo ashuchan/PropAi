@@ -1284,9 +1284,9 @@ def _write_property_report(
     """
     try:
         try:
-            from scripts.scrape_report import generate_property_report
+            from scripts.reports.per_property import generate_property_report
         except ImportError:
-            from ma_poc.scripts.scrape_report import generate_property_report  # type: ignore[no-redef]
+            from ma_poc.scripts.reports.per_property import generate_property_report  # type: ignore[no-redef]
     except ImportError as exc:
         log.debug("scrape_report unavailable — skipping report for %s: %s", canonical_id, exc)
         return

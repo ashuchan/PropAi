@@ -51,7 +51,7 @@ for _p in (_app, _ma_poc):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from scripts._trigger_common import (  # noqa: E402
+from scripts._common.trigger import (  # noqa: E402
     REGION,
     check_job_exists,
     emit_structured_result,

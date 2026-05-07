@@ -88,5 +88,5 @@ if defined RUN_SYNC (
 )
 
 echo [send_daily_failures_report] Sending failures report ...
-"%PY%" "%MA_POC_ROOT%\scripts\email_daily_failures_report.py"%FORWARD_ARGS%
+"%PY%" -m scripts.email.daily_failures%FORWARD_ARGS%
 exit /b %errorlevel%
