@@ -6,7 +6,10 @@ Input CSV columns (header row required):
 For every CSV row:
   1. Resolve `apartmentid` → `canonical_id` via `properties.apartment_id`.
   2. Pull the property's distinct floor plans from `units` (de-duped by
-     name + bed/bath/area, with a unit-count per group).
+     name + bed/bath/area, with a unit-count per group). Treat
+     ``area <= 0`` (the v2 ``-1`` sqft sentinel and any zero/negative
+     stragglers) as ``None`` so the matcher doesn't compute spurious
+     deltas like ``csv_area - (-1)``.
   3. Try to match the CSV row to one DB floor plan, in this order:
 
        a. name_semantic   — rapidfuzz token_set_ratio(description, db_name)
@@ -15,7 +18,20 @@ For every CSV row:
        b. bed_bath_sqft   — beds + baths exact AND |csv_area - db_area|
                             ≤ AREA_BUFFER_SQFT (default 35).
        c. bed_bath_only   — beds + baths exact, area ignored.
-       d. unmatched       — none of the above.
+       d. name_only       — rapidfuzz token_set_ratio ≥ NAME_THRESHOLD
+                            against a DB plan whose beds OR baths is
+                            NULL (DB lost bed/bath during extraction).
+                            Lower-confidence rescue tier — the score is
+                            still reported so callers can filter.
+       e. unmatched       — none of the above.
+
+Beyond the four match tiers, two additional outcomes are surfaced so the
+"unmatched" headline reflects only genuine match failures:
+
+  - ``property_not_found`` — apartmentid not present in ``properties``.
+  - ``db_empty``           — apartmentid resolved to a canonical_id, but
+                             the ``units`` table has zero rows for that
+                             property (typically a scrape failure).
 
 Results land in two Postgres tables (alembic 0008):
   - `floor_plan_comparison_runs`  — per-property aggregate scores
@@ -100,7 +116,9 @@ class CsvFloorPlan:
 
 @dataclass
 class MatchResult:
-    method: str  # name_semantic | bed_bath_sqft | bed_bath_only | unmatched | property_not_found
+    # name_semantic | bed_bath_sqft | bed_bath_only | name_only |
+    # unmatched | property_not_found | db_empty
+    method: str
     score: float | None
     matched: DbFloorPlan | None
     sqft_within_buffer: bool | None
@@ -116,9 +134,23 @@ def _bb_equal(a: CsvFloorPlan, b: DbFloorPlan) -> bool:
 
 
 def _sqft_delta(csv: CsvFloorPlan, db: DbFloorPlan) -> int | None:
+    # ``DbFloorPlan.area`` is already coerced to None for the -1 sentinel /
+    # zero / negative values at load time, so this just needs to handle the
+    # symmetric None-on-either-side case.
     if csv.area is None or db.area is None:
         return None
     return int(csv.area) - int(db.area)
+
+
+def _bb_partial(a: CsvFloorPlan, b: DbFloorPlan) -> bool:
+    """True when CSV has both beds+baths but DB lost at least one of them.
+
+    Used by the (d) ``name_only`` rescue tier so plans whose extraction
+    dropped bed/bath but kept the marketing name are still reachable.
+    """
+    if a.bed is None or a.bath is None:
+        return False
+    return b.beds is None or b.baths is None
 
 
 def match_floor_plan(
@@ -127,7 +159,12 @@ def match_floor_plan(
     name_threshold: float,
     area_buffer: int,
 ) -> MatchResult:
-    """Run the four-level cascade for one CSV row against this property's plans."""
+    """Run the five-level cascade for one CSV row against this property's plans.
+
+    Order: name_semantic → bed_bath_sqft → bed_bath_only → name_only →
+    unmatched. Callers handle the ``property_not_found`` / ``db_empty``
+    outcomes outside this function.
+    """
     if not db_plans:
         return MatchResult("unmatched", None, None, None, None)
 
@@ -185,6 +222,30 @@ def match_floor_plan(
         )
         return MatchResult("bed_bath_only", None, chosen, within, delta)
 
+    # ── (d) name_only — rescue tier: DB lost bed/bath, name still scores
+    # high. Limited to plans where DB has the name AND beds-or-baths are
+    # NULL, so it never overrides a clean (a–c) match. Score is preserved
+    # so analysts can filter or downgrade as needed.
+    if csv.description and csv.description.strip():
+        best_no: tuple[float, DbFloorPlan] | None = None
+        for plan in db_plans:
+            if not plan.has_name:
+                continue
+            if not _bb_partial(csv, plan):
+                continue
+            score = float(fuzz.token_set_ratio(csv.description, plan.name))
+            if score >= name_threshold and (best_no is None or score > best_no[0]):
+                best_no = (score, plan)
+        if best_no is not None:
+            score, plan = best_no
+            delta = _sqft_delta(csv, plan)
+            within = (
+                None
+                if delta is None
+                else abs(delta) <= area_buffer
+            )
+            return MatchResult("name_only", score, plan, within, delta)
+
     return MatchResult("unmatched", None, None, None, None)
 
 
@@ -223,11 +284,24 @@ def _load_db_floor_plans(session: Session, canonical_id: str) -> list[DbFloorPla
 
     groups: dict[tuple[str, int | None, float | None, int | None], list[Any]] = defaultdict(list)
     for r in rows:
+        # The v2 schema transform writes ``-1`` for "sqft absent" (see
+        # ``ma_poc/scripts/schema_v2.py::_format_area``), and a small number
+        # of legacy rows carry literal 0. Normalise both to None so they
+        # don't anchor the dedup key or feed _sqft_delta.
+        area_val: int | None = None
+        if r.area is not None:
+            try:
+                area_int = int(r.area)
+                if area_int > 0:
+                    area_val = area_int
+            except (TypeError, ValueError):
+                area_val = None
+
         key = (
             (r.floor_plan_name or "").strip().lower(),
             int(r.beds) if r.beds is not None else None,
             float(r.baths) if r.baths is not None else None,
-            int(r.area) if r.area is not None else None,
+            area_val,
         )
         groups[key].append(r)
 
@@ -347,8 +421,10 @@ def run_comparison(
             "name": 0,
             "bb_sqft": 0,
             "bb_only": 0,
+            "name_only": 0,
             "unmatched": 0,
             "property_not_found": 0,
+            "db_empty": 0,
             "sqft_within_buffer": 0,
             "properties_compared": 0,
             "properties_with_any_match": 0,
@@ -394,12 +470,23 @@ def run_comparison(
                 "name": 0,
                 "bb_sqft": 0,
                 "bb_only": 0,
+                "name_only": 0,
                 "unmatched": 0,
+                "db_empty": 0,
                 "sqft_within_buffer": 0,
             }
 
+            # Properties whose canonical_id resolved but ``units`` is empty
+            # are scrape failures, not matching defects. Bucket their rows
+            # as ``db_empty`` so the unmatched headline reflects only real
+            # match failures.
+            db_is_empty = len(db_plans) == 0
+
             for csv_row in rows:
-                result = match_floor_plan(csv_row, db_plans, name_threshold, area_buffer)
+                if db_is_empty:
+                    result = MatchResult("db_empty", None, None, None, None)
+                else:
+                    result = match_floor_plan(csv_row, db_plans, name_threshold, area_buffer)
                 per_property["csv_rows"] += 1
                 totals["csv_rows"] += 1
 
@@ -418,6 +505,14 @@ def run_comparison(
                     per_property["matched"] += 1
                     totals["bb_only"] += 1
                     totals["matched"] += 1
+                elif result.method == "name_only":
+                    per_property["name_only"] += 1
+                    per_property["matched"] += 1
+                    totals["name_only"] += 1
+                    totals["matched"] += 1
+                elif result.method == "db_empty":
+                    per_property["db_empty"] += 1
+                    totals["db_empty"] += 1
                 else:
                     per_property["unmatched"] += 1
                     totals["unmatched"] += 1
@@ -481,7 +576,9 @@ def run_comparison(
                     name_match_count=per_property["name"],
                     bed_bath_sqft_match_count=per_property["bb_sqft"],
                     bed_bath_only_match_count=per_property["bb_only"],
+                    name_only_match_count=per_property["name_only"],
                     unmatched_count=per_property["unmatched"],
+                    db_empty_count=per_property["db_empty"],
                     sqft_within_buffer_count=per_property["sqft_within_buffer"],
                     missing_in_csv_count=missing_in_csv,
                     created_at=datetime.now(timezone.utc).replace(tzinfo=None),
@@ -560,7 +657,7 @@ def main() -> int:
         database_url=args.database_url,
     )
 
-    print("\n── Floor plan comparison summary ──")
+    print("\n-- Floor plan comparison summary --")
     print(f"  run_id:           {summary['run_id']}")
     print(f"  csv:              {summary['csv_path']}")
     print(f"  name_threshold:   {summary['name_threshold']}")
@@ -571,9 +668,11 @@ def main() -> int:
     print(f"    name_semantic:            {t['name']}")
     print(f"    bed_bath_sqft:            {t['bb_sqft']}")
     print(f"    bed_bath_only:            {t['bb_only']}")
+    print(f"    name_only (rescue):       {t['name_only']}")
     print(f"  unmatched:                  {t['unmatched']}")
+    print(f"  db_empty (scrape failed):   {t['db_empty']}")
     print(f"  property_not_found:         {t['property_not_found']}")
-    print(f"  sqft within ±{summary['area_buffer_sqft']}:           {t['sqft_within_buffer']}")
+    print(f"  sqft within +/-{summary['area_buffer_sqft']}:        {t['sqft_within_buffer']}")
     print(f"  properties compared:        {t['properties_compared']}")
     print(f"  properties with any match:  {t['properties_with_any_match']}")
     return 0

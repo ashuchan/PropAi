@@ -172,6 +172,19 @@ async def run_jugnu(
     cond_cache = ConditionalCache(cache_dir / "conditional.sqlite")
     sitemap = SitemapConsumer(fetcher=jugnu_fetch, cond_cache=cond_cache)
 
+    # Load the FS state-store once for the whole run.  All _process_property
+    # coroutines share this instance and call upsert_units() synchronously
+    # (no await between accesses) so in-memory mutations are linearised under
+    # AsyncPool's single-thread event loop.  save() happens once after the pool
+    # completes so we pay only two file-IO round-trips regardless of run size.
+    from ma_poc.scripts.state_store import StateStore as _RunStateStore
+    run_state_store = _RunStateStore(state_dir)
+    try:
+        run_state_store.load()
+    except Exception as _sse:
+        log.warning("state_store.load() failed — carry-forward and keyless gate disabled: %s", _sse)
+        run_state_store = None  # type: ignore[assignment]
+
     # Dummy profile store (reads from ma_poc/config/profiles/ if available)
     profile_store = _SimpleProfileStore(_MA_POC_ROOT / "config" / "profiles")
 
@@ -218,6 +231,7 @@ async def run_jugnu(
                 data_dir,
                 csv_row=csv_row,
                 run_dir=run_dir,
+                state_store=run_state_store,
             )
             formatted = _format_output(result, csv_row, schema_version)
             # F2: Null Field Recovery — runs on v2 units with null rent_low
@@ -269,6 +283,15 @@ async def run_jugnu(
             )
 
     results = await pool.map(_process_one, [(t,) for t in tasks])
+
+    # Persist the run-level state-store exactly once after all properties
+    # complete.  A single save amortises the per-property I/O cost (was
+    # O(n × 2 × file-size) per run; now O(1)).
+    if run_state_store is not None:
+        try:
+            run_state_store.save()
+        except Exception as _sse:
+            log.warning("state_store.save() failed after run: %s", _sse)
 
     # Collect results and write output
     properties: list[dict[str, Any]] = []
@@ -366,6 +389,7 @@ async def _process_property(
     data_dir: Path,
     csv_row: dict[str, Any] | None = None,
     run_dir: Path | None = None,
+    state_store: Any | None = None,
 ) -> dict[str, Any]:
     """Process a single property through L1-L4.
 
@@ -376,6 +400,18 @@ async def _process_property(
         frontier: Frontier for recording outcomes.
         dlq: DLQ for parking/unparking.
         data_dir: Base data directory.
+        csv_row: CSV metadata row for this property.
+        run_dir: Path to today's run output directory.
+        state_store: Shared run-level StateStore (loaded once in run_jugnu,
+            saved once after all properties complete).  When None the
+            state-store upsert and carry-forward are skipped gracefully.
+
+    Concurrency invariant:
+        The ``state_store.upsert_units`` block contains NO await expressions.
+        Under AsyncPool (single-thread asyncio) the scheduler cannot interleave
+        two coroutines during a synchronous slice, so each property's
+        load-mutate sequence is effectively serialised.  If an await is ever
+        added inside that block this invariant must be re-evaluated.
 
     Returns:
         Property result dict (internal format).
@@ -443,12 +479,23 @@ async def _process_property(
         if should_cf:
             # Try carry-forward from prior state
             from ma_poc.discovery.carry_forward import carry_forward_property
-            from ma_poc.scripts.state_store import StateStore
 
             try:
-                state_store = StateStore(data_dir / "state")
+                # Use the run-level shared StateStore when available so
+                # carry_forward_property sees index data from this run.
+                # Fall back to a minimal unloaded instance for ad-hoc
+                # invocations that don't inject one.
+                _cf_ss = state_store
+                if _cf_ss is None:
+                    from ma_poc.scripts.state_store import StateStore as _SS
+                    _cf_ss = _SS(data_dir / "state")
+                # Prefer the concrete dated run_dir so carry_forward_property
+                # can derive the schema root reliably. Fall back to the
+                # "latest" symlink only when run_dir wasn't injected (e.g.
+                # ad-hoc invocations without a run context).
+                _cf_run_dir = run_dir if run_dir is not None else data_dir / "runs" / "latest"
                 cf_record = carry_forward_property(
-                    task.property_id, data_dir / "runs" / "latest", state_store, reason
+                    task.property_id, _cf_run_dir, _cf_ss, reason
                 )
                 if cf_record:
                     # Stamp a SUCCESS verdict so run_report counts this
@@ -547,6 +594,64 @@ async def _process_property(
         verdict=verdict.verdict.value,
         units=len(result.get("units", [])),
     )
+
+    # ── State-store upsert + UNITS_KEYLESS_HIGH gate ──────────────────────
+    # On every successful scrape: (a) persist units into the FS state-store
+    # so carry_forward_units() has data on the next failure run, and (b) fire
+    # the UNITS_KEYLESS_HIGH issue when > 50 % of units lacked a natural
+    # identity anchor (synthetic_key_used > 50 % of input_count).
+    #
+    # load() and save() happen once at the run boundary in run_jugnu; only
+    # the in-memory upsert_units() runs here (no I/O, no await).
+    _today_units = result.get("units") or []
+    if _today_units and run_dir is not None and state_store is not None:
+        from ma_poc.data_provider.dtos import IssueEntry as _IssueEntry
+        from ma_poc.data_provider.dtos import UnitDiff as _UnitDiff
+        from ma_poc.services.merge_yield import evaluate as _merge_yield_evaluate
+        try:
+            _run_date_str = run_dir.name  # "YYYY-MM-DD"
+            _diff_raw = state_store.upsert_units(task.property_id, _today_units, _run_date_str)
+
+            _diff = _UnitDiff(**_diff_raw)
+            _yield_verdict = _merge_yield_evaluate(_diff)
+            if _yield_verdict.next_tier_requested:
+                _kl_issue = _IssueEntry(
+                    severity="WARNING",
+                    code="UNITS_KEYLESS_HIGH",
+                    message=(
+                        f"{_yield_verdict.keyless_ratio:.0%} of units "
+                        f"({_diff.synthetic_key_used}/{_diff.input_count}) "
+                        "lack a natural identity anchor"
+                    ),
+                    canonical_id=task.property_id,
+                    details={
+                        "keyless_ratio": round(_yield_verdict.keyless_ratio, 4),
+                        "synthetic_key_used": _diff.synthetic_key_used,
+                        "input_count": _diff.input_count,
+                    },
+                )
+                _append_issue_to_run(run_dir, _kl_issue)
+                log.info(
+                    "UNITS_KEYLESS_HIGH for %s: %.0f%% (%d/%d units unkeyable)",
+                    task.property_id,
+                    _yield_verdict.keyless_ratio * 100,
+                    _diff.synthetic_key_used,
+                    _diff.input_count,
+                )
+        except Exception as _exc:
+            log.warning(
+                "state_store upsert / keyless gate failed for %s: %s",
+                task.property_id, _exc,
+            )
+            _append_issue_to_run(
+                run_dir,
+                _IssueEntry(
+                    severity="WARNING",
+                    code="STATE_STORE_FAULT",
+                    message=str(_exc)[:200],
+                    canonical_id=task.property_id,
+                ),
+            )
 
     # ── F1: Adapter Debugger ──────────────────────────────────────────────
     # Runs once per FAILED_NO_DATA on TIER_1_* tiers. Gated by existing
@@ -883,6 +988,23 @@ def _format_v2_unit(
     except Exception:
         pass
 
+    # Bed/bath fallback inference from the floor-plan name. Only fills
+    # gaps — never overwrites a source value. Drives down the pool of
+    # plans whose ``beds``/``baths`` is NULL in ``units``, which is the
+    # dominant cause of comparator misses (Phase 2 of the floor-plan gap
+    # plan).
+    if (beds_raw in (None, "")) or (baths_raw in (None, "")):
+        try:
+            from ma_poc.pms.adapters._parsing import infer_bed_bath_from_name
+
+            inferred_beds, inferred_baths = infer_bed_bath_from_name(fp_name)
+            if beds_raw in (None, "") and inferred_beds is not None:
+                beds_raw = inferred_beds
+            if baths_raw in (None, "") and inferred_baths is not None:
+                baths_raw = inferred_baths
+        except Exception:
+            pass
+
     # rent: numeric first, parse rent_range string if needed.
     rent_lo_raw = unit.get("market_rent_low") or unit.get("asking_rent")
     rent_hi_raw = unit.get("market_rent_high") or unit.get("asking_rent")
@@ -896,10 +1018,28 @@ def _format_v2_unit(
             except Exception:
                 pass
 
+    norm_beds = _normalize_beds(beds_raw)
+    norm_baths = _normalize_baths(baths_raw)
+
+    # Phase 3: stamp a deterministic floor_plan_id so analytics can
+    # collapse unit-level rows back to plan-level rows. Computed from
+    # post-normalisation values so two units with the same plan always
+    # share the id even when one source emitted "Studio" and another
+    # emitted "0".
+    try:
+        from ma_poc.pms.adapters._parsing import compute_floor_plan_id
+
+        floor_plan_id = compute_floor_plan_id(
+            property_id, fp_name, norm_beds, norm_baths
+        )
+    except Exception:
+        floor_plan_id = None
+
     out: dict[str, Any] = {
-        "beds": _normalize_beds(beds_raw),
-        "baths": _normalize_baths(baths_raw),
+        "beds": norm_beds,
+        "baths": norm_baths,
         "floor_plan_name": fp_name or None,
+        "floor_plan_id": floor_plan_id,
         "area": _format_area(sqft),
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
         "rent_low": _format_rent(rent_lo_raw),
@@ -1151,28 +1291,33 @@ def _write_property_report(
         log.debug("scrape_report unavailable — skipping report for %s: %s", canonical_id, exc)
         return
 
-    from types import SimpleNamespace
+    try:
+        from ma_poc.data_provider.dtos import IssueEntry
+    except ImportError:
+        from data_provider.dtos import IssueEntry  # type: ignore[no-redef]
 
     validated = scrape_result.get("_validated") or {}
     issues: list[Any] = []
     for rej in validated.get("rejected") or []:
         msg = rej.get("reason") if isinstance(rej, dict) else str(rej)
-        issues.append(
-            SimpleNamespace(
-                severity="ERROR",
-                code="VALIDATION_REJECTED",
-                message=str(msg)[:200],
-            )
+        issue = IssueEntry(
+            severity="ERROR",
+            code="VALIDATION_REJECTED",
+            message=str(msg)[:200],
+            canonical_id=canonical_id,
         )
+        issues.append(issue)
+        _append_issue_to_run(run_dir, issue)
     for fl in validated.get("flagged") or []:
         msg = fl.get("flag") if isinstance(fl, dict) else str(fl)
-        issues.append(
-            SimpleNamespace(
-                severity="WARNING",
-                code="VALIDATION_FLAGGED",
-                message=str(msg)[:200],
-            )
+        issue = IssueEntry(
+            severity="WARNING",
+            code="VALIDATION_FLAGGED",
+            message=str(msg)[:200],
+            canonical_id=canonical_id,
         )
+        issues.append(issue)
+        _append_issue_to_run(run_dir, issue)
 
     unit_diff: dict[str, list] = {
         "new": [],
@@ -1193,6 +1338,21 @@ def _write_property_report(
         )
     except Exception as exc:
         log.warning("property report generation failed for %s: %s", canonical_id, exc)
+
+
+def _append_issue_to_run(run_dir: Path, issue: Any) -> None:
+    """Append one IssueEntry JSON line to {run_dir}/issues.jsonl.
+
+    Never raises — issue writes are best-effort observability.
+    """
+    try:
+        issues_path = run_dir / "issues.jsonl"
+        issues_path.parent.mkdir(parents=True, exist_ok=True)
+        line = json.dumps(issue.model_dump(mode="json"), ensure_ascii=False)
+        with open(issues_path, "a", encoding="utf-8") as _f:
+            _f.write(line + "\n")
+    except Exception as exc:
+        log.debug("_append_issue_to_run failed: %s", exc)
 
 
 def _make_failed_record(

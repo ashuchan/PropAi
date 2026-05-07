@@ -308,8 +308,9 @@ def test_seen_at_iso_happy_path() -> None:
 def test_seen_at_iso_truncates_extra_chars() -> None:
     """Callers passing a full ISO timestamp by accident get the date
     portion only — the time/offset is replaced with wall-clock."""
-    res = seen_at_iso("2026-05-06T00:00:00+00:00")
-    assert res.startswith("2026-05-06T")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    res = seen_at_iso(f"{today}T00:00:00+00:00")
+    assert res.startswith(f"{today}T")
     parsed = datetime.fromisoformat(res)
     # Time portion came from wall-clock, NOT the input — so it's "now-ish".
     delta = abs((datetime.now(UTC) - parsed).total_seconds())

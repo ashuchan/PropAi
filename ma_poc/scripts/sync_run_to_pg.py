@@ -132,7 +132,6 @@ from models.extraction_result import (  # noqa: E402
     ExtractionTier,
 )
 from models.scrape_event import ScrapeEvent, ScrapeOutcome  # noqa: E402
-from services.merge_yield import evaluate as _evaluate_merge_yield  # noqa: E402
 
 log = logging.getLogger("sync_run_to_pg")
 
@@ -586,46 +585,6 @@ def _stable_event_id(property_id: str, run_date: str) -> str:
     return str(uuid.UUID(hex=hex32, version=4))
 
 
-def _record_keyless_yield(
-    dst: DataProvider, run_date: str, canonical_id: str, diff: Any
-) -> None:
-    """Surface a high keyless-merge ratio as a run_issue.
-
-    Pure side-effect — runs after every ``upsert_units`` call. When more
-    than half of the captured units could not be keyed (and therefore
-    didn't merge into ``units``), append a ``UNITS_KEYLESS_HIGH`` issue so
-    the run report flags the property and the next run can prioritize a
-    different extraction tier.
-
-    Never raises; issue-log failures are swallowed because this is a
-    diagnostic, not a contract.
-    """
-    try:
-        verdict = _evaluate_merge_yield(diff)
-        if not verdict.next_tier_requested:
-            return
-        dst.runs.append_issue(
-            run_date,
-            IssueEntry(
-                severity="WARNING",
-                code="UNITS_KEYLESS_HIGH",
-                message=(
-                    f"{int(verdict.keyless_ratio * 100)}% of captured units could not be keyed; "
-                    "next-tier extraction recommended."
-                ),
-                canonical_id=canonical_id,
-                details={
-                    "keyless_ratio": round(verdict.keyless_ratio, 4),
-                    "threshold": verdict.threshold,
-                    "skipped_no_identity": getattr(diff, "skipped_no_identity", 0),
-                    "input_count": getattr(diff, "input_count", 0),
-                },
-            ),
-        )
-    except Exception:
-        log.exception("Failed to record keyless-yield issue for %s", canonical_id)
-
-
 def _sync_current_state_from_snapshots(
     dst: DataProvider,
     run_date: str,
@@ -690,8 +649,7 @@ def _sync_current_state_from_snapshots(
         snap["last_units_count"] = len(units)
         dst.property_state.upsert(cid, snap, run_date)
         if units:
-            diff = dst.unit_state.upsert_units(cid, units, run_date)
-            _record_keyless_yield(dst, run_date, cid, diff)
+            dst.unit_state.upsert_units(cid, units, run_date)
 
     success, failures = isolate_row_writes(
         session,
@@ -760,8 +718,7 @@ def _sync_current_state_no_isolation(
         snap["last_units_count"] = len(units)
         dst.property_state.upsert(cid, snap, run_date)
         if units:
-            diff = dst.unit_state.upsert_units(cid, units, run_date)
-            _record_keyless_yield(dst, run_date, cid, diff)
+            dst.unit_state.upsert_units(cid, units, run_date)
         count += 1
     return count
 

@@ -5,8 +5,6 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
-from typing import Any
-
 import pytest
 
 # Make ma_poc top-level packages importable from tests
@@ -65,14 +63,3 @@ def api_response_sample() -> str:
     return (FIXTURES / "api_response_sample.json").read_text(encoding="utf-8")
 
 
-def make_session(html: str | None = None, pms: str | None = None, **kw: Any) -> Any:
-    """Build a BrowserSession without launching Playwright."""
-    from scraper.browser import BrowserSession
-
-    s = BrowserSession(
-        property_id=kw.get("property_id", "TEST-001"),
-        url=kw.get("url", "https://example.com/property"),
-        pms_platform=pms,
-    )
-    s.html = html
-    return s

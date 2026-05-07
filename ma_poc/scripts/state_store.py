@@ -198,12 +198,13 @@ class StateStore:
 
             uid = str(u.get("unit_id") or "").strip()
             if not uid:
-                # No-drop contract: assign_fallback_unit_id walks the
-                # natural → fingerprint → floor-plan ladder, and if none
-                # of those bind we synthesize a stable id from the payload
-                # hash. Either way the record is inserted — never dropped.
+                # Walk the natural → fingerprint → floor-plan ladder.
                 derived = assign_fallback_unit_id(u, canonical_id)
                 if not derived:
+                    # No-drop contract: rescue with a stable payload-hash id
+                    # so every captured unit lands in the index.  The
+                    # unkeyable_ prefix lets callers count / filter these rows
+                    # separately (see services/merge_yield.py).
                     derived = synthesize_unkeyable_id(u, canonical_id)
                     diff["synthetic_key_used"] += 1
                 uid = derived

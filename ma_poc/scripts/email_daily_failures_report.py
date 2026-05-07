@@ -90,11 +90,17 @@ Required env (already in ma_poc/.env):
 Windows Task Scheduler — add / remove
 -------------------------------------
 
+For daily scheduling, point Task Scheduler at the wrapper batch file
+``scripts/send_daily_failures_report.bat`` rather than this script
+directly. The wrapper handles venv activation, working-directory
+quirks, and an optional ``--with-sync`` step that mirrors Cloud SQL
+into the local DB first.
+
 ADD a daily 8:30 AM job (run as the user, NOT elevated):
 
     schtasks /Create ^
         /TN "PropAi Daily Failures Report" ^
-        /TR "\\"C:\\\\Users\\\\ashus\\\\OneDrive\\\\Documents\\\\Code\\\\PropAi\\\\ma_poc\\\\.venv\\\\Scripts\\\\python.exe\\" \\"C:\\\\Users\\\\ashus\\\\OneDrive\\\\Documents\\\\Code\\\\PropAi\\\\ma_poc\\\\scripts\\\\email_daily_failures_report.py\\"" ^
+        /TR "C:\\Users\\ashus\\OneDrive\\Documents\\Code\\PropAi\\ma_poc\\scripts\\send_daily_failures_report.bat" ^
         /SC DAILY /ST 08:30 ^
         /F
 

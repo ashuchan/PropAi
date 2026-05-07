@@ -102,6 +102,7 @@ class UnitIndexEntry(BaseModel):
     beds: int | None = None
     baths: float | None = None
     floor_plan_name: str | None = None
+    floor_plan_id: str | None = None
     area: int | None = None
     rent_low: float | int | None = None
     rent_high: float | int | None = None

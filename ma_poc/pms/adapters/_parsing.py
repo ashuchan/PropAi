@@ -6,6 +6,7 @@ lightweight helpers without depending on the full scraper engine.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from typing import Any
 
@@ -157,6 +158,219 @@ def is_junk_unit_number(val: Any) -> bool:
     if len(s) <= 1:
         return True
     return False
+
+
+# Patterns for inferring bed/bath count from a floor-plan / unit name.
+# Runs in declared order; first match wins. Patterns are designed to be
+# narrow enough that they don't false-positive on unrelated marketing
+# copy ("Five Star View" should NOT yield beds=5). The corpus they were
+# tuned against is the union of:
+#   - ma_poc/config/Floorplan- comparisons.csv     (vendor CSV side)
+#   - distinct units.floor_plan_name in production (DB side)
+# When extending, add a regression test in
+# tests/pms/adapters/test_infer_bed_bath_from_name.py rather than
+# loosening an existing pattern.
+_STUDIO_RE = re.compile(
+    r"\b(?:studio|micro[- ]?studio|efficiency|jr\s*studio|junior\s*studio|"
+    r"open[- ]?one|0\s*(?:bd|br|bed|bedroom)s?)\b",
+    re.IGNORECASE,
+)
+# "2BR/2BA", "3 BR / 2.5 BA", "1 Bed 1 Bath" — second token is a bath
+# token ("ba" / "bath").
+_BED_BATH_PAIR_RE = re.compile(
+    r"\b(\d)\s*(?:bd|br|bed(?:room)?s?)\s*[/\\]?\s*"
+    r"(\d(?:\.\d)?)\s*(?:ba|bath(?:room)?s?)\b",
+    re.IGNORECASE,
+)
+# Vendor CSV quirk: "1BD/1BR-1", "2BD/1BR-2", "3BD/2.5BR-3" — the second
+# "BR" actually means bathroom in this notation. Surfaced from the
+# Floorplan- comparisons.csv corpus. A trailing "-N" suffix is allowed
+# (the vendor's plan-variant index) so it doesn't break the boundary.
+_BED_BATH_VENDOR_BR_RE = re.compile(
+    r"\b(\d)\s*BD\s*/\s*(\d(?:\.\d)?)\s*BR\b",
+    re.IGNORECASE,
+)
+# Word-form pair: "One Bedroom One Bath", "Two Bedroom Two Bathroom".
+_WORD_BED_BATH_PAIR_RE = re.compile(
+    r"\b(one|two|three|four|five)\s*(?:bd|br|bed(?:room)?s?)\s+"
+    r"(one|two|three|four|five)\s*(?:ba|bath(?:room)?s?)\b",
+    re.IGNORECASE,
+)
+# "1x1", "2x2.5", "3 x 2" — common shorthand on RentCafe / Yardi / SightMap.
+# Anchored on word boundaries so "1x12" isn't read as bed=1, bath=12.
+_X_PAIR_RE = re.compile(r"(?<![\d.])(\d)\s*[xX]\s*(\d(?:\.\d)?)(?!\d)")
+# "1/1", "2/2.5" — same shorthand with a slash separator. Excluded:
+# "1/2/3" (looks like a date or list, not a bed/bath).
+_SLASH_PAIR_RE = re.compile(r"(?<![\d./])(\d)\s*/\s*(\d(?:\.\d)?)(?!\s*/)")
+# Standalone bed counts: "1BR", "2 Bed", "Three Bedroom".
+_BED_ONLY_RE = re.compile(
+    r"\b(\d)\s*(?:bd|br|bed(?:room)?s?)\b",
+    re.IGNORECASE,
+)
+_WORD_BED_RE = re.compile(
+    r"\b(one|two|three|four|five)\s*(?:bd|br|bed(?:room)?s?)\b",
+    re.IGNORECASE,
+)
+# Standalone bath count: "1 Bath", "2.5 BA". Used only when bed was
+# already inferred by a separate pass — never seeds beds from a bath.
+_BATH_ONLY_RE = re.compile(
+    r"\b(\d(?:\.\d)?)\s*(?:ba|bath(?:room)?s?)\b",
+    re.IGNORECASE,
+)
+_WORD_TO_INT = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
+
+
+def infer_bed_bath_from_name(
+    name: str | None,
+) -> tuple[int | None, float | None]:
+    """Best-effort inference of (beds, baths) from a plan / unit name.
+
+    Returns ``(None, None)`` when nothing reliable can be inferred. The
+    function never raises and never invents data — every output value is
+    grounded in a literal substring of ``name``.
+
+    Apply only as a *fallback* when the adapter / API didn't deliver
+    these fields. Never overwrite a non-null source value with the
+    inferred one — extraction is always more authoritative than name
+    parsing.
+    """
+    if not name or not isinstance(name, str):
+        return None, None
+    s = name.strip()
+    if not s:
+        return None, None
+
+    # 1. Studio / micro-studio: beds=0, baths left to its own pass.
+    is_studio = bool(_STUDIO_RE.search(s))
+
+    beds: int | None = None
+    baths: float | None = None
+
+    # 2a. Vendor "BD/BR" pair (where second BR == bath) — runs before the
+    # standard pair so the vendor notation isn't mis-read as bed/bed.
+    m = _BED_BATH_VENDOR_BR_RE.search(s)
+    if m:
+        try:
+            beds = int(m.group(1))
+            baths = float(m.group(2))
+        except ValueError:
+            beds = baths = None
+
+    # 2b. Standard explicit bed/bath pair.
+    if beds is None and baths is None:
+        m = _BED_BATH_PAIR_RE.search(s)
+        if m:
+            try:
+                beds = int(m.group(1))
+                baths = float(m.group(2))
+            except ValueError:
+                beds = baths = None
+
+    # 2c. Word-form pair: "One Bedroom One Bath".
+    if beds is None and baths is None:
+        m = _WORD_BED_BATH_PAIR_RE.search(s)
+        if m:
+            beds = _WORD_TO_INT.get(m.group(1).lower())
+            baths_word = _WORD_TO_INT.get(m.group(2).lower())
+            baths = float(baths_word) if baths_word is not None else None
+
+    # 3. NxN shorthand. Run only if we don't have a pair already.
+    if beds is None and baths is None:
+        m = _X_PAIR_RE.search(s)
+        if m:
+            try:
+                beds = int(m.group(1))
+                baths = float(m.group(2))
+            except ValueError:
+                beds = baths = None
+
+    # 4. N/N slash shorthand — skip on studios since "0/1" wouldn't be
+    # written that way conventionally; falls through to single-bed pass.
+    if beds is None and baths is None:
+        m = _SLASH_PAIR_RE.search(s)
+        if m:
+            try:
+                beds = int(m.group(1))
+                baths = float(m.group(2))
+            except ValueError:
+                beds = baths = None
+
+    # 5. Single-field passes.
+    if beds is None:
+        m = _BED_ONLY_RE.search(s)
+        if m:
+            try:
+                beds = int(m.group(1))
+            except ValueError:
+                beds = None
+    if beds is None:
+        m = _WORD_BED_RE.search(s)
+        if m:
+            beds = _WORD_TO_INT.get(m.group(1).lower())
+    if baths is None:
+        m = _BATH_ONLY_RE.search(s)
+        if m:
+            try:
+                baths = float(m.group(1))
+            except ValueError:
+                baths = None
+
+    # 6. Studio overrides bed count if no explicit "1 BR" type pattern
+    # contradicted it. Studios are sometimes labelled "Studio - 1 Bath",
+    # so set beds=0 only when the bed pass found nothing.
+    if is_studio and beds is None:
+        beds = 0
+
+    # 7. Sanity bounds — apartment plans realistically span 0–7 beds and
+    # 0–10 baths. Anything outside is signal that the regex matched a
+    # number that wasn't a bed/bath count (e.g. "Loft 12B").
+    if beds is not None and not (0 <= beds <= 7):
+        beds = None
+    if baths is not None and not (0 <= baths <= 10):
+        baths = None
+
+    return beds, baths
+
+
+def compute_floor_plan_id(
+    canonical_id: str | None,
+    floor_plan_name: str | None,
+    beds: int | None,
+    baths: float | None,
+) -> str | None:
+    """Deterministic 12-char id grouping units that share a floor plan.
+
+    Returns ``None`` when there is not enough signal to identify a plan
+    — specifically: when neither ``floor_plan_name`` nor any of
+    ``beds``/``baths`` is set. Without one of those, two units of the
+    same property would collapse to the same id even though they are
+    clearly distinct plans.
+
+    Inputs are normalised: name is lowercased + whitespace-collapsed,
+    canonical_id is stringified, missing fields use the literal token
+    ``"-"`` so e.g. ``(beds=None, baths=1.0)`` doesn't collide with
+    ``(beds=1, baths=None)``.
+
+    Two units with the same (canonical_id, name, beds, baths) always
+    return the same id, regardless of unit_number / area / extraction
+    timestamp. Per-unit area variation is intentionally NOT part of the
+    key — that's the whole point of grouping unit-level rows back to
+    plan-level rows.
+    """
+    cid = (canonical_id or "").strip()
+    raw_name = floor_plan_name or ""
+    name_norm = re.sub(r"\s+", " ", raw_name.strip().lower())
+
+    # Plan-anchor signal: must have at least a name OR a bed/bath value.
+    if not name_norm and beds is None and baths is None:
+        return None
+
+    beds_part = "-" if beds is None else str(int(beds))
+    baths_part = "-" if baths is None else f"{float(baths):g}"
+    name_part = name_norm or "-"
+
+    payload = f"{cid}|{name_part}|{beds_part}|{baths_part}".encode()
+    return hashlib.sha256(payload).hexdigest()[:12]
 
 
 def parse_rent_range(rent_range: str) -> tuple[int | None, int | None]:

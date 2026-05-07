@@ -145,18 +145,24 @@ def build_v2_property(
         "website_design": website_design if website_design else None,
         "concessions": concessions_text,
         # ── Units ────────────────────────────────────────────────────────
-        "units": [_format_v2_unit(u, scrape_ts) for u in target_units],
+        "units": [
+            _format_v2_unit(u, scrape_ts, str(_safe_int(csv_id) or ""))
+            for u in target_units
+        ],
     }
 
     return prop
 
 
-def _format_v2_unit(unit: dict, scrape_ts: datetime) -> dict:
+def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> dict:
     """Transform a single internal unit dict to V2 unit format.
 
     Internal unit dicts carry private fields (prefixed with ``_``) from
     ``scrape_properties.py`` that are not part of the V1 public schema but
     contain the raw data we need for V2.
+
+    ``property_id`` seeds the deterministic ``floor_plan_id`` so two
+    properties with identically-named plans don't collide.
     """
     beds_raw = unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds")
     baths_raw = unit.get("_bathrooms") or unit.get("bathrooms") or unit.get("baths")
@@ -165,6 +171,20 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime) -> dict:
 
     # unit_id alias (adapters emit unit_number)
     uid = unit.get("unit_id") or unit.get("unit_number") or unit.get("_unit_number")
+
+    # Bed/bath fallback inference from the floor-plan name. Mirrors the
+    # Jugnu transform so both pipelines fill the same gaps.
+    if (beds_raw in (None, "")) or (baths_raw in (None, "")):
+        try:
+            from ma_poc.pms.adapters._parsing import infer_bed_bath_from_name
+
+            inferred_beds, inferred_baths = infer_bed_bath_from_name(fp_name)
+            if beds_raw in (None, "") and inferred_beds is not None:
+                beds_raw = inferred_beds
+            if baths_raw in (None, "") and inferred_baths is not None:
+                baths_raw = inferred_baths
+        except Exception:
+            pass
 
     # rent: try numeric fields first, then parse rent_range string
     rent_lo = unit.get("market_rent_low") or unit.get("asking_rent")
@@ -198,10 +218,22 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime) -> dict:
     raw_amenities = unit.get("amenities")
     norm_amenities = _normalize_amenities(raw_amenities) if raw_amenities else None
 
+    norm_beds = _normalize_beds(beds_raw)
+    norm_baths = _normalize_baths(baths_raw)
+    try:
+        from ma_poc.pms.adapters._parsing import compute_floor_plan_id
+
+        floor_plan_id = compute_floor_plan_id(
+            property_id, fp_name, norm_beds, norm_baths
+        )
+    except Exception:
+        floor_plan_id = None
+
     return {
-        "beds": _normalize_beds(beds_raw),
-        "baths": _normalize_baths(baths_raw),
+        "beds": norm_beds,
+        "baths": norm_baths,
         "floor_plan_name": fp_name if fp_name else None,
+        "floor_plan_id": floor_plan_id,
         "area": _format_area(sqft),
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
         "rent_low": _format_rent(rent_lo),
