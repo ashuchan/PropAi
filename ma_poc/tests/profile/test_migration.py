@@ -17,7 +17,7 @@ from models.scrape_profile import (
     ProfileStats,
     ScrapeProfile,
 )
-from scripts.migrate_profiles_v1_to_v2 import _migrate_one, migrate_profiles
+from scripts.migrations.profiles_v1_to_v2 import _migrate_one, migrate_profiles
 
 
 def _make_v1_profile(**overrides: Any) -> dict[str, Any]:
@@ -107,7 +107,7 @@ def _fake_detect_pms_unknown(url: str, **_: Any) -> _FakeDetectedPMS:
 class TestMigrateOne:
     """Unit tests for _migrate_one (in-memory dict transform)."""
 
-    @patch("scripts.migrate_profiles_v1_to_v2.detect_pms", _fake_detect_pms_rentcafe)
+    @patch("scripts.migrations.profiles_v1_to_v2.detect_pms", _fake_detect_pms_rentcafe)
     def test_migration_populates_api_provider_from_url(self) -> None:
         """When api_provider is null and URL matches, detect_pms fills it."""
         v1 = _make_v1_profile()
@@ -116,7 +116,7 @@ class TestMigrateOne:
         assert v2["api_hints"]["api_provider"] == "rentcafe"
         assert v2["api_hints"]["client_account_id"] == "rc-123"
 
-    @patch("scripts.migrate_profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
+    @patch("scripts.migrations.profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
     def test_migration_preserves_llm_field_mappings(self) -> None:
         """Existing llm_field_mappings (within cap) are preserved."""
         mappings = [
@@ -133,7 +133,7 @@ class TestMigrateOne:
         assert len(v2["api_hints"]["llm_field_mappings"]) == 2
         assert v2["api_hints"]["llm_field_mappings"][0]["api_url_pattern"] == "/api/units"
 
-    @patch("scripts.migrate_profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
+    @patch("scripts.migrations.profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
     def test_migration_drops_cluster_id(self) -> None:
         """cluster_id is removed from the migrated profile."""
         v1 = _make_v1_profile()
@@ -141,7 +141,7 @@ class TestMigrateOne:
         v2 = _migrate_one(v1)
         assert "cluster_id" not in v2
 
-    @patch("scripts.migrate_profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
+    @patch("scripts.migrations.profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
     def test_migration_caps_explored_links_at_50(self) -> None:
         """explored_links longer than 50 are truncated."""
         v1 = _make_v1_profile()
@@ -149,7 +149,7 @@ class TestMigrateOne:
         v2 = _migrate_one(v1)
         assert len(v2["navigation"]["explored_links"]) == 50
 
-    @patch("scripts.migrate_profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
+    @patch("scripts.migrations.profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
     def test_migration_audit_copy_written(self, tmp_path: Path) -> None:
         """migrate_profiles writes v1 audit copy."""
         profiles_dir = tmp_path / "profiles"
@@ -166,7 +166,7 @@ class TestMigrateOne:
         # Audit copy should have the original cluster_id
         assert audit_data.get("cluster_id") == "cluster-abc"
 
-    @patch("scripts.migrate_profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
+    @patch("scripts.migrations.profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
     def test_migration_is_idempotent(self) -> None:
         """Running migration twice produces the same result."""
         v1 = _make_v1_profile()
@@ -213,7 +213,7 @@ class TestMigrateOne:
         assert conf.consecutive_unreachable == 0
         assert conf.last_success_detection is None
 
-    @patch("scripts.migrate_profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
+    @patch("scripts.migrations.profiles_v1_to_v2.detect_pms", _fake_detect_pms_unknown)
     def test_hot_profile_must_have_api_provider_warning(self, caplog: pytest.LogCaptureFixture) -> None:
         """A HOT profile with api_provider=unknown should log a warning."""
         v1 = _make_v1_profile()
