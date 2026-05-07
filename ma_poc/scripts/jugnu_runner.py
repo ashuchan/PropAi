@@ -447,8 +447,13 @@ async def _process_property(
 
             try:
                 state_store = StateStore(data_dir / "state")
+                # Prefer the concrete dated run_dir so carry_forward_property
+                # can derive the schema root reliably. Fall back to the
+                # "latest" symlink only when run_dir wasn't injected (e.g.
+                # ad-hoc invocations without a run context).
+                _cf_run_dir = run_dir if run_dir is not None else data_dir / "runs" / "latest"
                 cf_record = carry_forward_property(
-                    task.property_id, data_dir / "runs" / "latest", state_store, reason
+                    task.property_id, _cf_run_dir, state_store, reason
                 )
                 if cf_record:
                     # Stamp a SUCCESS verdict so run_report counts this

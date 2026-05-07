@@ -199,13 +199,14 @@ class StateStore:
             uid = str(u.get("unit_id") or "").strip()
             if not uid:
                 # Walk the natural → fingerprint → floor-plan ladder.
-                # If nothing binds (no physical fields at all), skip — a
-                # unit with only rent/date and no anchor cannot be merged
-                # across runs and pollutes the index.
                 derived = assign_fallback_unit_id(u, canonical_id)
                 if not derived:
-                    diff["skipped_no_identity"] += 1
-                    continue
+                    # No-drop contract: rescue with a stable payload-hash id
+                    # so every captured unit lands in the index.  The
+                    # unkeyable_ prefix lets callers count / filter these rows
+                    # separately (see services/merge_yield.py).
+                    derived = synthesize_unkeyable_id(u, canonical_id)
+                    diff["synthetic_key_used"] += 1
                 uid = derived
             current_ids.add(uid)
 
