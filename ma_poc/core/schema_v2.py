@@ -92,7 +92,7 @@ def build_v2_property(
 
     The scraper core is untouched — this is a pure post-processing step.
     """
-    from identity import csv_get
+    from ma_poc.core.identity import csv_get
 
     if scrape_ts is None:
         scrape_ts = datetime.now(UTC)
