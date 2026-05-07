@@ -83,25 +83,29 @@ _PRIORITY_MAP = {
 
 # Leasing portal domains — ported from scripts/entrata.py _LEASING_PORTAL_DOMAINS.
 #
-# 2026-05-06: added securecafe.com / securecafenet.com (RentCafe leasing-portal
-# subdomains, observed on loftsatopop / livecantata / 215cstreet / rentmiro etc.),
-# prospectportal.com (Entrata leasing-portal subdomain), and appfolio.com (any
-# tenant subdomain). Bulk scan of 81 still-failing properties in canary v10
+# 2026-05-06 (canary-batch-11 bulk scan): added securecafe.com /
+# securecafenet.com (RentCafe leasing-portal subdomains), prospectportal.com
+# (Entrata leasing-portal subdomain), and appfolio.com (any tenant
+# subdomain). Bulk scan of 81 still-failing properties in canary v10
 # showed 19% link to *.securecafe.com / *.securecafenet.com and 7% to
-# *.appfolio.com/connect or /listings — both currently filtered out as
-# "non-PMS" because no adapter advertises them in static_fingerprints().
+# *.appfolio.com — both filtered out as "non-PMS" without these entries.
 #
 # 2026-05-06 (smart link-hop expansion): added cross-domain leasing portals
-# observed in deep-dive samples:
-#   - yottareal.com (adaraportal.yottareal.com — verandahlake.com sub-portal)
-#   - ovationco.com (PMC parent portal for lasvegasliving sub-properties)
-#   - mytouchtour.com (TouchTour platform — Ovation Vegas)
-#   - liveovation.com (Ovation parent brand portfolio)
-#   - knockrentals.com / doorway.knck.io (Knock leasing widget)
-#   - hyly.ai (Hyly leasing CMS — knockrentals competitor)
-#   - marketapts.com (Market Apartments lead-gen)
+# observed in deep-dive samples — yottareal.com, ovationco.com,
+# mytouchtour.com, liveovation.com, knockrentals.com, doorway.knck.io,
+# hyly.ai, marketapts.com. NOTE: some of these (hyly.ai, knockrentals,
+# marketapts) are CRM/marketing-widget hosts when embedded as iframes —
+# they qualify as link-hop targets (because the redirect chain often
+# leads to a real PMS portal) but should NOT be in the iframe-direct-
+# follow allowlist (`_IFRAME_PMS_HOSTS` in scraper.py), which is for
+# iframes whose embedded src is itself the unit-data source.
+#
+# 2026-05-07 audit additions: fortresstech.io (Carlson Place — Squarespace
+# + widget), appfoliowebsites.com (AppFolio CMS host), g5marketingcloud.com
+# (G5 GraphQL inventory API — followed when captured, not via iframe).
 _LEASING_PORTAL_DOMAINS = frozenset(
     {
+        # Original portals
         "sightmap.com",
         "realpage.com",
         "loftliving.com",
@@ -111,10 +115,12 @@ _LEASING_PORTAL_DOMAINS = frozenset(
         "yardi.com",
         "smartrent.com",
         "onlineleasing.realpage.com",
+        # canary-batch-11 portal sublinks
         "securecafe.com",
         "securecafenet.com",
         "prospectportal.com",
         "appfolio.com",
+        # canary-batch-11 cross-domain portfolio portals + CRM hosts
         "yottareal.com",
         "ovationco.com",
         "mytouchtour.com",
@@ -123,6 +129,12 @@ _LEASING_PORTAL_DOMAINS = frozenset(
         "doorway.knck.io",
         "hyly.ai",
         "marketapts.com",
+        # 2026-05-07 audit additions
+        "fortresstech.io",
+        "availability.fortresstech.io",
+        "portal.fortresstech.io",
+        "appfoliowebsites.com",
+        "g5marketingcloud.com",
     }
 )
 
@@ -491,3 +503,200 @@ async def resolve_target(
         result.method = "failed"
         result.hop_path = [original_url]
         return result
+
+
+def resolve_target_from_html(
+    page_html: str | None,
+    original_url: str,
+    initial_detection: DetectedPMS,
+    iframe_srcs: list[str] | None = None,
+) -> ResolvedTarget:
+    """Jugnu-mode (no live page) port of `resolve_target`.
+
+    Production audit (2026-05-06 run, 1000-property sample) showed that
+    `resolve_target()` was bypassed in 100% of Jugnu runs because the L1
+    fetcher returns `fetch_result.body` and `page=None`. Consequence:
+    every smart-link-hop / portal-sublink / candidate-dedup / word-
+    boundary-keyword improvement made on the resolver shipped in legacy
+    mode but never reached production. 850 of 1000 sampled properties
+    (85%) were detected as a known PMS but extracted by some other tier
+    because `resolve_target()` never ran.
+
+    This function ports steps 1-4 of `resolve_target` to operate on the
+    raw HTML body (BeautifulSoup). Step 5 (post-render redirect detection)
+    is handled separately via `fetch_result.final_url` in the caller.
+
+    Parameters
+    ----------
+    page_html : str | None
+        The fetched HTML body. If None, only Step 1 (URL-only fingerprint
+        match) can succeed.
+    original_url : str
+        The property's marketing-site URL (entry).
+    initial_detection : DetectedPMS
+        Result of `detect_pms(original_url, csv_row, page_html)`.
+    iframe_srcs : list[str] | None
+        Optional pre-extracted iframe srcs (e.g. from detector_signals).
+        If None, this function will parse them from `page_html`.
+    """
+    result = ResolvedTarget(
+        original_url=original_url,
+        resolved_url=original_url,
+        final_detection=initial_detection,
+    )
+
+    # Step 1: Already on PMS host?
+    try:
+        if initial_detection.confidence >= 0.85 and _url_matches_pms_fingerprints(original_url):
+            normalized = normalize_appfolio_url(original_url)
+            result.resolved_url = normalized
+            result.method = "no_hop"
+            result.hop_path = [original_url] if normalized == original_url else [original_url, normalized]
+            return result
+    except Exception:
+        pass
+
+    if not page_html or len(page_html) < 100:
+        # Without HTML, we can only do URL-level matching (Step 1). If that
+        # didn't fire, return fetch_only — the original URL is what the
+        # caller will pass to the adapter.
+        result.method = "fetch_only"
+        result.hop_path = [original_url]
+        return result
+
+    # Steps 2-3: Extract candidate anchors from the HTML body.
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        result.method = "fetch_only"
+        result.hop_path = [original_url]
+        return result
+
+    try:
+        soup = BeautifulSoup(page_html, "lxml")
+    except Exception:
+        try:
+            soup = BeautifulSoup(page_html, "html.parser")
+        except Exception:
+            result.method = "fetch_only"
+            result.hop_path = [original_url]
+            return result
+
+    candidates: list[tuple[int, str, str]] = []
+    seen_keys: set[str] = set()
+
+    for a in soup.find_all("a", href=True):
+        raw_href = a.get("href") or ""
+        href = (raw_href if isinstance(raw_href, str) else " ".join(raw_href)).strip()
+        if not href:
+            continue
+        # Resolve relative → absolute against original_url
+        try:
+            from urllib.parse import urljoin
+            abs_href = urljoin(original_url, href)
+        except Exception:
+            abs_href = href
+        if not abs_href.startswith(("http://", "https://")):
+            continue
+        text = (a.get_text(" ", strip=True) or "").strip()[:100]
+
+        # Same three triggers as `resolve_target`:
+        text_match = bool(_CTA_TEXT_RE.search(text))
+        portal_match = _url_is_known_portal(abs_href)
+        try:
+            href_path = urlparse(abs_href).path or ""
+        except Exception:
+            href_path = ""
+        path_match = bool(_CTA_PATH_RE.search(href_path))
+        if not (text_match or portal_match or path_match):
+            continue
+        if is_blacklisted_path(abs_href):
+            continue
+        key = _candidate_dedup_key(abs_href)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        if text_match:
+            priority = _get_priority(text)
+        elif portal_match:
+            priority = 75
+        else:
+            priority = 60
+        candidates.append((priority, abs_href, text))
+
+    candidates.sort(key=lambda x: -x[0])
+    candidates = candidates[:_CANDIDATE_CAP]
+
+    try:
+        original_host = (urlparse(original_url).hostname or "").lower()
+    except Exception:
+        original_host = ""
+
+    # Pass 3a — known portal hosts (cross-domain allowed)
+    for _priority, href, _text in candidates:
+        if not _url_is_known_portal(href):
+            continue
+        detection = detect_pms(href)
+        normalized = normalize_appfolio_url(href)
+        result.resolved_url = normalized
+        result.final_detection = detection
+        result.method = "cta_link"
+        hops = [original_url, href]
+        if normalized != href:
+            hops.append(normalized)
+        result.hop_path = hops
+        return result
+
+    # Pass 3b — same-host CTA-path candidates
+    for _priority, href, _text in candidates:
+        try:
+            href_parsed = urlparse(href)
+        except Exception:
+            continue
+        href_host = (href_parsed.hostname or "").lower()
+        if href_host != original_host:
+            continue
+        if not _CTA_PATH_RE.search(href_parsed.path or ""):
+            continue
+        detection = detect_pms(href)
+        normalized = normalize_appfolio_url(href)
+        result.resolved_url = normalized
+        result.final_detection = detection
+        result.method = "cta_link"
+        hops = [original_url, href]
+        if normalized != href:
+            hops.append(normalized)
+        result.hop_path = hops
+        return result
+
+    # Step 4: iframes — operate on pre-extracted list or scan HTML.
+    if iframe_srcs is None:
+        iframe_srcs = []
+        try:
+            for iframe in soup.find_all("iframe", src=True):
+                src = iframe.get("src") or ""
+                if isinstance(src, str) and src.startswith(("http://", "https://", "//")):
+                    if src.startswith("//"):
+                        src = "https:" + src
+                    iframe_srcs.append(src)
+        except Exception:
+            pass
+
+    for src in iframe_srcs:
+        src_lower = src.lower()
+        if any(domain in src_lower for domain in _LEASING_PORTAL_DOMAINS):
+            detection = detect_pms(src)
+            normalized = normalize_appfolio_url(src)
+            result.resolved_url = normalized
+            result.final_detection = detection
+            result.method = "iframe"
+            hops = [original_url, src]
+            if normalized != src:
+                hops.append(normalized)
+            result.hop_path = hops
+            return result
+
+    # Nothing found
+    result.method = "failed"
+    result.hop_path = [original_url]
+    return result
