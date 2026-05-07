@@ -1,0 +1,650 @@
+"""Pure API-parsing utilities for Jugnu PMS adapters.
+
+Extracted from scripts/entrata.py and scripts/scrape_properties.py so these
+functions have a Jugnu-native home and the legacy scripts can be retired.
+No Playwright or network dependencies — pure data transforms only.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+import urllib.parse
+from typing import Any
+
+log = logging.getLogger(__name__)
+
+# ── Constants ──────────────────────────────────────────────────────────────────
+
+TARGET_JSONLD_TYPES: frozenset[str] = frozenset({
+    "Apartment",
+    "ApartmentUnit",
+    "ApartmentComplex",
+    "Offer",
+    "FloorPlan",
+    "Residence",
+    "SingleFamilyResidence",
+})
+
+_RENT_MIN = 200
+_RENT_MAX = 50_000
+
+_UNIT_ID_KEYS: tuple[str, ...] = (
+    "unit_number", "unitNumber", "UnitNumber",
+    "unit_id", "unitId", "unit_name", "unitName",
+    "label", "id", "ID",
+)
+
+_RENT_KEYS: frozenset[str] = frozenset({
+    "price", "minRent", "askingRent", "rent", "monthlyRent",
+    "minPrice", "startingPrice", "base_rent", "baseRent",
+    "display_price", "displayPrice", "monthly_rent",
+    "rentTerms", "pricing", "market_rent",
+})
+
+# ── Low-level helpers ──────────────────────────────────────────────────────────
+
+
+def _get(d: dict, *keys: str) -> str:
+    """Try multiple key names, return first non-empty string found.
+
+    Unwraps nested rent/sqft objects like ``{rent: {min: 1351, max: 1351}}``.
+    """
+    for k in keys:
+        v = d.get(k)
+        if v is None or v == "" or v == [] or v == {}:
+            continue
+        if isinstance(v, list):
+            continue
+        if isinstance(v, dict):
+            for sub_k in ("min", "low", "amount", "value", "effectiveRent", "max", "high"):
+                sv = v.get(sub_k)
+                if sv is not None and sv != "":
+                    return str(sv)
+            continue
+        return str(v)
+    return ""
+
+
+def _money_to_int(s: Any) -> int | None:
+    """Parse '$1,450', '1450.00', '1,450 USD' → 1450. Returns None on failure."""
+    if s is None:
+        return None
+    cleaned = re.sub(r"[^\d.]", "", str(s))
+    if not cleaned or cleaned == ".":
+        return None
+    try:
+        return int(float(cleaned))
+    except ValueError:
+        return None
+
+
+def _find_list(obj: Any, keys: tuple[str, ...]) -> list:
+    """Return the first non-empty list found at any of the given keys in obj."""
+    if not isinstance(obj, dict):
+        return []
+    for k in keys:
+        v = obj.get(k)
+        if isinstance(v, list) and v:
+            return v
+    return []
+
+
+def _extract_rent(u: dict) -> tuple[int | None, int | None]:
+    """Extract (rent_low, rent_high) from a unit/floorplan dict.
+
+    Handles flat keys, nested dicts ``{rent: {min: X, max: Y}}``, and
+    nested lists ``{rentTerms: [{rent: 1200, term: 12}]}``.
+    """
+    _LO_KEYS = (
+        "price", "minRent", "askingRent", "rent", "monthlyRent",
+        "minPrice", "startingPrice", "base_rent", "baseRent",
+        "display_price", "monthly_rent", "market_rent", "rentTerms", "pricing",
+    )
+    _HI_KEYS = ("maxRent", "price_max", "max_price", "maxPrice", "rent_max")
+
+    lo: int | None = None
+    hi: int | None = None
+
+    for k in _LO_KEYS:
+        v = u.get(k)
+        if v is None:
+            continue
+        if isinstance(v, dict):
+            lo = _money_to_int(
+                v.get("min") or v.get("low") or v.get("amount")
+                or v.get("effectiveRent") or v.get("value")
+            )
+            hi = _money_to_int(v.get("max") or v.get("high"))
+            if lo:
+                break
+            continue
+        if isinstance(v, list) and v and isinstance(v[0], dict):
+            best = None
+            for term in v:
+                r = _money_to_int(term.get("rent") or term.get("price") or term.get("amount"))
+                if r and (best is None or r < best):
+                    best = r
+            if best:
+                lo = best
+                break
+            continue
+        lo = _money_to_int(v)
+        if lo:
+            break
+
+    for k in _HI_KEYS:
+        v = u.get(k)
+        if v is not None:
+            hi = _money_to_int(v)
+            if hi:
+                break
+    if hi is None:
+        hi = lo
+
+    return (lo, hi)
+
+
+# ── JSON-LD helpers ────────────────────────────────────────────────────────────
+
+
+def _jsonld_type_matches(item: dict) -> bool:
+    t = item.get("@type")
+    if isinstance(t, list):
+        return any(isinstance(x, str) and x in TARGET_JSONLD_TYPES for x in t)
+    return isinstance(t, str) and t in TARGET_JSONLD_TYPES
+
+
+def _jsonld_floor_size(item: dict) -> str:
+    fs = item.get("floorSize")
+    if isinstance(fs, dict):
+        v = fs.get("value", "")
+        return str(v) if v not in (None, "") else ""
+    if fs in (None, ""):
+        return ""
+    return str(fs)
+
+
+def _walk_jsonld(node: Any, out: list[dict]) -> None:
+    """JSON-LD may nest matching items inside @graph, itemListElement, etc."""
+    if isinstance(node, dict):
+        if _jsonld_type_matches(node):
+            out.append(node)
+        for v in node.values():
+            _walk_jsonld(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _walk_jsonld(v, out)
+
+
+def _jsonld_item_has_unit_signal(item: dict) -> bool:
+    """True if a JSON-LD node has offers/pricing/rooms data — i.e. unit-level."""
+    offers = item.get("offers")
+    if isinstance(offers, dict) and (
+        offers.get("price") or offers.get("lowPrice") or offers.get("highPrice")
+    ):
+        return True
+    if isinstance(offers, list) and offers:
+        return True
+    num_rooms = item.get("numberOfRooms")
+    if isinstance(num_rooms, dict):
+        num_rooms = num_rooms.get("value")
+    try:
+        if num_rooms not in (None, "") and float(num_rooms) > 0:
+            return True
+    except (TypeError, ValueError):
+        pass
+    if item.get("floorSize"):
+        return True
+    t = item.get("@type")
+    t_list = t if isinstance(t, list) else [t]
+    return any(
+        x in ("Apartment", "FloorPlan", "Residence", "Offer", "SingleFamilyResidence")
+        for x in t_list
+        if isinstance(x, str)
+    )
+
+
+# ── Quality checks ─────────────────────────────────────────────────────────────
+
+
+def _is_low_signal_units(units: list[dict]) -> bool:
+    """True if every unit is missing both a rent and a unit_number/unit_id."""
+    if not units:
+        return True
+    for u in units:
+        has_rent = bool(
+            u.get("rent_range") or u.get("market_rent_low")
+            or u.get("market_rent_high") or u.get("rent")
+        )
+        has_id = bool(
+            (u.get("unit_number") or "").strip() or (u.get("unit_id") or "").strip()
+        )
+        if has_rent or has_id:
+            return False
+    return True
+
+
+def _units_below_expected(
+    units: list[dict], expected: int | None, floor_ratio: float = 0.2
+) -> bool:
+    """True if units is materially smaller than the known expected count."""
+    if not expected or expected <= 0 or not units:
+        return False
+    if len(units) >= max(1, int(expected * floor_ratio)):
+        return False
+    return all(
+        not (u.get("rent_range") or u.get("market_rent_low") or u.get("rent"))
+        for u in units
+    )
+
+
+# ── SightMap dedicated parser ──────────────────────────────────────────────────
+
+
+def parse_sightmap_payload(body: Any, url: str) -> list[dict]:
+    """SightMap floorplan+unit join — adapter-compatible output shape."""
+    units_out: list[dict] = []
+    data = body.get("data") if isinstance(body, dict) else None
+    if not isinstance(data, dict):
+        return units_out
+
+    raw_units = data.get("units") or []
+    raw_fps = data.get("floor_plans") or []
+    if not isinstance(raw_units, list) or not raw_units:
+        return units_out
+
+    fp_by_id: dict[str, dict] = {}
+    for fp in raw_fps if isinstance(raw_fps, list) else []:
+        if isinstance(fp, dict) and fp.get("id") is not None:
+            fp_by_id[str(fp["id"])] = fp
+
+    for u in raw_units:
+        if not isinstance(u, dict):
+            continue
+        fp = fp_by_id.get(str(u.get("floor_plan_id") or ""), {})
+
+        price = u.get("price")
+        price_i: int | None = None
+        if isinstance(price, (int, float)) and price > 0:
+            price_i = int(price)
+        else:
+            price_i = _money_to_int(str(u.get("display_price") or ""))
+
+        area = u.get("area")
+        if isinstance(area, (int, float)) and area > 0:
+            sqft = str(int(area))
+        else:
+            sqft = str(u.get("display_area") or "").strip()
+
+        beds = fp.get("bedroom_count")
+        baths = fp.get("bathroom_count")
+        name = fp.get("name") or fp.get("filter_label") or ""
+
+        if beds == 0 or (isinstance(name, str) and "studio" in name.lower()):
+            bed_label = "Studio"
+        elif beds is not None:
+            bed_label = f"{beds} Bedroom"
+        else:
+            bed_label = ""
+
+        units_out.append({
+            "floor_plan_name": str(name),
+            "bed_label": bed_label,
+            "bedrooms": str(beds) if beds is not None else "",
+            "bathrooms": str(baths) if baths is not None else "",
+            "sqft": sqft,
+            "unit_number": str(u.get("unit_number") or u.get("label") or ""),
+            "floor": str(u.get("floor_id") or ""),
+            "building": str(u.get("building") or ""),
+            "rent_range": f"${price_i:,}" if price_i else str(u.get("display_price") or ""),
+            "deposit": "",
+            "concession": str(u.get("specials_description") or ""),
+            "availability_status": "AVAILABLE",
+            "available_units": "1",
+            "availability_date": str(u.get("available_on") or u.get("display_available_on") or ""),
+            "source_api_url": url,
+            "extraction_tier": "TIER_1_API_SIGHTMAP",
+        })
+    return units_out
+
+
+# ── RealPage dedicated parser ──────────────────────────────────────────────────
+
+
+def _to_iso_date(s: Any) -> str | None:
+    """Best-effort ISO date parse from common formats."""
+    if s is None:
+        return None
+    s = str(s).strip()
+    if not s:
+        return None
+    import re as _re
+    m = _re.match(r"^(\d{4})-(\d{2})-(\d{2})", s)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    m = _re.match(r"^(\d{1,2})/(\d{1,2})/(\d{2,4})$", s)
+    if m:
+        mm, dd, yy = m.group(1), m.group(2), m.group(3)
+        if len(yy) == 2:
+            yy = "20" + yy
+        return f"{int(yy):04d}-{int(mm):02d}-{int(dd):02d}"
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).date().isoformat()
+    except (ValueError, TypeError):
+        return None
+
+
+def realpage_units_from_body(body: Any, source_url: str) -> list[dict]:
+    """Parse RealPage API responses (api.ws.realpage.com).
+
+    Handles two endpoint shapes:
+      /floorplans → {response: {floorplans: [...]}}
+      /units      → {response: [{unitNumber, rent, availableDate, ...}]}
+
+    Returns records in the internal shape (unit_id / market_rent_low /
+    market_rent_high). Use ``realpage_units_to_adapter_shape`` for the
+    adapter-compatible output.
+    """
+    out: list[dict] = []
+    if not isinstance(body, dict):
+        return out
+    resp = body.get("response")
+    if resp is None:
+        return out
+
+    if isinstance(resp, dict) and "floorplans" in resp:
+        for fp in resp.get("floorplans") or []:
+            if not isinstance(fp, dict):
+                continue
+            fp_id = str(fp.get("id") or fp.get("name") or "")
+            beds = fp.get("bedRooms") or fp.get("bedrooms")
+            sqft = fp.get("sqft") or fp.get("squareFeet")
+            sqft_v = int(sqft) if isinstance(sqft, (int, float)) and sqft > 0 else None
+            lo = _money_to_int(fp.get("minRent") or fp.get("rentMin"))
+            hi = _money_to_int(fp.get("maxRent") or fp.get("rentMax")) or lo
+            out.append({
+                "unit_id": fp_id,
+                "market_rent_low": lo,
+                "market_rent_high": hi,
+                "available_date": None,
+                "lease_link": None,
+                "concessions": None,
+                "amenities": None,
+                "floorplan_image_url": fp.get("imageUrl") or fp.get("image") or None,
+                "_sqft": sqft_v,
+                "_floor_plan": fp.get("name") or fp_id,
+                "_bedrooms": beds,
+            })
+        return out
+
+    if isinstance(resp, list):
+        for u in resp:
+            if not isinstance(u, dict):
+                continue
+            uid = str(u.get("unitNumber") or u.get("unit_number") or u.get("unitId") or "")
+            if not uid:
+                continue
+            lo = _money_to_int(u.get("rent") or u.get("minRent") or u.get("bestPrice"))
+            hi = _money_to_int(u.get("maxRent")) or lo
+            if lo is not None and (lo < _RENT_MIN or lo > _RENT_MAX):
+                continue
+            sqft_v = u.get("sqft") or u.get("squareFeet")
+            out.append({
+                "unit_id": uid,
+                "market_rent_low": lo,
+                "market_rent_high": hi,
+                "available_date": _to_iso_date(u.get("availableDate") or u.get("available_date")),
+                "lease_link": u.get("applyOnlineUrl") or None,
+                "concessions": u.get("concessions") or u.get("specials") or None,
+                "amenities": None,
+                "floorplan_image_url": (
+                    u.get("floorPlanImage") or u.get("floorplanImage") or u.get("imageUrl") or None
+                ),
+                "_sqft": int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
+                "_floor_plan": u.get("floorPlanName") or u.get("floorplanName") or "",
+                "_bedrooms": u.get("bedrooms") or u.get("bedRooms"),
+            })
+        return out
+
+    return out
+
+
+def realpage_units_to_adapter_shape(body: Any, url: str) -> list[dict]:
+    """RealPage /units parser translated to the adapter output shape."""
+    internal = realpage_units_from_body(body, url) or []
+    out: list[dict] = []
+    for u in internal:
+        lo = u.get("market_rent_low")
+        hi = u.get("market_rent_high")
+        if lo is not None and hi is not None and lo != hi:
+            rent_range = f"${lo:,} - ${hi:,}"
+        elif lo is not None:
+            rent_range = f"${lo:,}"
+        else:
+            rent_range = ""
+        beds = u.get("_bedrooms")
+        name = u.get("_floor_plan") or ""
+        if beds == 0 or (not beds and "studio" in str(name).lower()):
+            bed_label = "Studio"
+        elif beds not in (None, ""):
+            bed_label = f"{beds} Bedroom"
+        else:
+            bed_label = ""
+        sqft = u.get("_sqft")
+        out.append({
+            "floor_plan_name": str(name),
+            "bed_label": bed_label,
+            "bedrooms": str(beds) if beds not in (None, "") else "",
+            "bathrooms": "",
+            "sqft": str(sqft) if sqft is not None else "",
+            "unit_number": str(u.get("unit_id") or ""),
+            "floor": "",
+            "building": "",
+            "rent_range": rent_range,
+            "deposit": "",
+            "concession": str(u.get("concessions") or ""),
+            "availability_status": "AVAILABLE",
+            "available_units": "",
+            "availability_date": str(u.get("available_date") or ""),
+            "source_api_url": url,
+            "extraction_tier": "TIER_1_API",
+        })
+    return out
+
+
+# ── Main generic API parser ────────────────────────────────────────────────────
+
+_LIST_KEYS = (
+    "floorPlans", "floor_plans", "FloorPlans",
+    "units", "Units", "apartments", "Apartments",
+    "availabilities", "Availabilities", "results", "items",
+)
+
+
+def parse_api_responses(api_responses: list[dict]) -> list[dict]:
+    """Parse captured API JSON into normalised unit/floor-plan records.
+
+    Handles SightMap (dedicated parser), generic REST, and GraphQL-style
+    responses with 50+ key-name variants. Output is adapter-compatible
+    (``floor_plan_name``, ``bed_label``, ``rent_range``, etc.).
+    """
+    units: list[dict] = []
+    seen: set[str] = set()
+    skipped_no_fields = 0
+
+    for resp in api_responses:
+        url = resp["url"]
+        data = resp["body"]
+
+        host = urllib.parse.urlparse(url).netloc.lower()
+        if "sightmap.com" in host:
+            sm_units = parse_sightmap_payload(data, url)
+            for u in sm_units:
+                key = u["unit_number"] or f"{u['floor_plan_name']}|{u['sqft']}|{u['rent_range']}"
+                if key and key not in seen:
+                    seen.add(key)
+                    units.append(u)
+            if sm_units:
+                continue
+
+        candidates: list[dict] = []
+        if isinstance(data, list):
+            candidates = data
+        elif isinstance(data, dict):
+            candidates = _find_list(data, _LIST_KEYS)
+            if not candidates:
+                inner = data.get("data") if isinstance(data.get("data"), dict) else None
+                if not inner and isinstance(data.get("response"), dict):
+                    inner = data.get("response")
+                if isinstance(inner, dict):
+                    candidates = _find_list(inner, _LIST_KEYS)
+                    if not candidates:
+                        for v in inner.values():
+                            if isinstance(v, dict):
+                                candidates = _find_list(v, _LIST_KEYS)
+                                if candidates:
+                                    break
+
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+
+            name = _get(item,
+                "floorPlanName", "floor_plan_name", "name", "planName",
+                "unitType", "unit_type", "title", "FloorPlanName",
+                "floorplan_name", "floorplan-name",
+            )
+            rent_lo = _get(item,
+                "minRent", "rent_min", "min_rent", "startingFrom",
+                "starting_rent", "askingRent", "rent", "minPrice",
+                "startingPrice", "MinRent", "price", "base_rent",
+                "baseRent", "display_price", "displayPrice",
+                "monthlyRent", "monthly_rent",
+            )
+            rent_hi = _get(item,
+                "maxRent", "rent_max", "max_rent", "maxAskingRent",
+                "endingAt", "MaxRent", "max_price", "maxPrice", "price_max",
+            )
+            beds = _get(item,
+                "bedrooms", "beds", "bedroom_count", "numBedrooms",
+                "bd", "Bedrooms", "BedroomCount", "bedroomCount",
+                "num_bedrooms", "no_of_bedroom", "no_of_bedrooms",
+            )
+            baths = _get(item,
+                "bathrooms", "baths", "bathroom_count", "numBathrooms",
+                "ba", "Bathrooms", "BathroomCount", "bathroomCount",
+            )
+            sqft = _get(item,
+                "sqft", "squareFeet", "square_feet", "minSqft", "size",
+                "SquareFeet", "Sqft", "sqftMin", "area", "square_footage",
+                "squareFootage", "display_area", "displayArea",
+            )
+            sqft_max = _get(item, "maxSqft", "sqftMax", "squareFeetMax", "max_area")
+            avail = _get(item,
+                "availableCount", "available_count", "numAvailable",
+                "unitsAvailable", "AvailableCount", "units_available",
+            )
+            avail_dt = _get(item,
+                "availableDate", "available_date", "moveInDate", "moveInReady",
+                "availableFrom", "AvailableDate", "NextAvailDate",
+                "available_on", "availableOn", "display_available_on", "readyDate",
+            )
+            status = _get(item, "status", "availability_status", "leaseStatus", "Status", "unit_status")
+            unit_num = _get(item,
+                "unitNumber", "unit_number", "unitId", "unit_id", "UnitNumber",
+                "label", "display_unit_number", "unitCode", "unit_code",
+            )
+            floor_num = _get(item, "floor", "floorNumber", "FloorNumber", "floor_id", "floorId")
+            building = _get(item, "building", "buildingName", "BuildingName", "building_name")
+            plan_type = _get(item, "floorPlanType", "type", "bedBath", "BedBath")
+            deposit = _get(item, "deposit", "securityDeposit", "SecurityDeposit", "security_deposit")
+            concession = _get(item,
+                "concession", "special", "promotion", "Concession", "Special",
+                "specials_description", "specialsDescription",
+            )
+
+            if not any([name, beds, sqft, rent_lo]):
+                skipped_no_fields += 1
+                continue
+
+            dedup_key = unit_num or f"{name}|{beds}|{sqft}|{rent_lo}"
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+
+            lo_i = _money_to_int(rent_lo)
+            hi_i = _money_to_int(rent_hi)
+            if lo_i is not None and hi_i is not None and lo_i != hi_i:
+                rent_display = f"${lo_i:,} - ${hi_i:,}"
+            elif lo_i is not None:
+                rent_display = f"${lo_i:,}"
+            else:
+                rent_display = ""
+
+            sqft_display = sqft
+            if sqft and sqft_max and sqft != sqft_max:
+                sqft_display = f"{sqft} - {sqft_max}"
+
+            if beds == "0" or (not beds and "studio" in (name or "").lower()):
+                bed_label = "Studio"
+            elif beds:
+                bed_label = f"{beds} Bedroom"
+            else:
+                bed_label = plan_type or "?"
+
+            units.append({
+                "floor_plan_name": name,
+                "bed_label": bed_label,
+                "bedrooms": beds,
+                "bathrooms": baths,
+                "sqft": sqft_display,
+                "unit_number": unit_num,
+                "floor": floor_num,
+                "building": building,
+                "rent_range": rent_display,
+                "deposit": deposit,
+                "concession": concession,
+                "availability_status": status or ("AVAILABLE" if (avail and avail != "0") else ""),
+                "available_units": avail,
+                "availability_date": avail_dt,
+                "source_api_url": url,
+                "extraction_tier": "TIER_1_API",
+            })
+
+    has_real = any(u.get("unit_number") or u.get("rent_range") for u in units)
+    stub_count = 0
+    if has_real:
+        before = len(units)
+        units = [u for u in units if u.get("unit_number") or u.get("rent_range")]
+        stub_count = before - len(units)
+
+    log.debug(
+        "parse_api_responses: %d APIs → %d units (skipped: %d no-fields, %d stubs)",
+        len(api_responses), len(units), skipped_no_fields, stub_count,
+    )
+    return units
+
+
+__all__ = [
+    "TARGET_JSONLD_TYPES",
+    "_RENT_MIN",
+    "_RENT_MAX",
+    "_UNIT_ID_KEYS",
+    "_RENT_KEYS",
+    "_get",
+    "_money_to_int",
+    "_find_list",
+    "_extract_rent",
+    "_jsonld_type_matches",
+    "_jsonld_floor_size",
+    "_walk_jsonld",
+    "_jsonld_item_has_unit_signal",
+    "_is_low_signal_units",
+    "_units_below_expected",
+    "parse_sightmap_payload",
+    "realpage_units_from_body",
+    "realpage_units_to_adapter_shape",
+    "parse_api_responses",
+]
