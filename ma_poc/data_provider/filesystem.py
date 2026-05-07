@@ -61,7 +61,7 @@ _MA_POC_ROOT = Path(__file__).resolve().parent.parent
 if str(_MA_POC_ROOT) not in sys.path:
     sys.path.insert(0, str(_MA_POC_ROOT))
 
-from ma_poc.core.state_store import StateStore as _StateStore
+from ma_poc.core.state_store import StateStore as _StateStore  # noqa: E402
 from services.profile_store import ProfileStore as _ProfileStore  # noqa: E402
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
