@@ -124,22 +124,60 @@ def is_rent_grounded(rent: int | None, source_text: str) -> bool:
     return False
 
 
+def is_value_grounded(value: int | str | None, source_text: str) -> bool:
+    """Generalisation of ``is_rent_grounded`` that handles sqft / unit_number.
+
+    Returns True when ``value`` (or ``str(value)``) appears as a token in
+    ``source_text`` with word boundaries on both sides. Returns True when
+    ``value is None`` (no value to ground).
+
+    Used for sqft (numeric) and unit_number (alphanumeric, e.g. "101", "A12").
+    Handles three cases:
+      - None → True (nothing to ground)
+      - int → match the integer with optional ``,`` thousands and optional
+        ``$`` prefix (rent helper subset)
+      - str → match the string verbatim with word boundaries; allow leading
+        ``#`` or ``Unit`` / ``Apt.`` prefix variations.
+    """
+    if value is None:
+        return True
+    if isinstance(value, int):
+        return is_rent_grounded(value, source_text)
+    s = str(value).strip()
+    if not s:
+        return True
+    if not source_text:
+        return False
+    # Allow common prefixes ("#", "Unit ", "Apt. ") and word boundaries.
+    # Use re.escape on the value so special chars don't break the regex.
+    pat = re.compile(rf"(?<![\w/])(?:#|Unit\s+|Apt\.?\s+)?{re.escape(s)}(?![\w/])", re.IGNORECASE)
+    return bool(pat.search(source_text))
+
+
 def filter_llm_units_grounded(
     units: list[dict[str, Any]],
     source_text: str,
+    *,
+    require_rent: bool = True,
+    require_sqft: bool = False,
+    require_unit_number: bool = False,
 ) -> tuple[list[dict[str, Any]], int]:
-    """Drop LLM-emitted units whose rent values aren't in *source_text*.
+    """Drop LLM-emitted units whose values aren't in *source_text*.
 
-    Returns ``(filtered_units, dropped_count)``. A unit passes when EITHER:
-      - It has no rent_low and no rent_high (nothing to ground), OR
-      - Its rent_low (or, if rent_low absent, rent_high) is grounded in source.
+    Returns ``(filtered_units, dropped_count)``. By default validates only
+    rent (the dominant hallucination class observed in canary-batch-13).
+    The ``require_sqft`` and ``require_unit_number`` flags extend grounding
+    to sqft and unit_number respectively — useful as the system gains trust
+    in source-grounding semantics.
 
-    Caller surfaces ``dropped_count`` so an LLM tier that hallucinated 5 of 7
-    units still emits the 2 grounded ones, with the drops logged for
-    diagnosis. Apply ONLY to LLM-emitted unit lists — DOM-scraped and API-
-    parsed units are by definition grounded in their source and don't need
-    this check (and would be incorrectly filtered when their source HTML
-    differs from the page HTML, e.g. iframe content).
+    A unit passes when EVERY required field is grounded:
+      - rent: either rent_low/rent_high is in source, OR both are null (no
+        rent to ground — happens legitimately on "Call for pricing" pages)
+      - sqft: sqft value is in source, OR null
+      - unit_number: unit_number is in source, OR null
+
+    Apply ONLY to LLM-emitted unit lists — DOM-scraped and API-parsed units
+    are by definition grounded in their source and don't need this check.
     """
     if not units:
         return units, 0
@@ -148,14 +186,37 @@ def filter_llm_units_grounded(
     for u in units:
         rent_lo = u.get("market_rent_low") or u.get("rent_low")
         rent_hi = u.get("market_rent_high") or u.get("rent_high")
-        # Convert to int if it's a string
         if isinstance(rent_lo, str) and rent_lo.strip():
             rent_lo = money_to_int(rent_lo)
         if isinstance(rent_hi, str) and rent_hi.strip():
             rent_hi = money_to_int(rent_hi)
-        # Pick the non-null rent to validate — prefer rent_low.
-        check = rent_lo if rent_lo else rent_hi
-        if check is None or is_rent_grounded(int(check), source_text):
+        check_rent = rent_lo if rent_lo else rent_hi
+
+        rent_ok = True
+        if require_rent and check_rent is not None:
+            rent_ok = is_rent_grounded(int(check_rent), source_text)
+
+        sqft_ok = True
+        if require_sqft:
+            sqft_val = u.get("sqft") or u.get("area")
+            if isinstance(sqft_val, str) and sqft_val.strip():
+                # Sqft strings sometimes carry units ("750 sq ft") — strip non-digits.
+                digits = re.sub(r"\D", "", sqft_val)
+                sqft_val = int(digits) if digits else None
+            elif isinstance(sqft_val, (int, float)) and sqft_val > 0:
+                sqft_val = int(sqft_val)
+            else:
+                sqft_val = None
+            if sqft_val is not None:
+                sqft_ok = is_value_grounded(sqft_val, source_text)
+
+        unit_ok = True
+        if require_unit_number:
+            un = u.get("unit_number")
+            if isinstance(un, str) and un.strip():
+                unit_ok = is_value_grounded(un.strip(), source_text)
+
+        if rent_ok and sqft_ok and unit_ok:
             filtered.append(u)
         else:
             dropped += 1
