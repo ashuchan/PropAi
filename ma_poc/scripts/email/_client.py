@@ -29,7 +29,7 @@ CLI usage
 Library usage
 -------------
 
-    from scripts.email_html import send_html_email
+    from scripts.email._client import send_html_email
 
     send_html_email(
         subject="PropAi LLM analysis — 2026-05-05",
@@ -63,7 +63,7 @@ for _p in (_MA_POC_ROOT, _REPO_ROOT):
 from dotenv import load_dotenv  # noqa: E402
 
 # Reuse the daily-report helpers — single source of truth for the MCP send.
-from scripts.email_daily_report import (  # noqa: E402
+from scripts.email.daily import (  # noqa: E402
     _html_to_plain,
     _parse_recipients,
     _send_via_mcp,

@@ -170,7 +170,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    from ma_poc.scripts.jugnu_runner import _resolve_data_dirs, _resolve_schema_version
+    from ma_poc.scripts.runners.jugnu import _resolve_data_dirs, _resolve_schema_version
 
     schema_version = _resolve_schema_version(args)
     output_run_dir, _state_dir, _cache_dir, _root = _resolve_data_dirs(
@@ -289,7 +289,7 @@ def main() -> int:
     # Optional: sync to postgres
     if not args.skip_sync:
         try:
-            from ma_poc.scripts.sync_run_to_pg import sync_run_to_postgres
+            from ma_poc.scripts.sync.run_to_pg import sync_run_to_postgres
 
             log.info("Syncing merged run to postgres...")
             # The merge writes a single, consolidated properties.json — a

@@ -329,7 +329,7 @@ async def test_nf_t06_high_confidence_recovery_applied_in_jugnu_hook(
     tmp_path: Path,
 ) -> None:
     """The _run_null_field_recovery helper applies confidence>=0.85 recoveries in place."""
-    from ma_poc.scripts.jugnu_runner import _run_null_field_recovery
+    from ma_poc.scripts.runners.jugnu import _run_null_field_recovery
 
     fake_recovery = FieldRecovery(
         property_id="P001",

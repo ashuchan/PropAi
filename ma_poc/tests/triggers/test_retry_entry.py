@@ -42,7 +42,7 @@ class TestRetryModeTranslation:
         # Re-import so we patch the *reloaded* module's symbol bindings.
         import importlib
 
-        import scripts.jugnu_retry_entry as m  # noqa: PLC0415
+        import scripts.runners.retry_entry as m  # noqa: PLC0415
 
         importlib.reload(m)
 
@@ -82,7 +82,7 @@ class TestRetryModeTranslation:
         with pytest.raises(SystemExit) as exc_info:
             import importlib
 
-            import scripts.jugnu_retry_entry as m  # noqa: PLC0415
+            import scripts.runners.retry_entry as m  # noqa: PLC0415
 
             importlib.reload(m)
             m.main()
@@ -98,7 +98,7 @@ class TestRetryModeTranslation:
         with pytest.raises(SystemExit) as exc_info:
             import importlib
 
-            import scripts.jugnu_retry_entry as m  # noqa: PLC0415
+            import scripts.runners.retry_entry as m  # noqa: PLC0415
 
             importlib.reload(m)
             m.main()
@@ -113,7 +113,7 @@ class TestRetryModeTranslation:
         with pytest.raises(SystemExit) as exc_info:
             import importlib
 
-            import scripts.jugnu_retry_entry as m  # noqa: PLC0415
+            import scripts.runners.retry_entry as m  # noqa: PLC0415
 
             importlib.reload(m)
             m.main()

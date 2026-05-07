@@ -140,11 +140,11 @@ from data_provider.sql.models import (  # noqa: E402
     ScrapeEventRow,
 )
 from data_provider.sql.provider import SqlDataProvider  # noqa: E402
-from scripts.email_daily_report import (  # noqa: E402
+from scripts.email.daily import (  # noqa: E402
     _open_provider,
     _parse_recipients,
 )
-from scripts.email_html import send_html_email  # noqa: E402
+from scripts.email._client import send_html_email  # noqa: E402
 
 log = logging.getLogger("email_daily_failures_report")
 

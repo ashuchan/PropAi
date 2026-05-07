@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from ma_poc.scripts.migrate_inferred_ids_v1_to_v2 import (
+from ma_poc.scripts.migrations.inferred_ids_v1_to_v2 import (
     V1_ID_RE,
     migrate_postgres_units,
     migrate_run_properties,

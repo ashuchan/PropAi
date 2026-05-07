@@ -9,7 +9,7 @@ APIs captured/filtered, LLM prompts/responses, and extraction results.
 Output: ``data/runs/{date}/property_reports/{canonical_id}.md``
 
 Usage (called by daily_runner.py / retry_runner.py):
-    from scripts.scrape_report import generate_property_report
+    from scripts.reports.per_property import generate_property_report
     generate_property_report(scrape_result, property_record, unit_diff,
                              per_prop_issues, run_dir, canonical_id, run_date)
 """
@@ -1049,3 +1049,8 @@ def _body_preview(body: Any) -> str:
         return f"{{{', '.join(list(body.keys())[:5])}...}}"
     s = str(body)
     return s[:60]
+
+
+if __name__ == "__main__":
+    # See generate functions above
+    pass

@@ -203,7 +203,7 @@ def test_cost_ledger_record_and_rollup_fetch_tier(tmp_path) -> None:  # type: ig
 # ── escalation_report.py ──────────────────────────────────────────────────────
 
 def test_escalation_report_empty_events(tmp_path) -> None:
-    from ma_poc.scripts.escalation_report import _summarise
+    from ma_poc.scripts.reports.escalation import _summarise
 
     summary = _summarise([])
     assert summary["total_events"] == 0
@@ -211,7 +211,7 @@ def test_escalation_report_empty_events(tmp_path) -> None:
 
 
 def test_escalation_report_counts_events(tmp_path) -> None:
-    from ma_poc.scripts.escalation_report import _summarise
+    from ma_poc.scripts.reports.escalation import _summarise
 
     events = [
         {"kind": "fetch.tier_escalated", "tier": "DC_PROXY"},

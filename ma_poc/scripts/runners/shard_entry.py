@@ -213,7 +213,7 @@ def _sync_to_postgres(run_date: str, schema_version: str, shard_id: str) -> int:
     try:
         # Import here so container startup doesn't pay for SQLAlchemy + the
         # Cloud SQL connector unless we're actually about to use them.
-        from ma_poc.scripts.sync_run_to_pg import sync_run_to_postgres
+        from ma_poc.scripts.sync.run_to_pg import sync_run_to_postgres
     except Exception as exc:  # noqa: BLE001
         print(f"[shard_entry] Failed to import sync module: {exc}", file=sys.stderr)
         return 1

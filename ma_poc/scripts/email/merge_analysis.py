@@ -44,12 +44,12 @@ for _p in (_MA_POC_ROOT, _REPO_ROOT):
 
 from dotenv import load_dotenv  # noqa: E402
 
-from scripts.email_daily_report import (  # noqa: E402
+from scripts.email.daily import (  # noqa: E402
     _open_provider,
     _parse_recipients,
     _resolve_run_date,
 )
-from scripts.email_html import send_html_email  # noqa: E402
+from scripts.email._client import send_html_email  # noqa: E402
 from services.merge_analysis import (  # noqa: E402
     DisappearedHistoryRow,
     IdentityMix,
