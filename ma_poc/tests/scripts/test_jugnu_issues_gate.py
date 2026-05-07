@@ -18,8 +18,8 @@ from types import SimpleNamespace
 import pytest
 
 from ma_poc.data_provider.dtos import IssueEntry
-from ma_poc.scripts.jugnu_runner import _append_issue_to_run
-from ma_poc.scripts.state_store import StateStore
+from ma_poc.scripts.runners.jugnu import _append_issue_to_run
+from ma_poc.core.state_store import StateStore
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ class TestWritePropertyReportIssues:
     """Verify _write_property_report writes IssueEntry rows to issues.jsonl."""
 
     def _call_write_report(self, run_dir: Path, rejected=(), flagged=()):
-        from ma_poc.scripts.jugnu_runner import _write_property_report
+        from ma_poc.scripts.runners.jugnu import _write_property_report
 
         scrape_result = {
             "_validated": {
@@ -147,7 +147,7 @@ class TestUnitsKeylessHighGate:
         from types import SimpleNamespace
 
         from ma_poc.data_provider.dtos import UnitDiff
-        from ma_poc.scripts.jugnu_runner import _append_issue_to_run
+        from ma_poc.scripts.runners.jugnu import _append_issue_to_run
         from ma_poc.services.merge_yield import evaluate as merge_yield_evaluate
 
         run_dir = tmp_path / "runs" / "2026-05-07"
@@ -238,7 +238,7 @@ class TestStateStoreFault:
 
         from ma_poc.data_provider.dtos import IssueEntry
         from ma_poc.data_provider.dtos import UnitDiff
-        from ma_poc.scripts.jugnu_runner import _append_issue_to_run
+        from ma_poc.scripts.runners.jugnu import _append_issue_to_run
         from ma_poc.services.merge_yield import evaluate as merge_yield_evaluate
 
         run_dir = tmp_path / "runs" / "2026-05-07"
@@ -274,7 +274,7 @@ class TestStateStoreFault:
         from unittest.mock import MagicMock
 
         from ma_poc.data_provider.dtos import IssueEntry
-        from ma_poc.scripts.jugnu_runner import _append_issue_to_run
+        from ma_poc.scripts.runners.jugnu import _append_issue_to_run
 
         run_dir = tmp_path / "runs" / "2026-05-07"
         _append_issue_to_run(

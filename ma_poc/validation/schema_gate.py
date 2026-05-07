@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
-from ma_poc.scripts.identity_fallback import compute_fallback_unit_id
+from ma_poc.core.identity import compute_fallback_unit_id
 
 log = logging.getLogger(__name__)
 

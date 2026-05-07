@@ -295,13 +295,13 @@ def _utc_now_iso() -> str:
 def _seen_at_iso(run_date: str) -> str:
     """Date-anchored ``last_seen_at`` timestamp.
 
-    Thin wrapper around :func:`ma_poc.scripts.identity_fallback.seen_at_iso`
+    Thin wrapper around :func:`ma_poc.core.identity.seen_at_iso`
     — kept here under the underscore-prefixed legacy name so internal call
     sites don't need updating. The lazy import preserves the
     ``data_provider`` ↔ ``scripts`` boundary (the latter shouldn't be on
     sys.path during alembic migrations).
     """
-    from ma_poc.scripts.identity_fallback import seen_at_iso
+    from ma_poc.core.identity import seen_at_iso
     return seen_at_iso(run_date)
 
 
@@ -493,7 +493,7 @@ class SqlPropertyCatalogSource(IPropertyCatalogSource):
 
 
 class SqlUnitStateStore(IUnitStateStore):
-    """SQL port of scripts.state_store.StateStore.upsert_units.
+    """SQL port of core.state_store.StateStore.upsert_units.
 
     Diff semantics match the FS store 1:1: `new`, `updated`, `unchanged`,
     `disappeared`. `disappeared_since` is set on prior units that didn't
@@ -544,7 +544,7 @@ class SqlUnitStateStore(IUnitStateStore):
     ) -> UnitDiff:
         # Lazy import — keeps data_provider importable when scripts/ is not
         # on sys.path (e.g. during alembic migrations).
-        from ma_poc.scripts.identity_fallback import (
+        from ma_poc.core.identity import (
             assign_fallback_unit_id,
             compute_unit_data_sha256,
             synthesize_unkeyable_id,

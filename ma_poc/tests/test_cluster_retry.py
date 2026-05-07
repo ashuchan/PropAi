@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.cluster_retry import filter_by_domain, registered_domain
+from scripts.diagnostics.cluster_retry import filter_by_domain, registered_domain
 
 
 def _prop(website: str, verdict: str = "FAILED_NO_DATA") -> dict:
@@ -26,7 +26,7 @@ def test_cluster_analysis_groups_by_registered_domain_not_full_host() -> None:
 
 def test_cluster_analysis_sorts_clusters_by_failure_count_desc(tmp_path: Path) -> None:
     """Clusters with more failures appear first."""
-    from scripts.cluster_retry import analyze
+    from scripts.diagnostics.cluster_retry import analyze
 
     props = [
         _prop("https://gscapts.com/1"),
@@ -48,7 +48,7 @@ def test_cluster_analysis_sorts_clusters_by_failure_count_desc(tmp_path: Path) -
 
 def test_cluster_analysis_includes_sample_body_truncated_to_500(tmp_path: Path) -> None:
     """Sample body is truncated to 500 characters."""
-    from scripts.cluster_retry import analyze
+    from scripts.diagnostics.cluster_retry import analyze
 
     long_body = "x" * 1000
     props = [
