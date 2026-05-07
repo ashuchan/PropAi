@@ -18,7 +18,7 @@ from pathlib import Path
 
 log = logging.getLogger("gate_jugnu")
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def check_phase_0() -> list[str]:
@@ -129,7 +129,6 @@ def check_phase_4() -> list[str]:
     required = [
         "contracts.py",
         "schema_gate.py",
-        "identity_fallback.py",
         "cross_run_sanity.py",
         "orchestrator.py",
     ]
@@ -193,9 +192,9 @@ def check_phase_7() -> list[str]:
 def check_phase_8() -> list[str]:
     """J8 gate: integration runner exists."""
     failures: list[str] = []
-    runner = _PROJECT_ROOT / "scripts" / "jugnu_runner.py"
+    runner = _PROJECT_ROOT / "scripts" / "runners" / "jugnu.py"
     if not runner.exists():
-        failures.append("scripts/jugnu_runner.py missing")
+        failures.append("scripts/runners/jugnu.py missing")
     return failures
 
 

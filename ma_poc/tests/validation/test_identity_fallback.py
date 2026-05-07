@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ma_poc.validation.identity_fallback import compute_fallback_id
+from ma_poc.core.identity import compute_fallback_id
 
 
 def _base_record(**overrides: object) -> dict:

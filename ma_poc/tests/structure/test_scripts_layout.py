@@ -204,21 +204,9 @@ LEGACY_IMPORT_NAMES = sorted({
 
 
 # ---------------------------------------------------------------------------
-# Until the refactor lands, every assertion is xfail(strict=False).
-# Remove the decorator from each test as that test's slice of the move lands.
-# ---------------------------------------------------------------------------
-
-REFACTOR_INCOMPLETE = pytest.mark.xfail(
-    reason="scripts/ refactor not yet executed — see ma_poc/docs/SCRIPTS_REFACTOR.md",
-    strict=False,
-)
-
-
-# ---------------------------------------------------------------------------
 # Test 1 — every new path exists
 # ---------------------------------------------------------------------------
 
-@REFACTOR_INCOMPLETE
 @pytest.mark.parametrize(
     "new_relpath",
     [new for new, _old in EXPECTED_MOVES],
@@ -236,7 +224,6 @@ def test_target_files_exist(new_relpath: str) -> None:
 # Test 2 — every old path is gone
 # ---------------------------------------------------------------------------
 
-@REFACTOR_INCOMPLETE
 @pytest.mark.parametrize(
     "old_relpath",
     [old for _new, old in EXPECTED_MOVES if old is not None],
@@ -254,7 +241,6 @@ def test_old_paths_are_gone(old_relpath: str) -> None:
 # Test 3 — scripts/ root contains only the allowed files and subdirs
 # ---------------------------------------------------------------------------
 
-@REFACTOR_INCOMPLETE
 def test_no_unexpected_files_in_scripts_root() -> None:
     if not SCRIPTS.exists():
         pytest.fail(f"{SCRIPTS} does not exist")
@@ -273,7 +259,6 @@ def test_no_unexpected_files_in_scripts_root() -> None:
 # Test 4 — each subdir __init__.py opens with its charter docstring
 # ---------------------------------------------------------------------------
 
-@REFACTOR_INCOMPLETE
 @pytest.mark.parametrize(
     "pkg_dir, expected_charter",
     list(CHARTERS.items()),
@@ -371,7 +356,6 @@ def _iter_scripts_python_files() -> list[Path]:
     return files
 
 
-@REFACTOR_INCOMPLETE
 def test_scripts_files_have_main_guard() -> None:
     missing: list[str] = []
     for path in _iter_scripts_python_files():
@@ -389,7 +373,6 @@ def test_scripts_files_have_main_guard() -> None:
 # Test 7 — files under ma_poc/core/ have NO __main__ guard
 # ---------------------------------------------------------------------------
 
-@REFACTOR_INCOMPLETE
 def test_core_files_have_no_main_guard() -> None:
     if not CORE.exists():
         pytest.fail(
@@ -436,7 +419,6 @@ def _iter_python_files_under(root: Path) -> list[Path]:
     return out
 
 
-@REFACTOR_INCOMPLETE
 def test_no_legacy_imports() -> None:
     legacy = set(LEGACY_IMPORT_NAMES)
     offenders: list[str] = []
@@ -465,7 +447,6 @@ def test_no_legacy_imports() -> None:
 # Test 9 — tests/conftest.py no longer contains the validation.py workaround
 # ---------------------------------------------------------------------------
 
-@REFACTOR_INCOMPLETE
 def test_conftest_workaround_removed() -> None:
     conftest = TESTS / "conftest.py"
     text = conftest.read_text(encoding="utf-8", errors="replace")

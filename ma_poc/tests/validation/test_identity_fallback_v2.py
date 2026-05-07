@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ma_poc.validation.identity_fallback import compute_fallback_unit_id
+from ma_poc.core.identity import compute_fallback_unit_id
 
 
 def _u(**kw: object) -> dict:

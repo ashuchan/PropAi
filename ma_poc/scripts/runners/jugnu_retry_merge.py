@@ -289,7 +289,7 @@ def main() -> int:
     # Optional: sync to postgres
     if not args.skip_sync:
         try:
-            from ma_poc.scripts.sync_run_to_pg import sync_run_to_postgres
+            from ma_poc.scripts.sync.run_to_pg import sync_run_to_postgres
 
             log.info("Syncing merged run to postgres...")
             # The merge writes a single, consolidated properties.json — a
