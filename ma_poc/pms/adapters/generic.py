@@ -44,6 +44,7 @@ from ma_poc.pms.adapters._html_extract import (  # noqa: I001
 )
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
+    filter_llm_units_grounded,
     format_rent_range,
     get_field,
     is_junk_floor_plan,
@@ -1994,6 +1995,20 @@ class GenericAdapter:
         _budget = getattr(ctx, "budget", None) or {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
         api_llm_budget = int(_budget.get("llm_api_calls", 3))
         dom_llm_budget = int(_budget.get("llm_dom_calls", 1))
+
+        # 2026-05-07 — Source-grounded validator. The text below is the
+        # union of (page HTML) + (captured API response bodies). Every unit
+        # emitted by an LLM tier (6a/6b/6c) is validated against this text
+        # via filter_llm_units_grounded — units whose rent doesn't appear
+        # verbatim in the source get dropped as suspected hallucinations.
+        # Built once here so repeated tier checks don't re-stringify.
+        try:
+            _api_source = "\n".join(
+                str(r.get("body", ""))[:200_000] for r in api_responses if r is not None
+            )
+        except Exception:
+            _api_source = ""
+        _grounded_source = (html or "") + "\n" + _api_source
         llm_interactions: list[dict[str, Any]] = getattr(result, "_llm_interactions", []) or []
         # Self-learning payload surfaced to scraper.py. Shape matches what
         # services.profile_updater.update_profile_after_extraction expects:
@@ -2067,6 +2082,16 @@ class GenericAdapter:
             )
 
         if targeted_units:
+            # Source-grounded validation (2026-05-07).
+            targeted_units, _dropped_grounded = filter_llm_units_grounded(
+                targeted_units, _grounded_source
+            )
+            if _dropped_grounded:
+                result.errors.append(
+                    f"GROUNDED_FILTER_LLM_API: dropped {_dropped_grounded} unit(s) "
+                    "with rent not found in source HTML or captured API bodies"
+                )
+        if targeted_units:
             result.units = targeted_units
             result.tier_used = "TIER_4_LLM_API"
             result.winning_url = result.api_responses[0].get("url") if result.api_responses else ctx.base_url
@@ -2106,6 +2131,16 @@ class GenericAdapter:
             )
 
         if dom_units:
+            # Source-grounded validation (2026-05-07).
+            dom_units, _dropped_grounded = filter_llm_units_grounded(
+                dom_units, _grounded_source
+            )
+            if _dropped_grounded:
+                result.errors.append(
+                    f"GROUNDED_FILTER_LLM_DOM: dropped {_dropped_grounded} unit(s) "
+                    "with rent not found in source HTML or captured API bodies"
+                )
+        if dom_units:
             result.units = dom_units
             result.tier_used = "TIER_4_LLM_DOM"
             result.winning_url = ctx.base_url
@@ -2143,6 +2178,16 @@ class GenericAdapter:
                 reason="" if llm_units else "LLM returned no structured units",
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
+            if llm_units:
+                # Source-grounded validation (2026-05-07).
+                llm_units, _dropped_grounded = filter_llm_units_grounded(
+                    llm_units, _grounded_source
+                )
+                if _dropped_grounded:
+                    result.errors.append(
+                        f"GROUNDED_FILTER_LLM_MONO: dropped {_dropped_grounded} unit(s) "
+                        "with rent not found in source HTML or captured API bodies"
+                    )
             if llm_units:
                 result.units = llm_units
                 result.tier_used = "TIER_4_LLM"

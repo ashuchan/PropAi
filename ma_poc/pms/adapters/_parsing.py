@@ -72,6 +72,96 @@ def rent_in_sanity_range(rent: int | None) -> bool:
     return 200 <= rent <= 50000
 
 
+# ── Source-grounded validation (2026-05-07) ─────────────────────────────
+# LLM tiers (TIER_4_LLM_API / _DOM / monolithic) can hallucinate rent values
+# that aren't anywhere in the source HTML or captured API bodies. Investigation
+# of canary-batch-12 regressions (16 properties that flipped SUCCESS→FAILED
+# with identical fetched URLs / captures / adapter selection) confirmed this
+# is the dominant variance failure mode: the LLM emits a unit with a
+# plausible-looking rent that never appears in the input.
+#
+# The remedy: before emitting LLM-derived units, drop any whose rent values
+# can't be found in the source. The source is the union of (page HTML) +
+# (captured API response bodies, JSON-stringified). We accept several
+# numeric formats — "$1,275", "1275", "1,275", "$1275.00" — because the LLM
+# may render the same value differently from how the page wrote it.
+def is_rent_grounded(rent: int | None, source_text: str) -> bool:
+    """True when *rent* (e.g. 1275) appears as a number in *source_text*.
+
+    Returns True when ``rent is None`` (no rent to ground — used by units
+    that legitimately lack a rent value). Accepts comma-separated, plain,
+    and decimal forms.
+
+    Examples (rent=1275):
+      - "$1,275"         → True (canonical comma form)
+      - "$1,275.00"      → True (decimal form)
+      - "1275"           → True (plain integer)
+      - "1,275 monthly"  → True (no $ prefix, comma form)
+      - "$12,750"        → False (different number — must NOT match
+                                  via "1275" being a substring of "12750")
+      - "1275" inside "12750" → False (word-boundary required)
+    """
+    if rent is None:
+        return True
+    if not source_text:
+        return False
+    # Word-boundary on both sides so "1275" doesn't false-match inside
+    # "12750" or "01275a". Allow optional leading "$" and optional trailing
+    # ".00" decimal. The comma form requires a 4-digit hundred (1,275 has
+    # exactly 1 digit before the comma, 12,750 has 2 digits) — we generate
+    # the canonical comma string for *rent* and look for that exact form.
+    plain = str(rent)
+    comma = f"{rent:,}"
+    # Word boundaries: positive lookbehind/lookahead asserting digit
+    # neighbour is absent.
+    plain_re = re.compile(rf"(?<!\d)\$?{re.escape(plain)}(?:\.\d{{1,2}})?(?!\d)")
+    if plain_re.search(source_text):
+        return True
+    if comma != plain:
+        comma_re = re.compile(rf"(?<!\d)\$?{re.escape(comma)}(?:\.\d{{1,2}})?(?!\d)")
+        if comma_re.search(source_text):
+            return True
+    return False
+
+
+def filter_llm_units_grounded(
+    units: list[dict[str, Any]],
+    source_text: str,
+) -> tuple[list[dict[str, Any]], int]:
+    """Drop LLM-emitted units whose rent values aren't in *source_text*.
+
+    Returns ``(filtered_units, dropped_count)``. A unit passes when EITHER:
+      - It has no rent_low and no rent_high (nothing to ground), OR
+      - Its rent_low (or, if rent_low absent, rent_high) is grounded in source.
+
+    Caller surfaces ``dropped_count`` so an LLM tier that hallucinated 5 of 7
+    units still emits the 2 grounded ones, with the drops logged for
+    diagnosis. Apply ONLY to LLM-emitted unit lists — DOM-scraped and API-
+    parsed units are by definition grounded in their source and don't need
+    this check (and would be incorrectly filtered when their source HTML
+    differs from the page HTML, e.g. iframe content).
+    """
+    if not units:
+        return units, 0
+    filtered: list[dict[str, Any]] = []
+    dropped = 0
+    for u in units:
+        rent_lo = u.get("market_rent_low") or u.get("rent_low")
+        rent_hi = u.get("market_rent_high") or u.get("rent_high")
+        # Convert to int if it's a string
+        if isinstance(rent_lo, str) and rent_lo.strip():
+            rent_lo = money_to_int(rent_lo)
+        if isinstance(rent_hi, str) and rent_hi.strip():
+            rent_hi = money_to_int(rent_hi)
+        # Pick the non-null rent to validate — prefer rent_low.
+        check = rent_lo if rent_lo else rent_hi
+        if check is None or is_rent_grounded(int(check), source_text):
+            filtered.append(u)
+        else:
+            dropped += 1
+    return filtered, dropped
+
+
 # ── Junk deny-lists (Phase 5) ──────────────────────────────────────────────
 # Floor plan names that match these patterns are CMS widget / vendor
 # artefacts, not real apartment plans. Observed in the 2026-04-19 run:
