@@ -553,6 +553,57 @@ async def _process_property(
         units=len(result.get("units", [])),
     )
 
+    # ── State-store upsert + UNITS_KEYLESS_HIGH gate ──────────────────────
+    # On every successful scrape: (a) persist units into the FS state-store
+    # so carry_forward_units() has data on the next failure run, and (b) fire
+    # the UNITS_KEYLESS_HIGH issue when > 50 % of units lacked a natural
+    # identity anchor (synthetic_key_used > 50 % of input_count).
+    #
+    # The load → upsert_units → save block is intentionally synchronous
+    # (no await) so AsyncPool never interleaves two coroutines inside it.
+    _today_units = result.get("units") or []
+    if _today_units and run_dir is not None:
+        try:
+            from ma_poc.data_provider.dtos import IssueEntry as _IssueEntry
+            from ma_poc.data_provider.dtos import UnitDiff as _UnitDiff
+            from ma_poc.scripts.state_store import StateStore as _StateStore
+            from ma_poc.services.merge_yield import evaluate as _merge_yield_evaluate
+
+            _ss = _StateStore(data_dir / "state")
+            _ss.load()
+            _run_date_str = run_dir.name  # "YYYY-MM-DD"
+            _diff_raw = _ss.upsert_units(task.property_id, list(_today_units), _run_date_str)
+            _ss.save()
+
+            _diff = _UnitDiff(**_diff_raw)
+            _yield_verdict = _merge_yield_evaluate(_diff)
+            if _yield_verdict.next_tier_requested:
+                _kl_issue = _IssueEntry(
+                    severity="WARNING",
+                    code="UNITS_KEYLESS_HIGH",
+                    message=(
+                        f"{_yield_verdict.keyless_ratio:.0%} of units "
+                        f"({_diff.synthetic_key_used}/{_diff.input_count}) "
+                        "lack a natural identity anchor"
+                    ),
+                    canonical_id=task.property_id,
+                    details={
+                        "keyless_ratio": round(_yield_verdict.keyless_ratio, 4),
+                        "synthetic_key_used": _diff.synthetic_key_used,
+                        "input_count": _diff.input_count,
+                    },
+                )
+                _append_issue_to_run(run_dir, _kl_issue)
+                log.info(
+                    "UNITS_KEYLESS_HIGH for %s: %.0f%% (%d/%d units unkeyable)",
+                    task.property_id,
+                    _yield_verdict.keyless_ratio * 100,
+                    _diff.synthetic_key_used,
+                    _diff.input_count,
+                )
+        except Exception as _exc:
+            log.debug("state_store upsert / keyless gate failed for %s: %s", task.property_id, _exc)
+
     # ── F1: Adapter Debugger ──────────────────────────────────────────────
     # Runs once per FAILED_NO_DATA on TIER_1_* tiers. Gated by existing
     # diagnosis file (one diagnosis per property per run is enough).
@@ -1156,28 +1207,33 @@ def _write_property_report(
         log.debug("scrape_report unavailable — skipping report for %s: %s", canonical_id, exc)
         return
 
-    from types import SimpleNamespace
+    try:
+        from ma_poc.data_provider.dtos import IssueEntry
+    except ImportError:
+        from data_provider.dtos import IssueEntry  # type: ignore[no-redef]
 
     validated = scrape_result.get("_validated") or {}
     issues: list[Any] = []
     for rej in validated.get("rejected") or []:
         msg = rej.get("reason") if isinstance(rej, dict) else str(rej)
-        issues.append(
-            SimpleNamespace(
-                severity="ERROR",
-                code="VALIDATION_REJECTED",
-                message=str(msg)[:200],
-            )
+        issue = IssueEntry(
+            severity="ERROR",
+            code="VALIDATION_REJECTED",
+            message=str(msg)[:200],
+            canonical_id=canonical_id,
         )
+        issues.append(issue)
+        _append_issue_to_run(run_dir, issue)
     for fl in validated.get("flagged") or []:
         msg = fl.get("flag") if isinstance(fl, dict) else str(fl)
-        issues.append(
-            SimpleNamespace(
-                severity="WARNING",
-                code="VALIDATION_FLAGGED",
-                message=str(msg)[:200],
-            )
+        issue = IssueEntry(
+            severity="WARNING",
+            code="VALIDATION_FLAGGED",
+            message=str(msg)[:200],
+            canonical_id=canonical_id,
         )
+        issues.append(issue)
+        _append_issue_to_run(run_dir, issue)
 
     unit_diff: dict[str, list] = {
         "new": [],
@@ -1198,6 +1254,21 @@ def _write_property_report(
         )
     except Exception as exc:
         log.warning("property report generation failed for %s: %s", canonical_id, exc)
+
+
+def _append_issue_to_run(run_dir: Path, issue: Any) -> None:
+    """Append one IssueEntry JSON line to {run_dir}/issues.jsonl.
+
+    Never raises — issue writes are best-effort observability.
+    """
+    try:
+        issues_path = run_dir / "issues.jsonl"
+        issues_path.parent.mkdir(parents=True, exist_ok=True)
+        line = json.dumps(issue.model_dump(mode="json"), ensure_ascii=False)
+        with open(issues_path, "a", encoding="utf-8") as _f:
+            _f.write(line + "\n")
+    except Exception as exc:
+        log.debug("_append_issue_to_run failed: %s", exc)
 
 
 def _make_failed_record(
