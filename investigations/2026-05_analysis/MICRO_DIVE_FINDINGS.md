@@ -535,6 +535,32 @@ Net regressed = -8 verdicts, but **net real successes = +7** after subtracting p
 
 The grounded filter only validates `rent_low` / `rent_high`. It does NOT validate sqft, beds, baths, unit_number, or floor_plan_name — so an LLM that hallucinates one of those but gets rent right will still pass through. Future work: extend grounding to sqft + unit_number for tighter trust.
 
+**2026-05-07 follow-up**: implemented `is_value_grounded()` + extended `filter_llm_units_grounded(require_sqft=, require_unit_number=)` flags. Default `False` to preserve current behavior; opt-in for stricter grounding as system trust grows. 23 tests pass. Committed at `bed051f`.
+
+### Variance test (b13 vs b13b — same image, same input, two runs)
+
+To measure how much residual variance remains after `seed=42 + top_p=0.1 + temperature=0`, ran the canary image a second time on the same 567-property test cohort. Results:
+
+| Metric | b13 (1st run) | b13b (2nd run) | Δ |
+|---|---:|---:|---:|
+| SUCCESS | 207 | 198 | -9 |
+| FAILED_NO_DATA | 286 | 297 | +11 |
+| FAILED_UNREACHABLE | 74 | 72 | -2 |
+
+**Per-property variance:**
+- 34 of 567 (**6.0%**) flipped verdict between runs
+- 76 of 567 (**13.4%**) chose a different `tier_used`
+- 76 of 567 (**13.4%**) emitted different unit counts
+
+**Conclusion**: qwen-235b on OpenRouter does NOT fully respect `seed=42`. The LLM is partially deterministic (94% verdict stability vs unbounded baseline) but ~6% of properties still flip run-to-run on identical input.
+
+To get true determinism, the next iteration needs one of:
+1. **Switch model** to Claude / OpenAI which honor seeds more strictly. Cost: ~3× per-call.
+2. **Multi-call consensus**: 3 LLM calls in parallel, emit unit only if 2-of-3 agree on rent (within $5). Triples cost.
+3. **Profile_replay loop**: persist successful first-run LLM mappings; replay deterministically on day-2+. Zero LLM cost on stable properties; one-time cost per new property. Best long-term ROI.
+
+The grounded validator is doing useful work (24 of 47 same-success properties had FEWER units in b13 vs b12 = filter active) but it can't eliminate variance that originates from the LLM's stochastic [] outputs.
+
 ---
 
 ## Final synthesis — exhaustive cohort breakdown
