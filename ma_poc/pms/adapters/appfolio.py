@@ -150,26 +150,168 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
 def parse_appfolio_listings(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
     """Parse AppFolio listing/floorplan objects into standard unit dicts.
 
-    Handles both /listings endpoint (bedrooms, price, sqft) and
-    /floorplans/all endpoint (bed, bath, rent, sq_ft).
+    Handles:
+      - /listings endpoint (bedrooms, price, sqft)
+      - /floorplans/all endpoint (bed, bath, rent, sq_ft)
+      - Patch #8 (2026-05-06 audit) — AppFolio Websites collection runtime
+        endpoint /rts/collections/public/.../appfolio-listings/query-data
+        which uses Webflow-style hyphenated keys (bed-count, monthly-rent,
+        square-feet, etc.). The Grain Belt (id 61396) and 15 other AppFolio
+        properties extracted unit_id+name+available_date but lost rent/
+        beds/baths/sqft because the previous key list was incomplete.
     """
     units: list[dict[str, str]] = []
     for item in items:
         if not isinstance(item, dict):
             continue
-        name = get_field(item, "name", "listing_type", "property_type", "apartment_type")
-        beds_str = get_field(item, "bed", "bedrooms", "beds", "bedroom_count")
-        baths_str = get_field(item, "bath", "bathrooms", "baths", "bathroom_count")
+        name = get_field(
+            item,
+            # Patch #8 (REVISED) — `unit_template_name` is the floor-plan
+            # name on AppFolio Websites query-data; prefer it over the
+            # generic `property_type` ("Multi-Family") which is the
+            # property class, not the floor-plan label.
+            "unit_template_name",
+            "unit-template-name",
+            "name",
+            "floor_plan_name",
+            "floorplan_name",
+            "floor-plan-name",
+            "plan_name",
+            "plan-name",
+            "title",
+            "Title",
+            "listing_type",
+            "apartment_type",
+            "property_type",
+        )
+        beds_str = get_field(
+            item,
+            "bed",
+            "bedrooms",
+            "beds",
+            "bedroom_count",
+            "bedroom-count",
+            "Bedrooms",
+            "BedroomCount",
+            "bed-count",
+            "numBedrooms",
+            "no_of_bedrooms",
+            "no-of-bedrooms",
+        )
+        baths_str = get_field(
+            item,
+            "bath",
+            "bathrooms",
+            "baths",
+            "bathroom_count",
+            "bathroom-count",
+            "Bathrooms",
+            "BathroomCount",
+            "bath-count",
+            "numBathrooms",
+            "no_of_bathrooms",
+            "no-of-bathrooms",
+        )
         beds = int(float(beds_str)) if beds_str else None
         baths = int(float(baths_str)) if baths_str else None
-        sqft = get_field(item, "sq_ft", "sqft", "square_feet", "squareFeet", "area")
+        sqft = get_field(
+            item,
+            "sq_ft",
+            "sqft",
+            "square_feet",
+            "square-feet",
+            "squareFeet",
+            "area",
+            "sq-ft",
+            "Sqft",
+            "SquareFeet",
+            "Square-Footage",
+            "square-footage",
+        )
 
-        rent_lo = money_to_int(get_field(item, "price", "rent", "minRent", "asking_rent"))
-        rent_hi = money_to_int(get_field(item, "maxRent", "max_rent"))
+        rent_lo = money_to_int(
+            get_field(
+                item,
+                "price",
+                "rent",
+                "minRent",
+                "min-rent",
+                "min_rent",
+                "monthly-rent",
+                "monthly_rent",
+                "asking_rent",
+                "asking-rent",
+                "starting-rent",
+                "starting_rent",
+                "starting-price",
+                "starting_price",
+                "price-from",
+                "price_from",
+                "Price",
+                "Rent",
+                "monthly-price",
+                "base-rent",
+                "base_rent",
+                "market_rent",
+                "market-rent",
+            )
+        )
+        rent_hi = money_to_int(
+            get_field(
+                item,
+                "maxRent",
+                "max_rent",
+                "max-rent",
+                "maxPrice",
+                "max-price",
+                "max_price",
+                "maximum-rent",
+                "maximum_rent",
+            )
+        )
+        # Patch #8 (REVISED) — AppFolio query-data uses `rent_range: [lo, hi]`
+        # as a 2-element list. Handle the list form explicitly.
+        rr = item.get("rent_range")
+        if isinstance(rr, list) and len(rr) >= 1:
+            try:
+                _lo = float(rr[0])
+                if rent_lo is None and _lo > 0:
+                    rent_lo = int(_lo)
+            except (TypeError, ValueError):
+                pass
+            if len(rr) >= 2:
+                try:
+                    _hi = float(rr[1])
+                    if rent_hi is None and _hi > 0:
+                        rent_hi = int(_hi)
+                except (TypeError, ValueError):
+                    pass
 
-        unit_num = get_field(item, "unit_number", "unitNumber", "unit_id", "id", "label")
-        avail_date = get_field(item, "available_date", "availableDate", "move_in_date")
-        status = get_field(item, "status", "availability_status")
+        unit_num = get_field(
+            item,
+            "unit_number",
+            "unitNumber",
+            "unit_id",
+            "id",
+            "label",
+            "unit-number",
+            "unit-id",
+            "Unit",
+            "UnitNumber",
+            "Unit-Number",
+        )
+        avail_date = get_field(
+            item,
+            "available_date",
+            "availableDate",
+            "move_in_date",
+            "available-date",
+            "move-in-date",
+            "AvailableDate",
+            "available_on",
+            "available-on",
+        )
+        status = get_field(item, "status", "availability_status", "availability-status")
 
         units.append(
             make_unit_dict(
@@ -214,6 +356,20 @@ def _is_appfolio_response(body: Any) -> bool:
         "bath",
         "sq_ft",
         "rent_from",
+        # Patch #8 — Webflow-style hyphenated keys used by the
+        # appfolio-listings/query-data collection runtime endpoint.
+        "monthly-rent",
+        "min-rent",
+        "starting-rent",
+        "bed-count",
+        "bath-count",
+        "square-feet",
+        "sq-ft",
+        "monthly_rent",
+        "min_rent",
+        "starting_rent",
+        "bed_count",
+        "bath_count",
     }
 
     def _has_signals(items: list[dict[str, Any]]) -> bool:
@@ -222,9 +378,42 @@ def _is_appfolio_response(body: Any) -> bool:
         return len(_UNIT_SIGNAL_KEYS & set(items[0].keys())) >= 2
 
     if isinstance(body, dict):
-        objects = body.get("objects") or body.get("results") or body.get("listings")
+        # Patch #8 (REVISED 2026-05-06 after Phase C live-fetch validation).
+        # Real envelope shapes confirmed against
+        # https://www.thegrainbeltmpls.com/rts/collections/public/.../appfolio-listings/query-data:
+        #   {name: "appfolio-listings", values: [{data: {...}, page_item_url}, ...]}
+        # Each item carries the unit fields under `.data` (snake_case:
+        # market_rent, rent_range, bedrooms, bathrooms, square_feet, ...).
+        # Other AppFolio responses use {objects:[...]} (legacy /listings) or
+        # {results:[...]}. Try them all.
+        objects = (
+            body.get("values")  # Webflow-runtime / appfolio-listings query-data
+            or body.get("objects")  # legacy /listings
+            or body.get("results")
+            or body.get("listings")
+            or body.get("items")
+            or body.get("data")
+            or body.get("records")
+            or body.get("rows")
+        )
+        # Unwrap items wrapped in {data: ...} envelopes (the query-data shape).
+        if isinstance(objects, list) and objects and isinstance(objects[0], dict) and "data" in objects[0]:
+            unwrapped = [it.get("data", {}) for it in objects if isinstance(it, dict) and isinstance(it.get("data"), dict)]
+            if unwrapped:
+                return _has_signals(unwrapped)
         if isinstance(objects, list):
             return _has_signals(objects)
+        # Some collection runtimes wrap once more: {data: {items: [...]}}
+        if isinstance(objects, dict):
+            inner = (
+                objects.get("items")
+                or objects.get("results")
+                or objects.get("listings")
+                or objects.get("rows")
+                or objects.get("values")
+            )
+            if isinstance(inner, list):
+                return _has_signals(inner)
     if isinstance(body, list):
         return _has_signals(body)
     return False
@@ -261,7 +450,36 @@ class AppFolioAdapter:
                 url = resp.get("url", "")
                 items: list[dict[str, Any]] = []
                 if isinstance(body, dict):
-                    items = body.get("objects") or body.get("results") or body.get("listings") or []
+                    # Patch #8 (REVISED) — match _is_appfolio_response.
+                    raw = (
+                        body.get("values")  # query-data envelope
+                        or body.get("objects")
+                        or body.get("results")
+                        or body.get("listings")
+                        or body.get("items")
+                        or body.get("data")
+                        or body.get("records")
+                        or body.get("rows")
+                    )
+                    # Unwrap {data: ...} envelopes per item (query-data shape)
+                    if isinstance(raw, list) and raw and isinstance(raw[0], dict) and "data" in raw[0]:
+                        items = [
+                            it.get("data", {})
+                            for it in raw
+                            if isinstance(it, dict) and isinstance(it.get("data"), dict)
+                        ]
+                    elif isinstance(raw, list):
+                        items = raw
+                    elif isinstance(raw, dict):
+                        nested = (
+                            raw.get("items")
+                            or raw.get("results")
+                            or raw.get("listings")
+                            or raw.get("rows")
+                            or raw.get("values")
+                        )
+                        if isinstance(nested, list):
+                            items = nested
                 elif isinstance(body, list):
                     items = body
                 units = parse_appfolio_listings(items, url)

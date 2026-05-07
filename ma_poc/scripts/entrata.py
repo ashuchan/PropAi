@@ -787,8 +787,40 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
                 "specialsDescription",
             )
 
-            # Skip if we can't identify the record at all
-            if not any([name, beds, sqft, rent_lo]):
+            # Skip if we can't identify the record at all.
+            # Hardened gate (2026-05-06 — bug #2 in run audit): a unit/floor-plan
+            # record must carry at least one *transactional* or *structural*
+            # signal — not just a name. Plain list-of-named-objects responses
+            # (e.g. nestiolistings.com /api/v2/neighborhoods which returns
+            # {id, name, area, city, state} for 260 NYC neighborhoods, or a
+            # supabase /rest/v1/properties row for a single property) used to
+            # pass when only `name` was present, producing fake "units" with
+            # no rent and corrupting both the run output and the planner's
+            # completeness signal.
+            #
+            # An item is accepted iff it carries any of:
+            #   - a numeric rent (lo_i)
+            #   - an availability signal (count, date, or status text)
+            #   - an explicit unit identifier (unit_num)
+            #   - a floor-plan anchor: a name PLUS at least one numeric
+            #     structural field (beds, baths, or numeric sqft). This still
+            #     captures RealPage-style /floorplans responses that omit
+            #     rent (rent comes from a separate /units endpoint).
+            lo_i_for_gate = _money_to_int(rent_lo)
+            sqft_int_for_gate = _money_to_int(sqft)
+            try:
+                beds_int_for_gate = int(float(beds)) if beds else None
+            except (ValueError, TypeError):
+                beds_int_for_gate = None
+            has_rent = lo_i_for_gate is not None
+            has_avail = bool(avail) or bool(avail_dt) or (
+                status and status.strip().lower() in {"available", "vacant", "open"}
+            )
+            has_unit_anchor = bool(unit_num)
+            has_floorplan_anchor = bool(name) and (
+                beds_int_for_gate is not None or sqft_int_for_gate is not None or bool(baths)
+            )
+            if not (has_rent or has_avail or has_unit_anchor or has_floorplan_anchor):
                 skipped_no_fields += 1
                 continue
 

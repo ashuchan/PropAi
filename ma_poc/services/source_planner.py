@@ -198,6 +198,119 @@ _DETERMINISTIC_CASCADE_SOURCES = frozenset(
 _LLM_TARGETED_SOURCES = frozenset({SourceId.LLM_API_TARGETED, SourceId.LLM_DOM_TARGETED})
 
 
+# Patch #1 (2026-05-06 audit) — anchor patterns that strongly imply a
+# property has a dedicated pricing/availability sub-page. If the entry HTML
+# contains any anchor href OR visible text matching one of these patterns
+# AND the URL hasn't been visited yet, the planner returns ESCALATE_LINK_HOP
+# regardless of per-unit completeness. The homepage is rarely the canonical
+# pricing page on multifamily sites; if a sub-page link exists, it almost
+# always carries more or different data than the hero/landing area.
+_CANONICAL_SUBPAGE_HREF_PATTERNS = (
+    "/floor-plans",
+    "/floorplans",
+    "/floor_plans",
+    "/availability",
+    "/availabilities",
+    "/apartments",
+    "/pricing",
+    "/units",
+    "/lease",
+    "/leasing",
+    "/rates",
+    "/availability-by-floor-plan",
+    "/our-apartments",
+    "/our-units",
+    "/our-floorplans",
+    "/our-floor-plans",
+)
+_CANONICAL_SUBPAGE_TEXT_PATTERNS = (
+    "floor plan",
+    "floorplan",
+    "view availability",
+    "see availability",
+    "check availability",
+    "all apartments",
+    "all units",
+    "view pricing",
+    "view rates",
+    "view rentals",
+    "view our apartments",
+    "live here",
+    "lease now",
+    "browse units",
+)
+
+
+def has_unvisited_canonical_subpage(
+    entry_html: str | None,
+    visited_urls: set[str] | None = None,
+    *,
+    base_url: str = "",
+) -> bool:
+    """Return True iff the entry HTML contains an anchor whose href OR
+    visible text suggests a dedicated floor-plans / availability / pricing
+    sub-page that we haven't yet fetched.
+
+    The check is deliberately broad — false positives are cheap (one extra
+    sub-page fetch under the link-hop budget) while false negatives mean we
+    declare a property "done" with only homepage data, which has been the
+    single largest cause of partial-rent extractions in production.
+
+    Pure-Python and never raises. If the HTML cannot be parsed (None, empty,
+    or malformed), returns False so the planner falls through to its
+    standard pct_complete logic.
+    """
+    if not entry_html or len(entry_html) < 100:
+        return False
+
+    visited = {u.strip() for u in (visited_urls or set()) if u}
+
+    # Fast-path: split anchors by `<a ` tokens — full HTML parsing is
+    # overkill and parser failures must not break the planner.
+    import re
+
+    anchor_re = re.compile(r"<a\b[^>]*\bhref\s*=\s*['\"]([^'\"]+)['\"][^>]*>(.*?)</a>", re.IGNORECASE | re.DOTALL)
+    text_strip_re = re.compile(r"<[^>]+>")
+
+    href_patterns = tuple(p.lower() for p in _CANONICAL_SUBPAGE_HREF_PATTERNS)
+    text_patterns = tuple(p.lower() for p in _CANONICAL_SUBPAGE_TEXT_PATTERNS)
+
+    base_lower = base_url.strip().rstrip("/").lower()
+
+    for match in anchor_re.finditer(entry_html):
+        href = (match.group(1) or "").strip()
+        anchor_text = (match.group(2) or "").strip()
+        if not href:
+            continue
+        href_lower = href.lower()
+        anchor_text_clean = text_strip_re.sub(" ", anchor_text).strip().lower()
+
+        # href-pattern hit?
+        href_hit = any(p in href_lower for p in href_patterns)
+        # text-pattern hit?
+        text_hit = any(p in anchor_text_clean for p in text_patterns)
+
+        if not (href_hit or text_hit):
+            continue
+
+        # Skip non-navigational anchors.
+        if href_lower.startswith(("#", "javascript:", "mailto:", "tel:")):
+            continue
+        # Skip if already visited (compare both raw and normalised).
+        normalised = href.strip()
+        # Make absolute if relative.
+        if normalised.startswith("/") and base_lower:
+            normalised = base_lower + normalised
+        if normalised in visited or href in visited:
+            continue
+        # Skip the entry URL itself.
+        if base_lower and normalised.rstrip("/").lower() == base_lower:
+            continue
+
+        return True
+    return False
+
+
 def rank_sources_for_field_group(
     field_group: str,
     pms_name: str = "unknown",
@@ -242,10 +355,21 @@ def plan_next_action(
     pms_name: str = "unknown",
     profile_completeness_floor: dict | None = None,
     profile_preferences: list[Any] | None = None,
+    *,
+    entry_html: str | None = None,
+    entry_url: str = "",
+    visited_urls: set[str] | None = None,
 ) -> Decision:
     """The decision map. Returns at most ONE Decision per call.
 
     Decision rules (locked):
+      HOMEPAGE_ONLY:  if extraction has only sourced from the entry/homepage
+                      and the entry HTML contains an anchor to a floor-plans /
+                      availability / pricing sub-page we haven't visited,
+                      ESCALATE_LINK_HOP unconditionally (Patch #1, 2026-05-06).
+                      This rule fires *before* STOP because a 1-unit "complete"
+                      extraction from the homepage hero is structurally
+                      insufficient when a /floorplans page exists.
       STOP:           pct_complete >= floor_complete AND pct_with_transactional >= floor_trans
       TARGET_GAP:     0.50 <= pct_complete < floor_complete
                       → identify smallest axis; pick best untried LLM/link-hop
@@ -255,6 +379,21 @@ def plan_next_action(
     floor = profile_completeness_floor or {}
     floor_pct_complete = max(0.50, float(floor.get("complete", 0.90)))
     floor_pct_trans = max(0.50, float(floor.get("transactional", 0.70)))
+
+    # Patch #1 — structural homepage check. If we've only sourced from the
+    # entry URL and an unvisited canonical sub-page exists, hop unconditionally.
+    # `sources_already_run` being empty is a proxy for "no link-hop has fired
+    # yet on this property"; this method is called before each escalation,
+    # so the first call sees an empty set.
+    if (
+        not sources_already_run
+        and budget_remaining.get("link_hop", 0) > 0
+        and has_unvisited_canonical_subpage(entry_html, visited_urls, base_url=entry_url)
+    ):
+        return Decision(
+            action="ESCALATE_LINK_HOP",
+            rationale="homepage-only extraction; canonical sub-page unvisited",
+        )
 
     # STOP
     if report.pct_complete >= floor_pct_complete and report.pct_with_transactional >= floor_pct_trans:
