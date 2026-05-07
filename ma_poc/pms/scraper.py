@@ -28,7 +28,7 @@ from ma_poc.pms.detector import (
     confirm_detection,
     detect_pms,
 )
-from ma_poc.pms.resolver import ResolvedTarget, resolve_target
+from ma_poc.pms.resolver import ResolvedTarget, resolve_target, resolve_target_from_html
 
 if TYPE_CHECKING:
     pass  # Playwright Page type used only in type annotations
@@ -193,6 +193,34 @@ async def scrape(
         elif isinstance(body, str):
             page_html = body
 
+    # Patch #6 (2026-05-06 audit) — detect cross-host redirects to a
+    # different property (Pearl Midlane → Briscoe River Oaks class).
+    # We don't suppress extraction here — the verdict pipeline handles
+    # demotion — but we surface the redirect on the result so the report
+    # shows it and downstream rules (e.g. cross_run_sanity) can flag it.
+    if fetch_result is not None:
+        _final_url = getattr(fetch_result, "final_url", "") or base_url
+        _target_name = ""
+        if csv_row:
+            for k in ("Property Name", "name", "Name", "proj_name"):
+                v = csv_row.get(k) if isinstance(csv_row, dict) else None
+                if v:
+                    _target_name = str(v).strip()
+                    break
+        _suspicious, _reason = is_suspicious_cross_host_redirect(
+            base_url, _final_url, target_name=_target_name
+        )
+        if _suspicious:
+            result["_suspicious_redirect"] = {
+                "input_url": base_url,
+                "final_url": _final_url,
+                "reason": _reason,
+            }
+            result["errors"].append(
+                f"SUSPICIOUS_REDIRECT: {_reason}. Extracted units may belong "
+                f"to a different property."
+            )
+
     # --- Step 4: Re-detect with page HTML if available ---
     if page_html:
         html_detection = detect_pms(base_url, csv_row=csv_row, page_html=page_html)
@@ -233,13 +261,40 @@ async def scrape(
             pass
 
     # --- Step 5: Resolve target (CTA hop / iframe / redirect) ---
-    # resolve_target uses the live page for CTA-hop; skip it if we're in
-    # fetch-only mode (no page) — adapters will work from the fetched HTML
-    # of the original URL.
+    # 2026-05-07 audit fix: resolve_target_from_html is the Jugnu-mode port
+    # of resolve_target. The legacy version requires a live Playwright
+    # `page` object (page.evaluate to scrape anchors) which Jugnu never
+    # passes — so before this port, every smart-link-hop / portal-sublink /
+    # candidate-dedup / word-boundary-keyword improvement made on the
+    # resolver shipped in legacy mode but never reached production. The
+    # 1000-property audit found 850 (85%) detected-as-known-PMS properties
+    # that were extracted by some other tier because resolve_target never
+    # ran. The HTML port runs steps 1-4 on the fetched body; step 5
+    # (post-render redirect) is handled by fetch_result.final_url already.
     resolved: ResolvedTarget
     if page is not None:
         try:
             resolved = await resolve_target(page, base_url, initial_detection)
+        except Exception:
+            resolved = ResolvedTarget(
+                original_url=base_url,
+                resolved_url=base_url,
+                hop_path=[base_url],
+                final_detection=initial_detection,
+                method="failed",
+            )
+    elif page_html:
+        # Jugnu-mode: run the same CTA-hop logic against the fetched HTML.
+        # Pull iframe srcs from the detector_signals event we already
+        # collected, so we don't re-parse iframes from the body.
+        _det_iframe_srcs = (result.get("_detector_signals") or {}).get("iframe_srcs_sample") or []
+        try:
+            resolved = resolve_target_from_html(
+                page_html=page_html,
+                original_url=base_url,
+                initial_detection=initial_detection,
+                iframe_srcs=list(_det_iframe_srcs) if _det_iframe_srcs else None,
+            )
         except Exception:
             resolved = ResolvedTarget(
                 original_url=base_url,
@@ -345,26 +400,79 @@ async def scrape(
         # the generic parser sees dicts/lists, not stringified payloads.
         import json as _json
 
+        # Patch #7 (2026-05-06 audit) — body-truncation diagnostic for PMS
+        # data hosts. NOTE: Phase A replay validation proved that the
+        # original premise (sightmap/realpage bodies are widely truncated)
+        # is FALSE: sightmap.com had 293 captures with 0 zero-rent
+        # outcomes, realpage 87/0. The truncation case is rare. We keep
+        # the diagnostic — it's cheap and catches future regressions —
+        # but do NOT count it among meaningful recovery patches.
+        _PMS_DATA_HOSTS = (
+            "sightmap.com",
+            "api.rentcafe.com",
+            "api.ws.realpage.com",
+            "onlineleasing.realpage.com",
+            "api.appfolio.com",
+            "api.gtmaservices.com",
+            "api.entrata.com",
+            "fortresstech.io",
+            "funnelleasing.com",
+            "knck.io",
+            "hy.ly",
+            "inventory.g5marketingcloud.com",
+        )
+
         prepared: list[dict[str, Any]] = []
+        truncation_diagnostics: list[dict[str, Any]] = []
         for entry in network_log:
             if not isinstance(entry, dict):
                 continue
+            url = entry.get("url", "") or ""
             raw_body = entry.get("body")
             parsed_body: Any = raw_body
+            parse_error: str = ""
             if isinstance(raw_body, str) and raw_body.strip().startswith(("{", "[")):
                 try:
                     parsed_body = _json.loads(raw_body)
-                except Exception:
+                except Exception as exc:
                     parsed_body = raw_body
+                    parse_error = f"{type(exc).__name__}: {str(exc)[:80]}"
+
+            # Patch #7 — detect truncation on known PMS hosts.
+            url_lower = url.lower()
+            if (
+                parse_error
+                and isinstance(raw_body, str)
+                and any(host in url_lower for host in _PMS_DATA_HOSTS)
+            ):
+                truncation_diagnostics.append(
+                    {
+                        "url": url,
+                        "body_size": len(raw_body),
+                        "body_size_reported": entry.get("body_size"),
+                        "parse_error": parse_error,
+                        "host_class": next(
+                            (h for h in _PMS_DATA_HOSTS if h in url_lower),
+                            "",
+                        ),
+                    }
+                )
+
             prepared.append(
                 {
-                    "url": entry.get("url", ""),
+                    "url": url,
                     "body": parsed_body,
                     "status": entry.get("status"),
                     "content_type": entry.get("content_type"),
+                    # Patch #7 — propagate parse_error so adapters can
+                    # decide whether to re-fetch / fall back rather than
+                    # silently returning 0 units.
+                    "_body_parse_error": parse_error,
                 }
             )
         ctx._api_responses = prepared  # type: ignore[attr-defined]
+        if truncation_diagnostics:
+            result["_pms_body_truncations"] = truncation_diagnostics
 
     # --- Step 6b: Router invariant (Change 2) ------------------------------
     # Before we hand control to the detected PMS adapter, ask the detector
@@ -753,6 +861,377 @@ _LINK_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("commoncf.entrata.com", 115),
 )
 
+
+# Patch #4 (2026-05-06 audit, REVISED 2026-05-07 after web-validation).
+# Iframe-PMS allowlist. When the entry HTML embeds an iframe whose src host
+# is in this set, the iframe content IS the unit data source. Following the
+# iframe as a link-hop target is the canonical recovery for widget-hosted
+# unit data (Squarespace + sightmap, custom CMS + fortresstech, etc.).
+#
+# Validation history
+# ------------------
+# v1 (2026-05-06): broad allowlist included hy.ly, knck.io, funnelleasing,
+#   marketapts.com, gounion.com, comms.entrata.com, popcard.rentcafe.com.
+# v2 (2026-05-07): web-validation revealed those are MARKETING / CHAT / CRM
+#   widgets, NOT unit data. Iframes from those hosts carry chat assistants,
+#   tour schedulers, lead-capture popups — none have floor plans. Following
+#   them wastes a link-hop and risks polluting extraction with marketing
+#   text. Allowlist tightened to verified-unit-data hosts only.
+#
+# Verified unit-data iframe hosts (kept):
+#   - sightmap.com           — interactive site-map widget; serves unit JSON
+#   - fortresstech.io        — Carlson Place class; Squarespace + widget
+#   - appfolio.com           — leasing/listing portal
+#   - appfoliowebsites.com   — AppFolio CMS host with /listings sub-paths
+#   - securecafe.com         — RentCafe leasing portal (login-required but
+#                              floor-plan pages render unauthenticated)
+#   - securecafenet.com      — RentCafe SSO variant
+#   - onlineleasing.realpage.com — RealPage leasing portal
+#
+# Removed (verified marketing / chat / CRM, NOT unit data):
+#   - hy.ly / my.hy.ly        — Hyly: marketing automation + virtual
+#                               leasing assistant (chat). NO unit data.
+#   - knck.io / doorway.knck.io — Knock: CRM + chatbot + tour scheduler.
+#                               NO unit data.
+#   - funnelleasing.com /
+#     integrations.funnelleasing.com — Funnel: chat widget + appointment
+#                               scheduling. NO unit data.
+#   - popcard.rentcafe.com    — RentCafe popup/lead capture. NO unit data.
+#   - comms.entrata.com       — Entrata communications/chat. NO unit data.
+#   - marketapts.com, gtmaservices.com, gounion.com, myresman.com —
+#     unverified; held out pending live-fetch evidence rather than included
+#     speculatively.
+#
+# Note: rentcafe.com / entrata.com root domains are NOT in the allowlist
+# because most subdomains under them are marketing/chat. Specific portal
+# paths (e.g. *.securecafe.com or onlineleasing.realpage.com) are.
+_IFRAME_PMS_HOSTS: tuple[str, ...] = (
+    "sightmap.com",
+    "fortresstech.io",
+    "appfolio.com",
+    "appfoliowebsites.com",
+    "securecafe.com",
+    "securecafenet.com",
+    "onlineleasing.realpage.com",
+)
+
+
+# Patch #9 (2026-05-06 audit) — broader allowlist for portal URLs found
+# *inside* captured API JSON bodies. JSON link fields like
+# `floor_plan_link`, `applicant_link`, `leasing_url` are hyperlinks the
+# site itself provides — they almost always point to unit data when they
+# point to a PMS root domain (rentcafe.com, entrata.com root). Distinct
+# from iframe-direct-follow because iframes can be chat/widgets while
+# JSON-emitted hyperlinks are typically meaningful pointers.
+_PORTAL_LINK_HOSTS: tuple[str, ...] = _IFRAME_PMS_HOSTS + (
+    "rentcafe.com",
+    "entrata.com",
+    "yardi.com",
+    "smartrent.com",
+    "loftliving.com",
+    "on-site.com",
+    "myresman.com",
+)
+
+
+# Patch #12 (2026-05-07 audit) — PMS fingerprint → expected API host map.
+# When a property's static fingerprint (HTML/script-source signature) says
+# it's on a particular PMS, we expect to capture an API URL on that PMS's
+# host during page render. If we don't, the marketing site is a "shell"
+# that links out to a separate leasing portal we never followed. This map
+# defines: detected PMS → host substring(s) we'd expect in captured APIs.
+_PMS_TO_EXPECTED_API_HOSTS: dict[str, tuple[str, ...]] = {
+    "rentcafe":  ("rentcafe.com",),
+    "realpage":  ("ws.realpage.com", "onlineleasing.realpage.com"),
+    "entrata":   ("entrata.com",),
+    "appfolio":  ("appfolio.com", "appfolio-listings"),
+    "onesite":   ("onesite",),
+    "sightmap":  ("sightmap.com",),
+    "avalonbay": ("avaloncommunities.com", "avb.api"),
+}
+
+
+def _pms_fingerprint_without_api_capture(result: dict, page_html: str | None) -> bool:
+    """Patch #12 — return True iff the property has a known-PMS fingerprint
+    matched but no captured API on that PMS's host AND current extraction
+    is incomplete (rent missing on at least some units).
+
+    This is the strongest signal we have that the homepage is a marketing
+    shell pointing to a separate leasing portal: we detected the PMS via
+    static signatures (script src host, meta tags), but the page never made
+    an XHR to the PMS data API. The unit data lives on a portal one hop
+    away — link-hop should fire to find and follow it.
+
+    Production audit (2026-05-06 run) showed this pattern on 850 of 1000
+    sampled properties (85%); triggering link-hop here is the largest
+    single recovery opportunity in the audit.
+
+    Completeness gate (added after dry-run showed 117 already-GOOD
+    properties would have triggered): require rent populated on < 90% of
+    units before firing the hop. Already-rent-full extractions don't need
+    a re-fetch from the canonical source.
+    """
+    # ---- Completeness gate: skip if already substantially complete ----
+    units = result.get("units") or []
+    if units:
+        n = len(units)
+        # Match both v1 and v2 unit shapes — v2 uses rent_low/rent_high,
+        # v1 uses rent_range string.
+        n_with_rent = sum(
+            1 for u in units
+            if (
+                (isinstance(u, dict) and (u.get("rent_low") or u.get("rent_high")))
+                or (isinstance(u, dict) and isinstance(u.get("rent_range"), str) and "$" in u.get("rent_range", ""))
+            )
+        )
+        if n > 0 and n_with_rent / n >= 0.9:
+            return False  # Already 90%+ rent-populated — don't waste hop.
+    detected_pms_dict = result.get("_detected_pms") or {}
+    evidence = detected_pms_dict.get("evidence") or []
+    detected_pms = (detected_pms_dict.get("pms") or "").lower()
+
+    # Static fingerprints either appear in the detected.pms field or in the
+    # detector_signals' fingerprints_matched list. Normalize.
+    matched_pmses: set[str] = set()
+    if detected_pms and detected_pms != "unknown":
+        matched_pmses.add(detected_pms)
+    detector_signals = result.get("_detector_signals") or {}
+    for fp in (detector_signals.get("fingerprints_matched") or []):
+        matched_pmses.add(str(fp).lower())
+
+    # Filter to PMSes for which we actually have an adapter — we shouldn't
+    # hop on `marketing_knock` / `marketing_hyly` / `wix` / `squarespace`
+    # fingerprints since those aren't unit-data sources.
+    relevant_pmses = matched_pmses & set(_PMS_TO_EXPECTED_API_HOSTS.keys())
+    if not relevant_pmses:
+        return False
+
+    # What APIs were captured?
+    captured_apis = result.get("_raw_api_responses") or []
+    captured_urls = []
+    for r in captured_apis:
+        if isinstance(r, dict):
+            u = r.get("url") or ""
+            if u:
+                captured_urls.append(u.lower())
+
+    # For each relevant PMS, did we capture any API on its expected hosts?
+    for pms in relevant_pmses:
+        expected_hosts = _PMS_TO_EXPECTED_API_HOSTS.get(pms, ())
+        if any(any(h in u for h in expected_hosts) for u in captured_urls):
+            # We DID capture this PMS's API → not a misroute case.
+            return False
+
+    # No PMS API was captured for any matched PMS — likely shell site.
+    # Sanity check: is there at least an anchor to a PMS host in the HTML?
+    # (If not, link-hop will fail anyway and we shouldn't waste budget.)
+    if page_html and len(page_html) > 100:
+        page_lower = page_html.lower()
+        for pms in relevant_pmses:
+            for host in _PMS_TO_EXPECTED_API_HOSTS.get(pms, ()):
+                if host in page_lower:
+                    return True
+        # No anchor either — but still flag, link-hop's keyword ranker may
+        # find something else. Cheap to attempt.
+        return True
+    return True
+
+
+def _extract_portal_links_from_api_bodies(api_responses: list[dict]) -> list[str]:
+    """Patch #9 (2026-05-06 audit) — recursively scan captured API JSON
+    bodies for string fields whose value is a URL pointing to a known PMS
+    portal host (rentcafe, securecafe, sightmap, fortresstech, etc.).
+    These are typically `floor_plan_link`, `applicant_link`, `resident_link`,
+    `availability_url` keys on a property metadata response.
+
+    Birch Run (id 14182) is the canonical case: a Supabase
+    /rest/v1/properties response carried a working RentCafe portal URL
+    in the `floor_plan_link` field — never followed. ~50–100 properties
+    in the run had a similar pattern.
+
+    Returns deduplicated list of portal URLs. Pure / never raises.
+    """
+    if not api_responses:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    # Patch #9 — use the broader _PORTAL_LINK_HOSTS, not the strict
+    # iframe-only allowlist. JSON-emitted hyperlinks to rentcafe.com /
+    # entrata.com etc. are nearly always meaningful pointers; only iframe
+    # embeds need the stricter allowlist.
+    portal_hosts = _PORTAL_LINK_HOSTS
+
+    def _walk(node: object, depth: int = 0) -> None:
+        if depth > 8:  # bound recursion
+            return
+        if isinstance(node, dict):
+            for v in node.values():
+                _walk(v, depth + 1)
+        elif isinstance(node, list):
+            for item in node:
+                _walk(item, depth + 1)
+        elif isinstance(node, str):
+            s = node.strip()
+            if not s.startswith(("http://", "https://")):
+                return
+            s_lower = s.lower()
+            if not any(host in s_lower for host in portal_hosts):
+                return
+            if s in seen:
+                return
+            seen.add(s)
+            out.append(s)
+
+    for resp in api_responses:
+        if not isinstance(resp, dict):
+            continue
+        body = resp.get("body")
+        if body is None:
+            continue
+        try:
+            _walk(body)
+        except Exception:
+            continue
+    return out
+
+
+def _extract_iframe_pms_urls(entry_html: str | None) -> list[str]:
+    """Return iframe src URLs in entry_html whose host matches a known PMS
+    portal allowlist. Pure regex over the HTML — never raises.
+    """
+    if not entry_html or len(entry_html) < 50:
+        return []
+    import re
+    iframe_re = re.compile(r"<iframe\b[^>]*\bsrc\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE)
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in iframe_re.finditer(entry_html):
+        src = (m.group(1) or "").strip()
+        if not src.startswith(("http://", "https://", "//")):
+            continue
+        if src.startswith("//"):
+            src = "https:" + src
+        src_lower = src.lower()
+        if not any(host in src_lower for host in _IFRAME_PMS_HOSTS):
+            continue
+        if src in seen:
+            continue
+        seen.add(src)
+        out.append(src)
+    return out
+
+
+def is_suspicious_cross_host_redirect(
+    input_url: str,
+    final_url: str,
+    target_name: str = "",
+) -> tuple[bool, str]:
+    """Patch #6 (2026-05-06 audit) — detect when the L1 fetcher followed a
+    redirect to a host that doesn't belong to the target property.
+
+    Pearl Midlane (id 41008) redirected pearlmidlane.com → thebriscoeriveroaks.com,
+    a different property entirely. We then extracted JSON-LD from Briscoe's
+    homepage and stored 13 of Briscoe's floor plans against Pearl Midlane's
+    apartment_id. ~40–60 properties in the run had this pattern.
+
+    Returns (is_suspicious, reason). Suspicious iff:
+      - Hosts differ (after stripping leading 'www.')
+      - The final host is NOT a known PMS portal/widget host (those are
+        legitimate redirects — RentCafe, Sightmap, etc.)
+      - The final host shares NO token with the input host AND no token
+        with the target property name.
+
+    Pure / never raises. When inputs are malformed or hosts can't be parsed,
+    returns (False, '') so callers fall through to default behaviour.
+    """
+    if not input_url or not final_url:
+        return False, ""
+    try:
+        in_host = (urllib.parse.urlparse(input_url).hostname or "").lower().lstrip(".")
+        fi_host = (urllib.parse.urlparse(final_url).hostname or "").lower().lstrip(".")
+    except Exception:
+        return False, ""
+    if not in_host or not fi_host:
+        return False, ""
+    in_host = in_host.removeprefix("www.")
+    fi_host = fi_host.removeprefix("www.")
+    if in_host == fi_host:
+        return False, ""
+    # Known portal/widget hosts are legitimate redirect targets.
+    if any(host in fi_host for host in _IFRAME_PMS_HOSTS):
+        return False, ""
+    if any(fi_host.endswith(suf) for suf, _ in _LINK_HOST_KEYWORDS):
+        return False, ""
+    # Token overlap check (whole tokens after splitting on . and -).
+    in_tokens = _slug_tokens(in_host.replace(".", " ").replace("-", " "))
+    in_tokens -= {"www", "com", "net", "org", "co", "us", "io", "the", "apartments", "apts"}
+    fi_tokens = _slug_tokens(fi_host.replace(".", " ").replace("-", " "))
+    fi_tokens -= {"www", "com", "net", "org", "co", "us", "io", "the", "apartments", "apts"}
+    name_tokens = _slug_tokens(target_name) if target_name else set()
+    if (in_tokens & fi_tokens) or (name_tokens and (name_tokens & fi_tokens)):
+        return False, ""
+    # Substring check for compound hosts: 'livethemarion.com' →
+    # 'marionapartments.com' shares no whole token but both contain 'marion'.
+    # We use only the FIRST property-specific name token to avoid
+    # false-negatives on shared-neighbourhood naming (e.g. Pearl Midlane
+    # River Oaks vs The Briscoe River Oaks both contain "river"/"oaks" —
+    # those are not the property's distinguishing identifier).
+    _name_filler = {"the", "at", "of", "on", "by", "apartments", "apts", "lofts", "place", "house", "homes", "residences", "tower", "park", "river", "oaks", "ridge", "hill", "creek", "pointe", "view", "village", "crossing", "square", "manor"}
+    name_tokens_ordered = [t for t in target_name.lower().split() if t and t.isalnum()] if target_name else []
+    primary_name_token = next(
+        (t for t in name_tokens_ordered if t not in _name_filler and len(t) >= 4),
+        "",
+    )
+    if primary_name_token and primary_name_token in fi_host:
+        return False, ""
+    # Substring check between input host tokens (≥5 chars) and final host:
+    # captures rebrand cases without a CSV name. Only consider the longest
+    # input token, again to avoid neighbourhood-name false-negatives.
+    long_in_tokens = sorted({t for t in in_tokens if len(t) >= 5}, key=len, reverse=True)
+    if long_in_tokens and (long_in_tokens[0] in fi_host or fi_host.split(".", 1)[0] in long_in_tokens[0]):
+        return False, ""
+    # Patch #6 (REVISED 2026-05-07 after web-validation showed 37% false-
+    # positive rate). PMC umbrella redirects are LEGITIMATE and produce full
+    # rent — flagging them as suspicious clutters telemetry without
+    # functional value. Heuristic: hosts whose name CONTAINS one of these
+    # umbrella tokens are a Property-Management-Company portfolio site that
+    # legitimately serves data for the redirected property.
+    _PMC_UMBRELLA_TOKENS = (
+        "communities", "living", "management", "properties", "realty",
+        "group", "homes", "residential", "apartmenthomes", "apts",
+    )
+    if any(tok in fi_host for tok in _PMC_UMBRELLA_TOKENS):
+        return False, ""
+    return True, (
+        f"redirect from {in_host} to {fi_host} — no host-token or name-token overlap; "
+        f"likely cross-portfolio leak (target={target_name!r})"
+    )
+
+
+def _augment_ranked_with_iframe_pms(
+    ranked: list[tuple[str, int, str]],
+    iframe_urls: list[str],
+) -> list[tuple[str, int, str]]:
+    """Push iframe-PMS URLs to the top of the ranked candidates.
+
+    Iframe-hosted PMS widgets (Sightmap, Fortresstech, Knock, etc.) are
+    nearly always the canonical source of unit data on multi-tier CMS sites
+    (Squarespace + widget, Wix + widget, marketing-React + widget). Score
+    them higher than even LLM navigation hints (1000) because they're a
+    structural/signal-level certainty — there's literally an iframe in the
+    DOM pointing at unit JSON.
+    """
+    if not iframe_urls:
+        return ranked
+    seen_urls = {u for u, _, _ in ranked}
+    augmented: list[tuple[str, int, str]] = []
+    for url in iframe_urls:
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        augmented.append((url, 1100, "iframe-pms"))
+    return augmented + ranked
+
 # Skip these link shapes outright — they're never availability pages.
 _LINK_SKIP_PATTERNS: tuple[str, ...] = (
     "tel:",
@@ -785,16 +1264,76 @@ _LINK_SKIP_PATTERNS: tuple[str, ...] = (
 )
 
 
+# Patch #5 (2026-05-06 audit) — generic floor-plan/availability path tokens
+# that don't carry property-specific meaning. When the link slug is one of
+# these (e.g. `/floorplans`, `/availability`), we don't penalise for
+# missing target-name overlap because such paths apply to the whole
+# property and are the canonical sub-page regardless of slug naming.
+_GENERIC_SUBPAGE_TOKENS = frozenset(
+    {
+        "floor",
+        "floorplan",
+        "floorplans",
+        "floor-plans",
+        "floor_plans",
+        "plans",
+        "availability",
+        "available",
+        "availabilities",
+        "apartments",
+        "apartment",
+        "pricing",
+        "rates",
+        "rent",
+        "rentals",
+        "leasing",
+        "lease",
+        "units",
+        "specials",
+        "tour",
+        "schedule",
+        "amenities",
+        "gallery",
+        "contact",
+        "about",
+        "neighborhood",
+    }
+)
+
+
+def _slug_tokens(text: str) -> set[str]:
+    """Tokenise a property name or URL slug into lowercase word tokens.
+    Used by Patch #5 to compare a candidate link's slug against the target
+    property's name. Empty / single-letter tokens are dropped.
+    """
+    if not text:
+        return set()
+    import re
+
+    raw = re.split(r"[^a-z0-9]+", text.lower().strip())
+    return {tok for tok in raw if len(tok) > 1}
+
+
 def _rank_internal_links(
     page_html: str,
     base_url: str,
     limit: int = 5,
+    *,
+    target_name: str = "",
 ) -> list[tuple[str, int, str]]:
     """Rank internal links on a page for likelihood of carrying unit data.
 
     Scores each link by anchor text, path keywords, and host (portal
     subdomains). Returns ``[(url, score, anchor_text), ...]`` sorted best
     first. Never raises — parser errors yield an empty list.
+
+    Patch #5 (2026-05-06 audit) — when ``target_name`` is provided, links
+    whose URL slug or anchor text shares ANY non-generic token with the
+    target receive a +50 bonus; links whose slug is property-specific
+    (i.e. not in _GENERIC_SUBPAGE_TOKENS) but shares NO token with the
+    target receive a -150 penalty (removes them from contention unless
+    nothing else exists). This prevents cross-portfolio sister-property
+    leakage like Carlson Place hopping to /apartments-on-7th.
     """
     if not page_html:
         return []
@@ -815,6 +1354,20 @@ def _rank_internal_links(
     except Exception:
         return []
     base_host = (base.hostname or "").lower()
+
+    # Patch #5 — derive target tokens from the property name AND the
+    # base-URL host (the host often encodes the property name, e.g.
+    # 'livethemarion.com' → tokens {'live', 'themarion', 'marion'}).
+    # Only apply when an explicit target_name was passed; without one we
+    # fall back to legacy ranker behaviour (no bonus, no penalty) so callers
+    # that don't yet pass a name aren't penalised.
+    target_tokens: set[str] = set()
+    if target_name:
+        target_tokens = _slug_tokens(target_name)
+        if base_host:
+            host_tokens = _slug_tokens(base_host.replace(".", " ").replace("-", " "))
+            host_tokens -= {"www", "com", "net", "org", "co", "us", "io"}
+            target_tokens |= host_tokens
 
     candidates: dict[str, tuple[int, str]] = {}
     for a in soup.find_all("a", href=True):
@@ -853,6 +1406,27 @@ def _rank_internal_links(
         for suffix, weight in _LINK_HOST_KEYWORDS:
             if link_host.endswith(suffix):
                 score += weight
+
+        # Patch #5 — target-name token bonus / sister-property penalty.
+        # Skip the check when no target_name was provided (e.g. tests, or
+        # when the planner couldn't surface the property name).
+        if target_tokens:
+            slug_text = (link_path or "") + " " + (anchor or "")
+            slug_tokens = _slug_tokens(slug_text)
+            specific_slug_tokens = slug_tokens - _GENERIC_SUBPAGE_TOKENS
+            shared = slug_tokens & target_tokens
+            if shared:
+                # Slug carries a property-name token → decisive boost. Set
+                # high enough to outrank the strongest generic combination
+                # (anchor "availability"=100 + path "/availability"=95 = 195),
+                # because a property-name-matched path is the cleanest
+                # possible signal that this is the right sub-page.
+                score += 250
+            elif specific_slug_tokens:
+                # Property-specific tokens that DON'T match the target — this
+                # is most likely a sister property in a multi-property
+                # portfolio (e.g. Carlson Place's /apartments-on-7th).
+                score -= 150
 
         # Stay on-site or go to a known portal subdomain
         is_same_site = (
@@ -894,6 +1468,7 @@ async def _try_link_hop(
     llm_navigation_hints: list[str] | None = None,
     visited_urls: set[str] | None = None,
     shared_budget: dict | None = None,
+    api_responses: list[dict] | None = None,
 ) -> dict[str, Any] | None:
     """One-level BFS over home-page links when primary extraction is empty.
 
@@ -912,17 +1487,54 @@ async def _try_link_hop(
     visited: set[str] = set(visited_urls) if visited_urls else set()
     visited.add(entry_url)
 
-    ranked = _rank_internal_links(entry_page_html, entry_url, limit=max_hops)
+    # Patch #5 (2026-05-06 audit) — pass target property name to the ranker
+    # so links to sister properties in the same portfolio (e.g. Carlson
+    # Place's /apartments-on-7th) are demoted in favour of generic
+    # /floorplans-style paths or property-name-matched paths.
+    _target_name = ""
+    if csv_row:
+        for k in ("Property Name", "name", "Name", "proj_name"):
+            v = csv_row.get(k) if isinstance(csv_row, dict) else None
+            if v:
+                _target_name = str(v).strip()
+                break
+    ranked = _rank_internal_links(
+        entry_page_html, entry_url, limit=max_hops, target_name=_target_name
+    )
+    # Patch #4 (2026-05-06 audit) — surface iframe-PMS hosts BEFORE applying
+    # the max_hops cap. Iframe widgets (Sightmap, Fortresstech, Knock, Hyly,
+    # Funnel, securecafe, etc.) are the canonical unit source on multi-tier
+    # CMS sites; ranking them at 1100 ensures they outrank both keyword
+    # candidates and LLM hints.
+    iframe_pms_urls = _extract_iframe_pms_urls(entry_page_html)
+    if iframe_pms_urls:
+        ranked = _augment_ranked_with_iframe_pms(ranked, iframe_pms_urls)
+    # Patch #9 (2026-05-06 audit) — also augment with portal links found
+    # inside captured API JSON bodies (e.g. supabase property-metadata
+    # response carrying a `floor_plan_link` to a RentCafe portal).
+    portal_links_in_json: list[str] = []
+    if api_responses:
+        portal_links_in_json = _extract_portal_links_from_api_bodies(api_responses)
+        if portal_links_in_json:
+            ranked = _augment_ranked_with_iframe_pms(ranked, portal_links_in_json)
     if llm_navigation_hints:
         ranked = _augment_ranked_with_hints(ranked, llm_navigation_hints, entry_url)
-        # Cap to keep budget bounded even with hints merged in.
-        ranked = ranked[: max(max_hops, len(llm_navigation_hints) + 1)]
+    # Cap to keep budget bounded with augmentations merged in. The cap
+    # grows with the number of explicit hints (LLM + iframe-PMS + portal-in-JSON)
+    # so high-priority candidates aren't dropped before the keyword-ranked
+    # generic candidates.
+    extra_priority_n = (
+        len(llm_navigation_hints or []) + len(iframe_pms_urls) + len(portal_links_in_json)
+    )
+    ranked = ranked[: max(max_hops, extra_priority_n + 1)]
     # Phase 9: drop URLs already visited (cycle break)
     ranked = [(u, s, a) for (u, s, a) in ranked if u not in visited]
     # Phase 9: hard-cap at max_hops (defensive — _rank_internal_links has
-    # its own limit, but enforcing here protects against augment-with-hints
-    # bypassing the limit).
-    ranked = ranked[:max_hops]
+    # its own limit, but enforcing here protects against augment bypass).
+    # When iframe-PMS hits exist, allow up to max_hops + iframe count so
+    # we never drop a structural-certainty hop in favour of a keyword guess.
+    effective_cap = max_hops + len(iframe_pms_urls) + len(portal_links_in_json)
+    ranked = ranked[:effective_cap]
     if not ranked:
         return None
 
@@ -1180,6 +1792,30 @@ async def scrape_jugnu(
     if fetch_result is not None and _jugnu_budget.get("link_hop", 0) > 0:
         if not result.get("units"):
             should_hop = True
+        elif result.get("_llm_navigation_hints"):
+            # Patch #3 (2026-05-06 audit) — when the LLM explicitly emits a
+            # navigation_hint (e.g. "/onlineleasing/.../floorplans.aspx" for
+            # a React/Supabase site, "/floor-plans" for a misclassified site
+            # whose homepage didn't expose nav links), hop unconditionally
+            # even if main tiers extracted *something*. The "something" is
+            # almost always a hero card, a property metadata blob, or a
+            # marketing snippet — the LLM is telling us the real data lives
+            # one level deeper. Without this trigger, ~150–200 properties in
+            # the 2026-05-06 run had a working sub-page URL identified by
+            # the LLM but never followed.
+            should_hop = True
+        elif _pms_fingerprint_without_api_capture(result, page_html):
+            # Patch #12 (2026-05-07 audit) — biggest single recovery path.
+            # When a property has a PMS fingerprint matched (rentcafe,
+            # entrata, realpage, appfolio, onesite, sightmap) AND no
+            # captured API URL has that PMS host, the data is one hop away
+            # on the leasing portal. Production audit: 850 of 1000 sampled
+            # properties (85%) are PMS-fingerprinted but extracted by some
+            # other tier — usually TIER_4_LLM_DOM scraping marketing copy
+            # rather than the canonical PMS portal. Triggering link-hop
+            # here finds the rentcafe/realpage/etc. anchor in the
+            # marketing site's HTML and routes to the real data source.
+            should_hop = True
         else:
             # Phase G2: consult planner when main has units
             try:
@@ -1190,11 +1826,27 @@ async def scrape_jugnu(
                     for u in (result.get("units") or [])
                 ]
                 _report = evaluate_completeness(_pu)
+                # Patch #1 (2026-05-06 audit) — pass entry HTML to planner
+                # so it can apply the homepage-only structural rule. We
+                # decode here once; the same value is reused below for the
+                # actual link-hop call.
+                _planner_html: str | None = None
+                _body = getattr(fetch_result, "body", None)
+                if isinstance(_body, bytes):
+                    try:
+                        _planner_html = _body.decode("utf-8", errors="replace")
+                    except Exception:
+                        _planner_html = None
+                elif isinstance(_body, str):
+                    _planner_html = _body
                 _decision = plan_next_action(
                     _report,
                     sources_already_run=set(),
                     budget_remaining=dict(_jugnu_budget),
                     pms_name=detected_pms.get("pms", "unknown"),
+                    entry_html=_planner_html,
+                    entry_url=base_url,
+                    visited_urls={base_url},
                 )
                 if _decision.action == "ESCALATE_LINK_HOP":
                     should_hop = True
@@ -1220,6 +1872,43 @@ async def scrape_jugnu(
                 )
                 # Phase 5: feed LLM navigation hints (if any) into the
                 # ranker so they outrank keyword candidates.
+                # Patch #10 (2026-05-06 audit) — populate `links_found` on
+                # the result so the per-property report reflects what the
+                # ranker actually surfaced. Pre-patch: every report showed
+                # "Internal links discovered: 0" across the entire run,
+                # blinding any debugging effort. We capture the ranked
+                # output and stuff it into the result dict.
+                _ranked_preview = []
+                try:
+                    _target_for_links = ""
+                    if csv_row:
+                        for k in ("Property Name", "name", "Name", "proj_name"):
+                            v = csv_row.get(k) if isinstance(csv_row, dict) else None
+                            if v:
+                                _target_for_links = str(v).strip()
+                                break
+                    _ranked_preview = _rank_internal_links(
+                        entry_html, base_url, limit=20, target_name=_target_for_links
+                    )
+                    _iframe_preview = _extract_iframe_pms_urls(entry_html)
+                    _portal_in_json_preview = _extract_portal_links_from_api_bodies(
+                        result.get("_raw_api_responses") or []
+                    )
+                    result["links_found"] = (
+                        [u for u, _, _ in _ranked_preview]
+                        + _iframe_preview
+                        + _portal_in_json_preview
+                    )
+                    result["_link_candidates_detail"] = {
+                        "ranked": [
+                            {"url": u, "score": s, "anchor": a}
+                            for u, s, a in _ranked_preview
+                        ],
+                        "iframe_pms": _iframe_preview,
+                        "portal_in_json": _portal_in_json_preview,
+                    }
+                except Exception:
+                    pass
                 hop_result = await _try_link_hop(
                     entry_url=base_url,
                     entry_page_html=entry_html,
@@ -1232,6 +1921,10 @@ async def scrape_jugnu(
                     llm_navigation_hints=result.get("_llm_navigation_hints"),
                     visited_urls={base_url},  # Phase 9: cycle protection (H5)
                     shared_budget=_jugnu_budget,
+                    # Patch #9 — pass captured API responses so the ranker
+                    # can surface portal URLs embedded in JSON bodies
+                    # (e.g. supabase floor_plan_link → RentCafe portal).
+                    api_responses=result.get("_raw_api_responses"),
                 )
             except Exception as exc:
                 log.warning("link-hop orchestration failed for %s: %s", property_id, exc)
