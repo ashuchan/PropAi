@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ma_poc.scripts.verify_csv_mapping import MIN_COVERAGE, verify
+from ma_poc.scripts.checks.csv_mapping import MIN_COVERAGE, verify
 
 
 def test_csv_property_id_mapping_verified(tmp_path: Path) -> None:
