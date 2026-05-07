@@ -21,7 +21,7 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
 
       containers {
         image   = "${var.repository_url}/jugnu:${var.image_tag}"
-        command = ["python", "ma_poc/scripts/jugnu_shard_entry.py"]
+        command = ["python", "ma_poc/scripts/runners/shard_entry.py"]
 
         resources {
           limits = {
@@ -77,7 +77,7 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
         # The Postgres schema this deploy's migrations created is v2
         # (alembic 0002_v2_strict). Jugnu runner reads SCHEMA_VERSION to
         # pick the correct unit-dict shape and output directory
-        # (ma_poc/scripts/jugnu_runner.py:_resolve_data_dirs).
+        # (ma_poc/scripts/runners/jugnu.py:_resolve_data_dirs).
         env {
           name  = "SCHEMA_VERSION"
           value = "v2"
@@ -158,8 +158,8 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
   template {
     # Sharded retry: parallelism > 1 spawns N parallel tasks, each
     # processing a disjoint slice of the failure list via
-    # CLOUD_RUN_TASK_INDEX/COUNT round-robin in jugnu_retry_runner.py.
-    # The merge job (jugnu_retry_merge.py) consolidates shard outputs.
+    # CLOUD_RUN_TASK_INDEX/COUNT round-robin in runners/jugnu_retry.py.
+    # The merge job (runners/jugnu_retry_merge.py) consolidates shard outputs.
     # 1 = legacy single-task behaviour.
     parallelism = var.retry_task_count
     task_count  = var.retry_task_count
@@ -177,7 +177,7 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
 
       containers {
         image   = "${var.repository_url}/jugnu:${var.image_tag}"
-        command = ["python", "ma_poc/scripts/jugnu_retry_entry.py"]
+        command = ["python", "ma_poc/scripts/runners/retry_entry.py"]
 
         resources {
           limits = {
@@ -317,7 +317,7 @@ resource "google_cloud_run_v2_job" "jugnu_adhoc" {
 
       containers {
         image   = "${var.repository_url}/jugnu:${var.image_tag}"
-        command = ["python", "-m", "ma_poc.scripts.run_script"]
+        command = ["python", "-m", "ma_poc.scripts.runners.dispatcher"]
 
         resources {
           limits = {

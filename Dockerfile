@@ -54,9 +54,9 @@ COPY --chown=pwuser:pwuser ma_poc/ ./ma_poc/
 # all four prompt templates are present with the {known_floor_plans}
 # placeholder intact, and the modules wired into scrape_jugnu still
 # import cleanly under the runtime venv. Any failure exits the build.
-RUN python -m ma_poc.scripts.verify_csv_mapping \
+RUN python -m ma_poc.scripts.checks.csv_mapping \
  && chown pwuser:pwuser /app/ma_poc/config/csv_floorplan_mapping.json \
- && python -m ma_poc.scripts.validate_deployment
+ && python -m ma_poc.scripts.checks.deployment
 
 USER pwuser
 

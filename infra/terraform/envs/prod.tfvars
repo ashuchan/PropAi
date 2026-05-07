@@ -12,7 +12,7 @@ browsers_per_task  = 10
 task_cpu           = "2"
 task_memory        = "4Gi"
 # task_count > 15 on db-f1-micro triggers connection exhaustion (validated by
-# trigger_run.py:130 guard); upgrade tier to match the new parallelism.
+# triggers/run.py:130 guard); upgrade tier to match the new parallelism.
 db_tier            = "db-g1-small"
 
 # Sharded retry: ceiling on concurrent retry tasks. Operators choose
