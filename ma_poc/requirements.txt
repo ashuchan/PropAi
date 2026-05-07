@@ -54,3 +54,10 @@ google-cloud-storage>=2.10.0
 # XLSX writer for the daily failures email (scripts/email_daily_failures_report.py).
 # Pure-Python; works on Windows ARM64 with no native build step.
 openpyxl>=3.1.0
+
+# CSV diff / fuzzy-match utilities used by scripts/compare_floor_plans_csv.py
+# and scripts/report_floor_plan_comparison.py. Required by the Cloud Run
+# script-executor node — without them, the floor-plan comparison job fails at
+# import time with ModuleNotFoundError.
+pandas>=2.2.0
+rapidfuzz>=3.9.0

@@ -11,13 +11,14 @@ Three modes:
   --resume         Re-process everything that isn't a clean success.  Useful
                    after an interrupted run.
 
-  --unprocessed    Pick up properties that are present in the source CSV but
+  --unprocessed    Pick up properties that are in the input catalog but
                    absent from the prior run's properties.json.  Used when
                    one or more scrape shards never finished (e.g. a stuck
-                   Cloud Run task) so their slice of the CSV produced no
-                   record at all — neither --retry-errors nor --resume can
-                   see those properties because they iterate properties.json.
-                   Requires --csv.
+                   Cloud Run task) so their slice produced no record at
+                   all — neither --retry-errors nor --resume can see those
+                   properties because they iterate properties.json. Reads
+                   the catalog from the DataProvider's `properties` table
+                   by default; pass --csv to override with a file.
 
 All modes:
   - Create CrawlTasks with reason=RETRY and feed them through L1-L5.
@@ -35,14 +36,14 @@ Usage:
   # Resume an interrupted run
   python scripts/jugnu_retry_runner.py --resume --run-date 2026-04-18
 
-  # Recover properties from a stuck shard (CSV vs properties.json diff)
-  python scripts/jugnu_retry_runner.py --unprocessed --run-date 2026-04-28 \\
-      --csv config/properties.csv
+  # Recover properties from a stuck shard (catalog vs properties.json diff)
+  python scripts/jugnu_retry_runner.py --unprocessed --run-date 2026-04-28
 
   # Retry with a limit
   python scripts/jugnu_retry_runner.py --retry-errors --limit 10
 
-  # Retry using a CSV (needed when retrying legacy runs that don't store URLs)
+  # Override the catalog source with a CSV (useful for retrying legacy
+  # runs that pre-date the DB-backed catalog)
   python scripts/jugnu_retry_runner.py --retry-errors --run-date 2026-04-17 \\
       --csv config/properties.csv
 """
@@ -180,34 +181,31 @@ def _load_jugnu_candidates(
 
 def _load_unprocessed_candidates(
     run_dir: Path,
-    csv_path: Path,
+    catalog_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Load CSV rows whose canonical_id has NO record in properties.json.
+    """Return catalog rows whose canonical_id has NO record in properties.json.
 
     Used by --unprocessed mode to recover properties from a scrape run
     where one or more shards never completed (stuck task, OOM kill, 4h
     timeout). The retry runner's other modes only see properties that
     already have a record; this loader closes the gap by diffing the
-    source CSV against the prior run's output.
+    source catalog against the prior run's output.
 
-    Match key is the raw CSV property identifier compared against
-    ``_meta.canonical_id`` in properties.json — Jugnu writes the CSV id
-    straight through as canonical_id, so a string equality match
-    correctly identifies untouched rows.
+    Match key is the catalog property identifier compared against
+    ``_meta.canonical_id`` in properties.json — Jugnu writes the
+    canonical_id straight through, so string equality correctly
+    identifies untouched rows.
 
     Args:
         run_dir: Path to the prior run directory (holds properties.json).
-        csv_path: Path to the source CSV (the original full population).
+        catalog_rows: Catalog rows (as flat dicts via PropertyToScrape.
+            as_csv_row()). Source-agnostic — could be CSV-backed or
+            DB-backed depending on how the caller resolved them.
 
     Returns:
         List of dicts (property_id, url, prior_status="UNPROCESSED") for
-        every CSV row not present in properties.json. Empty if the CSV is
-        unreadable or has no usable rows.
+        every catalog row not present in properties.json.
     """
-    if not csv_path or not csv_path.exists():
-        log.error("--unprocessed requires --csv pointing at the source CSV")
-        return []
-
     seen_ids: set[str] = set()
     props_path = run_dir / "properties.json"
     if props_path.exists():
@@ -226,47 +224,40 @@ def _load_unprocessed_candidates(
             )
     else:
         log.warning(
-            "No properties.json at %s — treating every CSV row as unprocessed",
+            "No properties.json at %s — treating every catalog row as unprocessed",
             props_path,
         )
-
-    import csv as csv_mod
 
     candidates: list[dict[str, Any]] = []
     skipped_no_id = 0
     skipped_no_url = 0
-    try:
-        with open(csv_path, encoding="utf-8-sig", newline="") as f:
-            for row in csv_mod.DictReader(f):
-                pid = (
-                    row.get("property_id")
-                    or row.get("Unique ID")
-                    or row.get("Property ID")
-                    or row.get("apartmentid")
-                    or ""
-                ).strip()
-                url = (row.get("url") or row.get("Website") or row.get("website") or "").strip()
-                if not pid:
-                    skipped_no_id += 1
-                    continue
-                if not url:
-                    skipped_no_url += 1
-                    continue
-                if pid in seen_ids:
-                    continue
-                candidates.append(
-                    {
-                        "property_id": pid,
-                        "url": url,
-                        "prior_status": "UNPROCESSED",
-                    }
-                )
-    except OSError as exc:
-        log.error("Could not read CSV %s: %s", csv_path, exc)
-        return []
+    for row in catalog_rows:
+        pid = str(
+            row.get("property_id")
+            or row.get("Unique ID")
+            or row.get("Property ID")
+            or row.get("apartmentid")
+            or ""
+        ).strip()
+        url = str(row.get("url") or row.get("Website") or row.get("website") or "").strip()
+        if not pid:
+            skipped_no_id += 1
+            continue
+        if not url:
+            skipped_no_url += 1
+            continue
+        if pid in seen_ids:
+            continue
+        candidates.append(
+            {
+                "property_id": pid,
+                "url": url,
+                "prior_status": "UNPROCESSED",
+            }
+        )
 
     log.info(
-        "Unprocessed diff: %d processed in run, %d candidates from CSV (skipped %d no-id, %d no-url)",
+        "Unprocessed diff: %d processed in run, %d candidates from catalog (skipped %d no-id, %d no-url)",
         len(seen_ids),
         len(candidates),
         skipped_no_id,
@@ -386,35 +377,44 @@ def _shard_candidates(
     return [c for i, c in enumerate(ordered) if i % task_count == task_index]
 
 
-def _load_csv_lookup(csv_path: Path) -> dict[str, str]:
-    """Build a {property_id: url} lookup from a CSV file.
+def _build_url_lookup(catalog_rows: list[dict[str, Any]]) -> dict[str, str]:
+    """Build a {property_id: url} lookup from catalog rows.
 
-    Args:
-        csv_path: Path to properties CSV.
-
-    Returns:
-        Dict mapping property_id to URL.
+    Source-agnostic — accepts the flat-dict shape produced by
+    PropertyToScrape.as_csv_row(), which both the CSV and DB catalog
+    sources emit.
     """
-    import csv as csv_mod
-
     lookup: dict[str, str] = {}
-    try:
-        with open(csv_path, encoding="utf-8-sig", newline="") as f:
-            reader = csv_mod.DictReader(f)
-            for row in reader:
-                pid = (
-                    row.get("property_id")
-                    or row.get("Unique ID")
-                    or row.get("Property ID")
-                    or row.get("apartmentid")
-                    or ""
-                )
-                url = row.get("url") or row.get("Website") or row.get("website") or ""
-                if pid and url:
-                    lookup[pid] = url
-    except (OSError, KeyError) as exc:
-        log.error("Could not read CSV %s: %s", csv_path, exc)
+    for row in catalog_rows:
+        pid = str(
+            row.get("property_id")
+            or row.get("Unique ID")
+            or row.get("Property ID")
+            or row.get("apartmentid")
+            or ""
+        )
+        url = str(row.get("url") or row.get("Website") or row.get("website") or "")
+        if pid and url:
+            lookup[pid] = url
     return lookup
+
+
+def _resolve_catalog_rows(csv_path: Path | None) -> list[dict[str, Any]]:
+    """Resolve the input catalog as a list of flat dicts.
+
+    When `csv_path` is set we read that file directly (back-compat). When
+    None we read from the active DataProvider's catalog — same flip-rule
+    used by jugnu_runner.
+    """
+    from data_provider.dtos import PropertyToScrape  # noqa: F401  (imported for type clarity)
+    from data_provider.factory import get_data_provider
+    from data_provider.filesystem import CsvPropertyCatalogSource
+
+    if csv_path is not None:
+        source = CsvPropertyCatalogSource(csv_path)
+    else:
+        source = get_data_provider().property_catalog
+    return [p.as_csv_row() for p in source.list_active()]
 
 
 def _find_latest_run_dir(data_dir: Path) -> Path | None:
@@ -517,7 +517,11 @@ async def run_retry(
         data_dir: Base data directory.
         mode: 'retry_errors', 'resume', or 'unprocessed'.
         run_date: Target run date (YYYY-MM-DD). None = latest.
-        csv_path: Optional CSV for URL lookup (REQUIRED for 'unprocessed').
+        csv_path: Optional CSV override for the catalog source. When None
+            the catalog comes from `provider.property_catalog` (the
+            `properties` table for sql backends, the FS-default CSV
+            otherwise). 'unprocessed' mode no longer requires --csv: an
+            empty catalog from the active provider triggers FATAL.
         limit: Max properties to retry.
         schema_version: "v1" or "v2" output format.
 
@@ -554,42 +558,39 @@ async def run_retry(
 
     log.info("Source run: %s", source_run_dir)
 
-    # -- Build CSV lookups if provided --
-    csv_lookup = _load_csv_lookup(csv_path) if csv_path else None
-    # Full CSV row lookup for output formatting
+    # -- Resolve the input catalog — DB by default, CSV if --csv given --
+    catalog_rows = _resolve_catalog_rows(csv_path)
+    csv_lookup = _build_url_lookup(catalog_rows) if catalog_rows else None
+    # Full row lookup for output formatting (keyed by property_id).
     csv_rows: dict[str, dict[str, Any]] = {}
-    if csv_path:
-        import csv as csv_mod
-
-        try:
-            with open(csv_path, encoding="utf-8-sig", newline="") as f:
-                for row in csv_mod.DictReader(f):
-                    pid = (
-                        row.get("property_id")
-                        or row.get("Unique ID")
-                        or row.get("Property ID")
-                        or row.get("apartmentid")
-                        or ""
-                    )
-                    if pid:
-                        csv_rows[pid] = dict(row)
-        except OSError:
-            pass
+    for row in catalog_rows:
+        pid = str(
+            row.get("property_id")
+            or row.get("Unique ID")
+            or row.get("Property ID")
+            or row.get("apartmentid")
+            or ""
+        )
+        if pid:
+            csv_rows[pid] = dict(row)
 
     # -- Load candidates --
     if mode == "unprocessed":
-        # CSV-vs-properties.json diff. Distinct loader because the other
-        # two modes iterate properties.json, which by definition does NOT
-        # contain the records we need to find here.
-        if csv_path is None:
-            log.error("unprocessed mode requires --csv pointing at the source CSV")
+        # Catalog-vs-properties.json diff. Distinct loader because the
+        # other two modes iterate properties.json, which by definition
+        # does NOT contain the records we need to find here.
+        if not catalog_rows:
+            log.error(
+                "unprocessed mode requires a non-empty catalog "
+                "(seed the `properties` table or pass --csv)"
+            )
             return {
                 "exit_status": "FATAL",
-                "error": "unprocessed mode requires --csv",
+                "error": "unprocessed mode requires a non-empty catalog",
                 "run_date": run_date,
                 "mode": mode,
             }
-        candidates = _load_unprocessed_candidates(source_run_dir, csv_path)
+        candidates = _load_unprocessed_candidates(source_run_dir, catalog_rows)
     else:
         # Try Jugnu format first (properties.json with _meta), fall back to legacy.
         candidates = _load_jugnu_candidates(source_run_dir, mode)
@@ -936,7 +937,8 @@ Examples:
         help=(
             "Process CSV rows that are missing from properties.json — "
             "recovers properties from a stuck/timed-out shard whose slice "
-            "never reached the output file. Requires --csv."
+            "never reached the output file. Reads the catalog from the "
+            "DataProvider by default; pass --csv to override."
         ),
     )
     parser.add_argument(
@@ -949,7 +951,12 @@ Examples:
         "--csv",
         type=Path,
         default=None,
-        help="CSV for URL lookup (needed when retrying legacy runs without URLs in output)",
+        help=(
+            "Optional CSV override. When set, replaces the DataProvider's "
+            "catalog (the `properties` table) as the source of truth for "
+            "URL lookups and --unprocessed diffing. Useful for retrying "
+            "legacy runs whose URLs aren't in the DB yet."
+        ),
     )
     parser.add_argument("--data-dir", type=Path, default=_MA_POC_ROOT / "data")
     parser.add_argument("--limit", type=int, default=None)

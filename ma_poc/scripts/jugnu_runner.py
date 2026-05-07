@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import csv
 import json
 import logging
 import os
@@ -105,24 +104,38 @@ def _resolve_data_dirs(
 
 
 async def run_jugnu(
-    csv_path: Path,
+    csv_path: Path | None = None,
     data_dir: Path = _MA_POC_ROOT / "data",
     limit: int | None = None,
     run_date: str | None = None,
     schema_version: str = "v1",
     start_index: int = 0,
+    shard_index: int | None = None,
+    shard_count: int | None = None,
 ) -> dict[str, Any]:
     """Run the Jugnu integrated pipeline.
 
     Args:
-        csv_path: Path to properties CSV.
+        csv_path: Optional CSV override. When set, the runner reads the
+            input catalog from this file regardless of DATA_PROVIDER —
+            useful for back-compat / dev. When None (the default), the
+            runner reads from `provider.property_catalog`, whose backing
+            store depends on DATA_PROVIDER (CSV for filesystem, the
+            `properties` table for postgres/sqlite).
         data_dir: Base data directory.
         limit: Max properties to process.
         run_date: Override run date (YYYY-MM-DD).
         schema_version: "v1" or "v2" output format.
-        start_index: Zero-based row index in the CSV to start scraping from.
-            Rows before this index are skipped. ``limit`` still caps the
-            number of rows processed *after* skipping.
+        start_index: Zero-based row index in the catalog to start scraping
+            from. Rows before this index are skipped. ``limit`` still caps
+            the number of rows processed *after* skipping.
+        shard_index: Zero-based index of this shard. Requires ``shard_count``.
+            Catalog rows are sliced into ``shard_count`` contiguous chunks
+            (ordered by canonical_id for SQL, original CSV order for CSV)
+            and this shard processes the chunk at ``shard_index``.
+        shard_count: Total number of shards. When set with ``shard_index``,
+            replaces the legacy "download CSV → slice → exec --csv" pattern
+            in jugnu_shard_entry.py.
 
     Returns:
         Run summary dict.
@@ -156,15 +169,56 @@ async def run_jugnu(
     events.configure(run_dir, run_id)
     cost_ledger = CostLedger(run_dir / "cost_ledger.db")
 
-    # Load CSV
-    rows = _load_csv(csv_path, limit, start_index=start_index)
+    # Resolve the catalog source — explicit --csv override beats the
+    # provider-default. Without --csv we read whichever backing store the
+    # configured DataProvider exposes (CSV for filesystem, DB for sql).
+    from data_provider.dtos import CatalogFilters
+    from data_provider.factory import get_data_provider
+    from data_provider.filesystem import CsvPropertyCatalogSource
+
+    if csv_path is not None:
+        catalog_source = CsvPropertyCatalogSource(csv_path)
+        catalog_label = f"csv:{csv_path}"
+    else:
+        catalog_source = get_data_provider().property_catalog
+        catalog_label = type(catalog_source).__name__
+
+    catalog_filters = CatalogFilters(
+        start_index=start_index or None,
+        shard_index=shard_index,
+        shard_count=shard_count,
+    )
+    catalog_rows = catalog_source.list_active(limit=limit, filters=catalog_filters)
+    # Downstream consumers (scheduler.build_tasks, csv_lookup, _format_v1/v2)
+    # treat each row as a flat dict with property_id/url + Title-Case CSV
+    # aliases. `as_csv_row()` mints exactly that shape from the DTO so
+    # nothing below this line cares whether the source was CSV or DB.
+    rows = [p.as_csv_row() for p in catalog_rows]
     log.info(
-        "Loaded %d properties from %s (start_index=%d, limit=%s)",
+        "Loaded %d properties from %s (start_index=%d, limit=%s, shard=%s/%s)",
         len(rows),
-        csv_path,
+        catalog_label,
         start_index,
         limit,
+        shard_index,
+        shard_count,
     )
+    # Empty-catalog defensive warning. Most likely cause: DATA_PROVIDER
+    # points at a SQL backend that hasn't been seeded yet — the operator
+    # forgot to run `python -m scripts.ingest_properties_csv`. Without
+    # this log line the run silently "succeeds" with zero properties
+    # processed, which looks like green CI but is a missed daily scrape.
+    # A user passing --csv explicitly knows what they're doing and might
+    # legitimately point at an empty file (smoke tests etc), so don't
+    # warn in that case.
+    if not rows and csv_path is None:
+        log.warning(
+            "Catalog source %s returned 0 properties. If DATA_PROVIDER points "
+            "at a SQL backend, did you run `python -m scripts.ingest_properties_csv` "
+            "to seed the `properties` table? Pass --csv to bypass the catalog "
+            "and read from a file directly.",
+            catalog_label,
+        )
 
     # Setup L2 components
     frontier = Frontier(state_dir / "frontier.sqlite")
@@ -1520,58 +1574,6 @@ def _safe_int_gt1(val: Any) -> int | None:
         return None
 
 
-# ---------------------------------------------------------------------------
-# CSV loading
-# ---------------------------------------------------------------------------
-
-
-def _load_csv(
-    csv_path: Path,
-    limit: int | None = None,
-    start_index: int = 0,
-) -> list[dict[str, Any]]:
-    """Load CSV rows with flexible column names.
-
-    Args:
-        csv_path: Path to the CSV file.
-        limit: Max rows to load *after* applying ``start_index``.
-        start_index: Zero-based row index to start from. Rows before this
-            index are skipped. The resulting ``property_id`` fallback still
-            uses the original row index so IDs stay stable across resumed
-            runs.
-
-    Returns:
-        List of row dicts.
-    """
-    if start_index < 0:
-        raise ValueError(f"start_index must be >= 0, got {start_index}")
-
-    rows: list[dict[str, Any]] = []
-    with open(csv_path, encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        for i, row in enumerate(reader):
-            if i < start_index:
-                continue
-            if limit and len(rows) >= limit:
-                break
-            # Normalize column names
-            normalized: dict[str, Any] = {}
-            for k, v in row.items():
-                normalized[k] = v
-            # Ensure property_id and url exist
-            if "property_id" not in normalized:
-                normalized["property_id"] = (
-                    normalized.get("Unique ID")
-                    or normalized.get("Property ID")
-                    or normalized.get("apartmentid")
-                    or f"row_{i}"
-                )
-            if "url" not in normalized:
-                normalized["url"] = normalized.get("Website") or normalized.get("website") or ""
-            rows.append(normalized)
-    return rows
-
-
 def _merge_with_existing_properties(
     path: Path,
     new_properties: list[dict[str, Any]],
@@ -1762,7 +1764,17 @@ def main() -> int:
         format="%(asctime)s %(name)s %(levelname)s: %(message)s",
     )
     parser = argparse.ArgumentParser(description="Jugnu integrated runner")
-    parser.add_argument("--csv", type=Path, default=_MA_POC_ROOT / "config" / "properties.csv")
+    parser.add_argument(
+        "--csv",
+        type=Path,
+        default=None,
+        help=(
+            "Optional CSV override. When set, reads the catalog from this "
+            "file instead of the DataProvider's catalog (which is the "
+            "`properties` table when DATA_PROVIDER=postgres/sqlite). Use "
+            "this for dev / back-compat with the legacy CSV workflow."
+        ),
+    )
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--data-dir", type=Path, default=_MA_POC_ROOT / "data")
     parser.add_argument("--run-date", type=str, default=None)
@@ -1770,7 +1782,23 @@ def main() -> int:
         "--start-index",
         type=int,
         default=0,
-        help="Zero-based CSV row index to start scraping from (skips earlier rows).",
+        help="Zero-based catalog row index to start scraping from (skips earlier rows).",
+    )
+    parser.add_argument(
+        "--shard-index",
+        type=int,
+        default=None,
+        help=(
+            "Zero-based shard index for distributed runs. Requires "
+            "--shard-count. Replaces the CSV-slicing pattern previously "
+            "used in jugnu_shard_entry.py."
+        ),
+    )
+    parser.add_argument(
+        "--shard-count",
+        type=int,
+        default=None,
+        help="Total number of shards in the run.",
     )
     parser.add_argument(
         "--schema-version",
@@ -1779,6 +1807,9 @@ def main() -> int:
         help="Output schema version (default: env SCHEMA_VERSION or v1)",
     )
     args = parser.parse_args()
+
+    if (args.shard_index is None) != (args.shard_count is None):
+        parser.error("--shard-index and --shard-count must be provided together")
 
     schema_version = _resolve_schema_version(args)
 
@@ -1790,6 +1821,8 @@ def main() -> int:
             run_date=args.run_date,
             schema_version=schema_version,
             start_index=args.start_index,
+            shard_index=args.shard_index,
+            shard_count=args.shard_count,
         )
     )
 

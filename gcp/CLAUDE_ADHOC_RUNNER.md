@@ -319,6 +319,54 @@ Or:
 SCRIPT_ARGS=--retry example.com --run-date 2026-05-07
 ```
 
+#### `failure_debug_summary` — per-property failure debug bundles
+For every property whose `run_ledger` status is not `SUCCESS` on the given day, builds a self-contained triage bundle combining Cloud SQL state and Cloud Storage artifacts. Each bundle includes the latest `scrape_events`, all `run_issues`, the full `scrape_profile` (maturity, blocked_endpoints, llm_field_mappings), the `property_snapshot.payload` with `_meta` / `_extract_result` / `_explored_links` / `_raw_api_responses` / `_filtered_apis` / `_winning_page_url` / `_llm_interactions`, the `dlq_entries` row if parked, and `llm_property_details` / `llm_diagnostics` blobs. With `--include-gcs` (or `--use-gcs` for runs aged out past the 3-day SQL retention) it also copies in `property_reports/{cid}.md`, `raw_api/{cid}.json`, and `llm_report/{cid}.json` from `gs://{BUCKET_NAME}/runs/{date}/shard_*/`.
+
+| Field | Value |
+|---|---|
+| `SCRIPT_NAME` | `failure_debug_summary` |
+| `SCRIPT_ARGS` | `--run-date 2026-05-07 --include-gcs` |
+
+Variations:
+```
+# Today (UTC), latest run, SQL only
+SCRIPT_ARGS=
+
+# Specific day, full bundle (SQL + GCS artifacts)
+SCRIPT_ARGS=--run-date 2026-05-07 --include-gcs
+
+# Backdated past the 3-day SQL retention — forces GCS read
+SCRIPT_ARGS=--run-date 2026-05-01 --use-gcs
+
+# Drill into specific properties (cids that succeeded are dropped automatically)
+SCRIPT_ARGS=--run-date 2026-05-07 --canonical-ids 12345,67890 --include-gcs
+
+# Pin the output dir
+SCRIPT_ARGS=--run-date 2026-05-07 --out-dir /tmp/failures --include-gcs
+
+# Tweak the per-cid scrape_events window (default 10)
+SCRIPT_ARGS=--run-date 2026-05-07 --events-limit 25
+```
+
+Output (default `ma_poc/data/runs/{run_date}/failure_debug/`):
+```
+failure_debug/
+    index.md / index.json                       # Top-level: status / tier / issue-code histograms + per-cid links
+    {canonical_id}/
+        summary.md / summary.json               # Triage summary (URLs scraped/filtered/explored, issue codes, latest scrape event, profile state)
+        scrape_profile.json                     # Full profile payload
+        scrape_events.jsonl                     # Latest events
+        run_issues.jsonl                        # All issues for this cid
+        property_snapshot.json                  # Full payload incl. internal debug keys
+        llm_property_detail.json                # If present
+        llm_diagnostics.jsonl                   # If present
+        dlq_entry.json                          # If currently parked
+        property_report.md / raw_api.json /     # Copied from GCS shard if --include-gcs
+            llm_report.json
+```
+
+> The bundle is self-contained — no follow-up `gsutil` needed. Inspect `index.md` first for the failure cohort overview, then drill into any `{cid}/summary.md` for the per-property narrative.
+
 ---
 
 ### Migrations / schema
@@ -379,6 +427,19 @@ These exist in `ma_poc/scripts/` but require local-laptop context (browser sessi
 1. The data-dir must exist on the container. If it's only in GCS, write a small wrapper that downloads first; otherwise:
 2. `SCRIPT_NAME=sync_run_to_pg`, `SCRIPT_ARGS=--run-date 2026-05-04 --data-dir /tmp/data`.
 3. Then trigger any downstream backfill (`backfill_artifacts_pg --run-date <same>`).
+
+### "Why did these properties fail today? Get me everything"
+
+Builds a per-property bundle for every cid whose `run_ledger` status is not `SUCCESS`, combining Cloud SQL (events, issues, profile, snapshot, dlq, llm tables) and Cloud Storage (`property_reports/{cid}.md`, `raw_api/{cid}.json`, `llm_report/{cid}.json`).
+
+1. Today's run, full bundle:
+   ```
+   SCRIPT_NAME=failure_debug_summary
+   SCRIPT_ARGS=--include-gcs
+   ```
+2. After it finishes, browse `data/runs/{date}/failure_debug/index.md` in the run dir (uploaded back to `gs://{BUCKET_NAME}/runs/{date}/shard_<idx>/failure_debug/` by the next sync).
+3. For ad-hoc inspection of specific cids: `SCRIPT_ARGS=--canonical-ids 12345,67890 --include-gcs`.
+4. For runs older than 3 days (past SQL retention): `SCRIPT_ARGS=--run-date 2026-05-01 --use-gcs`.
 
 ### "Verify the live image is healthy after a deploy"
 

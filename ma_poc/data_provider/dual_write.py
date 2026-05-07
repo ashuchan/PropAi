@@ -213,6 +213,8 @@ class DualWriteDataProvider(DataProvider):
         self.extraction_results = _DualExtractionResults(
             primary.extraction_results, secondary.extraction_results
         )
+        # Read-only — nothing to dual-write. Primary is the source of truth.
+        self.property_catalog = primary.property_catalog
 
     @property
     def name(self) -> str:

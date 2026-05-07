@@ -4,13 +4,25 @@ scripts/jugnu_shard_entry.py — Cloud Run task entry point.
 Environment variables consumed:
   CLOUD_RUN_TASK_INDEX   (auto-set by Cloud Run) — this task's index
   CLOUD_RUN_TASK_COUNT   (auto-set by Cloud Run) — total tasks in execution
-  CSV_GCS_URI            (required) — gs:// URI of the properties CSV
+  SHARD_SOURCE           (optional) — "db" (default) or "csv". DB-mode reads
+                                       the catalog from the `properties` table
+                                       and slices via --shard-index/--shard-count.
+                                       CSV-mode is the legacy download-and-slice
+                                       path, retained as an escape hatch.
+  CSV_GCS_URI            (required iff SHARD_SOURCE=csv) — gs:// URI of the CSV
   RUN_DATE               (optional) — YYYY-MM-DD; defaults to UTC today
   LIMIT                  (optional) — cap properties per shard; useful for smoke tests
   SCHEMA_VERSION         (optional) — v1 or v2; defaults to v1
   BUCKET_NAME            (required) — bucket for artifact upload
 
-Flow:
+Flow (SHARD_SOURCE=db, default):
+  1. Exec: python ma_poc/scripts/jugnu_runner.py --shard-index $IDX --shard-count $N
+     The runner queries the `properties` table directly and slices rows by
+     (canonical_id ORDER BY) into $N contiguous chunks. No CSV download,
+     no /tmp slicing, no per-shard CSV file.
+  2. Sync, upload, exit — identical to the legacy flow below.
+
+Flow (SHARD_SOURCE=csv, legacy):
   1. Download CSV from GCS to /tmp/properties.csv
   2. Slice rows for this shard (ceiling division)
   3. Write slice to /tmp/shard_{idx}.csv
@@ -253,34 +265,22 @@ def main() -> None:
 
     task_idx = int(os.environ.get("CLOUD_RUN_TASK_INDEX", "0"))
     task_count = int(os.environ.get("CLOUD_RUN_TASK_COUNT", "1"))
-    csv_gcs_uri = _require_env("CSV_GCS_URI")
     bucket_name = _require_env("BUCKET_NAME")
     run_date = os.environ.get("RUN_DATE") or date.today().isoformat()
     limit_str = os.environ.get("LIMIT")
     limit = int(limit_str) if limit_str else None
     schema_version = os.environ.get("SCHEMA_VERSION", "v1")
+    shard_source = (os.environ.get("SHARD_SOURCE") or "db").strip().lower()
 
-    print(f"[shard_entry] task {task_idx}/{task_count}, run_date={run_date}", file=sys.stderr)
+    print(
+        f"[shard_entry] task {task_idx}/{task_count}, run_date={run_date}, source={shard_source}",
+        file=sys.stderr,
+    )
 
-    # 1. Download CSV
-    csv_local = Path("/tmp/properties.csv")
-    _download_csv(csv_gcs_uri, csv_local)
-
-    # 2-3. Slice to shard file
-    shard_csv, row_count = _slice_csv(csv_local, task_idx, task_count, limit)
-    print(f"[shard_entry] shard has {row_count} rows", file=sys.stderr)
-
-    if row_count == 0:
-        print("[shard_entry] Empty shard — nothing to process, exiting 0", file=sys.stderr)
-        sys.exit(0)
-
-    # 4-5. Run the pipeline; always upload artifacts
     runner = _app_root / "ma_poc" / "scripts" / "jugnu_runner.py"
     cmd = [
         sys.executable,
         str(runner),
-        "--csv",
-        str(shard_csv),
         "--run-date",
         run_date,
         "--schema-version",
@@ -288,6 +288,33 @@ def main() -> None:
         "--data-dir",
         "/tmp/data",
     ]
+
+    if shard_source == "db":
+        # DB-mode: the runner reads the `properties` table and slices
+        # rows itself. No download, no /tmp shard CSV. Empty-shard
+        # detection is the runner's job (a shard whose canonical_id
+        # range is empty exits cleanly with zero properties processed).
+        cmd += [
+            "--shard-index",
+            str(task_idx),
+            "--shard-count",
+            str(task_count),
+        ]
+    elif shard_source == "csv":
+        # Legacy escape hatch — download the CSV from GCS, slice locally,
+        # exec the runner with --csv pointing at the shard file.
+        csv_gcs_uri = _require_env("CSV_GCS_URI")
+        csv_local = Path("/tmp/properties.csv")
+        _download_csv(csv_gcs_uri, csv_local)
+        shard_csv, row_count = _slice_csv(csv_local, task_idx, task_count, limit)
+        print(f"[shard_entry] shard has {row_count} rows", file=sys.stderr)
+        if row_count == 0:
+            print("[shard_entry] Empty shard — nothing to process, exiting 0", file=sys.stderr)
+            sys.exit(0)
+        cmd += ["--csv", str(shard_csv)]
+    else:
+        sys.exit(f"Unknown SHARD_SOURCE={shard_source!r}; expected 'db' or 'csv'")
+
     if limit is not None:
         cmd += ["--limit", str(limit)]
 
@@ -359,8 +386,10 @@ if __name__ == "__main__":
     task_idx = os.environ.get("CLOUD_RUN_TASK_INDEX", "0")
     task_count = os.environ.get("CLOUD_RUN_TASK_COUNT", "1")
 
-    # If running as a stub (no CSV_GCS_URI) print info and exit
-    if not os.environ.get("CSV_GCS_URI"):
+    # Stub-mode detection: if neither BUCKET_NAME nor any explicit "go"
+    # signal is set, just print info and exit. Previously keyed off
+    # CSV_GCS_URI, which DB-mode shards no longer set.
+    if not os.environ.get("BUCKET_NAME"):
         print(f"jugnu_shard_entry stub: task {task_idx}/{task_count}")
         sys.exit(0)
 

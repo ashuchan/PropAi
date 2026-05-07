@@ -55,6 +55,8 @@ __all__ = [
     "RunReport",
     "IssueEntry",
     "LedgerEntry",
+    "PropertyToScrape",
+    "CatalogFilters",
 ]
 
 
@@ -208,6 +210,112 @@ class IssueEntry(BaseModel):
     row_index: int | None = None
     details: dict[str, Any] | None = None
     timestamp: datetime | str | None = None
+
+
+class CatalogFilters(BaseModel):
+    """Narrow filter set passed to IPropertyCatalogSource.list_active().
+
+    Empty values mean "no filter". Filters AND together — passing both
+    `pms_platforms` and `canonical_ids` returns rows matching both.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    canonical_ids: list[str] | None = None
+    pms_platforms: list[str] | None = None
+    property_types: list[str] | None = None  # STABILISED | LEASE_UP
+    shard_index: int | None = None  # zero-based; requires shard_count
+    shard_count: int | None = None  # total number of shards
+    start_index: int | None = None  # zero-based row offset (post-filter)
+
+
+class PropertyToScrape(BaseModel):
+    """One row in the input catalog — a property the runner should scrape.
+
+    Carries V2-canonical fields (`proj_name`, `website`, `zip_code`, …) plus
+    a `raw` passthrough dict so consumers that do dict.get() fallbacks
+    against many column-name variants ("Property Name", "name", "proj_name")
+    keep working without per-call refactors.
+
+    Use `as_csv_row()` to get a flat dict shaped like the legacy CSV row.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    canonical_id: str
+    url: str
+
+    # V2-canonical enrichment (mirrors `properties` table columns).
+    proj_name: str | None = None
+    address: str | None = None
+    city: str | None = None
+    state: str | None = None
+    zip_code: str | None = None
+    country: str | None = None
+    phone: str | None = None
+    email_address: str | None = None
+    website: str | None = None
+    pmc: str | None = None
+    apartment_id: int | None = None
+    property_type: str | None = None  # STABILISED | LEASE_UP | other
+
+    # Anything else the source surfaced — CSV columns we don't model
+    # explicitly, JSON `extra` from the SQL row, etc. Passed through to
+    # consumers that look up by string key.
+    raw: dict[str, Any] = Field(default_factory=dict)
+
+    def as_csv_row(self) -> dict[str, Any]:
+        """Flatten to the dict shape `_format_v1` / `_format_v2` consume.
+
+        Populates *both* the V2 keys (`proj_name`, `website`, `zip_code`)
+        and the Title-Case CSV aliases (`Property Name`, `Website`,
+        `ZIP Code`) so existing fallback lookups keep hitting. `raw` is
+        layered first so explicit fields win on collision.
+        """
+        d: dict[str, Any] = dict(self.raw)
+        # Always-present normalised keys.
+        d["property_id"] = self.canonical_id
+        d["url"] = self.url
+        # Aliases keyed off each V2 field. setdefault so an existing
+        # value in `raw` (e.g. the original CSV cell) takes precedence.
+        if self.proj_name:
+            d.setdefault("name", self.proj_name)
+            d.setdefault("Name", self.proj_name)
+            d.setdefault("Property Name", self.proj_name)
+            d.setdefault("proj_name", self.proj_name)
+        if self.address:
+            d.setdefault("address", self.address)
+            d.setdefault("Address", self.address)
+            d.setdefault("Property Address", self.address)
+        if self.city:
+            d.setdefault("city", self.city)
+            d.setdefault("City", self.city)
+        if self.state:
+            d.setdefault("state", self.state)
+            d.setdefault("State", self.state)
+        if self.zip_code:
+            d.setdefault("zip", self.zip_code)
+            d.setdefault("Zip", self.zip_code)
+            d.setdefault("ZIP Code", self.zip_code)
+            d.setdefault("zip_code", self.zip_code)
+        if self.phone:
+            d.setdefault("phone", self.phone)
+            d.setdefault("Phone", self.phone)
+        if self.website:
+            d.setdefault("website", self.website)
+            d.setdefault("Website", self.website)
+        if self.pmc:
+            d.setdefault("pmc", self.pmc)
+            d.setdefault("Management Company", self.pmc)
+        if self.apartment_id is not None:
+            d.setdefault("apartmentid", self.apartment_id)
+            d.setdefault("apartment_id", self.apartment_id)
+            d.setdefault("Unique ID", self.apartment_id)
+        if self.property_type:
+            d.setdefault("type", self.property_type)
+            d.setdefault("Type", self.property_type)
+            d.setdefault("Property Type", self.property_type)
+        return d
 
 
 class LedgerEntry(BaseModel):

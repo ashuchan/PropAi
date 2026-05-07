@@ -24,16 +24,19 @@ from sqlalchemy.orm import Session, sessionmaker
 from data_provider.contracts import (
     IExtractionResultStore,
     IProfileStore,
+    IPropertyCatalogSource,
     IPropertyStateStore,
     IRunStore,
     IScrapeEventStore,
     IUnitStateStore,
 )
 from data_provider.dtos import (
+    CatalogFilters,
     ExtractionResult,
     IssueEntry,
     LedgerEntry,
     PropertyIndexEntry,
+    PropertyToScrape,
     RunReport,
     RunSummary,
     ScrapeEvent,
@@ -364,6 +367,126 @@ class SqlPropertyStateStore(IPropertyStateStore):
         with self._h.scope() as s:
             rows = s.execute(select(PropertyRow.canonical_id)).scalars().all()
             return set(rows)
+
+
+# ── IPropertyCatalogSource ───────────────────────────────────────────────────
+
+
+class SqlPropertyCatalogSource(IPropertyCatalogSource):
+    """Catalog backed by the `properties` table.
+
+    Stable order is enforced via `ORDER BY canonical_id` so shard slicing
+    yields the same rows for the same `(shard_index, shard_count)` across
+    processes — the contract's stable-order requirement.
+
+    Sharding is done in SQL via OFFSET/LIMIT computed from the post-filter
+    count: identical semantics to the CSV source's pure-Python slice.
+    """
+
+    def __init__(self, holder: _SessionHolder) -> None:
+        self._h = holder
+
+    @staticmethod
+    def _row_to_dto(row: PropertyRow) -> PropertyToScrape:
+        extra = dict(row.extra or {})
+        # `extra` may carry the original CSV cell values (Property Type,
+        # Building Type, etc.) when the row was seeded via the ingest
+        # script. Surface them as `raw` so dict-style consumers in the
+        # runner keep finding their old keys.
+        property_type = extra.pop("property_type", None) or extra.pop("Property Type", None)
+        return PropertyToScrape(
+            canonical_id=row.canonical_id,
+            url=row.website or "",
+            proj_name=row.proj_name,
+            address=row.address,
+            city=row.city,
+            state=row.state,
+            zip_code=row.zip_code,
+            country=row.country,
+            phone=row.phone,
+            email_address=row.email_address,
+            website=row.website,
+            pmc=row.pmc,
+            apartment_id=row.apartment_id,
+            property_type=property_type,
+            raw=extra,
+        )
+
+    @staticmethod
+    def _apply_filters(stmt: Any, filters: CatalogFilters | None) -> Any:
+        if filters is None:
+            return stmt
+        if filters.canonical_ids:
+            stmt = stmt.where(PropertyRow.canonical_id.in_(filters.canonical_ids))
+        # `property_types` lives in the `extra` JSON; SQL filtering across
+        # JSON fields is dialect-specific and rarely needed for 500 rows.
+        # Apply in-memory after fetch to keep this dialect-agnostic.
+        return stmt
+
+    @staticmethod
+    def _apply_post_filters(
+        rows: list[PropertyRow], filters: CatalogFilters | None
+    ) -> list[PropertyRow]:
+        if filters is None or not filters.property_types:
+            return rows
+        wanted = {t.upper() for t in filters.property_types}
+        out: list[PropertyRow] = []
+        for r in rows:
+            extra = r.extra or {}
+            t = extra.get("property_type") or extra.get("Property Type") or ""
+            if str(t).upper() in wanted:
+                out.append(r)
+        return out
+
+    def list_active(
+        self,
+        *,
+        limit: int | None = None,
+        filters: CatalogFilters | None = None,
+    ) -> list[PropertyToScrape]:
+        with self._h.scope() as s:
+            stmt = select(PropertyRow).order_by(PropertyRow.canonical_id)
+            stmt = self._apply_filters(stmt, filters)
+            rows = list(s.execute(stmt).scalars().all())
+
+        # Post-filters that are easier in Python than SQL (JSON-extra lookups).
+        rows = self._apply_post_filters(rows, filters)
+
+        # Shard slicing operates on the filtered set — identical to the
+        # CSV source so a shard scrapes the same rows regardless of source.
+        if filters is not None and filters.shard_index is not None and filters.shard_count is not None:
+            idx = filters.shard_index
+            count = filters.shard_count
+            if count <= 0 or idx < 0 or idx >= count:
+                return []
+            per_shard = (len(rows) + count - 1) // count
+            start = idx * per_shard
+            end = min(start + per_shard, len(rows))
+            rows = rows[start:end]
+
+        if filters is not None and filters.start_index:
+            rows = rows[filters.start_index :]
+        if limit is not None:
+            rows = rows[:limit]
+        return [self._row_to_dto(r) for r in rows]
+
+    def count_active(self, *, filters: CatalogFilters | None = None) -> int:
+        with self._h.scope() as s:
+            stmt = select(PropertyRow).order_by(PropertyRow.canonical_id)
+            stmt = self._apply_filters(stmt, filters)
+            rows = list(s.execute(stmt).scalars().all())
+        rows = self._apply_post_filters(rows, filters)
+        # Match list_active's shard math so callers can size shards correctly.
+        if filters is not None and filters.shard_index is not None and filters.shard_count is not None:
+            idx = filters.shard_index
+            count = filters.shard_count
+            if count <= 0 or idx < 0 or idx >= count:
+                return 0
+            per_shard = (len(rows) + count - 1) // count
+            start = idx * per_shard
+            end = min(start + per_shard, len(rows))
+            return end - start
+        return len(rows)
 
 
 # ── IUnitStateStore ──────────────────────────────────────────────────────────
