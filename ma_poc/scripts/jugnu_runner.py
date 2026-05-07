@@ -939,6 +939,23 @@ def _format_v2_unit(
     except Exception:
         pass
 
+    # Bed/bath fallback inference from the floor-plan name. Only fills
+    # gaps — never overwrites a source value. Drives down the pool of
+    # plans whose ``beds``/``baths`` is NULL in ``units``, which is the
+    # dominant cause of comparator misses (Phase 2 of the floor-plan gap
+    # plan).
+    if (beds_raw in (None, "")) or (baths_raw in (None, "")):
+        try:
+            from ma_poc.pms.adapters._parsing import infer_bed_bath_from_name
+
+            inferred_beds, inferred_baths = infer_bed_bath_from_name(fp_name)
+            if beds_raw in (None, "") and inferred_beds is not None:
+                beds_raw = inferred_beds
+            if baths_raw in (None, "") and inferred_baths is not None:
+                baths_raw = inferred_baths
+        except Exception:
+            pass
+
     # rent: numeric first, parse rent_range string if needed.
     rent_lo_raw = unit.get("market_rent_low") or unit.get("asking_rent")
     rent_hi_raw = unit.get("market_rent_high") or unit.get("asking_rent")
@@ -952,10 +969,28 @@ def _format_v2_unit(
             except Exception:
                 pass
 
+    norm_beds = _normalize_beds(beds_raw)
+    norm_baths = _normalize_baths(baths_raw)
+
+    # Phase 3: stamp a deterministic floor_plan_id so analytics can
+    # collapse unit-level rows back to plan-level rows. Computed from
+    # post-normalisation values so two units with the same plan always
+    # share the id even when one source emitted "Studio" and another
+    # emitted "0".
+    try:
+        from ma_poc.pms.adapters._parsing import compute_floor_plan_id
+
+        floor_plan_id = compute_floor_plan_id(
+            property_id, fp_name, norm_beds, norm_baths
+        )
+    except Exception:
+        floor_plan_id = None
+
     out: dict[str, Any] = {
-        "beds": _normalize_beds(beds_raw),
-        "baths": _normalize_baths(baths_raw),
+        "beds": norm_beds,
+        "baths": norm_baths,
         "floor_plan_name": fp_name or None,
+        "floor_plan_id": floor_plan_id,
         "area": _format_area(sqft),
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
         "rent_low": _format_rent(rent_lo_raw),

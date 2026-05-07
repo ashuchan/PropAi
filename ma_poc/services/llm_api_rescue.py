@@ -14,7 +14,6 @@ from __future__ import annotations
 import copy
 import json
 import logging
-import os
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -352,126 +351,65 @@ async def _call_llm(prompt: str, property_id: str) -> tuple[dict, float, str]:
     chance of success. Callers detect this case via ``raw == ""`` and surface
     the source URL to the per-property blocklist.
     """
-    endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
-    api_key = os.environ.get("AZURE_OPENAI_API_KEY", "")
-    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
-
-    if not endpoint or not api_key:
-        # No Azure credentials → delegate to the configured provider
-        # (OpenRouter / Anthropic / etc.) via the shared text provider.
-        # This is the path that fires under the production env where
-        # LLM_PROVIDER=openrouter and AZURE_OPENAI_* are unset.
-        try:
-            from llm.factory import get_text_provider
-            from llm.interaction_logger import make_interaction
-        except Exception as exc:
-            log.warning("llm_api_rescue: text provider unavailable: %s", exc)
-            return {}, 0.0, ""
-
-        system = "You are a real estate data extraction agent. Return ONLY valid JSON. No markdown, no commentary."
-        for attempt in range(2):
-            try:
-                provider = get_text_provider()
-            except Exception as exc:
-                log.warning("llm_api_rescue: get_text_provider failed for %s: %s", property_id, exc)
-                return {}, 0.0, ""
-            current_prompt = prompt
-            if attempt == 1:
-                current_prompt += "\nReturn ONLY a valid JSON object. No prose, no markdown."
-            try:
-                raw = await provider.complete(system, current_prompt, max_tokens=4096)
-            except Exception as exc:
-                log.warning("llm_api_rescue: shared LLM call failed for %s: %s", property_id, exc)
-                return {}, 0.0, ""
-            # Empty-body short-circuit: upstream returned nothing. Retry
-            # would just hit the same null response. Surface to caller via
-            # raw="" so it can blocklist the source URL.
-            if not raw or not raw.strip():
-                log.warning(
-                    "llm_api_rescue: empty body from provider for %s (attempt %d); not retrying",
-                    property_id, attempt + 1,
-                )
-                return {}, 0.0, ""
-            usage = getattr(provider, "_last_usage", {}) or {}
-            try:
-                interaction = make_interaction(
-                    property_id=property_id,
-                    tier="TIER_6_LLM_RESCUE",
-                    call_type="text",
-                    provider=str(usage.get("provider", "unknown")),
-                    model=str(usage.get("model", "unknown")),
-                    system_prompt=system,
-                    user_prompt=current_prompt,
-                    raw_response=raw,
-                    tokens_input=int(usage.get("input_tokens", 0)),
-                    tokens_output=int(usage.get("output_tokens", 0)),
-                    latency_ms=0,
-                    timestamp="",
-                    success=True,
-                    error=None,
-                )
-                cost = float((interaction or {}).get("cost_usd", 0.0))
-            except Exception:
-                cost = 0.0
-            try:
-                parsed = _parse_json_response(raw)
-                return parsed, cost, raw
-            except json.JSONDecodeError as exc:
-                log.warning(
-                    "llm_api_rescue: JSON decode error (attempt %d) for %s: %s",
-                    attempt + 1, property_id, exc,
-                )
-                if attempt == 1:
-                    return {}, cost, raw
+    try:
+        from llm.factory import get_text_provider
+        from llm.interaction_logger import make_interaction
+    except Exception as exc:
+        log.warning("llm_api_rescue: text provider unavailable: %s", exc)
         return {}, 0.0, ""
 
+    system = "You are a real estate data extraction agent. Return ONLY valid JSON. No markdown, no commentary."
     for attempt in range(2):
+        try:
+            provider = get_text_provider()
+        except Exception as exc:
+            log.warning("llm_api_rescue: get_text_provider failed for %s: %s", property_id, exc)
+            return {}, 0.0, ""
         current_prompt = prompt
         if attempt == 1:
             current_prompt += "\nReturn ONLY a valid JSON object. No prose, no markdown."
         try:
-            import httpx
-
-            headers = {
-                "api-key": api_key,
-                "Content-Type": "application/json",
-            }
-            payload = {
-                "messages": [{"role": "user", "content": current_prompt}],
-                "temperature": 0.0,
-                "max_tokens": 4096,
-            }
-            url = f"{endpoint.rstrip('/')}/openai/deployments/{deployment}/chat/completions?api-version=2024-02-01"
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(url, headers=headers, json=payload)
-                resp.raise_for_status()
-                data = resp.json()
-            raw = data["choices"][0]["message"]["content"]
-            # Empty-body short-circuit (Azure path) — see shared-provider
-            # branch above for rationale.
-            if not raw or not raw.strip():
-                log.warning(
-                    "llm_api_rescue: empty body from Azure for %s (attempt %d); not retrying",
-                    property_id, attempt + 1,
-                )
-                return {}, 0.0, ""
-            # Estimate cost: GPT-4o-mini ~$0.15/1M input + $0.60/1M output tokens
-            usage = data.get("usage", {})
-            in_tok = usage.get("prompt_tokens", 0)
-            out_tok = usage.get("completion_tokens", 0)
-            cost = (in_tok * 0.15 + out_tok * 0.60) / 1_000_000
+            raw = await provider.complete(system, current_prompt, max_tokens=4096)
+        except Exception as exc:
+            log.warning("llm_api_rescue: shared LLM call failed for %s: %s", property_id, exc)
+            return {}, 0.0, ""
+        if not raw or not raw.strip():
+            log.warning(
+                "llm_api_rescue: empty body from provider for %s (attempt %d); not retrying",
+                property_id, attempt + 1,
+            )
+            return {}, 0.0, ""
+        usage = getattr(provider, "_last_usage", {}) or {}
+        try:
+            interaction = make_interaction(
+                property_id=property_id,
+                tier="TIER_6_LLM_RESCUE",
+                call_type="text",
+                provider=str(usage.get("provider", "unknown")),
+                model=str(usage.get("model", "unknown")),
+                system_prompt=system,
+                user_prompt=current_prompt,
+                raw_response=raw,
+                tokens_input=int(usage.get("input_tokens", 0)),
+                tokens_output=int(usage.get("output_tokens", 0)),
+                latency_ms=0,
+                timestamp="",
+                success=True,
+                error=None,
+            )
+            cost = float((interaction or {}).get("cost_usd", 0.0))
+        except Exception:
+            cost = 0.0
+        try:
             parsed = _parse_json_response(raw)
             return parsed, cost, raw
         except json.JSONDecodeError as exc:
             log.warning(
-                "llm_api_rescue: JSON decode error (attempt %d) for %s: %s", attempt + 1, property_id, exc
+                "llm_api_rescue: JSON decode error (attempt %d) for %s: %s",
+                attempt + 1, property_id, exc,
             )
             if attempt == 1:
-                return {}, 0.0, ""
-        except Exception as exc:
-            log.warning("llm_api_rescue: LLM call failed for %s: %s", property_id, exc)
-            return {}, 0.0, ""
-
+                return {}, cost, raw
     return {}, 0.0, ""
 
 
