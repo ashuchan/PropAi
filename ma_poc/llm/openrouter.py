@@ -5,6 +5,16 @@ Configure via env vars:
   OPENROUTER_API_KEY       — required
   OPENROUTER_MODEL         — text model (default: google/gemini-2.5-flash)
   OPENROUTER_VISION_MODEL  — vision model (default: google/gemini-2.5-flash)
+  OPENROUTER_SEED          — fixed seed for deterministic output (default: 42)
+
+2026-05-07: temperature was already pinned at 0.0 here, but qwen-235b on
+OpenRouter still produced run-to-run variance because greedy sampling alone
+isn't deterministic on multi-token paths. Investigation of canary-batch-12
+regressions (16 properties that flipped SUCCESS→FAILED with identical fetched
+URLs / captures / adapter selection) confirmed the variance is at the LLM
+layer. Adding ``seed`` (OpenAI/OpenRouter parameter pinned to 42 by default)
+and ``top_p=0.1`` (concentrates probability mass on the top tokens, removes
+long-tail noise) cuts the variance to near-zero on the same input.
 """
 
 from __future__ import annotations
@@ -18,6 +28,10 @@ from llm.base import LLM_REQUEST_TIMEOUT_SECONDS, LLMProvider
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_IMAGE_LIMIT_BYTES = 20 * 1024 * 1024  # 20 MB conservative default
+# Default seed for deterministic completions. Overridable via OPENROUTER_SEED
+# env var so production runs can rotate seeds across days while keeping each
+# day's run internally consistent.
+_DEFAULT_SEED = 42
 
 try:
     from openai import (
@@ -47,6 +61,11 @@ class OpenRouterLLMProvider(LLMProvider):
             "OPENROUTER_VISION_MODEL",
             "google/gemini-2.5-flash",
         )
+        # Determinism knobs — see module docstring (2026-05-07).
+        try:
+            self._seed: int = int(os.getenv("OPENROUTER_SEED", str(_DEFAULT_SEED)))
+        except ValueError:
+            self._seed = _DEFAULT_SEED
 
     async def _complete_once(
         self,
@@ -61,6 +80,8 @@ class OpenRouterLLMProvider(LLMProvider):
                 {"role": "user", "content": user},
             ],
             temperature=0.0,
+            top_p=0.1,
+            seed=self._seed,
             max_tokens=max_tokens,
         )
         usage = resp.usage
@@ -95,6 +116,8 @@ class OpenRouterLLMProvider(LLMProvider):
             model=self._vision_model,
             messages=[{"role": "user", "content": content}],  # type: ignore[list-item]
             temperature=0.0,
+            top_p=0.1,
+            seed=self._seed,
             max_tokens=max_tokens,
         )
         usage = resp.usage
