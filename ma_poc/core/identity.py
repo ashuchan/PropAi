@@ -329,3 +329,20 @@ def _round_to(value: int, step: int) -> int:
     if step <= 0:
         return value
     return round(value / step) * step
+
+
+def csv_get(row: dict, *keys: str) -> str:
+    """Return the first non-empty value found under any of the given column names.
+
+    Treats ``None``, empty string, ``"null"``, ``"none"``, ``"n/a"``, and
+    ``"na"`` as absent.  Used by ``core/schema_v2.build_v2_property`` to
+    pull CSV property-level fields by their various header spellings.
+    """
+    for k in keys:
+        v = row.get(k)
+        if v is None:
+            continue
+        s = str(v).strip()
+        if s and s.lower() not in ("null", "none", "n/a", "na"):
+            return s
+    return ""

@@ -24,7 +24,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -74,8 +74,8 @@ def check_phase_0() -> GateResult:
             "'Current-pipeline metrics' section has at least one baseline capture",
         )
 
-    script_path = ROOT / "scripts" / "refactor_baseline.py"
-    result.add(script_path.is_file(), "scripts/refactor_baseline.py exists")
+    script_path = ROOT / "scripts" / "baselines" / "refactor.py"
+    result.add(script_path.is_file(), "scripts/baselines/refactor.py exists")
 
     ok, summary = _run_pytest("tests/refactor/test_baseline.py")
     result.add(ok, f"tests/refactor/test_baseline.py — {summary}")
@@ -267,8 +267,8 @@ def check_phase_6() -> GateResult:
     ok, summary = _run_pytest("tests/profile/test_migration.py")
     result.add(ok, f"tests/profile/test_migration.py — {summary}")
 
-    migrate = ROOT / "scripts" / "migrate_profiles_v1_to_v2.py"
-    result.add(migrate.is_file(), "scripts/migrate_profiles_v1_to_v2.py exists")
+    migrate = ROOT / "scripts" / "migrations" / "profiles_v1_to_v2.py"
+    result.add(migrate.is_file(), "scripts/migrations/profiles_v1_to_v2.py exists")
 
     return result
 

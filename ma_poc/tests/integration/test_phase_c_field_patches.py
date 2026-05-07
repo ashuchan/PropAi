@@ -17,7 +17,7 @@ def test_c1_resolve_source_url_picks_right_response() -> None:
         {"url": "https://x.com/api/units", "body": [{"id": "U1", "rent": 1500}]},
     ]
     target = {"unit_id": "U1"}
-    from ma_poc.scripts.jugnu_runner import _resolve_source_url
+    from ma_poc.scripts.runners.jugnu import _resolve_source_url
 
     url, body = _resolve_source_url(raw_apis, target)
     assert url == "https://x.com/api/units"
@@ -26,7 +26,7 @@ def test_c1_resolve_source_url_picks_right_response() -> None:
 
 def test_c1_resolve_source_url_fallback_to_first_nonempty() -> None:
     """When no response contains the needle, fall back to the first non-empty."""
-    from ma_poc.scripts.jugnu_runner import _resolve_source_url
+    from ma_poc.scripts.runners.jugnu import _resolve_source_url
 
     raw_apis = [
         {"url": "https://x.com/api/info", "body": {"name": "X"}},
@@ -38,7 +38,7 @@ def test_c1_resolve_source_url_fallback_to_first_nonempty() -> None:
 
 
 def test_c1_resolve_source_url_empty_raw_apis() -> None:
-    from ma_poc.scripts.jugnu_runner import _resolve_source_url
+    from ma_poc.scripts.runners.jugnu import _resolve_source_url
 
     url, body = _resolve_source_url([], {"unit_id": "U1"})
     assert url == ""
@@ -71,7 +71,7 @@ def test_c2_field_patches_persisted_via_profile_updater(tmp_path) -> None:
 
 
 def test_url_pattern_from_strips_scheme_and_host() -> None:
-    from ma_poc.scripts.jugnu_runner import _url_pattern_from
+    from ma_poc.scripts.runners.jugnu import _url_pattern_from
 
     assert _url_pattern_from("https://example.com/api/v1/units?page=1") == "/api/v1/units"
     assert _url_pattern_from("/api/units") == "/api/units"

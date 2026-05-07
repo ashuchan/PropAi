@@ -274,7 +274,7 @@ def test_a6_migration_atomic_write_creates_backup(tmp_path: Path) -> None:
     """First migrate_one call creates a .pre_xsource.bak; second run does not
     overwrite it (so ops can diff original vs migrated).
     """
-    from ma_poc.scripts.migrate_profiles_xsource import migrate_one
+    from ma_poc.scripts.migrations.profiles_xsource import migrate_one
 
     p = tmp_path / "test.json"
     original_content = json.dumps({"canonical_id": "x", "version": 1})
@@ -299,7 +299,7 @@ def test_a6_migration_atomic_write_creates_backup(tmp_path: Path) -> None:
 
 def test_a6_migration_dry_run_does_not_write(tmp_path: Path) -> None:
     """dry_run=True must not write or create backup."""
-    from ma_poc.scripts.migrate_profiles_xsource import migrate_one
+    from ma_poc.scripts.migrations.profiles_xsource import migrate_one
 
     p = tmp_path / "profile.json"
     p.write_text(json.dumps({"canonical_id": "y", "version": 1}), encoding="utf-8")

@@ -181,7 +181,7 @@ def _hydrate_dlq_from_db(schema_version: str) -> int:
 
     try:
         from ma_poc.data_provider import PostgresDataProvider
-        from ma_poc.scripts.sync_run_to_pg import load_dlq_from_db_to_file
+        from ma_poc.scripts.sync.run_to_pg import load_dlq_from_db_to_file
     except Exception as exc:  # noqa: BLE001
         print(f"[retry_entry] Failed to import sync module: {exc}", file=sys.stderr)
         raise
@@ -212,7 +212,7 @@ def _sync_dlq_to_db(schema_version: str) -> int:
 
     try:
         from ma_poc.data_provider import PostgresDataProvider
-        from ma_poc.scripts.sync_run_to_pg import _sync_dlq
+        from ma_poc.scripts.sync.run_to_pg import _sync_dlq
     except Exception as exc:  # noqa: BLE001
         print(f"[retry_entry] Failed to import sync module: {exc}", file=sys.stderr)
         return 1

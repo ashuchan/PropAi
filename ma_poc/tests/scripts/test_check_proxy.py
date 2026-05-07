@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 if "httpx" not in sys.modules:
     sys.modules["httpx"] = MagicMock()
 
-from ma_poc.scripts.check_proxy import main  # noqa: E402
+from ma_poc.scripts.diagnostics.proxy import main  # noqa: E402
 
 _BD_URL = "http://brd-customer-hl_6785472d-zone-residential_proxy1:0owuh5392unq@brd.superproxy.io:33335"
 

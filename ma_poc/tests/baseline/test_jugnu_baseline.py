@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.jugnu_baseline import (
+from scripts.baselines.jugnu import (
     BaselineMetrics,
     compute_failure_signatures,
     compute_llm_cost,

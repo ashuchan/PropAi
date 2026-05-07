@@ -39,7 +39,7 @@ import os  # noqa: E402
 
 from dotenv import load_dotenv  # noqa: E402
 
-from scripts.email_daily_report import (  # noqa: E402
+from scripts.email.daily import (  # noqa: E402
     _html_to_plain,
     _parse_recipients,
     _send_via_mcp,

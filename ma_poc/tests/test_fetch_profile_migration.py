@@ -17,7 +17,7 @@ for _p in (_repo_parent, _repo):
 
 from ma_poc.models.fetch_tier import FetchTier  # noqa: E402
 from ma_poc.models.scrape_profile import FetchProfile  # noqa: E402
-from ma_poc.scripts.migrate_profiles_add_fetch import migrate_profiles  # noqa: E402
+from ma_poc.scripts.migrations.profiles_add_fetch import migrate_profiles  # noqa: E402
 
 
 def _write_profile(directory: Path, canonical_id: str, extra: dict | None = None) -> Path:

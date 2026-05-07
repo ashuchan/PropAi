@@ -16,7 +16,7 @@ for _p in (_app, _here):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from scripts._trigger_common import (  # noqa: E402
+from scripts._common.trigger import (  # noqa: E402
     ABSOLUTE_MAX_TASKS,
     MAX_TASKS_F1_MICRO,
     MAX_TASKS_G1_SMALL,
