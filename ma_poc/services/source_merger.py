@@ -157,7 +157,7 @@ def merge_sources(
             k: v.value for k, v in unit.items() if isinstance(v, FieldValue)
         }
         try:
-            from scripts.identity_fallback import compute_fallback_unit_id
+            from ma_poc.core.identity import compute_fallback_unit_id
             fb = compute_fallback_unit_id(legacy, property_id)
         except Exception:
             fb = None

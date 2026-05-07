@@ -1,6 +1,6 @@
 """Filesystem implementation of the data-provider interfaces.
 
-Wraps the existing `scripts.state_store.StateStore` and
+Wraps the existing `core.state_store.StateStore` and
 `services.profile_store.ProfileStore` so the scraper pipeline keeps writing
 the exact same files on disk. The provider is a typed, swappable facade on
 top of that layout — not a replacement for it.
@@ -61,7 +61,7 @@ _MA_POC_ROOT = Path(__file__).resolve().parent.parent
 if str(_MA_POC_ROOT) not in sys.path:
     sys.path.insert(0, str(_MA_POC_ROOT))
 
-from scripts.state_store import StateStore as _StateStore  # noqa: E402
+from ma_poc.core.state_store import StateStore as _StateStore  # noqa: E402
 from services.profile_store import ProfileStore as _ProfileStore  # noqa: E402
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

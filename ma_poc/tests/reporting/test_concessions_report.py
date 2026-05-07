@@ -107,7 +107,7 @@ def test_f10_schema_v2_unit_surfaces_in_concessions_report(tmp_path: Path) -> No
     scripts_dir = _P(__file__).resolve().parent.parent.parent / "scripts"
     if str(scripts_dir) not in sys.path:
         sys.path.insert(0, str(scripts_dir))
-    from scripts.schema_v2 import _format_v2_unit
+    from ma_poc.core.schema_v2 import _format_v2_unit
 
     ts = datetime(2026, 5, 5, 12, 0, 0, tzinfo=timezone.utc)
     raw_unit = {

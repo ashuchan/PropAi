@@ -22,17 +22,11 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-# Ensure scripts/ is importable even when StateStore is imported from tests
-_HERE = Path(__file__).resolve().parent
-if str(_HERE) not in sys.path:
-    sys.path.insert(0, str(_HERE))
-
-from identity_fallback import (  # noqa: E402
+from ma_poc.core.identity import (
     assign_fallback_unit_id,
     compute_fallback_unit_id,
     compute_unit_data_sha256,

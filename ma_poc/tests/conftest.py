@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 from pathlib import Path
 import pytest
@@ -17,23 +16,6 @@ if str(ROOT) not in sys.path:
 SCRIPTS_DIR = ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
-
-# Pre-load scripts/validation.py under the bare ``validation`` name. Without
-# this, the first ``from scripts.schema_v2 import ...`` triggers
-# ``import validation as V`` inside schema_v2.py, which Python resolves to
-# ma_poc/validation/ (the package) — and that package's relative imports
-# then explode under top-level invocation. Force-binding sys.modules
-# guarantees the legacy issue-logger wins, matching production behavior
-# where ma_poc/scripts is the working directory of daily_runner.
-_existing = sys.modules.get("validation")
-if _existing is None or not hasattr(_existing, "V2_INVALID_BEDS"):
-    _spec = importlib.util.spec_from_file_location(
-        "validation", SCRIPTS_DIR / "validation.py"
-    )
-    if _spec and _spec.loader:
-        _mod = importlib.util.module_from_spec(_spec)
-        sys.modules["validation"] = _mod
-        _spec.loader.exec_module(_mod)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

@@ -21,7 +21,7 @@ import pytest
 
 from datetime import UTC, datetime
 
-from ma_poc.scripts.identity_fallback import (
+from ma_poc.core.identity import (
     _normalize_token,
     assign_fallback_unit_id,
     compute_fallback_unit_id,

@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from ma_poc.scripts.state_store import StateStore
+from ma_poc.core.state_store import StateStore
 from ma_poc.services.merge_yield import evaluate as merge_yield_evaluate
 
 

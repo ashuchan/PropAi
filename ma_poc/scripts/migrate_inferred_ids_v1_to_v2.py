@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from ma_poc.scripts.identity_fallback import compute_fallback_unit_id
+from ma_poc.core.identity import compute_fallback_unit_id
 
 # v1 = 12-char digest (pre-2026-04 format). v2 = 16-char digest.
 V1_ID_RE = re.compile(r"^inferred_[0-9a-f]{12}$")
