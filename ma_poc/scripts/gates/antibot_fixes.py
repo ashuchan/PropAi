@@ -15,8 +15,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-# parents[0]=scripts, [1]=ma_poc, [2]=PropAi
-REPO_ROOT = Path(__file__).resolve().parents[2]
+# parents[0]=gates, [1]=scripts, [2]=ma_poc, [3]=PropAi
+REPO_ROOT = Path(__file__).resolve().parents[3]
 MAPOC = REPO_ROOT / "ma_poc"
 
 FIX_TESTS: dict[str, list[str]] = {
@@ -53,10 +53,10 @@ RENTCAFE_PERMITTED: frozenset[str] = frozenset(
         "ma_poc/pms/rentcafe_direct/propertyid_resolver.py",
         "ma_poc/pms/rentcafe_direct/fetcher.py",
         "ma_poc/pms/rentcafe_direct/runner_dispatch.py",
-        "ma_poc/scripts/diagnostics/tls_vs_ip_diagnostic.py",
-        "ma_poc/scripts/smoke_rentcafe_direct.py",
-        "ma_poc/scripts/jugnu_runner.py",
-        "ma_poc/scripts/gate_antibot_fixes.py",
+        "ma_poc/scripts/diagnostics/tls_vs_ip.py",
+        "ma_poc/scripts/smoke/rentcafe_direct.py",
+        "ma_poc/scripts/runners/jugnu.py",
+        "ma_poc/scripts/gates/antibot_fixes.py",
         "ma_poc/services/profile_updater.py",
         "ma_poc/models/scrape_profile.py",
     }
@@ -153,7 +153,7 @@ def _check_static_invariants() -> tuple[bool, list[str]]:
 
     # H11 — writer in profile_updater.py + reader in jugnu_runner.py.
     pu = MAPOC / "services" / "profile_updater.py"
-    rn = MAPOC / "scripts" / "jugnu_runner.py"
+    rn = MAPOC / "scripts" / "runners" / "jugnu.py"
     has_writer = pu.exists() and "rentcafe_property_id" in pu.read_text(encoding="utf-8")
     has_reader = rn.exists() and "rentcafe_property_id" in rn.read_text(encoding="utf-8")
     if has_writer and has_reader:
