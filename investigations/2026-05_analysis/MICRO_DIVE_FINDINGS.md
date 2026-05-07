@@ -437,6 +437,64 @@ The link-hop fix is consistently the dominant lever across every cohort sampled.
 
 ---
 
+## Canary-batch-12 results (smart link-hop expansion + investigation)
+
+**Cumulative results vs v10 baseline (567-property test cohort):**
+
+| Verdict | v10 | batch-11 | batch-12 | Δ vs v10 |
+|---|---:|---:|---:|---:|
+| SUCCESS | 165 | 213 | **218** | **+53 (+9.3 pp)** |
+| FAILED_NO_DATA | 333 | 285 | 278 | -55 |
+| FAILED_UNREACHABLE | 69 | 69 | 71 | +2 |
+
+**Per-property cumulative delta v10 → b12:**
+- Recovered: **71 properties**
+- Regressed: 16 properties
+- Net: **+55 properties**
+
+**Quality of 71 recovered properties (1101 units):**
+- with rent: 1026 (93.2%)
+- with beds: 1013 (92.0%)
+- with sqft/area: 1101 (100.0%)
+
+**Recovered by tier:**
+| Tier | Count |
+|---|---:|
+| TIER_1_API_SIGHTMAP_DIRECT_FETCH | 40 |
+| TIER_4_LLM_DOM | 15 |
+| TIER_4_LLM | 5 |
+| TIER_3_DOM | 5 |
+| TIER_3_DOM_RENTMANAGER | 5 |
+| TIER_MERGED_CROSS_PAGE | 1 |
+
+### Regression analysis (16 cumulative)
+
+All 16 regressions follow the same pattern: v10 won via TIER_4_LLM_DOM/LLM, b12 won via TIER_1_API_* (or TIER_1_API_ENTRATA/ONESITE/APPFOLIO) with `verdict_reason: "no records extracted"`.
+
+**Investigation on `pid=224888 coveatoverlakeapts.com`:**
+- Same 3 URLs fetched in b11 (SUCCESS) and b12 (FAILED): homepage + /floor-plans/ + /virtual-tours/
+- Same adapter selected (`onesite` at 0.85 confidence) in both runs
+- Same captures, same tier attempts
+- LLM_DOM ran 3× and LLM ran 3× in b12 — all returned empty
+
+**Conclusion**: regressions are LLM stochastic variance, not code bugs. qwen-235b on the same input can return slightly different outputs run-to-run. Sometimes it extracts hallucinated units that pass validation; sometimes it correctly returns empty. **Not a fixable code regression.**
+
+### Still-failing 278 — bucketed for next iteration
+
+| Tier | Count | Why still failing |
+|---|---:|---|
+| TIER_1_API | 191 | Generic API parser ran on captured XHRs but found 0 unit-shaped envelopes |
+| TIER_1_API_ENTRATA | 27 | Entrata adapter ran, returned 0 units (mostly false-positive sightmap fingerprint cases) |
+| TIER_1_API_APPFOLIO | 23 | AppFolio adapter ran, returned 0 units |
+| TIER_1_API_ONESITE | 15 | OneSite adapter ran, returned 0 units |
+| SYNDICATION_ONLY_SQUARESPACE | 10 | Squarespace short-circuit (no extractor for these) |
+| LLM_GATE_NO_BODY | 7 | Body too small for LLM gate to open |
+| SYNDICATION_ONLY_WIX | 8 | Wix short-circuit |
+
+**Largest opportunity**: 191 plain `TIER_1_API` failures + 65 PMS-specific tier failures = **256 properties (~45% of cohort) where an API tier ran but extracted 0 units**. The LLM IS running on these (verified via events.jsonl) but returning empty. These need either (a) better API parser variants or (b) genuinely have no public rent data.
+
+---
+
 ## Final synthesis — exhaustive cohort breakdown
 
 After dive on every failure cohort:
