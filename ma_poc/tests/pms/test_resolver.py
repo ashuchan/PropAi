@@ -189,6 +189,127 @@ async def test_resolver_dedupes_duplicate_floor_plan_links() -> None:
 
 
 @pytest.mark.asyncio
+async def test_resolver_admits_portal_url_with_empty_anchor_text() -> None:
+    """2026-05-06 smart link-hop: footer-logo style links to a portal host
+    must be admitted even when the anchor text is empty (image-only).
+
+    Reproduces the typical "icon-only RESIDENT PORTAL" footer button.
+    """
+    links = [
+        # Empty text (image-only logo link to AppFolio portal)
+        {"href": "https://schwebpartners.appfolio.com/connect/users/sign_in", "text": ""},
+    ]
+    page = _make_mock_page(links=links, url="https://example.com/")
+    detection = detect_pms("https://example.com/")
+    result = await resolve_target(page, "https://example.com/", detection)
+    assert result.method == "cta_link"
+    assert "appfolio.com" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_admits_yottareal_portal_via_url_only() -> None:
+    """Cross-domain external portals (yottareal, ovationco, etc.) match via
+    the expanded _LEASING_PORTAL_DOMAINS set even with terse anchor text.
+    """
+    links = [
+        # Terse anchor text that doesn't match _CTA_TEXT_RE
+        {"href": "https://adaraportal.yottareal.com/dba/floorplans?dbaid=58", "text": "More"},
+    ]
+    page = _make_mock_page(links=links, url="https://verandahlake.com/")
+    detection = detect_pms("https://verandahlake.com/")
+    result = await resolve_target(page, "https://verandahlake.com/", detection)
+    assert result.method == "cta_link"
+    assert "yottareal.com" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_essex_style_same_host_subpage() -> None:
+    """Essex Apartments case: same-host path match wins when no portal exists.
+
+    Essex's URL scheme is essexapartmenthomes.com/apartments/<region>/<slug>/floor-plans.
+    The homepage is a JS-rendered React shell with no extractable units; the
+    /floor-plans sub-page IS where the data lives. Pre-fix, the resolver only
+    accepted known portals so this same-host path was never followed.
+    """
+    links = [
+        {
+            "href": "https://www.essexapartmenthomes.com/apartments/california/walnut-creek/avana-walnut-creek/floor-plans",
+            "text": "Avana Walnut Creek",  # property name as anchor — NOT a CTA keyword
+        },
+    ]
+    page = _make_mock_page(links=links, url="https://www.essexapartmenthomes.com/")
+    detection = detect_pms("https://www.essexapartmenthomes.com/")
+    result = await resolve_target(page, "https://www.essexapartmenthomes.com/", detection)
+    assert result.method == "cta_link"
+    assert "/floor-plans" in result.resolved_url
+    assert "essexapartmenthomes.com" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_pass_3a_portal_beats_pass_3b_same_host_path() -> None:
+    """Even when a same-host path candidate has higher anchor-text priority,
+    the cross-domain portal candidate wins because Pass 3a runs first.
+
+    Rationale: a portal URL proves PMS identity and routes to a known
+    adapter; a same-host path is only a hint that data lives deeper.
+    """
+    links = [
+        # Same-host path with priority-100 anchor text
+        {
+            "href": "https://example.com/availability",
+            "text": "View Availability",
+        },
+        # Cross-domain portal with priority-50 anchor text
+        {
+            "href": "https://9259508.onlineleasing.realpage.com/",
+            "text": "Apply Now",
+        },
+    ]
+    page = _make_mock_page(links=links, url="https://example.com/")
+    detection = detect_pms("https://example.com/")
+    result = await resolve_target(page, "https://example.com/", detection)
+    assert result.method == "cta_link"
+    assert "onlineleasing.realpage.com" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_admits_path_match_with_terse_anchor_text() -> None:
+    """An anchor with terse text but a /floor-plans path is admitted via
+    criterion (c) — URL path matches CTA-path regex.
+    """
+    links = [
+        # Anchor text "More" doesn't match _CTA_TEXT_RE
+        {"href": "https://example.com/Floor-plans.aspx", "text": "More →"},
+    ]
+    page = _make_mock_page(links=links, url="https://example.com/")
+    detection = detect_pms("https://example.com/")
+    result = await resolve_target(page, "https://example.com/", detection)
+    assert result.method == "cta_link"
+    assert "Floor-plans.aspx" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_path_match_does_not_cross_domain() -> None:
+    """Cross-domain path-only matches (no portal) are NOT followed.
+
+    Avoids the regression risk of navigating to an unrelated marketing parent
+    or third-party lead-gen vendor whose URL happens to contain /listings/.
+    """
+    links = [
+        # Cross-domain, path-only match (NOT a known portal host)
+        {
+            "href": "https://random-marketing-vendor.com/listings/featured",
+            "text": "Browse",
+        },
+    ]
+    page = _make_mock_page(links=links, url="https://example.com/")
+    detection = detect_pms("https://example.com/")
+    result = await resolve_target(page, "https://example.com/", detection)
+    # Cross-domain non-portal match must be rejected — neither pass fires.
+    assert result.method == "failed"
+
+
+@pytest.mark.asyncio
 async def test_resolver_word_boundary_priority_skips_intra_word_match() -> None:
     """2026-05-06 fix 1c: `Communities` must not match the `unit` keyword.
 

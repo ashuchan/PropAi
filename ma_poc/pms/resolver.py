@@ -90,6 +90,16 @@ _PRIORITY_MAP = {
 # showed 19% link to *.securecafe.com / *.securecafenet.com and 7% to
 # *.appfolio.com/connect or /listings — both currently filtered out as
 # "non-PMS" because no adapter advertises them in static_fingerprints().
+#
+# 2026-05-06 (smart link-hop expansion): added cross-domain leasing portals
+# observed in deep-dive samples:
+#   - yottareal.com (adaraportal.yottareal.com — verandahlake.com sub-portal)
+#   - ovationco.com (PMC parent portal for lasvegasliving sub-properties)
+#   - mytouchtour.com (TouchTour platform — Ovation Vegas)
+#   - liveovation.com (Ovation parent brand portfolio)
+#   - knockrentals.com / doorway.knck.io (Knock leasing widget)
+#   - hyly.ai (Hyly leasing CMS — knockrentals competitor)
+#   - marketapts.com (Market Apartments lead-gen)
 _LEASING_PORTAL_DOMAINS = frozenset(
     {
         "sightmap.com",
@@ -105,7 +115,39 @@ _LEASING_PORTAL_DOMAINS = frozenset(
         "securecafenet.com",
         "prospectportal.com",
         "appfolio.com",
+        "yottareal.com",
+        "ovationco.com",
+        "mytouchtour.com",
+        "liveovation.com",
+        "knockrentals.com",
+        "doorway.knck.io",
+        "hyly.ai",
+        "marketapts.com",
     }
+)
+
+
+# 2026-05-06 (smart link-hop): URL-path patterns that strongly suggest
+# leasing/availability content regardless of anchor text. Catches:
+#   - footer logo links to portal (text="" or just a logo image)
+#   - icon-only nav buttons (text=" " or unicode chevron)
+#   - terse-text anchors ("More" / "Details" / "→") with revealing paths
+#   - case-variant paths (/Floor-plans.aspx vs /floor-plans/)
+# Word-boundary on the left so /tour-floorplan/ matches but /motorist/ doesn't.
+_CTA_PATH_RE = re.compile(
+    r"(?:^|/)(?:"
+    r"floor[-_ ]?plans?"
+    r"|floorplans?"
+    r"|availab\w+"
+    r"|listings?"
+    r"|pricing"
+    r"|rentals?"
+    r"|onlineleasing"
+    r"|guestcards?"
+    r"|properties?/[^/]+"
+    r"|apartments?/[^/]+"
+    r")(?:/|$|[?#.])",
+    re.IGNORECASE,
 )
 
 
@@ -292,7 +334,36 @@ async def resolve_target(
         for link in links:
             href = link.get("href", "")
             text = link.get("text", "")
-            if not href or not _CTA_TEXT_RE.search(text):
+            if not href:
+                continue
+            # 2026-05-06 (smart link-hop): three independent triggers — any
+            # one is sufficient to consider the anchor as a candidate. The
+            # original code required (a). Bulk scan of 81 still-failing hosts
+            # showed many portal links have empty / icon-only anchor text,
+            # missing the (a) gate even though their URLs are clearly portal
+            # destinations.
+            #
+            #   (a) anchor text matches CTA pattern (floor plan / availab /
+            #       lease / apply / resident.*portal)
+            #   (b) URL host is on a known leasing-portal allowlist
+            #       (catches footer-logo and icon-only links to *.realpage,
+            #       *.appfolio, *.securecafe, *.knockrentals etc.)
+            #   (c) URL path matches the CTA-path regex
+            #       (catches /Floor-plans.aspx, /properties/<slug>, /listings/ —
+            #       the Essex apartment-homes case-variant URLs and similar)
+            text_match = bool(_CTA_TEXT_RE.search(text))
+            portal_match = _url_is_known_portal(href)
+            try:
+                href_path = urlparse(href).path or ""
+            except Exception:
+                href_path = ""
+            path_match = bool(_CTA_PATH_RE.search(href_path))
+            if not (text_match or portal_match or path_match):
+                continue
+            # Drop candidates whose path is on the resolver blacklist
+            # (/tour, /apply, /contact, /book) — these reCAPTCHA on most PMSes
+            # and aren't useful even if anchor text passed the CTA filter.
+            if is_blacklisted_path(href):
                 continue
             # Dedupe by canonical (netloc + path) key — three anchors with the
             # same href but different surrounding text shouldn't take three
@@ -302,19 +373,61 @@ async def resolve_target(
             if key in seen_keys:
                 continue
             seen_keys.add(key)
-            priority = _get_priority(text)
+            # Priority: anchor-text-derived score wins when it fires; otherwise
+            # use a baseline reflecting WHY this candidate was admitted. Portal
+            # match (b) is a stronger URL signal than path match (c) because
+            # the host alone proves PMS identity.
+            if text_match:
+                priority = _get_priority(text)
+            elif portal_match:
+                priority = 75
+            else:
+                priority = 60
             candidates.append((priority, href, text))
 
         # Sort by priority descending, cap at _CANDIDATE_CAP (8 since 2026-05-06).
         candidates.sort(key=lambda x: -x[0])
         candidates = candidates[:_CANDIDATE_CAP]
 
-        # Step 3: Check each candidate for known portal host. Adapter
-        # fingerprints + leasing-portal-domain set are both consulted —
-        # the latter catches *.securecafe.com / *.prospectportal.com which
-        # no single adapter owns but which all resolve to a downstream PMS.
+        # Step 3: Two-pass — portal candidates first, then same-host CTA-path
+        # candidates. Two passes (rather than one with mixed priorities) so a
+        # priority-30 portal candidate still beats a priority-100 same-host
+        # path candidate. URLs to a known portal prove PMS identity; same-host
+        # paths only suggest there's data deeper in the site.
+        try:
+            original_host = (urlparse(original_url).hostname or "").lower()
+        except Exception:
+            original_host = ""
+
+        # Pass 3a — known portal hosts (any host, cross-domain allowed).
         for _priority, href, _text in candidates:
             if not _url_is_known_portal(href):
+                continue
+            detection = detect_pms(href)
+            normalized = normalize_appfolio_url(href)
+            result.resolved_url = normalized
+            result.final_detection = detection
+            result.method = "cta_link"
+            hops = [original_url, href]
+            if normalized != href:
+                hops.append(normalized)
+            result.hop_path = hops
+            return result
+
+        # Pass 3b — same-host CTA-path candidates. Targets the Essex Apartments
+        # case (essexapartmenthomes.com/apartments/<region>/<slug>/floor-plans)
+        # plus any vanity CMS where unit data lives one path-hop deep. Limited
+        # to same-host to avoid the cross-domain risk of navigating to a
+        # marketing parent / unrelated lead-gen vendor.
+        for _priority, href, _text in candidates:
+            try:
+                href_parsed = urlparse(href)
+            except Exception:
+                continue
+            href_host = (href_parsed.hostname or "").lower()
+            if href_host != original_host:
+                continue
+            if not _CTA_PATH_RE.search(href_parsed.path or ""):
                 continue
             detection = detect_pms(href)
             normalized = normalize_appfolio_url(href)
