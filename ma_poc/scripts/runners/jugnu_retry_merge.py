@@ -1,6 +1,6 @@
 """Jugnu retry merge — consolidate per-shard retry outputs into properties.json.
 
-When jugnu_retry_runner.py runs as a sharded Cloud Run job (task_count > 1),
+When runners/jugnu_retry.py runs as a sharded Cloud Run job (task_count > 1),
 each task writes its retried records to ``properties.retry.shard{NN}.json``
 instead of merging in-place. This script runs after the sharded job completes,
 merges all shard files into ``properties.json`` by canonical_id, regenerates
@@ -10,9 +10,9 @@ Single-task. Run after every sharded retry execution. Refuses to run if
 fewer shard files are present than declared by --expect-shards.
 
 Usage:
-  python scripts/jugnu_retry_merge.py --run-date 2026-04-25 --expect-shards 5
-  python scripts/jugnu_retry_merge.py --run-date 2026-04-25 --expect-shards 5 --mode errors
-  python scripts/jugnu_retry_merge.py --run-date 2026-04-25 --skip-sync   # skip postgres sync
+  python scripts/runners/jugnu_retry_merge.py --run-date 2026-04-25 --expect-shards 5
+  python scripts/runners/jugnu_retry_merge.py --run-date 2026-04-25 --expect-shards 5 --mode errors
+  python scripts/runners/jugnu_retry_merge.py --run-date 2026-04-25 --skip-sync   # skip postgres sync
 
 Exit codes:
   0  Merge succeeded

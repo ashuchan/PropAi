@@ -594,7 +594,7 @@ def _jugnu_v2_property(
 ) -> dict[str, Any]:
     """Build a V2 property dict shaped like what jugnu_runner writes.
 
-    Mirrors the structure of ``ma_poc/scripts/jugnu_runner.py::_format_v2``
+    Mirrors the structure of ``ma_poc/scripts/runners/jugnu.py::_format_v2``
     — the minimum keys the sync layer reads. If this drifts from the
     runner's actual output, the sync test is a false positive.
     """

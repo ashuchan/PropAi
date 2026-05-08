@@ -1,7 +1,7 @@
 """F7 — smoke threshold (H9): ≥30 of 50 produce ≥1 unit via direct path.
 
 The smoke script is run manually (it hits live network from production
-egress; see ma_poc/scripts/smoke_rentcafe_direct.py docstring). This
+egress; see ma_poc/scripts/smoke/rentcafe_direct.py docstring). This
 test asserts that the committed output meets the H9 threshold; until
 the smoke is run, it is auto-skipped with a clear instruction so the
 broader gate can pass on a fresh checkout.

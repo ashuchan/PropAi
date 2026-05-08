@@ -1,5 +1,5 @@
 """
-scripts/smoke_test.py — Jugnu import-sanity smoke test (offline, no network).
+scripts/smoke/imports.py — Jugnu import-sanity smoke test (offline, no network).
 
 Checks:
   1. L1 Fetch layer imports cleanly

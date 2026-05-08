@@ -28,13 +28,13 @@ Data sources
 
 The runner writes per-shard artifacts to two destinations on every run:
 
-  • Cloud SQL — ``sync_run_to_pg`` mirrors snapshots, ledger, issues,
+  • Cloud SQL — ``sync.run_to_pg`` mirrors snapshots, ledger, issues,
     scrape_events into the proppy/jugnu instance. The script's primary
     read path. Subject to the 3-day retention sweep
-    (``ma_poc/scripts/sync_run_to_pg.py::_apply_retention``) — anything
+    (``ma_poc/scripts/sync/run_to_pg.py::_apply_retention``) — anything
     older than 3 days has been deleted from per-run tables.
 
-  • GCS — ``jugnu_shard_entry.py`` uploads the entire
+  • GCS — ``runners/shard_entry.py`` uploads the entire
     ``runs/{run_date}/`` tree per shard to
     ``gs://{BUCKET_NAME}/runs/{run_date}/shard_{idx}/``. Kept
     indefinitely; this is the long-window source for any date that has

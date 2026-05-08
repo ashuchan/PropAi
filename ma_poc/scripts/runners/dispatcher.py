@@ -1,5 +1,5 @@
 """
-scripts/run_script.py — On-demand dispatcher for the jugnu-adhoc Cloud Run Job.
+scripts/runners/dispatcher.py — On-demand dispatcher for the jugnu-adhoc Cloud Run Job.
 
 Lets an operator pick any script in ``ma_poc/scripts/`` from the Cloud Run
 console and run it with arbitrary CLI arguments — without redeploying the

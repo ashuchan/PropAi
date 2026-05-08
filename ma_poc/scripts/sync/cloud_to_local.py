@@ -43,16 +43,16 @@ copies row data — it does not create or alter tables.
 Usage
 -----
   # Default: mirror everything from cloud -> local proppy
-  python scripts/sync_cloud_to_local.py
+  python scripts/sync/cloud_to_local.py
 
   # Subset of tables
-  python scripts/sync_cloud_to_local.py --tables properties,units,run_reports
+  python scripts/sync/cloud_to_local.py --tables properties,units,run_reports
 
   # Dry run (just print row counts)
-  python scripts/sync_cloud_to_local.py --dry-run
+  python scripts/sync/cloud_to_local.py --dry-run
 
   # Custom destination
-  python scripts/sync_cloud_to_local.py \
+  python scripts/sync/cloud_to_local.py \
       --local-url postgresql+pg8000://postgres:secret@localhost:5432/mydb
 """
 

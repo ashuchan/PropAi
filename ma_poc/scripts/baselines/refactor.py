@@ -294,7 +294,7 @@ def _default_baseline_header() -> str:
     return (
         "# Refactor Baseline\n\n"
         "## Current-pipeline metrics\n\n"
-        "_Filled by `scripts/refactor_baseline.py` — see appended runs below._\n\n"
+        "_Filled by `scripts/baselines/refactor.py` — see appended runs below._\n\n"
         "## Known PMS distribution in current property set\n\n"
         "_Fill manually from handoff doc + CSV inspection._\n\n"
         "## Target metrics after refactor (hypothesis)\n"

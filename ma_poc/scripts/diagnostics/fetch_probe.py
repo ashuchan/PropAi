@@ -11,13 +11,13 @@ becomes `fetch_probe.py --from-run <dir> --filter tier=<x> --strategies ...`.
 
 Usage
 -----
-    python ma_poc/scripts/fetch_probe.py \\
+    python ma_poc/scripts/diagnostics/fetch_probe.py \\
         --from-run ma_poc/data/v2/runs/2026-04-19 \\
         --filter tier=generic:no_body_short_circuit \\
         --strategies networkidle:35000,domcontentloaded:15000+5s,load:20000+3s \\
         --max-urls 5
 
-    python ma_poc/scripts/fetch_probe.py \\
+    python ma_poc/scripts/diagnostics/fetch_probe.py \\
         --url https://www.ariaatella.com/ \\
         --strategies domcontentloaded:15000+5s
 

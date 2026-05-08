@@ -1,16 +1,16 @@
 """
 Refactor gate runner.
 
-Implements ``scripts/gate_refactor.py phase <N>`` described in
+Implements ``scripts/gates/refactor.py phase <N>`` described in
 ``claude_refactor.md``. Phases 0–2 are wired up in this revision; later phases
 add their own checks as they are implemented.
 
 Usage::
 
-    python scripts/gate_refactor.py phase 0
-    python scripts/gate_refactor.py phase 1
-    python scripts/gate_refactor.py phase 2
-    python scripts/gate_refactor.py all
+    python scripts/gates/refactor.py phase 0
+    python scripts/gates/refactor.py phase 1
+    python scripts/gates/refactor.py phase 2
+    python scripts/gates/refactor.py all
 """
 
 from __future__ import annotations

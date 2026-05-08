@@ -4,7 +4,7 @@ The inference helper exists to fill bed/bath gaps from the floor-plan
 name when the adapter / API didn't supply them. It is intentionally
 narrow — every output value must be grounded in a literal substring of
 the input. These cases are sourced from the production
-``Floorplan- comparisons.csv`` corpus and live ``units.floor_plan_name``
+``Floorplan-comparisons.csv`` corpus and live ``units.floor_plan_name``
 values; new patterns should be added here, not by loosening the regexes.
 """
 

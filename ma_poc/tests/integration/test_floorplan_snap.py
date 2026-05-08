@@ -13,7 +13,7 @@ from ma_poc.services.floorplan_snap import snap_units
 
 @pytest.fixture
 def catalog(tmp_path: Path) -> fc.FloorplanCatalog:
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     csv_path.write_text(
         "apartmentid,floorplannumber,description,bed,bath,area\n"
         # Two unique 1BR plans with different sqft.
@@ -87,7 +87,7 @@ def test_unsnapped_records_not_dropped(catalog) -> None:
 
 
 def test_snap_does_not_run_when_csv_low_coverage(tmp_path: Path) -> None:
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     csv_path.write_text(
         "apartmentid,floorplannumber,description,bed,bath,area\nP1,1,Aspen,1,1,750\n",
         encoding="utf-8",

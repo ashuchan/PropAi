@@ -28,23 +28,23 @@ All modes:
 
 Usage:
   # Retry failures from yesterday (auto-detects latest run)
-  python scripts/jugnu_retry_runner.py --retry-errors
+  python scripts/runners/jugnu_retry.py --retry-errors
 
   # Retry failures from a specific date
-  python scripts/jugnu_retry_runner.py --retry-errors --run-date 2026-04-17
+  python scripts/runners/jugnu_retry.py --retry-errors --run-date 2026-04-17
 
   # Resume an interrupted run
-  python scripts/jugnu_retry_runner.py --resume --run-date 2026-04-18
+  python scripts/runners/jugnu_retry.py --resume --run-date 2026-04-18
 
   # Recover properties from a stuck shard (catalog vs properties.json diff)
-  python scripts/jugnu_retry_runner.py --unprocessed --run-date 2026-04-28
+  python scripts/runners/jugnu_retry.py --unprocessed --run-date 2026-04-28
 
   # Retry with a limit
-  python scripts/jugnu_retry_runner.py --retry-errors --limit 10
+  python scripts/runners/jugnu_retry.py --retry-errors --limit 10
 
   # Override the catalog source with a CSV (useful for retrying legacy
   # runs that pre-date the DB-backed catalog)
-  python scripts/jugnu_retry_runner.py --retry-errors --run-date 2026-04-17 \\
+  python scripts/runners/jugnu_retry.py --retry-errors --run-date 2026-04-17 \\
       --csv config/properties.csv
 """
 
@@ -913,11 +913,11 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python scripts/jugnu_retry_runner.py --retry-errors
-  python scripts/jugnu_retry_runner.py --retry-errors --run-date 2026-04-17
-  python scripts/jugnu_retry_runner.py --resume --run-date 2026-04-18
-  python scripts/jugnu_retry_runner.py --retry-errors --limit 10
-  python scripts/jugnu_retry_runner.py --retry-errors --csv config/properties.csv
+  python scripts/runners/jugnu_retry.py --retry-errors
+  python scripts/runners/jugnu_retry.py --retry-errors --run-date 2026-04-17
+  python scripts/runners/jugnu_retry.py --resume --run-date 2026-04-18
+  python scripts/runners/jugnu_retry.py --retry-errors --limit 10
+  python scripts/runners/jugnu_retry.py --retry-errors --csv config/properties.csv
         """,
     )
     mode_group = parser.add_mutually_exclusive_group(required=True)

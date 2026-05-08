@@ -12,8 +12,8 @@ This wraps the existing daily_runner.py flow with Jugnu's:
 Supports both v1 and v2 output schemas via --schema-version flag.
 
 Usage:
-  python scripts/jugnu_runner.py --csv config/properties.csv --limit 20
-  python scripts/jugnu_runner.py --csv config/properties.csv --schema-version v2
+  python scripts/runners/jugnu.py --csv config/properties.csv --limit 20
+  python scripts/runners/jugnu.py --csv config/properties.csv --schema-version v2
 """
 
 from __future__ import annotations

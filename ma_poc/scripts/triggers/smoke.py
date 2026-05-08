@@ -47,7 +47,7 @@ Exit codes
 
 Usage
 -----
-  python ma_poc/scripts/trigger_smoke.py --env {staging|prod}
+  python ma_poc/scripts/triggers/smoke.py --env {staging|prod}
 
 Options
 -------

@@ -5,7 +5,7 @@ Launches Playwright, navigates to each property URL, captures API responses,
 runs detect_pms + the appropriate adapter, and reports results.
 
 Usage:
-    python scripts/validate_adapters_live.py
+    python scripts/checks/adapters_live.py
 """
 
 from __future__ import annotations

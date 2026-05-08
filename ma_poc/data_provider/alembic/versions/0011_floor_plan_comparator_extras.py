@@ -18,7 +18,7 @@ Two unrelated-but-adjacent schema additions for the floor-plan comparator:
 
   2. New table ``floor_plan_disagreement_review`` — manual-review queue
      for genuine CSV/DB disagreements (Phase 5 of the floor-plan gap
-     plan). Populated by ``scripts/export_floor_plan_disagreements.py``
+     plan). Populated by ``scripts/floor_plans/export_disagreements.py``
      from the per-row comparator output. Reviewer notes survive
      re-exports because only ``status='pending'`` rows are wiped.
 

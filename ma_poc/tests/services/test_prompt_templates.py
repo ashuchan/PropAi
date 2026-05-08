@@ -113,7 +113,7 @@ def test_known_plans_renders_when_catalog_has_property(tmp_path: Path) -> None:
     from ma_poc.services import floorplan_catalog as fc
     from ma_poc.services.llm_extractor import _resolve_known_plans_block
 
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     csv_path.write_text(
         "apartmentid,floorplannumber,description,bed,bath,area\n"
         "P1,1,Aspen,1,1,750\n",
@@ -136,7 +136,7 @@ def test_known_plans_empty_when_property_unknown(tmp_path: Path) -> None:
     from ma_poc.services import floorplan_catalog as fc
     from ma_poc.services.llm_extractor import _resolve_known_plans_block
 
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     csv_path.write_text(
         "apartmentid,floorplannumber,description,bed,bath,area\n"
         "P1,1,Aspen,1,1,750\n",
@@ -161,7 +161,7 @@ def test_known_plans_size_capped(tmp_path: Path) -> None:
         FloorplanCatalog,
     )
 
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     rows = ["apartmentid,floorplannumber,description,bed,bath,area"]
     for i in range(192):  # the spec calls out 192 as the CSV maximum
         rows.append(f"P9,{i},Plan{i},{i % 4},{1 + (i % 2) * 0.5},{600 + i}")
@@ -186,7 +186,7 @@ def test_known_plans_truncation_logged(tmp_path: Path, caplog) -> None:
         FloorplanCatalog,
     )
 
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     rows = ["apartmentid,floorplannumber,description,bed,bath,area"]
     for i in range(KNOWN_PLANS_PROMPT_LIMIT + 3):
         rows.append(f"P9,{i},Plan{i},{i % 4},{1 + (i % 2) * 0.5},{600 + i}")

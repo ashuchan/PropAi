@@ -1,6 +1,6 @@
 """Phase 0 CSV-mapping verification.
 
-Validates that ``Floorplan- comparisons.csv`` rows can be joined to the
+Validates that ``Floorplan-comparisons.csv`` rows can be joined to the
 production property roster (``properties.csv``) by some stable column.
 Persists the chosen mapping to ``config/csv_floorplan_mapping.json`` so
 the runtime ``FloorplanCatalog`` does not have to recompute the join.
@@ -26,7 +26,7 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 _CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config"
-_FLOORPLAN_CSV = _CONFIG_DIR / "Floorplan- comparisons.csv"
+_FLOORPLAN_CSV = _CONFIG_DIR / "Floorplan-comparisons.csv"
 _PROPERTIES_CSV = _CONFIG_DIR / "properties.csv"
 _MAPPING_OUT = _CONFIG_DIR / "csv_floorplan_mapping.json"
 

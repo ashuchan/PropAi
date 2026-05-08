@@ -24,10 +24,10 @@ status other than pending) are preserved across re-exports so manual
 work isn't lost.
 
 Usage:
-    python ma_poc/scripts/export_floor_plan_disagreements.py \\
+    python ma_poc/scripts/floor_plans/export_disagreements.py \\
         --run-id 2026-05-07-phase2
 
-    python ma_poc/scripts/export_floor_plan_disagreements.py \\
+    python ma_poc/scripts/floor_plans/export_disagreements.py \\
         --run-id 2026-05-07-phase2 --min-score 95 --to-csv out.csv
 """
 

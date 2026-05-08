@@ -12,8 +12,8 @@ Motivation:
 Idempotent — re-running replaces each row in place.
 
 Usage:
-    python scripts/sync_properties_from_snapshots.py --run-date 2026-04-21
-    python scripts/sync_properties_from_snapshots.py --run-date 2026-04-21 --dry-run
+    python scripts/sync/properties_from_snapshots.py --run-date 2026-04-21
+    python scripts/sync/properties_from_snapshots.py --run-date 2026-04-21 --dry-run
 """
 
 from __future__ import annotations

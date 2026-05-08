@@ -22,17 +22,17 @@ Output is a single HTML file with:
 
 Usage:
     # Today's run
-    python scripts/generate_daily_report.py
+    python scripts/reports/daily.py
 
     # Specific run date
-    python scripts/generate_daily_report.py --run-date 2026-05-01
+    python scripts/reports/daily.py --run-date 2026-05-01
 
     # Custom output path
-    python scripts/generate_daily_report.py --run-date 2026-05-01 \
+    python scripts/reports/daily.py --run-date 2026-05-01 \
         --out data/runs/2026-05-01/daily_report.html
 
     # Override DB URL (otherwise picks up DATABASE_URL / DATA_PROVIDER from env)
-    python scripts/generate_daily_report.py \
+    python scripts/reports/daily.py \
         --database-url postgresql+pg8000://user:pass@localhost:5432/proppy
 """
 

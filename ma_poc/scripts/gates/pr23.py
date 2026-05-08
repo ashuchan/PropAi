@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """PR #23 gate runner — wiring audit for phases A–I.
 
-Mirrors scripts/gate_xsource.py. Verifies that every phase claimed live in
+Mirrors scripts/gates/xsource.py. Verifies that every phase claimed live in
 PR #23 has a non-test caller in production code (H11) and no dead branches
 remain (H12).
 
 Usage:
-    python -m ma_poc.scripts.gate_pr23 phase <A|B|C|D|E|F|G|H|I|Z>
-    python -m ma_poc.scripts.gate_pr23 all
+    python -m ma_poc.scripts.gates.pr23 phase <A|B|C|D|E|F|G|H|I|Z>
+    python -m ma_poc.scripts.gates.pr23 all
 """
 
 from __future__ import annotations

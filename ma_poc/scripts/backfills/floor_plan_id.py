@@ -9,8 +9,8 @@ The script is idempotent: only rows where ``floor_plan_id`` is NULL
 are touched. Re-runs are no-ops.
 
 Usage:
-    python ma_poc/scripts/backfill_floor_plan_id.py --dry-run
-    python ma_poc/scripts/backfill_floor_plan_id.py
+    python ma_poc/scripts/backfills/floor_plan_id.py --dry-run
+    python ma_poc/scripts/backfills/floor_plan_id.py
 """
 
 from __future__ import annotations

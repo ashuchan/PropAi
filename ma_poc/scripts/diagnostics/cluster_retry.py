@@ -2,10 +2,10 @@
 
 Usage:
   # Analyze failure clusters in a run
-  python scripts/cluster_retry.py --analyze data/runs/2026-04-20/properties.json
+  python scripts/diagnostics/cluster_retry.py --analyze data/runs/2026-04-20/properties.json
 
   # Retry properties from a specific registered domain
-  python scripts/cluster_retry.py --retry gscapts.com --run-date 2026-04-21
+  python scripts/diagnostics/cluster_retry.py --retry gscapts.com --run-date 2026-04-21
 """
 
 from __future__ import annotations

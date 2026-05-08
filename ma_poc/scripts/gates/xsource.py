@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Cross-source + self-learning gate runner.
 
-Mirrors scripts/gate_refactor.py. Runs the per-phase test files and the
+Mirrors scripts/gates/refactor.py. Runs the per-phase test files and the
 static scans defined in CLAUDE_XSOURCE_AND_LEARNING.
 
 Usage:
-    python -m ma_poc.scripts.gate_xsource phase <N>
-    python -m ma_poc.scripts.gate_xsource all
+    python -m ma_poc.scripts.gates.xsource phase <N>
+    python -m ma_poc.scripts.gates.xsource all
 
 A phase passes iff:
   1. its pytest files all pass

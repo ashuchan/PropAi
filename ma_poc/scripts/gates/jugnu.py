@@ -2,9 +2,9 @@
 Jugnu J9 — Unified gate script for all phases.
 
 Usage:
-    python scripts/gate_jugnu.py phase 0   # Check J0 gate
-    python scripts/gate_jugnu.py phase 1   # Check J1 gate
-    python scripts/gate_jugnu.py all       # Check all phases
+    python scripts/gates/jugnu.py phase 0   # Check J0 gate
+    python scripts/gates/jugnu.py phase 1   # Check J1 gate
+    python scripts/gates/jugnu.py all       # Check all phases
 """
 
 from __future__ import annotations

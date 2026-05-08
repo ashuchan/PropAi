@@ -432,7 +432,7 @@ class FloorPlanDisagreementReviewRow(Base):
     """Manual-review queue for genuine CSV-vs-DB floor-plan disagreements.
 
     Populated from ``floor_plan_comparison_rows`` by
-    ``scripts/export_floor_plan_disagreements.py``. Surfaces rows where the
+    ``scripts/floor_plans/export_disagreements.py``. Surfaces rows where the
     fuzzy name matches but bed/bath conflict (the "real" disagreements
     after the matcher has done its job — see Phase 5 of the floor-plan gap
     plan).

@@ -1,4 +1,4 @@
-"""Phase 0 gate: ``scripts/verify_csv_mapping.py`` produces a mapping file with
+"""Phase 0 gate: ``scripts/checks/csv_mapping.py`` produces a mapping file with
 a single non-null ``chosen_field`` value, and the resulting coverage clears
 the spec's threshold (H6).
 """
@@ -16,7 +16,7 @@ def test_csv_property_id_mapping_verified(tmp_path: Path) -> None:
     fp_csv = (
         Path(__file__).resolve().parent.parent.parent
         / "config"
-        / "Floorplan- comparisons.csv"
+        / "Floorplan-comparisons.csv"
     )
     props_csv = (
         Path(__file__).resolve().parent.parent.parent / "config" / "properties.csv"

@@ -12,11 +12,11 @@ Two reports are available:
 Uses pg8000 because psycopg-binary has no ARM64 Windows wheel
 (see project memory).
 
-    python scripts/health_report.py                                  # health, today
-    python scripts/health_report.py --report extraction-quality
-    python scripts/health_report.py --report all --run-date 2026-05-04
-    python scripts/health_report.py --days 7 --json                  # 7-day window + JSON
-    python scripts/health_report.py --out -                          # stdout only (single report)
+    python scripts/reports/health.py                                  # health, today
+    python scripts/reports/health.py --report extraction-quality
+    python scripts/reports/health.py --report all --run-date 2026-05-04
+    python scripts/reports/health.py --days 7 --json                  # 7-day window + JSON
+    python scripts/reports/health.py --out -                          # stdout only (single report)
 """
 
 from __future__ import annotations

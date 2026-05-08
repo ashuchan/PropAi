@@ -10,7 +10,7 @@ Exit codes:
   130 SIGINT
 
 Usage:
-  python scripts/trigger_run.py --env {staging|prod} (--tasks N | --target-hours H) [OPTIONS]
+  python scripts/triggers/run.py --env {staging|prod} (--tasks N | --target-hours H) [OPTIONS]
 
 Options:
   --tasks N              Explicit task count (1-40)
@@ -25,10 +25,10 @@ Options:
   --yes                  Skip confirmation prompt (for CI)
 
 Examples:
-  python scripts/trigger_run.py --env prod --target-hours 2
-  python scripts/trigger_run.py --env staging --tasks 10
-  python scripts/trigger_run.py --env staging --tasks 2 --limit 50 --no-wait
-  python scripts/trigger_run.py --env prod --target-hours 1 --dry-run
+  python scripts/triggers/run.py --env prod --target-hours 2
+  python scripts/triggers/run.py --env staging --tasks 10
+  python scripts/triggers/run.py --env staging --tasks 2 --limit 50 --no-wait
+  python scripts/triggers/run.py --env prod --target-hours 1 --dry-run
 """
 
 from __future__ import annotations

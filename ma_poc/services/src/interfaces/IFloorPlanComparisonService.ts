@@ -2,7 +2,7 @@
  * @file IFloorPlanComparisonService.ts
  * @description Interface for the CSV-vs-DB floor-plan comparison service.
  * Backed by the floor_plan_comparison_runs / floor_plan_comparison_rows
- * tables; populated by `ma_poc/scripts/compare_floor_plans_csv.py`.
+ * tables; populated by `ma_poc/scripts/floor_plans/compare.py`.
  */
 
 import type {

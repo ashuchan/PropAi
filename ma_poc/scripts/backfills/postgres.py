@@ -9,11 +9,11 @@ identity keys, and skips duplicates where the SQL schema enforces PK
 uniqueness (e.g. scrape_events by event_id).
 
 Usage:
-    python scripts/backfill_pg.py                             # defaults
-    python scripts/backfill_pg.py --target sqlite
-    python scripts/backfill_pg.py --only runs,state
-    python scripts/backfill_pg.py --run-dates 2026-04-14,2026-04-19
-    python scripts/backfill_pg.py --dry-run
+    python scripts/backfills/postgres.py                             # defaults
+    python scripts/backfills/postgres.py --target sqlite
+    python scripts/backfills/postgres.py --only runs,state
+    python scripts/backfills/postgres.py --run-dates 2026-04-14,2026-04-19
+    python scripts/backfills/postgres.py --dry-run
 """
 
 from __future__ import annotations

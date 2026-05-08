@@ -10,8 +10,8 @@ with:
   - Top 20 blocked domains
 
 Usage:
-    python scripts/escalation_baseline.py
-    python scripts/escalation_baseline.py --data-dir ./data --out docs/ESCALATION_BASELINE.md
+    python scripts/baselines/escalation.py
+    python scripts/baselines/escalation.py --data-dir ./data --out docs/ESCALATION_BASELINE.md
 """
 
 from __future__ import annotations

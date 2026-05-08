@@ -1,7 +1,7 @@
 /**
  * @file FloorPlanComparisonStore.ts (postgres adapter)
  * @description Reads CSV-vs-DB floor plan comparison results written by
- * `ma_poc/scripts/compare_floor_plans_csv.py`. Two backing tables:
+ * `ma_poc/scripts/floor_plans/compare.py`. Two backing tables:
  * `floor_plan_comparison_runs` (per-property summary) and
  * `floor_plan_comparison_rows` (per-CSV-row detail). Re-running the util
  * with the same run_id replaces both tables for that run.

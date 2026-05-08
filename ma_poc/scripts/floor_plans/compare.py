@@ -40,10 +40,10 @@ Results land in two Postgres tables (alembic 0008):
 Re-running with the same `--run-id` replaces results for that run.
 
 Usage:
-    python ma_poc/scripts/compare_floor_plans_csv.py \\
-        --csv ma_poc/config/Floorplan-\\ comparisons.csv
+    python -m ma_poc.scripts.floor_plans.compare \\
+        --csv ma_poc/config/Floorplan-comparisons.csv
 
-    python ma_poc/scripts/compare_floor_plans_csv.py \\
+    python -m ma_poc.scripts.floor_plans.compare \\
         --csv path/to.csv --run-id 2026-05-02-manual --buffer 50
 """
 

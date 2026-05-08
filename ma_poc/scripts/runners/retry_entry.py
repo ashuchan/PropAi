@@ -1,5 +1,5 @@
 """
-scripts/jugnu_retry_entry.py — Cloud Run retry job entry point.
+scripts/runners/retry_entry.py — Cloud Run retry job entry point.
 
 Environment variables consumed:
   RETRY_MODE      (required) — "errors", "resume", or "unprocessed"
@@ -24,7 +24,7 @@ Flow:
      Cloud Run started a brand new container, so without this step the
      retry runner would see an empty DLQ and re-park any still-broken
      properties from scratch, losing their original ``parked_at``.
-  6. Exec: python ma_poc/scripts/jugnu_retry_runner.py
+  6. Exec: python ma_poc/scripts/runners/jugnu_retry.py
          --retry-errors OR --resume  (based on RETRY_MODE)
          --run-date {run_date}
          --csv /tmp/properties.csv
@@ -286,7 +286,7 @@ def main() -> None:
         sys.exit(1)
 
     # 6. Run the retry runner
-    runner = _app_root / "ma_poc" / "scripts" / "jugnu_retry_runner.py"
+    runner = _app_root / "ma_poc" / "scripts" / "runners" / "jugnu_retry.py"
     mode_flag = {
         "errors": "--retry-errors",
         "resume": "--resume",

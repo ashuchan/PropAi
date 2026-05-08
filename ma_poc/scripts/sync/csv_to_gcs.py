@@ -11,11 +11,11 @@ Validates before uploading:
 Uploads two objects:
   - ``property-list/properties.csv`` — the full CSV the nightly scrape reads.
   - ``canary/properties.csv``        — the first ``CANARY_ROWS`` rows,
-    consumed by ``trigger_smoke.py`` for the deploy-time canary run.
+    consumed by ``triggers/smoke.py`` for the deploy-time canary run.
 
 Usage:
-  python scripts/deploy_csv_sync.py --env staging
-  python scripts/deploy_csv_sync.py --env prod --path properties.csv
+  python scripts/sync/csv_to_gcs.py --env staging
+  python scripts/sync/csv_to_gcs.py --env prod --path properties.csv
 """
 
 from __future__ import annotations

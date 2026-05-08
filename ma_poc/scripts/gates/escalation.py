@@ -1,14 +1,14 @@
 """Gate runner for the fetch-tier escalation ladder.
 
-Same structure as scripts/gate_refactor.py — one function per phase,
+Same structure as scripts/gates/refactor.py — one function per phase,
 each returning a GateResult.
 
 Usage::
 
-    python scripts/gate_escalation.py phase 0
-    python scripts/gate_escalation.py phase 1
-    python scripts/gate_escalation.py all
-    python scripts/gate_escalation.py final
+    python scripts/gates/escalation.py phase 0
+    python scripts/gates/escalation.py phase 1
+    python scripts/gates/escalation.py all
+    python scripts/gates/escalation.py final
 """
 
 from __future__ import annotations

@@ -10,7 +10,7 @@ Exit codes:
   130 SIGINT
 
 Usage:
-  python scripts/trigger_retry.py --env {staging|prod} --mode {errors|resume|unprocessed} [OPTIONS]
+  python scripts/triggers/retry.py --env {staging|prod} --mode {errors|resume|unprocessed} [OPTIONS]
 
 Options:
   --env {staging|prod}                 Target environment (required)
@@ -29,10 +29,10 @@ Options:
   --yes                      Skip confirmation prompt
 
 Examples:
-  python scripts/trigger_retry.py --env prod --mode errors --run-date 2026-04-18
-  python scripts/trigger_retry.py --env staging --mode resume
-  python scripts/trigger_retry.py --env prod --mode errors --tasks 10 --limit 200
-  python scripts/trigger_retry.py --env prod --mode unprocessed --run-date 2026-04-28 --tasks 5
+  python scripts/triggers/retry.py --env prod --mode errors --run-date 2026-04-18
+  python scripts/triggers/retry.py --env staging --mode resume
+  python scripts/triggers/retry.py --env prod --mode errors --tasks 10 --limit 200
+  python scripts/triggers/retry.py --env prod --mode unprocessed --run-date 2026-04-28 --tasks 5
 """
 
 from __future__ import annotations

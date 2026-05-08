@@ -1,5 +1,5 @@
 """
-scripts/validate_outputs.py — required Phase A metrics.
+scripts/checks/outputs.py — required Phase A metrics.
 
 Reads data/scrape_events.jsonl. Computes the 10 metrics from CLAUDE.md and
 prints a structured summary. Exit non-zero if any hard target is missed.

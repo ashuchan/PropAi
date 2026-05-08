@@ -1,4 +1,4 @@
-"""Per-property floor-plan catalog backed by ``Floorplan- comparisons.csv``.
+"""Per-property floor-plan catalog backed by ``Floorplan-comparisons.csv``.
 
 Loaded once at process start. Exposes per-property canonical floor plans
 and a deterministic ``snap()`` method that resolves an extracted unit's
@@ -39,7 +39,7 @@ log = logging.getLogger(__name__)
 KNOWN_PLANS_PROMPT_LIMIT = 40
 
 _CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
-_FLOORPLAN_CSV = _CONFIG_DIR / "Floorplan- comparisons.csv"
+_FLOORPLAN_CSV = _CONFIG_DIR / "Floorplan-comparisons.csv"
 _MAPPING_PATH = _CONFIG_DIR / "csv_floorplan_mapping.json"
 
 # Tokens that contribute nothing to floor-plan-name disambiguation. These
@@ -92,7 +92,7 @@ def _sqft_present(v: int | None) -> bool:
 
 @dataclass(frozen=True)
 class CanonicalPlan:
-    """A single row of ``Floorplan- comparisons.csv``."""
+    """A single row of ``Floorplan-comparisons.csv``."""
 
     apartmentid: str
     floorplannumber: int

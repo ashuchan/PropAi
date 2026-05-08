@@ -1,5 +1,5 @@
 """
-scripts/jugnu_shard_entry.py — Cloud Run task entry point.
+scripts/runners/shard_entry.py — Cloud Run task entry point.
 
 Environment variables consumed:
   CLOUD_RUN_TASK_INDEX   (auto-set by Cloud Run) — this task's index
@@ -16,7 +16,7 @@ Environment variables consumed:
   BUCKET_NAME            (required) — bucket for artifact upload
 
 Flow (SHARD_SOURCE=db, default):
-  1. Exec: python ma_poc/scripts/jugnu_runner.py --shard-index $IDX --shard-count $N
+  1. Exec: python ma_poc/scripts/runners/jugnu.py --shard-index $IDX --shard-count $N
      The runner queries the `properties` table directly and slices rows by
      (canonical_id ORDER BY) into $N contiguous chunks. No CSV download,
      no /tmp slicing, no per-shard CSV file.
@@ -26,7 +26,7 @@ Flow (SHARD_SOURCE=csv, legacy):
   1. Download CSV from GCS to /tmp/properties.csv
   2. Slice rows for this shard (ceiling division)
   3. Write slice to /tmp/shard_{idx}.csv
-  4. Exec: python ma_poc/scripts/jugnu_runner.py --csv /tmp/shard_{idx}.csv ...
+  4. Exec: python ma_poc/scripts/runners/jugnu.py --csv /tmp/shard_{idx}.csv ...
   5. Sync every written artifact (runs, snapshots, reports, profiles,
      scrape_events, LLM reports + diagnostics, extraction results, property
      reports, current-state properties/units) into Cloud SQL via
@@ -277,7 +277,7 @@ def main() -> None:
         file=sys.stderr,
     )
 
-    runner = _app_root / "ma_poc" / "scripts" / "jugnu_runner.py"
+    runner = _app_root / "ma_poc" / "scripts" / "runners" / "jugnu.py"
     cmd = [
         sys.executable,
         str(runner),

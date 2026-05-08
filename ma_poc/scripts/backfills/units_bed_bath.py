@@ -11,9 +11,9 @@ The script ONLY fills NULL values — it never overwrites an existing
 beds/baths. Re-running is idempotent: a second run touches no rows.
 
 Usage:
-    python ma_poc/scripts/backfill_units_bed_bath.py --dry-run
-    python ma_poc/scripts/backfill_units_bed_bath.py
-    python ma_poc/scripts/backfill_units_bed_bath.py --batch-size 500
+    python ma_poc/scripts/backfills/units_bed_bath.py --dry-run
+    python ma_poc/scripts/backfills/units_bed_bath.py
+    python ma_poc/scripts/backfills/units_bed_bath.py --batch-size 500
 """
 
 from __future__ import annotations

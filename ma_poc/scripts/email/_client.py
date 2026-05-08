@@ -1,7 +1,7 @@
 """Generic HTML email sender.
 
-Thin wrapper around the Gmail MCP send path used by ``email_daily_report.py``
-and ``email_merge_analysis.py``. Hand it an HTML string + subject and it
+Thin wrapper around the Gmail MCP send path used by ``email/daily.py``
+and ``email/merge_analysis.py``. Hand it an HTML string + subject and it
 ships through the same authenticated Gmail MCP server, to the same
 ``REPORT_RECIPIENTS`` (or whatever you pass).
 
@@ -9,20 +9,20 @@ CLI usage
 ---------
 
     # Pipe HTML in, send to REPORT_RECIPIENTS
-    cat report.html | python scripts/email_html.py --subject "PropAi note"
+    cat report.html | python scripts/email/_client.py --subject "PropAi note"
 
     # Read HTML from a file
-    python scripts/email_html.py --subject "PropAi note" --html-file report.html
+    python scripts/email/_client.py --subject "PropAi note" --html-file report.html
 
     # Override recipients
-    python scripts/email_html.py --subject "Hi" --html-file r.html \
+    python scripts/email/_client.py --subject "Hi" --html-file r.html \
         --recipients a@x.com,b@y.com
 
     # Render only — print plaintext fallback to stdout, do not send
-    python scripts/email_html.py --subject "Hi" --html-file r.html --dry-run
+    python scripts/email/_client.py --subject "Hi" --html-file r.html --dry-run
 
     # Attach one or more files (Gmail previews .csv / .xlsx as Sheets)
-    python scripts/email_html.py --subject "Daily failures" --html-file r.html \
+    python scripts/email/_client.py --subject "Daily failures" --html-file r.html \
         --attach data/runs/2026-05-07/scraped_units.xlsx \
         --attach data/runs/2026-05-07/failed_properties.xlsx
 

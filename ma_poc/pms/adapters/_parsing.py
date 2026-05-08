@@ -165,7 +165,7 @@ def is_junk_unit_number(val: Any) -> bool:
 # narrow enough that they don't false-positive on unrelated marketing
 # copy ("Five Star View" should NOT yield beds=5). The corpus they were
 # tuned against is the union of:
-#   - ma_poc/config/Floorplan- comparisons.csv     (vendor CSV side)
+#   - ma_poc/config/Floorplan-comparisons.csv     (vendor CSV side)
 #   - distinct units.floor_plan_name in production (DB side)
 # When extending, add a regression test in
 # tests/pms/adapters/test_infer_bed_bath_from_name.py rather than
@@ -184,7 +184,7 @@ _BED_BATH_PAIR_RE = re.compile(
 )
 # Vendor CSV quirk: "1BD/1BR-1", "2BD/1BR-2", "3BD/2.5BR-3" — the second
 # "BR" actually means bathroom in this notation. Surfaced from the
-# Floorplan- comparisons.csv corpus. A trailing "-N" suffix is allowed
+# Floorplan-comparisons.csv corpus. A trailing "-N" suffix is allowed
 # (the vendor's plan-variant index) so it doesn't break the boundary.
 _BED_BATH_VENDOR_BR_RE = re.compile(
     r"\b(\d)\s*BD\s*/\s*(\d(?:\.\d)?)\s*BR\b",

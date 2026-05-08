@@ -1,7 +1,7 @@
 """
 Jugnu J0 — capture baseline metrics from the latest run.
 
-Usage: python scripts/jugnu_baseline.py [--run-dir data/runs/2026-04-17]
+Usage: python scripts/baselines/jugnu.py [--run-dir data/runs/2026-04-17]
 """
 
 from __future__ import annotations
