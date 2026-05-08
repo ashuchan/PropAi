@@ -1,4 +1,4 @@
-"""Regression tests for deploy_csv_sync.py.
+"""Regression tests for sync/csv_to_gcs.py (formerly deploy_csv_sync.py).
 
 Covers:
   - Dual upload path (full list + canary).
@@ -22,7 +22,7 @@ for _p in (_here,):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from scripts import deploy_csv_sync  # noqa: E402
+from scripts.sync import csv_to_gcs as deploy_csv_sync  # noqa: E402
 
 
 def _make_csv(tmp_path: Path, row_count: int = 10) -> Path:
@@ -49,7 +49,7 @@ def test_upload_sends_both_full_and_canary(tmp_path: Path) -> None:
         captured.append((Path(src_p.read_text(encoding="utf-8")), dest))  # type: ignore[arg-type]
         return 0
 
-    with patch("scripts.deploy_csv_sync.subprocess.check_call", side_effect=fake_check_call):
+    with patch("scripts.sync.csv_to_gcs.subprocess.check_call", side_effect=fake_check_call):
         deploy_csv_sync.upload(src, env="prod")
 
     assert len(captured) == 2
@@ -71,7 +71,7 @@ def test_canary_contains_exactly_n_data_rows(tmp_path: Path) -> None:
             canary_bodies.append(Path(cmd[-2]).read_text(encoding="utf-8"))
         return 0
 
-    with patch("scripts.deploy_csv_sync.subprocess.check_call", side_effect=fake_check_call):
+    with patch("scripts.sync.csv_to_gcs.subprocess.check_call", side_effect=fake_check_call):
         deploy_csv_sync.upload(src, env="prod")
 
     assert len(canary_bodies) == 1
@@ -93,7 +93,7 @@ def test_canary_tolerates_source_smaller_than_canary_rows(tmp_path: Path) -> Non
             canary_bodies.append(Path(cmd[-2]).read_text(encoding="utf-8"))
         return 0
 
-    with patch("scripts.deploy_csv_sync.subprocess.check_call", side_effect=fake_check_call):
+    with patch("scripts.sync.csv_to_gcs.subprocess.check_call", side_effect=fake_check_call):
         deploy_csv_sync.upload(src, env="prod")
 
     lines = canary_bodies[0].strip().splitlines()
@@ -108,7 +108,7 @@ def test_staging_maps_to_staging_tf_env(tmp_path: Path) -> None:
         dests.append(cmd[-1])
         return 0
 
-    with patch("scripts.deploy_csv_sync.subprocess.check_call", side_effect=fake_check_call):
+    with patch("scripts.sync.csv_to_gcs.subprocess.check_call", side_effect=fake_check_call):
         deploy_csv_sync.upload(src, env="staging")
 
     assert all("jugnu-raw-staging" in d for d in dests), dests
@@ -126,7 +126,7 @@ def test_canary_cleanup_removes_tempfile_even_on_failure(tmp_path: Path) -> None
             raise RuntimeError("simulated gsutil failure on canary")
         return 0
 
-    with patch("scripts.deploy_csv_sync.subprocess.check_call", side_effect=fake_check_call):
+    with patch("scripts.sync.csv_to_gcs.subprocess.check_call", side_effect=fake_check_call):
         try:
             deploy_csv_sync.upload(src, env="prod")
         except RuntimeError:

@@ -1,4 +1,4 @@
-"""Verify ma_poc.scripts.migrate.cloud_sql_proxy against a mock subprocess.
+"""Verify ma_poc.scripts.migrations.alembic.cloud_sql_proxy against a mock subprocess.
 
 Real cloud-sql-proxy v2 writes its ready message to stdout. v1 wrote to
 stderr. We cover both, plus the two hang paths (silent process, process
@@ -27,7 +27,7 @@ _here = Path(__file__).resolve().parent
 _ma_poc = _here.parent.parent
 sys.path.insert(0, str(_ma_poc))
 
-from scripts import migrate  # noqa: E402
+from scripts.migrations import alembic as migrate  # noqa: E402
 
 
 def _python_subproc(stdout_lines: list[str], stderr_lines: list[str], exit_code: int | None = None, linger_sec: float = 0.5) -> list[str]:

@@ -1,10 +1,11 @@
-# Wraps scripts/jugnu_runner.py to advance --start-index by 100 each run.
+# Wraps scripts/runners/jugnu.py to advance --start-index by 100 each run.
 # Scheduled via schtasks every 15 minutes. Stops when CSV is exhausted.
 
 $ErrorActionPreference = "Stop"
 
+# This script lives at ma_poc/scripts/runners/. Walk up two levels to land on ma_poc/.
 $scriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
-$maPocDir   = Split-Path -Parent $scriptDir
+$maPocDir   = Split-Path -Parent (Split-Path -Parent $scriptDir)
 Set-Location $maPocDir
 
 $csvPath     = "config/properties.csv"
@@ -51,7 +52,7 @@ Log "Run start: --start-index $startIndex --limit $batchSize (CSV rows=$rowCount
 $prevPref = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    $output = & $pythonExe scripts/jugnu_runner.py --csv $csvPath --start-index $startIndex --limit $batchSize 2>&1 |
+    $output = & $pythonExe scripts/runners/jugnu.py --csv $csvPath --start-index $startIndex --limit $batchSize 2>&1 |
         Tee-Object -FilePath $logFile -Append
     $exitCode = $LASTEXITCODE
 } finally {

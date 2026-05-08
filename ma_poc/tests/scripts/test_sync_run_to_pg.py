@@ -1,4 +1,4 @@
-"""End-to-end test for ``scripts.sync_run_to_pg.sync_run_to_postgres``.
+"""End-to-end test for ``scripts.sync.run_to_pg.sync_run_to_postgres``.
 
 Seeds an FS provider with the full surface the scrape runner writes
 (state, profiles, events, runs, artifacts) and syncs it into a SQLite
@@ -36,7 +36,7 @@ from models.extraction_result import (
 from models.scrape_event import ScrapeEvent, ScrapeOutcome
 from models.scrape_profile import ScrapeProfile
 
-from scripts import sync_run_to_pg
+from scripts.sync import run_to_pg as sync_run_to_pg
 
 
 # Tests that exercise ``sync_run_to_postgres()`` end-to-end must use a

@@ -153,11 +153,11 @@ from data_provider.sql.models import (  # noqa: E402
     ScrapeProfileRow,
 )
 from data_provider.sql.provider import SqlDataProvider  # noqa: E402
-from scripts.email_daily_failures_report import (  # noqa: E402
+from scripts.email.daily_failures import (  # noqa: E402
     _find_latest_gcs_run,
     _gcs_run_dir_exists,
 )
-from scripts.email_daily_report import _open_provider  # noqa: E402
+from scripts.email.daily import _open_provider  # noqa: E402
 
 log = logging.getLogger("failure_debug_summary")
 

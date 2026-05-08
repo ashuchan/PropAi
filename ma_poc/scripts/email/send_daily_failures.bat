@@ -26,7 +26,7 @@ rem  ADD a daily 8:30 AM job (run as the user, NOT elevated):
 rem
 rem    schtasks /Create ^
 rem        /TN "PropAi Daily Failures Report" ^
-rem        /TR "C:\Users\ashus\OneDrive\Documents\Code\PropAi\ma_poc\scripts\send_daily_failures_report.bat" ^
+rem        /TR "C:\Users\ashus\OneDrive\Documents\Code\PropAi\ma_poc\scripts\email\send_daily_failures.bat" ^
 rem        /SC DAILY /ST 08:30 ^
 rem        /F
 rem
@@ -53,7 +53,7 @@ rem ============================================================================
 
 setlocal enableextensions
 
-set "MA_POC_ROOT=%~dp0.."
+set "MA_POC_ROOT=%~dp0..\.."
 set "PY=%MA_POC_ROOT%\.venv\Scripts\python.exe"
 
 if not exist "%PY%" (
@@ -80,9 +80,9 @@ goto parse
 
 if defined RUN_SYNC (
     echo [send_daily_failures_report] Mirroring Cloud SQL ^-^> local first ^(--with-sync^)
-    "%PY%" "%MA_POC_ROOT%\scripts\sync_cloud_to_local.py"
+    "%PY%" "%MA_POC_ROOT%\scripts\sync\cloud_to_local.py"
     if errorlevel 1 (
-        echo [send_daily_failures_report] sync_cloud_to_local.py failed; aborting send 1>&2
+        echo [send_daily_failures_report] scripts\sync\cloud_to_local.py failed; aborting send 1>&2
         exit /b 3
     )
 )

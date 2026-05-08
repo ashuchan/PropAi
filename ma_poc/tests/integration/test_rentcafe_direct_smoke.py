@@ -25,7 +25,7 @@ def test_f7_smoke_threshold_30_of_50() -> None:
     if not SMOKE.exists():
         pytest.skip(
             "Smoke output not present; run "
-            "`python -m ma_poc.scripts.smoke_rentcafe_direct "
+            "`python -m ma_poc.scripts.smoke.rentcafe_direct "
             "--blocked-input <bot_blocked_properties_latest.json>` first."
         )
     data = json.loads(SMOKE.read_text(encoding="utf-8"))

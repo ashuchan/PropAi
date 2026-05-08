@@ -149,7 +149,7 @@ jobs:
             --entrypoint python \
             -e CLOUD_RUN_TASK_INDEX=0 \
             -e CLOUD_RUN_TASK_COUNT=1 \
-            jugnu:ci ma_poc/scripts/jugnu_shard_entry.py
+            jugnu:ci ma_poc/scripts/runners/shard_entry.py
       - name: Image size check
         run: |
           size_bytes=$(docker image inspect jugnu:ci --format='{{.Size}}')

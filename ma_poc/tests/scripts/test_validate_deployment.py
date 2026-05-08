@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from ma_poc.scripts import validate_deployment as vd
+from ma_poc.scripts.checks import deployment as vd
 
 
 def _seed_csv_pair(dst: Path, *, rows: int = 1500, chosen: str | None = "apartmentid") -> None:

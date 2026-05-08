@@ -79,13 +79,13 @@ def check_phase_0() -> GateResult:
         for section in required_sections:
             result.add(section in body, f"ESCALATION_BASELINE.md contains '{section}'")
 
-    # Check escalation_baseline.py exists and runs cleanly
-    script_path = ROOT / "scripts" / "escalation_baseline.py"
-    result.add(script_path.is_file(), "scripts/escalation_baseline.py exists")
+    # Check baselines/escalation.py exists and runs cleanly
+    script_path = ROOT / "scripts" / "baselines" / "escalation.py"
+    result.add(script_path.is_file(), "scripts/baselines/escalation.py exists")
 
     if script_path.is_file():
         ok, summary = _run_cmd([sys.executable, str(script_path)])
-        result.add(ok, f"escalation_baseline.py runs cleanly ({summary})")
+        result.add(ok, f"baselines/escalation.py runs cleanly ({summary})")
 
     # Check feature-flag tests pass
     ok, summary = _run_pytest("tests/test_feature_flags.py")

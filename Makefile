@@ -15,14 +15,14 @@ smoke-shard: build  ## Run shard entry stub with fake task env
 		-e CLOUD_RUN_TASK_INDEX=0 \
 		-e CLOUD_RUN_TASK_COUNT=1 \
 		$(IMAGE_NAME):$(IMAGE_TAG) \
-		python ma_poc/scripts/jugnu_shard_entry.py
+		python ma_poc/scripts/runners/shard_entry.py
 
 .PHONY: smoke-retry
 smoke-retry: build  ## Run retry entry stub
 	docker run --rm \
 		-e RETRY_MODE=errors \
 		$(IMAGE_NAME):$(IMAGE_TAG) \
-		python ma_poc/scripts/jugnu_retry_entry.py
+		python ma_poc/scripts/runners/retry_entry.py
 
 .PHONY: shell
 shell: build  ## Open a shell in the image for debugging

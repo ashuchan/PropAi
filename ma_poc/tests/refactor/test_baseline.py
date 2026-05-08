@@ -1,4 +1,4 @@
-"""Phase 0 — tests for scripts/refactor_baseline.py."""
+"""Phase 0 — tests for scripts/baselines/refactor.py."""
 
 from __future__ import annotations
 
@@ -9,11 +9,10 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ROOT / "scripts"
-if str(SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-import refactor_baseline as rb  # noqa: E402
+from scripts.baselines import refactor as rb  # noqa: E402
 
 SUCCESS_REPORT = """# Scrape Report: Sunny Oaks
 **Canonical ID:** `1001`
