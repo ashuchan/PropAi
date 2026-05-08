@@ -333,6 +333,23 @@ def main() -> None:
         # worker role. Unset → the migration raises, which is what we
         # want: no silent default.
         env["JUGNU_WORKER_DB_USER"] = worker_db_user
+        # PYTHONPATH must include BOTH ma_poc/ and the repo root so the
+        # alembic subprocess can resolve every import in the env.py chain:
+        #   • `from data_provider.sql.engine import ...` needs ma_poc/ on
+        #     sys.path (provided by alembic.ini's `prepend_sys_path = .`
+        #     when alembic runs with cwd=ma_poc/, but only inside alembic
+        #     itself — not in env.py's child imports).
+        #   • `from ma_poc.core.state_store import ...` (in
+        #     data_provider/filesystem.py since the Phase 1 evacuation)
+        #     needs the repo root on sys.path so the ``ma_poc`` package
+        #     resolves at all.
+        # Two separate path entries because alembic.ini's `prepend_sys_path`
+        # only fires for alembic's own import machinery; the subprocess'
+        # ambient sys.path comes from PYTHONPATH.
+        existing_pp = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = os.pathsep.join(
+            p for p in (str(_REPO_ROOT), str(_MA_POC_DIR), existing_pp) if p
+        )
         cmd = ["alembic", "-c", str(ALEMBIC_CONFIG)]
         if args.cmd == "up":
             cmd += ["upgrade", "head"]
