@@ -66,7 +66,7 @@ from sqlalchemy.orm import Session
 
 # Add ma_poc to sys.path so this script can be run directly.
 _HERE = Path(__file__).resolve()
-_MA_POC_ROOT = _HERE.parent.parent
+_MA_POC_ROOT = _HERE.parent.parent.parent
 if str(_MA_POC_ROOT) not in sys.path:
     sys.path.insert(0, str(_MA_POC_ROOT))
 

@@ -28,7 +28,7 @@ import tempfile
 from pathlib import Path
 
 # Allow running as module or script
-REPO = Path(__file__).resolve().parents[2]
+REPO = Path(__file__).resolve().parents[3]
 if str(REPO / "ma_poc") not in sys.path:
     sys.path.insert(0, str(REPO / "ma_poc"))
 

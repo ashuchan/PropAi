@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 # the parent unlocks `from ma_poc.pms.*` (the convention the rest of
 # the repo uses for the adapter package).
 _HERE = Path(__file__).resolve()
-_MA_POC_ROOT = _HERE.parent.parent  # ma_poc/
+_MA_POC_ROOT = _HERE.parent.parent.parent  # ma_poc/
 _REPO_ROOT = _MA_POC_ROOT.parent  # PropAi/
 for _p in (_REPO_ROOT, _MA_POC_ROOT):
     if str(_p) not in sys.path:

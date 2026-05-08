@@ -164,7 +164,7 @@ def _connect() -> pg8000.Connection:
     falls back to local proppy defaults. Strips the SQLAlchemy ``+driver`` suffix."""
     url = os.environ.get("DATABASE_URL")
     if not url:
-        env_path = Path(__file__).resolve().parent.parent / ".env"
+        env_path = Path(__file__).resolve().parent.parent.parent / ".env"
         if env_path.exists():
             for line in env_path.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
@@ -1655,7 +1655,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="Also write a sibling .json file with the raw data")
     args = ap.parse_args(argv)
 
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = Path(__file__).resolve().parent.parent.parent
     out_dir = repo_root / "data" / "runs" / args.run_date
     suffix = "" if args.source == "db" else "_gcs"
 

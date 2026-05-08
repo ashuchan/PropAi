@@ -57,9 +57,9 @@ import sys
 from datetime import date
 from pathlib import Path
 
-# Ensure ma_poc is importable when invoked as /app/ma_poc/scripts/jugnu_shard_entry.py
+# Ensure ma_poc is importable when invoked as /app/ma_poc/scripts/runners/shard_entry.py
 _script_dir = Path(__file__).resolve().parent
-_ma_poc_root = _script_dir.parent  # /app/ma_poc
+_ma_poc_root = _script_dir.parent.parent  # /app/ma_poc
 _app_root = _ma_poc_root.parent  # /app
 for _p in (_app_root, _ma_poc_root):
     if str(_p) not in sys.path:

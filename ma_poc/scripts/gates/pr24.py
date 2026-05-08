@@ -30,7 +30,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 MAPOC = REPO_ROOT / "ma_poc"
 
 FIX_TESTS: dict[str, list[str]] = {

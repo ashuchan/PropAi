@@ -82,7 +82,7 @@ def _summarise(events: list[dict]) -> dict:
 
 
 def run(run_dir: Path | None = None) -> dict:
-    data_dir = Path(__file__).resolve().parent.parent / "data"
+    data_dir = Path(__file__).resolve().parent.parent.parent / "data"
 
     if run_dir is None:
         run_dir = _latest_run_dir(data_dir)

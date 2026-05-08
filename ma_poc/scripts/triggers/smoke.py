@@ -72,7 +72,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 _here = Path(__file__).resolve().parent
-_ma_poc = _here.parent
+_ma_poc = _here.parent.parent
 _app = _ma_poc.parent
 for _p in (_app, _ma_poc):
     if str(_p) not in sys.path:

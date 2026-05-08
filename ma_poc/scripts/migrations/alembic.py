@@ -58,7 +58,7 @@ ENV_CONFIG: dict[str, dict[str, str]] = {
 # source of truth — pointing here used to apply migrations against a tree
 # that did not include 0002_v2_strict onwards, so prod sat at
 # "000_initial_schema" forever while the app wrote v2-shaped rows.
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 _MA_POC_DIR = _REPO_ROOT / "ma_poc"
 ALEMBIC_CONFIG = _MA_POC_DIR / "alembic.ini"
 # Relative paths in ma_poc/alembic.ini (script_location, prepend_sys_path) are

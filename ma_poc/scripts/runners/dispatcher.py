@@ -41,7 +41,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-_SCRIPTS_DIR = Path(__file__).resolve().parent
+_SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 _PACKAGE = "ma_poc.scripts"
 
 # Cloud Run injects these at runtime — surfacing them in the banner makes
@@ -81,9 +81,11 @@ _SECRET_NAME_HINTS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIA
 _USAGE = """\
 Usage:
   Set env var SCRIPT_NAME (and optionally SCRIPT_ARGS), or pass them as argv:
-    python -m ma_poc.scripts.run_script <script_name> [args...]
+    python -m ma_poc.scripts.runners.dispatcher <script_name> [args...]
 
-  SCRIPT_NAME is the module stem inside ma_poc/scripts/, e.g. 'validate_outputs'.
+  SCRIPT_NAME is the dotted module path under ma_poc/scripts/, e.g.
+  'checks.outputs' (resolves to ma_poc/scripts/checks/outputs.py) or
+  'failure_debug_summary' (top-level scripts/ entrypoints stay flat).
   SCRIPT_ARGS is a shell-quoted string, e.g. '--csv config/properties.csv --limit 5'.
 """
 
@@ -166,36 +168,53 @@ def _resolve_inputs(argv: list[str]) -> tuple[str, list[str]]:
 
 
 def _validate_script(name: str) -> Path:
-    """Reject path traversal, private modules, and missing files."""
+    """Reject path traversal, private modules, and missing files.
+
+    Accepts dotted submodule names (e.g. ``backfills.artifacts``) — the
+    Phase 2/3 reorg moved most scripts into subdirectories, so a flat
+    ``backfill_artifacts_pg``-style name is no longer valid. Each segment
+    of the dotted path is checked against the same private/hidden rule
+    so ``email._client`` is rejected (private library), but
+    ``email.daily`` resolves to ``ma_poc/scripts/email/daily.py``.
+    """
     if not name:
         _log("FATAL: SCRIPT_NAME is required (env var or first argv)")
         raise SystemExit(f"error: SCRIPT_NAME is required\n\n{_USAGE}")
-    if name.startswith("_") or name.startswith("."):
-        _log(f"FATAL: refusing to run private/hidden module {name!r}")
-        raise SystemExit(f"error: refusing to run private/hidden module {name!r}")
     if "/" in name or "\\" in name or ".." in name:
-        _log(f"FATAL: SCRIPT_NAME must be a bare module name, got {name!r}")
-        raise SystemExit(f"error: SCRIPT_NAME must be a bare module name, got {name!r}")
+        _log(f"FATAL: SCRIPT_NAME must be a dotted module name, got {name!r}")
+        raise SystemExit(f"error: SCRIPT_NAME must be a dotted module name, got {name!r}")
     if name.endswith(".py"):
         name = name[:-3]
 
-    target = _SCRIPTS_DIR / f"{name}.py"
+    segments = name.split(".")
+    for seg in segments:
+        if not seg or seg.startswith("_") or seg.startswith("."):
+            _log(f"FATAL: refusing to run private/hidden module {name!r}")
+            raise SystemExit(f"error: refusing to run private/hidden module {name!r}")
+
+    target = _SCRIPTS_DIR.joinpath(*segments).with_suffix(".py")
     if not target.is_file():
-        # List a few near-misses so the operator can correct a typo
-        # without redeploying. Cheap directory scan, runs once per job.
-        candidates = sorted(
-            p.stem for p in _SCRIPTS_DIR.glob("*.py")
-            if not p.stem.startswith("_") and name.lower() in p.stem.lower()
-        )
+        # Walk every .py under scripts/ (skipping private dirs/files) and
+        # surface dotted-path matches whose stem fuzzy-contains the typo.
+        candidates: list[str] = []
+        for p in _SCRIPTS_DIR.rglob("*.py"):
+            rel = p.relative_to(_SCRIPTS_DIR)
+            if any(part.startswith("_") for part in rel.parts):
+                continue
+            dotted = rel.with_suffix("").as_posix().replace("/", ".")
+            if name.split(".")[-1].lower() in p.stem.lower():
+                candidates.append(dotted)
+        candidates.sort()
         hint = (
             f"\nDid you mean: {', '.join(candidates[:5])}"
             if candidates
             else ""
         )
-        _log(f"FATAL: no such script ma_poc/scripts/{name}.py{hint}")
+        rel_target = target.relative_to(_SCRIPTS_DIR).as_posix()
+        _log(f"FATAL: no such script ma_poc/scripts/{rel_target}{hint}")
         raise SystemExit(
-            f"error: no such script ma_poc/scripts/{name}.py\n"
-            f"hint: pass the bare module name without the .py extension{hint}"
+            f"error: no such script ma_poc/scripts/{rel_target}\n"
+            f"hint: pass the dotted module name without the .py extension{hint}"
         )
     return target
 

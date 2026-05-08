@@ -25,7 +25,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 _HERE = Path(__file__).resolve()
-_MA_POC_ROOT = _HERE.parent.parent
+_MA_POC_ROOT = _HERE.parent.parent.parent
 _REPO_ROOT = _MA_POC_ROOT.parent
 for _p in (_REPO_ROOT, _MA_POC_ROOT):
     if str(_p) not in sys.path:

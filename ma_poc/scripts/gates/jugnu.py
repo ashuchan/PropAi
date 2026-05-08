@@ -18,7 +18,7 @@ from pathlib import Path
 
 log = logging.getLogger("gate_jugnu")
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 def check_phase_0() -> list[str]:

@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 # wrong (truncated CSV, encoding mismatch, mapping key drift).
 MIN_INDEX_PROPERTIES = 1_000
 
-_CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+_CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config"
 _MAPPING_PATH = _CONFIG_DIR / "csv_floorplan_mapping.json"
 _PROMPT_DIR = _CONFIG_DIR / "prompts"
 _REQUIRED_PROMPTS = (

@@ -48,7 +48,7 @@ from typing import Any
 
 # Ensure ma_poc is importable
 _script_dir = Path(__file__).resolve().parent
-_ma_poc_root = _script_dir.parent
+_ma_poc_root = _script_dir.parent.parent
 _app_root = _ma_poc_root.parent
 for _p in (_app_root, _ma_poc_root):
     if str(_p) not in sys.path:

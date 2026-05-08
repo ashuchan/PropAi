@@ -211,9 +211,10 @@ def migrate_postgres_units(dry_run: bool, mode: str = "v1->v2") -> dict[str, Any
 # ---- Store C: per-run properties.json --------------------------------------
 
 # Resolve to ma_poc/data/runs regardless of CWD. The migration script is
-# packaged inside ma_poc/scripts/, so walking up two parents lands on the
-# ma_poc/ root no matter where the operator invoked it from.
-_DEFAULT_RUNS_DIR = Path(__file__).resolve().parents[1] / "data" / "runs"
+# packaged inside ma_poc/scripts/migrations/, so walking up two parents
+# (parents[2]) lands on the ma_poc/ root no matter where the operator invoked
+# it from.
+_DEFAULT_RUNS_DIR = Path(__file__).resolve().parents[2] / "data" / "runs"
 
 
 def _properties_files_in_window(base: Path | None = None) -> Iterator[Path]:
@@ -295,7 +296,7 @@ def main() -> None:
     print(f"Mode: {args.mode}  (matching {id_re.pattern})")
 
     print("\n=== Store A: data/state/unit_index.json ===")
-    state_path = Path(__file__).resolve().parents[1] / "data" / "state" / "unit_index.json"
+    state_path = Path(__file__).resolve().parents[2] / "data" / "state" / "unit_index.json"
     res_a = migrate_unit_index(state_path, args.dry_run, id_re)
     print(json.dumps(res_a, indent=2, default=str))
 

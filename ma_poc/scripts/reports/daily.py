@@ -50,7 +50,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-_MA_POC_ROOT = Path(__file__).resolve().parent.parent
+_MA_POC_ROOT = Path(__file__).resolve().parent.parent.parent
 _REPO_ROOT = _MA_POC_ROOT.parent
 # `ma_poc/` first so bare `import data_provider` resolves; the repo root
 # is also needed because some modules (e.g. models.scrape_profile) reach

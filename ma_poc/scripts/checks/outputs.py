@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 DATA = Path(os.getenv("DATA_DIR", str(ROOT / "data")))
 EVENTS = DATA / "scrape_events.jsonl"
 

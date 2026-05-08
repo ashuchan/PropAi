@@ -29,7 +29,7 @@ import logging
 import sys
 from pathlib import Path
 
-_MA_POC_ROOT = Path(__file__).resolve().parent.parent
+_MA_POC_ROOT = Path(__file__).resolve().parent.parent.parent
 _REPO_ROOT = _MA_POC_ROOT.parent
 for _p in (_MA_POC_ROOT, _REPO_ROOT):
     if str(_p) not in sys.path:

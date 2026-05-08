@@ -34,8 +34,8 @@ from typing import Any
 # _repo_root lets ``from ma_poc.pms...`` resolve; _MA_POC_ROOT lets
 # ``from services.profile_store...`` and ``from models....`` resolve
 # (those packages live directly under ma_poc/, not ma_poc/ma_poc/).
-_repo_root = Path(__file__).resolve().parent.parent.parent
-_MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
+_repo_root = Path(__file__).resolve().parent.parent.parent.parent
+_MA_POC_ROOT = Path(__file__).resolve().parent.parent.parent  # ma_poc/
 for _p in (_repo_root, _MA_POC_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))

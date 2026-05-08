@@ -48,9 +48,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-# parents[0]=scripts, [1]=ma_poc, [2]=PropAi
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-_MA_POC_ROOT = Path(__file__).resolve().parents[1]
+# parents[0]=smoke, [1]=scripts, [2]=ma_poc, [3]=PropAi
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_MA_POC_ROOT = Path(__file__).resolve().parents[2]
 for _p in (_REPO_ROOT, _MA_POC_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))

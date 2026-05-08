@@ -124,7 +124,7 @@ from typing import Any
 # file is invoked as `python scripts/email_daily_report.py` from the ma_poc
 # root. The repo root is also needed because some modules (e.g.
 # models.scrape_profile) reach back via `from ma_poc.models...`.
-_MA_POC_ROOT = Path(__file__).resolve().parent.parent
+_MA_POC_ROOT = Path(__file__).resolve().parent.parent.parent
 _REPO_ROOT = _MA_POC_ROOT.parent
 for _p in (_MA_POC_ROOT, _REPO_ROOT):
     if str(_p) not in sys.path:

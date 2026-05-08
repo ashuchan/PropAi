@@ -327,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--root",
         type=Path,
-        default=Path(__file__).resolve().parent.parent,
+        default=Path(__file__).resolve().parent.parent.parent,
         help="Project root (defaults to ma_poc/)",
     )
     args = parser.parse_args(argv)

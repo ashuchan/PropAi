@@ -18,7 +18,7 @@ from typing import Any
 
 log = logging.getLogger("jugnu_baseline")
 
-_MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
+_MA_POC_ROOT = Path(__file__).resolve().parent.parent.parent  # ma_poc/
 
 
 def _schema_data_root(data_dir: Path) -> Path:

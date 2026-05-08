@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 # Allow running from repo root or scripts/
-_repo = Path(__file__).resolve().parent.parent
+_repo = Path(__file__).resolve().parent.parent.parent
 if str(_repo) not in sys.path:
     sys.path.insert(0, str(_repo))
 

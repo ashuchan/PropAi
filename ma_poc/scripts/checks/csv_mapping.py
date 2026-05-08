@@ -25,7 +25,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-_CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+_CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "config"
 _FLOORPLAN_CSV = _CONFIG_DIR / "Floorplan- comparisons.csv"
 _PROPERTIES_CSV = _CONFIG_DIR / "properties.csv"
 _MAPPING_OUT = _CONFIG_DIR / "csv_floorplan_mapping.json"
