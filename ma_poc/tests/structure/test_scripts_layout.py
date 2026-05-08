@@ -162,6 +162,11 @@ SCRIPTS_ROOT_ALLOWED_FILES = {
     "CLAUDE.md",
     "JUGNU_ALGORITHM.md",
     "llm_fallbacks.md",
+    # One-shot operator tools that don't fit any of the categorised
+    # subdirectories. Both predate the Phase 2/3 reorg and are invoked
+    # directly via `python -m ma_poc.scripts.<name>`.
+    "failure_debug_summary.py",
+    "ingest_properties_csv.py",
 }
 
 # Subdirectories allowed at the scripts/ root.

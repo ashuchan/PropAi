@@ -55,6 +55,30 @@ from ma_poc.core.identity import assign_fallback_unit_id
 log = logging.getLogger("jugnu_runner")
 
 
+def _resolve_per_property_timeout() -> float:
+    """Per-property wall-clock cap for the full L1→L4 pipeline.
+
+    Sized off prod data: p95 property completes in ~30s; p99 in ~120s.
+    600s (10 min) leaves enormous headroom for slow sites while still
+    cutting the pathological tail (the multi-hour hangs that wedged
+    shards 8/12/17 on three consecutive days). Above this cap, a single
+    bad property would otherwise consume the entire 4h Cloud Run task
+    budget and freeze the AsyncPool. Override via
+    PER_PROPERTY_TIMEOUT_SECONDS for back-compat / debugging.
+    """
+    raw = os.getenv("PER_PROPERTY_TIMEOUT_SECONDS")
+    if not raw:
+        return 600.0
+    try:
+        v = float(raw)
+        return v if v > 0 else 600.0
+    except (TypeError, ValueError):
+        return 600.0
+
+
+PER_PROPERTY_TIMEOUT_SECONDS = _resolve_per_property_timeout()
+
+
 def _resolve_schema_version(args: Any = None) -> str:
     """Resolve schema version from CLI args > env > default.
 
@@ -276,16 +300,23 @@ async def run_jugnu(
         log.info("Processing %s (%s)", task.property_id, task.url)
         try:
             csv_row = csv_lookup.get(task.property_id, {})
-            result = await _process_property(
-                task,
-                cost_ledger,
-                profile_store,
-                frontier,
-                dlq,
-                data_dir,
-                csv_row=csv_row,
-                run_dir=run_dir,
-                state_store=run_state_store,
+            # Per-property wall-clock guard. Without this, a single property
+            # that gets caught in the LLM-retry/link-hop tail can monopolise
+            # the AsyncPool until Cloud Run's 4h task timeout kills the whole
+            # shard (observed three days running on shards 8 / 12 / 17).
+            result = await asyncio.wait_for(
+                _process_property(
+                    task,
+                    cost_ledger,
+                    profile_store,
+                    frontier,
+                    dlq,
+                    data_dir,
+                    csv_row=csv_row,
+                    run_dir=run_dir,
+                    state_store=run_state_store,
+                ),
+                timeout=PER_PROPERTY_TIMEOUT_SECONDS,
             )
             formatted = _format_output(result, csv_row, schema_version)
             # F2: Null Field Recovery — runs on v2 units with null rent_low
@@ -327,6 +358,28 @@ async def run_jugnu(
                 all_llm_interactions.extend(interactions)
 
             return formatted
+        except (TimeoutError, asyncio.TimeoutError) as exc:
+            # Bookkeeping that runs LATE inside _process_property is lost
+            # when the inner coroutine is cancelled by wait_for:
+            #   - cost_ledger.record_llm() (any LLM cost incurred during
+            #     the timed-out scrape never reaches the SQLite ledger)
+            #   - state_store.upsert_units() (no state delta persisted)
+            #   - profile_store.save() (drift demotion not durable)
+            #   - PROPERTY_EMITTED event
+            # This is the deliberate tradeoff: lose post-scrape bookkeeping
+            # rather than wedge the shard. Operators investigating "why is
+            # there $X of LLM spend with no ledger entry?" should look here
+            # first — the per-property log line above is the breadcrumb.
+            log.error(
+                "Property %s timed out after %.0fs — skipping to protect shard",
+                task.property_id, PER_PROPERTY_TIMEOUT_SECONDS,
+            )
+            return _make_failed_record(
+                task.property_id,
+                task.url,
+                f"per_property_timeout:{int(PER_PROPERTY_TIMEOUT_SECONDS)}s ({type(exc).__name__})",
+                schema_version,
+            )
         except Exception as exc:
             log.error("Property %s crashed: %s", task.property_id, exc)
             return _make_failed_record(

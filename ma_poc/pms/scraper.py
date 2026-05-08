@@ -142,6 +142,15 @@ async def scrape(
     api_responses : list[dict] | None
         Pre-captured API responses for testing. If None, uses whatever the
         page captured during load.
+    shared_budget : dict | None
+        Per-property LLM budget. **Mutated in place** when provided —
+        sub-tier LLM calls in GenericAdapter decrement
+        ``llm_api_calls`` / ``llm_dom_calls`` / ``llm_monolithic`` against
+        this dict and accumulate cost into ``_cost_usd_spent``. Pass the
+        same dict reference into recursive ``scrape()`` calls (e.g.
+        link-hop) so decrements compose; passing a fresh copy reverts to
+        the pre-Fix#2 behaviour where one property could fire 20 LLM
+        calls (1 entry × 5 + 3 hops × 5).
 
     Returns
     -------
@@ -293,8 +302,15 @@ async def scrape(
 
     # Phase H / Fix 8: use shared_budget if provided (avoids double-allocation
     # when scrape_jugnu() has already computed the budget for this run).
+    #
+    # IMPORTANT — this is a reference, not a copy. Link-hop reuses the same
+    # dict across the entry page and each sub-page so LLM-call decrements
+    # propagate up; otherwise each link-hop sub-page would silently get a
+    # fresh 5-call budget (3+1+1) and one property could fire 20 LLM calls
+    # via 1 entry + 3 hops × 5 = 20. The earlier `dict(shared_budget)` copy
+    # was the root cause of the per-day stuck-shard burns.
     if shared_budget is not None:
-        budget: dict = dict(shared_budget)
+        budget: dict = shared_budget
     else:
         budget = {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
         if profile is not None:

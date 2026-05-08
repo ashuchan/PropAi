@@ -1410,9 +1410,45 @@ class GenericAdapter:
 
         # Phase H: use budget from ctx (computed per-property in scraper.py).
         # Falls back to safe defaults when ctx.budget is absent (e.g. old callers).
+        # NOTE: this dict is the SAME reference held by scraper.py's
+        # _jugnu_budget — link-hop reuses it across the entry page and each
+        # sub-page so decrements compose. See scraper.py shared_budget
+        # comment for the wedge bug this prevents.
         _budget = getattr(ctx, "budget", None) or {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
-        api_llm_budget = int(_budget.get("llm_api_calls", 3))
-        dom_llm_budget = int(_budget.get("llm_dom_calls", 1))
+        # Per-property cumulative cost gate (Fix #3). Default $1.00/property —
+        # past this, no further LLM calls fire even if call-count budget
+        # still allows them. Override via the budget dict's _cost_cap_usd
+        # key (compute_budget can dial it per profile maturity later).
+        #
+        # SOFT CAP: the gate checks _cost_usd_spent BEFORE each call, but
+        # the in-flight call's cost is only recorded when it returns. So
+        # actual spend can overshoot the cap by up to one call's worth
+        # (~$0.05 for monolithic, ~$0.01 for targeted). This is intentional
+        # — making it hard would require mid-call cancellation, which the
+        # provider SDKs don't expose cleanly. Treat _cost_cap_usd as a
+        # ceiling-plus-epsilon, not a hard quota.
+        _cost_cap_usd = float(_budget.get("_cost_cap_usd", 1.00) or 1.00)
+
+        def _llm_cost_exceeded() -> bool:
+            spent = float(_budget.get("_cost_usd_spent", 0.0) or 0.0)
+            if spent >= _cost_cap_usd:
+                log.warning(
+                    "Property %s LLM cost cap reached: $%.4f >= $%.2f — skipping further LLM calls",
+                    ctx.property_id, spent, _cost_cap_usd,
+                )
+                return True
+            return False
+
+        def _record_interaction_cost(interaction: dict[str, Any] | None) -> None:
+            if not interaction:
+                return
+            try:
+                cost = float(interaction.get("cost_usd", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                return
+            if cost > 0:
+                _budget["_cost_usd_spent"] = float(_budget.get("_cost_usd_spent", 0.0) or 0.0) + cost
+
         llm_interactions: list[dict[str, Any]] = getattr(result, "_llm_interactions", []) or []
         # Self-learning payload surfaced to scraper.py. Shape matches what
         # services.profile_updater.update_profile_after_extraction expects:
@@ -1428,12 +1464,17 @@ class GenericAdapter:
         # deterministic parsers couldn't unwrap, ask the LLM to both
         # extract units AND return json_paths + response_envelope that we
         # can replay deterministically on the next run (zero LLM cost).
+        #
+        # Budget is consumed against the shared dict, NOT a local counter,
+        # so link-hop sub-pages see decrements made by the entry page.
         targeted_units: list[dict[str, Any]] = []
-        if api_responses and api_llm_budget > 0:
+        if api_responses and int(_budget.get("llm_api_calls", 0)) > 0 and not _llm_cost_exceeded():
             t0 = _time.monotonic()
             api_calls_made = 0
             for resp in api_responses:
-                if api_calls_made >= api_llm_budget:
+                if int(_budget.get("llm_api_calls", 0)) <= 0:
+                    break
+                if _llm_cost_exceeded():
                     break
                 body = resp.get("body")
                 items = _find_unit_list(body)
@@ -1442,6 +1483,10 @@ class GenericAdapter:
                 if not items or not _has_unit_signals(items):
                     continue
                 url = resp.get("url", "")
+                # Atomic consume — decrement BEFORE the awaited call so a
+                # concurrent recursive scrape() (link-hop) sees the lower
+                # remaining budget.
+                _budget["llm_api_calls"] = int(_budget.get("llm_api_calls", 0)) - 1
                 try:
                     units, mapping, is_noise, interaction = await analyze_api_with_llm(
                         resp,
@@ -1454,6 +1499,7 @@ class GenericAdapter:
                 api_calls_made += 1
                 if interaction:
                     llm_interactions.append(interaction)
+                    _record_interaction_cost(interaction)
                 if is_noise:
                     # Feed profile_updater the colon-prefixed format it
                     # already recognises so this URL ends up in
@@ -1500,8 +1546,9 @@ class GenericAdapter:
         # the LLM to return units AND CSS selectors we can replay next run.
         dom_units = []
         dom_section_html = _extract_rent_dom_section(html) if html else None
-        if dom_section_html and dom_llm_budget > 0:
+        if dom_section_html and int(_budget.get("llm_dom_calls", 0)) > 0 and not _llm_cost_exceeded():
             t0 = _time.monotonic()
+            _budget["llm_dom_calls"] = int(_budget.get("llm_dom_calls", 0)) - 1
             try:
                 dom_units, selectors, interaction = await analyze_dom_with_llm(
                     dom_section_html,
@@ -1514,6 +1561,7 @@ class GenericAdapter:
                 dom_units, selectors, interaction = [], None, None
             if interaction:
                 llm_interactions.append(interaction)
+                _record_interaction_cost(interaction)
             if selectors:
                 llm_css_selectors = selectors
             _log_attempt(
@@ -1540,47 +1588,63 @@ class GenericAdapter:
         # Only fires when 6a + 6b both returned empty. This is the legacy
         # "send full HTML + top-3 APIs" prompt — broadest coverage, highest
         # token cost, so it runs last.
-        t0 = _time.monotonic()
-        try:
-            llm_input = prepare_llm_input(html, api_responses, property_context)
-            llm_units, hints, _raw, interaction = await extract_with_llm(
-                llm_input,
-                property_id=ctx.property_id or "unknown",
-            )
-            if interaction:
-                llm_interactions.append(interaction)
-            # Capture navigation_hint (Phase 3 + Phase 5) so scrape_jugnu's
-            # link-hop can prioritise the URL the LLM just told us about.
-            if isinstance(hints, dict):
-                nav = hints.get("navigation_hint") or ""
-                if nav:
-                    llm_navigation_hints.append(str(nav))
+        #
+        # Previously this tier was unguarded: budget["llm_monolithic"] was
+        # in the dict but never checked, so every link-hop sub-page that
+        # reached it fired another monolithic call. Now consumes the
+        # shared budget like 6a/6b. When the budget is exhausted (or the
+        # cost cap is hit) we skip the call but DO NOT short-circuit the
+        # Vision Tier 5 fallback below — the cost cap fires there too.
+        if int(_budget.get("llm_monolithic", 0)) > 0 and not _llm_cost_exceeded():
+            _budget["llm_monolithic"] = int(_budget.get("llm_monolithic", 0)) - 1
+            t0 = _time.monotonic()
+            try:
+                llm_input = prepare_llm_input(html, api_responses, property_context)
+                llm_units, hints, _raw, interaction = await extract_with_llm(
+                    llm_input,
+                    property_id=ctx.property_id or "unknown",
+                )
+                if interaction:
+                    llm_interactions.append(interaction)
+                    _record_interaction_cost(interaction)
+                # Capture navigation_hint (Phase 3 + Phase 5) so scrape_jugnu's
+                # link-hop can prioritise the URL the LLM just told us about.
+                if isinstance(hints, dict):
+                    nav = hints.get("navigation_hint") or ""
+                    if nav:
+                        llm_navigation_hints.append(str(nav))
+                _log_attempt(
+                    "generic:llm",
+                    "ran_units" if llm_units else "ran_empty",
+                    units=len(llm_units or []),
+                    reason="" if llm_units else "LLM returned no structured units",
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if llm_units:
+                    result.units = llm_units
+                    result.tier_used = "TIER_4_LLM"
+                    result.winning_url = ctx.base_url
+                    result.confidence = min(0.75, 0.5 + 0.04 * len(llm_units))
+                    result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
+                    result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
+                    result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
+                    if hints:
+                        result._llm_hints = hints  # type: ignore[attr-defined]
+                    return result
+            except Exception as exc:
+                _log_attempt(
+                    "generic:llm",
+                    "errored",
+                    reason=str(exc)[:200],
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                result.errors.append(f"llm-tier-error: {exc}")
+        else:
             _log_attempt(
                 "generic:llm",
-                "ran_units" if llm_units else "ran_empty",
-                units=len(llm_units or []),
-                reason="" if llm_units else "LLM returned no structured units",
-                duration_ms=int((_time.monotonic() - t0) * 1000),
+                "skipped",
+                reason="llm_monolithic budget exhausted or cost cap reached",
             )
-            if llm_units:
-                result.units = llm_units
-                result.tier_used = "TIER_4_LLM"
-                result.winning_url = ctx.base_url
-                result.confidence = min(0.75, 0.5 + 0.04 * len(llm_units))
-                result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
-                result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
-                result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
-                if hints:
-                    result._llm_hints = hints  # type: ignore[attr-defined]
-                return result
-        except Exception as exc:
-            _log_attempt(
-                "generic:llm",
-                "errored",
-                reason=str(exc)[:200],
-                duration_ms=int((_time.monotonic() - t0) * 1000),
-            )
-            result.errors.append(f"llm-tier-error: {exc}")
 
         # Fix 6 — Vision LLM as Tier 5 last-resort fallback.
         # When all text-based LLM tiers (api_targeted, dom_targeted, monolithic)
@@ -1604,7 +1668,7 @@ class GenericAdapter:
             if html:
                 _hl = html.lower()
                 has_rent_kw = any(kw in _hl for kw in ("rent", "bedroom", "studio", "sqft", "floor plan", "$"))
-            if vision_enabled and page_obj is not None and has_rent_kw and hasattr(page_obj, "screenshot"):
+            if vision_enabled and page_obj is not None and has_rent_kw and hasattr(page_obj, "screenshot") and not _llm_cost_exceeded():
                 t_v = _time.monotonic()
                 try:
                     screenshot_bytes = await page_obj.screenshot(full_page=True, type="png", timeout=10000)
@@ -1633,6 +1697,7 @@ class GenericAdapter:
                         )
                         if vision_interaction:
                             llm_interactions.append(vision_interaction)
+                            _record_interaction_cost(vision_interaction)
                         if vision_units:
                             result.units = vision_units
                             result.tier_used = "TIER_5_VISION"

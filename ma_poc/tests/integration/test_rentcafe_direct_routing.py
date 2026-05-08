@@ -400,8 +400,8 @@ def test_f6_non_rentcafe_unchanged() -> None:
     """Non-RentCafe properties never enter the direct path — covered by
     the runner's ``api_provider == "rentcafe"`` guard. This is a tiny
     smoke that the guard exists in source (cheap drift check)."""
-    runner_path = _REPO / "ma_poc" / "scripts" / "jugnu_runner.py"
+    runner_path = _REPO / "ma_poc" / "scripts" / "runners" / "jugnu.py"
     text = runner_path.read_text(encoding="utf-8")
     assert 'api_provider == "rentcafe"' in text, (
-        "jugnu_runner must guard the direct path on api_provider=='rentcafe'"
+        "runners/jugnu.py must guard the direct path on api_provider=='rentcafe'"
     )

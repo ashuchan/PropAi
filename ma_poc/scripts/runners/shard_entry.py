@@ -320,9 +320,31 @@ def main() -> None:
 
     runner_exit = 1
     sync_exit = 0
+    # Wall-clock cap for the runner subprocess. Cloud Run's task timeout is
+    # 4h (14400s); we cap at 3h45m so the parent gets control back ~15min
+    # before Cloud Run sends SIGKILL. That window is what lets the finally
+    # block actually run — _upload_artifacts and PG sync need ~5–10min on a
+    # full shard, and SIGKILL is unblockable, so without a parent-side
+    # timeout a wedged subprocess takes its artifacts to the grave (the
+    # exact failure mode that left stuck shards undebuggable).
+    runner_subprocess_timeout = float(os.environ.get("SHARD_RUNNER_TIMEOUT_SECONDS", "13500"))
     try:
-        result = subprocess.run(cmd, check=False)
-        runner_exit = result.returncode
+        try:
+            result = subprocess.run(cmd, check=False, timeout=runner_subprocess_timeout)
+            runner_exit = result.returncode
+        except subprocess.TimeoutExpired:
+            # Subprocess didn't return in time. Python has already sent
+            # SIGKILL by the time TimeoutExpired surfaces (subprocess.run
+            # internals), so the child is dead. Mark as failure but keep
+            # going — the finally block must still upload whatever
+            # partial artifacts the runner managed to flush, and PG sync
+            # of a partial properties.json is still better than nothing.
+            print(
+                f"[shard_entry] runner exceeded {runner_subprocess_timeout}s wall-clock cap; "
+                "killed subprocess. Proceeding to artifact upload + sync.",
+                file=sys.stderr,
+            )
+            runner_exit = 124  # convention: 124 = timeout (matches GNU coreutils `timeout`)
         # Always attempt PG sync when the runner finished — partial runs
         # (e.g. 140/499 succeeded) still have useful data that MUST land
         # in Postgres. The runner returns 1 whenever any property fails,

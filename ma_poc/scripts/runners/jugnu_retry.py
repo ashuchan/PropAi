@@ -700,6 +700,7 @@ async def run_retry(
     # -- Process tasks through L1-L4 concurrently --
     from ma_poc.core.concurrency import AsyncPool, SystemResources
     from ma_poc.scripts.runners.jugnu import (
+        PER_PROPERTY_TIMEOUT_SECONDS,
         _format_output,
         _make_failed_record,
         _process_property,
@@ -713,13 +714,19 @@ async def run_retry(
     async def _retry_one(task: Any) -> dict[str, Any]:
         log.info("Retrying %s (%s)", task.property_id, task.url)
         try:
-            result = await _process_property(
-                task,
-                cost_ledger,
-                profile_store,
-                frontier,
-                dlq,
-                data_dir,
+            # Same per-property wall-clock guard as the main runner — a
+            # retry is exactly as susceptible to the LLM-tail wedge that
+            # ate the original run, so it needs the same cap.
+            result = await asyncio.wait_for(
+                _process_property(
+                    task,
+                    cost_ledger,
+                    profile_store,
+                    frontier,
+                    dlq,
+                    data_dir,
+                ),
+                timeout=PER_PROPERTY_TIMEOUT_SECONDS,
             )
             meta = result.setdefault("_meta", {})
             meta["retry"] = True
@@ -727,6 +734,21 @@ async def run_retry(
 
             csv_row = csv_rows.get(task.property_id, {})
             return _format_output(result, csv_row, schema_version)
+        except (TimeoutError, asyncio.TimeoutError):
+            log.error(
+                "Property %s retry timed out after %.0fs",
+                task.property_id, PER_PROPERTY_TIMEOUT_SECONDS,
+            )
+            failed = _make_failed_record(
+                task.property_id,
+                task.url,
+                f"per_property_timeout:{int(PER_PROPERTY_TIMEOUT_SECONDS)}s",
+                schema_version,
+            )
+            failed_meta = failed.setdefault("_meta", {})
+            failed_meta["retry"] = True
+            failed_meta["retry_source_run"] = run_date
+            return failed
         except Exception as exc:
             log.error("Property %s crashed on retry: %s", task.property_id, exc)
             failed = _make_failed_record(

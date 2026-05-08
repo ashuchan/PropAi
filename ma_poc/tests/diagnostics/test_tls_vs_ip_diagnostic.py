@@ -11,7 +11,7 @@ import importlib
 
 import pytest
 
-mod = importlib.import_module("ma_poc.scripts.diagnostics.tls_vs_ip_diagnostic")
+mod = importlib.import_module("ma_poc.scripts.diagnostics.tls_vs_ip")
 
 
 @pytest.mark.parametrize(

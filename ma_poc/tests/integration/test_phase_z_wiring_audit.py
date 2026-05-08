@@ -33,8 +33,8 @@ def test_z_h11_find_cluster_mates_has_production_caller() -> None:
 
 
 def test_z_h11_resolve_source_url_has_production_caller() -> None:
-    """H11: _resolve_source_url must be called from jugnu_runner.py."""
-    src = (_MAPOC / "scripts" / "jugnu_runner.py").read_text()
+    """H11: _resolve_source_url must be called from runners/jugnu.py."""
+    src = (_MAPOC / "scripts" / "runners" / "jugnu.py").read_text()
     assert "_resolve_source_url(" in src
 
 
