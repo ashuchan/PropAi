@@ -78,8 +78,10 @@ Required env (already in ma_poc/.env):
 
     REPORT_RECIPIENTS       Comma-separated default recipient list
     REPORT_SENDER_NAME      Display name in the email From header
-    GMAIL_MCP_COMMAND       MCP server launch command (default: npx)
-    GMAIL_MCP_ARGS          Args, space-separated
+    EMAIL_TRANSPORT         gmail_api (default) | mcp — see
+                            ``scripts/email/daily.py`` for the per-transport
+                            env vars (GMAIL_DELEGATED_USER for gmail_api;
+                            GMAIL_MCP_COMMAND/ARGS for mcp).
     DATA_PROVIDER           postgres | sqlite | filesystem
     DATABASE_URL            postgresql+pg8000://user:pass@host:port/dbname
     CLOUD_SQL_INSTANCE      project:region:instance (Cloud SQL path)

@@ -70,6 +70,14 @@ _WIRING_VARS = (
     "LLM_PROVIDER",
     "DATA_DIR",
     "CONFIG_DIR",
+    # Email transport — surfaces in the banner so operators can debug
+    # send-failures from logs alone (which transport ran, who it tried
+    # to impersonate, and where mail was being sent from/to).
+    "EMAIL_TRANSPORT",
+    "GMAIL_EMAILER_SA",
+    "GMAIL_DELEGATED_USER",
+    "REPORT_RECIPIENTS",
+    "REPORT_SENDER_NAME",
 )
 
 # Substrings that, if present in an env var name, cause the value to be

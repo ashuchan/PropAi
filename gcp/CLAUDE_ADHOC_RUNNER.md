@@ -133,7 +133,12 @@ Optional: `--min-score 95` (default 90, tighter than the matcher's 85), `--to-cs
 
 ### Email reports
 
-> Email reports send via Gmail MCP using OAuth credentials baked into the image at `~/.gmail-mcp/credentials.json`. **If you haven't configured Gmail MCP in the image, all of these will fail.** Use `--dry-run` first to render HTML to stdout without sending.
+> Email reports route through one of two transports, selected by the **`EMAIL_TRANSPORT`** env var on the adhoc job (read by [`scripts/email/daily.py`](../ma_poc/scripts/email/daily.py)::`_email_transport`):
+>
+> - **`gmail_api`** *(default on Cloud Run)* — Workspace domain-wide delegation. The worker SA impersonates `GMAIL_EMAILER_SA` via `iamcredentials.signJwt`, then sends as `GMAIL_DELEGATED_USER`. Both env vars are wired by Terraform (`infra/terraform/envs/{env}.tfvars`); the IAM `serviceAccountTokenCreator` binding is created in the same module. No Node, no `~/.gmail-mcp/credentials.json`, no key files. To verify the chain end-to-end before deploying, run [`scripts/diagnostics/dwd_smoke.py`](../ma_poc/scripts/diagnostics/dwd_smoke.py) locally — it uses the same `_build_gmail_api_credentials` path.
+> - **`mcp`** — legacy `@gongrzhe/server-gmail-autoauth-mcp` over stdio. Requires Node + `~/.gmail-mcp/credentials.json` baked into the image; **not** present in the prod image. Useful from a workstation that already has MCP creds set up. Toggle by setting `EMAIL_TRANSPORT=mcp` either in tfvars or as a one-shot override on the execute command (`--update-env-vars="...,EMAIL_TRANSPORT=mcp"`).
+>
+> Use `--dry-run` first to render the HTML to stdout (visible in Cloud Logging) without actually sending.
 
 #### `email.daily` — daily PropAi scrape report (headline dashboard)
 
@@ -256,6 +261,21 @@ Reads `data/scrape_events.jsonl` and computes the BRD weekly-gate metrics (succe
 
 ### Reports & analysis
 
+> **All five report scripts now email their output at the end of the run.** They share a single utility — [`scripts/email/report.py`](../ma_poc/scripts/email/report.py)::`email_report` — which renders a professional HTML shell (header, summary callout, body, Cloud Run footer) and ships through the same `EMAIL_TRANSPORT` dispatcher used by `scripts/email/*`. Recipients fall back to `REPORT_RECIPIENTS` (set in tfvars). Every report supports three flags for its email behaviour:
+>
+> - `--no-email` — skip the send. Markdown / HTML / JSON artifacts are still written.
+> - `--email-recipients alice@x.com,bob@y.com` — override `REPORT_RECIPIENTS` for this invocation.
+> - `--dry-run` — render the email body to stdout (visible in Cloud Logging) but do not actually send. Use this first when changing recipients or sending a backdated report.
+>
+> Each report has its own subject line — the recipient can filter on them. Subjects:
+> - `reports.daily` → `PropAi Daily Report — {run_date}`
+> - `reports.analysis` → `PropAi 5-Day Analytics — {today}`
+> - `reports.health` → `PropAi Health Report — {run_date}` (and a separate `PropAi Extraction Quality Report — {run_date}` when `--report=all`)
+> - `reports.escalation` → `PropAi Fetch-Tier Escalation — {run_dir}`
+> - `reports.floor_plan_comparison` → `Floor Plan Comparison — {run_id}`
+>
+> Markdown reports (`health`, `floor_plan_comparison`) are converted to HTML by an in-house lightweight converter (headings, pipe tables, lists, fenced code, inline bold/italic/code/links — no extra dependency). Stdout-style reports (`analysis`, `escalation`) are wrapped in a monospace `<pre>` so column alignment survives. The full HTML report from `daily` is attached as a file (Gmail clips inline HTML at ~100KB). All reports include the on-disk artifact (markdown / HTML / JSON sidecar) as an attachment when one was written.
+
 #### `reports.health` — health / extraction-quality report
 
 | Field | Value |
@@ -268,18 +288,29 @@ Variations:
 SCRIPT_ARGS=--report all --source gcs --bucket <bucket>
 SCRIPT_ARGS=--report extraction-quality --run-date 2026-05-07
 SCRIPT_ARGS=--report health --days 7 --json --out -
+SCRIPT_ARGS=--report health --no-email                            # write artifact, no mail
+SCRIPT_ARGS=--report all --dry-run                                # preview both emails
 ```
 
-`--no-scan-events` skips the events.jsonl scan when sourcing from GCS (faster, drops wall-clock runtime metrics).
+`--no-scan-events` skips the events.jsonl scan when sourcing from GCS (faster, drops wall-clock runtime metrics). `--report=all` sends two separate emails — one health, one extraction-quality — so subject filters stay clean.
 
-#### `reports.daily` — markdown daily report
+#### `reports.daily` — daily HTML dashboard
 
 | Field | Value |
 |---|---|
 | `SCRIPT_NAME` | `reports.daily` |
 | `SCRIPT_ARGS` | `--run-date 2026-05-07` |
 
-Optional: `--out /tmp/report.md`, `--database-url`, `--trend-window 14`.
+Optional: `--out /tmp/report.html`, `--database-url`, `--trend-window 14`. The full HTML report is attached as a file because it usually exceeds Gmail's 100KB inline-clip threshold; the email body itself is a compact text summary with the headline KPIs.
+
+#### `reports.analysis` — 5-day analytics summary
+
+| Field | Value |
+|---|---|
+| `SCRIPT_NAME` | `reports.analysis` |
+| `SCRIPT_ARGS` | *(empty)* |
+
+Writes `data/runs/{today}/analysis_report.json` and emails the full text summary (success trends, units quality, daily diffs, system performance) with the JSON attached.
 
 #### `reports.escalation` — fetch-tier escalation report
 
@@ -289,6 +320,15 @@ Optional: `--out /tmp/report.md`, `--database-url`, `--trend-window 14`.
 | `SCRIPT_ARGS` | *(empty for latest run)* |
 
 Optional: `--run-dir /tmp/data/runs/2026-05-07`.
+
+#### `reports.floor_plan_comparison` — markdown report from a `compare_floor_plans_csv` run
+
+| Field | Value |
+|---|---|
+| `SCRIPT_NAME` | `reports.floor_plan_comparison` |
+| `SCRIPT_ARGS` | `--run-id 2026-05-07-prod` |
+
+Optional: `--top 50`, `--examples-per-method 5`, `--out /tmp/report.md`. Emails the markdown body (rendered to HTML via the in-house converter) with the `.md` file attached. If no `--run-id` is passed, picks the most recent comparison run from the DB.
 
 #### `baselines.escalation` — generate ESCALATION_BASELINE.md from latest run
 
@@ -460,7 +500,10 @@ Both are network-free. If either fails, the image is broken and you should roll 
 | `error: no such script ma_poc/scripts/<name>.py` with `Did you mean: ...` | Either a typo, or the dispatcher hasn't been patched to handle dotted submodule paths (see [Dispatcher: required code fix](#dispatcher-required-code-fix)). | Confirm patch is deployed; if so, use one of the suggested names. |
 | Banner shows `<unset>` for `CLOUD_SQL_INSTANCE` | Adhoc job was deployed before that env was added. | `cd infra/terraform && terraform apply -var-file=envs/{env}.tfvars`. |
 | Child script prints `relation "X" does not exist` | DB hasn't been migrated to the schema this image expects. | Run `migrations.alembic --env <env> up` first. |
-| Email scripts fail with Gmail MCP errors | `~/.gmail-mcp/credentials.json` not present in the image, or token expired. | Re-auth Gmail MCP locally and rebake the image. |
+| `EMAIL_TRANSPORT=gmail_api` send fails with `Permission 'iam.serviceAccounts.signJwt' denied` | The worker SA doesn't have `serviceAccountTokenCreator` on the emailer SA — usually means the adhoc job was deployed before `gmail_emailer_sa_email` was set in tfvars (the IAM binding is only created when that var is non-empty). | Set the var in `infra/terraform/envs/{env}.tfvars` and `terraform apply`. |
+| `EMAIL_TRANSPORT=gmail_api` send fails with `unauthorized_client` from `oauth2.googleapis.com/token` | Workspace DWD entry is missing or has the wrong scope. | admin.google.com → Security → API controls → Domain-wide delegation. Client ID = the **numeric** `oauth2ClientId` of the emailer SA (not its email). Scope: `https://www.googleapis.com/auth/gmail.send`. |
+| `EMAIL_TRANSPORT=gmail_api` send fails with `invalid_grant: Invalid email or User ID` | `GMAIL_DELEGATED_USER` is not a real Workspace user in the authorised domain. | Use a real mailbox in the Workspace whose admin authorised the SA. |
+| `EMAIL_TRANSPORT=mcp` requested but the script crashes at `npx` spawn | Node is not installed in the prod image. | Switch back to `gmail_api` (the default), or run from a workstation that has Node + `~/.gmail-mcp/credentials.json`. |
 | Script needs a file under `data/` or `config/` and fails with `FileNotFoundError` | The container only carries what's baked into the image at build time. | Either put the file on GCS and download in a wrapper, or rebuild the image with the file copied in. |
 | `OSError: [Errno 28] No space left on device` | Long-running script filled `/tmp`. | Bump `task_memory` in tfvars or aggressively clean inside the script. |
 | Job times out at 7200s | Default adhoc timeout. | Re-execute with `--task-timeout=...` override on the gcloud command, or extend the var in tfvars. |

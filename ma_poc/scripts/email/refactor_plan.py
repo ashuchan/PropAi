@@ -1,8 +1,10 @@
 """Email a senior-architect SOLID refactor plan for ma_poc/.
 
-Reuses the data-provider connection helpers and Gmail MCP send path from
-``email_daily_report.py`` so this script ships under the same recipients,
-sender, and credentials configuration (REPORT_RECIPIENTS / GMAIL_MCP_*).
+Reuses the data-provider connection helpers and the email transport
+dispatcher from ``email/daily.py`` so this script ships under the same
+recipients, sender, and credentials configuration (``REPORT_RECIPIENTS``
++ ``EMAIL_TRANSPORT`` + transport-specific vars — see
+``scripts/email/daily.py`` for the full env list).
 
 Body content is static — derived from a one-off architectural review of
 the bulky modules under ma_poc/ (jugnu_runner, entrata, daily_runner,
@@ -40,9 +42,10 @@ import os  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
 
 from scripts.email.daily import (  # noqa: E402
+    _email_transport,
     _html_to_plain,
     _parse_recipients,
-    _send_via_mcp,
+    _send_email,
 )
 
 log = logging.getLogger("email_refactor_plan")
@@ -567,9 +570,10 @@ def main(argv: list[str] | None = None) -> int:
         log.info("Dry run — would send to: %s", ", ".join(recipients) or "(none)")
         return 0
 
+    transport = _email_transport()
     try:
         result = asyncio.run(
-            _send_via_mcp(
+            _send_email(
                 recipients=recipients,
                 subject=subject,
                 html_body=_HTML,
@@ -577,16 +581,17 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     except Exception as exc:
-        log.exception("Gmail MCP send failed: %s", exc)
+        log.exception("Email send failed (transport=%s): %s", transport, exc)
         return 1
 
     if result.get("isError"):
-        log.error("Gmail MCP returned an error: %s", result.get("content"))
+        log.error("Email transport returned an error (%s): %s",
+                  transport, result.get("content"))
         return 1
 
     log.info(
-        "Sent refactor plan to %d recipient(s). MCP response: %s",
-        len(recipients), result.get("content") or "(empty)",
+        "Sent refactor plan to %d recipient(s). transport=%s response: %s",
+        len(recipients), transport, result.get("content") or "(empty)",
     )
     return 0
 

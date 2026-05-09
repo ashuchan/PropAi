@@ -1653,6 +1653,12 @@ def main(argv: list[str] | None = None) -> int:
                          "Use '-' for stdout-only. Ignored when --report=all.")
     ap.add_argument("--json", action="store_true",
                     help="Also write a sibling .json file with the raw data")
+    ap.add_argument("--no-email", action="store_true",
+                    help="Skip the email send. Markdown/JSON artifacts are still written.")
+    ap.add_argument("--email-recipients", default=None,
+                    help="Comma-separated override of REPORT_RECIPIENTS.")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="Render the email body to stdout but do not actually send.")
     args = ap.parse_args(argv)
 
     repo_root = Path(__file__).resolve().parent.parent.parent
@@ -1670,6 +1676,11 @@ def main(argv: list[str] | None = None) -> int:
         return out_dir / name
 
     rendered: list[str] = []
+    # (subject, summary, body_md, attachments) tuples — one per report
+    # generated. ``--report=all`` produces two entries; one email per
+    # report keeps each subject line tight and lets the recipient
+    # filter on it.
+    email_payloads: list[tuple[str, str, str, list[Path]]] = []
 
     if args.report in ("health", "all"):
         if args.source == "gcs":
@@ -1681,6 +1692,7 @@ def main(argv: list[str] | None = None) -> int:
         md = _md(rep)
         rendered.append(md)
         out_path = _resolve_out("health_report.md")
+        attachments: list[Path] = []
         if out_path is not None:
             _write_pair(out_path, md, {
                 "run_date": rep.run_date,
@@ -1692,6 +1704,15 @@ def main(argv: list[str] | None = None) -> int:
                 "diff_yesterday": rep.diff_yesterday,
                 "performance": rep.performance,
             }, args.json)
+            attachments.append(out_path)
+            if args.json:
+                attachments.append(out_path.with_suffix(".json"))
+        email_payloads.append((
+            f"PropAi Health Report — {rep.run_date}",
+            _build_health_summary(rep),
+            md,
+            attachments,
+        ))
 
     if args.report in ("extraction-quality", "all"):
         if args.source == "gcs":
@@ -1703,6 +1724,7 @@ def main(argv: list[str] | None = None) -> int:
         md = _md_extraction_quality(eq)
         rendered.append(md)
         out_path = _resolve_out("extraction_quality_report.md")
+        attachments = []
         if out_path is not None:
             _write_pair(out_path, md, {
                 "run_date": eq.run_date,
@@ -1712,12 +1734,91 @@ def main(argv: list[str] | None = None) -> int:
                 "concessions": eq.concessions,
                 "quantity": eq.quantity,
             }, args.json)
+            attachments.append(out_path)
+            if args.json:
+                attachments.append(out_path.with_suffix(".json"))
+        email_payloads.append((
+            f"PropAi Extraction Quality Report — {eq.run_date}",
+            _build_extraction_quality_summary(eq),
+            md,
+            attachments,
+        ))
 
     for md in rendered:
         _safe_print(md)
         if len(rendered) > 1:
             _safe_print("\n\n---\n\n")
-    return 0
+
+    if args.no_email:
+        return 0
+
+    from scripts.email.report import email_report
+
+    recipients = (
+        [r.strip() for r in args.email_recipients.split(",") if r.strip()]
+        if args.email_recipients
+        else None
+    )
+    rc = 0
+    for subject, summary, body_md, attachments in email_payloads:
+        result = email_report(
+            subject=subject,
+            summary=summary,
+            body_md=body_md,
+            attachments=attachments or None,
+            recipients=recipients,
+            dry_run=args.dry_run,
+        )
+        if result.get("isError"):
+            print(f"[health_report] email send failed for {subject!r}: "
+                  f"{result.get('content')}", file=sys.stderr)
+            rc = 1
+    return rc
+
+
+def _build_health_summary(rep: "HealthReport") -> str:
+    """One-line TL;DR for the health email — anchored on the most recent
+    day's success rate from the rolling window."""
+    history = rep.success_history or []
+    if not history:
+        return f"Health report for {rep.run_date} — no success history rows."
+    latest = history[-1]
+    parts = [
+        f"{latest.get('date', rep.run_date)}: "
+        f"{latest.get('success', 0)}/{latest.get('total', 0)} succeeded "
+        f"({latest.get('success_rate', 0.0):.1f}%)"
+    ]
+    failed = latest.get("failed", 0)
+    if failed:
+        parts.append(f"{failed} failed")
+    uq = rep.unit_quality or {}
+    if uq.get("total_units"):
+        parts.append(
+            f"{uq['total_units']} units (rent {uq.get('pct_with_rent', 0):.0f}%, "
+            f"availability {uq.get('pct_with_availability', 0):.0f}%)"
+        )
+    diff = rep.diff_yesterday or {}
+    if diff.get("rent_increases") or diff.get("rent_decreases"):
+        parts.append(
+            f"{diff.get('rent_increases', 0)}↑/{diff.get('rent_decreases', 0)}↓ rents vs yesterday"
+        )
+    return ". ".join(parts) + "."
+
+
+def _build_extraction_quality_summary(eq: "ExtractionQualityReport") -> str:
+    """One-line TL;DR for the extraction-quality email — coverage rates
+    for the three semi-extracted fields (amenities, concessions, units)."""
+    parts = [f"Run {eq.run_date}"]
+    am = eq.amenities or {}
+    co = eq.concessions or {}
+    qu = eq.quantity or {}
+    if am:
+        parts.append(f"amenities: {am.get('coverage_pct', 0):.0f}% coverage")
+    if co:
+        parts.append(f"concessions: {co.get('coverage_pct', 0):.0f}%")
+    if qu:
+        parts.append(f"unit-count: {qu.get('coverage_pct', 0):.0f}%")
+    return ". ".join(parts) + "."
 
 
 if __name__ == "__main__":

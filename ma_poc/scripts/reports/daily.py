@@ -1173,6 +1173,47 @@ def render_report(data: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _build_email_summary(data: dict[str, Any]) -> str:
+    """One-line summary used as the email's TL;DR callout.
+
+    Pulls headline KPIs from the same ``report.cost`` / ``report.totals``
+    fields the HTML report renders from (see ``render_cost_panel`` and the
+    KPI strip), so the email summary can never disagree with the report
+    body.
+
+    Cost-dict keys: the writer (``reporting.run_report``) emits ``"llm"``
+    and ``"vision"`` — single-word floats in USD. Older keys like
+    ``llm_cost_usd`` were only ever inside ``_extract_result`` on the
+    per-property record, never in the run-level ``report.cost`` dict.
+    """
+    rep = data["report"]
+    totals = rep.totals
+    cost = rep.cost or {}
+    parts = [
+        f"{totals.succeeded}/{totals.properties} properties succeeded "
+        f"({totals.success_rate_pct:.1f}%)",
+    ]
+    if totals.failed:
+        parts.append(f"{totals.failed} failed")
+    if totals.carry_forward:
+        parts.append(f"{totals.carry_forward} carry-forward")
+    llm = float(cost.get("llm") or 0.0)
+    vision = float(cost.get("vision") or 0.0)
+    if llm or vision:
+        cost_parts = []
+        if llm:
+            cost_parts.append(f"LLM ${llm:.2f}")
+        if vision:
+            cost_parts.append(f"Vision ${vision:.2f}")
+        parts.append(" + ".join(cost_parts))
+    issues_count = len(data["issues"])
+    if issues_count:
+        parts.append(f"{issues_count} issues")
+    if rep.slo_violations:
+        parts.append(f"{len(rep.slo_violations)} SLO violation(s)")
+    return ". ".join(parts) + "."
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
 
@@ -1198,6 +1239,21 @@ def main() -> int:
         default=7,
         help="Number of recent runs (including this one) to include in trend (default 7).",
     )
+    p.add_argument(
+        "--no-email",
+        action="store_true",
+        help="Skip the email send. The HTML artifact is still written.",
+    )
+    p.add_argument(
+        "--email-recipients",
+        default=None,
+        help="Comma-separated override of REPORT_RECIPIENTS for this run only.",
+    )
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Render the email body to stdout but do not actually send.",
+    )
     args = p.parse_args()
 
     provider = _ensure_provider(args.database_url)
@@ -1221,6 +1277,43 @@ def main() -> int:
         len(data["issues"]),
         size_kb,
     )
+
+    if args.no_email:
+        log.info("--no-email set, skipping email send")
+        return 0
+
+    # Late import: keeps the module importable in environments that don't
+    # ship the email transport (e.g. unit tests of the rendering helpers).
+    from scripts.email.report import email_report
+
+    summary = _build_email_summary(data)
+    # The full HTML report is a complete document and often >100KB —
+    # Gmail clips inline HTML at ~102KB. Attach the file and put a
+    # compact text body instead so nothing is lost in transit.
+    body_text = (
+        f"Daily PropAi scrape report for {args.run_date}.\n\n"
+        f"Headline KPIs:\n  {summary}\n\n"
+        f"Full HTML report (with SLO panel, trends, tier distribution, "
+        f"per-property details, cost breakdown, and rent insights) is "
+        f"attached as {out_path.name}. Open in any browser."
+    )
+    recipients = (
+        [r.strip() for r in args.email_recipients.split(",") if r.strip()]
+        if args.email_recipients
+        else None
+    )
+    result = email_report(
+        subject=f"PropAi Daily Report — {args.run_date}",
+        summary=summary,
+        body_text=body_text,
+        attachments=[out_path],
+        recipients=recipients,
+        dry_run=args.dry_run,
+    )
+    if result.get("isError"):
+        log.error("email send failed: %s", result.get("content"))
+        return 1
+    log.info("email sent: %s", result.get("content") or "(empty)")
     return 0
 
 

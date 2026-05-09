@@ -418,9 +418,54 @@ resource "google_cloud_run_v2_job" "jugnu_adhoc" {
             }
           }
         }
+
+        # ── Email transport ────────────────────────────────────────────
+        # Read by scripts/email/daily.py::_email_transport and friends.
+        # gmail_api is the production transport; mcp is kept as a
+        # workstation-only fallback (Node + ~/.gmail-mcp/credentials.json
+        # are not present in the image).
+        env {
+          name  = "EMAIL_TRANSPORT"
+          value = var.email_transport
+        }
+        # The runtime SA is the worker SA (Cloud SQL IAM auth needs that),
+        # so the gmail_api path uses the iam.Signer impersonation chain.
+        # GMAIL_EMAILER_SA tells _build_gmail_api_credentials which SA to
+        # impersonate via signJwt.
+        env {
+          name  = "GMAIL_EMAILER_SA"
+          value = var.gmail_emailer_sa_email
+        }
+        env {
+          name  = "GMAIL_DELEGATED_USER"
+          value = var.gmail_delegated_user
+        }
+        env {
+          name  = "REPORT_RECIPIENTS"
+          value = var.report_recipients
+        }
+        env {
+          name  = "REPORT_SENDER_NAME"
+          value = var.report_sender_name
+        }
       }
     }
   }
+}
+
+# Lets the worker SA mint impersonated tokens for the emailer SA via
+# iamcredentials.signJwt. Without this, the gmail_api transport on
+# Cloud Run fails at refresh time with
+# `Permission 'iam.serviceAccounts.signJwt' denied`.
+#
+# Conditionally created — when gmail_emailer_sa_email is empty (e.g.
+# initial bootstrap before the emailer SA exists), no binding is made
+# and the email scripts simply fail at send time.
+resource "google_service_account_iam_member" "worker_can_impersonate_emailer" {
+  count              = var.gmail_emailer_sa_email != "" ? 1 : 0
+  service_account_id = "projects/-/serviceAccounts/${var.gmail_emailer_sa_email}"
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${var.worker_sa_email}"
 }
 
 # ── Scheduler SA run invoker bindings ─────────────────────────────────────────

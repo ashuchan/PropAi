@@ -124,3 +124,48 @@ variable "anthropic_vision_model" {
   default     = "claude-haiku-4-5-20251001"
   description = "Anthropic vision model id for ma_poc.llm.anthropic."
 }
+
+# ── Email transport for the jugnu-adhoc job ─────────────────────────────────
+# The four scripts/email/* entrypoints route through one of two transports
+# (see scripts/email/daily.py::_email_transport):
+#   - gmail_api (default): Workspace DWD via the Gmail API. Worker SA
+#     impersonates gmail_emailer_sa_email and sends as gmail_delegated_user.
+#     Requires a one-time DWD entry in admin.google.com (see CLAUDE_ADHOC_RUNNER.md).
+#   - mcp: legacy `@gongrzhe/server-gmail-autoauth-mcp`. Workstation use only;
+#     the prod image does not bake Node + MCP creds.
+# All values default to empty/zero — the email scripts then fail at send
+# time with a clear error, but the rest of the adhoc job still works.
+
+variable "gmail_emailer_sa_email" {
+  type        = string
+  default     = ""
+  description = "Service account authorised in Workspace DWD with the gmail.send scope. Worker SA gets serviceAccountTokenCreator on this SA."
+}
+
+variable "gmail_delegated_user" {
+  type        = string
+  default     = ""
+  description = "Workspace mailbox the emailer SA impersonates (the From address)."
+}
+
+variable "email_transport" {
+  type        = string
+  default     = "gmail_api"
+  description = "Email transport for scripts/email/*: gmail_api (DWD) or mcp (legacy stdio)."
+  validation {
+    condition     = contains(["gmail_api", "mcp"], var.email_transport)
+    error_message = "email_transport must be one of: gmail_api, mcp"
+  }
+}
+
+variable "report_recipients" {
+  type        = string
+  default     = ""
+  description = "Comma-separated default recipient list. Per-invocation override via SCRIPT_ARGS=--recipients ..."
+}
+
+variable "report_sender_name" {
+  type        = string
+  default     = "PropAi Daily Reports"
+  description = "Display name in the email From header."
+}

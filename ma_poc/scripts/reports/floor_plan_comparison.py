@@ -419,6 +419,12 @@ def main() -> int:
         help="Output markdown path. Default: ma_poc/data/reports/floor_plan_comparison_{run_id}.md",
     )
     parser.add_argument("--verbose", "-v", action="store_true")
+    parser.add_argument("--no-email", action="store_true",
+                        help="Skip the email send. The markdown artifact is still written.")
+    parser.add_argument("--email-recipients", default=None,
+                        help="Comma-separated override of REPORT_RECIPIENTS.")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Render the email body to stdout but do not actually send.")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -438,6 +444,14 @@ def main() -> int:
             top_n_properties=args.top,
             examples_per_method=args.examples_per_method,
         )
+        # While the session is still open, capture run-level totals so the
+        # email summary can quote real numbers without re-opening the DB.
+        run_row = session.execute(
+            select(FloorPlanComparisonRunRow).where(
+                FloorPlanComparisonRunRow.run_id == run_id
+            )
+        ).scalar_one_or_none()
+        summary_stats = _collect_summary_stats(session, run_id) if run_row else {}
 
     out = args.out or (
         _MA_POC_ROOT
@@ -448,7 +462,73 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(md, encoding="utf-8")
     print(f"Wrote {out} ({len(md):,} chars)")
+
+    if args.no_email:
+        return 0
+
+    from scripts.email.report import email_report
+
+    recipients = (
+        [r.strip() for r in args.email_recipients.split(",") if r.strip()]
+        if args.email_recipients
+        else None
+    )
+    summary = _build_email_summary(run_id, summary_stats)
+    result = email_report(
+        subject=f"Floor Plan Comparison — {run_id}",
+        summary=summary,
+        body_md=md,
+        attachments=[out],
+        recipients=recipients,
+        dry_run=args.dry_run,
+    )
+    if result.get("isError"):
+        print(f"email send failed: {result.get('content')}", file=sys.stderr)
+        return 1
+    print(f"email sent: {result.get('content') or '(empty)'}")
     return 0
+
+
+def _collect_summary_stats(session: Session, run_id: str) -> dict[str, int]:
+    """Headline numbers for the email TL;DR.
+
+    Re-issues the same ``SELECT FloorPlanComparisonRunRow WHERE run_id=?``
+    that ``build_report`` already ran — one extra round-trip on the same
+    session. We could thread the rows down from ``build_report`` to skip
+    it, but the win is one cached query at run end and the extra arg
+    would clutter the rendering pipeline. Keeping the duplicated query
+    until either query cost or session-pinning becomes a real concern.
+    """
+    rows = session.execute(
+        select(FloorPlanComparisonRunRow).where(
+            FloorPlanComparisonRunRow.run_id == run_id
+        )
+    ).scalars().all()
+    return {
+        "csv_rows": sum(r.csv_rows_total for r in rows),
+        "matched": sum(r.matched_total for r in rows),
+        "unmatched": sum(r.unmatched_count for r in rows),
+        "missing_in_csv": sum(r.missing_in_csv_count for r in rows),
+        "properties": len(rows),
+    }
+
+
+def _build_email_summary(run_id: str, stats: dict[str, int]) -> str:
+    """One-line TL;DR for the floor-plan comparison email."""
+    if not stats:
+        return f"Floor plan comparison run {run_id} — no rows found."
+    csv_rows = stats["csv_rows"]
+    matched = stats["matched"]
+    rate = (matched / csv_rows * 100) if csv_rows else 0.0
+    parts = [
+        f"{matched}/{csv_rows} CSV rows matched ({rate:.1f}%)",
+        f"{stats['properties']} properties",
+    ]
+    if stats["unmatched"]:
+        parts.append(f"{stats['unmatched']} unmatched")
+    if stats["missing_in_csv"]:
+        parts.append(f"{stats['missing_in_csv']} DB-only plans")
+    return ". ".join(parts) + "."
 
 
 if __name__ == "__main__":

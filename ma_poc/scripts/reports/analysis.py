@@ -6,8 +6,16 @@ Produces metrics on:
 - Units data quality scores
 - Diffs from yesterday
 - System performance metrics
+
+CLI flags:
+    --no-email           Skip the email send. JSON is still written.
+    --email-recipients   Comma-separated override for REPORT_RECIPIENTS.
+    --dry-run            Render the email body to stdout, do not send.
 """
 
+import argparse
+import contextlib
+import io
 import json
 import sys
 import os
@@ -206,7 +214,71 @@ def analyze_performance(provider, date_range: list[str]) -> dict:
         "note": "Actual shard metrics require infrastructure telemetry"
     }
 
+def _build_email_summary(scrape_analysis: list[dict], diffs: dict) -> str:
+    """One-line TL;DR from the latest day's scrape stats + day-over-day diff.
+
+    Used as the email summary callout. Anchors on the most recent
+    ``scrape_analysis`` entry so the summary reflects the run that
+    triggered this report, not an averaged window.
+    """
+    if not scrape_analysis:
+        return "Analysis report — no scrape data found in the last 5 days."
+    today = scrape_analysis[-1]
+    parts = [
+        f"{today['date']}: {today['success']}/{today['total']} succeeded "
+        f"({today['success_rate']:.1f}%)"
+    ]
+    if today["failed"]:
+        parts.append(f"{today['failed']} failed")
+    if today["skipped"]:
+        parts.append(f"{today['skipped']} skipped")
+    if diffs.get("rent_increases") or diffs.get("rent_decreases"):
+        parts.append(
+            f"{diffs.get('rent_increases', 0)}↑/{diffs.get('rent_decreases', 0)}↓ rents"
+        )
+    new_props = diffs.get("new_properties", 0)
+    missed = diffs.get("missed_properties", 0)
+    if new_props or missed:
+        parts.append(f"{new_props} new / {missed} missed properties")
+    return ". ".join(parts) + "."
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--no-email", action="store_true",
+                        help="Skip the email send. JSON is still written.")
+    parser.add_argument("--email-recipients", default=None,
+                        help="Comma-separated override of REPORT_RECIPIENTS.")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Render the email body to stdout but do not send.")
+    args = parser.parse_args()
+
+    # Capture every print() so the same text body can be both shown to the
+    # operator (Cloud Run logs) and shipped in the email. Tee to real
+    # stdout while we're at it so the existing log experience is unchanged.
+    captured = io.StringIO()
+
+    class _Tee:
+        def __init__(self, *streams: io.TextIOBase) -> None:
+            self._streams = streams
+
+        def write(self, s: str) -> int:
+            for st in self._streams:
+                st.write(s)
+            return len(s)
+
+        def flush(self) -> None:
+            for st in self._streams:
+                st.flush()
+
+    real_stdout = sys.stdout
+    tee = _Tee(real_stdout, captured)
+
+    with contextlib.redirect_stdout(tee):
+        return _run(args, captured)
+
+
+def _run(args: argparse.Namespace, captured: io.StringIO) -> int:
     provider = get_data_provider()
 
     today = datetime.now().date().isoformat()
@@ -316,5 +388,31 @@ def main():
 
     print(f"\nJSON report saved to: {output_path}")
 
+    if args.no_email:
+        return 0
+
+    from scripts.email.report import email_report
+
+    summary = _build_email_summary(scrape_analysis, diffs)
+    recipients = (
+        [r.strip() for r in args.email_recipients.split(",") if r.strip()]
+        if args.email_recipients
+        else None
+    )
+    result = email_report(
+        subject=f"PropAi 5-Day Analytics — {today}",
+        summary=summary,
+        body_text=captured.getvalue(),
+        attachments=[output_path],
+        recipients=recipients,
+        dry_run=args.dry_run,
+    )
+    if result.get("isError"):
+        print(f"\nemail send failed: {result.get('content')}", file=sys.stderr)
+        return 1
+    print(f"\nemail sent: {result.get('content') or '(empty)'}")
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

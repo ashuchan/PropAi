@@ -5,11 +5,14 @@ store to produce a per-tier summary: escalation counts, promotion/demotion
 counts, DLQ_PARK counts, and an estimated cost breakdown.
 
 Usage:
-    python -m ma_poc.scripts.escalation_report [--run-dir PATH]
+    python -m scripts.reports.escalation [--run-dir PATH] [--no-email]
+                                         [--email-recipients ...] [--dry-run]
 """
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import sys
 from collections import defaultdict
@@ -81,7 +84,33 @@ def _summarise(events: list[dict]) -> dict:
     }
 
 
-def run(run_dir: Path | None = None) -> dict:
+def _build_email_summary(summary: dict, run_dir: Path) -> str:
+    """One-line TL;DR with the headline counts a watcher cares about:
+    DLQ parks (terminal failures), probe pass/fail (active escalation
+    attempts), and total escalation events."""
+    parts = [f"Run dir: {run_dir.name}"]
+    parts.append(f"DLQ parks: {summary.get('dlq_parks', 0)}")
+    probes_ok = summary.get("probe_successes", 0)
+    probes_fail = summary.get("probe_failures", 0)
+    if probes_ok or probes_fail:
+        parts.append(f"probes: {probes_ok} ok / {probes_fail} fail")
+    esc_total = sum(summary.get("escalations_per_tier", {}).values())
+    if esc_total:
+        parts.append(f"{esc_total} tier escalation(s)")
+    promotions = sum(summary.get("promotions_to_tier", {}).values())
+    demotions = sum(summary.get("demotions_to_tier", {}).values())
+    if promotions or demotions:
+        parts.append(f"{promotions} promotion(s) / {demotions} demotion(s)")
+    return ". ".join(parts) + "."
+
+
+def run(
+    run_dir: Path | None = None,
+    *,
+    send_email: bool = True,
+    email_recipients: list[str] | None = None,
+    dry_run: bool = False,
+) -> dict:
     data_dir = Path(__file__).resolve().parent.parent.parent / "data"
 
     if run_dir is None:
@@ -95,7 +124,36 @@ def run(run_dir: Path | None = None) -> dict:
     events = _load_events(events_path)
     summary = _summarise(events)
 
-    _print_report(summary, run_dir)
+    # Tee stdout so the printed report is also available as the email body.
+    captured = io.StringIO()
+    real_stdout = sys.stdout
+
+    class _Tee:
+        def write(self, s: str) -> int:
+            real_stdout.write(s)
+            captured.write(s)
+            return len(s)
+
+        def flush(self) -> None:
+            real_stdout.flush()
+            captured.flush()
+
+    with contextlib.redirect_stdout(_Tee()):
+        _print_report(summary, run_dir)
+
+    if send_email:
+        from scripts.email.report import email_report
+
+        result = email_report(
+            subject=f"PropAi Fetch-Tier Escalation — {run_dir.name}",
+            summary=_build_email_summary(summary, run_dir),
+            body_text=captured.getvalue(),
+            recipients=email_recipients,
+            dry_run=dry_run,
+        )
+        if result.get("isError"):
+            print(f"email send failed: {result.get('content')}", file=sys.stderr)
+
     return summary
 
 
@@ -129,5 +187,21 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Fetch-tier escalation report")
     parser.add_argument("--run-dir", type=Path, default=None)
+    parser.add_argument("--no-email", action="store_true",
+                        help="Skip the email send.")
+    parser.add_argument("--email-recipients", default=None,
+                        help="Comma-separated override of REPORT_RECIPIENTS.")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Render the email body to stdout but do not send.")
     args = parser.parse_args()
-    run(run_dir=args.run_dir)
+    recips = (
+        [r.strip() for r in args.email_recipients.split(",") if r.strip()]
+        if args.email_recipients
+        else None
+    )
+    run(
+        run_dir=args.run_dir,
+        send_email=not args.no_email,
+        email_recipients=recips,
+        dry_run=args.dry_run,
+    )

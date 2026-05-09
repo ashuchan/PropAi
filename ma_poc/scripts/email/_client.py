@@ -42,7 +42,9 @@ Library usage
     )
 
 Env (already in ma_poc/.env):
-    REPORT_RECIPIENTS, REPORT_SENDER_NAME, GMAIL_MCP_COMMAND, GMAIL_MCP_ARGS
+    REPORT_RECIPIENTS, REPORT_SENDER_NAME, EMAIL_TRANSPORT
+    gmail_api transport: GMAIL_DELEGATED_USER (+ GMAIL_EMAILER_SA off Cloud Run)
+    mcp transport:       GMAIL_MCP_COMMAND, GMAIL_MCP_ARGS
 """
 
 from __future__ import annotations
@@ -62,11 +64,14 @@ for _p in (_MA_POC_ROOT, _REPO_ROOT):
 
 from dotenv import load_dotenv  # noqa: E402
 
-# Reuse the daily-report helpers — single source of truth for the MCP send.
+# Reuse the daily-report helpers — single source of truth for the send
+# dispatcher. ``_send_email`` routes to MCP or Gmail API based on the
+# ``EMAIL_TRANSPORT`` env var (default ``gmail_api``).
 from scripts.email.daily import (  # noqa: E402
+    _email_transport,
     _html_to_plain,
     _parse_recipients,
-    _send_via_mcp,
+    _send_email,
 )
 
 log = logging.getLogger("email_html")
@@ -142,8 +147,9 @@ def send_html_email(
         )
         return {"isError": False, "content": ["dry-run"]}
 
+    transport = _email_transport()
     result = asyncio.run(
-        _send_via_mcp(
+        _send_email(
             recipients=recipients,
             subject=subject,
             html_body=html_body,
@@ -153,11 +159,12 @@ def send_html_email(
     )
 
     if result.get("isError"):
-        log.error("Gmail MCP returned an error: %s", result.get("content"))
+        log.error("Email transport returned an error (%s): %s",
+                  transport, result.get("content"))
     else:
         log.info(
-            "Sent %r to %d recipient(s). MCP response: %s",
-            subject, len(recipients), result.get("content") or "(empty)",
+            "Sent %r to %d recipient(s). transport=%s response: %s",
+            subject, len(recipients), transport, result.get("content") or "(empty)",
         )
     return result
 

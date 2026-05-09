@@ -2,14 +2,24 @@
 
 Reads the daily report from the data-provider DB (local Postgres / SQLite
 or Cloud SQL — whichever ``DATA_PROVIDER`` + ``DATABASE_URL`` point at),
-renders an HTML body, and sends it via the Gmail MCP server
-(`@gongrzhe/server-gmail-autoauth-mcp`).
+renders an HTML body, and sends it via one of two transports — selected
+by the ``EMAIL_TRANSPORT`` env var:
 
-The script spawns the MCP server itself over stdio — Claude Code is NOT
-in the loop. That makes it safe to run from cron / Windows Task
-Scheduler. The Gmail account used for sending is whatever was authorised
-when you ran `npx @gongrzhe/server-gmail-autoauth-mcp auth` (credentials
-live at `~/.gmail-mcp/credentials.json`).
+* ``EMAIL_TRANSPORT=gmail_api`` (default) — Gmail API with Workspace
+  domain-wide delegation. On Cloud Run the runtime SA is the emailer SA;
+  locally the script impersonates the SA via the IAM Credentials API
+  (no key file). Required env: ``GMAIL_DELEGATED_USER``. Optional env
+  off Cloud Run: ``GMAIL_EMAILER_SA``.
+* ``EMAIL_TRANSPORT=mcp`` — legacy Gmail MCP server
+  (``@gongrzhe/server-gmail-autoauth-mcp``) over stdio. Requires
+  ``~/.gmail-mcp/credentials.json`` from a prior
+  ``npx @gongrzhe/server-gmail-autoauth-mcp auth`` run, plus Node + npx
+  on PATH. Use this from a workstation that already has the MCP creds
+  set up; not viable on Cloud Run without baking Node into the image.
+
+Both transports return the same ``{"isError", "content"}`` dict shape, so
+callers go through the ``_send_email`` dispatcher and never branch on
+which one is active.
 
 ────────────────────────────────────────────────────────────────────────
 Usage
@@ -34,8 +44,11 @@ Usage
 Required env (already in ma_poc/.env):
     REPORT_RECIPIENTS       Comma-separated default recipient list
     REPORT_SENDER_NAME      Display name in the email From header
-    GMAIL_MCP_COMMAND       MCP server launch command (default: npx)
-    GMAIL_MCP_ARGS          Args, space-separated (default: @gongrzhe/...)
+    EMAIL_TRANSPORT         gmail_api (default) | mcp
+    GMAIL_DELEGATED_USER    DWD impersonation target (gmail_api transport)
+    GMAIL_EMAILER_SA        Emailer SA email — local dev only (gmail_api)
+    GMAIL_MCP_COMMAND       MCP server launch command (default: npx) (mcp)
+    GMAIL_MCP_ARGS          Args, space-separated (default: @gongrzhe/...) (mcp)
     DATA_PROVIDER           postgres | sqlite | filesystem (default: filesystem)
     DATABASE_URL            postgresql+pg8000://user:pass@host:port/dbname
 
@@ -109,6 +122,7 @@ import asyncio
 import atexit
 import logging
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -1048,11 +1062,199 @@ async def _send_via_mcp(
     return out
 
 
+# ── Gmail API send (DWD on Cloud Run, keyless local impersonation) ──────────
+
+
+_GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
+
+
+def _build_gmail_api_credentials(delegated_user: str):
+    """Return google-auth credentials authorised to send mail as ``delegated_user``.
+
+    Two execution contexts, distinguished by whether ``GMAIL_EMAILER_SA``
+    is set:
+
+    1. ``GMAIL_EMAILER_SA`` set (current Cloud Run + local dev path):
+       runtime identity is *not* the emailer SA — on Cloud Run it's the
+       worker SA (Cloud SQL IAM auth requires the worker SA stays as
+       runtime), locally it's an ADC user. Either way we mint impersonated
+       tokens for the emailer SA via ``google.auth.iam.Signer``, which
+       calls ``iamcredentials.signJwt`` under the hood. The caller must
+       have ``roles/iam.serviceAccountTokenCreator`` on the emailer SA —
+       Terraform creates this binding for the worker SA in
+       ``modules/cloud_run_jobs/main.tf``; for local dev it's granted to
+       the human running the script.
+
+    2. ``GMAIL_EMAILER_SA`` unset (hypothetical pure-DWD setup): the
+       runtime SA *is* the emailer SA, so ``google.auth.default()`` returns
+       SA credentials that natively support ``.with_subject()``. This
+       branch is kept so future deployments can flip to it without code
+       changes — but it's not used today.
+    """
+    from google.auth import default
+    from google.auth.transport.requests import Request
+
+    source_creds, _ = default()
+    sa_email = os.getenv("GMAIL_EMAILER_SA", "").strip()
+
+    # Pure-DWD fast path — only fires when GMAIL_EMAILER_SA is unset AND
+    # the runtime credentials already support .with_subject() (i.e. they
+    # come from a service account, not a user). Not the current Cloud Run
+    # config; see context #2 in the docstring.
+    if not sa_email and hasattr(source_creds, "with_subject"):
+        return source_creds.with_subject(delegated_user)
+
+    # Impersonation path: signJwt as the emailer SA, then DWD.
+    from google.auth import iam
+    from google.oauth2 import service_account
+
+    if not sa_email:
+        raise RuntimeError(
+            "GMAIL_EMAILER_SA must be set when ADC is a user account "
+            "(local development). Cloud Run sets it via Terraform — see "
+            "infra/terraform/modules/cloud_run_jobs/main.tf."
+        )
+
+    signer = iam.Signer(Request(), source_creds, sa_email)
+    return service_account.Credentials(
+        signer=signer,
+        service_account_email=sa_email,
+        token_uri="https://oauth2.googleapis.com/token",
+        scopes=_GMAIL_SCOPES,
+        subject=delegated_user,
+    )
+
+
+def _send_via_gmail_api(
+    *,
+    recipients: list[str],
+    subject: str,
+    html_body: str,
+    sender_name: str | None,
+    attachments: list[str] | None = None,
+) -> dict[str, Any]:
+    """Send an HTML email via the Gmail API using Workspace DWD.
+
+    Required env:
+        GMAIL_DELEGATED_USER  Workspace mailbox to impersonate (the From).
+
+    Optional env:
+        GMAIL_EMAILER_SA      Emailer SA email — only needed off Cloud Run.
+                              On Cloud Run the runtime SA already is the
+                              emailer SA so this is left unset.
+
+    Returns the same ``{"isError": bool, "content": list[str]}`` shape as
+    ``_send_via_mcp`` so the dispatcher can route either transport
+    transparently.
+    """
+    import base64
+    import mimetypes
+    from email.message import EmailMessage
+
+    from googleapiclient.discovery import build
+    from googleapiclient.errors import HttpError
+
+    delegated_user = os.getenv("GMAIL_DELEGATED_USER", "").strip()
+    if not delegated_user:
+        raise RuntimeError(
+            "GMAIL_DELEGATED_USER must be set to the Workspace mailbox "
+            "authorised in the DWD entry (the address mail is sent AS)."
+        )
+
+    msg = EmailMessage()
+    msg["To"] = ", ".join(recipients)
+    msg["From"] = (
+        f"{sender_name} <{delegated_user}>" if sender_name else delegated_user
+    )
+    msg["Subject"] = subject
+    msg.set_content(_html_to_plain(html_body))
+    msg.add_alternative(html_body, subtype="html")
+
+    for path in attachments or []:
+        p = Path(path)
+        ctype, _enc = mimetypes.guess_type(p.name)
+        # Default to a generic binary type — Gmail still attaches it; the
+        # recipient client decides how to render. .xlsx → spreadsheet MIME
+        # is what mimetypes returns on Python 3.10+.
+        maintype, subtype = (ctype.split("/", 1) if ctype else ("application", "octet-stream"))
+        msg.add_attachment(
+            p.read_bytes(),
+            maintype=maintype,
+            subtype=subtype,
+            filename=p.name,
+        )
+
+    creds = _build_gmail_api_credentials(delegated_user)
+    raw = base64.urlsafe_b64encode(bytes(msg)).decode()
+    service = build("gmail", "v1", credentials=creds, cache_discovery=False)
+    try:
+        sent = service.users().messages().send(
+            userId="me", body={"raw": raw}
+        ).execute()
+    except HttpError as exc:
+        # Mirror MCP's error-object shape so callers don't branch.
+        return {
+            "isError": True,
+            "content": [f"HttpError {exc.resp.status}: {exc.error_details or exc}"],
+        }
+
+    return {
+        "isError": False,
+        "content": [f"messageId={sent['id']} threadId={sent.get('threadId')}"],
+    }
+
+
+# ── Transport dispatcher ────────────────────────────────────────────────────
+
+
+def _email_transport() -> str:
+    """Return the active transport: ``"gmail_api"`` (default) or ``"mcp"``.
+
+    Reads ``EMAIL_TRANSPORT``. Anything other than ``"mcp"`` falls back to
+    ``gmail_api`` — the new default — so a missing/typo env doesn't
+    accidentally break Cloud Run sends.
+    """
+    t = os.getenv("EMAIL_TRANSPORT", "gmail_api").strip().lower()
+    return "mcp" if t == "mcp" else "gmail_api"
+
+
+async def _send_email(
+    *,
+    recipients: list[str],
+    subject: str,
+    html_body: str,
+    sender_name: str | None,
+    attachments: list[str] | None = None,
+) -> dict[str, Any]:
+    """Transport-agnostic send. Routes to MCP or Gmail API based on env.
+
+    Both transports return the same dict shape:
+        {"isError": bool, "content": list[str]}
+    so callers don't need to know which one ran.
+    """
+    if _email_transport() == "mcp":
+        return await _send_via_mcp(
+            recipients=recipients,
+            subject=subject,
+            html_body=html_body,
+            sender_name=sender_name,
+            attachments=attachments,
+        )
+    # Gmail API path is sync — run it off the event loop so an existing
+    # asyncio.run(...) caller doesn't block on Gmail's HTTPS roundtrip.
+    return await asyncio.to_thread(
+        _send_via_gmail_api,
+        recipients=recipients,
+        subject=subject,
+        html_body=html_body,
+        sender_name=sender_name,
+        attachments=attachments,
+    )
+
+
 def _html_to_plain(html: str) -> str:
     """Crude HTML → text fallback for mail clients that ignore the HTML part.
     Good enough for the daily-report shape; we don't need a full parser."""
-    import re
-
     text = re.sub(r"<style[^>]*>.*?</style>", "", html, flags=re.S | re.I)
     text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.S | re.I)
     text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
@@ -1065,10 +1267,31 @@ def _html_to_plain(html: str) -> str:
 # ── Entrypoint ───────────────────────────────────────────────────────────────
 
 
+_CRLF_RE = re.compile(r"[\r\n]")
+
+
 def _parse_recipients(raw: str | None) -> list[str]:
+    """Parse a comma-separated address list. Rejects CRLF in any address.
+
+    The MIME ``To`` header is built by joining these with ``", "``. An
+    embedded ``\\r\\n`` would let an attacker inject arbitrary headers
+    (BCC, Reply-To, Content-Type) — classic SMTP header injection. The
+    env is operator-controlled today, but enforcing the invariant here
+    closes the vector once and forever.
+    """
     if not raw:
         return []
-    return [r.strip() for r in raw.split(",") if r.strip()]
+    out: list[str] = []
+    for r in raw.split(","):
+        addr = r.strip()
+        if not addr:
+            continue
+        if _CRLF_RE.search(addr):
+            raise ValueError(
+                f"recipient address contains CR/LF (header injection): {addr!r}"
+            )
+        out.append(addr)
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1197,9 +1420,10 @@ def main(argv: list[str] | None = None) -> int:
         log.info("Dry run — would send to: %s", ", ".join(recipients) or "(none)")
         return 0
 
+    transport = _email_transport()
     try:
         result = asyncio.run(
-            _send_via_mcp(
+            _send_email(
                 recipients=recipients,
                 subject=subject,
                 html_body=html,
@@ -1207,17 +1431,19 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     except Exception as exc:
-        log.exception("Gmail MCP send failed: %s", exc)
+        log.exception("Email send failed (transport=%s): %s", transport, exc)
         return 1
 
     if result.get("isError"):
-        log.error("Gmail MCP returned an error: %s", result.get("content"))
+        log.error("Email transport returned an error (%s): %s",
+                  transport, result.get("content"))
         return 1
 
     log.info(
-        "Sent daily report for %s to %d recipient(s). MCP response: %s",
+        "Sent daily report for %s to %d recipient(s). transport=%s response: %s",
         run_date,
         len(recipients),
+        transport,
         result.get("content") or "(empty)",
     )
     return 0

@@ -101,3 +101,63 @@ variable "retry_timeout" {
   default     = "3600s"
   description = "Per-task timeout for jugnu-retry, e.g. '3600s' or '7200s'."
 }
+
+# ── Email transport (jugnu-adhoc only) ──────────────────────────────────────
+#
+# The adhoc job runs the four scripts/email/* entrypoints. Sending is
+# routed by the EMAIL_TRANSPORT env var (read by
+# scripts/email/daily.py::_email_transport):
+#
+#   "gmail_api" (default) — Workspace domain-wide delegation. The runtime
+#       SA (worker SA) impersonates the dedicated emailer SA via
+#       iamcredentials.signJwt, then trades the JWT for a user-impersonating
+#       access token at oauth2.googleapis.com/token. The exchange is
+#       authorised by Workspace's DWD entry on the emailer SA's client ID.
+#       This is the same code path used locally — see
+#       _build_gmail_api_credentials in scripts/email/daily.py.
+#   "mcp" — legacy `@gongrzhe/server-gmail-autoauth-mcp` over stdio.
+#       Requires Node + ~/.gmail-mcp/credentials.json baked into the
+#       image. Not currently set up; kept as a switch for workstation use.
+#
+# Why impersonation rather than running as the emailer SA directly: the
+# adhoc job needs Cloud SQL IAM auth, which requires the runtime SA to
+# match the DB user (and it's already the worker SA). Switching to the
+# emailer SA would break every adhoc backfill/sync/migration script.
+# Keeping the worker SA as runtime + impersonating to send mail isolates
+# the two capabilities — a leaked worker token can write to the DB but
+# can only send mail when the explicit serviceAccountTokenCreator
+# binding (managed below) lets it mint a JWT for the emailer SA.
+
+variable "gmail_emailer_sa_email" {
+  type        = string
+  default     = ""
+  description = "Service account email authorised in Workspace DWD with the gmail.send scope. The worker SA gets serviceAccountTokenCreator on this SA so the email scripts can mint impersonated tokens at runtime. Empty string disables the binding (email scripts then fail at send time with a clear error; everything else still works)."
+}
+
+variable "gmail_delegated_user" {
+  type        = string
+  default     = ""
+  description = "Workspace mailbox the emailer SA impersonates (the From address). Empty string disables email; the scripts surface a clear error if invoked."
+}
+
+variable "email_transport" {
+  type        = string
+  default     = "gmail_api"
+  description = "Which email transport scripts/email/* use: gmail_api (DWD via Gmail API) or mcp (legacy stdio Gmail MCP)."
+  validation {
+    condition     = contains(["gmail_api", "mcp"], var.email_transport)
+    error_message = "email_transport must be one of: gmail_api, mcp"
+  }
+}
+
+variable "report_recipients" {
+  type        = string
+  default     = ""
+  description = "Comma-separated default recipient list for daily/failure/merge/refactor email reports. Per-invocation override via SCRIPT_ARGS=--recipients ..."
+}
+
+variable "report_sender_name" {
+  type        = string
+  default     = "PropAi Daily Reports"
+  description = "Display name in the email From header."
+}

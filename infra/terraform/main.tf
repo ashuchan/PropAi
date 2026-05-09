@@ -60,6 +60,11 @@ module "cloud_run_jobs" {
   task_memory                  = var.task_memory
   retry_task_count             = var.retry_task_count
   retry_timeout                = var.retry_timeout
+  gmail_emailer_sa_email       = var.gmail_emailer_sa_email
+  gmail_delegated_user         = var.gmail_delegated_user
+  email_transport              = var.email_transport
+  report_recipients            = var.report_recipients
+  report_sender_name           = var.report_sender_name
 }
 
 module "scheduler" {
