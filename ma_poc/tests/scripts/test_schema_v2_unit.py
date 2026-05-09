@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from scripts.schema_v2 import _format_v2_unit, _normalize_amenities
+from ma_poc.core.schema_v2 import _format_v2_unit, _normalize_amenities
 
 
 _TS = datetime(2026, 5, 5, 12, 0, 0, tzinfo=timezone.utc)

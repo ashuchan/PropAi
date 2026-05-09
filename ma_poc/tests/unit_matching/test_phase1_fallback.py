@@ -6,7 +6,7 @@ Expect: ALL FAIL (ImportError or AssertionError).
 """
 import hashlib
 import pytest
-from identity_fallback import compute_fallback_unit_id, compute_fallback_id
+from ma_poc.core.identity import compute_fallback_unit_id, compute_fallback_id
 from tests.unit_matching.conftest import stable_fallback_id
 
 CID = "prop_001"

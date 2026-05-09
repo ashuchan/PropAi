@@ -1,7 +1,7 @@
 """Post-extraction CSV snap.
 
 Resolves an extracted unit's identity to a canonical row in
-``Floorplan- comparisons.csv`` whenever possible. Records that snap
+``Floorplan-comparisons.csv`` whenever possible. Records that snap
 successfully receive a deterministic ``floor_plan_id`` and have their
 ``floor_plan_name`` overwritten with the canonical description (the
 LLM-emitted name is preserved for audit in

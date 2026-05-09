@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -20,6 +21,53 @@ from .proxy.base import ProxyConfig
 from .stealth import Identity
 
 log = logging.getLogger(__name__)
+
+
+def _resolve_int_env(name: str, default_ms: int) -> int:
+    """Parse a millisecond env var with a positive-value guard.
+
+    Falls back to *default_ms* with a warning when the value is unparseable
+    or non-positive — prod misconfig must never hard-fail container startup
+    or, worse, silently disable a safety cap.
+    """
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default_ms
+    try:
+        v = int(raw)
+    except (TypeError, ValueError):
+        log.warning("%s=%r is not an int; using default %dms", name, raw, default_ms)
+        return default_ms
+    if v <= 0:
+        log.warning("%s=%r must be positive; using default %dms", name, raw, default_ms)
+        return default_ms
+    return v
+
+
+# Page-level Playwright defaults applied to every page after new_page().
+# These act as a safety net behind explicit per-call timeouts (e.g. the
+# 20s cap on page.goto in fetch/fetcher.py): any Playwright op that
+# *doesn't* pass an explicit timeout — page.content(), page.evaluate(),
+# page.wait_for_selector(), page.click(), etc. — would otherwise inherit
+# Playwright's default 30s and, on a renderer-IPC hang (dead Chromium
+# child), can in practice park forever waiting on a websocket reply
+# that's never coming.
+#
+# Surfacing those hangs as ``playwright.TimeoutError`` propagates through
+# the existing per-property guard (asyncio.wait_for(_process_property,
+# 600s) in scripts/runners/jugnu.py:307) as a normal exception, instead
+# of leaving the coroutine pinned on a non-cancellable await. Without
+# this, the per-property timeout's CancelledError can't take effect on
+# code parked inside Playwright's IPC layer — that was the wedge mode
+# observed across "shards 8/12/17 on three consecutive days" (see
+# jugnu.py:_resolve_per_property_timeout).
+#
+# 60s for general ops is 2x Playwright's default, leaving headroom for
+# legitimate slow page.content() on heavy pages (~10-20s observed); 45s
+# for navigation is a backstop for the rare page.reload/frame.goto path
+# that doesn't pass its own timeout. Override via env vars below.
+DEFAULT_PAGE_TIMEOUT_MS = _resolve_int_env("PLAYWRIGHT_PAGE_TIMEOUT_MS", 60_000)
+DEFAULT_NAV_TIMEOUT_MS = _resolve_int_env("PLAYWRIGHT_NAV_TIMEOUT_MS", 45_000)
 
 
 class BrowserContextPool:
@@ -102,6 +150,8 @@ class BrowserContextPool:
         context = await browser.new_context(**context_opts)  # type: ignore[arg-type]
         self._active_contexts.append(context)
         page = await context.new_page()
+        page.set_default_timeout(DEFAULT_PAGE_TIMEOUT_MS)
+        page.set_default_navigation_timeout(DEFAULT_NAV_TIMEOUT_MS)
         return page
 
     async def release(self, page: Page) -> None:

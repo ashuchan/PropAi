@@ -1,4 +1,4 @@
-"""End-to-end test for ``scripts.sync_run_to_pg.sync_run_to_postgres``.
+"""End-to-end test for ``scripts.sync.run_to_pg.sync_run_to_postgres``.
 
 Seeds an FS provider with the full surface the scrape runner writes
 (state, profiles, events, runs, artifacts) and syncs it into a SQLite
@@ -36,7 +36,7 @@ from models.extraction_result import (
 from models.scrape_event import ScrapeEvent, ScrapeOutcome
 from models.scrape_profile import ScrapeProfile
 
-from scripts import sync_run_to_pg
+from scripts.sync import run_to_pg as sync_run_to_pg
 
 
 # Tests that exercise ``sync_run_to_postgres()`` end-to-end must use a
@@ -594,7 +594,7 @@ def _jugnu_v2_property(
 ) -> dict[str, Any]:
     """Build a V2 property dict shaped like what jugnu_runner writes.
 
-    Mirrors the structure of ``ma_poc/scripts/jugnu_runner.py::_format_v2``
+    Mirrors the structure of ``ma_poc/scripts/runners/jugnu.py::_format_v2``
     — the minimum keys the sync layer reads. If this drifts from the
     runner's actual output, the sync test is a false positive.
     """
@@ -1163,7 +1163,7 @@ def test_oversize_floor_plan_does_not_drop_other_properties(tmp_path: Path) -> N
         # rest of its data (rent, beds, etc.) is intact.
         bad_units = target.unit_state.get_units("PROP-2")
         assert "PROP-2-101" in bad_units
-        assert len(bad_units["PROP-2-101"].floor_plan_name or "") <= 256
+        assert len(bad_units["PROP-2-101"].floor_plan_name or "") <= 1024
         assert bad_units["PROP-2-101"].rent_low == 1500
     finally:
         target.close()

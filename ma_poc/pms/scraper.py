@@ -49,6 +49,79 @@ _UNREACHABLE_PATTERNS: tuple[str, ...] = (
     "net::ERR_",
 )
 
+
+# Telemetry keys whose values are list-typed and concatenate across the
+# main + sub-page sources. Order matters for downstream readers
+# (cost_ledger walks _llm_interactions in arrival order), so we always
+# place main before sub.
+_MERGE_LIST_KEYS: tuple[str, ...] = (
+    "_raw_api_responses",
+    "_llm_interactions",
+    "_llm_field_mappings",
+    "_tier_attempts",
+)
+
+# Telemetry keys whose values are dict-typed and merge by key. Sub-page
+# entries take priority on collision because the link-hop is the path
+# that produced the data the merger ultimately kept. Without this list,
+# self-learning artifacts (mappings, blocklist classifications, CSS
+# selectors) discovered while crawling the sub-page were silently
+# dropped on the TIER_MERGED_CROSS_PAGE path — see
+# tests/integration/test_phase9_merge_preserves_learning.py.
+_MERGE_DICT_KEYS: tuple[str, ...] = (
+    "_llm_analysis_results",
+    "_llm_hints",
+    "_explored_links",
+)
+
+
+def _merge_post_hop_telemetry(
+    result: dict[str, Any],
+    hop_result: dict[str, Any],
+) -> None:
+    """Combine self-learning telemetry from main + sub-page extractions.
+
+    Mutates ``result`` in place. Used after Phase 9 cross-page merge
+    succeeds (TIER_MERGED_CROSS_PAGE) so the profile_updater sees every
+    mapping, noise classification, CSS selector, and link-hop outcome the
+    sub-page produced — not just main's.
+
+    Rules:
+      - List telemetry concatenates: ``main + sub`` (preserves arrival
+        order). Lone-side values pass through unchanged.
+      - Dict telemetry merges with sub winning collisions: link-hop is
+        the data-bearing path, so its hints/classifications take priority.
+        Lone-side dicts pass through unchanged.
+
+    Why a helper: the merge block in scrape() is buried inside a
+    multi-level nested async path, making the previous bug (omission of
+    ``_llm_analysis_results`` from the merged keys) hard to spot. Lifting
+    the rules to a named function with explicit key lists makes future
+    additions a one-line edit and lets the integration test pin behaviour
+    without spinning up the whole pipeline.
+    """
+    for k in _MERGE_LIST_KEYS:
+        main_v = result.get(k)
+        sub_v = hop_result.get(k)
+        if isinstance(main_v, list) and isinstance(sub_v, list):
+            result[k] = list(main_v) + list(sub_v)
+        elif sub_v is not None and main_v is None:
+            result[k] = sub_v
+    for k in _MERGE_DICT_KEYS:
+        main_v = result.get(k)
+        sub_v = hop_result.get(k)
+        if isinstance(main_v, dict) and isinstance(sub_v, dict):
+            # Sub-page wins collisions — see _MERGE_DICT_KEYS docstring.
+            result[k] = {**main_v, **sub_v}
+        elif sub_v is not None and main_v is None:
+            result[k] = sub_v
+    # Provenance fields — back-fill from sub-page when main never set them.
+    # The link-hop did the data-bearing work so its winning_page_url /
+    # adapter_used are the right answer when main has nothing to say.
+    for k in ("_winning_page_url", "_adapter_used"):
+        if hop_result.get(k) and not result.get(k):
+            result[k] = hop_result[k]
+
 _HTTPS_RE = re.compile(r"^http://", re.IGNORECASE)
 
 
@@ -142,6 +215,15 @@ async def scrape(
     api_responses : list[dict] | None
         Pre-captured API responses for testing. If None, uses whatever the
         page captured during load.
+    shared_budget : dict | None
+        Per-property LLM budget. **Mutated in place** when provided —
+        sub-tier LLM calls in GenericAdapter decrement
+        ``llm_api_calls`` / ``llm_dom_calls`` / ``llm_monolithic`` against
+        this dict and accumulate cost into ``_cost_usd_spent``. Pass the
+        same dict reference into recursive ``scrape()`` calls (e.g.
+        link-hop) so decrements compose; passing a fresh copy reverts to
+        the pre-Fix#2 behaviour where one property could fire 20 LLM
+        calls (1 entry × 5 + 3 hops × 5).
 
     Returns
     -------
@@ -293,8 +375,15 @@ async def scrape(
 
     # Phase H / Fix 8: use shared_budget if provided (avoids double-allocation
     # when scrape_jugnu() has already computed the budget for this run).
+    #
+    # IMPORTANT — this is a reference, not a copy. Link-hop reuses the same
+    # dict across the entry page and each sub-page so LLM-call decrements
+    # propagate up; otherwise each link-hop sub-page would silently get a
+    # fresh 5-call budget (3+1+1) and one property could fire 20 LLM calls
+    # via 1 entry + 3 hops × 5 = 20. The earlier `dict(shared_budget)` copy
+    # was the root cause of the per-day stuck-shard burns.
     if shared_budget is not None:
-        budget: dict = dict(shared_budget)
+        budget: dict = shared_budget
     else:
         budget = {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
         if profile is not None:
@@ -1285,22 +1374,15 @@ async def scrape_jugnu(
                                 u.pop("_provenance", None)
                             result["units"] = legacy
                             result["extraction_tier_used"] = "TIER_MERGED_CROSS_PAGE"
-                            # Telemetry — additive (sub-page contributions appended).
-                            for k in (
-                                "_raw_api_responses",
-                                "_llm_interactions",
-                                "_llm_field_mappings",
-                                "_tier_attempts",
-                            ):
-                                main_v = result.get(k)
-                                sub_v = hop_result.get(k)
-                                if isinstance(main_v, list) and isinstance(sub_v, list):
-                                    result[k] = list(main_v) + list(sub_v)
-                                elif sub_v is not None and main_v is None:
-                                    result[k] = sub_v
-                            for k in ("_winning_page_url", "_adapter_used"):
-                                if hop_result.get(k) and not result.get(k):
-                                    result[k] = hop_result[k]
+                            # Combine telemetry from main + sub-page so the
+                            # self-learning loop sees every mapping, blocked
+                            # endpoint, CSS selector, and explored link the
+                            # link-hop discovered. The previous inline loop
+                            # only handled list-typed keys, silently dropping
+                            # ``_llm_analysis_results`` / ``_llm_hints`` /
+                            # ``_explored_links`` (all dict-typed) and costing
+                            # TIER_MERGED_CROSS_PAGE wins their persistence.
+                            _merge_post_hop_telemetry(result, hop_result)
                         else:
                             # Merge produced nothing usable — fall back to overwrite path.
                             for k in (

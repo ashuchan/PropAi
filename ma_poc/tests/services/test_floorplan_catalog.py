@@ -49,7 +49,7 @@ def _write_mapping(path: Path, chosen: str | None = "apartmentid") -> None:
 
 @pytest.fixture
 def catalog_dir(tmp_path: Path) -> Path:
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     map_path = tmp_path / "csv_floorplan_mapping.json"
     _write_csv(
         csv_path,
@@ -74,7 +74,7 @@ def catalog_dir(tmp_path: Path) -> Path:
 
 def test_catalog_loads_from_csv(catalog_dir: Path) -> None:
     cat = FloorplanCatalog(
-        csv_path=catalog_dir / "Floorplan- comparisons.csv",
+        csv_path=catalog_dir / "Floorplan-comparisons.csv",
         mapping_path=catalog_dir / "csv_floorplan_mapping.json",
     )
     assert not cat.in_bypass_mode
@@ -89,7 +89,7 @@ def test_catalog_loads_from_csv(catalog_dir: Path) -> None:
 
 def test_strict_sqft_no_tolerance(catalog_dir: Path) -> None:
     cat = FloorplanCatalog(
-        csv_path=catalog_dir / "Floorplan- comparisons.csv",
+        csv_path=catalog_dir / "Floorplan-comparisons.csv",
         mapping_path=catalog_dir / "csv_floorplan_mapping.json",
     )
     # Aspen is 750 sqft. 748 is close but not equal → no match (H2).
@@ -100,7 +100,7 @@ def test_strict_sqft_no_tolerance(catalog_dir: Path) -> None:
 
 def test_sqft_sentinel_treated_as_null(catalog_dir: Path) -> None:
     cat = FloorplanCatalog(
-        csv_path=catalog_dir / "Floorplan- comparisons.csv",
+        csv_path=catalog_dir / "Floorplan-comparisons.csv",
         mapping_path=catalog_dir / "csv_floorplan_mapping.json",
     )
     # apartment 300 has sqft=-1 (sentinel). Extracted -1 should be treated
@@ -113,7 +113,7 @@ def test_sqft_sentinel_treated_as_null(catalog_dir: Path) -> None:
 
 def test_snap_unique_two_field_when_sqft_null(catalog_dir: Path) -> None:
     cat = FloorplanCatalog(
-        csv_path=catalog_dir / "Floorplan- comparisons.csv",
+        csv_path=catalog_dir / "Floorplan-comparisons.csv",
         mapping_path=catalog_dir / "csv_floorplan_mapping.json",
     )
     # apartment 100 has only one 2BR/2BA plan (Cedar) — sqft None still
@@ -129,7 +129,7 @@ def test_snap_unique_two_field_when_sqft_null(catalog_dir: Path) -> None:
 
 def test_snap_name_disambiguation_when_multiple_candidates(catalog_dir: Path) -> None:
     cat = FloorplanCatalog(
-        csv_path=catalog_dir / "Floorplan- comparisons.csv",
+        csv_path=catalog_dir / "Floorplan-comparisons.csv",
         mapping_path=catalog_dir / "csv_floorplan_mapping.json",
     )
     # apartment 200 has two 2BR/2BA/950sqft plans — Junior and Senior. Hint
@@ -151,7 +151,7 @@ def test_snap_name_disambiguation_when_multiple_candidates(catalog_dir: Path) ->
 
 def test_snap_ambiguous_returns_fail_closed(catalog_dir: Path) -> None:
     cat = FloorplanCatalog(
-        csv_path=catalog_dir / "Floorplan- comparisons.csv",
+        csv_path=catalog_dir / "Floorplan-comparisons.csv",
         mapping_path=catalog_dir / "csv_floorplan_mapping.json",
     )
     # No hint → cannot disambiguate Junior vs Senior → fail closed (H8).
@@ -162,7 +162,7 @@ def test_snap_ambiguous_returns_fail_closed(catalog_dir: Path) -> None:
 
 def test_snap_returns_exact_three_for_unique_three_field_match(catalog_dir: Path) -> None:
     cat = FloorplanCatalog(
-        csv_path=catalog_dir / "Floorplan- comparisons.csv",
+        csv_path=catalog_dir / "Floorplan-comparisons.csv",
         mapping_path=catalog_dir / "csv_floorplan_mapping.json",
     )
     res = cat.snap("100", beds=1, baths=1.0, sqft=750, floor_plan_name_hint="Aspen")
@@ -175,7 +175,7 @@ def test_snap_returns_exact_three_for_unique_three_field_match(catalog_dir: Path
 
 
 def test_low_coverage_bypass_short_circuits(tmp_path: Path) -> None:
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     map_path = tmp_path / "csv_floorplan_mapping.json"
     _write_csv(csv_path, [("100", 1, "Aspen", 1, 1, 750)])
     _write_mapping(map_path, chosen=None)
@@ -188,7 +188,7 @@ def test_low_coverage_bypass_short_circuits(tmp_path: Path) -> None:
 
 
 def test_missing_mapping_file_falls_back_to_bypass(tmp_path: Path) -> None:
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     _write_csv(csv_path, [("100", 1, "Aspen", 1, 1, 750)])
     cat = FloorplanCatalog(
         csv_path=csv_path, mapping_path=tmp_path / "missing.json"
@@ -200,7 +200,7 @@ def test_missing_mapping_file_falls_back_to_bypass(tmp_path: Path) -> None:
 
 
 def test_known_plans_block_caps_at_limit(tmp_path: Path) -> None:
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     map_path = tmp_path / "csv_floorplan_mapping.json"
     rows = [
         ("999", i, f"Plan{i}", 1, 1, 600 + i)
@@ -218,7 +218,7 @@ def test_known_plans_block_caps_at_limit(tmp_path: Path) -> None:
 def test_known_plans_truncation_logged(tmp_path: Path, caplog) -> None:
     import logging
 
-    csv_path = tmp_path / "Floorplan- comparisons.csv"
+    csv_path = tmp_path / "Floorplan-comparisons.csv"
     map_path = tmp_path / "csv_floorplan_mapping.json"
     rows = [
         ("999", i, f"Plan{i}", 1, 1, 600 + i)
@@ -234,7 +234,7 @@ def test_known_plans_truncation_logged(tmp_path: Path, caplog) -> None:
 
 def test_known_plans_block_empty_when_unknown_property(catalog_dir: Path) -> None:
     cat = FloorplanCatalog(
-        csv_path=catalog_dir / "Floorplan- comparisons.csv",
+        csv_path=catalog_dir / "Floorplan-comparisons.csv",
         mapping_path=catalog_dir / "csv_floorplan_mapping.json",
     )
     text, meta = cat.known_plans_block("does-not-exist")

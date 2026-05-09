@@ -70,7 +70,7 @@ ma_poc/services/*.lock
 # build time to produce csv_floorplan_mapping.json and assert the catalog
 # loads with ≥1 000 indexed properties, so they have to be in the context.
 ma_poc/config/*.csv
-!ma_poc/config/Floorplan- comparisons.csv
+!ma_poc/config/Floorplan-comparisons.csv
 !ma_poc/config/properties.csv
 
 # Misc large/irrelevant-to-runtime dirs under ma_poc/

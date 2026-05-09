@@ -36,11 +36,13 @@ from ma_poc.pms.adapters._daily_runner_parsers import (
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_sightmap_payload as _dr_parse_sightmap,
 )
-from ma_poc.pms.adapters._html_extract import (  # noqa: I001
+from ma_poc.models.scrape_profile import FieldSelectorMap as _FieldSelectorMap
+from ma_poc.pms.adapters._html_extract import (
     extract_embedded_blobs_from_html,
     extract_jsonld_from_html,
     extract_units_from_dom,
     extract_units_from_text,
+    extract_with_hints,
 )
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -52,6 +54,27 @@ from ma_poc.pms.adapters._parsing import (
     make_unit_dict,
     money_to_int,
     rent_in_sanity_range,
+)
+from ma_poc.pms.adapters._merge_fns import (
+    AMBIGUITY_RANKS as _AMBIGUITY_RANKS,
+    MERGE_MUTABLE_FIELDS as _MERGE_MUTABLE_FIELDS,
+    MERGE_PHYSICAL_FIELDS as _MERGE_PHYSICAL_FIELDS,
+    MERGE_UNION_FIELDS as _MERGE_UNION_FIELDS,
+    RANK_LADDER as _RANK_LADDER,
+    aggregate_quality as _aggregate_quality,
+    availability_count_aware_merge as _availability_count_aware_merge,
+    emit_ambiguous_fail_closed as _emit_ambiguous_fail_closed,
+    emit_physical_conflicts as _emit_physical_conflicts,
+    find_unit_list as _find_unit_list,
+    has_unit_signals as _has_unit_signals,
+    merge_field_values as _merge_field_values,
+    merge_float_or_none as _merge_float_or_none,
+    merge_int_or_none as _merge_int_or_none,
+    merge_into_result_units as _merge_into_result_units,
+    merge_norm as _merge_norm,
+    merge_field_present as _merge_field_present,
+    merge_rank_signature as _merge_rank_signature,
+    rank_matches as _rank_matches,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
@@ -111,9 +134,9 @@ def _assess_and_decide(
     if not units_so_far:
         return None
     try:
-        from ma_poc.models.scrape_profile import ProfileMaturity
-        from ma_poc.models.source import SourceId, from_legacy_unit
         from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
+        from ma_poc.models.source import SourceId, from_legacy_unit
+        from ma_poc.models.scrape_profile import ProfileMaturity
     except Exception:
         return None
     try:
@@ -157,425 +180,6 @@ def _assess_and_decide(
         return None
 
 
-# ── Field categories used by the anchor-first merge (H9) ──────────────────
-# Mutable: latest extracted value wins on conflict.
-_MERGE_MUTABLE_FIELDS: frozenset[str] = frozenset(
-    {
-        "market_rent_low",
-        "market_rent_high",
-        "asking_rent",
-        "effective_rent",
-        "rent_low",
-        "rent_high",
-        "rent_range",
-        "available_date",
-        "availability_status",
-        "lease_term",
-        "concession_text",
-        "concession_value",
-        "concession_source",
-        "days_on_market",
-    }
-)
-# Physical / identity: existing wins on conflict; conflict is logged.
-_MERGE_PHYSICAL_FIELDS: frozenset[str] = frozenset(
-    {
-        "floor_plan_id",
-        "floor_plan_name",
-        "floor_plan_name_extracted",
-        "floor_plan_source",
-        "beds",
-        "bedrooms",
-        "_bedrooms",
-        "baths",
-        "bathrooms",
-        "_bathrooms",
-        "sqft",
-        "area",
-        "_sqft",
-        "unit_number",
-        "_unit_number",
-        "unit_id",
-        "apartmentid",
-        "floorplannumber",
-    }
-)
-# Multi-source: union/dedup. Insertion-order is preserved at this layer;
-# the run-end report sorts the aggregated property_amenities for stable
-# diffing.
-_MERGE_UNION_FIELDS: frozenset[str] = frozenset({"amenities"})
-
-
-def _merge_field_values(
-    target: dict[str, Any],
-    source: dict[str, Any],
-    *,
-    rank: str,
-    conflict_log: list[dict[str, Any]],
-) -> None:
-    """Merge ``source`` into ``target`` per the H9 field-category rules.
-
-    Mutable fields take the latest extracted value when both sides carry one.
-    Physical fields keep the existing value and emit a structured conflict
-    record. Multi-source fields union+dedupe. Anything else falls through
-    to fill-when-missing semantics.
-    """
-    for k, v in source.items():
-        if k.startswith("_"):
-            # Telemetry keys (e.g. _provenance) flow through the source
-            # merger, not this function. Skip them so they never collide.
-            continue
-        if v in (None, "", -1, "-1"):
-            continue
-
-        existing_val = target.get(k)
-        existing_present = existing_val not in (None, "", -1, "-1")
-
-        if k in _MERGE_UNION_FIELDS:
-            if isinstance(existing_val, list) or isinstance(v, list):
-                # Seed from existing — list values verbatim, scalars wrapped
-                # so a previous tier's single string isn't dropped when the
-                # next tier emits a list.
-                if isinstance(existing_val, list):
-                    merged: list[Any] = list(existing_val)
-                elif existing_present:
-                    merged = [existing_val]
-                else:
-                    merged = []
-                seen: set[Any] = set()
-                for x in merged:
-                    try:
-                        seen.add(x)
-                    except TypeError:
-                        # Non-hashable items (rare — e.g. dicts) can't seed
-                        # the dedup set. Fall back to value-equality check.
-                        pass
-                for item in v if isinstance(v, list) else [v]:
-                    try:
-                        if item in seen:
-                            continue
-                        seen.add(item)
-                    except TypeError:
-                        if any(item == m for m in merged):
-                            continue
-                    merged.append(item)
-                target[k] = merged
-            else:
-                if not existing_present:
-                    target[k] = v
-            continue
-
-        if k in _MERGE_MUTABLE_FIELDS:
-            target[k] = v  # latest wins
-            continue
-
-        if k in _MERGE_PHYSICAL_FIELDS:
-            if not existing_present:
-                target[k] = v
-            elif existing_val != v:
-                conflict_log.append(
-                    {
-                        "field": k,
-                        "existing": existing_val,
-                        "new": v,
-                        "rank_used": rank,
-                    }
-                )
-            continue
-
-        # Default: fill-when-missing (legacy behaviour for anything not
-        # explicitly categorised).
-        if not existing_present:
-            target[k] = v
-
-
-def _merge_norm(v: Any) -> str:
-    if v is None:
-        return ""
-    return str(v).strip().lower()
-
-
-def _merge_int_or_none(v: Any) -> int | None:
-    """Coerce to int or return None. Treats `-1` sentinel as None (H2)."""
-    if v is None or v == "" or v == -1:
-        return None
-    try:
-        return int(float(str(v).strip().replace(",", "")))
-    except (TypeError, ValueError):
-        return None
-
-
-def _merge_float_or_none(v: Any) -> float | None:
-    if v is None or v == "":
-        return None
-    try:
-        return float(str(v).strip())
-    except (TypeError, ValueError):
-        return None
-
-
-def _merge_field_present(unit: dict[str, Any], *keys: str) -> Any:
-    for k in keys:
-        v = unit.get(k)
-        if v not in (None, "", -1, "-1"):
-            return v
-    return None
-
-
-def _merge_rank_signature(unit: dict[str, Any]) -> dict[str, Any]:
-    """Extract the comparable identity fields from a unit (H2 strict sqft)."""
-    fp_id = _merge_field_present(unit, "floor_plan_id")
-    uid = _merge_field_present(unit, "unit_id", "unit_number", "_unit_number")
-    fp_name = _merge_norm(_merge_field_present(unit, "floor_plan_name", "_floor_plan", "floorplan_name"))
-    beds = _merge_int_or_none(_merge_field_present(unit, "beds", "bedrooms", "_bedrooms"))
-    baths = _merge_float_or_none(_merge_field_present(unit, "baths", "bathrooms", "_bathrooms"))
-    sqft = _merge_int_or_none(_merge_field_present(unit, "sqft", "area", "_sqft"))
-    return {
-        "fp_id": str(fp_id) if fp_id else "",
-        "uid": _merge_norm(uid),
-        "fp_name": fp_name,
-        "beds": beds,
-        "baths": baths,
-        "sqft": sqft,
-    }
-
-
-# Rank predicate: each function returns True when the candidate matches at
-# this rank. The order of rank evaluation IS the priority ladder (R0 → R1f).
-def _rank_matches(rank: str, ex_sig: dict[str, Any], inc_sig: dict[str, Any]) -> bool:
-    if rank == "R0":
-        return bool(ex_sig["fp_id"]) and ex_sig["fp_id"] == inc_sig["fp_id"]
-    if rank == "R0a":
-        return bool(ex_sig["uid"]) and ex_sig["uid"] == inc_sig["uid"]
-    if rank == "R1a":
-        return (
-            bool(ex_sig["fp_name"])
-            and bool(inc_sig["fp_name"])
-            and ex_sig["fp_name"] == inc_sig["fp_name"]
-            and ex_sig["beds"] is not None
-            and inc_sig["beds"] is not None
-            and ex_sig["beds"] == inc_sig["beds"]
-            and ex_sig["baths"] is not None
-            and inc_sig["baths"] is not None
-            and ex_sig["baths"] == inc_sig["baths"]
-            and ex_sig["sqft"] is not None
-            and inc_sig["sqft"] is not None
-            and ex_sig["sqft"] == inc_sig["sqft"]  # H2 strict
-        )
-    if rank == "R1b":
-        return (
-            ex_sig["beds"] is not None
-            and inc_sig["beds"] is not None
-            and ex_sig["beds"] == inc_sig["beds"]
-            and ex_sig["baths"] is not None
-            and inc_sig["baths"] is not None
-            and ex_sig["baths"] == inc_sig["baths"]
-            and ex_sig["sqft"] is not None
-            and inc_sig["sqft"] is not None
-            and ex_sig["sqft"] == inc_sig["sqft"]  # H2 strict
-        )
-    if rank == "R1c":
-        return (
-            ex_sig["beds"] is not None
-            and inc_sig["beds"] is not None
-            and ex_sig["beds"] == inc_sig["beds"]
-            and ex_sig["baths"] is not None
-            and inc_sig["baths"] is not None
-            and ex_sig["baths"] == inc_sig["baths"]
-            and bool(ex_sig["fp_name"])
-            and bool(inc_sig["fp_name"])
-            and ex_sig["fp_name"] == inc_sig["fp_name"]
-        )
-    if rank == "R1d":
-        return (
-            ex_sig["beds"] is not None
-            and inc_sig["beds"] is not None
-            and ex_sig["beds"] == inc_sig["beds"]
-            and ex_sig["baths"] is not None
-            and inc_sig["baths"] is not None
-            and ex_sig["baths"] == inc_sig["baths"]
-            and ex_sig["sqft"] is None
-            and inc_sig["sqft"] is None
-            and not (ex_sig["fp_name"] and inc_sig["fp_name"])
-        )
-    if rank == "R1e":
-        return (
-            ex_sig["beds"] is not None
-            and inc_sig["beds"] is not None
-            and ex_sig["beds"] == inc_sig["beds"]
-            and (ex_sig["baths"] is None or inc_sig["baths"] is None)
-            and (ex_sig["sqft"] is None or inc_sig["sqft"] is None)
-            and not (ex_sig["fp_name"] and inc_sig["fp_name"])
-        )
-    if rank == "R1f":
-        return (
-            ex_sig["beds"] is not None
-            and inc_sig["beds"] is not None
-            and ex_sig["beds"] == inc_sig["beds"]
-            and bool(ex_sig["fp_name"])
-            and bool(inc_sig["fp_name"])
-            and ex_sig["fp_name"] == inc_sig["fp_name"]
-            and (ex_sig["baths"] is None or inc_sig["baths"] is None)
-            and (ex_sig["sqft"] is None or inc_sig["sqft"] is None)
-        )
-    return False
-
-
-_RANK_LADDER: tuple[str, ...] = ("R0", "R0a", "R1a", "R1b", "R1c", "R1d", "R1e", "R1f")
-# Ranks that allow the H8 fail-closed treatment for ambiguous matches (every
-# rank below R0 / R0a — the strong-identity rungs cannot be ambiguous given
-# fp_id and unit_id are unique).
-_AMBIGUITY_RANKS: frozenset[str] = frozenset({"R1a", "R1b", "R1c", "R1d", "R1e", "R1f"})
-
-
-def _emit_physical_conflicts(
-    property_id: str,
-    unit_index: int,
-    rank: str,
-    conflicts: list[dict[str, Any]],
-) -> None:
-    if not conflicts:
-        return
-    try:
-        from ma_poc.observability.events import EventKind, emit
-
-        for c in conflicts:
-            emit(
-                EventKind.EXTRACT_PHYSICAL_ATTRIBUTE_CONFLICT,
-                property_id,
-                unit_index=unit_index,
-                field=c["field"],
-                existing=c["existing"],
-                new=c["new"],
-                rank_used=rank,
-            )
-    except Exception:
-        pass  # observability is best-effort
-
-
-def _emit_ambiguous_fail_closed(property_id: str, rank: str, candidate_count: int) -> None:
-    try:
-        from ma_poc.observability.events import EventKind, emit
-
-        emit(
-            EventKind.EXTRACT_AMBIGUOUS_MERGE_FAIL_CLOSED,
-            property_id,
-            rank=rank,
-            candidate_count=candidate_count,
-        )
-    except Exception:
-        pass
-
-
-def _availability_count_aware_merge(
-    target: dict[str, Any],
-    source: dict[str, Any],
-    rank: str,
-) -> None:
-    """Sum availability_count when merging at R0 or R1a; latest-wins below."""
-    inc_count = source.get("availability_count")
-    if inc_count is None:
-        return
-    if rank in ("R0", "R0a", "R1a"):
-        ex_count = target.get("availability_count")
-        try:
-            ex_int = int(ex_count) if ex_count is not None else 0
-            inc_int = int(inc_count)
-        except (TypeError, ValueError):
-            target["availability_count"] = inc_count
-            return
-        target["availability_count"] = ex_int + inc_int
-    else:
-        target["availability_count"] = inc_count
-
-
-def _merge_into_result_units(
-    existing: list[dict[str, Any]],
-    incoming: list[dict[str, Any]],
-    *,
-    property_id: str = "unknown",
-) -> list[dict[str, Any]]:
-    """Anchor-first merge cascade (Phase 4 of CLAUDE_PROMPTS_MERGE_RESILIENCE).
-
-    Walks the rank ladder R0 → R1f for each incoming record. The first rank
-    with a unique winner among the existing list takes the merge. Multiple
-    candidates at the same rank below R0/R0a fail closed (H8): the new
-    record is appended rather than silently merged.
-
-    Field-level merge follows H9 — mutable fields take latest, physical
-    fields keep existing and emit a conflict event.
-
-    H10: this function never merges across properties; callers are
-    responsible for grouping by property_id, and the property_id is
-    forwarded only for telemetry.
-    """
-    if not existing:
-        return list(incoming)
-    if not incoming:
-        return list(existing)
-
-    # Pre-compute signatures for the existing list so we don't recompute
-    # them on every incoming row.
-    ex_sigs: list[dict[str, Any]] = [_merge_rank_signature(u) for u in existing]
-    result: list[dict[str, Any]] = list(existing)
-
-    for inc_idx, inc in enumerate(incoming):
-        inc_sig = _merge_rank_signature(inc)
-        match_idx: int | None = None
-        match_rank: str | None = None
-        ambiguous = False
-        ambiguous_rank: str | None = None
-        ambiguous_count = 0
-
-        for rank in _RANK_LADDER:
-            candidates: list[int] = []
-            for i, ex_sig in enumerate(ex_sigs):
-                if _rank_matches(rank, ex_sig, inc_sig):
-                    candidates.append(i)
-            if len(candidates) == 1:
-                match_idx = candidates[0]
-                match_rank = rank
-                break
-            if len(candidates) > 1:
-                # H8: ambiguous below the strong-identity rungs → fail closed.
-                if rank in _AMBIGUITY_RANKS:
-                    ambiguous = True
-                    ambiguous_rank = rank
-                    ambiguous_count = len(candidates)
-                    break
-                # R0/R0a should never be ambiguous (fp_id and unit_id unique
-                # within a property). If they are, prefer the first hit.
-                match_idx = candidates[0]
-                match_rank = rank
-                break
-
-        if match_idx is not None and match_rank is not None and not ambiguous:
-            target = result[match_idx]
-            conflict_log: list[dict[str, Any]] = []
-            _availability_count_aware_merge(target, inc, match_rank)
-            _merge_field_values(target, inc, rank=match_rank, conflict_log=conflict_log)
-            _emit_physical_conflicts(property_id, match_idx, match_rank, conflict_log)
-            # Refresh signature in case the merge added identity fields.
-            ex_sigs[match_idx] = _merge_rank_signature(target)
-        else:
-            if ambiguous and ambiguous_rank is not None:
-                _emit_ambiguous_fail_closed(
-                    property_id, ambiguous_rank, candidate_count=ambiguous_count
-                )
-            # Append as a fresh record — the original (existing) and the
-            # new record both stand on their own (H8).
-            result.append(dict(inc))
-            ex_sigs.append(_merge_rank_signature(inc))
-
-    return result
-
-
-def _aggregate_quality(mappings: list[Any]) -> float:
-    """Min quality_score across contributing mappings; defaults to 1.0."""
-    if not mappings:
-        return 1.0
-    qs = [float(getattr(m, "quality_score", 1.0) or 1.0) for m in mappings]
-    return min(qs) if qs else 1.0
 
 
 def _apply_field_patches(
@@ -691,48 +295,6 @@ def _mark_patch_miss(patch: Any, reason: str) -> None:
             pass
     except Exception:
         pass
-
-
-def _find_unit_list(body: Any) -> list[dict[str, Any]]:
-    """Attempt to find a list of unit/floorplan dicts in an API response body.
-
-    Searches multiple envelope shapes: direct list, dict with known keys,
-    one level of nesting (data.units, response.floorplans, etc.).
-    """
-    _LIST_KEYS = (
-        "floorPlans",
-        "floor_plans",
-        "FloorPlans",
-        "floorplans",
-        "units",
-        "apartments",
-        "availabilities",
-        "results",
-        "items",
-        "listings",
-    )
-
-    if isinstance(body, list) and body and isinstance(body[0], dict):
-        return body
-
-    if isinstance(body, dict):
-        for k in _LIST_KEYS:
-            v = body.get(k)
-            if isinstance(v, list) and v and isinstance(v[0], dict):
-                return v
-        # One level deeper
-        for outer in ("data", "response", "result", "body"):
-            nested = body.get(outer)
-            if isinstance(nested, dict):
-                for k in _LIST_KEYS:
-                    v = nested.get(k)
-                    if isinstance(v, list) and v and isinstance(v[0], dict):
-                        return v
-            # response might be a list directly
-            if isinstance(nested, list) and nested and isinstance(nested[0], dict):
-                return nested
-
-    return []
 
 
 def _extract_rent_dom_section(html: str, max_bytes: int = 20_000) -> str | None:
@@ -852,51 +414,6 @@ async def _get_page_html(page: Any, ctx: AdapterContext) -> str | None:
     return None
 
 
-def _has_unit_signals(items: list[dict[str, Any]]) -> bool:
-    """Check if a list of dicts has enough unit/floorplan signals to be worth parsing."""
-    if not items:
-        return False
-    _SIGNAL_KEYS = {
-        "rent",
-        "minRent",
-        "maxRent",
-        "min_rent",
-        "max_rent",
-        "price",
-        "askingRent",
-        "monthlyRent",
-        "baseRent",
-        "bedrooms",
-        "beds",
-        "bedRooms",
-        "bed",
-        "sqft",
-        "squareFeet",
-        "square_footage",
-        "sq_ft",
-        "minimumSquareFeet",
-        "no_of_bedroom",
-        "unitNumber",
-        "unit_number",
-        "unitId",
-        "unit_id",
-        "floorPlanName",
-        "floor_plan_name",
-        "floorplan_name",
-        "floorplan-name",
-        "availableDate",
-        "available_date",
-        "availableCount",
-        "minimumRent",
-        "maximumRent",
-        "minimumMarketRent",
-        "maximumMarketRent",
-        "rentRange",
-        "depositAmount",
-        "numberOfUnitsDisplay",
-    }
-    sample_keys = set(items[0].keys())
-    return len(sample_keys & _SIGNAL_KEYS) >= 2
 
 
 def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
@@ -1205,8 +722,7 @@ class GenericAdapter:
         # Phase I: emit IDENTITY_FUZZY_LINK events via callback; merger stays pure
         def _emit_fuzzy(unit: Any, key: Any, conf: float) -> None:
             try:
-                from ma_poc.observability.events import EventKind as _EK
-                from ma_poc.observability.events import emit as _ev
+                from ma_poc.observability.events import EventKind as _EK, emit as _ev
                 _ev(_EK.IDENTITY_FUZZY_LINK, ctx.property_id, bucket_key=str(key)[:80], confidence=conf)
             except Exception:
                 pass
@@ -1225,8 +741,7 @@ class GenericAdapter:
         result._merged_units = list(merged)  # type: ignore[attr-defined]
         # Phase I: emit SOURCES_MERGED telemetry
         try:
-            from ma_poc.observability.events import EventKind as _EK2
-            from ma_poc.observability.events import emit as _ev2
+            from ma_poc.observability.events import EventKind as _EK2, emit as _ev2
             _ev2(
                 _EK2.SOURCES_MERGED,
                 ctx.property_id,
@@ -1466,6 +981,24 @@ class GenericAdapter:
                         reason="replayed saved LlmFieldMapping (quality ok)",
                         duration_ms=int((_time.monotonic() - t0) * 1000),
                     )
+                    # PROFILE_REPLAY_HIT — the self-learning loop produced
+                    # a unit set without paying any LLM cost. This is THE
+                    # avoidance signal we monitor: aggregating these per
+                    # run divided by total successful properties is the
+                    # "LLM tax avoidance rate". A drop in this rate means
+                    # the loop has regressed (mappings stopped persisting,
+                    # the data layer wiped them, etc.).
+                    try:
+                        from ma_poc.observability.events import EventKind, emit
+                        emit(
+                            EventKind.PROFILE_REPLAY_HIT,
+                            ctx.property_id or "unknown",
+                            units=len(replayed_units),
+                            quality=round(float(agg_q), 3),
+                            mappings_used=len(replayed_mappings),
+                        )
+                    except Exception:
+                        pass
                     result.units = replayed_units
                     result.tier_used = "TIER_1_PROFILE_MAPPING"
                     result.winning_url = (
@@ -1491,6 +1024,24 @@ class GenericAdapter:
                 reason=("no saved mappings" if not saved else "saved mappings didn't match any captured API"),
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
+            # PROFILE_REPLAY_MISS_WITH_SAVED — the property had saved
+            # mappings but none of them matched a captured API on this
+            # run. Distinct from "skipped" (no saved at all): a miss
+            # despite having saved mappings is the early-warning sign
+            # for environment/URL drift between runs. If this fires for
+            # the same property 3+ days running, the eviction path will
+            # clear the entry, but until then the property pays LLM tax.
+            if saved and not replayed_units:
+                try:
+                    from ma_poc.observability.events import EventKind, emit
+                    emit(
+                        EventKind.PROFILE_REPLAY_MISS_WITH_SAVED,
+                        ctx.property_id or "unknown",
+                        saved_count=len(saved),
+                        captured_apis=len(api_responses),
+                    )
+                except Exception:
+                    pass
 
         # Sub-tier 1: narrow generic API parser -----------------------------
         t0 = _time.monotonic()
@@ -1687,7 +1238,18 @@ class GenericAdapter:
             if ctx.profile is not None:
                 fs = ctx.profile.dom_hints.field_selectors
                 if fs and getattr(fs, "container", None):
-                    dom_hints = fs
+                    # Skip replay when the saved selectors were flagged at
+                    # save time as low-quality (LLM produced selectors that
+                    # didn't reproduce their own units). Letting them try
+                    # anyway would produce ``consecutive_misses`` events
+                    # that gradually evict the entry — but at the cost of
+                    # one wasted DOM cascade per run. Faster to bypass them
+                    # and let the LLM-DOM tier produce fresh selectors.
+                    fs_quality = float(
+                        getattr(ctx.profile.dom_hints, "field_selectors_quality", 1.0) or 1.0
+                    )
+                    if fs_quality >= 0.4:
+                        dom_hints = fs
             hints_attempted = dom_hints is not None
             try:
                 dom_units, _dom_hit_mode = extract_units_from_dom(html, ctx.base_url, hints=dom_hints)
@@ -1719,108 +1281,10 @@ class GenericAdapter:
                     result._decision_log = decision_log  # type: ignore[attr-defined]
                     return result
                 skip_llm = False  # planner escalated — allow LLM
-
-            # 2026-05-06 — SightMap direct-fetch sub-tier. ~11% of failing
-            # properties (vinity-site → /floor-plans/ → SightMap iframe) have
-            # an embed URL in the page HTML, but the iframe-load timing race
-            # means no SightMap XHR was captured. Detector demoted them to
-            # "unknown" so SightMapAdapter never ran. Deterministic side-
-            # channel: fetch the embed → parse __APP_CONFIG__ → fetch JSON
-            # API → parse units. Gated on `not result.units` so it doesn't
-            # fire for properties where DOM/JSON-LD already extracted units.
-            if not result.units:
-                from ma_poc.pms.adapters.sightmap import (
-                    _TIER_DIRECT_FETCH as _SM_TIER_DIRECT,
-                )
-                from ma_poc.pms.adapters.sightmap import (
-                    _find_embed_hashid,
-                    fetch_sightmap_units_direct,
-                )
-
-                _embed_id = _find_embed_hashid(html)
-                if _embed_id:
-                    t_sm = _time.monotonic()
-                    sm_units, sm_url, sm_errors = await fetch_sightmap_units_direct(
-                        _embed_id
-                    )
-                    _log_attempt(
-                        "generic:sightmap_direct_fetch",
-                        "ran_units" if sm_units else "ran_empty",
-                        units=len(sm_units),
-                        reason=("; ".join(sm_errors)[:200]) if not sm_units else "",
-                        duration_ms=int((_time.monotonic() - t_sm) * 1000),
-                    )
-                    if sm_errors:
-                        result.errors.extend(sm_errors)
-                    if sm_units:
-                        result.units = _merge_into_result_units(
-                            result.units, sm_units, property_id=ctx.property_id
-                        )
-                        result.tier_used = _SM_TIER_DIRECT
-                        result.winning_url = sm_url
-                        result.confidence = min(0.85, 0.6 + 0.05 * len(result.units))
-                        from ma_poc.models.source import SourceId as _SI_SM
-
-                        sources_already_run.add(_SI_SM.API_GENERIC_NARROW)
-                        _dd_sm = _assess_and_decide(
-                            result.units, sources_already_run, ctx, decision_log
-                        )
-                        if _dd_sm is None or _dd_sm.action == "STOP":
-                            result._decision_log = decision_log  # type: ignore[attr-defined]
-                            return result
-                        skip_llm = False
-
-            # 2026-05-06 — Plain-text regex extractor as a deterministic
-            # fallback BEFORE LLM tiers. Targets the LLM_COULD_NOT_EXTRACT
-            # cohort: marketing-CMS sites where rent lives in flowing copy
-            # (e.g. "Starting at $1,095 — 1 Bed 1 Bath, 650 sqft") that
-            # neither DOM container scan nor JSON-LD can pick up. Quality
-            # gates inside the function require >= 2 distinct rent
-            # clusters with bed/bath OR sqft proximity, so phone numbers
-            # and isolated deposit fees don't slip through.
-            if not result.units:
-                t_tr = _time.monotonic()
-                try:
-                    text_units = extract_units_from_text(html, ctx.base_url)
-                except Exception as exc:
-                    text_units = []
-                    _log_attempt(
-                        "generic:text_regex",
-                        "errored",
-                        reason=str(exc)[:120],
-                        duration_ms=int((_time.monotonic() - t_tr) * 1000),
-                    )
-                else:
-                    _log_attempt(
-                        "generic:text_regex",
-                        "ran_units" if text_units else "ran_empty",
-                        units=len(text_units),
-                        reason=""
-                        if text_units
-                        else "no rent clusters with bed/bath or sqft proximity",
-                        duration_ms=int((_time.monotonic() - t_tr) * 1000),
-                    )
-                if text_units:
-                    result.units = _merge_into_result_units(
-                        result.units, text_units, property_id=ctx.property_id
-                    )
-                    result.tier_used = "TIER_3_TEXT_REGEX"
-                    result.winning_url = ctx.base_url
-                    result.confidence = min(0.65, 0.45 + 0.03 * len(result.units))
-                    from ma_poc.models.source import SourceId as _SI_TR
-                    sources_already_run.add(_SI_TR.DOM_CASCADE)
-                    _dd_tr = _assess_and_decide(
-                        result.units, sources_already_run, ctx, decision_log
-                    )
-                    if _dd_tr is None or _dd_tr.action == "STOP":
-                        result._decision_log = decision_log  # type: ignore[attr-defined]
-                        return result
-                    skip_llm = False
         else:
             _log_attempt("generic:jsonld", "skipped", reason="no HTML body available")
             _log_attempt("generic:embedded_json", "skipped", reason="no HTML body available")
             _log_attempt("generic:dom_scan", "skipped", reason="no HTML body available")
-            _log_attempt("generic:text_regex", "skipped", reason="no HTML body available")
 
         # Sub-tier 6: LLM extraction --------------------------------------
         # Originally gated ON only for ``pms=unknown``. Option C relaxes
@@ -1955,9 +1419,14 @@ class GenericAdapter:
             )
             if not decision.escalate:
                 _log_attempt("generic:llm", "skipped", reason=decision.reason)
-                result.tier_used = decision.reason.split(":")[0]
+                # Only overwrite tier_used if no prior tier already set it —
+                # JSON-LD / embedded tiers may have succeeded and their tier
+                # label must be preserved even when the LLM gate fires.
+                if result.tier_used in ("TIER_1_API", "", None):
+                    result.tier_used = decision.reason.split(":")[0]
                 result.errors.append(decision.reason)
-                result.confidence = 0.0
+                if not result.units:
+                    result.confidence = 0.0
                 return result
         except Exception as exc:
             _log_attempt("generic:llm_gate", "errored", reason=str(exc)[:200])
@@ -1992,16 +1461,51 @@ class GenericAdapter:
 
         # Phase H: use budget from ctx (computed per-property in scraper.py).
         # Falls back to safe defaults when ctx.budget is absent (e.g. old callers).
+        # NOTE: this dict is the SAME reference held by scraper.py's
+        # _jugnu_budget — link-hop reuses it across the entry page and each
+        # sub-page so decrements compose. See scraper.py shared_budget
+        # comment for the wedge bug this prevents.
         _budget = getattr(ctx, "budget", None) or {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
-        api_llm_budget = int(_budget.get("llm_api_calls", 3))
-        dom_llm_budget = int(_budget.get("llm_dom_calls", 1))
+        # Per-property cumulative cost gate (Fix #3). Default $1.00/property —
+        # past this, no further LLM calls fire even if call-count budget
+        # still allows them. Override via the budget dict's _cost_cap_usd
+        # key (compute_budget can dial it per profile maturity later).
+        #
+        # SOFT CAP: the gate checks _cost_usd_spent BEFORE each call, but
+        # the in-flight call's cost is only recorded when it returns. So
+        # actual spend can overshoot the cap by up to one call's worth
+        # (~$0.05 for monolithic, ~$0.01 for targeted). This is intentional
+        # — making it hard would require mid-call cancellation, which the
+        # provider SDKs don't expose cleanly. Treat _cost_cap_usd as a
+        # ceiling-plus-epsilon, not a hard quota.
+        _cost_cap_usd = float(_budget.get("_cost_cap_usd", 1.00) or 1.00)
 
-        # 2026-05-07 — Source-grounded validator. The text below is the
-        # union of (page HTML) + (captured API response bodies). Every unit
-        # emitted by an LLM tier (6a/6b/6c) is validated against this text
-        # via filter_llm_units_grounded — units whose rent doesn't appear
-        # verbatim in the source get dropped as suspected hallucinations.
-        # Built once here so repeated tier checks don't re-stringify.
+        def _llm_cost_exceeded() -> bool:
+            spent = float(_budget.get("_cost_usd_spent", 0.0) or 0.0)
+            if spent >= _cost_cap_usd:
+                log.warning(
+                    "Property %s LLM cost cap reached: $%.4f >= $%.2f — skipping further LLM calls",
+                    ctx.property_id, spent, _cost_cap_usd,
+                )
+                return True
+            return False
+
+        def _record_interaction_cost(interaction: dict[str, Any] | None) -> None:
+            if not interaction:
+                return
+            try:
+                cost = float(interaction.get("cost_usd", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                return
+            if cost > 0:
+                _budget["_cost_usd_spent"] = float(_budget.get("_cost_usd_spent", 0.0) or 0.0) + cost
+
+        # 2026-05-07 — Source-grounded validator. The text below is the union
+        # of (page HTML) + (captured API response bodies). Every unit emitted
+        # by an LLM tier (6a/6b/6c) is validated against this text via
+        # filter_llm_units_grounded — units whose rent doesn't appear verbatim
+        # in the source get dropped as suspected hallucinations. Built once
+        # here so repeated tier checks don't re-stringify.
         try:
             _api_source = "\n".join(
                 str(r.get("body", ""))[:200_000] for r in api_responses if r is not None
@@ -2009,6 +1513,7 @@ class GenericAdapter:
         except Exception:
             _api_source = ""
         _grounded_source = (html or "") + "\n" + _api_source
+
         llm_interactions: list[dict[str, Any]] = getattr(result, "_llm_interactions", []) or []
         # Self-learning payload surfaced to scraper.py. Shape matches what
         # services.profile_updater.update_profile_after_extraction expects:
@@ -2024,12 +1529,17 @@ class GenericAdapter:
         # deterministic parsers couldn't unwrap, ask the LLM to both
         # extract units AND return json_paths + response_envelope that we
         # can replay deterministically on the next run (zero LLM cost).
+        #
+        # Budget is consumed against the shared dict, NOT a local counter,
+        # so link-hop sub-pages see decrements made by the entry page.
         targeted_units: list[dict[str, Any]] = []
-        if api_responses and api_llm_budget > 0:
+        if api_responses and int(_budget.get("llm_api_calls", 0)) > 0 and not _llm_cost_exceeded():
             t0 = _time.monotonic()
             api_calls_made = 0
             for resp in api_responses:
-                if api_calls_made >= api_llm_budget:
+                if int(_budget.get("llm_api_calls", 0)) <= 0:
+                    break
+                if _llm_cost_exceeded():
                     break
                 body = resp.get("body")
                 items = _find_unit_list(body)
@@ -2038,6 +1548,10 @@ class GenericAdapter:
                 if not items or not _has_unit_signals(items):
                     continue
                 url = resp.get("url", "")
+                # Atomic consume — decrement BEFORE the awaited call so a
+                # concurrent recursive scrape() (link-hop) sees the lower
+                # remaining budget.
+                _budget["llm_api_calls"] = int(_budget.get("llm_api_calls", 0)) - 1
                 try:
                     units, mapping, is_noise, interaction = await analyze_api_with_llm(
                         resp,
@@ -2050,6 +1564,7 @@ class GenericAdapter:
                 api_calls_made += 1
                 if interaction:
                     llm_interactions.append(interaction)
+                    _record_interaction_cost(interaction)
                 if is_noise:
                     # Feed profile_updater the colon-prefixed format it
                     # already recognises so this URL ends up in
@@ -2082,7 +1597,7 @@ class GenericAdapter:
             )
 
         if targeted_units:
-            # Source-grounded validation (2026-05-07).
+            # 2026-05-07 — Source-grounded validation.
             targeted_units, _dropped_grounded = filter_llm_units_grounded(
                 targeted_units, _grounded_source
             )
@@ -2106,8 +1621,9 @@ class GenericAdapter:
         # the LLM to return units AND CSS selectors we can replay next run.
         dom_units = []
         dom_section_html = _extract_rent_dom_section(html) if html else None
-        if dom_section_html and dom_llm_budget > 0:
+        if dom_section_html and int(_budget.get("llm_dom_calls", 0)) > 0 and not _llm_cost_exceeded():
             t0 = _time.monotonic()
+            _budget["llm_dom_calls"] = int(_budget.get("llm_dom_calls", 0)) - 1
             try:
                 dom_units, selectors, interaction = await analyze_dom_with_llm(
                     dom_section_html,
@@ -2120,6 +1636,7 @@ class GenericAdapter:
                 dom_units, selectors, interaction = [], None, None
             if interaction:
                 llm_interactions.append(interaction)
+                _record_interaction_cost(interaction)
             if selectors:
                 llm_css_selectors = selectors
             _log_attempt(
@@ -2131,7 +1648,7 @@ class GenericAdapter:
             )
 
         if dom_units:
-            # Source-grounded validation (2026-05-07).
+            # 2026-05-07 — Source-grounded validation.
             dom_units, _dropped_grounded = filter_llm_units_grounded(
                 dom_units, _grounded_source
             )
@@ -2149,64 +1666,136 @@ class GenericAdapter:
             result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
             result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
             if llm_css_selectors:
-                result._llm_hints = {"css_selectors": llm_css_selectors}  # type: ignore[attr-defined]
+                # Self-validate the LLM's selectors before persisting them.
+                # The LLM has just produced N units AND a CSS-selector dict
+                # claimed to extract them deterministically. Replay the
+                # selectors against the same dom_section_html and compare
+                # the unit count to gate persistence:
+                #
+                #   ratio >= 0.8  → high quality, persist as-is.
+                #   0.4 ≤ ratio < 0.8 → flaky, persist with a quality_score
+                #                       so replay-side gating can soft-fail.
+                #   ratio < 0.4   → broken, drop the selectors entirely so
+                #                   tomorrow's run won't burn time on a
+                #                   guaranteed miss before falling through
+                #                   to LLM. Cheaper to re-LLM than to chase
+                #                   a known-bad hint cycle.
+                #
+                # Why inline at extract-time and not in profile_updater:
+                # the dom_section_html lives only here. Plumbing it through
+                # to the updater would bloat the result dict and cost ledger
+                # for every property; the validation needs ~1ms locally so
+                # there's no reason to defer it.
+                quality_score = 1.0
+                try:
+                    _hints_obj = _FieldSelectorMap(**llm_css_selectors) if isinstance(
+                        llm_css_selectors, dict
+                    ) else llm_css_selectors
+                    _replayed = extract_with_hints(
+                        dom_section_html or "", ctx.base_url, _hints_obj
+                    )
+                    expected = max(len(dom_units), 1)
+                    quality_score = min(1.0, len(_replayed) / expected)
+                except Exception:
+                    # Replay raised — treat selectors as unverified rather
+                    # than blocking the win. Quality 0.5 lets the cascade
+                    # use them tomorrow but the replay path won't trust
+                    # them for short-circuit.
+                    quality_score = 0.5
+
+                if quality_score < 0.4:
+                    # Selectors don't reproduce against their own source
+                    # HTML — they will almost certainly miss tomorrow.
+                    # Skip persistence and emit telemetry so the saver
+                    # regression doesn't reappear silently.
+                    try:
+                        from ma_poc.observability.events import EventKind, emit
+                        emit(
+                            EventKind.DOM_HINTS_MISS,
+                            ctx.property_id or "unknown",
+                            count=0,
+                            reason=f"selectors_self_validation_failed:{quality_score:.2f}",
+                        )
+                    except Exception:
+                        pass
+                else:
+                    result._llm_hints = {  # type: ignore[attr-defined]
+                        "css_selectors": llm_css_selectors,
+                        "css_selectors_quality": quality_score,
+                    }
             return result
 
         # Sub-tier 6c: monolithic fallback --------------------------------
         # Only fires when 6a + 6b both returned empty. This is the legacy
         # "send full HTML + top-3 APIs" prompt — broadest coverage, highest
         # token cost, so it runs last.
-        t0 = _time.monotonic()
-        try:
-            llm_input = prepare_llm_input(html, api_responses, property_context)
-            llm_units, hints, _raw, interaction = await extract_with_llm(
-                llm_input,
-                property_id=ctx.property_id or "unknown",
-            )
-            if interaction:
-                llm_interactions.append(interaction)
-            # Capture navigation_hint (Phase 3 + Phase 5) so scrape_jugnu's
-            # link-hop can prioritise the URL the LLM just told us about.
-            if isinstance(hints, dict):
-                nav = hints.get("navigation_hint") or ""
-                if nav:
-                    llm_navigation_hints.append(str(nav))
-            _log_attempt(
-                "generic:llm",
-                "ran_units" if llm_units else "ran_empty",
-                units=len(llm_units or []),
-                reason="" if llm_units else "LLM returned no structured units",
-                duration_ms=int((_time.monotonic() - t0) * 1000),
-            )
-            if llm_units:
-                # Source-grounded validation (2026-05-07).
-                llm_units, _dropped_grounded = filter_llm_units_grounded(
-                    llm_units, _grounded_source
+        #
+        # Previously this tier was unguarded: budget["llm_monolithic"] was
+        # in the dict but never checked, so every link-hop sub-page that
+        # reached it fired another monolithic call. Now consumes the
+        # shared budget like 6a/6b. When the budget is exhausted (or the
+        # cost cap is hit) we skip the call but DO NOT short-circuit the
+        # Vision Tier 5 fallback below — the cost cap fires there too.
+        if int(_budget.get("llm_monolithic", 0)) > 0 and not _llm_cost_exceeded():
+            _budget["llm_monolithic"] = int(_budget.get("llm_monolithic", 0)) - 1
+            t0 = _time.monotonic()
+            try:
+                llm_input = prepare_llm_input(html, api_responses, property_context)
+                llm_units, hints, _raw, interaction = await extract_with_llm(
+                    llm_input,
+                    property_id=ctx.property_id or "unknown",
                 )
-                if _dropped_grounded:
-                    result.errors.append(
-                        f"GROUNDED_FILTER_LLM_MONO: dropped {_dropped_grounded} unit(s) "
-                        "with rent not found in source HTML or captured API bodies"
+                if interaction:
+                    llm_interactions.append(interaction)
+                    _record_interaction_cost(interaction)
+                # Capture navigation_hint (Phase 3 + Phase 5) so scrape_jugnu's
+                # link-hop can prioritise the URL the LLM just told us about.
+                if isinstance(hints, dict):
+                    nav = hints.get("navigation_hint") or ""
+                    if nav:
+                        llm_navigation_hints.append(str(nav))
+                _log_attempt(
+                    "generic:llm",
+                    "ran_units" if llm_units else "ran_empty",
+                    units=len(llm_units or []),
+                    reason="" if llm_units else "LLM returned no structured units",
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if llm_units:
+                    # 2026-05-07 — Source-grounded validation.
+                    llm_units, _dropped_grounded = filter_llm_units_grounded(
+                        llm_units, _grounded_source
                     )
-            if llm_units:
-                result.units = llm_units
-                result.tier_used = "TIER_4_LLM"
-                result.winning_url = ctx.base_url
-                result.confidence = min(0.75, 0.5 + 0.04 * len(llm_units))
-                result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
-                result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
-                result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
-                if hints:
-                    result._llm_hints = hints  # type: ignore[attr-defined]
-                return result
-        except Exception as exc:
+                    if _dropped_grounded:
+                        result.errors.append(
+                            f"GROUNDED_FILTER_LLM_MONO: dropped {_dropped_grounded} unit(s) "
+                            "with rent not found in source HTML or captured API bodies"
+                        )
+                if llm_units:
+                    result.units = llm_units
+                    result.tier_used = "TIER_4_LLM"
+                    result.winning_url = ctx.base_url
+                    result.confidence = min(0.75, 0.5 + 0.04 * len(llm_units))
+                    result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
+                    result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
+                    result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
+                    if hints:
+                        result._llm_hints = hints  # type: ignore[attr-defined]
+                    return result
+            except Exception as exc:
+                _log_attempt(
+                    "generic:llm",
+                    "errored",
+                    reason=str(exc)[:200],
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                result.errors.append(f"llm-tier-error: {exc}")
+        else:
             _log_attempt(
                 "generic:llm",
-                "errored",
-                reason=str(exc)[:200],
-                duration_ms=int((_time.monotonic() - t0) * 1000),
+                "skipped",
+                reason="llm_monolithic budget exhausted or cost cap reached",
             )
-            result.errors.append(f"llm-tier-error: {exc}")
 
         # Fix 6 — Vision LLM as Tier 5 last-resort fallback.
         # When all text-based LLM tiers (api_targeted, dom_targeted, monolithic)
@@ -2230,7 +1819,7 @@ class GenericAdapter:
             if html:
                 _hl = html.lower()
                 has_rent_kw = any(kw in _hl for kw in ("rent", "bedroom", "studio", "sqft", "floor plan", "$"))
-            if vision_enabled and page_obj is not None and has_rent_kw and hasattr(page_obj, "screenshot"):
+            if vision_enabled and page_obj is not None and has_rent_kw and hasattr(page_obj, "screenshot") and not _llm_cost_exceeded():
                 t_v = _time.monotonic()
                 try:
                     screenshot_bytes = await page_obj.screenshot(full_page=True, type="png", timeout=10000)
@@ -2259,6 +1848,7 @@ class GenericAdapter:
                         )
                         if vision_interaction:
                             llm_interactions.append(vision_interaction)
+                            _record_interaction_cost(vision_interaction)
                         if vision_units:
                             result.units = vision_units
                             result.tier_used = "TIER_5_VISION"

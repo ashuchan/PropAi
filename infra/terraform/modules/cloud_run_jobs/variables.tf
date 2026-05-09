@@ -83,7 +83,7 @@ variable "task_memory" {
 # Default parallelism for jugnu-retry. Setting this >1 enables sharded
 # retries: Cloud Run spawns N parallel tasks, each picks a disjoint slice
 # of the failure list (CLOUD_RUN_TASK_INDEX/COUNT round-robin) and writes
-# to its own shard file. The merge job (jugnu_retry_merge.py) consolidates
+# to its own shard file. The merge job (runners/jugnu_retry_merge.py) consolidates
 # afterwards. 1 = legacy single-task behaviour.
 # Override at execution time without re-applying via:
 #   gcloud run jobs execute jugnu-retry-{env} --tasks=N --parallelism=N

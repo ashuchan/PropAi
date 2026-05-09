@@ -13,12 +13,12 @@ from pathlib import Path
 
 import pytest
 
-from ma_poc.scripts import validate_deployment as vd
+from ma_poc.scripts.checks import deployment as vd
 
 
 def _seed_csv_pair(dst: Path, *, rows: int = 1500, chosen: str | None = "apartmentid") -> None:
     """Drop a synthetic CSV/mapping pair under ``dst`` so the catalog loads."""
-    fp = dst / "Floorplan- comparisons.csv"
+    fp = dst / "Floorplan-comparisons.csv"
     fp.write_text(
         "apartmentid,floorplannumber,description,bed,bath,area\n"
         + "\n".join(f"{i},1,Plan{i},1,1,{600 + i}" for i in range(rows)),
@@ -51,7 +51,7 @@ def patched_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
     from ma_poc.services import floorplan_catalog as fc
 
-    monkeypatch.setattr(fc, "_FLOORPLAN_CSV", config / "Floorplan- comparisons.csv")
+    monkeypatch.setattr(fc, "_FLOORPLAN_CSV", config / "Floorplan-comparisons.csv")
     monkeypatch.setattr(fc, "_MAPPING_PATH", config / "csv_floorplan_mapping.json")
     fc.reset_default_catalog()
     yield config

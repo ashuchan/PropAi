@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 if "httpx" not in sys.modules:
     sys.modules["httpx"] = MagicMock()
 
-from ma_poc.scripts.check_proxy import main  # noqa: E402
+from ma_poc.scripts.diagnostics.proxy import main  # noqa: E402
 
 _BD_URL = "http://brd-customer-hl_6785472d-zone-residential_proxy1:0owuh5392unq@brd.superproxy.io:33335"
 
@@ -39,7 +39,7 @@ def test_exits_2_when_httpx_raises() -> None:
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
         mock_client.get.side_effect = ConnectionError("proxy refused")
-        with patch("ma_poc.scripts.check_proxy.httpx.Client", return_value=mock_client):
+        with patch("ma_poc.scripts.diagnostics.proxy.httpx.Client", return_value=mock_client):
             assert main() == 2
 
 
@@ -62,14 +62,14 @@ def _mock_client_returning(body: dict) -> MagicMock:
 def test_exits_3_when_asn_is_google() -> None:
     body = {"ip": "35.186.1.1", "asn": {"asnum": 15169, "org_name": "Google LLC"}, "country": "US"}
     with patch.dict("os.environ", {"PROXY_POOL_URLS": _BD_URL}):
-        with patch("ma_poc.scripts.check_proxy.httpx.Client", return_value=_mock_client_returning(body)):
+        with patch("ma_poc.scripts.diagnostics.proxy.httpx.Client", return_value=_mock_client_returning(body)):
             assert main() == 3
 
 
 def test_exits_0_when_asn_is_not_google() -> None:
     body = {"ip": "72.14.204.99", "asn": {"asnum": 7922, "org_name": "Comcast"}, "country": "US"}
     with patch.dict("os.environ", {"PROXY_POOL_URLS": _BD_URL}):
-        with patch("ma_poc.scripts.check_proxy.httpx.Client", return_value=_mock_client_returning(body)):
+        with patch("ma_poc.scripts.diagnostics.proxy.httpx.Client", return_value=_mock_client_returning(body)):
             assert main() == 0
 
 
@@ -79,21 +79,21 @@ def test_exits_0_when_asn_is_not_google() -> None:
 def test_exits_4_when_ip_missing() -> None:
     body = {"asn": {"asnum": 7922}}
     with patch.dict("os.environ", {"PROXY_POOL_URLS": _BD_URL}):
-        with patch("ma_poc.scripts.check_proxy.httpx.Client", return_value=_mock_client_returning(body)):
+        with patch("ma_poc.scripts.diagnostics.proxy.httpx.Client", return_value=_mock_client_returning(body)):
             assert main() == 4
 
 
 def test_exits_4_when_asn_block_missing() -> None:
     body = {"ip": "72.14.204.99"}
     with patch.dict("os.environ", {"PROXY_POOL_URLS": _BD_URL}):
-        with patch("ma_poc.scripts.check_proxy.httpx.Client", return_value=_mock_client_returning(body)):
+        with patch("ma_poc.scripts.diagnostics.proxy.httpx.Client", return_value=_mock_client_returning(body)):
             assert main() == 4
 
 
 def test_exits_4_when_asnum_key_absent_inside_asn_block() -> None:
     body = {"ip": "72.14.204.99", "asn": {"org_name": "Comcast"}}  # no asnum key
     with patch.dict("os.environ", {"PROXY_POOL_URLS": _BD_URL}):
-        with patch("ma_poc.scripts.check_proxy.httpx.Client", return_value=_mock_client_returning(body)):
+        with patch("ma_poc.scripts.diagnostics.proxy.httpx.Client", return_value=_mock_client_returning(body)):
             assert main() == 4
 
 
@@ -111,7 +111,7 @@ def test_uses_first_url_from_comma_list() -> None:
         return _mock_client_returning(body)
 
     with patch.dict("os.environ", {"PROXY_POOL_URLS": two_urls}):
-        with patch("ma_poc.scripts.check_proxy.httpx.Client", side_effect=_capturing_client):
+        with patch("ma_poc.scripts.diagnostics.proxy.httpx.Client", side_effect=_capturing_client):
             result = main()
 
     assert result == 0

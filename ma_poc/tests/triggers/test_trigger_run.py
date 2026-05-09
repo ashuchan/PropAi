@@ -1,4 +1,4 @@
-"""Unit tests for trigger_run.py and _trigger_common.plan_tasks."""
+"""Unit tests for triggers/run.py and _common.trigger.plan_tasks."""
 
 from __future__ import annotations
 
@@ -16,10 +16,11 @@ for _p in (_app, _here):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from scripts._trigger_common import (  # noqa: E402
+from scripts._common.trigger import (  # noqa: E402
     ABSOLUTE_MAX_TASKS,
     MAX_TASKS_F1_MICRO,
     MAX_TASKS_G1_SMALL,
+    _GCLOUD,
     check_job_exists,
     emit_structured_result,
     plan_tasks,
@@ -113,7 +114,7 @@ class TestTriggerRunArgs:
                     "--dry-run",
                     "--yes",
                 ]
-                from scripts import trigger_run  # noqa: PLC0415
+                from scripts.triggers import run as trigger_run  # noqa: PLC0415
 
                 trigger_run.main()
             assert exc_info.value.code == 0
@@ -123,7 +124,7 @@ class TestTriggerRunArgs:
     def test_rejects_without_tasks_or_target_hours(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit) as exc_info:
             sys.argv = ["trigger_run.py", "--env", "staging"]
-            from scripts import trigger_run  # noqa: PLC0415
+            from scripts.triggers import run as trigger_run  # noqa: PLC0415
 
             trigger_run.main()
         assert exc_info.value.code == 2
@@ -138,7 +139,7 @@ class TestTriggerRunArgs:
                 "0.2",
                 "--yes",
             ]
-            from scripts import trigger_run  # noqa: PLC0415
+            from scripts.triggers import run as trigger_run  # noqa: PLC0415
 
             trigger_run.main()
         assert exc_info.value.code == 4
@@ -153,7 +154,7 @@ class TestTriggerRunArgs:
                 "9",
                 "--yes",
             ]
-            from scripts import trigger_run  # noqa: PLC0415
+            from scripts.triggers import run as trigger_run  # noqa: PLC0415
 
             trigger_run.main()
         assert exc_info.value.code == 4
@@ -170,7 +171,7 @@ class TestTriggerRunArgs:
                 "f1-micro",
                 "--yes",
             ]
-            from scripts import trigger_run  # noqa: PLC0415
+            from scripts.triggers import run as trigger_run  # noqa: PLC0415
 
             trigger_run.main()
         assert exc_info.value.code == 4
@@ -185,7 +186,7 @@ class TestTriggerRunArgs:
                 "41",
                 "--yes",
             ]
-            from scripts import trigger_run  # noqa: PLC0415
+            from scripts.triggers import run as trigger_run  # noqa: PLC0415
 
             trigger_run.main()
         assert exc_info.value.code == 4
@@ -286,8 +287,10 @@ class TestRunGcloud:
         mock_result = MagicMock(returncode=0, stdout="output\n")
         with patch("subprocess.run", return_value=mock_result) as mock_run:
             result = run_gcloud("gcloud", "config", "list")
+            # run_gcloud swaps the literal "gcloud" for the resolved
+            # absolute path (Windows needs gcloud.CMD without shell=True).
             mock_run.assert_called_once_with(
-                ["gcloud", "config", "list"],
+                [_GCLOUD, "config", "list"],
                 capture_output=True,
                 text=True,
                 check=False,

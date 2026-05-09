@@ -43,6 +43,11 @@ output "retry_job_name" {
   value       = module.cloud_run_jobs.retry_job_name
 }
 
+output "adhoc_job_name" {
+  description = "Cloud Run on-demand script-runner job name. Execute from the console with SCRIPT_NAME and SCRIPT_ARGS overrides."
+  value       = module.cloud_run_jobs.adhoc_job_name
+}
+
 output "scheduler_job_names" {
   description = "Cloud Scheduler job names"
   value       = module.scheduler.scheduler_job_names

@@ -316,13 +316,13 @@ jobs:
         env:
           GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID }}
           GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID }}
-        run: python ma_poc/scripts/migrate.py --env ${{ inputs.env }} up
+        run: python -m ma_poc.scripts.migrations.alembic --env ${{ inputs.env }} up
 
       - name: Confirm migration status
         env:
           GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID }}
           GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID }}
-        run: python ma_poc/scripts/migrate.py --env ${{ inputs.env }} status
+        run: python -m ma_poc.scripts.migrations.alembic --env ${{ inputs.env }} status
 
   # ── Step 7: CSV sync ───────────────────────────────────────────────────────────
   sync-csv:
@@ -356,7 +356,7 @@ jobs:
         # property list.
         run: |
           if [ -f properties.csv ]; then
-            python ma_poc/scripts/deploy_csv_sync.py --env ${{ inputs.env }} --path properties.csv
+            python -m ma_poc.scripts.sync.csv_to_gcs --env ${{ inputs.env }} --path properties.csv
           else
             echo "::error::properties.csv missing at repo root — deploy cannot seed the prod bucket."
             exit 1
@@ -397,12 +397,12 @@ jobs:
       - name: Run multi-shard smoke test
         # TEMPORARILY DISABLED (2026-04-24): operator is validating the
         # BrightData proxy wiring manually via
-        # ``ma_poc/scripts/trigger_proxy_smoke.py --env prod`` instead of
+        # ``python -m ma_poc.scripts.triggers.proxy_smoke --env prod`` instead of
         # running the full multi-shard → PG-sync smoke on every deploy.
         # Re-enable by removing ``if: false`` once proxy rollout stabilises
         # and we want end-to-end sync validation back in the gate.
         if: false
-        # What this validates (see ma_poc/scripts/trigger_smoke.py):
+        # What this validates (see ma_poc/scripts/triggers/smoke.py):
         #
         #   1. Uploads a 6-row smoke CSV (.invalid URLs — no DNS resolution,
         #      no LLM cost) to gs://{bucket}/smoke-test/{ts}/properties.csv.
@@ -436,7 +436,7 @@ jobs:
         env:
           GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID }}
           GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID }}
-        run: python ma_poc/scripts/trigger_smoke.py --env ${{ inputs.env }}
+        run: python -m ma_poc.scripts.triggers.smoke --env ${{ inputs.env }}
 
       - name: Tag image as known-good
         run: |

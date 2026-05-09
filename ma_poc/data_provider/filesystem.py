@@ -1,6 +1,6 @@
 """Filesystem implementation of the data-provider interfaces.
 
-Wraps the existing `scripts.state_store.StateStore` and
+Wraps the existing `core.state_store.StateStore` and
 `services.profile_store.ProfileStore` so the scraper pipeline keeps writing
 the exact same files on disk. The provider is a typed, swappable facade on
 top of that layout — not a replacement for it.
@@ -21,6 +21,7 @@ Layout (paths below are rooted at `base_dir` / `config_dir`):
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
 import os
@@ -34,16 +35,19 @@ from data_provider.contracts import (
     DataProvider,
     IExtractionResultStore,
     IProfileStore,
+    IPropertyCatalogSource,
     IPropertyStateStore,
     IRunStore,
     IScrapeEventStore,
     IUnitStateStore,
 )
 from data_provider.dtos import (
+    CatalogFilters,
     ExtractionResult,
     IssueEntry,
     LedgerEntry,
     PropertyIndexEntry,
+    PropertyToScrape,
     RunReport,
     ScrapeEvent,
     ScrapeProfile,
@@ -61,7 +65,7 @@ _MA_POC_ROOT = Path(__file__).resolve().parent.parent
 if str(_MA_POC_ROOT) not in sys.path:
     sys.path.insert(0, str(_MA_POC_ROOT))
 
-from scripts.state_store import StateStore as _StateStore  # noqa: E402
+from ma_poc.core.state_store import StateStore as _StateStore  # noqa: E402
 from services.profile_store import ProfileStore as _ProfileStore  # noqa: E402
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -408,6 +412,143 @@ class FsExtractionResultStore(IExtractionResultStore):
         return ExtractionResult.model_validate(data)
 
 
+# ── IPropertyCatalogSource (CSV) ─────────────────────────────────────────────
+
+
+class CsvPropertyCatalogSource(IPropertyCatalogSource):
+    """CSV-backed catalog. Used as the seed source before DB ingest, and
+    as a back-compat override (`--csv <path>` on the runner)."""
+
+    def __init__(self, csv_path: Path | str) -> None:
+        self._path = Path(csv_path)
+
+    @staticmethod
+    def _coerce_int(value: Any) -> int | None:
+        if value in (None, "", "null", "None"):
+            return None
+        try:
+            return int(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _pick(row: dict[str, Any], *keys: str) -> Any:
+        for k in keys:
+            v = row.get(k)
+            if v not in (None, "", "null", "None"):
+                return v
+        return None
+
+    @classmethod
+    def _resolve_canonical_id(cls, row: dict[str, Any], file_index: int) -> str:
+        """Compute the canonical_id for a CSV row. Falls back to a stable
+        `row_<i>` synthesised from the original *file* row index so the
+        same row keeps the same id even after we re-sort the list."""
+        cid = cls._pick(row, "property_id", "Unique ID", "Property ID", "apartmentid")
+        return str(cid) if cid is not None else f"row_{file_index}"
+
+    @classmethod
+    def _row_to_dto(cls, row: dict[str, Any], canonical_id: str) -> PropertyToScrape:
+        url = cls._pick(row, "url", "Website", "website") or ""
+        return PropertyToScrape(
+            canonical_id=canonical_id,
+            url=str(url),
+            proj_name=cls._pick(row, "name", "Name", "Property Name", "proj_name"),
+            address=cls._pick(row, "address", "Address", "Property Address"),
+            city=cls._pick(row, "city", "City"),
+            state=cls._pick(row, "state", "State"),
+            zip_code=cls._pick(row, "zip_code", "ZIP Code", "zip", "Zip"),
+            phone=cls._pick(row, "phone", "Phone"),
+            email_address=cls._pick(row, "email_address", "Email", "email"),
+            website=cls._pick(row, "website", "Website"),
+            pmc=cls._pick(row, "pmc", "Management Company"),
+            apartment_id=cls._coerce_int(cls._pick(row, "apartment_id", "apartmentid", "Unique ID")),
+            property_type=cls._pick(row, "type", "Type", "Property Type"),
+            raw=row,
+        )
+
+    def _read_rows(self) -> list[tuple[str, dict[str, Any]]]:
+        """Read the CSV and return `(canonical_id, row_dict)` pairs sorted
+        by canonical_id ascending — matches the SQL source's
+        `ORDER BY canonical_id`. Both sources thus emit identical row
+        order, so `--shard-index N --shard-count K` picks the same rows
+        regardless of which catalog backend the runner is reading from.
+        """
+        if not self._path.exists():
+            log.warning("CSV catalog source: %s not found; returning empty list", self._path)
+            return []
+        pairs: list[tuple[str, dict[str, Any]]] = []
+        with open(self._path, encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            for i, row in enumerate(reader):
+                row_dict = {k: v for k, v in row.items()}
+                pairs.append((self._resolve_canonical_id(row_dict, i), row_dict))
+        pairs.sort(key=lambda p: p[0])
+        return pairs
+
+    @staticmethod
+    def _apply_filters(
+        pairs: list[tuple[str, dict[str, Any]]],
+        filters: CatalogFilters | None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        if filters is None:
+            return pairs
+        out = pairs
+        if filters.canonical_ids:
+            wanted = set(filters.canonical_ids)
+            out = [(cid, r) for cid, r in out if cid in wanted]
+        if filters.property_types:
+            wanted_types = {t.upper() for t in filters.property_types}
+            out = [
+                (cid, r)
+                for cid, r in out
+                if str(r.get("type") or r.get("Type") or r.get("Property Type") or "").upper()
+                in wanted_types
+            ]
+        return out
+
+    @staticmethod
+    def _apply_shard(
+        pairs: list[tuple[str, dict[str, Any]]],
+        filters: CatalogFilters | None,
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """Slice by (shard_index, shard_count). Pure-Python equivalent of
+        SQL OFFSET/LIMIT — call after `_apply_filters` so the shard index
+        is computed against the filtered row set."""
+        if filters is None or filters.shard_index is None or filters.shard_count is None:
+            return pairs
+        idx = filters.shard_index
+        count = filters.shard_count
+        if count <= 0 or idx < 0 or idx >= count:
+            return []
+        # Ceiling division so the last shard absorbs the remainder.
+        per_shard = (len(pairs) + count - 1) // count
+        start = idx * per_shard
+        end = min(start + per_shard, len(pairs))
+        return pairs[start:end]
+
+    def list_active(
+        self,
+        *,
+        limit: int | None = None,
+        filters: CatalogFilters | None = None,
+    ) -> list[PropertyToScrape]:
+        pairs = self._read_rows()
+        pairs = self._apply_filters(pairs, filters)
+        pairs = self._apply_shard(pairs, filters)
+        if filters is not None and filters.start_index:
+            pairs = pairs[filters.start_index :]
+        if limit is not None:
+            pairs = pairs[:limit]
+        return [self._row_to_dto(row, cid) for cid, row in pairs]
+
+    def count_active(self, *, filters: CatalogFilters | None = None) -> int:
+        pairs = self._read_rows()
+        pairs = self._apply_filters(pairs, filters)
+        pairs = self._apply_shard(pairs, filters)
+        return len(pairs)
+
+
 # ── DataProvider facade ─────────────────────────────────────────────────────
 
 
@@ -426,6 +567,7 @@ class FileSystemDataProvider(DataProvider):
         config_dir: Path | str,
         *,
         scrape_events_path: Path | str | None = None,
+        catalog_csv_path: Path | str | None = None,
     ) -> None:
         self._base = Path(base_dir)
         self._config = Path(config_dir)
@@ -443,6 +585,9 @@ class FileSystemDataProvider(DataProvider):
         )
         self.profiles = FsProfileStore(self._config / "profiles")
         self.extraction_results = FsExtractionResultStore(self._base)
+        self.property_catalog = CsvPropertyCatalogSource(
+            Path(catalog_csv_path) if catalog_csv_path else self._config / "properties.csv"
+        )
 
     @property
     def name(self) -> str:

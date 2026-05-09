@@ -35,6 +35,7 @@ module = [
     "PIL.*",
     "google.cloud.*",
     "google.cloud.storage.*",
+    "openpyxl.*",
 ]
 ignore_missing_imports = true
 

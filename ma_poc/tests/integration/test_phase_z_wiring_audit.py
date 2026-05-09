@@ -33,8 +33,8 @@ def test_z_h11_find_cluster_mates_has_production_caller() -> None:
 
 
 def test_z_h11_resolve_source_url_has_production_caller() -> None:
-    """H11: _resolve_source_url must be called from jugnu_runner.py."""
-    src = (_MAPOC / "scripts" / "jugnu_runner.py").read_text()
+    """H11: _resolve_source_url must be called from runners/jugnu.py."""
+    src = (_MAPOC / "scripts" / "runners" / "jugnu.py").read_text()
     assert "_resolve_source_url(" in src
 
 
@@ -59,13 +59,13 @@ def test_z_h12_cross_page_merge_is_reachable() -> None:
 
 
 def test_z_gate_pr23_script_exists() -> None:
-    """Phase Z gate script must exist at scripts/gate_pr23.py."""
-    gate = _MAPOC / "scripts" / "gate_pr23.py"
-    assert gate.exists(), f"gate_pr23.py must exist at {gate}"
+    """Phase Z gate script must exist at scripts/gates/pr23.py."""
+    gate = _MAPOC / "scripts" / "gates" / "pr23.py"
+    assert gate.exists(), f"gates/pr23.py must exist at {gate}"
 
 
 def test_z_all_phase_test_files_exist() -> None:
-    """All phase test files referenced in gate_pr23.py must exist."""
+    """All phase test files referenced in gates/pr23.py must exist."""
     expected = [
         "tests/services/test_phase_a_correctness.py",
         "tests/profile/test_phase_b_save_mapping_kwargs.py",

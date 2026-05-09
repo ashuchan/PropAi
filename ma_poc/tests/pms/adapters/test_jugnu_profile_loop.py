@@ -22,7 +22,7 @@ if str(_MA_POC) not in sys.path:
 
 
 def test_simple_profile_store_backs_onto_real_profile_store(tmp_path: Path) -> None:
-    from ma_poc.scripts.jugnu_runner import _SimpleProfileStore
+    from ma_poc.scripts.runners.jugnu import _SimpleProfileStore
     from models.scrape_profile import ProfileMaturity, ScrapeProfile
 
     store = _SimpleProfileStore(tmp_path)
@@ -47,7 +47,7 @@ def test_update_profile_after_extraction_accepts_jugnu_result_shape(tmp_path: Pa
     If scraper.py ever stops populating _raw_api_responses / _winning_page_url
     / extraction_tier_used, this test will catch the drift.
     """
-    from ma_poc.scripts.jugnu_runner import _SimpleProfileStore
+    from ma_poc.scripts.runners.jugnu import _SimpleProfileStore
     from models.scrape_profile import ProfileMaturity
     from services.profile_updater import update_profile_after_extraction
 

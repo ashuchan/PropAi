@@ -11,10 +11,11 @@ from typing import Generator
 
 import pytest
 
-# Ensure scripts/ is on sys.path so `from state_store import StateStore` etc. work.
-_SCRIPTS = pathlib.Path(__file__).resolve().parent.parent.parent / "scripts"
-if str(_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS))
+# Ensure ma_poc/ is on sys.path so `from ma_poc.core.state_store import StateStore` works.
+# StateStore moved from scripts/ to core/ in the Phase 1 library evacuation.
+_REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 # Stub out playwright so scrape_properties (which imports entrata → playwright)
 # can be imported in unit tests without a real browser installed.
@@ -32,7 +33,7 @@ def _stub_playwright() -> None:
 
 _stub_playwright()
 
-from state_store import StateStore  # noqa: E402
+from ma_poc.core.state_store import StateStore  # noqa: E402
 
 
 # ── Date constants ────────────────────────────────────────────────────────────

@@ -5,10 +5,10 @@ name: Retry failed properties (sharded)
 #   1. Authenticates to GCP via WIF.
 #   2. Submits the jugnu-retry Cloud Run job with --tasks N --parallelism N
 #      so failures are sharded across N parallel containers (round-robin
-#      slice in jugnu_retry_runner.py via CLOUD_RUN_TASK_INDEX/COUNT).
+#      slice in runners/jugnu_retry.py via CLOUD_RUN_TASK_INDEX/COUNT).
 #   3. Waits for the execution to terminate.
 #   4. Downloads every shard's properties.retry.shard{NN}.json from GCS
-#      and runs jugnu_retry_merge.py to consolidate into properties.json.
+#      and runs runners/jugnu_retry_merge.py to consolidate into properties.json.
 #   5. Uploads the merged result back to GCS, optionally syncs to Postgres.
 #
 # Prerequisite: terraform must have applied with retry_task_count >= the
@@ -142,22 +142,22 @@ jobs:
           if [ -n "${{ inputs.limit }}" ]; then
             ARGS+=(--limit "${{ inputs.limit }}")
           fi
-          # trigger_retry.py emits "RESULT: {...}" structured JSON to stderr
+          # triggers.retry emits "RESULT: {...}" structured JSON to stderr
           # on completion; capture both streams so we can scrape the
           # execution name even on failure.
           set +e
-          python ma_poc/scripts/trigger_retry.py "${ARGS[@]}" 2> trigger.err
+          python -m ma_poc.scripts.triggers.retry "${ARGS[@]}" 2> trigger.err
           rc=$?
           set -e
           cat trigger.err
           # Pull the execution name from the structured RESULT line.
-          # Format (see _trigger_common.emit_structured_result):
+          # Format (see _common.trigger.emit_structured_result):
           #   RESULT:{"status":"SUCCESS","execution_name":"...","mode":"errors",...}
           exec_name=$(grep -E '^RESULT:' trigger.err | tail -1 | sed -E 's/^RESULT://' | python -c "import sys,json; d=json.load(sys.stdin); print(d.get('execution_name',''))" || true)
           echo "execution_name=${exec_name}" >> $GITHUB_OUTPUT
           echo "rc=${rc}" >> $GITHUB_OUTPUT
           if [ "$rc" -ne 0 ]; then
-            echo "::error::trigger_retry.py exited $rc — retry execution failed; merge step will be skipped."
+            echo "::error::triggers.retry exited $rc — retry execution failed; merge step will be skipped."
             exit "$rc"
           fi
 
@@ -172,7 +172,7 @@ jobs:
           # Each shard uploaded to gs://{bucket}/runs/{run_date}/retry-{execution}/
           # which contains its properties.retry.shard{NN}.json plus the
           # base properties.json. Pull everything into ma_poc/data/runs/{run_date}/
-          # so jugnu_retry_merge.py can find shards next to properties.json.
+          # so runners/jugnu_retry_merge.py can find shards next to properties.json.
           mkdir -p ma_poc/data/runs/$RUN_DATE
           gcloud storage cp -r \
             "gs://$BUCKET/runs/$RUN_DATE/retry-$EXEC/*" \
@@ -191,12 +191,12 @@ jobs:
           # The merge step runs on the GitHub runner, which has no Cloud
           # SQL connectivity — always pass --skip-sync. Per-shard DLQ
           # state is already synced to Postgres inside each Cloud Run
-          # task (see jugnu_retry_entry._sync_dlq_to_db). The merge here
+          # task (see runners/retry_entry._sync_dlq_to_db). The merge here
           # consolidates JSON only; properties.json gets uploaded back
           # to GCS in the next step. If you need a Postgres refresh
           # from the merged result, run sync_run_to_pg as a follow-up
           # Cloud Run job — not from GitHub Actions.
-          python ma_poc/scripts/jugnu_retry_merge.py \
+          python -m ma_poc.scripts.runners.jugnu_retry_merge \
             --run-date "${{ steps.run_date.outputs.value }}" \
             --expect-shards "${{ inputs.tasks }}" \
             --mode "${{ inputs.mode }}" \

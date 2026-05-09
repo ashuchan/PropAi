@@ -11,12 +11,12 @@ from typing import Any
 
 import pytest
 
-from ma_poc.scripts.jugnu_retry_merge import (
+from ma_poc.scripts.runners.jugnu_retry_merge import (
     _detect_overlaps,
     _find_shard_files,
     _merge_records,
 )
-from ma_poc.scripts.jugnu_retry_runner import _shard_candidates
+from ma_poc.scripts.runners.jugnu_retry import _shard_candidates
 
 # ---------------------------------------------------------------------------
 # _shard_candidates

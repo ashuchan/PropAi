@@ -3,7 +3,7 @@
  * @description Helpers for telling apart "this run was purged by the
  * retention sweep" from "this run never existed".
  *
- * Background: the Postgres sync (`ma_poc/scripts/sync_run_to_pg.py
+ * Background: the Postgres sync (`ma_poc/scripts/sync/run_to_pg.py
  * :: _apply_retention`) deletes rows older than 3 days from every
  * per-run table (`property_snapshots`, `run_issues`, `run_ledger`,
  * `llm_reports`, `llm_property_details`, `llm_diagnostics`,

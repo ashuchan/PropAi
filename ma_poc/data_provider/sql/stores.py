@@ -24,16 +24,19 @@ from sqlalchemy.orm import Session, sessionmaker
 from data_provider.contracts import (
     IExtractionResultStore,
     IProfileStore,
+    IPropertyCatalogSource,
     IPropertyStateStore,
     IRunStore,
     IScrapeEventStore,
     IUnitStateStore,
 )
 from data_provider.dtos import (
+    CatalogFilters,
     ExtractionResult,
     IssueEntry,
     LedgerEntry,
     PropertyIndexEntry,
+    PropertyToScrape,
     RunReport,
     RunSummary,
     ScrapeEvent,
@@ -133,6 +136,7 @@ _UNIT_COLS = {
     "beds",
     "baths",
     "floor_plan_name",
+    "floor_plan_id",
     "area",
     "rent_low",
     "rent_high",
@@ -148,6 +152,10 @@ _UNIT_COLS = {
     "last_absent_date",
     "concessions",
     "changed_fields",
+    # Informational drift hash — never used for merge / dedup, written on
+    # every upsert so SQL drift queries don't have to unpack the JSON
+    # ``extra`` column.
+    "data_sha256",
 }
 
 
@@ -258,6 +266,7 @@ def _hydrate_unit(row: UnitRow) -> UnitIndexEntry:
         "beds": row.beds,
         "baths": row.baths,
         "floor_plan_name": row.floor_plan_name,
+        "floor_plan_id": row.floor_plan_id,
         "area": row.area,
         "rent_low": row.rent_low,
         "rent_high": row.rent_high,
@@ -281,6 +290,19 @@ def _hydrate_unit(row: UnitRow) -> UnitIndexEntry:
 
 def _utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _seen_at_iso(run_date: str) -> str:
+    """Date-anchored ``last_seen_at`` timestamp.
+
+    Thin wrapper around :func:`ma_poc.core.identity.seen_at_iso`
+    — kept here under the underscore-prefixed legacy name so internal call
+    sites don't need updating. The lazy import preserves the
+    ``data_provider`` ↔ ``scripts`` boundary (the latter shouldn't be on
+    sys.path during alembic migrations).
+    """
+    from ma_poc.core.identity import seen_at_iso
+    return seen_at_iso(run_date)
 
 
 # ── IPropertyStateStore ──────────────────────────────────────────────────────
@@ -315,7 +337,10 @@ class SqlPropertyStateStore(IPropertyStateStore):
             # payloads — it's no longer a column, drop it silently.
             merged.pop("last_seen_date", None)
             merged["canonical_id"] = canonical_id
-            merged["last_seen_at"] = _utc_now_iso()
+            # Anchor the date portion to ``run_date`` so day-level queries
+            # against ``properties.last_seen_at`` agree with the same field
+            # on ``units`` (both populated via :func:`_seen_at_iso`).
+            merged["last_seen_at"] = _seen_at_iso(run_date)
             if is_new:
                 merged["first_seen_date"] = run_date
             else:
@@ -344,11 +369,131 @@ class SqlPropertyStateStore(IPropertyStateStore):
             return set(rows)
 
 
+# ── IPropertyCatalogSource ───────────────────────────────────────────────────
+
+
+class SqlPropertyCatalogSource(IPropertyCatalogSource):
+    """Catalog backed by the `properties` table.
+
+    Stable order is enforced via `ORDER BY canonical_id` so shard slicing
+    yields the same rows for the same `(shard_index, shard_count)` across
+    processes — the contract's stable-order requirement.
+
+    Sharding is done in SQL via OFFSET/LIMIT computed from the post-filter
+    count: identical semantics to the CSV source's pure-Python slice.
+    """
+
+    def __init__(self, holder: _SessionHolder) -> None:
+        self._h = holder
+
+    @staticmethod
+    def _row_to_dto(row: PropertyRow) -> PropertyToScrape:
+        extra = dict(row.extra or {})
+        # `extra` may carry the original CSV cell values (Property Type,
+        # Building Type, etc.) when the row was seeded via the ingest
+        # script. Surface them as `raw` so dict-style consumers in the
+        # runner keep finding their old keys.
+        property_type = extra.pop("property_type", None) or extra.pop("Property Type", None)
+        return PropertyToScrape(
+            canonical_id=row.canonical_id,
+            url=row.website or "",
+            proj_name=row.proj_name,
+            address=row.address,
+            city=row.city,
+            state=row.state,
+            zip_code=row.zip_code,
+            country=row.country,
+            phone=row.phone,
+            email_address=row.email_address,
+            website=row.website,
+            pmc=row.pmc,
+            apartment_id=row.apartment_id,
+            property_type=property_type,
+            raw=extra,
+        )
+
+    @staticmethod
+    def _apply_filters(stmt: Any, filters: CatalogFilters | None) -> Any:
+        if filters is None:
+            return stmt
+        if filters.canonical_ids:
+            stmt = stmt.where(PropertyRow.canonical_id.in_(filters.canonical_ids))
+        # `property_types` lives in the `extra` JSON; SQL filtering across
+        # JSON fields is dialect-specific and rarely needed for 500 rows.
+        # Apply in-memory after fetch to keep this dialect-agnostic.
+        return stmt
+
+    @staticmethod
+    def _apply_post_filters(
+        rows: list[PropertyRow], filters: CatalogFilters | None
+    ) -> list[PropertyRow]:
+        if filters is None or not filters.property_types:
+            return rows
+        wanted = {t.upper() for t in filters.property_types}
+        out: list[PropertyRow] = []
+        for r in rows:
+            extra = r.extra or {}
+            t = extra.get("property_type") or extra.get("Property Type") or ""
+            if str(t).upper() in wanted:
+                out.append(r)
+        return out
+
+    def list_active(
+        self,
+        *,
+        limit: int | None = None,
+        filters: CatalogFilters | None = None,
+    ) -> list[PropertyToScrape]:
+        with self._h.scope() as s:
+            stmt = select(PropertyRow).order_by(PropertyRow.canonical_id)
+            stmt = self._apply_filters(stmt, filters)
+            rows = list(s.execute(stmt).scalars().all())
+
+        # Post-filters that are easier in Python than SQL (JSON-extra lookups).
+        rows = self._apply_post_filters(rows, filters)
+
+        # Shard slicing operates on the filtered set — identical to the
+        # CSV source so a shard scrapes the same rows regardless of source.
+        if filters is not None and filters.shard_index is not None and filters.shard_count is not None:
+            idx = filters.shard_index
+            count = filters.shard_count
+            if count <= 0 or idx < 0 or idx >= count:
+                return []
+            per_shard = (len(rows) + count - 1) // count
+            start = idx * per_shard
+            end = min(start + per_shard, len(rows))
+            rows = rows[start:end]
+
+        if filters is not None and filters.start_index:
+            rows = rows[filters.start_index :]
+        if limit is not None:
+            rows = rows[:limit]
+        return [self._row_to_dto(r) for r in rows]
+
+    def count_active(self, *, filters: CatalogFilters | None = None) -> int:
+        with self._h.scope() as s:
+            stmt = select(PropertyRow).order_by(PropertyRow.canonical_id)
+            stmt = self._apply_filters(stmt, filters)
+            rows = list(s.execute(stmt).scalars().all())
+        rows = self._apply_post_filters(rows, filters)
+        # Match list_active's shard math so callers can size shards correctly.
+        if filters is not None and filters.shard_index is not None and filters.shard_count is not None:
+            idx = filters.shard_index
+            count = filters.shard_count
+            if count <= 0 or idx < 0 or idx >= count:
+                return 0
+            per_shard = (len(rows) + count - 1) // count
+            start = idx * per_shard
+            end = min(start + per_shard, len(rows))
+            return end - start
+        return len(rows)
+
+
 # ── IUnitStateStore ──────────────────────────────────────────────────────────
 
 
 class SqlUnitStateStore(IUnitStateStore):
-    """SQL port of scripts.state_store.StateStore.upsert_units.
+    """SQL port of core.state_store.StateStore.upsert_units.
 
     Diff semantics match the FS store 1:1: `new`, `updated`, `unchanged`,
     `disappeared`. `disappeared_since` is set on prior units that didn't
@@ -365,6 +510,7 @@ class SqlUnitStateStore(IUnitStateStore):
         "beds": ("beds", "bedrooms", "_bedrooms"),
         "baths": ("baths", "bathrooms", "_bathrooms"),
         "floor_plan_name": ("floor_plan_name", "_floor_plan"),
+        "floor_plan_id": ("floor_plan_id",),
         "area": ("area", "sqft", "_sqft"),
         "rent_low": ("rent_low", "market_rent_low"),
         "rent_high": ("rent_high", "market_rent_high"),
@@ -396,26 +542,54 @@ class SqlUnitStateStore(IUnitStateStore):
         today_units: list[dict[str, Any]],
         run_date: str,
     ) -> UnitDiff:
+        # Lazy import — keeps data_provider importable when scripts/ is not
+        # on sys.path (e.g. during alembic migrations).
+        from ma_poc.core.identity import (
+            assign_fallback_unit_id,
+            compute_unit_data_sha256,
+            synthesize_unkeyable_id,
+        )
+
         with self._h.scope() as s:
             prior_rows = (
                 s.execute(select(UnitRow).where(UnitRow.canonical_id == canonical_id)).scalars().all()
             )
             prior_by_id: dict[str, UnitRow] = {r.unit_id: r for r in prior_rows}
 
-            diff = UnitDiff()
+            diff = UnitDiff(input_count=len(today_units))
             current_ids: set[str] = set()
 
             for u in today_units:
+                # Stamp the data hash first so synthesize_unkeyable_id can
+                # reuse it. Explicit ``not in`` instead of ``setdefault`` so
+                # we don't recompute a 50K-element-payload SHA on records
+                # that already have one set upstream — Python evaluates the
+                # default argument unconditionally.
+                if "data_sha256" not in u:
+                    u["data_sha256"] = compute_unit_data_sha256(u)
+
                 uid = str(u.get("unit_id") or "").strip()
                 if not uid:
-                    continue
+                    # No-drop contract: try the natural / fingerprint /
+                    # floor-plan-only fallback first; if even that returns
+                    # None, synthesize a stable id from the payload hash and
+                    # insert as a new unit. Records never silently disappear.
+                    derived = assign_fallback_unit_id(u, canonical_id)
+                    if not derived:
+                        derived = synthesize_unkeyable_id(u, canonical_id)
+                        diff.synthetic_key_used += 1
+                    uid = derived
                 current_ids.add(uid)
 
                 snap: dict[str, Any] = {
                     "canonical_id": canonical_id,
                     "unit_id": uid,
-                    "last_seen_at": _utc_now_iso(),
+                    # Date portion = run_date so day-level "was this unit
+                    # observed on day X?" queries are deterministic; time
+                    # portion = wall-clock for within-run ordering.
+                    "last_seen_at": _seen_at_iso(run_date),
                     "carryforward_days": 0,
+                    "data_sha256": u["data_sha256"],
                 }
                 for col, sources in self._SNAPSHOT_SOURCES.items():
                     snap[col] = self._read_first(u, sources)
@@ -459,11 +633,15 @@ class SqlUnitStateStore(IUnitStateStore):
         with self._h.scope() as s:
             rows = s.execute(select(UnitRow).where(UnitRow.canonical_id == canonical_id)).scalars().all()
             out: list[dict[str, Any]] = []
+            seen_at = _seen_at_iso(run_date)
             for r in rows:
                 if r.disappeared_since:
                     continue
                 r.carryforward_days = (r.carryforward_days or 0) + 1
-                r.last_seen_at = _utc_now_iso()
+                # Anchor to run_date so a carry-forward on day X registers
+                # as "seen on day X" for day-level queries — same contract
+                # as a fresh upsert.
+                r.last_seen_at = seen_at
                 out.append(
                     {
                         "unit_id": r.unit_id,
@@ -471,6 +649,7 @@ class SqlUnitStateStore(IUnitStateStore):
                         "beds": r.beds,
                         "baths": r.baths,
                         "floor_plan_name": r.floor_plan_name,
+                        "floor_plan_id": r.floor_plan_id,
                         "area": r.area,
                         "rent_low": r.rent_low,
                         "rent_high": r.rent_high,

@@ -23,6 +23,7 @@ from data_provider.sql.models import Base
 from data_provider.sql.stores import (
     SqlExtractionResultStore,
     SqlProfileStore,
+    SqlPropertyCatalogSource,
     SqlPropertyStateStore,
     SqlRunStore,
     SqlScrapeEventStore,
@@ -61,6 +62,7 @@ class SqlDataProvider(DataProvider):
         self.scrape_events = SqlScrapeEventStore(self._holder)
         self.profiles = SqlProfileStore(self._holder)
         self.extraction_results = SqlExtractionResultStore(self._holder)
+        self.property_catalog = SqlPropertyCatalogSource(self._holder)
 
     @property
     def name(self) -> str:

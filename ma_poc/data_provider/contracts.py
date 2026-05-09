@@ -21,10 +21,12 @@ from contextlib import AbstractContextManager
 from typing import Any
 
 from data_provider.dtos import (
+    CatalogFilters,
     ExtractionResult,
     IssueEntry,
     LedgerEntry,
     PropertyIndexEntry,
+    PropertyToScrape,
     RunReport,
     ScrapeEvent,
     ScrapeProfile,
@@ -139,6 +141,35 @@ class IExtractionResultStore(ABC):
     def read(self, run_date: str, property_id: str) -> ExtractionResult | None: ...
 
 
+class IPropertyCatalogSource(ABC):
+    """Read-only source of the *input* list of properties to scrape.
+
+    Distinct from IPropertyStateStore (which holds *output* state per
+    canonical_id). The CSV file historically served as this catalog;
+    after the v2 migration it is the `properties` table. The CSV impl
+    is retained as a back-compat override (`--csv <path>` on the runner
+    and the one-shot ingest script).
+    """
+
+    @abstractmethod
+    def list_active(
+        self,
+        *,
+        limit: int | None = None,
+        filters: CatalogFilters | None = None,
+    ) -> list[PropertyToScrape]:
+        """Return the catalog rows the runner should scrape, in stable order.
+
+        Stable ordering matters for shard assignment — the same call on
+        the same data must yield the same row order across processes.
+        """
+
+    @abstractmethod
+    def count_active(self, *, filters: CatalogFilters | None = None) -> int:
+        """Cheap count without loading rows. Used by shard slicing to
+        compute per-shard offset/limit before fetching the slice."""
+
+
 class DataProvider(ABC):
     """Facade bundling all stores. Obtain via `get_data_provider()`."""
 
@@ -148,6 +179,7 @@ class DataProvider(ABC):
     scrape_events: IScrapeEventStore
     profiles: IProfileStore
     extraction_results: IExtractionResultStore
+    property_catalog: IPropertyCatalogSource
 
     @property
     @abstractmethod

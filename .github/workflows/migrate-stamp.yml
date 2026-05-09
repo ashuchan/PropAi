@@ -9,7 +9,7 @@ name: migrate-stamp
 # DDL. NEVER use this to skip a real migration.
 #
 # Normal deploys (deploy-staging.yml / deploy-prod.yml) keep using
-# `migrate.py up` — this workflow is deliberately separate so a stamp can
+# `migrations.alembic up` — this workflow is deliberately separate so a stamp can
 # never fire by accident on merge.
 
 on:
@@ -70,16 +70,16 @@ jobs:
         env:
           GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID_STAGING }}
           GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID_PROD }}
-        run: python ma_poc/scripts/migrate.py --env ${{ inputs.env }} status || true
+        run: python -m ma_poc.scripts.migrations.alembic --env ${{ inputs.env }} status || true
 
       - name: Stamp alembic_version
         env:
           GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID_STAGING }}
           GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID_PROD }}
-        run: python ma_poc/scripts/migrate.py --env ${{ inputs.env }} stamp ${{ inputs.revision }}
+        run: python -m ma_poc.scripts.migrations.alembic --env ${{ inputs.env }} stamp ${{ inputs.revision }}
 
       - name: Show current revision (after stamp)
         env:
           GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID_STAGING }}
           GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID_PROD }}
-        run: python ma_poc/scripts/migrate.py --env ${{ inputs.env }} status
+        run: python -m ma_poc.scripts.migrations.alembic --env ${{ inputs.env }} status

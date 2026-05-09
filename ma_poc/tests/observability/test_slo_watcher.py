@@ -79,3 +79,83 @@ def test_slo_reads_jugnu_extract_result_tier() -> None:
     violations = check({"llm": 0.5}, succ + fail)
     names = [v.name for v in violations]
     assert "success_rate" not in names  # 95% meets the 95% threshold
+
+
+# ── llm_tax_avoidance_rate ──────────────────────────────────────────────────
+
+
+def _make_jugnu_prop(tier: str, *, verdict: str = "SUCCESS") -> dict:
+    """Mirror the Jugnu property shape so tests pin the same key paths
+    the runner produces. ``_extract_result.tier_used`` is the Jugnu key;
+    ``_meta.scrape_tier_used`` is the legacy fallback."""
+    return {
+        "_meta": {"verdict": verdict, "canonical_id": "p"},
+        "_extract_result": {"tier_used": tier, "llm_cost_usd": 0.0},
+    }
+
+
+def test_llm_tax_avoidance_rate_default_threshold_is_zero() -> None:
+    """Default ``llm_tax_avoidance_min`` must be 0.0 so existing runs
+    without the new replay tier don't suddenly flag. Operators ratchet
+    it up once a baseline is established."""
+    t = SloThresholds()
+    assert t.llm_tax_avoidance_min == 0.0
+
+
+def test_llm_tax_avoidance_rate_observes_replay_wins() -> None:
+    """When ratcheted to 0.5, a population where 80% of successes won
+    via the zero-LLM replay tier passes; 30% replay wins fails.
+
+    This is the metric we'd watch to detect another "every property
+    starts COLD" regression: in the broken state observed in shard_0 of
+    2026-05-08 (0/224 successes won via replay), this would alert at any
+    non-zero threshold."""
+    props_high_replay = (
+        [_make_jugnu_prop("TIER_1_PROFILE_MAPPING") for _ in range(80)]
+        + [_make_jugnu_prop("TIER_4_LLM_DOM") for _ in range(20)]
+    )
+    t = SloThresholds(llm_tax_avoidance_min=0.5)
+    violations = check({"llm": 0.0}, props_high_replay, thresholds=t)
+    names = [v.name for v in violations]
+    assert "llm_tax_avoidance_rate" not in names
+
+    props_low_replay = (
+        [_make_jugnu_prop("TIER_1_PROFILE_MAPPING") for _ in range(30)]
+        + [_make_jugnu_prop("TIER_4_LLM_DOM") for _ in range(70)]
+    )
+    violations = check({"llm": 0.0}, props_low_replay, thresholds=t)
+    names = [v.name for v in violations]
+    assert "llm_tax_avoidance_rate" in names
+
+
+def test_llm_tax_avoidance_rate_excludes_failed_from_denominator() -> None:
+    """Failed properties can't have replayed by definition. Including
+    them in the denominator would conflate "fetch broken" with "loop
+    broken" — two failure modes that need different responses."""
+    props = (
+        [_make_jugnu_prop("TIER_1_PROFILE_MAPPING") for _ in range(50)]
+        + [_make_jugnu_prop("TIER_4_LLM_DOM") for _ in range(40)]
+        # 10 unreachable properties — should NOT count against avoidance.
+        + [_make_jugnu_prop("FAILED", verdict="FAILED_UNREACHABLE") for _ in range(10)]
+    )
+    # 50/90 successful = 55.5% replay rate, threshold 0.5 → no violation.
+    t = SloThresholds(
+        llm_tax_avoidance_min=0.5,
+        success_rate_min=0.0,  # don't trip the success_rate gate too
+    )
+    violations = check({"llm": 0.0}, props, thresholds=t)
+    names = [v.name for v in violations]
+    assert "llm_tax_avoidance_rate" not in names
+
+
+def test_llm_tax_avoidance_rate_handles_all_failures() -> None:
+    """Edge case — when zero properties succeeded, the metric is
+    undefined. Don't divide by zero, don't emit a violation; let other
+    checks (success_rate) carry the alert."""
+    props = [
+        _make_jugnu_prop("FAILED", verdict="FAILED_UNREACHABLE") for _ in range(10)
+    ]
+    t = SloThresholds(llm_tax_avoidance_min=0.5, success_rate_min=0.0)
+    violations = check({"llm": 0.0}, props, thresholds=t)
+    names = [v.name for v in violations]
+    assert "llm_tax_avoidance_rate" not in names

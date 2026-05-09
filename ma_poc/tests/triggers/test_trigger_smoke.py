@@ -1,4 +1,4 @@
-"""Unit tests for scripts/trigger_smoke.py.
+"""Unit tests for scripts/triggers/smoke.py.
 
 Covers the pure-logic pieces (fixture generation, log grouping,
 per-shard count assertions, argparse gates) without touching gcloud or
@@ -23,7 +23,7 @@ for _p in (_app, _here):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from scripts import trigger_smoke as mod  # noqa: E402
+from scripts.triggers import smoke as mod  # noqa: E402
 
 
 # ── Fixture generation ─────────────────────────────────────────────────────

@@ -16,6 +16,8 @@ from ma_poc.fetch.http_client import (
 
 
 def test_s2_client_factory_dispatch() -> None:
+    pytest.importorskip("curl_cffi", reason="curl_cffi not installed — DC_PROXY tier requires it")
+
     direct = make_http_client(FetchTier.DIRECT, proxy=None)
     assert isinstance(direct, _HttpxAdapter)
 

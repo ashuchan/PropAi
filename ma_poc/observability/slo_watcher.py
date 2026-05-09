@@ -20,6 +20,14 @@ class SloThresholds:
     llm_cost_per_run_max_usd: float = 1.00
     vision_fallback_max_pct: float = 0.05
     drift_noise_max_pct: float = 0.02
+    # Minimum fraction of successful properties that won via the
+    # zero-LLM-cost replay path (``TIER_1_PROFILE_MAPPING``). Captures
+    # the LLM-tax avoidance rate end-to-end. Default 0.0 keeps this
+    # observational while the self-learning loop ramps; raise once
+    # we have a stable baseline (target ~0.5–0.7 for mature properties
+    # per BRD economics: 7.77 → ~0.1 LLM calls/property/day requires
+    # the replay tier to win on at least half the population).
+    llm_tax_avoidance_min: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -125,5 +133,30 @@ def check(
                 observed=round(drift_pct, 4),
             )
         )
+
+    # LLM-tax avoidance rate — fraction of successful properties that
+    # extracted via the zero-LLM-cost replay tier. This is THE metric
+    # for the self-learning loop's health. The previous regression
+    # (every Cloud Run container starting with an empty profile dir,
+    # so 0/250 properties replayed) would have shown up here as 0.0
+    # observed against any non-zero threshold. Computed only over
+    # successful properties — failed scrapes can't have replayed by
+    # definition, including them in the denominator would punish bad
+    # fetch outcomes via a learning metric they don't control.
+    successful = total - failed
+    if successful > 0:
+        replay_won = sum(
+            1 for p in property_results
+            if not _failed(p) and "PROFILE_MAPPING" in _tier(p).upper()
+        )
+        avoidance_rate = replay_won / successful
+        if avoidance_rate < thresholds.llm_tax_avoidance_min:
+            violations.append(
+                SloViolation(
+                    name="llm_tax_avoidance_rate",
+                    threshold=thresholds.llm_tax_avoidance_min,
+                    observed=round(avoidance_rate, 4),
+                )
+            )
 
     return violations

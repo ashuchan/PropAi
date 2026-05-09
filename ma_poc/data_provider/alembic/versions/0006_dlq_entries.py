@@ -9,7 +9,7 @@ Postgres table so it survives Cloud Run container restarts. The local
 JSONL file is an append-only transaction log; this table mirrors the
 post-compaction live state (one row per currently-parked property).
 
-Sync flow — see ``scripts/sync_run_to_pg.py``:
+Sync flow — see ``scripts/sync/run_to_pg.py``:
 
   scrape run ──▶ writes state/dlq.jsonl (ephemeral /tmp) ──▶ shard_entry
                                                            post-runner

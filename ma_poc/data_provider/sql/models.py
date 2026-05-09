@@ -102,6 +102,13 @@ class UnitRow(Base):
     # LLM-extracted floor plan names can be marketing copy ("The Grand Vista
     # at Sunset Ridge — 1 Bed Den"); 256 chars overflowed in production.
     floor_plan_name: Mapped[str | None] = mapped_column(String(1024))
+    # Deterministic SHA-256 of (canonical_id, normalised floor_plan_name,
+    # beds, baths). Two units with the same plan share the same id, so
+    # GROUP BY floor_plan_id collapses unit-level rows back to plan-level
+    # rows for analytics — fixes the 35% of properties where unit-level
+    # variation was inflating the apparent plan count. Nullable for the
+    # backfill window; populated at write time after Phase 3.
+    floor_plan_id: Mapped[str | None] = mapped_column(String(16))
     area: Mapped[int | None] = mapped_column(Integer)
     rent_low: Mapped[float | None] = mapped_column(Float)
     rent_high: Mapped[float | None] = mapped_column(Float)
@@ -112,12 +119,22 @@ class UnitRow(Base):
 
     # ── State-tracking (no v2 equivalent) ───────────────────────────────
     first_seen_date: Mapped[str | None] = mapped_column(String(16))
+    # ISO timestamp of the most recent upsert for this (canonical_id, unit_id).
+    # Re-stamped by ``upsert_units`` on every appearance, so the first 10
+    # chars are the "day this unit was last seen" — usable directly as a
+    # day-level filter via ``substring(last_seen_at, 1, 10) = '<run_date>'``.
     last_seen_at: Mapped[str | None] = mapped_column(String(64))
     carryforward_days: Mapped[int] = mapped_column(Integer, default=0)
     disappeared_since: Mapped[str | None] = mapped_column(String(16))
     last_absent_date: Mapped[str | None] = mapped_column(String(16))
     concessions: Mapped[Any | None] = mapped_column(JSON)
     changed_fields: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+    # Informational SHA256 of the full incoming unit dict at upsert time.
+    # Never compared between rows for identity / merge / dedup — this is
+    # purely a drift-diagnostic fingerprint surfaced in the merge analysis.
+    # 64 hex chars = 32 bytes; column kept nullable for backfill compat.
+    data_sha256: Mapped[str | None] = mapped_column(String(64))
 
     extra: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
@@ -366,7 +383,14 @@ class FloorPlanComparisonRunRow(Base):
     name_match_count: Mapped[int] = mapped_column(Integer, default=0)
     bed_bath_sqft_match_count: Mapped[int] = mapped_column(Integer, default=0)
     bed_bath_only_match_count: Mapped[int] = mapped_column(Integer, default=0)
+    # Rescue tier: fuzzy name match where DB lost beds-or-baths during
+    # extraction. Counted as "matched" for the headline rate but kept
+    # separate so analysts can downgrade on confidence.
+    name_only_match_count: Mapped[int] = mapped_column(Integer, default=0)
     unmatched_count: Mapped[int] = mapped_column(Integer, default=0)
+    # Property resolved but ``units`` is empty — scrape failure, not a
+    # match defect. Excluded from the unmatched headline.
+    db_empty_count: Mapped[int] = mapped_column(Integer, default=0)
     sqft_within_buffer_count: Mapped[int] = mapped_column(Integer, default=0)
     missing_in_csv_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -401,4 +425,51 @@ class FloorPlanComparisonRowRow(Base):
     __table_args__ = (
         Index("ix_fpc_rows_run_canonical", "run_id", "canonical_id"),
         Index("ix_fpc_rows_run_method", "run_id", "match_method"),
+    )
+
+
+class FloorPlanDisagreementReviewRow(Base):
+    """Manual-review queue for genuine CSV-vs-DB floor-plan disagreements.
+
+    Populated from ``floor_plan_comparison_rows`` by
+    ``scripts/floor_plans/export_disagreements.py``. Surfaces rows where the
+    fuzzy name matches but bed/bath conflict (the "real" disagreements
+    after the matcher has done its job — see Phase 5 of the floor-plan gap
+    plan).
+
+    The reviewer updates ``status`` to one of ``pending`` (default),
+    ``csv_correct`` (DB extraction is wrong; fix upstream), ``db_correct``
+    (CSV is stale; flag with the data vendor), ``ambiguous`` (both
+    plausible — record but take no action). Re-running the exporter is
+    idempotent on (run_id, canonical_id, csv_floorplan_number): only
+    pending rows are wiped and re-added; reviewer-marked rows are
+    preserved across exports.
+    """
+
+    __tablename__ = "floor_plan_disagreement_review"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(String(64))
+    canonical_id: Mapped[str | None] = mapped_column(String(256))
+    csv_apartment_id: Mapped[int | None] = mapped_column(Integer)
+    csv_floorplan_number: Mapped[str | None] = mapped_column(String(64))
+    csv_description: Mapped[str | None] = mapped_column(String(512))
+    csv_bed: Mapped[int | None] = mapped_column(Integer)
+    csv_bath: Mapped[float | None] = mapped_column(Float)
+    csv_area: Mapped[int | None] = mapped_column(Integer)
+    db_floor_plan_name: Mapped[str | None] = mapped_column(String(256))
+    db_beds: Mapped[int | None] = mapped_column(Integer)
+    db_baths: Mapped[float | None] = mapped_column(Float)
+    db_area: Mapped[int | None] = mapped_column(Integer)
+    name_match_score: Mapped[float | None] = mapped_column(Float)
+    # Reviewer state.
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    reviewer_note: Mapped[str | None] = mapped_column(Text)
+    reviewed_by: Mapped[str | None] = mapped_column(String(128))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_fpdr_run_status", "run_id", "status"),
+        Index("ix_fpdr_canonical", "canonical_id"),
     )

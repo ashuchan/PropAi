@@ -113,7 +113,7 @@ export function FloorPlansPage() {
         <Header />
         <EmptyState
           title="Floor plan comparisons unavailable"
-          description="The active data provider doesn't expose comparison data. Switch to the Postgres provider and run scripts/compare_floor_plans_csv.py to populate this view."
+          description="The active data provider doesn't expose comparison data. Switch to the Postgres provider and run scripts/floor_plans/compare.py to populate this view."
         />
       </div>
     );
@@ -127,7 +127,7 @@ export function FloorPlansPage() {
         <Header />
         <EmptyState
           title="No comparison runs yet"
-          description="Run python ma_poc/scripts/compare_floor_plans_csv.py --csv ma_poc/config/Floorplan-\\ comparisons.csv to generate the first comparison."
+          description="Run python -m ma_poc.scripts.floor_plans.compare --csv ma_poc/config/Floorplan-comparisons.csv to generate the first comparison."
         />
       </div>
     );

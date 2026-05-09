@@ -76,8 +76,8 @@ class TestClipToColumnLimits:
         # The exact columns that exist on UnitRow today — guards against
         # accidental schema regressions where a column changes from
         # String(N) to TEXT (clip becomes a no-op for that column).
-        assert limits["unit_id"] == 256
-        assert limits["floor_plan_name"] == 256
+        assert limits["unit_id"] == 512
+        assert limits["floor_plan_name"] == 1024
         assert limits["available_date"] == 32
         assert limits["last_seen_at"] == 64
 
@@ -89,13 +89,13 @@ class TestClipToColumnLimits:
         assert out["beds"] == 1
 
     def test_clip_truncates_oversize_floor_plan_name(self, caplog: pytest.LogCaptureFixture) -> None:
-        # The actual offender from the 2026-04-29 incident: 455 chars.
-        bad = "Perfect luxury living space " * 20  # 560 chars
+        # floor_plan_name is String(1024) after migration 0009 — need >1024 chars to trigger clip.
+        bad = "Perfect luxury living space " * 40  # 1120 chars
         values = {"floor_plan_name": bad}
         with caplog.at_level(logging.WARNING):
             out = _clip_to_column_limits(values, UnitRow)
-        assert len(out["floor_plan_name"]) == 256
-        assert out["floor_plan_name"] == bad[:256]
+        assert len(out["floor_plan_name"]) == 1024
+        assert out["floor_plan_name"] == bad[:1024]
         # Surface the upstream extractor bug — silent truncation is what
         # let this slip past for three days. WARN-level log is mandatory.
         assert any("clipping oversize value" in rec.message for rec in caplog.records)
@@ -125,10 +125,10 @@ class TestClipToColumnLimits:
         # unit_id is part of the PK but some portals genuinely emit
         # long URL-encoded blob keys. Better a clipped-but-stored row
         # than no row at all.
-        bad_id = "U" * 400
+        bad_id = "U" * 600  # unit_id is String(512) after migration 0009 — need >512 chars
         with caplog.at_level(logging.WARNING):
             out = _clip_to_column_limits({"unit_id": bad_id}, UnitRow)
-        assert len(out["unit_id"]) == 256
+        assert len(out["unit_id"]) == 512
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -155,7 +155,7 @@ class TestUpsertUnitsClip:
         # Verify the row landed with the clipped value, not the raw 560-char blob.
         stored = sqlite_provider.unit_state.get_units("CID-1")
         assert "A101" in stored
-        assert len(stored["A101"].floor_plan_name or "") <= 256
+        assert len(stored["A101"].floor_plan_name or "") <= 1024
 
     def test_no_silent_drop_under_concurrent_oversize_rows(
         self, sqlite_provider: SqliteDataProvider
