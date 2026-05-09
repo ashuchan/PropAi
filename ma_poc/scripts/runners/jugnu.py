@@ -263,8 +263,12 @@ async def run_jugnu(
         log.warning("state_store.load() failed — carry-forward and keyless gate disabled: %s", _sse)
         run_state_store = None  # type: ignore[assignment]
 
-    # Dummy profile store (reads from ma_poc/config/profiles/ if available)
-    profile_store = _SimpleProfileStore(_MA_POC_ROOT / "config" / "profiles")
+    # Profile store. In production the DATA_PROVIDER env points at Postgres
+    # so we get a SqlProfileStore that survives Cloud Run task teardown —
+    # critical for the self-learning loop (saved llm_field_mappings &
+    # dom_hints replay on the next run instead of re-paying LLM tax). Local
+    # dev with DATA_PROVIDER unset still gets the FS store, same as before.
+    profile_store = _build_profile_store(_MA_POC_ROOT / "config" / "profiles")
 
     scheduler = Scheduler(
         frontier=frontier,
@@ -1728,36 +1732,78 @@ def _write_properties_incremental(path: Path, properties: list[dict[str, Any]]) 
 
 
 class _SimpleProfileStore:
-    """Adapter around services.profile_store.ProfileStore.
+    """Profile store adapter — delegates to a durable backing store.
 
-    Provides ``get_profile(property_id)`` for back-compat with the dispatch
-    sites that expected the old read-only shim, while delegating storage,
-    bootstrap, drift detection, and post-extraction updates to the full
-    self-learning service layer that daily_runner uses.
+    In production (DATA_PROVIDER=postgres), the backing store is the
+    SqlProfileStore from data_provider.sql.stores so profile state survives
+    Cloud Run container teardown. The previous implementation was filesystem-
+    only, writing to ``/app/ma_poc/config/profiles/`` — a path that
 
-    This means Jugnu now:
-      - loads real ScrapeProfile objects (ProfileMaturity, preferred_tier,
-        known_endpoints, blocked_endpoints, etc.)
-      - updates profiles after each scrape via update_profile_after_extraction
-      - runs drift detection to demote HOT/WARM profiles that regressed
+      • is excluded from the docker image by ``.dockerignore``
+        (``config/profiles/`` is listed), so every container started with an
+        empty profile dir, AND
+      • is ephemeral once the Cloud Run task exits.
 
-    The bootstrap path creates a COLD profile from URL-based PMS detection
-    when a property is scraped for the first time — same as daily_runner.
+    Net effect: every property was bootstrapped COLD on every daily run, so
+    ``llm_field_mappings`` and ``dom_hints.field_selectors`` never replayed.
+    The profile_replay sub-tier in GenericAdapter recorded
+    ``outcome=skipped reason="no saved mappings"`` 462/462 times in
+    shard_0 of 2026-05-08 — every property re-paid the LLM tax daily.
+
+    Selection rules:
+      • If ``backing`` is provided (an ``IProfileStore``), use it directly.
+        Production wires this with ``DataProvider.profiles`` (PG-backed).
+      • Otherwise fall back to the filesystem store at ``profiles_dir``.
+        This is what local-dev / pytest paths get when no DataProvider is
+        wired in — same behaviour as before.
+
+    Save semantics: ``save`` and ``put`` are aliased so this object can be
+    passed directly to ``services.profile_updater.update_profile_after_extraction``
+    (which calls ``store.save(profile)``) or to any code expecting the
+    ``IProfileStore.put`` contract.
     """
 
-    def __init__(self, profiles_dir: Path) -> None:
-        # Lazy imports so importing this module doesn't drag in the services
-        # layer (and its deps) unless the profile loop is actually used.
+    def __init__(
+        self,
+        profiles_dir: Path,
+        *,
+        backing: Any | None = None,
+    ) -> None:
+        # Lazy imports keep the cold-start cost off importers that don't
+        # actually exercise the profile loop (e.g. test helpers).
         from services.profile_store import ProfileStore  # type: ignore[import-not-found]
 
-        self._backing = ProfileStore(profiles_dir)
+        self._fs_backing = ProfileStore(profiles_dir)
+        # When a DataProvider-backed store is supplied (production), prefer
+        # it. The FS store is kept as the bootstrap fallback so local-dev
+        # without a DB still works unchanged.
+        self._backing: Any = backing if backing is not None else self._fs_backing
+        self._uses_data_provider = backing is not None
 
     def get_profile(self, property_id: str) -> Any:
-        """Return a ScrapeProfile (not a plain dict). None if not found."""
+        """Return a ScrapeProfile (not a plain dict). None if not found.
+
+        Tries the durable backing first; on any read error, falls back to
+        the FS store so a transient DB blip doesn't tank the run. The
+        FS-only path keeps the historical behaviour for local-dev.
+        """
         try:
+            if self._uses_data_provider:
+                # IProfileStore.get is the canonical read API.
+                return self._backing.get(property_id)
             return self._backing.load(property_id)
         except Exception as exc:
-            log.debug("profile load failed for %s: %s", property_id, exc)
+            log.warning(
+                "profile load failed for %s via %s: %s — falling back to FS",
+                property_id,
+                "data_provider" if self._uses_data_provider else "fs",
+                exc,
+            )
+            if self._uses_data_provider:
+                try:
+                    return self._fs_backing.load(property_id)
+                except Exception:
+                    return None
             return None
 
     def bootstrap(self, property_id: str, meta: dict[str, Any], website: str) -> Any:
@@ -1765,8 +1811,9 @@ class _SimpleProfileStore:
 
         Builds the ScrapeProfile directly rather than using
         ``ProfileStore.bootstrap_from_meta`` because that helper references
-        fields that drifted out of the current ``DomHints`` model. Keeps
-        this path self-contained so Jugnu isn't blocked by upstream bugs.
+        fields that drifted out of the current ``DomHints`` model. The
+        bootstrap is persisted via ``save()`` so the same code path works
+        for both FS and DB backings.
         """
         try:
             from models.scrape_profile import (  # type: ignore[import-not-found]
@@ -1792,22 +1839,91 @@ class _SimpleProfileStore:
                 api_hints=api_hints,
                 dom_hints=DomHints(),
             )
-            self._backing.save(profile)
+            self.save(profile)
             return profile
         except Exception as exc:
             log.debug("profile bootstrap failed for %s: %s", property_id, exc)
             return None
 
     def save(self, profile: Any) -> None:
+        """Persist the profile via the durable backing.
+
+        FS backing exposes ``save``; IProfileStore exposes ``put``.
+        We dispatch on whichever is wired so callers (notably
+        ``profile_updater.update_profile_after_extraction``) can stay
+        backing-agnostic.
+        """
         try:
-            self._backing.save(profile)
+            if self._uses_data_provider:
+                self._backing.put(profile)
+            else:
+                self._backing.save(profile)
         except Exception as exc:
             log.warning("profile save failed: %s", exc)
+            if self._uses_data_provider:
+                # Last-ditch FS write so we don't lose the update entirely
+                # on a DB blip. Next sync will reconcile.
+                try:
+                    self._fs_backing.save(profile)
+                except Exception as fs_exc:
+                    log.warning("FS fallback save also failed: %s", fs_exc)
 
+    # ``profile_updater`` calls ``store.save(profile)`` on whatever object
+    # is passed as the 4th arg. With the legacy FS store that was the
+    # ``services.profile_store.ProfileStore`` instance (``self._backing``);
+    # with the DB-backed path we need ``self`` so the dispatch logic in
+    # ``save()`` (FS vs DB) runs. ``backing`` therefore returns ``self``
+    # for the data-provider path and the underlying FS store for the
+    # legacy path. Either way the consumer just calls ``.save(profile)``.
     @property
     def backing(self) -> Any:
-        """Raw ProfileStore — for APIs that expect the full service."""
-        return self._backing
+        return self if self._uses_data_provider else self._fs_backing
+
+    # IProfileStore alias — lets external code that wants the contract
+    # interface call ``store.put(profile)`` instead of ``store.save(profile)``.
+    def put(self, profile: Any) -> None:
+        self.save(profile)
+
+
+def _build_profile_store(profiles_dir: Path) -> _SimpleProfileStore:
+    """Construct the runner's profile store with the right backing.
+
+    Resolution order:
+      1. Use ``get_data_provider().profiles`` when a DataProvider is
+         configured (DATA_PROVIDER=postgres/sqlite/dual). This is the
+         production path and the one that closes the self-learning loop:
+         profiles persist in Postgres across Cloud Run task boundaries.
+      2. Fall back to the legacy FS-only store at ``profiles_dir``.
+         This keeps local-dev (DATA_PROVIDER unset / =filesystem)
+         behaving identically to before.
+
+    Failures in step 1 are non-fatal — the runner still produces output,
+    just without the durable profile loop. We log loudly so the regression
+    is visible in shard logs rather than silent.
+    """
+    pg_backing: Any = None
+    try:
+        provider_name = (os.getenv("DATA_PROVIDER") or "filesystem").strip().lower()
+        if provider_name in ("postgres", "pg", "sqlite", "dual"):
+            from data_provider.factory import (  # type: ignore[import-not-found]
+                get_data_provider,
+            )
+
+            provider = get_data_provider()
+            pg_backing = provider.profiles
+            log.info(
+                "Profile store wired to data_provider=%s (durable across runs)",
+                provider.name,
+            )
+    except Exception as exc:
+        # Fall through to FS — never block the runner because PG wiring
+        # blew up. The end-of-shard sync still has its own retry path.
+        log.warning(
+            "Failed to wire profile store to data_provider; falling back to FS: %s",
+            exc,
+        )
+        pg_backing = None
+    return _SimpleProfileStore(profiles_dir, backing=pg_backing)
 
 
 def main() -> int:

@@ -229,6 +229,17 @@ class DomHints(BaseModel):
     availability_page_sections: list[str] = Field(default_factory=list)  # CSS selectors for unit sections
     # Phase 8: drift eviction — clear field_selectors after 3 consecutive misses
     consecutive_misses: int = 0
+    # Save-time replay quality for ``field_selectors``. Recorded by
+    # ``profile_updater`` from the value the GenericAdapter computed when
+    # the LLM produced the selectors: replay the selectors against the
+    # source HTML and divide by the LLM's own unit count. A score below
+    # 0.4 prevents persistence; between 0.4 and 0.8 the selectors persist
+    # but the replay path soft-fails (won't short-circuit on them); 1.0
+    # means perfect reproduction. Default is 1.0 for backward compat
+    # with profiles written before this field existed — they were saved
+    # without validation, but the consecutive-misses eviction still
+    # cleans them up.
+    field_selectors_quality: float = 1.0
 
 
 class ExtractionConfidence(BaseModel):

@@ -88,6 +88,15 @@ class EventKind(StrEnum):
     MAPPING_EVICTED = "mapping.evicted"
     DOM_HINTS_MISS = "dom_hints.miss"
     DOM_HINTS_EVICTED = "dom_hints.evicted"
+    # LLM-tax avoidance signal — emitted from generic.py's profile_replay
+    # sub-tier whenever a property reached a tier without paying for an
+    # LLM call. Pair with MAPPING_REPLAY_EMPTY / DOM_HINTS_MISS to compute
+    # an "avoidance rate" per run, which is the canonical regression
+    # signal for the self-learning loop. Without this metric, the
+    # 462/462 silent-skip regression would re-appear invisibly. See
+    # validate_outputs.py / slo_watcher.py for aggregation.
+    PROFILE_REPLAY_HIT = "profile.replay_hit"
+    PROFILE_REPLAY_MISS_WITH_SAVED = "profile.replay_miss_with_saved"
     FIELD_PATCH_HIT = "field_patch.hit"
     FIELD_PATCH_DRIFT = "field_patch.drift"
     FIELD_PATCH_EVICTED = "field_patch.evicted"

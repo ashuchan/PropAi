@@ -347,6 +347,22 @@ def update_profile_after_extraction(
                 availability_date=css.get("availability_date"),
                 unit_id=css.get("unit_id"),
             )
+            # Persist the save-time replay quality score the adapter
+            # computed (1.0 by default for selectors that perfectly
+            # reproduce their own LLM-extracted units; <0.8 means the
+            # cascade should soft-trust them; <0.4 should never reach
+            # this path because the adapter drops the hints entirely).
+            # Without this score, consecutive-miss eviction is the only
+            # safety net, which spends a wasted DOM cascade on every
+            # broken selector for three runs before clearing — exactly
+            # the daily LLM-tax pattern this fix targets.
+            quality_raw = llm_hints.get("css_selectors_quality")
+            if isinstance(quality_raw, (int, float)):
+                profile.dom_hints.field_selectors_quality = max(
+                    0.0, min(1.0, float(quality_raw))
+                )
+            else:
+                profile.dom_hints.field_selectors_quality = 1.0
 
         if llm_hints.get("platform_guess"):
             profile.dom_hints.platform_detected = llm_hints["platform_guess"]

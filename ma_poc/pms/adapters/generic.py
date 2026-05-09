@@ -36,10 +36,12 @@ from ma_poc.pms.adapters._daily_runner_parsers import (
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_sightmap_payload as _dr_parse_sightmap,
 )
+from ma_poc.models.scrape_profile import FieldSelectorMap as _FieldSelectorMap
 from ma_poc.pms.adapters._html_extract import (
     extract_embedded_blobs_from_html,
     extract_jsonld_from_html,
     extract_units_from_dom,
+    extract_with_hints,
 )
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -977,6 +979,24 @@ class GenericAdapter:
                         reason="replayed saved LlmFieldMapping (quality ok)",
                         duration_ms=int((_time.monotonic() - t0) * 1000),
                     )
+                    # PROFILE_REPLAY_HIT — the self-learning loop produced
+                    # a unit set without paying any LLM cost. This is THE
+                    # avoidance signal we monitor: aggregating these per
+                    # run divided by total successful properties is the
+                    # "LLM tax avoidance rate". A drop in this rate means
+                    # the loop has regressed (mappings stopped persisting,
+                    # the data layer wiped them, etc.).
+                    try:
+                        from ma_poc.observability.events import EventKind, emit
+                        emit(
+                            EventKind.PROFILE_REPLAY_HIT,
+                            ctx.property_id or "unknown",
+                            units=len(replayed_units),
+                            quality=round(float(agg_q), 3),
+                            mappings_used=len(replayed_mappings),
+                        )
+                    except Exception:
+                        pass
                     result.units = replayed_units
                     result.tier_used = "TIER_1_PROFILE_MAPPING"
                     result.winning_url = (
@@ -1002,6 +1022,24 @@ class GenericAdapter:
                 reason=("no saved mappings" if not saved else "saved mappings didn't match any captured API"),
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
+            # PROFILE_REPLAY_MISS_WITH_SAVED — the property had saved
+            # mappings but none of them matched a captured API on this
+            # run. Distinct from "skipped" (no saved at all): a miss
+            # despite having saved mappings is the early-warning sign
+            # for environment/URL drift between runs. If this fires for
+            # the same property 3+ days running, the eviction path will
+            # clear the entry, but until then the property pays LLM tax.
+            if saved and not replayed_units:
+                try:
+                    from ma_poc.observability.events import EventKind, emit
+                    emit(
+                        EventKind.PROFILE_REPLAY_MISS_WITH_SAVED,
+                        ctx.property_id or "unknown",
+                        saved_count=len(saved),
+                        captured_apis=len(api_responses),
+                    )
+                except Exception:
+                    pass
 
         # Sub-tier 1: narrow generic API parser -----------------------------
         t0 = _time.monotonic()
@@ -1198,7 +1236,18 @@ class GenericAdapter:
             if ctx.profile is not None:
                 fs = ctx.profile.dom_hints.field_selectors
                 if fs and getattr(fs, "container", None):
-                    dom_hints = fs
+                    # Skip replay when the saved selectors were flagged at
+                    # save time as low-quality (LLM produced selectors that
+                    # didn't reproduce their own units). Letting them try
+                    # anyway would produce ``consecutive_misses`` events
+                    # that gradually evict the entry — but at the cost of
+                    # one wasted DOM cascade per run. Faster to bypass them
+                    # and let the LLM-DOM tier produce fresh selectors.
+                    fs_quality = float(
+                        getattr(ctx.profile.dom_hints, "field_selectors_quality", 1.0) or 1.0
+                    )
+                    if fs_quality >= 0.4:
+                        dom_hints = fs
             hints_attempted = dom_hints is not None
             try:
                 dom_units, _dom_hit_mode = extract_units_from_dom(html, ctx.base_url, hints=dom_hints)
@@ -1581,7 +1630,63 @@ class GenericAdapter:
             result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
             result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
             if llm_css_selectors:
-                result._llm_hints = {"css_selectors": llm_css_selectors}  # type: ignore[attr-defined]
+                # Self-validate the LLM's selectors before persisting them.
+                # The LLM has just produced N units AND a CSS-selector dict
+                # claimed to extract them deterministically. Replay the
+                # selectors against the same dom_section_html and compare
+                # the unit count to gate persistence:
+                #
+                #   ratio >= 0.8  → high quality, persist as-is.
+                #   0.4 ≤ ratio < 0.8 → flaky, persist with a quality_score
+                #                       so replay-side gating can soft-fail.
+                #   ratio < 0.4   → broken, drop the selectors entirely so
+                #                   tomorrow's run won't burn time on a
+                #                   guaranteed miss before falling through
+                #                   to LLM. Cheaper to re-LLM than to chase
+                #                   a known-bad hint cycle.
+                #
+                # Why inline at extract-time and not in profile_updater:
+                # the dom_section_html lives only here. Plumbing it through
+                # to the updater would bloat the result dict and cost ledger
+                # for every property; the validation needs ~1ms locally so
+                # there's no reason to defer it.
+                quality_score = 1.0
+                try:
+                    _hints_obj = _FieldSelectorMap(**llm_css_selectors) if isinstance(
+                        llm_css_selectors, dict
+                    ) else llm_css_selectors
+                    _replayed = extract_with_hints(
+                        dom_section_html or "", ctx.base_url, _hints_obj
+                    )
+                    expected = max(len(dom_units), 1)
+                    quality_score = min(1.0, len(_replayed) / expected)
+                except Exception:
+                    # Replay raised — treat selectors as unverified rather
+                    # than blocking the win. Quality 0.5 lets the cascade
+                    # use them tomorrow but the replay path won't trust
+                    # them for short-circuit.
+                    quality_score = 0.5
+
+                if quality_score < 0.4:
+                    # Selectors don't reproduce against their own source
+                    # HTML — they will almost certainly miss tomorrow.
+                    # Skip persistence and emit telemetry so the saver
+                    # regression doesn't reappear silently.
+                    try:
+                        from ma_poc.observability.events import EventKind, emit
+                        emit(
+                            EventKind.DOM_HINTS_MISS,
+                            ctx.property_id or "unknown",
+                            count=0,
+                            reason=f"selectors_self_validation_failed:{quality_score:.2f}",
+                        )
+                    except Exception:
+                        pass
+                else:
+                    result._llm_hints = {  # type: ignore[attr-defined]
+                        "css_selectors": llm_css_selectors,
+                        "css_selectors_quality": quality_score,
+                    }
             return result
 
         # Sub-tier 6c: monolithic fallback --------------------------------
