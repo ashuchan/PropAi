@@ -30,7 +30,9 @@ def test_field_mapping_saved_to_profile() -> None:
     assert saved is True
     assert len(profile.api_hints.llm_field_mappings) == 1
     m = profile.api_hints.llm_field_mappings[0]
-    assert m.api_url_pattern == "https://example.com/api/floorplans"
+    # normalize_url_pattern (added in main PR5) strips the scheme so patterns
+    # survive api_key rotation and scheme changes between runs.
+    assert "example.com/api/floorplans" in m.api_url_pattern
     assert m.json_paths.get("bedrooms") == "beds"
     assert m.response_envelope == "data.units"
 
