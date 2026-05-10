@@ -134,7 +134,7 @@ class TestPostgresModeGuard:
         fixture = Path(__file__).resolve().parents[1] / "fixtures" / "canary" / "failures.csv"
 
         monkeypatch.setattr(lc, "_find_failures_csv", lambda _: fixture)
-        monkeypatch.setattr(lc, "setup_canary_db", lambda dsn: None)
+        monkeypatch.setattr(lc, "setup_canary_db", lambda dsn, db_mode="sqlite": None)
         monkeypatch.setattr(lc, "teardown_canary_db", lambda p: None)
         monkeypatch.setattr(lc, "replay", lambda **kw: 0)
         monkeypatch.setattr(lc, "read_canary_outcomes", lambda *a, **kw: {})

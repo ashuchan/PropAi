@@ -6,6 +6,8 @@ Phases executed in order:
   SETUP    — Create a disposable SQLite canary DB; bootstrap schema.
   SELECT   — Read failures from a prior cloud run; apply filters; write
              canary_input.csv.
+  SEED     — (optional, --seed-from-prod) Copy scrape_profiles for the
+             selected properties from the live DB into the canary DB.
   REPLAY   — Invoke jugnu_runner as a subprocess with DATABASE_URL pointed
              at the canary DB and env flags injected from --flag args.
   COMPARE  — Diff each property's cloud-run outcome vs. canary outcome.
@@ -21,6 +23,7 @@ Usage:
   python scripts/diagnostics/local_canary.py --from-run 2026-05-10
   python scripts/diagnostics/local_canary.py --from-run 2026-05-10 --limit 100 --filter-tier TIER_4_LLM_API
   python scripts/diagnostics/local_canary.py --from-run 2026-05-10 --include-property-id 37685 --keep --verbose
+  python scripts/diagnostics/local_canary.py compare --baseline-dir /tmp/run_a --treatment-dir /tmp/run_b
 """
 
 from __future__ import annotations
@@ -38,12 +41,10 @@ from pathlib import Path
 from typing import Any
 
 # ── Path bootstrap ────────────────────────────────────────────────────────────
-# Mirrors the pattern in analyze_cloud_run.py so the same DA_POC packages
-# resolve regardless of working directory.
 _SCRIPT_DIR = Path(__file__).resolve().parent          # scripts/diagnostics/
 _MA_POC_ROOT = _SCRIPT_DIR.parent.parent               # ma_poc/
 _REPO_ROOT = _MA_POC_ROOT.parent                       # PropAi/
-for _p in (_REPO_ROOT, _MA_POC_ROOT):
+for _p in (_REPO_ROOT, _MA_POC_ROOT, _SCRIPT_DIR):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
@@ -54,6 +55,7 @@ log = logging.getLogger("local_canary")
 _DEFAULT_LIMIT = 50
 _DEFAULT_TIMEOUT_PER_PROPERTY = 180          # seconds
 _JUGNU_RUNNER = _MA_POC_ROOT / "scripts" / "runners" / "jugnu.py"
+_DRY_RUN_RUNNER = _SCRIPT_DIR / "_canary_dry_run_runner.py"
 _DEFAULT_OUT_ROOT = _MA_POC_ROOT / "data" / "canary" / "local_runs"
 # Mirrors DEFAULT_OUT_ROOT from analyze_cloud_run.py
 _ANALYZER_OUT_ROOT = _MA_POC_ROOT / "data" / "reports"
@@ -77,8 +79,10 @@ class _CanaryOutcome:
     """Per-property result derived from the canary run's events.jsonl."""
 
     property_id: str
-    verdict: str       # SUCCESS / FAILED_* / TIMEOUT_IN_CANARY
+    verdict: str          # SUCCESS / FAILED_* / TIMEOUT_IN_CANARY
     units: int = 0
+    tier: str = ""        # populated from extract.tier_won events (L4)
+    event_kinds: set[str] = field(default_factory=set)  # all event kinds seen (L4)
 
 
 @dataclass
@@ -91,10 +95,10 @@ class ComparedRow:
     cloud_tier: str
     cloud_units: int
     canary_outcome: str
-    canary_tier: str     # populated in L4 (attribution); empty in L1
+    canary_tier: str     # populated from tier_won events (L4)
     canary_units: int
     verdict: str         # IMPROVED / REGRESSED / UNCHANGED_OK / UNCHANGED_FAIL
-    attributed_fix: str = ""   # L4
+    attributed_fix: str = ""   # L4 attribution
 
 
 @dataclass
@@ -152,24 +156,59 @@ def _read_failures_csv(path: Path) -> list[dict[str, str]]:
 # ── DB setup / teardown ───────────────────────────────────────────────────────
 
 
-def setup_canary_db(canary_dsn: str) -> None:
-    """Create and bootstrap the canary SQLite DB.
+def setup_canary_db(canary_dsn: str, db_mode: str = "sqlite") -> None:
+    """Create and bootstrap the canary DB.
 
-    Uses SqliteDataProvider with create_schema=True so the full ORM schema
-    (Base.metadata.create_all) is applied idempotently.  The provider is
-    closed immediately; the subprocess gets a fresh connection via DATABASE_URL.
+    For ``sqlite`` mode uses SqliteDataProvider (create_schema=True) so the
+    full ORM schema is applied idempotently.
+
+    For ``postgres`` mode runs ``alembic upgrade head`` against the DSN, falling
+    back to ``Base.metadata.create_all()`` when alembic is unavailable.  The
+    caller is responsible for provisioning and cleaning up the Postgres DB.
 
     Args:
-        canary_dsn: SQLAlchemy connection string, e.g. ``sqlite:///path.sqlite``.
+        canary_dsn: SQLAlchemy connection string.
+        db_mode: ``"sqlite"`` (default) or ``"postgres"``.
 
     Raises:
         RuntimeError: If schema creation fails (surfaces as exit code 2).
     """
-    from data_provider.sqlite import SqliteDataProvider
+    if db_mode == "sqlite":
+        from data_provider.sqlite import SqliteDataProvider
 
-    dp = SqliteDataProvider(url=canary_dsn, create_schema=True)
-    dp.close()
-    log.info("Canary DB initialised: %s", canary_dsn)
+        dp = SqliteDataProvider(url=canary_dsn, create_schema=True)
+        dp.close()
+        log.info("Canary SQLite DB initialised: %s", canary_dsn)
+        return
+
+    # postgres mode — try alembic first, fall back to create_all
+    _setup_canary_db_postgres(canary_dsn)
+
+
+def _setup_canary_db_postgres(canary_dsn: str) -> None:
+    """Bootstrap schema for a Postgres canary DB.
+
+    Tries alembic upgrade head; falls back to Base.metadata.create_all().
+    """
+    try:
+        import alembic.config
+        import alembic.command
+
+        alembic_ini = _MA_POC_ROOT / "alembic.ini"
+        cfg = alembic.config.Config(str(alembic_ini))
+        cfg.set_main_option("sqlalchemy.url", canary_dsn)
+        alembic.command.upgrade(cfg, "head")
+        log.info("Canary Postgres DB bootstrapped via alembic: %s", canary_dsn)
+    except ImportError:
+        log.warning("alembic not installed; falling back to Base.metadata.create_all()")
+        from sqlalchemy import create_engine
+
+        from data_provider.sql.models import Base
+
+        engine = create_engine(canary_dsn)
+        Base.metadata.create_all(engine)
+        engine.dispose()
+        log.info("Canary Postgres DB bootstrapped via create_all: %s", canary_dsn)
 
 
 def teardown_canary_db(canary_db_path: Path) -> None:
@@ -183,6 +222,88 @@ def teardown_canary_db(canary_db_path: Path) -> None:
         log.info("Canary DB removed: %s", canary_db_path)
     except OSError as exc:
         log.warning("Could not remove canary DB %s: %s", canary_db_path, exc)
+
+
+# ── Profile seeding (L2) ──────────────────────────────────────────────────────
+
+
+def seed_profiles_from_prod(
+    property_ids: list[str],
+    canary_dsn: str,
+    source_dsn: str | None = None,
+) -> int:
+    """Copy scrape_profiles from the live DB into the canary DB.
+
+    Scoped to the given property_ids so only the profiles relevant to the
+    current canary batch are copied.  Uses a DELETE-then-INSERT pattern so
+    the call is idempotent.
+
+    Args:
+        property_ids: Canonical IDs to seed.
+        canary_dsn: SQLAlchemy DSN for the canary DB (destination).
+        source_dsn: SQLAlchemy DSN for the production DB (source).
+            Defaults to ``PROD_DATABASE_URL`` env var.
+
+    Returns:
+        Number of profiles seeded.
+
+    Raises:
+        RuntimeError: If the source DSN is unavailable or the copy fails.
+    """
+    if not property_ids:
+        log.info("seed_profiles_from_prod: no property IDs — nothing to seed")
+        return 0
+
+    resolved_source = source_dsn or os.environ.get("PROD_DATABASE_URL", "")
+    if not resolved_source:
+        raise RuntimeError(
+            "seed_profiles_from_prod requires PROD_DATABASE_URL env var "
+            "(or explicit source_dsn parameter)"
+        )
+
+    from sqlalchemy import create_engine, delete, select
+
+    from data_provider.sql.models import ScrapeProfileRow
+
+    log.info(
+        "Seeding %d profiles from prod → canary", len(property_ids)
+    )
+
+    src_engine = create_engine(resolved_source)
+    dst_engine = create_engine(canary_dsn)
+
+    try:
+        # Fetch matching profiles from the source DB.
+        with src_engine.connect() as src_conn:
+            stmt = select(ScrapeProfileRow).where(
+                ScrapeProfileRow.canonical_id.in_(property_ids)
+            )
+            src_rows = src_conn.execute(stmt).mappings().all()
+
+        if not src_rows:
+            log.info("No profiles found in source DB for the given property IDs")
+            return 0
+
+        # Delete any existing profiles in the canary DB for these IDs, then
+        # insert the source rows.
+        with dst_engine.begin() as dst_conn:
+            dst_conn.execute(
+                delete(ScrapeProfileRow).where(
+                    ScrapeProfileRow.canonical_id.in_(property_ids)
+                )
+            )
+            for row in src_rows:
+                dst_conn.execute(
+                    ScrapeProfileRow.__table__.insert().values(dict(row))
+                )
+
+        seeded = len(src_rows)
+        log.info("Seeded %d profiles into canary DB", seeded)
+        return seeded
+
+    finally:
+        src_engine.dispose()
+        dst_engine.dispose()
 
 
 # ── Property selection ────────────────────────────────────────────────────────
@@ -287,8 +408,9 @@ def replay(
     flag_overrides: dict[str, str],
     timeout_per_property: int = _DEFAULT_TIMEOUT_PER_PROPERTY,
     limit: int = _DEFAULT_LIMIT,
+    runner: Path | None = None,
 ) -> int:
-    """Invoke jugnu_runner as a subprocess against the canary input.
+    """Invoke jugnu_runner (or a custom runner) as a subprocess against the canary input.
 
     The subprocess gets a fresh env with DATABASE_URL pointed at the canary
     DB and any --flag overrides injected.  stdout+stderr are captured to
@@ -306,6 +428,9 @@ def replay(
         timeout_per_property: Seconds to allow per property (default 180).
         limit: Number of properties being run; used to compute the aggregate
             timeout ceiling for the subprocess.
+        runner: Optional path to an alternative runner script.  Defaults to
+            ``jugnu.py``.  Useful for dry-run/smoke tests (pass
+            ``_DRY_RUN_RUNNER``).
 
     Returns:
         Jugnu subprocess exit code (0 = completed, non-zero = partial / error).
@@ -318,9 +443,10 @@ def replay(
         **flag_overrides,
     }
 
+    effective_runner = runner or _JUGNU_RUNNER
     cmd = [
         sys.executable,
-        str(_JUGNU_RUNNER),
+        str(effective_runner),
         "--csv", str(canary_input_csv),
         "--data-dir", str(out_dir),
         "--run-date", run_date,
@@ -363,14 +489,15 @@ def replay(
 def read_canary_outcomes(out_dir: Path, run_date: str) -> dict[str, _CanaryOutcome]:
     """Parse the canary run's events.jsonl to get per-property verdicts.
 
-    Each PROPERTY_EMITTED event carries ``verdict`` and ``units`` in its
-    flat payload (events are serialised with ``**self.data`` unpacked into
-    the top-level dict, not nested under a ``data`` key).
+    Two-phase parse:
+      1. Scan all events to collect ``event_kinds`` and ``tier_used`` per
+         property (from ``extract.tier_won`` events).
+      2. Build outcomes only for properties that emitted a
+         ``output.property_emitted`` event (last event per property wins).
 
     Args:
         out_dir: Base data directory used for the jugnu subprocess.
-        run_date: YYYY-MM-DD of the canary run (matches ``--run-date`` passed
-            to jugnu; determines the ``runs/{run_date}/`` subdirectory).
+        run_date: YYYY-MM-DD of the canary run.
 
     Returns:
         Dict mapping ``property_id → _CanaryOutcome``.  Properties that emitted
@@ -382,7 +509,11 @@ def read_canary_outcomes(out_dir: Path, run_date: str) -> dict[str, _CanaryOutco
         log.warning("events.jsonl not found at %s", events_path)
         return {}
 
-    outcomes: dict[str, _CanaryOutcome] = {}
+    # Phase 1 — collect ancillary info for every property.
+    event_kinds_by_pid: dict[str, set[str]] = {}
+    tier_by_pid: dict[str, str] = {}
+    last_emitted: dict[str, dict[str, Any]] = {}
+
     with events_path.open(encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
@@ -392,17 +523,34 @@ def read_canary_outcomes(out_dir: Path, run_date: str) -> dict[str, _CanaryOutco
                 ev = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if ev.get("kind") != "output.property_emitted":
-                continue
+
             pid = str(ev.get("property_id", "")).strip()
             if not pid:
                 continue
-            verdict = str(ev.get("verdict", "FAILED_NO_DATA"))
-            units = int(ev.get("units", 0))
-            # Last PROPERTY_EMITTED per property wins (carry-forward can re-emit).
-            outcomes[pid] = _CanaryOutcome(
-                property_id=pid, verdict=verdict, units=units
-            )
+
+            kind = str(ev.get("kind", ""))
+            event_kinds_by_pid.setdefault(pid, set()).add(kind)
+
+            if kind == "extract.tier_won":
+                tier = str(ev.get("tier_used", ""))
+                if tier:
+                    tier_by_pid[pid] = tier
+
+            if kind == "output.property_emitted":
+                last_emitted[pid] = ev
+
+    # Phase 2 — build outcomes only for PROPERTY_EMITTED properties.
+    outcomes: dict[str, _CanaryOutcome] = {}
+    for pid, ev in last_emitted.items():
+        verdict = str(ev.get("verdict", "FAILED_NO_DATA"))
+        units = int(ev.get("units", 0))
+        outcomes[pid] = _CanaryOutcome(
+            property_id=pid,
+            verdict=verdict,
+            units=units,
+            tier=tier_by_pid.get(pid, ""),
+            event_kinds=event_kinds_by_pid.get(pid, set()),
+        )
 
     log.info("Read %d canary outcomes from %s", len(outcomes), events_path)
     return outcomes
@@ -427,6 +575,8 @@ def compare(
                           treated as infrastructure failure, not as a
                           code-under-test failure.
 
+    IMPROVED rows are annotated with a heuristic fix attribution (L4).
+
     Args:
         cloud_rows: Rows from canary_input.csv (includes the cloud verdict).
         canary_outcomes: Per-property results from the canary run's events.
@@ -435,6 +585,8 @@ def compare(
     Returns:
         Populated CanaryReport.
     """
+    from local_canary_attribution import attribute_fix
+
     report = CanaryReport(
         run_date=date.today().isoformat(),
         source_run_date=source_run_date,
@@ -451,18 +603,24 @@ def compare(
         if canary is None:
             canary_verdict = VERDICT_TIMEOUT_IN_CANARY
             canary_units = 0
+            canary_tier = ""
+            event_kinds: set[str] = set()
         else:
             canary_verdict = canary.verdict
             canary_units = canary.units
+            canary_tier = canary.tier
+            event_kinds = canary.event_kinds
 
         canary_was_ok = canary_verdict in _SUCCESS_VERDICTS
 
+        attributed_fix = ""
         if canary_verdict == VERDICT_TIMEOUT_IN_CANARY:
             row_verdict = VERDICT_TIMEOUT_IN_CANARY
             report.timeout_in_canary += 1
         elif not cloud_was_ok and canary_was_ok:
             row_verdict = VERDICT_IMPROVED
             report.improved += 1
+            attributed_fix = attribute_fix(event_kinds, cloud_tier, canary_tier)
         elif cloud_was_ok and not canary_was_ok:
             row_verdict = VERDICT_REGRESSED
             report.regressed += 1
@@ -481,9 +639,10 @@ def compare(
                 cloud_tier=cloud_tier,
                 cloud_units=0,  # failures.csv has no units count for failures
                 canary_outcome=canary_verdict,
-                canary_tier="",  # populated in L4
+                canary_tier=canary_tier,
                 canary_units=canary_units,
                 verdict=row_verdict,
+                attributed_fix=attributed_fix,
             )
         )
 
@@ -541,19 +700,35 @@ def render_markdown(report: CanaryReport) -> str:
                 )
         lines.append("")
 
+    if report.improved > 0:
+        lines += [
+            "## Improvements — FIX ATTRIBUTION",
+            "",
+            "These properties were failing in the cloud run but succeed in the canary.",
+            "",
+        ]
+        for row in report.rows:
+            if row.verdict == VERDICT_IMPROVED:
+                attr = f" ← `{row.attributed_fix}`" if row.attributed_fix else ""
+                lines.append(
+                    f"- **`{row.property_id}`** `{row.url}` — "
+                    f"cloud: `{row.cloud_outcome}` → canary: `{row.canary_outcome}`{attr}"
+                )
+        lines.append("")
+
     lines += [
         "## Per-property delta",
         "",
         "| property_id | cloud_outcome | cloud_tier | cloud_units"
-        " | canary_outcome | canary_units | verdict |",
-        "|---|---|---|---|---|---|---|",
+        " | canary_outcome | canary_tier | canary_units | verdict | attributed_fix |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
 
     for row in report.rows:
         lines.append(
             f"| `{row.property_id}` | {row.cloud_outcome} | {row.cloud_tier}"
-            f" | {row.cloud_units} | {row.canary_outcome} | {row.canary_units}"
-            f" | **{row.verdict}** |"
+            f" | {row.cloud_units} | {row.canary_outcome} | {row.canary_tier}"
+            f" | {row.canary_units} | **{row.verdict}** | {row.attributed_fix} |"
         )
 
     lines.append("")
@@ -596,6 +771,101 @@ def render_json(report: CanaryReport) -> str:
         ],
     }
     return json.dumps(payload, indent=2)
+
+
+# ── Compare subcommand (L5) ───────────────────────────────────────────────────
+
+
+def _load_summary_json(out_dir: Path) -> dict[str, Any]:
+    """Load and return a summary.json from an out-dir."""
+    path = out_dir / "summary.json"
+    if not path.exists():
+        raise FileNotFoundError(f"summary.json not found in {out_dir}")
+    with path.open(encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def _build_compare_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for the ``compare`` subcommand."""
+    p = argparse.ArgumentParser(
+        prog="local_canary.py compare",
+        description=(
+            "Compare two prior canary out-dirs (baseline vs. treatment) "
+            "and emit a delta summary."
+        ),
+    )
+    p.add_argument(
+        "--baseline-dir",
+        required=True,
+        type=Path,
+        metavar="PATH",
+        help="Out-dir from the baseline canary run (all flags off).",
+    )
+    p.add_argument(
+        "--treatment-dir",
+        required=True,
+        type=Path,
+        metavar="PATH",
+        help="Out-dir from the treatment canary run (flags on).",
+    )
+    p.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit delta as JSON to stdout.",
+    )
+    return p
+
+
+def _main_compare(argv: list[str]) -> int:
+    """Entry point for the ``compare`` subcommand.
+
+    Loads summary.json from baseline and treatment out-dirs, prints a delta
+    block, and exits 0 (pass) or 1 (treatment regressed vs. baseline).
+    """
+    parser = _build_compare_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        baseline = _load_summary_json(args.baseline_dir)
+        treatment = _load_summary_json(args.treatment_dir)
+    except FileNotFoundError as exc:
+        log.error("%s", exc)
+        return 2
+
+    delta = {
+        "baseline_dir": str(args.baseline_dir),
+        "treatment_dir": str(args.treatment_dir),
+        "baseline_passed": baseline.get("passed", False),
+        "treatment_passed": treatment.get("passed", False),
+        "delta_improved": treatment.get("improved", 0) - baseline.get("improved", 0),
+        "delta_regressed": treatment.get("regressed", 0) - baseline.get("regressed", 0),
+        "delta_unchanged_ok": (
+            treatment.get("unchanged_ok", 0) - baseline.get("unchanged_ok", 0)
+        ),
+        "delta_unchanged_fail": (
+            treatment.get("unchanged_fail", 0) - baseline.get("unchanged_fail", 0)
+        ),
+    }
+
+    if args.json:
+        print(json.dumps(delta, indent=2))
+    else:
+        print("\nBaseline vs. Treatment delta")
+        print(f"  baseline : {args.baseline_dir}")
+        print(f"  treatment: {args.treatment_dir}")
+        print(f"  ΔIMPROVED:       {delta['delta_improved']:+d}")
+        print(f"  ΔUNCHANGED_OK:   {delta['delta_unchanged_ok']:+d}")
+        print(f"  ΔUNCHANGED_FAIL: {delta['delta_unchanged_fail']:+d}")
+        print(f"  ΔREGRESSED:      {delta['delta_regressed']:+d}")
+        passed = (
+            treatment.get("passed", False)
+            and delta["delta_regressed"] <= 0
+        )
+        print(f"\n  Gate: treatment_passed AND no new regressions → {'PASS' if passed else 'FAIL'}")
+
+    # Return 1 if treatment introduced new regressions vs. baseline.
+    return 0 if delta["delta_regressed"] <= 0 else 1
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -692,12 +962,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--seed-from-prod",
         action="store_true",
         default=False,
-        help="[L2] Copy yesterday's scrape_profiles from the live DB into the canary DB. Not implemented in L1.",
+        help=(
+            "Copy scrape_profiles from PROD_DATABASE_URL into the canary DB "
+            "for the selected property IDs. Requires PROD_DATABASE_URL env var."
+        ),
     )
     db.add_argument(
         "--keep",
-        action="store_true",
         default=False,
+        action="store_true",
         help="Do not drop the canary DB at the end; print its DSN for forensics.",
     )
 
@@ -717,7 +990,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--baseline",
         action="store_true",
         default=False,
-        help="[L5] Run twice — baseline (flags off) then treatment (flags on). Not implemented in L1.",
+        help=(
+            "Run twice — baseline (flags off) then treatment (flags on). "
+            "Emits a delta block comparing the two runs."
+        ),
     )
 
     # Output
@@ -754,8 +1030,50 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SEC",
         help=f"Abort a property after this many seconds (default: {_DEFAULT_TIMEOUT_PER_PROPERTY}).",
     )
+    beh.add_argument(
+        "--dry-run-replay",
+        action="store_true",
+        default=False,
+        help=(
+            "Use the synthetic dry-run runner instead of jugnu.py. "
+            "Every property gets a synthetic SUCCESS verdict. "
+            "Useful for smoke-testing the canary tool itself."
+        ),
+    )
 
     return p
+
+
+def _run_single(
+    args: argparse.Namespace,
+    out_dir: Path,
+    canary_dsn: str,
+    flag_overrides: dict[str, str],
+    selected: list[dict[str, str]],
+    canary_input_csv: Path,
+    runner: Path | None,
+) -> tuple[int, CanaryReport]:
+    """Execute one replay+compare cycle.  Returns (exit_code, report)."""
+    run_date = date.today().isoformat()
+
+    jugnu_exit = replay(
+        canary_input_csv=canary_input_csv,
+        canary_dsn=canary_dsn,
+        out_dir=out_dir,
+        run_date=run_date,
+        flag_overrides=flag_overrides,
+        timeout_per_property=args.timeout_per_property,
+        limit=len(selected),
+        runner=runner,
+    )
+
+    if jugnu_exit == 2:
+        log.error("Jugnu subprocess failed to start; cannot produce a meaningful report.")
+        return 2, CanaryReport(run_date=run_date, source_run_date=args.from_run)
+
+    canary_outcomes = read_canary_outcomes(out_dir, run_date)
+    report = compare(selected, canary_outcomes, source_run_date=args.from_run)
+    return 0, report
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -767,8 +1085,13 @@ def main(argv: list[str] | None = None) -> int:
     Returns:
         Exit code: 0 = pass, 1 = regressions found, 2 = infra failure.
     """
+    # Dispatch compare subcommand before full parser so it gets its own --help.
+    effective_argv = argv if argv is not None else sys.argv[1:]
+    if effective_argv and effective_argv[0] == "compare":
+        return _main_compare(effective_argv[1:])
+
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(effective_argv)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -778,10 +1101,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.limit <= 0:
         parser.error("--limit must be > 0")
 
-    if args.baseline:
-        log.warning("--baseline is not implemented in L1; flag ignored.")
-    if args.seed_from_prod:
-        log.warning("--seed-from-prod is not implemented in L1; flag ignored.")
     if args.db_mode == "postgres":
         log.warning("--db-mode postgres is not implemented in L1; falling back to sqlite.")
 
@@ -794,7 +1113,7 @@ def main(argv: list[str] | None = None) -> int:
     canary_dsn = f"sqlite:///{canary_db_path}"
 
     try:
-        setup_canary_db(canary_dsn)
+        setup_canary_db(canary_dsn, db_mode=args.db_mode)
     except Exception as exc:
         log.error("Canary DB setup failed: %s", exc)
         return 2
@@ -845,27 +1164,27 @@ def main(argv: list[str] | None = None) -> int:
     canary_input_csv = out_dir / "canary_input.csv"
     write_canary_input_csv(selected, canary_input_csv)
 
+    # ── SEED (L2) ─────────────────────────────────────────────────────────────
+    if args.seed_from_prod:
+        property_ids = [r["property_id"] for r in selected]
+        try:
+            seeded = seed_profiles_from_prod(property_ids, canary_dsn)
+            log.info("Profile seeding complete: %d profiles seeded", seeded)
+        except RuntimeError as exc:
+            log.error("Profile seeding failed: %s", exc)
+            return 2
+
     # ── REPLAY ────────────────────────────────────────────────────────────────
     flag_overrides = _parse_flag_overrides(args.flag)
-    run_date = date.today().isoformat()
+    runner: Path | None = _DRY_RUN_RUNNER if args.dry_run_replay else None
 
-    jugnu_exit = replay(
-        canary_input_csv=canary_input_csv,
-        canary_dsn=canary_dsn,
-        out_dir=out_dir,
-        run_date=run_date,
-        flag_overrides=flag_overrides,
-        timeout_per_property=args.timeout_per_property,
-        limit=args.limit,
-    )
+    if args.baseline:
+        exit_code, report = _run_baseline_treatment(args, out_dir, canary_dsn, flag_overrides, selected, canary_input_csv, runner)
+    else:
+        exit_code, report = _run_single(args, out_dir, canary_dsn, flag_overrides, selected, canary_input_csv, runner)
 
-    if jugnu_exit == 2:
-        log.error("Jugnu subprocess failed to start; cannot produce a meaningful report.")
+    if exit_code == 2:
         return 2
-
-    # ── COMPARE ───────────────────────────────────────────────────────────────
-    canary_outcomes = read_canary_outcomes(out_dir, run_date)
-    report = compare(selected, canary_outcomes, source_run_date=args.from_run)
 
     # ── REPORT ────────────────────────────────────────────────────────────────
     md_path = out_dir / "report.md"
@@ -887,6 +1206,62 @@ def main(argv: list[str] | None = None) -> int:
         teardown_canary_db(canary_db_path)
 
     return 0 if report.passed else 1
+
+
+def _run_baseline_treatment(
+    args: argparse.Namespace,
+    out_dir: Path,
+    canary_dsn: str,
+    flag_overrides: dict[str, str],
+    selected: list[dict[str, str]],
+    canary_input_csv: Path,
+    runner: Path | None,
+) -> tuple[int, CanaryReport]:
+    """Run two passes (baseline then treatment) and return the treatment report."""
+    log.info("--baseline: running baseline pass (flags stripped)")
+
+    baseline_dir = out_dir / "baseline"
+    baseline_dir.mkdir(parents=True, exist_ok=True)
+
+    # Baseline: all feature flags stripped
+    exit_b, report_b = _run_single(
+        args, baseline_dir, canary_dsn,
+        flag_overrides={}, selected=selected,
+        canary_input_csv=canary_input_csv, runner=runner,
+    )
+    if exit_b == 2:
+        return 2, report_b
+
+    # Write baseline summary.json for the compare subcommand.
+    baseline_json = baseline_dir / "summary.json"
+    baseline_json.write_text(render_json(report_b), encoding="utf-8")
+
+    log.info("--baseline: running treatment pass (flags on)")
+
+    treatment_dir = out_dir / "treatment"
+    treatment_dir.mkdir(parents=True, exist_ok=True)
+
+    exit_t, report_t = _run_single(
+        args, treatment_dir, canary_dsn,
+        flag_overrides=flag_overrides, selected=selected,
+        canary_input_csv=canary_input_csv, runner=runner,
+    )
+    if exit_t == 2:
+        return 2, report_t
+
+    treatment_json = treatment_dir / "summary.json"
+    treatment_json.write_text(render_json(report_t), encoding="utf-8")
+
+    # Print baseline vs. treatment delta.
+    delta_regressed = report_t.regressed - report_b.regressed
+    delta_improved = report_t.improved - report_b.improved
+    print("\nBaseline vs. Treatment delta")
+    print(f"  ΔIMPROVED:  {delta_improved:+d}")
+    print(f"  ΔREGRESSED: {delta_regressed:+d}")
+    gate = delta_regressed <= 0 and report_t.passed
+    print(f"\n  Gate: treatment no new regressions → {'PASS' if gate else 'FAIL'}")
+
+    return 0, report_t
 
 
 def _print_summary(report: CanaryReport, out_dir: Path | None = None) -> None:

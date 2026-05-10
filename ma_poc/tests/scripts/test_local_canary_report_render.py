@@ -349,7 +349,7 @@ class TestExitCodes:
     def _run_main(self, monkeypatch, tmp_path, canary_outcomes: dict, jugnu_exit: int = 0) -> int:
         """Run main() with jugnu and DB creation stubbed out."""
         monkeypatch.setattr(lc, "_find_failures_csv", lambda _: self._FIXTURE)
-        monkeypatch.setattr(lc, "setup_canary_db", lambda dsn: None)
+        monkeypatch.setattr(lc, "setup_canary_db", lambda dsn, db_mode="sqlite": None)
         monkeypatch.setattr(lc, "teardown_canary_db", lambda p: None)
         monkeypatch.setattr(lc, "replay", lambda **kw: jugnu_exit)
         monkeypatch.setattr(lc, "read_canary_outcomes", lambda *a, **kw: canary_outcomes)
@@ -394,7 +394,7 @@ class TestExitCodes:
             )
 
         monkeypatch.setattr(lc, "_find_failures_csv", lambda _: synth)
-        monkeypatch.setattr(lc, "setup_canary_db", lambda dsn: None)
+        monkeypatch.setattr(lc, "setup_canary_db", lambda dsn, db_mode="sqlite": None)
         monkeypatch.setattr(lc, "teardown_canary_db", lambda p: None)
         monkeypatch.setattr(lc, "replay", lambda **kw: 0)
         monkeypatch.setattr(
@@ -414,7 +414,7 @@ class TestExitCodes:
 
     def test_exit_2_when_failures_csv_missing(self, monkeypatch, tmp_path):
         monkeypatch.setattr(lc, "_find_failures_csv", lambda _: None)
-        monkeypatch.setattr(lc, "setup_canary_db", lambda dsn: None)
+        monkeypatch.setattr(lc, "setup_canary_db", lambda dsn, db_mode="sqlite": None)
         monkeypatch.setattr(lc, "_DEFAULT_OUT_ROOT", tmp_path)
         code = lc.main(["--from-run", "2026-05-10", "--limit", "3"])
         assert code == 2
