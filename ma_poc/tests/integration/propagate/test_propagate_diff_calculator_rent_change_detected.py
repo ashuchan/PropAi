@@ -26,17 +26,12 @@ def session() -> Session:
         yield s
 
 
-_ordinal_counter: dict[str, int] = {}
-
-
-def _insert_snapshot(session: Session, run_date: str, prop_id: str, units: list[dict[str, Any]]) -> None:
+def _insert_snapshot(session: Session, run_date: str, prop_id: str, units: list[dict[str, Any]], ordinal: int = 1) -> None:
     """Insert a PropertySnapshotRow with the given run_date and units."""
-    key = run_date
-    _ordinal_counter[key] = _ordinal_counter.get(key, 0) + 1
     row = PropertySnapshotRow(
         run_date=run_date,
         canonical_id=prop_id,
-        ordinal=_ordinal_counter[key],
+        ordinal=ordinal,
         payload={
             "Unique ID": prop_id,
             "Property Name": f"Test Property {prop_id}",

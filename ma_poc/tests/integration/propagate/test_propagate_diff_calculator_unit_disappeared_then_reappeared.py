@@ -26,15 +26,11 @@ def session() -> Session:
         yield s
 
 
-_ordinal_seq: dict[str, int] = {}
-
-
-def _snap(session: Session, run_date: str, prop_id: str, units: list[dict[str, Any]]) -> None:
-    _ordinal_seq[run_date] = _ordinal_seq.get(run_date, 0) + 1
+def _snap(session: Session, run_date: str, prop_id: str, units: list[dict[str, Any]], ordinal: int = 1) -> None:
     row = PropertySnapshotRow(
         run_date=run_date,
         canonical_id=prop_id,
-        ordinal=_ordinal_seq[run_date],
+        ordinal=ordinal,
         payload={
             "Unique ID": prop_id,
             "Property Name": f"Prop {prop_id}",
