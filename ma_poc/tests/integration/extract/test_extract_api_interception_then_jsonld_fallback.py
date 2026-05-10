@@ -145,7 +145,7 @@ def test_jsonld_fallback_units_have_required_fields() -> None:
     assert result.tier_used == "TIER_2_JSONLD"
     for unit in result.units:
         assert isinstance(unit, dict)
-        has_beds = unit.get("beds") is not None
+        has_beds = unit.get("bedrooms") is not None or unit.get("beds") is not None
         has_rent = (
             unit.get("market_rent_low") is not None
             or unit.get("rent_low") is not None
