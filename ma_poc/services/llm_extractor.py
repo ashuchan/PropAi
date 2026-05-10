@@ -94,6 +94,22 @@ RULES:
 """
 
 
+def clean_string_value_dict(d: Any) -> dict[str, str]:
+    """Return a ``dict[str, str]`` with all non-string-valued entries dropped.
+
+    The Pydantic models that consume LLM-emitted dicts (``ApiEndpoint.json_paths``,
+    ``LlmFieldMapping.json_paths``) declare ``dict[str, str]`` strictly. The LLM
+    routinely returns ``null`` for fields it could not map (``"lease_term": null``).
+    Without this filter a single null value crashes the writer with Pydantic
+    ``string_type`` validation, the runner's outer ``except Exception`` swallows
+    it as a warning, and the property's profile is silently never updated —
+    breaking the self-learning loop. See profile_updater.update_profile_after_extraction.
+    """
+    if not isinstance(d, dict):
+        return {}
+    return {k: v.strip() for k, v in d.items() if isinstance(v, str) and v.strip()}
+
+
 def _trim_html(html: str) -> str:
     """Remove non-content tags from HTML. Keep JSON-LD scripts."""
     soup = BeautifulSoup(html, "lxml")
@@ -320,6 +336,13 @@ async def extract_with_llm(
         raw_units = []
     if not isinstance(hints, dict):
         hints = {}
+
+    # The LLM emits ``null`` for fields it could not map. The downstream
+    # ``ApiEndpoint`` / ``LlmFieldMapping`` writers declare ``json_paths:
+    # dict[str, str]`` strictly. Clean here so cached on-disk artifacts
+    # are also clean (replay matchers and drift comparators read this dict).
+    if "json_paths" in hints:
+        hints["json_paths"] = clean_string_value_dict(hints.get("json_paths"))
 
     # Capture the top-level ``property_amenities`` array the prompt asks
     # for. The previous return contract dropped this entirely — every
@@ -560,10 +583,12 @@ async def analyze_api_with_llm(
     # (profile_updater.save_llm_field_mapping) accept degraded mappings
     # behind ENABLE_DEGRADED_MAPPING_PERSIST so the cascade has a URL to
     # try even when the per-field paths weren't articulated.
-    json_paths = parsed.get("json_paths", {})
+    # The LLM emits ``null`` for fields it could not map. Drop those before the
+    # mapping reaches the persistence layer — ``LlmFieldMapping.json_paths``
+    # is ``dict[str, str]`` strict and a single null crashes the writer (and
+    # thereby the whole self-learning loop for the property).
+    json_paths = clean_string_value_dict(parsed.get("json_paths"))
     response_envelope = parsed.get("response_envelope", "")
-    if not isinstance(json_paths, dict):
-        json_paths = {}
     if not isinstance(response_envelope, str):
         response_envelope = ""
 

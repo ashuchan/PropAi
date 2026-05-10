@@ -17,10 +17,11 @@ for _p in (_app, _here):
         sys.path.insert(0, str(_p))
 
 from scripts._common.trigger import (  # noqa: E402
+    _GCLOUD,
     ABSOLUTE_MAX_TASKS,
+    MAX_TASKS_CUSTOM_2_7680,
     MAX_TASKS_F1_MICRO,
     MAX_TASKS_G1_SMALL,
-    _GCLOUD,
     check_job_exists,
     emit_structured_result,
     plan_tasks,
@@ -89,6 +90,21 @@ class TestPlanTasks:
     def test_larger_tier_ceiling(self) -> None:
         plan = plan_tasks(total_properties=100000, target_hours=0.1, db_tier="larger")
         assert plan.tasks <= ABSOLUTE_MAX_TASKS
+
+    def test_custom_2_7680_ceiling(self) -> None:
+        # 100k props / 0.1h asks for 500 tasks; custom-2-7680 caps at 100.
+        plan = plan_tasks(total_properties=100000, target_hours=0.1, db_tier="custom-2-7680")
+        assert plan.tasks <= MAX_TASKS_CUSTOM_2_7680
+
+    def test_custom_2_7680_default_safe_for_100(self) -> None:
+        plan = plan_tasks(total_properties=5000, explicit_tasks=100, db_tier="custom-2-7680")
+        assert plan.tasks == 100
+        assert plan.warning is None
+
+    def test_custom_2_7680_warns_above_ceiling(self) -> None:
+        plan = plan_tasks(total_properties=5000, explicit_tasks=150, db_tier="custom-2-7680")
+        assert plan.warning is not None
+        assert "custom-2-7680" in plan.warning
 
     def test_ceiling_of_ceiling_produces_warning(self) -> None:
         # explicit_tasks > ceiling should set a warning
@@ -183,7 +199,28 @@ class TestTriggerRunArgs:
                 "--env",
                 "staging",
                 "--tasks",
-                "41",
+                str(ABSOLUTE_MAX_TASKS + 1),
+                "--db-tier",
+                "larger",
+                "--yes",
+            ]
+            from scripts.triggers import run as trigger_run  # noqa: PLC0415
+
+            trigger_run.main()
+        assert exc_info.value.code == 4
+
+    def test_safety_clamp_tasks_too_high_on_custom_2_7680(self) -> None:
+        # Tasks above the custom-2-7680 ceiling (100) get rejected too,
+        # not just f1-micro overflow.
+        with pytest.raises(SystemExit) as exc_info:
+            sys.argv = [
+                "trigger_run.py",
+                "--env",
+                "prod",
+                "--tasks",
+                str(MAX_TASKS_CUSTOM_2_7680 + 1),
+                "--db-tier",
+                "custom-2-7680",
                 "--yes",
             ]
             from scripts.triggers import run as trigger_run  # noqa: PLC0415

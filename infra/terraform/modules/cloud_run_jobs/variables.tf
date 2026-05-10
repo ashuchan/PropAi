@@ -64,8 +64,9 @@ variable "anthropic_vision_model" {
   default     = "claude-haiku-4-5-20251001"
 }
 variable "default_task_count" {
-  type    = number
-  default = 5
+  type        = number
+  default     = 100
+  description = "parallelism / task_count for the scrape job. 100-way is the post-2026-05-11 production default; db_tier must match (see ../cloud_sql/variables.tf tier table)."
 }
 variable "browsers_per_task" {
   type    = number

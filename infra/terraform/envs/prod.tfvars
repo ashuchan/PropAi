@@ -7,13 +7,18 @@ vpc_self_link = "projects/jugnu-494013/global/networks/default"
 deployer_sa_email = "github-deployer@jugnu-494013.iam.gserviceaccount.com"
 developer_emails  = ["ashu@surgexdigital.com"] # your gcloud account email
 
-default_task_count = 20 # bumped from 10 for 250 props/shard at the 5000-property scale
+default_task_count = 100 # 100-way scrape: ~50 props/shard at the 5000-property scale
 browsers_per_task  = 10
 task_cpu           = "2"
 task_memory        = "4Gi"
-# task_count > 15 on db-f1-micro triggers connection exhaustion (validated by
-# triggers/run.py:130 guard); upgrade tier to match the new parallelism.
-db_tier = "db-g1-small"
+# Sizing rationale (2026-05-11): 100 parallel shards each open ~2 SQLAlchemy
+# connections during the end-of-run sync wave, so peak DB load is ~150-200
+# concurrent connections. db-g1-small (~50 max_conn) saturates well below
+# this; the next dedicated-vCPU tier db-custom-2-7680 (2 vCPU / 7.5 GiB RAM,
+# ~200 max_conn) gives ~2x burst headroom for ~$95/mo vs ~$25/mo on g1-small.
+# Reverting to g1-small or f1-micro requires lowering default_task_count
+# (see ceilings in ma_poc/scripts/_common/trigger.py).
+db_tier = "db-custom-2-7680"
 
 # Sharded retry: ceiling on concurrent retry tasks. Operators choose
 # how many to actually use at execution time via --tasks N (must be

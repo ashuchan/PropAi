@@ -13,12 +13,13 @@ Usage:
   python scripts/triggers/run.py --env {staging|prod} (--tasks N | --target-hours H) [OPTIONS]
 
 Options:
-  --tasks N              Explicit task count (1-40)
+  --tasks N              Explicit task count (1-200; absolute ceiling is ABSOLUTE_MAX_TASKS)
   --target-hours H       Pick tasks to fit wall clock target (0.5-8)
   --csv GCS_URI          Override CSV location
   --limit N              Cap properties (useful for ad-hoc tests)
   --run-date YYYY-MM-DD  Override run date (default: today UTC)
-  --db-tier TIER         f1-micro | g1-small | larger (default: f1-micro)
+  --db-tier TIER         f1-micro | g1-small | custom-1-3840 | custom-2-7680
+                         | custom-4-15360 | larger (default: custom-2-7680)
   --total-props N        Total property count (required when --csv is a non-default URI)
   --wait / --no-wait     Wait for completion (default: --wait)
   --dry-run              Print plan, don't submit
@@ -49,6 +50,7 @@ for _p in (_app, _ma_poc):
         sys.path.insert(0, str(_p))
 
 from scripts._common.trigger import (  # noqa: E402
+    _TIER_CEILINGS,
     ABSOLUTE_MAX_TASKS,
     REGION,
     TaskPlan,
@@ -92,9 +94,16 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--run-date", metavar="YYYY-MM-DD", help="Override run date (default: today UTC)")
     p.add_argument(
         "--db-tier",
-        choices=["f1-micro", "g1-small", "larger"],
-        default="f1-micro",
-        help="DB tier for parallelism safety clamp",
+        choices=[
+            "f1-micro",
+            "g1-small",
+            "custom-1-3840",
+            "custom-2-7680",
+            "custom-4-15360",
+            "larger",
+        ],
+        default="custom-2-7680",
+        help="DB tier for parallelism safety clamp; default matches prod's deployed tier",
     )
     p.add_argument(
         "--total-props",
@@ -127,9 +136,11 @@ def _enforce_safety_clamps(args: argparse.Namespace) -> None:
                 file=sys.stderr,
             )
             sys.exit(4)
-        if args.tasks > 15 and args.db_tier == "f1-micro":
+        tier_ceiling = _TIER_CEILINGS[args.db_tier]
+        if args.tasks > tier_ceiling:
             print(
-                "tasks > 15 on db-f1-micro risks connection exhaustion; upgrade db tier or lower tasks",
+                f"tasks > {tier_ceiling} on db-{args.db_tier} risks connection exhaustion; "
+                f"upgrade db tier (see infra/terraform/variables.tf tier table) or lower tasks",
                 file=sys.stderr,
             )
             sys.exit(4)

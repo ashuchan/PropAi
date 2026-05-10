@@ -126,3 +126,44 @@ gcloud scheduler jobs pause jugnu-daily-scrape-{env} \
 | `secrets` | Secret Manager slots (values written manually) |
 | `cloud_run_jobs` | scrape job + retry job |
 | `scheduler` | 4 Cloud Scheduler jobs (SQL start/stop + daily scrape + daily retry) |
+
+## Sizing: Cloud Run parallelism ↔ Cloud SQL tier
+
+`default_task_count` and `db_tier` must move together. Each scrape shard
+opens ~2 SQLAlchemy connections during the end-of-run `sync_run_to_pg`
+wave, so peak demand ≈ 2 × `default_task_count`. Pick the smallest tier
+whose ~max_conn comfortably exceeds that.
+
+| `db_tier` | vCPU / RAM | ~max_conn | Safe `default_task_count` | ~cost (24×7) |
+|---|---|---|---|---|
+| `db-f1-micro` | shared / 0.6 GiB | 25 | 10 | ~$10/mo |
+| `db-g1-small` | shared / 1.7 GiB | 50 | 20 | ~$25/mo |
+| `db-custom-1-3840` | 1 / 3.75 GiB | 100 | 50 | ~$50/mo |
+| **`db-custom-2-7680`** *(prod default 2026-05-11)* | 2 / 7.5 GiB | 200 | **100** | ~$95/mo |
+| `db-custom-4-15360` | 4 / 15 GiB | 400 | 200 | ~$200/mo |
+
+Actual cost is lower because the scrape window is ~2–4h/day and
+`activation_policy` cycles the instance on/off via Cloud Scheduler.
+
+Current deployed defaults (`envs/*.tfvars`):
+
+| env | `default_task_count` | `db_tier` |
+|---|---|---|
+| staging | 10 | `db-g1-small` |
+| prod | 100 | `db-custom-2-7680` |
+
+The same ceilings are mirrored as hard safety clamps in
+[`ma_poc/scripts/_common/trigger.py`](../../ma_poc/scripts/_common/trigger.py)
+and gate every `triggers.run` invocation. If you change either side
+(tfvars or trigger constants), update both together.
+
+### Bumping a tier
+
+```bash
+# Live (instant — Cloud SQL accepts tier changes as an online operation):
+gcloud sql instances patch jugnu-db-{env} --tier=db-custom-2-7680
+
+# Persist in tfvars so the next `terraform apply` doesn't drift back:
+#   edit infra/terraform/envs/{env}.tfvars
+#     db_tier = "db-custom-2-7680"
+```

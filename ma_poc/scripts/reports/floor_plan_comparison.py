@@ -72,15 +72,20 @@ class DbFloorPlan:
     unit_count: int
 
 
-def _load_db_floor_plans(session: Session, canonical_id: str) -> list[DbFloorPlan]:
-    rows = session.execute(
-        select(
-            UnitRow.floor_plan_name,
-            UnitRow.beds,
-            UnitRow.baths,
-            UnitRow.area,
-        ).where(UnitRow.canonical_id == canonical_id)
-    ).all()
+def _load_db_floor_plans(
+    session: Session,
+    canonical_id: str,
+    last_seen_on: str | None = None,
+) -> list[DbFloorPlan]:
+    stmt = select(
+        UnitRow.floor_plan_name,
+        UnitRow.beds,
+        UnitRow.baths,
+        UnitRow.area,
+    ).where(UnitRow.canonical_id == canonical_id)
+    if last_seen_on:
+        stmt = stmt.where(UnitRow.last_seen_at.like(f"{last_seen_on}%"))
+    rows = session.execute(stmt).all()
 
     groups: dict[tuple[str, int | None, float | None, int | None], list[Any]] = defaultdict(list)
     for r in rows:
@@ -138,7 +143,20 @@ def build_report(
     run_id: str,
     top_n_properties: int,
     examples_per_method: int,
+    last_seen_on: str | None = None,
+    title_override: str | None = None,
 ) -> str:
+    """Render the markdown report for a single comparison ``run_id``.
+
+    ``last_seen_on`` is passed through to ``_load_db_floor_plans`` so the
+    "DB has X plans" / "DB-only floor plans" sections reflect the same
+    scope the comparison itself ran with. Pass ``None`` for the
+    unfiltered (overall) view.
+
+    ``title_override`` replaces the default ``# Floor Plan Comparison
+    Report — <run_id>`` h1. Used when ``compare.py`` is stitching two
+    scope-sections together under a single email-shell h1.
+    """
     # ── Per-property aggregate rows for this run.
     run_rows = session.execute(
         select(FloorPlanComparisonRunRow).where(FloorPlanComparisonRunRow.run_id == run_id)
@@ -230,7 +248,7 @@ def build_report(
                     d.db_area,
                 )
             )
-        db_plans = _load_db_floor_plans(session, prop.canonical_id)
+        db_plans = _load_db_floor_plans(session, prop.canonical_id, last_seen_on)
         missing = [
             p for p in db_plans
             if ((p.name or "").strip().lower(), p.beds, p.baths, p.area) not in matched_keys
@@ -241,9 +259,14 @@ def build_report(
 
     # ── Render markdown.
     lines: list[str] = []
-    lines.append(f"# Floor Plan Comparison Report — `{run_id}`")
+    if title_override is not None:
+        lines.append(title_override)
+    else:
+        lines.append(f"# Floor Plan Comparison Report — `{run_id}`")
     lines.append("")
     lines.append(f"_Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}_")
+    if last_seen_on:
+        lines.append(f"_Scope: units with `last_seen_at` on `{last_seen_on}`_")
     lines.append("")
 
     # ── Summary

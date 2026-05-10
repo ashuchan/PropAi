@@ -200,7 +200,20 @@ gs://jugnu-raw-{env}/
 
 1. `google_sql_database_instance`:
    - `database_version = "POSTGRES_15"`
-   - `tier = var.db_tier` (default `db-f1-micro` per arch doc; `db-g1-small` when task_count > 15)
+   - `tier = var.db_tier` — must scale with `default_task_count`. Current
+     mapping (kept in lock-step with the safety clamps in
+     `ma_poc/scripts/_common/trigger.py`):
+
+     | `db_tier` | vCPU / RAM | ~max_conn | safe `default_task_count` ceiling | ~cost (24×7) |
+     |---|---|---|---|---|
+     | `db-f1-micro` | shared / 0.6 GiB | 25 | 10 | ~$10/mo |
+     | `db-g1-small` | shared / 1.7 GiB | 50 | 20 | ~$25/mo |
+     | `db-custom-1-3840` | 1 / 3.75 GiB | 100 | 50 | ~$50/mo |
+     | **`db-custom-2-7680`** *(2026-05-11 prod default)* | 2 / 7.5 GiB | 200 | **100** | ~$95/mo |
+     | `db-custom-4-15360` | 4 / 15 GiB | 400 | 200 | ~$200/mo |
+
+     End-of-run `sync_run_to_pg` opens ~2 SQLAlchemy connections per shard,
+     so peak concurrent-connection demand ≈ 2 × `default_task_count`.
    - `availability_type = "ZONAL"` (no HA — arch doc §7)
    - `backup_configuration { enabled = true, start_time = "03:30" }` — after the 3am SQL stop window, before the 2am start
    - `ip_configuration { ipv4_enabled = false, private_network = var.vpc_self_link }`
@@ -468,11 +481,11 @@ variable "developer_emails"    { type = list(string) default = [] }
 
 # Knobs
 variable "image_tag"          { type = string }              # REQUIRED at apply time
-variable "default_task_count" { type = number default = 5 }
+variable "default_task_count" { type = number default = 100 }  # post-2026-05-11 prod default
 variable "browsers_per_task"  { type = number default = 10 }
 variable "task_cpu"           { type = string default = "2" }
 variable "task_memory"        { type = string default = "4Gi" }
-variable "db_tier"            { type = string default = "db-f1-micro" }
+variable "db_tier"            { type = string default = "db-custom-2-7680" }  # sized for 100 tasks; see §4.4 tier table
 ```
 
 **`envs/staging.tfvars`:**
@@ -480,7 +493,8 @@ variable "db_tier"            { type = string default = "db-f1-micro" }
 env        = "staging"
 project_id = "jugnu-staging-<unique>"
 # image_tag supplied by CI at apply time
-default_task_count = 3                # smaller for staging
+default_task_count = 10               # smaller for staging — cost-saver
+db_tier            = "db-g1-small"    # supports up to 20 staging shards
 developer_emails   = ["you@company.com"]
 ```
 
@@ -488,8 +502,8 @@ developer_emails   = ["you@company.com"]
 ```hcl
 env        = "prod"
 project_id = "jugnu-prod-<unique>"
-default_task_count = 5                # per arch doc
-db_tier            = "db-f1-micro"    # upgrade to g1-small if task_count > 15
+default_task_count = 100              # post-2026-05-11 prod default — 50 props/shard at 5000-property scale
+db_tier            = "db-custom-2-7680"  # 2 vCPU / 7.5 GiB / ~200 max_conn — sized for 100-task end-of-run sync
 developer_emails   = ["you@company.com", "teammate@company.com"]
 ```
 

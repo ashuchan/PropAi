@@ -266,21 +266,32 @@ def _resolve_apartment_id_to_canonical(
     return {int(r.apartment_id): (r.canonical_id, r.proj_name) for r in rows if r.apartment_id is not None}
 
 
-def _load_db_floor_plans(session: Session, canonical_id: str) -> list[DbFloorPlan]:
+def _load_db_floor_plans(
+    session: Session,
+    canonical_id: str,
+    last_seen_on: str | None = None,
+) -> list[DbFloorPlan]:
     """Load distinct floor plans for a property from the `units` table.
 
     De-dupes by (floor_plan_name, beds, baths, area) and counts the units
     in each group. Names are normalised (strip + lower) for the dedup key
     only — the original casing is preserved on the returned record.
+
+    When ``last_seen_on`` is set (``YYYY-MM-DD``), units whose
+    ``last_seen_at`` ISO timestamp does not start with that date are
+    excluded. ``last_seen_at`` is re-stamped by ``StateStore.upsert_units``
+    on every appearance (including carry-forwards), so the filter
+    expresses "plans backing units that were seen on this run-date".
     """
-    rows = session.execute(
-        select(
-            UnitRow.floor_plan_name,
-            UnitRow.beds,
-            UnitRow.baths,
-            UnitRow.area,
-        ).where(UnitRow.canonical_id == canonical_id)
-    ).all()
+    stmt = select(
+        UnitRow.floor_plan_name,
+        UnitRow.beds,
+        UnitRow.baths,
+        UnitRow.area,
+    ).where(UnitRow.canonical_id == canonical_id)
+    if last_seen_on:
+        stmt = stmt.where(UnitRow.last_seen_at.like(f"{last_seen_on}%"))
+    rows = session.execute(stmt).all()
 
     groups: dict[tuple[str, int | None, float | None, int | None], list[Any]] = defaultdict(list)
     for r in rows:
@@ -378,8 +389,15 @@ def run_comparison(
     name_threshold: float,
     area_buffer: int,
     database_url: str | None = None,
+    last_seen_on: str | None = None,
 ) -> dict[str, Any]:
-    """Run the comparison end-to-end. Returns a top-level summary dict."""
+    """Run the comparison end-to-end. Returns a top-level summary dict.
+
+    When ``last_seen_on`` is set, the DB floor-plan pool is scoped to
+    units whose ``last_seen_at`` falls on that date — i.e. plans backing
+    units that were upserted or carried forward on that run-date. The
+    CSV input is unchanged; only the DB side gets the filter.
+    """
     log.info("Reading CSV: %s", csv_path)
     csv_rows = load_csv(csv_path)
     log.info("Loaded %d CSV rows", len(csv_rows))
@@ -461,7 +479,7 @@ def run_comparison(
                 continue
 
             canonical_id, proj_name = aid_to_cid[apartment_id]
-            db_plans = _load_db_floor_plans(session, canonical_id)
+            db_plans = _load_db_floor_plans(session, canonical_id, last_seen_on)
             matched_db_keys: set[tuple[Any, ...]] = set()
 
             per_property = {
@@ -597,10 +615,71 @@ def run_comparison(
         "csv_path": str(csv_path),
         "name_threshold": name_threshold,
         "area_buffer_sqft": area_buffer,
+        "last_seen_on": last_seen_on,
         "totals": totals,
     }
     log.info("Comparison complete: %s", summary)
     return summary
+
+
+# ── Dual-scope orchestration ────────────────────────────────────────────────
+
+
+TODAY_SUFFIX = "__today"
+
+
+def _today_run_id(base_run_id: str) -> str:
+    return f"{base_run_id}{TODAY_SUFFIX}"
+
+
+def run_dual_comparison(
+    csv_path: Path,
+    base_run_id: str,
+    name_threshold: float,
+    area_buffer: int,
+    last_seen_on: str,
+    scope: str,
+    database_url: str | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Run the comparison for one or both scopes.
+
+    ``scope`` is ``today``, ``overall``, or ``both``. The "today" pass
+    writes to ``<base_run_id>__today`` and filters the DB plan pool to
+    ``units.last_seen_at`` starting with ``last_seen_on``. The "overall"
+    pass writes to ``<base_run_id>`` and uses every unit on record.
+
+    Returns ``{scope_label: summary_dict}`` so the caller can drive the
+    combined report rendering without re-querying the DB.
+    """
+    if scope not in {"today", "overall", "both"}:
+        raise ValueError(f"scope must be today|overall|both, got {scope!r}")
+
+    summaries: dict[str, dict[str, Any]] = {}
+
+    if scope in {"today", "both"}:
+        today_run_id = _today_run_id(base_run_id)
+        log.info("Running TODAY scope (last_seen_on=%s, run_id=%s)", last_seen_on, today_run_id)
+        summaries["today"] = run_comparison(
+            csv_path=csv_path,
+            run_id=today_run_id,
+            name_threshold=name_threshold,
+            area_buffer=area_buffer,
+            database_url=database_url,
+            last_seen_on=last_seen_on,
+        )
+
+    if scope in {"overall", "both"}:
+        log.info("Running OVERALL scope (run_id=%s)", base_run_id)
+        summaries["overall"] = run_comparison(
+            csv_path=csv_path,
+            run_id=base_run_id,
+            name_threshold=name_threshold,
+            area_buffer=area_buffer,
+            database_url=database_url,
+            last_seen_on=None,
+        )
+
+    return summaries
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────
@@ -610,13 +689,171 @@ def _default_run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
 
 
+def _default_last_seen_on() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _print_summary(scope_label: str, summary: dict[str, Any]) -> None:
+    """Print a single scope's summary to stdout — visible in Cloud Run logs."""
+    t = summary["totals"]
+    print(f"\n-- Floor plan comparison summary [{scope_label}] --")
+    print(f"  run_id:           {summary['run_id']}")
+    print(f"  last_seen_on:     {summary.get('last_seen_on') or '(all units)'}")
+    print(f"  name_threshold:   {summary['name_threshold']}")
+    print(f"  area_buffer_sqft: ±{summary['area_buffer_sqft']}")
+    print(f"  csv rows:                   {t['csv_rows']}")
+    print(f"  matched (any method):       {t['matched']}")
+    print(f"    name_semantic:            {t['name']}")
+    print(f"    bed_bath_sqft:            {t['bb_sqft']}")
+    print(f"    bed_bath_only:            {t['bb_only']}")
+    print(f"    name_only (rescue):       {t['name_only']}")
+    print(f"  unmatched:                  {t['unmatched']}")
+    print(f"  db_empty (scrape failed):   {t['db_empty']}")
+    print(f"  property_not_found:         {t['property_not_found']}")
+    print(f"  sqft within +/-{summary['area_buffer_sqft']}:        {t['sqft_within_buffer']}")
+    print(f"  properties compared:        {t['properties_compared']}")
+    print(f"  properties with any match:  {t['properties_with_any_match']}")
+
+
+def _scope_h1(scope_label: str, summary: dict[str, Any]) -> str:
+    """Top-level heading for a scope's section inside the combined report."""
+    if scope_label == "today":
+        return f"# Today — `last_seen_at = {summary.get('last_seen_on')}`"
+    return "# Overall — all units on record"
+
+
+def _build_combined_markdown(
+    summaries: dict[str, dict[str, Any]],
+    base_run_id: str,
+    top_n_properties: int,
+    examples_per_method: int,
+    database_url: str | None,
+) -> str:
+    """Stitch a single markdown document covering every scope that ran.
+
+    Both sections come from the same ``build_report`` helper used by the
+    standalone report CLI, so the two paths can never diverge. The shell
+    CSS gives every h1 a top border, so the scope sections are visually
+    separated in the rendered email.
+    """
+    # Import lazily — keeps the comparison-only code path (e.g. tests
+    # mocking the email layer) free of the report module's heavier deps.
+    from scripts.reports.floor_plan_comparison import build_report
+
+    engine = make_engine(database_url)
+    SessionLocal = make_session_factory(engine)
+
+    parts: list[str] = []
+    parts.append(f"# Floor Plan Comparison — `{base_run_id}`")
+    parts.append("")
+    parts.append(_combined_tldr_table(summaries))
+    parts.append("")
+
+    with SessionLocal() as session:
+        for scope_label in ("today", "overall"):
+            summary = summaries.get(scope_label)
+            if summary is None:
+                continue
+            section_md = build_report(
+                session=session,
+                run_id=summary["run_id"],
+                top_n_properties=top_n_properties,
+                examples_per_method=examples_per_method,
+                last_seen_on=summary.get("last_seen_on"),
+                title_override=_scope_h1(scope_label, summary),
+            )
+            parts.append(section_md)
+            parts.append("")
+
+    return "\n".join(parts)
+
+
+def _combined_tldr_table(summaries: dict[str, dict[str, Any]]) -> str:
+    """Side-by-side headline table for the combined report."""
+    rows: list[str] = []
+    rows.append("## Headline")
+    rows.append("")
+    rows.append("| Metric | Today | Overall |")
+    rows.append("|---|---:|---:|")
+
+    def _cell(scope_label: str, key: str) -> str:
+        s = summaries.get(scope_label)
+        if s is None:
+            return "—"
+        return f"{s['totals'].get(key, 0):,}"
+
+    def _pct_cell(scope_label: str, num_key: str, denom_key: str) -> str:
+        s = summaries.get(scope_label)
+        if s is None:
+            return "—"
+        num = s["totals"].get(num_key, 0)
+        denom = s["totals"].get(denom_key, 0)
+        if not denom:
+            return "0.00%"
+        return f"{(num / denom) * 100:.2f}%"
+
+    rows.append(f"| CSV rows | {_cell('today', 'csv_rows')} | {_cell('overall', 'csv_rows')} |")
+    rows.append(
+        f"| Matched | {_cell('today', 'matched')} ({_pct_cell('today', 'matched', 'csv_rows')}) "
+        f"| {_cell('overall', 'matched')} ({_pct_cell('overall', 'matched', 'csv_rows')}) |"
+    )
+    rows.append(f"| Unmatched | {_cell('today', 'unmatched')} | {_cell('overall', 'unmatched')} |")
+    rows.append(f"| db_empty | {_cell('today', 'db_empty')} | {_cell('overall', 'db_empty')} |")
+    rows.append(
+        f"| Properties compared | {_cell('today', 'properties_compared')} "
+        f"| {_cell('overall', 'properties_compared')} |"
+    )
+    rows.append(
+        f"| Properties with any match | {_cell('today', 'properties_with_any_match')} "
+        f"| {_cell('overall', 'properties_with_any_match')} |"
+    )
+    return "\n".join(rows)
+
+
+def _build_email_summary(summaries: dict[str, dict[str, Any]]) -> str:
+    """One-line TL;DR shown in the email summary callout."""
+    parts: list[str] = []
+    for scope_label in ("today", "overall"):
+        s = summaries.get(scope_label)
+        if s is None:
+            continue
+        t = s["totals"]
+        csv_rows = t.get("csv_rows", 0)
+        matched = t.get("matched", 0)
+        rate = (matched / csv_rows * 100) if csv_rows else 0.0
+        parts.append(f"{scope_label}: {matched}/{csv_rows} matched ({rate:.1f}%)")
+    return "; ".join(parts) + "." if parts else "No comparison ran."
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--csv", required=True, type=Path, help="Path to comparison CSV")
     parser.add_argument(
         "--run-id",
         default=None,
-        help="Stable identifier for this comparison (default: UTC timestamp).",
+        help=(
+            "Stable identifier for this comparison (default: UTC timestamp). "
+            "For --scope=both, this is the base id; the today-pass writes to "
+            "<run-id>__today and the overall-pass writes to <run-id>."
+        ),
+    )
+    parser.add_argument(
+        "--scope",
+        choices=("today", "overall", "both"),
+        default="both",
+        help=(
+            "Which comparisons to run. 'today' filters the DB plan pool to "
+            "units last seen on --last-seen-on; 'overall' uses every unit; "
+            "'both' (default) runs both and emails a combined report."
+        ),
+    )
+    parser.add_argument(
+        "--last-seen-on",
+        default=None,
+        help=(
+            "YYYY-MM-DD date used by the today-scope filter "
+            "(units.last_seen_at LIKE '<date>%%'). Default: today UTC."
+        ),
     )
     parser.add_argument(
         "--threshold",
@@ -635,6 +872,33 @@ def main() -> int:
         default=None,
         help="Override DATABASE_URL (otherwise read from env via make_engine)",
     )
+    parser.add_argument(
+        "--top",
+        type=int,
+        default=25,
+        help="Properties (most DB-only plans) to enumerate in each scope's section (default: 25).",
+    )
+    parser.add_argument(
+        "--examples-per-method",
+        type=int,
+        default=5,
+        help="Examples to show per match method in each scope's section (default: 5).",
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help=(
+            "Output markdown path for the combined report. "
+            "Default: ma_poc/data/reports/floor_plan_comparison_<run-id>.md"
+        ),
+    )
+    parser.add_argument("--no-email", action="store_true",
+                        help="Skip the email send. The markdown artifact is still written.")
+    parser.add_argument("--email-recipients", default=None,
+                        help="Comma-separated override of REPORT_RECIPIENTS.")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Render the email body to stdout but do not actually send.")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
@@ -648,33 +912,66 @@ def main() -> int:
         log.error("CSV not found: %s", csv_path)
         return 2
 
-    run_id = args.run_id or _default_run_id()
-    summary = run_comparison(
+    base_run_id = args.run_id or _default_run_id()
+    last_seen_on = args.last_seen_on or _default_last_seen_on()
+
+    summaries = run_dual_comparison(
         csv_path=csv_path,
-        run_id=run_id,
+        base_run_id=base_run_id,
         name_threshold=args.threshold,
         area_buffer=args.buffer,
+        last_seen_on=last_seen_on,
+        scope=args.scope,
         database_url=args.database_url,
     )
 
-    print("\n-- Floor plan comparison summary --")
-    print(f"  run_id:           {summary['run_id']}")
-    print(f"  csv:              {summary['csv_path']}")
-    print(f"  name_threshold:   {summary['name_threshold']}")
-    print(f"  area_buffer_sqft: ±{summary['area_buffer_sqft']}")
-    t = summary["totals"]
-    print(f"  csv rows:                   {t['csv_rows']}")
-    print(f"  matched (any method):       {t['matched']}")
-    print(f"    name_semantic:            {t['name']}")
-    print(f"    bed_bath_sqft:            {t['bb_sqft']}")
-    print(f"    bed_bath_only:            {t['bb_only']}")
-    print(f"    name_only (rescue):       {t['name_only']}")
-    print(f"  unmatched:                  {t['unmatched']}")
-    print(f"  db_empty (scrape failed):   {t['db_empty']}")
-    print(f"  property_not_found:         {t['property_not_found']}")
-    print(f"  sqft within +/-{summary['area_buffer_sqft']}:        {t['sqft_within_buffer']}")
-    print(f"  properties compared:        {t['properties_compared']}")
-    print(f"  properties with any match:  {t['properties_with_any_match']}")
+    for scope_label in ("today", "overall"):
+        if scope_label in summaries:
+            _print_summary(scope_label, summaries[scope_label])
+
+    # Build the combined markdown report. Always written to disk so the
+    # artifact survives even when --no-email is set or the email transport
+    # fails — operators can re-send manually from the saved file.
+    combined_md = _build_combined_markdown(
+        summaries=summaries,
+        base_run_id=base_run_id,
+        top_n_properties=args.top,
+        examples_per_method=args.examples_per_method,
+        database_url=args.database_url,
+    )
+
+    out = args.out or (
+        _MA_POC_ROOT
+        / "data"
+        / "reports"
+        / f"floor_plan_comparison_{base_run_id.replace(':', '-')}.md"
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(combined_md, encoding="utf-8")
+    print(f"\nWrote {out} ({len(combined_md):,} chars)")
+
+    if args.no_email:
+        return 0
+
+    from scripts.email.report import email_report
+
+    recipients = (
+        [r.strip() for r in args.email_recipients.split(",") if r.strip()]
+        if args.email_recipients
+        else None
+    )
+    result = email_report(
+        subject=f"Floor Plan Comparison — {base_run_id}",
+        summary=_build_email_summary(summaries),
+        body_md=combined_md,
+        attachments=[out],
+        recipients=recipients,
+        dry_run=args.dry_run,
+    )
+    if result.get("isError"):
+        print(f"email send failed: {result.get('content')}", file=sys.stderr)
+        return 1
+    print(f"email sent: {result.get('content') or '(empty)'}")
     return 0
 
 

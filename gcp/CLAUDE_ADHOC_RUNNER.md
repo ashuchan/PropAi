@@ -43,7 +43,7 @@ The banner is the first ~30 lines of every execution. Look for:
 |---|---|
 | `script='<name>'` | What was dispatched. `<unset>` means SCRIPT_NAME was missing — fatal. |
 | `CLOUD_RUN_EXECUTION` | Pin this to a specific console execution row. |
-| `CLOUD_RUN_TASK_INDEX/COUNT/ATTEMPT` | Useful when comparing reruns. Adhoc runs at parallelism=1, so usually `0/1/1`. |
+| `CLOUD_RUN_TASK_INDEX/COUNT/ATTEMPT` | Useful when comparing reruns. Adhoc runs at parallelism=1, so usually `0/1/1`. The sibling `jugnu-scrape-{env}` job runs at parallelism=100 in prod (2026-05-11) — see `infra/terraform/envs/prod.tfvars`. |
 | `DATA_PROVIDER`, `DATABASE_URL`, `CLOUD_SQL_INSTANCE`, `BUCKET_NAME`, `SCHEMA_VERSION` | Wiring the script will see. If a backfill writes to the wrong DB, this is the first place to look. |
 | `Secrets (masked)` | Every secret-shaped env var with `***<last4>` so you can confirm the right secret version was injected without leaking it. |
 | `dispatching :` | Exact `python -m ...` command being run. Copy-paste-runnable locally. |
@@ -108,16 +108,33 @@ Optional: `--batch-size 500`, `--database-url <override>`, `--dry-run`, `-v`.
 ### Floor-plan comparison & disagreement export
 
 #### `floor_plans.compare` — match a floor-plan CSV against the DB
-Writes `floor_plan_comparison_runs` + `floor_plan_comparison_rows`. Re-running with the same `--run-id` replaces results for that run.
+Writes `floor_plan_comparison_runs` + `floor_plan_comparison_rows`, then emails a combined markdown report at the end. Re-running with the same `--run-id` replaces results for that run.
+
+**Dual-scope by default (`--scope=both`):**
+- `today` pass writes to `<run-id>__today`, filters the DB plan pool to `units.last_seen_at LIKE '<--last-seen-on>%'` (default: today UTC). Captures "what we saw on this run".
+- `overall` pass writes to `<run-id>`, uses every unit on record. Captures "everything the DB has ever seen for this property".
+- The emailed report contains both as separate `# Today` / `# Overall` sections under a single `Floor Plan Comparison — <run-id>` subject. Combined markdown is also written to `data/reports/floor_plan_comparison_<run-id>.md` and attached.
 
 | Field | Value |
 |---|---|
 | `SCRIPT_NAME` | `floor_plans.compare` |
 | `SCRIPT_ARGS` | `--csv ma_poc/config/Floorplan-comparisons.csv --run-id 2026-05-07-prod` |
 
-Tuning: `--threshold 85` (default name match score), `--buffer 35` (sqft buffer in sqft), `--database-url`, `-v`.
+Variations:
+```
+SCRIPT_ARGS=--csv ma_poc/config/Floorplan-comparisons.csv --run-id 2026-05-07-prod --scope today
+SCRIPT_ARGS=--csv ma_poc/config/Floorplan-comparisons.csv --run-id 2026-05-07-prod --scope overall
+SCRIPT_ARGS=--csv ma_poc/config/Floorplan-comparisons.csv --run-id 2026-05-07-prod --last-seen-on 2026-05-06
+SCRIPT_ARGS=--csv ma_poc/config/Floorplan-comparisons.csv --run-id 2026-05-07-prod --dry-run
+SCRIPT_ARGS=--csv ma_poc/config/Floorplan-comparisons.csv --run-id 2026-05-07-prod --no-email
+SCRIPT_ARGS=--csv ma_poc/config/Floorplan-comparisons.csv --run-id 2026-05-07-prod --email-recipients alice@example.com
+```
+
+Tuning: `--threshold 85` (default name match score), `--buffer 35` (sqft buffer in sqft), `--top 25` (DB-only properties per section), `--examples-per-method 5`, `--database-url`, `-v`.
 
 > The CSV must already be present on the container image. To compare against a fresh CSV, upload it to GCS and either bake it into the image or load via a small adapter script — `gs://` paths are not directly supported.
+
+> The standalone `reports.floor_plan_comparison` script (below) is still available if you want to re-email a single scope from a prior `compare` run.
 
 #### `floor_plans.export_disagreements` — write review-queue rows for genuine CSV-vs-DB disagreements
 Reads from a previous `floor_plans.compare` run. Idempotent: re-running clears `status='pending'` rows for the run-id; reviewer-touched rows are preserved.

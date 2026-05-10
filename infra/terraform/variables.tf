@@ -41,10 +41,15 @@ variable "image_tag" {
   description = "Docker image tag to deploy (e.g. staging-abc1234567ef)"
 }
 
-# Parallelism and resource knobs
+# Parallelism and resource knobs.
+# 100 is the post-2026-05-11 production default — 50 props/shard at the
+# 5000-property scale. Staging overrides this to 10 in envs/staging.tfvars
+# (cost), prod inherits the default. Bumping above 100 requires the db_tier
+# to move from db-custom-2-7680 to db-custom-4-15360 (see tier table in
+# infra/terraform/README.md).
 variable "default_task_count" {
   type    = number
-  default = 5
+  default = 100
 }
 
 variable "browsers_per_task" {
@@ -80,8 +85,20 @@ variable "retry_timeout" {
 
 variable "db_tier" {
   type        = string
-  default     = "db-f1-micro"
-  description = "Cloud SQL machine tier; upgrade to db-g1-small when task_count > 15"
+  default     = "db-custom-2-7680"
+  description = <<EOT
+Cloud SQL machine tier. Pick from the parallelism table below — connection
+ceilings are Cloud SQL's automatic max_connections (scales with memory):
+
+  db-f1-micro       shared / 0.6 GiB / ~25 max_conn  → safe up to  10 tasks
+  db-g1-small       shared / 1.7 GiB / ~50 max_conn  → safe up to  20 tasks
+  db-custom-1-3840  1 vCPU / 3.75 GiB / ~100 max_conn → safe up to  50 tasks
+  db-custom-2-7680  2 vCPU / 7.5 GiB / ~200 max_conn  → safe up to 100 tasks (current prod default)
+  db-custom-4-15360 4 vCPU / 15 GiB  / ~400 max_conn  → safe up to 200 tasks
+
+The end-of-run sync_run_to_pg wave is the connection-pressure event;
+each shard opens ~2 SQLAlchemy connections during it.
+EOT
 }
 
 # LLM provider + model ids passed through to the Cloud Run jobs as env

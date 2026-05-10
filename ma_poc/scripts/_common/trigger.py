@@ -38,9 +38,16 @@ _GCLOUD = shutil.which("gcloud") or "gcloud"
 # Conservative floor (headroom for warm-up, slow pages):
 BASELINE_PROPS_PER_TASK_PER_HOUR: int = 2000
 
-MAX_TASKS_F1_MICRO: int = 10  # db-f1-micro: ~25 connections, 2-3 per task
-MAX_TASKS_G1_SMALL: int = 20  # db-g1-small: ~50 connections
-ABSOLUTE_MAX_TASKS: int = 40  # Cloud Run parallelism ceiling we're willing to pay for
+# Per-tier task ceilings. Each shard opens ~2 SQLAlchemy connections during
+# the end-of-run sync_run_to_pg wave; ceilings leave ~2x burst headroom under
+# Cloud SQL's tier-driven max_connections. Keep in sync with the table in
+# infra/terraform/variables.tf :: variable "db_tier".
+MAX_TASKS_F1_MICRO: int = 10  # db-f1-micro: ~25 max_conn (shared / 0.6 GiB)
+MAX_TASKS_G1_SMALL: int = 20  # db-g1-small: ~50 max_conn (shared / 1.7 GiB)
+MAX_TASKS_CUSTOM_1_3840: int = 50  # db-custom-1-3840: ~100 max_conn (1 vCPU / 3.75 GiB)
+MAX_TASKS_CUSTOM_2_7680: int = 100  # db-custom-2-7680: ~200 max_conn (2 vCPU / 7.5 GiB) — current prod default
+MAX_TASKS_CUSTOM_4_15360: int = 200  # db-custom-4-15360: ~400 max_conn (4 vCPU / 15 GiB)
+ABSOLUTE_MAX_TASKS: int = 200  # Cloud Run parallelism ceiling we're willing to pay for
 
 # Environment → GCP project mapping.  Keep in sync with infra/terraform/envs/*.tfvars.
 # Resolution order: GCP_PROJECT_ID_{STAGING,PROD} → GCP_PROJECT_ID → placeholder.
@@ -76,12 +83,34 @@ class TaskPlan:
     warning: str | None  # human-readable warning; None if clean
 
 
+_DbTier = Literal[
+    "f1-micro",
+    "g1-small",
+    "custom-1-3840",
+    "custom-2-7680",
+    "custom-4-15360",
+    "larger",
+]
+
+# Per-tier task ceilings. Lookup table kept in one place so trigger scripts,
+# tests, and docs stay aligned. New tiers added here only; "larger" is the
+# escape hatch for anything bigger than custom-4-15360.
+_TIER_CEILINGS: dict[str, int] = {
+    "f1-micro": MAX_TASKS_F1_MICRO,
+    "g1-small": MAX_TASKS_G1_SMALL,
+    "custom-1-3840": MAX_TASKS_CUSTOM_1_3840,
+    "custom-2-7680": MAX_TASKS_CUSTOM_2_7680,
+    "custom-4-15360": MAX_TASKS_CUSTOM_4_15360,
+    "larger": ABSOLUTE_MAX_TASKS,
+}
+
+
 def plan_tasks(
     *,
     total_properties: int,
     target_hours: float | None = None,
     explicit_tasks: int | None = None,
-    db_tier: Literal["f1-micro", "g1-small", "larger"] = "f1-micro",
+    db_tier: _DbTier = "custom-2-7680",
 ) -> TaskPlan:
     """Pick task count.
 
@@ -97,11 +126,7 @@ def plan_tasks(
     if explicit_tasks is not None and explicit_tasks <= 0:
         raise ValueError("explicit_tasks must be positive")
 
-    ceiling = {
-        "f1-micro": MAX_TASKS_F1_MICRO,
-        "g1-small": MAX_TASKS_G1_SMALL,
-        "larger": ABSOLUTE_MAX_TASKS,
-    }[db_tier]
+    ceiling = _TIER_CEILINGS[db_tier]
 
     if explicit_tasks is not None:
         tasks = explicit_tasks

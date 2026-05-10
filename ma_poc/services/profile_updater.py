@@ -25,6 +25,7 @@ from ma_poc.models.scrape_profile import (
     ProfileMaturity,
     ScrapeProfile,
 )
+from ma_poc.services.llm_extractor import clean_string_value_dict
 from ma_poc.services.profile_store import ProfileStore
 
 log = logging.getLogger(__name__)
@@ -338,7 +339,14 @@ def save_llm_field_mapping(
     # substring compare survives query-param drift between runs.
     raw_url = mapping_dict.get("api_url_pattern", "")
     url_pattern = normalize_url_pattern(raw_url)
-    json_paths = mapping_dict.get("json_paths") or {}
+    # Defensive layer — must run BEFORE the ``is_degraded = not json_paths``
+    # classification below. A dict like ``{"rent": None}`` looks non-empty
+    # (so the legacy code treated it as a full mapping and crashed at the
+    # ``LlmFieldMapping(json_paths=...)`` Pydantic strict-string validator)
+    # but is semantically empty for replay — clean it so the existing
+    # degraded-path machinery (preserve-existing-full, quality_score=0.5,
+    # envelope-only persist) makes the right call.
+    json_paths = clean_string_value_dict(mapping_dict.get("json_paths"))
     response_envelope = mapping_dict.get("response_envelope") or ""
 
     if not url_pattern:
@@ -632,13 +640,16 @@ def update_profile_after_extraction(
         if tier in llm_tiers:
             profile.updated_by = "LLM_VISION" if tier == "TIER_5_VISION" else "LLM_EXTRACTION"
 
-        # API hints from LLM
+        # API hints from LLM. Defensive layer — upstream extractors clean
+        # json_paths but any new caller path that bypasses them must not
+        # crash ``ApiEndpoint(json_paths: dict[str, str])`` on a null value.
+        clean_paths = clean_string_value_dict(llm_hints.get("json_paths"))
         for api_url in llm_hints.get("api_urls_with_data") or []:
             if not any(ep.url_pattern == api_url for ep in profile.api_hints.known_endpoints):
                 profile.api_hints.known_endpoints.append(
                     ApiEndpoint(
                         url_pattern=api_url,
-                        json_paths=llm_hints.get("json_paths", {}),
+                        json_paths=clean_paths,
                     )
                 )
 

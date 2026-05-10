@@ -70,10 +70,17 @@ from typing import Literal
 # Conservative floor (allow headroom for warm-up, occasional slow pages):
 BASELINE_PROPS_PER_TASK_PER_HOUR = 2000
 
-# Safety ceilings tied to downstream resource limits
-MAX_TASKS_F1_MICRO  = 10   # db-f1-micro: ~25 connections, 2-3 per task
-MAX_TASKS_G1_SMALL  = 20   # db-g1-small: ~50 connections
-ABSOLUTE_MAX_TASKS  = 40   # Cloud Run parallelism ceiling we're willing to pay for
+# Safety ceilings tied to Cloud SQL tier max_connections. Each shard opens
+# ~2 SQLAlchemy connections during the end-of-run sync_run_to_pg wave, so
+# ceilings leave ~2× burst headroom under the tier's max_connections.
+# Keep in lock-step with the tier table in
+# infra/terraform/variables.tf :: variable "db_tier".
+MAX_TASKS_F1_MICRO        = 10    # db-f1-micro:       ~25 max_conn  (shared / 0.6 GiB)
+MAX_TASKS_G1_SMALL        = 20    # db-g1-small:       ~50 max_conn  (shared / 1.7 GiB)
+MAX_TASKS_CUSTOM_1_3840   = 50    # db-custom-1-3840:  ~100 max_conn (1 vCPU / 3.75 GiB)
+MAX_TASKS_CUSTOM_2_7680   = 100   # db-custom-2-7680:  ~200 max_conn (2 vCPU / 7.5 GiB) — prod default
+MAX_TASKS_CUSTOM_4_15360  = 200   # db-custom-4-15360: ~400 max_conn (4 vCPU / 15 GiB)
+ABSOLUTE_MAX_TASKS        = 200   # Cloud Run parallelism ceiling we're willing to pay for
 
 
 @dataclass(frozen=True)
@@ -245,8 +252,8 @@ Examples:
 **Safety clamps (must be enforced, not warned):**
 - `--target-hours < 0.5` → reject ("below this, you're paying for warm-up, not work")
 - `--target-hours > 8` → reject ("use the nightly scheduler instead of a manual trigger")
-- `--tasks > 40` → reject (absolute ceiling; anything more is a code change, not a CLI flag)
-- `--tasks > 15` and `--db-tier = f1-micro` → reject ("upgrade db tier or lower tasks")
+- `--tasks > ABSOLUTE_MAX_TASKS` (200) → reject (absolute ceiling; anything more is a code change, not a CLI flag)
+- `--tasks > <per-tier ceiling>` for the supplied `--db-tier` → reject (generic check against `_TIER_CEILINGS`; covers f1-micro >10, g1-small >20, custom-1-3840 >50, custom-2-7680 >100, custom-4-15360 >200)
 
 ---
 

@@ -7,11 +7,15 @@ vpc_self_link = "projects/jugnu-494013/global/networks/default"
 deployer_sa_email = "github-deployer@jugnu-494013.iam.gserviceaccount.com"
 developer_emails  = ["ashu@surgexdigital.com"] # your gcloud account email
 
-default_task_count = 10 # smaller for staging
+default_task_count = 10 # smaller for staging; raise (with db_tier upgrade) only when staging-scale validation needs it
 browsers_per_task  = 10
 task_cpu           = "2"
 task_memory        = "4Gi"
-db_tier            = "db-f1-micro"
+# db-g1-small (~50 max_conn) comfortably covers up to ~20 staging shards;
+# any higher and you need db-custom-2-7680 to match prod's connection math.
+# Kept smaller than prod for cost — staging only validates the sharding
+# pipeline end-to-end, not full-fleet scale.
+db_tier = "db-g1-small"
 
 # Sharded retry: ceiling on concurrent retry tasks. Operators choose
 # how many to actually use at execution time via --tasks N (must be
