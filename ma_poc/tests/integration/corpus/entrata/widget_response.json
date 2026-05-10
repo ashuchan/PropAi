@@ -1,0 +1,43 @@
+[
+  {
+    "url": "https://www.testprop.com/Apartments/module/widgets/",
+    "body": [
+      {
+        "id": 900001,
+        "floorplan-name": "Studio-A",
+        "no_of_bedroom": 0,
+        "no_of_bathroom": 1,
+        "square_footage": 520,
+        "is_rent_hidden": false,
+        "is_call_for_pricing": false,
+        "min_rent": "$1,250",
+        "max_rent": "$1,450",
+        "rent": "$1,250"
+      },
+      {
+        "id": 900002,
+        "floorplan-name": "1BD-Classic",
+        "no_of_bedroom": 1,
+        "no_of_bathroom": 1,
+        "square_footage": 720,
+        "is_rent_hidden": false,
+        "is_call_for_pricing": false,
+        "min_rent": "$1,550",
+        "max_rent": "$1,800",
+        "rent": "$1,550"
+      },
+      {
+        "id": 900003,
+        "floorplan-name": "2BD-Classic",
+        "no_of_bedroom": 2,
+        "no_of_bathroom": 2,
+        "square_footage": 1000,
+        "is_rent_hidden": false,
+        "is_call_for_pricing": false,
+        "min_rent": "$2,100",
+        "max_rent": "$2,400",
+        "rent": "$2,100"
+      }
+    ]
+  }
+]

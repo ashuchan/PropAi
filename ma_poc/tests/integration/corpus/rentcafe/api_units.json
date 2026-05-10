@@ -1,0 +1,58 @@
+[
+  {
+    "url": "https://testprop.rentcafe.com/wp-json/middleware/v1/getFloorplans/?propertyId[]=1234567",
+    "body": [
+      {
+        "propertyId": "1234567",
+        "floorplanId": "A1001",
+        "floorplanName": "Studio",
+        "minimumSQFT": "550",
+        "maximumSQFT": "550",
+        "minimumRent": "1200.00",
+        "maximumRent": "1400.00",
+        "availableUnitsCount": "2",
+        "beds": "0",
+        "baths": "1",
+        "propertyName": "Test Property",
+        "min_price": 1200,
+        "max_price": 1400,
+        "unitsCount": "2",
+        "api": "rentcafe"
+      },
+      {
+        "propertyId": "1234567",
+        "floorplanId": "A1002",
+        "floorplanName": "1BD-A",
+        "minimumSQFT": "750",
+        "maximumSQFT": "800",
+        "minimumRent": "1650.00",
+        "maximumRent": "1900.00",
+        "availableUnitsCount": "3",
+        "beds": "1",
+        "baths": "1",
+        "propertyName": "Test Property",
+        "min_price": 1650,
+        "max_price": 1900,
+        "unitsCount": "3",
+        "api": "rentcafe"
+      },
+      {
+        "propertyId": "1234567",
+        "floorplanId": "A1003",
+        "floorplanName": "2BD-A",
+        "minimumSQFT": "1050",
+        "maximumSQFT": "1100",
+        "minimumRent": "2200.00",
+        "maximumRent": "2500.00",
+        "availableUnitsCount": "1",
+        "beds": "2",
+        "baths": "2",
+        "propertyName": "Test Property",
+        "min_price": 2200,
+        "max_price": 2500,
+        "unitsCount": "1",
+        "api": "rentcafe"
+      }
+    ]
+  }
+]

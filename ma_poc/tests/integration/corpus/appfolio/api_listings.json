@@ -1,0 +1,39 @@
+[
+  {
+    "url": "https://testprop.appfolio.com/api/listings",
+    "body": {
+      "objects": [
+        {
+          "id": "unit-2001",
+          "name": "Studio Suite",
+          "bedrooms": 0,
+          "bathrooms": 1,
+          "sqft": 480,
+          "price": 1300,
+          "status": "available",
+          "available_date": "2026-06-01"
+        },
+        {
+          "id": "unit-2002",
+          "name": "1BR Classic",
+          "bedrooms": 1,
+          "bathrooms": 1,
+          "sqft": 720,
+          "price": 1750,
+          "status": "available",
+          "available_date": "2026-06-15"
+        },
+        {
+          "id": "unit-2003",
+          "name": "2BR Deluxe",
+          "bedrooms": 2,
+          "bathrooms": 2,
+          "sqft": 1050,
+          "price": 2350,
+          "status": "available",
+          "available_date": "2026-07-01"
+        }
+      ]
+    }
+  }
+]
