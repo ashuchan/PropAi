@@ -1,0 +1,4 @@
+property_id,shard,domain,url,verdict,terminal_tier,pms_detected,adapter_selected,fetch_outcome,fetch_error_signature,fetch_status,body_bytes,captcha_detected,bot_blocked,llm_rescue_attempted,llm_rescue_succeeded,llm_cost,link_hops_attempted,link_hops_recovered,issue_codes,pattern_id,pattern_sub,final_url
+10001,shard_0,example-apartments.com,https://example-apartments.com/floorplans,FAILED_NO_DATA,TIER_4_LLM_API,unknown,GenericAdapter,OK,,200,45321,False,False,False,False,0.00120,2,0,,P3,,https://example-apartments.com/floorplans
+10002,shard_1,realty-corp.com,https://realty-corp.com/availability,FAILED_UNREACHABLE,,unknown,GenericAdapter,HARD_FAIL,connection_timeout,,0,False,False,False,False,0.0,0,0,,P7,,
+10003,shard_2,luxeliving.net,https://luxeliving.net/apartments,FAILED_NO_DATA,TIER_4_LLM_DOM,entrata,EntrataAdapter,OK,,200,82100,False,False,True,False,0.00450,1,0,UNITS_KEYLESS_HIGH,P4,,https://luxeliving.net/apartments/floor-plans

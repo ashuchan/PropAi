@@ -57,12 +57,16 @@ class Scheduler:
         self,
         csv_rows: list[dict[str, Any]],
         run_date: date | None = None,
+        force_scrape: bool = False,
     ) -> AsyncIterator[CrawlTask]:
         """Build and yield CrawlTasks in priority order.
 
         Args:
             csv_rows: Property records from CSV.
             run_date: Date of this run (default: today).
+            force_scrape: When True, bypass change-detection and always issue a
+                full RENDER task — useful for canary replays and per-property
+                forensics where stale-skip logic would mask the fix under test.
 
         Yields:
             CrawlTask objects in priority order.
@@ -122,12 +126,13 @@ class Scheduler:
             # Compute days since last render
             days_since = self._days_since_render(frontier_entry)
 
-            # Change detection decision
+            # Change detection decision; force_scrape overrides to full RENDER.
             decision: ChangeDecision = self._change_fn(
                 profile_maturity=profile_maturity,
                 frontier_entry=frontier_entry,
                 sitemap_lastmod=None,  # sitemap checked separately
                 days_since_full_render=days_since,
+                force_full=force_scrape,
             )
 
             # Get cached etag/last_modified
