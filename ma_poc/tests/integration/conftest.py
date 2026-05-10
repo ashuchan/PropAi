@@ -31,7 +31,7 @@ import pytest
 from tests.integration.fakes.event_spy import EventSpy
 from tests.integration.fakes.fake_browser import (
     PLAYWRIGHT_STUB_MODULES,
-    _build_playwright_stub,
+    build_playwright_stub,
 )
 from tests.integration.fakes.fake_fetcher import FakeFetcher
 from tests.integration.fakes.fake_llm import FakeLLM
@@ -62,7 +62,7 @@ def patch_playwright_modules(monkeypatch: pytest.MonkeyPatch) -> None:
 
     for name in PLAYWRIGHT_STUB_MODULES:
         if name not in sys.modules:
-            monkeypatch.setitem(sys.modules, name, _build_playwright_stub(name))
+            monkeypatch.setitem(sys.modules, name, build_playwright_stub(name))
 
 
 # ---------------------------------------------------------------------------
@@ -104,10 +104,13 @@ def fake_llm(monkeypatch: pytest.MonkeyPatch) -> FakeLLM:
         # ... run test that triggers LLM extraction ...
         assert fake_llm.call_count == 1
     """
+    import llm.base as _llm_base
     import llm.factory as _llm_factory
 
     fake = FakeLLM()
     monkeypatch.setattr(_llm_factory, "get_text_provider", lambda: fake)
+    # Zero the retry sleep so raises_rate_limit() doesn't add 0–8s per test.
+    monkeypatch.setattr(_llm_base, "RETRY_WAIT_CAP_SECONDS", 0.0)
     return fake
 
 

@@ -26,7 +26,7 @@ PLAYWRIGHT_STUB_MODULES: tuple[str, ...] = (
 )
 
 
-def _build_playwright_stub(name: str) -> types.ModuleType:
+def build_playwright_stub(name: str) -> types.ModuleType:
     """Build a minimal module stub that satisfies import-time attribute access."""
     mod = types.ModuleType(name)
     # Attributes referenced by type annotations in production code:
@@ -50,7 +50,7 @@ def inject_playwright_stubs() -> dict[str, types.ModuleType | None]:
     for name in PLAYWRIGHT_STUB_MODULES:
         previous[name] = sys.modules.get(name)
         if name not in sys.modules:
-            sys.modules[name] = _build_playwright_stub(name)
+            sys.modules[name] = build_playwright_stub(name)
     return previous
 
 

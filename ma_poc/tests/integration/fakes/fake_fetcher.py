@@ -8,7 +8,6 @@ falls back to a configurable default.
 
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
@@ -45,7 +44,7 @@ class FakeFetcher:
     """
 
     def __init__(self) -> None:
-        self._queues: dict[str, list[FetchResult]] = defaultdict(list)
+        self._queues: dict[str, list[FetchResult]] = {}
         self._calls: list[tuple[Any, Any]] = []  # (task, profile)
         self._default_factory = _default_ok
 

@@ -33,7 +33,6 @@ def build_profile(
     field_patches: list[FieldPatch] | None = None,
     blocked_endpoints: list[BlockedEndpoint] | None = None,
     cluster_key: str = "",
-    **extra: Any,
 ) -> ScrapeProfile:
     """Return a ScrapeProfile with the given maturity and hints.
 
@@ -78,7 +77,6 @@ def build_profile(
         confidence=confidence,
         api_hints=api_hints,
         cluster_key=cluster_key,
-        **extra,
     )
 
 

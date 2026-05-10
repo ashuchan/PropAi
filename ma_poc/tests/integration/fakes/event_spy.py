@@ -24,7 +24,14 @@ from ma_poc.observability.events import EventKind
 
 
 class EventSpy:
-    """Captures (kind, property_id, kwargs) tuples emitted via emit()."""
+    """Captures (kind, property_id, kwargs) tuples emitted via emit().
+
+    Limitation: only captures calls that reach ``ma_poc.observability.events.emit``
+    via a lazy import (``from ma_poc.observability.events import emit`` inside a
+    function body). Module-level eager imports cache the original function object
+    and will bypass the spy. All current production callers use lazy imports, so
+    this is safe today — keep this constraint in mind when adding new callers.
+    """
 
     def __init__(self) -> None:
         self._calls: list[tuple[EventKind, str, dict[str, Any]]] = []
