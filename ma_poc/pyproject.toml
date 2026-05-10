@@ -12,6 +12,10 @@ filterwarnings = [
 ]
 markers = [
     "llm: test requires a live LLM provider (skip with -m 'not llm')",
+    "db: test requires a real Postgres instance (skipped unless POSTGRES_TEST_DSN is set)",
+    "ts: test requires a Node.js toolchain",
+    "slow: test takes > 2s wall-clock — excluded from the default CI run",
+    "e2e: full pipeline through all 4 layers (extract → propagate → persist → consume)",
 ]
 
 [tool.mypy]
