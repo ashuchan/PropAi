@@ -64,12 +64,30 @@ _SUCCESS_VERDICTS = frozenset({"SUCCESS"})
 # CARRY_FORWARD counts as a "soft success" from the cloud run perspective;
 # a canary that fails on it is a regression.
 _CLOUD_OK_VERDICTS = frozenset({"SUCCESS", "CARRY_FORWARD"})
+# Verdicts that qualify a property for the regression sentinel basket.
+_REGRESSION_SENTINEL_VERDICTS = frozenset({"SUCCESS", "CARRY_FORWARD"})
 
 VERDICT_IMPROVED = "IMPROVED"
 VERDICT_REGRESSED = "REGRESSED"
 VERDICT_UNCHANGED_OK = "UNCHANGED_OK"
 VERDICT_UNCHANGED_FAIL = "UNCHANGED_FAIL"
 VERDICT_TIMEOUT_IN_CANARY = "TIMEOUT_IN_CANARY"
+
+# Basket labels written to canary_input.csv so operators know why each
+# property was selected.
+BASKET_FAILURE = "FAILURE"
+BASKET_REGRESSION = "REGRESSION_SENTINEL"
+
+# Default stratification dimensions for each basket.
+# QA coverage rationale:
+#   terminal_tier  — exercises a distinct extraction code path per tier
+#   pms_detected   — exercises a distinct adapter per PMS platform
+# Regression basket adds fetch_outcome to ensure CARRY_FORWARD (state
+# persistence) code path is always represented.
+_DEFAULT_FAILURE_STRATA: list[str] = ["terminal_tier", "pms_detected"]
+_DEFAULT_REGRESSION_STRATA: list[str] = ["terminal_tier", "pms_detected", "fetch_outcome"]
+
+_DEFAULT_REGRESSION_BASKET_SIZE = 20
 
 # ── Data models ───────────────────────────────────────────────────────────────
 
@@ -98,7 +116,8 @@ class ComparedRow:
     canary_tier: str     # populated from tier_won events (L4)
     canary_units: int
     verdict: str         # IMPROVED / REGRESSED / UNCHANGED_OK / UNCHANGED_FAIL
-    attributed_fix: str = ""   # L4 attribution
+    basket: str = BASKET_FAILURE   # FAILURE or REGRESSION_SENTINEL
+    attributed_fix: str = ""       # L4 attribution
 
 
 @dataclass
@@ -113,6 +132,9 @@ class CanaryReport:
     unchanged_ok: int = 0
     unchanged_fail: int = 0
     timeout_in_canary: int = 0
+    # Regression sentinel basket counts (subset of the totals above).
+    sentinel_total: int = 0
+    sentinel_regressed: int = 0
     rows: list[ComparedRow] = field(default_factory=list)
 
     @property
@@ -151,6 +173,137 @@ def _read_failures_csv(path: Path) -> list[dict[str, str]]:
     """Parse failures.csv into a list of row dicts."""
     with path.open(newline="", encoding="utf-8") as fh:
         return list(csv.DictReader(fh))
+
+
+def _find_successes_csv(run_date: str) -> Path | None:
+    """Locate the successes.csv produced by analyze_cloud_run.py.
+
+    Args:
+        run_date: YYYY-MM-DD string identifying the source cloud run.
+
+    Returns:
+        Path to successes.csv, or None if not found.
+    """
+    candidates = [
+        _ANALYZER_OUT_ROOT / f"cloud_run_{run_date}" / "successes.csv",
+        Path(f"c:/tmp/run-{run_date}/_analyzer_out/successes.csv"),
+    ]
+    for candidate in candidates:
+        if candidate.exists() and candidate.stat().st_size > 0:
+            return candidate
+    return None
+
+
+def _read_successes_csv(path: Path) -> list[dict[str, str]]:
+    """Parse successes.csv into a list of row dicts."""
+    with path.open(newline="", encoding="utf-8") as fh:
+        return list(csv.DictReader(fh))
+
+
+# ── Stratified population selection ──────────────────────────────────────────
+
+
+def select_stratified(
+    rows: list[dict[str, str]],
+    strata_keys: list[str],
+    n_per_stratum: int = 1,
+    limit: int | None = None,
+) -> list[dict[str, str]]:
+    """Greedy stratified sampler: guarantee at least n_per_stratum rows per
+    distinct value of each key in strata_keys.
+
+    Algorithm:
+      1. Build a (key, value) → candidate_rows index.
+      2. For each stratum, pick n_per_stratum rows not yet selected.
+         A single row can satisfy multiple strata simultaneously.
+      3. Fill remaining slots up to limit with un-selected rows.
+
+    This gives the minimum population that covers every code path represented
+    by the strata dimensions while staying within the budget.
+
+    Args:
+        rows: Source rows (failures.csv or successes.csv dicts).
+        strata_keys: Column names to stratify on, e.g. ["terminal_tier", "pms_detected"].
+        n_per_stratum: Minimum rows per distinct stratum value (default 1).
+        limit: Hard cap on output size; None means uncapped.
+
+    Returns:
+        Stratified sample, deduplicated by property_id.
+    """
+    from collections import defaultdict
+
+    seen_ids: set[str] = set()
+    result: list[dict[str, str]] = []
+
+    # Index rows by (key, value) stratum.
+    strata_bins: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
+    for row in rows:
+        for key in strata_keys:
+            val = row.get(key, "").strip()
+            if val:
+                strata_bins[(key, val)].append(row)
+
+    # For each stratum, pick n_per_stratum unseen rows.
+    for (_key, _val), candidates in strata_bins.items():
+        picks = 0
+        for row in candidates:
+            if picks >= n_per_stratum:
+                break
+            pid = row.get("property_id", "").strip()
+            if pid and pid not in seen_ids:
+                result.append(row)
+                seen_ids.add(pid)
+                picks += 1
+
+    # Fill up to limit with remaining rows in original order.
+    if limit is not None:
+        for row in rows:
+            if len(result) >= limit:
+                break
+            pid = row.get("property_id", "").strip()
+            if pid and pid not in seen_ids:
+                result.append(row)
+                seen_ids.add(pid)
+
+    return result[:limit] if limit is not None else result
+
+
+def select_regression_basket(
+    success_rows: list[dict[str, str]],
+    strata_keys: list[str] | None = None,
+    limit: int = _DEFAULT_REGRESSION_BASKET_SIZE,
+) -> list[dict[str, str]]:
+    """Select the regression sentinel basket from cloud-run SUCCESS/CARRY_FORWARD rows.
+
+    The regression basket contains properties that SUCCEEDED in the cloud run
+    and therefore MUST still succeed in the canary.  Any REGRESSED property
+    in this basket means the change under test broke a previously working
+    code path — the deploy gate must fail.
+
+    Stratification ensures each extraction tier, PMS adapter, and fetch outcome
+    is represented.  A 20-property basket typically covers 6-8 tiers × 4 adapters
+    with overlap.
+
+    Args:
+        success_rows: Rows from successes.csv (verdict in SUCCESS/CARRY_FORWARD).
+        strata_keys: Stratification dimensions (defaults to _DEFAULT_REGRESSION_STRATA).
+        limit: Maximum basket size (default 20).
+
+    Returns:
+        Stratified sample of regression sentinel properties.
+    """
+    if limit <= 0:
+        raise ValueError(f"regression basket limit must be > 0, got {limit}")
+
+    effective_keys = strata_keys if strata_keys is not None else _DEFAULT_REGRESSION_STRATA
+
+    # Filter to only SUCCESS and CARRY_FORWARD verdicts.
+    eligible = [
+        r for r in success_rows
+        if r.get("verdict", "") in _REGRESSION_SENTINEL_VERDICTS
+    ]
+
+    return select_stratified(eligible, effective_keys, n_per_stratum=1, limit=limit)
 
 
 # ── DB setup / teardown ───────────────────────────────────────────────────────
@@ -368,8 +521,13 @@ def write_canary_input_csv(rows: list[dict[str, str]], out_path: Path) -> None:
     The output schema is the minimal set jugnu_runner accepts via --csv:
     property_id, url (plus extra columns preserved for the compare phase).
 
+    The ``basket`` column labels each row as FAILURE (was failing in the cloud
+    run — we're testing our fix) or REGRESSION_SENTINEL (was succeeding — we're
+    checking we didn't break it).  ``cloud_units`` records how many units the
+    cloud run extracted, enabling severity assessment of regressions.
+
     Args:
-        rows: Selected rows from failures.csv.
+        rows: Selected rows from failures.csv or successes.csv.
         out_path: Destination file path.
     """
     _FIELDNAMES = [
@@ -379,6 +537,8 @@ def write_canary_input_csv(rows: list[dict[str, str]], out_path: Path) -> None:
         "terminal_tier",
         "pms_detected",
         "domain",
+        "basket",
+        "cloud_units",
     ]
     with out_path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=_FIELDNAMES, extrasaction="ignore")
@@ -392,6 +552,8 @@ def write_canary_input_csv(rows: list[dict[str, str]], out_path: Path) -> None:
                     "terminal_tier": row.get("terminal_tier", ""),
                     "pms_detected": row.get("pms_detected", ""),
                     "domain": row.get("domain", ""),
+                    "basket": row.get("basket", BASKET_FAILURE),
+                    "cloud_units": row.get("units", row.get("cloud_units", "0")),
                 }
             )
     log.info("Wrote %d rows → %s", len(rows), out_path)
@@ -598,6 +760,12 @@ def compare(
         cloud_verdict = row.get("verdict", "FAILED_NO_DATA")
         cloud_tier = row.get("terminal_tier", "")
         cloud_was_ok = cloud_verdict in _CLOUD_OK_VERDICTS
+        basket = row.get("basket", BASKET_FAILURE)
+        # cloud_units: failures have 0; successes.csv carries actual unit count.
+        try:
+            cloud_units_val = int(row.get("cloud_units", row.get("units", 0)) or 0)
+        except (ValueError, TypeError):
+            cloud_units_val = 0
 
         canary = canary_outcomes.get(pid)
         if canary is None:
@@ -613,6 +781,10 @@ def compare(
 
         canary_was_ok = canary_verdict in _SUCCESS_VERDICTS
 
+        is_sentinel = basket == BASKET_REGRESSION
+        if is_sentinel:
+            report.sentinel_total += 1
+
         attributed_fix = ""
         if canary_verdict == VERDICT_TIMEOUT_IN_CANARY:
             row_verdict = VERDICT_TIMEOUT_IN_CANARY
@@ -624,6 +796,8 @@ def compare(
         elif cloud_was_ok and not canary_was_ok:
             row_verdict = VERDICT_REGRESSED
             report.regressed += 1
+            if is_sentinel:
+                report.sentinel_regressed += 1
         elif cloud_was_ok and canary_was_ok:
             row_verdict = VERDICT_UNCHANGED_OK
             report.unchanged_ok += 1
@@ -637,11 +811,12 @@ def compare(
                 url=row.get("url", ""),
                 cloud_outcome=cloud_verdict,
                 cloud_tier=cloud_tier,
-                cloud_units=0,  # failures.csv has no units count for failures
+                cloud_units=cloud_units_val,
                 canary_outcome=canary_verdict,
                 canary_tier=canary_tier,
                 canary_units=canary_units,
                 verdict=row_verdict,
+                basket=basket,
                 attributed_fix=attributed_fix,
             )
         )
@@ -662,22 +837,28 @@ def render_markdown(report: CanaryReport) -> str:
         Markdown string suitable for writing to report.md.
     """
     gate = "PASS" if report.passed else "FAIL ⚠️  DO NOT DEPLOY"
+    failure_total = report.properties_total - report.sentinel_total
     lines = [
         f"# Local Canary Report — {report.run_date}",
         "",
         f"**Source run:** {report.source_run_date}  ",
-        f"**Properties tested:** {report.properties_total}  ",
+        f"**Properties tested:** {report.properties_total}  "
+        f"({failure_total} failure-basket + {report.sentinel_total} regression-sentinel)  ",
         f"**Pre-deploy gate:** `REGRESSED == 0` → **{gate}**",
         "",
         "## Summary",
         "",
         "```",
         f"Local canary: {report.properties_total} properties from cloud-run {report.source_run_date}",
-        f"  IMPROVED:        {report.improved:4d}  (was failing, now succeed)",
-        f"  UNCHANGED_OK:    {report.unchanged_ok:4d}  (was succeeding, still succeed — sanity baseline)",
-        f"  UNCHANGED_FAIL:  {report.unchanged_fail:4d}  (was failing, still failing — fix doesn't cover them)",
-        f"  REGRESSED:       {report.regressed:4d}  (was succeeding, now fail — STOP, do not deploy)",
-        f"  TIMEOUT:         {report.timeout_in_canary:4d}  (no PROPERTY_EMITTED — investigate canary tool)",
+        f"  Failure basket ({failure_total} properties — fix validation):",
+        f"    IMPROVED:        {report.improved:4d}  (was failing, now succeed — fix is working)",
+        f"    UNCHANGED_FAIL:  {report.unchanged_fail:4d}  (was failing, still failing — fix doesn't cover them)",
+        f"  Regression sentinel ({report.sentinel_total} properties — regression detection):",
+        f"    UNCHANGED_OK:    {report.unchanged_ok:4d}  (was succeeding, still succeed — no regression)",
+        f"    REGRESSED:       {report.sentinel_regressed:4d}  (was succeeding, now fail — STOP)",
+        f"  Cross-basket:",
+        f"    REGRESSED total: {report.regressed:4d}  (any regression = deploy blocked)",
+        f"    TIMEOUT:         {report.timeout_in_canary:4d}  (no PROPERTY_EMITTED — investigate canary tool)",
         "",
         f"Pre-deploy gate: REGRESSED == 0 → {('PASS' if report.passed else 'FAIL')}",
         "```",
@@ -765,6 +946,7 @@ def render_json(report: CanaryReport) -> str:
                 "canary_tier": r.canary_tier,
                 "canary_units": r.canary_units,
                 "verdict": r.verdict,
+                "basket": r.basket,
                 "attributed_fix": r.attributed_fix,
             }
             for r in report.rows
@@ -948,6 +1130,45 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         metavar="PATH",
         help="Override the failures.csv source entirely with this external CSV.",
+    )
+    sel.add_argument(
+        "--stratify",
+        action="store_true",
+        default=False,
+        help=(
+            "Apply stratified sampling to the failure basket so that at least "
+            "one property per terminal_tier and pms_detected value is included. "
+            "Off by default to preserve backward compatibility."
+        ),
+    )
+
+    # Regression sentinel basket
+    reg = p.add_argument_group(
+        "Regression sentinel basket",
+        description=(
+            "Select properties that SUCCEEDED in the cloud run. "
+            "These are replayed to detect regressions introduced by the change under test."
+        ),
+    )
+    reg.add_argument(
+        "--regression-basket-csv",
+        type=Path,
+        metavar="PATH",
+        help=(
+            "Explicit path to a successes.csv for the regression basket. "
+            "Defaults to the successes.csv produced by analyze_cloud_run.py "
+            f"alongside failures.csv in {_ANALYZER_OUT_ROOT}."
+        ),
+    )
+    reg.add_argument(
+        "--regression-basket-size",
+        type=int,
+        default=_DEFAULT_REGRESSION_BASKET_SIZE,
+        metavar="N",
+        help=(
+            f"Maximum size of the regression sentinel basket (default: {_DEFAULT_REGRESSION_BASKET_SIZE}). "
+            "Set 0 to disable regression sentinel selection entirely."
+        ),
     )
 
     # DB
@@ -1139,7 +1360,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        selected = select_properties(
+        failure_rows = select_properties(
             all_rows,
             filter_tier=args.filter_tier,
             filter_pms=args.filter_pms,
@@ -1150,6 +1371,58 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         parser.error(str(exc))
         return 2  # unreachable; parser.error() calls sys.exit
+
+    # Optionally stratify the failure basket for better code-path coverage.
+    if args.stratify and failure_rows:
+        failure_rows = select_stratified(
+            failure_rows, _DEFAULT_FAILURE_STRATA, n_per_stratum=1, limit=args.limit
+        )
+
+    # Tag each failure row with its basket label.
+    for row in failure_rows:
+        row["basket"] = BASKET_FAILURE
+
+    # ── REGRESSION SENTINEL BASKET ────────────────────────────────────────────
+    regression_rows: list[dict[str, str]] = []
+    if args.regression_basket_size > 0:
+        if args.regression_basket_csv:
+            successes_path: Path | None = args.regression_basket_csv
+        else:
+            successes_path = _find_successes_csv(args.from_run)
+
+        if successes_path is not None and successes_path.exists():
+            try:
+                raw_successes = _read_successes_csv(successes_path)
+                regression_rows = select_regression_basket(
+                    raw_successes,
+                    limit=args.regression_basket_size,
+                )
+                for row in regression_rows:
+                    row["basket"] = BASKET_REGRESSION
+                log.info(
+                    "Regression sentinel basket: %d properties from %s",
+                    len(regression_rows), successes_path,
+                )
+            except Exception as exc:
+                log.warning(
+                    "Failed to build regression basket from %s: %s — skipping.",
+                    successes_path, exc,
+                )
+        else:
+            log.info(
+                "No successes.csv found for run %s — regression sentinel basket empty.",
+                args.from_run,
+            )
+
+    # Merge failure + regression baskets; deduplicate by property_id (failure
+    # basket wins if both contain the same property).
+    seen_pids: set[str] = {r["property_id"] for r in failure_rows}
+    for row in regression_rows:
+        if row["property_id"] not in seen_pids:
+            failure_rows.append(row)
+            seen_pids.add(row["property_id"])
+
+    selected = failure_rows
 
     if not selected:
         log.warning(
