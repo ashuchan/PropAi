@@ -10,8 +10,8 @@ from __future__ import annotations
 import ast
 import pathlib
 
-
-_GENERIC_SRC = pathlib.Path("ma_poc/pms/adapters/generic.py").read_text(encoding="utf-8")
+_MA_POC = pathlib.Path(__file__).resolve().parent.parent.parent.parent  # ma_poc/
+_GENERIC_SRC = (_MA_POC / "pms" / "adapters" / "generic.py").read_text(encoding="utf-8")
 
 
 def test_assess_and_decide_called_after_jsonld_tier() -> None:

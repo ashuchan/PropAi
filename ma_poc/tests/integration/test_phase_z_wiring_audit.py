@@ -5,7 +5,11 @@ from __future__ import annotations
 import pathlib
 
 
-_MAPOC = pathlib.Path("ma_poc")
+# Resolve ma_poc/ relative to this file rather than CWD so the tests work
+# regardless of where pytest is launched from.
+_HERE = pathlib.Path(__file__).resolve().parent        # tests/integration/
+_TESTS = _HERE.parent                                  # tests/
+_MAPOC = _TESTS.parent                                 # ma_poc/
 
 
 def test_z_h11_compute_budget_has_production_caller() -> None:
@@ -65,17 +69,17 @@ def test_z_gate_pr23_script_exists() -> None:
 
 
 def test_z_all_phase_test_files_exist() -> None:
-    """All phase test files referenced in gates/pr23.py must exist."""
+    """Phase test files must exist at their current canonical locations."""
     expected = [
         "tests/services/test_phase_a_correctness.py",
         "tests/profile/test_phase_b_save_mapping_kwargs.py",
-        "tests/integration/test_phase_c_field_patches.py",
+        "tests/integration/propagate/test_propagate_source_url_and_field_patches.py",
         "tests/profile/test_phase_d_observations.py",
         "tests/profile/test_phase_e_dom_hints.py",
-        "tests/integration/test_phase_f_cluster.py",
-        "tests/integration/test_phase_g_phase9_reachability.py",
-        "tests/integration/test_phase_h_planner_wiring.py",
-        "tests/integration/test_phase_i_telemetry.py",
+        "tests/integration/extract/test_extract_cluster_key_from_detector.py",
+        "tests/integration/extract/test_extract_link_hop_guard_and_budget_reachability.py",
+        "tests/integration/extract/test_extract_planner_budget_wiring.py",
+        "tests/integration/propagate/test_propagate_telemetry_emissions.py",
     ]
     missing = [p for p in expected if not (_MAPOC / p).exists()]
     assert missing == [], f"Missing phase test files: {missing}"
