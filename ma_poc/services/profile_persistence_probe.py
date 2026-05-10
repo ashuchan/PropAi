@@ -27,6 +27,7 @@ from typing import Any
 from ma_poc.models.scrape_profile import (
     ApiEndpoint,
     BlockedEndpoint,
+    FieldPatch,
     FieldSelectorMap,
     LlmFieldMapping,
     ScrapeProfile,
@@ -78,6 +79,19 @@ def _build_sentinel_profile() -> ScrapeProfile:
             url_pattern="https://probe.example.com/api/floorplans",
             json_paths={"name": "floorplans.0.name"},
             provider="probe_provider",
+        )
+    )
+    # Channel 6 — field_patches (PR 2 added; covers per-field replay).
+    # If FieldPatch's Pydantic Literal[field_name] gets out of sync with
+    # the producer at jugnu.py:1324 _PATCH_FIELDS, this round-trip fails
+    # at deploy time instead of silently producing zero patches in the DB.
+    sentinel.api_hints.field_patches.append(
+        FieldPatch(
+            api_url_pattern="https://probe.example.com/api/units",
+            field_name="rent_low",
+            json_path="units[*].rent",
+            confidence=0.9,
+            source_envelope_hash="probe_hash_16chr",
         )
     )
     # Channel 4 — dom_hints.field_selectors
@@ -142,6 +156,18 @@ def _assert_round_trip(loaded: ScrapeProfile) -> None:
     if fs is None or fs.container != ".probe-unit":
         raise PersistenceProbeError(
             f"channel=dom_hints.field_selectors: container lost (got {fs.container if fs else None!r})"
+        )
+
+    # Channel 6 — field_patches (PR 2)
+    patches = loaded.api_hints.field_patches
+    if not any(
+        p.api_url_pattern == "https://probe.example.com/api/units"
+        and p.field_name == "rent_low"
+        and p.json_path == "units[*].rent"
+        for p in patches
+    ):
+        raise PersistenceProbeError(
+            f"channel=field_patches: probe entry not found (got {len(patches)} entries)"
         )
 
     if loaded.navigation.winning_page_url != "https://probe.example.com/floorplans":
@@ -216,7 +242,7 @@ def run_sentinel_probe(store: Any) -> None:
         log.warning("Persistence probe sentinel cleanup failed (non-fatal): %s", exc)
 
     _safe_emit("STARTUP_PROBE_OK")
-    log.info("Persistence probe OK: all 5 channels round-tripped.")
+    log.info("Persistence probe OK: all writeable channels round-tripped (mappings, blocked, known, dom_selectors, navigation, field_patches).")
 
 
 # --- store adapter helpers ------------------------------------------------

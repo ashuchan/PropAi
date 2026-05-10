@@ -98,6 +98,20 @@ def real_world_scrape_result() -> dict:
                 "body": {"floorplans": [{"id": 1, "rent": 1500}]},
             },
         ],
+        # Channel: field_patches (PR 2 — writes via _field_patches list).
+        # Shape lifted from real 2026-05-10 cloud-run llm_diagnostics output
+        # for pid 12727 (riverway / 3CM Multifamily) where null_field_recovery
+        # extracted unit_id with confidence=0.95 from "$.uuid".
+        "_field_patches": [
+            {
+                "api_url_pattern": "/api/v1/units",
+                "field_name": "unit_id",
+                "json_path": "units[*].uuid",
+                "confidence": 0.95,
+                "parser_fix": "item.get('uuid')",
+                "_envelope_hash": "0123456789abcdef",
+            },
+        ],
     }
 
 
@@ -152,6 +166,20 @@ def test_full_writer_contract(
         "/contact" in url for url in p.navigation.explored_links
     ), "REGRESSION: navigation.explored_links writer broke."
 
+    # Channel 6 — field_patches (PR 2)
+    assert len(p.api_hints.field_patches) > 0, (
+        "REGRESSION: field_patches writer broke. The _field_patches key "
+        "wasn't surfaced on scrape_result OR update_profile_after_extraction "
+        "stopped reading it OR the call order regressed (recovery now runs "
+        "AFTER profile update — see PR 2 docs)."
+    )
+    fp = p.api_hints.field_patches[0]
+    assert fp.field_name == "unit_id"
+    assert fp.json_path == "units[*].uuid", (
+        "REGRESSION: PR 2's path normaliser stripped the brackets. "
+        "Reader (_apply_field_patches) needs them to traverse [*]."
+    )
+
 
 def test_full_writer_contract_survives_round_trip(
     store: ProfileStore, real_world_scrape_result: dict, tmp_path
@@ -184,3 +212,7 @@ def test_full_writer_contract_survives_round_trip(
     )
     assert loaded.dom_hints.field_selectors is not None
     assert loaded.dom_hints.field_selectors.container == ".unit-card"
+    assert len(loaded.api_hints.field_patches) > 0, (
+        "REGRESSION: field_patches lost on FS round-trip — Pydantic "
+        "FieldPatch model drift or serializer issue."
+    )

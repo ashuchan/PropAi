@@ -200,22 +200,27 @@ def _apply_field_patches(
     at json_path, then fill units[i][field_name] = values[i] where the field is
     currently absent/null. Never overwrites non-null values.
     Returns the (mutated) units list.
+
+    PR 2 (2026-05-10) Gap 3: path resolution now uses
+    ``services.profile_updater._normalize_json_path`` +
+    ``_walk_json_path`` which support bracket notation (``units[*].rent``,
+    ``data.items[0].price``). Pre-PR's dot-only walker silently failed on
+    every LLM-emitted path with brackets — most paths beyond single-segment
+    aliases like ``uuid``.
     """
     if not units or not api_responses or not field_patches:
         return units
 
+    # Lazy import to keep the cross-module dependency localised. The
+    # services package already imports ma_poc.pms in some flows, so an
+    # eager import would risk a circular dep at module load time.
+    from ma_poc.services.profile_updater import (
+        _normalize_json_path,
+        _walk_json_path,
+    )
+
     def _get_path(obj: Any, path: str) -> Any:
-        for part in path.split("."):
-            if isinstance(obj, dict):
-                obj = obj.get(part)
-            elif isinstance(obj, list) and part.isdigit():
-                idx = int(part)
-                obj = obj[idx] if idx < len(obj) else None
-            else:
-                return None
-            if obj is None:
-                return None
-        return obj
+        return _walk_json_path(obj, _normalize_json_path(path))
 
     for patch in field_patches:
         try:

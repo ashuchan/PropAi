@@ -331,20 +331,16 @@ async def run_jugnu(
                     csv_row=csv_row,
                     run_dir=run_dir,
                     state_store=run_state_store,
+                    schema_version=schema_version,
                 ),
                 timeout=PER_PROPERTY_TIMEOUT_SECONDS,
             )
-            formatted = _format_output(result, csv_row, schema_version)
-            # F2: Null Field Recovery — runs on v2 units with null rent_low
-            # / unit_id produced by Tier-1 adapters. Applies high-confidence
-            # recoveries in place on the unit dicts.
-            if schema_version == "v2":
-                await _run_null_field_recovery(
-                    result,
-                    formatted,
-                    run_dir,
-                    task.property_id,
-                )
+            # PR 2 (2026-05-10): null-field recovery now runs INSIDE
+            # _process_property (before the profile-update step) so
+            # recovered FieldPatch entries reach the persistence layer.
+            # Reuse the formatted dict produced there if present; otherwise
+            # build it now for the report-writing path below.
+            formatted = result.get("_v2_formatted") or _format_output(result, csv_row, schema_version)
             # Per-property report — same format as daily_runner emits, but
             # sourced from jugnu's raw scrape_result + formatted v1/v2 record
             # so v2 metadata (apartment_id/pmc/website_design/concessions)
@@ -513,6 +509,7 @@ async def _process_property(
     csv_row: dict[str, Any] | None = None,
     run_dir: Path | None = None,
     state_store: Any | None = None,
+    schema_version: str = "v1",
 ) -> dict[str, Any]:
     """Process a single property through L1-L4.
 
@@ -676,6 +673,40 @@ async def _process_property(
             drift_detected, reasons = detect_drift(profile, units_extracted, result)
             if drift_detected:
                 profile = apply_drift_demotion(profile, reasons)
+
+            # PR 2 (2026-05-10): Channel 4 — null-field-recovery + FieldPatch
+            # persistence. Before this PR, recovery ran in the OUTER
+            # _process_one AFTER the profile was already saved here, so
+            # recovered patches never reached the persistence layer.
+            # Hoisting the recovery here populates result["_field_patches"]
+            # in time for save_field_patch below. Calling save_field_patch
+            # directly (not a second update_profile_after_extraction pass)
+            # avoids double-incrementing consecutive_successes / maturity.
+            if schema_version == "v2":
+                try:
+                    formatted_for_recovery = _format_output(result, csv_row or {}, schema_version)
+                    await _run_null_field_recovery(
+                        result,
+                        formatted_for_recovery,
+                        run_dir,
+                        task.property_id,
+                    )
+                    # Stash so the outer _process_one reuses it for the
+                    # property report instead of re-running _format_output
+                    # (saves ~1ms × 5,000 properties / day).
+                    result["_v2_formatted"] = formatted_for_recovery
+
+                    # Persist patches surfaced by the recovery.
+                    from services.profile_updater import save_field_patch
+                    for patch_dict in result.get("_field_patches", []) or []:
+                        if isinstance(patch_dict, dict):
+                            save_field_patch(profile, patch_dict)
+                except Exception as exc:
+                    log.warning(
+                        "F2 null_field_recovery hoist failed for %s: %s",
+                        task.property_id, exc, exc_info=True,
+                    )
+
             if hasattr(profile_store, "save"):
                 profile_store.save(profile)
         except Exception as exc:

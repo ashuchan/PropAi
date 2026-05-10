@@ -10,6 +10,7 @@ Phase: claude-scrapper-arch.md Step 3.1
 from __future__ import annotations
 
 import logging
+import re
 import urllib.parse
 from datetime import datetime
 from typing import Any
@@ -27,6 +28,103 @@ from ma_poc.models.scrape_profile import (
 from ma_poc.services.profile_store import ProfileStore
 
 log = logging.getLogger(__name__)
+
+
+# PR 2 (2026-05-10) Gap 3 — shared JSONPath normaliser + walker.
+#
+# Pre-PR: writer (save_field_patch) stripped only the leading "$." prefix;
+# reader (_apply_field_patches::_get_path in generic.py) walked dot-segments
+# and could only resolve numeric tokens as list indices. Bracket-notation
+# paths the LLM canonically emits — `$.units[*].pricing.amount`,
+# `units[0].rent` — became unresolvable strings the reader silently failed
+# on. Saved patches stayed in the DB but never replayed.
+#
+# Post-PR: both writer and reader call _normalize_json_path, which converts
+# all path styles to a single canonical token list. _walk_json_path
+# resolves it, including [N] (numeric index) and [*] (each-element).
+#
+# Sentinel for wildcard. Using a private object so user-supplied strings
+# can't collide with it. Comparison is identity-only.
+_JSON_PATH_WILDCARD = object()
+
+# Token-extracting regex: matches either "name" or "[123]" or "[*]".
+# JSONPath grammar in the wild also has `..descendant`, filters, and
+# slicing — none of which the LLM emits and none of which the existing
+# replay layer needs. We deliberately keep this narrow.
+_JSON_PATH_TOKEN_RE = re.compile(r"([^.\[\]]+)|\[(\*|\d+)\]")
+
+
+def _normalize_json_path(path: str) -> list[Any]:
+    """Convert a JSONPath string to a token list of (str | int | sentinel).
+
+    Accepted inputs (all canonicalise to the same token list when equivalent):
+      ``$.units[*].rent`` → ``["units", _WILDCARD, "rent"]``
+      ``$.units[0].rent`` → ``["units", 0, "rent"]``
+      ``units[0].rent``   → ``["units", 0, "rent"]``
+      ``units.0.rent``    → ``["units", 0, "rent"]``  (legacy dot-only form)
+      ``uuid``            → ``["uuid"]``
+      ``""`` / ``None``   → ``[]``
+
+    Idempotent: call on a path that's already been processed and you get
+    the same list back as the path string. Re-call on the resulting list
+    and you get the same list (after string-rejoining and re-parsing).
+    """
+    if not path:
+        return []
+    s = path.strip().lstrip("$").lstrip(".")
+    if not s:
+        return []
+    tokens: list[Any] = []
+    for m in _JSON_PATH_TOKEN_RE.finditer(s):
+        name, bracket = m.group(1), m.group(2)
+        if name is not None:
+            # A bare numeric segment in dot notation is a list index too.
+            if name.isdigit():
+                tokens.append(int(name))
+            else:
+                tokens.append(name)
+        elif bracket is not None:
+            if bracket == "*":
+                tokens.append(_JSON_PATH_WILDCARD)
+            else:
+                tokens.append(int(bracket))
+    return tokens
+
+
+def _walk_json_path(obj: Any, tokens: list[Any]) -> Any:
+    """Resolve a normalised path token list against a JSON-shaped value.
+
+    Returns:
+      - The scalar / object / list at the path, OR
+      - When a ``_JSON_PATH_WILDCARD`` token is encountered against a list,
+        recurses for each element with the remaining tokens and returns a
+        flat ``list`` of resolved values (None entries dropped).
+      - ``None`` if any traversal step finds nothing.
+    """
+    if obj is None:
+        return None
+    if not tokens:
+        return obj
+    head, rest = tokens[0], tokens[1:]
+    if head is _JSON_PATH_WILDCARD:
+        if not isinstance(obj, list):
+            return None
+        out = []
+        for item in obj:
+            v = _walk_json_path(item, rest)
+            if v is not None:
+                out.append(v)
+        return out
+    if isinstance(head, int):
+        if not isinstance(obj, list):
+            return None
+        if head < 0 or head >= len(obj):
+            return None
+        return _walk_json_path(obj[head], rest)
+    # head is a string (dict key)
+    if isinstance(obj, dict):
+        return _walk_json_path(obj.get(head), rest)
+    return None
 
 
 def _emit_mapping_save_dropped(canonical_id: str, reason: str) -> None:
@@ -288,7 +386,16 @@ def save_field_patch(profile: ScrapeProfile, patch_dict: dict) -> bool:
         if not url or not field_name:
             log.warning("save_field_patch: dropped url=%s field=%s", url[:60], field_name)
             return False
-        json_path = (patch_dict.get("json_path", "") or "").lstrip("$").lstrip(".")
+        # PR 2 (2026-05-10) Gap 3: store the canonicalised path string (no "$." prefix,
+        # bracket notation preserved) so the reader's _walk_json_path can resolve it
+        # via _normalize_json_path. Pre-PR did only ``lstrip("$").lstrip(".")`` which
+        # left "units[*].rent" alone — fine for the writer, but the reader's
+        # dot-only walker silently failed on the bracket. Now both sides parse
+        # through the same helper.
+        raw_path = patch_dict.get("json_path", "") or ""
+        # Preserve the canonical string form (whatever the LLM emitted) but
+        # strip the "$." prefix once so we don't double-prefix on round trips.
+        json_path = raw_path.strip().lstrip("$").lstrip(".")
         for existing in profile.api_hints.field_patches:
             if existing.api_url_pattern == url and existing.field_name == field_name:
                 existing.json_path = json_path or existing.json_path
