@@ -97,6 +97,12 @@ class EventKind(StrEnum):
     MAPPING_EVICTED = "mapping.evicted"
     DOM_HINTS_MISS = "dom_hints.miss"
     DOM_HINTS_EVICTED = "dom_hints.evicted"
+    # PR 6 (2026-05-10): emitted when self-validation < 0.4 but the
+    # ENABLE_DEGRADED_DOM_PERSIST flag let the selectors save anyway.
+    # Pair with DOM_HINTS_MISS counts to track how much the loosened gate
+    # contributes — and to spot regressions where the flag accidentally
+    # flips off (DEGRADED_SAVED → 0 while MISS spikes).
+    DOM_HINTS_DEGRADED_SAVED = "dom_hints.degraded_saved"
     # LLM-tax avoidance signal — emitted from generic.py's profile_replay
     # sub-tier whenever a property reached a tier without paying for an
     # LLM call. Pair with MAPPING_REPLAY_EMPTY / DOM_HINTS_MISS to compute

@@ -140,7 +140,8 @@ def test_full_writer_contract(
         "early-returned. Re-run pre-impl trace from PR 1 docs."
     )
     mapping = p.api_hints.llm_field_mappings[0]
-    assert mapping.api_url_pattern.startswith("https://www.planoparktownhomes.com/")
+    # PR 5 (2026-05-10): writer normalises URL → host/path (no scheme, no query).
+    assert mapping.api_url_pattern.startswith("www.planoparktownhomes.com/")
     assert "rent_low" in mapping.json_paths
 
     # Channel 2 — blocked_endpoints
@@ -178,6 +179,16 @@ def test_full_writer_contract(
     assert fp.json_path == "units[*].uuid", (
         "REGRESSION: PR 2's path normaliser stripped the brackets. "
         "Reader (_apply_field_patches) needs them to traverse [*]."
+    )
+
+    # Channel 7 — navigation.last_navigation_hints (PR 7).
+    # The fixture supplies _llm_hints["navigation_hint"] = "/floorplans".
+    # The writer must persist it so the next run's link-hop can follow
+    # the URL without re-paying for the LLM diagnostic.
+    assert "/floorplans" in p.navigation.last_navigation_hints, (
+        "REGRESSION: navigation_hint writer broke. The _llm_hints.navigation_hint "
+        "key wasn't read OR profile_updater stopped writing to "
+        "profile.navigation.last_navigation_hints. See PR 7 docs."
     )
 
 

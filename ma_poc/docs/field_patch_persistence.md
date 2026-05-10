@@ -1,4 +1,4 @@
-# PR 2 — Failure Mechanism (Channel 4 / FieldPatch)
+# `field_patches` persistence — order-of-operations + JSONPath bracket walker
 
 **Channel under repair:** `field_patches` (per-field deterministic-replay patches; sub-tier `generic:_apply_field_patches` at `pms/adapters/generic.py:1028`).
 

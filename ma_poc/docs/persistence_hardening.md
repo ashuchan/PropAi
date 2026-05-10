@@ -1,4 +1,4 @@
-# PR 1 — Failure Mechanism
+# Persistence hardening — three-layer drop on empty `json_paths`
 
 **Channel under repair:** `llm_field_mappings` (the per-API-endpoint deterministic-replay mapping; sub-tier `generic:profile_replay`).
 

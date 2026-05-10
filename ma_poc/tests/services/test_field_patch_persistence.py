@@ -1,4 +1,4 @@
-"""PR 2 — Channel 4 (FieldPatch) end-to-end persistence + JSONPath bracket walker.
+"""``FieldPatch`` end-to-end persistence + JSONPath bracket walker.
 
 Three layers tested independently and end-to-end:
 

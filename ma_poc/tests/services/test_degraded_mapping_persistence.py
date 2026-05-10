@@ -1,4 +1,4 @@
-"""PR 1 — degraded LlmFieldMapping persistence (Action 1 from the brief).
+"""Degraded ``LlmFieldMapping`` persistence (envelope-only, no json_paths).
 
 Pre-PR: ``save_llm_field_mapping`` early-returned when ``json_paths`` was
 empty, dropping ~99% of LLM-API tier outputs (the LLM extracts units via
@@ -47,7 +47,8 @@ def test_full_mapping_persists_unchanged(profile: ScrapeProfile) -> None:
     assert ok is True
     assert len(profile.api_hints.llm_field_mappings) == 1
     m = profile.api_hints.llm_field_mappings[0]
-    assert m.api_url_pattern == "https://api.example.com/units"
+    # PR 5 (2026-05-10): writer normalises URL → host/path (no scheme).
+    assert m.api_url_pattern == "api.example.com/units"
     assert m.json_paths == {"rent": "data.rent", "unit_id": "data.id"}
     assert m.quality_score == 1.0
 

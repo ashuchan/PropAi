@@ -367,6 +367,86 @@ def plan_next_action(
     return Decision(action="ACCEPT_PARTIAL", rationale="no untried source within budget")
 
 
+# Source-confidence tightening — read by compute_budget below.
+#
+# A profile with consistently-high-confidence saved sources doesn't
+# benefit from re-paying for fresh LLM probes; the cached hint should
+# fire. We trim per-source LLM caps by 1 (floor at 1) so there's always
+# one fresh probe to detect drift, while still freeing budget for
+# whichever source IS struggling.
+
+# Min ``avg_confidence_when_won`` for a source to be considered
+# "high-confidence enough to skip a probe".
+_SOURCE_CONFIDENCE_TIGHTEN_THRESHOLD = 0.85
+# Min ``contribution_count`` to avoid trimming on a one-off lucky win.
+_SOURCE_CONFIDENCE_MIN_CONTRIBUTIONS = 5
+# Floor — never trim below 1 fresh probe per cascade tier.
+_SOURCE_CONFIDENCE_MIN_PROBE_FLOOR = 1
+
+
+def _tighten_budget_by_source_confidence(profile: Any, budget: dict) -> dict:
+    """Tighten the per-source LLM budget when saved-source confidence is high.
+
+    Behind ``ENABLE_SOURCE_TIERED_BUDGET`` (default OFF). When ON and
+    the profile has any source observation meeting both
+    ``avg_confidence_when_won >= 0.85`` and ``contribution_count >= 5``,
+    decrement the matching budget key by 1 (floor at 1).
+
+    Maps source_id → budget key:
+      - ``llm_api_targeted``   → ``llm_api_calls``
+      - ``llm_dom_targeted``   → ``llm_dom_calls``
+
+    Returns a new dict; never mutates the input.
+    """
+    try:
+        from ma_poc.config.feature_flags import enable_source_tiered_budget
+        if not enable_source_tiered_budget():
+            return budget
+    except Exception:
+        return budget
+
+    try:
+        observations = list(getattr(profile.api_hints, "source_observations", None) or [])
+    except Exception:
+        observations = []
+    if not observations:
+        return budget
+
+    src_to_budget_key = {
+        "llm_api_targeted": "llm_api_calls",
+        "llm_dom_targeted": "llm_dom_calls",
+    }
+
+    # Pick the highest-confidence observation per source_id (a profile
+    # can have one row per (source_id, field_group) — we want the
+    # best-observed signal, not the per-field-group one).
+    best_by_source: dict[str, float] = {}
+    contrib_by_source: dict[str, int] = {}
+    for obs in observations:
+        try:
+            sid = str(getattr(obs, "source_id", "") or "")
+            conf = float(getattr(obs, "avg_confidence_when_won", 0.0) or 0.0)
+            contrib = int(getattr(obs, "contribution_count", 0) or 0)
+        except Exception:
+            continue
+        if sid not in src_to_budget_key:
+            continue
+        if conf > best_by_source.get(sid, -1.0):
+            best_by_source[sid] = conf
+        contrib_by_source[sid] = max(contrib_by_source.get(sid, 0), contrib)
+
+    out = dict(budget)
+    for sid, conf in best_by_source.items():
+        if (
+            conf >= _SOURCE_CONFIDENCE_TIGHTEN_THRESHOLD
+            and contrib_by_source.get(sid, 0) >= _SOURCE_CONFIDENCE_MIN_CONTRIBUTIONS
+        ):
+            key = src_to_budget_key[sid]
+            current = int(out.get(key, 0))
+            out[key] = max(_SOURCE_CONFIDENCE_MIN_PROBE_FLOOR, current - 1)
+    return out
+
+
 def compute_budget(profile: Any, is_cold: bool) -> dict:
     """Per-property LLM budget for this run.
 
@@ -385,13 +465,14 @@ def compute_budget(profile: Any, is_cold: bool) -> dict:
     """
     cost_cap = get_property_llm_cost_cap_usd()
     if not is_cold:
-        return {
+        budget = {
             "llm_api_calls": 3,   # per-response cap; mirrors legacy api_llm_budget
             "llm_dom_calls": 1,   # per-page cap; mirrors legacy dom_llm_budget
             "llm_monolithic": 1,  # one shot per run
             "link_hop": 3,
             "_cost_cap_usd": cost_cap,
         }
+        return _tighten_budget_by_source_confidence(profile, budget)
 
     n = 0
     try:

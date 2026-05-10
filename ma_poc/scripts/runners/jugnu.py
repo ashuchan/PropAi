@@ -1307,6 +1307,23 @@ def _url_pattern_from(url: str) -> str:
         return url
 
 
+def _f2_has_recoverable_body(raw_apis: list[dict[str, Any]]) -> bool:
+    """PR 9 sub-3 (2026-05-10): True if at least one raw_api has a
+    non-empty dict or list body. Empty dicts, None bodies, or
+    error-shaped responses do NOT contain recoverable fields, so F2
+    should skip them rather than burning LLM cost on hopeless cases.
+    """
+    for entry in raw_apis or []:
+        if not isinstance(entry, dict):
+            continue
+        body = entry.get("body")
+        if isinstance(body, dict) and body:
+            return True
+        if isinstance(body, list) and body:
+            return True
+    return False
+
+
 async def _run_null_field_recovery(
     scrape_result: dict[str, Any],
     formatted: dict[str, Any],
@@ -1335,6 +1352,32 @@ async def _run_null_field_recovery(
         units = formatted.get("units") or []
         null_units = [u for u in units if u.get("rent_low") is None or u.get("unit_id") is None]
         if not null_units:
+            return
+
+        # PR 9 sub-3 (2026-05-10): tighten F2 precondition. raw_apis being
+        # non-empty doesn't mean any API has data — could be all error
+        # responses or empty bodies. Skip if no raw_api has a non-empty
+        # dict/list body.
+        if not _f2_has_recoverable_body(raw_apis):
+            log.info(
+                "F2 skipped for %s: no raw_api has a non-empty body",
+                canonical_id,
+            )
+            return
+
+        # PR 9 sub-3: when EVERY unit has BOTH rent_low AND unit_id null,
+        # this is parser-tier failure (no fields identified at all), not
+        # field-level recovery territory. F2 won't help.
+        all_units_total_null = bool(units) and all(
+            u.get("rent_low") is None and u.get("unit_id") is None
+            for u in units
+        )
+        if all_units_total_null:
+            log.info(
+                "F2 skipped for %s: every unit has rent_low AND unit_id null "
+                "(parser-tier failure, not field-recovery)",
+                canonical_id,
+            )
             return
 
         from ma_poc.services.llm_diagnostics import (

@@ -939,6 +939,19 @@ class GenericAdapter:
                         _env_hash = None  # type: ignore[assignment]
                     from datetime import datetime as _dt
 
+                    # Normalise both saved pattern and incoming URL so
+                    # query-param drift (api_key rotation, session tokens)
+                    # doesn't kill the substring match.
+                    try:
+                        from ma_poc.services.profile_updater import normalize_url_pattern as _norm_url
+                    except ImportError:
+                        # If the writer module is not importable in this
+                        # context (test isolation, etc.) fall back to
+                        # identity so the matcher still works on
+                        # non-drifted URLs.
+                        def _norm_url(x: str) -> str:
+                            return x
+
                     for mapping in saved:
                         try:
                             pat = getattr(mapping, "api_url_pattern", None) or (
@@ -948,8 +961,12 @@ class GenericAdapter:
                             pat = None
                         if not pat:
                             continue
+                        norm_pat = _norm_url(pat)
+                        if not norm_pat:
+                            continue
                         for resp in api_responses:
-                            if pat in resp.get("url", ""):
+                            norm_url = _norm_url(resp.get("url", ""))
+                            if norm_pat in norm_url:
                                 # Phase 6: drift check
                                 body = resp.get("body")
                                 saved_hash = getattr(mapping, "source_envelope_hash", "") or ""
@@ -1008,6 +1025,25 @@ class GenericAdapter:
                                             mapping.consecutive_replay_failures = 0
                                         except Exception:
                                             pass
+                                    # PR 9 sub-2 (2026-05-10): promote-on-hint.
+                                    # Bump quality_score by +0.05 (clamped at
+                                    # 1.0) so PR-6 degraded saves at 0.4 can
+                                    # rise toward full quality after consistent
+                                    # replay success. Behind ENABLE_PROMOTE_ON_HINT.
+                                    try:
+                                        from ma_poc.config.feature_flags import enable_promote_on_hint
+                                        from ma_poc.services.profile_updater import (
+                                            DOM_HINT_QUALITY_MAX as _Q_MAX,
+                                            DOM_HINT_QUALITY_PROMOTE_STEP as _Q_STEP,
+                                        )
+                                        if enable_promote_on_hint() and hasattr(mapping, "quality_score"):
+                                            # round(.., 2) avoids float drift (see _Q_STEP comment)
+                                            mapping.quality_score = min(
+                                                _Q_MAX,
+                                                round(float(mapping.quality_score) + _Q_STEP, 2),
+                                            )
+                                    except Exception:
+                                        pass
                                     break
                                 else:
                                     # Empty replay — count failure
@@ -1312,10 +1348,18 @@ class GenericAdapter:
                     # that gradually evict the entry — but at the cost of
                     # one wasted DOM cascade per run. Faster to bypass them
                     # and let the LLM-DOM tier produce fresh selectors.
-                    fs_quality = float(
-                        getattr(ctx.profile.dom_hints, "field_selectors_quality", 1.0) or 1.0
+                    # Replay admission gate. Mirror of the same constant used
+                    # at save time and in the eviction policy — see
+                    # services/profile_updater.py constants.
+                    from ma_poc.services.profile_updater import (
+                        DOM_HINT_QUALITY_MAX,
+                        DOM_HINT_QUALITY_REPLAY_FLOOR,
                     )
-                    if fs_quality >= 0.4:
+                    fs_quality = float(
+                        getattr(ctx.profile.dom_hints, "field_selectors_quality", DOM_HINT_QUALITY_MAX)
+                        or DOM_HINT_QUALITY_MAX
+                    )
+                    if fs_quality >= DOM_HINT_QUALITY_REPLAY_FLOOR:
                         dom_hints = fs
             hints_attempted = dom_hints is not None
             try:
@@ -1883,26 +1927,67 @@ class GenericAdapter:
                     # them for short-circuit.
                     quality_score = 0.5
 
-                if quality_score < 0.4:
-                    # Selectors don't reproduce against their own source
-                    # HTML — they will almost certainly miss tomorrow.
-                    # Skip persistence and emit telemetry so the saver
-                    # regression doesn't reappear silently.
+                # The strict < REPLAY_FLOOR drop assumed any selector that
+                # doesn't 1:1 reproduce its own source HTML is broken. In
+                # practice low self-validation often means (a) the LLM
+                # analysed the API/JSON envelope which has more units than
+                # the DOM displays at first paint, or (b) stale
+                # loading-state nodes interfered with selector match today
+                # but won't be there tomorrow. Behind
+                # ENABLE_DEGRADED_DOM_PERSIST (default ON) we persist with
+                # quality clamped to the replay-gate floor so the matcher
+                # admits the hint on the next run.
+                from ma_poc.services.profile_updater import (
+                    DOM_HINT_QUALITY_REPLAY_FLOOR as _Q_REPLAY_FLOOR,
+                )
+                if quality_score < _Q_REPLAY_FLOOR:
+                    try:
+                        from ma_poc.config.feature_flags import enable_degraded_dom_persist
+                        _allow_degraded = enable_degraded_dom_persist()
+                    except Exception:
+                        _allow_degraded = False
                     try:
                         from ma_poc.observability.events import EventKind, emit
-                        emit(
-                            EventKind.DOM_HINTS_MISS,
-                            ctx.property_id or "unknown",
-                            count=0,
-                            reason=f"selectors_self_validation_failed:{quality_score:.2f}",
-                        )
-                    except Exception:
-                        pass
-                    # Selectors discarded but the rest of the DOM-LLM's
-                    # output (nav hints, platform guess, etc.) is still
-                    # useful — surface it so profile_updater can persist.
-                    if aggregated_hints:
-                        result._llm_hints = dict(aggregated_hints)  # type: ignore[attr-defined]
+                    except ImportError:
+                        EventKind = None  # type: ignore[assignment]
+                        emit = None  # type: ignore[assignment]
+
+                    if _allow_degraded:
+                        # Clamp to the replay-gate floor so the matcher
+                        # admits the entry. The reader still treats it as
+                        # soft-fail but at least gets a chance.
+                        if emit is not None and EventKind is not None:
+                            try:
+                                emit(
+                                    EventKind.DOM_HINTS_DEGRADED_SAVED,
+                                    ctx.property_id or "unknown",
+                                    raw_quality=round(quality_score, 3),
+                                )
+                            except Exception:
+                                pass
+                        merged_hints: dict[str, Any] = dict(aggregated_hints)
+                        merged_hints["css_selectors"] = llm_css_selectors
+                        merged_hints["css_selectors_quality"] = _Q_REPLAY_FLOOR
+                        result._llm_hints = merged_hints  # type: ignore[attr-defined]
+                    else:
+                        # Strict pre-PR-6 behaviour — drop. Skip persistence
+                        # and emit telemetry so the saver regression doesn't
+                        # reappear silently.
+                        if emit is not None and EventKind is not None:
+                            try:
+                                emit(
+                                    EventKind.DOM_HINTS_MISS,
+                                    ctx.property_id or "unknown",
+                                    count=0,
+                                    reason=f"selectors_self_validation_failed:{quality_score:.2f}",
+                                )
+                            except Exception:
+                                pass
+                        # Selectors discarded but the rest of the DOM-LLM's
+                        # output (nav hints, platform guess, etc.) is still
+                        # useful — surface it so profile_updater can persist.
+                        if aggregated_hints:
+                            result._llm_hints = dict(aggregated_hints)  # type: ignore[attr-defined]
                 else:
                     # Compose hints from the cross-tier aggregator and
                     # overlay the validated css_selectors + quality on

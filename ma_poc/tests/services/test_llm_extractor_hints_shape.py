@@ -1,4 +1,4 @@
-"""PR 1 — Drop 1 (producer-side) fix verification.
+"""Producer-side hints shape contract for ``analyze_api_with_llm``.
 
 Pre-PR: ``analyze_api_with_llm`` only populated ``api_url_pattern`` in the
 returned hints dict when the LLM emitted a non-empty ``json_paths``. When
