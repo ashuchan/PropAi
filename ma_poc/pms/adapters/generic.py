@@ -27,6 +27,7 @@ Key findings:
 
 from __future__ import annotations
 
+import logging
 import re as _re
 from typing import TYPE_CHECKING, Any
 
@@ -75,6 +76,14 @@ from ma_poc.pms.adapters._merge_fns import (
     rank_matches as _rank_matches,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+
+# F0.1: module-level logger. Previously the cost-cap-exceeded branch
+# referenced a bare ``log`` symbol that didn't exist, so a property that
+# legitimately blew the cap raised NameError instead of logging — the
+# error was masked by an outer try/except and the branch silently
+# behaved as if the cap had not been enforced (the property failed with a
+# NameError instead of stopping further LLM calls).
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -845,6 +854,61 @@ class GenericAdapter:
                     reason=f"dropped {dropped} API(s) from profile.blocked_endpoints",
                 )
 
+        # Sub-tier 0a: deterministic probe of profile-recorded endpoints
+        # (Bug 3.2 / 3.6). The profile remembers every URL that
+        # previously yielded unit data — ``known_endpoints`` for general
+        # APIs, ``widget_endpoints`` for Entrata-style XHR widgets that
+        # render via iframe and don't always re-fire on entry-page
+        # navigation. Without this probe those URLs were passively
+        # captured only when the page happened to call them; pages that
+        # render differently across runs (or that need a click to fire
+        # the XHR) lose their cached endpoint and the property has to
+        # rediscover it via LLM. Probing through the existing
+        # Playwright session preserves cookies + same-origin headers.
+        page_obj = getattr(ctx, "_page", None) or getattr(ctx, "page", None)
+        if profile is not None and page_obj is not None:
+            evaluate = getattr(page_obj, "evaluate", None)
+            probe_urls: list[str] = []
+            try:
+                for ep in getattr(profile.api_hints, "known_endpoints", []) or []:
+                    pat = getattr(ep, "url_pattern", None)
+                    if isinstance(pat, str) and pat.startswith(("http://", "https://")):
+                        probe_urls.append(pat)
+                for w in getattr(profile.api_hints, "widget_endpoints", []) or []:
+                    if isinstance(w, str) and w.startswith(("http://", "https://")):
+                        probe_urls.append(w)
+            except Exception:
+                probe_urls = []
+            # Already-captured URLs don't need re-probing — the existing
+            # network log carries them. Also bound the probe count so a
+            # cluster property with dozens of cached endpoints can't
+            # blow the per-property time budget.
+            seen_urls = {r.get("url", "") for r in api_responses}
+            probe_urls = [u for u in probe_urls if u not in seen_urls][:5]
+            if probe_urls and callable(evaluate):
+                t0 = _time.monotonic()
+                probed_added = 0
+                for url in probe_urls:
+                    try:
+                        body = await evaluate(
+                            "(u) => fetch(u, {credentials: 'include'})"
+                            ".then(r => r.ok ? r.json() : null).catch(() => null)",
+                            url,
+                        )
+                    except Exception:
+                        continue
+                    if body is not None:
+                        api_responses.append({"url": url, "body": body})
+                        probed_added += 1
+                if probed_added:
+                    _log_attempt(
+                        "generic:profile_probe",
+                        "ran_units",
+                        units=0,
+                        reason=f"probed {probed_added}/{len(probe_urls)} profile endpoint(s)",
+                        duration_ms=int((_time.monotonic() - t0) * 1000),
+                    )
+
         # Phase 4 sub-tier 0: deterministic replay of saved LLM mappings.
         # Runs before ANY parser: if a prior run's LLM told us exactly how
         # to extract units from a specific API shape, we can reuse it with
@@ -1441,6 +1505,22 @@ class GenericAdapter:
             "total_units": ctx.expected_total_units or "",
             "website": ctx.base_url,
         }
+        # Bug 3.7 — inject prior LLM observations as context. The
+        # ``field_mapping_notes`` written by past runs are short prose
+        # describing how the site organises its data (e.g. "rent lives
+        # inside .pricing > .price"). Feeding them back as PRIOR
+        # OBSERVATIONS lets the next LLM call skip rediscovery and
+        # converge faster on the same selectors / paths. Only attached
+        # when populated so cold profiles don't see an empty header.
+        try:
+            prior_notes = (
+                getattr(getattr(ctx.profile, "llm_artifacts", None), "field_mapping_notes", None)
+                if getattr(ctx, "profile", None) is not None else None
+            )
+        except Exception:
+            prior_notes = None
+        if isinstance(prior_notes, str) and prior_notes.strip():
+            property_context["prior_observations"] = prior_notes.strip()[:500]
 
         # Import the targeted LLM helpers; fall through cleanly if unavailable
         # so the adapter degrades gracefully (monolithic call still runs).
@@ -1463,11 +1543,31 @@ class GenericAdapter:
         # _jugnu_budget — link-hop reuses it across the entry page and each
         # sub-page so decrements compose. See scraper.py shared_budget
         # comment for the wedge bug this prevents.
-        _budget = getattr(ctx, "budget", None) or {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
-        # Per-property cumulative cost gate (Fix #3). Default $1.00/property —
-        # past this, no further LLM calls fire even if call-count budget
-        # still allows them. Override via the budget dict's _cost_cap_usd
-        # key (compute_budget can dial it per profile maturity later).
+        # F0.1: import the env-driven default lazily so a missing budget
+        # dict still picks up PROPERTY_LLM_COST_CAP_USD overrides.
+        try:
+            from ma_poc.services.source_planner import (
+                get_property_llm_cost_cap_usd as _get_cost_cap,
+            )
+            _env_cost_cap = _get_cost_cap()
+        except Exception:
+            _env_cost_cap = 1.50
+        _budget = getattr(ctx, "budget", None) or {
+            "llm_api_calls": 3,
+            "llm_dom_calls": 1,
+            "llm_monolithic": 1,
+            "link_hop": 3,
+            "_cost_cap_usd": _env_cost_cap,
+        }
+        # Per-property cumulative cost gate (Fix #3 + F0.1). Default is
+        # ``PROPERTY_LLM_COST_CAP_USD`` (env-overridable, $1.50 baseline).
+        # The 2026-05-09 cloud-run regression showed the prior $1.00 cap
+        # starved link-hop pages of their LLM rescue path; F0.1 raises the
+        # baseline and adds a one-time bonus per link-hop session in
+        # ``pms/scraper.py:_refresh_cost_cap_for_hop``. Past the cap, no
+        # further LLM calls fire even if call-count budget still allows
+        # them. Override per-property via the budget dict's
+        # ``_cost_cap_usd`` key — compute_budget already populates it.
         #
         # SOFT CAP: the gate checks _cost_usd_spent BEFORE each call, but
         # the in-flight call's cost is only recorded when it returns. So
@@ -1476,7 +1576,7 @@ class GenericAdapter:
         # — making it hard would require mid-call cancellation, which the
         # provider SDKs don't expose cleanly. Treat _cost_cap_usd as a
         # ceiling-plus-epsilon, not a hard quota.
-        _cost_cap_usd = float(_budget.get("_cost_cap_usd", 1.00) or 1.00)
+        _cost_cap_usd = float(_budget.get("_cost_cap_usd", _env_cost_cap) or _env_cost_cap)
 
         def _llm_cost_exceeded() -> bool:
             spent = float(_budget.get("_cost_usd_spent", 0.0) or 0.0)
@@ -1508,6 +1608,59 @@ class GenericAdapter:
         llm_css_selectors: dict[str, Any] | None = None
         llm_navigation_hints: list[str] = []
 
+        # Cross-tier hint aggregator. Every LLM sub-tier (api / dom /
+        # monolithic / vision) can volunteer ancillary signals
+        # (navigation_hint, platform_guess, api_urls_with_data,
+        # property_amenities, dom_structure_hash, api_schema_signature).
+        # Previously the adapter only surfaced ``css_selectors`` from DOM
+        # tier OR the full ``profile_hints`` from monolithic — every
+        # other signal was discarded. This dict accumulates everything
+        # learned across all tiers in this run; the winner-tier branch
+        # merges it into ``result._llm_hints`` so profile_updater sees
+        # the complete picture regardless of which tier ultimately won.
+        aggregated_hints: dict[str, Any] = {}
+        # Property-level amenities collected across tiers — folded into
+        # ``aggregated_hints["property_amenities"]`` and surfaced on the
+        # AdapterResult so scraper.py's aggregator at line ~1567 finally
+        # has data to read.
+        aggregated_property_amenities: list[str] = []
+
+        def _merge_hint_extras(src: Any) -> None:
+            """Fold ancillary LLM signals from any sub-tier into the aggregator.
+
+            Safe to call with ``None`` or partial dicts — we only copy
+            keys we recognise so an unexpected schema can't poison the
+            aggregator. Lists (api_urls, property_amenities) are
+            extended without duplicates; scalar keys overwrite (later
+            tiers refine earlier guesses).
+            """
+            if not isinstance(src, dict):
+                return
+            nav = src.get("navigation_hint")
+            if isinstance(nav, str) and nav.strip() and nav.strip() not in llm_navigation_hints:
+                llm_navigation_hints.append(nav.strip())
+                aggregated_hints["navigation_hint"] = nav.strip()
+            plat = src.get("platform_guess")
+            if isinstance(plat, str) and plat.strip() and plat.strip().lower() not in ("null", "none"):
+                aggregated_hints["platform_guess"] = plat.strip()
+            api_urls = src.get("api_urls_with_data")
+            if isinstance(api_urls, list):
+                existing = set(aggregated_hints.get("api_urls_with_data", []) or [])
+                for u in api_urls:
+                    if isinstance(u, str) and u.strip() and u.strip() not in existing:
+                        existing.add(u.strip())
+                if existing:
+                    aggregated_hints["api_urls_with_data"] = sorted(existing)
+            prop_amen = src.get("property_amenities")
+            if isinstance(prop_amen, list):
+                for a in prop_amen:
+                    if isinstance(a, str) and a.strip() and a.strip() not in aggregated_property_amenities:
+                        aggregated_property_amenities.append(a.strip())
+            for k in ("dom_structure_hash", "api_schema_signature", "extraction_prompt_hash", "field_mapping_notes"):
+                v = src.get(k)
+                if isinstance(v, str) and v.strip() and not aggregated_hints.get(k):
+                    aggregated_hints[k] = v.strip()
+
         # Sub-tier 6a: targeted API analysis ------------------------------
         # For each captured API response with unit-like signals that the
         # deterministic parsers couldn't unwrap, ask the LLM to both
@@ -1537,7 +1690,7 @@ class GenericAdapter:
                 # remaining budget.
                 _budget["llm_api_calls"] = int(_budget.get("llm_api_calls", 0)) - 1
                 try:
-                    units, mapping, is_noise, interaction = await analyze_api_with_llm(
+                    units, api_hints, is_noise, interaction = await analyze_api_with_llm(
                         resp,
                         property_context,
                         ctx.property_id or "unknown",
@@ -1549,20 +1702,51 @@ class GenericAdapter:
                 if interaction:
                     llm_interactions.append(interaction)
                     _record_interaction_cost(interaction)
+
+                # Capture ancillary signals from this API analysis (nav
+                # hint, platform_guess, property_amenities,
+                # api_schema_signature) regardless of unit/noise outcome
+                # — the LLM may have classified noise but still
+                # diagnosed where the real data lives.
+                _merge_hint_extras(api_hints)
+
                 if is_noise:
                     # Feed profile_updater the colon-prefixed format it
                     # already recognises so this URL ends up in
                     # profile.api_hints.blocked_endpoints on next run.
-                    llm_analysis_results[url] = "noise:no_unit_data"
+                    # Use the LLM's free-text noise_reason when available
+                    # so the blocklist entry carries WHY this URL was
+                    # rejected (chatbot_config / analytics / gallery / …)
+                    # instead of the generic ``no_unit_data``.
+                    noise_reason = (
+                        (api_hints or {}).get("noise_reason") or "no_unit_data"
+                    )
+                    llm_analysis_results[url] = f"noise:{noise_reason}"
+                    try:
+                        from ma_poc.observability.events import EventKind, emit
+                        emit(
+                            EventKind.LLM_API_NOISE,
+                            ctx.property_id or "unknown",
+                            url=url[:200],
+                            reason=str(noise_reason)[:200],
+                        )
+                    except Exception:
+                        pass
                     continue
                 if units:
                     targeted_units.extend(units)
-                    if mapping:
-                        # Emit the mapping dict at its URL key — matches
-                        # the shape profile_updater reads via
-                        # save_llm_field_mapping().
-                        llm_field_mappings.append(mapping)
-                        llm_analysis_results[url] = mapping
+                    # Extract the persistable mapping subset (the keys
+                    # ``save_llm_field_mapping`` needs) from the broader
+                    # hints envelope. The other keys flow through the
+                    # aggregator above.
+                    mapping_subset: dict[str, Any] = {}
+                    if isinstance(api_hints, dict):
+                        for k in ("api_url_pattern", "json_paths", "response_envelope"):
+                            if k in api_hints:
+                                mapping_subset[k] = api_hints[k]
+                    if mapping_subset.get("json_paths"):
+                        llm_field_mappings.append(mapping_subset)
+                        llm_analysis_results[url] = mapping_subset
                         if not result.api_responses:
                             result.api_responses.append(resp)
 
@@ -1588,6 +1772,15 @@ class GenericAdapter:
             result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
             result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
             result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
+            # Surface the cross-tier hint aggregator + property amenities
+            # so profile_updater persists every signal the API tier
+            # collected (nav_hint, platform_guess, api_urls, schema_sig).
+            if aggregated_hints:
+                result._llm_hints = dict(aggregated_hints)  # type: ignore[attr-defined]
+            if aggregated_property_amenities:
+                result._property_amenities = list(aggregated_property_amenities)  # type: ignore[attr-defined]
+            if llm_navigation_hints:
+                result._llm_navigation_hints = list(llm_navigation_hints)  # type: ignore[attr-defined]
             return result
 
         # Sub-tier 6b: targeted DOM analysis ------------------------------
@@ -1599,7 +1792,7 @@ class GenericAdapter:
             t0 = _time.monotonic()
             _budget["llm_dom_calls"] = int(_budget.get("llm_dom_calls", 0)) - 1
             try:
-                dom_units, selectors, interaction = await analyze_dom_with_llm(
+                dom_units, dom_hints, interaction = await analyze_dom_with_llm(
                     dom_section_html,
                     ctx.base_url,
                     property_context,
@@ -1607,12 +1800,21 @@ class GenericAdapter:
                 )
             except Exception as exc:
                 result.errors.append(f"dom-analysis-error: {exc}")
-                dom_units, selectors, interaction = [], None, None
+                dom_units, dom_hints, interaction = [], None, None
             if interaction:
                 llm_interactions.append(interaction)
                 _record_interaction_cost(interaction)
-            if selectors:
-                llm_css_selectors = selectors
+            # The DOM-LLM now returns a richer envelope rather than a
+            # bare css_selectors dict. Extract css_selectors for the
+            # self-validation path below; fold every other signal
+            # (nav_hint, platform_guess, api_urls_with_data,
+            # property_amenities, dom_structure_hash) into the
+            # cross-tier aggregator so winner-tier persistence sees them.
+            if isinstance(dom_hints, dict):
+                css_from_dom = dom_hints.get("css_selectors")
+                if isinstance(css_from_dom, dict) and css_from_dom.get("container"):
+                    llm_css_selectors = css_from_dom
+                _merge_hint_extras(dom_hints)
             _log_attempt(
                 "generic:llm_dom_targeted",
                 "ran_units" if dom_units else "ran_empty",
@@ -1682,11 +1884,30 @@ class GenericAdapter:
                         )
                     except Exception:
                         pass
+                    # Selectors discarded but the rest of the DOM-LLM's
+                    # output (nav hints, platform guess, etc.) is still
+                    # useful — surface it so profile_updater can persist.
+                    if aggregated_hints:
+                        result._llm_hints = dict(aggregated_hints)  # type: ignore[attr-defined]
                 else:
-                    result._llm_hints = {  # type: ignore[attr-defined]
-                        "css_selectors": llm_css_selectors,
-                        "css_selectors_quality": quality_score,
-                    }
+                    # Compose hints from the cross-tier aggregator and
+                    # overlay the validated css_selectors + quality on
+                    # top. Aggregator first so any later key the
+                    # css_selectors block wants to set wins.
+                    merged_hints: dict[str, Any] = dict(aggregated_hints)
+                    merged_hints["css_selectors"] = llm_css_selectors
+                    merged_hints["css_selectors_quality"] = quality_score
+                    result._llm_hints = merged_hints  # type: ignore[attr-defined]
+            else:
+                # No selectors at all — still surface the aggregator so
+                # nav hints / platform guess / property_amenities reach
+                # profile_updater on a DOM-tier win.
+                if aggregated_hints:
+                    result._llm_hints = dict(aggregated_hints)  # type: ignore[attr-defined]
+            if aggregated_property_amenities:
+                result._property_amenities = list(aggregated_property_amenities)  # type: ignore[attr-defined]
+            if llm_navigation_hints:
+                result._llm_navigation_hints = list(llm_navigation_hints)  # type: ignore[attr-defined]
             return result
 
         # Sub-tier 6c: monolithic fallback --------------------------------
@@ -1712,12 +1933,12 @@ class GenericAdapter:
                 if interaction:
                     llm_interactions.append(interaction)
                     _record_interaction_cost(interaction)
-                # Capture navigation_hint (Phase 3 + Phase 5) so scrape_jugnu's
-                # link-hop can prioritise the URL the LLM just told us about.
-                if isinstance(hints, dict):
-                    nav = hints.get("navigation_hint") or ""
-                    if nav:
-                        llm_navigation_hints.append(str(nav))
+                # Fold the monolithic LLM's hints into the cross-tier
+                # aggregator so they survive even when the monolithic
+                # returns no units (the LLM frequently produces a
+                # navigation_hint or platform_guess on an empty page —
+                # signal we want regardless of which tier ultimately wins).
+                _merge_hint_extras(hints)
                 _log_attempt(
                     "generic:llm",
                     "ran_units" if llm_units else "ran_empty",
@@ -1733,8 +1954,22 @@ class GenericAdapter:
                     result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
                     result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
                     result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
-                    if hints:
-                        result._llm_hints = hints  # type: ignore[attr-defined]
+                    # Monolithic hints are the broadest envelope — they
+                    # already include profile_hints (nav_hint /
+                    # platform_guess / api_urls_with_data /
+                    # field_mapping_notes / property_amenities /
+                    # extraction_prompt_hash). Fold the aggregator in
+                    # underneath so any DOM/API tier discoveries are
+                    # preserved on collision (monolithic wins on shared keys).
+                    merged_mono = dict(aggregated_hints)
+                    if isinstance(hints, dict):
+                        merged_mono.update(hints)
+                    if merged_mono:
+                        result._llm_hints = merged_mono  # type: ignore[attr-defined]
+                    if aggregated_property_amenities:
+                        result._property_amenities = list(aggregated_property_amenities)  # type: ignore[attr-defined]
+                    if llm_navigation_hints:
+                        result._llm_navigation_hints = list(llm_navigation_hints)  # type: ignore[attr-defined]
                     return result
             except Exception as exc:
                 _log_attempt(
@@ -1803,6 +2038,9 @@ class GenericAdapter:
                         if vision_interaction:
                             llm_interactions.append(vision_interaction)
                             _record_interaction_cost(vision_interaction)
+                        # Vision LLM may also volunteer property_amenities
+                        # / nav_hint — fold into the cross-tier aggregator.
+                        _merge_hint_extras(vision_hints)
                         if vision_units:
                             result.units = vision_units
                             result.tier_used = "TIER_5_VISION"
@@ -1811,8 +2049,18 @@ class GenericAdapter:
                             result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
                             result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
                             result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
-                            if vision_hints:
-                                result._llm_hints = vision_hints  # type: ignore[attr-defined]
+                            # Merge aggregator with vision hints — vision
+                            # wins on shared keys (it's the most recent
+                            # observation, equivalent to monolithic).
+                            merged_vision = dict(aggregated_hints)
+                            if isinstance(vision_hints, dict):
+                                merged_vision.update(vision_hints)
+                            if merged_vision:
+                                result._llm_hints = merged_vision  # type: ignore[attr-defined]
+                            if aggregated_property_amenities:
+                                result._property_amenities = list(aggregated_property_amenities)  # type: ignore[attr-defined]
+                            if llm_navigation_hints:
+                                result._llm_navigation_hints = list(llm_navigation_hints)  # type: ignore[attr-defined]
                             return result
         except Exception as exc:
             # Vision tier must never crash the adapter; swallow and continue
@@ -1826,6 +2074,15 @@ class GenericAdapter:
         result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
         if llm_navigation_hints:
             result._llm_navigation_hints = llm_navigation_hints  # type: ignore[attr-defined]
+        # Even on a no-tier-win path, every learnable signal that any
+        # sub-tier surfaced (nav_hint / platform_guess / api_urls /
+        # property_amenities / drift hashes) flows to profile_updater.
+        # Without this, the same property would re-pay for the same
+        # diagnostic work tomorrow.
+        if aggregated_hints:
+            result._llm_hints = dict(aggregated_hints)  # type: ignore[attr-defined]
+        if aggregated_property_amenities:
+            result._property_amenities = list(aggregated_property_amenities)  # type: ignore[attr-defined]
         result._decision_log = decision_log  # type: ignore[attr-defined]
         result.confidence = 0.0
         result.errors.append("Generic parser found no units in captured API responses")

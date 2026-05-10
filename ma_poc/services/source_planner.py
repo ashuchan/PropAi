@@ -9,10 +9,60 @@ and compute_budget.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
 from ma_poc.models.source import SourceId
+
+# F0.1 (2026-05-09): per-property LLM cost cap is env-configurable so prod
+# can dial it without a code deploy. The 1.50 default was chosen after the
+# 2026-05-09 cloud-run regression analysis showed the prior $1.00 cap
+# starved link-hop pages of their LLM rescue path (commit 6a6e389).
+# Hop-bonus is added once per ESCALATE_LINK_HOP session and is bounded by
+# a 3× hard ceiling inside scraper.py so a misconfigured env var cannot
+# uncap spend.
+_DEFAULT_PROPERTY_LLM_COST_CAP_USD = 1.50
+_DEFAULT_PROPERTY_LLM_COST_CAP_HOP_BONUS_USD = 0.50
+
+
+def _read_positive_float_env(name: str, default: float) -> float:
+    """Read ``name`` as a positive float. Falls back to ``default`` for
+    missing, empty, malformed, or non-positive values. Never raises."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return default
+    if value <= 0 or value != value:  # rejects 0, negatives, NaN
+        return default
+    return value
+
+
+def get_property_llm_cost_cap_usd() -> float:
+    """Per-property USD cap on LLM spend, env-overridable.
+
+    Read fresh from env on every call so tests can monkey-patch
+    ``PROPERTY_LLM_COST_CAP_USD`` without re-importing the module.
+    """
+    return _read_positive_float_env(
+        "PROPERTY_LLM_COST_CAP_USD",
+        _DEFAULT_PROPERTY_LLM_COST_CAP_USD,
+    )
+
+
+def get_property_llm_cost_cap_hop_bonus_usd() -> float:
+    """Per-link-hop USD bonus added to the cost cap before a sub-page hop.
+
+    Granted once per ESCALATE_LINK_HOP session in ``pms/scraper.py`` and
+    capped there at 3× the base cap (``get_property_llm_cost_cap_usd``).
+    """
+    return _read_positive_float_env(
+        "PROPERTY_LLM_COST_CAP_HOP_BONUS_USD",
+        _DEFAULT_PROPERTY_LLM_COST_CAP_HOP_BONUS_USD,
+    )
 
 # Maps (field_group) -> ordered list of (SourceId, base_confidence)
 DEFAULT_SOURCE_RANKING: dict[str, list[tuple[SourceId, float]]] = {
@@ -328,13 +378,19 @@ def compute_budget(profile: Any, is_cold: bool) -> dict:
     retry, but always keeps 1 DOM-LLM probe available — that tier is the only
     extractor that works on marketing/boutique-CMS sites without API or JSON-LD,
     and gating it caused a -15pp success-rate regression in May 2026.
+
+    Every returned dict carries ``_cost_cap_usd`` from
+    :func:`get_property_llm_cost_cap_usd` so the GenericAdapter cost gate
+    sees the env-configured value rather than its in-code fallback.
     """
+    cost_cap = get_property_llm_cost_cap_usd()
     if not is_cold:
         return {
             "llm_api_calls": 3,   # per-response cap; mirrors legacy api_llm_budget
             "llm_dom_calls": 1,   # per-page cap; mirrors legacy dom_llm_budget
             "llm_monolithic": 1,  # one shot per run
             "link_hop": 3,
+            "_cost_cap_usd": cost_cap,
         }
 
     n = 0
@@ -343,7 +399,25 @@ def compute_budget(profile: Any, is_cold: bool) -> dict:
     except Exception:
         n = 0
     if n % 3 == 0:
-        return {"llm_api_calls": 1, "llm_dom_calls": 1, "llm_monolithic": 0, "link_hop": 1}
+        return {
+            "llm_api_calls": 1,
+            "llm_dom_calls": 1,
+            "llm_monolithic": 0,
+            "link_hop": 1,
+            "_cost_cap_usd": cost_cap,
+        }
     if n % 3 == 1:
-        return {"llm_api_calls": 0, "llm_dom_calls": 1, "llm_monolithic": 0, "link_hop": 3}
-    return {"llm_api_calls": 0, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 1}
+        return {
+            "llm_api_calls": 0,
+            "llm_dom_calls": 1,
+            "llm_monolithic": 0,
+            "link_hop": 3,
+            "_cost_cap_usd": cost_cap,
+        }
+    return {
+        "llm_api_calls": 0,
+        "llm_dom_calls": 1,
+        "llm_monolithic": 1,
+        "link_hop": 1,
+        "_cost_cap_usd": cost_cap,
+    }

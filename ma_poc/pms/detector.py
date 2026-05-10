@@ -338,40 +338,54 @@ def _detect_url_extension(url: str) -> tuple[PmsName, float, list[str]] | None:
 
 def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | None:
     h = page_html.lower()
-    # Platform giveaway scripts first — these are strong "not-a-PMS" signals.
-    if "static.parastorage.com" in h or "wix.com" in h:
-        return "wix_nopms", 0.85, ["Wix script/platform marker in HTML"]
-    if "squarespace.com" in h:
-        return "squarespace_nopms", 0.85, ["Squarespace script/platform marker in HTML"]
-    # PMS-specific markers. Checked after the no-PMS platforms so that a
-    # Squarespace site with a linked "rentcafe.com" image asset doesn't
-    # misfire as RentCafe.
-    if "entrata.com" in h or "/apartments/module/" in h or "entrata-widget" in h:
+    # F0.3 (2026-05-09): three-pass priority order so a real PMS portal
+    # reachable from a Squarespace/Wix marketing shell (e.g. 123taylor.com →
+    # ``onlineleasing.realpage.com``) isn't demoted to ``syndication_only``.
+    #
+    # Pass 1 — STRONG PMS markers: definitive portal/widget evidence that
+    # cannot be an incidental CDN asset or marketing link. These beat
+    # Wix/Squarespace shells because a real leasing path is the source of
+    # truth even when the surrounding marketing site is built on a no-PMS
+    # platform.
+    if "onlineleasing.realpage.com" in h:
+        return "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
+    if "/apartments/module/" in h or "entrata-widget" in h or "commoncf.entrata.com" in h:
         return (
             "entrata",
             0.85,
-            ["Entrata marker in HTML (entrata.com / /Apartments/module/ / entrata-widget)"],
+            ["Entrata widget marker in HTML (/Apartments/module/ / entrata-widget / commoncf.entrata.com)"],
         )
-    if "rentcafe" in h or "yardi" in h:
-        return "rentcafe", 0.80, ["RentCafe/Yardi marker in HTML"]
-    if "onlineleasing.realpage.com" in h:
-        return "onesite", 0.85, ["OneSite marker in HTML (onlineleasing.realpage.com)"]
-    if "sightmap.com" in h:
-        return "sightmap", 0.80, ["SightMap iframe/script marker in HTML"]
-    if ".appfolio.com" in h:
-        return "appfolio", 0.80, ["AppFolio marker in HTML"]
-    # Funnel / Nestio — script hosts, JS globals, data- attributes. Observed
-    # on windsorcommunities.com property subpages (04-20 live fetch).
     if "nestiolistings.com" in h or "nestio_" in h or "data-nestio-" in h:
         return (
             "funnel",
             0.90,
             ["Funnel/Nestio marker in HTML (nestiolistings.com / NESTIO_* / data-nestio-*)"],
         )
-    # TouchTour / Ovation — marketing subdomains under mytouchtour.com, or
-    # the liveovation.com parent portfolio.
-    if "mytouchtour.com" in h or "liveovation.com" in h:
-        return "touchtour", 0.85, ["TouchTour/Ovation marker in HTML (mytouchtour.com / liveovation.com)"]
+    if "mytouchtour.com" in h:
+        return "touchtour", 0.85, ["TouchTour portal marker in HTML (mytouchtour.com)"]
+
+    # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong
+    # "not-a-PMS" signals when no strong PMS marker appeared in pass 1.
+    if "static.parastorage.com" in h or "wix.com" in h:
+        return "wix_nopms", 0.85, ["Wix script/platform marker in HTML"]
+    if "squarespace.com" in h:
+        return "squarespace_nopms", 0.85, ["Squarespace script/platform marker in HTML"]
+
+    # Pass 3 — WEAK PMS markers: substrings that could be incidental CDN
+    # asset references or marketing links rather than actual portal
+    # endpoints. Run after Wix/Squarespace so a ``cdngeneralcf.rentcafe.com``
+    # image on a Squarespace site doesn't misroute to RentCafe — see
+    # ``test_no_rentcafe_false_positive_on_squarespace_with_cdn_asset``.
+    if "entrata.com" in h:
+        return "entrata", 0.80, ["Entrata marker in HTML (entrata.com)"]
+    if "rentcafe" in h or "yardi" in h:
+        return "rentcafe", 0.80, ["RentCafe/Yardi marker in HTML"]
+    if "sightmap.com" in h:
+        return "sightmap", 0.80, ["SightMap iframe/script marker in HTML"]
+    if ".appfolio.com" in h:
+        return "appfolio", 0.80, ["AppFolio marker in HTML"]
+    if "liveovation.com" in h:
+        return "touchtour", 0.80, ["Ovation portfolio marker in HTML (liveovation.com)"]
     return None
 
 
@@ -517,12 +531,21 @@ def confirm_detection(
 ) -> DetectedPMS:
     """After page load, verify the URL-based detection against captured bodies.
 
-    If no captured response matches the detected PMS's body shape, demote to
-    ``pms="unknown"`` so the generic cascade (with LLM/Vision allowed) runs
-    rather than stamping a misleading ``TIER_1_API_<PMS>`` label on a
-    mismatched property. This is the counter to Windsor/Mark-Taylor/Vegas
+    If captured responses exist but none match the detected PMS's body shape,
+    demote to ``pms="unknown"`` so the generic cascade (with LLM/Vision
+    allowed) runs rather than stamping a misleading ``TIER_1_API_<PMS>`` label
+    on a mismatched property. This is the counter to Windsor/Mark-Taylor/Vegas
     misrouting observed in the 2026-04-20 run: the URL said ``RentCafe`` but
     the captured body shape was ``Funnel``.
+
+    Empty ``api_responses`` is treated as "no evidence" rather than
+    "disconfirming evidence" — the URL-based detection is preserved. Demotion
+    requires at least one captured body that fails the adapter's
+    ``matches_response_body`` check. Without this guard, change-detector GET
+    paths (no Playwright, no XHR capture) and blocked/timed-out pages would
+    demote every detected PMS to ``unknown`` and starve real portals of their
+    proper adapter — see ``docs/PROFILE_MATURITY_LOCKIN_BUG.md`` and the
+    2026-05-09 cloud-run regression analysis.
 
     Adapter opt-in is by defining ``matches_response_body(body) -> bool``.
     Adapters that don't implement the method (DOM-only parsers like
@@ -530,6 +553,11 @@ def confirm_detection(
     """
     # "unknown" is already the fallthrough — nothing to demote to.
     if initial.pms == "unknown":
+        return initial
+
+    responses = api_responses or []
+    if not responses:
+        # F0.2: absence of captures ≠ disconfirmation. Preserve URL detection.
         return initial
 
     # Local import to avoid a circular adapters→detector→registry dep at import time.
@@ -548,7 +576,6 @@ def confirm_detection(
         # Adapter didn't opt in — preserve URL-based detection.
         return initial
 
-    responses = api_responses or []
     for resp in responses:
         body = resp.get("body") if isinstance(resp, dict) else None
         try:

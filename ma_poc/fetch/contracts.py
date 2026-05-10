@@ -64,6 +64,12 @@ class FetchResult:
     fetch_tier_used: int = 0  # FetchTier value — int avoids circular import
     fetch_tier_attempts: list[int] = field(default_factory=list)
     block_signature: str | None = None
+    # F1.2 (2026-05-08 plan): True when ``looks_like_captcha`` matched the
+    # body the fetcher salvaged. Populated by Fetcher.fetch around line 264
+    # via dataclasses.replace so the orchestrator's rescue gate at
+    # pms/scraper.py can short-circuit instead of feeding interstitial HTML
+    # into the LLM. Default False so all pre-F1.2 callers stay valid.
+    captcha_detected: bool = False
 
     def ok(self) -> bool:
         """True when fetch succeeded with a 2xx response."""

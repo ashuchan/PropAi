@@ -27,6 +27,7 @@ Key findings:
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -41,6 +42,78 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
+
+log = logging.getLogger(__name__)
+
+# Bug 7 (2026-05-09 deep-dive): AppFolio /listings/detail/<uuid> single-property
+# detail pages aren't matched by ``data-listing-id=`` (that's the index marker)
+# and don't return the ``{"objects": [...]}`` API envelope. Today the adapter
+# bails on these pages even though the unit data is right there in the HTML.
+# These regexes pull the standard rent/bed/bath/sqft fields from the detail
+# page's main content.
+_DETAIL_RENT_RE = re.compile(
+    r"\$([0-9,]{3,7})(?:\s*/?\s*month|\s*/?\s*mo)?", re.IGNORECASE
+)
+_DETAIL_BED_RE = re.compile(r"(\d+)\s*(?:bed|bd|br)\b", re.IGNORECASE)
+_DETAIL_BATH_RE = re.compile(r"(\d+(?:\.\d)?)\s*(?:bath|ba)\b", re.IGNORECASE)
+_DETAIL_SQFT_RE = re.compile(
+    r"([0-9,]{3,5})\s*(?:sq\s*ft|sqft|sf)\b", re.IGNORECASE
+)
+_DETAIL_H1_RE = re.compile(
+    r"<h1[^>]*>(?P<txt>[^<]{1,200})</h1>", re.IGNORECASE | re.DOTALL
+)
+_DETAIL_MAIN_RE = re.compile(
+    r"<main[^>]*>(?P<inner>.*?)</main>", re.IGNORECASE | re.DOTALL
+)
+_DETAIL_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any]]:
+    """Bug 7: parse a single AppFolio /listings/detail/<uuid> page into one unit.
+
+    Returns ``[]`` when the page doesn't carry an extractable rent — pages
+    without a recognisable ``$XXX`` token are almost certainly the
+    sign-in/auth interstitial, not a real listing.
+    """
+    if not html:
+        return []
+
+    main_match = _DETAIL_MAIN_RE.search(html)
+    main_html = main_match.group("inner") if main_match else html
+    text = _DETAIL_TAG_RE.sub(" ", main_html)
+    text = re.sub(r"\s+", " ", text).strip()
+
+    rent = _DETAIL_RENT_RE.search(text)
+    if not rent:
+        return []
+    try:
+        rent_val = int(rent.group(1).replace(",", ""))
+    except (TypeError, ValueError):
+        return []
+
+    h1 = _DETAIL_H1_RE.search(html)
+    floor_plan_name = ""
+    if h1:
+        floor_plan_name = _DETAIL_TAG_RE.sub("", h1.group("txt")).strip()
+
+    beds = _DETAIL_BED_RE.search(text)
+    baths = _DETAIL_BATH_RE.search(text)
+    sqft = _DETAIL_SQFT_RE.search(text)
+
+    return [
+        {
+            "unit_number": "",
+            "floor_plan_name": floor_plan_name,
+            "bedrooms": beds.group(1) if beds else "",
+            "bathrooms": baths.group(1) if baths else "",
+            "sqft": sqft.group(1).replace(",", "") if sqft else "",
+            "rent_range": f"${rent_val:,}",
+            "market_rent_low": rent_val,
+            "market_rent_high": rent_val,
+            "source_api_url": source_url,
+            "extraction_tier": "TIER_1_DOM_APPFOLIO_DETAIL",
+        }
+    ]
 
 
 # F11 — SSR DOM card extractors. Verified live against:
@@ -317,6 +390,28 @@ class AppFolioAdapter:
                 result.winning_url = getattr(ctx, "base_url", "") or None
                 result.confidence = min(0.95, 0.7 + 0.05 * len(ssr_units))
                 return result
+
+        # Bug 7 (2026-05-09 deep-dive): /listings/detail/<uuid> single-listing
+        # pages don't carry data-listing-id and aren't an API envelope, but
+        # the unit data is in the HTML. Parse it directly when the URL shape
+        # signals a detail page. Confidence stays at 0.85 (single record →
+        # we can't cross-check) so downstream gates still treat it as a
+        # provisional Tier-1 result.
+        if page_html:
+            current_url = ""
+            ff = getattr(ctx, "fetch_result", None)
+            if ff is not None:
+                current_url = getattr(ff, "final_url", "") or ""
+            if not current_url:
+                current_url = getattr(ctx, "base_url", "") or ""
+            if "/listings/detail/" in current_url:
+                detail_units = parse_appfolio_detail_page(page_html, current_url)
+                if detail_units:
+                    result.units = detail_units
+                    result.tier_used = "TIER_1_DOM_APPFOLIO_DETAIL"
+                    result.winning_url = current_url or None
+                    result.confidence = 0.85
+                    return result
 
         result.confidence = 0.0
         result.errors.append("No AppFolio unit data found in captured API responses or SSR DOM")

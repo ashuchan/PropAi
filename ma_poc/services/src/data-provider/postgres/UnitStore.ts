@@ -26,6 +26,7 @@ interface Row {
   disappeared_since: string | null;
   last_absent_date: string | null;
   concessions: unknown;
+  amenities: unknown;
   changed_fields: string[] | null;
   extra: Record<string, unknown> | null;
 }
@@ -35,7 +36,7 @@ const COLS = `
   rent_low, rent_high, date_captured, available_date, lease_term, move_in_date,
   first_seen_date, last_seen_at,
   carryforward_days, disappeared_since, last_absent_date,
-  concessions, changed_fields, extra
+  concessions, amenities, changed_fields, extra
 `;
 
 export class PgUnitStore implements IUnitStore {
@@ -76,6 +77,7 @@ export class PgUnitStore implements IUnitStore {
       // Shared
       availableDate: row.available_date,
       concessions: row.concessions,
+      amenities: row.amenities,
       floorPlanName: row.floor_plan_name,
       firstSeenDate: row.first_seen_date,
       lastSeenAt: row.last_seen_at,

@@ -17,6 +17,8 @@ from ma_poc.services.llm_api_rescue import (
     RescueOutput,
     _build_prompt,
     _filter_candidates,
+    _is_noise_url,
+    _noise_blocklist_enabled,
     _rank_candidates,
     _tier_label_for,
     _trim_body,
@@ -114,6 +116,134 @@ def test_rescue_filter_drops_foreign_host_responses() -> None:
 
 def test_rescue_filter_keeps_known_pms_hosts() -> None:
     responses = [{"url": "https://entrata.com/api/units", "body": {"units": [{"id": 1}]}}]
+    kept = _filter_candidates(responses, None)
+    assert len(kept) == 1
+
+
+# ── F1.1 — static noise blocklist ─────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://klaviyo.com/api/track",
+        "https://static-forms.klaviyo.com/x",
+        "https://www.googletagmanager.com/gtag/js",
+        "https://places.googleapis.com/$rpc/Places/Search",
+        "https://challenges.cloudflare.com/cdn-cgi/challenge",
+        "https://hcaptcha.com/captcha",
+        "https://cmp.osano.com/cmp.js",
+        "https://app.meetelise.com/widget",
+        "https://example.com/Apartments/module/widgets/property_info/",
+        "https://example.com/Apartments/module/application_authentication/",
+        "https://example.com/forms/api/submit",
+        "https://example.com/popdown/promo",
+        "https://example.com/realms/foliospace/protocol/openid-connect/auth",
+    ],
+)
+def test_f1_1_noise_blocklist_drops_known_noise_hosts(url: str) -> None:
+    """F1.1: every audited noise host/path must be classified as noise."""
+    assert _is_noise_url(url) is True
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://entrata.com/api/units",
+        "https://acme.appfolio.com/api/v1/community_info/",
+        "https://1234.onlineleasing.realpage.com/listings",
+        "https://yardi-host.com/RentCafe/availability",
+        "https://www.example.com/floorplans",
+    ],
+)
+def test_f1_1_noise_blocklist_keeps_real_data_hosts(url: str) -> None:
+    """F1.1: no PMS data host or general property URL is misclassified as noise."""
+    assert _is_noise_url(url) is False
+
+
+def test_f1_1_filter_drops_static_noise_when_flag_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ENABLE_RESCUE_NOISE_BLOCKLIST", "true")
+    responses = [
+        {"url": "https://klaviyo.com/api/track", "body": {"x": 1}},
+        {"url": "https://example.com/api/units", "body": {"units": [{"id": 1}]}},
+    ]
+    kept = _filter_candidates(responses, None)
+    assert [r["url"] for r in kept] == ["https://example.com/api/units"]
+
+
+def test_f1_1_filter_keeps_static_noise_when_flag_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F1.1: when ENABLE_RESCUE_NOISE_BLOCKLIST=false, the blocklist is skipped
+    entirely. Real-data filtering still applies (non-JSON bodies dropped)."""
+    monkeypatch.setenv("ENABLE_RESCUE_NOISE_BLOCKLIST", "false")
+    responses = [
+        {"url": "https://klaviyo.com/api/track", "body": {"x": 1}},
+        {"url": "https://example.com/api/units", "body": {"units": [{"id": 1}]}},
+    ]
+    kept = _filter_candidates(responses, None)
+    # Both kept — flag-off bypasses _is_noise_url
+    assert {r["url"] for r in kept} == {
+        "https://klaviyo.com/api/track",
+        "https://example.com/api/units",
+    }
+
+
+def test_f1_1_blocklist_default_is_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default behaviour: when env var is unset, blocklist is enabled."""
+    monkeypatch.delenv("ENABLE_RESCUE_NOISE_BLOCKLIST", raising=False)
+    assert _noise_blocklist_enabled() is True
+
+
+def test_f1_1_blocklist_flag_accepts_truthy_strings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for val in ("false", "FALSE", "0", "no", "off"):
+        monkeypatch.setenv("ENABLE_RESCUE_NOISE_BLOCKLIST", val)
+        assert _noise_blocklist_enabled() is False, val
+    for val in ("true", "1", "yes", "on", "anything-else"):
+        monkeypatch.setenv("ENABLE_RESCUE_NOISE_BLOCKLIST", val)
+        assert _noise_blocklist_enabled() is True, val
+
+
+def test_f1_1_subdomain_match_works() -> None:
+    """``static-forms.klaviyo.com`` should match the ``klaviyo.com`` registered host."""
+    assert _is_noise_url("https://static-forms.klaviyo.com/x") is True
+    assert _is_noise_url("https://api.subdomain.googletagmanager.com/x") is True
+
+
+# ── F1.2 — captcha_detected gate ──────────────────────────────────────────────
+
+
+def test_f1_2_filter_drops_captcha_detected_responses() -> None:
+    """F1.2: a response captured during a captcha challenge is dropped before
+    reaching the LLM, regardless of body shape."""
+    responses = [
+        {
+            "url": "https://example.com/api/units",
+            "body": {"units": [{"id": 1}]},
+            "captcha_detected": True,
+        },
+        {
+            "url": "https://example.com/api/units2",
+            "body": {"units": [{"id": 2}]},
+        },
+    ]
+    kept = _filter_candidates(responses, None)
+    assert [r["url"] for r in kept] == ["https://example.com/api/units2"]
+
+
+def test_f1_2_filter_captcha_detected_false_keeps_response() -> None:
+    """F1.2: explicit captcha_detected=False is treated identically to absence."""
+    responses = [
+        {
+            "url": "https://example.com/api/units",
+            "body": {"units": [{"id": 1}]},
+            "captcha_detected": False,
+        },
+    ]
     kept = _filter_candidates(responses, None)
     assert len(kept) == 1
 

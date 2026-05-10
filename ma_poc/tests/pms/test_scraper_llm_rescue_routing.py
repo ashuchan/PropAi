@@ -554,3 +554,393 @@ async def test_scraper_emits_all_three_rescue_events() -> None:
 
     assert "extract.llm_rescue_attempted" in emitted_kinds
     assert "extract.llm_rescue_succeeded" in emitted_kinds
+
+
+# ── F1.3 (Bug 2) — gate on adapter_name, expanded allow-list ────────────────
+
+
+@pytest.mark.asyncio
+async def test_f1_3_rescue_fires_when_detection_is_unknown_but_adapter_resolves_to_generic() -> None:
+    """F1.3: detection.pms = 'unknown' (e.g. F0.2 demoted) but the adapter
+    resolves to GenericAdapter. Pre-fix, the gate was on ``pms_name`` and
+    locked rescue out of every demoted property. Post-fix, ``adapter_name``
+    is in {generic,entrata,appfolio,onesite,amli} so rescue fires."""
+    from ma_poc.pms import scraper as scraper_mod
+    from ma_poc.services.llm_api_rescue import RescueOutput
+
+    empty_result = AdapterResult(units=_hollow_units(), tier_used="TIER_1_API")
+    rescue_out = RescueOutput(
+        units=_good_units(),
+        tier_used="TIER_1_GENERIC_LLM_RESCUE",
+        cost_usd=0.05,
+        n_llm_calls=1,
+    )
+
+    with (
+        patch("ma_poc.pms.scraper.get_adapter") as mock_get_adapter,
+        patch("ma_poc.pms.scraper.resolve_target") as mock_resolve,
+        patch("ma_poc.pms.scraper.detect_pms") as mock_detect,
+        patch(
+            "ma_poc.services.llm_api_rescue.rescue_from_api_responses",
+            return_value=rescue_out,
+        ) as mock_rescue,
+    ):
+        mock_detect.return_value = _detected("unknown")
+        mock_resolve.return_value = MagicMock(
+            resolved_url="https://test.com",
+            final_detection=_detected("unknown"),
+            original_url="https://test.com",
+            hop_path=[],
+            method="noop",
+        )
+        mock_adapter = AsyncMock()
+        mock_adapter.pms_name = "generic"  # unknown → generic
+        mock_adapter.extract = AsyncMock(return_value=empty_result)
+        mock_get_adapter.return_value = mock_adapter
+
+        await scraper_mod.scrape(
+            "https://test.com",
+            api_responses=_api_responses(),
+            property_id="TEST-001",
+        )
+
+    mock_rescue.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_f1_3_rescue_fires_for_onesite_adapter() -> None:
+    """F1.3: ``onesite`` was added to the rescue allow-list per the May-8
+    plan. Without this, ~50 OneSite properties never see the LLM rescue."""
+    from ma_poc.pms import scraper as scraper_mod
+    from ma_poc.services.llm_api_rescue import RescueOutput
+
+    empty_result = AdapterResult(units=_hollow_units(), tier_used="TIER_1_API_ONESITE")
+    rescue_out = RescueOutput(
+        units=_good_units(),
+        tier_used="TIER_1_ONESITE_LLM_RESCUE",
+        cost_usd=0.05,
+        n_llm_calls=1,
+    )
+
+    with (
+        patch("ma_poc.pms.scraper.get_adapter") as mock_get_adapter,
+        patch("ma_poc.pms.scraper.resolve_target") as mock_resolve,
+        patch("ma_poc.pms.scraper.detect_pms") as mock_detect,
+        patch(
+            "ma_poc.services.llm_api_rescue.rescue_from_api_responses",
+            return_value=rescue_out,
+        ) as mock_rescue,
+    ):
+        mock_detect.return_value = _detected("onesite")
+        mock_resolve.return_value = MagicMock(
+            resolved_url="https://test.com",
+            final_detection=_detected("onesite"),
+            original_url="https://test.com",
+            hop_path=[],
+            method="noop",
+        )
+        mock_adapter = AsyncMock()
+        mock_adapter.pms_name = "onesite"
+        mock_adapter.extract = AsyncMock(return_value=empty_result)
+        mock_get_adapter.return_value = mock_adapter
+
+        await scraper_mod.scrape(
+            "https://test.com",
+            api_responses=_api_responses(),
+            property_id="TEST-001",
+        )
+
+    mock_rescue.assert_called_once()
+
+
+# ── F1.2 — captcha_detected on fetch_result skips rescue ────────────────────
+
+
+@pytest.mark.asyncio
+async def test_f1_2_rescue_skipped_when_fetch_result_flagged_as_captcha() -> None:
+    """F1.2: when the fetch_result carried captcha_detected=True, the rescue
+    gate must short-circuit even if all other conditions are met. The
+    rescue can't extract from interstitial HTML.
+
+    Uses the real ``FetchResult`` type (not a stub) to prove the gate is
+    correctly wired against the production dataclass — the previous stub
+    masked a slots+frozen issue where ``getattr(..., 'captcha_detected',
+    False)`` always returned False on real FetchResult instances."""
+    from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
+    from ma_poc.pms import scraper as scraper_mod
+
+    real_fetch_result = FetchResult(
+        url="https://test.com",
+        outcome=FetchOutcome.OK,
+        status=200,
+        body=b"<html>...cf challenge...</html>",
+        headers={},
+        render_mode=RenderMode.RENDER,
+        final_url="https://test.com",
+        attempts=1,
+        elapsed_ms=100,
+        captcha_detected=True,
+    )
+
+    empty_result = AdapterResult(units=_hollow_units(), tier_used="TIER_1_API")
+
+    with (
+        patch("ma_poc.pms.scraper.get_adapter") as mock_get_adapter,
+        patch("ma_poc.pms.scraper.resolve_target") as mock_resolve,
+        patch("ma_poc.pms.scraper.detect_pms") as mock_detect,
+        patch("ma_poc.services.llm_api_rescue.rescue_from_api_responses") as mock_rescue,
+    ):
+        mock_detect.return_value = _detected("generic")
+        mock_resolve.return_value = MagicMock(
+            resolved_url="https://test.com",
+            final_detection=_detected("generic"),
+            original_url="https://test.com",
+            hop_path=[],
+            method="noop",
+        )
+        mock_adapter = AsyncMock()
+        mock_adapter.pms_name = "generic"
+        mock_adapter.extract = AsyncMock(return_value=empty_result)
+        mock_get_adapter.return_value = mock_adapter
+
+        result = await scraper_mod.scrape(
+            "https://test.com",
+            api_responses=_api_responses(),
+            property_id="TEST-001",
+            fetch_result=real_fetch_result,
+        )
+
+    mock_rescue.assert_not_called()
+    assert result.get("_rescue_skipped_reason") == "captcha_detected"
+
+
+@pytest.mark.asyncio
+async def test_f1_2_real_fetchresult_default_captcha_detected_is_false() -> None:
+    """F1.2 regression: a default-constructed FetchResult must have
+    ``captcha_detected=False`` so the rescue gate doesn't false-positive.
+    Catches the case where someone removes the field default."""
+    from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
+
+    fr = FetchResult(
+        url="https://test.com",
+        outcome=FetchOutcome.OK,
+        status=200,
+        body=b"normal body",
+        headers={},
+        render_mode=RenderMode.RENDER,
+        final_url="https://test.com",
+        attempts=1,
+        elapsed_ms=100,
+    )
+    assert fr.captcha_detected is False
+
+
+def test_f1_2_orchestrator_forwards_captcha_flag_from_network_log() -> None:
+    """F1.2: the per-network-log-entry captcha_detected flag captured by
+    the fetcher must survive the orchestrator's network_log → _api_responses
+    rebuild. Without this propagation the rescue's _filter_candidates can't
+    drop interstitial XHR captures.
+
+    Exercises the rebuild loop in scrape() directly so the assertion is
+    independent of full pipeline mocking."""
+    import asyncio
+
+    from ma_poc.fetch.contracts import FetchOutcome, FetchResult, RenderMode
+    from ma_poc.pms import scraper as scraper_mod
+
+    fr = FetchResult(
+        url="https://test.com",
+        outcome=FetchOutcome.OK,
+        status=200,
+        body=b"<html></html>",
+        headers={},
+        render_mode=RenderMode.RENDER,
+        final_url="https://test.com",
+        attempts=1,
+        elapsed_ms=100,
+        network_log=[
+            {
+                "url": "https://test.com/api/units",
+                "status": 200,
+                "content_type": "application/json",
+                "body": '{"units": []}',
+                "captcha_detected": True,
+            },
+            {
+                "url": "https://test.com/api/floorplans",
+                "status": 200,
+                "content_type": "application/json",
+                "body": '{"floorplans": []}',
+                "captcha_detected": False,
+            },
+        ],
+    )
+
+    with (
+        patch("ma_poc.pms.scraper.get_adapter") as mock_get_adapter,
+        patch("ma_poc.pms.scraper.resolve_target") as mock_resolve,
+        patch("ma_poc.pms.scraper.detect_pms") as mock_detect,
+    ):
+        mock_detect.return_value = _detected("generic")
+        mock_resolve.return_value = MagicMock(
+            resolved_url="https://test.com",
+            final_detection=_detected("generic"),
+            original_url="https://test.com",
+            hop_path=[],
+            method="noop",
+        )
+        captured_ctx: dict[str, Any] = {}
+
+        async def _capture(_page: Any, ctx: AdapterContext) -> AdapterResult:
+            captured_ctx["api_responses"] = list(getattr(ctx, "_api_responses", []))
+            return AdapterResult(units=_good_units(), tier_used="TIER_1_API")
+
+        mock_adapter = AsyncMock()
+        mock_adapter.pms_name = "generic"
+        mock_adapter.extract = _capture
+        mock_get_adapter.return_value = mock_adapter
+
+        asyncio.run(
+            scraper_mod.scrape(
+                "https://test.com",
+                api_responses=None,  # force the network_log → _api_responses rebuild
+                property_id="TEST-001",
+                fetch_result=fr,
+            )
+        )
+
+    responses = captured_ctx["api_responses"]
+    by_url = {r["url"]: r for r in responses}
+    assert by_url["https://test.com/api/units"]["captcha_detected"] is True
+    assert by_url["https://test.com/api/floorplans"]["captcha_detected"] is False
+
+
+# ── F1.4 — envelope → response_envelope normalization at bridge ─────────────
+
+
+@pytest.mark.asyncio
+async def test_f1_4_bridge_normalizes_envelope_to_response_envelope() -> None:
+    """F1.4: rescue emits ``envelope`` but profile_updater reads
+    ``response_envelope``. The bridge in scraper.py renames the key so
+    persisted LlmFieldMappings replay correctly."""
+    from ma_poc.pms import scraper as scraper_mod
+    from ma_poc.services.llm_api_rescue import RescueOutput
+
+    empty_result = AdapterResult(units=_hollow_units(), tier_used="TIER_1_API")
+    rescue_out = RescueOutput(
+        units=_good_units(),
+        tier_used="TIER_1_GENERIC_LLM_RESCUE",
+        winning_url="https://test.com/api/v2/units",
+        cost_usd=0.05,
+        n_llm_calls=1,
+        llm_field_mappings=[
+            {
+                "api_url_pattern": "https://test.com/api/v2/units",
+                "envelope": "$.data.results",
+                "json_paths": {"unit_number": "id"},
+                "source_adapter": "generic",
+                "created_at": "2026-05-09T00:00:00",
+                "success_count": 1,
+            }
+        ],
+    )
+
+    with (
+        patch("ma_poc.pms.scraper.get_adapter") as mock_get_adapter,
+        patch("ma_poc.pms.scraper.resolve_target") as mock_resolve,
+        patch("ma_poc.pms.scraper.detect_pms") as mock_detect,
+        patch(
+            "ma_poc.services.llm_api_rescue.rescue_from_api_responses",
+            return_value=rescue_out,
+        ),
+    ):
+        mock_detect.return_value = _detected("generic")
+        mock_resolve.return_value = MagicMock(
+            resolved_url="https://test.com",
+            final_detection=_detected("generic"),
+            original_url="https://test.com",
+            hop_path=[],
+            method="noop",
+        )
+        mock_adapter = AsyncMock()
+        mock_adapter.pms_name = "generic"
+        mock_adapter.extract = AsyncMock(return_value=empty_result)
+        mock_get_adapter.return_value = mock_adapter
+
+        result = await scraper_mod.scrape(
+            "https://test.com",
+            api_responses=_api_responses(),
+            property_id="TEST-001",
+        )
+
+    analysis = result.get("_llm_analysis_results") or {}
+    mapping = analysis.get("https://test.com/api/v2/units")
+    assert isinstance(mapping, dict), f"Expected mapping dict, got {mapping!r}"
+    assert mapping.get("response_envelope") == "$.data.results", (
+        "F1.4 must rename 'envelope' to 'response_envelope' so "
+        "profile_updater.save_llm_field_mapping persists it correctly"
+    )
+    assert "envelope" not in mapping, (
+        "Old key must be removed after normalization to avoid double storage"
+    )
+
+
+@pytest.mark.asyncio
+async def test_f1_4_bridge_preserves_response_envelope_when_already_correct() -> None:
+    """F1.4: if rescue ever emits ``response_envelope`` directly (forward-
+    compatible), the bridge must NOT clobber it with an empty value."""
+    from ma_poc.pms import scraper as scraper_mod
+    from ma_poc.services.llm_api_rescue import RescueOutput
+
+    empty_result = AdapterResult(units=_hollow_units(), tier_used="TIER_1_API")
+    rescue_out = RescueOutput(
+        units=_good_units(),
+        tier_used="TIER_1_GENERIC_LLM_RESCUE",
+        winning_url="https://test.com/api/v2/units",
+        cost_usd=0.05,
+        n_llm_calls=1,
+        llm_field_mappings=[
+            {
+                "api_url_pattern": "https://test.com/api/v2/units",
+                "response_envelope": "$.payload",
+                "json_paths": {},
+                "source_adapter": "generic",
+                "created_at": "2026-05-09T00:00:00",
+                "success_count": 1,
+            }
+        ],
+    )
+
+    with (
+        patch("ma_poc.pms.scraper.get_adapter") as mock_get_adapter,
+        patch("ma_poc.pms.scraper.resolve_target") as mock_resolve,
+        patch("ma_poc.pms.scraper.detect_pms") as mock_detect,
+        patch(
+            "ma_poc.services.llm_api_rescue.rescue_from_api_responses",
+            return_value=rescue_out,
+        ),
+    ):
+        mock_detect.return_value = _detected("generic")
+        mock_resolve.return_value = MagicMock(
+            resolved_url="https://test.com",
+            final_detection=_detected("generic"),
+            original_url="https://test.com",
+            hop_path=[],
+            method="noop",
+        )
+        mock_adapter = AsyncMock()
+        mock_adapter.pms_name = "generic"
+        mock_adapter.extract = AsyncMock(return_value=empty_result)
+        mock_get_adapter.return_value = mock_adapter
+
+        result = await scraper_mod.scrape(
+            "https://test.com",
+            api_responses=_api_responses(),
+            property_id="TEST-001",
+        )
+
+    mapping = (result.get("_llm_analysis_results") or {}).get(
+        "https://test.com/api/v2/units"
+    )
+    assert isinstance(mapping, dict)
+    assert mapping.get("response_envelope") == "$.payload"

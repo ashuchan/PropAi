@@ -61,6 +61,35 @@ _MAX_LLM_FIELD_MAPPINGS = 20
 _MAX_EXPLORED_LINKS = 30
 
 
+# Bug 4.4 — typed normalisation of the dual-shape ``_llm_analysis_results``
+# value space. Historically the value at each URL key could be:
+#   - a dict with "api_url_pattern" → save as LlmFieldMapping
+#   - the literal string "blocked" → blocklist with reason "no_unit_data"
+#   - a string starting with "noise:" → blocklist with the trailing reason
+#   - anything else → silently ignored
+# The silent-ignore branch made every refactor that changed the shape
+# (e.g. introducing a typed verdict) lose data without any visible
+# signal. The helper below makes the verdict explicit and logs anything
+# unrecognised so a future shape drift surfaces immediately.
+def _classify_llm_analysis_verdict(value: Any) -> tuple[str, dict | None, str | None]:
+    """Return ``(kind, mapping, noise_reason)``.
+
+    - ``kind="mapping"`` → ``mapping`` is the persistable dict
+      (``api_url_pattern`` + ``json_paths`` + optional ``response_envelope``).
+    - ``kind="noise"``   → ``noise_reason`` carries the LLM's free-text
+      reason (or ``"no_unit_data"`` when not provided).
+    - ``kind="ignored"`` → unrecognised shape; caller should log + skip.
+    """
+    if isinstance(value, dict) and value.get("api_url_pattern"):
+        return "mapping", value, None
+    if value == "blocked":
+        return "noise", None, "no_unit_data"
+    if isinstance(value, str) and value.startswith("noise:"):
+        reason = value[len("noise:"):].strip() or "no_unit_data"
+        return "noise", None, reason
+    return "ignored", None, None
+
+
 def update_profile_blocklist(
     profile: ScrapeProfile,
     api_url: str,
@@ -320,10 +349,22 @@ def update_profile_after_extraction(
     # TIER_4_LLM_DOM (targeted per-DOM-section analysis). Both carry
     # learnable hints — json_paths for the former, css_selectors for the
     # latter — so they're treated the same as the monolithic TIER_4_LLM.
+    #
+    # NOTE: previously the entire hint-capture block was gated on
+    # ``tier in ("TIER_4_LLM", "TIER_4_LLM_API", "TIER_4_LLM_DOM",
+    # "TIER_5_VISION")``. That gate silently discarded everything the
+    # LLM learned whenever a deterministic tier ultimately won (e.g.
+    # ``TIER_MERGED_CROSS_PAGE`` after a hop, or ``TIER_3_DOM`` after the
+    # cascade). The fix is to gate on the *presence* of ``_llm_hints``
+    # — if LLM ran and produced anything, persist it regardless of who
+    # got the units credit. The ``updated_by`` label stays tier-gated
+    # since that flag describes the WINNING tier, not the
+    # learning surface.
     llm_hints = scrape_result.get("_llm_hints")
     llm_tiers = ("TIER_4_LLM", "TIER_4_LLM_API", "TIER_4_LLM_DOM", "TIER_5_VISION")
-    if llm_hints and tier in llm_tiers:
-        profile.updated_by = "LLM_VISION" if tier == "TIER_5_VISION" else "LLM_EXTRACTION"
+    if llm_hints:
+        if tier in llm_tiers:
+            profile.updated_by = "LLM_VISION" if tier == "TIER_5_VISION" else "LLM_EXTRACTION"
 
         # API hints from LLM
         for api_url in llm_hints.get("api_urls_with_data") or []:
@@ -338,6 +379,11 @@ def update_profile_after_extraction(
         # DOM hints from LLM
         css = llm_hints.get("css_selectors") or {}
         if css.get("container"):
+            # Persist every selector slot the FieldSelectorMap model
+            # exposes. Earlier this dropped floor_plan_name + availability_status
+            # (the LLM returns them, the model has the fields, the writer
+            # forgot to pass them through). amenities + concession are new
+            # slots — DOM analysis prompts ask for them, so save them too.
             profile.dom_hints.field_selectors = FieldSelectorMap(
                 container=css.get("container"),
                 rent=css.get("rent"),
@@ -345,7 +391,11 @@ def update_profile_after_extraction(
                 bedrooms=css.get("bedrooms"),
                 bathrooms=css.get("bathrooms"),
                 availability_date=css.get("availability_date"),
+                availability_status=css.get("availability_status"),
                 unit_id=css.get("unit_id"),
+                floor_plan_name=css.get("floor_plan_name"),
+                amenities=css.get("amenities"),
+                concession=css.get("concession"),
             )
             # Persist the save-time replay quality score the adapter
             # computed (1.0 by default for selectors that perfectly
@@ -370,6 +420,45 @@ def update_profile_after_extraction(
 
         if llm_hints.get("field_mapping_notes"):
             profile.llm_artifacts.field_mapping_notes = llm_hints["field_mapping_notes"]
+
+        # Drift-detection hashes — populated by the extractors at call
+        # time (sha-256[:16] of the prompt template / dom section /
+        # api envelope). Stored on llm_artifacts so a future run can
+        # compare and decide whether cached mappings still apply.
+        if llm_hints.get("extraction_prompt_hash"):
+            profile.llm_artifacts.extraction_prompt_hash = llm_hints["extraction_prompt_hash"]
+        if llm_hints.get("dom_structure_hash"):
+            profile.llm_artifacts.dom_structure_hash = llm_hints["dom_structure_hash"]
+        if llm_hints.get("api_schema_signature"):
+            profile.llm_artifacts.api_schema_signature = llm_hints["api_schema_signature"]
+
+        # Raw navigation hints emitted by the LLM (e.g. "/floorplans"),
+        # captured even when no link-hop has consumed them yet so the
+        # next run can prioritise the same URL without re-paying for
+        # the LLM diagnostic. Existing entries refresh in place; we
+        # keep the most recent 10 (validator caps).
+        nav_hint_str = llm_hints.get("navigation_hint")
+        if isinstance(nav_hint_str, str) and nav_hint_str.strip():
+            existing_navs = list(profile.navigation.last_navigation_hints or [])
+            cleaned = nav_hint_str.strip()
+            if cleaned in existing_navs:
+                existing_navs.remove(cleaned)
+            existing_navs.append(cleaned)
+            profile.navigation.last_navigation_hints = existing_navs[-10:]
+
+    # ── Property-level amenities (Bug 2.1) ───────────────────────────
+    # Surfaced from any LLM tier via ``result["property_amenities"]``
+    # (set in scraper.py from ``adapter_result._property_amenities``).
+    # Lowercased + deduplicated; merged with prior runs so amenities
+    # observed once stick across runs (a brief outage that drops the
+    # amenities section shouldn't flush a property's known facilities).
+    amen_raw = scrape_result.get("property_amenities")
+    if isinstance(amen_raw, list) and amen_raw:
+        existing_amen = {a.lower().strip() for a in (profile.property_amenities or []) if isinstance(a, str)}
+        for a in amen_raw:
+            if isinstance(a, str) and a.strip():
+                existing_amen.add(a.strip().lower())
+        profile.property_amenities = sorted(existing_amen)
 
     # ── Navigation hints from the actual crawl ───────────────────────
     # Always update availability_page_path if we found units via crawling
@@ -411,10 +500,17 @@ def update_profile_after_extraction(
 
     llm_analysis = scrape_result.get("_llm_analysis_results", {})
     is_multi_source = len(llm_analysis) > 1
+    # Per-URL verdict cache the LLM produced this run. Maintains the
+    # ``llm_artifacts.last_api_analysis_results`` field so the cascade
+    # can future-skip re-analysing the same URL when the verdict is
+    # still cached. URLs that resolved to mappings → "has_units";
+    # URLs marked noise → "noise:<reason>".
+    verdicts_this_run: dict[str, str] = {}
     for api_url, result in llm_analysis.items():
-        if isinstance(result, dict) and result.get("api_url_pattern"):
+        kind, mapping_dict, noise_reason = _classify_llm_analysis_verdict(result)
+        if kind == "mapping" and mapping_dict is not None:
             # Phase B: match the captured body by api_url_pattern substring
-            pattern = result.get("api_url_pattern", "")
+            pattern = mapping_dict.get("api_url_pattern", "")
             matched_body = None
             for url, body in url_to_body.items():
                 if pattern in url:
@@ -428,15 +524,37 @@ def update_profile_after_extraction(
                     pass
             save_llm_field_mapping(
                 profile,
-                result,
+                mapping_dict,
                 source_envelope_hash=env_hash,
                 body_for_validation=matched_body,
                 expected_unit_count=expected_n,
                 multi_source=is_multi_source,
             )
-        elif result == "blocked" or (isinstance(result, str) and result.startswith("noise:")):
-            reason = result.replace("noise:", "").strip() if isinstance(result, str) else "no_unit_data"
+            verdicts_this_run[str(api_url)] = "has_units"
+        elif kind == "noise":
+            reason = noise_reason or "no_unit_data"
             update_profile_blocklist(profile, api_url, reason)
+            verdicts_this_run[str(api_url)] = f"noise:{reason}"
+        else:
+            # Unknown verdict shape — log so a future shape drift is
+            # caught loudly instead of silently dropped. Don't raise:
+            # the property's other learning still completes.
+            log.warning(
+                "Unrecognised _llm_analysis_results value for %s on %s (type=%s) — skipped",
+                api_url, profile.canonical_id, type(result).__name__,
+            )
+
+    # Merge into prior verdicts (newer entries supersede; cap at 50 to
+    # bound profile growth — cluster-property profiles can otherwise
+    # accumulate hundreds of one-shot URLs over time).
+    if verdicts_this_run:
+        prior = dict(profile.llm_artifacts.last_api_analysis_results or {})
+        prior.update(verdicts_this_run)
+        if len(prior) > 50:
+            # Keep only the most-recently-seen 50 (dict ordering is
+            # insertion-ordered as of Python 3.7+).
+            prior = dict(list(prior.items())[-50:])
+        profile.llm_artifacts.last_api_analysis_results = prior
 
     # ── Record explored links ────────────────────────────────
     explored = scrape_result.get("_explored_links", {})

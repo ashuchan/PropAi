@@ -9,6 +9,7 @@ Never raises on transient errors. Always returns a FetchResult.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import gzip
 import logging
 import os
@@ -249,6 +250,16 @@ class Fetcher:
                 except Exception:
                     captcha_detected, captcha_provider = False, None
 
+            # F1.2 (2026-05-08 plan): propagate captcha_detected onto the
+            # FetchResult itself so the orchestrator's rescue gate at
+            # pms/scraper.py:574 can short-circuit on interstitial bodies
+            # without re-running the detector. FetchResult is frozen, so we
+            # rebuild via dataclasses.replace. Pre-F1.2 the value lived only
+            # in this local + the FETCH_COMPLETED event payload — making the
+            # rescue gate's getattr() always read False in production.
+            if captcha_detected and not result.captcha_detected:
+                result = dataclasses.replace(result, captcha_detected=True)
+
             emit(
                 EventKind.FETCH_COMPLETED,
                 task.property_id,
@@ -329,6 +340,24 @@ class Fetcher:
                     self._proxy_pool.mark_failure(proxy, result.outcome.value)
                 proxy = self._proxy_pool.pick(sticky_key=None)  # Fresh proxy
                 emit(EventKind.FETCH_ROTATED_IDENTITY, task.property_id)
+            elif (
+                # Bug 6 (2026-05-09 deep-dive): if we hit RATE_LIMITED with
+                # ``proxy is None`` (run started without a sticky proxy and
+                # the retry policy didn't request rotation), force-engage a
+                # proxy from the pool on the next attempt. Without this,
+                # all 3 retries hit the host from the same direct IP and
+                # the property dies in FAILED_UNREACHABLE territory.
+                result.outcome == FetchOutcome.RATE_LIMITED
+                and proxy is None
+            ):
+                forced = self._proxy_pool.pick(sticky_key=None)
+                if forced:
+                    proxy = forced
+                    emit(
+                        EventKind.FETCH_ROTATED_IDENTITY,
+                        task.property_id,
+                        reason="rate_limited_proxy_escalation",
+                    )
 
             if decision.wait_ms > 0:
                 await asyncio.sleep(decision.wait_ms / 1000.0)
@@ -492,6 +521,21 @@ class Fetcher:
                         # adapters reject the response as a string. 256KB
                         # covers every real-world unit-API body we've seen
                         # while still capping image/HTML page captures.
+                        #
+                        # F1.2 (2026-05-08 plan): tag each entry with
+                        # captcha_detected so the LLM rescue's
+                        # _filter_candidates can drop responses captured
+                        # behind a CF/recaptcha interstitial. Detection runs
+                        # on the first 8KB only (looks_like_captcha is a
+                        # cheap signature scan) so we don't double the cost
+                        # of every captured response.
+                        entry_captcha = False
+                        if body:
+                            try:
+                                detected, _ = looks_like_captcha(body[:8192])
+                                entry_captcha = bool(detected)
+                            except Exception:
+                                entry_captcha = False
                         network_log.append(
                             {
                                 "url": url,
@@ -499,6 +543,7 @@ class Fetcher:
                                 "content_type": content_type,
                                 "body_size": len(body),
                                 "body": body.decode("utf-8", errors="replace")[:262_144],
+                                "captcha_detected": entry_captcha,
                             }
                         )
                 except Exception:
@@ -610,6 +655,27 @@ class Fetcher:
                                     _LATE_RENDER_HOSTS.add(landed_host)
                         except Exception:
                             pass
+
+            # Bug 8 (2026-05-09 deep-dive): SPA-shell salvage retry. When the
+            # raw body is non-trivial but the visible text (HTML tags stripped)
+            # is absurdly small, the SPA hadn't finished hydrating before we
+            # called page.content() — adapters and the LLM gate will both
+            # reject this near-empty shell as LLM_GATE_NO_BODY. Sleep 6s and
+            # re-read once. Gated tightly on visible-text < 500 bytes so it
+            # doesn't fire on the broad late-render path that batch-6 reverted.
+            if body_text is not None and len(body_text) >= 512:
+                import re as _re_b8
+
+                visible = _re_b8.sub(r"<[^>]+>", " ", body_text)
+                visible = _re_b8.sub(r"\s+", " ", visible).strip()
+                if len(visible) < 500:
+                    try:
+                        await asyncio.sleep(6.0)
+                        body_text_b8 = await page.content()
+                        if body_text_b8 and len(body_text_b8) > len(body_text):
+                            body_text = body_text_b8
+                    except Exception:
+                        pass
 
             if body_text is None or len(body_text) < 512:
                 outcome, sig = classify(

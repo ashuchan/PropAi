@@ -184,6 +184,28 @@ def _resolve_known_plans_block(property_context: dict[str, Any]) -> str:
         return ""
 
 
+def _resolve_prior_observations_block(property_context: dict[str, Any]) -> str:
+    """Render the PRIOR OBSERVATIONS preamble for this property.
+
+    profile_updater stamps the LLM's free-text field_mapping_notes onto
+    ``profile.llm_artifacts.field_mapping_notes`` after every successful
+    extraction. The adapter forwards the string into ``property_context``
+    under ``prior_observations``; we render it here as a short block so
+    the next LLM call sees what previous calls already learned about
+    the site's organisation. Empty string when not present so cold
+    profiles emit no header.
+    """
+    notes = property_context.get("prior_observations")
+    if not isinstance(notes, str) or not notes.strip():
+        return ""
+    return (
+        "PRIOR OBSERVATIONS (from previous successful extractions on this "
+        "property — use these to converge faster, but verify they still "
+        "apply to the current page):\n"
+        f"  {notes.strip()}\n"
+    )
+
+
 def _build_prompt(llm_input: dict[str, Any]) -> str:
     """Build the full prompt from template and input.
 
@@ -202,6 +224,7 @@ def _build_prompt(llm_input: dict[str, Any]) -> str:
         "{content_type}": llm_input.get("content_type", "HTML"),
         "{trimmed_content}": llm_input.get("trimmed_content", ""),
         "{known_floor_plans}": _resolve_known_plans_block(ctx),
+        "{prior_observations}": _resolve_prior_observations_block(ctx),
     }
     result = template
     for placeholder, value in replacements.items():
@@ -298,6 +321,31 @@ async def extract_with_llm(
     if not isinstance(hints, dict):
         hints = {}
 
+    # Capture the top-level ``property_amenities`` array the prompt asks
+    # for. The previous return contract dropped this entirely — every
+    # property paid for the LLM call, the LLM extracted property-level
+    # amenities, and the data was discarded before the adapter saw it.
+    # Folding it into the hints dict keeps the existing tuple arity
+    # (callers read other keys via ``hints.get(...)``).
+    prop_amenities = parsed.get("property_amenities")
+    if isinstance(prop_amenities, list):
+        hints["property_amenities"] = [
+            str(a).strip() for a in prop_amenities if isinstance(a, str) and a.strip()
+        ]
+
+    # Stamp the prompt template hash so profile_updater can persist it
+    # for drift detection across releases — when this hash changes we
+    # know prior extractions ran against a different prompt and any
+    # cached field-mapping artefacts may need to be re-validated.
+    try:
+        import hashlib as _hashlib
+        hints.setdefault(
+            "extraction_prompt_hash",
+            _hashlib.sha256(prompt.encode("utf-8", errors="replace")).hexdigest()[:16],
+        )
+    except Exception:
+        pass
+
     units = _normalize_units(raw_units)
     log.info(
         "Tier 4 LLM extracted %d units (raw: %d) | tokens=%d+%d | cost=$%.5f | latency=%dms",
@@ -349,9 +397,27 @@ async def analyze_api_with_llm(
         property_id: Canonical property ID for interaction logging.
 
     Returns:
-        Tuple of (units, llm_field_mapping_dict, is_noise, interaction_record).
-        llm_field_mapping_dict contains json_paths + response_envelope if units found.
-        is_noise is True if LLM determined this API has no unit data.
+        Tuple of (units, hints_dict, is_noise, interaction_record).
+
+        ``hints_dict`` carries everything the LLM volunteered about this
+        API response — both the field-mapping triplet (when units were
+        found) and ancillary signals that the prompt now asks for:
+
+          - When units found:
+              ``api_url_pattern``, ``json_paths``, ``response_envelope``
+              (the persistable mapping the cascade replays next run)
+              + optional ``navigation_hint``, ``platform_guess``,
+              ``property_amenities``, ``api_schema_signature``.
+
+          - When ``is_noise=True``:
+              ``noise_reason`` (free text describing what the API
+              actually contains) and any ``navigation_hint``,
+              ``platform_guess``, ``property_amenities`` that
+              the LLM still managed to produce while diagnosing the
+              noise. Previously this dict was ``None`` and we lost
+              every noise diagnostic except the boolean.
+
+        ``None`` only when nothing learnable came back at all.
     """
     template = _load_api_analysis_prompt()
     if not template:
@@ -375,6 +441,7 @@ async def analyze_api_with_llm(
     prompt = prompt.replace("{api_url}", api_url)
     prompt = prompt.replace("{api_response_json}", body_str)
     prompt = prompt.replace("{known_floor_plans}", _resolve_known_plans_block(property_context))
+    prompt = prompt.replace("{prior_observations}", _resolve_prior_observations_block(property_context))
 
     system = (
         "You are a real estate data extraction agent analyzing API responses. "
@@ -437,13 +504,39 @@ async def analyze_api_with_llm(
 
     parsed = _parse_llm_response(raw_response)
 
+    # Helper: extract optional ancillary signals every API analysis
+    # response is now allowed to volunteer (prompt update). Always safe
+    # to call — returns whatever made it through validation.
+    def _ancillary_signals(p: dict) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        nav_hint = p.get("navigation_hint")
+        if isinstance(nav_hint, str) and nav_hint.strip():
+            out["navigation_hint"] = nav_hint.strip()
+        plat = p.get("platform_guess")
+        if isinstance(plat, str) and plat.strip() and plat.strip().lower() not in ("null", "none"):
+            out["platform_guess"] = plat.strip()
+        prop_amen = p.get("property_amenities")
+        if isinstance(prop_amen, list):
+            cleaned = [a.strip() for a in prop_amen if isinstance(a, str) and a.strip()]
+            if cleaned:
+                out["property_amenities"] = cleaned
+        return out
+
     has_unit_data = parsed.get("has_unit_data", False)
     is_noise = not has_unit_data
 
     if is_noise:
-        noise_reason = parsed.get("noise_reason", "unknown")
+        noise_reason = parsed.get("noise_reason") or "no_unit_data"
+        if not isinstance(noise_reason, str):
+            noise_reason = "no_unit_data"
         log.info("API analysis: %s is noise (%s) | latency=%dms", api_url[:80], noise_reason, latency_ms)
-        return [], None, True, interaction
+        # Build a noise-side hints dict so the adapter can flow
+        # noise_reason into BlockedEndpoint.reason and observe any
+        # ancillary signals the LLM still produced (a navigation_hint
+        # while diagnosing noise is real signal).
+        noise_hints: dict[str, Any] = {"noise_reason": noise_reason}
+        noise_hints.update(_ancillary_signals(parsed))
+        return [], noise_hints if noise_hints else None, True, interaction
 
     # Extract units
     raw_units = parsed.get("units", [])
@@ -451,27 +544,50 @@ async def analyze_api_with_llm(
         raw_units = []
     units = _normalize_units(raw_units)
 
-    # Build field mapping for profile persistence
+    # Build the unified hints dict. The mapping triplet (api_url_pattern
+    # / json_paths / response_envelope) is what the cascade replays
+    # deterministically on subsequent runs. The ancillary keys flow
+    # through the adapter into ``_llm_hints`` so profile_updater can
+    # persist them — these used to be silently discarded because the
+    # second tuple element was a mapping-only dict.
     json_paths = parsed.get("json_paths", {})
     response_envelope = parsed.get("response_envelope", "")
-    mapping_dict: dict | None = None
+    hints: dict[str, Any] = {}
     if isinstance(json_paths, dict) and json_paths:
-        mapping_dict = {
-            "api_url_pattern": api_url,
-            "json_paths": json_paths,
-            "response_envelope": response_envelope if isinstance(response_envelope, str) else "",
-        }
+        hints["api_url_pattern"] = api_url
+        hints["json_paths"] = json_paths
+        hints["response_envelope"] = (
+            response_envelope if isinstance(response_envelope, str) else ""
+        )
+
+    hints.update(_ancillary_signals(parsed))
+
+    # API-side drift signature: SHA-256[:16] of the body envelope shape.
+    # profile_updater stamps this onto ``profile.llm_artifacts.api_schema_signature``
+    # so a future run that sees a different signature on the same URL
+    # knows the API contract changed and any cached mapping needs
+    # re-validation.
+    try:
+        from ma_poc.models.source import envelope_hash_of as _eh
+        sig = _eh(api_response.get("body"))
+        if sig:
+            hints["api_schema_signature"] = sig[:16]
+    except Exception:
+        pass
+
+    hints_out: dict | None = hints if hints else None
 
     log.info(
-        "API analysis: %s → %d units, mapping=%s | tokens=%d+%d | latency=%dms",
+        "API analysis: %s → %d units, mapping=%s, nav_hint=%s | tokens=%d+%d | latency=%dms",
         api_url[:80],
         len(units),
-        "yes" if mapping_dict else "no",
+        "yes" if hints.get("json_paths") else "no",
+        "yes" if hints.get("navigation_hint") else "no",
         tokens_in,
         tokens_out,
         latency_ms,
     )
-    return units, mapping_dict, False, interaction
+    return units, hints_out, False, interaction
 
 
 async def analyze_dom_with_llm(
@@ -489,8 +605,12 @@ async def analyze_dom_with_llm(
         property_id: Canonical property ID for interaction logging.
 
     Returns:
-        Tuple of (units, css_selectors_dict, interaction_record).
-        css_selectors_dict contains learned selectors if units found.
+        Tuple of (units, hints_dict, interaction_record).
+        ``hints_dict`` is the broader DOM-LLM envelope when populated:
+        ``{"css_selectors": {...}, "navigation_hint": str, "platform_guess":
+        str, "api_urls_with_data": list[str], "property_amenities": list[str],
+        "dom_structure_hash": str}``. ``None`` when the LLM produced no
+        selectors AND no other learnable signals.
     """
     template = _load_dom_analysis_prompt()
     if not template:
@@ -508,6 +628,7 @@ async def analyze_dom_with_llm(
     prompt = prompt.replace("{page_url}", page_url)
     prompt = prompt.replace("{dom_section_html}", dom_html)
     prompt = prompt.replace("{known_floor_plans}", _resolve_known_plans_block(property_context))
+    prompt = prompt.replace("{prior_observations}", _resolve_prior_observations_block(property_context))
 
     system = (
         "You are a real estate data extraction agent analyzing website DOM. "
@@ -576,20 +697,67 @@ async def analyze_dom_with_llm(
     units = _normalize_units(raw_units)
 
     css_selectors = parsed.get("css_selectors", {})
-    selectors_dict: dict | None = None
-    if isinstance(css_selectors, dict) and css_selectors.get("container"):
-        selectors_dict = css_selectors
+    if not isinstance(css_selectors, dict):
+        css_selectors = {}
+
+    # Build the broader hints envelope. Anything the prompt promised to
+    # return becomes part of this dict so the adapter and profile_updater
+    # can persist it. Previously only ``css_selectors`` survived; the new
+    # signals (navigation_hint / platform_guess / api_urls_with_data /
+    # property_amenities) used to be silently dropped because the return
+    # tuple shape exposed nothing else.
+    hints: dict[str, Any] = {}
+    if css_selectors.get("container"):
+        hints["css_selectors"] = css_selectors
+
+    nav_hint = parsed.get("navigation_hint")
+    if isinstance(nav_hint, str) and nav_hint.strip():
+        hints["navigation_hint"] = nav_hint.strip()
+
+    plat = parsed.get("platform_guess")
+    if isinstance(plat, str) and plat.strip() and plat.strip().lower() not in ("null", "none"):
+        hints["platform_guess"] = plat.strip()
+
+    api_urls = parsed.get("api_urls_with_data")
+    if isinstance(api_urls, list):
+        clean_urls = [u.strip() for u in api_urls if isinstance(u, str) and u.strip()]
+        if clean_urls:
+            hints["api_urls_with_data"] = clean_urls
+
+    prop_amenities = parsed.get("property_amenities")
+    if isinstance(prop_amenities, list):
+        cleaned_amen = [
+            a.strip() for a in prop_amenities if isinstance(a, str) and a.strip()
+        ]
+        if cleaned_amen:
+            hints["property_amenities"] = cleaned_amen
+
+    # Drift-detection signal: stable hash of the DOM section we just
+    # analysed. profile_updater stores it on the profile; on the next
+    # run a different hash means the page shape changed and any
+    # learned selectors should be re-validated rather than blindly trusted.
+    try:
+        import hashlib as _hashlib
+        hints["dom_structure_hash"] = _hashlib.sha256(
+            dom_html.encode("utf-8", errors="replace")
+        ).hexdigest()[:16]
+    except Exception:
+        pass
+
+    hints_out: dict | None = hints if hints else None
 
     log.info(
-        "DOM analysis: %s → %d units, selectors=%s | tokens=%d+%d | latency=%dms",
+        "DOM analysis: %s → %d units, selectors=%s, nav_hint=%s, platform=%s | tokens=%d+%d | latency=%dms",
         page_url[:80],
         len(units),
-        "yes" if selectors_dict else "no",
+        "yes" if hints.get("css_selectors") else "no",
+        "yes" if hints.get("navigation_hint") else "no",
+        hints.get("platform_guess") or "—",
         tokens_in,
         tokens_out,
         latency_ms,
     )
-    return units, selectors_dict, interaction
+    return units, hints_out, interaction
 
 
 def apply_saved_mapping(api_response_body: Any, mapping: dict) -> list[dict]:
@@ -700,6 +868,30 @@ def apply_saved_mapping(api_response_body: Any, mapping: dict) -> list[dict]:
         status_path = json_paths.get("availability_status", "")
         if status_path:
             unit["availability_status"] = _get_nested(item, status_path)
+
+        # Amenities + concessions — these used to be requested in the
+        # prompt but never replayed, so the mapping was effectively
+        # half-functional. Per-unit amenities feed the new
+        # ``units.amenities`` JSON column; concession_* feeds the
+        # existing ``units.concessions`` JSON column.
+        amen_path = json_paths.get("amenities", "")
+        if amen_path:
+            amen_val = _get_nested(item, amen_path)
+            if isinstance(amen_val, list):
+                unit["amenities"] = [str(a) for a in amen_val if a]
+            elif isinstance(amen_val, str) and amen_val.strip():
+                # Some APIs return a comma-separated string instead of a list.
+                unit["amenities"] = [s.strip() for s in amen_val.split(",") if s.strip()]
+
+        ctext_path = json_paths.get("concession_text", "")
+        if ctext_path:
+            unit["concession_text"] = _get_nested(item, ctext_path)
+
+        cval_path = json_paths.get("concession_value", "")
+        if cval_path:
+            unit["concession_value"] = _get_nested(item, cval_path)
+            # Concession came from a dedicated API field — record source.
+            unit["concession_source"] = "api_field"
 
         # Default confidence for mapping-based extraction
         unit["confidence"] = 0.85

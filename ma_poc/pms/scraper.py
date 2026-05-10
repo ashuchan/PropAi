@@ -184,6 +184,180 @@ def _resolved_to_dict(res: ResolvedTarget) -> dict[str, Any]:
     }
 
 
+# F0.1: hard ceiling so a misconfigured PROPERTY_LLM_COST_CAP_HOP_BONUS_USD
+# (or many compounding hops, in a future per-hop variant) cannot uncap spend.
+_COST_CAP_HOP_CEILING_MULTIPLIER = 3.0
+
+# Bug 5 alignment (2026-05-09 deep-dive): minimum body bytes a hop must have
+# before we consider granting a fresh LLM rescue budget. Below this the body
+# is almost certainly a redirect, login wall, or near-empty SPA shell —
+# bumping the cap there is wasted spend.
+_RICH_HOP_MIN_BODY_BYTES = 50_000
+
+# Cheap content markers that suggest unit-bearing structured data is present.
+# Either marker + body size threshold qualifies the hop as "rich."
+_RICH_HOP_JSONLD_MARKERS = ("FloorPlan", "ApartmentComplex", "Apartment\"")
+# Heuristic: at least N rent-shaped tokens ($1234 or $1234/mo) anywhere in
+# the body. Five distinct hits is uncommon outside an actual pricing page.
+_RICH_HOP_RENT_TOKEN_RE = re.compile(r"\$\d{3,4}")
+_RICH_HOP_MIN_RENT_TOKENS = 5
+
+
+def _link_hop_is_rich(fetch_result: Any) -> bool:
+    """Bug 5 alignment: should this hop's body trigger a cost-cap refresh?
+
+    True only when the body is large enough AND carries a positive content
+    signal (JSON-LD FloorPlan/Apartment OR enough rent-shaped tokens).
+    Filters out redirect bodies, login walls, and Cloudflare interstitials
+    that the previous unconditional refresh blindly subsidised.
+    """
+    if fetch_result is None:
+        return False
+    body = getattr(fetch_result, "body", None)
+    if not body:
+        return False
+    if isinstance(body, bytes):
+        if len(body) < _RICH_HOP_MIN_BODY_BYTES:
+            return False
+        try:
+            body_str = body.decode("utf-8", errors="replace")
+        except Exception:
+            return False
+    elif isinstance(body, str):
+        if len(body) < _RICH_HOP_MIN_BODY_BYTES:
+            return False
+        body_str = body
+    else:
+        return False
+
+    for marker in _RICH_HOP_JSONLD_MARKERS:
+        if marker in body_str:
+            return True
+    rent_hits = sum(1 for _ in _RICH_HOP_RENT_TOKEN_RE.finditer(body_str))
+    return rent_hits >= _RICH_HOP_MIN_RENT_TOKENS
+
+
+def _refresh_cost_cap_for_hop(
+    budget: dict[str, Any],
+    *,
+    property_id: str | None = None,
+    sub_url: str | None = None,
+    hop_index: int | None = None,
+) -> bool:
+    """Grant a cost-cap bonus before/during a rich link-hop session.
+
+    F0.1 + Bug 5 alignment: link-hop sub-pages (``/availability``,
+    ``/floor-plans``) are where the unit data typically lives. When the
+    entry page exhausted the per-property LLM cost cap on its own (e.g.
+    low-content marketing shell + an expensive monolithic call), the
+    sub-page never gets to use the LLM rescue path and the property fails.
+    Caller gates on ``_link_hop_is_rich`` before calling so we don't
+    subsidise login walls or redirects.
+
+    Bounded by ``base_cap × _COST_CAP_HOP_CEILING_MULTIPLIER`` (default 3×)
+    so a misconfigured env var cannot create runaway spend. Mutates
+    ``budget`` in place — the same dict reference flows into the hopped
+    sub-page via ``shared_budget`` so the new cap is observed by the
+    GenericAdapter cost gate.
+
+    Returns True if the cap was actually raised (so callers can decide
+    whether to emit telemetry).
+    """
+    try:
+        from ma_poc.services.source_planner import (
+            get_property_llm_cost_cap_hop_bonus_usd,
+            get_property_llm_cost_cap_usd,
+        )
+    except Exception:
+        return False
+    base = get_property_llm_cost_cap_usd()
+    bonus = get_property_llm_cost_cap_hop_bonus_usd()
+    ceiling = base * _COST_CAP_HOP_CEILING_MULTIPLIER
+    try:
+        current = float(budget.get("_cost_cap_usd", base) or base)
+    except (TypeError, ValueError):
+        current = base
+    new_cap = min(current + bonus, ceiling)
+    if new_cap <= current:
+        # Already at ceiling — no-op. Caller can still observe the attempt
+        # via the return value if it wants to surface "would have refreshed
+        # but was clamped" telemetry. Today we keep the helper silent.
+        return False
+    budget["_cost_cap_usd"] = new_cap
+
+    if property_id:
+        try:
+            from ma_poc.observability.events import EventKind, emit
+
+            emit(
+                EventKind.LINK_HOP_BUDGET_REFRESH,
+                property_id,
+                sub_url=sub_url,
+                hop_index=hop_index,
+                old_cap_usd=round(current, 4),
+                new_cap_usd=round(new_cap, 4),
+                ceiling_usd=round(ceiling, 4),
+            )
+        except Exception:
+            # Telemetry must never break the cap refresh.
+            pass
+    return True
+
+
+def _refresh_monolithic_budget_for_llm_hint(
+    budget: dict[str, Any],
+    *,
+    property_id: str | None = None,
+    sub_url: str | None = None,
+    hop_index: int | None = None,
+) -> bool:
+    """Grant a fresh monolithic LLM call when hopping to an LLM-hinted URL.
+
+    The LLM only emits ``navigation_hint`` when it has diagnosed that the
+    unit data lives on a different page — i.e. it has already paid the
+    introspection cost on the entry page and is telling us where to look.
+    In that case the entry-page call legitimately consumed the
+    per-property ``llm_monolithic`` counter (default = 1) and any sub-page
+    rescue would be denied. We treat the LLM's hint as high-confidence
+    evidence and refresh the counter to at least 1 so the hinted page can
+    use the monolithic LLM tier if its deterministic parsers also miss.
+
+    Mutates ``budget`` in place — the same dict reference flows into the
+    sub-page's ``scrape()`` call via ``shared_budget`` so the new counter
+    is observed by the GenericAdapter cost gate.
+
+    Returns True when the counter was actually raised.
+    """
+    try:
+        current = int(budget.get("llm_monolithic", 0) or 0)
+    except (TypeError, ValueError):
+        current = 0
+    if current >= 1:
+        return False
+    budget["llm_monolithic"] = 1
+    if property_id:
+        try:
+            from ma_poc.observability.events import EventKind, emit
+
+            # NOTE: do not use ``kind=`` as a kwarg — that collides with
+            # ``emit(kind: EventKind, ...)``'s positional parameter and
+            # raised TypeError silently swallowed by the except below.
+            # Use ``refresh_kind`` so analysers can distinguish counter
+            # refreshes from cost-cap refreshes.
+            emit(
+                EventKind.LINK_HOP_BUDGET_REFRESH,
+                property_id,
+                sub_url=sub_url,
+                hop_index=hop_index,
+                refresh_kind="llm_monolithic_counter",
+                old_value=current,
+                new_value=1,
+            )
+        except Exception:
+            pass
+    return True
+
+
 async def scrape(
     base_url: str,
     proxy: str | None = None,
@@ -385,7 +559,17 @@ async def scrape(
     if shared_budget is not None:
         budget: dict = shared_budget
     else:
-        budget = {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
+        # F0.1: include _cost_cap_usd in the fallback so the env override
+        # still applies on the no-profile path. compute_budget below also
+        # injects it; this keeps both branches consistent.
+        from ma_poc.services.source_planner import get_property_llm_cost_cap_usd
+        budget = {
+            "llm_api_calls": 3,
+            "llm_dom_calls": 1,
+            "llm_monolithic": 1,
+            "link_hop": 3,
+            "_cost_cap_usd": get_property_llm_cost_cap_usd(),
+        }
         if profile is not None:
             try:
                 from ma_poc.services.source_planner import compute_budget
@@ -451,6 +635,11 @@ async def scrape(
                     "body": parsed_body,
                     "status": entry.get("status"),
                     "content_type": entry.get("content_type"),
+                    # F1.2: forward the per-entry captcha flag so the LLM
+                    # rescue's _filter_candidates can drop interstitial
+                    # bodies. Populated by Fetcher._do_render's network_log
+                    # capture; default False keeps non-render paths safe.
+                    "captcha_detected": bool(entry.get("captcha_detected", False)),
                 }
             )
         ctx._api_responses = prepared  # type: ignore[attr-defined]
@@ -508,13 +697,36 @@ async def scrape(
         raw_api_responses = getattr(ctx, "_api_responses", []) or []
         page_unreachable = any("FAILED_UNREACHABLE" in str(e) for e in adapter_result.errors)
 
+        # F1.3 / Bug 2 (2026-05-09): gate on ``adapter_name`` (resolved adapter
+        # the scraper actually called) — NOT ``pms_name`` (URL-based detection
+        # which can be ``unknown`` after F0.2 demotion). The previous
+        # ``pms_name`` gate locked rescue out of every detection-demoted
+        # property, costing ~300 properties/run.
+        # Allow-list also widened to include ``onesite`` and ``amli`` per the
+        # May-8 implementation plan F1.3.
+        # F1.2: also short-circuit on captcha — bodies captured behind a
+        # Cloudflare interstitial are noise the rescue can't extract from.
+        captcha_detected = bool(getattr(fetch_result, "captcha_detected", False))
         needs_rescue = (
             not property_passes_quality_gate(adapter_result.units)
             and bool(raw_api_responses)
-            and pms_name in {"generic", "entrata", "appfolio"}
+            and adapter_name in {"generic", "entrata", "appfolio", "onesite", "amli"}
             and consecutive_rescue_failures < 3
             and not page_unreachable
+            and not captcha_detected
         )
+
+        if not needs_rescue and captcha_detected and bool(raw_api_responses):
+            # F1.2: surface the bot-block separately from FAILED_NO_DATA so
+            # the run report doesn't bury captcha pages in the generic
+            # extraction-failure bucket.
+            emit(
+                EventKind.LLM_RESCUE_SKIPPED,
+                ctx.property_id,
+                source_adapter=adapter_name,
+                reason="captcha_detected",
+            )
+            result["_rescue_skipped_reason"] = "captcha_detected"
 
         if needs_rescue:
             from ma_poc.services.llm_api_rescue import RescueInput, rescue_from_api_responses
@@ -522,7 +734,7 @@ async def scrape(
             emit(
                 EventKind.LLM_RESCUE_ATTEMPTED,
                 ctx.property_id,
-                source_adapter=pms_name,
+                source_adapter=adapter_name,
                 n_candidates=len(raw_api_responses),
             )
 
@@ -535,7 +747,7 @@ async def scrape(
                         "city": getattr(ctx, "city", ""),
                         "expected_units": ctx.expected_total_units,
                     },
-                    source_adapter=pms_name,
+                    source_adapter=adapter_name,
                     api_responses=raw_api_responses,
                     profile_snapshot=(
                         ctx.profile.model_dump(mode="json") if ctx.profile is not None else None
@@ -544,19 +756,6 @@ async def scrape(
             )
 
             result["_rescue_cost_usd"] = rescue.cost_usd
-
-            # Bridge rescue's per-URL blocklist into _llm_analysis_results so
-            # profile_updater actually persists them. profile_updater reads
-            # only that dict (looking for "noise:<reason>" sentinels) — until
-            # this bridge existed, blocked_endpoints died at the rescue
-            # boundary on every run, defeating the whole point of the cache.
-            if rescue.blocked_endpoints:
-                analysis = result.setdefault("_llm_analysis_results", {})
-                for blocked_url, reason in rescue.blocked_endpoints:
-                    # Don't clobber a successful-mapping entry for the same URL.
-                    if blocked_url in analysis and isinstance(analysis[blocked_url], dict):
-                        continue
-                    analysis[blocked_url] = f"noise:{reason}"
 
             if rescue.units:
                 adapter_result.units = rescue.units
@@ -584,6 +783,50 @@ async def scrape(
                     errors=rescue.errors,
                     cost=rescue.cost_usd,
                 )
+
+            # F1.4 (2026-05-08 implementation plan): bridge BOTH
+            # ``rescue.blocked_endpoints`` (always) AND
+            # ``rescue.llm_field_mappings`` (success only) into
+            # ``adapter_result._llm_analysis_results`` so the lift at the
+            # bottom of this function picks them up coherently. Replaces
+            # the prior ``result["_llm_analysis_results"]`` write that was
+            # silently overwritten by the in-line generic-LLM tier.
+            #
+            # CRITICAL key normalization: rescue emits ``envelope`` but
+            # ``profile_updater.save_llm_field_mapping`` reads
+            # ``response_envelope``. Without this rename, the persisted
+            # ``LlmFieldMapping`` has empty ``response_envelope`` →
+            # replay returns empty → quality_score=0.4 → mapping persists
+            # but never short-circuits the LLM cost on subsequent runs.
+            # Normalizing here (not at rescue source) avoids changing the
+            # ``RescueOutput.llm_field_mappings`` contract for any other
+            # consumer.
+            if rescue.blocked_endpoints or (rescue.units and rescue.llm_field_mappings):
+                existing = getattr(adapter_result, "_llm_analysis_results", None) or {}
+                if not isinstance(existing, dict):
+                    existing = {}
+
+                for blocked_url, reason in rescue.blocked_endpoints:
+                    # Don't clobber a successful-mapping entry for the same URL.
+                    if blocked_url in existing and isinstance(existing[blocked_url], dict):
+                        continue
+                    existing[blocked_url] = f"noise:{reason}"
+
+                if rescue.units:
+                    for m in rescue.llm_field_mappings:
+                        url_key = m.get("api_url_pattern") or rescue.winning_url
+                        if not url_key:
+                            continue
+                        normalized = dict(m)
+                        if "envelope" in normalized and "response_envelope" not in normalized:
+                            normalized["response_envelope"] = normalized.pop("envelope")
+                        # Don't overwrite an earlier good mapping for the same URL.
+                        prior = existing.get(url_key)
+                        if isinstance(prior, dict):
+                            continue
+                        existing[url_key] = normalized
+
+                adapter_result._llm_analysis_results = existing  # type: ignore[attr-defined]
 
             result["_rescue_attempted"] = True
             result["_rescue_succeeded"] = bool(rescue.units)
@@ -677,6 +920,16 @@ async def scrape(
     if nav_hints:
         result["_llm_navigation_hints"] = list(nav_hints)
 
+    # Surface property-level amenities collected by any LLM tier so the
+    # ``aggregate_property_amenities`` step downstream finally has data
+    # to read. Adapter writes the cross-tier-deduped list to
+    # ``adapter_result._property_amenities`` (see GenericAdapter); we
+    # promote it here onto ``result["property_amenities"]`` as the
+    # ``explicit`` source for the existing aggregator.
+    prop_amen = getattr(adapter_result, "_property_amenities", None)
+    if prop_amen:
+        result["property_amenities"] = list(prop_amen)
+
     return result
 
 
@@ -765,6 +1018,16 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
 # "View Availability" click away.
 
 
+# Sentinel score for LLM-emitted navigation hints. Detected downstream
+# (anchor prefix ``llm-hint:``) by ``_try_link_hop`` to refresh the
+# monolithic LLM budget before scraping the suggested URL — the LLM has
+# already diagnosed where unit data lives, so we trust it enough to
+# grant one more monolithic shot on that page even if the entry page
+# burned the original budget on a no-content marketing shell.
+_LLM_HINT_SCORE = 10_000
+_LLM_HINT_ANCHOR_PREFIX = "llm-hint:"
+
+
 def _augment_ranked_with_hints(
     ranked: list[tuple[str, int, str]],
     hints: list[str],
@@ -772,17 +1035,22 @@ def _augment_ranked_with_hints(
 ) -> list[tuple[str, int, str]]:
     """Push LLM-provided navigation hints to the top of the ranked list.
 
-    When the monolithic LLM call returned ``units: []`` but filled in
-    ``profile_hints.navigation_hint`` (e.g. "/Marketing/FloorPlans"), we want
-    link-hop to try that URL first. The hint can be a relative path or a
-    full URL — we resolve against ``base_url`` either way and deduplicate.
+    When an LLM call returned ``units: []`` but filled in
+    ``profile_hints.navigation_hint`` (e.g. "/Marketing/FloorPlans"), we
+    want link-hop to try that URL first. The hint can be a relative path
+    or a full URL — we resolve against ``base_url`` either way and
+    deduplicate.
 
-    Phase 5: acts on LLM diagnostic output that was previously discarded.
+    LLM hints get the highest sentinel score (``_LLM_HINT_SCORE``) and
+    are returned at the head of the list. If the same URL was also
+    keyword-ranked we drop the keyword duplicate so the LLM-anchored
+    entry is the one that fires; its anchor prefix is what
+    ``_try_link_hop`` keys off to refresh the monolithic LLM budget.
     """
     if not hints:
         return ranked
-    seen_urls = {u for u, _, _ in ranked}
     augmented: list[tuple[str, int, str]] = []
+    hinted_urls: set[str] = set()
     for raw in hints:
         raw_s = (raw or "").strip()
         if not raw_s:
@@ -793,12 +1061,14 @@ def _augment_ranked_with_hints(
             continue
         if not abs_url.startswith(("http://", "https://")):
             continue
-        if abs_url in seen_urls:
+        if abs_url in hinted_urls:
             continue
-        seen_urls.add(abs_url)
-        # Score 1000 so LLM hints always outrank keyword-matched links.
-        augmented.append((abs_url, 1000, f"llm-hint:{raw_s[:60]}"))
-    return augmented + ranked
+        hinted_urls.add(abs_url)
+        augmented.append(
+            (abs_url, _LLM_HINT_SCORE, f"{_LLM_HINT_ANCHOR_PREFIX}{raw_s[:60]}")
+        )
+    rest = [(u, s, a) for (u, s, a) in ranked if u not in hinted_urls]
+    return augmented + rest
 
 
 _LINK_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
@@ -1006,12 +1276,57 @@ async def _try_link_hop(
         ranked = _augment_ranked_with_hints(ranked, llm_navigation_hints, entry_url)
         # Cap to keep budget bounded even with hints merged in.
         ranked = ranked[: max(max_hops, len(llm_navigation_hints) + 1)]
-    # Phase 9: drop URLs already visited (cycle break)
-    ranked = [(u, s, a) for (u, s, a) in ranked if u not in visited]
+
+    # Profile-driven navigation memory (Bug 3.1). The profile records
+    # ``winning_page_url`` (yesterday's URL that produced units) and
+    # ``availability_links`` (every sub-URL that previously yielded
+    # data). We inject those as the highest-priority candidates so a
+    # property that succeeded via ``/floor-plans`` last run skips the
+    # anchor-text re-discovery step entirely. ``explored_links`` is the
+    # complementary skip-list — sub-URLs that returned empty in past
+    # runs are filtered out so we don't re-pay for known dead ends.
+    profile_top: list[tuple[str, int, str]] = []
+    explored_skip: set[str] = set()
+    if profile is not None:
+        try:
+            nav = profile.navigation
+            wpu = getattr(nav, "winning_page_url", None)
+            if isinstance(wpu, str) and wpu and wpu not in visited:
+                # Highest possible score so it always lands first.
+                profile_top.append((wpu, _LLM_HINT_SCORE + 1, "profile:winning_page_url"))
+            for link in getattr(nav, "availability_links", []) or []:
+                if isinstance(link, str) and link and link not in visited:
+                    profile_top.append((link, _LLM_HINT_SCORE, "profile:availability_link"))
+            for dead in getattr(nav, "explored_links", []) or []:
+                if isinstance(dead, str) and dead:
+                    explored_skip.add(dead)
+        except Exception:
+            # Profile access is best-effort — never let a malformed
+            # profile sink the link-hop entirely.
+            pass
+
+    # Merge profile-top candidates ahead of the existing ranking, dedup
+    # by URL (profile entry wins on collision since it carries the
+    # higher score).
+    if profile_top:
+        seen_in_top = {u for u, _, _ in profile_top}
+        ranked = profile_top + [
+            (u, s, a) for (u, s, a) in ranked if u not in seen_in_top
+        ]
+
+    # Phase 9: drop URLs already visited (cycle break) — and skip the
+    # profile's recorded dead ends so we don't re-pay for them.
+    ranked = [
+        (u, s, a) for (u, s, a) in ranked
+        if u not in visited and u not in explored_skip
+    ]
     # Phase 9: hard-cap at max_hops (defensive — _rank_internal_links has
     # its own limit, but enforcing here protects against augment-with-hints
-    # bypassing the limit).
-    ranked = ranked[:max_hops]
+    # bypassing the limit). Bumped slightly when profile candidates are
+    # present so winning_page_url + availability_links don't squeeze out
+    # the keyword-ranked fallbacks entirely.
+    cap = max_hops + (1 if profile_top else 0)
+    ranked = ranked[:cap]
     if not ranked:
         return None
 
@@ -1075,6 +1390,34 @@ async def _try_link_hop(
         if outcome_val != "OK":
             explored[sub_url] = False
             continue
+
+        # Bug 5 alignment (2026-05-09 deep-dive): if this hop's body looks
+        # rich (≥50KB AND JSON-LD FloorPlan/Apartment OR ≥5 rent tokens),
+        # raise the cost cap on the shared budget so the sub-page's LLM
+        # rescue can fire even if the entry page already burned the cap.
+        # Gated by the richness predicate so login walls / redirects /
+        # CF interstitials don't silently buy themselves more budget.
+        is_llm_hint = anchor.startswith(_LLM_HINT_ANCHOR_PREFIX) or score == _LLM_HINT_SCORE
+        if shared_budget is not None and (_link_hop_is_rich(sub_fetch) or is_llm_hint):
+            _refresh_cost_cap_for_hop(
+                shared_budget,
+                property_id=property_id,
+                sub_url=sub_url,
+                hop_index=idx,
+            )
+
+        # Navigation-hint trust: when the LLM explicitly named this URL
+        # as the place where unit data lives, it is high-confidence
+        # diagnostic output. Reset ``llm_monolithic`` so the hinted page
+        # can use the monolithic tier even if the entry page consumed
+        # the per-property counter on its own no-content rescue.
+        if shared_budget is not None and is_llm_hint:
+            _refresh_monolithic_budget_for_llm_hint(
+                shared_budget,
+                property_id=property_id,
+                sub_url=sub_url,
+                hop_index=idx,
+            )
 
         # Re-run extraction on the sub-page via ``scrape()`` (not
         # ``scrape_jugnu``) so link-hop doesn't recurse — scrape_jugnu is
@@ -1167,7 +1510,16 @@ async def scrape_jugnu(
     property_id = task.property_id if hasattr(task, "property_id") else "unknown"
 
     # Phase G2: compute budget here so link-hop guard can respect it.
-    _jugnu_budget: dict = {"llm_api_calls": 3, "llm_dom_calls": 1, "llm_monolithic": 1, "link_hop": 3}
+    # F0.1: env-driven _cost_cap_usd injected via the fallback dict and
+    # via compute_budget() so both code paths agree on the cap.
+    from ma_poc.services.source_planner import get_property_llm_cost_cap_usd
+    _jugnu_budget: dict = {
+        "llm_api_calls": 3,
+        "llm_dom_calls": 1,
+        "llm_monolithic": 1,
+        "link_hop": 3,
+        "_cost_cap_usd": get_property_llm_cost_cap_usd(),
+    }
     if profile is not None:
         try:
             from ma_poc.services.source_planner import compute_budget as _cb
@@ -1291,6 +1643,11 @@ async def scrape_jugnu(
                 pass
 
     if should_hop:
+        # Bug 5 alignment (2026-05-09 deep-dive): the per-hop cost-cap
+        # refresh is now gated on _link_hop_is_rich and applied INSIDE
+        # _try_link_hop after each hop fetch returns OK — see the call
+        # site near LINK_HOP_FETCHED. Removing the unconditional pre-loop
+        # refresh stops us from subsidising login walls and redirects.
         body = getattr(fetch_result, "body", None)
         entry_html: str | None = None
         if isinstance(body, bytes):

@@ -159,6 +159,59 @@ def normalize_units(raw_units: list[dict]) -> list[dict]:
         except (ValueError, TypeError):
             unit["confidence"] = 0.5
 
+        # Pass-through fields the schema_v2 mapper consumes downstream.
+        # The LLM prompts ask for these on every record; previously the
+        # normalizer dropped them, so concessions and amenities never
+        # reached the units table even though storage exists for them.
+        amenities_raw = u.get("amenities")
+        if isinstance(amenities_raw, list):
+            unit["amenities"] = [
+                str(item).strip() for item in amenities_raw
+                if isinstance(item, str) and item.strip()
+            ] or None
+        else:
+            unit["amenities"] = None
+
+        ctext = u.get("concession_text")
+        unit["concession_text"] = ctext if isinstance(ctext, str) and ctext.strip() else None
+
+        cval = u.get("concession_value")
+        try:
+            unit["concession_value"] = float(cval) if cval not in (None, "", "null") else None
+        except (ValueError, TypeError):
+            unit["concession_value"] = None
+
+        csrc = u.get("concession_source")
+        unit["concession_source"] = csrc if isinstance(csrc, str) and csrc.strip() else None
+
+        # Floor-plan provenance — tells downstream identity matching whether
+        # the LLM read the name off a confident source (page label) or
+        # synthesized it (inferred). Used to gate identity stability.
+        fpsrc = u.get("floor_plan_source")
+        unit["floor_plan_source"] = fpsrc if isinstance(fpsrc, str) and fpsrc.strip() else None
+
+        # Per-floor-plan availability count: when the page lists "5 units
+        # available" instead of 5 individual rows, the LLM emits ONE record
+        # with availability_count=5. Schema_v2 reads this field; without
+        # the pass-through it always reached schema as None and we lost the
+        # property's true unit count.
+        ac = u.get("availability_count")
+        try:
+            unit["availability_count"] = int(ac) if ac not in (None, "", "null") else None
+        except (ValueError, TypeError):
+            unit["availability_count"] = None
+
+        # Lease term + move-in date — schema_v2 expects them
+        # (schema_v2.py: ``unit.get("lease_term") or unit.get("_lease_term")``).
+        lt = u.get("lease_term")
+        try:
+            unit["lease_term"] = int(lt) if lt not in (None, "", "null") else None
+        except (ValueError, TypeError):
+            unit["lease_term"] = None
+
+        mid = u.get("move_in_date")
+        unit["move_in_date"] = mid if isinstance(mid, str) and mid.strip() else None
+
         if unit.get("unit_id") or unit.get("floor_plan_name") or unit.get("market_rent_low"):
             normalized.append(unit)
 

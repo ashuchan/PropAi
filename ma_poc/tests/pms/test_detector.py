@@ -209,11 +209,92 @@ def test_entrata_marker_html() -> None:
 
 def test_no_rentcafe_false_positive_on_squarespace_with_cdn_asset() -> None:
     # Squarespace giveaway script MUST win over an incidental rentcafe CDN asset.
+    # F0.3: rentcafe is a "weak" marker (pass 3) so the Squarespace pass-2
+    # check still wins for this CDN-asset case.
     html = (
         "<html><head>"
         '<script src="https://static1.squarespace.com/x.js"></script>'
         '<img src="https://cdngeneralcf.rentcafe.com/foo.jpg">'
         "</head></html>"
+    )
+    r = detect_pms("https://vanity.example/", page_html=html)
+    assert r.pms == "squarespace_nopms"
+
+
+def test_onesite_strong_marker_beats_squarespace_shell() -> None:
+    # F0.3 (Bug 6): A 123taylor.com-style site has a Squarespace marketing
+    # shell linking to a real OneSite portal subdomain. Without the
+    # 3-pass priority, Squarespace short-circuits at pass 2 and the
+    # OneSite portal hop is lost — the property gets routed to
+    # syndication_only and yields no units.
+    html = (
+        "<html><head>"
+        '<script src="https://static1.squarespace.com/x.js"></script>'
+        "</head><body>"
+        '<a href="https://1234567.onlineleasing.realpage.com/">Apply Now</a>'
+        "</body></html>"
+    )
+    r = detect_pms("https://vanity.example/", page_html=html)
+    assert r.pms == "onesite"
+    assert r.confidence >= 0.80
+
+
+def test_commoncf_entrata_strong_marker_beats_squarespace_shell() -> None:
+    # F0.3 regression test: ``commoncf.entrata.com`` was added to pass 1 as a
+    # strong portal signal (it's an Entrata-served CDN host that only appears
+    # on real Entrata-backed properties). A Squarespace shell linking to it
+    # must route to entrata, not squarespace_nopms.
+    html = (
+        "<html><head>"
+        '<script src="https://static1.squarespace.com/x.js"></script>'
+        '<script src="https://commoncf.entrata.com/widget.js"></script>'
+        "</head></html>"
+    )
+    r = detect_pms("https://vanity.example/", page_html=html)
+    assert r.pms == "entrata"
+    assert r.confidence >= 0.80
+
+
+def test_entrata_widget_beats_wix_shell() -> None:
+    # F0.3: Entrata widget marker is a strong portal signal (pass 1) and
+    # must beat a Wix marketing shell. Without F0.3 the property would
+    # be misrouted to syndication_only.
+    html = (
+        "<html><head>"
+        '<script src="https://static.parastorage.com/x.js"></script>'
+        "</head><body>"
+        '<div id="entrata-widget-container"></div>'
+        '<a href="/Apartments/module/application_101/">Apply</a>'
+        "</body></html>"
+    )
+    r = detect_pms("https://vanity.example/", page_html=html)
+    assert r.pms == "entrata"
+    assert r.confidence >= 0.80
+
+
+def test_funnel_nestio_beats_squarespace_shell() -> None:
+    # F0.3: Nestio is a strong PMS marker. Squarespace shell with a
+    # nestiolistings.com script src must route to funnel.
+    html = (
+        "<html><head>"
+        '<script src="https://static1.squarespace.com/x.js"></script>'
+        '<script src="https://nestiolistings.com/static/bundle.js"></script>'
+        "</head></html>"
+    )
+    r = detect_pms("https://vanity.example/", page_html=html)
+    assert r.pms == "funnel"
+
+
+def test_squarespace_with_appfolio_marketing_link_stays_squarespace() -> None:
+    # F0.3: .appfolio.com is a weak marker (could be a marketing link). A
+    # Squarespace site with a stray appfolio.com link must NOT misroute
+    # to AppFolio — Squarespace at pass 2 wins.
+    html = (
+        "<html><head>"
+        '<script src="https://static1.squarespace.com/x.js"></script>'
+        "</head><body>"
+        '<a href="https://www.appfolio.com/blog">Powered by AppFolio</a>'
+        "</body></html>"
     )
     r = detect_pms("https://vanity.example/", page_html=html)
     assert r.pms == "squarespace_nopms"
@@ -268,11 +349,28 @@ def test_confirm_detection_demotes_when_no_body_matches() -> None:
     assert result.recommended_strategy == "cascade"
 
 
-def test_confirm_detection_demotes_when_no_responses() -> None:
+def test_confirm_detection_preserves_when_no_responses() -> None:
+    # F0.2: 0 captured responses ≠ wrong URL detection. When the page
+    # was served via httpx GET (change-detector path), blocked, or
+    # timed out, we have no evidence to disconfirm the URL-based
+    # detection. Demoting here would force the generic cascade and
+    # starve real PMS portals of their proper adapter. See the
+    # 2026-05-09 cloud-run regression analysis for the recovery cohort.
     initial = _rentcafe_initial()
     result = confirm_detection(initial, [])
-    assert result.pms == "unknown"
-    assert any("demoted_from_rentcafe" in e for e in result.evidence)
+    assert result.pms == "rentcafe"
+    assert result.confidence == initial.confidence
+    assert not any("demoted_from_rentcafe" in e for e in result.evidence)
+
+
+def test_confirm_detection_preserves_when_responses_is_none() -> None:
+    # The scraper passes ``getattr(ctx, "_api_responses", []) or []`` so
+    # ``None`` shouldn't reach this function in production, but the
+    # signature accepts it. None must behave identically to empty list.
+    initial = _rentcafe_initial()
+    result = confirm_detection(initial, None)
+    assert result.pms == "rentcafe"
+    assert result.confidence == initial.confidence
 
 
 def test_confirm_detection_leaves_unknown_alone() -> None:

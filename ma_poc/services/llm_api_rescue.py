@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -22,6 +23,101 @@ from typing import Any
 from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
+
+# F1.1 (2026-05-08 implementation plan): static noise blocklist applied in
+# ``_filter_candidates`` BEFORE the per-property blocked_endpoints check.
+# Audited against the 32-property May-8 sample (100% noise rate on these
+# hosts) plus the safe subset of the legacy daily_runner blocklist (no SaaS
+# data hosts). The full SaaS subset (meetelise/sierra.chat/etc.) is deferred
+# to Phase 2 pending a corpus-grep verification.
+_RESCUE_NOISE_HOSTS: frozenset[str] = frozenset(
+    {
+        # Pure analytics / CDN — safe subset of the legacy port:
+        "googleapis.com",
+        "go-mpulse.net",
+        "googletagmanager.com",
+        "doubleclick.net",
+        "facebook.com",
+        "hotjar.com",
+        "sentry.io",
+        "userway.org",
+        "omni.cafe",
+        # Audit-derived from 2026-05-08 (100% noise rate):
+        "klaviyo.com",
+        "static-forms.klaviyo.com",
+        "static.cdn-website.com",  # Duda CMS
+        "enormapps.com",  # slider widget
+        "tour.tourbuilder.com",  # tour analytics
+        "places.googleapis.com",
+        "maps.googleapis.com",
+        "cmp.osano.com",
+        "osano.com",  # cookie consent
+        "app.meetelise.com",  # chatbot
+        # Captcha providers (defensive — never legitimate data):
+        "challenges.cloudflare.com",
+        "hcaptcha.com",
+        "recaptcha.net",
+    }
+)
+
+# Path fragments that indicate noise regardless of host. Ported from the
+# legacy daily_runner plus 2026-05-08 audit additions.
+_RESCUE_NOISE_PATH_FRAGMENTS: frozenset[str] = frozenset(
+    {
+        # Legacy daily_runner ports:
+        "/tag-manager/",
+        "/mapsjs/",
+        "/gen_204",
+        "/analytics/",
+        "/gtag/",
+        "/pixel",
+        "/beacon",
+        "/tour/availabilities",
+        "/html_forms/",
+        "/yext_reviews/",
+        "/blurb/v1/",
+        # 2026-05-08 audit additions:
+        "/popdown/",
+        "/forms/api/",
+        "/speculations/rules/",
+        "/Apartments/module/widgets/",
+        "/Apartments/module/application_authentication/",
+        "/Apartments/module/property_info/",
+        "$rpc/",  # Google Maps RPC
+        "/realms/",  # OIDC auth
+        "/openid-connect/",  # OIDC auth
+        "/recaptcha",  # captcha provider regardless of host
+    }
+)
+
+
+def _noise_blocklist_enabled() -> bool:
+    """F1.1 feature flag. Defaults to enabled; set ``ENABLE_RESCUE_NOISE_BLOCKLIST=false``
+    for staged rollback. Read fresh on every call so tests can monkey-patch."""
+    raw = os.getenv("ENABLE_RESCUE_NOISE_BLOCKLIST")
+    if raw is None or not raw.strip():
+        return True
+    return raw.strip().lower() not in {"false", "0", "no", "off"}
+
+
+def _is_noise_url(url: str) -> bool:
+    """F1.1: return True if ``url`` matches a known-noise host or path fragment.
+    Used by ``_filter_candidates`` BEFORE the per-property blocklist."""
+    if not url:
+        return True
+    try:
+        host = urlparse(url).hostname or ""
+    except Exception:
+        return False
+    host_lower = host.lower()
+    for h in _RESCUE_NOISE_HOSTS:
+        if host_lower == h or host_lower.endswith("." + h):
+            return True
+    url_lower = url.lower()
+    for frag in _RESCUE_NOISE_PATH_FRAGMENTS:
+        if frag.lower() in url_lower:
+            return True
+    return False
 
 _AVAILABILITY_URL_SIGNALS = (
     "/availab", "/floor-plan", "/floorplan", "/pricing", "/units",
@@ -164,6 +260,8 @@ def _filter_candidates(
             if pat:
                 blocked_patterns.append(pat)
 
+    blocklist_enabled = _noise_blocklist_enabled()
+
     kept: list[dict] = []
     for r in api_responses:
         url = r.get("url", "")
@@ -173,7 +271,21 @@ def _filter_candidates(
         if body is None or body == "" or body == [] or body == {}:
             continue
 
-        # Drop if URL matches a blocked endpoint
+        # F1.2: drop responses captured during a captcha challenge — the
+        # body is the interstitial HTML, not real unit data. Populated
+        # by the network log capture when a CF/recaptcha page rendered.
+        if r.get("captcha_detected"):
+            continue
+
+        # F1.1: static noise blocklist (audit-derived hosts + analytics
+        # CDN + captcha + OIDC). Behind ENABLE_RESCUE_NOISE_BLOCKLIST so
+        # we can roll back without a deploy if a real data host gets
+        # caught up. Applied BEFORE per-property blocklist since static
+        # entries should never reach the LLM regardless of profile state.
+        if blocklist_enabled and _is_noise_url(url):
+            continue
+
+        # Drop if URL matches a per-property blocked endpoint
         if any(pat in url for pat in blocked_patterns):
             continue
 

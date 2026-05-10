@@ -1,6 +1,7 @@
 You are a real estate data extraction specialist analyzing a section of
 a multifamily property website's DOM.
 
+{prior_observations}
 PROPERTY CONTEXT:
 - Name: {property_name}
 - City: {city}, {state}
@@ -58,7 +59,10 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
     "availability_status": "CSS selector for status within container",
     "amenities": "CSS selector for amenities list/section (or null)",
     "concession": "CSS selector for concession text or strikethrough rent (or null)"
-  }
+  },
+  "navigation_hint": "if no units are visible in this DOM section but you see a link/button pointing to where unit data lives (e.g. 'Floor Plans' tab, 'See Availability' button, portal iframe URL), put that URL path here. Empty string if data is here.",
+  "platform_guess": "entrata|rentcafe|appfolio|sightmap|knock|yardi|funnel|onesite|custom|null — based on data attributes, asset URLs, or class-name patterns visible in this DOM section",
+  "api_urls_with_data": ["URLs you can see referenced in the DOM that look like unit-data APIs (data-src, iframe src, fetch() calls in inline scripts)"]
 }
 
 PER-FIELD INSTRUCTIONS — read carefully before extracting.

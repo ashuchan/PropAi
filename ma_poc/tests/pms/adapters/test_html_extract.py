@@ -375,3 +375,82 @@ async def test_generic_adapter_recovers_units_from_embedded_json() -> None:
     assert isinstance(result, AdapterResult)
     assert len(result.units) >= 1, f"Expected units from embedded JSON; errors={result.errors}"
     assert result.tier_used == "TIER_1_5_EMBEDDED"
+
+
+# ── Bug 4 (2026-05-09) — JSON-LD Pass 3: standalone Offer arrays ─────────────
+
+
+def test_bug4_pass3_standalone_offers_emit_units() -> None:
+    """Bug 4: bare ``Offer`` nodes that are siblings of Brand/PostalAddress
+    (gscapts.com / Jonah Systems / Knock CMS shape) get emitted as units.
+    Pass 1 skips bare Offers and Pass 2 won't descend into Brand — Pass 3
+    closes the gap."""
+    html = """<html><head>
+    <script type="application/ld+json">
+    [
+      {"@type": "PostalAddress", "addressLocality": "Largo"},
+      {"@type": "Brand", "name": "Madison"},
+      {"@type": "Offer", "name": "1BR Plan A", "price": "1450"},
+      {"@type": "Offer", "name": "2BR Plan B", "price": "1850"},
+      {"@type": "Offer", "name": "3BR Plan C", "price": "2350"}
+    ]
+    </script></head></html>"""
+    units = extract_jsonld_from_html(html, "https://gscapts.com/")
+    assert len(units) == 3
+    names = {u.get("floor_plan_name") for u in units}
+    assert names == {"1BR Plan A", "2BR Plan B", "3BR Plan C"}
+
+
+def test_bug4_pass3_requires_distinguishing_dimensions() -> None:
+    """Bug 4: a single Offer replicated 3× must NOT inflate to 3 units.
+    The distinguishing-fields guard (≥2 distinct prices OR ≥2 distinct names)
+    drops degenerate arrays."""
+    html = """<html><head>
+    <script type="application/ld+json">
+    [
+      {"@type": "Offer", "name": "Plan A", "price": "1450"},
+      {"@type": "Offer", "name": "Plan A", "price": "1450"},
+      {"@type": "Offer", "name": "Plan A", "price": "1450"}
+    ]
+    </script></head></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/")
+    assert units == []
+
+
+def test_bug4_pass3_only_fires_when_passes_1_2_empty() -> None:
+    """Bug 4: when Pass 1 (Apartment) already produced units, Pass 3 must
+    NOT add duplicates from any incidental Offer siblings."""
+    html = """<html><head>
+    <script type="application/ld+json">
+    [
+      {"@context":"https://schema.org","@type":"Apartment",
+       "name":"The Parker 1x1","numberOfRooms":1,
+       "offers":{"@type":"Offer","lowPrice":1800,"highPrice":2000}},
+      {"@type": "Offer", "name": "Stray", "price": "999"},
+      {"@type": "Offer", "name": "Other", "price": "888"}
+    ]
+    </script></head></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/")
+    # Only the Apartment unit — Pass 3 short-circuits because Pass 1 emitted.
+    assert len(units) == 1
+    assert units[0]["floor_plan_name"] == "The Parker 1x1"
+
+
+def test_bug4_pass3_handles_offers_nested_in_brand() -> None:
+    """Bug 4: the Pass 3 walker must recurse into non-listed containers like
+    ``Brand`` so Offers nested there are still discovered."""
+    html = """<html><head>
+    <script type="application/ld+json">
+    {
+      "@type": "Brand",
+      "name": "Madison",
+      "makesOffer": [
+        {"@type": "Offer", "name": "1BR", "price": "1450"},
+        {"@type": "Offer", "name": "2BR", "price": "1850"}
+      ]
+    }
+    </script></head></html>"""
+    units = extract_jsonld_from_html(html, "https://example.com/")
+    # Pass 3 walks dict.values() so the "makesOffer" array is reached and the
+    # bare Offers inside are emitted.
+    assert len(units) >= 2

@@ -25,8 +25,10 @@ Key findings:
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse, urlunparse
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -38,6 +40,22 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
+
+log = logging.getLogger(__name__)
+
+# Bug 9 (2026-05-09 deep-dive): when the entry page fired no Entrata XHRs
+# (typical of marketing-redirect homepages — observed on 1701arch.com /
+# livethearch.com), probe these well-known Entrata paths directly through
+# the live browser session. ``page.evaluate`` runs the fetch under the
+# same origin so cookies/session/CSRF are preserved without us re-creating
+# the auth flow.
+_ENTRATA_PROBES: tuple[str, ...] = (
+    "/Apartments/module/floor_plans/",
+    "/Apartments/module/availability_pricing/",
+    "/Apartments/module/property_info/",
+    "/api/floorplans",
+    "/api/availability",
+)
 
 # Entrata widget types that contain real floor plan / availability data.
 _PROPERTY_WIDGET_TYPES = {"floor_plans", "availability"}
@@ -178,11 +196,102 @@ class EntrataAdapter:
             result.units = all_units
             result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
             result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
-        else:
-            result.confidence = 0.0
-            result.errors.append("No Entrata floorplan data found in captured API responses")
+            return result
+
+        # Bug 9 (2026-05-09 deep-dive): direct probe of known Entrata paths
+        # when the captured-API path produced nothing AND we have a live
+        # Playwright page. Entry pages that are pure marketing redirects
+        # (e.g. 1701arch.com → livethearch.com) load zero unit XHRs, so the
+        # capture-driven path can't fire. Probing with page.evaluate lets us
+        # exercise the same origin/session the page already established.
+        if page is not None:
+            probe_units = await self._probe_known_endpoints(page, ctx)
+            if probe_units:
+                result.units = probe_units
+                result.tier_used = "TIER_1_API_ENTRATA_PROBE"
+                result.confidence = min(0.95, 0.7 + 0.05 * len(probe_units))
+                return result
+
+        result.confidence = 0.0
+        result.errors.append("No Entrata floorplan data found in captured API responses")
 
         return result
 
     def static_fingerprints(self) -> list[str]:
         return list(self._fingerprints)
+
+    @staticmethod
+    def _origin_from_ctx(page: Page, ctx: AdapterContext) -> str:
+        """Bug 9: build the origin (scheme://host) for direct probes.
+
+        Prefer ``page.url`` since redirects may have already settled there;
+        fall back to ``ctx.base_url`` when the page object isn't useful.
+        """
+        candidate = ""
+        try:
+            candidate = page.url or ""
+        except Exception:
+            candidate = ""
+        if not candidate:
+            candidate = getattr(ctx, "base_url", "") or ""
+        try:
+            parsed = urlparse(candidate)
+        except Exception:
+            return ""
+        if not parsed.scheme or not parsed.netloc:
+            return ""
+        return urlunparse((parsed.scheme, parsed.netloc, "", "", "", ""))
+
+    async def _probe_known_endpoints(
+        self,
+        page: Page,
+        ctx: AdapterContext,
+    ) -> list[dict[str, str]]:
+        """Bug 9: hit the Entrata endpoint catalogue directly via fetch.
+
+        Returns the first probe's parsed units. Probes never raise — a
+        404/CORS/error simply moves to the next path.
+        """
+        origin = self._origin_from_ctx(page, ctx)
+        if not origin:
+            return []
+
+        for path in _ENTRATA_PROBES:
+            url = origin + path
+            # Defensive: if the SDK doesn't expose evaluate (test stubs),
+            # bail entire probe loop rather than misbehave.
+            evaluate = getattr(page, "evaluate", None)
+            if not callable(evaluate):
+                return []
+            try:
+                payload = await evaluate(
+                    "(u) => fetch(u, {credentials: 'include'}).then(r => r.ok ? r.json() : null).catch(() => null)",
+                    url,
+                )
+            except Exception as exc:
+                log.debug("Entrata probe failed url=%s err=%s", url, exc)
+                continue
+            if not payload:
+                continue
+            try:
+                if isinstance(payload, list) and payload and isinstance(payload[0], dict):
+                    if any(
+                        k in payload[0]
+                        for k in ("floorplan-name", "no_of_bedroom", "square_footage")
+                    ):
+                        units = parse_entrata_floorplans(payload, url)
+                        if units:
+                            return units
+                elif isinstance(payload, dict):
+                    units = parse_entrata_widget_envelope(payload, url)
+                    if units:
+                        return units
+                    fps = payload.get("floor_plans") if isinstance(payload, dict) else None
+                    if isinstance(fps, list) and fps:
+                        units = parse_entrata_floorplans(fps, url)
+                        if units:
+                            return units
+            except Exception as exc:
+                log.debug("Entrata probe parse failed url=%s err=%s", url, exc)
+                continue
+        return []

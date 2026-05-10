@@ -128,6 +128,11 @@ class UnitRow(Base):
     disappeared_since: Mapped[str | None] = mapped_column(String(16))
     last_absent_date: Mapped[str | None] = mapped_column(String(16))
     concessions: Mapped[Any | None] = mapped_column(JSON)
+    # Per-unit amenities — list of normalised lowercase strings. Produced
+    # by deterministic adapters and by LLM extraction (per-unit ``amenities``
+    # array on every prompt). Nullable so a row that never extracted
+    # amenities is distinguishable from one that explicitly returned [].
+    amenities: Mapped[Any | None] = mapped_column(JSON)
     changed_fields: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     # Informational SHA256 of the full incoming unit dict at upsert time.

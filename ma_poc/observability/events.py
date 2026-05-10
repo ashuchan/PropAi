@@ -71,6 +71,15 @@ class EventKind(StrEnum):
     LLM_RESCUE_ATTEMPTED = "extract.llm_rescue_attempted"
     LLM_RESCUE_SUCCEEDED = "extract.llm_rescue_succeeded"
     LLM_RESCUE_FAILED = "extract.llm_rescue_failed"
+    # F1.2 (2026-05-09): rescue gate fired but rescue was skipped — e.g.
+    # captcha_detected on the fetch_result. Distinct from FAILED so the
+    # run report can separate "tried and got nothing" from "didn't try
+    # because the input was poisoned".
+    LLM_RESCUE_SKIPPED = "extract.llm_rescue_skipped"
+    # Bug 5 alignment (2026-05-09): emitted when _refresh_cost_cap_for_hop
+    # decides a link-hop body is rich enough to warrant a fresh LLM
+    # rescue budget. Lets us measure how often the predicate fires.
+    LINK_HOP_BUDGET_REFRESH = "planner.link_hop_budget_refresh"
 
     # Fetch-tier escalation events (Phase E3+)
     FETCH_TIER_ESCALATED = "fetch.tier_escalated"
@@ -117,6 +126,10 @@ class EventKind(StrEnum):
     EXTRACT_AMENITIES_OBSERVED = "extract.amenities_observed"
     EXTRACT_CONCESSION_OBSERVED = "extract.concession_observed"
     EXTRACT_AVAILABILITY_QUANTITY = "extract.availability_quantity_observed"
+    # LLM API analysis classified an endpoint as noise (chatbot config,
+    # analytics, gallery metadata, etc.). Carries the LLM's free-text
+    # reason so analysers can cluster and tune the static blocklist.
+    LLM_API_NOISE = "extract.llm_api_noise"
 
 
 @dataclass(slots=True, frozen=True)

@@ -1,6 +1,7 @@
 You are a real estate data extraction specialist. Extract unit-level
 apartment availability data from the provided website content.
 
+{prior_observations}
 PROPERTY CONTEXT:
 - Name: {property_name}
 - City: {city}, {state}

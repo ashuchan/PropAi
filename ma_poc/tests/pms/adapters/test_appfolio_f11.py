@@ -12,6 +12,7 @@ import pytest
 
 from ma_poc.pms.adapters.appfolio import (
     AppFolioAdapter,
+    parse_appfolio_detail_page,
     parse_appfolio_listings_ssr,
 )
 from ma_poc.pms.adapters.base import AdapterContext
@@ -231,3 +232,90 @@ async def test_no_api_no_html_returns_clean_failure() -> None:
     assert result.units == []
     assert result.confidence == 0.0
     assert result.errors  # non-empty diagnostic
+
+
+# ── Bug 7 (2026-05-09) — /listings/detail/<uuid> parser ──────────────────────
+
+
+_DETAIL_PAGE = """
+<html><head><title>Gage Crossing</title></head><body>
+<main>
+  <h1>Gage Crossing — 2BR Modern</h1>
+  <div class="rent-block">$2,150 / month</div>
+  <div class="specs">2 bd / 2 ba</div>
+  <div class="sqft">1,150 sqft</div>
+  <p>Available August 1, 2026</p>
+</main>
+</body></html>
+"""
+
+
+def test_bug7_detail_parser_extracts_full_specs() -> None:
+    """Bug 7: /listings/detail/<uuid> page yields one unit with rent, beds,
+    baths, sqft, and floor_plan_name from the H1."""
+    units = parse_appfolio_detail_page(
+        _DETAIL_PAGE,
+        "https://ardentpm.appfolio.com/listings/detail/cbc67d94-deadbeef",
+    )
+    assert len(units) == 1
+    u = units[0]
+    assert u["floor_plan_name"] == "Gage Crossing — 2BR Modern"
+    assert u["bedrooms"] == "2"
+    assert u["bathrooms"] == "2"
+    assert u["sqft"] == "1150"
+    assert u["market_rent_low"] == 2150
+    assert u["market_rent_high"] == 2150
+    assert "$2,150" in u["rent_range"]
+    assert u["extraction_tier"] == "TIER_1_DOM_APPFOLIO_DETAIL"
+
+
+def test_bug7_detail_parser_returns_empty_without_rent() -> None:
+    """Bug 7: a page with no $XXX rent token (auth interstitial / sign-in
+    redirect) yields no units — guard against extracting from non-listing
+    pages that happen to have /listings/detail/ in the URL."""
+    units = parse_appfolio_detail_page(
+        "<html><body><main><h1>Sign In</h1><p>Please log in.</p></main></body></html>",
+        "https://example.appfolio.com/listings/detail/abc",
+    )
+    assert units == []
+
+
+def test_bug7_detail_parser_falls_back_to_full_html_when_no_main() -> None:
+    """Bug 7: pages without a <main> element still parse — the regex falls
+    back to the entire HTML body."""
+    html = "<html><body><h1>Plan A</h1><div>$1,500/mo · 1 bed · 1 bath · 700 sqft</div></body></html>"
+    units = parse_appfolio_detail_page(
+        html, "https://example.appfolio.com/listings/detail/x"
+    )
+    assert len(units) == 1
+    assert units[0]["bedrooms"] == "1"
+    assert units[0]["market_rent_low"] == 1500
+
+
+@pytest.mark.asyncio
+async def test_bug7_adapter_routes_detail_url_to_detail_parser() -> None:
+    """Bug 7: AppFolioAdapter.extract() runs the detail parser when the
+    fetch_result.final_url contains ``/listings/detail/`` and the SSR
+    listing-id path returned nothing."""
+
+    @dataclass
+    class _DetailFetchResult:
+        body: bytes | str | None
+        final_url: str
+
+    ctx = AdapterContext(
+        base_url="https://ardentpm.appfolio.com/listings/detail/cbc67d94",
+        detected=detect_pms("https://ardentpm.appfolio.com/listings/detail/cbc67d94"),
+        profile=None,
+        expected_total_units=None,
+        property_id="P_BUG7",
+        fetch_result=_DetailFetchResult(
+            body=_DETAIL_PAGE.encode("utf-8"),
+            final_url="https://ardentpm.appfolio.com/listings/detail/cbc67d94",
+        ),
+    )
+    ctx._api_responses = []  # type: ignore[attr-defined]
+    result = await AppFolioAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert len(result.units) == 1
+    assert result.tier_used == "TIER_1_DOM_APPFOLIO_DETAIL"
+    assert result.confidence == 0.85

@@ -53,6 +53,40 @@ def test_retry_proxy_error_rotates_proxy_twice() -> None:
     assert d3.should_retry is False
 
 
+# ── Bug 6 (2026-05-09) — proxy escalation on RATE_LIMITED ───────────────────
+
+
+def test_bug6_rate_limited_first_attempt_does_not_rotate() -> None:
+    """Bug 6: first 429 is benign — single retry on the same proxy is fine,
+    matches existing behaviour; only escalate after a second strike."""
+    policy = RetryPolicy()
+    decision = policy.decide(FetchOutcome.RATE_LIMITED, attempt=1)
+    assert decision.should_retry is True
+    assert decision.rotate_identity is False
+
+
+def test_bug6_rate_limited_second_attempt_rotates_identity() -> None:
+    """Bug 6: hitting 429 twice in a row signals the host has decided this
+    caller needs to back off. Force a rotation so the next attempt comes
+    from a fresh egress."""
+    policy = RetryPolicy()
+    decision = policy.decide(FetchOutcome.RATE_LIMITED, attempt=2)
+    assert decision.should_retry is True
+    assert decision.rotate_identity is True
+
+
+def test_bug6_rate_limited_respects_retry_after_with_rotation() -> None:
+    """Bug 6: retry-after header is still honoured when rotation kicks in
+    on attempt 2."""
+    policy = RetryPolicy()
+    decision = policy.decide(
+        FetchOutcome.RATE_LIMITED, attempt=2, retry_after_header="7"
+    )
+    assert decision.should_retry is True
+    assert decision.wait_ms == 7000
+    assert decision.rotate_identity is True
+
+
 def test_retry_exhausts_after_max_attempts() -> None:
     policy = RetryPolicy(max_attempts=2)
     decision = policy.decide(FetchOutcome.TRANSIENT, 2)

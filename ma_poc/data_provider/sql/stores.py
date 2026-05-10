@@ -151,6 +151,7 @@ _UNIT_COLS = {
     "disappeared_since",
     "last_absent_date",
     "concessions",
+    "amenities",
     "changed_fields",
     # Informational drift hash — never used for merge / dedup, written on
     # every upsert so SQL drift queries don't have to unpack the JSON
@@ -281,6 +282,7 @@ def _hydrate_unit(row: UnitRow) -> UnitIndexEntry:
         "disappeared_since": row.disappeared_since,
         "last_absent_date": row.last_absent_date,
         "concessions": row.concessions,
+        "amenities": row.amenities,
         "changed_fields": row.changed_fields or [],
     }
     if row.extra:
@@ -519,6 +521,7 @@ class SqlUnitStateStore(IUnitStateStore):
         "lease_term": ("lease_term", "_lease_term"),
         "move_in_date": ("move_in_date", "_move_in_date"),
         "concessions": ("concessions",),
+        "amenities": ("amenities",),
     }
 
     def __init__(self, holder: _SessionHolder) -> None:

@@ -182,16 +182,28 @@ async def extract_with_vision(
     if isinstance(result, dict):
         raw_units = result.get("units", [])
         hints = result.get("profile_hints", {})
+        top_level_amenities = result.get("property_amenities")
     else:
         raw_text = str(result)
         parsed = _parse_vision_response(raw_text)
         raw_units = parsed.get("units", [])
         hints = parsed.get("profile_hints", {})
+        top_level_amenities = parsed.get("property_amenities")
 
     if not isinstance(raw_units, list):
         raw_units = []
     if not isinstance(hints, dict):
         hints = {}
+
+    # Property-level amenities — same plumbing as the text extractors,
+    # so vision-extracted amenities flow through ``_llm_hints`` to
+    # ``profile.property_amenities``.
+    if isinstance(top_level_amenities, list):
+        cleaned = [
+            a.strip() for a in top_level_amenities if isinstance(a, str) and a.strip()
+        ]
+        if cleaned:
+            hints["property_amenities"] = cleaned
 
     # Reuse normalization from llm_extractor
     from services.llm_extractor import _normalize_units

@@ -79,6 +79,12 @@ class FieldSelectorMap(BaseModel):
     availability_status: str | None = None
     availability_date: str | None = None
     floor_plan_name: str | None = None
+    # Selectors for the per-unit/per-card amenity list and the concession
+    # banner / strikethrough rent. The DOM analysis prompt asks the LLM
+    # for both; without these slots they were silently dropped at the
+    # profile-write boundary.
+    amenities: str | None = None
+    concession: str | None = None
 
 
 class ExpanderAction(BaseModel):
@@ -103,13 +109,29 @@ class NavigationConfig(BaseModel):
     block_resource_domains: list[str] = Field(default_factory=list)
     availability_links: list[str] = Field(default_factory=list)  # All links that led to availability data
     explored_links: list[str] = Field(default_factory=list)  # Links explored that had no data (skip next run)
+    # Raw navigation hints emitted by the LLM (e.g. "/Marketing/FloorPlans").
+    # Captured even when the link-hop didn't take them so the next run can
+    # still prioritise them — and so a human reviewer can see what the LLM
+    # diagnosed even when no hop succeeded.
+    last_navigation_hints: list[str] = Field(default_factory=list)
 
     @field_validator("explored_links", mode="before")
     @classmethod
     def cap_explored_links(cls, v: list[str]) -> list[str]:
-        """Cap explored_links at 50 entries to prevent unbounded growth."""
+        """Cap explored_links at 50 entries to prevent unbounded growth.
+
+        Keeps the **newest** 50 — older dead-end discoveries roll off so
+        recent learning isn't drowned by historical noise.
+        """
         if isinstance(v, list) and len(v) > 50:
-            return v[:50]
+            return v[-50:]
+        return v
+
+    @field_validator("last_navigation_hints", mode="before")
+    @classmethod
+    def cap_last_navigation_hints(cls, v: list[str]) -> list[str]:
+        if isinstance(v, list) and len(v) > 10:
+            return v[-10:]
         return v
 
 
@@ -333,6 +355,12 @@ class ScrapeProfile(BaseModel):
     fetch: FetchProfile = Field(default_factory=FetchProfile)
     # Phase 12: cluster bootstrap — populated from detector's pms_client_account_id
     cluster_key: str = ""
+    # Aggregated property-level amenities. Populated either from the LLM's
+    # top-level ``property_amenities`` output or from the union of per-unit
+    # amenity arrays. Lowercased + deduplicated. Lives on the profile (not
+    # the units table) because amenities are a property-of-property
+    # observation: stable across runs, refreshed on each successful scrape.
+    property_amenities: list[str] = Field(default_factory=list)
 
 
 def detect_platform(url: str) -> str | None:

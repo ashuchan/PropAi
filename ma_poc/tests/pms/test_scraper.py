@@ -364,3 +364,154 @@ async def test_orchestrator_adds_new_detection_keys() -> None:
 
     # base_url got normalized to https
     assert result["base_url"].startswith("https://")
+
+
+# ---------------------------------------------------------------------------
+# F0.1 — _refresh_cost_cap_for_hop (link-hop budget refresh)
+# ---------------------------------------------------------------------------
+
+
+def test_refresh_cost_cap_for_hop_grants_bonus_within_ceiling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # F0.1: with $1.50 base + $0.50 bonus, a budget at $1.50 should rise
+    # to $2.00 after one hop refresh.
+    from ma_poc.pms.scraper import _refresh_cost_cap_for_hop
+
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_USD", "1.50")
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_HOP_BONUS_USD", "0.50")
+    budget: dict = {"_cost_cap_usd": 1.50}
+    _refresh_cost_cap_for_hop(budget)
+    assert budget["_cost_cap_usd"] == pytest.approx(2.00)
+
+
+def test_refresh_cost_cap_for_hop_respects_3x_ceiling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # F0.1: the helper must clamp at base × 3 even when the budget dict
+    # already carries a cap above the ceiling. Belt-and-suspenders against
+    # a misconfigured PROPERTY_LLM_COST_CAP_HOP_BONUS_USD.
+    from ma_poc.pms.scraper import _refresh_cost_cap_for_hop
+
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_USD", "1.50")
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_HOP_BONUS_USD", "10.00")
+    budget: dict = {"_cost_cap_usd": 4.00}
+    _refresh_cost_cap_for_hop(budget)
+    # base 1.50 × 3 = 4.50 ceiling — even huge bonus cannot exceed.
+    assert budget["_cost_cap_usd"] == pytest.approx(4.50)
+
+
+def test_refresh_cost_cap_for_hop_no_op_at_ceiling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # F0.1: idempotent — once the cap reaches the ceiling, subsequent
+    # refreshes are no-ops (not "set back down" or "rolled over").
+    from ma_poc.pms.scraper import _refresh_cost_cap_for_hop
+
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_USD", "1.50")
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_HOP_BONUS_USD", "0.50")
+    budget: dict = {"_cost_cap_usd": 4.50}  # already at ceiling
+    _refresh_cost_cap_for_hop(budget)
+    assert budget["_cost_cap_usd"] == pytest.approx(4.50)
+
+
+def test_refresh_cost_cap_for_hop_handles_missing_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # F0.1: if the budget dict has no _cost_cap_usd key (legacy callers),
+    # the helper should treat it as starting from the env-driven base.
+    from ma_poc.pms.scraper import _refresh_cost_cap_for_hop
+
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_USD", "1.50")
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_HOP_BONUS_USD", "0.50")
+    budget: dict = {"llm_api_calls": 3}  # no _cost_cap_usd
+    _refresh_cost_cap_for_hop(budget)
+    assert budget["_cost_cap_usd"] == pytest.approx(2.00)
+
+
+def test_refresh_cost_cap_for_hop_handles_malformed_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # F0.1: a non-numeric stored cap (defensive — shouldn't happen but
+    # the dict is mutated in place from many sites) must not crash.
+    from ma_poc.pms.scraper import _refresh_cost_cap_for_hop
+
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_USD", "1.50")
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_HOP_BONUS_USD", "0.50")
+    budget: dict = {"_cost_cap_usd": "not-a-number"}
+    _refresh_cost_cap_for_hop(budget)
+    # Falls back to base 1.50 + bonus 0.50 = 2.00.
+    assert budget["_cost_cap_usd"] == pytest.approx(2.00)
+
+
+# ---------------------------------------------------------------------------
+# Bug 5 alignment (2026-05-09) — _link_hop_is_rich richness predicate
+# ---------------------------------------------------------------------------
+
+
+class _StubFetch:
+    """Minimal stand-in for FetchResult — only the body field is read."""
+
+    def __init__(self, body: bytes | str | None) -> None:
+        self.body = body
+
+
+def test_bug5_rich_hop_requires_min_body_size() -> None:
+    """A 49KB body never qualifies as rich, even with rent tokens."""
+    from ma_poc.pms.scraper import _link_hop_is_rich
+
+    body = ("$1500 " * 200).encode("utf-8")  # plenty of $ tokens but small
+    assert len(body) < 50_000
+    assert _link_hop_is_rich(_StubFetch(body)) is False
+
+
+def test_bug5_rich_hop_jsonld_marker_qualifies() -> None:
+    """Body ≥50KB AND containing 'FloorPlan' qualifies as rich."""
+    from ma_poc.pms.scraper import _link_hop_is_rich
+
+    payload = '{"@type":"FloorPlan","name":"A"}' + ("x" * 60_000)
+    assert _link_hop_is_rich(_StubFetch(payload.encode("utf-8"))) is True
+
+
+def test_bug5_rich_hop_apartment_complex_marker_qualifies() -> None:
+    from ma_poc.pms.scraper import _link_hop_is_rich
+
+    payload = '{"@type":"ApartmentComplex"}' + ("x" * 60_000)
+    assert _link_hop_is_rich(_StubFetch(payload.encode("utf-8"))) is True
+
+
+def test_bug5_rich_hop_rent_tokens_qualify_at_threshold() -> None:
+    """≥5 distinct $XXX tokens AND body ≥50KB qualifies."""
+    from ma_poc.pms.scraper import _link_hop_is_rich
+
+    payload = (
+        "$1200 $1300 $1400 $1500 $1600 $1700 "
+        + ("noise " * 12_000)  # padding to push >50KB
+    )
+    assert len(payload) > 50_000
+    assert _link_hop_is_rich(_StubFetch(payload.encode("utf-8"))) is True
+
+
+def test_bug5_rich_hop_below_rent_threshold_with_no_jsonld_is_not_rich() -> None:
+    """Big body with NO content markers — pure text-of-disclaimers — is not
+    rich. Filters out cookie banners / ToS pages with large bodies."""
+    from ma_poc.pms.scraper import _link_hop_is_rich
+
+    payload = "blah " * 20_000  # ~100KB but no $rent and no JSON-LD markers
+    assert _link_hop_is_rich(_StubFetch(payload.encode("utf-8"))) is False
+
+
+def test_bug5_rich_hop_handles_none_body() -> None:
+    from ma_poc.pms.scraper import _link_hop_is_rich
+
+    assert _link_hop_is_rich(_StubFetch(None)) is False
+    assert _link_hop_is_rich(None) is False
+
+
+def test_bug5_rich_hop_handles_str_body() -> None:
+    """Body comes in as str on some code paths — equivalent treatment."""
+    from ma_poc.pms.scraper import _link_hop_is_rich
+
+    payload = '{"@type":"FloorPlan"}' + ("x" * 60_000)
+    assert _link_hop_is_rich(_StubFetch(payload)) is True
+

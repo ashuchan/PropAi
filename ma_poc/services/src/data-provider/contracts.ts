@@ -87,6 +87,7 @@ export interface UnitStateRecord {
   // Shared
   availableDate?: string | null;
   concessions?: unknown;
+  amenities?: unknown;
   floorPlanName?: string | null;
   availabilityStatus?: string | null;
   firstSeenDate?: string | null;

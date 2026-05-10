@@ -8,11 +8,13 @@ import pytest
 
 from models.source import FieldValue, ProvenancedUnit, SourceId
 from services.source_planner import (
-    CompletenessReport,
     DEFAULT_SOURCE_RANKING,
+    CompletenessReport,
     Decision,
     compute_budget,
     evaluate_completeness,
+    get_property_llm_cost_cap_hop_bonus_usd,
+    get_property_llm_cost_cap_usd,
     plan_next_action,
     rank_sources_for_field_group,
 )
@@ -165,3 +167,74 @@ def test_compute_budget_cold_rotates() -> None:
     assert b0["llm_api_calls"] == 1 and b0["llm_monolithic"] == 0
     assert b1["llm_api_calls"] == 0 and b1["llm_monolithic"] == 0 and b1["link_hop"] >= 1
     assert b2["llm_api_calls"] == 0 and b2["llm_monolithic"] == 1
+
+
+# ---------------------------------------------------------------------------
+# F0.1 — env-driven per-property LLM cost cap
+# ---------------------------------------------------------------------------
+
+
+def test_property_llm_cost_cap_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    # F0.1: default is $1.50 — chosen after the 2026-05-09 cloud-run
+    # regression analysis showed the prior $1.00 starved link-hop pages.
+    monkeypatch.delenv("PROPERTY_LLM_COST_CAP_USD", raising=False)
+    assert get_property_llm_cost_cap_usd() == pytest.approx(1.50)
+
+
+def test_property_llm_cost_cap_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_USD", "2.25")
+    assert get_property_llm_cost_cap_usd() == pytest.approx(2.25)
+
+
+def test_property_llm_cost_cap_malformed_env_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Bad values (non-numeric, blank, zero, negative) must fall back to the
+    # default rather than crash the pipeline at budget-construction time.
+    for bad in ("", "  ", "abc", "0", "-1", "1.5e", "nan"):
+        monkeypatch.setenv("PROPERTY_LLM_COST_CAP_USD", bad)
+        assert get_property_llm_cost_cap_usd() == pytest.approx(1.50), bad
+
+
+def test_property_llm_cost_cap_hop_bonus_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("PROPERTY_LLM_COST_CAP_HOP_BONUS_USD", raising=False)
+    assert get_property_llm_cost_cap_hop_bonus_usd() == pytest.approx(0.50)
+
+
+def test_property_llm_cost_cap_hop_bonus_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_HOP_BONUS_USD", "0.75")
+    assert get_property_llm_cost_cap_hop_bonus_usd() == pytest.approx(0.75)
+
+
+def test_compute_budget_warm_includes_cost_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # F0.1: every branch of compute_budget must populate _cost_cap_usd so
+    # the GenericAdapter cost gate sees the env-configured value.
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_USD", "1.75")
+
+    class P:
+        class confidence:
+            cold_run_count = 0
+
+    b = compute_budget(P(), is_cold=False)
+    assert b["_cost_cap_usd"] == pytest.approx(1.75)
+
+
+def test_compute_budget_cold_all_rotations_include_cost_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PROPERTY_LLM_COST_CAP_USD", "1.75")
+
+    class P:
+        class confidence:
+            cold_run_count = 0
+
+    for n in (0, 1, 2):
+        P.confidence.cold_run_count = n
+        b = compute_budget(P(), is_cold=True)
+        assert b["_cost_cap_usd"] == pytest.approx(1.75), f"cold rotation {n}"

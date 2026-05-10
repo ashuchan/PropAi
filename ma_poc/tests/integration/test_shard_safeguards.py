@@ -211,15 +211,28 @@ def test_fix3_cost_gate_helpers_present_in_generic_adapter() -> None:
     assert "_cost_usd_spent" in src
 
 
-def test_fix3_cost_gate_default_is_one_dollar_per_property() -> None:
-    """Default cap of $1.00 was sized off prod data: a healthy property
-    spends ~$0.05 in Tier 5 vision worst case. $1.00 is 20× headroom for
-    legitimate variation while still cutting the 20-call wedge that one
-    bad property could otherwise ring up."""
+def test_fix3_cost_gate_default_is_env_overridable_property_llm_cost_cap() -> None:
+    """F0.1 (2026-05-09): the cost-cap default lives in
+    ``services/source_planner.get_property_llm_cost_cap_usd`` and is
+    env-overridable via ``PROPERTY_LLM_COST_CAP_USD``. The 2026-05-09
+    cloud-run regression showed the prior hard-coded $1.00 starved
+    link-hop pages of LLM rescue; the new $1.50 baseline plus the
+    per-hop bonus restores headroom while keeping the wedge protection.
+
+    The generic adapter must read its fallback through the planner
+    helper (not redefine the literal) so future env tuning takes effect
+    without a code change."""
     src = _GENERIC.read_text(encoding="utf-8")
-    # The literal must appear at the cost-cap site. Formatted as 1.00
-    # (not 1.0) deliberately to flag this as a USD value to readers.
-    assert '_budget.get("_cost_cap_usd", 1.00)' in src
+    assert "get_property_llm_cost_cap_usd" in src, (
+        "GenericAdapter must source the cost cap from the planner helper "
+        "so PROPERTY_LLM_COST_CAP_USD is honored"
+    )
+    assert "_cost_cap_usd" in src, "the budget-dict key must remain stable"
+    # The literal $1.00 from the regression-causing commit must NOT remain
+    # as the in-code default. (1.00 may still appear in unrelated math.)
+    assert '_budget.get("_cost_cap_usd", 1.00)' not in src, (
+        "remove the hard-coded $1.00 default that caused the 2026-05-09 regression"
+    )
 
 
 def test_fix3_cost_gate_called_before_every_paid_tier() -> None:

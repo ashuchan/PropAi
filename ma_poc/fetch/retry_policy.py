@@ -62,7 +62,16 @@ class RetryPolicy:
         if outcome == FetchOutcome.RATE_LIMITED:
             # Respect Retry-After if present
             wait_ms = self._parse_retry_after(retry_after_header)
-            return RetryDecision(should_retry=True, wait_ms=wait_ms, rotate_identity=False)
+            # Bug 6 (2026-05-09 deep-dive): once we've hit 429 twice in a
+            # row on the same proxy/identity, the host has decided this
+            # caller needs to back off. Rotating identity (and proxy via
+            # the fetcher's rotate path) on attempt ≥2 escalates to a
+            # fresh egress, which is what residential-proxy escalation
+            # was meant to do but wasn't being triggered (no rotation
+            # signal). Stays single-tier — the actual residential pool
+            # comes via tier_escalator (F3.2 in the May-8 plan).
+            rotate = attempt >= 2
+            return RetryDecision(should_retry=True, wait_ms=wait_ms, rotate_identity=rotate)
 
         if outcome == FetchOutcome.BOT_BLOCKED:
             # Do NOT retry on bot-block. The 2026-05-03 prod analysis showed

@@ -1,6 +1,7 @@
 You are a real estate data extraction specialist analyzing a single API
 response from a multifamily property website.
 
+{prior_observations}
 PROPERTY CONTEXT:
 - Name: {property_name}
 - City: {city}, {state}
@@ -69,7 +70,9 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
       "confidence": 0.0-1.0
     }
   ],
-  "property_amenities": []
+  "property_amenities": [],
+  "navigation_hint": "if this API isn't unit data but it references / redirects to / embeds the URL where unit data lives, put that URL/path here. Empty string otherwise.",
+  "platform_guess": "entrata|rentcafe|appfolio|sightmap|knock|yardi|funnel|onesite|custom|null — based on URL host, response shape, or vendor field names"
 }
 
 PER-FIELD INSTRUCTIONS — read carefully before extracting.

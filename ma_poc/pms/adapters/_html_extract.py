@@ -278,6 +278,68 @@ def _extract_offers_as_units(data: Any, source_url: str) -> list[dict[str, Any]]
     return units
 
 
+def _extract_standalone_offers(data: Any, source_url: str) -> list[dict[str, Any]]:
+    """Bug 4 (2026-05-09 deep-dive): emit units from Offer arrays not nested in
+    a known container.
+
+    Some marketing CMSes (gscapts.com / Jonah Systems / Knock-driven sites)
+    emit JSON-LD with multiple top-level ``Offer`` nodes that are siblings of
+    ``Brand``/``PostalAddress``/etc., or nested inside non-listed container
+    types like ``Brand``. Pass 1 (``_walk_jsonld``) explicitly skips bare
+    Offers; Pass 2 (``_extract_offers_as_units``) only descends into
+    ``_OFFER_CONTAINER_TYPES``. This pass closes the gap.
+
+    Distinguishing-fields guard mirrors pass 2: require ≥2 distinct prices
+    OR ≥2 distinct names so a single Offer replicated across the doc
+    doesn't masquerade as multiple units.
+    """
+    offers: list[dict[str, Any]] = []
+
+    def _walk(node: Any) -> None:
+        if isinstance(node, dict):
+            t = node.get("@type")
+            t_list: list[str] = []
+            if isinstance(t, str):
+                t_list = [t]
+            elif isinstance(t, list):
+                t_list = [x for x in t if isinstance(x, str)]
+            # Bare Offer nodes (single-typed) — collect, don't recurse into
+            # their fields (Offer's children are scalar attributes, not
+            # nested unit data).
+            if t_list == ["Offer"]:
+                offers.append(node)
+                return
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                _walk(v)
+
+    _walk(data)
+    if len(offers) < 2:
+        return []
+
+    prices: set[str] = set()
+    names: set[str] = set()
+    for o in offers:
+        for pk in ("price", "lowPrice", "highPrice"):
+            v = o.get(pk)
+            if v not in (None, ""):
+                prices.add(str(v))
+        n = o.get("name")
+        if n:
+            names.add(str(n))
+    if len(prices) < 2 and len(names) < 2:
+        return []
+
+    units: list[dict[str, Any]] = []
+    for o in offers:
+        u = _build_unit_from_offer(o, "", source_url)
+        if u:
+            units.append(u)
+    return units
+
+
 def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]:
     """Extract unit records from ``<script type="application/ld+json">`` blocks.
 
@@ -444,6 +506,16 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
     if not units:
         for data in parsed_blocks:
             units.extend(_extract_offers_as_units(data, source_url))
+
+    # Pass 3 (Bug 4, 2026-05-09): standalone Offer arrays — bare ``Offer``
+    # nodes that are siblings of ``Brand``/``PostalAddress``/etc., or nested
+    # inside non-listed containers like ``Brand``. Closes the gscapts.com /
+    # Jonah Systems / Knock CMS gap where Offers are present but neither
+    # Pass 1 nor Pass 2 emits them. Same distinguishing-fields guard as
+    # Pass 2 prevents single-offer-replicated arrays from inflating counts.
+    if not units:
+        for data in parsed_blocks:
+            units.extend(_extract_standalone_offers(data, source_url))
 
     return units
 
@@ -885,16 +957,64 @@ def extract_units_from_dom(
     return [], "none"
 
 
+def _select_one_text(node: Any, selector: str | None) -> str:
+    """Pick the first matching child element's text under ``node``.
+
+    Returns "" on missing selector / no match / parse error so callers
+    can ``or``-chain a regex fallback.
+    """
+    if not selector:
+        return ""
+    try:
+        match = node.select_one(selector)
+    except Exception:
+        return ""
+    if match is None:
+        return ""
+    try:
+        text = match.get_text(" ", strip=True)
+    except Exception:
+        return ""
+    return text or ""
+
+
+def _select_all_text(node: Any, selector: str | None) -> list[str]:
+    """Return text of every match under ``node``. Used for
+    multi-element selectors (amenities lists, concession callouts)."""
+    if not selector:
+        return []
+    try:
+        matches = node.select(selector)
+    except Exception:
+        return []
+    out: list[str] = []
+    for m in matches:
+        try:
+            t = m.get_text(" ", strip=True)
+        except Exception:
+            continue
+        if t:
+            out.append(t)
+    return out
+
+
 def extract_with_hints(
     html: str,
     source_url: str,
     hints: Any,
 ) -> list[dict[str, Any]]:
-    """Phase 8 — hint-only DOM extraction.
+    """Phase 8 — hint-driven DOM extraction.
 
-    Honors ``hints.container`` (and optional rent / sqft / bedrooms / etc.
-    selectors). Returns ``[]`` if container doesn't match. Does NOT fall
-    back to the default cascade — callers can chain.
+    Honors ``hints.container`` (required) plus per-field selectors when
+    set. For every field whose selector is present AND matches, the
+    selector's value wins; otherwise the regex extraction over the
+    container's full text fills the gap. This means hints that only set
+    ``container`` still work (back-compat — preserves the
+    ``test_dom_hints_wiring.py`` contract), while richer hints that
+    nominate per-field selectors get deterministic per-field routing.
+
+    Returns ``[]`` when container doesn't match. Does NOT fall back to
+    the default cascade — callers can chain.
     """
     if not html or hints is None:
         return []
@@ -914,15 +1034,90 @@ def extract_with_hints(
         return []
     if not nodes or len(nodes) > 200:
         return []
+
+    # Optional per-field selectors. Anything absent or unmatched falls
+    # through to the regex extraction over the container's text.
+    sel_unit_id = getattr(hints, "unit_id", None)
+    sel_floor_plan = getattr(hints, "floor_plan_name", None)
+    sel_rent = getattr(hints, "rent", None)
+    sel_sqft = getattr(hints, "sqft", None)
+    sel_beds = getattr(hints, "bedrooms", None)
+    sel_baths = getattr(hints, "bathrooms", None)
+    sel_avail_date = getattr(hints, "availability_date", None)
+    sel_avail_status = getattr(hints, "availability_status", None)
+    sel_amenities = getattr(hints, "amenities", None)
+    sel_concession = getattr(hints, "concession", None)
+
     units: list[dict[str, Any]] = []
     seen: set[str] = set()
     for node in nodes:
         text = node.get_text(" ", strip=True)
         if len(text) < 10 or len(text) > 3000:
             continue
+        # Regex-derived baseline (every existing field)
         unit = _container_yields_unit(text)
         if unit is None:
             continue
+
+        # Per-field selector overrides — only override when the
+        # selector matched. An empty selector match leaves the regex
+        # value alone so a partially-broken hint set degrades
+        # gracefully rather than wiping out otherwise-valid units.
+        if (v := _select_one_text(node, sel_unit_id)):
+            unit["unit_number"] = v
+        if (v := _select_one_text(node, sel_floor_plan)):
+            unit["floor_plan_name"] = v
+        if (v := _select_one_text(node, sel_rent)):
+            # Re-parse the matched text for rent integers — the LLM may
+            # nominate a wrapper that contains "$1,500/mo" rather than
+            # the bare number, and we want consistent rent_low/high.
+            rent_ints = [r for r in (_rent_to_int(x) for x in _RENT_PATTERN.findall(v)) if r is not None]
+            if rent_ints:
+                lo, hi = min(rent_ints), max(rent_ints)
+                unit["rent_range"] = f"{lo}-{hi}" if hi > lo else str(lo)
+                unit["market_rent_low"] = lo
+                unit["market_rent_high"] = hi
+        if (v := _select_one_text(node, sel_sqft)):
+            m = _SQFT_PATTERN.search(v)
+            if m:
+                unit["sqft"] = m.group(1)
+        if (v := _select_one_text(node, sel_beds)):
+            m = _BEDS_PATTERN.search(v)
+            if m:
+                unit["bedrooms"] = m.group(1)
+        if (v := _select_one_text(node, sel_baths)):
+            m = _BATHS_PATTERN.search(v)
+            if m:
+                unit["bathrooms"] = m.group(1)
+        if (v := _select_one_text(node, sel_avail_date)):
+            unit["availability_date"] = v
+        if (v := _select_one_text(node, sel_avail_status)):
+            # Normalise to the existing enum surface used by schema_v2.
+            up = v.strip().upper()
+            if up in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "UNKNOWN"):
+                unit["availability_status"] = up
+
+        # Amenities: list selector → list of strings. Falls through
+        # to None when no selector / no matches; the existing regex
+        # path doesn't surface amenities at all so this is purely
+        # additive.
+        amen_items = _select_all_text(node, sel_amenities)
+        if amen_items:
+            # If a single match contained a comma-separated list,
+            # split it. If multiple elements matched, take them as-is.
+            if len(amen_items) == 1 and "," in amen_items[0]:
+                amen_items = [x.strip() for x in amen_items[0].split(",") if x.strip()]
+            unit["amenities"] = amen_items
+
+        # Concession: the strikethrough rent or banner text. Stamp
+        # ``concession_source="strikethrough_dom"`` since that matches
+        # the V2 enum the prompt and schema agree on for DOM-derived
+        # concessions.
+        conc_text = _select_one_text(node, sel_concession)
+        if conc_text:
+            unit["concession_text"] = conc_text
+            unit["concession_source"] = "strikethrough_dom"
+
         unit["source_api_url"] = f"dom_hints:{container_sel}"
         unit["_source_url"] = source_url
         dedup = unit["unit_number"] or f"{unit['rent_range']}|{unit['sqft']}|{unit['bedrooms']}"
