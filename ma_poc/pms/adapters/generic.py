@@ -1739,12 +1739,21 @@ class GenericAdapter:
                     # ``save_llm_field_mapping`` needs) from the broader
                     # hints envelope. The other keys flow through the
                     # aggregator above.
+                    #
+                    # PR 1 (2026-05-10): gate on ``api_url_pattern`` rather
+                    # than ``json_paths``. Producer (llm_extractor) now
+                    # always sets api_url_pattern when units were
+                    # extracted; the persistence layer
+                    # (save_llm_field_mapping) gates degraded persistence
+                    # on its own flag. Surfacing-site empty-paths gate
+                    # used to drop 38 of 41 daily LLM-API winners before
+                    # they could ever be persisted.
                     mapping_subset: dict[str, Any] = {}
                     if isinstance(api_hints, dict):
                         for k in ("api_url_pattern", "json_paths", "response_envelope"):
                             if k in api_hints:
                                 mapping_subset[k] = api_hints[k]
-                    if mapping_subset.get("json_paths"):
+                    if mapping_subset.get("api_url_pattern"):
                         llm_field_mappings.append(mapping_subset)
                         llm_analysis_results[url] = mapping_subset
                         if not result.api_responses:

@@ -550,15 +550,28 @@ async def analyze_api_with_llm(
     # through the adapter into ``_llm_hints`` so profile_updater can
     # persist them — these used to be silently discarded because the
     # second tuple element was a mapping-only dict.
+    #
+    # PR 1 (2026-05-10): always populate ``api_url_pattern`` when units
+    # were extracted, regardless of whether the LLM articulated
+    # ``json_paths``. Without this, the persistence layer never sees
+    # ``api_url_pattern`` (the classifier requires it for kind="mapping")
+    # and 38 of 41 daily LLM-API winners silently lose their mapping. The
+    # downstream surfacing site (generic.py) and persistence layer
+    # (profile_updater.save_llm_field_mapping) accept degraded mappings
+    # behind ENABLE_DEGRADED_MAPPING_PERSIST so the cascade has a URL to
+    # try even when the per-field paths weren't articulated.
     json_paths = parsed.get("json_paths", {})
     response_envelope = parsed.get("response_envelope", "")
-    hints: dict[str, Any] = {}
-    if isinstance(json_paths, dict) and json_paths:
-        hints["api_url_pattern"] = api_url
-        hints["json_paths"] = json_paths
-        hints["response_envelope"] = (
-            response_envelope if isinstance(response_envelope, str) else ""
-        )
+    if not isinstance(json_paths, dict):
+        json_paths = {}
+    if not isinstance(response_envelope, str):
+        response_envelope = ""
+
+    hints: dict[str, Any] = {
+        "api_url_pattern": api_url,
+        "json_paths": json_paths,
+        "response_envelope": response_envelope,
+    }
 
     hints.update(_ancillary_signals(parsed))
 

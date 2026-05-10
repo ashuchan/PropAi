@@ -26,3 +26,21 @@ ENABLE_UNLOCKER_TIER: Final[bool] = (
     ENABLE_TIER_ESCALATION
     and os.environ.get("ENABLE_UNLOCKER_TIER", "false").lower() == "true"
 )
+
+
+def enable_degraded_mapping_persist() -> bool:
+    """PR 1 (2026-05-10): degraded LlmFieldMapping persistence kill switch.
+
+    When True (default), `save_llm_field_mapping` persists mappings that
+    have a non-empty ``response_envelope`` even when ``json_paths`` is
+    empty (LLM extracted units via semantic understanding without
+    articulating per-field paths). Replay on these is a no-op (the cascade
+    falls through to other tiers), but the URL itself is now known to the
+    profile and can be prioritised by the cascade — and the entry is the
+    foundation for an offline LLM-pass that fills in ``json_paths`` later.
+
+    Read each call (not at import) so a flip via env var doesn't require
+    a process restart — the next ``save_llm_field_mapping`` call sees
+    the new value.
+    """
+    return os.environ.get("ENABLE_DEGRADED_MAPPING_PERSIST", "true").lower() == "true"

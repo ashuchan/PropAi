@@ -270,6 +270,18 @@ async def run_jugnu(
     # dev with DATA_PROVIDER unset still gets the FS store, same as before.
     profile_store = _build_profile_store(_MA_POC_ROOT / "config" / "profiles")
 
+    # PR 1 (2026-05-10): Persistence sentinel probe. Verifies that every
+    # writeable channel of the self-learning loop round-trips through the
+    # store before the runner processes any property. On failure: emit
+    # STARTUP_PROBE_FAILED and re-raise so the runner exits non-zero (the
+    # shard's PG sync is gated on runner exit code in shard_entry.py and
+    # so won't poison the DB with the output of a half-broken run). Toggle
+    # via ENABLE_PERSISTENCE_PROBE=false (default true).
+    from services.profile_persistence_probe import run_sentinel_probe
+    run_sentinel_probe(
+        profile_store.backing if hasattr(profile_store, "backing") else profile_store
+    )
+
     scheduler = Scheduler(
         frontier=frontier,
         dlq=dlq,
@@ -667,7 +679,24 @@ async def _process_property(
             if hasattr(profile_store, "save"):
                 profile_store.save(profile)
         except Exception as exc:
-            log.debug("profile update failed for %s: %s", task.property_id, exc)
+            # PR 1 (2026-05-10): elevate to log.warning so production logs
+            # surface silent persistence regressions, and emit a structured
+            # event so the daily analyser's named-fix table counts them.
+            # Previously at log.debug — invisible in production INFO logs.
+            log.warning(
+                "profile update failed for %s: %s",
+                task.property_id, exc, exc_info=True,
+            )
+            try:
+                from ma_poc.observability.events import EventKind, emit
+                emit(
+                    EventKind.PROFILE_UPDATE_FAILED,
+                    task.property_id or "unknown",
+                    error=str(exc)[:200],
+                    error_type=type(exc).__name__,
+                )
+            except Exception:
+                pass
 
     # L4: Validate
     extract_result = result.get("_extract_result")

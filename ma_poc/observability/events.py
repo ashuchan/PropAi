@@ -109,6 +109,17 @@ class EventKind(StrEnum):
     FIELD_PATCH_HIT = "field_patch.hit"
     FIELD_PATCH_DRIFT = "field_patch.drift"
     FIELD_PATCH_EVICTED = "field_patch.evicted"
+    # PR 1 (2026-05-10) — persistence-channel telemetry. The 2026-05-09 → 2026-05-10
+    # regression made the writer-side drops invisible: 125+ daily LLM-API extractions
+    # produced mappings that never reached the DB (3 rows total across 5,054 profiles)
+    # because three coordinated guards on empty json_paths short-circuited at the
+    # producer, the surfacing site, and the persistence call. Without these counters
+    # the next instance of the same shape — a writer that runs but never writes — is
+    # visible only after a manual DB query.
+    MAPPING_SAVE_DROPPED = "mapping.save_dropped"
+    PROFILE_UPDATE_FAILED = "profile.update_failed"
+    STARTUP_PROBE_FAILED = "startup.probe_failed"
+    STARTUP_PROBE_OK = "startup.probe_ok"
     # Phase 5 / 9
     IDENTITY_FUZZY_LINK = "identity.fuzzy_link"
     PLANNER_DECISION = "planner.decision"

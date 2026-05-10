@@ -28,6 +28,19 @@ from ma_poc.services.profile_store import ProfileStore
 
 log = logging.getLogger(__name__)
 
+
+def _emit_mapping_save_dropped(canonical_id: str, reason: str) -> None:
+    """Emit MAPPING_SAVE_DROPPED so the daily analyser surfaces persistence drops.
+
+    Never raises. Lazy-imports the events module so test contexts that
+    don't initialise the ledger don't fail at import time.
+    """
+    try:
+        from ma_poc.observability.events import EventKind, emit
+        emit(EventKind.MAPPING_SAVE_DROPPED, canonical_id or "unknown", reason=reason)
+    except Exception:
+        pass
+
 # Tier name → tier number mapping
 _TIER_MAP: dict[str, int] = {
     "TIER_1_API": 1,
@@ -137,25 +150,63 @@ def save_llm_field_mapping(
     Fix 3: when multi_source=True (multiple API endpoints contributed to the
     total unit count), skip per-endpoint self-validation since expected_unit_count
     is not attributable to any single endpoint.
+
+    PR 1 (2026-05-10): degraded persistence. When ``json_paths`` is empty
+    BUT ``response_envelope`` is set, persist the mapping with
+    ``quality_score=0.5`` (instead of the prior silent drop) so the URL is
+    known to the profile for next-run prioritisation. Replay falls through
+    to the cascade. Wrapped behind ``ENABLE_DEGRADED_MAPPING_PERSIST``
+    (default on) for kill-switch ability if degraded mappings start
+    spamming the replay tier with empty-replay attempts.
+
+    On every drop, emit ``MAPPING_SAVE_DROPPED`` with the reason so the
+    daily analyser's named-fix table surfaces the count day 1.
     """
+    from ma_poc.config.feature_flags import enable_degraded_mapping_persist
+
     url_pattern = mapping_dict.get("api_url_pattern", "")
     json_paths = mapping_dict.get("json_paths") or {}
+    response_envelope = mapping_dict.get("response_envelope") or ""
+
     if not url_pattern:
         log.warning(
             "save_llm_field_mapping: dropped mapping with empty api_url_pattern (paths=%d)",
             len(json_paths),
         )
-        return False
-    if not json_paths:
-        log.warning(
-            "save_llm_field_mapping: dropped mapping with empty json_paths for url=%s",
-            url_pattern[:80],
-        )
+        _emit_mapping_save_dropped(profile.canonical_id, "empty_pattern")
         return False
 
+    is_degraded = not json_paths
+    if is_degraded and not response_envelope:
+        # Nothing learnable — drop. (Empty paths AND empty envelope means
+        # the LLM gave us back only an URL we already know.)
+        log.warning(
+            "save_llm_field_mapping: dropped mapping with empty paths AND envelope for url=%s",
+            url_pattern[:80],
+        )
+        _emit_mapping_save_dropped(profile.canonical_id, "empty_paths_and_envelope")
+        return False
+
+    if is_degraded and not enable_degraded_mapping_persist():
+        log.info(
+            "save_llm_field_mapping: dropped degraded mapping for url=%s (flag off)",
+            url_pattern[:80],
+        )
+        _emit_mapping_save_dropped(profile.canonical_id, "disabled_by_flag")
+        return False
+
+    if is_degraded:
+        log.info(
+            "save_llm_field_mapping: persisting degraded mapping (envelope-only) for %s",
+            url_pattern[:80],
+        )
+
     # Phase 10: self-validation (skipped when multi_source — count is not per-endpoint)
-    quality_score = 1.0
-    if not multi_source and body_for_validation is not None and expected_unit_count is not None and expected_unit_count > 0:
+    # Degraded mappings (no json_paths) cannot self-validate by definition (the replay
+    # would always produce 0 units), so we pin quality_score=0.5 and skip the Phase 10
+    # check rather than letting it demote a known-degraded mapping to its 0.4 floor.
+    quality_score = 0.5 if is_degraded else 1.0
+    if not is_degraded and not multi_source and body_for_validation is not None and expected_unit_count is not None and expected_unit_count > 0:
         try:
             from ma_poc.services.llm_extractor import apply_saved_mapping
             replayed = apply_saved_mapping(
@@ -177,6 +228,32 @@ def save_llm_field_mapping(
 
     for existing in profile.api_hints.llm_field_mappings:
         if existing.api_url_pattern == url_pattern:
+            # PR 1 (2026-05-10) self-review HIGH fix: don't let a degraded
+            # follow-up overwrite a previously-good mapping. If the
+            # existing entry has non-empty json_paths AND the new entry is
+            # degraded (json_paths empty), keep the existing fields and
+            # only refresh metadata. Otherwise overwrite with the new
+            # mapping as before.
+            existing_full = bool(existing.json_paths)
+            new_degraded = is_degraded
+            if existing_full and new_degraded:
+                # Preserve existing json_paths and quality. The new envelope
+                # may be different (rare — same URL, different shape) so
+                # accept it only if existing didn't have one.
+                if not existing.response_envelope and response_envelope:
+                    existing.response_envelope = response_envelope
+                if source_envelope_hash and not existing.source_envelope_hash:
+                    existing.source_envelope_hash = source_envelope_hash
+                # quality_score stays at the existing value — don't downgrade.
+                # Don't emit MAPPING_SAVE_DROPPED here: the call returns
+                # True (the existing better mapping is what we want to keep).
+                # Telemetry-wise this is a preservation win, not a drop.
+                log.info(
+                    "save_llm_field_mapping: upsert preserved existing full mapping for %s "
+                    "(new mapping was degraded, would have downgraded quality_score)",
+                    url_pattern[:80],
+                )
+                return True
             existing.json_paths = json_paths
             existing.response_envelope = mapping_dict.get("response_envelope", existing.response_envelope)
             if source_envelope_hash:
