@@ -1,0 +1,40 @@
+{
+  "Q4_channel_row_counts": [
+    {
+      "total_profiles": 5054,
+      "profiles_with_mappings": 3,
+      "profiles_with_patches": 0,
+      "profiles_with_blocked": 618,
+      "profiles_with_known": 739,
+      "profiles_with_dom_selectors": 1897,
+      "total_mapping_entries": 3,
+      "total_patch_entries": 0
+    }
+  ],
+  "Q5_recent_activity": [
+    {
+      "total_profiles": 5054,
+      "updated_last_24h": 0,
+      "updated_last_7d": 4982,
+      "bootstrapped_only": 3150,
+      "updated_by_llm": 1902,
+      "most_recent_update": "2026-05-09 04:46:10.557305",
+      "oldest_update": "2026-04-15 04:02:43.555135"
+    }
+  ],
+  "Q6_maturity_distribution": [
+    {
+      "maturity": "WARM",
+      "n": 3457
+    },
+    {
+      "maturity": "COLD",
+      "n": 1587
+    },
+    {
+      "maturity": "HOT",
+      "n": 10
+    }
+  ],
+  "Q7_top_replay_winners": []
+}

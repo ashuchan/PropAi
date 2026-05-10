@@ -70,11 +70,18 @@ def test_llm_cost_accumulates(store: ProfileStore) -> None:
 def test_save_mapping_rejects_empty_paths_with_log(
     store: ProfileStore, caplog: pytest.LogCaptureFixture
 ) -> None:
+    """PR 1 (2026-05-10): the rejection criterion is now "empty paths AND
+    empty envelope" (degraded mappings with envelope persist, see
+    test_pr1_degraded_mapping_persistence). Log message updated to match.
+    Behaviour for the no-paths-no-envelope case is unchanged: drop.
+    """
     p = ScrapeProfile(canonical_id="phase1-004")
     caplog.set_level(logging.WARNING, logger="services.profile_updater")
     ok = save_llm_field_mapping(p, {"api_url_pattern": "/api/x", "json_paths": {}})
     assert ok is False
-    assert any("empty json_paths" in rec.message for rec in caplog.records)
+    assert any(
+        "empty paths AND envelope" in rec.message for rec in caplog.records
+    )
     assert len(p.api_hints.llm_field_mappings) == 0
 
 

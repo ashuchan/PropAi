@@ -134,6 +134,23 @@ class RunStats:
     fetch_signatures: Counter = field(default_factory=Counter)
     failure_terminal_tiers: Counter = field(default_factory=Counter)
 
+    # PR 3 (2026-05-10) — Persistence health (self-learning loop SLO).
+    # Counted from events.jsonl across all shards. The dashboard section
+    # at the top of summary.md cross-references these against thresholds
+    # so writer-broken regressions surface day 1.
+    mapping_save_dropped: Counter = field(default_factory=Counter)  # reason → count
+    profile_update_failed: int = 0
+    startup_probe_ok: int = 0
+    startup_probe_failed: int = 0
+    profile_replay_hits: int = 0
+    profile_replay_miss_with_saved: int = 0
+    field_patch_hits: int = 0
+    field_patch_drift: int = 0
+    llm_gate_relaxed: int = 0
+    # Optional: populated when --check-db is passed and DB is reachable.
+    # Maps query name → list of result rows. None when DB check skipped.
+    db_persistence_health: dict[str, list[dict[str, Any]]] | None = None
+
 
 # ---------------------------------------------------------------------------
 # IO helpers
@@ -194,13 +211,30 @@ def load_json(path: Path) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 
-def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, Any] | None]:
-    """Return (per-property outcomes, run-summary dict-or-None) for a shard."""
+def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, Any] | None, dict[str, Any]]:
+    """Return (per-property outcomes, run-summary dict-or-None, persistence-health counters) for a shard.
+
+    PR 3 (2026-05-10): the third return value is a small dict aggregating the
+    self-learning-loop SLO events so ``aggregate_run`` can merge them into
+    ``RunStats``. The events themselves are property-scoped, but the dashboard
+    cares about run-wide totals.
+    """
     events = load_jsonl(shard_dir / "events.jsonl")
     issues = load_jsonl(shard_dir / "issues.jsonl")
     report = load_json(shard_dir / "report.json")
 
     outcomes: dict[str, PropertyOutcome] = {}
+    persistence_health: dict[str, Any] = {
+        "mapping_save_dropped": Counter(),  # reason → count
+        "profile_update_failed": 0,
+        "startup_probe_ok": 0,
+        "startup_probe_failed": 0,
+        "profile_replay_hits": 0,
+        "profile_replay_miss_with_saved": 0,
+        "field_patch_hits": 0,
+        "field_patch_drift": 0,
+        "llm_gate_relaxed": 0,
+    }
 
     def get(pid: str) -> PropertyOutcome:
         if pid not in outcomes:
@@ -208,11 +242,33 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
         return outcomes[pid]
 
     for ev in events:
+        kind = ev.get("kind")
+        # Persistence-health events are run-scoped (shard-level counters).
+        # Some don't even carry a property_id (startup events). Count them
+        # before the property-id gate below.
+        if kind == "mapping.save_dropped":
+            persistence_health["mapping_save_dropped"][ev.get("reason") or "unknown"] += 1
+        elif kind == "profile.update_failed":
+            persistence_health["profile_update_failed"] += 1
+        elif kind == "startup.probe_ok":
+            persistence_health["startup_probe_ok"] += 1
+        elif kind == "startup.probe_failed":
+            persistence_health["startup_probe_failed"] += 1
+        elif kind == "profile.replay_hit":
+            persistence_health["profile_replay_hits"] += 1
+        elif kind == "profile.replay_miss_with_saved":
+            persistence_health["profile_replay_miss_with_saved"] += 1
+        elif kind == "field_patch.hit":
+            persistence_health["field_patch_hits"] += 1
+        elif kind == "field_patch.drift":
+            persistence_health["field_patch_drift"] += 1
+        elif kind == "extract.llm_gate_relaxed":
+            persistence_health["llm_gate_relaxed"] += 1
+
         pid = str(ev.get("property_id") or "")
         if not pid:
             continue
         o = get(pid)
-        kind = ev.get("kind")
 
         if kind == "fetch.started":
             # First fetch_started is the initial entry-URL fetch.
@@ -264,7 +320,7 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
         if pid in outcomes and issue.get("code"):
             outcomes[pid].issue_codes.append(issue["code"])
 
-    return outcomes, report
+    return outcomes, report, persistence_health
 
 
 # ---------------------------------------------------------------------------
@@ -282,8 +338,19 @@ def aggregate_run(run_dir: Path, run_date: str, expected_shards: int = 20) -> tu
     all_outcomes: dict[str, PropertyOutcome] = {}
 
     for shard_dir in shard_dirs:
-        outcomes, report = parse_shard(shard_dir)
+        outcomes, report, persistence_health = parse_shard(shard_dir)
         all_outcomes.update(outcomes)
+        # Merge persistence-health counters across shards.
+        for reason, n in persistence_health["mapping_save_dropped"].items():
+            stats.mapping_save_dropped[reason] += n
+        stats.profile_update_failed += persistence_health["profile_update_failed"]
+        stats.startup_probe_ok += persistence_health["startup_probe_ok"]
+        stats.startup_probe_failed += persistence_health["startup_probe_failed"]
+        stats.profile_replay_hits += persistence_health["profile_replay_hits"]
+        stats.profile_replay_miss_with_saved += persistence_health["profile_replay_miss_with_saved"]
+        stats.field_patch_hits += persistence_health["field_patch_hits"]
+        stats.field_patch_drift += persistence_health["field_patch_drift"]
+        stats.llm_gate_relaxed += persistence_health["llm_gate_relaxed"]
         if report:
             totals = report.get("totals") or {}
             stats.properties_total += int(totals.get("properties") or 0)
@@ -388,6 +455,125 @@ def cluster_by_domain(failures: list[PropertyOutcome], top_n: int = 25) -> list[
 # ---------------------------------------------------------------------------
 
 
+# PR 3 (2026-05-10) — Persistence health SLO thresholds. Tuned for the
+# post-PR-1+2 baseline; revisit after Canary 1.
+#
+# - mapping_save_drop_rate (drops / (drops + replay_hits)) > 0.5 → ALERT
+# - profile_replay_hit_rate (hits / (hits + miss_with_saved)) < 0.3 → ALERT
+# - profile_update_failed > 100 → ALERT (silent persistence failures)
+# - startup_probe_failed > 0 → ALERT (deploy-time guard fired)
+SLO_MAPPING_SAVE_DROP_RATE_MAX = 0.5
+SLO_PROFILE_REPLAY_HIT_RATE_MIN = 0.3
+SLO_PROFILE_UPDATE_FAILED_MAX = 100
+SLO_STARTUP_PROBE_FAILED_MAX = 0
+
+
+def _slo_marker(ok: bool) -> str:
+    return "OK" if ok else "ALERT"
+
+
+def render_persistence_health_md(stats: RunStats) -> list[str]:
+    """Render the persistence-health SLO section.
+
+    Returns a list of markdown lines (caller appends to its accumulator).
+    Always renders, even when all counters are zero — a zero startup-probe
+    count when shards_seen > 0 is itself a signal (probe wasn't deployed
+    yet OR was disabled via env).
+    """
+    drops_total = sum(stats.mapping_save_dropped.values())
+    replay_total = stats.profile_replay_hits + stats.profile_replay_miss_with_saved
+    save_attempts = drops_total + stats.profile_replay_hits  # rough denominator
+    drop_rate = (drops_total / save_attempts) if save_attempts else 0.0
+    replay_hit_rate = (stats.profile_replay_hits / replay_total) if replay_total else 0.0
+
+    drop_ok = drop_rate <= SLO_MAPPING_SAVE_DROP_RATE_MAX
+    replay_ok = (
+        replay_hit_rate >= SLO_PROFILE_REPLAY_HIT_RATE_MIN
+        if replay_total > 0
+        else True  # no signal yet — don't alarm
+    )
+    update_ok = stats.profile_update_failed <= SLO_PROFILE_UPDATE_FAILED_MAX
+    probe_ok = stats.startup_probe_failed <= SLO_STARTUP_PROBE_FAILED_MAX
+
+    lines = [
+        "## Persistence health (self-learning loop SLO)",
+        "",
+        "Counted from per-shard `events.jsonl`. Cross-references the channel-by-channel "
+        "DB row counts in `scripts/diagnostics/profile_persistence_health.sql` (run via "
+        "`db_query.py`). When a row is **ALERT**, the runner is silently dropping or "
+        "the loop has regressed — page someone.",
+        "",
+        "| Metric | Today | Threshold | Status |",
+        "|---|---|---|---|",
+        f"| `MAPPING_SAVE_DROPPED` total | {drops_total} | — | — |",
+        f"| `mapping_save_drop_rate` | {drop_rate:.1%} | < {SLO_MAPPING_SAVE_DROP_RATE_MAX:.0%} | {_slo_marker(drop_ok)} |",
+        f"| `PROFILE_REPLAY_HIT` count | {stats.profile_replay_hits} | — | — |",
+        f"| `profile_replay_hit_rate` | {replay_hit_rate:.1%} | ≥ {SLO_PROFILE_REPLAY_HIT_RATE_MIN:.0%} | {_slo_marker(replay_ok)} |",
+        f"| `PROFILE_UPDATE_FAILED` count | {stats.profile_update_failed} | ≤ {SLO_PROFILE_UPDATE_FAILED_MAX} | {_slo_marker(update_ok)} |",
+        f"| `STARTUP_PROBE_OK` count | {stats.startup_probe_ok} | ≥ shards_seen | — |",
+        f"| `STARTUP_PROBE_FAILED` count | {stats.startup_probe_failed} | == 0 | {_slo_marker(probe_ok)} |",
+        f"| `FIELD_PATCH_HIT` count | {stats.field_patch_hits} | — | — |",
+        f"| `FIELD_PATCH_DRIFT` count | {stats.field_patch_drift} | — | — |",
+        f"| `LLM_GATE_RELAXED` count | {stats.llm_gate_relaxed} | — | — |",
+        "",
+    ]
+
+    # MAPPING_SAVE_DROPPED breakdown by reason (reason cardinality is small —
+    # 3 reasons today: empty_pattern, empty_paths_and_envelope, disabled_by_flag).
+    if stats.mapping_save_dropped:
+        lines += [
+            "### MAPPING_SAVE_DROPPED reasons",
+            "",
+            "| Reason | Count |",
+            "|---|---|",
+        ]
+        for reason, n in stats.mapping_save_dropped.most_common():
+            lines.append(f"| `{reason}` | {n} |")
+        lines.append("")
+
+    # DB section (only when --check-db was passed and the query succeeded)
+    if stats.db_persistence_health:
+        lines += [
+            "### DB row counts (Q4 channel asymmetry)",
+            "",
+            "Same query is at `scripts/diagnostics/profile_persistence_health.sql :: Q4_channel_row_counts`. "
+            "When two channels differ by >100x and they share `update_profile_after_extraction` "
+            "as their writer, a writer is broken — see `project_self_learning_loop_arch.md` for "
+            "the diagnostic discipline.",
+            "",
+        ]
+        for query_name, rows in stats.db_persistence_health.items():
+            if not rows:
+                continue
+            lines.append(f"#### {query_name}")
+            lines.append("")
+            cols = list(rows[0].keys())
+            lines.append("| " + " | ".join(cols) + " |")
+            lines.append("|" + "|".join("---" for _ in cols) + "|")
+            for r in rows:
+                lines.append("| " + " | ".join(str(r.get(c, "")) for c in cols) + " |")
+            lines.append("")
+
+    # Page the operator: any ALERT row gets a loud final note so it's
+    # impossible to miss when skimming the report.
+    alerts = []
+    if not drop_ok:
+        alerts.append(f"mapping_save_drop_rate {drop_rate:.1%} > {SLO_MAPPING_SAVE_DROP_RATE_MAX:.0%}")
+    if replay_total > 0 and not replay_ok:
+        alerts.append(f"profile_replay_hit_rate {replay_hit_rate:.1%} < {SLO_PROFILE_REPLAY_HIT_RATE_MIN:.0%}")
+    if not update_ok:
+        alerts.append(f"profile_update_failed {stats.profile_update_failed} > {SLO_PROFILE_UPDATE_FAILED_MAX}")
+    if not probe_ok:
+        alerts.append(f"startup_probe_failed {stats.startup_probe_failed} > 0 — RUNNER FAILED DEPLOY GUARD")
+    if alerts:
+        lines.append("> **🚨 PERSISTENCE-LOOP ALERT — page on-call.**")
+        for a in alerts:
+            lines.append(f"> - {a}")
+        lines.append("")
+
+    return lines
+
+
 def render_summary_md(stats: RunStats, outcomes: dict[str, PropertyOutcome]) -> str:
     failed = [o for o in outcomes.values() if o.failed]
     succeeded = [o for o in outcomes.values() if o.succeeded]
@@ -425,6 +611,11 @@ def render_summary_md(stats: RunStats, outcomes: dict[str, PropertyOutcome]) -> 
             f"> **Missing shards:** {', '.join(missing)}. Investigate dispatcher logs in `ma_poc/scripts/runners/dispatcher.py`.",
             "",
         ]
+
+    # PR 3 (2026-05-10): persistence-health SLO section. Goes near the top
+    # so a regression of the self-learning loop surfaces in the first
+    # screen of summary.md, not below 200 lines of failure tables.
+    lines += render_persistence_health_md(stats)
 
     lines += [
         "## Failure breakdown by terminal tier",
@@ -758,6 +949,21 @@ def write_outputs(
             for k, v in stats.fetch_signatures.items()
         ],
         "slo_breaches": stats.slo_breaches,
+        # PR 3 (2026-05-10): persistence-health metrics for downstream
+        # alerting / dashboards. Same numbers the markdown table renders;
+        # JSON form is the canonical machine-readable surface.
+        "persistence_health": {
+            "mapping_save_dropped": dict(stats.mapping_save_dropped),
+            "profile_update_failed": stats.profile_update_failed,
+            "startup_probe_ok": stats.startup_probe_ok,
+            "startup_probe_failed": stats.startup_probe_failed,
+            "profile_replay_hits": stats.profile_replay_hits,
+            "profile_replay_miss_with_saved": stats.profile_replay_miss_with_saved,
+            "field_patch_hits": stats.field_patch_hits,
+            "field_patch_drift": stats.field_patch_drift,
+            "llm_gate_relaxed": stats.llm_gate_relaxed,
+            "db": stats.db_persistence_health,
+        },
     }
     (out_dir / "summary.json").write_text(
         json.dumps(payload, indent=2), encoding="utf-8"
@@ -815,7 +1021,48 @@ def parse_args() -> argparse.Namespace:
         default=20,
         help="Expected shard count (for missing-shard detection)",
     )
+    p.add_argument(
+        "--check-db",
+        action="store_true",
+        help=(
+            "Run profile_persistence_health.sql against the live DB and "
+            "include results in the persistence-health section of summary.md. "
+            "Requires DATABASE_URL + cloud-sql-proxy reachable. Skipped "
+            "silently with a warning if the DB is unreachable."
+        ),
+    )
     return p.parse_args()
+
+
+def _maybe_attach_db_persistence_health(stats: RunStats) -> None:
+    """If db_query.py + DATABASE_URL are reachable, populate stats.db_persistence_health.
+
+    Best-effort. Any failure is logged to stderr and stats is left untouched —
+    the persistence-health section of summary.md will still render with the
+    event-side counters.
+    """
+    sql_path = REPO_ROOT / "scripts" / "diagnostics" / "profile_persistence_health.sql"
+    if not sql_path.exists():
+        print(f"[warn] --check-db: SQL file not found at {sql_path}; skipping DB section.", file=sys.stderr)
+        return
+    try:
+        # Sibling-import: the analyzer and db_query both live under
+        # scripts/diagnostics/, so importing as a sibling avoids the
+        # ma_poc.* prefix issue when the analyzer is invoked from inside
+        # ma_poc/ (where ma_poc isn't a package — it IS the cwd).
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        try:
+            from db_query import run_named  # type: ignore[import-not-found]
+        finally:
+            # Don't pollute sys.path beyond the import.
+            sys.path.pop(0)
+        # Only the channel-asymmetry query is small and fast enough for the
+        # daily report. Other queries in the file are for ad-hoc inspection
+        # via the standalone CLI.
+        results = run_named(sql_path, query_name="Q4_channel_row_counts")
+        stats.db_persistence_health = results
+    except Exception as exc:
+        print(f"[warn] --check-db: DB query failed ({type(exc).__name__}: {exc}); skipping DB section.", file=sys.stderr)
 
 
 def main() -> int:
@@ -830,6 +1077,8 @@ def main() -> int:
         local_mirror_root=local_root,
         expected_shards=args.expected_shards,
     )
+    if args.check_db:
+        _maybe_attach_db_persistence_health(stats)
 
     comparison = None
     if args.compare_date:

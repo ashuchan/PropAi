@@ -311,10 +311,15 @@ def test_a6_migration_dry_run_does_not_write(tmp_path: Path) -> None:
 
 # ── Import standardisation: no bare imports in targeted files ─────────────────
 
+# Source root resolved from this file's location, not from the runner's
+# CWD — the same test must pass when invoked from PropAi/ or from ma_poc/.
+_MA_POC_ROOT = Path(__file__).resolve().parents[2]
+
+
 def test_a_no_bare_imports_in_generic() -> None:
     """generic.py must not have bare 'from models.' or 'from services.' imports."""
     import re
-    text = Path("ma_poc/pms/adapters/generic.py").read_text(encoding="utf-8")
+    text = (_MA_POC_ROOT / "pms" / "adapters" / "generic.py").read_text(encoding="utf-8")
     bare = re.findall(r"^\s*from\s+(models|services)\.", text, re.MULTILINE)
     assert not bare, f"bare imports found in generic.py: {bare}"
 
@@ -322,6 +327,6 @@ def test_a_no_bare_imports_in_generic() -> None:
 def test_a_no_bare_imports_in_scraper() -> None:
     """scraper.py must not have bare 'from models.' or 'from services.' imports."""
     import re
-    text = Path("ma_poc/pms/scraper.py").read_text(encoding="utf-8")
+    text = (_MA_POC_ROOT / "pms" / "scraper.py").read_text(encoding="utf-8")
     bare = re.findall(r"^\s*from\s+(models|services)\.", text, re.MULTILINE)
     assert not bare, f"bare imports found in scraper.py: {bare}"

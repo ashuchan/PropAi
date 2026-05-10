@@ -10,6 +10,7 @@ Phase: claude-scrapper-arch.md Step 3.1
 from __future__ import annotations
 
 import logging
+import re
 import urllib.parse
 from datetime import datetime
 from typing import Any
@@ -27,6 +28,188 @@ from ma_poc.models.scrape_profile import (
 from ma_poc.services.profile_store import ProfileStore
 
 log = logging.getLogger(__name__)
+
+
+# ── DOM-hint quality thresholds ────────────────────────────────────────────
+# Single source of truth for the 0.4 / 0.8 / 0.05 magic numbers that wire
+# together (a) the LLM_DOM save-time self-validation gate in
+# pms/adapters/generic, (b) the replay-time admission gate also in
+# generic, (c) the quality-tiered eviction policy below, and (d) the
+# promote-on-hit increment.
+#
+# These four numbers form a contract — changing any one in isolation
+# silently breaks one of the policies. Constants here are the
+# authoritative values; both modules read them.
+
+# Below this, the replay matcher refuses the saved hint AND the save
+# site (with the degraded-persist flag off) drops the hint.
+DOM_HINT_QUALITY_REPLAY_FLOOR = 0.4
+
+# At/above this, eviction uses the 3-strike resilience policy (transient
+# misses don't destroy a validated hint). Below it, eviction is 1-strike.
+# Mirror of the comment at pms/adapters/generic.py:1867
+# ("ratio >= 0.8 → high quality, persist as-is").
+DOM_HINT_QUALITY_RESILIENT_FLOOR = 0.8
+
+# Bump applied to quality_score on every successful replay hit.
+# 0.05 means a degraded save (starts at 0.4) graduates to the resilient
+# tier (0.8) after exactly 8 hits.
+DOM_HINT_QUALITY_PROMOTE_STEP = 0.05
+
+# Maximum quality (saturation point of promote-on-hit).
+DOM_HINT_QUALITY_MAX = 1.0
+
+
+# PR 2 (2026-05-10) Gap 3 — shared JSONPath normaliser + walker.
+#
+# Pre-PR: writer (save_field_patch) stripped only the leading "$." prefix;
+# reader (_apply_field_patches::_get_path in generic.py) walked dot-segments
+# and could only resolve numeric tokens as list indices. Bracket-notation
+# paths the LLM canonically emits — `$.units[*].pricing.amount`,
+# `units[0].rent` — became unresolvable strings the reader silently failed
+# on. Saved patches stayed in the DB but never replayed.
+#
+# Post-PR: both writer and reader call _normalize_json_path, which converts
+# all path styles to a single canonical token list. _walk_json_path
+# resolves it, including [N] (numeric index) and [*] (each-element).
+#
+# Sentinel for wildcard. Using a private object so user-supplied strings
+# can't collide with it. Comparison is identity-only.
+_JSON_PATH_WILDCARD = object()
+
+# Token-extracting regex: matches either "name" or "[123]" or "[*]".
+# JSONPath grammar in the wild also has `..descendant`, filters, and
+# slicing — none of which the LLM emits and none of which the existing
+# replay layer needs. We deliberately keep this narrow.
+_JSON_PATH_TOKEN_RE = re.compile(r"([^.\[\]]+)|\[(\*|\d+)\]")
+
+
+def _normalize_json_path(path: str) -> list[Any]:
+    """Convert a JSONPath string to a token list of (str | int | sentinel).
+
+    Accepted inputs (all canonicalise to the same token list when equivalent):
+      ``$.units[*].rent`` → ``["units", _WILDCARD, "rent"]``
+      ``$.units[0].rent`` → ``["units", 0, "rent"]``
+      ``units[0].rent``   → ``["units", 0, "rent"]``
+      ``units.0.rent``    → ``["units", 0, "rent"]``  (legacy dot-only form)
+      ``uuid``            → ``["uuid"]``
+      ``""`` / ``None``   → ``[]``
+
+    Idempotent: call on a path that's already been processed and you get
+    the same list back as the path string. Re-call on the resulting list
+    and you get the same list (after string-rejoining and re-parsing).
+    """
+    if not path:
+        return []
+    s = path.strip().lstrip("$").lstrip(".")
+    if not s:
+        return []
+    tokens: list[Any] = []
+    for m in _JSON_PATH_TOKEN_RE.finditer(s):
+        name, bracket = m.group(1), m.group(2)
+        if name is not None:
+            # A bare numeric segment in dot notation is a list index too.
+            if name.isdigit():
+                tokens.append(int(name))
+            else:
+                tokens.append(name)
+        elif bracket is not None:
+            if bracket == "*":
+                tokens.append(_JSON_PATH_WILDCARD)
+            else:
+                tokens.append(int(bracket))
+    return tokens
+
+
+def _walk_json_path(obj: Any, tokens: list[Any]) -> Any:
+    """Resolve a normalised path token list against a JSON-shaped value.
+
+    Returns:
+      - The scalar / object / list at the path, OR
+      - When a ``_JSON_PATH_WILDCARD`` token is encountered against a list,
+        recurses for each element with the remaining tokens and returns a
+        flat ``list`` of resolved values (None entries dropped).
+      - ``None`` if any traversal step finds nothing.
+    """
+    if obj is None:
+        return None
+    if not tokens:
+        return obj
+    head, rest = tokens[0], tokens[1:]
+    if head is _JSON_PATH_WILDCARD:
+        if not isinstance(obj, list):
+            return None
+        out = []
+        for item in obj:
+            v = _walk_json_path(item, rest)
+            if v is not None:
+                out.append(v)
+        return out
+    if isinstance(head, int):
+        if not isinstance(obj, list):
+            return None
+        if head < 0 or head >= len(obj):
+            return None
+        return _walk_json_path(obj[head], rest)
+    # head is a string (dict key)
+    if isinstance(obj, dict):
+        return _walk_json_path(obj.get(head), rest)
+    return None
+
+
+def normalize_url_pattern(url: str) -> str:
+    """Reduce a URL to the stable substring used for replay matching.
+
+    PR 5 (2026-05-10): the replay matcher in ``pms.adapters.generic``
+    does ``saved_pattern in incoming_url``, so any drift in query params,
+    fragments, or scheme/case between runs makes the cache miss.
+    Normalising both sides to ``host/path`` (lowercase host, no scheme,
+    no query, no fragment) lets the substring compare survive rotated
+    api_keys, session tokens, and timestamp params — which is what the
+    Sweetwater FL profile saw in production (api_key rotation broke
+    every replay attempt).
+
+    Pre-existing un-normalised stored patterns continue to match because
+    the matcher normalises the saved pattern at read time too — the
+    full URL collapses to the same ``host/path`` form.
+
+    Returns the input unchanged when normalisation would lose
+    information (empty string, no path).
+    """
+    if not url:
+        return ""
+    raw = url.strip()
+    # If the input lacks a scheme, urlparse won't extract a host. Synthesise
+    # one so the parse is consistent — but remember to drop it on output if
+    # it was synthesised (caller didn't ask for one).
+    had_scheme = "://" in raw
+    try:
+        parsed = urllib.parse.urlparse(raw if had_scheme else "https://" + raw)
+    except Exception:
+        return raw
+    host = (parsed.hostname or "").lower()
+    # urllib.parse.urlparse keeps the port separately; drop it (replay
+    # treats default and explicit-default as the same endpoint).
+    path = parsed.path or ""
+    if not host and not path:
+        return raw
+    if not host:
+        # Path-only inputs ("/api/units") collapse to the path only.
+        return path
+    return f"{host}{path}"
+
+
+def _emit_mapping_save_dropped(canonical_id: str, reason: str) -> None:
+    """Emit MAPPING_SAVE_DROPPED so the daily analyser surfaces persistence drops.
+
+    Never raises. Lazy-imports the events module so test contexts that
+    don't initialise the ledger don't fail at import time.
+    """
+    try:
+        from ma_poc.observability.events import EventKind, emit
+        emit(EventKind.MAPPING_SAVE_DROPPED, canonical_id or "unknown", reason=reason)
+    except Exception:
+        pass
 
 # Tier name → tier number mapping
 _TIER_MAP: dict[str, int] = {
@@ -137,25 +320,66 @@ def save_llm_field_mapping(
     Fix 3: when multi_source=True (multiple API endpoints contributed to the
     total unit count), skip per-endpoint self-validation since expected_unit_count
     is not attributable to any single endpoint.
+
+    PR 1 (2026-05-10): degraded persistence. When ``json_paths`` is empty
+    BUT ``response_envelope`` is set, persist the mapping with
+    ``quality_score=0.5`` (instead of the prior silent drop) so the URL is
+    known to the profile for next-run prioritisation. Replay falls through
+    to the cascade. Wrapped behind ``ENABLE_DEGRADED_MAPPING_PERSIST``
+    (default on) for kill-switch ability if degraded mappings start
+    spamming the replay tier with empty-replay attempts.
+
+    On every drop, emit ``MAPPING_SAVE_DROPPED`` with the reason so the
+    daily analyser's named-fix table surfaces the count day 1.
     """
-    url_pattern = mapping_dict.get("api_url_pattern", "")
+    from ma_poc.config.feature_flags import enable_degraded_mapping_persist
+
+    # PR 5 (2026-05-10): normalise URL at write time so the matcher's
+    # substring compare survives query-param drift between runs.
+    raw_url = mapping_dict.get("api_url_pattern", "")
+    url_pattern = normalize_url_pattern(raw_url)
     json_paths = mapping_dict.get("json_paths") or {}
+    response_envelope = mapping_dict.get("response_envelope") or ""
+
     if not url_pattern:
         log.warning(
             "save_llm_field_mapping: dropped mapping with empty api_url_pattern (paths=%d)",
             len(json_paths),
         )
-        return False
-    if not json_paths:
-        log.warning(
-            "save_llm_field_mapping: dropped mapping with empty json_paths for url=%s",
-            url_pattern[:80],
-        )
+        _emit_mapping_save_dropped(profile.canonical_id, "empty_pattern")
         return False
 
+    is_degraded = not json_paths
+    if is_degraded and not response_envelope:
+        # Nothing learnable — drop. (Empty paths AND empty envelope means
+        # the LLM gave us back only an URL we already know.)
+        log.warning(
+            "save_llm_field_mapping: dropped mapping with empty paths AND envelope for url=%s",
+            url_pattern[:80],
+        )
+        _emit_mapping_save_dropped(profile.canonical_id, "empty_paths_and_envelope")
+        return False
+
+    if is_degraded and not enable_degraded_mapping_persist():
+        log.info(
+            "save_llm_field_mapping: dropped degraded mapping for url=%s (flag off)",
+            url_pattern[:80],
+        )
+        _emit_mapping_save_dropped(profile.canonical_id, "disabled_by_flag")
+        return False
+
+    if is_degraded:
+        log.info(
+            "save_llm_field_mapping: persisting degraded mapping (envelope-only) for %s",
+            url_pattern[:80],
+        )
+
     # Phase 10: self-validation (skipped when multi_source — count is not per-endpoint)
-    quality_score = 1.0
-    if not multi_source and body_for_validation is not None and expected_unit_count is not None and expected_unit_count > 0:
+    # Degraded mappings (no json_paths) cannot self-validate by definition (the replay
+    # would always produce 0 units), so we pin quality_score=0.5 and skip the Phase 10
+    # check rather than letting it demote a known-degraded mapping to its 0.4 floor.
+    quality_score = 0.5 if is_degraded else 1.0
+    if not is_degraded and not multi_source and body_for_validation is not None and expected_unit_count is not None and expected_unit_count > 0:
         try:
             from ma_poc.services.llm_extractor import apply_saved_mapping
             replayed = apply_saved_mapping(
@@ -168,15 +392,48 @@ def save_llm_field_mapping(
         except Exception:
             replayed = []
         ratio = len(replayed) / expected_unit_count
-        if ratio < 0.8:
-            quality_score = max(0.4, ratio)
+        if ratio < DOM_HINT_QUALITY_RESILIENT_FLOOR:
+            quality_score = max(DOM_HINT_QUALITY_REPLAY_FLOOR, ratio)
             log.warning(
                 "Mapping for %s saved at quality_score=%.2f (replay produced %d/%d units)",
                 url_pattern[:80], quality_score, len(replayed), expected_unit_count,
             )
 
     for existing in profile.api_hints.llm_field_mappings:
-        if existing.api_url_pattern == url_pattern:
+        # PR 5 (2026-05-10): existing entry may have been stored pre-PR-5
+        # with a raw URL. Normalise both sides of the equality check so the
+        # upsert correctly collapses old + new entries for the same endpoint.
+        # On match, also REWRITE existing.api_url_pattern to the normalised
+        # form so subsequent saves and the matcher see the canonical key.
+        if normalize_url_pattern(existing.api_url_pattern) == url_pattern:
+            if existing.api_url_pattern != url_pattern:
+                existing.api_url_pattern = url_pattern
+            # PR 1 (2026-05-10) self-review HIGH fix: don't let a degraded
+            # follow-up overwrite a previously-good mapping. If the
+            # existing entry has non-empty json_paths AND the new entry is
+            # degraded (json_paths empty), keep the existing fields and
+            # only refresh metadata. Otherwise overwrite with the new
+            # mapping as before.
+            existing_full = bool(existing.json_paths)
+            new_degraded = is_degraded
+            if existing_full and new_degraded:
+                # Preserve existing json_paths and quality. The new envelope
+                # may be different (rare — same URL, different shape) so
+                # accept it only if existing didn't have one.
+                if not existing.response_envelope and response_envelope:
+                    existing.response_envelope = response_envelope
+                if source_envelope_hash and not existing.source_envelope_hash:
+                    existing.source_envelope_hash = source_envelope_hash
+                # quality_score stays at the existing value — don't downgrade.
+                # Don't emit MAPPING_SAVE_DROPPED here: the call returns
+                # True (the existing better mapping is what we want to keep).
+                # Telemetry-wise this is a preservation win, not a drop.
+                log.info(
+                    "save_llm_field_mapping: upsert preserved existing full mapping for %s "
+                    "(new mapping was degraded, would have downgraded quality_score)",
+                    url_pattern[:80],
+                )
+                return True
             existing.json_paths = json_paths
             existing.response_envelope = mapping_dict.get("response_envelope", existing.response_envelope)
             if source_envelope_hash:
@@ -211,7 +468,16 @@ def save_field_patch(profile: ScrapeProfile, patch_dict: dict) -> bool:
         if not url or not field_name:
             log.warning("save_field_patch: dropped url=%s field=%s", url[:60], field_name)
             return False
-        json_path = (patch_dict.get("json_path", "") or "").lstrip("$").lstrip(".")
+        # PR 2 (2026-05-10) Gap 3: store the canonicalised path string (no "$." prefix,
+        # bracket notation preserved) so the reader's _walk_json_path can resolve it
+        # via _normalize_json_path. Pre-PR did only ``lstrip("$").lstrip(".")`` which
+        # left "units[*].rent" alone — fine for the writer, but the reader's
+        # dot-only walker silently failed on the bracket. Now both sides parse
+        # through the same helper.
+        raw_path = patch_dict.get("json_path", "") or ""
+        # Preserve the canonical string form (whatever the LLM emitted) but
+        # strip the "$." prefix once so we don't double-prefix on round trips.
+        json_path = raw_path.strip().lstrip("$").lstrip(".")
         for existing in profile.api_hints.field_patches:
             if existing.api_url_pattern == url and existing.field_name == field_name:
                 existing.json_path = json_path or existing.json_path
@@ -437,14 +703,34 @@ def update_profile_after_extraction(
         # next run can prioritise the same URL without re-paying for
         # the LLM diagnostic. Existing entries refresh in place; we
         # keep the most recent 10 (validator caps).
+        #
+        # PR 7 (2026-05-10): also merge ``scrape_result["_llm_navigation_hints"]``
+        # — the LIST captured by ``_merge_hint_extras`` across every LLM
+        # sub-tier in this run. The singular ``llm_hints["navigation_hint"]``
+        # is overwritten by the latest tier; the list preserves all hints.
+        # Without this, when LLM_DOM emits ``/floorplans`` and the monolithic
+        # tier emits ``/availability`` only the latest one persists, and
+        # the next run only retries ``/availability``.
+        nav_candidates: list[str] = []
         nav_hint_str = llm_hints.get("navigation_hint")
         if isinstance(nav_hint_str, str) and nav_hint_str.strip():
-            existing_navs = list(profile.navigation.last_navigation_hints or [])
-            cleaned = nav_hint_str.strip()
+            nav_candidates.append(nav_hint_str.strip())
+    else:
+        nav_candidates = []
+
+    raw_nav_list = scrape_result.get("_llm_navigation_hints") or []
+    if isinstance(raw_nav_list, list):
+        for v in raw_nav_list:
+            if isinstance(v, str) and v.strip():
+                nav_candidates.append(v.strip())
+
+    if nav_candidates:
+        existing_navs = list(profile.navigation.last_navigation_hints or [])
+        for cleaned in nav_candidates:
             if cleaned in existing_navs:
                 existing_navs.remove(cleaned)
             existing_navs.append(cleaned)
-            profile.navigation.last_navigation_hints = existing_navs[-10:]
+        profile.navigation.last_navigation_hints = existing_navs[-10:]
 
     # ── Property-level amenities (Bug 2.1) ───────────────────────────
     # Surfaced from any LLM tier via ``result["property_amenities"]``
@@ -568,9 +854,36 @@ def update_profile_after_extraction(
             save_field_patch(profile, patch_dict)
 
     # Phase 8: DOM hints miss tracking + eviction
+    #
+    # PR 8 (2026-05-10): quality-tiered eviction threshold.
+    #   - Validated selectors (quality >= 0.8): 3-strike resilience —
+    #     transient page issues shouldn't prematurely lose a hint that
+    #     proved itself.
+    #   - Soft selectors (quality < 0.8 — incl. PR 6's degraded saves at
+    #     quality=0.4): 1-strike. They already failed self-validation OR
+    #     were labelled "flaky" by the adapter; the first miss is the
+    #     second strike. Cutting losses faster avoids 2 more days of
+    #     wasted DOM cascade attempts before eviction.
     if scrape_result.get("_dom_hints_attempted"):
         if scrape_result.get("_dom_hints_hit"):
             profile.dom_hints.consecutive_misses = 0
+            # PR 9 sub-2 (2026-05-10): promote-on-hint. Bump
+            # field_selectors_quality by +0.05 (clamped at 1.0) so PR-6
+            # degraded DOM saves at 0.4 can rise to 1.0 after consistent
+            # replay success. Combined with PR 8's tiered eviction, a
+            # degraded selector that proves itself moves into the 3-strike
+            # bucket once it crosses 0.8.
+            try:
+                from ma_poc.config.feature_flags import enable_promote_on_hint
+                if enable_promote_on_hint():
+                    cur_q = float(getattr(profile.dom_hints, "field_selectors_quality", DOM_HINT_QUALITY_MAX) or DOM_HINT_QUALITY_MAX)
+                    # round(.., 2) avoids float drift (see DOM_HINT_QUALITY_PROMOTE_STEP comment)
+                    profile.dom_hints.field_selectors_quality = min(
+                        DOM_HINT_QUALITY_MAX,
+                        round(cur_q + DOM_HINT_QUALITY_PROMOTE_STEP, 2),
+                    )
+            except Exception:
+                pass
         else:
             profile.dom_hints.consecutive_misses = getattr(
                 profile.dom_hints, "consecutive_misses", 0
@@ -584,16 +897,28 @@ def update_profile_after_extraction(
                 )
             except Exception:
                 pass
-            if profile.dom_hints.consecutive_misses >= 3:
+            fs_quality = float(
+                getattr(profile.dom_hints, "field_selectors_quality", DOM_HINT_QUALITY_MAX) or DOM_HINT_QUALITY_MAX
+            )
+            eviction_threshold = 3 if fs_quality >= DOM_HINT_QUALITY_RESILIENT_FLOOR else 1
+            if profile.dom_hints.consecutive_misses >= eviction_threshold:
                 log.info(
-                    "Evicting DOM field selectors for %s after 3 consecutive misses",
+                    "Evicting DOM field selectors for %s after %d miss(es) (quality=%.2f, threshold=%d)",
                     profile.canonical_id,
+                    profile.dom_hints.consecutive_misses,
+                    fs_quality,
+                    eviction_threshold,
                 )
                 profile.dom_hints.field_selectors = FieldSelectorMap()
                 profile.dom_hints.consecutive_misses = 0
                 try:
                     from ma_poc.observability.events import EventKind, emit
-                    emit(EventKind.DOM_HINTS_EVICTED, profile.canonical_id)
+                    emit(
+                        EventKind.DOM_HINTS_EVICTED,
+                        profile.canonical_id,
+                        threshold=eviction_threshold,
+                        quality=round(fs_quality, 3),
+                    )
                 except Exception:
                     pass
 

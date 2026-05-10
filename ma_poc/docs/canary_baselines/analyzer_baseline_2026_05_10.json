@@ -1,0 +1,351 @@
+{
+  "run_date": "2026-05-10",
+  "shards_seen": [
+    "shard_0",
+    "shard_1",
+    "shard_2",
+    "shard_3",
+    "shard_4",
+    "shard_5",
+    "shard_6",
+    "shard_7",
+    "shard_8",
+    "shard_9",
+    "shard_10",
+    "shard_11",
+    "shard_12",
+    "shard_13",
+    "shard_14",
+    "shard_15",
+    "shard_16",
+    "shard_17",
+    "shard_18",
+    "shard_19"
+  ],
+  "totals": {
+    "properties": 4982,
+    "succeeded": 3830,
+    "failed_no_data": 1031,
+    "failed_unreachable": 113,
+    "failed_other": 8,
+    "success_rate_pct": 76.88
+  },
+  "llm_cost_total": 21.682446,
+  "tier_distribution": {
+    "TIER_3_DOM": 1377,
+    "TIER_1_API": 929,
+    "TIER_MERGED_CROSS_PAGE": 860,
+    "TIER_4_LLM": 348,
+    "TIER_4_LLM_DOM": 336,
+    "TIER_1_API_ENTRATA": 332,
+    "TIER_4_LLM_API": 37,
+    "TIER_1_API_APPFOLIO": 52,
+    "TIER_1_API_ONESITE": 93,
+    "TIER_1_API_SIGHTMAP": 286,
+    "TIER_1_API_RENTCAFE": 48,
+    "SYNDICATION_ONLY_WIX": 11,
+    "TIER_1_API_AVALONBAY": 22,
+    "TIER_2_JSONLD": 16,
+    "LLM_GATE_NO_BODY": 43,
+    "TIER_1_API_APPFOLIO_LLM_RESCUE": 17,
+    "TIER_1_5_EMBEDDED": 22,
+    "TIER_1_API_ENTRATA_LLM_RESCUE": 3,
+    "SYNDICATION_ONLY_SQUARESPACE": 18,
+    "FAILED": 8,
+    "TIER_1_DOM_APPFOLIO_SSR": 3,
+    "TIER_1_API_LLM_RESCUE": 3,
+    "TIER_1_API_AMLI_NEXT_DATA": 4,
+    "TIER_1_PROFILE_MAPPING": 1
+  },
+  "failure_terminal_tiers": {
+    "TIER_1_API_APPFOLIO": 32,
+    "TIER_1_API": 648,
+    "SYNDICATION_ONLY_WIX": 11,
+    "TIER_1_API_ENTRATA": 245,
+    "TIER_1_API_ONESITE": 45,
+    "__no_extraction__": 113,
+    "LLM_GATE_NO_BODY": 28,
+    "SYNDICATION_ONLY_SQUARESPACE": 18,
+    "TIER_1_API_AMLI_NEXT_DATA": 4
+  },
+  "fetch_signatures": [
+    {
+      "outcome": "OK",
+      "signature": "",
+      "count": 4861
+    },
+    {
+      "outcome": "TRANSIENT",
+      "signature": "Error",
+      "count": 28
+    },
+    {
+      "outcome": "BOT_BLOCKED",
+      "signature": "CF_CHALLENGE",
+      "count": 24
+    },
+    {
+      "outcome": "RATE_LIMITED",
+      "signature": "HTTP_429",
+      "count": 28
+    },
+    {
+      "outcome": "BOT_BLOCKED",
+      "signature": "HTTP_403",
+      "count": 10
+    },
+    {
+      "outcome": "HARD_FAIL",
+      "signature": "HTTP_404",
+      "count": 7
+    },
+    {
+      "outcome": "BOT_BLOCKED",
+      "signature": "BOT_BLOCKED",
+      "count": 4
+    },
+    {
+      "outcome": "OK",
+      "signature": "TIMEOUT_SALVAGED",
+      "count": 7
+    },
+    {
+      "outcome": "TRANSIENT",
+      "signature": "timeout",
+      "count": 8
+    },
+    {
+      "outcome": "HARD_FAIL",
+      "signature": "HTTP_401",
+      "count": 1
+    },
+    {
+      "outcome": "TRANSIENT",
+      "signature": "HTTP_500",
+      "count": 1
+    },
+    {
+      "outcome": "HARD_FAIL",
+      "signature": "HTTP_409",
+      "count": 1
+    }
+  ],
+  "slo_breaches": [
+    {
+      "shard": "shard_0",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.82
+    },
+    {
+      "shard": "shard_0",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.1075
+    },
+    {
+      "shard": "shard_1",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.768
+    },
+    {
+      "shard": "shard_1",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.2561
+    },
+    {
+      "shard": "shard_2",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.732
+    },
+    {
+      "shard": "shard_2",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.0821
+    },
+    {
+      "shard": "shard_3",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.784
+    },
+    {
+      "shard": "shard_4",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.752
+    },
+    {
+      "shard": "shard_5",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.776
+    },
+    {
+      "shard": "shard_5",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.0331
+    },
+    {
+      "shard": "shard_6",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.648
+    },
+    {
+      "shard": "shard_6",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.0921
+    },
+    {
+      "shard": "shard_7",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.82
+    },
+    {
+      "shard": "shard_8",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.808
+    },
+    {
+      "shard": "shard_8",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.1109
+    },
+    {
+      "shard": "shard_9",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.8
+    },
+    {
+      "shard": "shard_10",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.804
+    },
+    {
+      "shard": "shard_10",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.3274
+    },
+    {
+      "shard": "shard_11",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.784
+    },
+    {
+      "shard": "shard_11",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.1657
+    },
+    {
+      "shard": "shard_12",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.796
+    },
+    {
+      "shard": "shard_12",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.1472
+    },
+    {
+      "shard": "shard_13",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.76
+    },
+    {
+      "shard": "shard_13",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.0111
+    },
+    {
+      "shard": "shard_14",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.752
+    },
+    {
+      "shard": "shard_14",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.2059
+    },
+    {
+      "shard": "shard_15",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.784
+    },
+    {
+      "shard": "shard_16",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.732
+    },
+    {
+      "shard": "shard_16",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.049
+    },
+    {
+      "shard": "shard_17",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.74
+    },
+    {
+      "shard": "shard_17",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.2579
+    },
+    {
+      "shard": "shard_18",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.78
+    },
+    {
+      "shard": "shard_19",
+      "name": "success_rate",
+      "threshold": 0.95,
+      "observed": 0.7328
+    },
+    {
+      "shard": "shard_19",
+      "name": "llm_cost_per_run",
+      "threshold": 1.0,
+      "observed": 1.1108
+    }
+  ],
+  "persistence_health": {
+    "mapping_save_dropped": {},
+    "profile_update_failed": 0,
+    "startup_probe_ok": 0,
+    "startup_probe_failed": 0,
+    "profile_replay_hits": 1,
+    "profile_replay_miss_with_saved": 3,
+    "field_patch_hits": 0,
+    "field_patch_drift": 0,
+    "llm_gate_relaxed": 0,
+    "db": null
+  }
+}

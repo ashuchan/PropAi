@@ -270,6 +270,18 @@ async def run_jugnu(
     # dev with DATA_PROVIDER unset still gets the FS store, same as before.
     profile_store = _build_profile_store(_MA_POC_ROOT / "config" / "profiles")
 
+    # PR 1 (2026-05-10): Persistence sentinel probe. Verifies that every
+    # writeable channel of the self-learning loop round-trips through the
+    # store before the runner processes any property. On failure: emit
+    # STARTUP_PROBE_FAILED and re-raise so the runner exits non-zero (the
+    # shard's PG sync is gated on runner exit code in shard_entry.py and
+    # so won't poison the DB with the output of a half-broken run). Toggle
+    # via ENABLE_PERSISTENCE_PROBE=false (default true).
+    from services.profile_persistence_probe import run_sentinel_probe
+    run_sentinel_probe(
+        profile_store.backing if hasattr(profile_store, "backing") else profile_store
+    )
+
     scheduler = Scheduler(
         frontier=frontier,
         dlq=dlq,
@@ -319,20 +331,16 @@ async def run_jugnu(
                     csv_row=csv_row,
                     run_dir=run_dir,
                     state_store=run_state_store,
+                    schema_version=schema_version,
                 ),
                 timeout=PER_PROPERTY_TIMEOUT_SECONDS,
             )
-            formatted = _format_output(result, csv_row, schema_version)
-            # F2: Null Field Recovery — runs on v2 units with null rent_low
-            # / unit_id produced by Tier-1 adapters. Applies high-confidence
-            # recoveries in place on the unit dicts.
-            if schema_version == "v2":
-                await _run_null_field_recovery(
-                    result,
-                    formatted,
-                    run_dir,
-                    task.property_id,
-                )
+            # PR 2 (2026-05-10): null-field recovery now runs INSIDE
+            # _process_property (before the profile-update step) so
+            # recovered FieldPatch entries reach the persistence layer.
+            # Reuse the formatted dict produced there if present; otherwise
+            # build it now for the report-writing path below.
+            formatted = result.get("_v2_formatted") or _format_output(result, csv_row, schema_version)
             # Per-property report — same format as daily_runner emits, but
             # sourced from jugnu's raw scrape_result + formatted v1/v2 record
             # so v2 metadata (apartment_id/pmc/website_design/concessions)
@@ -501,6 +509,7 @@ async def _process_property(
     csv_row: dict[str, Any] | None = None,
     run_dir: Path | None = None,
     state_store: Any | None = None,
+    schema_version: str = "v1",
 ) -> dict[str, Any]:
     """Process a single property through L1-L4.
 
@@ -664,10 +673,61 @@ async def _process_property(
             drift_detected, reasons = detect_drift(profile, units_extracted, result)
             if drift_detected:
                 profile = apply_drift_demotion(profile, reasons)
+
+            # PR 2 (2026-05-10): Channel 4 — null-field-recovery + FieldPatch
+            # persistence. Before this PR, recovery ran in the OUTER
+            # _process_one AFTER the profile was already saved here, so
+            # recovered patches never reached the persistence layer.
+            # Hoisting the recovery here populates result["_field_patches"]
+            # in time for save_field_patch below. Calling save_field_patch
+            # directly (not a second update_profile_after_extraction pass)
+            # avoids double-incrementing consecutive_successes / maturity.
+            if schema_version == "v2":
+                try:
+                    formatted_for_recovery = _format_output(result, csv_row or {}, schema_version)
+                    await _run_null_field_recovery(
+                        result,
+                        formatted_for_recovery,
+                        run_dir,
+                        task.property_id,
+                    )
+                    # Stash so the outer _process_one reuses it for the
+                    # property report instead of re-running _format_output
+                    # (saves ~1ms × 5,000 properties / day).
+                    result["_v2_formatted"] = formatted_for_recovery
+
+                    # Persist patches surfaced by the recovery.
+                    from services.profile_updater import save_field_patch
+                    for patch_dict in result.get("_field_patches", []) or []:
+                        if isinstance(patch_dict, dict):
+                            save_field_patch(profile, patch_dict)
+                except Exception as exc:
+                    log.warning(
+                        "F2 null_field_recovery hoist failed for %s: %s",
+                        task.property_id, exc, exc_info=True,
+                    )
+
             if hasattr(profile_store, "save"):
                 profile_store.save(profile)
         except Exception as exc:
-            log.debug("profile update failed for %s: %s", task.property_id, exc)
+            # PR 1 (2026-05-10): elevate to log.warning so production logs
+            # surface silent persistence regressions, and emit a structured
+            # event so the daily analyser's named-fix table counts them.
+            # Previously at log.debug — invisible in production INFO logs.
+            log.warning(
+                "profile update failed for %s: %s",
+                task.property_id, exc, exc_info=True,
+            )
+            try:
+                from ma_poc.observability.events import EventKind, emit
+                emit(
+                    EventKind.PROFILE_UPDATE_FAILED,
+                    task.property_id or "unknown",
+                    error=str(exc)[:200],
+                    error_type=type(exc).__name__,
+                )
+            except Exception:
+                pass
 
     # L4: Validate
     extract_result = result.get("_extract_result")
@@ -1247,6 +1307,23 @@ def _url_pattern_from(url: str) -> str:
         return url
 
 
+def _f2_has_recoverable_body(raw_apis: list[dict[str, Any]]) -> bool:
+    """PR 9 sub-3 (2026-05-10): True if at least one raw_api has a
+    non-empty dict or list body. Empty dicts, None bodies, or
+    error-shaped responses do NOT contain recoverable fields, so F2
+    should skip them rather than burning LLM cost on hopeless cases.
+    """
+    for entry in raw_apis or []:
+        if not isinstance(entry, dict):
+            continue
+        body = entry.get("body")
+        if isinstance(body, dict) and body:
+            return True
+        if isinstance(body, list) and body:
+            return True
+    return False
+
+
 async def _run_null_field_recovery(
     scrape_result: dict[str, Any],
     formatted: dict[str, Any],
@@ -1275,6 +1352,32 @@ async def _run_null_field_recovery(
         units = formatted.get("units") or []
         null_units = [u for u in units if u.get("rent_low") is None or u.get("unit_id") is None]
         if not null_units:
+            return
+
+        # PR 9 sub-3 (2026-05-10): tighten F2 precondition. raw_apis being
+        # non-empty doesn't mean any API has data — could be all error
+        # responses or empty bodies. Skip if no raw_api has a non-empty
+        # dict/list body.
+        if not _f2_has_recoverable_body(raw_apis):
+            log.info(
+                "F2 skipped for %s: no raw_api has a non-empty body",
+                canonical_id,
+            )
+            return
+
+        # PR 9 sub-3: when EVERY unit has BOTH rent_low AND unit_id null,
+        # this is parser-tier failure (no fields identified at all), not
+        # field-level recovery territory. F2 won't help.
+        all_units_total_null = bool(units) and all(
+            u.get("rent_low") is None and u.get("unit_id") is None
+            for u in units
+        )
+        if all_units_total_null:
+            log.info(
+                "F2 skipped for %s: every unit has rent_low AND unit_id null "
+                "(parser-tier failure, not field-recovery)",
+                canonical_id,
+            )
             return
 
         from ma_poc.services.llm_diagnostics import (

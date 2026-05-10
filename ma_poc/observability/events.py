@@ -97,6 +97,12 @@ class EventKind(StrEnum):
     MAPPING_EVICTED = "mapping.evicted"
     DOM_HINTS_MISS = "dom_hints.miss"
     DOM_HINTS_EVICTED = "dom_hints.evicted"
+    # PR 6 (2026-05-10): emitted when self-validation < 0.4 but the
+    # ENABLE_DEGRADED_DOM_PERSIST flag let the selectors save anyway.
+    # Pair with DOM_HINTS_MISS counts to track how much the loosened gate
+    # contributes — and to spot regressions where the flag accidentally
+    # flips off (DEGRADED_SAVED → 0 while MISS spikes).
+    DOM_HINTS_DEGRADED_SAVED = "dom_hints.degraded_saved"
     # LLM-tax avoidance signal — emitted from generic.py's profile_replay
     # sub-tier whenever a property reached a tier without paying for an
     # LLM call. Pair with MAPPING_REPLAY_EMPTY / DOM_HINTS_MISS to compute
@@ -109,6 +115,17 @@ class EventKind(StrEnum):
     FIELD_PATCH_HIT = "field_patch.hit"
     FIELD_PATCH_DRIFT = "field_patch.drift"
     FIELD_PATCH_EVICTED = "field_patch.evicted"
+    # PR 1 (2026-05-10) — persistence-channel telemetry. The 2026-05-09 → 2026-05-10
+    # regression made the writer-side drops invisible: 125+ daily LLM-API extractions
+    # produced mappings that never reached the DB (3 rows total across 5,054 profiles)
+    # because three coordinated guards on empty json_paths short-circuited at the
+    # producer, the surfacing site, and the persistence call. Without these counters
+    # the next instance of the same shape — a writer that runs but never writes — is
+    # visible only after a manual DB query.
+    MAPPING_SAVE_DROPPED = "mapping.save_dropped"
+    PROFILE_UPDATE_FAILED = "profile.update_failed"
+    STARTUP_PROBE_FAILED = "startup.probe_failed"
+    STARTUP_PROBE_OK = "startup.probe_ok"
     # Phase 5 / 9
     IDENTITY_FUZZY_LINK = "identity.fuzzy_link"
     PLANNER_DECISION = "planner.decision"
