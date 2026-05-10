@@ -136,6 +136,7 @@ async def run_jugnu(
     start_index: int = 0,
     shard_index: int | None = None,
     shard_count: int | None = None,
+    force_scrape: bool = False,
 ) -> dict[str, Any]:
     """Run the Jugnu integrated pipeline.
 
@@ -160,6 +161,9 @@ async def run_jugnu(
         shard_count: Total number of shards. When set with ``shard_index``,
             replaces the legacy "download CSV → slice → exec --csv" pattern
             in jugnu_shard_entry.py.
+        force_scrape: When True, bypass change-detection for every property
+            and always issue a full RENDER task. Intended for canary replays
+            and per-property forensics; do not set in production shards.
 
     Returns:
         Run summary dict.
@@ -292,7 +296,7 @@ async def run_jugnu(
 
     # Build tasks
     tasks: list[CrawlTask] = []
-    async for task in scheduler.build_tasks(rows):
+    async for task in scheduler.build_tasks(rows, force_scrape=force_scrape):
         tasks.append(task)
     log.info("Scheduled %d tasks", len(tasks))
 
@@ -2078,6 +2082,16 @@ def main() -> int:
         default=None,
         help="Output schema version (default: env SCHEMA_VERSION or v1)",
     )
+    parser.add_argument(
+        "--force-scrape",
+        action="store_true",
+        default=False,
+        help=(
+            "Bypass change-detection for every property; always issue a full "
+            "RENDER task. Intended for canary replays and per-property forensics. "
+            "Do not use in production shards."
+        ),
+    )
     args = parser.parse_args()
 
     if (args.shard_index is None) != (args.shard_count is None):
@@ -2095,6 +2109,7 @@ def main() -> int:
             start_index=args.start_index,
             shard_index=args.shard_index,
             shard_count=args.shard_count,
+            force_scrape=args.force_scrape,
         )
     )
 

@@ -1,0 +1,11 @@
+property_id,shard,domain,url,verdict,terminal_tier,pms_detected,adapter_selected,fetch_outcome,fetch_error_signature,fetch_status,body_bytes,units,captcha_detected,bot_blocked,llm_rescue_attempted,llm_rescue_succeeded,llm_cost,link_hops_attempted,link_hops_recovered,issue_codes,final_url
+20001,shard_0,profile-apts.com,https://profile-apts.com/floorplans,SUCCESS,TIER_1_PROFILE_MAPPING,unknown,GenericAdapter,OK,,200,38400,12,False,False,False,False,0.0,0,0,,https://profile-apts.com/floorplans
+20002,shard_1,api-narrow-apts.com,https://api-narrow-apts.com/units,SUCCESS,TIER_2_API_NARROW,unknown,GenericAdapter,OK,,200,54200,8,False,False,False,False,0.0,1,0,,https://api-narrow-apts.com/units
+20003,shard_2,entrata-broad.com,https://entrata-broad.com/availability,SUCCESS,TIER_2_API_BROAD,entrata,EntrataAdapter,OK,,200,71800,24,False,False,False,False,0.0,0,0,,https://entrata-broad.com/availability
+20004,shard_3,jsonld-apts.com,https://jsonld-apts.com/apartments,SUCCESS,TIER_3_JSON_LD,unknown,GenericAdapter,OK,,200,29100,6,False,False,False,False,0.0,0,0,,https://jsonld-apts.com/apartments
+20005,shard_0,rentcafe-dom.com,https://rentcafe-dom.com/floorplans,SUCCESS,TIER_3_DOM_SCAN,rentcafe,RentCafeAdapter,OK,,200,66500,15,False,False,False,False,0.0,1,1,,https://rentcafe-dom.com/floorplans
+20006,shard_1,llm-api-apts.com,https://llm-api-apts.com/units,SUCCESS,TIER_4_LLM_API,unknown,GenericAdapter,OK,,200,47300,10,False,False,True,True,0.00350,2,0,,https://llm-api-apts.com/units
+20007,shard_2,entrata-llm.com,https://entrata-llm.com/floor-plans,SUCCESS,TIER_4_LLM_DOM,entrata,EntrataAdapter,OK,,200,83600,7,False,False,True,True,0.00520,0,0,,https://entrata-llm.com/floor-plans
+20008,shard_3,carry-fwd-apts.com,https://carry-fwd-apts.com/availability,CARRY_FORWARD,TIER_2_API_NARROW,unknown,GenericAdapter,HARD_FAIL,connection_timeout,,0,8,False,False,False,False,0.0,0,0,,
+20009,shard_0,appfolio-apts.com,https://appfolio-apts.com/listings,SUCCESS,TIER_2_API_BROAD,appfolio,AppFolioAdapter,OK,,200,59400,18,False,False,False,False,0.0,1,0,,https://appfolio-apts.com/listings
+20010,shard_1,broad-dom-unknown.com,https://broad-dom-unknown.com/units,SUCCESS,TIER_3_DOM_SCAN,unknown,GenericAdapter,OK,,200,41200,9,False,False,False,False,0.0,0,0,,https://broad-dom-unknown.com/units

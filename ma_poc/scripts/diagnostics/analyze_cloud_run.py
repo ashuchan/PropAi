@@ -719,7 +719,54 @@ def render_summary_md(stats: RunStats, outcomes: dict[str, PropertyOutcome]) -> 
     return "\n".join(lines) + "\n"
 
 
-def render_failures_csv(outcomes: dict[str, PropertyOutcome], out_path: Path) -> None:
+def render_successes_csv(outcomes: dict[str, PropertyOutcome], out_path: Path) -> None:
+    """Write one row per SUCCESS/CARRY_FORWARD property for the canary regression basket.
+
+    Schema mirrors failures.csv with the addition of a ``units`` column so the
+    canary report can show cloud_units for regression-sentinel properties.
+    """
+    _SUCCESS_VERDICTS = {"SUCCESS", "CARRY_FORWARD"}
+    rows = []
+    for o in outcomes.values():
+        if o.verdict not in _SUCCESS_VERDICTS:
+            continue
+        rows.append({
+            "property_id": o.property_id,
+            "shard": o.shard,
+            "domain": o.domain or "",
+            "url": o.url or "",
+            "verdict": o.verdict or "",
+            "terminal_tier": o.terminal_tier or "",
+            "pms_detected": o.pms_detected or "",
+            "adapter_selected": o.adapter_selected or "",
+            "fetch_outcome": o.fetch_outcome or "",
+            "fetch_error_signature": o.fetch_error_signature or "",
+            "fetch_status": o.fetch_status or "",
+            "body_bytes": o.body_bytes or 0,
+            "units": o.units,
+            "captcha_detected": o.captcha_detected,
+            "bot_blocked": o.bot_blocked,
+            "llm_rescue_attempted": o.llm_rescue_attempted,
+            "llm_rescue_succeeded": o.llm_rescue_succeeded,
+            "llm_cost": round(o.llm_cost, 5),
+            "link_hops_attempted": o.link_hops_attempted,
+            "link_hops_recovered": o.link_hops_recovered,
+            "issue_codes": "|".join(o.issue_codes),
+            "final_url": o.final_url or "",
+        })
+    rows.sort(key=lambda r: (r["terminal_tier"], r["pms_detected"], r["property_id"]))
+
+    if not rows:
+        out_path.write_text("", encoding="utf-8")
+        return
+
+    with out_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+
     rows = []
     for o in outcomes.values():
         if not o.failed:
@@ -928,6 +975,7 @@ def write_outputs(
         render_summary_md(stats, outcomes), encoding="utf-8"
     )
     render_failures_csv(outcomes, out_dir / "failures.csv")
+    render_successes_csv(outcomes, out_dir / "successes.csv")
 
     # Stable JSON for downstream automation / future deltas.
     payload = {
