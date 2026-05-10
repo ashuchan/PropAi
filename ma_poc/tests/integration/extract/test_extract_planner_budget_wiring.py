@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import pathlib
 import pytest
+
+_MA_POC = pathlib.Path(__file__).resolve().parent.parent.parent.parent  # ma_poc/
+_GENERIC = _MA_POC / "pms" / "adapters" / "generic.py"
+_SCRAPER = _MA_POC / "pms" / "scraper.py"
 
 from ma_poc.models.scrape_profile import ProfileMaturity, ScrapeProfile
 from ma_poc.services.source_planner import compute_budget
@@ -171,8 +176,8 @@ def test_h3_budget_zero_llm_targeted_prevents_api_llm_tier() -> None:
     """When llm_targeted budget is 0, api_llm_budget in cascade must be 0."""
     # Verifies that ctx.budget flows into the api_llm_budget variable.
     # We inspect the source rather than running the full async cascade.
-    import ast, pathlib
-    src = pathlib.Path("ma_poc/pms/adapters/generic.py").read_text()
+    import ast
+    src = _GENERIC.read_text()
     assert "ctx.budget" in src or "_budget.get(" in src, (
         "generic.py must read budget from ctx, not use hardcoded values"
     )
@@ -186,13 +191,11 @@ def test_h3_budget_zero_llm_targeted_prevents_api_llm_tier() -> None:
 
 def test_h3_scraper_contains_compute_budget_call() -> None:
     """scraper.py must call compute_budget(."""
-    import pathlib
-    src = pathlib.Path("ma_poc/pms/scraper.py").read_text()
+    src = _SCRAPER.read_text()
     assert "compute_budget(" in src, "scraper.py must call compute_budget("
 
 
 def test_h3_generic_contains_plan_next_action_call() -> None:
     """generic.py must call plan_next_action(."""
-    import pathlib
-    src = pathlib.Path("ma_poc/pms/adapters/generic.py").read_text()
+    src = _GENERIC.read_text()
     assert "plan_next_action(" in src, "generic.py must call plan_next_action("
