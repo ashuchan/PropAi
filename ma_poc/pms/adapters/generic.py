@@ -128,6 +128,17 @@ def _is_non_data_response(resp: dict[str, Any]) -> bool:
     url_lower = (resp.get("url") or "").lower().split("?")[0]
     return any(url_lower.endswith(sfx) for sfx in _NON_DATA_URL_SUFFIXES)
 
+
+# Phase 1: module-level singleton for SourceQualifier (R1-H1 fix).
+# Instantiated once at import time so the api_narrow loop doesn't
+# re-create a new SourceQualifier on every extract() call.
+# Uses a try/except so import failure degrades gracefully to legacy path.
+try:
+    from ma_poc.pms.signal_engine.defaults import create_default_qualifier as _create_sq
+    _source_qualifier = _create_sq()
+except Exception:
+    _source_qualifier = None  # type: ignore[assignment]
+
 # Broader rent-shaped pattern: matches rent values that don't lead with $.
 # Examples: "Starting at 1,500", "1,500/mo", "from $1500/month", "1500 - 2000",
 # "Rent: 1500", "Lease: $1,500/month". Used as a SECONDARY signal in
@@ -1246,16 +1257,48 @@ class GenericAdapter:
                     pass
 
         # Sub-tier 1: narrow generic API parser -----------------------------
+        # Phase 1: SourceQualifier runs alongside _has_unit_signals().
+        # A signal passes if EITHER the existing check OR the qualifier
+        # accepts it. This opens the door for RentCafe unit-level responses
+        # (RC2) which have no keys in _UNIT_SIGNAL_KEYS but match the
+        # rentcafe_unit FieldCombination. has_unit_signals() is preserved
+        # in _merge_fns.py — it continues to serve merge/dedup contexts.
+        # _source_qualifier is a module-level singleton (R1-H1 fix).
         t0 = _time.monotonic()
         for resp in api_responses:
             body = resp.get("body")
             items = _find_unit_list(body)
-            if items and _has_unit_signals(items):
-                url = resp.get("url", "")
-                units = parse_generic_api(items, url)
-                if units:
-                    all_units.extend(units)
-                    result.api_responses.append(resp)
+            if not items:
+                continue
+            url = resp.get("url", "")
+            # Primary gate: existing has_unit_signals check (unchanged).
+            _legacy_pass = _has_unit_signals(items)
+            # Secondary gate: SourceQualifier — catches additional combinations
+            # (RentCafe unit-level, SightMap, floor-plan physical) that the
+            # legacy check misses because it only knows _UNIT_SIGNAL_KEYS.
+            _qualifier_pass = False
+            if not _legacy_pass and _source_qualifier is not None:
+                try:
+                    from ma_poc.pms.signal_engine.models import SourceKind, SourceSignal
+                    # R1-M1: guard against non-dict first item
+                    _first = items[0] if items else {}
+                    _fkeys = frozenset(_first.keys()) if isinstance(_first, dict) else frozenset()
+                    _sig = SourceSignal(
+                        kind=SourceKind.API_RESPONSE,
+                        url=url,
+                        content_type=resp.get("content_type"),
+                        field_keys=_fkeys,
+                    )
+                    _qr = _source_qualifier.qualify(_sig)
+                    _qualifier_pass = _qr.qualifies
+                except Exception:
+                    pass
+            if not (_legacy_pass or _qualifier_pass):
+                continue
+            units = parse_generic_api(items, url)
+            if units:
+                all_units.extend(units)
+                result.api_responses.append(resp)
         _narrow_ms = int((_time.monotonic() - t0) * 1000)
         if api_responses:
             _log_attempt(
