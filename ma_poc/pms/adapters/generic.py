@@ -2046,6 +2046,7 @@ class GenericAdapter:
         # Extract the rent-bearing DOM section (not the full page) and ask
         # the LLM to return units AND CSS selectors we can replay next run.
         dom_units = []
+        dom_hints: dict[str, Any] | None = None
         dom_section_html = _extract_rent_dom_section(html) if html else None
         if dom_section_html and int(_budget.get("llm_dom_calls", 0)) > 0 and not _llm_cost_exceeded():
             t0 = _time.monotonic()
@@ -2081,6 +2082,13 @@ class GenericAdapter:
                 reason="" if dom_units else "targeted DOM LLM returned no units",
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
+        # RC3 tracking: capture the nav hint from DOM analysis specifically
+        # (distinct from llm_navigation_hints which aggregates across all tiers).
+        _dom_nav_hint: str | None = (
+            dom_hints.get("navigation_hint")
+            if isinstance(dom_hints, dict)
+            else None
+        )
 
         if dom_units:
             result.units = dom_units
@@ -2221,7 +2229,49 @@ class GenericAdapter:
         # shared budget like 6a/6b. When the budget is exhausted (or the
         # cost cap is hit) we skip the call but DO NOT short-circuit the
         # Vision Tier 5 fallback below — the cost cap fires there too.
-        if int(_budget.get("llm_monolithic", 0)) > 0 and not _llm_cost_exceeded():
+        #
+        # RC3 guard: if DOM analysis (sub-tier 6b) found 0 units but
+        # diagnosed a navigation_hint pointing elsewhere, AND there is
+        # link_hop budget remaining, defer the monolithic to the hop page
+        # rather than burning it on the current page. ActionDecider encodes
+        # the full deferral rule including the high-confidence-hop threshold.
+        _rc3_deferred = False
+        if _dom_nav_hint and not dom_units and int(_budget.get("link_hop", 0)) > 0:
+            try:
+                from ma_poc.pms.signal_engine.decider import (
+                    ActionDecider as _ActionDecider,
+                    ActionType as _ActionType,
+                    DecisionContext as _DecisionContext,
+                    DOMAnalysisResult as _DOMAnalysisResult,
+                )
+                from ma_poc.pms.signal_engine.models import (
+                    SourceKind as _SourceKind,
+                    SourceSignal as _SourceSignal,
+                )
+                from ma_poc.pms.signal_engine.ranker import RankedSignal as _RankedSignal
+                _dar = _DOMAnalysisResult(unit_count=0, navigation_hint=_dom_nav_hint)
+                _hint_sig = _SourceSignal(kind=_SourceKind.LLM_HINT, url=_dom_nav_hint)
+                _hint_rs = _RankedSignal(
+                    signal=_hint_sig, composite_score=10_000, reason="dom_navigation_hint"
+                )
+                _dctx = _DecisionContext(
+                    ranked_signals=[_hint_rs],
+                    current_unit_count=0,
+                    budget=dict(_budget),
+                    dom_analysis_result=_dar,
+                    hop_depth=getattr(ctx, "hop_depth", 0),
+                )
+                _decision = _ActionDecider().decide(_dctx)
+                if _decision.action_type == _ActionType.HOP_TO_URL:
+                    _rc3_deferred = True
+                    _log_attempt(
+                        "generic:llm",
+                        "skipped",
+                        reason="rc3_defer_monolithic_to_hop",
+                    )
+            except Exception:
+                pass
+        if not _rc3_deferred and int(_budget.get("llm_monolithic", 0)) > 0 and not _llm_cost_exceeded():
             _budget["llm_monolithic"] = int(_budget.get("llm_monolithic", 0)) - 1
             t0 = _time.monotonic()
             try:
@@ -2279,7 +2329,7 @@ class GenericAdapter:
                     duration_ms=int((_time.monotonic() - t0) * 1000),
                 )
                 result.errors.append(f"llm-tier-error: {exc}")
-        else:
+        elif not _rc3_deferred:
             _log_attempt(
                 "generic:llm",
                 "skipped",

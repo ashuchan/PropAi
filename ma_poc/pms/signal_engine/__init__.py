@@ -25,8 +25,20 @@ from ma_poc.pms.signal_engine.ranker import (
     ScoringTables,
     SourceRanker,
 )
+from ma_poc.pms.signal_engine.decider import (
+    ActionDecider,
+    ActionType,
+    DecisionContext,
+    DOMAnalysisResult,
+    ExtractionAction,
+)
 
 __all__ = [
+    "ActionDecider",
+    "ActionType",
+    "DecisionContext",
+    "DOMAnalysisResult",
+    "ExtractionAction",
     "FieldCombination",
     "MediaTypeFilter",
     "QualificationResult",
