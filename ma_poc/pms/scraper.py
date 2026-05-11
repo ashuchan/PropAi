@@ -1052,19 +1052,22 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
 
 
 # Sentinel score for LLM-emitted navigation hints. Detected downstream
-# (anchor prefix ``llm-hint:``) by ``_try_link_hop`` to refresh the
-# monolithic LLM budget before scraping the suggested URL — the LLM has
-# already diagnosed where unit data lives, so we trust it enough to
-# grant one more monolithic shot on that page even if the entry page
-# burned the original budget on a no-content marketing shell.
-_LLM_HINT_SCORE = 10_000
+# Phase 2: scoring constants imported from signal_engine.defaults — single
+# source of truth. Aliases preserved here so existing code at call sites
+# compiles without changes until Phase 4 cleanup removes the definitions.
+from ma_poc.pms.signal_engine.defaults import (  # noqa: E402
+    LLM_HINT_SCORE as _LLM_HINT_SCORE,
+    EMBEDDED_PORTAL_SCORE as _EMBEDDED_PORTAL_SCORE,
+    PMS_PRIOR_SCORE as _PMS_PRIOR_SCORE,
+    DEFAULT_ANCHOR_KEYWORDS as _LINK_ANCHOR_KEYWORDS,
+    DEFAULT_PATH_KEYWORDS as _LINK_PATH_KEYWORDS,
+    DEFAULT_HOST_KEYWORDS as _LINK_HOST_KEYWORDS,
+    DEFAULT_PMS_PRIORS as _PMS_SUB_PATH_PRIORS,
+    DEFAULT_UNIVERSAL_PRIORS as _UNIVERSAL_SUB_PATH_PRIORS,
+)
+
 _LLM_HINT_ANCHOR_PREFIX = "llm-hint:"
 _EMBEDDED_PORTAL_ANCHOR_PREFIX = "embedded-portal:"
-# Score for leasing-portal URLs surfaced by embedded-JSON detection.
-# Same level as LLM nav-hints — both are "an extractor told us this URL
-# holds the data," not a guess. Sits above PMS_PRIOR (5000) so portal
-# pointers beat universal-prior guesses when both fire.
-_EMBEDDED_PORTAL_SCORE = 10_000
 
 
 def _augment_ranked_with_hints(
@@ -1110,78 +1113,8 @@ def _augment_ranked_with_hints(
     return augmented + rest
 
 
-# Bug B (P4 — evidence ladders for recovery, 2026-05-11). Score for
-# PMS-fingerprint priors injected into ``_try_link_hop``. Sits between
-# profile-top (≥ 10000) and keyword anchor ranker (0-200), so profile
-# and LLM nav-hint candidates win over priors, and priors win over
-# generic anchor-text guesses. See
-# docs/2026_05_11_regressions_fix_design.md (Bug B / P4).
-_PMS_PRIOR_SCORE = 5000
-
-# Template-derived sub-paths for each detected PMS. When a property has
-# no profile-learned URL and the homepage's anchor scan returns zero
-# useful candidates (SPA marketing shell — the 2026-05-11 Bug B shape),
-# these priors guarantee at least one well-typed URL for link-hop to
-# try, instead of returning None.
-#
-# Order within each tuple reflects the most common availability-page
-# convention for that PMS — first entry tried first after dedup.
-#
-# Every PMS that exposes ``matches_response_body`` (i.e., the same PMSes
-# that ride the Bug-C P3 preservation path) must appear here.
-# Enforcement: ``test_pms_priors_dict_covers_all_pms_with_body_checker``.
-# Adding a new PMS adapter? Add its priors here in the same commit.
-_PMS_SUB_PATH_PRIORS: dict[str, tuple[str, ...]] = {
-    "rentcafe": ("/floorplans", "/availability", "/apartments"),
-    # Entrata custom-domain properties use a property-specific path that
-    # embeds city + property slug, e.g. /montclair/alister-montclair/conventional/.
-    # The /conventional/ and /apartments/ segments appear consistently across
-    # Entrata-hosted custom domains — the generic priors (/floorplans etc.)
-    # typically 404 on those sites. Both patterns are included so the link-hop
-    # hits the right URL regardless of which naming convention the site uses.
-    "entrata": ("/floorplans", "/conventional/", "/apartments/", "/availability", "/leasing"),
-    "appfolio": ("/listings", "/apartments", "/floor-plans"),
-    "onesite": ("/floorplans", "/availability", "/apartments"),
-    "realpage_oll": ("/floorplans", "/availability"),
-    "sightmap": ("/floorplans", "/availability"),
-    "avalonbay": ("/floor-plans-pricing", "/apartments"),
-    "amli": ("/floor-plans", "/availability"),
-    "funnel": ("/floorplans", "/availability"),
-}
-
-
-#: Universal multifamily-site sub-paths tried when the PMS detection returns
-#: ``unknown`` or when no PMS-specific prior is registered. The intent is to
-#: decouple the link-hop recovery mechanism from PMS-fingerprint recognition.
-#:
-#: Without this fallback, every site running on an unrecognised CMS (custom
-#: stack, Jonah Digital, new platform) was structurally blocked from
-#: link-hop recovery — the runner snapshots the homepage, finds no
-#: keyword anchors (SPA marketing shell), has no profile priors (cold
-#: property), no LLM nav hint on this run, and ``_pms_priors_for``
-#: returned ``[]`` because ``detected.pms == "unknown"``. The 2026-05-11
-#: canary surfaced this on Skyline at Kessler (11611) — a Jonah Digital
-#: site with real unit data at ``/floorplans/`` but classified ``unknown``.
-#:
-#: Recognising the template is helpful for telemetry but should not be
-#: load-bearing for recovery. Multifamily sites converge on a small set
-#: of path conventions regardless of CMS — try them.
-#:
-#: Order matters: first entry tried first. ``/floorplans`` (no hyphen)
-#: covers the majority of multifamily templates (Jonah, RentCafe,
-#: Entrata, OneSite, Sightmap, Funnel); the hyphenated and other variants
-#: cover the remainder. Cost is bounded by ``max_hops`` (3 by default),
-#: so even if every entry resolves, link-hop tries at most ``max_hops``
-#: candidates per property.
-_UNIVERSAL_SUB_PATH_PRIORS: tuple[str, ...] = (
-    "/floorplans",
-    "/floor-plans",
-    "/availability",
-    "/view-availability",
-    "/apartments",
-    "/units",
-    "/leasing",
-)
+# Phase 2: _PMS_PRIOR_SCORE, _PMS_SUB_PATH_PRIORS, _UNIVERSAL_SUB_PATH_PRIORS
+# are now imported from signal_engine.defaults above. Definitions removed.
 
 
 def _pms_priors_for(
@@ -1234,72 +1167,8 @@ def _pms_priors_for(
     return out
 
 
-_LINK_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
-    # (keyword, score) — anchor text, lowercased, substring match
-    ("availability", 100),
-    ("floor plan", 90),
-    ("floor-plan", 90),
-    ("floorplan", 85),
-    ("pricing", 80),
-    ("rent", 70),
-    # Navigation-menu CTAs that appear on Entrata / RealPage / custom-CMS
-    # property sites. These are the primary "find units" entry points on
-    # marketing shells that don't use standard /floorplans path names.
-    ("find your home", 88),
-    ("find a home", 88),
-    ("pick your home", 88),      # Entrata ProspectPortal "Pick Your Home" CTA
-    ("pick a home", 88),
-    ("choose your home", 88),
-    ("search homes", 85),
-    ("search apartments", 85),
-    ("view availability", 88),
-    ("check availability", 88),
-    ("available homes", 85),
-    ("available apartments", 85),
-    ("see available", 80),
-    ("view floor plan", 88),
-    ("view floorplan", 88),
-    ("apartment", 60),
-    ("unit", 55),
-    ("lease", 50),
-    ("tour", 40),
-    ("apply", 30),
-    ("schedule", 20),
-)
-
-_LINK_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (
-    # (substring, score) — matched against url path, lowercased
-    ("/floor-plan", 95),
-    ("/floorplan", 90),
-    ("/availability", 95),
-    ("/pricing", 80),
-    ("/apartments", 70),
-    ("/rent", 60),
-    ("/units", 85),
-    ("/leasing", 50),
-    ("/lease", 45),
-    ("/floorplans", 90),
-    ("/availabilities", 95),
-    # Entrata custom-domain properties use /{city}/{property}/conventional/
-    # as the floor-plan landing page. Scoring on the path segment means the
-    # link gets discovered even when the anchor text is a generic CTA.
-    ("/conventional/", 88),
-    ("/conventional", 85),
-)
-
-_LINK_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
-    # (host suffix, score) — portals run on known subdomains
-    (".rentcafe.com", 120),
-    (".appfolio.com", 120),
-    (".onlineleasing.realpage.com", 120),
-    ("sightmap.com", 110),
-    (".entrata.com", 115),
-    ("commoncf.entrata.com", 115),
-    # Entrata ProspectPortal: custom-domain Entrata properties route their
-    # "Pick Your Home" / floor-plan CTA through {property}.prospectportal.com.
-    # Following this domain surfaces the same unit data as /conventional/.
-    ("prospectportal.com", 115),
-)
+# Phase 2: _LINK_ANCHOR_KEYWORDS, _LINK_PATH_KEYWORDS, _LINK_HOST_KEYWORDS
+# are now imported from signal_engine.defaults above. Definitions removed.
 
 # Skip these link shapes outright — they're never availability pages.
 _LINK_SKIP_PATTERNS: tuple[str, ...] = (
@@ -1587,6 +1456,48 @@ async def _try_link_hop(
                 seen_urls.add(u)
                 merged.append((u, s, a))
         ranked = merged
+
+    # Phase 2: delegate final ordering to SourceRanker.
+    # Convert (url, score, anchor) tuples to SourceSignals keyed by anchor
+    # prefix, run through SourceRanker, convert back. The ranker uses the
+    # same constants (from signal_engine.defaults) so scores are identical;
+    # this makes SourceRanker the canonical ordering authority.
+    try:
+        from ma_poc.pms.signal_engine.defaults import create_default_ranker as _mk_ranker
+        from ma_poc.pms.signal_engine.models import SourceKind as _SK, SourceSignal as _SS
+
+        def _anchor_to_kind(anchor: str) -> _SK:
+            a = anchor.lower()
+            if a.startswith("llm-hint:"):
+                return _SK.LLM_HINT
+            if a.startswith("profile:winning"):
+                return _SK.PROFILE_WINNING
+            if a.startswith("profile:"):
+                return _SK.PROFILE_NAV_HINT
+            if a.startswith("embedded-portal:"):
+                return _SK.EXTERNAL_PORTAL
+            if a.startswith("pms_prior:"):
+                return _SK.PMS_PRIOR
+            return _SK.INTERNAL_LINK
+
+        _ranker = _mk_ranker()
+        _signals = [
+            _SS(
+                kind=_anchor_to_kind(a),
+                url=u,
+                anchor_text=a,
+                profile_score_override=(s if _anchor_to_kind(a) == _SK.PROFILE_WINNING else None),
+            )
+            for u, s, a in ranked
+        ]
+        _ranked_signals = _ranker.rank(_signals)
+        # Reconstruct (url, score, anchor) format for the rest of _try_link_hop
+        ranked = [
+            (rs.signal.url or "", rs.composite_score, rs.signal.anchor_text or "")
+            for rs in _ranked_signals
+        ]
+    except Exception:
+        pass  # Degrade gracefully — existing score-based sort already in ranked
 
     # Phase 9: drop URLs already visited (cycle break) — and skip the
     # profile's recorded dead ends so we don't re-pay for them.

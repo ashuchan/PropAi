@@ -15,10 +15,113 @@ Invariants enforced here (verified by tests/pms/signal_engine/test_qualifier.py)
 
 from __future__ import annotations
 
+from ma_poc.pms.signal_engine.models import SourceKind
 from ma_poc.pms.signal_engine.qualifier import (
     FieldCombination,
     MediaTypeFilter,
     SourceQualifier,
+)
+from ma_poc.pms.signal_engine.ranker import ScoringTables, SourceRanker
+
+
+# ── Scoring constants (single source of truth) ────────────────────────────────
+# These replace the scattered constants in scraper.py.
+# scraper.py imports these during Phase 2; the definitions there are removed
+# in Phase 4 after regression tests pass.
+
+LLM_HINT_SCORE: int = 10_000
+EMBEDDED_PORTAL_SCORE: int = 10_000
+PMS_PRIOR_SCORE: int = 5_000
+
+DEFAULT_KIND_BASE_SCORES: dict[SourceKind, int] = {
+    SourceKind.PROFILE_WINNING:  10_001,   # profile:winning_page_url sentinel
+    SourceKind.LLM_HINT:         10_000,   # replaces _LLM_HINT_SCORE
+    SourceKind.EXTERNAL_PORTAL:  10_000,   # replaces _EMBEDDED_PORTAL_SCORE
+    SourceKind.PROFILE_NAV_HINT:  9_000,
+    SourceKind.API_RESPONSE:      8_000,   # network-captured = data exists
+    SourceKind.EMBEDDED_JSON:     7_500,
+    SourceKind.JSON_LD:           6_000,
+    SourceKind.DOM_SECTION:       5_500,
+    SourceKind.PMS_PRIOR:         5_000,   # replaces _PMS_PRIOR_SCORE
+    SourceKind.UNIVERSAL_PRIOR:   4_500,
+    SourceKind.INTERNAL_LINK:     4_000,   # base, augmented by keyword scoring
+}
+
+DEFAULT_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
+    ("availability", 100),
+    ("floor plan", 90),
+    ("floor-plan", 90),
+    ("floorplan", 85),
+    ("pricing", 80),
+    ("rent", 70),
+    ("find your home", 88),
+    ("find a home", 88),
+    ("pick your home", 88),
+    ("pick a home", 88),
+    ("choose your home", 88),
+    ("search homes", 85),
+    ("search apartments", 85),
+    ("view availability", 88),
+    ("check availability", 88),
+    ("available homes", 85),
+    ("available apartments", 85),
+    ("see available", 80),
+    ("view floor plan", 88),
+    ("view floorplan", 88),
+    ("apartment", 60),
+    ("unit", 55),
+    ("lease", 50),
+    ("tour", 40),
+    ("apply", 30),
+    ("schedule", 20),
+)
+
+DEFAULT_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (
+    ("/floor-plan", 95),
+    ("/floorplan", 90),
+    ("/availability", 95),
+    ("/pricing", 80),
+    ("/apartments", 70),
+    ("/rent", 60),
+    ("/units", 85),
+    ("/leasing", 50),
+    ("/lease", 45),
+    ("/floorplans", 90),
+    ("/availabilities", 95),
+    ("/conventional/", 88),
+    ("/conventional", 85),
+)
+
+DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
+    (".rentcafe.com", 120),
+    (".appfolio.com", 120),
+    (".onlineleasing.realpage.com", 120),
+    ("sightmap.com", 110),
+    (".entrata.com", 115),
+    ("commoncf.entrata.com", 115),
+    ("prospectportal.com", 115),
+)
+
+DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
+    "rentcafe": ("/floorplans", "/availability", "/apartments"),
+    "entrata": ("/floorplans", "/conventional/", "/apartments/", "/availability", "/leasing"),
+    "appfolio": ("/listings", "/apartments", "/floor-plans"),
+    "onesite": ("/floorplans", "/availability", "/apartments"),
+    "realpage_oll": ("/floorplans", "/availability"),
+    "sightmap": ("/floorplans", "/availability"),
+    "avalonbay": ("/floor-plans-pricing", "/apartments"),
+    "amli": ("/floor-plans", "/availability"),
+    "funnel": ("/floorplans", "/availability"),
+}
+
+DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (
+    "/floorplans",
+    "/floor-plans",
+    "/availability",
+    "/view-availability",
+    "/apartments",
+    "/units",
+    "/leasing",
 )
 
 
@@ -124,4 +227,18 @@ def create_default_qualifier(
         ),
         blocked_ttl_days=14,
         min_noise_verdicts=2,
+    )
+
+
+def create_default_ranker() -> SourceRanker:
+    """Build the canonical SourceRanker with all scoring tables."""
+    return SourceRanker(
+        tables=ScoringTables(
+            kind_base_scores=DEFAULT_KIND_BASE_SCORES,
+            anchor_keywords=DEFAULT_ANCHOR_KEYWORDS,
+            path_keywords=DEFAULT_PATH_KEYWORDS,
+            host_keywords=DEFAULT_HOST_KEYWORDS,
+            pms_priors=DEFAULT_PMS_PRIORS,
+            universal_priors=DEFAULT_UNIVERSAL_PRIORS,
+        )
     )

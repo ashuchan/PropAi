@@ -20,12 +20,20 @@ from ma_poc.pms.signal_engine.qualifier import (
     QualificationResult,
     SourceQualifier,
 )
+from ma_poc.pms.signal_engine.ranker import (
+    RankedSignal,
+    ScoringTables,
+    SourceRanker,
+)
 
 __all__ = [
     "FieldCombination",
     "MediaTypeFilter",
     "QualificationResult",
+    "RankedSignal",
+    "ScoringTables",
     "SourceKind",
+    "SourceRanker",
     "SourceSignal",
     "SourceQualifier",
 ]
