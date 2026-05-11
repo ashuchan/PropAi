@@ -202,7 +202,7 @@ def _normalise_item(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def _is_rentcafe_response(body: Any) -> bool:
-    """Check if a response body looks like RentCafe floorplan data."""
+    """Check if a response body looks like RentCafe floorplan or unit data."""
     items = _unwrap_rentcafe_list(body)
     if not items:
         return False
@@ -215,15 +215,37 @@ def _is_rentcafe_response(body: Any) -> bool:
     # equality check only matched lowercase "rentcafe". Lowercase the value too.
     if str(first_lc.get("api") or "").lower() == "rentcafe":
         return True
-    rentcafe_keys = {
+    # Floor-plan level shape (≥3 of 6 keys) — the original check.
+    _fp_keys: frozenset[str] = frozenset({
         "floorplanname",
         "floorplanid",
         "minimumrent",
         "maximumrent",
         "availableunitscount",
         "availabilityurl",
-    }
-    return len(rentcafe_keys & set(first_lc.keys())) >= 3
+    })
+    if len(_fp_keys & set(first_lc.keys())) >= 3:
+        return True
+    # RC2: unit-level shape — RentCafe unit endpoints return individual
+    # apartment records keyed by RentCafe IDs rather than floor-plan
+    # aggregates. Without this check those endpoints were rejected by
+    # _is_rentcafe_response() and fell through to the generic parser which
+    # also failed (different key names, e.g. RentCafeApartmentId vs unitId).
+    # Require ≥2 of the 3 RentCafe-specific ID keys (all normalised to lc).
+    _unit_id_keys: frozenset[str] = frozenset({
+        "rentcafeapartmentid",
+        "rentcafefloorplanid",
+        "rentcafepropertyid",
+    })
+    if len(_unit_id_keys & set(first_lc.keys())) >= 2:
+        return True
+    # Alternate unit-level shape with rent fields instead of property ID.
+    _unit_rent_keys: frozenset[str] = frozenset({
+        "rentcafeapartmentid",
+        "unitrent",
+        "marketrent",
+    })
+    return len(_unit_rent_keys & set(first_lc.keys())) >= 2
 
 
 # 2026-04-20 fix: structured tier codes for failure-mode classification.

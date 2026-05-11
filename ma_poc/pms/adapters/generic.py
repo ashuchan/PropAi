@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import re as _re
+from datetime import datetime, timezone as _timezone
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._daily_runner_parsers import (
@@ -94,6 +95,38 @@ if TYPE_CHECKING:
 _re_strip_script = _re.compile(r"<script.*?</script>|<style.*?</style>", _re.IGNORECASE | _re.DOTALL)
 _re_strip_tag = _re.compile(r"<[^>]+>")
 _re_rent = _re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?", _re.IGNORECASE)
+
+# RC4: media-type hard gate — content types and URL suffixes that can never
+# contain unit data. Defined at module level so the check is not re-created
+# on every extract() call. Used before the LLM budget is consumed to prevent
+# feeding JS/CSS/font files from CDNs (e.g. cdngeneralmvc.rentcafe.com) to
+# the LLM, which correctly returns no units but wastes $0.005 of budget.
+_NON_DATA_CT_PREFIXES: tuple[str, ...] = (
+    "text/javascript",
+    "text/css",
+    "font/",
+    "image/",
+    "application/font",
+    "application/x-font",
+)
+_NON_DATA_URL_SUFFIXES: tuple[str, ...] = (
+    ".js", ".css", ".woff", ".woff2", ".ttf", ".otf",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
+)
+
+
+def _is_non_data_response(resp: dict[str, Any]) -> bool:
+    """Return True when the API response is a non-data media type (JS/CSS/font/image).
+
+    Checks both the content_type field and the URL suffix. Query-string
+    components are stripped before suffix matching.
+    """
+    ct = (resp.get("content_type") or
+          (resp.get("headers") or {}).get("content-type") or "").lower()
+    if any(ct.startswith(p) for p in _NON_DATA_CT_PREFIXES):
+        return True
+    url_lower = (resp.get("url") or "").lower().split("?")[0]
+    return any(url_lower.endswith(sfx) for sfx in _NON_DATA_URL_SUFFIXES)
 
 # Broader rent-shaped pattern: matches rent values that don't lead with $.
 # Examples: "Starting at 1,500", "1,500/mo", "from $1500/month", "1500 - 2000",
@@ -874,14 +907,43 @@ class GenericAdapter:
         # noise. Saves token spend on known-bad endpoints (chatbot configs,
         # analytics pixels, CMS widgets). New noise discoveries also flow
         # back into this list via _llm_analysis_results.
+        #
+        # RC1: apply a 14-day TTL and a minimum-noise-verdicts guard before
+        # treating a blocked endpoint as still-blocked. A URL that was
+        # misclassified once (noise_verdicts < 2) should be re-admitted so
+        # it can be re-evaluated, rather than blocked forever. A URL that
+        # was correctly classified but whose block is >14 days old is also
+        # re-admitted in case the endpoint has been redesigned.
+        _BLOCK_TTL_DAYS = 14
+        _MIN_NOISE_VERDICTS = 2
         profile = getattr(ctx, "profile", None)
         blocked_urls: set[str] = set()
         if profile is not None:
             try:
+                _now = datetime.now(_timezone.utc).replace(tzinfo=None)
                 for be in getattr(profile.api_hints, "blocked_endpoints", []) or []:
                     pat = getattr(be, "url_pattern", None)
-                    if pat:
-                        blocked_urls.add(str(pat))
+                    if not pat:
+                        continue
+                    attempts = int(getattr(be, "attempts", 1) or 1)
+                    if attempts < _MIN_NOISE_VERDICTS:
+                        # Not enough evidence — re-admit
+                        continue
+                    blocked_at = getattr(be, "blocked_at", None)
+                    if blocked_at is not None:
+                        try:
+                            # blocked_at may be tz-aware or naive depending on
+                            # the profile serialisation path. Normalise to naive UTC.
+                            _ba = blocked_at
+                            if hasattr(_ba, "tzinfo") and _ba.tzinfo is not None:
+                                _ba = _ba.astimezone(_timezone.utc).replace(tzinfo=None)
+                            age_days = (_now - _ba).days
+                            if age_days >= _BLOCK_TTL_DAYS:
+                                # TTL expired — re-admit for re-evaluation
+                                continue
+                        except Exception:
+                            pass
+                    blocked_urls.add(str(pat))
             except Exception:
                 blocked_urls = set()
         if blocked_urls:
@@ -1820,6 +1882,9 @@ class GenericAdapter:
                     break
                 if _llm_cost_exceeded():
                     break
+                # RC4: skip non-data media types before LLM
+                if _is_non_data_response(resp):
+                    continue
                 body = resp.get("body")
                 items = _find_unit_list(body)
                 # Only spend budget on responses where something looks like a

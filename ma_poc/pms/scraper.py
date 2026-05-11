@@ -1992,6 +1992,12 @@ async def scrape_jugnu(
             pass
 
     # Delta 2: short-circuit on non-OK fetch
+    # RC5: EMPTY_BODY gets a distinct verdict prefix so dashboards can
+    # distinguish "server returned 200 but no content" from real unreachable.
+    _OUTCOME_VERDICT_PREFIX: dict[str, str] = {
+        "EMPTY_BODY": "FAILED_FETCH_EMPTY",
+        "DEAD_URL":   "FAILED_DEAD_URL",
+    }
     if hasattr(fetch_result, "outcome"):
         outcome_val = (
             fetch_result.outcome.value
@@ -2002,8 +2008,9 @@ async def scrape_jugnu(
             result = _empty_result(base_url)
             result["_property_id"] = property_id
             result["extraction_tier_used"] = "generic:no_body_short_circuit"
+            _verdict_prefix = _OUTCOME_VERDICT_PREFIX.get(outcome_val, "FAILED_UNREACHABLE")
             result["errors"].append(
-                f"FAILED_UNREACHABLE: fetch_outcome={outcome_val} "
+                f"{_verdict_prefix}: fetch_outcome={outcome_val} "
                 f"sig={getattr(fetch_result, 'error_signature', None)}"
             )
             # Attach the diagnostic so the report can render *why* it failed.

@@ -290,7 +290,13 @@ class Fetcher:
             last_result = result
 
             # 6. Check if we got a good result
-            if result.outcome in (FetchOutcome.OK, FetchOutcome.NOT_MODIFIED, FetchOutcome.HARD_FAIL):
+            # EMPTY_BODY is terminal like HARD_FAIL — no retry, the server
+            # deliberately returned nothing and a second request won't help.
+            if result.outcome in (
+                FetchOutcome.OK, FetchOutcome.NOT_MODIFIED,
+                FetchOutcome.HARD_FAIL, FetchOutcome.EMPTY_BODY,
+                FetchOutcome.DEAD_URL,
+            ):
                 break
 
             if result.outcome == FetchOutcome.BOT_BLOCKED:
@@ -442,6 +448,14 @@ class Fetcher:
             body_head = body[:4096] if body else None
 
             outcome, sig = classify(resp.status_code, resp_headers, body_head)
+
+            # RC5: HTTP GET 200 with an empty or trivially-small body (< 16 bytes).
+            # classify() returns OK for 200, but a body this small cannot contain
+            # meaningful unit data. Override to EMPTY_BODY so the short-circuit in
+            # scraper.py emits a distinct FAILED_FETCH_EMPTY verdict.
+            if method == "GET" and outcome == FetchOutcome.OK and len(body or b"") < 16:
+                outcome = FetchOutcome.EMPTY_BODY
+                sig = "EMPTY_BODY_200"
 
             # S4 — persist any cookies the server issued (HEAD can also set cookies).
             if resp.cookies:
@@ -749,6 +763,37 @@ class Fetcher:
                         pass
 
             if body_text is None or len(body_text) < 512:
+                _body_len = len(body_text) if body_text else 0
+                # RC5: HTTP 200 with a trivially-small body (< 16 bytes) is
+                # classified as EMPTY_BODY, not TRANSIENT. The server returned
+                # a 200 but no content — retrying is unlikely to help, and
+                # TRANSIENT would silently carry forward stale data on future
+                # runs. EMPTY_BODY is terminal so dashboards can track it
+                # separately from real connectivity errors.
+                _resp_status = None
+                try:
+                    _resp_status = resp.status if resp is not None else None
+                except Exception:
+                    pass
+                if (
+                    nav_exc is None
+                    and _resp_status == 200
+                    and _body_len < 16
+                ):
+                    return FetchResult(
+                        url=task.url,
+                        outcome=FetchOutcome.EMPTY_BODY,
+                        status=200,
+                        body=None,
+                        headers={},
+                        render_mode=RenderMode.RENDER,
+                        final_url=page.url,
+                        attempts=attempt,
+                        elapsed_ms=_now_ms() - start_ms,
+                        network_log=network_log,
+                        error_signature="EMPTY_BODY_200",
+                        proxy_used=_redact_proxy(proxy),
+                    )
                 outcome, sig = classify(
                     resp.status if resp else None,
                     {},
