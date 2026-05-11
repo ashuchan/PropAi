@@ -1,4 +1,11 @@
-"""Tests for F1 — schema-gated unit quality functions."""
+"""Tests for F1 — schema-gated unit quality functions.
+
+Stage 1 contract change (2026-05-12): ``is_substantive`` now delegates to
+``unit_validity.is_valid_unit``. The new bar requires at least one
+**numeric physical dimension** (beds / baths / area) — rent alone or
+floor_plan_name alone no longer qualifies. See
+docs/2026_05_11_regressions_fix_design.md.
+"""
 
 from __future__ import annotations
 
@@ -37,12 +44,23 @@ def test_is_substantive_detects_beds_present() -> None:
     assert is_substantive(_with(beds=1))
 
 
-def test_is_substantive_detects_rent_low_present() -> None:
-    assert is_substantive(_with(rent_low=1500))
+def test_is_substantive_rejects_rent_low_alone() -> None:
+    """Stage 1 contract: rent is NOT a physical dimension; alone it does
+    not qualify a row as a unit. (Pre-Stage-1: this asserted True.)"""
+    assert not is_substantive(_with(rent_low=1500))
 
 
-def test_is_substantive_detects_floor_plan_name_present() -> None:
-    assert is_substantive(_with(floor_plan_name="Studio A"))
+def test_is_substantive_rejects_floor_plan_name_alone() -> None:
+    """Stage 1 contract: floor_plan_name is identity-text, not a dimension;
+    alone it does not qualify a row. Closes the Skyline-at-Kessler 2026-05-11
+    regression shape (rows with only ``floor_plan_name="Hoboken"``).
+    (Pre-Stage-1: this asserted True.)"""
+    assert not is_substantive(_with(floor_plan_name="Studio A"))
+
+
+def test_is_substantive_detects_baths_present() -> None:
+    """New under Stage 1: baths alone is a dimension and qualifies."""
+    assert is_substantive(_with(baths=1.5))
 
 
 def test_is_substantive_detects_area_present() -> None:
@@ -69,7 +87,9 @@ def test_property_passes_quality_gate_empty_list_fails() -> None:
 
 
 def test_property_passes_quality_gate_all_substantive_passes() -> None:
-    units = [_with(beds=1), _with(rent_low=1200), _with(floor_plan_name="1BR")]
+    """All units carry a dimension (Stage 1 bar). Pre-Stage-1 this mixed
+    in rent_low-only and floor_plan_name-only rows; those no longer qualify."""
+    units = [_with(beds=1), _with(area=750), _with(baths=2.0)]
     assert property_passes_quality_gate(units)
 
 

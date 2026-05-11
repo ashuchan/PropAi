@@ -151,7 +151,18 @@ MAX_BODY_TOKENS = 12_000
 MAX_BODY_ARRAY_ITEMS = 200
 MAX_CANDIDATES = 3
 
-SUPPORTED_ADAPTERS: frozenset[str] = frozenset({"generic", "entrata", "appfolio"})
+# Adapter names the rescue path knows how to handle. This frozenset is
+# the **single source of truth** for the rescue allow-list: scraper.py's
+# inline gate at the ``needs_rescue`` boolean imports this same constant
+# (P2 — cross-file invariants live in one module). Drift between the two
+# gates is the bug class that produced Bug D (2026-05-11 — 427 OneSite +
+# AMLI rescues rejected with ``unsupported adapter``). Any new adapter
+# added here MUST also have an entry in ``_tier_label_for`` below; the
+# pair moves together — ``test_tier_label_for_handles_all_supported_adapters``
+# enforces that pairing.
+SUPPORTED_ADAPTERS: frozenset[str] = frozenset(
+    {"generic", "entrata", "appfolio", "onesite", "amli"}
+)
 
 KNOWN_PMS_HOSTS: frozenset[str] = frozenset(
     {
@@ -630,10 +641,20 @@ def _now_iso() -> str:
 
 
 def _tier_label_for(adapter: str) -> str:
+    """Map a supported source-adapter name to the tier-string the
+    rescue records on success.
+
+    Naming convention: ``TIER_1_API[_<PLATFORM>]_LLM_RESCUE``. The
+    generic case omits the platform segment; all platform-named adapters
+    include it. Every adapter in ``SUPPORTED_ADAPTERS`` must have an
+    entry here — see ``test_tier_label_for_handles_all_supported_adapters``.
+    """
     return {
         "generic": "TIER_1_API_LLM_RESCUE",
         "entrata": "TIER_1_API_ENTRATA_LLM_RESCUE",
         "appfolio": "TIER_1_API_APPFOLIO_LLM_RESCUE",
+        "onesite": "TIER_1_API_ONESITE_LLM_RESCUE",
+        "amli": "TIER_1_API_AMLI_LLM_RESCUE",
     }[adapter]
 
 

@@ -168,7 +168,10 @@ def test_profile_roundtrip_through_sqlite_provider_then_replays(
         p_day1.api_hints.llm_field_mappings = [
             LlmFieldMapping(
                 api_url_pattern="/api/units",
-                json_paths={"unit_id": "id", "rent_low": "rent"},
+                # Stage 1 contract (2026-05-12): mapping must learn at
+                # least one dimension. Extended with ``beds`` so the
+                # replayed units carry a real dim and pass is_valid_unit.
+                json_paths={"unit_id": "id", "rent_low": "rent", "bedrooms": "bedrooms"},
                 response_envelope="",
             )
         ]
@@ -187,8 +190,8 @@ def test_profile_roundtrip_through_sqlite_provider_then_replays(
             {
                 "url": "https://example.com/api/units",
                 "body": [
-                    {"id": "U1", "rent": 1450},
-                    {"id": "U2", "rent": 1675},
+                    {"id": "U1", "rent": 1450, "bedrooms": 1},
+                    {"id": "U2", "rent": 1675, "bedrooms": 2},
                 ],
             }
         ]

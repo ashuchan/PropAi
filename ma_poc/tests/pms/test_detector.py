@@ -427,3 +427,90 @@ def test_confirm_detection_handles_adapter_without_body_check() -> None:
     )
     result = confirm_detection(initial, [{"url": "x", "body": {"noise": 1}}])
     assert result.pms == "entrata"
+
+
+# ── Bug C (2026-05-11) — P3 "innocent until proven guilty" demotion rule ────
+
+
+def test_confirm_detection_preserves_when_bodies_are_pure_noise() -> None:
+    """The 2026-05-11 production failure shape: RentCafe URL detection
+    + every captured XHR is a third-party widget (analytics, CDN,
+    captcha). None match RentCafe's body shape, but none match a
+    *different* PMS either — they're just noise. P3 says noise is
+    absence-of-evidence, not evidence-of-absence: preserve.
+
+    Before the fix this demoted, losing 558 RentCafe properties/day.
+    After the fix it preserves because no cross-match is found in
+    Phase 2.
+    """
+    initial = _rentcafe_initial()
+    noise_responses = [
+        {"url": "https://www.googletagmanager.com/gtm.js", "body": "ga()"},
+        {"url": "https://maps.googleapis.com/maps/api/place", "body": '{"results":[]}'},
+        {"url": "https://challenges.cloudflare.com/turnstile", "body": "<html/>"},
+        {"url": "https://hotjar.com/c/heatmap.json", "body": '{"hm":1}'},
+        {"url": "https://cmp.osano.com/16A0DbT9yDNIaQkvZ/widget", "body": '{"consent":true}'},
+    ]
+    result = confirm_detection(initial, noise_responses)
+    assert result.pms == "rentcafe", (
+        f"P3 violation: confirm_detection demoted on pure noise. "
+        f"Got {result.pms!r}, evidence={result.evidence}"
+    )
+    # No demotion → evidence list unchanged from initial.
+    assert not any("demoted_from" in e for e in result.evidence)
+
+
+def test_confirm_detection_demotes_with_specific_cross_match_in_evidence() -> None:
+    """Phase 2 finds a captured body that positively matches a different
+    adapter (Funnel). That's positive evidence the URL detection was
+    wrong — demote, and surface *which* adapter the body actually
+    belonged to in the evidence string so operators can triage.
+
+    Documents the new evidence format introduced by the Bug C fix:
+    ``demoted_from_<src>:response_<idx>_matches_<dst>_body_shape``.
+    """
+    initial = _rentcafe_initial()
+    responses = [
+        {"url": "https://noise.example.com/widget", "body": '{"unrelated": 1}'},
+        {"url": "https://nestiolistings.com/api/listings", "body": _funnel_body()},
+    ]
+    result = confirm_detection(initial, responses)
+    assert result.pms == "unknown"
+    assert any("demoted_from_rentcafe" in e for e in result.evidence)
+    # The specific cross-match must be named — operators look for this
+    # when triaging "why did this property route to generic?"
+    assert any(
+        "funnel" in e.lower() for e in result.evidence
+    ), (
+        f"demotion evidence must name the matched adapter (funnel); "
+        f"got: {result.evidence}"
+    )
+
+
+def test_confirm_detection_preserves_when_only_initial_adapter_has_checker(
+    monkeypatch,  # type: ignore[no-untyped-def]
+) -> None:
+    """Edge case: the registry has zero *other* adapters with
+    ``matches_response_body``. Phase 2 finds no checkers to cross-test
+    against, so no negative evidence is possible — preserve. Documents
+    the safe-default behaviour: when in doubt, trust the URL detection.
+
+    Implemented via a monkeypatched ``all_adapters`` that returns only
+    the initial adapter; avoids touching the real registry.
+    """
+    from ma_poc.pms.adapters import registry
+    from ma_poc.pms.adapters.registry import get_adapter
+
+    rentcafe_adapter = get_adapter("rentcafe")
+    monkeypatch.setattr(registry, "all_adapters", lambda: [rentcafe_adapter])
+
+    initial = _rentcafe_initial()
+    # Body that doesn't match RentCafe — and there's no other adapter
+    # in the registry to cross-check against in Phase 2.
+    responses = [{"url": "https://x/api", "body": '{"completely": "alien"}'}]
+    result = confirm_detection(initial, responses)
+    assert result.pms == "rentcafe", (
+        f"With only the initial adapter in the registry, Phase 2 has no "
+        f"alternative to cross-match against. P3 says preserve when no "
+        f"negative evidence is found — got {result.pms!r}"
+    )

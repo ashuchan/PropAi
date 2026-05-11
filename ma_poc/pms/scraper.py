@@ -702,15 +702,20 @@ async def scrape(
         # which can be ``unknown`` after F0.2 demotion). The previous
         # ``pms_name`` gate locked rescue out of every detection-demoted
         # property, costing ~300 properties/run.
-        # Allow-list also widened to include ``onesite`` and ``amli`` per the
-        # May-8 implementation plan F1.3.
         # F1.2: also short-circuit on captcha — bodies captured behind a
         # Cloudflare interstitial are noise the rescue can't extract from.
+        # Bug D (2026-05-11): the allow-list is owned by ``llm_api_rescue.py``
+        # (it enforces the same invariant) and imported here. Drift between
+        # the two gates caused ``unsupported adapter`` rejections for 427
+        # OneSite + AMLI properties/day until the import landed. P2 — see
+        # docs/2026_05_11_regressions_fix_design.md.
+        from ma_poc.services.llm_api_rescue import SUPPORTED_ADAPTERS
+
         captcha_detected = bool(getattr(fetch_result, "captcha_detected", False))
         needs_rescue = (
             not property_passes_quality_gate(adapter_result.units)
             and bool(raw_api_responses)
-            and adapter_name in {"generic", "entrata", "appfolio", "onesite", "amli"}
+            and adapter_name in SUPPORTED_ADAPTERS
             and consecutive_rescue_failures < 3
             and not page_unreachable
             and not captcha_detected
@@ -1071,6 +1076,123 @@ def _augment_ranked_with_hints(
     return augmented + rest
 
 
+# Bug B (P4 — evidence ladders for recovery, 2026-05-11). Score for
+# PMS-fingerprint priors injected into ``_try_link_hop``. Sits between
+# profile-top (≥ 10000) and keyword anchor ranker (0-200), so profile
+# and LLM nav-hint candidates win over priors, and priors win over
+# generic anchor-text guesses. See
+# docs/2026_05_11_regressions_fix_design.md (Bug B / P4).
+_PMS_PRIOR_SCORE = 5000
+
+# Template-derived sub-paths for each detected PMS. When a property has
+# no profile-learned URL and the homepage's anchor scan returns zero
+# useful candidates (SPA marketing shell — the 2026-05-11 Bug B shape),
+# these priors guarantee at least one well-typed URL for link-hop to
+# try, instead of returning None.
+#
+# Order within each tuple reflects the most common availability-page
+# convention for that PMS — first entry tried first after dedup.
+#
+# Every PMS that exposes ``matches_response_body`` (i.e., the same PMSes
+# that ride the Bug-C P3 preservation path) must appear here.
+# Enforcement: ``test_pms_priors_dict_covers_all_pms_with_body_checker``.
+# Adding a new PMS adapter? Add its priors here in the same commit.
+_PMS_SUB_PATH_PRIORS: dict[str, tuple[str, ...]] = {
+    "rentcafe": ("/floorplans", "/availability", "/apartments"),
+    "entrata": ("/floorplans", "/availability", "/leasing"),
+    "appfolio": ("/listings", "/apartments", "/floor-plans"),
+    "onesite": ("/floorplans", "/availability", "/apartments"),
+    "realpage_oll": ("/floorplans", "/availability"),
+    "sightmap": ("/floorplans", "/availability"),
+    "avalonbay": ("/floor-plans-pricing", "/apartments"),
+    "amli": ("/floor-plans", "/availability"),
+    "funnel": ("/floorplans", "/availability"),
+}
+
+
+#: Universal multifamily-site sub-paths tried when the PMS detection returns
+#: ``unknown`` or when no PMS-specific prior is registered. The intent is to
+#: decouple the link-hop recovery mechanism from PMS-fingerprint recognition.
+#:
+#: Without this fallback, every site running on an unrecognised CMS (custom
+#: stack, Jonah Digital, new platform) was structurally blocked from
+#: link-hop recovery — the runner snapshots the homepage, finds no
+#: keyword anchors (SPA marketing shell), has no profile priors (cold
+#: property), no LLM nav hint on this run, and ``_pms_priors_for``
+#: returned ``[]`` because ``detected.pms == "unknown"``. The 2026-05-11
+#: canary surfaced this on Skyline at Kessler (11611) — a Jonah Digital
+#: site with real unit data at ``/floorplans/`` but classified ``unknown``.
+#:
+#: Recognising the template is helpful for telemetry but should not be
+#: load-bearing for recovery. Multifamily sites converge on a small set
+#: of path conventions regardless of CMS — try them.
+#:
+#: Order matters: first entry tried first. ``/floorplans`` (no hyphen)
+#: covers the majority of multifamily templates (Jonah, RentCafe,
+#: Entrata, OneSite, Sightmap, Funnel); the hyphenated and other variants
+#: cover the remainder. Cost is bounded by ``max_hops`` (3 by default),
+#: so even if every entry resolves, link-hop tries at most ``max_hops``
+#: candidates per property.
+_UNIVERSAL_SUB_PATH_PRIORS: tuple[str, ...] = (
+    "/floorplans",
+    "/floor-plans",
+    "/availability",
+    "/apartments",
+    "/units",
+    "/leasing",
+)
+
+
+def _pms_priors_for(
+    detected: DetectedPMS | None,
+    entry_url: str,
+) -> list[tuple[str, int, str]]:
+    """Generate template-prior candidates for ``_try_link_hop``.
+
+    Returns ``(url, score, anchor)`` tuples — same shape as the keyword
+    ranker and the LLM-hint augmenter — so the merge loop in
+    ``_try_link_hop`` can consume them uniformly.
+
+    Two paths:
+      * **PMS-specific** — when ``detected.pms`` is recognised AND has an
+        entry in ``_PMS_SUB_PATH_PRIORS``, use that PMS's preferred
+        ordering. Anchor labelled ``pms_prior:<name>`` for telemetry.
+      * **Universal fallback** — when ``detected`` is None, ``detected.pms``
+        is ``"unknown"``, or the PMS lacks a registered entry, use
+        ``_UNIVERSAL_SUB_PATH_PRIORS``. Anchor labelled
+        ``pms_prior:universal``. This decouples recovery from
+        fingerprint recognition — sites on unrecognised CMSes still
+        get a fair shot at the canonical multifamily sub-paths.
+
+    ``entry_url`` is the absolute homepage URL; priors are resolved against
+    it via ``urljoin``. URLs identical to ``entry_url`` (e.g., when
+    ``urljoin`` collapses an empty path) are filtered out.
+
+    Pure function. Caller is responsible for dedup against visited /
+    profile-top / keyword candidates.
+    """
+    pms = detected.pms if detected is not None else "unknown"
+    template_paths = _PMS_SUB_PATH_PRIORS.get(pms)
+    if template_paths:
+        anchor = f"pms_prior:{pms}"
+    else:
+        # Universal fallback — fires for ``unknown`` AND for any future
+        # PMS that hasn't been registered with a specific prior tuple.
+        # See ``_UNIVERSAL_SUB_PATH_PRIORS`` for the rationale.
+        template_paths = _UNIVERSAL_SUB_PATH_PRIORS
+        anchor = "pms_prior:universal"
+
+    out: list[tuple[str, int, str]] = []
+    for path in template_paths:
+        prior_url = urllib.parse.urljoin(entry_url, path)
+        # urljoin returns entry_url itself when path is "" or "/", and
+        # may produce malformed output when entry_url is unparseable.
+        # Filter both — we only emit strictly-distinct sub-page URLs.
+        if prior_url and prior_url != entry_url:
+            out.append((prior_url, _PMS_PRIOR_SCORE, anchor))
+    return out
+
+
 _LINK_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
     # (keyword, score) — anchor text, lowercased, substring match
     ("availability", 100),
@@ -1305,14 +1427,39 @@ async def _try_link_hop(
             # profile sink the link-hop entirely.
             pass
 
-    # Merge profile-top candidates ahead of the existing ranking, dedup
-    # by URL (profile entry wins on collision since it carries the
-    # higher score).
-    if profile_top:
-        seen_in_top = {u for u, _, _ in profile_top}
-        ranked = profile_top + [
-            (u, s, a) for (u, s, a) in ranked if u not in seen_in_top
-        ]
+    # Bug B (P4): PMS fingerprint priors. Template-derived sub-paths for
+    # the detected PMS. Slot between profile-top (highest) and keyword-
+    # ranked (lowest) in score. When neither profile nor keyword ranker
+    # produces candidates (SPA marketing shell with detected PMS — the
+    # 2026-05-11 Bug B shape), this guarantees at least one well-typed
+    # candidate to try. See docs/2026_05_11_regressions_fix_design.md.
+    pms_priors = _pms_priors_for(detected, entry_url)
+
+    # Merge all candidate sources and rank by SCORE, not source-list order.
+    # Sources contribute candidates at their own confidence levels:
+    #   profile.winning_page_url     → 10_001 (highest — yesterday's win)
+    #   profile.availability_links   → 10_000
+    #   LLM navigation_hint          → 10_000 (Phase 5 cross-tier signal)
+    #   PMS template priors (specific or universal) → 5_000
+    #   keyword anchor ranker        → 0-200
+    # Score-based sort means a future source addition lands cleanly by
+    # picking its confidence level without touching this merge.
+    # Stable sort preserves source order within the same score (e.g. when
+    # two LLM hints both score 10_000, they keep their emission order).
+    # Dedup is first-seen-after-sort, so highest-scored entry for any
+    # given URL keeps the slot.
+    if profile_top or pms_priors:
+        combined: list[tuple[str, int, str]] = (
+            list(profile_top) + list(pms_priors) + list(ranked)
+        )
+        combined.sort(key=lambda triple: triple[1], reverse=True)
+        seen_urls: set[str] = set()
+        merged: list[tuple[str, int, str]] = []
+        for u, s, a in combined:
+            if u not in seen_urls:
+                seen_urls.add(u)
+                merged.append((u, s, a))
+        ranked = merged
 
     # Phase 9: drop URLs already visited (cycle break) — and skip the
     # profile's recorded dead ends so we don't re-pay for them.

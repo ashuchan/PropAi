@@ -4,6 +4,12 @@ Two paths:
   1. Strict: record has unit_id, rent, all required fields -> accept.
   2. Soft: record missing unit_id -> call compute_fallback_unit_id (v2);
      if fallback returns an id, accept with inferred_id=True; else reject.
+
+``is_substantive`` is preserved as a back-compat shim but now delegates to
+``ma_poc.validation.unit_validity.is_valid_unit`` — the single source of
+truth for "is this row a unit?" introduced in Stage 1 of the 2026-05-11
+regression fix. Callers that previously imported ``is_substantive`` keep
+working; their bar is now consistent with adapter-level ``post_process``.
 """
 
 from __future__ import annotations
@@ -14,6 +20,7 @@ from datetime import date, datetime
 from typing import Any
 
 from ma_poc.core.identity import compute_fallback_unit_id
+from ma_poc.validation.unit_validity import is_valid_unit
 
 log = logging.getLogger(__name__)
 
@@ -43,13 +50,23 @@ def _is_present(value: Any) -> bool:
 
 
 def is_substantive(unit: dict[str, Any]) -> bool:
-    """Return True when at least one identifying/pricing field is present.
+    """Back-compat shim — delegates to ``unit_validity.is_valid_unit``.
 
-    Checks both v2 canonical names and v1 legacy aliases so that records
-    from either schema generation pass the quality gate correctly.
+    Historical semantics (pre-Stage-1): accepted ANY one of
+    [beds, rent_low, floor_plan_name, area] as substantive — including a
+    row with only ``floor_plan_name="Hoboken"`` (the Skyline at Kessler
+    regression shape). That bar was inconsistent with the other five gates
+    surveyed in the 2026-05-11 design audit.
+
+    Post-Stage-1: delegates to ``is_valid_unit``, which requires at least
+    one numeric physical dimension (beds / baths / area), dropping
+    identity-text-only and rent-only rows.
+
+    The function name is preserved for back-compat (external test files
+    and downstream callers). New code should call ``is_valid_unit``
+    directly to make intent explicit.
     """
-    all_keys = SUBSTANTIVE_FIELDS + _LEGACY_SUBSTANTIVE_FIELDS
-    return any(_is_present(unit.get(k)) for k in all_keys)
+    return is_valid_unit(unit)
 
 
 def property_passes_quality_gate(units: list[dict[str, Any]], threshold: float = 0.5) -> bool:

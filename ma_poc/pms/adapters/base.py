@@ -46,6 +46,14 @@ class AdapterContext:
 @dataclass
 class AdapterResult:
     units: list[dict[str, Any]] = field(default_factory=list)
+    #: Stage 2 (2026-05-12): floor-plan-level summaries surfaced separately
+    #: from per-apartment ``units``. Adapters populate this from
+    #: ``PostProcessResult.plan_summaries``; the runner surfaces them as
+    #: ``floor_plans[]`` on the V2 property record. See
+    #: docs/2026_05_11_regressions_fix_design.md (Stage 2 — plan-level
+    #: routing). Additive field — adapters that don't yet populate this
+    #: continue to return an empty list, matching pre-Stage-2 behaviour.
+    plan_summaries: list[dict[str, Any]] = field(default_factory=list)
     tier_used: str = ""
     winning_url: str | None = None
     api_responses: list[dict[str, Any]] = field(default_factory=list)

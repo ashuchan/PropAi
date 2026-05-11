@@ -36,26 +36,37 @@ def _make_ctx(profile: ScrapeProfile, api_responses: list[dict[str, Any]]) -> Ad
 
 
 def test_phase5_post_merge_replay_only_no_cascade() -> None:
-    """When replay produces field-rich units, behavior matches pre-Phase-5."""
+    """When replay produces field-rich units, behavior matches pre-Phase-5.
+
+    Stage 1 contract (2026-05-12): the mapping must learn at least one
+    numeric dimension (beds / baths / area) for the replayed units to
+    pass ``is_valid_unit``. Pre-Stage-1 the mapping only learned
+    ``unit_id`` + ``rent_low``; that no longer admits the rows.
+    """
     p = ScrapeProfile(canonical_id="phase5-001")
     p.api_hints.llm_field_mappings = [
         LlmFieldMapping(
             api_url_pattern="/api/units",
-            json_paths={"unit_id": "id", "rent_low": "rent"},
+            # ``apply_saved_mapping`` keys json_paths by the V1 field
+            # name ``bedrooms`` (not the V2 canonical ``beds``).
+            json_paths={"unit_id": "id", "rent_low": "rent", "bedrooms": "bedrooms"},
             response_envelope="",
         )
     ]
     api = [
         {
             "url": "https://example.com/api/units",
-            "body": [{"id": "U1", "rent": 1500}, {"id": "U2", "rent": 1700}],
+            "body": [
+                {"id": "U1", "rent": 1500, "bedrooms": 1},
+                {"id": "U2", "rent": 1700, "bedrooms": 2},
+            ],
         }
     ]
     ctx = _make_ctx(p, api)
     adapter = GenericAdapter()
     result = asyncio.run(adapter.extract(page=None, ctx=ctx))
-    # Replay produces units with unit_id + market_rent_low → field-rich →
-    # short-circuits to TIER_1_PROFILE_MAPPING (legacy behavior preserved)
+    # Replay produces units with unit_id + market_rent_low + beds → field-rich
+    # → short-circuits to TIER_1_PROFILE_MAPPING (legacy behavior preserved)
     assert result.tier_used == "TIER_1_PROFILE_MAPPING"
     assert len(result.units) == 2
 

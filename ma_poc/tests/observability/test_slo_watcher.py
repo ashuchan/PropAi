@@ -159,3 +159,116 @@ def test_llm_tax_avoidance_rate_handles_all_failures() -> None:
     violations = check({"llm": 0.0}, props, thresholds=t)
     names = [v.name for v in violations]
     assert "llm_tax_avoidance_rate" not in names
+
+
+# ── Bug A v0.2 defence-in-depth — events.jsonl as authoritative secondary ───
+
+
+def test_slo_consults_events_when_meta_verdict_empty(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """When ``_meta.verdict`` is missing for every property (the
+    2026-05-11 production-observed shape — Bug A), the success-rate
+    SLO must still flag correctly using events.jsonl as the
+    authoritative secondary source.
+
+    Without this, ``slo_watcher.check`` would silently classify every
+    failed property as a success and skip paging on a run that is
+    actually losing ~40% of its data.
+    """
+    import json
+
+    run_dir = tmp_path / "run-test"
+    run_dir.mkdir()
+    # 70 actual successes, 30 actual failures per events.jsonl. All
+    # properties have empty _meta.verdict (Bug A's prod shape).
+    properties = [
+        {
+            "_meta": {"canonical_id": f"P{i}"},  # NO verdict, NO scrape_tier_used
+            "_extract_result": {"tier_used": "TIER_1_API", "llm_cost_usd": 0.0},
+        }
+        for i in range(100)
+    ]
+    events = (
+        [
+            {"kind": "output.property_emitted", "property_id": f"P{i}", "verdict": "SUCCESS"}
+            for i in range(70)
+        ]
+        + [
+            {"kind": "output.property_emitted", "property_id": f"P{i}", "verdict": "FAILED_NO_DATA"}
+            for i in range(70, 100)
+        ]
+    )
+    (run_dir / "events.jsonl").write_text(
+        "\n".join(json.dumps(e) for e in events) + "\n",
+        encoding="utf-8",
+    )
+
+    # WITH run_dir — events consulted, 30/100 failures → success_rate 70% < 95% → violation.
+    violations = check({"llm": 0.0}, properties, run_dir=run_dir)
+    names = [v.name for v in violations]
+    assert "success_rate" in names, (
+        "success_rate SLO must fire when 30% of properties failed per "
+        "events.jsonl, even though _meta.verdict is empty everywhere. "
+        "Without events consultation the runner would silently report "
+        "100% success and no paging."
+    )
+
+
+def test_slo_legacy_no_run_dir_path_still_works() -> None:
+    """When ``run_dir`` is omitted (legacy callers, unit tests not staging
+    a run dir), behaviour must match pre-v0.2: only ``_meta.verdict`` is
+    consulted, no I/O is attempted. Backwards-compat guarantee."""
+    # 80 successes + 20 failures, all encoded in _meta.verdict only.
+    props = [_make_jugnu_prop("TIER_3_DOM", verdict="SUCCESS") for _ in range(80)]
+    props.extend(
+        _make_jugnu_prop("TIER_1_API", verdict="FAILED_NO_DATA") for _ in range(20)
+    )
+    violations = check({"llm": 0.0}, props)  # NO run_dir argument
+    names = [v.name for v in violations]
+    # 80% < 95% success threshold → violation expected.
+    assert "success_rate" in names
+
+
+def test_slo_events_win_on_disagreement(
+    tmp_path,  # type: ignore[no-untyped-def]
+    caplog,
+) -> None:
+    """When _meta.verdict and the emit event disagree (a runner bug —
+    they're written from the same source by construction), events win
+    and a warning is logged. Documents the contract so a future change
+    to the runner that creates disagreement is loud, not silent."""
+    import json
+    import logging
+
+    caplog.set_level(logging.WARNING, logger="ma_poc.reporting.verdict")
+
+    run_dir = tmp_path / "run-test"
+    run_dir.mkdir()
+    # _meta says SUCCESS (would-be-100% per legacy path) but events say
+    # all 5 failed. Events must win → success_rate 0% → violation.
+    properties = [
+        {
+            "_meta": {"canonical_id": f"P{i}", "verdict": "SUCCESS"},
+            "_extract_result": {"tier_used": "TIER_1_API", "llm_cost_usd": 0.0},
+        }
+        for i in range(5)
+    ]
+    events = [
+        {"kind": "output.property_emitted", "property_id": f"P{i}", "verdict": "FAILED_NO_DATA"}
+        for i in range(5)
+    ]
+    (run_dir / "events.jsonl").write_text(
+        "\n".join(json.dumps(e) for e in events) + "\n",
+        encoding="utf-8",
+    )
+
+    violations = check({"llm": 0.0}, properties, run_dir=run_dir)
+    names = [v.name for v in violations]
+    assert "success_rate" in names
+
+    disagreement_warnings = [
+        rec for rec in caplog.records if "verdict disagreement" in rec.message
+    ]
+    assert disagreement_warnings, (
+        "expected at least one 'verdict disagreement' warning when "
+        "_meta and events disagree"
+    )

@@ -13,6 +13,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+# ``resolve_verdict`` lives in reporting/verdict.py so both run_report
+# and slo_watcher can share the dual-source resolution semantics. See
+# Bug A v0.2 in docs/2026_05_11_regressions_fix_design.md.
+from ma_poc.reporting.verdict import resolve_verdict
+
 log = logging.getLogger(__name__)
 
 
@@ -20,22 +25,35 @@ log = logging.getLogger(__name__)
 # ma_poc/observability/events.py.
 _BOT_KINDS = frozenset({"fetch.bot_blocked"})
 _CAPTCHA_KINDS = frozenset({"fetch.captcha_detected"})
+_EMIT_KIND = "output.property_emitted"
 
 
 def _scan_event_ledger(
     run_dir: Path,
-) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-    """Read events.jsonl and return (bot_blocked_by_pid, captcha_by_pid).
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], dict[str, str]]:
+    """Read events.jsonl and return (bot_blocked_by_pid, captcha_by_pid, verdict_by_pid).
 
-    Each value is keyed by property_id and holds the first-seen event
-    payload (url, attempt, ts, etc.) for downstream reporting. Returns
-    empty dicts when the ledger is missing or unreadable — never raises.
+    Each value in the first two dicts is keyed by property_id and holds
+    the first-seen event payload (url, attempt, ts, etc.) for downstream
+    reporting. ``verdict_by_pid`` is the canonical per-property verdict
+    captured from the ``output.property_emitted`` event, which the runner
+    emits at the same moment it writes ``_meta.verdict`` to the result
+    dict. Both sources should agree by construction; events is the
+    authoritative one because it is emitted unconditionally regardless of
+    downstream serialisation. ``run_report.build`` prefers events over
+    ``_meta.verdict`` to make the headline metric robust against any
+    ``_meta`` corruption (see Bug A 2026-05-11 — formatter dropped the
+    verdict between writer and on-disk JSON).
+
+    Returns empty containers when the ledger is missing or unreadable —
+    never raises.
     """
     bot: dict[str, dict[str, Any]] = {}
     captcha: dict[str, dict[str, Any]] = {}
+    verdict_by_pid: dict[str, str] = {}
     events_path = run_dir / "events.jsonl"
     if not events_path.exists():
-        return bot, captcha
+        return bot, captcha, verdict_by_pid
     try:
         for line in events_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -49,26 +67,37 @@ def _scan_event_ledger(
             pid = evt.get("property_id")
             if not pid:
                 continue
-            if kind in _BOT_KINDS and pid not in bot:
-                bot[pid] = {
-                    "property_id": pid,
+            pid_str = str(pid)
+            if kind in _BOT_KINDS and pid_str not in bot:
+                bot[pid_str] = {
+                    "property_id": pid_str,
                     "url": evt.get("url"),
                     "attempt": evt.get("attempt"),
                     "ts": evt.get("ts"),
                     "kind": kind,
                 }
-            elif kind in _CAPTCHA_KINDS and pid not in captcha:
-                captcha[pid] = {
-                    "property_id": pid,
+            elif kind in _CAPTCHA_KINDS and pid_str not in captcha:
+                captcha[pid_str] = {
+                    "property_id": pid_str,
                     "url": evt.get("url"),
                     "provider": evt.get("provider"),
                     "attempt": evt.get("attempt"),
                     "ts": evt.get("ts"),
                     "kind": kind,
                 }
+            elif kind == _EMIT_KIND:
+                # The runner emits this exactly once per property at the
+                # tail of _process_property. If duplicates appear (a
+                # future change emits multiple), last-write-wins matches
+                # the verdict the runner ultimately settled on.
+                emitted = evt.get("verdict")
+                if isinstance(emitted, str) and emitted:
+                    verdict_by_pid[pid_str] = emitted
     except Exception as exc:  # noqa: BLE001
         log.warning("run_report: failed to scan event ledger %s: %s", events_path, exc)
-    return bot, captcha
+    return bot, captcha, verdict_by_pid
+
+
 
 
 def build(
@@ -95,6 +124,14 @@ def build(
     failed = 0
     carry_forward = 0
 
+    # Read events.jsonl once up front. ``verdict_by_pid`` is the
+    # authoritative secondary source consulted alongside ``_meta.verdict``
+    # below; ``bot_blocked_by_pid`` / ``captcha_by_pid`` feed the
+    # pre-extraction termination classifier further down. See
+    # docs/2026_05_11_regressions_fix_design.md (Bug A v0.1) for why the
+    # event ledger is the authoritative source for the headline metric.
+    bot_blocked_by_pid, captcha_by_pid, verdict_by_pid = _scan_event_ledger(run_dir)
+
     for p in properties:
         meta = p.get("_meta", {}) or {}
         # Jugnu writes extraction tier on _extract_result; legacy path writes
@@ -111,10 +148,29 @@ def build(
             or "UNKNOWN"
         )
         tier_counts[tier] += 1
-        # Verdict is the authoritative success/fail signal — tier_used can
-        # say TIER_1_API on a carry-forward record, so tier string alone is
-        # not a failure indicator.
-        verdict = meta.get("verdict") or ""
+        # Verdict resolution — events.jsonl is the canonical source
+        # (emitted unconditionally by the runner at PROPERTY_EMITTED),
+        # ``_meta.verdict`` is the mirror written into properties.json.
+        # When they disagree the event wins and a warning is logged; the
+        # case mainly matters when ``_meta.verdict`` is missing because a
+        # downstream serialisation step dropped it (Bug A 2026-05-11).
+        # ``canonical_id`` is the key the runner emits with; ``property_id``
+        # covers the legacy daily_runner shape.
+        pid = str(
+            meta.get("canonical_id")
+            or meta.get("property_id")
+            or p.get("property_id")
+            or ""
+        )
+        verdict = resolve_verdict(
+            meta_verdict=str(meta.get("verdict") or ""),
+            event_verdict=verdict_by_pid.get(pid) if pid else None,
+            pid=pid,
+        )
+        # ``FAIL`` substring guard preserved for the small set of records
+        # (e.g. ``_make_failed_record`` early returns) that bypass both
+        # the verdict-writer AND the emit event — they carry tier="FAILED"
+        # and no other failure signal.
         if verdict.startswith("FAILED") or "FAIL" in str(tier).upper():
             failed += 1
         if meta.get("carry_forward_used"):
@@ -136,13 +192,10 @@ def build(
         else:
             real_tier_counts[tier] += count
 
-    # ── Authoritative bot/captcha classification from the event ledger ─────
-    # The verdict-string heuristic below is best-effort — the events.jsonl
-    # ledger is the source of truth for fetch outcomes. We use it to (a)
-    # produce a per-property list of bot/captcha-blocked properties, and (b)
-    # classify pre-extraction terminations precisely instead of dumping
-    # everything into "fetch_other".
-    bot_blocked_by_pid, captcha_by_pid = _scan_event_ledger(run_dir)
+    # ``bot_blocked_by_pid`` / ``captcha_by_pid`` were populated by the
+    # single ``_scan_event_ledger`` call at the top of this function.
+    # Used here to classify pre-extraction terminations precisely instead
+    # of dumping everything into "fetch_other".
 
     # Map fetch-outcome short-circuit tiers to descriptive keys.
     pre_extraction_terminations: dict[str, int] = {}

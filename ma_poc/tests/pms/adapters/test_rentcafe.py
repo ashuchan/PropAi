@@ -464,3 +464,193 @@ def test_rentcafe_matches_response_body_protocol() -> None:
         is True
     )
     assert adapter.matches_response_body({"random": "not-rentcafe"}) is False
+
+
+# ── 2026-05-12 field-map fix: MAA Worthington shape ─────────────────────────
+
+
+class TestMAAWorthingtonFieldMap:
+    """Regression tests for the unit-level field-map fix.
+
+    The MAA Worthington payload (real shape from run 2026-05-11/shard_0/11992.md)
+    uses ``apartmentName`` for the per-unit identifier and a plain ``sqft``
+    field for the area. Pre-fix, the parser:
+      * dropped ``sqft`` because only ``minimumsqft``/``maximumsqft`` were read
+      * used ``floorplanId`` (a shared floorplan-level id) as ``unit_number``
+        causing every unit on the same plan to collide.
+
+    The fix reads both unit-level fields first, falling back to the legacy
+    plan-level fields. Existing Windsor/Bexley tests (no apartmentName,
+    no plain sqft) continue to use the legacy paths.
+    """
+
+    def test_unit_level_sqft_preferred_over_min_max(self):
+        """``sqft=1019`` wins over ``MinimumSqft=900, MaximumSqft=1100``."""
+        items = [
+            {
+                "floorplanName": "Traditional 2x2 1019 SF",
+                "apartmentName": "217",
+                "beds": 2,
+                "baths": 2,
+                "sqft": 1019,                # ← unit-level (MAA shape)
+                "minimumSqft": 900,
+                "maximumSqft": 1100,
+                "minimumRent": 2680,
+                "maximumRent": 5165,
+            }
+        ]
+        units = parse_rentcafe_floorplans(items, "test")
+        assert len(units) == 1
+        assert units[0]["sqft"] == "1019"
+
+    def test_unit_level_sqft_only(self):
+        """MAA case: only ``sqft`` is set; no min/max range. Read directly."""
+        items = [
+            {
+                "floorplanName": "Traditional 2x2 1019 SF",
+                "apartmentName": "217",
+                "beds": 2, "baths": 2,
+                "sqft": 1019,
+                "minimumRent": 2680,
+                "maximumRent": 5165,
+            }
+        ]
+        units = parse_rentcafe_floorplans(items, "test")
+        assert units[0]["sqft"] == "1019"
+
+    def test_apartmentname_preferred_over_floorplanid(self):
+        """``apartmentName="217"`` wins over ``floorplanId="2321569"``."""
+        items = [
+            {
+                "floorplanName": "Traditional 2x2 1019 SF",
+                "floorplanId": "2321569",     # legacy fallback id
+                "apartmentName": "217",       # ← real unit number
+                "beds": 2, "baths": 2, "sqft": 1019,
+                "minimumRent": 2680,
+            }
+        ]
+        units = parse_rentcafe_floorplans(items, "test")
+        assert units[0]["unit_number"] == "217"
+
+    def test_unitnumber_alias_preferred_over_floorplanid(self):
+        """If the payload uses ``unitNumber`` (snake_case lowercased) instead
+        of ``apartmentName``, that's also preferred over ``floorplanId``."""
+        items = [
+            {
+                "floorplanName": "1BR Standard",
+                "floorplanId": "FP1",
+                "unitNumber": "101",
+                "beds": 1, "baths": 1, "sqft": 750, "minimumRent": 1500,
+            }
+        ]
+        units = parse_rentcafe_floorplans(items, "test")
+        assert units[0]["unit_number"] == "101"
+
+    def test_legacy_floorplanid_fallback_still_works(self):
+        """Windsor/Bexley payloads (no apartmentName, no plain sqft) keep
+        their existing behaviour: ``floorplanId`` becomes ``unit_number``,
+        and ``minimumSqft``/``maximumSqft`` form the sqft range string."""
+        items = [
+            {
+                "FloorplanName": "1BR",
+                "FloorplanId": "FP1",
+                "Beds": 1, "Baths": 1,
+                "MinimumSqft": 700,
+                "MaximumSqft": 750,
+                "MinimumRent": "2100",
+                "MaximumRent": "2400",
+            }
+        ]
+        units = parse_rentcafe_floorplans(items, "test")
+        assert units[0]["unit_number"] == "FP1"
+        assert units[0]["sqft"] == "700-750"
+
+    @pytest.mark.asyncio
+    async def test_full_extract_admits_maa_units(self):
+        """End-to-end: 3 MAA-shape items → 3 admitted units after post_process."""
+        body = [
+            {
+                "floorplanName": "Traditional 2x2 1019 SF",
+                "floorplanId": "2321569",
+                "apartmentName": "217",
+                "beds": 2, "baths": 2, "sqft": 1019,
+                "minimumRent": 2680, "maximumRent": 5165,
+                "api": "rentcafe",
+            },
+            {
+                "floorplanName": "Traditional 2x2 1019 SF",
+                "floorplanId": "2321569",
+                "apartmentName": "318",
+                "beds": 2, "baths": 2, "sqft": 1019,
+                "minimumRent": 2700, "maximumRent": 5180,
+                "api": "rentcafe",
+            },
+            {
+                "floorplanName": "Traditional 1x1 770 SF",
+                "floorplanId": "2604570",
+                "apartmentName": "302",
+                "beds": 1, "baths": 1, "sqft": 720,
+                "minimumRent": 1940, "maximumRent": 3270,
+                "api": "rentcafe",
+            },
+        ]
+        adapter = RentCafeAdapter()
+        ctx = _make_ctx([{"url": "https://www.maac.com/api/properties/X/units/available/", "body": body}])
+        result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+        assert result.tier_used == "TIER_1_API_RENTCAFE"
+        assert len(result.units) == 3
+        # Each unit retains its apartmentName-derived unit_number
+        unit_numbers = {u.get("unit_number") for u in result.units}
+        assert unit_numbers == {"217", "318", "302"}
+
+    @pytest.mark.asyncio
+    async def test_full_extract_rejects_dimless_rows(self):
+        """An adversarial payload with valid RentCafe shape but no dimensions
+        on any item — post_process drops them all and adapter falls through
+        to the failure path, recording RENTCAFE_VALIDITY_REJECTED."""
+        body = [
+            {
+                "api": "rentcafe",
+                "floorplanName": "Some Plan",
+                "minimumRent": "1500",
+                # no beds, no baths, no sqft, no min/max sqft — fails is_valid_unit
+            },
+        ]
+        adapter = RentCafeAdapter()
+        ctx = _make_ctx([{"url": "https://example.com/api", "body": body}])
+        result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+        # No admitted units
+        assert len(result.units) == 0
+        # Error trail names the validity-rejection
+        assert any(
+            "RENTCAFE_VALIDITY_REJECTED" in e for e in result.errors
+        ), f"expected validity-rejection error, got: {result.errors!r}"
+
+    def test_three_maa_units_on_same_plan_get_distinct_unit_numbers(self):
+        """Pre-fix: three apartments sharing floorplanId 2321569 all got
+        unit_number=2321569 → dedup collapsed them. Post-fix: each carries
+        its real apartmentName, all distinct."""
+        items = [
+            {
+                "floorplanName": "Traditional 2x2 1019 SF",
+                "floorplanId": "2321569",
+                "apartmentName": "217",
+                "beds": 2, "baths": 2, "sqft": 1019, "minimumRent": 2680,
+            },
+            {
+                "floorplanName": "Traditional 2x2 1019 SF",
+                "floorplanId": "2321569",
+                "apartmentName": "318",
+                "beds": 2, "baths": 2, "sqft": 1019, "minimumRent": 2700,
+            },
+            {
+                "floorplanName": "Traditional 2x2 1019 SF",
+                "floorplanId": "2321569",
+                "apartmentName": "419",
+                "beds": 2, "baths": 2, "sqft": 1019, "minimumRent": 2720,
+            },
+        ]
+        units = parse_rentcafe_floorplans(items, "test")
+        assert len(units) == 3
+        unit_numbers = {u["unit_number"] for u in units}
+        assert unit_numbers == {"217", "318", "419"}

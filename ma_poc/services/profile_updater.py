@@ -581,13 +581,23 @@ def update_profile_after_extraction(
         profile.confidence.consecutive_failures += 1
         profile.confidence.consecutive_successes = 0
 
-    # Promote/demote maturity
+    # Promote/demote maturity. Resolve the enum class from the instance's own
+    # schema rather than the module-level ``ProfileMaturity`` import, because
+    # the codebase has both ``models.scrape_profile`` and
+    # ``ma_poc.models.scrape_profile`` reachable on sys.path — Python loads
+    # them as distinct modules, each with its own ``ProfileMaturity`` class.
+    # Assigning the "wrong" class (functionally equal — StrEnum compares by
+    # value, JSON output is correct) trips Pydantic's
+    # ``PydanticSerializationUnexpectedValue`` on every profile save after a
+    # maturity transition. Using the instance-bound class guarantees the
+    # serializer's expected enum class matches the assigned value.
+    _Maturity = type(profile.confidence.maturity)
     if profile.confidence.consecutive_successes >= 3:
-        profile.confidence.maturity = ProfileMaturity.HOT
+        profile.confidence.maturity = _Maturity.HOT
     elif profile.confidence.consecutive_successes >= 1:
-        profile.confidence.maturity = ProfileMaturity.WARM
+        profile.confidence.maturity = _Maturity.WARM
     elif profile.confidence.consecutive_failures >= 3:
-        profile.confidence.maturity = ProfileMaturity.COLD
+        profile.confidence.maturity = _Maturity.COLD
 
     # ── Record the winning page URL ────────────────────────────────────
     # This is the actual URL (or widget endpoint) that produced unit data.

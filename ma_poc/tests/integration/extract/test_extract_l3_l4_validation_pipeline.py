@@ -109,11 +109,15 @@ class TestSightmapToValidation:
 
 class TestRealPageToValidation:
     def _realpage_body(self) -> dict:
+        # Stage 1 contract (2026-05-12): validity requires a numeric dimension.
+        # Fixture extended with beds/baths/sqft so the pipeline exercises the
+        # validation step with realistic per-unit data. Pre-Stage-1 these
+        # rows had only unitNumber+rent — that no longer qualifies as a unit.
         return {
             "response": [
-                {"unitNumber": "A101", "rent": 1450, "availableDate": "2026-06-01"},
-                {"unitNumber": "A102", "rent": 1600},
-                {"unitNumber": "A103", "rent": 50},  # below sanity min — skipped
+                {"unitNumber": "A101", "rent": 1450, "bedrooms": 1, "bathrooms": 1, "sqft": 750, "availableDate": "2026-06-01"},
+                {"unitNumber": "A102", "rent": 1600, "bedrooms": 2, "bathrooms": 2, "sqft": 1050},
+                {"unitNumber": "A103", "rent": 50, "bedrooms": 1, "bathrooms": 1, "sqft": 750},  # below sanity min — skipped
             ]
         }
 

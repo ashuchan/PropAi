@@ -1,13 +1,22 @@
 """SLO watcher — checks run-level metrics against thresholds.
 
-Pure logic, no I/O. Raises alerts as SloViolation dataclasses.
+Raises alerts as SloViolation dataclasses. Optional events.jsonl
+consultation (when ``run_dir`` is provided to ``check``) makes the
+success-rate signal robust against ``_meta.verdict`` corruption — see
+docs/2026_05_11_regressions_fix_design.md (Bug A v0.2).
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+from ma_poc.reporting.verdict import (
+    resolve_verdict,
+    scan_event_ledger_verdicts,
+)
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +53,7 @@ def check(
     cost_rollup: dict[str, float],
     property_results: list[dict[str, Any]],
     thresholds: SloThresholds | None = None,
+    run_dir: Path | None = None,
 ) -> list[SloViolation]:
     """Check run-level metrics against SLO thresholds.
 
@@ -51,6 +61,14 @@ def check(
         cost_rollup: Dict from CostLedger.total() — {category: total_usd}.
         property_results: List of property result dicts from the run.
         thresholds: SLO thresholds (default: production thresholds).
+        run_dir: When provided, ``events.jsonl`` in this directory is
+            consulted as the authoritative secondary source for
+            per-property verdicts. The runner emits
+            ``output.property_emitted`` unconditionally at the tail of
+            ``_process_property`` — that signal is preserved even when
+            ``_meta.verdict`` is dropped by a downstream serialisation
+            step (Bug A 2026-05-11). Omitting ``run_dir`` falls back to
+            ``_meta.verdict`` only, preserving the pre-v0.2 behaviour.
 
     Returns:
         List of SloViolation for any breached thresholds.
@@ -61,15 +79,41 @@ def check(
     violations: list[SloViolation] = []
     total = len(property_results) or 1
 
-    # Source of truth for per-property outcome: `_meta.verdict` (SUCCESS /
-    # FAILED_UNREACHABLE / FAILED_NO_DATA / PARTIAL). `_meta.scrape_tier_used`
-    # is written by the legacy pipeline but NOT by Jugnu, so reading it alone
-    # flags every Jugnu property as failed.
-    def _failed(p: dict[str, Any]) -> bool:
+    # Resolve verdicts once. When ``run_dir`` is omitted (legacy callers
+    # and most tests), ``verdict_by_pid`` is an empty dict and the
+    # resolver falls through to ``_meta.verdict`` — matching pre-v0.2
+    # behaviour.
+    verdict_by_pid: dict[str, str] = (
+        scan_event_ledger_verdicts(run_dir) if run_dir is not None else {}
+    )
+
+    def _verdict(p: dict[str, Any]) -> str:
         meta = p.get("_meta", {}) or {}
-        verdict = str(meta.get("verdict") or "")
+        pid = str(
+            meta.get("canonical_id")
+            or meta.get("property_id")
+            or p.get("property_id")
+            or ""
+        )
+        return resolve_verdict(
+            meta_verdict=str(meta.get("verdict") or ""),
+            event_verdict=verdict_by_pid.get(pid) if pid else None,
+            pid=pid,
+        )
+
+    def _failed(p: dict[str, Any]) -> bool:
+        # ``_meta.scrape_tier_used`` is written by the legacy pipeline
+        # but NOT by Jugnu, so reading the tier-string heuristic alone
+        # would flag every Jugnu property as failed. Keep the heuristic
+        # only as a tail-case guard for records whose verdict resolved
+        # to empty (no ``_meta.verdict`` AND no emit event — the
+        # ``_make_failed_record`` early-return shape).
+        verdict = _verdict(p)
         if verdict.startswith("FAILED"):
             return True
+        if verdict:
+            return False
+        meta = p.get("_meta", {}) or {}
         tier_legacy = str(meta.get("scrape_tier_used") or "")
         return "FAIL" in tier_legacy.upper()
 

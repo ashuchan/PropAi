@@ -263,8 +263,25 @@ class AmliAdapter:
                     result.tier_used = _TIER_INLINE
                     result.winning_url = ctx.base_url
             if result.units:
-                result.confidence = min(0.95, 0.7 + 0.05 * len(result.units))
-                return result
+                # Stage 1 validity gate. If every parsed inline unit fails
+                # validity, clear them and fall through to the submarket
+                # refetch path.
+                from ma_poc.extraction.post_process import post_process
+
+                _pp_parsed = len(result.units)
+                _pp = post_process(
+                    result.units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _pp.n_admitted > 0:
+                    result.units = _pp.admitted
+                    result.plan_summaries = _pp.plan_summaries
+                    result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
+                    return result
+                result.units = []
+                result.errors.append(
+                    f"AMLI_INLINE_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
+                    f"failed unit_validity (no numeric dimension)"
+                )
 
         # Step 2 — refetch the SUBMARKET _next/data JSON. This is the
         # authoritative source — it always has units when AMLI has them.
@@ -306,9 +323,24 @@ class AmliAdapter:
             )
             return result
 
+        # Stage 1 validity gate on submarket-fetched units.
+        from ma_poc.extraction.post_process import post_process
+
+        _pp_parsed = len(result.units)
+        _pp = post_process(result.units, property_id=getattr(ctx, "property_id", None))
+        if _pp.n_admitted == 0:
+            result.units = []
+            result.errors.append(
+                f"AMLI_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
+                f"failed unit_validity (no numeric dimension)"
+            )
+            return result
+
+        result.units = _pp.admitted
+        result.plan_summaries = _pp.plan_summaries
         result.tier_used = _TIER_FETCHED
         result.winning_url = submarket_url
-        result.confidence = min(0.95, 0.7 + 0.05 * len(result.units))
+        result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
         return result
 
     def static_fingerprints(self) -> list[str]:

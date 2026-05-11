@@ -79,10 +79,58 @@ def test_classify_playwright_timeout_exception() -> None:
     assert sig == "timeout"
 
 
-def test_classify_404_hard_fail() -> None:
+def test_classify_404_is_dead_url() -> None:
+    """Stage 3 (2026-05-12): 404 is terminal — the resource is gone.
+    Distinct from HARD_FAIL (which 4xx-other-than-dead-URL covers).
+    Reporting excludes DEAD_URL from the success-rate denominator.
+    (Pre-Stage-3: this asserted FetchOutcome.HARD_FAIL.)"""
     outcome, sig = classify(404, {}, b"")
-    assert outcome == FetchOutcome.HARD_FAIL
+    assert outcome == FetchOutcome.DEAD_URL
     assert sig == "HTTP_404"
+
+
+def test_classify_410_is_dead_url() -> None:
+    """410 Gone — the resource was permanently removed."""
+    outcome, sig = classify(410, {}, b"")
+    assert outcome == FetchOutcome.DEAD_URL
+    assert sig == "HTTP_410"
+
+
+def test_classify_451_is_dead_url() -> None:
+    """451 Unavailable For Legal Reasons — terminal, never retry."""
+    outcome, sig = classify(451, {}, b"")
+    assert outcome == FetchOutcome.DEAD_URL
+    assert sig == "HTTP_451"
+
+
+def test_classify_other_4xx_stays_hard_fail() -> None:
+    """4xx codes other than dead-URL codes still route to HARD_FAIL.
+    400 (bad request), 405 (method not allowed), 406 (not acceptable),
+    etc. — these are application-layer issues, not "resource gone"."""
+    for status in (400, 405, 406, 408, 409, 411, 415, 422):
+        outcome, sig = classify(status, {}, b"")
+        assert outcome == FetchOutcome.HARD_FAIL, f"status={status} should be HARD_FAIL"
+        assert sig == f"HTTP_{status}"
+
+
+def test_classify_nxdomain_exception_is_dead_url() -> None:
+    """``ERR_NAME_NOT_RESOLVED`` / NXDOMAIN — the domain doesn't exist.
+    Distinct from a transient DNS hiccup which stays HARD_FAIL."""
+    from socket import gaierror
+
+    exc = gaierror("[Errno -2] Name or service not known")
+    outcome, sig = classify(None, {}, None, exception=exc)
+    # "name or service not known" matches the NXDOMAIN heuristic
+    assert outcome == FetchOutcome.DEAD_URL
+    assert sig == "ERR_DNS_NXDOMAIN"
+
+
+def test_classify_nxdomain_chrome_signature_is_dead_url() -> None:
+    """Chrome / Chromium-emitted ``ERR_NAME_NOT_RESOLVED`` from Playwright."""
+    exc = OSError("net::ERR_NAME_NOT_RESOLVED at https://gone-domain.example/")
+    outcome, sig = classify(None, {}, None, exception=exc)
+    assert outcome == FetchOutcome.DEAD_URL
+    assert sig == "ERR_DNS_NXDOMAIN"
 
 
 def test_patchright_timeout_import_resolves() -> None:

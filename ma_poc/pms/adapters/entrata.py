@@ -193,10 +193,23 @@ class EntrataAdapter:
                     result.api_responses.append(resp)
 
         if all_units:
-            result.units = all_units
-            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
-            result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
-            return result
+            # Stage 1 validity gate — drops dim-less rows.
+            from ma_poc.extraction.post_process import post_process
+
+            _pp_parsed = len(all_units)
+            _pp = post_process(all_units, property_id=getattr(ctx, "property_id", None))
+            if _pp.n_admitted > 0:
+                result.units = _pp.admitted
+                result.plan_summaries = _pp.plan_summaries
+                result.winning_url = (
+                    result.api_responses[0].get("url") if result.api_responses else None
+                )
+                result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
+                return result
+            result.errors.append(
+                f"ENTRATA_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
+                f"failed unit_validity (no numeric dimension)"
+            )
 
         # Bug 9 (2026-05-09 deep-dive): direct probe of known Entrata paths
         # when the captured-API path produced nothing AND we have a live
@@ -207,10 +220,22 @@ class EntrataAdapter:
         if page is not None:
             probe_units = await self._probe_known_endpoints(page, ctx)
             if probe_units:
-                result.units = probe_units
-                result.tier_used = "TIER_1_API_ENTRATA_PROBE"
-                result.confidence = min(0.95, 0.7 + 0.05 * len(probe_units))
-                return result
+                # Stage 1 validity gate also applies to probed units.
+                from ma_poc.extraction.post_process import post_process
+
+                _pp_probe = post_process(
+                    probe_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _pp_probe.n_admitted > 0:
+                    result.units = _pp_probe.admitted
+                    result.plan_summaries = _pp_probe.plan_summaries
+                    result.tier_used = "TIER_1_API_ENTRATA_PROBE"
+                    result.confidence = min(0.95, 0.7 + 0.05 * _pp_probe.n_admitted)
+                    return result
+                result.errors.append(
+                    f"ENTRATA_PROBE_VALIDITY_REJECTED: {len(probe_units)} probed rows "
+                    f"failed unit_validity (no numeric dimension)"
+                )
 
         result.confidence = 0.0
         result.errors.append("No Entrata floorplan data found in captured API responses")

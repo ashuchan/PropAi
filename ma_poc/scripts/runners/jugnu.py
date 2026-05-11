@@ -465,7 +465,11 @@ async def run_jugnu(
     except Exception as exc:  # noqa: BLE001
         log.warning("event ledger flush before reporting failed: %s", exc)
     cost_rollup = cost_ledger.total()
-    slo_violations = slo_check(cost_rollup, merged_properties)
+    # ``run_dir`` consulted by slo_check so events.jsonl serves as the
+    # authoritative secondary source for per-property verdicts. Keeps
+    # the success-rate SLO honest when _meta.verdict is dropped by a
+    # downstream serialisation step (Bug A v0.2).
+    slo_violations = slo_check(cost_rollup, merged_properties, run_dir=run_dir)
     report = build_run_report(merged_properties, run_dir, today, cost_rollup, slo_violations)
 
     # Cleanup
@@ -913,6 +917,20 @@ def _format_output(
 ) -> dict[str, Any]:
     """Format a raw Jugnu result into the target output schema.
 
+    Sharing contract — both ``_format_v1`` and ``_format_v2`` use
+    ``result.setdefault("_meta", {})`` so that after this call returns:
+
+      1. ``result["_meta"]`` exists (created if absent).
+      2. The returned dict's ``_meta`` is the **same object** as
+         ``result["_meta"]``.
+
+    Mutations to either reference (e.g. the verdict-writer in
+    ``_process_property`` that runs *after* the hoisted format call) are
+    therefore visible through both. Caller-side initialisation is not
+    required. This contract is what prevents Bug A (2026-05-11 cloud-run
+    regression where the verdict written after a hoisted ``_format_output``
+    call never reached ``properties.json``).
+
     Args:
         result: Internal result dict from _process_property.
         csv_row: Original CSV row for this property (for field enrichment).
@@ -931,8 +949,14 @@ def _format_v1(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
 
     Produces the same structure as daily_runner.build_property_record but
     without requiring PropertyIdentity — uses CSV row + scrape metadata.
+
+    See ``_format_output`` docstring for the ``_meta`` sharing contract this
+    function upholds via ``setdefault``.
     """
-    meta = result.get("_meta", {})
+    # ``setdefault`` (not ``.get``) so the returned dict's ``_meta`` is the
+    # same object as ``result["_meta"]``. See _format_output docstring +
+    # docs/2026_05_11_regressions_fix_design.md (Bug A).
+    meta = result.setdefault("_meta", {})
     md = result.get("property_metadata") or {}
     units = result.get("units", [])
     canonical_id = meta.get("canonical_id", "")
@@ -1043,8 +1067,20 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
 
     Uses the same logic as schema_v2.build_v2_property but without
     requiring PropertyIdentity.
+
+    See ``_format_output`` docstring for the ``_meta`` sharing contract this
+    function upholds via ``setdefault``.
     """
-    meta = result.get("_meta", {})
+    # ``setdefault`` (not ``.get``) so the returned dict's ``_meta`` is the
+    # same object as ``result["_meta"]``. Mutations performed after this call
+    # returns — e.g. the verdict-writer in ``_process_property:761`` running
+    # after the hoisted format call at line 691 — propagate into the cached
+    # ``_v2_formatted`` and onward into ``properties.json``. Without this,
+    # ``properties.json`` carries ``_meta = {}`` and every downstream
+    # consumer that reads ``_meta.verdict`` (run_report, slo_watcher,
+    # sync_to_pg, retry, …) loses the signal. Root cause of Bug A —
+    # docs/2026_05_11_regressions_fix_design.md.
+    meta = result.setdefault("_meta", {})
     md = result.get("property_metadata") or {}
     units = result.get("units", [])
     scrape_ts = datetime.now(UTC)

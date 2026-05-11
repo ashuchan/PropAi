@@ -63,11 +63,20 @@ def apply_drift_demotion(profile: ScrapeProfile, reasons: list[str]) -> ScrapePr
     """Demote profile maturity based on drift signals."""
     severe = any("all_rents_null" in r or "timeout_pattern" in r for r in reasons)
 
+    # Resolve the enum class from the instance's own schema rather than the
+    # module-level ``ProfileMaturity`` import — the codebase has both
+    # ``models.scrape_profile`` and ``ma_poc.models.scrape_profile`` reachable
+    # on sys.path, each with its own ``ProfileMaturity`` class object.
+    # Assigning the "wrong" class trips ``PydanticSerializationUnexpectedValue``
+    # warnings on the next profile save; using the instance-bound class
+    # guarantees serializer/value class agreement. Comparison (``==``) is
+    # value-based on StrEnum so existing == checks remain correct unchanged.
+    _Maturity = type(profile.confidence.maturity)
     if severe:
-        profile.confidence.maturity = ProfileMaturity.COLD
+        profile.confidence.maturity = _Maturity.COLD
         profile.confidence.consecutive_successes = 0
     elif profile.confidence.maturity == ProfileMaturity.HOT:
-        profile.confidence.maturity = ProfileMaturity.WARM
+        profile.confidence.maturity = _Maturity.WARM
         profile.confidence.consecutive_successes = 0
 
     return profile

@@ -94,6 +94,69 @@ async def test_rescue_returns_empty_when_unsupported_adapter() -> None:
     assert any("unsupported" in e for e in result.errors)
 
 
+# ── Bug D: rescue allow-list matches scraper-side gate (P2 invariant) ────────
+
+
+@pytest.mark.asyncio
+async def test_rescue_accepts_onesite_source_adapter() -> None:
+    """Bug D regression guard. ``scraper.py:713`` passes ``onesite`` to
+    ``rescue_from_api_responses`` per the F1.3 widening (commit 53b0680).
+    Rescue must not reject at the supported-adapter gate.
+
+    The test asserts the failure message is NOT "unsupported adapter:
+    onesite" — it does not assert the rescue ultimately succeeds, since
+    the mocked LLM is absent and the rescue may fail downstream for other
+    reasons (which is fine; we only enforce the gate behaviour).
+    """
+    result = await rescue_from_api_responses(_inp(source_adapter="onesite"))
+    assert not any(
+        "unsupported adapter" in e for e in result.errors
+    ), (
+        f"Rescue rejected 'onesite' at the supported-adapter gate. "
+        f"scraper.py widens its inline allow-list to onesite but "
+        f"llm_api_rescue.SUPPORTED_ADAPTERS does not include it — drift "
+        f"reintroduced. See Bug D in "
+        f"docs/2026_05_11_regressions_fix_design.md. Errors observed: "
+        f"{result.errors}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_rescue_accepts_amli_source_adapter() -> None:
+    """Symmetric to ``test_rescue_accepts_onesite_source_adapter``."""
+    result = await rescue_from_api_responses(_inp(source_adapter="amli"))
+    assert not any(
+        "unsupported adapter" in e for e in result.errors
+    ), (
+        f"Rescue rejected 'amli' at the supported-adapter gate. Errors: "
+        f"{result.errors}"
+    )
+
+
+def test_tier_label_for_handles_all_supported_adapters() -> None:
+    """Every member of ``SUPPORTED_ADAPTERS`` must have a tier-label entry
+    in ``_tier_label_for``. Otherwise a successful rescue at a newly
+    supported adapter raises ``KeyError`` at ``llm_api_rescue.py:719`` —
+    which the broad ``except`` at line 732 silently swallows, turning
+    success into a silent miss. The invariant: gate + label vocabulary
+    move together.
+    """
+    from ma_poc.services.llm_api_rescue import SUPPORTED_ADAPTERS
+
+    for adapter in SUPPORTED_ADAPTERS:
+        label = _tier_label_for(adapter)
+        assert isinstance(label, str) and label, (
+            f"_tier_label_for({adapter!r}) returned a falsy or non-string "
+            f"value: {label!r}. Every adapter in SUPPORTED_ADAPTERS must "
+            f"have a tier label so rescue can record what won."
+        )
+        # All rescue labels follow the convention.
+        assert "LLM_RESCUE" in label, (
+            f"tier label for {adapter!r} = {label!r} does not match the "
+            f"existing convention (must contain 'LLM_RESCUE')"
+        )
+
+
 # ── Filter ────────────────────────────────────────────────────────────────────
 
 

@@ -719,6 +719,58 @@ def render_summary_md(stats: RunStats, outcomes: dict[str, PropertyOutcome]) -> 
     return "\n".join(lines) + "\n"
 
 
+def render_failures_csv(outcomes: dict[str, PropertyOutcome], out_path: Path) -> None:
+    """Write one row per failed property — the canonical failure-list source.
+
+    Restored after commit f11b6dc added ``render_successes_csv`` for the
+    canary regression basket but left ``write_outputs`` calling
+    ``render_failures_csv``, which had been removed by the same commit's
+    rename. Without this, ``analyze_cloud_run`` crashes at the end of
+    every invocation with ``NameError: name 'render_failures_csv' is
+    not defined``. Schema mirrors the commit-6cf2389 version (24 cols).
+    """
+    rows = []
+    for o in outcomes.values():
+        if not o.failed:
+            continue
+        pattern_id, sub = categorise_failure(o)
+        rows.append({
+            "property_id": o.property_id,
+            "shard": o.shard,
+            "domain": o.domain or "",
+            "url": o.url or "",
+            "verdict": o.verdict or "",
+            "terminal_tier": o.terminal_tier or "",
+            "pms_detected": o.pms_detected or "",
+            "adapter_selected": o.adapter_selected or "",
+            "fetch_outcome": o.fetch_outcome or "",
+            "fetch_error_signature": o.fetch_error_signature or "",
+            "fetch_status": o.fetch_status or "",
+            "body_bytes": o.body_bytes or 0,
+            "captcha_detected": o.captcha_detected,
+            "bot_blocked": o.bot_blocked,
+            "llm_rescue_attempted": o.llm_rescue_attempted,
+            "llm_rescue_succeeded": o.llm_rescue_succeeded,
+            "llm_cost": round(o.llm_cost, 5),
+            "link_hops_attempted": o.link_hops_attempted,
+            "link_hops_recovered": o.link_hops_recovered,
+            "issue_codes": "|".join(o.issue_codes),
+            "pattern_id": pattern_id,
+            "pattern_sub": sub,
+            "final_url": o.final_url or "",
+        })
+    rows.sort(key=lambda r: (r["pattern_id"], r["domain"], r["property_id"]))
+
+    if not rows:
+        out_path.write_text("", encoding="utf-8")
+        return
+
+    with out_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def render_successes_csv(outcomes: dict[str, PropertyOutcome], out_path: Path) -> None:
     """Write one row per SUCCESS/CARRY_FORWARD property for the canary regression basket.
 

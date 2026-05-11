@@ -43,12 +43,36 @@ from ma_poc.pms.adapters._parsing import (
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
+# Note: ``ma_poc.extraction.post_process`` is imported lazily inside ``extract``
+# below to break the import cycle. The full chain would otherwise be:
+#   rentcafe (load) → extraction.post_process → extraction.infer →
+#   pms.adapters._parsing → pms.adapters.__init__ → rentcafe (RE-load).
+# Function-local import dodges this; Python caches the module after the first
+# call, so there's no per-call overhead.
+
 if TYPE_CHECKING:
     from playwright.async_api import Page
 
 
 def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
-    """Parse a RentCafe/Yardi floorplan list into standard unit dicts."""
+    """Parse a RentCafe/Yardi floorplan list into standard unit dicts.
+
+    Field-map additions (2026-05-12 fix for MAA Worthington):
+
+      * **sqft**: prefer the unit-level ``sqft`` field (MAA-shaped payload);
+        fall back to ``minimumsqft``/``maximumsqft`` (Windsor range shape).
+        Pre-fix, MAA's per-unit ``sqft=1019`` was silently dropped because
+        only the min/max forms were read.
+
+      * **unit_number**: prefer the unit-level identifier (``apartmentname``
+        or ``unitnumber``) when present; fall back to ``floorplanid`` (the
+        legacy floorplan-level surrogate). MAA emits ``apartmentName="217"``
+        — that's the real unit number, not the shared floorplan id.
+
+    Both changes are additive: the legacy fallbacks keep existing Windsor/
+    Bexley/Pacifica behaviour intact (their payloads don't carry the
+    unit-level fields).
+    """
     units: list[dict[str, str]] = []
     for item in items:
         if not isinstance(item, dict):
@@ -62,9 +86,14 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         baths_str = str(baths_raw) if baths_raw is not None else None
         baths = int(float(baths_str)) if baths_str is not None else None
 
-        sqft_lo = str(item_lc.get("minimumsqft") or item_lc.get("minsqft") or "")
-        sqft_hi = str(item_lc.get("maximumsqft") or item_lc.get("maxsqft") or "")
-        sqft = sqft_lo if sqft_lo == sqft_hi or not sqft_hi else f"{sqft_lo}-{sqft_hi}"
+        # F1 (2026-05-12): unit-level sqft wins over plan-level min/max range.
+        sqft_single_raw = item_lc.get("sqft")
+        if sqft_single_raw is not None and sqft_single_raw != "":
+            sqft = str(sqft_single_raw)
+        else:
+            sqft_lo = str(item_lc.get("minimumsqft") or item_lc.get("minsqft") or "")
+            sqft_hi = str(item_lc.get("maximumsqft") or item_lc.get("maxsqft") or "")
+            sqft = sqft_lo if sqft_lo == sqft_hi or not sqft_hi else f"{sqft_lo}-{sqft_hi}"
 
         # Prefer numeric min_price/max_price; fall back to string minimumRent/maximumRent
         rent_lo_raw = item_lc.get("min_price")
@@ -82,6 +111,15 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         avail_count = str(item_lc.get("availableunitscount") or item_lc.get("unitscount") or "")
         avail_date = str(item_lc.get("availabledate") or "")
 
+        # F2 (2026-05-12): real unit number wins over floorplan-level id.
+        unit_number_str = str(
+            item_lc.get("apartmentname")
+            or item_lc.get("unitnumber")
+            or item_lc.get("unit_number")
+            or item_lc.get("floorplanid")
+            or ""
+        )
+
         units.append(
             make_unit_dict(
                 floor_plan_name=name,
@@ -89,7 +127,7 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
                 bedrooms=str(beds) if beds is not None else "",
                 bathrooms=str(baths) if baths is not None else "",
                 sqft=sqft,
-                unit_number=str(item_lc.get("floorplanid") or ""),
+                unit_number=unit_number_str,
                 rent_range=format_rent_range(rent_lo, rent_hi),
                 availability_status="AVAILABLE" if avail_count and avail_count != "0" else "UNAVAILABLE",
                 available_units=avail_count,
@@ -257,11 +295,38 @@ class RentCafeAdapter:
                 result.api_responses.append(resp)
 
         if all_units:
-            result.units = all_units
-            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
-            result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
-            result.tier_used = _TIER_BASE
-            return result
+            # Stage 1 validity gate: every emitted unit must carry at least
+            # one numeric dimension (beds OR baths OR area, post-inference,
+            # post-sanity). Drops the 2026-05-11 regression shapes
+            # (Skyline-at-Kessler neighborhoods that masqueraded as units)
+            # while preserving real RentCafe inventory. See
+            # docs/2026_05_11_regressions_fix_design.md.
+            #
+            # Lazy import: see module-level note above for the cycle-break.
+            from ma_poc.extraction.post_process import post_process
+
+            pp = post_process(all_units, property_id=getattr(ctx, "property_id", None))
+            if pp.n_admitted > 0:
+                # Stage 2: surface unit-level AND plan-level lists. The
+                # runner promotes ``plan_summaries`` into the V2 record's
+                # ``floor_plans[]`` field; verdict treats a property with
+                # only plan-level data as SUCCESS_PLAN_LEVEL.
+                result.units = pp.admitted
+                result.plan_summaries = pp.plan_summaries
+                result.winning_url = (
+                    result.api_responses[0].get("url") if result.api_responses else None
+                )
+                result.confidence = min(0.95, 0.7 + 0.05 * pp.n_admitted)
+                result.tier_used = _TIER_BASE
+                return result
+            # All parsed units failed validity — record and fall through
+            # to the failure-classification path so the run-report
+            # distinguishes "parser produced rows but all invalid" from
+            # "parser produced zero rows".
+            result.errors.append(
+                f"RENTCAFE_VALIDITY_REJECTED: {len(all_units)} parsed rows "
+                f"failed unit_validity (no numeric dimension)"
+            )
 
         # Failure path: re-stamp tier_used with a structured sub-code so the
         # downstream report can distinguish misrouting from genuine zero data.

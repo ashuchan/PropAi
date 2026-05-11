@@ -111,6 +111,17 @@ def classify(
             return FetchOutcome.HARD_FAIL, "ERR_SSL_PROTOCOL_ERROR"
         if isinstance(exception, _DNS_ERRORS):
             err_msg = str(exception).lower()
+            # Stage 3 (2026-05-12): NXDOMAIN / "name not known" → terminal
+            # dead URL. Distinct from a transient DNS hiccup ("temporary
+            # failure in name resolution") which stays HARD_FAIL.
+            if (
+                "nxdomain" in err_msg
+                or "name or service not known" in err_msg
+                or "no such host" in err_msg
+                or "name not resolved" in err_msg
+                or "err_name_not_resolved" in err_msg
+            ):
+                return FetchOutcome.DEAD_URL, "ERR_DNS_NXDOMAIN"
             if "getaddrinfo" in err_msg or "name or service" in err_msg:
                 return FetchOutcome.HARD_FAIL, "ERR_DNS"
         if isinstance(exception, (asyncio.TimeoutError, TimeoutError)):
@@ -157,6 +168,15 @@ def classify(
 
     if 200 <= status < 300:
         return FetchOutcome.OK, None
+
+    # Stage 3 (2026-05-12): explicit "this resource is gone" statuses are
+    # terminal — distinct from other 4xx (HARD_FAIL). The site has either
+    # explicitly declared the resource gone (404 / 410) or legally
+    # unavailable (451). Reporting excludes these from the success-rate
+    # denominator and routes them to a re-discovery queue rather than
+    # the standard DLQ retry escalation.
+    if status in (404, 410, 451):
+        return FetchOutcome.DEAD_URL, f"HTTP_{status}"
 
     if 400 <= status < 500:
         return FetchOutcome.HARD_FAIL, f"HTTP_{status}"

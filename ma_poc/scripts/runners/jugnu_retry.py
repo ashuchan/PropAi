@@ -828,7 +828,9 @@ async def run_retry(
 
     # -- Report --
     cost_rollup = cost_ledger.total()
-    slo_violations = slo_check(cost_rollup, merged)
+    # events.jsonl in ``output_run_dir`` is the authoritative secondary
+    # source for per-property verdicts — see Bug A v0.2.
+    slo_violations = slo_check(cost_rollup, merged, run_dir=output_run_dir)
     report = build_run_report(merged, output_run_dir, today, cost_rollup, slo_violations)
 
     # Also write a retry-specific summary.

@@ -260,7 +260,9 @@ def main() -> int:
             cost_rollup = cl.total()
             cl.close()
 
-        slo_violations = slo_check(cost_rollup, merged)
+        # events.jsonl in ``output_run_dir`` is the authoritative secondary
+        # source for per-property verdicts — see Bug A v0.2.
+        slo_violations = slo_check(cost_rollup, merged, run_dir=output_run_dir)
         report = build_run_report(merged, output_run_dir, args.run_date, cost_rollup, slo_violations)
         log.info(
             "Regenerated report: %d properties, %d succeeded, success_rate=%s%%",

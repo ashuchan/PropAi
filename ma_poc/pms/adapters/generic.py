@@ -426,6 +426,67 @@ async def _get_page_html(page: Any, ctx: AdapterContext) -> str | None:
     return None
 
 
+# Cap on chunked-XHR HTML bodies promoted into the page HTML pool. Each
+# fragment is truncated to ``_CHUNK_BODY_CAP_BYTES``; the per-property
+# total is capped at ``_MAX_CHUNK_BODIES`` fragments. This bounds the
+# augmented HTML pool to ~1MB regardless of how many XHRs fired during
+# the fetch, so BeautifulSoup / DOM scanners stay within budget.
+_CHUNK_BODY_CAP_BYTES = 100_000
+_MAX_CHUNK_BODIES = 10
+
+
+def _collect_html_chunk_bodies(
+    api_responses: list[dict[str, Any]],
+    base_url: str | None,
+) -> list[tuple[str, str]]:
+    """Pick HTML-fragment XHR responses to promote into the HTML pool.
+
+    Sites such as Jonah Digital, legacy ASP.NET, and some headless WordPress
+    deliver unit data via XHRs that return HTML fragments rather than JSON.
+    The L1 fetcher captures these in ``network_log``, but the JSON-shape
+    unit gates (``find_unit_list`` / ``has_unit_signals``) skip them because
+    the body is a string starting with ``<`` instead of a dict/list. This
+    helper picks those bodies so ``dom_scan`` / ``jsonld`` / ``embedded_json``
+    can see them alongside the main page HTML.
+
+    Selection rules:
+      - Body must be a non-empty string whose first non-whitespace char is ``<``.
+      - URL must not equal the page navigation URL — the main page response is
+        also captured by ``page.on("response")`` and we already get it via
+        ``_get_page_html`` / ``fetch_result.body``.
+      - ``find_unit_list(body)`` must return empty — if the API gate already
+        consumed this response, don't double-feed it.
+      - Each body is truncated to ``_CHUNK_BODY_CAP_BYTES``.
+      - The returned list is truncated to ``_MAX_CHUNK_BODIES`` entries.
+
+    Returns a list of ``(url, body)`` tuples in capture order.
+    """
+    if not api_responses:
+        return []
+
+    base = (base_url or "").strip()
+    out: list[tuple[str, str]] = []
+
+    for resp in api_responses:
+        if len(out) >= _MAX_CHUNK_BODIES:
+            break
+        url = str(resp.get("url") or "")
+        if not url or url == base:
+            continue
+        body = resp.get("body")
+        if not isinstance(body, str):
+            continue
+        stripped = body.lstrip()
+        if not stripped or not stripped.startswith("<"):
+            continue
+        try:
+            if _find_unit_list(body):
+                continue
+        except Exception:
+            pass
+        out.append((url, body[:_CHUNK_BODY_CAP_BYTES]))
+
+    return out
 
 
 def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
@@ -613,6 +674,11 @@ class GenericAdapter:
         Calls _extract_inner (the legacy cascade) and, if sub-tier 0 stashed
         partial replay units that need filling-in by other sub-tiers, runs
         merge_sources on the combined source list and rewrites result.units.
+
+        Stage 1 validity gate runs **after** ``_phase5_post_merge`` (so the
+        cross-source merger has a chance to combine partial records before
+        filtering) but **before** ``_stash_provenanced_units`` (so the
+        observability snapshot reflects the same set the run output ships).
         """
         result = await self._extract_inner(page, ctx)
         try:
@@ -620,6 +686,40 @@ class GenericAdapter:
         except Exception:
             # Never break the run on a merge-side error (H10 best-effort)
             pass
+
+        # Stage 1 unified validity gate. Drops the rows that surveyed gates
+        # (parse_generic_api / parse_api_responses per-item / has_unit_signals
+        # / _container_yields_unit / _offer_to_unit / schema_gate.is_substantive)
+        # would each have caught with different bars. See
+        # docs/2026_05_11_regressions_fix_design.md (Stage 1).
+        if result.units:
+            try:
+                from ma_poc.extraction.post_process import post_process
+
+                _pp_parsed = len(result.units)
+                _pp = post_process(
+                    result.units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _pp.n_admitted > 0:
+                    result.units = _pp.admitted
+                    result.plan_summaries = _pp.plan_summaries
+                    # confidence already set by the winning sub-tier; only
+                    # rescale if the validity-drop changes its denominator
+                    # materially. Leave alone to preserve sub-tier scoring.
+                else:
+                    result.units = []
+                    result.tier_used = "GENERIC_VALIDITY_REJECTED"
+                    result.errors.append(
+                        f"GENERIC_VALIDITY_REJECTED: {_pp_parsed} rows from "
+                        f"{result.tier_used} failed unit_validity "
+                        f"(no numeric dimension)"
+                    )
+            except Exception:
+                # Never let the gate crash the run; fall through with the
+                # pre-gate units. The downstream schema_gate.check still
+                # filters per-record so we're not silently shipping junk.
+                pass
+
         # Fix 4: stash provenanced units for the Phase 11 self-learning loop
         # when the merge step didn't already populate _merged_units (single-source path).
         if not getattr(result, "_merged_units", None) and result.units:
@@ -1237,6 +1337,30 @@ class GenericAdapter:
         # a live Playwright page or from fetch_result.body) and cover the SSR
         # / static-site cases where no XHR fires during load.
         html = await _get_page_html(page, ctx)
+
+        # Promote chunked-XHR HTML fragments into the HTML pool so the
+        # downstream extractors see them. Some platforms (Jonah Digital,
+        # legacy ASP.NET, some headless WordPress) deliver unit data via
+        # XHRs that return HTML rather than JSON — those bodies fall
+        # through the JSON unit gates upstream and would otherwise be
+        # invisible to dom_scan / jsonld / embedded_json.
+        _chunk_bodies = _collect_html_chunk_bodies(api_responses, ctx.base_url)
+        if _chunk_bodies:
+            _chunk_blob = "\n".join(
+                f"<!-- chunked-xhr url={url!r} -->\n{body}"
+                for url, body in _chunk_bodies
+            )
+            html = ((html or "") + "\n" + _chunk_blob) if html else _chunk_blob
+            _log_attempt(
+                "generic:html_chunks_promoted",
+                "ran_promoted",
+                units=0,
+                reason=(
+                    f"promoted {len(_chunk_bodies)} HTML-fragment XHR body(ies) "
+                    f"into HTML pool for downstream extractors"
+                ),
+            )
+
         if html:
             # Sub-tier 3: JSON-LD
             t0 = _time.monotonic()

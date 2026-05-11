@@ -28,7 +28,6 @@ from ma_poc.pms.scraper import (
     _refresh_monolithic_budget_for_llm_hint,
 )
 
-
 # ── _augment_ranked_with_hints ───────────────────────────────────────────────
 
 
@@ -224,3 +223,414 @@ def test_monolithic_refresh_silent_when_no_property_id() -> None:
     raised = _refresh_monolithic_budget_for_llm_hint(budget)
     assert raised is True
     # No exception, returns the right value.
+
+
+# ── Bug B (P4) — PMS fingerprint priors ─────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "pms_name,expected_first_path",
+    [
+        ("rentcafe", "/floorplans"),
+        ("entrata", "/floorplans"),
+        ("appfolio", "/listings"),
+        ("onesite", "/floorplans"),
+        ("realpage_oll", "/floorplans"),
+        ("sightmap", "/floorplans"),
+        ("avalonbay", "/floor-plans-pricing"),
+        ("amli", "/floor-plans"),
+        ("funnel", "/floorplans"),
+    ],
+)
+def test_pms_priors_for_each_supported_pms_injects_template_paths(
+    pms_name: str, expected_first_path: str
+) -> None:
+    """Every PMS with a body-shape checker (i.e., every PMS that rides
+    the Bug-C P3 preservation path) must produce at least one priors
+    candidate when detected. The first prior path matches the dominant
+    convention for that platform. Bug B contract."""
+    from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
+    from ma_poc.pms.scraper import _PMS_PRIOR_SCORE, _pms_priors_for
+
+    detected = DetectedPMS(
+        pms=pms_name,
+        confidence=0.9,
+        evidence=[f"fp:{pms_name}"],
+        recommended_strategy=_STRATEGY_BY_PMS.get(pms_name, "cascade"),
+    )
+    priors = _pms_priors_for(detected, "https://example.com/")
+    assert priors, f"expected at least one prior for {pms_name!r}, got none"
+    # First entry is the canonical sub-path for this PMS.
+    first_url, first_score, first_anchor = priors[0]
+    assert first_url == f"https://example.com{expected_first_path}"
+    assert first_score == _PMS_PRIOR_SCORE
+    assert first_anchor == f"pms_prior:{pms_name}"
+
+
+def test_pms_priors_falls_back_to_universal_when_pms_is_unknown() -> None:
+    """When detection produces ``unknown``, the universal multifamily
+    sub-path priors fire as a fallback. This decouples link-hop recovery
+    from PMS-fingerprint recognition — sites on unrecognised CMSes still
+    get a fair shot at the canonical sub-paths. Pre-2026-05-12: returned
+    ``[]`` (the bug); fix lets recovery work for any unrecognised template
+    (Jonah Digital, custom stacks, future CMSes).
+    """
+    from ma_poc.pms.detector import DetectedPMS
+    from ma_poc.pms.scraper import _PMS_PRIOR_SCORE, _UNIVERSAL_SUB_PATH_PRIORS, _pms_priors_for
+
+    detected = DetectedPMS(
+        pms="unknown",
+        confidence=0.0,
+        evidence=["no signal"],
+        recommended_strategy="cascade",
+    )
+    priors = _pms_priors_for(detected, "https://example.com/")
+    assert len(priors) == len(_UNIVERSAL_SUB_PATH_PRIORS)
+    for url, score, anchor in priors:
+        assert score == _PMS_PRIOR_SCORE
+        assert anchor == "pms_prior:universal"
+    # First entry should be /floorplans — the most common multifamily
+    # availability-page convention across CMSes.
+    assert priors[0][0] == "https://example.com/floorplans"
+
+
+def test_pms_priors_falls_back_to_universal_when_detection_is_none() -> None:
+    """Defensive: when ``detected`` is None (caller didn't run detection),
+    still emit the universal priors. Treating absent detection the same as
+    ``unknown`` keeps the recovery path open."""
+    from ma_poc.pms.scraper import _UNIVERSAL_SUB_PATH_PRIORS, _pms_priors_for
+
+    priors = _pms_priors_for(None, "https://example.com/")
+    assert len(priors) == len(_UNIVERSAL_SUB_PATH_PRIORS)
+    assert all(anchor == "pms_prior:universal" for _, _, anchor in priors)
+
+
+def test_pms_priors_falls_back_to_universal_when_pms_lacks_template_entry() -> None:
+    """A PMS that's known to the detector but absent from
+    ``_PMS_SUB_PATH_PRIORS`` (e.g., wix_nopms / squarespace_nopms which
+    are syndication-only with no inventory data path) still gets the
+    universal fallback. If those sites happen to expose a `/floorplans`
+    page, link-hop will try it; if not, the fetch fails cheap (one 404)
+    and the generic adapter falls through to its other tiers. Cost is
+    bounded by max_hops; no correctness risk."""
+    from ma_poc.pms.detector import DetectedPMS
+    from ma_poc.pms.scraper import _UNIVERSAL_SUB_PATH_PRIORS, _pms_priors_for
+
+    detected = DetectedPMS(
+        pms="wix_nopms",
+        confidence=0.8,
+        evidence=["fp:wix"],
+        recommended_strategy="cascade",
+    )
+    priors = _pms_priors_for(detected, "https://example.com/")
+    assert len(priors) == len(_UNIVERSAL_SUB_PATH_PRIORS)
+    assert all(anchor == "pms_prior:universal" for _, _, anchor in priors)
+
+
+def test_pms_priors_universal_unblocks_skyline_at_kessler_regression() -> None:
+    """Regression for 2026-05-12 canary. Skyline at Kessler (11611) is
+    a Jonah Digital marketing-CMS site — not a PMS we fingerprint.
+    Detection returns ``unknown``. Pre-fix the prior ladder returned
+    ``[]`` and link-hop's keyword ranker found nothing (SPA marketing
+    shell with no statically-discoverable anchors), so the runner
+    never visited ``/floorplans/`` and missed the units API.
+
+    Post-fix: the universal fallback emits ``/floorplans`` as a
+    candidate regardless of whether the template is recognised. Once
+    link-hop fetches it, the generic adapter's DOM scan / LLM DOM
+    tier processes the rendered floor-plan cards.
+
+    This test pins the behaviour for the SPECIFIC unrecognised-template
+    + zero-link-hop-candidate shape that the canary surfaced.
+    """
+    from ma_poc.pms.detector import DetectedPMS
+    from ma_poc.pms.scraper import _pms_priors_for
+
+    skyline_detection = DetectedPMS(
+        pms="unknown",  # Jonah Digital is not in our PMS fingerprint set
+        confidence=0.0,
+        evidence=[],
+        recommended_strategy="cascade",
+    )
+    priors = _pms_priors_for(
+        skyline_detection,
+        "https://www.skylineatkessler.com/",
+    )
+    urls = [u for u, _, _ in priors]
+    assert "https://www.skylineatkessler.com/floorplans" in urls, (
+        "Universal fallback must inject /floorplans for unknown-PMS sites "
+        "so link-hop fetches the page that triggers Jonah's renderer XHR."
+    )
+
+
+def test_pms_priors_filter_entry_url_collisions() -> None:
+    """When a template path resolves to the entry URL itself (e.g.,
+    entry_url already includes the path), filter that prior out — we
+    only want strictly-distinct sub-pages because re-fetching the same
+    URL is wasted budget."""
+    from ma_poc.pms.detector import DetectedPMS
+    from ma_poc.pms.scraper import _pms_priors_for
+
+    detected = DetectedPMS(
+        pms="rentcafe",
+        confidence=0.9,
+        evidence=["fp:rentcafe"],
+        recommended_strategy="jsonld_first",
+    )
+    # entry_url IS /floorplans. urljoin("...../floorplans", "/floorplans")
+    # returns the same URL — filter it.
+    priors = _pms_priors_for(detected, "https://x.com/floorplans")
+    urls = [u for u, _, _ in priors]
+    assert "https://x.com/floorplans" not in urls
+    # But the other priors for rentcafe (/availability, /apartments) still
+    # produce — the entry-URL filter is per-path, not all-or-nothing.
+    assert "https://x.com/availability" in urls
+    assert "https://x.com/apartments" in urls
+
+
+def test_pms_priors_dict_covers_all_pms_with_body_checker() -> None:
+    """Invariant: every PMS that implements ``matches_response_body``
+    (i.e., every PMS that rides the Bug-C P3 preservation path) must
+    also have a ``_PMS_SUB_PATH_PRIORS`` entry.
+
+    Rationale: those are the PMSes the detector confidently identifies
+    AND for which the scraper has a known template. If the body-shape
+    check is good enough to preserve a detection through ``confirm_detection``,
+    it should be good enough to seed a link-hop prior. Catches drift if
+    a new PMS adapter is added with `matches_response_body` but
+    without a prior list — silent under today's code, loud under this
+    test.
+    """
+    from ma_poc.pms.adapters.registry import all_adapters
+    from ma_poc.pms.scraper import _PMS_SUB_PATH_PRIORS
+
+    pms_with_checker = {
+        getattr(a, "pms_name", "")
+        for a in all_adapters()
+        if callable(getattr(a, "matches_response_body", None))
+    }
+    pms_with_checker.discard("")  # paranoid: skip any nameless adapter
+    missing = pms_with_checker - set(_PMS_SUB_PATH_PRIORS)
+    assert not missing, (
+        f"PMSes that have ``matches_response_body`` but no ``_PMS_SUB_PATH_PRIORS`` "
+        f"entry: {sorted(missing)}. Add their canonical sub-paths to "
+        f"``_PMS_SUB_PATH_PRIORS`` so link-hop has a template prior to "
+        f"fall back on. See Bug B / P4 in "
+        f"docs/2026_05_11_regressions_fix_design.md."
+    )
+
+
+# ── Bug B (P4) — merge behaviour inside _try_link_hop ───────────────────────
+#
+# These tests exercise the merge + dedup loop in ``_try_link_hop`` that
+# combines profile-top, PMS priors, and keyword candidates into a single
+# ranked list. Unlike the pure-helper tests above, these mock the L1
+# fetcher and re-run ``_try_link_hop`` end-to-end.
+
+
+def _starved_profile() -> Any:
+    """Profile with no learned navigation memory (the Bug B starvation
+    shape — Bug-1 collateral over many days)."""
+
+    class _Nav:
+        winning_page_url = None
+        availability_links: list[str] = []
+        explored_links: list[str] = []
+
+    class _Profile:
+        navigation = _Nav()
+        api_hints = None
+
+    return _Profile()
+
+
+def _profile_with_winning_url(url: str) -> Any:
+    """Profile that learned ``url`` as the winning page on a prior run."""
+
+    class _Nav:
+        winning_page_url = url
+        availability_links: list[str] = []
+        explored_links: list[str] = []
+
+    class _Profile:
+        navigation = _Nav()
+        api_hints = None
+
+    return _Profile()
+
+
+def _profile_with_explored_dead_end(url: str) -> Any:
+    """Profile that recorded ``url`` as explored-and-empty (skip-list)."""
+
+    class _Nav:
+        winning_page_url = None
+        availability_links: list[str] = []
+        explored_links: list[str] = [url]
+
+    class _Profile:
+        navigation = _Nav()
+        api_hints = None
+
+    return _Profile()
+
+
+@pytest.mark.asyncio
+async def test_link_hop_dedups_profile_against_pms_prior_for_same_url() -> None:
+    """When profile.winning_page_url is /floorplans AND the RentCafe
+    prior also wants /floorplans, the merged candidate list contains
+    exactly one entry for that URL. Profile wins on score (10001 vs
+    5000) so its anchor (``profile:winning_page_url``) is the one
+    recorded.
+
+    Documents the priority ordering: profile > PMS prior > keyword.
+    """
+    from unittest.mock import patch
+
+    from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
+    from ma_poc.pms.scraper import _try_link_hop
+
+    detected = DetectedPMS(
+        pms="rentcafe",
+        confidence=0.9,
+        evidence=["fp:rentcafe"],
+        recommended_strategy=_STRATEGY_BY_PMS["rentcafe"],
+    )
+
+    fetch_calls: list[str] = []
+    candidate_records: list[list[dict]] = []
+
+    async def _fake_fetch(task: Any) -> Any:
+        fetch_calls.append(getattr(task, "url", ""))
+
+        class _O:
+            value = "OK"
+
+        class _R:
+            outcome = _O()
+            status = 200
+            body = b"<html></html>"
+            final_url = task.url
+            elapsed_ms = 0
+            content_type = "text/html"
+            captcha_detected = False
+            error_signature = None
+            identity_ua_hash = "test"
+            render_mode = type("M", (), {"value": "RENDER"})()
+            headers: dict = {}
+
+            def to_dict(self) -> dict:
+                return {"outcome": "OK"}
+
+        return _R()
+
+    # Capture the LINK_HOP_STARTED event so we can read the candidate list.
+    from ma_poc.observability import events as obs_events
+
+    original_emit = obs_events.emit
+
+    def _spy_emit(kind: Any, property_id: str, **payload: Any) -> Any:
+        kind_value = getattr(kind, "value", str(kind))
+        if "link_hop_started" in kind_value.lower():
+            candidate_records.append(payload.get("candidates", []))
+        return original_emit(kind, property_id, **payload)
+
+    with (
+        patch("ma_poc.fetch.fetch", _fake_fetch, create=True),
+        patch.object(obs_events, "emit", _spy_emit),
+    ):
+        await _try_link_hop(
+            entry_url="https://example.com/",
+            entry_page_html="<html></html>",  # no useful anchors
+            detected=detected,
+            profile=_profile_with_winning_url("https://example.com/floorplans"),
+            expected_total_units=None,
+            property_id="DEDUP-TEST",
+            csv_row=None,
+            max_hops=3,
+        )
+
+    assert candidate_records, "LINK_HOP_STARTED event not emitted"
+    candidates = candidate_records[0]
+    matching = [c for c in candidates if c["url"] == "https://example.com/floorplans"]
+    assert len(matching) == 1, (
+        f"Profile + prior should dedup to one entry for /floorplans; got "
+        f"{len(matching)}: {[c for c in matching]}"
+    )
+    # Profile wins on score (its anchor is recorded, not the prior's).
+    assert matching[0]["anchor"].startswith("profile:"), (
+        f"On collision profile must win over prior; got anchor "
+        f"{matching[0]['anchor']!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_link_hop_priors_respect_explored_skip_list() -> None:
+    """A PMS prior URL that the profile has already marked as
+    ``explored_links`` (i.e., known-empty from prior runs) must be
+    filtered out of the candidate list before the cap. We don't re-pay
+    for known dead ends just because the template says so.
+
+    Documents the dead-end skip-list contract for the new prior layer.
+    """
+    from unittest.mock import patch
+
+    from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
+    from ma_poc.pms.scraper import _try_link_hop
+
+    detected = DetectedPMS(
+        pms="rentcafe",
+        confidence=0.9,
+        evidence=["fp:rentcafe"],
+        recommended_strategy=_STRATEGY_BY_PMS["rentcafe"],
+    )
+
+    fetch_calls: list[str] = []
+
+    async def _fake_fetch(task: Any) -> Any:
+        fetch_calls.append(getattr(task, "url", ""))
+
+        class _O:
+            value = "OK"
+
+        class _R:
+            outcome = _O()
+            status = 200
+            body = b"<html></html>"
+            final_url = task.url
+            elapsed_ms = 0
+            content_type = "text/html"
+            captcha_detected = False
+            error_signature = None
+            identity_ua_hash = "test"
+            render_mode = type("M", (), {"value": "RENDER"})()
+            headers: dict = {}
+
+            def to_dict(self) -> dict:
+                return {"outcome": "OK"}
+
+        return _R()
+
+    # Profile says /floorplans was explored and had no data (skip it).
+    # RentCafe prior would otherwise inject /floorplans as candidate #1.
+    with patch("ma_poc.fetch.fetch", _fake_fetch, create=True):
+        await _try_link_hop(
+            entry_url="https://example.com/",
+            entry_page_html="<html></html>",
+            detected=detected,
+            profile=_profile_with_explored_dead_end("https://example.com/floorplans"),
+            expected_total_units=None,
+            property_id="SKIP-TEST",
+            csv_row=None,
+            max_hops=3,
+        )
+
+    assert "https://example.com/floorplans" not in fetch_calls, (
+        f"Prior URL was in profile.explored_links but still got fetched: "
+        f"{fetch_calls}. The skip-list must apply to priors the same way "
+        f"it applies to keyword candidates."
+    )
+    # The OTHER priors (/availability, /apartments) should still fire.
+    assert any("availability" in u or "apartments" in u for u in fetch_calls), (
+        f"Skipping /floorplans should not suppress the rest of the "
+        f"RentCafe priors; got fetch_calls={fetch_calls}"
+    )

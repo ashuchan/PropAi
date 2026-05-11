@@ -531,25 +531,41 @@ def confirm_detection(
 ) -> DetectedPMS:
     """After page load, verify the URL-based detection against captured bodies.
 
-    If captured responses exist but none match the detected PMS's body shape,
-    demote to ``pms="unknown"`` so the generic cascade (with LLM/Vision
-    allowed) runs rather than stamping a misleading ``TIER_1_API_<PMS>`` label
-    on a mismatched property. This is the counter to Windsor/Mark-Taylor/Vegas
-    misrouting observed in the 2026-04-20 run: the URL said ``RentCafe`` but
-    the captured body shape was ``Funnel``.
+    Demotion rule (P3 — innocent until proven guilty): downgrade
+    ``initial.pms`` to ``unknown`` **only when there is positive evidence
+    that the URL detection was wrong**. Absence of confirmation is not
+    disconfirmation.
 
-    Empty ``api_responses`` is treated as "no evidence" rather than
-    "disconfirming evidence" — the URL-based detection is preserved. Demotion
-    requires at least one captured body that fails the adapter's
-    ``matches_response_body`` check. Without this guard, change-detector GET
-    paths (no Playwright, no XHR capture) and blocked/timed-out pages would
-    demote every detected PMS to ``unknown`` and starve real portals of their
-    proper adapter — see ``docs/PROFILE_MATURITY_LOCKIN_BUG.md`` and the
-    2026-05-09 cloud-run regression analysis.
+    Algorithm:
 
-    Adapter opt-in is by defining ``matches_response_body(body) -> bool``.
-    Adapters that don't implement the method (DOM-only parsers like
-    TouchTour) are treated as opt-out: the URL detection stays intact.
+      1. If ``initial.pms == 'unknown'``: no-op (nothing to demote to).
+      2. If ``api_responses`` is empty: preserve. F0.2 from 2026-05-09 —
+         change-detector GETs, blocked pages, and timed-out fetches all
+         produce zero captures, which would otherwise demote every detected
+         PMS and starve real portals.
+      3. If the initial adapter exposes ``matches_response_body``:
+         Phase 1 — iterate responses; if any body matches the initial
+         adapter's shape, preserve immediately. Phase 2 — if no body
+         matched the initial adapter, iterate all *other* registered
+         adapters' body-shape checkers; if any captured body positively
+         matches a different adapter, that is the negative evidence
+         needed to demote. The evidence string names the specific
+         cross-match for operator triage.
+      4. If the initial adapter doesn't expose ``matches_response_body``
+         (DOM-only parsers like TouchTour): preserve — there's no body
+         shape to assert against.
+
+    This rule resolves the tension between two historical failure modes:
+
+      * eb18889 (2026-04-20) — Windsor/Mark-Taylor/Vegas misrouting:
+        URL said RentCafe, captured bodies were positively Funnel-shaped.
+        Phase 2 still catches this case via the cross-match. ✓
+      * Bug C (2026-05-11) — 558 RentCafe-fingerprinted properties had
+        all captures be third-party noise (CDN/analytics/captcha). Phase
+        2 finds no positive cross-match → preserves. ✓
+
+    See ``docs/2026_05_11_regressions_fix_design.md`` (Bug C / P3) for the
+    full design history.
     """
     # "unknown" is already the fallthrough — nothing to demote to.
     if initial.pms == "unknown":
@@ -560,9 +576,11 @@ def confirm_detection(
         # F0.2: absence of captures ≠ disconfirmation. Preserve URL detection.
         return initial
 
-    # Local import to avoid a circular adapters→detector→registry dep at import time.
+    # Local import to avoid a circular adapters→detector→registry dep at
+    # import time. Same pattern was already in use for ``get_adapter``;
+    # ``all_adapters`` joins it for the Phase 2 cross-match scan.
     try:
-        from ma_poc.pms.adapters.registry import get_adapter
+        from ma_poc.pms.adapters.registry import all_adapters, get_adapter
     except Exception:
         return initial
 
@@ -576,6 +594,7 @@ def confirm_detection(
         # Adapter didn't opt in — preserve URL-based detection.
         return initial
 
+    # ── Phase 1: does any body match the initial adapter's shape? ───────────
     for resp in responses:
         body = resp.get("body") if isinstance(resp, dict) else None
         try:
@@ -585,12 +604,56 @@ def confirm_detection(
             # A misbehaving checker must not demote or crash the pipeline.
             continue
 
-    # No captured body matched the detected PMS — demote to "unknown".
+    # ── Phase 2 (Bug C — P3): require positive cross-match to demote ────────
+    # No body matched the initial adapter. That alone is not evidence the
+    # URL detection was wrong — bodies may just be noise (analytics, CDN,
+    # captcha). Demote only when a captured body positively matches a
+    # *different* adapter's body-shape predicate.
+    try:
+        other_adapters = all_adapters()
+    except Exception:
+        # If the registry can't enumerate, fail-safe: preserve.
+        return initial
+
+    cross_match: tuple[str, int] | None = None  # (matched_pms_name, response_idx)
+    for other in other_adapters:
+        other_name = getattr(other, "pms_name", "")
+        # Skip the initial adapter (already checked in Phase 1) and the
+        # generic fallback (it has no body-shape and accepts anything).
+        if not other_name or other_name == initial.pms or other_name == "generic":
+            continue
+        other_checker = getattr(other, "matches_response_body", None)
+        if not callable(other_checker):
+            continue
+        for idx, resp in enumerate(responses):
+            body = resp.get("body") if isinstance(resp, dict) else None
+            try:
+                if other_checker(body):
+                    cross_match = (other_name, idx)
+                    break
+            except Exception:
+                continue
+        if cross_match is not None:
+            break
+
+    if cross_match is None:
+        # No positive cross-match — bodies are noise, not evidence. P3 says
+        # preserve. This is the 2026-05-11 Bug C recovery path.
+        return initial
+
+    # Positive cross-match — URL detection contradicted by a body that
+    # belongs to a known different PMS. Demote with the specific match
+    # named so operators can triage "why did this property route to
+    # generic?" via the evidence trail rather than the responses list.
+    matched_pms, matched_idx = cross_match
     return DetectedPMS(
         pms="unknown",
         confidence=0.0,
         evidence=list(initial.evidence)
-        + [f"demoted_from_{initial.pms}:no_matching_body_in_{len(responses)}_captures"],
+        + [
+            f"demoted_from_{initial.pms}:"
+            f"response_{matched_idx}_matches_{matched_pms}_body_shape"
+        ],
         pms_client_account_id=None,
         recommended_strategy=_STRATEGY_BY_PMS["unknown"],
     )

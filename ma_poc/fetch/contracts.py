@@ -32,8 +32,17 @@ class FetchOutcome(StrEnum):
     BOT_BLOCKED = "BOT_BLOCKED"  # CAPTCHA / 403 pattern
     RATE_LIMITED = "RATE_LIMITED"  # 429 with Retry-After
     TRANSIENT = "TRANSIENT"  # 5xx, timeout, retriable
-    HARD_FAIL = "HARD_FAIL"  # SSL, DNS, 4xx non-retriable
+    HARD_FAIL = "HARD_FAIL"  # SSL, 4xx non-retriable other than dead-URL
     PROXY_ERROR = "PROXY_ERROR"  # 407, proxy exhausted
+    #: Stage 3 (2026-05-12): the URL is **dead** — 404/410/451 final status
+    #: or NXDOMAIN. Terminal — never retry. The site has explicitly
+    #: declared the resource gone (404/410), legally unavailable (451), or
+    #: the DNS authority denies the name (NXDOMAIN). Distinct from
+    #: ``HARD_FAIL`` so reporting can exclude these from the success-rate
+    #: denominator (counting them is unfair — we never had a chance to
+    #: extract from them) and route them to a re-discovery queue.
+    #: See docs/2026_05_11_regressions_fix_design.md (Stage 3).
+    DEAD_URL = "DEAD_URL"
 
 
 @dataclass(slots=True, frozen=True)

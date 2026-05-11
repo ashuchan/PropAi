@@ -220,20 +220,40 @@ class SightMapAdapter:
                 result.api_responses.append(resp)
 
         if all_units:
-            result.units = all_units
-            result.winning_url = result.api_responses[0].get("url") if result.api_responses else None
-            result.confidence = min(0.95, 0.7 + 0.05 * len(all_units))
-            result.tier_used = _TIER_BASE
-            # Even on success, surface silent unit-level loss when the join
-            # rate drops below the 80% floor.
-            if total_raw_units > 0 and total_dropped > _PARTIAL_JOIN_FRACTION * total_raw_units:
-                result.errors.append(
-                    f"SIGHTMAP_PARTIAL_JOIN: {total_dropped} of {total_raw_units} "
-                    f"units could not be joined to a floor plan "
-                    f"({total_dropped / total_raw_units:.0%} silently dropped) — "
-                    "inspect floor_plan_id field on dropped units for drift"
+            # Stage 1 validity gate — drops dim-less rows before they leak
+            # into properties.json. Lazy import: see RentCafe adapter for the
+            # cycle-break rationale.
+            from ma_poc.extraction.post_process import post_process
+
+            _pp_parsed = len(all_units)
+            _pp = post_process(all_units, property_id=getattr(ctx, "property_id", None))
+            if _pp.n_admitted > 0:
+                result.units = _pp.admitted
+                result.plan_summaries = _pp.plan_summaries
+                result.winning_url = (
+                    result.api_responses[0].get("url") if result.api_responses else None
                 )
-            return result
+                result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
+                result.tier_used = _TIER_BASE
+                # Even on success, surface silent unit-level loss when the
+                # SightMap-internal join rate drops below the 80% floor.
+                # ``total_raw_units`` / ``total_dropped`` track join-time
+                # losses upstream of the validity gate, so the percentage
+                # is independent of the validity filtering above.
+                if total_raw_units > 0 and total_dropped > _PARTIAL_JOIN_FRACTION * total_raw_units:
+                    result.errors.append(
+                        f"SIGHTMAP_PARTIAL_JOIN: {total_dropped} of {total_raw_units} "
+                        f"units could not be joined to a floor plan "
+                        f"({total_dropped / total_raw_units:.0%} silently dropped) — "
+                        "inspect floor_plan_id field on dropped units for drift"
+                    )
+                return result
+            # Parsed N rows but every one failed unit-validity (no numeric
+            # dimension). Record and fall through to failure classification.
+            result.errors.append(
+                f"SIGHTMAP_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
+                f"failed unit_validity (no numeric dimension)"
+            )
 
         # Failure path: classify via structured sub-codes mirroring the RentCafe
         # adapter pattern.
