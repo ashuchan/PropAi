@@ -747,6 +747,205 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
     return found
 
 
+def detect_floorplan_subpage_urls(
+    blobs: list[dict[str, Any]],
+    page_html: str,
+    base_url: str,
+) -> list[tuple[str, str]]:
+    """Detect floor-plan sub-page URLs from a floor-plan index page.
+
+    Jonah Digital (and similar custom CMSes) structure availability as:
+      /floorplans/           ← index page (limited unit data per plan)
+      /floorplans/{slug}/    ← per-plan page with FULL unit list in
+                               an embedded <script type="application/json">
+                               block (not behind any XHR).
+
+    This helper recognises the index page by finding a Jonah-style widget
+    config blob (``renderable_endpoint: "_fp-renderable"`` + ``base_uri``)
+    in the embedded JSON, then scans the page HTML for ``<a href>`` tags
+    that are one path-segment deeper than ``base_uri``.  Returns those URLs
+    as ``(url, "floorplan_subpage")`` tuples so link-hop can fetch each
+    and extract units from the sub-page's embedded JSON.
+
+    Args:
+        blobs:     Output of ``extract_embedded_blobs_from_html`` — parsed blobs.
+        page_html: Raw HTML of the current page (used for anchor scanning).
+        base_url:  Absolute URL of the current page (for resolving relative hrefs).
+
+    Returns:
+        Deduplicated list of ``(absolute_url, "floorplan_subpage")`` tuples.
+        Empty when the page is not a recognised floor-plan index.
+    """
+    if not blobs or not page_html:
+        return []
+
+    # Step 1 — confirm we're on a floor-plan index by looking for a Jonah
+    # config blob with both ``base_uri`` and ``renderable_endpoint``.
+    base_uri: str | None = None
+    for blob in blobs:
+        body = blob.get("body") if isinstance(blob, dict) else None
+        if not isinstance(body, dict):
+            continue
+        if body.get("renderable_endpoint") and body.get("base_uri"):
+            candidate_base = str(body["base_uri"]).strip()
+            if candidate_base and candidate_base.startswith("/"):
+                base_uri = candidate_base.rstrip("/") + "/"
+                break
+
+    if base_uri is None:
+        return []
+
+    # Step 2 — find <a href> tags whose path is exactly one segment deeper
+    # than base_uri (e.g. /floorplans/the-edgefield/ when base_uri=/floorplans/).
+    import urllib.parse as _urlparse
+
+    try:
+        soup = BeautifulSoup(page_html, "lxml")
+    except Exception:
+        soup = BeautifulSoup(page_html, "html.parser")
+
+    try:
+        base_parsed = _urlparse.urlparse(base_url)
+        base_host = base_parsed.scheme + "://" + (base_parsed.netloc or "")
+    except Exception:
+        return []
+
+    seen: set[str] = set()
+    out: list[tuple[str, str]] = []
+
+    for a in soup.find_all("a", href=True):
+        raw = a.get("href") or ""
+        href = (raw if isinstance(raw, str) else " ".join(raw)).strip()
+        if not href or href.startswith(("#", "tel:", "mailto:", "javascript:")):
+            continue
+        try:
+            resolved = _urlparse.urljoin(base_url, href)
+        except Exception:
+            continue
+        try:
+            parsed = _urlparse.urlparse(resolved)
+        except Exception:
+            continue
+        # Must be same host
+        if (base_parsed.hostname or "").lower() != (parsed.hostname or "").lower():
+            continue
+        path = parsed.path.rstrip("/") + "/"
+        # Must start with base_uri and have exactly one more path segment
+        if not path.startswith(base_uri):
+            continue
+        # Strip the base_uri prefix and see if the remainder is a single slug
+        remainder = path[len(base_uri):]
+        if "/" in remainder.rstrip("/"):
+            continue  # more than one additional segment — skip
+        if not remainder.rstrip("/"):
+            continue  # same page
+        abs_url = base_host + path
+        if abs_url not in seen:
+            seen.add(abs_url)
+            out.append((abs_url, "floorplan_subpage"))
+
+    return out
+
+
+# Leasing-portal host patterns. Each tuple is (substring, portal_name);
+# matches against any URL string found inside an embedded JSON blob.
+# Specific-first so e.g. ``onlineleasing.realpage.com`` outranks the
+# generic ``realpage.com`` host check.
+_PORTAL_URL_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("sightmap.com/embed/", "sightmap"),
+    ("embed.engrain.com", "sightmap"),
+    ("onlineleasing.realpage.com", "realpage_oll"),
+    ("myleasingoffice.com", "realpage_oll"),
+    ("rentcafe.com/apartments/", "rentcafe"),
+    ("rentcafe.com/onlineleasing", "rentcafe"),
+    ("funnelleasing.com/embed", "funnel"),
+    ("apartments.appfolio.com", "appfolio"),
+    ("widgets.appfolio.com", "appfolio"),
+)
+
+# Cap the recursion depth so a self-referential JSON blob can't blow
+# the stack. 12 is deep enough for every realistic portal-config shape
+# we've seen (SightMap's deepest path is ``engrain.disabled_ui[0]`` —
+# 3 levels).
+_PORTAL_DETECT_MAX_DEPTH = 12
+
+
+def detect_embedded_portal_urls(
+    blobs: list[dict[str, Any]],
+) -> list[tuple[str, str]]:
+    """Scan parsed embedded-JSON blobs for leasing-portal embed URLs.
+
+    Some property sites (Jonah Digital, headless WordPress, custom
+    React/Vue marketing shells) don't host their own unit data — they
+    inline a configuration blob that points at a third-party leasing
+    portal (SightMap, RealPage OLL, RentCafe, FunnelLeasing, AppFolio)
+    where the actual units live. The portal URL is *physically present*
+    in the HTML we already fetched, just nested inside a JSON config
+    that our unit-signal heuristic correctly rejects (it has no
+    rent/sqft keys, only `embed_url`, `integration`, `engrain.asset_id`,
+    etc.).
+
+    This helper walks every parsed blob recursively, looking at every
+    string value for one of the known portal host patterns. Returns a
+    list of ``(url, portal_name)`` tuples — caller emits them as fetch
+    candidates for link-hop, which then dispatches each portal URL to
+    the matching PMS adapter (the URL host triggers the SightMap /
+    RentCafe / etc. fingerprint).
+
+    Args:
+        blobs: Output of ``extract_embedded_blobs_from_html`` —
+               ``[{"url": ..., "body": parsed_json}]``.
+
+    Returns:
+        Deduplicated list of ``(url, portal_name)`` tuples in first-seen
+        order. Empty when no portal pointer is found.
+    """
+    if not blobs:
+        return []
+
+    seen_urls: set[str] = set()
+    out: list[tuple[str, str]] = []
+
+    def _walk(node: Any, depth: int) -> None:
+        if depth > _PORTAL_DETECT_MAX_DEPTH:
+            return
+        if isinstance(node, str):
+            # URL strings inside JSON often have escaped slashes ("\/").
+            # The L1 fetcher's json.loads already unescapes those, but
+            # being defensive in case a future caller hands in raw
+            # unparsed text.
+            candidate = node.replace("\\/", "/")
+            if "://" not in candidate and not candidate.startswith("//"):
+                return
+            lowered = candidate.lower()
+            for needle, portal in _PORTAL_URL_PATTERNS:
+                if needle in lowered:
+                    # Normalise to absolute URL — accept protocol-relative
+                    # too ("//sightmap.com/embed/...").
+                    if candidate.startswith("//"):
+                        candidate = "https:" + candidate
+                    if candidate in seen_urls:
+                        return
+                    seen_urls.add(candidate)
+                    out.append((candidate, portal))
+                    return
+            return
+        if isinstance(node, dict):
+            for v in node.values():
+                _walk(v, depth + 1)
+        elif isinstance(node, list):
+            for item in node:
+                _walk(item, depth + 1)
+
+    for blob in blobs:
+        body = blob.get("body") if isinstance(blob, dict) else None
+        if body is None:
+            continue
+        _walk(body, 0)
+
+    return out
+
+
 # ── DOM selector cascade ────────────────────────────────────────────────────
 # Runs when neither XHR capture nor JSON-LD nor embedded-JSON produced units
 # but the raw HTML has visible rent signals ($NNN text). Looks for container

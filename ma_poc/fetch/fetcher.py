@@ -514,13 +514,19 @@ class Fetcher:
                             body = await response.body()
                         except Exception:
                             body = b""
-                        # Body cap: 256KB. The previous 10KB cap silently
-                        # truncated RentCafe getFloorplans (5-30KB) and
-                        # SightMap /sightmaps/ payloads (30-150KB) mid-JSON,
-                        # which then failed json.loads downstream and made
-                        # adapters reject the response as a string. 256KB
-                        # covers every real-world unit-API body we've seen
-                        # while still capping image/HTML page captures.
+                        # Body cap — content-type aware:
+                        #   JSON/XML: 512 KB. The SightMap REST API
+                        #   (/app/api/v1/{key}/sightmaps/{id}) returns ~278 KB
+                        #   of gzip-decompressed JSON. The previous 256 KB cap
+                        #   truncated it mid-JSON, causing json.loads to fail
+                        #   and the unit-signal gate to reject the response
+                        #   as a string. JSON APIs are text-only so doubling
+                        #   the cap has negligible memory impact.
+                        #   HTML/text: 256 KB (unchanged — page captures
+                        #   are already capped to prevent huge DOM bodies
+                        #   from filling the shard's memory budget).
+                        _is_json_xml = "json" in content_type or "xml" in content_type
+                        _body_cap = 524_288 if _is_json_xml else 262_144
                         #
                         # F1.2 (2026-05-08 plan): tag each entry with
                         # captcha_detected so the LLM rescue's
@@ -542,7 +548,7 @@ class Fetcher:
                                 "status": response.status,
                                 "content_type": content_type,
                                 "body_size": len(body),
-                                "body": body.decode("utf-8", errors="replace")[:262_144],
+                                "body": body.decode("utf-8", errors="replace")[:_body_cap],
                                 "captcha_detected": entry_captcha,
                             }
                         )
@@ -590,6 +596,67 @@ class Fetcher:
                 if nav_exc is None:
                     nav_exc = exc
 
+            # IntersectionObserver scroll-trigger (2026-05-12):
+            # Some sites (Jonah Digital, some Entrata / RealPage custom-domain
+            # properties) use IntersectionObserver to gate unit-data loading.
+            # The floor-plan section only loads when it enters the browser
+            # viewport — without a scroll event that never happens in headless
+            # mode, so the _fp-renderable XHR never fires and both the DOM and
+            # the network_log stay empty of unit data.
+            #
+            # Trigger conditions (all must hold):
+            #   • RENDER mode (has a live Playwright page)
+            #   • Initial body ≥ 50 KB (has real content, not an error page)
+            #   • Zero rent signals ($NNN) in the initial body (units not
+            #     pre-rendered — deferred loading is likely)
+            #
+            # On trigger: scroll to the bottom of the page (fires all pending
+            # IntersectionObservers), wait 1.5 s for XHR round-trips, then
+            # re-read page.content(). The network_log handler was registered
+            # before page.goto() and stays active, so any XHRs that fire
+            # during the scroll window are automatically captured.
+            #
+            # Always log the outcome so we can analyse effectiveness and tune
+            # the condition over time.
+            import re as _re_scroll
+
+            _scroll_triggered = False
+            if (
+                task.render_mode == RenderMode.RENDER
+                and body_text is not None
+                and len(body_text) >= 50_000
+                and not _re_scroll.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", body_text)
+            ):
+                _body_before_scroll = len(body_text)
+                try:
+                    await page.evaluate(
+                        "window.scrollTo(0, document.body.scrollHeight)"
+                    )
+                    await asyncio.sleep(1.5)
+                    _body_after_scroll_text = await page.content()
+                    _body_after_size = len(_body_after_scroll_text or "")
+                    _body_grew = _body_after_size > _body_before_scroll
+                    _rent_appeared = bool(
+                        _re_scroll.search(
+                            r"\$\s?\d{3,4}(?:[,.]\d{3})?",
+                            _body_after_scroll_text or "",
+                        )
+                    )
+                    if _body_after_scroll_text:
+                        body_text = _body_after_scroll_text
+                    _scroll_triggered = True
+                    log.info(
+                        "fetch.scroll_trigger url=%s body_before=%d body_after=%d"
+                        " grew=%s rent_appeared=%s",
+                        task.url,
+                        _body_before_scroll,
+                        _body_after_size,
+                        _body_grew,
+                        _rent_appeared,
+                    )
+                except Exception as _scroll_exc:
+                    log.debug("fetch.scroll_trigger failed for %s: %s", task.url, _scroll_exc)
+
             # 2026-05 Fix B + Fix 5 + Fix 7 — portal-aware late-render wait
             # with extended portal list and in-memory per-host learning.
             #
@@ -623,6 +690,10 @@ class Fetcher:
                             ".rentcafe.com",  # Fix 5 — added per cluster analysis
                             "rlets.com",  # Fix 5 — Hyly's portal CDN
                             "my.hy.ly",  # Fix 5 — Hyly portal
+                            # Entrata ProspectPortal: the SightMap widget initialises
+                            # asynchronously (~3-4s after page load). The standard 2s
+                            # settle is not enough for the SightMap REST API call to fire.
+                            "prospectportal.com",
                         )
                     )
                 except Exception:

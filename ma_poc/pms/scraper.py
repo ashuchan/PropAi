@@ -875,6 +875,21 @@ async def scrape(
             if fallback_result.units:
                 adapter_result = fallback_result
                 result["_adapter_used"] = generic_name
+            # Always promote portal hints from the generic fallback even when
+            # it extracted 0 units. The fallback's embedded-JSON tier may have
+            # found a leasing-portal pointer (SightMap embed URL, RealPage OLL
+            # config) inside an SSR blob — those hints must reach link-hop
+            # regardless of whether the fallback recovered any units here.
+            _fallback_portal_hints = getattr(
+                fallback_result, "_embedded_portal_hints", None
+            )
+            if _fallback_portal_hints:
+                _existing_portal = getattr(
+                    adapter_result, "_embedded_portal_hints", None
+                ) or []
+                adapter_result._embedded_portal_hints = (  # type: ignore[attr-defined]
+                    _existing_portal + _fallback_portal_hints
+                )
         except Exception as exc:
             adapter_result.errors.append(f"generic-fallback-error: {exc}")
 
@@ -924,6 +939,19 @@ async def scrape(
     nav_hints = getattr(adapter_result, "_llm_navigation_hints", None)
     if nav_hints:
         result["_llm_navigation_hints"] = list(nav_hints)
+
+    # Leasing-portal pointers discovered in embedded JSON blobs (Jonah
+    # widget configs, headless WordPress marketing shells, etc. that
+    # delegate unit data to SightMap / RealPage OLL / RentCafe / etc.).
+    # Forwarded to link-hop, which fetches each URL and lets the host's
+    # fingerprint route it to the matching PMS adapter.
+    portal_hints = getattr(adapter_result, "_embedded_portal_hints", None)
+    if portal_hints:
+        result["_embedded_portal_hints"] = list(portal_hints)
+
+    floorplan_hints = getattr(adapter_result, "_embedded_floorplan_subpage_hints", None)
+    if floorplan_hints:
+        result["_embedded_floorplan_subpage_hints"] = list(floorplan_hints)
 
     # Surface property-level amenities collected by any LLM tier so the
     # ``aggregate_property_amenities`` step downstream finally has data
@@ -1031,6 +1059,12 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
 # burned the original budget on a no-content marketing shell.
 _LLM_HINT_SCORE = 10_000
 _LLM_HINT_ANCHOR_PREFIX = "llm-hint:"
+_EMBEDDED_PORTAL_ANCHOR_PREFIX = "embedded-portal:"
+# Score for leasing-portal URLs surfaced by embedded-JSON detection.
+# Same level as LLM nav-hints — both are "an extractor told us this URL
+# holds the data," not a guess. Sits above PMS_PRIOR (5000) so portal
+# pointers beat universal-prior guesses when both fire.
+_EMBEDDED_PORTAL_SCORE = 10_000
 
 
 def _augment_ranked_with_hints(
@@ -1099,7 +1133,13 @@ _PMS_PRIOR_SCORE = 5000
 # Adding a new PMS adapter? Add its priors here in the same commit.
 _PMS_SUB_PATH_PRIORS: dict[str, tuple[str, ...]] = {
     "rentcafe": ("/floorplans", "/availability", "/apartments"),
-    "entrata": ("/floorplans", "/availability", "/leasing"),
+    # Entrata custom-domain properties use a property-specific path that
+    # embeds city + property slug, e.g. /montclair/alister-montclair/conventional/.
+    # The /conventional/ and /apartments/ segments appear consistently across
+    # Entrata-hosted custom domains — the generic priors (/floorplans etc.)
+    # typically 404 on those sites. Both patterns are included so the link-hop
+    # hits the right URL regardless of which naming convention the site uses.
+    "entrata": ("/floorplans", "/conventional/", "/apartments/", "/availability", "/leasing"),
     "appfolio": ("/listings", "/apartments", "/floor-plans"),
     "onesite": ("/floorplans", "/availability", "/apartments"),
     "realpage_oll": ("/floorplans", "/availability"),
@@ -1137,6 +1177,7 @@ _UNIVERSAL_SUB_PATH_PRIORS: tuple[str, ...] = (
     "/floorplans",
     "/floor-plans",
     "/availability",
+    "/view-availability",
     "/apartments",
     "/units",
     "/leasing",
@@ -1201,6 +1242,23 @@ _LINK_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("floorplan", 85),
     ("pricing", 80),
     ("rent", 70),
+    # Navigation-menu CTAs that appear on Entrata / RealPage / custom-CMS
+    # property sites. These are the primary "find units" entry points on
+    # marketing shells that don't use standard /floorplans path names.
+    ("find your home", 88),
+    ("find a home", 88),
+    ("pick your home", 88),      # Entrata ProspectPortal "Pick Your Home" CTA
+    ("pick a home", 88),
+    ("choose your home", 88),
+    ("search homes", 85),
+    ("search apartments", 85),
+    ("view availability", 88),
+    ("check availability", 88),
+    ("available homes", 85),
+    ("available apartments", 85),
+    ("see available", 80),
+    ("view floor plan", 88),
+    ("view floorplan", 88),
     ("apartment", 60),
     ("unit", 55),
     ("lease", 50),
@@ -1222,6 +1280,11 @@ _LINK_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("/lease", 45),
     ("/floorplans", 90),
     ("/availabilities", 95),
+    # Entrata custom-domain properties use /{city}/{property}/conventional/
+    # as the floor-plan landing page. Scoring on the path segment means the
+    # link gets discovered even when the anchor text is a generic CTA.
+    ("/conventional/", 88),
+    ("/conventional", 85),
 )
 
 _LINK_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
@@ -1232,6 +1295,10 @@ _LINK_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("sightmap.com", 110),
     (".entrata.com", 115),
     ("commoncf.entrata.com", 115),
+    # Entrata ProspectPortal: custom-domain Entrata properties route their
+    # "Pick Your Home" / floor-plan CTA through {property}.prospectportal.com.
+    # Following this domain surfaces the same unit data as /conventional/.
+    ("prospectportal.com", 115),
 )
 
 # Skip these link shapes outright — they're never availability pages.
@@ -1298,9 +1365,28 @@ def _rank_internal_links(
     base_host = (base.hostname or "").lower()
 
     candidates: dict[str, tuple[int, str]] = {}
-    for a in soup.find_all("a", href=True):
-        raw_href = a.get("href") or ""
-        href = (raw_href if isinstance(raw_href, str) else " ".join(raw_href)).strip()
+
+    # Build a unified iterable of (href_value, anchor_text) from both
+    # <a href> links and <form action> attributes. Form actions are scored
+    # the same way as links — some Entrata / Yardi custom-domain sites
+    # put the availability URL in a search form action rather than a link.
+    def _href_anchor_pairs() -> list[tuple[str, str]]:
+        pairs: list[tuple[str, str]] = []
+        for a in soup.find_all("a", href=True):
+            raw = a.get("href") or ""
+            href = (raw if isinstance(raw, str) else " ".join(raw)).strip()
+            pairs.append((href, (a.get_text(" ", strip=True) or "").lower()[:120]))
+        for form in soup.find_all("form", action=True):
+            raw = form.get("action") or ""
+            action = (raw if isinstance(raw, str) else " ".join(raw)).strip()
+            if action:
+                # Use the form's submit-button text or a generic anchor label
+                btn = form.find(attrs={"type": "submit"})
+                label = (btn.get_text(" ", strip=True) if btn else "").lower()[:120] or "form"
+                pairs.append((action, label))
+        return pairs
+
+    for href, anchor in _href_anchor_pairs():
         if not href:
             continue
         lower = href.lower()
@@ -1321,8 +1407,6 @@ def _rank_internal_links(
             continue
         link_host = (parsed.hostname or "").lower()
         link_path = (parsed.path or "").lower()
-
-        anchor = (a.get_text(" ", strip=True) or "").lower()[:120]
 
         score = 0
         for kw, weight in _LINK_ANCHOR_KEYWORDS:
@@ -1351,6 +1435,17 @@ def _rank_internal_links(
         if score <= 0:
             continue
 
+        # Multi-signal boost: when BOTH anchor text AND path independently
+        # signal floor-plan / availability intent, boost to near PMS-prior
+        # level (4 000) so the link isn't crowded out by failing priors.
+        # Closes the alistermontclair.com class: "Find Your Home" anchor +
+        # /conventional/ path both fire, yet raw score is only ~176 which
+        # falls below the 5 PMS priors at 5 000 each.
+        _anchor_score = sum(w for kw, w in _LINK_ANCHOR_KEYWORDS if kw in anchor)
+        _path_score = sum(w for kw, w in _LINK_PATH_KEYWORDS if kw in link_path)
+        if _anchor_score > 0 and _path_score > 0:
+            score = max(score, _PMS_PRIOR_SCORE - 1_000)
+
         # Keep best score per URL
         existing = candidates.get(resolved)
         if existing is None or score > existing[0]:
@@ -1373,6 +1468,7 @@ async def _try_link_hop(
     csv_row: dict[str, Any] | None,
     max_hops: int = 3,
     llm_navigation_hints: list[str] | None = None,
+    embedded_portal_hints: list[tuple[str, str]] | None = None,
     visited_urls: set[str] | None = None,
     shared_budget: dict | None = None,
 ) -> dict[str, Any] | None:
@@ -1386,9 +1482,18 @@ async def _try_link_hop(
     candidates — if the LLM already diagnosed where data lives, we try
     that URL first instead of guessing from anchor text.
 
+    ``embedded_portal_hints`` carries ``(url, portal_name)`` tuples
+    surfaced by the generic adapter's embedded-JSON tier when it found
+    a third-party leasing-portal pointer (SightMap, RealPage OLL,
+    RentCafe, etc.) inside an SSR config blob. These are top-priority
+    candidates because the host fingerprint will route them to a
+    PMS-specific adapter that knows how to extract from them.
+
     Phase 9 — H5 invariant: ``visited_urls`` blocks fetch cycles. The
     entry URL is auto-added to prevent re-fetching the home page.
-    ``max_hops`` caps the bounded BFS at 3 by default (never deeper).
+    ``max_hops`` caps the bounded BFS at 3 by default. Portal hints
+    discovered during sub-fetches add up to ``max_hops`` extra slots
+    to the queue (capped so a malicious page can't blow the budget).
     """
     visited: set[str] = set(visited_urls) if visited_urls else set()
     visited.add(entry_url)
@@ -1435,11 +1540,30 @@ async def _try_link_hop(
     # candidate to try. See docs/2026_05_11_regressions_fix_design.md.
     pms_priors = _pms_priors_for(detected, entry_url)
 
+    # Leasing-portal pointers from embedded JSON (Jonah Digital widget
+    # config etc. point at SightMap / RealPage OLL). High-confidence —
+    # an extractor told us this is where units live — so score above
+    # PMS template priors.
+    portal_candidates: list[tuple[str, int, str]] = []
+    if embedded_portal_hints:
+        for hint in embedded_portal_hints:
+            try:
+                url_s, portal_name = hint
+            except Exception:
+                continue
+            url_s = str(url_s or "").strip()
+            if not url_s or url_s in visited:
+                continue
+            portal_candidates.append(
+                (url_s, _EMBEDDED_PORTAL_SCORE, f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}")
+            )
+
     # Merge all candidate sources and rank by SCORE, not source-list order.
     # Sources contribute candidates at their own confidence levels:
     #   profile.winning_page_url     → 10_001 (highest — yesterday's win)
     #   profile.availability_links   → 10_000
     #   LLM navigation_hint          → 10_000 (Phase 5 cross-tier signal)
+    #   embedded leasing-portal hint → 10_000 (embedded-JSON cross-tier signal)
     #   PMS template priors (specific or universal) → 5_000
     #   keyword anchor ranker        → 0-200
     # Score-based sort means a future source addition lands cleanly by
@@ -1448,9 +1572,12 @@ async def _try_link_hop(
     # two LLM hints both score 10_000, they keep their emission order).
     # Dedup is first-seen-after-sort, so highest-scored entry for any
     # given URL keeps the slot.
-    if profile_top or pms_priors:
+    if profile_top or pms_priors or portal_candidates:
         combined: list[tuple[str, int, str]] = (
-            list(profile_top) + list(pms_priors) + list(ranked)
+            list(profile_top)
+            + list(portal_candidates)
+            + list(pms_priors)
+            + list(ranked)
         )
         combined.sort(key=lambda triple: triple[1], reverse=True)
         seen_urls: set[str] = set()
@@ -1498,7 +1625,26 @@ async def _try_link_hop(
     # profile.navigation.availability_links (prioritise-next-run).
     explored: dict[str, bool] = {}
 
-    for idx, (sub_url, score, anchor) in enumerate(ranked, 1):
+    # Iterate as a queue (not a fixed for-loop) so that hints discovered
+    # mid-iteration — leasing-portal pointers AND floor-plan sub-page
+    # links — can be fetched in the same pass.
+    queue: list[tuple[str, int, str]] = list(ranked)
+    queue_idx = 0
+    dynamic_appended = 0
+    max_dynamic_appends = max_hops
+
+    # When the first success is a floor-plan INDEX page (detects sub-pages),
+    # we accumulate units across all sub-pages rather than returning early.
+    # ``_first_successful_result`` holds the base result; ``_accumulated_units``
+    # merges all unit lists.
+    _first_successful_result: dict[str, Any] | None = None
+    _accumulated_units: list[dict[str, Any]] = []
+    _in_floorplan_accumulation = False
+
+    while queue_idx < len(queue):
+        sub_url, score, anchor = queue[queue_idx]
+        idx = queue_idx + 1
+        queue_idx += 1
         if sub_url in visited:
             # Phase 9: defensive — should already be filtered above, but
             # double-check to enforce H5 invariant under all code paths.
@@ -1544,8 +1690,14 @@ async def _try_link_hop(
         # rescue can fire even if the entry page already burned the cap.
         # Gated by the richness predicate so login walls / redirects /
         # CF interstitials don't silently buy themselves more budget.
-        is_llm_hint = anchor.startswith(_LLM_HINT_ANCHOR_PREFIX) or score == _LLM_HINT_SCORE
-        if shared_budget is not None and (_link_hop_is_rich(sub_fetch) or is_llm_hint):
+        is_portal_hint = anchor.startswith(_EMBEDDED_PORTAL_ANCHOR_PREFIX)
+        is_llm_hint = (
+            (anchor.startswith(_LLM_HINT_ANCHOR_PREFIX) or score == _LLM_HINT_SCORE)
+            and not is_portal_hint
+        )
+        if shared_budget is not None and (
+            _link_hop_is_rich(sub_fetch) or is_llm_hint or is_portal_hint
+        ):
             _refresh_cost_cap_for_hop(
                 shared_budget,
                 property_id=property_id,
@@ -1557,7 +1709,9 @@ async def _try_link_hop(
         # as the place where unit data lives, it is high-confidence
         # diagnostic output. Reset ``llm_monolithic`` so the hinted page
         # can use the monolithic tier even if the entry page consumed
-        # the per-property counter on its own no-content rescue.
+        # the per-property counter on its own no-content rescue. Portal
+        # hints don't get this — the portal's own PMS adapter does the
+        # work, no monolithic LLM call expected.
         if shared_budget is not None and is_llm_hint:
             _refresh_monolithic_budget_for_llm_hint(
                 shared_budget,
@@ -1597,6 +1751,122 @@ async def _try_link_hop(
             existing_explored = sub_result.get("_explored_links") or {}
             existing_explored.update(explored)
             sub_result["_explored_links"] = existing_explored
+
+            # Floor-plan index accumulation: after a successful sub-page
+            # scrape, run _rank_internal_links on the sub-page HTML to
+            # find floor-plan sub-sub-page links (e.g. /floorplans/the-edgefield/).
+            # If any score ≥ 88 (same-prefix high-confidence links), add
+            # them to the queue and continue accumulating — don't return
+            # early. Catches Jonah-style index pages where dom_scan finds
+            # 5 available units on the index but each plan sub-page carries
+            # the FULL unit list as embedded JSON.
+            #
+            # Prefer embedded hints (pre-scroll, JSON blob still present)
+            # and fall back to HTML link discovery (post-scroll, JS has
+            # rendered the card links but consumed the JSON config).
+            fp_hints = sub_result.get("_embedded_floorplan_subpage_hints") or []
+            if not fp_hints and not _in_floorplan_accumulation:
+                # HTML fallback: look for same-host sub-page links that
+                # score highly from the page's rendered anchor tags.
+                sub_html = (
+                    (sub_fetch.body.decode("utf-8", errors="replace"))
+                    if (hasattr(sub_fetch, "body") and sub_fetch.body)
+                    else ""
+                )
+                if sub_html:
+                    import re as _re_fp
+                    # Hash-based URL pattern: /floorplans/unit-{32+hex}/
+                    # These are single-unit detail pages, not plan-type
+                    # sub-pages. Skip them — they waste hops for 1 unit
+                    # each while plan-type pages (/floorplans/the-name/)
+                    # carry the full unit list.
+                    _HASH_PATH_RE = _re_fp.compile(
+                        r"/(?:unit|apt|apartment)-[0-9a-f]{16,}/", _re_fp.IGNORECASE
+                    )
+                    sub_links = _rank_internal_links(sub_html, sub_url, limit=20)
+                    for lnk_url, lnk_score, lnk_anchor in sub_links:
+                        if lnk_score < 88 or lnk_url in visited:
+                            continue
+                        if _HASH_PATH_RE.search(lnk_url):
+                            continue  # skip unit-detail pages
+                        if any(u == lnk_url for u, _, _ in queue):
+                            continue
+                        # For portal-domain hops (e.g. ProspectPortal),
+                        # only follow sub-paths that contain floor-plan
+                        # keywords — skip photo/amenity/contact pages.
+                        parsed_sub = None
+                        try:
+                            import urllib.parse as _up
+                            parsed_sub = _up.urlparse(lnk_url)
+                        except Exception:
+                            pass
+                        if parsed_sub is not None:
+                            sub_path_l = (parsed_sub.path or "").lower()
+                            base_path_l = (
+                                _up.urlparse(sub_url).path or ""
+                            ).lower()
+                            # Same-prefix check: only follow links that
+                            # are sub-paths of the current URL (avoids
+                            # collecting site-wide nav links like
+                            # /photos, /amenities, /contact).
+                            if not sub_path_l.startswith(base_path_l.rstrip("/")):
+                                # Allow if the link scores on a floor-plan
+                                # path keyword specifically.
+                                _path_kw_match = any(
+                                    kw in sub_path_l
+                                    for kw, _ in _LINK_PATH_KEYWORDS
+                                    if kw in ("/floorplan", "/floor-plan",
+                                              "/availability", "/units",
+                                              "/conventional", "/apartments")
+                                )
+                                if not _path_kw_match:
+                                    continue
+                        fp_hints.append((lnk_url, "html_subpage"))
+            if fp_hints and not _in_floorplan_accumulation:
+                # Mark accumulation mode so recursive sub-pages are merged,
+                # not treated as new floor-plan index pages.
+                _in_floorplan_accumulation = True
+                _first_successful_result = sub_result
+                _accumulated_units.extend(sub_result.get("units") or [])
+                # Queue all floor-plan sub-page hints (within dynamic cap).
+                for fp_url, fp_kind in fp_hints:
+                    if dynamic_appended >= max_dynamic_appends:
+                        break
+                    if fp_url in visited or any(u == fp_url for u, _, _ in queue):
+                        continue
+                    queue.append(
+                        (fp_url, _EMBEDDED_PORTAL_SCORE,
+                         f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{fp_kind}")
+                    )
+                    dynamic_appended += 1
+                emit(
+                    EventKind.LINK_HOP_RECOVERED,
+                    property_id,
+                    entry_url=entry_url,
+                    sub_url=sub_url,
+                    units=len(sub_result["units"]),
+                    tier=sub_result.get("extraction_tier_used"),
+                    hop_index=idx,
+                    score=score,
+                )
+                # Continue the loop — DON'T return yet.
+                continue
+
+            elif _in_floorplan_accumulation:
+                # Accumulating sub-page units — merge into the running total.
+                _accumulated_units.extend(sub_result.get("units") or [])
+                emit(
+                    EventKind.LINK_HOP_RECOVERED,
+                    property_id,
+                    entry_url=entry_url,
+                    sub_url=sub_url,
+                    units=len(sub_result["units"]),
+                    tier=sub_result.get("extraction_tier_used"),
+                    hop_index=idx,
+                    score=score,
+                )
+                continue
+
             emit(
                 EventKind.LINK_HOP_RECOVERED,
                 property_id,
@@ -1608,6 +1878,52 @@ async def _try_link_hop(
                 score=score,
             )
             return sub_result
+
+        # Dynamic discovery: a sub-fetch may itself have surfaced
+        # leasing-portal pointers (e.g. /floorplans/ inlines a SightMap
+        # embed URL). Harvest them into the queue so they're fetched in
+        # the same link-hop pass instead of waiting for the next run.
+        if dynamic_appended < max_dynamic_appends:
+            sub_portal_hints = sub_result.get("_embedded_portal_hints") or []
+            for hint in sub_portal_hints:
+                if dynamic_appended >= max_dynamic_appends:
+                    break
+                try:
+                    url_s, portal_name = hint
+                except Exception:
+                    continue
+                url_s = str(url_s or "").strip()
+                if not url_s or url_s in visited or url_s in explored_skip:
+                    continue
+                # Don't re-queue if already in the queue.
+                if any(u == url_s for u, _, _ in queue):
+                    continue
+                queue.append(
+                    (url_s, _EMBEDDED_PORTAL_SCORE,
+                     f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}")
+                )
+                dynamic_appended += 1
+
+    # If we were in floor-plan accumulation mode, return the merged result.
+    # Deduplicate by (unit_id or unit_number + floor_plan_name + rent_low).
+    if _in_floorplan_accumulation and _first_successful_result is not None:
+        seen_ids: set[str] = set()
+        deduped: list[dict[str, Any]] = []
+        for u in _accumulated_units:
+            key = (
+                u.get("unit_id") or u.get("unit_number") or "",
+                u.get("floor_plan_name") or u.get("floor_plan_id") or "",
+                str(u.get("rent_low") or u.get("market_rent_low") or ""),
+            )
+            key_str = "|".join(key)
+            if key_str not in seen_ids:
+                seen_ids.add(key_str)
+                deduped.append(u)
+        _first_successful_result["units"] = deduped
+        existing_explored = _first_successful_result.get("_explored_links") or {}
+        existing_explored.update(explored)
+        _first_successful_result["_explored_links"] = existing_explored
+        return _first_successful_result
 
     # No hop recovered — return None but stash the explored map on the
     # outer link-hop caller via a sentinel dict. The caller (scrape_jugnu)
@@ -1821,8 +2137,9 @@ async def scrape_jugnu(
                     expected_total_units=expected_total_units,
                     property_id=property_id,
                     csv_row=csv_row,
-                    max_hops=3,
+                    max_hops=7,
                     llm_navigation_hints=result.get("_llm_navigation_hints"),
+                    embedded_portal_hints=result.get("_embedded_portal_hints"),
                     visited_urls={base_url},  # Phase 9: cycle protection (H5)
                     shared_budget=_jugnu_budget,
                 )

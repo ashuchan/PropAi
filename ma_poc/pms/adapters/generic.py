@@ -426,69 +426,6 @@ async def _get_page_html(page: Any, ctx: AdapterContext) -> str | None:
     return None
 
 
-# Cap on chunked-XHR HTML bodies promoted into the page HTML pool. Each
-# fragment is truncated to ``_CHUNK_BODY_CAP_BYTES``; the per-property
-# total is capped at ``_MAX_CHUNK_BODIES`` fragments. This bounds the
-# augmented HTML pool to ~1MB regardless of how many XHRs fired during
-# the fetch, so BeautifulSoup / DOM scanners stay within budget.
-_CHUNK_BODY_CAP_BYTES = 100_000
-_MAX_CHUNK_BODIES = 10
-
-
-def _collect_html_chunk_bodies(
-    api_responses: list[dict[str, Any]],
-    base_url: str | None,
-) -> list[tuple[str, str]]:
-    """Pick HTML-fragment XHR responses to promote into the HTML pool.
-
-    Sites such as Jonah Digital, legacy ASP.NET, and some headless WordPress
-    deliver unit data via XHRs that return HTML fragments rather than JSON.
-    The L1 fetcher captures these in ``network_log``, but the JSON-shape
-    unit gates (``find_unit_list`` / ``has_unit_signals``) skip them because
-    the body is a string starting with ``<`` instead of a dict/list. This
-    helper picks those bodies so ``dom_scan`` / ``jsonld`` / ``embedded_json``
-    can see them alongside the main page HTML.
-
-    Selection rules:
-      - Body must be a non-empty string whose first non-whitespace char is ``<``.
-      - URL must not equal the page navigation URL — the main page response is
-        also captured by ``page.on("response")`` and we already get it via
-        ``_get_page_html`` / ``fetch_result.body``.
-      - ``find_unit_list(body)`` must return empty — if the API gate already
-        consumed this response, don't double-feed it.
-      - Each body is truncated to ``_CHUNK_BODY_CAP_BYTES``.
-      - The returned list is truncated to ``_MAX_CHUNK_BODIES`` entries.
-
-    Returns a list of ``(url, body)`` tuples in capture order.
-    """
-    if not api_responses:
-        return []
-
-    base = (base_url or "").strip()
-    out: list[tuple[str, str]] = []
-
-    for resp in api_responses:
-        if len(out) >= _MAX_CHUNK_BODIES:
-            break
-        url = str(resp.get("url") or "")
-        if not url or url == base:
-            continue
-        body = resp.get("body")
-        if not isinstance(body, str):
-            continue
-        stripped = body.lstrip()
-        if not stripped or not stripped.startswith("<"):
-            continue
-        try:
-            if _find_unit_list(body):
-                continue
-        except Exception:
-            pass
-        out.append((url, body[:_CHUNK_BODY_CAP_BYTES]))
-
-    return out
-
-
 def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
     """Parse a generic list of unit/floorplan dicts using broad key name matching.
 
@@ -1337,30 +1274,6 @@ class GenericAdapter:
         # a live Playwright page or from fetch_result.body) and cover the SSR
         # / static-site cases where no XHR fires during load.
         html = await _get_page_html(page, ctx)
-
-        # Promote chunked-XHR HTML fragments into the HTML pool so the
-        # downstream extractors see them. Some platforms (Jonah Digital,
-        # legacy ASP.NET, some headless WordPress) deliver unit data via
-        # XHRs that return HTML rather than JSON — those bodies fall
-        # through the JSON unit gates upstream and would otherwise be
-        # invisible to dom_scan / jsonld / embedded_json.
-        _chunk_bodies = _collect_html_chunk_bodies(api_responses, ctx.base_url)
-        if _chunk_bodies:
-            _chunk_blob = "\n".join(
-                f"<!-- chunked-xhr url={url!r} -->\n{body}"
-                for url, body in _chunk_bodies
-            )
-            html = ((html or "") + "\n" + _chunk_blob) if html else _chunk_blob
-            _log_attempt(
-                "generic:html_chunks_promoted",
-                "ran_promoted",
-                units=0,
-                reason=(
-                    f"promoted {len(_chunk_bodies)} HTML-fragment XHR body(ies) "
-                    f"into HTML pool for downstream extractors"
-                ),
-            )
-
         if html:
             # Sub-tier 3: JSON-LD
             t0 = _time.monotonic()
@@ -1439,6 +1352,62 @@ class GenericAdapter:
                 ),
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
+
+            # Leasing-portal detection. Even when SSR blobs have no unit
+            # signals (Jonah Digital widget config, headless WordPress
+            # marketing shells, custom React shells), they often point at
+            # a third-party portal (SightMap, RealPage OLL, RentCafe,
+            # FunnelLeasing, AppFolio) where the actual units live. We
+            # surface those URLs as hints for the orchestrator's link-hop
+            # to fetch — the URL host then triggers the matching PMS
+            # fingerprint and the right adapter takes over.
+            if embedded:
+                from ma_poc.pms.adapters._html_extract import (
+                    detect_embedded_portal_urls,
+                )
+                portal_hints = detect_embedded_portal_urls(embedded)
+                if portal_hints:
+                    existing = getattr(result, "_embedded_portal_hints", None) or []
+                    result._embedded_portal_hints = existing + portal_hints  # type: ignore[attr-defined]
+                    _log_attempt(
+                        "generic:embedded_portal_detected",
+                        "ran_hint",
+                        units=0,
+                        reason=(
+                            f"detected {len(portal_hints)} leasing-portal URL(s) in "
+                            f"embedded JSON: "
+                            + ", ".join(f"{p}@{u[:60]}" for u, p in portal_hints[:3])
+                        ),
+                    )
+
+                # Floor-plan sub-page detection: Jonah-style index pages
+                # (renderable_endpoint + base_uri in embedded JSON) contain
+                # per-plan sub-pages with the FULL unit list in their own
+                # embedded JSON blobs. Surface those URLs so link-hop
+                # fetches them and extracts units from the static HTML.
+                from ma_poc.pms.adapters._html_extract import (
+                    detect_floorplan_subpage_urls,
+                )
+                subpage_hints = detect_floorplan_subpage_urls(
+                    embedded, html, ctx.base_url
+                )
+                if subpage_hints:
+                    existing_sp = (
+                        getattr(result, "_embedded_floorplan_subpage_hints", None) or []
+                    )
+                    result._embedded_floorplan_subpage_hints = (  # type: ignore[attr-defined]
+                        existing_sp + subpage_hints
+                    )
+                    _log_attempt(
+                        "generic:floorplan_subpages_detected",
+                        "ran_hint",
+                        units=0,
+                        reason=(
+                            f"detected {len(subpage_hints)} floor-plan sub-page(s) "
+                            f"from embedded JSON config: "
+                            + ", ".join(u[:50] for u, _ in subpage_hints[:3])
+                        ),
+                    )
             if embedded_units:
                 result.units = _merge_into_result_units(
                     result.units, embedded_units, property_id=ctx.property_id

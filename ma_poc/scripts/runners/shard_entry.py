@@ -183,6 +183,131 @@ def _upload_artifacts(bucket_name: str, run_date: str, task_idx: int, schema_ver
         print(f"[shard_entry] dlq.jsonl not found at {dlq_local}; skipping", file=sys.stderr)
 
 
+def _resolve_shard_canonical_ids_db(
+    task_idx: int, task_count: int, limit: int | None
+) -> tuple[list[str], "Any"]:
+    """Return (canonical_ids, engine) for this shard's properties (DB mode).
+
+    Mirrors the exact shard-slicing logic the jugnu runner uses
+    (``SqlPropertyCatalogSource.list_active`` with the same
+    ``CatalogFilters`` and ``limit``), so the warmup deletes units for
+    precisely the properties this shard is about to process — no more,
+    no less.  Returns the provider's engine so the caller can reuse the
+    same connection pool for the delete, avoiding a second Cloud SQL
+    Connector handshake.
+
+    Guards on DATABASE_URL so it is safe to call on local dev where no
+    SQL backend is configured.
+    """
+    if not os.environ.get("DATABASE_URL"):
+        return [], None
+    try:
+        from ma_poc.data_provider.factory import get_data_provider
+        from ma_poc.data_provider.dtos import CatalogFilters
+
+        dp = get_data_provider()
+        filters = CatalogFilters(shard_index=task_idx, shard_count=task_count)
+        rows = dp.property_catalog.list_active(limit=limit, filters=filters)
+        engine = getattr(dp, "engine", None)
+        return [r.canonical_id for r in rows if r.canonical_id], engine
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[shard_entry] warmup: could not resolve shard canonical_ids: {exc}",
+            file=sys.stderr,
+        )
+        return [], None
+
+
+def _resolve_shard_canonical_ids_csv(shard_csv: Path) -> list[str]:
+    """Return canonical_ids from an already-sliced shard CSV (CSV mode).
+
+    Best-effort: covers the explicit ID columns the runner accepts.
+    Properties whose identity is derived from address rather than an
+    explicit ID column will be missed — CSV mode is the legacy escape
+    hatch and not used in production shards.
+    """
+    ids: list[str] = []
+    try:
+        with shard_csv.open(newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                cid = (
+                    row.get("property_id")
+                    or row.get("Unique ID")
+                    or row.get("Property ID")
+                    or row.get("apartmentid")
+                    or ""
+                ).strip()
+                if cid:
+                    ids.append(cid)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[shard_entry] warmup: could not read shard CSV {shard_csv}: {exc}",
+            file=sys.stderr,
+        )
+    return ids
+
+
+def _warmup_delete_today_units(
+    canonical_ids: list[str], run_date: str, engine: "Any" = None
+) -> int:
+    """Delete unit rows written today for this shard's properties.
+
+    Called once, before the runner subprocess starts, so a same-day
+    re-run begins from a clean slate.  Units without a stable
+    website-provided unit_id receive ``unkeyable_`` / ``inferred_`` IDs
+    derived from payload content; if rent or availability changes between
+    two runs on the same day those IDs differ, leaving the first run's
+    rows stranded.  Deleting today's rows here makes the incoming run the
+    sole source of truth for ``run_date``.
+
+    Scoped to this shard's canonical_ids so concurrent shards never
+    touch each other's data.  Never raises — any error is logged and
+    swallowed so the runner can still proceed.
+
+    ``engine`` should be the provider's engine from
+    ``_resolve_shard_canonical_ids_db`` so both steps share a single
+    connection pool.  When None (CSV mode or fallback), a fresh engine is
+    created and disposed after use.
+    """
+    if not os.environ.get("DATABASE_URL"):
+        return 0
+    if not canonical_ids:
+        return 0
+    own_engine = engine is None
+    try:
+        from ma_poc.data_provider.sql.engine import make_engine
+        from ma_poc.data_provider.sql.models import UnitRow
+        from sqlalchemy import delete
+
+        if own_engine:
+            engine = make_engine()
+        prefix = f"{run_date}%"
+        with engine.begin() as conn:
+            result = conn.execute(
+                delete(UnitRow).where(
+                    UnitRow.canonical_id.in_(canonical_ids),
+                    UnitRow.last_seen_at.like(prefix),
+                )
+            )
+            deleted = result.rowcount or 0
+        print(
+            f"[shard_entry] warmup: deleted {deleted} unit rows for "
+            f"{len(canonical_ids)} properties (last_seen_at={run_date}*)",
+            file=sys.stderr,
+        )
+        return deleted
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[shard_entry] warmup: unit cleanup failed (non-fatal): {exc}",
+            file=sys.stderr,
+        )
+        return 0
+    finally:
+        if own_engine and engine is not None:
+            engine.dispose()
+
+
 def _sync_to_postgres(run_date: str, schema_version: str, shard_id: str) -> int:
     """Copy the shard's FS output into Cloud SQL.
 
@@ -277,6 +402,7 @@ def main() -> None:
         file=sys.stderr,
     )
 
+    shard_csv: Path | None = None  # set in csv branch; read by warmup below
     runner = _app_root / "ma_poc" / "scripts" / "runners" / "jugnu.py"
     cmd = [
         sys.executable,
@@ -317,6 +443,18 @@ def main() -> None:
 
     if limit is not None:
         cmd += ["--limit", str(limit)]
+
+    # Warmup: clear today's unit rows for this shard's properties before
+    # the runner starts.  Prevents duplicate / stranded unit rows when the
+    # Cloud Run job re-executes on the same day (e.g. manual retry, Cloud
+    # Run automatic retry on transient infrastructure failure).  Scoped
+    # strictly to this shard's canonical_ids so concurrent shards are safe.
+    if shard_source == "db":
+        _warmup_cids, _warmup_engine = _resolve_shard_canonical_ids_db(task_idx, task_count, limit)
+    else:
+        _warmup_cids = _resolve_shard_canonical_ids_csv(shard_csv) if shard_csv else []
+        _warmup_engine = None
+    _warmup_delete_today_units(_warmup_cids, run_date, engine=_warmup_engine)
 
     runner_exit = 1
     sync_exit = 0

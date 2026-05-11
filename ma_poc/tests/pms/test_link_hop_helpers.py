@@ -634,3 +634,152 @@ async def test_link_hop_priors_respect_explored_skip_list() -> None:
         f"Skipping /floorplans should not suppress the rest of the "
         f"RentCafe priors; got fetch_calls={fetch_calls}"
     )
+
+
+# ── Entrata /conventional/ prior ────────────────────────────────────────────
+
+
+def test_entrata_priors_include_conventional_path() -> None:
+    """Entrata custom-domain sites use /{city}/{property}/conventional/ as
+    the floor-plan page — the standard Entrata sub-paths (/floorplans,
+    /availability, /leasing) 404 on those sites.  The prior tuple must
+    include /conventional/ so link-hop tries it without needing the LLM
+    to discover the URL.  Regression for alistermontclair.com (228073).
+    """
+    from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
+    from ma_poc.pms.scraper import _pms_priors_for
+
+    detected = DetectedPMS(
+        pms="entrata",
+        confidence=0.9,
+        evidence=["fp:entrata"],
+        recommended_strategy=_STRATEGY_BY_PMS.get("entrata", "cascade"),
+    )
+    priors = _pms_priors_for(detected, "https://www.alistermontclair.com/")
+    paths = [url for url, _, _ in priors]
+    assert any("conventional" in p for p in paths), (
+        f"expected /conventional/ in Entrata priors; got {paths}"
+    )
+    assert any("apartments" in p for p in paths), (
+        f"expected /apartments/ in Entrata priors; got {paths}"
+    )
+    # Standard paths must still be present so non-custom-domain Entrata
+    # sites keep working.
+    assert any("floorplans" in p for p in paths), (
+        f"expected /floorplans in Entrata priors; got {paths}"
+    )
+
+
+# ── Navigation-menu anchor keyword scoring ───────────────────────────────────
+
+
+def test_find_your_home_anchor_scores_above_apply() -> None:
+    """'Find Your Home' is a floor-plan CTA that should rank above generic
+    CTAs like 'Apply'. Before this fix the keyword list had no entry for
+    it, so a nav link 'Find Your Home' → /conventional/ would score 0.
+    """
+    from ma_poc.pms.scraper import _LINK_ANCHOR_KEYWORDS
+
+    kw_map = {kw.lower(): score for kw, score in _LINK_ANCHOR_KEYWORDS}
+    assert "find your home" in kw_map, "'find your home' must be in anchor keywords"
+    assert "view availability" in kw_map, "'view availability' must be in anchor keywords"
+    assert kw_map["find your home"] > kw_map.get("apply", 0), (
+        "'find your home' must score higher than 'apply'"
+    )
+
+
+def test_conventional_path_keyword_scores() -> None:
+    """/conventional/ appearing in a URL path must yield a non-zero score
+    from the path keyword list so it ranks above unscored links."""
+    from ma_poc.pms.scraper import _LINK_PATH_KEYWORDS
+
+    path_map = {kw.lower(): score for kw, score in _LINK_PATH_KEYWORDS}
+    assert "/conventional/" in path_map, (
+        "'/conventional/' must be in path keywords for Entrata custom-domain detection"
+    )
+    assert path_map["/conventional/"] > 50, (
+        "score for /conventional/ must be above 50 to outrank noise links"
+    )
+
+
+def test_rank_internal_links_surfaces_entrata_deep_url() -> None:
+    """Integration: given an alistermontclair-style HTML with a navigation
+    menu containing 'Find Your Home' → /montclair/alister-montclair/conventional/,
+    _rank_internal_links must return that URL in the top candidates.
+    """
+    from ma_poc.pms.scraper import _rank_internal_links
+
+    html = """<html><head></head><body>
+    <nav>
+      <ul>
+        <li><a href="/about">About Us</a></li>
+        <li>
+          <a href="#">Floor Plans</a>
+          <ul>
+            <li><a href="/montclair/alister-montclair/conventional/">Find Your Home</a></li>
+            <li><a href="/apply">Apply Now</a></li>
+          </ul>
+        </li>
+        <li><a href="/contact">Contact</a></li>
+      </ul>
+    </nav>
+    </body></html>"""
+
+    ranked = _rank_internal_links(html, "https://www.alistermontclair.com/", limit=5)
+    urls = [u for u, _, _ in ranked]
+    assert any("conventional" in u for u in urls), (
+        f"expected /conventional/ URL in ranked candidates; got {urls}"
+    )
+    # Multi-signal boost: anchor "find your home" (score 88) + path
+    # "/conventional/" (score 88) should both fire, triggering the
+    # boost to _PMS_PRIOR_SCORE - 1000 = 4000.  This ensures the link
+    # competes with PMS priors (5000) and isn't crowded out.
+    conventional_entry = next(
+        ((u, s, a) for u, s, a in ranked if "conventional" in u), None
+    )
+    assert conventional_entry is not None
+    _, boosted_score, _ = conventional_entry
+    from ma_poc.pms.scraper import _PMS_PRIOR_SCORE
+    assert boosted_score >= _PMS_PRIOR_SCORE - 1_000, (
+        f"expected multi-signal boost to >= {_PMS_PRIOR_SCORE - 1000}; "
+        f"got score={boosted_score}"
+    )
+
+
+def test_rank_internal_links_discovers_form_action_url() -> None:
+    """The alistermontclair.com shape: 'Pick Your Home' is an <a> pointing
+    at prospectportal.com (different host), but the same URL also appears
+    in a <form action>.  _rank_internal_links must parse form actions so
+    the same-site URL is discovered even when the <a> is cross-domain.
+    Regression for 228073.
+    """
+    from ma_poc.pms.scraper import _rank_internal_links
+
+    html = """<html><head></head><body>
+    <nav>
+      <!-- <a> goes to prospectportal.com — cross-site, filtered -->
+      <a href="https://alistermontclair.prospectportal.com/montclair/alister-montclair/conventional/">
+        Pick Your Home
+      </a>
+    </nav>
+    <!-- <form action> carries the same-site URL -->
+    <form method="post"
+          action="https://www.alistermontclair.com/montclair/alister-montclair/conventional/">
+      <input type="hidden" name="occupancy_type" value="conventional">
+      <button type="submit">Search</button>
+    </form>
+    </body></html>"""
+
+    ranked = _rank_internal_links(
+        html, "https://www.alistermontclair.com/", limit=10
+    )
+    urls = [u for u, _, _ in ranked]
+
+    # Same-site URL from form action must appear
+    assert any("montclair/alister-montclair/conventional" in u for u in urls), (
+        f"form-action URL not in ranked candidates; got {urls}"
+    )
+    # Cross-site prospectportal.com link should also be discovered (portal host)
+    assert any("prospectportal.com" in u for u in urls), (
+        f"prospectportal.com URL not in candidates (should score as portal host); got {urls}"
+    )

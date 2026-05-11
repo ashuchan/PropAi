@@ -74,7 +74,7 @@ _UNIT_SIGNAL_KEYS: frozenset[str] = frozenset(
         "no_of_bedroom",
         "unitNumber", "unit_number", "unitId", "unit_id",
         "floorPlanName", "floor_plan_name", "floorplan_name", "floorplan-name",
-        "availableDate", "available_date", "availableCount",
+        "availableDate", "available_date", "availableCount", "available_on",
         "minimumRent", "maximumRent", "minimumMarketRent", "maximumMarketRent",
         "rentRange", "depositAmount", "numberOfUnitsDisplay",
     }
