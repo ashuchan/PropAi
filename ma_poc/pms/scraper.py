@@ -1069,6 +1069,13 @@ from ma_poc.pms.signal_engine.defaults import (  # noqa: E402
 _LLM_HINT_ANCHOR_PREFIX = "llm-hint:"
 _EMBEDDED_PORTAL_ANCHOR_PREFIX = "embedded-portal:"
 
+# RC5: maps FetchOutcome values to the verdict prefix written into errors[].
+# Module-level so tests can import rather than redefine.
+_OUTCOME_VERDICT_PREFIX: dict[str, str] = {
+    "EMPTY_BODY": "FAILED_FETCH_EMPTY",
+    "DEAD_URL":   "FAILED_DEAD_URL",
+}
+
 
 def _augment_ranked_with_hints(
     ranked: list[tuple[str, int, str]],
@@ -1481,15 +1488,25 @@ async def _try_link_hop(
             return _SK.INTERNAL_LINK
 
         _ranker = _mk_ranker()
-        _signals = [
-            _SS(
-                kind=_anchor_to_kind(a),
-                url=u,
-                anchor_text=a,
-                profile_score_override=(s if _anchor_to_kind(a) == _SK.PROFILE_WINNING else None),
+        _signals = []
+        for u, s, a in ranked:
+            _kind = _anchor_to_kind(a)
+            # profile:winning_page_url and profile:availability_link both carry
+            # an explicit score from the profile layer (e.g. _LLM_HINT_SCORE).
+            # Pass it as override so the ranker doesn't recompute a lower value
+            # from keyword tables — preserving is_llm_hint=True downstream.
+            _is_profile_scored = (
+                _kind == _SK.PROFILE_WINNING
+                or a.lower().startswith("profile:availability_link")
             )
-            for u, s, a in ranked
-        ]
+            _signals.append(
+                _SS(
+                    kind=_kind,
+                    url=u,
+                    anchor_text=a,
+                    profile_score_override=(s if _is_profile_scored else None),
+                )
+            )
         _ranked_signals = _ranker.rank(_signals)
         # Reconstruct (url, score, anchor) format for the rest of _try_link_hop
         ranked = [
@@ -1905,10 +1922,7 @@ async def scrape_jugnu(
     # Delta 2: short-circuit on non-OK fetch
     # RC5: EMPTY_BODY gets a distinct verdict prefix so dashboards can
     # distinguish "server returned 200 but no content" from real unreachable.
-    _OUTCOME_VERDICT_PREFIX: dict[str, str] = {
-        "EMPTY_BODY": "FAILED_FETCH_EMPTY",
-        "DEAD_URL":   "FAILED_DEAD_URL",
-    }
+    # (_OUTCOME_VERDICT_PREFIX is a module-level constant — see above.)
     if hasattr(fetch_result, "outcome"):
         outcome_val = (
             fetch_result.outcome.value

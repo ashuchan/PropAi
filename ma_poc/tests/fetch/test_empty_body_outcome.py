@@ -48,11 +48,9 @@ def test_dead_url_outcome_exists() -> None:
 
 def test_scraper_verdict_prefix_empty_body() -> None:
     """The _OUTCOME_VERDICT_PREFIX dict in scraper.py maps EMPTY_BODY → FAILED_FETCH_EMPTY."""
-    _OUTCOME_VERDICT_PREFIX: dict[str, str] = {
-        "EMPTY_BODY": "FAILED_FETCH_EMPTY",
-        "DEAD_URL": "FAILED_DEAD_URL",
-    }
+    from ma_poc.pms.scraper import _OUTCOME_VERDICT_PREFIX
     assert _OUTCOME_VERDICT_PREFIX.get("EMPTY_BODY") == "FAILED_FETCH_EMPTY"
+    assert _OUTCOME_VERDICT_PREFIX.get("DEAD_URL") == "FAILED_DEAD_URL"
     assert _OUTCOME_VERDICT_PREFIX.get("BOT_BLOCKED", "FAILED_UNREACHABLE") == "FAILED_UNREACHABLE"
 
 

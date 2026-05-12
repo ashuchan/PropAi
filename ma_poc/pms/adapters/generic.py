@@ -1535,7 +1535,7 @@ class GenericAdapter:
             # where unit data lives in the markup, not in any JSON envelope.
             # Phase E: pass saved field_selectors as hints when available.
             t0 = _time.monotonic()
-            dom_hints = None
+            _profile_dom_field_selectors = None
             if ctx.profile is not None:
                 fs = ctx.profile.dom_hints.field_selectors
                 if fs and getattr(fs, "container", None):
@@ -1558,10 +1558,10 @@ class GenericAdapter:
                         or DOM_HINT_QUALITY_MAX
                     )
                     if fs_quality >= DOM_HINT_QUALITY_REPLAY_FLOOR:
-                        dom_hints = fs
-            hints_attempted = dom_hints is not None
+                        _profile_dom_field_selectors = fs
+            hints_attempted = _profile_dom_field_selectors is not None
             try:
-                dom_units, _dom_hit_mode = extract_units_from_dom(html, ctx.base_url, hints=dom_hints)
+                dom_units, _dom_hit_mode = extract_units_from_dom(html, ctx.base_url, hints=_profile_dom_field_selectors)
             except Exception as exc:
                 dom_units, _dom_hit_mode = [], "none"
                 result.errors.append(f"dom-scan-error: {exc}")
