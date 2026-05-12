@@ -53,6 +53,23 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 if TYPE_CHECKING:
     from playwright.async_api import Page
 
+# Phase 4: module-level RentCafe-scoped qualifier singleton.
+# Used by _is_rentcafe_response() to delegate its field-combination checks
+# so all FieldCombination definitions live in signal_engine/defaults.py.
+# The api=rentcafe value-sentinel check is NOT delegatable (it checks a
+# response value, not a key) and stays inline in _is_rentcafe_response().
+try:
+    from ma_poc.pms.signal_engine.defaults import create_rentcafe_qualifier as _create_rq
+    from ma_poc.pms.signal_engine.models import (
+        SourceKind as _RCSourceKind,
+        SourceSignal as _RCSourceSignal,
+    )
+    _rentcafe_qualifier = _create_rq()
+except Exception:
+    _rentcafe_qualifier = None  # type: ignore[assignment]
+    _RCSourceKind = None  # type: ignore[assignment]
+    _RCSourceSignal = None  # type: ignore[assignment]
+
 
 def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
     """Parse a RentCafe/Yardi floorplan list into standard unit dicts.
@@ -233,7 +250,7 @@ def _normalise_item(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def _is_rentcafe_response(body: Any) -> bool:
-    """Check if a response body looks like RentCafe floorplan data."""
+    """Check if a response body looks like RentCafe floorplan or unit data."""
     items = _unwrap_rentcafe_list(body)
     if not items:
         return False
@@ -246,15 +263,31 @@ def _is_rentcafe_response(body: Any) -> bool:
     # equality check only matched lowercase "rentcafe". Lowercase the value too.
     if str(first_lc.get("api") or "").lower() == "rentcafe":
         return True
-    rentcafe_keys = {
-        "floorplanname",
-        "floorplanid",
-        "minimumrent",
-        "maximumrent",
-        "availableunitscount",
-        "availabilityurl",
-    }
-    return len(rentcafe_keys & set(first_lc.keys())) >= 3
+    # Phase 4: delegate field-combination checks to the RentCafe-scoped
+    # SourceQualifier so all FieldCombination definitions stay in defaults.py.
+    # Fallback: inline checks when the signal engine is unavailable.
+    if _rentcafe_qualifier is not None:
+        sig = _RCSourceSignal(
+            kind=_RCSourceKind.API_RESPONSE,
+            field_keys=frozenset(first_lc.keys()),
+        )
+        return _rentcafe_qualifier.qualify(sig).qualifies
+    # Fallback: inline field-combination checks (signal engine unavailable).
+    _fp_keys: frozenset[str] = frozenset({
+        "floorplanname", "floorplanid", "minimumrent",
+        "maximumrent", "availableunitscount", "availabilityurl",
+    })
+    if len(_fp_keys & set(first_lc.keys())) >= 3:
+        return True
+    _unit_id_keys: frozenset[str] = frozenset({
+        "rentcafeapartmentid", "rentcafefloorplanid", "rentcafepropertyid",
+    })
+    if len(_unit_id_keys & set(first_lc.keys())) >= 2:
+        return True
+    _unit_rent_keys: frozenset[str] = frozenset({
+        "rentcafeapartmentid", "unitrent", "marketrent",
+    })
+    return len(_unit_rent_keys & set(first_lc.keys())) >= 2
 
 
 # 2026-04-20 fix: structured tier codes for failure-mode classification.

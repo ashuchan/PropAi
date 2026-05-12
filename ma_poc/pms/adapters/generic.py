@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import re as _re
+from datetime import datetime, timezone as _timezone
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._daily_runner_parsers import (
@@ -94,6 +95,128 @@ if TYPE_CHECKING:
 _re_strip_script = _re.compile(r"<script.*?</script>|<style.*?</style>", _re.IGNORECASE | _re.DOTALL)
 _re_strip_tag = _re.compile(r"<[^>]+>")
 _re_rent = _re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?", _re.IGNORECASE)
+
+# RC4: media-type hard gate — content types and URL suffixes that can never
+# contain unit data. Defined at module level so the check is not re-created
+# on every extract() call. Used before the LLM budget is consumed to prevent
+# feeding JS/CSS/font files from CDNs (e.g. cdngeneralmvc.rentcafe.com) to
+# the LLM, which correctly returns no units but wastes $0.005 of budget.
+_NON_DATA_CT_PREFIXES: tuple[str, ...] = (
+    "text/javascript",
+    "text/css",
+    "font/",
+    "image/",
+    "application/font",
+    "application/x-font",
+)
+_NON_DATA_URL_SUFFIXES: tuple[str, ...] = (
+    ".js", ".css", ".woff", ".woff2", ".ttf", ".otf",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
+)
+
+
+def _is_non_data_response(resp: dict[str, Any]) -> bool:
+    """Return True when the API response is a non-data media type (JS/CSS/font/image).
+
+    Checks both the content_type field and the URL suffix. Query-string
+    components are stripped before suffix matching.
+    """
+    ct = (resp.get("content_type") or
+          (resp.get("headers") or {}).get("content-type") or "").lower()
+    if any(ct.startswith(p) for p in _NON_DATA_CT_PREFIXES):
+        return True
+    url_lower = (resp.get("url") or "").lower().split("?")[0]
+    return any(url_lower.endswith(sfx) for sfx in _NON_DATA_URL_SUFFIXES)
+
+
+# Signal engine — module-level singletons (R1-H1 fix).
+# All signal engine imports are in ONE try/except so they succeed or fail
+# together. When any import fails the fallback path (_has_unit_signals,
+# inline RC1 checks) is used throughout. Graceful degradation — never raises.
+try:
+    from ma_poc.pms.signal_engine.defaults import (
+        create_default_qualifier as _create_sq,
+        create_default_ranker as _create_sr,
+    )
+    from ma_poc.pms.signal_engine.models import (
+        SourceKind as _SESourceKind,
+        SourceSignal as _SESourceSignal,
+    )
+    from ma_poc.pms.signal_engine.decider import (
+        ActionDecider as _SEActionDecider,
+        ActionType as _SEActionType,
+        DecisionContext as _SEDecisionContext,
+        DOMAnalysisResult as _SEDOMAnalysisResult,
+    )
+    _source_qualifier = _create_sq()
+    _source_ranker = _create_sr()
+    _action_decider = _SEActionDecider()   # stateless — safe to share across calls
+except Exception:
+    _source_qualifier = None  # type: ignore[assignment]
+    _source_ranker = None  # type: ignore[assignment]
+    _SESourceKind = None  # type: ignore[assignment]
+    _SESourceSignal = None  # type: ignore[assignment]
+    _action_decider = None  # type: ignore[assignment]
+    _SEActionDecider = None  # type: ignore[assignment]
+    _SEActionType = None  # type: ignore[assignment]
+    _SEDecisionContext = None  # type: ignore[assignment]
+    _SEDOMAnalysisResult = None  # type: ignore[assignment]
+
+# RC1: TTL + minimum-verdicts thresholds — hoisted to module level for testability.
+_BLOCK_TTL_DAYS: int = 14
+_MIN_NOISE_VERDICTS: int = 2
+
+
+def _should_block_endpoint(
+    be: Any,
+    now: "datetime",
+    ttl_days: int = _BLOCK_TTL_DAYS,
+    min_verdicts: int = _MIN_NOISE_VERDICTS,
+) -> bool:
+    """Return True when a blocked-endpoint record should still suppress the URL.
+
+    RC1: Re-admits when noise_verdicts < min_verdicts (insufficient evidence to
+    sustain a permanent block) or when blocked_at is older than ttl_days (TTL
+    expired — endpoint may have been redesigned).
+    """
+    attempts = int(getattr(be, "attempts", 1) or 1)
+    if attempts < min_verdicts:
+        return False
+    blocked_at = getattr(be, "blocked_at", None)
+    if blocked_at is not None:
+        try:
+            _ba = blocked_at
+            if hasattr(_ba, "tzinfo") and _ba.tzinfo is not None:
+                _ba = _ba.astimezone(_timezone.utc).replace(tzinfo=None)
+            age_days = (now - _ba).days
+            if age_days >= ttl_days:
+                return False
+        except Exception:
+            pass
+    return True
+
+
+def _api_signal_qualifies(resp: "dict[str, Any]", items: "list[Any]") -> bool:
+    """Return True when the API response body matches a recognisable unit-data shape.
+
+    Phase 4: SourceQualifier is the single gate, replacing the dual-run of
+    _has_unit_signals() + qualifier from Phase 1. Falls back to has_unit_signals()
+    when the signal engine is unavailable (import failure at startup).
+    """
+    if not items:
+        return False
+    if _source_qualifier is not None:
+        first = items[0] if items else {}
+        fkeys = frozenset(first.keys()) if isinstance(first, dict) else frozenset()
+        sig = _SESourceSignal(
+            kind=_SESourceKind.API_RESPONSE,
+            url=resp.get("url"),
+            content_type=resp.get("content_type"),
+            field_keys=fkeys,
+        )
+        return _source_qualifier.qualify(sig).qualifies
+    return _has_unit_signals(items)
+
 
 # Broader rent-shaped pattern: matches rent values that don't lead with $.
 # Examples: "Starting at 1,500", "1,500/mo", "from $1500/month", "1500 - 2000",
@@ -594,6 +717,91 @@ def parse_generic_api(items: list[dict[str, Any]], url: str) -> list[dict[str, s
     return units
 
 
+# ── RealPage CWS credential probe ────────────────────────────────────────────
+# RealPage LeaseStar CWS sites embed RPFP_config in their HTML with a numeric
+# propertyId and a UUID apiKey.  The units API requires x-ws-authkey but the
+# key is NOT secret — it is embedded in the publicly served HTML to authenticate
+# the browser-side JS widget.  We extract it and fire the call directly.
+
+_RPFP_PROPERTY_ID = _re.compile(
+    r'(?:var\s+propertyId|propertyId\s*:)\s*[=:]\s*["\']?(\d+)["\']?',
+    _re.IGNORECASE,
+)
+_RPFP_API_KEY = _re.compile(
+    r'apiKey\s*:\s*["\']([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})["\']',
+    _re.IGNORECASE,
+)
+# Unit field mappings from the RealPage units API response
+_RPFP_UNIT_MAP: dict[str, str] = {
+    "unitNumber": "unit_number",
+    "numberOfBeds": "bedrooms",
+    "numberOfBaths": "bathrooms",
+    "squareFeet": "sqft",
+    "rent": "market_rent_low",
+    "totalRent": "market_rent_high",
+    "internalAvailableDate": "available_date",
+    "floorNumber": "floor",
+    "buildingName": "building",
+    "floorplanId": "floor_plan_id",
+}
+
+
+async def _probe_realpage_cws(html: str) -> list[dict[str, Any]]:
+    """Extract units from a RealPage CWS page by reading credentials from HTML.
+
+    Args:
+        html: Full page HTML containing RPFP_config.
+
+    Returns:
+        Parsed unit dicts, empty list on any failure.
+    """
+    pid_m = _RPFP_PROPERTY_ID.search(html)
+    key_m = _RPFP_API_KEY.search(html)
+    if not pid_m or not key_m:
+        return []
+
+    property_id = pid_m.group(1)
+    api_key = key_m.group(1)
+
+    url = (
+        f"https://api.ws.realpage.com/v2/property/{property_id}/units"
+        f"?available=true&honordisplayorder=true&siteid={property_id}"
+        "&bestprice=true&leaseterm=3,4,5,6,7,8,9,10,11,12,13,14,15&baseRent=true"
+    )
+    try:
+        import httpx as _httpx
+        async with _httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(url, headers={"x-ws-authkey": api_key})
+        if resp.status_code != 200:
+            return []
+        data = resp.json()
+    except Exception:
+        return []
+
+    raw_units = (data.get("response") or {}).get("units") or []
+    units: list[dict[str, Any]] = []
+    for u in raw_units:
+        if not isinstance(u, dict):
+            continue
+        record: dict[str, Any] = {}
+        for src_key, dst_key in _RPFP_UNIT_MAP.items():
+            val = u.get(src_key)
+            if val is not None:
+                record[dst_key] = val
+        # Normalise date string to YYYY-MM-DD (strips time + TZ offset)
+        avail = record.get("available_date")
+        if isinstance(avail, str):
+            record["available_date"] = avail[:10]
+        # Lease status
+        if u.get("leaseStatus") in ("Available", "available"):
+            record["availability_status"] = "AVAILABLE"
+        elif u.get("leaseStatus"):
+            record["availability_status"] = "UNAVAILABLE"
+        if record.get("unit_number"):
+            units.append(record)
+    return units
+
+
 class GenericAdapter:
     """Generic fallback adapter.
 
@@ -926,13 +1134,23 @@ class GenericAdapter:
         # noise. Saves token spend on known-bad endpoints (chatbot configs,
         # analytics pixels, CMS widgets). New noise discoveries also flow
         # back into this list via _llm_analysis_results.
+        #
+        # RC1: apply a 14-day TTL and a minimum-noise-verdicts guard before
+        # treating a blocked endpoint as still-blocked. A URL that was
+        # misclassified once (noise_verdicts < 2) should be re-admitted so
+        # it can be re-evaluated, rather than blocked forever. A URL that
+        # was correctly classified but whose block is >14 days old is also
+        # re-admitted in case the endpoint has been redesigned.
         profile = getattr(ctx, "profile", None)
         blocked_urls: set[str] = set()
         if profile is not None:
             try:
+                _now = datetime.now(_timezone.utc).replace(tzinfo=None)
                 for be in getattr(profile.api_hints, "blocked_endpoints", []) or []:
                     pat = getattr(be, "url_pattern", None)
-                    if pat:
+                    if not pat:
+                        continue
+                    if _should_block_endpoint(be, _now):
                         blocked_urls.add(str(pat))
             except Exception:
                 blocked_urls = set()
@@ -1236,16 +1454,20 @@ class GenericAdapter:
                     pass
 
         # Sub-tier 1: narrow generic API parser -----------------------------
+        # Phase 4: _api_signal_qualifies() is the single gate — SourceQualifier
+        # when the signal engine is available, has_unit_signals() otherwise.
+        # This replaces the Phase 1 dual-run and removes the lazy import.
         t0 = _time.monotonic()
         for resp in api_responses:
             body = resp.get("body")
             items = _find_unit_list(body)
-            if items and _has_unit_signals(items):
-                url = resp.get("url", "")
-                units = parse_generic_api(items, url)
-                if units:
-                    all_units.extend(units)
-                    result.api_responses.append(resp)
+            url = resp.get("url", "")
+            if not _api_signal_qualifies(resp, items):
+                continue
+            units = parse_generic_api(items, url)
+            if units:
+                all_units.extend(units)
+                result.api_responses.append(resp)
         _narrow_ms = int((_time.monotonic() - t0) * 1000)
         if api_responses:
             _log_attempt(
@@ -1460,6 +1682,28 @@ class GenericAdapter:
                             + ", ".join(u[:50] for u, _ in subpage_hints[:3])
                         ),
                     )
+            # Shape-B SecureCafe detection — runs on raw HTML, not JSON blobs.
+            # Sites that route /onlineleasing/{slug} client-side and JS-redirect
+            # to {subdomain}.securecafe.com never expose the final URL until the
+            # React bundle fires.  We synthesise it from the href slug + domain.
+            if html and not result.units:
+                try:
+                    from ma_poc.pms.adapters._html_extract import (
+                        detect_securecafe_portal_url,
+                    )
+                    _sc_url = detect_securecafe_portal_url(html, ctx.base_url)
+                    if _sc_url:
+                        existing_ep = getattr(result, "_embedded_portal_hints", None) or []
+                        result._embedded_portal_hints = existing_ep + [(_sc_url, "securecafe")]  # type: ignore[attr-defined]
+                        _log_attempt(
+                            "generic:securecafe_portal_detected",
+                            "ran_hint",
+                            units=0,
+                            reason=f"synthesised securecafe URL from /onlineleasing/ href: {_sc_url[:70]}",
+                        )
+                except Exception:
+                    pass
+
             if embedded_units:
                 result.units = _merge_into_result_units(
                     result.units, embedded_units, property_id=ctx.property_id
@@ -1476,13 +1720,60 @@ class GenericAdapter:
                     return result
                 skip_llm = False  # planner escalated — allow LLM
 
+            # Sub-tier 4b: RealPage CWS credential probe ─────────────────────
+            # RealPage LeaseStar CWS sites serve a JavaScript shell whose
+            # static HTML contains an RPFP_config object with:
+            #   propertyId — the numeric property identifier
+            #   apiKey     — a UUID used as x-ws-authkey on the units API
+            # The widget makes: GET api.ws.realpage.com/v2/property/{id}/units
+            # Without x-ws-authkey the endpoint 401s; with it the full unit
+            # list (rent, sqft, availability) is returned directly.
+            # Extracting credentials from HTML and re-firing the call gives
+            # deterministic results without waiting for the JS bundle to load.
+            if not result.units and html and "rpfp_config" in html.lower():
+                try:
+                    _cws_units = await _probe_realpage_cws(html)
+                    if _cws_units:
+                        result.units = _merge_into_result_units(
+                            result.units, _cws_units, property_id=ctx.property_id
+                        )
+                        result.tier_used = "TIER_1_API"
+                        result.winning_url = ctx.base_url
+                        result.confidence = min(0.90, 0.65 + 0.04 * len(result.units))
+                        _log_attempt(
+                            "generic:realpage_cws",
+                            "ran_units",
+                            units=len(_cws_units),
+                            reason="RPFP_config credentials extracted from HTML",
+                        )
+                        from ma_poc.models.source import SourceId as _SI4b
+                        sources_already_run.add(_SI4b.API_GENERIC_NARROW)
+                        _cws_d = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
+                        if _cws_d is None or _cws_d.action == "STOP":
+                            result._decision_log = decision_log  # type: ignore[attr-defined]
+                            return result
+                    else:
+                        _log_attempt(
+                            "generic:realpage_cws",
+                            "ran_empty",
+                            units=0,
+                            reason="RPFP_config found but API returned no units",
+                        )
+                except Exception as _cws_exc:
+                    _log_attempt(
+                        "generic:realpage_cws",
+                        "ran_empty",
+                        units=0,
+                        reason=f"probe error: {_cws_exc}",
+                    )
+
             # Sub-tier 5: DOM selector cascade ------------------------------
             # Scans container elements (.unit, .floor-plan, .pricing-card, …)
             # for visible rent + structural signals. Catches static HTML sites
             # where unit data lives in the markup, not in any JSON envelope.
             # Phase E: pass saved field_selectors as hints when available.
             t0 = _time.monotonic()
-            dom_hints = None
+            _profile_dom_field_selectors = None
             if ctx.profile is not None:
                 fs = ctx.profile.dom_hints.field_selectors
                 if fs and getattr(fs, "container", None):
@@ -1505,10 +1796,10 @@ class GenericAdapter:
                         or DOM_HINT_QUALITY_MAX
                     )
                     if fs_quality >= DOM_HINT_QUALITY_REPLAY_FLOOR:
-                        dom_hints = fs
-            hints_attempted = dom_hints is not None
+                        _profile_dom_field_selectors = fs
+            hints_attempted = _profile_dom_field_selectors is not None
             try:
-                dom_units, _dom_hit_mode = extract_units_from_dom(html, ctx.base_url, hints=dom_hints)
+                dom_units, _dom_hit_mode = extract_units_from_dom(html, ctx.base_url, hints=_profile_dom_field_selectors)
             except Exception as exc:
                 dom_units, _dom_hit_mode = [], "none"
                 result.errors.append(f"dom-scan-error: {exc}")
@@ -1872,11 +2163,17 @@ class GenericAdapter:
                     break
                 if _llm_cost_exceeded():
                     break
+                # RC4: skip non-data media types before LLM
+                if _is_non_data_response(resp):
+                    continue
                 body = resp.get("body")
                 items = _find_unit_list(body)
                 # Only spend budget on responses where something looks like a
                 # unit list — avoids feeding analytics payloads to the LLM.
-                if not items or not _has_unit_signals(items):
+                # _api_signal_qualifies() runs the full SourceQualifier gate
+                # (including the RC4 MediaTypeFilter), so JS/CSS/font responses
+                # are dropped here too, not just in the api_narrow path.
+                if not _api_signal_qualifies(resp, items):
                     continue
                 url = resp.get("url", "")
                 # Atomic consume — decrement BEFORE the awaited call so a
@@ -1990,8 +2287,38 @@ class GenericAdapter:
         # Extract the rent-bearing DOM section (not the full page) and ask
         # the LLM to return units AND CSS selectors we can replay next run.
         dom_units = []
+        dom_hints: dict[str, Any] | None = None
+
+        # Rule 2: check for CSS selectors cached from a prior sub-page in the
+        # same floor-plan accumulation pass.  If the hop chain's first sub-page
+        # LLM DOM call already discovered the selectors, we can replay them
+        # against subsequent sub-pages without burning another LLM token.
+        # The selectors are written into the shared budget dict by _try_link_hop.
+        _fp_css_hint: dict[str, Any] | None = getattr(ctx, "budget", {}).get("_fp_css_hint")  # type: ignore[union-attr]
+        # Guard: only replay cache when no units yet — profile selectors may
+        # have been tried but produced 0 units (sub-page structure differs from
+        # the index page where selectors were saved).  The old check
+        # `not _profile_dom_field_selectors` skipped the replay entirely when
+        # the profile had saved selectors, defeating the floor-plan accumulation
+        # optimisation on WARM/HOT profiles.
+        if _fp_css_hint and not dom_units and html:
+            try:
+                _hint_obj = _FieldSelectorMap(**_fp_css_hint)
+                _fp_hint_units, _fp_mode = extract_units_from_dom(html, ctx.base_url, hints=_hint_obj)
+                if _fp_hint_units:
+                    dom_units = _fp_hint_units
+                    _log_attempt(
+                        "generic:llm_dom_targeted",
+                        "ran_units",
+                        units=len(dom_units),
+                        reason="fp_css_hint_replay",
+                        duration_ms=0,
+                    )
+            except Exception:
+                pass  # fall through to LLM DOM call below
+
         dom_section_html = _extract_rent_dom_section(html) if html else None
-        if dom_section_html and int(_budget.get("llm_dom_calls", 0)) > 0 and not _llm_cost_exceeded():
+        if not dom_units and dom_section_html and int(_budget.get("llm_dom_calls", 0)) > 0 and not _llm_cost_exceeded():
             t0 = _time.monotonic()
             _budget["llm_dom_calls"] = int(_budget.get("llm_dom_calls", 0)) - 1
             try:
@@ -2025,12 +2352,24 @@ class GenericAdapter:
                 reason="" if dom_units else "targeted DOM LLM returned no units",
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
+        # RC3 tracking: capture the nav hint from DOM analysis specifically
+        # (distinct from llm_navigation_hints which aggregates across all tiers).
+        _dom_nav_hint: str | None = (
+            dom_hints.get("navigation_hint")
+            if isinstance(dom_hints, dict)
+            else None
+        )
 
         if dom_units:
-            result.units = dom_units
+            # Merge rather than replace — result.units may already hold units
+            # from Tier 3 DOM scan when the planner escalated past it.
+            # Replacing would silently drop those units; merging keeps them.
+            result.units = _merge_into_result_units(
+                result.units, dom_units, property_id=ctx.property_id
+            )
             result.tier_used = "TIER_4_LLM_DOM"
             result.winning_url = ctx.base_url
-            result.confidence = min(0.80, 0.55 + 0.04 * len(dom_units))
+            result.confidence = min(0.80, 0.55 + 0.04 * len(result.units))
             result._llm_interactions = llm_interactions  # type: ignore[attr-defined]
             result._llm_field_mappings = llm_field_mappings  # type: ignore[attr-defined]
             result._llm_analysis_results = llm_analysis_results  # type: ignore[attr-defined]
@@ -2165,7 +2504,39 @@ class GenericAdapter:
         # shared budget like 6a/6b. When the budget is exhausted (or the
         # cost cap is hit) we skip the call but DO NOT short-circuit the
         # Vision Tier 5 fallback below — the cost cap fires there too.
-        if int(_budget.get("llm_monolithic", 0)) > 0 and not _llm_cost_exceeded():
+        #
+        # RC3 guard: if DOM analysis (sub-tier 6b) found 0 units but
+        # diagnosed a navigation_hint pointing elsewhere, AND there is
+        # link_hop budget remaining, defer the monolithic to the hop page
+        # rather than burning it on the current page. ActionDecider encodes
+        # the full deferral rule including the high-confidence-hop threshold.
+        _rc3_deferred = False
+        if _dom_nav_hint and not dom_units and int(_budget.get("link_hop", 0)) > 0:
+            if _source_ranker is not None and _action_decider is not None:
+                try:
+                    _dar = _SEDOMAnalysisResult(unit_count=0, navigation_hint=_dom_nav_hint)
+                    _hint_sig = _SESourceSignal(kind=_SESourceKind.LLM_HINT, url=_dom_nav_hint)
+                    # Use SourceRanker (single scoring authority) to produce the
+                    # composite score — not a hardcoded 10_000.
+                    _ranked = _source_ranker.rank([_hint_sig])
+                    _dctx = _SEDecisionContext(
+                        ranked_signals=_ranked,
+                        current_unit_count=0,
+                        budget=dict(_budget),
+                        dom_analysis_result=_dar,
+                        hop_depth=getattr(ctx, "hop_depth", 0),
+                    )
+                    _decision = _action_decider.decide(_dctx)
+                    if _decision.action_type == _SEActionType.HOP_TO_URL:
+                        _rc3_deferred = True
+                        _log_attempt(
+                            "generic:llm",
+                            "skipped",
+                            reason="rc3_defer_monolithic_to_hop",
+                        )
+                except Exception as _rc3_exc:
+                    log.debug("rc3-decider-error: %s", _rc3_exc)
+        if not _rc3_deferred and int(_budget.get("llm_monolithic", 0)) > 0 and not _llm_cost_exceeded():
             _budget["llm_monolithic"] = int(_budget.get("llm_monolithic", 0)) - 1
             t0 = _time.monotonic()
             try:
@@ -2223,7 +2594,7 @@ class GenericAdapter:
                     duration_ms=int((_time.monotonic() - t0) * 1000),
                 )
                 result.errors.append(f"llm-tier-error: {exc}")
-        else:
+        elif not _rc3_deferred:
             _log_attempt(
                 "generic:llm",
                 "skipped",

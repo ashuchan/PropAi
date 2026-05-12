@@ -43,6 +43,13 @@ class FetchOutcome(StrEnum):
     #: extract from them) and route them to a re-discovery queue.
     #: See docs/2026_05_11_regressions_fix_design.md (Stage 3).
     DEAD_URL = "DEAD_URL"
+    #: RC5: HTTP 200 response whose body is empty or below the meaningful-
+    #: content threshold (< 16 bytes). Distinct from TRANSIENT (which means
+    #: retriable server error) — an empty-body 200 should not be retried with
+    #: the same parameters because the server intentionally returned nothing.
+    #: Routes to a ``FAILED_FETCH_EMPTY`` verdict in scraper.py so dashboards
+    #: can distinguish bot-wall blank pages from real server errors.
+    EMPTY_BODY = "EMPTY_BODY"
 
 
 @dataclass(slots=True, frozen=True)
