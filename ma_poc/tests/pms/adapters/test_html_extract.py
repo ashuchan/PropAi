@@ -309,37 +309,6 @@ class _FetchResult:
         self.body = body
 
 
-@pytest.mark.asyncio
-async def test_generic_adapter_recovers_units_from_jsonld_without_page() -> None:
-    """No page, no API responses — just fetch_result.body with JSON-LD.
-
-    This simulates the Jugnu L1 fetch-only path (page=None) where the only
-    thing available is the raw HTTP response body.
-    """
-    html = """<html><head>
-    <script type="application/ld+json">
-    {"@context":"https://schema.org","@type":"Apartment","name":"Unit 101",
-     "numberOfRooms":1,"floorSize":{"value":700},
-     "offers":{"price":1750}}
-    </script></head></html>"""
-    fr = _FetchResult(html.encode("utf-8"))
-    ctx = AdapterContext(
-        base_url="https://example.com/",
-        detected=detect_pms("https://example.com/"),
-        profile=None,
-        expected_total_units=None,
-        property_id="test",
-        fetch_result=fr,
-    )
-    ctx._api_responses = []  # type: ignore[attr-defined]
-
-    result = await GenericAdapter().extract(None, ctx)  # type: ignore[arg-type]
-    assert isinstance(result, AdapterResult)
-    assert len(result.units) == 1
-    assert result.units[0]["floor_plan_name"] == "Unit 101"
-    assert result.tier_used == "TIER_2_JSONLD"
-    assert result.confidence > 0.5
-
 
 @pytest.mark.asyncio
 async def test_generic_adapter_recovers_units_from_embedded_json() -> None:

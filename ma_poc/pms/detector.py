@@ -322,7 +322,14 @@ def _detect_host(url: str) -> tuple[PmsName, float, list[str], str | None] | Non
 
 
 def _detect_url_extension(url: str) -> tuple[PmsName, float, list[str]] | None:
-    """``.aspx`` paths on non-Microsoft vanity domains signal RentCafe/Yardi."""
+    """``.aspx`` paths on non-Microsoft vanity domains are a weak RentCafe/Yardi signal.
+
+    Confidence is intentionally low (0.40) so that a single corroborating
+    HTML marker from ``_detect_html_markers`` is enough to promote the
+    verdict to the canonical 0.80 level — while preventing misrouting when
+    no HTML evidence is found (e.g. management-portal ASPX apps like
+    adaraportal.yottareal.com that have no RentCafe markers in the page).
+    """
     try:
         parsed = urllib.parse.urlparse(url)
     except (ValueError, TypeError):
@@ -331,9 +338,17 @@ def _detect_url_extension(url: str) -> tuple[PmsName, float, list[str]] | None:
     host = (parsed.hostname or "").lower()
     if not path.endswith(".aspx"):
         return None
-    if host.endswith("microsoft.com") or host.endswith("live.com") or host.endswith("sharepoint.com"):
+    # Known non-RentCafe ASPX domains — management portals, SaaS dashboards, etc.
+    _ASPX_SKIP_HOSTS: tuple[str, ...] = (
+        "microsoft.com", "live.com", "sharepoint.com",
+        "yottareal.com",   # multi-tenant management portal
+    )
+    if any(host.endswith(skip) for skip in _ASPX_SKIP_HOSTS):
         return None
-    return "rentcafe", 0.70, [f".aspx path on vanity host ({host}) — RentCafe/Yardi heuristic"]
+    # Low confidence — must be corroborated by at least one HTML fingerprint
+    # from _detect_html_markers to route to RentCafe adapter. Without HTML
+    # evidence this falls back to GenericAdapter.
+    return "rentcafe", 0.40, [f".aspx path on vanity host ({host}) — weak RentCafe/Yardi heuristic (needs HTML corroboration)"]
 
 
 def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | None:

@@ -1502,6 +1502,14 @@ class GenericAdapter:
                     broad = []
                     result.errors.append(f"daily-runner-parser-error: {exc}")
                 if broad:
+                    # Pre-filter: reject rows with no physical dimension
+                    # (beds/baths/sqft). CMS config objects and API noise rows
+                    # typically have only string fields. Emitting them causes
+                    # the planner to see units_found=N with pct=0.00 and
+                    # escalate to expensive LLM hop chains.
+                    from ma_poc.pms.signal_engine.unit_filter import filter_by_physical_dimension as _fpd
+                    broad = _fpd(broad)
+                if broad:
                     all_units.extend(broad)
                     # parse_api_responses tags each unit with source_api_url;
                     # surface the first as winning_url if we don't have one.
@@ -1554,21 +1562,32 @@ class GenericAdapter:
             jsonld_units = extract_jsonld_from_html(html, ctx.base_url)
             # Phase 5: reject JSON-LD success when the extraction is
             # plan-name-only with no Offer prices. That shape was gating
-            # the LLM sub-tiers from running on 8 properties in the
-            # 2026-04-19 run — marking them "SUCCESS" with a list of
-            # floor-plan labels but no rent/sqft. Better to fall through.
+            # the LLM sub-tiers from running on properties that ship only
+            # floor-plan labels. Extended: floor_plan_name + beds/baths is
+            # a valid partial record — the rent may load dynamically from
+            # an iframe/portal (e.g. AMLI ProspectPortal).
             if jsonld_units:
                 has_rent = any(
                     u.get("market_rent_low") or u.get("market_rent_high") or u.get("rent_range")
                     for u in jsonld_units
                 )
                 has_size = any(u.get("sqft") for u in jsonld_units)
-                if not has_rent and not has_size:
+                has_beds_or_baths = any(
+                    u.get("bedrooms") or u.get("bathrooms")
+                    for u in jsonld_units
+                )
+                has_floor_plan = any(u.get("floor_plan_name") for u in jsonld_units)
+                _is_name_only = (
+                    not has_rent
+                    and not has_size
+                    and not (has_floor_plan and has_beds_or_baths)
+                )
+                if _is_name_only:
                     _log_attempt(
                         "generic:jsonld",
                         "ran_empty",
                         units=len(jsonld_units),
-                        reason="JSON-LD had floor-plan names only (no rent/sqft) — falling through",
+                        reason="JSON-LD had floor-plan names only (no rent/sqft/beds) — falling through",
                         duration_ms=int((_time.monotonic() - t0) * 1000),
                     )
                     jsonld_units = []
@@ -1691,16 +1710,47 @@ class GenericAdapter:
                     from ma_poc.pms.adapters._html_extract import (
                         detect_securecafe_portal_url,
                     )
-                    _sc_url = detect_securecafe_portal_url(html, ctx.base_url)
+                    # Use final_url (post-redirect) when the server followed a
+                    # cross-HOST redirect (e.g. affinity56.com → elevation56.com).
+                    # Slug derivation from the original base_url would produce the
+                    # wrong securecafe subdomain in those cases. Same-host redirects
+                    # (path changes only) keep using base_url — the host is the same
+                    # so the slug is unchanged.
+                    _fr = ctx.fetch_result
+                    _final_url = getattr(_fr, "final_url", None) or ctx.base_url
+                    try:
+                        import urllib.parse as _up
+                        _base_host = (_up.urlparse(ctx.base_url).hostname or "").lower()
+                        _final_host = (_up.urlparse(_final_url).hostname or "").lower()
+                        _sc_base = _final_url if _final_host and _final_host != _base_host else ctx.base_url
+                    except Exception:
+                        _sc_base = ctx.base_url
+                    _sc_url = detect_securecafe_portal_url(html, _sc_base)
                     if _sc_url:
-                        existing_ep = getattr(result, "_embedded_portal_hints", None) or []
-                        result._embedded_portal_hints = existing_ep + [(_sc_url, "securecafe")]  # type: ignore[attr-defined]
-                        _log_attempt(
-                            "generic:securecafe_portal_detected",
-                            "ran_hint",
-                            units=0,
-                            reason=f"synthesised securecafe URL from /onlineleasing/ href: {_sc_url[:70]}",
-                        )
+                        # Generic session-level guard: if this URL already returned
+                        # a network error (BOT_BLOCKED, HARD_FAIL, TRANSIENT) on a
+                        # prior hop in this same scrape, don't re-queue it — doing
+                        # so wastes 4–8s per hop page on a guaranteed CF_CHALLENGE.
+                        # _session_blocked_urls lives on ctx.budget so it survives
+                        # across the full extraction pass without extra plumbing.
+                        _ctx_budget = getattr(ctx, "budget", None) or {}
+                        _session_blocked: set[str] = _ctx_budget.get("_session_blocked_urls", set())
+                        if _sc_url not in _session_blocked:
+                            existing_ep = getattr(result, "_embedded_portal_hints", None) or []
+                            result._embedded_portal_hints = existing_ep + [(_sc_url, "securecafe")]  # type: ignore[attr-defined]
+                            _log_attempt(
+                                "generic:securecafe_portal_detected",
+                                "ran_hint",
+                                units=0,
+                                reason=f"synthesised securecafe URL from /onlineleasing/ href: {_sc_url[:70]}",
+                            )
+                        else:
+                            _log_attempt(
+                                "generic:securecafe_portal_detected",
+                                "skipped",
+                                units=0,
+                                reason=f"securecafe URL already blocked in session: {_sc_url[:70]}",
+                            )
                 except Exception:
                     pass
 
@@ -2154,6 +2204,12 @@ class GenericAdapter:
         #
         # Budget is consumed against the shared dict, NOT a local counter,
         # so link-hop sub-pages see decrements made by the entry page.
+        # Session-level dedup: track API URLs already analyzed by LLM so
+        # successive hop pages don't repeat the same expensive call when the
+        # same endpoint appears in multiple page network logs. The set lives in
+        # _budget so it is shared across the entry page and all hop sub-pages.
+        _analyzed_api_urls: set[str] = _budget.setdefault("_analyzed_api_urls", set())
+
         targeted_units: list[dict[str, Any]] = []
         if api_responses and int(_budget.get("llm_api_calls", 0)) > 0 and not _llm_cost_exceeded():
             t0 = _time.monotonic()
@@ -2176,6 +2232,14 @@ class GenericAdapter:
                 if not _api_signal_qualifies(resp, items):
                     continue
                 url = resp.get("url", "")
+                # Skip if this API URL was already analyzed in this session
+                # (same endpoint reappears across multiple hop pages). Prior
+                # result is already in llm_analysis_results via shared_budget.
+                if url and url in _analyzed_api_urls:
+                    continue
+                # Mark as analyzed before the await so concurrent hops see it.
+                if url:
+                    _analyzed_api_urls.add(url)
                 # Atomic consume — decrement BEFORE the awaited call so a
                 # concurrent recursive scrape() (link-hop) sees the lower
                 # remaining budget.
@@ -2525,6 +2589,13 @@ class GenericAdapter:
                         budget=dict(_budget),
                         dom_analysis_result=_dar,
                         hop_depth=getattr(ctx, "hop_depth", 0),
+                        # Suppress RC3 deferral when the current page already
+                        # has rent or floor-plan signals — running the LLM here
+                        # is more likely to produce data than deferring to a hop
+                        # page that may be an equally empty SPA shell.
+                        page_has_content_signals=(
+                            (getattr(ctx, "rent_signal_count", 0) or 0) > 0
+                        ),
                     )
                     _decision = _action_decider.decide(_dctx)
                     if _decision.action_type == _SEActionType.HOP_TO_URL:

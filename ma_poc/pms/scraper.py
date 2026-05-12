@@ -1311,16 +1311,28 @@ def _rank_internal_links(
         if score <= 0:
             continue
 
-        # Multi-signal boost: when BOTH anchor text AND path independently
-        # signal floor-plan / availability intent, boost to near PMS-prior
-        # level (4 000) so the link isn't crowded out by failing priors.
-        # Closes the alistermontclair.com class: "Find Your Home" anchor +
-        # /conventional/ path both fire, yet raw score is only ~176 which
-        # falls below the 5 PMS priors at 5 000 each.
+        # Anchor-link elevation: a link that actually exists on the page and
+        # carries floor-plan / availability signals should outrank guessed
+        # template priors (PMS_PRIOR=5000, UNIVERSAL_PRIOR=4500) because the
+        # page author placed it there intentionally. Two tiers:
+        #
+        #   Strong anchor only (anchor_score > 50): e.g. "Floor Plans" anchor
+        #   on a page that uses a non-standard path. Lift above PMS_PRIOR so
+        #   it's tried before template guesses like /floorplans.aspx.
+        #   → floor = PMS_PRIOR_SCORE + 100 (= 5_100)
+        #
+        #   Anchor + path both signal intent: doubly-confirmed, highest
+        #   confidence for a page-discovered link.
+        #   → floor = PMS_PRIOR_SCORE + 600 (= 5_600)
         _anchor_score = sum(w for kw, w in _LINK_ANCHOR_KEYWORDS if kw in anchor)
         _path_score = sum(w for kw, w in _LINK_PATH_KEYWORDS if kw in link_path)
         if _anchor_score > 0 and _path_score > 0:
-            score = max(score, _PMS_PRIOR_SCORE - 1_000)
+            # Both anchor text and path keyword signal intent — highest confidence.
+            score = max(score, _PMS_PRIOR_SCORE + 600)
+        elif _anchor_score > 50:
+            # Strong anchor text alone (e.g. "floor plans", "availability") —
+            # outrank template priors since the link is real, not a guess.
+            score = max(score, _PMS_PRIOR_SCORE + 100)
 
         # Keep best score per URL
         existing = candidates.get(resolved)
@@ -1392,9 +1404,19 @@ async def _try_link_hop(
     explored_skip: set[str] = set()
     if profile is not None:
         try:
+            from services.profile_updater import _is_infra_api_url as _infra_check
+        except Exception:
+            _infra_check = None  # type: ignore[assignment]
+        try:
             nav = profile.navigation
             wpu = getattr(nav, "winning_page_url", None)
-            if isinstance(wpu, str) and wpu and wpu not in visited:
+            # Guard: never inject infra/media API endpoints as hop candidates.
+            # These were saved before _is_infra_api_url guarded the persist
+            # path, so they may still exist in older profiles. Checking here
+            # prevents wasting hop #1 on an endpoint that hard-fails (HTTP
+            # 400/401) before the actual floor-plans page is ever reached.
+            _wpu_is_infra = bool(_infra_check and isinstance(wpu, str) and _infra_check(wpu))
+            if isinstance(wpu, str) and wpu and wpu not in visited and not _wpu_is_infra:
                 # Highest possible score so it always lands first.
                 profile_top.append((wpu, _LLM_HINT_SCORE + 1, "profile:winning_page_url"))
             for link in getattr(nav, "availability_links", []) or []:
@@ -1501,13 +1523,21 @@ async def _try_link_hop(
         _signals = []
         for u, s, a in ranked:
             _kind = _anchor_to_kind(a)
-            # profile:winning_page_url and profile:availability_link both carry
-            # an explicit score from the profile layer (e.g. _LLM_HINT_SCORE).
-            # Pass it as override so the ranker doesn't recompute a lower value
-            # from keyword tables — preserving is_llm_hint=True downstream.
+            # Signals whose score was set by a trusted source (profile layer,
+            # LLM hint, or an anchor link elevated above PMS_PRIOR_SCORE by
+            # keyword matching in _rank_internal_links) must have their score
+            # preserved. If we hand them to the SourceRanker without an
+            # override, the ranker would re-score them from scratch — for
+            # INTERNAL_LINK that means base=4_000 + keyword bonus, which is
+            # below PMS_PRIOR (5_000) and causes real page anchors to lose
+            # to guessed template priors.
             _is_profile_scored = (
                 _kind == _SK.PROFILE_WINNING
                 or a.lower().startswith("profile:availability_link")
+                # Anchor links that _rank_internal_links boosted above the
+                # PMS_PRIOR threshold carry a meaningful score: preserve it
+                # so they outrank template priors in the final sort.
+                or (_kind == _SK.INTERNAL_LINK and s > _PMS_PRIOR_SCORE)
             )
             _signals.append(
                 _SS(
@@ -1638,6 +1668,18 @@ async def _try_link_hop(
 
         if outcome_val != "OK":
             explored[sub_url] = False
+            # Record this URL as blocked/failed in the session so adapter-level
+            # hint synthesisers (securecafe_portal_detected, etc.) don't re-queue
+            # it on subsequent hop pages. Works for BOT_BLOCKED, HARD_FAIL, and
+            # TRANSIENT — any outcome that is not "OK" is not worth retrying
+            # within the same scrape session.
+            if shared_budget is not None:
+                _blocked_set: set[str] = shared_budget.setdefault("_session_blocked_urls", set())
+                _blocked_set.add(sub_url)
+            # Signal back to profile_updater that profile:winning_page_url
+            # hard-failed so it can be cleared and the profile reset to COLD.
+            if anchor == "profile:winning_page_url" and shared_budget is not None:
+                shared_budget["_winning_page_url_hop_outcome"] = "profile:winning_page_url:failed"
             continue
 
         # Bug 5 alignment (2026-05-09 deep-dive): if this hop's body looks
@@ -1660,6 +1702,54 @@ async def _try_link_hop(
                 sub_url=sub_url,
                 hop_index=idx,
             )
+
+        # Silent homepage redirect guard: when a hop URL (e.g. /availability)
+        # returns HTTP 200 but the server silently redirected back to the
+        # homepage (same host, same or root path), the response body is
+        # identical to what we already scraped. Running extraction again wastes
+        # LLM budget and consumes a hop slot. Detect by comparing the redirect's
+        # final_url host+path against the entry_url.
+        _sub_final_url = getattr(sub_fetch, "final_url", None) or sub_url
+        try:
+            _entry_parsed = urllib.parse.urlparse(entry_url)
+            _sub_final_parsed = urllib.parse.urlparse(_sub_final_url)
+            _same_host = (
+                (_sub_final_parsed.hostname or "") == (_entry_parsed.hostname or "")
+            )
+            _entry_path = (_entry_parsed.path or "/").rstrip("/") or "/"
+            _sub_path = (_sub_final_parsed.path or "/").rstrip("/") or "/"
+            _redirected_to_entry = _same_host and _sub_path in (_entry_path, "/", "")
+        except Exception:
+            _redirected_to_entry = False
+
+        if _redirected_to_entry and _sub_final_url != sub_url:
+            # The server redirected our sub-path hop back to the homepage —
+            # identical content, no value in running extraction again.
+            explored[sub_url] = False
+            log.debug(
+                "link-hop %s: silent redirect to homepage (%s) — skipping extraction",
+                sub_url, _sub_final_url,
+            )
+            continue
+
+        # Property sub-path priors: when the hop URL has 3+ path segments
+        # (property-specific, not just a top-level prior guess), dynamically
+        # add /floorplans and /floor-plans relative to that URL. This catches
+        # sites like amli.com where the PMS prior is appended to the base
+        # domain instead of the property's own deep URL.
+        try:
+            _hop_path_parts = [p for p in urllib.parse.urlparse(sub_url).path.split("/") if p]
+            if len(_hop_path_parts) >= 3 and dynamic_appended < max_dynamic_appends:
+                _prop_sub_paths = ("/floorplans", "/floor-plans", "/pricing", "/apartments-pricing")
+                for _psp in _prop_sub_paths:
+                    _psp_url = sub_url.rstrip("/") + _psp
+                    if _psp_url not in visited and not any(u == _psp_url for u, _, _ in queue):
+                        queue.append((_psp_url, _PMS_PRIOR_SCORE + 200, f"prop_subpath:{_psp}"))
+                        dynamic_appended += 1
+                        if dynamic_appended >= max_dynamic_appends:
+                            break
+        except Exception:
+            pass
 
         # Navigation-hint trust: when the LLM explicitly named this URL
         # as the place where unit data lives, it is high-confidence
@@ -1807,6 +1897,17 @@ async def _try_link_hop(
                 _in_floorplan_accumulation = True
                 _first_successful_result = sub_result
                 _accumulated_units.extend(sub_result.get("units") or [])
+                # Checkpoint partial results so the timeout handler can
+                # salvage accumulated units if the property wall-clock budget
+                # expires mid-hop. Write to both shared_budget (in-process
+                # visibility) and _external_partial_ref (survives coroutine
+                # cancellation — the dict lives in _process_one's scope).
+                if shared_budget is not None:
+                    shared_budget["_partial_units"] = list(_accumulated_units)
+                    shared_budget["_partial_result"] = sub_result
+                    _ext_ref = shared_budget.get("_external_partial_ref")
+                    if isinstance(_ext_ref, dict):
+                        _ext_ref["units"] = list(_accumulated_units)
                 # Cache the LLM DOM selectors from this index page so
                 # sub-pages can replay them without another LLM call.
                 if _fp_llm_selectors is None:
@@ -1842,6 +1943,12 @@ async def _try_link_hop(
             elif _in_floorplan_accumulation:
                 # Accumulating sub-page units — merge into the running total.
                 _accumulated_units.extend(sub_result.get("units") or [])
+                if shared_budget is not None:
+                    shared_budget["_partial_units"] = list(_accumulated_units)
+                    shared_budget["_partial_result"] = _first_successful_result or sub_result
+                    _ext_ref = shared_budget.get("_external_partial_ref")
+                    if isinstance(_ext_ref, dict):
+                        _ext_ref["units"] = list(_accumulated_units)
                 # Cache selectors from first sub-page that has them.
                 if _fp_llm_selectors is None:
                     _css = (sub_result.get("_llm_hints") or {}).get("css_selectors")
@@ -1942,6 +2049,7 @@ async def scrape_jugnu(
     profile: Any | None = None,
     expected_total_units: int | None = None,
     csv_row: dict[str, Any] | None = None,
+    partial_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Jugnu L3 entry point — scrape using pre-fetched result.
 
@@ -1991,6 +2099,14 @@ async def scrape_jugnu(
             _jugnu_budget = _cb(profile, is_cold=profile.confidence.maturity == _PM.COLD)
         except Exception:
             pass
+
+    # Store a reference to the caller-supplied partial_state dict inside the
+    # budget dict. Because _jugnu_budget is passed by reference into scrape()
+    # and then into _try_link_hop, any accumulated units written to
+    # shared_budget["_external_partial_ref"] are visible in the caller's
+    # _partial_state even after asyncio.wait_for cancels this coroutine.
+    if partial_state is not None:
+        _jugnu_budget["_external_partial_ref"] = partial_state
 
     # Delta 2: short-circuit on non-OK fetch
     # RC5: EMPTY_BODY gets a distinct verdict prefix so dashboards can
@@ -2369,6 +2485,11 @@ async def scrape_jugnu(
                 pass
     except Exception as exc:  # noqa: BLE001
         log.warning("observation hook failed for %s: %s", property_id, exc)
+
+    # Surface budget-level signals back to the result dict so profile_updater
+    # can read them without needing direct access to the budget object.
+    if _jugnu_budget.get("_winning_page_url_hop_outcome"):
+        result["_winning_page_url_hop_outcome"] = _jugnu_budget["_winning_page_url_hop_outcome"]
 
     tier_used = result.get("extraction_tier_used") or "unknown"
     if result.get("units"):

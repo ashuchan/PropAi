@@ -69,6 +69,8 @@ DEFAULT_KIND_BASE_SCORES: dict[SourceKind, int] = {
 
 DEFAULT_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("availability", 100),
+    ("apartments & pricing", 100),
+    ("floor plans & pricing", 100),
     ("floor plan", 90),
     ("floor-plan", 90),
     ("floorplan", 85),
@@ -87,6 +89,7 @@ DEFAULT_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("available apartments", 85),
     ("see available", 80),
     ("view floor plan", 88),
+    ("browse floor plans", 88),
     ("view floorplan", 88),
     ("view floor plans", 88),
     ("apartment", 60),
@@ -101,9 +104,10 @@ DEFAULT_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("/floor-plan", 95),
     ("/floorplan", 90),
     ("/availability", 95),
+    ("/apartments-pricing", 95),
     ("/view-availability", 95),
     ("/pricing", 80),
-    ("/apartments", 70),
+    ("/apartments", 80),
     ("/rent", 60),
     ("/units", 85),
     ("/leasing", 50),

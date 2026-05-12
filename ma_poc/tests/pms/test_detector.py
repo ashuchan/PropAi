@@ -38,10 +38,14 @@ def test_detect_rentcafe_from_host() -> None:
 
 
 def test_detect_rentcafe_from_aspx_vanity() -> None:
-    # Vanity domain with .aspx path — heuristic match (0.70).
+    # Vanity domain with .aspx path — weak heuristic match (0.40).
+    # Confidence is intentionally below the 0.70 threshold so that a single
+    # HTML marker is required to confirm the RentCafe routing. Without HTML
+    # corroboration the .aspx signal alone is too broad (fires on any ASP.NET
+    # management portal, not only Yardi/RentCafe sites).
     result = detect_pms("https://fairwaysatfayetteville.apartments/floorplans.aspx")
     assert result.pms == "rentcafe"
-    assert result.confidence >= 0.70
+    assert 0.35 <= result.confidence <= 0.50  # weak heuristic — corroboration required
 
 
 def test_detect_entrata_from_mgmt_prior() -> None:

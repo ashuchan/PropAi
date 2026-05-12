@@ -467,16 +467,37 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
             else:
                 rent_range = ""
 
-            num_rooms = item.get("numberOfRooms", "")
-            if isinstance(num_rooms, dict):
-                num_rooms = num_rooms.get("value", "")
+            # Schema.org Apartment uses numberOfBedrooms / numberOfBathroomsTotal
+            # as the canonical bedroom/bathroom fields. numberOfRooms is the
+            # total room count (may be absent on floor-plan-only records).
+            # Read all three so AMLI-style JSON-LD (which uses the canonical
+            # fields) surfaces bed/bath data rather than emitting empty strings.
+            def _rooms_val(v: Any) -> str:
+                if v is None:
+                    return ""
+                if isinstance(v, dict):
+                    v = v.get("value", "")
+                return str(v) if v not in (None, "") else ""
+
+            num_bedrooms = (
+                _rooms_val(item.get("numberOfBedrooms"))
+                or _rooms_val(item.get("numberOfRooms"))
+            )
+            num_bathrooms = _rooms_val(
+                item.get("numberOfBathroomsTotal")
+                or item.get("numberOfFullBathrooms")
+                or item.get("numberOfRooms")
+                if not num_bedrooms  # avoid double-counting rooms as baths
+                else item.get("numberOfBathroomsTotal")
+                or item.get("numberOfFullBathrooms")
+            )
 
             units.append(
                 {
                     "floor_plan_name": name,
                     "bed_label": "",
-                    "bedrooms": str(num_rooms) if num_rooms not in (None, "") else "",
-                    "bathrooms": "",
+                    "bedrooms": num_bedrooms,
+                    "bathrooms": num_bathrooms,
                     "sqft": _jsonld_floor_size(item),
                     "unit_number": "",
                     "floor": "",

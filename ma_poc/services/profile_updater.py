@@ -253,8 +253,16 @@ _INFRA_API_DOMAINS: tuple[str, ...] = (
     "googleapis.com",       # Google APIs
     "firebase.com",
     "firebaseio.com",
-    "amazonaws.com/",       # AWS S3 / Lambda (unless PMS-owned)
-    "cloudfront.net/api/",
+    "amazonaws.com/",       # AWS S3 / Lambda paths
+    "execute-api.",         # AWS API Gateway custom domains (*.execute-api.*.amazonaws.com)
+    "cloudfront.net",       # AWS CloudFront CDN assets (no /api/ restriction)
+    "matterport.com",       # 3-D virtual tour API — never serves apartment data
+    "omappapi.com",         # OptinMonster popup service
+    "omappa.com",
+    "theconversioncloud.com",   # Conversion Cloud widget
+    "nestiolistings.com/api/",  # Nestio/Funnel neighborhoods/config API
+    "sightmap.com/app/api/",    # SightMap internal config (not the unit data endpoint)
+    "s3.amazonaws.com",     # S3 direct object URLs
 )
 
 
@@ -635,6 +643,24 @@ def update_profile_after_extraction(
         path = urllib.parse.urlparse(winning_url).path
         if path and path != "/":
             profile.navigation.availability_page_path = path
+
+    # ── Invalidate a stale winning_page_url that produced zero units ───
+    # If the scraper tried profile:winning_page_url as a hop candidate
+    # and it returned 0 units (HARD_FAIL, BOT_BLOCKED, or empty extraction),
+    # clear the stale URL so the next run doesn't waste hop #1 on it again.
+    # Also demote to COLD immediately — the property needs a fresh discovery.
+    _hop_anchor_used = scrape_result.get("_winning_page_url_hop_outcome")
+    if (
+        units_extracted == 0
+        and _hop_anchor_used == "profile:winning_page_url:failed"
+        and profile.navigation.winning_page_url
+    ):
+        profile.navigation.winning_page_url = None
+        profile.navigation.availability_page_path = None
+        profile.confidence.maturity = ProfileMaturity.COLD  # type: ignore[attr-defined]
+        profile.confidence.consecutive_failures = max(
+            3, profile.confidence.consecutive_failures
+        )
 
     # ── Record API URLs that had data (Tier 1 / widget) ──────────────
     if tier in (

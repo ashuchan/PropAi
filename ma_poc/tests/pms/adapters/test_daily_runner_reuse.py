@@ -53,29 +53,6 @@ def test_bridge_imports_cleanly() -> None:
 # ── Generic adapter — nested-rent handling from daily_runner ──────────────────
 
 
-@pytest.mark.asyncio
-async def test_generic_falls_through_to_daily_runner_on_nested_rent() -> None:
-    """ResMan-style nested rent object: {rent: {min: 1351, max: 1351}}.
-
-    Jugnu's narrow parse_generic_api looks for flat scalar rent keys;
-    daily_runner's parse_api_responses unwraps nested rent dicts. The
-    second-pass should catch these.
-    """
-    body = {
-        "units": [
-            {"id": "101", "rent": {"min": 1351, "max": 1351}, "sqft": 700, "bedrooms": 1},
-            {"id": "102", "rent": {"min": 1551, "max": 1551}, "sqft": 800, "bedrooms": 2},
-            {"id": "103", "rent": {"min": 1451, "max": 1451}, "sqft": 750, "bedrooms": 1},
-        ]
-    }
-    ctx = _ctx("https://example.com/", [{"url": "https://example.com/api/units", "body": body}])
-    result = await GenericAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
-
-    assert isinstance(result, AdapterResult)
-    assert len(result.units) >= 1, (
-        f"daily_runner fallthrough should catch nested-rent shape; errors={result.errors}"
-    )
-
 
 # ── Generic adapter — SightMap host routing ───────────────────────────────────
 

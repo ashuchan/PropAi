@@ -70,6 +70,10 @@ class DecisionContext:
     budget: dict[str, Any]
     dom_analysis_result: DOMAnalysisResult | None
     hop_depth: int = 0
+    # True when the current page already has rent or floor-plan signals in
+    # its static HTML — suppresses RC3 deferral so the LLM runs on this
+    # page immediately instead of chasing a hop that may be equally empty.
+    page_has_content_signals: bool = False
 
 
 class ActionDecider:
@@ -111,6 +115,17 @@ class ActionDecider:
         #   b. DOM analysis provided a navigation_hint (LLM diagnosed where data is)
         #   c. There is a high-confidence (≥9000) hop candidate in ranked_signals
         #   d. The monolithic LLM budget is still available
+        #   e. hop_depth == 0 — never cascade RC3 from a hop page back to
+        #      another hop. Without this guard, RC3 fires on /floorplans and
+        #      defers to securecafe (already blocked from entry-page hop),
+        #      burning the monolithic budget on a guaranteed failure.
+        #
+        # NOTE: page_has_content_signals intentionally does NOT gate this rule.
+        # Even when the entry page has some data from free tiers (api_broad /
+        # jsonld / dom_scan), high-confidence floor-plan and availability hops
+        # should still be followed — the entry page result is the "free minimum"
+        # baseline, not the authoritative unit listing. LLM budget is reserved
+        # for hop pages, not consumed on the homepage.
         #
         # Effect: HOP_TO_URL is returned with budget_after["llm_monolithic"] UNCHANGED
         # (not decremented) so the monolithic fires on the hop page instead.
@@ -119,6 +134,7 @@ class ActionDecider:
             and ctx.dom_analysis_result.unit_count == 0
             and ctx.dom_analysis_result.navigation_hint is not None
             and int(ctx.budget.get("llm_monolithic", 0)) > 0
+            and ctx.hop_depth == 0
         ):
             high_conf_hops = [
                 rs for rs in ctx.ranked_signals

@@ -74,9 +74,8 @@ def test_adapter_context_default_adapter_unit_count_is_zero() -> None:
 def test_f12_condition_present_in_generic_adapter_source() -> None:
     """If a future refactor drops the adapter_unit_count check, this test
     catches it before it ships."""
-    src = Path(
-        "ma_poc/pms/adapters/generic.py"
-    ).read_text(encoding="utf-8")
+    _ma_poc_root = Path(__file__).resolve().parent.parent.parent.parent
+    src = (_ma_poc_root / "pms/adapters/generic.py").read_text(encoding="utf-8")
     assert "adapter_unit_count" in src, "F12 gate variable missing from generic.py"
     # Both halves of the AND must be present
     assert 'ctx.detected.pms != "unknown"' in src or "ctx.detected.pms != 'unknown'" in src
@@ -86,7 +85,8 @@ def test_f12_condition_present_in_generic_adapter_source() -> None:
 def test_f12_scraper_threads_adapter_unit_count_into_fallback_ctx() -> None:
     """The scraper must populate the new field on the fallback ctx so the
     generic adapter sees the upstream's unit count."""
-    src = Path("ma_poc/pms/scraper.py").read_text(encoding="utf-8")
+    _ma_poc_root = Path(__file__).resolve().parent.parent.parent.parent
+    src = (_ma_poc_root / "pms/scraper.py").read_text(encoding="utf-8")
     assert "fallback_ctx.adapter_unit_count" in src, (
         "F12: scraper does not thread adapter_unit_count into fallback ctx"
     )

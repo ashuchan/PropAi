@@ -318,6 +318,11 @@ async def run_jugnu(
 
     async def _process_one(task: Any) -> dict[str, Any]:
         log.info("Processing %s (%s)", task.property_id, task.url)
+        # Created BEFORE wait_for so it outlives the coroutine. The scraper
+        # writes accumulated hop-units into this dict via shared_budget so the
+        # timeout handler can salvage partial results without any I/O inside
+        # the cancelled coroutine (which would deadlock on the event loop).
+        _partial_state: dict[str, Any] = {}
         try:
             csv_row = csv_lookup.get(task.property_id, {})
             # Per-property wall-clock guard. Without this, a single property
@@ -336,6 +341,7 @@ async def run_jugnu(
                     run_dir=run_dir,
                     state_store=run_state_store,
                     schema_version=schema_version,
+                    partial_state=_partial_state,
                 ),
                 timeout=PER_PROPERTY_TIMEOUT_SECONDS,
             )
@@ -375,27 +381,50 @@ async def run_jugnu(
 
             return formatted
         except (TimeoutError, asyncio.TimeoutError) as exc:
-            # Bookkeeping that runs LATE inside _process_property is lost
-            # when the inner coroutine is cancelled by wait_for:
-            #   - cost_ledger.record_llm() (any LLM cost incurred during
-            #     the timed-out scrape never reaches the SQLite ledger)
-            #   - state_store.upsert_units() (no state delta persisted)
-            #   - profile_store.save() (drift demotion not durable)
-            #   - PROPERTY_EMITTED event
-            # This is the deliberate tradeoff: lose post-scrape bookkeeping
-            # rather than wedge the shard. Operators investigating "why is
-            # there $X of LLM spend with no ledger entry?" should look here
-            # first — the per-property log line above is the breadcrumb.
             log.error(
-                "Property %s timed out after %.0fs — skipping to protect shard",
+                "Property %s timed out after %.0fs — attempting partial recovery",
                 task.property_id, PER_PROPERTY_TIMEOUT_SECONDS,
             )
-            return _make_failed_record(
+            # _partial_state was written by _try_link_hop via shared_budget
+            # while the coroutine was running. Because it was created in THIS
+            # scope (not inside the cancelled coroutine), it survives cancellation.
+            _partial_units: list[Any] = _partial_state.get("units") or []
+            _partial_profile = _partial_state.get("profile")
+            if _partial_units:
+                log.info(
+                    "Property %s: recovered %d partial units from hop accumulation",
+                    task.property_id, len(_partial_units),
+                )
+                # Persist partial units to state-store so carry-forward works
+                # on the next run and the data isn't completely lost.
+                try:
+                    if run_state_store is not None and run_dir is not None:
+                        _run_date_str = run_dir.name
+                        run_state_store.upsert_units(
+                            task.property_id, _partial_units, _run_date_str
+                        )
+                except Exception as _su_exc:
+                    log.warning("partial state_store.upsert_units failed: %s", _su_exc)
+                # Persist the scrape profile so LLM-learned CSS selectors and
+                # field mappings from this run survive for next-day replay.
+                try:
+                    if _partial_profile is not None and hasattr(profile_store, "save"):
+                        profile_store.save(_partial_profile)
+                except Exception as _ps_exc:
+                    log.warning("partial profile_store.save failed: %s", _ps_exc)
+            failed = _make_failed_record(
                 task.property_id,
                 task.url,
-                f"per_property_timeout:{int(PER_PROPERTY_TIMEOUT_SECONDS)}s ({type(exc).__name__})",
+                f"per_property_timeout:{int(PER_PROPERTY_TIMEOUT_SECONDS)}s ({type(exc).__name__})"
+                + (f" — {len(_partial_units)} partial units persisted" if _partial_units else ""),
                 schema_version,
             )
+            # Surface partial units in the failed record so the run report can
+            # show partial data rather than a zero-unit timeout row.
+            if _partial_units:
+                failed["units"] = _partial_units
+                failed.setdefault("_meta", {})["partial_recovery"] = True
+            return failed
         except Exception as exc:
             log.error("Property %s crashed: %s", task.property_id, exc)
             return _make_failed_record(
@@ -518,6 +547,7 @@ async def _process_property(
     run_dir: Path | None = None,
     state_store: Any | None = None,
     schema_version: str = "v1",
+    partial_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Process a single property through L1-L4.
 
@@ -651,6 +681,7 @@ async def _process_property(
         page=None,  # Would be provided in full RENDER mode
         profile=profile,
         csv_row=csv_row,
+        partial_state=partial_state,
     )
 
     # F6 (H6/H11) — surface the propertyId we used (resolved or cached)

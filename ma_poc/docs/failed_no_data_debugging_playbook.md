@@ -1,7 +1,7 @@
 # FAILED_NO_DATA Property Debugging Playbook
 
 **Audience:** Claude Code sessions debugging extraction failures after a cloud run.  
-**Source authority:** 2026-05-11/12 investigation session — every technique below was used live.  
+**Source authority:** 2026-05-11/12 investigation session + 2026-05-12 wide canary campaign (v1–v7). Every technique below was used live.  
 **Working directory for all commands:** `ma_poc/` (the Jugnu app root, not `PropAi/`).
 
 ---
@@ -122,6 +122,8 @@ Read top-to-bottom. Find the FIRST tier that ran and returned empty. That's the 
 | `generic:embedded_portal_detected` | Portal URLs in embedded JSON (SightMap, etc.) | Should appear if Jonah/portal config present |
 | `generic:floorplan_subpages_detected` | Floor-plan sub-page links from index page | Should appear if on a floor-plan index |
 | `generic:dom_scan` | CSS selector cascade on rendered DOM | "no DOM container matched" = page rendered but selectors don't match |
+| `generic:realpage_cws` | RealPage CWS credential probe — extracts `propertyId`+`apiKey` from RPFP_config and calls the units API directly | Only fires when `rpfp_config` in HTML. "RPFP_config found but API returned no units" = property has no available units |
+| `generic:securecafe_portal_detected` | SecureCafe URL synthesised from `/onlineleasing/{slug}` href in rendered HTML | Adds securecafe URL to portal hints at score 10000 for link-hop |
 | `generic:llm_dom_targeted` | LLM on tightest rent-containing section | Latency visible; if ran but empty, LLM couldn't find data |
 | `generic:llm` | Monolithic LLM on full page | "llm_monolithic budget exhausted" = earlier tiers used the budget |
 
@@ -181,6 +183,127 @@ There are **7 failure classes** for FAILED_NO_DATA. Diagnose in this order:
 **Diagnostic:** look at the API response body in Phase 5 LLM-Assisted section. Check which keys the items have against `_UNIT_SIGNAL_KEYS` in `_merge_fns.py`.  
 **Fix:** add the missing key names to `_UNIT_SIGNAL_KEYS`. Examples: `"available_on"` (SightMap REST API), `"price"` (generic e-commerce style), `"area"` (SightMap geometry).  
 **Also check body cap:** if API body > 256KB, JSON is truncated → `json.loads` fails → treated as string → gate rejects. Fix: raise `_body_cap` in fetcher.py for `application/json` content-type (currently 512KB).
+
+### Class 8: Parked / expired domain (L1 — 200 with junk content)
+**Signal:** `Outcome: DEAD_URL` with `PARKED_DOMAIN` error signature. Property has zero failures in prior runs but now always returns 0 units.  
+**Root cause:** domain registrar serves HTTP 200 with "This domain is for sale" / "domain is available" content. Standard HTTP-status classification misses it (200 looks like success).  
+**Detected by:** `response_classifier.py:_is_parked_domain()` — checks first 4KB of body against known registrar phrases (GoDaddy, Sedo, Namecheap, "searchhound", etc.) and emits `DEAD_URL / PARKED_DOMAIN` instead of `OK`.  
+**Action:** verdict becomes `DEAD_URL` which is excluded from the success-rate denominator. Route to re-discovery queue.  
+**Examples (2026-05-12):** pid=11961 (searchhounds.com redirect), pid=12557, pid=18941 — all domains up for sale.
+
+### Class 9: JavaScript widget with embedded API credentials (L1 auth)
+**Signal:** All tiers empty despite the property having a known RealPage integration. `generic:embedded_json` shows SSR blobs but no unit signals. Fetch body is large (100–150KB) but contains only a marketing shell with `<div id="rpfloorplans"></div>`.  
+**Root cause:** RealPage LeaseStar CWS sites serve a JS widget that reads `RPFP_config` from the page HTML and calls `api.ws.realpage.com/v2/property/{id}/units` with `x-ws-authkey: {apiKey}`. Without the header the API returns 401. The HTML contains both the `propertyId` and `apiKey` — they are **not secret** (they're there to authenticate the browser widget).  
+**Detected by:** `generic:realpage_cws` sub-tier in `generic.py` — searches for `RPFP_config` in HTML, extracts credentials with regex, fires the API directly.  
+**Key patterns to recognise:**
+```html
+<script>var propertyId = '7582398'; var propertyKey = '90775823';</script>
+<!-- and in RPFP_config: -->
+apiKey: 'c2f6b6be-c513-44bd-96e6-1f69efb66cbc',
+```
+**Response envelope:** `data["response"]["units"]` → list with `unitNumber`, `numberOfBeds`, `numberOfBaths`, `squareFeet`, `rent`, `totalRent`, `internalAvailableDate`.  
+**Examples (2026-05-12):** pid=11159 (hunterscourtapts.com) — 5 units extracted deterministically, zero LLM cost.
+
+### Class 10: React SPA with lazy-loaded navigation (L1 render timing)
+**Signal:** Entry page body is small (< 40KB) AND anchor link count < 20. The LLM nav_hint points to a leasing portal URL (e.g., securecafe.com, onlineleasing path) but the hop either HARD_FAILs or gets a matching JS shell.  
+**Root cause:** React Router uses code-splitting. The navigation component containing the leasing portal link lives in a separate JS chunk that loads AFTER `networkidle` / `domcontentloaded` fires. Playwright snapshots the HTML before React Router finishes mounting the route component.  
+**Two sub-patterns:**
+
+| Sub-pattern | Symptom | Fix |
+|---|---|---|
+| **Shape A** — direct securecafe href in rendered HTML | Appears in some runs (75KB body), absent in others (19KB) | Anchor stability gate makes it deterministic |
+| **Shape B** — local `/onlineleasing/{slug}` href | Always present, but hop to that path returns identical 19KB SPA shell | `detect_securecafe_portal_url()` synthesises the securecafe URL from href slug + domain |
+
+**Anchor stability gate** (`fetch/fetcher.py`): when body < 40KB and `<a href>` count < 20, polls anchor count every 1.5s (up to 4 rounds = 6s max) until stable. Once stable, re-reads `page.content()`. This gives React Router time to load the navigation chunk.  
+**Log line:** `fetch.anchor_stable url=... links=N stable=True body=XXXXX`  
+
+**SecureCafe URL synthesis** (`pms/adapters/_html_extract.py:detect_securecafe_portal_url()`): when HTML contains `href="/onlineleasing/{path-slug}"`, constructs `https://{domain-slug}.securecafe.com/onlineleasing/{path-slug}/floorplans.aspx`. The domain slug is the property hostname with TLD stripped; the path slug comes directly from the href (SecureCafe always matches them).  
+**Examples (2026-05-12):** pid=272521 (villageatthegateway.com → 8 units), pid=25964 (carrolltoncrossingapt.com → 1 unit).
+
+---
+
+## Phase 3b — Profile-level bugs (WARM/HOT regressions)
+
+WARM and HOT profiles sometimes cause MORE failures than COLD ones because corrupted or stale profile data actively misdirects the scraper. If a property was succeeding in cloud but fails in a canary that includes production profiles, check these before touching extraction code.
+
+### Profile bug 1: explored_skip filtering winning_page_url
+
+**Signal:** Property has `profile:winning_page_url` in its profile navigation, but `HOP_START` shows 0 candidates OR candidates do not include that URL despite it being in `navigation.explored_links`.
+
+**Root cause:** `_try_link_hop` in `scraper.py` builds `explored_skip` from `profile.navigation.explored_links`. After the first successful run, the `winning_page_url` IS added to `explored_links` (it was explored). On the next run, `explored_skip` filters it out of the hop queue — the very page that worked last time is silently skipped.
+
+**Fixed in:** `pms/scraper.py` — after building `explored_skip`, the code now strips `winning_page_url` and all `availability_links` back out:
+```python
+_priority_urls = {wpu} | set(availability_links)
+explored_skip -= _priority_urls  # never skip known-good pages
+```
+
+**Diagnosis:** check `profile.navigation.explored_links` for the property — if `winning_page_url` is in that list, this bug caused the failure.
+
+### Profile bug 2: infra API URL saved as winning_page_url
+
+**Signal:** Profile's `winning_page_url` is a Supabase REST endpoint (`supabase.co/rest/v1/...`) or HERE maps API (`browse.search.hereapi.com/v1/browse?...`). The hop tries it → HARD_FAIL (401) or gets 30 location POIs misidentified as units.
+
+**Root cause:** A previous run captured a backend API response that had unit-shaped JSON (Supabase returns property data; HERE maps returns POI address objects). The profile_updater saved it as `winning_page_url`. On subsequent runs, the hop tries it directly without browser session cookies → fails every time.
+
+**Fixed in:** `services/profile_updater.py:_is_infra_api_url()` — blocks `supabase.co`, `hereapi.com`, `googleapis.com`, `firebaseio.com`, `amazonaws.com/` from being saved as `winning_page_url` or `known_endpoints`.
+
+**Temporary fix for affected profiles:** clear `navigation.winning_page_url` in the profile JSON, or run one cold pass to let the infra filter prevent re-persistence.
+
+### Profile bug 3: Rule 2 CSS cache bypassed on WARM/HOT profiles
+
+**Signal:** Floor-plan accumulation is working (multiple sub-pages visited) but each sub-page calls `llm_dom_targeted` separately despite prior sub-pages already discovering CSS selectors.
+
+**Root cause:** The Rule 2 replay guard was `if _fp_css_hint and not _profile_dom_field_selectors`. When the profile had saved DOM selectors (WARM/HOT), `_profile_dom_field_selectors` was non-None → Rule 2 was skipped entirely, even if the profile selectors returned 0 units on the sub-page.
+
+**Fixed in:** `pms/adapters/generic.py` — guard changed to `if _fp_css_hint and not dom_units` (try cached selectors whenever DOM extraction produced nothing, regardless of whether profile selectors were attempted).
+
+### Profile bug 4: LLM DOM win drops Tier 3 units
+
+**Signal:** Tier 3 DOM scan finds N units, planner escalates (doesn't STOP), then LLM DOM also finds M units — but final result has only M units, not N+M.
+
+**Root cause:** `result.units = dom_units` at the LLM DOM win path **replaced** `result.units` instead of merging. Tier 3 units that were already in `result.units` were silently discarded.
+
+**Fixed in:** `pms/adapters/generic.py` — changed to `result.units = _merge_into_result_units(result.units, dom_units, ...)`.
+
+---
+
+## Phase 3c — Anchor keyword and scoring issues
+
+### Anchor scoring: exact vs semantic
+
+`_rank_internal_links` uses **two layers** of keyword matching:
+
+1. **Layer 1 (initial filter) — exact substring:** `if kw in anchor`. Handles most cases because `"floor plan"` is a substring of `"view floor plans"`, `"floor-plan"`, etc. Links scoring 0 here are dropped before Layer 2.
+
+2. **Layer 2 (SourceRanker re-ranking) — `rapidfuzz.fuzz.partial_ratio`:** Applied after Layer 1 via `pms/signal_engine/ranker.py`. Threshold=80 by default. Catches near-misses that exact matching would miss (e.g., `"floorplan pricing"` vs keyword `"pricing"`).
+
+**Key host keywords** (score 120, treated as known portals — links passing the same-site filter):
+```
+.rentcafe.com, .appfolio.com, .onlineleasing.realpage.com, sightmap.com,
+.entrata.com, prospectportal.com, securecafe.com, knockrentals.com, leasehawk.com
+```
+
+**Key path keywords** (scored in Layer 1):
+```
+/floor-plan (95), /availability (95), /floorplans (90), /units (85),
+/models (85), /find-your-home (88), /conventional (85)
+```
+
+**Key anchor keywords** (scored in Layer 1 with fuzzy boost in Layer 2):
+```
+"view availability" (88), "floor plan" (90), "find your home" (88),
+"check availability" (88), "view floor plan" (88)
+```
+
+**Diagnosing a missed link:** if a property URL is NOT appearing in hop candidates, run:
+```python
+from ma_poc.pms.scraper import _rank_internal_links
+ranked = _rank_internal_links(html, base_url, limit=20)
+for url, score, anchor in ranked:
+    print(f'{score:>6}  {anchor[:40]:<40}  {url[:80]}')
+```
+If the URL IS in the HTML but scores 0, check: (a) is it filtered by `_LINK_SKIP_PATTERNS`? (b) does its host pass `is_same_site or is_portal`? (c) does it score > 0 for any keyword?
 
 ---
 
@@ -287,6 +410,68 @@ Baskets:
 - `FAILURE` — was failing in cloud; we're testing the fix
 - `REGRESSION_SENTINEL` — was succeeding in cloud; we're checking we didn't break it
 
+### Seed production profiles (critical for true canary)
+
+Running without production profiles gives COLD-start behaviour. WARM/HOT profiles expose a completely different failure class (profile-level bugs, explored_skip issues, infra API URLs). Always seed from prod for any wide canary.
+
+**Export profiles from production DB to CSV:**
+```bash
+# On prod or from a studio_results download (CSV with canonical_id + profile_json columns)
+python C:/tmp/seed_all_profiles.py
+# → seeds local postgres 'proppy' DB from studio_results_YYYYMMDD_HHMM.csv
+```
+
+`C:/tmp/seed_all_profiles.py` (see comments in file for format). Requires `pg8000` driver (not psycopg — no ARM64 wheel).
+
+**Run canary with postgres profiles:**
+```bash
+# DATA_PROVIDER=postgres is set in ma_poc/.env
+# The canary reads profiles from postgres automatically
+cd ma_poc
+python scripts/diagnostics/local_canary.py \
+    --from-run 2026-05-12 \
+    --properties-csv data/canary/local_runs/{run-dir}/canary_input.csv \
+    --out-dir data/canary/local_runs/YYYY-MM-DD_description
+```
+
+The canary detects `DATA_PROVIDER=postgres` and reads scrape profiles from the local proppy DB. No `--seed-from-prod` flag needed — that flag requires a `PROD_DATABASE_URL` pointing to the live cloud DB.
+
+**Iterative canary strategy for large failure sets (proven 2026-05-12):**
+
+1. Seed all 30+ production profiles into local postgres
+2. Run wide canary v1 with all properties → identify regression vs v1 baseline
+3. Apply fixes → run v2 → compare
+4. **Exclude properties that succeeded in BOTH v2 AND v3** from subsequent runs — they are stable
+5. Next canary only runs the remaining failures + first-time successes that need confirmation
+6. Continue until persistent failures are understood root-causes, not code bugs
+
+**Building the reduced canary CSV:**
+```python
+import csv, json
+
+def get_results(events_path):
+    r = {}
+    with open(events_path, errors='ignore') as f:
+        for line in f:
+            try:
+                ev = json.loads(line)
+                if ev.get('kind') == 'output.property_emitted':
+                    pid = str(ev.get('property_id',''))
+                    if pid not in r: r[pid] = ev.get('verdict')
+            except: pass
+    return r
+
+prev = get_results('data/canary/local_runs/prev/v2/runs/.../events.jsonl')
+curr = get_results('data/canary/local_runs/curr/v2/runs/.../events.jsonl')
+
+# Keep only properties NOT consistently succeeding in both
+stable = {pid for pid in prev if prev[pid]=='SUCCESS' and curr.get(pid)=='SUCCESS'}
+# Write next canary input excluding stable
+with open('data/canary/local_runs/next/canary_input.csv', 'w', newline='') as f:
+    rows_filtered = [r for r in all_rows if r['property_id'] not in stable]
+    # ... write rows_filtered
+```
+
 ### Run the canary
 
 ```bash
@@ -372,9 +557,12 @@ grep "scroll_trigger" data/canary/local_runs/.../jugnu.log
 
 **Steps:**
 1. Check `fetch.scroll_trigger` log — did scroll fire? Did `rent_appeared=True` after?
-2. Check body_bytes on the entry-page fetch. If < 50KB, Playwright got a shell.
-3. Look at `Network Log Entries` in the per-property report. If 0 or very low, the XHR didn't fire.
-4. For deferred APIs (SightMap, Entrata widgets): check if the API fires only after scroll (IntersectionObserver) or after 3-5s (SPA init). Add the host to `_LATE_RENDER_HOSTS` or the portal late-render list in `fetcher.py`.
+2. Check `fetch.anchor_stable` log — did the anchor stability gate fire? If not, the page had > 40KB body or > 20 anchor links already. If yes, check `links=N stable=True/False` — False means the DOM was still growing at timeout.
+3. Check body_bytes on the entry-page fetch. If < 40KB, Playwright got a React shell — links were lazy-loaded. The anchor stability gate should handle this; if it didn't, check if RENDER mode was used.
+4. Look at `Network Log Entries` in the per-property report. If 0 or very low, the XHR didn't fire.
+5. For deferred APIs (SightMap, Entrata widgets): check if the API fires only after scroll (IntersectionObserver) or after 3-5s (SPA init). Add the host to `_LATE_RENDER_HOSTS` or the portal late-render list in `fetcher.py`.
+
+**Non-deterministic SPA rendering:** the same property can produce 19KB (React shell) one run and 75KB (fully hydrated) the next. If you see intermittent SUCCESS/FAIL on the same URL across canary runs, this is the cause. The anchor stability gate makes it deterministic for < 40KB pages by polling anchor link count instead of using a fixed sleep.
 
 **Quick local check:**
 
@@ -452,26 +640,65 @@ pytest tests/pms tests/fetch -q --tb=line  # ~60s
 | Link-hop candidate scoring | `pms/scraper.py:_LINK_ANCHOR_KEYWORDS`, `_LINK_PATH_KEYWORDS`, `_LINK_HOST_KEYWORDS` |
 | PMS sub-path priors | `pms/scraper.py:_PMS_SUB_PATH_PRIORS` |
 | Unit signal gate | `pms/adapters/_merge_fns.py:_UNIT_SIGNAL_KEYS`, `has_unit_signals()` |
-| L1 scroll trigger | `fetch/fetcher.py:_do_render` — search `scroll_trigger` |
+| Signal engine scoring constants | `pms/signal_engine/defaults.py` — `DEFAULT_KIND_BASE_SCORES`, `DEFAULT_ANCHOR_KEYWORDS`, `DEFAULT_HOST_KEYWORDS`, `DEFAULT_PATH_KEYWORDS` |
+| SourceQualifier field combos | `pms/signal_engine/defaults.py:create_default_qualifier()` |
+| L1 scroll trigger | `fetch/fetcher.py` — search `scroll_trigger` |
+| L1 anchor stability gate | `fetch/fetcher.py` — search `anchor_stable` |
 | L1 body cap | `fetch/fetcher.py:_on_response` — search `_body_cap` |
 | Portal late-render wait | `fetch/fetcher.py` — search `portal_match` list |
-| Portal URL detection | `pms/adapters/_html_extract.py:detect_embedded_portal_urls()` |
+| Parked domain detection | `fetch/response_classifier.py:_is_parked_domain()`, `_PARKED_DOMAIN_PHRASES` |
+| Portal URL detection (embedded JSON) | `pms/adapters/_html_extract.py:detect_embedded_portal_urls()` |
+| SecureCafe URL synthesis (SPA hrefs) | `pms/adapters/_html_extract.py:detect_securecafe_portal_url()` |
+| RealPage CWS credential probe | `pms/adapters/generic.py:_probe_realpage_cws()`, `generic:realpage_cws` tier |
 | Floor-plan sub-page detection | `pms/adapters/_html_extract.py:detect_floorplan_subpage_urls()` |
 | Form action parsing | `pms/scraper.py:_rank_internal_links → _href_anchor_pairs()` |
 | Floor-plan accumulation loop | `pms/scraper.py:_try_link_hop` — search `_in_floorplan_accumulation` |
+| explored_skip priority URL stripping | `pms/scraper.py:_try_link_hop` — search `_priority_urls` |
+| Profile winning_page_url update | `services/profile_updater.py` — search `winning_url` |
+| Infra API URL filter | `services/profile_updater.py:_is_infra_api_url()`, `_INFRA_API_DOMAINS` |
 | Per-property report generator | `scripts/reports/per_property.py` |
+
+---
+
+## 2026-05-12 wide canary campaign: summary of findings
+
+**Setup:** 30 production properties with prod scrape profiles seeded from studio_results CSV.  
+**Baseline (v2, no fixes, with prod profiles):** 7/30 SUCCESS (23%) — catastrophic regression from v1 (17/30) caused entirely by explored_skip bug.
+
+| Canary | Success | Key fix validated |
+|--------|---------|-------------------|
+| v2 | 7/30 (23%) | Baseline with prod profiles — explored_skip regression discovered |
+| v3 | 19/30 (63%) | explored_skip fix — strips winning_page_url from explored_skip set |
+| v4 | 13/24 (54%) | Parked domain detection, securecafe host keyword, /models path keyword, infra API filter, Rule 2 merge |
+| v5 (targeted) | 3/4 | RPFP_config probe (11159: 5u), /models keyword (56166: 8u), securecafe anchor stability (25964: 1u) |
+| v7 (securecafe) | 2/2 | Anchor stability gate (272521: 8u, 25964: 1u) |
+
+**Persistent failures after all fixes:**
+
+| pid | Root cause | Status |
+|-----|-----------|--------|
+| 11961, 12557, 18941 | Domain not available (parked) | Emit DEAD_URL now — excluded from success denominator |
+| 25964, 272521 | SecureCafe SPA — NOW FIXED with anchor stability gate | Fixed in v7 |
+| 56166 | HERE maps as winning_page_url, /models page — NOW FIXED | Fixed in v5 with /models keyword |
+| 11159 | RealPage CWS — NOW FIXED with RPFP_config probe | Fixed in v5 |
+
+**All 10 non-parked failures from original v2 canary are now resolved or correctly classified as DEAD_URL.**
 
 ---
 
 ## Canary manifests by fix history
 
-| Date | Manifest | Fix tested | Outcome |
+| Date | Run dir | Fix tested | Outcome |
 |---|---|---|---|
 | 2026-05-12 | `manifest_2026_05_12.csv` | Universal PMS priors | 5 IMPROVED, 0 REGRESSED |
 | 2026-05-12 | `manifest_2026_05_12_portal_detect.csv` | Portal detection from embedded JSON | 2 IMPROVED, 0 REGRESSED |
 | 2026-05-12 | `manifest_2026_05_12_portal_detect_v2.csv` | Fallback portal-hints promotion | 2 IMPROVED, 0 REGRESSED |
 | 2026-05-12 | `manifest_2026_05_12_floorplan_subpage.csv` | Scroll + Entrata /conventional/ prior | 11611 SUCCESS 5u, 228073 SUCCESS 1u |
 | 2026-05-12 | `manifest_2026_05_12_floorplan_and_sightmap.csv` | SightMap 512KB cap + floor-plan HTML discovery | 11611 SUCCESS 10u |
+| 2026-05-12 | `2026-05-12_wide_v2_all_profiles` | Prod profiles baseline | 7/30 — explored_skip regression |
+| 2026-05-12 | `2026-05-12_wide_v3_explored_fix` | explored_skip + Rule 2 fixes | 19/30 |
+| 2026-05-12 | `2026-05-12_wide_v4_fixes` | Parked domain, securecafe keyword, /models, infra API filter, Rule 2 merge | 13/24 |
+| 2026-05-12 | `2026-05-12_targeted_v5_rpfp` | RPFP_config probe, /models keyword, securecafe from LLM nav_hint | 3/4 (11159, 56166, 25964) |
+| 2026-05-12 | `2026-05-12_securecafe_v7_anchor_stable` | Anchor-link DOM stability gate | 2/2 (272521, 25964) |
 
-All manifests and canary outputs: `data/canary/local_runs/`  
-Final reports (when written): `data/canary/local_runs/{dir}/FINAL_REPORT.md`
+All canary outputs: `data/canary/local_runs/`
