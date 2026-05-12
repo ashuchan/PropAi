@@ -240,6 +240,31 @@ def _response_looks_like_units(body: Any) -> bool:
     return any(k in text for k in ("unit", "floor", "plan", "rent", "price", "sqft"))
 
 
+# Domains that provide infrastructure / third-party backend services and
+# should never be saved as winning_page_url or known_endpoints.  Fetching
+# these directly without the originating browser session will always fail
+# (401/403/0-byte body) and pollutes the profile with unreplayable hints.
+_INFRA_API_DOMAINS: tuple[str, ...] = (
+    "supabase.co",          # Supabase REST / Realtime backend
+    "supabase.io",
+    "hereapi.com",          # HERE Location Services (maps/geocoding POIs)
+    "here.com/v1/",
+    "browse.search.hereapi",
+    "googleapis.com",       # Google APIs
+    "firebase.com",
+    "firebaseio.com",
+    "amazonaws.com/",       # AWS S3 / Lambda (unless PMS-owned)
+    "cloudfront.net/api/",
+)
+
+
+def _is_infra_api_url(url: str) -> bool:
+    """Return True when url is a third-party infrastructure endpoint that
+    cannot be replayed without the originating browser session."""
+    lower = url.lower()
+    return any(domain in lower for domain in _INFRA_API_DOMAINS)
+
+
 _MAX_BLOCKED_ENDPOINTS = 50
 _MAX_LLM_FIELD_MAPPINGS = 20
 _MAX_EXPLORED_LINKS = 30
@@ -602,8 +627,10 @@ def update_profile_after_extraction(
     # ── Record the winning page URL ────────────────────────────────────
     # This is the actual URL (or widget endpoint) that produced unit data.
     # On subsequent runs the scraper can prioritise this URL.
+    # Guard: skip infrastructure / third-party backend URLs that require
+    # auth headers and can never be replayed via direct HTTP fetch.
     winning_url = scrape_result.get("_winning_page_url")
-    if winning_url and units_extracted > 0:
+    if winning_url and units_extracted > 0 and not _is_infra_api_url(winning_url):
         profile.navigation.winning_page_url = winning_url
         path = urllib.parse.urlparse(winning_url).path
         if path and path != "/":

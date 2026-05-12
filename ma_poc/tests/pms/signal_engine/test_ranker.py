@@ -42,8 +42,8 @@ def test_r2_api_known_endpoint_boosted(ranker) -> None:
     )
     result = ranker.rank([sig])
     assert len(result) == 1
-    # base=8000 + 500 boost
-    assert result[0].composite_score == 8_500
+    # base=9_500 + 500 boost (API sources ranked above navigation hints)
+    assert result[0].composite_score == 10_000
 
 
 def test_r2b_api_unknown_endpoint_no_boost(ranker) -> None:
@@ -53,7 +53,7 @@ def test_r2b_api_unknown_endpoint_no_boost(ranker) -> None:
         is_known_endpoint=False,
     )
     result = ranker.rank([sig])
-    assert result[0].composite_score == 8_000
+    assert result[0].composite_score == 9_500
 
 
 # ── R3: INTERNAL_LINK with anchor keyword scoring ─────────────────────────────
@@ -205,6 +205,123 @@ def test_multi_signal_internal_link_above_boost_floor(ranker) -> None:
     assert result[0].composite_score >= 4_000, (
         "Dual-signal internal link must score >= 4_000 (the multi-signal boost floor)"
     )
+
+
+# ── Semantic anchor-text scoring ──────────────────────────────────────────────
+# partial_ratio returns 100 for exact substring containment, so existing tests
+# that assert composite_score == 4_000 + keyword_score still pass unchanged.
+# These new tests verify the fuzzy path: near-matches produce proportionally
+# reduced scores, and unrelated text stays below the fuzzy_threshold (80).
+
+def test_semantic_near_match_anchor_scores_proportionally() -> None:
+    """Near-match (ratio < 100) produces int(score * ratio // 100), not full score.
+
+    Uses an isolated single-keyword ranker so the winning keyword is known and
+    the expected score can be computed deterministically.
+    """
+    from rapidfuzz import fuzz
+    from ma_poc.pms.signal_engine.ranker import SourceRanker, ScoringTables
+
+    kw, kw_score = "floor plan", 90
+    # "floor-plan" in the anchor differs from "floor plan" by one char (hyphen vs space)
+    # → partial_ratio ≈ 90 (near-match, not exact substring containment).
+    anchor = "view our floor-plan details"
+    ratio = int(fuzz.partial_ratio(kw, anchor))
+    assert 80 <= ratio < 100, f"Precondition: need near-match ratio in [80,100), got {ratio}"
+
+    tables = ScoringTables(
+        kind_base_scores={SourceKind.INTERNAL_LINK: 4_000},
+        anchor_keywords=((kw, kw_score),),
+        path_keywords=(), host_keywords=(), pms_priors={}, universal_priors=(),
+    )
+    ranker_test = SourceRanker(tables, fuzzy_threshold=80)
+    sig = SourceSignal(
+        kind=SourceKind.INTERNAL_LINK,
+        url="https://example.com/some-page",
+        anchor_text=anchor,
+    )
+    result = ranker_test.rank([sig])
+    expected_bonus = int(kw_score * ratio // 100)
+    assert result[0].composite_score == 4_000 + expected_bonus
+    assert result[0].composite_score < 4_000 + kw_score, "Near-match must yield less than full score"
+
+
+def test_semantic_exact_anchor_retains_full_score(ranker) -> None:
+    """Exact substring containment (ratio=100) gives the full keyword score."""
+    sig = SourceSignal(
+        kind=SourceKind.INTERNAL_LINK,
+        url="https://example.com/some-page",
+        anchor_text="check availability here",
+    )
+    result = ranker.rank([sig])
+    # "availability" keyword score=100; ratio=100 → full value
+    assert result[0].composite_score == 4_000 + 100
+
+
+def test_unrelated_anchor_scores_zero_bonus(ranker) -> None:
+    """Anchor text with no keyword overlap stays below fuzzy_threshold → no bonus."""
+    sig = SourceSignal(
+        kind=SourceKind.INTERNAL_LINK,
+        url="https://example.com/contact",
+        anchor_text="contact us today",
+    )
+    result = ranker.rank([sig])
+    assert result[0].composite_score == 4_000
+
+
+def test_url_path_uses_exact_not_fuzzy(ranker) -> None:
+    """Path keyword matching remains exact — no partial-ratio inflation."""
+    # "/availabilities" contains "/availability" as a substring → exact hit
+    sig_exact = SourceSignal(
+        kind=SourceKind.INTERNAL_LINK,
+        url="https://example.com/availabilities",
+        anchor_text="",
+    )
+    result = ranker.rank([sig_exact])
+    assert result[0].composite_score == 4_000 + 95   # /availabilities score=95
+
+    # A URL that is *similar* but not a substring must NOT match
+    sig_similar = SourceSignal(
+        kind=SourceKind.INTERNAL_LINK,
+        url="https://example.com/available-units",
+        anchor_text="",
+    )
+    result_similar = ranker.rank([sig_similar])
+    # /available-units does not contain /availability or /availabilities exactly
+    assert result_similar[0].composite_score == 4_000
+
+
+def test_fuzzy_threshold_parameter_respected() -> None:
+    """At threshold=100 a near-match (ratio<100) is suppressed; at threshold=80 it fires.
+
+    Uses an isolated single-keyword ranker so no other keyword can interfere.
+    """
+    from rapidfuzz import fuzz
+    from ma_poc.pms.signal_engine.ranker import SourceRanker, ScoringTables
+
+    kw, kw_score = "floor plan", 90
+    anchor = "view our floor-plan details"   # ratio ≈ 90 — near-match, not exact
+    ratio = fuzz.partial_ratio(kw, anchor)
+    assert 80 <= ratio < 100, f"Precondition: need near-match ratio in [80,100), got {ratio}"
+
+    tables = ScoringTables(
+        kind_base_scores={SourceKind.INTERNAL_LINK: 4_000},
+        anchor_keywords=((kw, kw_score),),
+        path_keywords=(), host_keywords=(), pms_priors={}, universal_priors=(),
+    )
+    sig = SourceSignal(
+        kind=SourceKind.INTERNAL_LINK,
+        url="https://example.com/x",
+        anchor_text=anchor,
+    )
+
+    # Permissive threshold: near-match fires → some bonus
+    lax_ranker = SourceRanker(tables, fuzzy_threshold=80)
+    assert lax_ranker.rank([sig])[0].composite_score > 4_000
+
+    # Strict threshold: ratio < 100 is suppressed → no bonus
+    strict_ranker = SourceRanker(tables, fuzzy_threshold=100)
+    assert strict_ranker.rank([sig])[0].composite_score == 4_000
 
 
 def test_multi_signal_link_stays_below_pms_prior(ranker) -> None:

@@ -24,6 +24,44 @@ log = logging.getLogger(__name__)
 # Exceptions that indicate DNS resolution failure
 _DNS_ERRORS = (gaierror, OSError)
 
+# ── Parked-domain content fingerprints ───────────────────────────────────────
+# Domain registrars serve HTTP 200 for parked / for-sale domains.  We detect
+# them by matching the first 4KB of the response body against known title and
+# body phrases.  Phrases are lowercased; body_head is decoded as latin-1
+# (never raises) so binary noise doesn't crash the check.
+_PARKED_DOMAIN_PHRASES: tuple[str, ...] = (
+    # Generic parked / for-sale copy
+    "this domain is for sale",
+    "domain is for sale",
+    "buy this domain",
+    "this domain may be for sale",
+    "domain name for sale",
+    "domain has been registered",
+    "this domain is available",
+    "domain is available",
+    # Common registrar / parking service indicators
+    "godaddy.com/domainforsale",
+    "dan.com/buy-domain",
+    "sedo.com",
+    "afternic.com",
+    "parking.namecheap.com",
+    "hugedomains.com",
+    "bodis.com",
+    "searchhound",          # searchhounds.com parking page
+    "this web page is parked",
+    "parked free courtesy of",
+    "web page is parked free",
+)
+
+
+def _is_parked_domain(body_head: bytes) -> bool:
+    """Return True if body_head looks like a domain-parking / for-sale page."""
+    try:
+        text = body_head[:4096].decode("latin-1").lower()
+    except Exception:
+        return False
+    return any(phrase in text for phrase in _PARKED_DOMAIN_PHRASES)
+
 # F3 — Cloudflare-edge response markers. ``server: cloudflare`` is the
 # canonical marker; ``cf-ray`` / ``cf-mitigated`` / ``cf-cache-status``
 # show up on edge-served responses even when the origin server header is
@@ -167,6 +205,14 @@ def classify(
         return FetchOutcome.TRANSIENT, f"HTTP_{status}"
 
     if 200 <= status < 300:
+        # Content-based parked-domain detection.  Domain registrars serve
+        # HTTP 200 when a domain has been purchased but not yet pointed at a
+        # real site, or when the domain is actively for sale.  These pages
+        # look like success to the HTTP layer but are useless for extraction.
+        # Classify them as DEAD_URL so the verdict layer can exclude them from
+        # the success-rate denominator and route them to re-discovery.
+        if body_head and _is_parked_domain(body_head):
+            return FetchOutcome.DEAD_URL, "PARKED_DOMAIN"
         return FetchOutcome.OK, None
 
     # Stage 3 (2026-05-12): explicit "this resource is gone" statuses are

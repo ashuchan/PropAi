@@ -185,6 +185,8 @@ def test_source_id_enum_static_scan_no_string_literals() -> None:
         repo_root / "ma_poc" / "pms" / "scraper.py",
         repo_root / "ma_poc" / "pms" / "adapters" / "base.py",
         repo_root / "ma_poc" / "pms" / "adapters" / "generic.py",
+        # signal_engine/decider.py maps ActionType → budget key strings.
+        repo_root / "ma_poc" / "pms" / "signal_engine" / "decider.py",
     }
     hits: list[str] = []
     for scan_dir in scan_dirs:

@@ -332,7 +332,8 @@ async def test_probe_response_feeds_subsequent_tiers() -> None:
     probe_body = {
         "data": {
             "units": [
-                {"unit_id": "P1", "rent": 1500, "sqft": 700, "bedrooms": 1},
+                # bathrooms required for floor_plan_bed_bath_area qualifier
+                {"unit_id": "P1", "rent": 1500, "sqft": 700, "bedrooms": 1, "bathrooms": 1},
             ]
         }
     }

@@ -1403,6 +1403,16 @@ async def _try_link_hop(
             for dead in getattr(nav, "explored_links", []) or []:
                 if isinstance(dead, str) and dead:
                     explored_skip.add(dead)
+            # Priority pages were explored in past runs and land in
+            # explored_links, but they must NEVER be skipped — they are
+            # the highest-confidence candidates.  Strip them back out.
+            _priority_urls: set[str] = set()
+            if isinstance(wpu, str) and wpu:
+                _priority_urls.add(wpu)
+            for link in getattr(nav, "availability_links", []) or []:
+                if isinstance(link, str) and link:
+                    _priority_urls.add(link)
+            explored_skip -= _priority_urls
         except Exception:
             # Profile access is best-effort — never let a malformed
             # profile sink the link-hop entirely.
@@ -1569,10 +1579,28 @@ async def _try_link_hop(
     _accumulated_units: list[dict[str, Any]] = []
     _in_floorplan_accumulation = False
 
+    # Rule: once profile:winning_page_url delivers >1 units, skip lower-scored
+    # candidates (priors, generic links) — they are speculative and waste hops.
+    # Profile-level and LLM-hint-level signals (score >= _LLM_HINT_SCORE) are
+    # still followed.  Floor-plan sub-page accumulation is unaffected.
+    _winning_page_satisfied = False
+
+    # Track which page produced the most units so the caller can promote it
+    # to winning_page_url if it outperforms the current recorded winner.
+    _best_units_page: tuple[str, int] = ("", 0)  # (url, unit_count)
+
+    # LLM CSS selectors cached from the first sub-page in accumulation mode.
+    # Passed via shared_budget so subsequent sub-pages skip the LLM DOM call.
+    _fp_llm_selectors: dict[str, Any] | None = None
+
     while queue_idx < len(queue):
         sub_url, score, anchor = queue[queue_idx]
         idx = queue_idx + 1
         queue_idx += 1
+
+        # Skip lower-scored priors once the profile winning page delivered data.
+        if _winning_page_satisfied and score < _LLM_HINT_SCORE and not _in_floorplan_accumulation:
+            continue
         if sub_url in visited:
             # Phase 9: defensive — should already be filtered above, but
             # double-check to enforce H5 invariant under all code paths.
@@ -1680,6 +1708,29 @@ async def _try_link_hop(
             existing_explored.update(explored)
             sub_result["_explored_links"] = existing_explored
 
+            # Track the page that has delivered the most units so the caller
+            # can promote it to winning_page_url if it beats the current record.
+            unit_count = len(sub_result.get("units") or [])
+            if unit_count > _best_units_page[1]:
+                _best_units_page = (sub_url, unit_count)
+
+            # Once profile:winning_page_url delivers >1 units on a WARM/HOT
+            # profile with no recent failures (successfully yielded data in
+            # the last 3 days by proxy), skip lower-scored priors.
+            # Cold profiles or profiles with consecutive failures must still
+            # explore — their winning_page_url may be stale.
+            if anchor.startswith("profile:winning_page_url") and unit_count > 1:
+                # Only apply the skip for WARM/HOT profiles whose last run
+                # succeeded (consecutive_failures == 0) — a reliable proxy
+                # for "winning_page_url is valid within the last 3 days".
+                # Cold profiles or ones with recent failures must still
+                # explore to rediscover the correct page.
+                _profile_conf = getattr(profile, "confidence", None) if profile else None
+                _profile_maturity = str(getattr(_profile_conf, "maturity", "COLD") or "COLD").upper()
+                _profile_failures = int(getattr(_profile_conf, "consecutive_failures", 99) or 0)
+                if _profile_maturity in ("WARM", "HOT") and _profile_failures == 0:
+                    _winning_page_satisfied = True
+
             # Floor-plan index accumulation: after a successful sub-page
             # scrape, run _rank_internal_links on the sub-page HTML to
             # find floor-plan sub-sub-page links (e.g. /floorplans/the-edgefield/).
@@ -1756,6 +1807,14 @@ async def _try_link_hop(
                 _in_floorplan_accumulation = True
                 _first_successful_result = sub_result
                 _accumulated_units.extend(sub_result.get("units") or [])
+                # Cache the LLM DOM selectors from this index page so
+                # sub-pages can replay them without another LLM call.
+                if _fp_llm_selectors is None:
+                    _css = (sub_result.get("_llm_hints") or {}).get("css_selectors")
+                    if isinstance(_css, dict) and _css.get("container"):
+                        _fp_llm_selectors = _css
+                        if shared_budget is not None:
+                            shared_budget["_fp_css_hint"] = _css
                 # Queue all floor-plan sub-page hints (within dynamic cap).
                 for fp_url, fp_kind in fp_hints:
                     if dynamic_appended >= max_dynamic_appends:
@@ -1783,6 +1842,13 @@ async def _try_link_hop(
             elif _in_floorplan_accumulation:
                 # Accumulating sub-page units — merge into the running total.
                 _accumulated_units.extend(sub_result.get("units") or [])
+                # Cache selectors from first sub-page that has them.
+                if _fp_llm_selectors is None:
+                    _css = (sub_result.get("_llm_hints") or {}).get("css_selectors")
+                    if isinstance(_css, dict) and _css.get("container"):
+                        _fp_llm_selectors = _css
+                        if shared_budget is not None:
+                            shared_budget["_fp_css_hint"] = _css
                 emit(
                     EventKind.LINK_HOP_RECOVERED,
                     property_id,
@@ -1805,6 +1871,8 @@ async def _try_link_hop(
                 hop_index=idx,
                 score=score,
             )
+            sub_result["_best_units_page"] = _best_units_page[0] or sub_url
+            sub_result["_best_units_count"] = _best_units_page[1]
             return sub_result
 
         # Dynamic discovery: a sub-fetch may itself have surfaced
@@ -1851,6 +1919,11 @@ async def _try_link_hop(
         existing_explored = _first_successful_result.get("_explored_links") or {}
         existing_explored.update(explored)
         _first_successful_result["_explored_links"] = existing_explored
+        # Expose the page that delivered the most units so the profile updater
+        # can promote it to winning_page_url.
+        if _best_units_page[0]:
+            _first_successful_result["_best_units_page"] = _best_units_page[0]
+            _first_successful_result["_best_units_count"] = _best_units_page[1]
         return _first_successful_result
 
     # No hop recovered — return None but stash the explored map on the

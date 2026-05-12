@@ -33,14 +33,34 @@ LLM_HINT_SCORE: int = 10_000
 EMBEDDED_PORTAL_SCORE: int = 10_000
 PMS_PRIOR_SCORE: int = 5_000
 
+# Shared media-type filter — used by both create_default_qualifier and
+# create_rentcafe_qualifier so the blocked sets are never out of sync.
+DEFAULT_MEDIA_FILTER: MediaTypeFilter = MediaTypeFilter(
+    blocked_content_types=frozenset({
+        "text/javascript",
+        "text/css",
+        "font/",
+        "image/",
+        "application/font",
+        "application/x-font",
+    }),
+    blocked_url_suffixes=frozenset({
+        ".js", ".css", ".woff", ".woff2", ".ttf", ".otf",
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
+    }),
+)
+
 DEFAULT_KIND_BASE_SCORES: dict[SourceKind, int] = {
     SourceKind.PROFILE_WINNING:  10_001,   # profile:winning_page_url sentinel
     SourceKind.LLM_HINT:         10_000,   # replaces _LLM_HINT_SCORE
     SourceKind.EXTERNAL_PORTAL:  10_000,   # replaces _EMBEDDED_PORTAL_SCORE
-    SourceKind.PROFILE_NAV_HINT:  9_000,
-    SourceKind.API_RESPONSE:      8_000,   # network-captured = data exists
-    SourceKind.EMBEDDED_JSON:     7_500,
-    SourceKind.JSON_LD:           6_000,
+    SourceKind.PROFILE_NAV_HINT:  9_500,
+    # API/JSON sources are ranked above all navigation hints — we already have
+    # the data, no additional fetch needed.  known_endpoint boost (+500) lifts
+    # a recognized API endpoint to 10_000, matching LLM hints.
+    SourceKind.API_RESPONSE:      9_500,   # network-captured response (was 8_000)
+    SourceKind.EMBEDDED_JSON:     9_000,   # SSR JSON blobs (was 7_500)
+    SourceKind.JSON_LD:           8_500,   # Schema.org structured data (was 6_000)
     SourceKind.DOM_SECTION:       5_500,
     SourceKind.PMS_PRIOR:         5_000,   # replaces _PMS_PRIOR_SCORE
     SourceKind.UNIVERSAL_PRIOR:   4_500,
@@ -68,6 +88,7 @@ DEFAULT_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("see available", 80),
     ("view floor plan", 88),
     ("view floorplan", 88),
+    ("view floor plans", 88),
     ("apartment", 60),
     ("unit", 55),
     ("lease", 50),
@@ -80,6 +101,7 @@ DEFAULT_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("/floor-plan", 95),
     ("/floorplan", 90),
     ("/availability", 95),
+    ("/view-availability", 95),
     ("/pricing", 80),
     ("/apartments", 70),
     ("/rent", 60),
@@ -90,6 +112,10 @@ DEFAULT_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("/availabilities", 95),
     ("/conventional/", 88),
     ("/conventional", 85),
+    # Apartment model pages (used by some marketing sites for floor plans)
+    ("/models", 85),
+    ("/find-your-home", 88),
+    ("/search", 50),
 )
 
 DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
@@ -100,6 +126,11 @@ DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
     (".entrata.com", 115),
     ("commoncf.entrata.com", 115),
     ("prospectportal.com", 115),
+    # Leasing portals / online-leasing platforms
+    ("securecafe.com", 120),        # ILS / SecureCafe online leasing
+    ("knockrentals.com", 115),      # Knock CRM leasing portal
+    ("leasehawk.com", 115),         # LeasHawk leasing CRM
+    ("rentgrata.com", 80),          # Referral, lower priority
 )
 
 DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
@@ -117,7 +148,10 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (
     "/floorplans",
     "/floor-plans",
+    "/Floor-plans.aspx",
+    "/floorplans.aspx",
     "/availability",
+    "/models",
     "/view-availability",
     "/apartments",
     "/units",
@@ -125,42 +159,142 @@ DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (
 )
 
 
-def create_default_qualifier(
-    unit_signal_keys: frozenset[str] | None = None,
-) -> SourceQualifier:
+# ── Qualifier toggle flags ────────────────────────────────────────────────────
+# Set False to disable a combination without deleting its definition.
+# Disabled combinations still appear in the code for reference and easy
+# re-enablement; they are simply excluded from the active list at runtime.
+_QUALIFIER_UNIT_GENERIC_ENABLED: bool = False      # too broad — admits any 2 unit keys
+_QUALIFIER_RENTCAFE_FP_ENABLED: bool = False       # RentCafe-path only; use create_rentcafe_qualifier()
+_QUALIFIER_RENTCAFE_UNIT_RENT_ENABLED: bool = False  # same
+_QUALIFIER_SIGHTMAP_UNIT_ENABLED: bool = False     # unit_number+price alone is too weak
+
+
+def create_default_qualifier() -> SourceQualifier:
     """Build the canonical SourceQualifier.
 
-    Args:
-        unit_signal_keys: The frozenset from _merge_fns._UNIT_SIGNAL_KEYS,
-            passed in by the caller to avoid circular imports. When None,
-            the factory imports it directly (safe in contexts where the
-            adapters package is already initialised).
-
-    Returns:
-        A fully configured SourceQualifier with all known field combinations.
+    Active combinations require cross-group field coverage (bed + bath + area
+    OR bed + bath + floor-plan name).  Looser combinations are defined below
+    but disabled via the ``_QUALIFIER_*_ENABLED`` flags — flip to True to
+    re-enable without a code deletion.  RentCafe-specific combinations live in
+    create_rentcafe_qualifier().
     """
-    if unit_signal_keys is None:
-        from ma_poc.pms.adapters._merge_fns import _UNIT_SIGNAL_KEYS
-        unit_signal_keys = _UNIT_SIGNAL_KEYS
+    # _lc_unit_keys used only when _QUALIFIER_UNIT_GENERIC_ENABLED is True.
+    if _QUALIFIER_UNIT_GENERIC_ENABLED:
+        from ma_poc.pms.adapters._merge_fns import _UNIT_SIGNAL_KEYS as _USK
+        _lc_unit_keys: frozenset[str] = frozenset(k.lower() for k in _USK)
+    else:
+        _lc_unit_keys = frozenset()
 
-    # Normalise all keys to lowercase — _UNIT_SIGNAL_KEYS contains mixed-case
-    # keys (e.g. "minRent", "unitNumber") but SourceSignal.__post_init__ also
-    # normalises, so comparisons must be consistent.
-    lc_unit_keys = frozenset(k.lower() for k in unit_signal_keys)
+    # ── Disabled combinations (kept for reference) ────────────────────────────
+    _disabled: list = []
+    if _QUALIFIER_UNIT_GENERIC_ENABLED:
+        _disabled.append(FieldCombination(
+            keys=_lc_unit_keys,
+            min_count=2,
+            label="unit_generic",
+        ))
+    if _QUALIFIER_RENTCAFE_FP_ENABLED:
+        _disabled.append(FieldCombination(
+            keys=frozenset({
+                "floorplanname", "floorplanid", "minimumrent",
+                "maximumrent", "availableunitscount", "availabilityurl",
+            }),
+            min_count=3,
+            label="rentcafe_floor_plan",
+        ))
+    if _QUALIFIER_RENTCAFE_UNIT_RENT_ENABLED:
+        _disabled.append(FieldCombination(
+            keys=frozenset({"rentcafeapartmentid", "unitrent", "marketrent"}),
+            min_count=2,
+            label="rentcafe_unit_rent",
+        ))
+    if _QUALIFIER_SIGHTMAP_UNIT_ENABLED:
+        _disabled.append(FieldCombination(
+            keys=frozenset({"unit_number", "price", "area", "available_on"}),
+            min_count=2,
+            label="sightmap_unit",
+        ))
 
     return SourceQualifier(
-        combinations=[
-            # ── Generic unit data (≥2 keys) ──────────────────────────────────
-            # Wraps existing has_unit_signals() from _merge_fns.py.
-            # Replaces the has_unit_signals() check in the api_narrow path
-            # during Phase 2; preserved alongside it in Phase 1.
+        combinations=_disabled + [
+            # ── Floor plan: bed + bath + area ─────────────────────────────────
+            # Cross-group: requires ≥1 bed key AND ≥1 bath key AND ≥1 area key.
+            # A response with three bed/bath synonyms but no sqft/area is NOT
+            # admitted — it carries no meaningful unit data.
             FieldCombination(
-                keys=lc_unit_keys,
-                min_count=2,
-                label="unit_generic",
+                keys=frozenset({
+                    "beds", "bedrooms",
+                    "baths", "bathrooms",
+                    "sqft", "area",
+                }),
+                min_count=3,
+                label="floor_plan_bed_bath_area",
+                required_groups=(
+                    frozenset({"beds", "bedrooms"}),
+                    frozenset({"baths", "bathrooms"}),
+                    frozenset({"sqft", "area"}),
+                ),
             ),
-            # ── RentCafe floor-plan level (≥3 of 6) ─────────────────────────
-            # Replaces _is_rentcafe_response() 3-of-6 check.
+            # ── Floor plan: bed + bath + floor plan name ──────────────────────
+            # Cross-group: requires ≥1 bed key AND ≥1 bath key AND a floor plan
+            # name field. Catches plan-level APIs that separate rent from layout.
+            FieldCombination(
+                keys=frozenset({
+                    "beds", "bedrooms",
+                    "baths", "bathrooms",
+                    "floor_plan_name", "floorplanname",
+                }),
+                min_count=3,
+                label="floor_plan_bed_bath_name",
+                required_groups=(
+                    frozenset({"beds", "bedrooms"}),
+                    frozenset({"baths", "bathrooms"}),
+                    frozenset({"floor_plan_name", "floorplanname"}),
+                ),
+            ),
+        ],
+        media_filter=DEFAULT_MEDIA_FILTER,
+        blocked_ttl_days=14,
+        min_noise_verdicts=2,
+    )
+
+
+def create_default_ranker(fuzzy_threshold: int = 80) -> SourceRanker:
+    """Build the canonical SourceRanker with all scoring tables.
+
+    Args:
+        fuzzy_threshold: Minimum ``rapidfuzz.fuzz.partial_ratio`` score (0–100)
+            for an anchor-text keyword to contribute any score at all.
+            Defaults to 80 — tight enough to suppress unrelated text while
+            admitting near-matches like "floor plans" → "floor plan".
+    """
+    return SourceRanker(
+        tables=ScoringTables(
+            kind_base_scores=DEFAULT_KIND_BASE_SCORES,
+            anchor_keywords=DEFAULT_ANCHOR_KEYWORDS,
+            path_keywords=DEFAULT_PATH_KEYWORDS,
+            host_keywords=DEFAULT_HOST_KEYWORDS,
+            pms_priors=DEFAULT_PMS_PRIORS,
+            universal_priors=DEFAULT_UNIVERSAL_PRIORS,
+        ),
+        fuzzy_threshold=fuzzy_threshold,
+    )
+
+
+def create_rentcafe_qualifier() -> SourceQualifier:
+    """Build a SourceQualifier scoped to RentCafe-specific API shapes.
+
+    Used by rentcafe._is_rentcafe_response() to delegate its field-combination
+    checks to the qualifier, keeping all FieldCombination definitions in one
+    place (defaults.py).
+
+    Deliberately excludes the ``unit_generic`` combination — that would admit
+    any generic unit-shaped API, defeating RentCafe-specific routing. The
+    ``api=rentcafe`` value sentinel is a content check (not a key check) and
+    stays in _is_rentcafe_response() alongside this qualifier.
+    """
+    return SourceQualifier(
+        combinations=[
             FieldCombination(
                 keys=frozenset({
                     "floorplanname", "floorplanid", "minimumrent",
@@ -169,9 +303,6 @@ def create_default_qualifier(
                 min_count=3,
                 label="rentcafe_floor_plan",
             ),
-            # ── RentCafe unit level with ID keys (≥2 of 3) — RC2 ────────────
-            # Unit-level RentCafe endpoints ship individual apartment records
-            # keyed by RentCafe IDs rather than floor-plan aggregates.
             FieldCombination(
                 keys=frozenset({
                     "rentcafeapartmentid",
@@ -181,7 +312,6 @@ def create_default_qualifier(
                 min_count=2,
                 label="rentcafe_unit",
             ),
-            # ── RentCafe unit level with rent fields (≥2 of 3) — RC2 alt ────
             FieldCombination(
                 keys=frozenset({
                     "rentcafeapartmentid",
@@ -191,54 +321,8 @@ def create_default_qualifier(
                 min_count=2,
                 label="rentcafe_unit_rent",
             ),
-            # ── SightMap unit (≥2 of 4) ──────────────────────────────────────
-            FieldCombination(
-                keys=frozenset({
-                    "unit_number", "price", "area", "available_on",
-                }),
-                min_count=2,
-                label="sightmap_unit",
-            ),
-            # ── Floor-plan physical dimensions (≥3 of 8) ─────────────────────
-            # Plan-level signals with no rent required — useful for
-            # detecting floor-plan APIs that separate rent from dimensions.
-            FieldCombination(
-                keys=frozenset({
-                    "beds", "bedrooms", "bathrooms", "baths",
-                    "sqft", "area", "floor_plan_name", "floorplanname",
-                }),
-                min_count=3,
-                label="floor_plan_physical",
-            ),
         ],
-        media_filter=MediaTypeFilter(
-            blocked_content_types=frozenset({
-                "text/javascript",
-                "text/css",
-                "font/",
-                "image/",
-                "application/font",
-                "application/x-font",
-            }),
-            blocked_url_suffixes=frozenset({
-                ".js", ".css", ".woff", ".woff2", ".ttf", ".otf",
-                ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
-            }),
-        ),
+        media_filter=DEFAULT_MEDIA_FILTER,
         blocked_ttl_days=14,
         min_noise_verdicts=2,
-    )
-
-
-def create_default_ranker() -> SourceRanker:
-    """Build the canonical SourceRanker with all scoring tables."""
-    return SourceRanker(
-        tables=ScoringTables(
-            kind_base_scores=DEFAULT_KIND_BASE_SCORES,
-            anchor_keywords=DEFAULT_ANCHOR_KEYWORDS,
-            path_keywords=DEFAULT_PATH_KEYWORDS,
-            host_keywords=DEFAULT_HOST_KEYWORDS,
-            pms_priors=DEFAULT_PMS_PRIORS,
-            universal_priors=DEFAULT_UNIVERSAL_PRIORS,
-        )
     )

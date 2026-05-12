@@ -78,9 +78,9 @@ def _passing_html() -> str:
 
 
 def _unit_shaped_api_body() -> dict[str, Any]:
-    """Body that passes ``find_unit_list`` + ``has_unit_signals`` so
-    ``analyze_api_with_llm`` is actually invoked. Keys drawn from
-    ``_UNIT_SIGNAL_KEYS``."""
+    """Body that passes ``find_unit_list`` + qualifier so ``analyze_api_with_llm``
+    is actually invoked.  Keys satisfy the floor_plan_bed_bath_name cross-group
+    combination (bedrooms + bathrooms + floor_plan_name)."""
     return {
         "data": {
             "units": [
@@ -89,6 +89,7 @@ def _unit_shaped_api_body() -> dict[str, Any]:
                     "rent": 1500,
                     "sqft": 700,
                     "bedrooms": 1,
+                    "bathrooms": 1,
                     "floor_plan_name": "A",
                 },
                 {
@@ -96,6 +97,7 @@ def _unit_shaped_api_body() -> dict[str, Any]:
                     "rent": 1700,
                     "sqft": 850,
                     "bedrooms": 2,
+                    "bathrooms": 2,
                     "floor_plan_name": "B",
                 },
             ]
@@ -218,12 +220,14 @@ async def test_dom_llm_win_merges_aggregator_with_css_selectors() -> None:
 
 
 @pytest.mark.asyncio
-async def test_dom_llm_win_quality_below_threshold_drops_selectors() -> None:
-    """When the LLM's selectors don't reproduce against their own
-    source HTML (quality < 0.4), the persistence gate drops them so
-    we don't lock in known-broken hints. But the rest of the
-    aggregator (nav_hint, platform_guess, etc.) MUST still survive —
-    that signal is independent of the selector quality."""
+async def test_dom_llm_win_quality_below_threshold_clamps_selectors() -> None:
+    """When the LLM's selectors don't reproduce against their own source HTML
+    (quality < REPLAY_FLOOR = 0.4), ENABLE_DEGRADED_DOM_PERSIST (default ON)
+    saves them at the clamped floor rather than dropping entirely.  The
+    css_selectors_quality field is set to the floor so the replay-side gate
+    admits the hint as soft-fail.  The rest of the aggregator (nav_hint,
+    platform_guess, etc.) MUST also survive — those signals are independent
+    of the selector quality."""
     dom_units = [_llm_unit()]
     dom_hints = {
         "css_selectors": {"container": ".unit-card"},
@@ -238,7 +242,9 @@ async def test_dom_llm_win_quality_below_threshold_drops_selectors() -> None:
         "ma_poc.services.llm_extractor.analyze_api_with_llm",
         new=AsyncMock(return_value=([], None, False, None)),
     ), patch(
-        # Replay returns 0 units while LLM claimed 1 → quality 0/1 = 0 → DROP.
+        # Replay returns 0 units while LLM claimed 1 → quality 0/1 = 0.
+        # With degraded persistence ON (default), quality is clamped to
+        # REPLAY_FLOOR (0.4) rather than dropped.
         "ma_poc.pms.adapters.generic.extract_with_hints",
         return_value=[],
     ):
@@ -246,10 +252,13 @@ async def test_dom_llm_win_quality_below_threshold_drops_selectors() -> None:
         ctx = _make_ctx()
         result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
 
+    from ma_poc.services.profile_updater import DOM_HINT_QUALITY_REPLAY_FLOOR
+
     hints = getattr(result, "_llm_hints", {})
-    # css_selectors dropped on the quality gate:
-    assert "css_selectors" not in hints or not hints["css_selectors"].get("container")
-    # But nav_hint + platform_guess survived:
+    # Degraded persistence: css_selectors present but quality clamped to floor.
+    assert hints.get("css_selectors", {}).get("container") == ".unit-card"
+    assert hints.get("css_selectors_quality") == DOM_HINT_QUALITY_REPLAY_FLOOR
+    # Ancillary signals survived regardless of quality gate:
     assert hints.get("navigation_hint") == "/floorplans"
     assert hints.get("platform_guess") == "rentcafe"
 
@@ -435,12 +444,15 @@ async def test_property_amenities_accumulate_across_tiers() -> None:
 
 @pytest.mark.asyncio
 async def test_navigation_hints_dedup_across_tiers() -> None:
-    """When two tiers volunteer the same /floorplans hint, it's
-    captured once. Otherwise the link-hop ranker would see duplicate
-    URLs and waste candidate slots."""
+    """When two tiers volunteer the same /floorplans hint, it's captured once.
+
+    RC3 (defer-monolithic rule) defers the monolithic LLM fallback to the
+    link-hop pass when nav hints are already present — so the monolithic tier
+    does not run during the main extraction pass and its /availability hint
+    never accumulates here.  The dedup invariant is verified using the two
+    tiers (API-LLM and DOM-LLM) that DO run."""
     api_hints = {"navigation_hint": "/floorplans"}
     dom_hints = {"navigation_hint": "/floorplans"}
-    mono_hints = {"navigation_hint": "/availability"}  # different
     api_responses = [
         {"url": "https://example.com/api/x", "body": _unit_shaped_api_body()}
     ]
@@ -453,15 +465,18 @@ async def test_navigation_hints_dedup_across_tiers() -> None:
         new=AsyncMock(return_value=([], dom_hints, None)),
     ), patch(
         "ma_poc.services.llm_extractor.extract_with_llm",
-        new=AsyncMock(return_value=([], mono_hints, "raw", None)),
+        new=AsyncMock(return_value=([], {"navigation_hint": "/availability"}, "raw", None)),
     ):
         adapter = GenericAdapter()
         ctx = _make_ctx(api_responses=api_responses)
         result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
 
     nav_hints = getattr(result, "_llm_navigation_hints", [])
+    # API-LLM and DOM-LLM both emit /floorplans — dedup keeps exactly one.
     assert nav_hints.count("/floorplans") == 1
-    assert "/availability" in nav_hints
+    # RC3 defers monolithic to hop when nav hints already present, so
+    # /availability from the mono tier is not collected in this pass.
+    assert "/availability" not in nav_hints
 
 
 # ── Scraper surface step ─────────────────────────────────────────────────────

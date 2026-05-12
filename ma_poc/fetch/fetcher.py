@@ -762,6 +762,62 @@ class Fetcher:
                     except Exception:
                         pass
 
+            # Anchor-link DOM stability gate (2026-05-12):
+            # React SPAs with code-split routes lazy-load navigation components
+            # AFTER networkidle / domcontentloaded fires.  React Router detects
+            # the current route and requests a separate JS chunk; that chunk
+            # renders the navigation links (including leasing-portal hrefs like
+            # securecafe.com / onlineleasing paths).  The prior heuristics
+            # (scroll-trigger, portal wait, Bug-8 salvage) all check body SIZE
+            # or rent-signal text — they can't tell whether the navigation DOM
+            # has finished rendering.
+            #
+            # The right signal: count <a href> elements.  If the count grows
+            # between two samples, React is still hydrating route components;
+            # wait and recheck.  Once stable (or budget exhausted), re-read.
+            #
+            # Trigger: page body < 40 KB AND anchor count < 20 (the SPA shell
+            # typically ships 3-10 skeleton links; a fully rendered site has 20+
+            # navigation links).  This targets exactly the tiny-shell case
+            # without firing on already-rendered pages.
+            #
+            # Max budget: 4 × 1.5 s = 6 s additional wait.  Safe because it
+            # only fires when the DOM is actively changing — if the first two
+            # samples are equal the loop exits immediately (0 extra wait).
+            if (
+                task.render_mode == RenderMode.RENDER
+                and body_text is not None
+                and len(body_text) < 40_000
+            ):
+                try:
+                    _link_count_prev = await page.evaluate(
+                        "document.querySelectorAll('a[href]').length"
+                    )
+                    if _link_count_prev < 20:
+                        _link_stable = False
+                        _max_stability_rounds = 4
+                        for _round in range(_max_stability_rounds):
+                            await asyncio.sleep(1.5)
+                            _link_count_now = await page.evaluate(
+                                "document.querySelectorAll('a[href]').length"
+                            )
+                            if _link_count_now == _link_count_prev:
+                                _link_stable = True
+                                break
+                            _link_count_prev = _link_count_now
+                        body_text_nav = await page.content()
+                        if body_text_nav and len(body_text_nav) > len(body_text):
+                            body_text = body_text_nav
+                            log.info(
+                                "fetch.anchor_stable url=%s links=%d stable=%s body=%d",
+                                task.url,
+                                _link_count_prev,
+                                _link_stable,
+                                len(body_text),
+                            )
+                except Exception:
+                    pass
+
             if body_text is None or len(body_text) < 512:
                 _body_len = len(body_text) if body_text else 0
                 # RC5: HTTP 200 with a trivially-small body (< 16 bytes) is

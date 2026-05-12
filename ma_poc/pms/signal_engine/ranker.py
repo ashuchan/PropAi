@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable
 
+from rapidfuzz import fuzz as _fuzz
+
 from ma_poc.pms.signal_engine.models import SourceKind, SourceSignal
 
 
@@ -49,10 +51,22 @@ class SourceRanker:
 
     Uses ScoringTables for all numeric weights. Pure function — no I/O,
     no state modification.
+
+    Anchor-text matching is semantic: ``rapidfuzz.fuzz.partial_ratio`` returns
+    how well the keyword substring aligns with the anchor text (0–100). The
+    keyword score is scaled by that ratio so an exact match keeps its full
+    value and a near-match is proportionally reduced.
+
+    URL path and host keywords use exact substring matching — those are
+    structured strings where fuzzy alignment adds noise, not signal.
+
+    ``fuzzy_threshold`` (default 80) is the minimum similarity required for an
+    anchor keyword to contribute any score at all.
     """
 
-    def __init__(self, tables: ScoringTables) -> None:
+    def __init__(self, tables: ScoringTables, fuzzy_threshold: int = 80) -> None:
         self.tables = tables
+        self.fuzzy_threshold = fuzzy_threshold
 
     def rank(self, signals: Iterable[SourceSignal]) -> list[RankedSignal]:
         """Score all signals and return them sorted best-first."""
@@ -98,14 +112,27 @@ class SourceRanker:
         Returns the BEST individual keyword score, not a sum. This prevents
         URLs that happen to match many low-value keywords from outranking
         a URL with one strong signal (e.g. ".rentcafe.com" host suffix).
+
+        Anchor scoring is semantic: ``partial_ratio`` aligns the keyword
+        substring within the anchor text and returns a 0–100 similarity.
+        The keyword's table score is multiplied by that ratio so exact
+        matches retain full value and near-matches are proportionally lower.
+
+        Path and host scoring remain exact-substring: those are structured
+        tokens where fuzzy alignment introduces false positives.
         """
         best = 0
         url = (signal.url or "").lower()
         anchor = (signal.anchor_text or "").lower()
 
-        for kw, score in self.tables.anchor_keywords:
-            if kw in anchor:
-                best = max(best, score)
+        # Anchor text — semantic fuzzy match
+        if anchor:
+            for kw, score in self.tables.anchor_keywords:
+                ratio = _fuzz.partial_ratio(kw, anchor)
+                if ratio >= self.fuzzy_threshold:
+                    best = max(best, int(score * ratio // 100))
+
+        # URL path and host — exact substring (structured strings)
         for kw, score in self.tables.path_keywords:
             if kw in url:
                 best = max(best, score)

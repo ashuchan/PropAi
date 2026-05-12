@@ -53,6 +53,23 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 if TYPE_CHECKING:
     from playwright.async_api import Page
 
+# Phase 4: module-level RentCafe-scoped qualifier singleton.
+# Used by _is_rentcafe_response() to delegate its field-combination checks
+# so all FieldCombination definitions live in signal_engine/defaults.py.
+# The api=rentcafe value-sentinel check is NOT delegatable (it checks a
+# response value, not a key) and stays inline in _is_rentcafe_response().
+try:
+    from ma_poc.pms.signal_engine.defaults import create_rentcafe_qualifier as _create_rq
+    from ma_poc.pms.signal_engine.models import (
+        SourceKind as _RCSourceKind,
+        SourceSignal as _RCSourceSignal,
+    )
+    _rentcafe_qualifier = _create_rq()
+except Exception:
+    _rentcafe_qualifier = None  # type: ignore[assignment]
+    _RCSourceKind = None  # type: ignore[assignment]
+    _RCSourceSignal = None  # type: ignore[assignment]
+
 
 def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
     """Parse a RentCafe/Yardi floorplan list into standard unit dicts.
@@ -215,35 +232,29 @@ def _is_rentcafe_response(body: Any) -> bool:
     # equality check only matched lowercase "rentcafe". Lowercase the value too.
     if str(first_lc.get("api") or "").lower() == "rentcafe":
         return True
-    # Floor-plan level shape (≥3 of 6 keys) — the original check.
+    # Phase 4: delegate field-combination checks to the RentCafe-scoped
+    # SourceQualifier so all FieldCombination definitions stay in defaults.py.
+    # Fallback: inline checks when the signal engine is unavailable.
+    if _rentcafe_qualifier is not None:
+        sig = _RCSourceSignal(
+            kind=_RCSourceKind.API_RESPONSE,
+            field_keys=frozenset(first_lc.keys()),
+        )
+        return _rentcafe_qualifier.qualify(sig).qualifies
+    # Fallback: inline field-combination checks (signal engine unavailable).
     _fp_keys: frozenset[str] = frozenset({
-        "floorplanname",
-        "floorplanid",
-        "minimumrent",
-        "maximumrent",
-        "availableunitscount",
-        "availabilityurl",
+        "floorplanname", "floorplanid", "minimumrent",
+        "maximumrent", "availableunitscount", "availabilityurl",
     })
     if len(_fp_keys & set(first_lc.keys())) >= 3:
         return True
-    # RC2: unit-level shape — RentCafe unit endpoints return individual
-    # apartment records keyed by RentCafe IDs rather than floor-plan
-    # aggregates. Without this check those endpoints were rejected by
-    # _is_rentcafe_response() and fell through to the generic parser which
-    # also failed (different key names, e.g. RentCafeApartmentId vs unitId).
-    # Require ≥2 of the 3 RentCafe-specific ID keys (all normalised to lc).
     _unit_id_keys: frozenset[str] = frozenset({
-        "rentcafeapartmentid",
-        "rentcafefloorplanid",
-        "rentcafepropertyid",
+        "rentcafeapartmentid", "rentcafefloorplanid", "rentcafepropertyid",
     })
     if len(_unit_id_keys & set(first_lc.keys())) >= 2:
         return True
-    # Alternate unit-level shape with rent fields instead of property ID.
     _unit_rent_keys: frozenset[str] = frozenset({
-        "rentcafeapartmentid",
-        "unitrent",
-        "marketrent",
+        "rentcafeapartmentid", "unitrent", "marketrent",
     })
     return len(_unit_rent_keys & set(first_lc.keys())) >= 2
 

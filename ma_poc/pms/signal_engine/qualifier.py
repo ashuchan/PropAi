@@ -44,11 +44,18 @@ class FieldCombination:
 
     All keys are stored lowercase; SourceSignal.__post_init__ normalises
     field_keys to lowercase before any comparison runs.
+
+    ``required_groups`` is an optional cross-group constraint: when set, every
+    group must contribute at least one matching key in addition to the
+    min_count total.  This lets you express "must have ≥1 bed key AND ≥1 bath
+    key AND ≥1 area key" without matching three synonyms from the same group.
+    Combinations without required_groups behave exactly as before.
     """
 
     keys: frozenset[str]
     min_count: int
     label: str
+    required_groups: tuple[frozenset[str], ...] = ()
 
 
 @dataclass
@@ -118,8 +125,16 @@ class SourceQualifier:
             if not signal.field_keys:
                 return QualificationResult(False, "no_field_keys")
             for combo in self.combinations:
-                if len(combo.keys & signal.field_keys) >= combo.min_count:
-                    return QualificationResult(True, f"match:{combo.label}", combo)
+                if len(combo.keys & signal.field_keys) < combo.min_count:
+                    continue
+                # Cross-group check: each required_group must contribute ≥1 key.
+                # Prevents "3 bed/bath synonyms" from satisfying a bed+bath+area rule.
+                if combo.required_groups and not all(
+                    any(k in signal.field_keys for k in grp)
+                    for grp in combo.required_groups
+                ):
+                    continue
+                return QualificationResult(True, f"match:{combo.label}", combo)
             return QualificationResult(False, "no_combination_matched")
 
         # All other kinds (links, hints, DOM sections) qualify here.

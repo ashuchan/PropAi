@@ -946,6 +946,80 @@ def detect_embedded_portal_urls(
     return out
 
 
+# ── SecureCafe portal URL detection ─────────────────────────────────────────
+
+# Properties that use SecureCafe online leasing often have one of two shapes:
+#
+#  Shape A — URL directly in HTML (href to subdomain.securecafe.com):
+#    The Playwright-rendered page contains a direct href to the securecafe
+#    subdomain. detect_embedded_portal_urls doesn't catch this because it
+#    only walks JSON blobs.  The DEFAULT_HOST_KEYWORDS score of 120 for
+#    securecafe.com means the ranker will already surface these links at
+#    10000+ — no extra work needed.
+#
+#  Shape B — local /onlineleasing/{slug} route (JS SPA redirect):
+#    The property site defines a local client-side route `/onlineleasing/{slug}`
+#    that JavaScript redirects to `{subdomain}.securecafe.com/onlineleasing/
+#    {slug}/`.  The slug in the href MATCHES the slug in the securecafe path.
+#    The subdomain is derived from the property domain by stripping TLD.
+#    Since the redirect is pure JS, we can construct the canonical URL
+#    deterministically without following the redirect.
+
+_ONLINELEASING_RE = re.compile(
+    r'href=["\'](?:https?://[^"\']*)?/onlineleasing/([a-z0-9][a-z0-9-]{2,80})',
+    re.IGNORECASE,
+)
+_TLD_RE = re.compile(
+    r'\.(com|net|org|apartments|info|biz|co|us|homes|live|apts)$',
+    re.IGNORECASE,
+)
+
+
+def detect_securecafe_portal_url(html: str, base_url: str) -> str | None:
+    """Construct a SecureCafe floor-plans URL from /onlineleasing/ href + domain.
+
+    Matches Shape-B SecureCafe sites where the property domain has a JS-only
+    route ``/onlineleasing/{slug}`` that client-side-redirects to the securecafe
+    subdomain.  Because the JS redirect is never followed in HTTP-fetch mode,
+    we synthesise the canonical URL instead:
+
+        https://{domain_slug}.securecafe.com/onlineleasing/{path_slug}/floorplans.aspx
+
+    The domain slug is the property hostname with ``www.`` and TLD stripped.
+    The path slug comes directly from the ``/onlineleasing/`` href — it always
+    matches the SecureCafe path because the property developer sets both.
+
+    Args:
+        html: Full Playwright-rendered page HTML.
+        base_url: The property entry URL (used to derive the subdomain).
+
+    Returns:
+        Absolute floorplans.aspx URL, or None when the pattern is absent.
+    """
+    path_m = _ONLINELEASING_RE.search(html)
+    if not path_m:
+        return None
+
+    path_slug = path_m.group(1).lower()
+
+    try:
+        from urllib.parse import urlparse as _up
+        host = _up(base_url).netloc or base_url.split("/")[0]
+    except Exception:
+        host = base_url.split("/")[0]
+
+    host = re.sub(r"^www\.", "", host, flags=re.IGNORECASE)
+    domain_slug = _TLD_RE.sub("", host)
+
+    if not domain_slug or "." in domain_slug:
+        return None
+
+    return (
+        f"https://{domain_slug}.securecafe.com"
+        f"/onlineleasing/{path_slug}/floorplans.aspx"
+    )
+
+
 # ── DOM selector cascade ────────────────────────────────────────────────────
 # Runs when neither XHR capture nor JSON-LD nor embedded-JSON produced units
 # but the raw HTML has visible rent signals ($NNN text). Looks for container
