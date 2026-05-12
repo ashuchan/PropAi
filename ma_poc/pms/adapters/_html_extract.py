@@ -1031,8 +1031,48 @@ def _rent_to_int(s: str) -> int | None:
     return n
 
 
+# Context words that precede a sqft match but indicate it's NOT the unit's
+# floor area — balconies, storage, patios, fees, etc. If any of these appear
+# within 40 characters before the sqft number, suppress the match.
+_SQFT_NOISE_CONTEXT_RE = re.compile(
+    r"balcon|patio|terrace|storage|closet|garage|amenity|amenities|locker",
+    re.IGNORECASE,
+)
+
+# Minimum realistic apartment sqft. Matches _format_area's [150, 10000] clamp.
+# Values below this are amenity descriptions, not unit sizes.
+_SQFT_MIN = 150
+
+
+def _sqft_match_is_valid(text: str, m: re.Match) -> bool:
+    """Return False when the sqft regex match is context-contaminated.
+
+    Two rejection criteria (both must be absent for the match to be valid):
+      1. The captured value is below the 150 sqft floor.
+      2. A noise context word appears in the 40 chars before the match start.
+    """
+    try:
+        val = int(m.group(1).replace(",", ""))
+    except (ValueError, AttributeError):
+        return False
+    if val < _SQFT_MIN:
+        return False
+    prefix = text[max(0, m.start() - 40) : m.start()]
+    if _SQFT_NOISE_CONTEXT_RE.search(prefix):
+        return False
+    return True
+
+
 def _container_yields_unit(text: str) -> dict[str, Any] | None:
-    """Return a unit dict if ``text`` has at least rent + (sqft or beds)."""
+    """Return a unit dict if ``text`` has at least rent + (sqft or beds).
+
+    2026-05-12 sqft fix: the regex matches any 2-5 digit number + sqft suffix,
+    including "100 sq ft storage" or "50 sq ft balcony". These values are
+    below 150 sqft (the realistic apartment floor), so _format_area previously
+    stored them as the -1 absent sentinel even though beds/baths were present.
+    _sqft_match_is_valid now rejects sub-150 matches and context-contaminated
+    matches (where a noise word like "balcony" or "storage" precedes the number).
+    """
     rents = _RENT_PATTERN.findall(text)
     if not rents:
         return None
@@ -1042,7 +1082,14 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
     rent_lo = min(rent_ints)
     rent_hi = max(rent_ints)
 
-    m_sqft = _SQFT_PATTERN.search(text)
+    # Find the best (largest) valid sqft match in the container text.
+    # Using the largest value avoids picking up sub-unit amenity areas that
+    # appear in the same container as the real unit sqft.
+    valid_sqft_matches = [
+        m for m in _SQFT_PATTERN.finditer(text) if _sqft_match_is_valid(text, m)
+    ]
+    m_sqft = max(valid_sqft_matches, key=lambda m: int(m.group(1).replace(",", "")), default=None)
+
     m_beds = _BEDS_PATTERN.search(text)
     m_baths = _BATHS_PATTERN.search(text)
     m_unit = _UNIT_NUM_PATTERN.search(text)

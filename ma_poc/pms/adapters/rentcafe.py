@@ -87,12 +87,43 @@ def parse_rentcafe_floorplans(items: list[dict[str, Any]], url: str) -> list[dic
         baths = int(float(baths_str)) if baths_str is not None else None
 
         # F1 (2026-05-12): unit-level sqft wins over plan-level min/max range.
-        sqft_single_raw = item_lc.get("sqft")
+        # Extended (2026-05-12): Yardi/RentCafe APIs use many sqft key variants
+        # across management companies. All are lowercased by _normalise_item().
+        # Order: single-value unit sqft → range lo/hi → area synonyms → size.
+        sqft_single_raw = (
+            item_lc.get("sqft")
+            or item_lc.get("squarefeet")
+            or item_lc.get("squarefootage")
+            or item_lc.get("square_footage")
+            or item_lc.get("square_feet")
+            or item_lc.get("sq_ft")
+            or item_lc.get("sqft_net")
+            or item_lc.get("netsqft")
+            or item_lc.get("floorsize")
+            or item_lc.get("floor_size")
+            or item_lc.get("unitsize")
+        )
         if sqft_single_raw is not None and sqft_single_raw != "":
             sqft = str(sqft_single_raw)
         else:
-            sqft_lo = str(item_lc.get("minimumsqft") or item_lc.get("minsqft") or "")
-            sqft_hi = str(item_lc.get("maximumsqft") or item_lc.get("maxsqft") or "")
+            sqft_lo = str(
+                item_lc.get("minimumsqft")
+                or item_lc.get("minsqft")
+                or item_lc.get("minimum_sqft")
+                or item_lc.get("min_sqft")
+                or item_lc.get("minimumsquarefeet")
+                or item_lc.get("minsquarefeet")
+                or ""
+            )
+            sqft_hi = str(
+                item_lc.get("maximumsqft")
+                or item_lc.get("maxsqft")
+                or item_lc.get("maximum_sqft")
+                or item_lc.get("max_sqft")
+                or item_lc.get("maximumsquarefeet")
+                or item_lc.get("maxsquarefeet")
+                or ""
+            )
             sqft = sqft_lo if sqft_lo == sqft_hi or not sqft_hi else f"{sqft_lo}-{sqft_hi}"
 
         # Prefer numeric min_price/max_price; fall back to string minimumRent/maximumRent

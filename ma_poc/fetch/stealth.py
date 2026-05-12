@@ -1,7 +1,16 @@
 """Stealth identity pool — curated browser fingerprints for anti-bot evasion.
 
-Only real Chrome/Firefox/Edge UA strings. No LLM-generated strings.
+Only real Chrome/Firefox/Edge/Safari UA strings. No LLM-generated strings.
 Sticky keys ensure the same property sees the same browser across runs.
+
+2026-05-12: Updated Chrome identities from 122-124 to 134-136 range.
+Chrome 124 (April 2024) was ~2 years stale; modern bot-detection checks
+UA recency. Edge updated from 123→136. Firefox updated from 125→137.
+Safari 17.4 kept (Safari releases are much slower).
+
+Also added `timezone_id` field so BrowserContextPool can inject a plausible
+US timezone into each page context — prevents the server UTC timezone from
+leaking via JS `Intl.DateTimeFormat().resolvedOptions().timeZone`.
 """
 
 from __future__ import annotations
@@ -27,98 +36,113 @@ class Identity:
     viewport: tuple[int, int]
     # S3 additions — additive only; existing field names/positions are not modified.
     browser_family: str = "chrome"   # "chrome" | "firefox" | "edge" | "safari"
-    browser_major: int = 124
+    browser_major: int = 136
     # Sec-CH-UA* headers — None for Firefox/Safari (they don't send Client Hints).
     sec_ch_ua: str | None = None
     sec_ch_ua_mobile: str = "?0"
     sec_ch_ua_platform: str | None = None
     sec_ch_ua_platform_version: str | None = None
+    # Timezone for Playwright context injection. Prevents server UTC from leaking
+    # via navigator.languages / Intl API when Playwright runs on a UTC host.
+    # US Eastern/Central covers >60% of apartment properties by volume.
+    timezone_id: str = "America/New_York"
 
 
-# Curated list of real browser identities — Chrome, Firefox, Edge on Windows/Mac/Linux
+# Curated list of real browser identities — Chrome, Firefox, Edge on Windows/Mac/Linux.
+# Chrome 136 (April 2026 stable), Edge 136, Firefox 137, Safari 17.4.
+# Sec-CH-UA format for Chrome 126+: "Google Chrome";v="N", "Chromium";v="N", "Not A;Brand";v="8"
+# Note: "Not-A.Brand" changed to "Not A;Brand" and v changed from "99" to "8" in Chrome 126+.
 _IDENTITIES: list[Identity] = [
-    # 0 — Chrome 124 on Windows 10 (1920×1080)
+    # 0 — Chrome 136 on Windows 10 (1920×1080) — Eastern US
     Identity(
         user_agent=(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
         ),
         accept_language="en-US,en;q=0.9",
         platform="Windows",
         viewport=(1920, 1080),
         browser_family="chrome",
-        browser_major=124,
-        sec_ch_ua='"Chromium";v="124", "Not-A.Brand";v="99", "Google Chrome";v="124"',
+        browser_major=136,
+        sec_ch_ua='"Google Chrome";v="136", "Chromium";v="136", "Not A;Brand";v="8"',
         sec_ch_ua_mobile="?0",
         sec_ch_ua_platform='"Windows"',
         sec_ch_ua_platform_version='"15.0.0"',
+        timezone_id="America/New_York",
     ),
-    # 1 — Chrome 124 on macOS (1440×900)
+    # 1 — Chrome 136 on macOS (1440×900) — Pacific US
     Identity(
         user_agent=(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
         ),
         accept_language="en-US,en;q=0.9",
         platform="macOS",
         viewport=(1440, 900),
         browser_family="chrome",
-        browser_major=124,
-        sec_ch_ua='"Chromium";v="124", "Not-A.Brand";v="99", "Google Chrome";v="124"',
+        browser_major=136,
+        sec_ch_ua='"Google Chrome";v="136", "Chromium";v="136", "Not A;Brand";v="8"',
         sec_ch_ua_mobile="?0",
         sec_ch_ua_platform='"macOS"',
         sec_ch_ua_platform_version='"14.4.1"',
+        timezone_id="America/Los_Angeles",
     ),
-    # 2 — Firefox 125 on Windows 10 (1920×1080)
+    # 2 — Firefox 137 on Windows 10 (1920×1080) — Central US
+    # Firefox does not send Sec-CH-UA headers (Mozilla opted out of Client Hints).
     Identity(
         user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) "
-            "Gecko/20100101 Firefox/125.0"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) "
+            "Gecko/20100101 Firefox/137.0"
         ),
         accept_language="en-US,en;q=0.5",
         platform="Windows",
         viewport=(1920, 1080),
         browser_family="firefox",
-        browser_major=125,
-        # Firefox does not send Sec-CH-UA headers (Mozilla opted out of Client Hints).
+        browser_major=137,
         sec_ch_ua=None,
         sec_ch_ua_mobile="?0",
         sec_ch_ua_platform=None,
         sec_ch_ua_platform_version=None,
+        timezone_id="America/Chicago",
     ),
-    # 3 — Chrome 124 on Linux (1920×1080)
+    # 3 — Chrome 135 on Linux (1920×1080) — Central US
+    # One version behind for diversity; still recent enough not to flag.
     Identity(
         user_agent=(
             "Mozilla/5.0 (X11; Linux x86_64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
         ),
         accept_language="en-US,en;q=0.9",
         platform="Linux",
         viewport=(1920, 1080),
         browser_family="chrome",
-        browser_major=124,
-        sec_ch_ua='"Chromium";v="124", "Not-A.Brand";v="99", "Google Chrome";v="124"',
+        browser_major=135,
+        sec_ch_ua='"Google Chrome";v="135", "Chromium";v="135", "Not A;Brand";v="8"',
         sec_ch_ua_mobile="?0",
         sec_ch_ua_platform='"Linux"',
+        # Linux Chrome sends empty platform version — this is correct.
         sec_ch_ua_platform_version='""',
+        timezone_id="America/Chicago",
     ),
-    # 4 — Edge 123 on Windows 10 (1920×1080)
+    # 4 — Edge 136 on Windows 10 (1920×1080) — Eastern US
     Identity(
         user_agent=(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0"
         ),
         accept_language="en-US,en;q=0.9",
         platform="Windows",
         viewport=(1920, 1080),
         browser_family="edge",
-        browser_major=123,
-        sec_ch_ua='"Microsoft Edge";v="123", "Not-A.Brand";v="99", "Chromium";v="123"',
+        browser_major=136,
+        sec_ch_ua='"Microsoft Edge";v="136", "Chromium";v="136", "Not A;Brand";v="8"',
         sec_ch_ua_mobile="?0",
         sec_ch_ua_platform='"Windows"',
         sec_ch_ua_platform_version='"15.0.0"',
+        timezone_id="America/New_York",
     ),
-    # 5 — Safari 17.4 on macOS (1440×900)
+    # 5 — Safari 17.4 on macOS (1440×900) — Pacific US
+    # Safari does not send Sec-CH-UA headers.
     Identity(
         user_agent=(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -129,43 +153,49 @@ _IDENTITIES: list[Identity] = [
         viewport=(1440, 900),
         browser_family="safari",
         browser_major=17,
-        # Safari does not send Sec-CH-UA headers.
         sec_ch_ua=None,
         sec_ch_ua_mobile="?0",
         sec_ch_ua_platform=None,
         sec_ch_ua_platform_version=None,
+        timezone_id="America/Los_Angeles",
     ),
-    # 6 — Chrome 122 on Windows 10 (1366×768)
+    # 6 — Chrome 134 on Windows 10 (1366×768) — Mountain US
+    # Two versions behind for diversity; low-end viewport for variety.
     Identity(
         user_agent=(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
         ),
         accept_language="en-US,en;q=0.9",
         platform="Windows",
         viewport=(1366, 768),
         browser_family="chrome",
-        browser_major=122,
-        sec_ch_ua='"Chromium";v="122", "Not-A.Brand";v="99", "Google Chrome";v="122"',
+        browser_major=134,
+        sec_ch_ua='"Google Chrome";v="134", "Chromium";v="134", "Not A;Brand";v="8"',
         sec_ch_ua_mobile="?0",
         sec_ch_ua_platform='"Windows"',
         sec_ch_ua_platform_version='"15.0.0"',
+        timezone_id="America/Denver",
     ),
-    # 7 — Chrome 123 on macOS (2560×1440)
+    # 7 — Chrome 135 on macOS (2560×1440) — Pacific US
+    # One version behind to ensure identity 7 has a distinct UA from identity 1.
+    # Chrome on macOS always reports 10_15_7 in the UA regardless of actual OS
+    # version — using a different Chrome version gives us UA uniqueness.
     Identity(
         user_agent=(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
         ),
         accept_language="en-US,en;q=0.9",
         platform="macOS",
         viewport=(2560, 1440),
         browser_family="chrome",
-        browser_major=123,
-        sec_ch_ua='"Chromium";v="123", "Not-A.Brand";v="99", "Google Chrome";v="123"',
+        browser_major=135,
+        sec_ch_ua='"Google Chrome";v="135", "Chromium";v="135", "Not A;Brand";v="8"',
         sec_ch_ua_mobile="?0",
         sec_ch_ua_platform='"macOS"',
         sec_ch_ua_platform_version='"14.4.1"',
+        timezone_id="America/Los_Angeles",
     ),
 ]
 

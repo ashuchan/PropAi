@@ -122,6 +122,11 @@ class BrowserContextPool:
             "user_agent": identity.user_agent,
             "viewport": {"width": identity.viewport[0], "height": identity.viewport[1]},
             "locale": identity.accept_language.split(",")[0],
+            # Inject timezone matching the identity's plausible US region.
+            # Without this, Playwright contexts on a UTC host (Cloud Run, CI)
+            # expose the server timezone via JS Intl.DateTimeFormat — a
+            # detectable inconsistency against the locale/UA combination.
+            "timezone_id": identity.timezone_id,
         }
         if isinstance(proxy, ProxyConfig):
             pw_proxy = proxy.to_playwright()

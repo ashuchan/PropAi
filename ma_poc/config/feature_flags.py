@@ -27,6 +27,13 @@ ENABLE_UNLOCKER_TIER: Final[bool] = (
     and os.environ.get("ENABLE_UNLOCKER_TIER", "false").lower() == "true"
 )
 
+# FlareSolverr tier — local Docker service for CF JS-challenge bypass.
+# Only useful for Tier-1 "Just a moment..." challenges, NOT WAF blocks.
+# Enable with: ENABLE_FLARESOLVERR_TIER=true + docker run FlareSolverr on :8191
+ENABLE_FLARESOLVERR_TIER: Final[bool] = (
+    os.environ.get("ENABLE_FLARESOLVERR_TIER", "false").lower() == "true"
+)
+
 
 def enable_degraded_mapping_persist() -> bool:
     """PR 1 (2026-05-10): degraded LlmFieldMapping persistence kill switch.

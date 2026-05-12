@@ -589,9 +589,16 @@ class Fetcher:
             # out on networkidle but had 144KB of rendered HTML with rent data
             # already visible). Only emit TRANSIENT when we couldn't pull any
             # body at all.
+            # Salvage: read the page DOM even if goto() timed out.
+            # Use a tight 8-second timeout — any DOM that loaded before
+            # the navigation timeout is immediately available; we only
+            # need time for the IPC round-trip, not for new network
+            # activity. Without this cap, page.content() inherits
+            # DEFAULT_PAGE_TIMEOUT_MS (60s) and hangs for a full minute
+            # on CF "Under Attack Mode" pages that are mid-JS-challenge.
             body_text: str | None = None
             try:
-                body_text = await page.content()
+                body_text = await asyncio.wait_for(page.content(), timeout=8.0)
             except Exception as exc:
                 if nav_exc is None:
                     nav_exc = exc
@@ -625,20 +632,35 @@ class Fetcher:
                 task.render_mode == RenderMode.RENDER
                 and body_text is not None
                 and len(body_text) >= 50_000
-                and not _re_scroll.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", body_text)
+                and not _re_scroll.search(r"\$\s*\d{1,3}(?:[,]\d{3})*", body_text)
             ):
+                # Progressive scroll: step through 25%→50%→75%→100% of page height
+                # with 200ms pauses at each stop. Real users don't jump instantly to
+                # the bottom; single-jump scrolls are a detectable bot signal for
+                # IntersectionObserver-based sites. After reaching 100%, wait 1.5s
+                # for XHR round-trips to complete.
                 _body_before_scroll = len(body_text)
                 try:
-                    await page.evaluate(
-                        "window.scrollTo(0, document.body.scrollHeight)"
-                    )
-                    await asyncio.sleep(1.5)
+                    await page.evaluate("""() => {
+                        const h = document.body.scrollHeight;
+                        const steps = [0.25, 0.5, 0.75, 1.0];
+                        let i = 0;
+                        function step() {
+                            if (i >= steps.length) return;
+                            window.scrollTo(0, Math.round(h * steps[i]));
+                            i++;
+                            if (i < steps.length) setTimeout(step, 200);
+                        }
+                        step();
+                    }""")
+                    # 4 steps × 200ms + 600ms headroom for the last step + 1.5s XHR wait
+                    await asyncio.sleep(2.5)
                     _body_after_scroll_text = await page.content()
                     _body_after_size = len(_body_after_scroll_text or "")
                     _body_grew = _body_after_size > _body_before_scroll
                     _rent_appeared = bool(
                         _re_scroll.search(
-                            r"\$\s?\d{3,4}(?:[,.]\d{3})?",
+                            r"\$\s*\d{1,3}(?:[,]\d{3})*",
                             _body_after_scroll_text or "",
                         )
                     )
@@ -656,6 +678,57 @@ class Fetcher:
                     )
                 except Exception as _scroll_exc:
                     log.debug("fetch.scroll_trigger failed for %s: %s", task.url, _scroll_exc)
+
+            # CF JS challenge auto-solve (2026-05-12):
+            # Cloudflare's Tier-1 "Just a moment..." protection is a JS
+            # challenge that runs for ~5-10 seconds then redirects to the real
+            # page. patchright handles navigator.webdriver, so the challenge
+            # CAN solve itself if we wait long enough.
+            #
+            # Detection: body contains "Just a moment" OR "challenge-platform"
+            # AND current body < 20KB (CF challenge pages are ~10KB).
+            # Action: wait 20 more seconds, re-read — if body grew and CF
+            # patterns are gone, challenge solved. If still blocked, return
+            # BOT_BLOCKED so the tier escalator can escalate.
+            #
+            # Only fires on JS_CHALLENGE pages, NOT WAF "Attention Required"
+            # (which shows "Sorry, you have been blocked" and can't auto-solve).
+            if body_text and 512 <= len(body_text) <= 20_000:
+                import re as _re_cf
+                _CF_JS_PATTERNS = (
+                    b"Just a moment", b"challenge-platform", b"__cf_chl_",
+                    b"Checking your browser",
+                )
+                _body_bytes_check = body_text.encode("utf-8", errors="replace")[:1024]
+                _is_cf_js_challenge = any(p in _body_bytes_check for p in _CF_JS_PATTERNS)
+                # Don't trigger on WAF blocks — they show "Sorry, you have been blocked"
+                _is_cf_waf = b"Attention Required" in _body_bytes_check or b"Sorry, you have been blocked" in _body_bytes_check
+                if _is_cf_js_challenge and not _is_cf_waf:
+                    log.info(
+                        "fetch.cf_js_challenge_detected url=%s body=%d -- waiting 20s for auto-solve",
+                        task.url, len(body_text),
+                    )
+                    try:
+                        await asyncio.sleep(20.0)
+                        _body_after_challenge = await asyncio.wait_for(page.content(), timeout=8.0)
+                        if _body_after_challenge and len(_body_after_challenge) > len(body_text):
+                            _still_cf = any(
+                                p in _body_after_challenge.encode("utf-8", errors="replace")[:1024]
+                                for p in _CF_JS_PATTERNS
+                            )
+                            if not _still_cf:
+                                body_text = _body_after_challenge
+                                log.info(
+                                    "fetch.cf_js_challenge_solved url=%s body_after=%d",
+                                    task.url, len(body_text),
+                                )
+                            else:
+                                log.info(
+                                    "fetch.cf_js_challenge_unsolved url=%s still_blocked=True",
+                                    task.url,
+                                )
+                    except Exception as _cf_exc:
+                        log.debug("fetch.cf_challenge_wait failed for %s: %s", task.url, _cf_exc)
 
             # 2026-05 Fix B + Fix 5 + Fix 7 — portal-aware late-render wait
             # with extended portal list and in-memory per-host learning.

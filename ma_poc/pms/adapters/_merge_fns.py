@@ -422,8 +422,32 @@ def find_unit_list(body: Any) -> list[dict[str, Any]]:
 
 
 def has_unit_signals(items: list[dict[str, Any]]) -> bool:
-    """Return True when the first item has ≥2 unit/floorplan field keys."""
+    """Return True when a sample of items has ≥2 signal keys with non-null values.
+
+    Previous check only verified key *names* on items[0]. A response like
+    ``[{"name": "Hoboken", "minRent": null, "bedrooms": null}, ...]`` has 3
+    matching key names but zero real data — the Nestiolistings locations
+    endpoint that polluted 52 properties in the 2026-05-11 run.
+
+    Fix: sample up to 5 items, require that ≥2 signal keys carry a
+    non-null, non-empty-string value on a *majority* (≥50%) of the sample.
+    A list where every sampled item has only null signal values is noise.
+    """
     if not items:
         return False
-    sample_keys = set(items[0].keys())
-    return len(sample_keys & _UNIT_SIGNAL_KEYS) >= 2
+    sample = items[: min(5, len(items))]
+    quorum = max(1, len(sample) // 2)  # majority of the sample
+
+    items_with_values = 0
+    for item in sample:
+        if not isinstance(item, dict):
+            continue
+        valued_signal_keys = sum(
+            1
+            for k in (item.keys() & _UNIT_SIGNAL_KEYS)
+            if item[k] not in (None, "", 0)
+        )
+        if valued_signal_keys >= 2:
+            items_with_values += 1
+
+    return items_with_values >= quorum

@@ -30,9 +30,14 @@ from .contracts import FetchTier
 
 log = logging.getLogger(__name__)
 
-# Pinned at PR-1 time. Bump in lockstep with the major Chrome version of
-# the most-prevalent identity in ``_IDENTITIES``. See H10.
-_DEFAULT_IMPERSONATE = "chrome124"
+# Env-configurable impersonation target.
+# Default: "chrome133" — safe for curl_cffi >=0.7.3.
+# Override via CURL_CFFI_IMPERSONATE=chrome136 when curl_cffi >=0.8 is installed.
+# Bump this in lockstep with the dominant Chrome version in _IDENTITIES when
+# a curl_cffi release adds the corresponding impersonation target.
+import os as _os
+
+_DEFAULT_IMPERSONATE: str = _os.getenv("CURL_CFFI_IMPERSONATE", "chrome133")
 
 
 @dataclass(frozen=True)

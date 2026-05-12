@@ -91,13 +91,15 @@ class SchemaGateResult:
     inferred_id: bool = False
 
 
-# H5: a record qualifies as having a physical signal when ANY of these
-# v2-canonical fields (or v1 aliases) carries a real (non-empty, non -1) value.
-_PHYSICAL_SIGNAL_FIELDS: tuple[str, ...] = (
-    "floor_plan_name",
-    "floor_plan_type",
-    "floorplan_name",
-    "floor_plan_id",
+# H5: a record qualifies as having a physical signal when it carries at least
+# one of: a numeric dimension (beds/baths/sqft) OR a rent value.
+#
+# floor_plan_name is deliberately excluded — a row with only unit_number +
+# floor_plan_name has identity-text but no measurable data. The 2026-05-11
+# CSV showed rows like Sagestone Village (unit=11, fp=B2, no rent, no dims)
+# and AppFolio listing IDs (fp="AppFolio listing 3918", no rent, no dims)
+# passing the old broad check. Those are name-only stubs, not real units.
+_DIMENSION_FIELDS: tuple[str, ...] = (
     "beds",
     "bedrooms",
     "_bedrooms",
@@ -107,6 +109,8 @@ _PHYSICAL_SIGNAL_FIELDS: tuple[str, ...] = (
     "sqft",
     "area",
     "_sqft",
+)
+_RENT_FIELDS: tuple[str, ...] = (
     "asking_rent",
     "market_rent_low",
     "market_rent_high",
@@ -117,12 +121,21 @@ _PHYSICAL_SIGNAL_FIELDS: tuple[str, ...] = (
 
 
 def _has_physical_signal(record: dict[str, Any]) -> bool:
-    """H5: True when at least one identity-bearing physical field is present.
+    """H5: True when the record carries a numeric dimension OR a rent value.
 
-    A record carrying nothing but ``unit_id`` is rejected by ``check`` —
-    a unit number alone is not enough identity to merge confidently.
+    Rejected (returns False):
+      * unit_id/unit_number alone — no data to merge on
+      * unit_number + floor_plan_name only — name-text, not a measurement
+      * AppFolio listing-ID floor plans with no rent/dims
+
+    Accepted (returns True):
+      * SightMap units: unit_number + rent_low (real price, just missing sqft)
+      * Standard units: beds + baths + rent
+      * LLM-DOM units that found rent but missed sqft
     """
-    return any(_is_present(record.get(k)) for k in _PHYSICAL_SIGNAL_FIELDS)
+    return any(_is_present(record.get(k)) for k in _DIMENSION_FIELDS) or any(
+        _is_present(record.get(k)) for k in _RENT_FIELDS
+    )
 
 
 def check(record: dict[str, Any], property_id: str) -> SchemaGateResult:

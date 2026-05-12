@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 from ma_poc.config.feature_flags import (
     ENABLE_DC_PROXY_TIER,
+    ENABLE_FLARESOLVERR_TIER,
     ENABLE_RESIDENTIAL_TIER,
     ENABLE_TIER_ESCALATION,
     ENABLE_UNLOCKER_TIER,
@@ -64,6 +65,9 @@ def _build_ladder(floor: FetchTier) -> list[FetchTier]:
         (FetchTier.DIRECT, True),
         (FetchTier.DC_PROXY, ENABLE_DC_PROXY_TIER),
         (FetchTier.RESIDENTIAL, ENABLE_RESIDENTIAL_TIER),
+        # FlareSolverr sits between RESIDENTIAL and UNLOCKER. It handles CF
+        # JS challenges locally (no proxy cost) but can't bypass WAF blocks.
+        (FetchTier.FLARESOLVERR, ENABLE_FLARESOLVERR_TIER),
         (FetchTier.UNLOCKER, ENABLE_UNLOCKER_TIER),
     ]
     return [t for t, enabled in all_tiers if enabled and t >= floor]
@@ -121,6 +125,9 @@ def _make_provider(tier: FetchTier) -> "FetchProvider":
     if tier == FetchTier.UNLOCKER:
         from ma_poc.fetch.providers.unlocker import UnlockerProvider
         return UnlockerProvider()
+    if tier == FetchTier.FLARESOLVERR:
+        from ma_poc.fetch.providers.flaresolverr import FlareSolverrProvider
+        return FlareSolverrProvider()
     raise ValueError(f"No provider for tier {tier!r}")
 
 

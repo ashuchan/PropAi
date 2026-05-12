@@ -624,6 +624,43 @@ class GenericAdapter:
             # Never break the run on a merge-side error (H10 best-effort)
             pass
 
+        # Floor-plan sqft backfill — runs after merge, before validity gate.
+        #
+        # Fills sqft on units where it is absent by scanning ALL captured API
+        # responses for floor-plan-aggregate bodies (short lists, has sqft +
+        # beds but no per-unit IDs). When a (beds, baths) key maps
+        # unambiguously to a single sqft value across all catalog APIs, that
+        # sqft is written onto matching units. Never overwrites a real value;
+        # never fills when the mapping is ambiguous.
+        #
+        # Real-world case: repli360.com get_apartmentsync_data_for_floorplan_*
+        # endpoints have sqft ranges per floor plan but are tagged as LLM noise
+        # because they don't carry per-unit identifiers. Units extracted from a
+        # companion unit-level API (which has rent + beds but no sqft) get the
+        # floor-plan sqft filled in here.
+        if result.units:
+            try:
+                from ma_poc.pms.adapters._sqft_backfill import run_sqft_backfill
+                from ma_poc.observability.events import EventKind, emit as _emit_ev
+
+                _api_responses: list[dict] = getattr(ctx, "_api_responses", []) or []
+                _ctx_keys, _filled = run_sqft_backfill(result.units, _api_responses)
+                if _filled > 0:
+                    try:
+                        _emit_ev(
+                            EventKind.TIER_ATTEMPTED,
+                            getattr(ctx, "property_id", ""),
+                            tier_key="generic:floorplan_sqft_backfill",
+                            outcome="ran_units",
+                            units_found=_filled,
+                            reason=f"{_ctx_keys} context keys, {_filled} units filled",
+                            duration_ms=0,
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
         # Stage 1 unified validity gate. Drops the rows that surveyed gates
         # (parse_generic_api / parse_api_responses per-item / has_unit_signals
         # / _container_yields_unit / _offer_to_unit / schema_gate.is_substantive)
@@ -651,11 +688,26 @@ class GenericAdapter:
                         f"{result.tier_used} failed unit_validity "
                         f"(no numeric dimension)"
                     )
-            except Exception:
-                # Never let the gate crash the run; fall through with the
-                # pre-gate units. The downstream schema_gate.check still
-                # filters per-record so we're not silently shipping junk.
-                pass
+            except Exception as _pp_exc:
+                # post_process raised unexpectedly. Fail-safe: clear units
+                # so no pre-gate junk ships, and log so the failure is
+                # visible. Silently falling through was the original
+                # behaviour but caused Sagestone Village-style rows (unit
+                # number + floor_plan_name only, no dims, no rent) to reach
+                # properties.json when the gate crashed.
+                log.warning(
+                    "post_process raised for property %s (%d units) — "
+                    "clearing units to prevent pre-gate junk: %s",
+                    getattr(ctx, "property_id", "?"),
+                    len(result.units),
+                    _pp_exc,
+                    exc_info=True,
+                )
+                result.units = []
+                result.tier_used = "GENERIC_VALIDITY_EXCEPTION"
+                result.errors.append(
+                    f"GENERIC_VALIDITY_EXCEPTION: post_process raised — {_pp_exc!r}"
+                )
 
         # Fix 4: stash provenanced units for the Phase 11 self-learning loop
         # when the merge step didn't already populate _merged_units (single-source path).

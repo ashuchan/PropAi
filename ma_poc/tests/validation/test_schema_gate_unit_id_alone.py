@@ -21,10 +21,18 @@ def test_unit_id_alone_rejected() -> None:
     assert "IDENTITY_REQUIRES_PHYSICAL_SIGNAL" in res.rejection_reasons
 
 
-def test_unit_id_plus_floor_plan_name_accepted() -> None:
+def test_unit_id_plus_floor_plan_name_rejected() -> None:
+    """unit_id + floor_plan_name alone is rejected.
+
+    2026-05-12: _has_physical_signal no longer accepts floor_plan_name as a
+    physical signal. A row with only unit_number + fp_name and no rent/dims
+    is identity-text, not a measurable unit (Sagestone Village regression —
+    API returned plan codes B2/C1 with unit numbers 11-18, no price, no sqft).
+    Use unit_id + beds or unit_id + rent instead.
+    """
     res = check({"unit_id": "101", "floor_plan_name": "Aspen"}, property_id="P1")
-    assert res.accepted is not None
-    assert res.rejection_reasons == []
+    assert res.accepted is None
+    assert "IDENTITY_REQUIRES_PHYSICAL_SIGNAL" in res.rejection_reasons
 
 
 def test_unit_id_plus_beds_accepted() -> None:

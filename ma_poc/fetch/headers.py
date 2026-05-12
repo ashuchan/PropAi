@@ -38,8 +38,10 @@ def chrome_header_set(identity: Identity, *, cold_visit: bool = False) -> dict[s
             "application/signed-exchange;v=b3;q=0.7"
         ),
         "Accept-Language": identity.accept_language,
-        # br (Brotli) must be present — its absence from a Chrome UA is a bot signal.
-        "Accept-Encoding": "gzip, deflate, br",
+        # br (Brotli) and zstd must be present — Chrome 118+ sends both.
+        # Sending "gzip, deflate, br" without zstd with a Chrome 118+ UA is
+        # a detectable inconsistency used by modern bot management systems.
+        "Accept-Encoding": "gzip, deflate, br, zstd",
         "Sec-Fetch-Site": "cross-site" if cold_visit else "same-origin",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-User": "?1",

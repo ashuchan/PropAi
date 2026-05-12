@@ -9,8 +9,14 @@ class FetchTier(IntEnum):
     """
 
     DIRECT = 0
-    STEALTH_LOCAL = 1  # reserved; collapses into DIRECT in v1
+    STEALTH_LOCAL = 1   # reserved; collapses into DIRECT in v1
     DC_PROXY = 2
     RESIDENTIAL = 3
-    UNLOCKER = 4
-    DLQ_PARK = 5  # terminal — never actually fetched
+    # FlareSolverr (3.5 cost-wise): local Docker service that solves CF JS
+    # challenges using real undetected Chrome. Free per-request but requires
+    # a running FlareSolverr instance (ENABLE_FLARESOLVERR_TIER=true).
+    # Sits between RESIDENTIAL and UNLOCKER; tried when BOT_BLOCKED body
+    # contains CF JS challenge patterns.
+    FLARESOLVERR = 4
+    UNLOCKER = 5
+    DLQ_PARK = 6        # terminal — never actually fetched
