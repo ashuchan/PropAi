@@ -119,51 +119,94 @@ _LEASING_PORTAL_DOMAINS = frozenset(
         "securecafenet.com",
         "prospectportal.com",
         "appfolio.com",
+        # 2026-05-13 — additional cross-domain portals observed in the
+        # 98 cross-domain-rebrand cases from May 13 manual QC:
+        # - yottareal.com (adaraportal.yottareal.com — verandahlake redirect)
+        # - mriprospectconnect.com (MRI Software portal — charterclubapts,
+        #   tgmcreeksidevillage)
+        # - showmojo.com (ShowMojo unit-tour platform)
+        # - apartmentsearch.com (CORT — relocation/aggregator with unit data)
+        # - selftournow.com (TouchTour / Engrain self-tour)
+        # - ovationco.com (Ovation Property Management — Vegas)
+        "yottareal.com",
+        "mriprospectconnect.com",
+        "showmojo.com",
+        "apartmentsearch.com",
+        "selftournow.com",
+        "ovationco.com",
+        "knockrentals.com",
+        "doorway.knck.io",
     }
 )
 
 
 # 2026-05-13 — URL-path patterns that strongly suggest leasing/availability
 # content regardless of anchor text. Empirical priors derived from the
-# May 13 manual-QC tagging of 373 failed properties (rank by frequency):
+# May 13 manual-QC tagging of 400 failed properties (rank by frequency):
 #
-#   pattern (anchor path ends with)        manual-tagged count   % of tagged
+#   pattern (anchor path contains)         manual-tagged count   % of tagged
 #   ─────────────────────────────────────  ───────────────────   ───────────
-#   /conventional                          108                   29%
-#   /floor-plans                            78                   21%
-#   /floorplans                             57                   15%
+#   /conventional                          105                   26%
+#   /floor-plans                            88                   22%
+#   /floor-plans#/  (SPA fragment)          28                    7%
+#   /floor-plans.aspx (case variants)       17                    4%
 #   /models                                 16                    4%
 #   /floor-plans-and-pricing                13                    3%
-#   /floor-plans.aspx                        7                    2%
-#   /floorplans.aspx                         6                    2%
 #   /availability                            6                    2%
-#   /Floor-plans.aspx                        5                    1%
-#   /vacancies                               1                    <1%
-#   /floorplan-availability                  2                    <1%
-#   /check-availability                      2                    <1%
+#   /vacancies                               1                   <1%
+#   /floorplan-availability                  2                   <1%
+#   /check-availability                      2                   <1%
+#   /units-available, /units                 2                   <1%
+#   /townhome-floorplans                     1                   <1%
+#   /plans.html, /plans.asp                  3                   <1%
+#   /interactive-site-map                    1                   <1%
+#   /communities/<slug>, /property/<slug>    4                    1%
+#   /apartment-communities/<slug>            1                   <1%
 #
 # The `/conventional/` segment is the Entrata Property Marketing Site URL
 # scheme — `/<region>/<property-slug>/conventional/`. NOT yet handled by
-# any adapter; all 108 manual-tagged sites lose because the resolver doesn't
-# follow this path. Adding it here unblocks the largest cluster.
+# any adapter; all 105 manual-tagged sites lose because the resolver doesn't
+# follow this path.
 _CTA_PATH_RE = re.compile(
     r"(?:^|/)(?:"
-    r"floor[-_ ]?plans?(?:[-_ ]and[-_ ]pricing)?"  # /floor-plans, /floor-plans-and-pricing
-    r"|floorplans?"  # /floorplans
-    r"|floorplan[-_ ]availab\w+"  # /floorplan-availability
-    r"|check[-_ ]availab\w+"  # /check-availability
-    r"|availab\w+"  # /availability
+    # Floor-plan variants (most common): /floor-plans, /floorplans,
+    # /floor-plans-and-pricing, /townhome-floorplans, /floor-plans.aspx,
+    # /plans.html, /plans.asp.
+    r"floor[-_ ]?plans?(?:[-_ ]and[-_ ]pricing)?"
+    r"|floorplans?"
+    r"|townhome[-_ ]?floorplans?"
+    r"|plans?\.(?:html|asp|aspx)"
+    # Availability variants: /availability, /units-available, /units,
+    # /vacancies, /check-availability, /floorplan-availability.
+    r"|floorplan[-_ ]availab\w+"
+    r"|check[-_ ]availab\w+"
+    r"|availab\w+"
+    r"|units?(?:[-_ ]available)?"
+    r"|vacancies"
+    # Leasing-engine paths: /onlineleasing, /oleapplication, /guestcards,
+    # /listings, /pricing, /rentals.
     r"|listings?"
     r"|pricing"
     r"|rentals?"
     r"|onlineleasing"
-    r"|oleapplication"  # Entrata Online Leasing Application
+    r"|oleapplication"
     r"|guestcards?"
-    r"|models?"  # /models (Greystar pattern)
-    r"|vacancies"  # /vacancies (Boston Capital pattern)
-    r"|conventional"  # /<region>/<slug>/conventional/ (Entrata PMS site)
-    r"|properties?/[^/]+"
+    # /<region>/<slug>/conventional/ — Entrata Property Marketing Site.
+    r"|conventional"
+    # Greystar: /models.
+    r"|models?"
+    # Portfolio paths: /properties/<slug>, /property/<slug>,
+    # /communities/<slug>, /apartment-communities/<slug>,
+    # /our-properties/<slug>, /apartments/<region>/<slug>.
+    r"|(?:property|properties)/[^/]+"
+    r"|(?:community|communities)/[^/]+"
+    r"|apartment[-_ ]communit(?:y|ies)/[^/]+"
+    r"|our[-_ ]propert(?:y|ies)/[^/]+"
     r"|apartments?/[^/]+"
+    # RentManager / Knock sitemap-style components: /interactive-site-map,
+    # /availability-sitemap.
+    r"|interactive[-_ ]site[-_ ]?map"
+    r"|sitemap[-_ ]availab\w+"
     r")(?:/|$|[?#.])",
     re.IGNORECASE,
 )

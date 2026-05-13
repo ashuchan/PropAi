@@ -289,6 +289,127 @@ async def test_resolver_word_boundary_priority_skips_intra_word_match() -> None:
 
 
 @pytest.mark.asyncio
+async def test_resolver_follows_plans_html_legacy_path() -> None:
+    """`/plans.html` and `/plans.asp` — legacy CMS variants (3 manual-tagged)."""
+    links = [
+        {"href": "https://example.com/standrews/plans.html", "text": "Plans"},
+    ]
+    page = _make_mock_page(links=links, url="https://example.com/")
+    detection = detect_pms("https://example.com/")
+    result = await resolve_target(page, "https://example.com/", detection)
+    assert result.method == "cta_link"
+    assert "plans.html" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_follows_communities_portfolio_path() -> None:
+    """`/communities/<slug>/` — portfolio PMC pattern. Princeton Mgmt has unit
+    data inline at this path (9 rents visible on probe).
+    """
+    links = [
+        {
+            "href": "https://princetonmanagement.com/communities/custer-crossing-apartments/",
+            "text": "Custer Crossing",
+        },
+    ]
+    page = _make_mock_page(links=links, url="https://princetonmanagement.com/")
+    detection = detect_pms("https://princetonmanagement.com/")
+    result = await resolve_target(page, "https://princetonmanagement.com/", detection)
+    assert result.method == "cta_link"
+    assert "/communities/" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_follows_townhome_floorplans() -> None:
+    """`/townhome-floorplans` — variant of /floor-plans."""
+    links = [
+        {"href": "https://therowtownhomes.com/townhome-floorplans/", "text": ""},
+    ]
+    page = _make_mock_page(links=links, url="https://therowtownhomes.com/")
+    detection = detect_pms("https://therowtownhomes.com/")
+    result = await resolve_target(page, "https://therowtownhomes.com/", detection)
+    assert result.method == "cta_link"
+    assert "/townhome-floorplans" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_follows_units_available_variant() -> None:
+    """`/units-available` — variant of /availability (autumnaugust pattern)."""
+    links = [
+        {"href": "https://autumnaugust.com/units-available/", "text": ""},
+    ]
+    page = _make_mock_page(links=links, url="https://autumnaugust.com/")
+    detection = detect_pms("https://autumnaugust.com/")
+    result = await resolve_target(page, "https://autumnaugust.com/", detection)
+    assert result.method == "cta_link"
+    assert "/units-available" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_follows_interactive_site_map() -> None:
+    """`/interactive-site-map` — RentManager sitemap with embedded units."""
+    links = [
+        {
+            "href": "https://www.henryonthepark.com/interactive-site-map/",
+            "text": "Site Map",
+        },
+    ]
+    page = _make_mock_page(links=links, url="https://www.henryonthepark.com/")
+    detection = detect_pms("https://www.henryonthepark.com/")
+    result = await resolve_target(page, "https://www.henryonthepark.com/", detection)
+    assert result.method == "cta_link"
+    assert "interactive-site-map" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_follows_property_portfolio_path() -> None:
+    """`/property/<slug>/` — portfolio PMC pattern (beacon management)."""
+    links = [
+        {
+            "href": "https://www.beaconmanagement.com/property/the-shores-of-lake-st-clair/",
+            "text": "The Shores of Lake St. Clair",
+        },
+    ]
+    page = _make_mock_page(links=links, url="https://www.beaconmanagement.com/")
+    detection = detect_pms("https://www.beaconmanagement.com/")
+    result = await resolve_target(page, "https://www.beaconmanagement.com/", detection)
+    assert result.method == "cta_link"
+    assert "/property/" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_recognizes_yottareal_portal() -> None:
+    """`adaraportal.yottareal.com` — Yardi sub-product portal (verandahlake redirect)."""
+    links = [
+        {
+            "href": "https://adaraportal.yottareal.com/dba/floorplans?dbaid=58",
+            "text": "Floor Plans",
+        },
+    ]
+    page = _make_mock_page(links=links, url="https://verandahlake.com/")
+    detection = detect_pms("https://verandahlake.com/")
+    result = await resolve_target(page, "https://verandahlake.com/", detection)
+    assert result.method == "cta_link"
+    assert "yottareal.com" in result.resolved_url
+
+
+@pytest.mark.asyncio
+async def test_resolver_recognizes_mriprospectconnect_portal() -> None:
+    """`*.mriprospectconnect.com` — MRI Software portal."""
+    links = [
+        {
+            "href": "https://smg.mriprospectconnect.com/Search/Index/cca",
+            "text": "Search Apartments",
+        },
+    ]
+    page = _make_mock_page(links=links, url="http://www.charterclubapts.com/")
+    detection = detect_pms("http://www.charterclubapts.com/")
+    result = await resolve_target(page, "http://www.charterclubapts.com/", detection)
+    assert result.method == "cta_link"
+    assert "mriprospectconnect.com" in result.resolved_url
+
+
+@pytest.mark.asyncio
 async def test_resolver_dedupes_duplicate_floor_plan_links() -> None:
     """Identical /floor-plans/ links (header / footer / button) shouldn't eat
     the cap. Reproduces hazelwoodhomesmd.com pattern: many duplicates of the
