@@ -137,16 +137,22 @@ DEFAULT_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (
     # sites like liveatsurf.com link from /floor-plans/ to /apartment/<slug>/
     # for each plan. The detail page has the actual rent. Singular
     # `/apartment/` (NOT `/apartments`) is the differentiator.
-    ("/apartment/", 78),
-    ("/home/", 50),                    # /home/<slug> per-property detail
+    #
+    # Weight 88 (not lower) so it passes the ≥88 gate in scraper.py's
+    # floor-plan-accumulation mode. _try_link_hop accumulates units across
+    # per-card sub-pages only when the link scores ≥ 88 (lower-scored
+    # candidates are speculative).
+    ("/apartment/", 88),
+    ("/home/", 65),                    # /home/<slug> per-property detail
     # Portfolio PMC site patterns — Princeton Mgmt, Beacon Mgmt etc.
-    ("/communities/", 75),
-    ("/community/", 70),
-    ("/property/", 70),
-    ("/properties/", 70),
-    ("/apartment-communities/", 75),
-    ("/our-properties/", 70),
-    ("/our-communities/", 70),
+    # Weight 88 to enable accumulation through portfolio site nav.
+    ("/communities/", 88),
+    ("/community/", 85),
+    ("/property/", 85),
+    ("/properties/", 85),
+    ("/apartment-communities/", 88),
+    ("/our-properties/", 85),
+    ("/our-communities/", 85),
 )
 
 DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (

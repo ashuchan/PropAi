@@ -1881,12 +1881,25 @@ async def _try_link_hop(
                             if not sub_path_l.startswith(base_path_l.rstrip("/")):
                                 # Allow if the link scores on a floor-plan
                                 # path keyword specifically.
+                                # 2026-05-13: also accept the per-plan detail
+                                # URL conventions that show up on card-based
+                                # marketing sites:
+                                #   /apartment/<slug>   (liveatsurf pattern)
+                                #   /home/<slug>        (some Greystar sites)
+                                #   /property/<slug>    (PMC portfolio detail
+                                #                       pages — princeton mgmt)
+                                # These were excluded by the previous
+                                # short-list, so floor-plan accumulation never
+                                # walked into per-card detail pages even when
+                                # the resolver landed on the index page.
                                 _path_kw_match = any(
                                     kw in sub_path_l
                                     for kw, _ in _LINK_PATH_KEYWORDS
                                     if kw in ("/floorplan", "/floor-plan",
                                               "/availability", "/units",
-                                              "/conventional", "/apartments")
+                                              "/conventional", "/apartments",
+                                              "/apartment/", "/home/",
+                                              "/property/", "/communities/")
                                 )
                                 if not _path_kw_match:
                                     continue
