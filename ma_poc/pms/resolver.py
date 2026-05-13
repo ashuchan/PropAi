@@ -142,6 +142,16 @@ _LEASING_PORTAL_DOMAINS = frozenset(
                              # crestriverdistrict, riverviewapts
         "reslisting.com",    # marquette-management.reslisting.com style
         "rentcafewebsite.com",  # legacy *.rentcafewebsite.com URLs
+        # 2026-05-13 (Round 4): Spherexx Presentation Software ("Convert").
+        # Leaflet-based interactive building site-map widget loaded via
+        # window.sspcfg={key:<base64>}. Iframe src is
+        # https://presentation.spherexx.app/#/ssp/availability.
+        # Adapter NOT YET BUILT — but recognizing the host so the resolver
+        # navigates there + 257KB SPA bundle XHRs are captured for future
+        # adapter work. See investigations/2026-05-13/spherexx_finding.md.
+        "presentation.spherexx.app",
+        "spherexx.app",
+        "spherexx.com",
     }
 )
 
@@ -318,6 +328,25 @@ def normalize_appfolio_url(url: str) -> str:
     Pablogroup-style offboarded tenants will still 302 to
     appfolio.com/page-not-found-sub from /listings; the adapter handles
     that signal separately (TENANT_OFFBOARDED).
+
+    2026-05-13 — multi-property tenant filter preservation:
+    Some PMC AppFolio tenants host MANY properties under one subdomain
+    (e.g. hayloftpropmgmt.appfolio.com manages 100+ buildings). The
+    AppFolio listings widget accepts ``filters[property_list]=<NAME>``
+    in the query string to narrow to a single property. Stripping the
+    query string was correct for single-property tenants (the param was
+    just a stale referral cookie like ?source=marketing) but WRONG for
+    multi-property tenants — without the filter we extract all 100+
+    properties' units and can't associate them with the canonical
+    property we're trying to scrape.
+
+    Live probe (2026-05-13) confirms:
+      - hayloftpropmgmt.appfolio.com/listings              → 292 rents (all props)
+      - hayloftpropmgmt.appfolio.com/listings?filters[...] → 40 rents (East Hampton only)
+
+    Fix: preserve query params that look like filter directives
+    (``filters[...]=``). Drop ONLY junk like utm/source/gclid that
+    came from the upstream referral.
     """
     if not url:
         return url
@@ -333,12 +362,55 @@ def normalize_appfolio_url(url: str) -> str:
     # urlparse separates path from query/fragment, so /listings?q=1 has
     # path=="/listings". A startswith("/listings?") would be dead code.
     path = parsed.path or "/"
-    if path == "/listings" or path.startswith("/listings/"):
-        return url
-    # Drop existing query/fragment when normalizing the entry path —
-    # AppFolio /listings ignores them and a stale `?source=...` from the
-    # vanity-site referral can break the SSR layout.
-    return f"{parsed.scheme}://{parsed.netloc}/listings"
+    is_listings_path = path == "/listings" or path.startswith("/listings/")
+
+    # 2026-05-13: strip only KNOWN referral-noise params; preserve everything
+    # else (including the AppFolio-specific `filters[property_list]=`,
+    # `theme_color`, etc. — the filter directives the widget actually uses).
+    # Drops utm_*, gclid, fbclid, msclkid, source, ref, mc_eid that came
+    # from the upstream vanity site's tracking. Preserving unknown params is
+    # safer than the inverse — if AppFolio adds a new filter key tomorrow
+    # we won't accidentally strip it.
+    from urllib.parse import parse_qsl, urlencode
+
+    _JUNK_PARAM_PREFIXES = ("utm_",)
+    _JUNK_PARAM_NAMES = frozenset({
+        "gclid", "fbclid", "msclkid", "yclid", "dclid",
+        "source", "ref", "referrer", "referral",
+        "mc_eid", "mc_cid", "_hsenc", "_hsmi",
+    })
+
+    def _keep_param(name: str) -> bool:
+        nl = name.lower()
+        if nl.startswith(_JUNK_PARAM_PREFIXES):
+            return False
+        if nl in _JUNK_PARAM_NAMES:
+            return False
+        # Bare timestamps (e.g. hayloft's `?1778663185787&...`) come through
+        # parse_qsl as a key with no value. Drop them.
+        if not name or name.isdigit():
+            return False
+        return True
+
+    kept_qs = ""
+    if parsed.query:
+        try:
+            pairs = parse_qsl(parsed.query, keep_blank_values=True)
+            kept = [(k, v) for k, v in pairs if _keep_param(k)]
+            if kept:
+                kept_qs = urlencode(kept)
+        except Exception:
+            kept_qs = parsed.query  # fall back to original on parse error
+
+    if is_listings_path:
+        # Already on /listings. Preserve the path + kept query.
+        if kept_qs:
+            return f"{parsed.scheme}://{parsed.netloc}{path}?{kept_qs}"
+        return f"{parsed.scheme}://{parsed.netloc}{path}"
+
+    # Bare-tenant root or other path → /listings with kept params preserved.
+    base = f"{parsed.scheme}://{parsed.netloc}/listings"
+    return f"{base}?{kept_qs}" if kept_qs else base
 
 
 async def resolve_target(

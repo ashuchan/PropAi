@@ -393,6 +393,91 @@ async def test_resolver_recognizes_yottareal_portal() -> None:
     assert "yottareal.com" in result.resolved_url
 
 
+def test_normalize_appfolio_url_preserves_property_filter() -> None:
+    """2026-05-13: multi-property AppFolio tenants encode the property
+    selection in `filters[property_list]=...`. Stripping the query loses
+    property identity → we extract 100+ wrong units. Filter must survive.
+
+    Reproduces the hayloftpropmgmt bug:
+      - WITHOUT filter: /listings returns 292 rents (all 100+ properties)
+      - WITH filter:    /listings returns 40 rents (just East Hampton)
+    """
+    from ma_poc.pms.resolver import normalize_appfolio_url
+
+    input_url = (
+        "https://hayloftpropmgmt.appfolio.com/listings"
+        "?1778663185787"
+        "&filters%5Bproperty_list%5D=EAST%20HAMPTON"
+        "&theme_color=%23676767"
+        "&filters%5Border_by%5D=date_posted"
+    )
+    out = normalize_appfolio_url(input_url)
+    # Filter directives survive; junk (the timestamp) does not.
+    assert "property_list" in out
+    assert "EAST" in out  # property name preserved
+    assert "theme_color" in out
+    assert "1778663185787" not in out  # junk timestamp dropped
+
+
+def test_normalize_appfolio_url_strips_utm_and_referral_noise() -> None:
+    """utm_/gclid/fbclid/source params are stripped from /listings."""
+    from ma_poc.pms.resolver import normalize_appfolio_url
+
+    out = normalize_appfolio_url(
+        "https://x.appfolio.com/listings?utm_source=foo&utm_campaign=bar&gclid=xx&fbclid=yy"
+    )
+    assert "utm_" not in out
+    assert "gclid" not in out
+    assert "fbclid" not in out
+    assert out == "https://x.appfolio.com/listings"
+
+
+def test_normalize_appfolio_url_bare_root_to_listings_keeps_filter() -> None:
+    """Bare tenant root (`/`) with a property filter → /listings + filter."""
+    from ma_poc.pms.resolver import normalize_appfolio_url
+
+    out = normalize_appfolio_url(
+        "https://x.appfolio.com/?filters%5Bproperty_list%5D=FOO%20BAR"
+    )
+    assert out.startswith("https://x.appfolio.com/listings?")
+    assert "property_list" in out
+    assert "FOO" in out
+
+
+def test_normalize_appfolio_url_bare_root_no_filter() -> None:
+    """Bare tenant root with no filter → canonical /listings (no query)."""
+    from ma_poc.pms.resolver import normalize_appfolio_url
+
+    out = normalize_appfolio_url("https://richelsonmanagement.appfolio.com/")
+    assert out == "https://richelsonmanagement.appfolio.com/listings"
+
+
+def test_normalize_appfolio_url_passes_through_non_appfolio() -> None:
+    from ma_poc.pms.resolver import normalize_appfolio_url
+
+    out = normalize_appfolio_url("https://example.com/foo?x=y")
+    assert out == "https://example.com/foo?x=y"
+
+
+@pytest.mark.asyncio
+async def test_resolver_recognizes_spherexx_portal() -> None:
+    """2026-05-13: Spherexx Presentation Software widget. Added to portal
+    allowlist so resolver navigates to the iframe URL. Full adapter is
+    future work — see investigations/2026-05-13/spherexx_finding.md.
+    """
+    links = [
+        {
+            "href": "https://presentation.spherexx.app/#/ssp/availability",
+            "text": "Interactive Site Map",
+        },
+    ]
+    page = _make_mock_page(links=links, url="https://www.henryonthepark.com/")
+    detection = detect_pms("https://www.henryonthepark.com/")
+    result = await resolve_target(page, "https://www.henryonthepark.com/", detection)
+    assert result.method == "cta_link"
+    assert "spherexx.app" in result.resolved_url
+
+
 @pytest.mark.asyncio
 async def test_resolver_recognizes_mriprospectconnect_portal() -> None:
     """`*.mriprospectconnect.com` — MRI Software portal."""
