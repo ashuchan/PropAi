@@ -882,6 +882,12 @@ _PORTAL_URL_PATTERNS: tuple[tuple[str, str], ...] = (
     ("funnelleasing.com/embed", "funnel"),
     ("apartments.appfolio.com", "appfolio"),
     ("widgets.appfolio.com", "appfolio"),
+    # ResMan property-management portal
+    ("myresman.com/portal/applicants", "resman"),
+    ("myresman.com/portal/prospects", "resman"),
+    ("resman.com/portal/", "resman"),
+    # Yardi RentCafe variants
+    (".yardi.com", "yardi"),
 )
 
 # Cap the recursion depth so a self-referential JSON blob can't blow
@@ -964,6 +970,48 @@ def detect_embedded_portal_urls(
             continue
         _walk(body, 0)
 
+    return out
+
+
+# Regex that finds all https:// URLs appearing as plain text anywhere in raw
+# HTML — covers JSON.parse('...') blobs, obfuscated JS assignments, and any
+# other encoding where the URL is present as a string literal but not in a
+# parseable structure.
+_RAW_URL_RE = re.compile(
+    r'https://[\w\-\.]+(?::\d+)?(?:/[^\s"\'<>\\\x00-\x1f]*)?',
+    re.ASCII,
+)
+
+
+def sweep_raw_html_for_portal_urls(html: str) -> list[tuple[str, str]]:
+    """Scan raw HTML text for portal URLs using a broad URL regex.
+
+    Complements ``detect_embedded_portal_urls`` for sites (e.g. Canva SPAs,
+    obfuscated marketing builders) where portal URLs are present as plain
+    text inside ``JSON.parse('...')`` or other non-parseable JS patterns —
+    structures that ``extract_embedded_blobs_from_html`` cannot decode.
+
+    Args:
+        html: Raw HTML string from the fetcher (before any parsing).
+
+    Returns:
+        Deduplicated ``(url, portal_name)`` list, same shape as
+        ``detect_embedded_portal_urls``.
+    """
+    if not html:
+        return []
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for m in _RAW_URL_RE.finditer(html):
+        url = m.group(0).rstrip(".,;)'\"")  # strip trailing punctuation
+        if url in seen:
+            continue
+        lower = url.lower()
+        for needle, portal in _PORTAL_URL_PATTERNS:
+            if needle in lower:
+                seen.add(url)
+                out.append((url, portal))
+                break
     return out
 
 
@@ -1089,6 +1137,17 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
 _RENT_PATTERN = re.compile(
     r"\$\s*(\d{1,3}(?:,\d{3})*|\d{3,5})(?:\.\d{2})?",
 )
+# Captures bare numbers following price-range / pricing labels.
+# Handles "Price Range: 1,200 - 1,500 /mo", "From 1,350/month", etc.
+# Group 1: lower bound (always present).  Group 2: upper bound (optional).
+# Only used as a fallback when _RENT_PATTERN produces no dollar matches.
+_PRICE_RANGE_PATTERN = re.compile(
+    r"(?:price\s+range|starting\s+(?:from|at)|from|rent\s+(?:from|starting))"
+    r"\s*:?\s*"
+    r"(\d{1,3}(?:,\d{3})*|\d{3,5})"
+    r"(?:[^0-9]{0,15}(\d{1,3}(?:,\d{3})*|\d{3,5}))?",
+    re.IGNORECASE,
+)
 _SQFT_PATTERN = re.compile(
     r"(\d{2,5})\s*(?:sq\.?\s*ft\.?|sqft|square\s*feet)",
     re.IGNORECASE,
@@ -1159,24 +1218,20 @@ def _sqft_match_is_valid(text: str, m: re.Match) -> bool:
 
 
 def _container_yields_unit(text: str) -> dict[str, Any] | None:
-    """Return a unit dict if ``text`` has at least rent + (sqft or beds).
+    """Return a unit dict when ``text`` has floor-plan structural signals.
 
-    2026-05-12 sqft fix: the regex matches any 2-5 digit number + sqft suffix,
-    including "100 sq ft storage" or "50 sq ft balcony". These values are
-    below 150 sqft (the realistic apartment floor), so _format_area previously
-    stored them as the -1 absent sentinel even though beds/baths were present.
-    _sqft_match_is_valid now rejects sub-150 matches and context-contaminated
-    matches (where a noise word like "balcony" or "storage" precedes the number).
+    Rent is extracted when present but is NOT required — a floor-plan record
+    with bedrooms/sqft and no price is still valid data.  The caller (schema
+    gate) can merge rent later if it arrives from a different hop page.
+
+    Structural signals are required (at least one of sqft, beds, studio) so
+    we don't pick up navigation links or marketing banners that lack any unit
+    dimension.
+
+    Rent extraction tries two patterns in order:
+      1. Dollar-prefixed amounts  ($1,200 / $1,200.00)
+      2. Price-range labels without $ (Price Range: 1,200 – 1,500 /mo)
     """
-    rents = _RENT_PATTERN.findall(text)
-    if not rents:
-        return None
-    rent_ints = [r for r in (_rent_to_int(x) for x in rents) if r is not None]
-    if not rent_ints:
-        return None
-    rent_lo = min(rent_ints)
-    rent_hi = max(rent_ints)
-
     # Find the best (largest) valid sqft match in the container text.
     # Using the largest value avoids picking up sub-unit amenity areas that
     # appear in the same container as the real unit sqft.
@@ -1190,17 +1245,38 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
     m_unit = _UNIT_NUM_PATTERN.search(text)
     is_studio = bool(_STUDIO_RE.search(text))
 
-    # Require at least one structural signal beyond rent so we don't pick up
-    # "hero price" banners or aggregate summaries.
+    # Require at least one structural signal so we don't accept hero banners
+    # or generic navigation entries with no unit dimension.
     if not (m_sqft or m_beds or is_studio):
         return None
+
+    # --- rent (optional) ---
+    rent_ints: list[int] = []
+    dollar_rents = _RENT_PATTERN.findall(text)
+    if dollar_rents:
+        rent_ints = [r for r in (_rent_to_int(x) for x in dollar_rents) if r is not None]
+
+    if not rent_ints:
+        # Fallback: price-range labels without explicit $ prefix.
+        # Each match has up to two capture groups (lower, optional upper).
+        for m in _PRICE_RANGE_PATTERN.finditer(text):
+            for grp in (m.group(1), m.group(2)):
+                if grp:
+                    v = _rent_to_int(grp)
+                    if v is not None:
+                        rent_ints.append(v)
+
+    rent_lo: int | None = min(rent_ints) if rent_ints else None
+    rent_hi: int | None = max(rent_ints) if rent_ints else None
+    if rent_lo is not None and rent_hi is not None:
+        rent_range: str | None = f"{rent_lo}-{rent_hi}" if rent_hi > rent_lo else str(rent_lo)
+    else:
+        rent_range = None
 
     beds_val = m_beds.group(1) if m_beds else ("0" if is_studio else "")
     baths_val = m_baths.group(1) if m_baths else ""
     sqft_val = m_sqft.group(1) if m_sqft else ""
     unit_num = m_unit.group(1) if m_unit else ""
-
-    rent_range = f"{rent_lo}-{rent_hi}" if rent_hi > rent_lo else str(rent_lo)
 
     return {
         "floor_plan_name": "",

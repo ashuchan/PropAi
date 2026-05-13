@@ -41,6 +41,10 @@ class AdapterContext:
     # generic-fallback handoff. When 0, the generic LLM gate stays open
     # even on detected (non-unknown) PMS hosts.
     adapter_unit_count: int = 0
+    # B1: structural floor-plan signal count from _characterize_html (0-4).
+    # Used by page_has_content_signals to suppress RC3 deferral when the
+    # entry page already has genuine unit-data structure.
+    floor_plan_signal_count: int = 0
 
 
 @dataclass

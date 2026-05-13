@@ -11,10 +11,10 @@ import this module — they remain deterministic by design.
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import logging
-import os
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -24,109 +24,24 @@ from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
 
-# F1.1 (2026-05-08 implementation plan): static noise blocklist applied in
-# ``_filter_candidates`` BEFORE the per-property blocked_endpoints check.
-# Audited against the 32-property May-8 sample (100% noise rate on these
-# hosts) plus the safe subset of the legacy daily_runner blocklist (no SaaS
-# data hosts). The full SaaS subset (meetelise/sierra.chat/etc.) is deferred
-# to Phase 2 pending a corpus-grep verification.
-_RESCUE_NOISE_HOSTS: frozenset[str] = frozenset(
-    {
-        # Pure analytics / CDN — safe subset of the legacy port:
-        "googleapis.com",
-        "go-mpulse.net",
-        "googletagmanager.com",
-        "doubleclick.net",
-        "facebook.com",
-        "hotjar.com",
-        "sentry.io",
-        "userway.org",
-        "omni.cafe",
-        # Audit-derived from 2026-05-08 (100% noise rate):
-        "klaviyo.com",
-        "static-forms.klaviyo.com",
-        "static.cdn-website.com",  # Duda CMS
-        "enormapps.com",  # slider widget
-        "tour.tourbuilder.com",  # tour analytics
-        "places.googleapis.com",
-        "maps.googleapis.com",
-        "cmp.osano.com",
-        "osano.com",  # cookie consent
-        "app.meetelise.com",  # chatbot
-        # Captcha providers (defensive — never legitimate data):
-        "challenges.cloudflare.com",
-        "hcaptcha.com",
-        "recaptcha.net",
-    }
-)
+# All signal-related filter constants (noise hosts, noise path fragments,
+# content-type blocks) live in signal_engine/defaults.py — not here.
+# This module imports the unified gate and adds only rescue-specific logic.
+from ma_poc.pms.signal_engine.defaults import is_api_noise_response as _is_api_noise
 
-# Path fragments that indicate noise regardless of host. Ported from the
-# legacy daily_runner plus 2026-05-08 audit additions.
-_RESCUE_NOISE_PATH_FRAGMENTS: frozenset[str] = frozenset(
-    {
-        # Legacy daily_runner ports:
-        "/tag-manager/",
-        "/mapsjs/",
-        "/gen_204",
-        "/analytics/",
-        "/gtag/",
-        "/pixel",
-        "/beacon",
-        "/tour/availabilities",
-        "/html_forms/",
-        "/yext_reviews/",
-        "/blurb/v1/",
-        # 2026-05-08 audit additions:
-        "/popdown/",
-        "/forms/api/",
-        "/speculations/rules/",
-        "/Apartments/module/widgets/",
-        "/Apartments/module/application_authentication/",
-        "/Apartments/module/property_info/",
-        "$rpc/",  # Google Maps RPC
-        "/realms/",  # OIDC auth
-        "/openid-connect/",  # OIDC auth
-        "/recaptcha",  # captcha provider regardless of host
-    }
-)
-
-
-def _noise_blocklist_enabled() -> bool:
-    """F1.1 feature flag. Defaults to enabled; set ``ENABLE_RESCUE_NOISE_BLOCKLIST=false``
-    for staged rollback. Read fresh on every call so tests can monkey-patch."""
-    raw = os.getenv("ENABLE_RESCUE_NOISE_BLOCKLIST")
-    if raw is None or not raw.strip():
-        return True
-    return raw.strip().lower() not in {"false", "0", "no", "off"}
-
-
-def _is_noise_url(url: str) -> bool:
-    """F1.1: return True if ``url`` matches a known-noise host or path fragment.
-    Used by ``_filter_candidates`` BEFORE the per-property blocklist."""
-    if not url:
-        return True
-    try:
-        host = urlparse(url).hostname or ""
-    except Exception:
-        return False
-    host_lower = host.lower()
-    for h in _RESCUE_NOISE_HOSTS:
-        if host_lower == h or host_lower.endswith("." + h):
-            return True
-    url_lower = url.lower()
-    for frag in _RESCUE_NOISE_PATH_FRAGMENTS:
-        if frag.lower() in url_lower:
-            return True
-    return False
-
-_AVAILABILITY_URL_SIGNALS = (
+# URL path signals that suggest an API response contains pricing/unit data.
+# These are rescue-specific: the signal_engine DEFAULT_PATH_KEYWORDS serve the
+# link-ranking use case (which pages to visit); these serve the body-ranking
+# use case (which captured API responses to try first).
+_AVAILABILITY_URL_SIGNALS: tuple[str, ...] = (
     "/availab", "/floor-plan", "/floorplan", "/pricing", "/units",
     "/apartments", "/rent", "/leasing", "/availability",
+    # AppFolio API convention
+    "/2/api/", "/property_units", "/listings",
+    # RentCafe / Entrata API conventions
+    "/getfloorplans", "/getunits", "/getavailability",
+    "/api/apartments", "/api/units", "/api/floorplans",
 )
-_UNIT_KEY_SIGNALS = frozenset({
-    "unit", "floor", "plan", "rent", "price", "sqft", "bed", "bath",
-    "available", "lease", "bedroom", "bathroom", "apartment",
-})
 
 
 def looks_like_availability_api(url: str) -> bool:
@@ -238,6 +153,8 @@ class RescueOutput:
     confidence: float = 0.0
     errors: list[str] = field(default_factory=list)
     n_llm_calls: int = 0
+    # Post-filter candidate count — use this (not raw api_responses length) for telemetry
+    n_filtered_candidates: int = 0
 
 
 # ── Candidate filtering ───────────────────────────────────────────────────────
@@ -259,7 +176,27 @@ def _filter_candidates(
     api_responses: list[dict],
     profile_snapshot: dict | None,
 ) -> list[dict]:
-    """Drop responses that are definitely not unit data."""
+    """Drop responses that are definitionally not unit data.
+
+    Filtering is intentionally conservative — the goal is to remove known
+    garbage (noise hosts, static assets, captcha pages) WITHOUT silently
+    discarding responses that MIGHT contain unit data in an unusual shape.
+    The ranking step then promotes high-potential candidates so the LLM
+    sees the most promising bodies first.
+
+    What is dropped here (hard gates, no false-negative risk):
+      1. Empty bodies.
+      2. Captcha-detected responses (body is an interstitial page).
+      3. Known-noise URL/content-type via signal_engine.is_api_noise_response
+         (analytics CDN, captcha providers, map tiles, static assets).
+      4. Per-property blocked endpoints (profile-state).
+      5. Non-JSON strings (body starts with neither '{' nor '[').
+
+    What is NOT dropped here:
+      - Bodies with unit keys that have null values — these are ranked low
+        by _score() and the LLM handles them; if they produce 0 units the
+        URL pattern is added to blocked_endpoints so future runs skip them.
+    """
     blocked_patterns: list[str] = []
     if profile_snapshot:
         hints = profile_snapshot.get("api_hints") or {}
@@ -271,36 +208,32 @@ def _filter_candidates(
             if pat:
                 blocked_patterns.append(pat)
 
-    blocklist_enabled = _noise_blocklist_enabled()
-
     kept: list[dict] = []
     for r in api_responses:
         url = r.get("url", "")
         body = r.get("body")
+        content_type = r.get("content_type")
 
-        # Drop empty bodies
+        # Gate 1: empty body
         if body is None or body == "" or body == [] or body == {}:
             continue
 
-        # F1.2: drop responses captured during a captcha challenge — the
-        # body is the interstitial HTML, not real unit data. Populated
-        # by the network log capture when a CF/recaptcha page rendered.
+        # Gate 2: captcha-detected — body is the interstitial HTML page
         if r.get("captcha_detected"):
             continue
 
-        # F1.1: static noise blocklist (audit-derived hosts + analytics
-        # CDN + captcha + OIDC). Behind ENABLE_RESCUE_NOISE_BLOCKLIST so
-        # we can roll back without a deploy if a real data host gets
-        # caught up. Applied BEFORE per-property blocklist since static
-        # entries should never reach the LLM regardless of profile state.
-        if blocklist_enabled and _is_noise_url(url):
+        # Gate 3: signal_engine noise gate (media type + noise hosts/paths).
+        # All signal-related filtering business logic lives in signal_engine;
+        # this is the single call-site for it in the rescue service.
+        if _is_api_noise(url, content_type):
             continue
 
-        # Drop if URL matches a per-property blocked endpoint
+        # Gate 4: per-property blocked endpoint patterns
         if any(pat in url for pat in blocked_patterns):
             continue
 
-        # Attempt JSON parse if body is a string
+        # Gate 5: non-JSON string — if a string body doesn't start with
+        # '{' or '[', it can't be parsed as JSON unit data.
         if isinstance(body, str):
             stripped = body.strip()
             if not stripped.startswith(("{", "[")):
@@ -321,10 +254,66 @@ def _filter_candidates(
 
 
 def _score(r: dict) -> float:
-    """Score an API response by likelihood of containing unit data."""
+    """Score an API response by likelihood of containing unit data.
+
+    Progressive scoring — high-potential sources that show early signs of
+    unit data receive proportionally higher weightage, ensuring the LLM
+    sees the best candidates first rather than operating on garbage:
+
+      +3.0 — body passes has_unit_signals: ≥2 unit keys with non-null values
+              in a majority of sampled items. Strong evidence of real unit data.
+      +1.5 — body has ≥1 unit key with a non-null value. Early sign: the API
+              carries some dimensional data even if incomplete.
+      +0.5 — body has unit-like key names (regardless of values). Weak signal.
+      +0.5 — URL contains a known availability/pricing/units path segment.
+      +1.0 — body text contains any unit keyword (rent, beds, sqft …).
+      +0.1×N (capped 1.0) — key-name overlap with unit key signals.
+
+    The graduated semantic tier (+0.5/+1.5/+3.0) ensures a real AppFolio
+    /2/api/property_units response outranks a Nestiolistings location-list
+    where every "bedrooms" value is null, without silently discarding the
+    latter (it may carry valid data in other properties).
+    """
     score = 0.0
     url = r.get("url", "")
     body = r.get("body")
+
+    # ── Progressive body signal scoring ──────────────────────────────────────
+    # Find the deepest unit-shaped array for semantic checks.  Dict bodies
+    # are searched recursively; list bodies used directly.
+    _arr: list | None = None
+    if isinstance(body, list) and body and isinstance(body[0], dict):
+        _arr = body
+    elif isinstance(body, dict):
+        _arr = _find_units_array(body)
+
+    if _arr is not None:
+        try:
+            from ma_poc.pms.adapters._merge_fns import (
+                has_unit_signals as _hus,
+                _UNIT_SIGNAL_KEYS as _USK,
+            )
+            sample = _arr[:5]
+            # Tier 1: any unit key names present (key names only, values ignored)
+            has_any_key = any(
+                k in _USK for item in sample if isinstance(item, dict) for k in item
+            )
+            if has_any_key:
+                score += 0.5
+            # Tier 2: at least one unit key carries a non-null value → early sign
+            has_any_value = any(
+                item.get(k) not in (None, "", 0)
+                for item in sample if isinstance(item, dict)
+                for k in (item.keys() & _USK)
+            )
+            if has_any_value:
+                score += 1.0  # cumulative: 0.5 + 1.0 = 1.5 total at this tier
+            # Tier 3: full has_unit_signals pass → strong evidence
+            if _hus(_arr):
+                score += 1.5  # cumulative: 0.5 + 1.0 + 1.5 = 3.0 total
+        except Exception:
+            pass  # scoring fails safe — unexpected body shape or import error
+
     if looks_like_availability_api(url):
         score += 0.5
     if response_looks_like_units(body):
@@ -492,7 +481,19 @@ async def _call_llm(prompt: str, property_id: str) -> tuple[dict, float, str]:
         if attempt == 1:
             current_prompt += "\nReturn ONLY a valid JSON object. No prose, no markdown."
         try:
-            raw = await provider.complete(system, current_prompt, max_tokens=4096)
+            # Per-call timeout prevents a hung provider from consuming the
+            # entire property budget (600 s). 90 s is generous for a 4096-
+            # token response; a healthy provider responds in <20 s.
+            raw = await asyncio.wait_for(
+                provider.complete(system, current_prompt, max_tokens=4096),
+                timeout=90.0,
+            )
+        except asyncio.TimeoutError:
+            log.warning(
+                "llm_api_rescue: LLM call timed out (>90 s) for %s (attempt %d); moving to next candidate",
+                property_id, attempt + 1,
+            )
+            return {}, 0.0, ""
         except Exception as exc:
             log.warning("llm_api_rescue: shared LLM call failed for %s: %s", property_id, exc)
             return {}, 0.0, ""
@@ -686,6 +687,10 @@ async def rescue_from_api_responses(inp: RescueInput) -> RescueOutput:
         out.errors.append(f"filter/rank failed: {exc}")
         log.exception("rescue filter/rank for %s", inp.property_id)
         return out
+
+    # Record post-filter count for telemetry — scraper.py logs this so that
+    # n_candidates in events reflects actual LLM candidates, not raw captures.
+    out.n_filtered_candidates = len(candidates)
 
     if not ranked:
         out.errors.append("no candidates after filtering")

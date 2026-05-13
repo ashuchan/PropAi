@@ -65,6 +65,38 @@ __all__ = [
 # is per-shard (process-local); each shard learns its own slice.
 _LATE_RENDER_HOSTS: set[str] = set()
 
+# C1 — in-flight XHR quiescence: URLs matching these patterns carry no
+# apartment unit data and must not block the quiescence counter.
+_C1_STATIC_SUFFIXES: frozenset[str] = frozenset({
+    ".js", ".css", ".woff", ".woff2", ".ttf", ".otf",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
+    ".webp", ".mp4", ".m4v", ".map",
+})
+_C1_ANALYTICS_SUBSTRINGS: tuple[str, ...] = (
+    "google-analytics", "googletagmanager", "facebook.com/tr",
+    "doubleclick", "hotjar.com", "segment.io", "mixpanel.com",
+    "heap.io", "intercom", "drift.com", "hubspot.com",
+    "crisp.chat", "zopim", "tawk.to", "chatlio",
+    "sentry.io", "bugsnag.com", "rollbar.com",
+    "fonts.googleapis.com", "fonts.gstatic.com",
+)
+_C1_QUIESCE_IDLE_S: float = 0.5    # seconds of silence → network done
+_C1_QUIESCE_MAX_S: float = 8.0     # absolute hard cap
+
+
+def _c1_is_relevant_request(url: str) -> bool:
+    """Return True if this request could carry apartment unit data.
+
+    Filters out static assets and analytics/tracking services that fire
+    indefinitely and would otherwise prevent the quiescence counter from
+    reaching zero.
+    """
+    lower = url.lower().split("?")[0]
+    suffix = "." + lower.rsplit(".", 1)[-1] if "." in lower else ""
+    if suffix in _C1_STATIC_SUFFIXES:
+        return False
+    return not any(s in lower for s in _C1_ANALYTICS_SUBSTRINGS)
+
 
 def _classify_fetch_outcome(
     status_code: int | None,
@@ -514,7 +546,14 @@ class Fetcher:
         Returns:
             FetchResult with body and network_log populated.
         """
-        page = await self._browsers.acquire(identity, proxy)
+        # Pattern A: if the caller supplied an existing Playwright page, reuse it
+        # so that session cookies, referrer chain, and XHR listeners carry over
+        # into the hop.  The caller owns the context; we must NOT release it.
+        _page_owned = task.reuse_page is None
+        if task.reuse_page is not None:
+            page = task.reuse_page
+        else:
+            page = await self._browsers.acquire(identity, proxy)
         network_log: list[dict[str, Any]] = []
 
         try:
@@ -571,6 +610,30 @@ class Fetcher:
 
             page.on("response", _on_response)
 
+            # C1 — in-flight quiescence tracking.
+            # _in_flight counts relevant (non-static, non-analytics) requests
+            # that have been dispatched but not yet completed.  When the count
+            # reaches 0 AND 500ms of silence have elapsed, all data we can
+            # capture has arrived — the asyncio.sleep(2.0) settle is replaced
+            # by a deterministic check rather than a fixed guess.
+            _in_flight: int = 0
+            _last_relevant_ts: list[float] = [time.monotonic()]  # mutable cell
+
+            def _on_request_c1(req: Any) -> None:
+                nonlocal _in_flight
+                if _c1_is_relevant_request(req.url):
+                    _in_flight += 1
+
+            def _on_finish_c1(req: Any) -> None:
+                nonlocal _in_flight
+                if _c1_is_relevant_request(req.url):
+                    _in_flight = max(0, _in_flight - 1)
+                    _last_relevant_ts[0] = time.monotonic()
+
+            page.on("request",         _on_request_c1)
+            page.on("requestfinished", _on_finish_c1)
+            page.on("requestfailed",   _on_finish_c1)
+
             # Cap per-attempt navigation at 20s. Probe (ma_poc/data/probe_runs/
             # 20260419T175926Z) showed that every timeout property rendered full
             # HTML at domcontentloaded in 4-12s but then blocked waiting on
@@ -590,13 +653,22 @@ class Fetcher:
             except Exception as exc:
                 nav_exc = exc
 
-            # Post-load settle: give SPAs a beat to hydrate. Next/Nuxt and
-            # similar frameworks finish client-side rendering after
-            # domcontentloaded fires.
-            try:
-                await asyncio.sleep(2.0)
-            except Exception:
-                pass
+            # C1 — quiescence wait: replace the fixed 2s settle with an
+            # event-driven loop.  Exit when no relevant request has been
+            # in-flight for _C1_QUIESCE_IDLE_S (500ms), or after
+            # _C1_QUIESCE_MAX_S (8s) regardless.  If domcontentloaded raised
+            # (nav_exc set), fall through immediately — the salvage logic below
+            # will handle any body we did capture.
+            if nav_exc is None:
+                try:
+                    _deadline = time.monotonic() + _C1_QUIESCE_MAX_S
+                    while time.monotonic() < _deadline:
+                        await asyncio.sleep(0.2)
+                        _idle_for = time.monotonic() - _last_relevant_ts[0]
+                        if _in_flight == 0 and _idle_for >= _C1_QUIESCE_IDLE_S:
+                            break
+                except Exception:
+                    pass
 
             # Always-salvage: even when page.goto() timed out, page.content()
             # typically returns a usable DOM (probe: charterclubapts.com timed
@@ -639,14 +711,17 @@ class Fetcher:
             #
             # Always log the outcome so we can analyse effectiveness and tune
             # the condition over time.
-            import re as _re_scroll
+            from ma_poc.pms.signal_engine.floor_plan_signals import (
+                has_floor_plan_signals as _has_fp_signals_fetch,
+                SIGNAL_THRESHOLD_ANY as _FP_THRESHOLD_ANY,
+            )
 
             _scroll_triggered = False
             if (
                 task.render_mode == RenderMode.RENDER
                 and body_text is not None
                 and len(body_text) >= 50_000
-                and not _re_scroll.search(r"\$\s*\d{1,3}(?:[,]\d{3})*", body_text)
+                and not _has_fp_signals_fetch(body_text, _FP_THRESHOLD_ANY)
             ):
                 # Progressive scroll: step through 25%→50%→75%→100% of page height
                 # with 200ms pauses at each stop. Real users don't jump instantly to
@@ -672,23 +747,20 @@ class Fetcher:
                     _body_after_scroll_text = await page.content()
                     _body_after_size = len(_body_after_scroll_text or "")
                     _body_grew = _body_after_size > _body_before_scroll
-                    _rent_appeared = bool(
-                        _re_scroll.search(
-                            r"\$\s*\d{1,3}(?:[,]\d{3})*",
-                            _body_after_scroll_text or "",
-                        )
+                    _fp_appeared = _has_fp_signals_fetch(
+                        _body_after_scroll_text or "", _FP_THRESHOLD_ANY
                     )
                     if _body_after_scroll_text:
                         body_text = _body_after_scroll_text
                     _scroll_triggered = True
                     log.info(
                         "fetch.scroll_trigger url=%s body_before=%d body_after=%d"
-                        " grew=%s rent_appeared=%s",
+                        " grew=%s fp_appeared=%s",
                         task.url,
                         _body_before_scroll,
                         _body_after_size,
                         _body_grew,
-                        _rent_appeared,
+                        _fp_appeared,
                     )
                 except Exception as _scroll_exc:
                     log.debug("fetch.scroll_trigger failed for %s: %s", task.url, _scroll_exc)
@@ -708,7 +780,6 @@ class Fetcher:
             # Only fires on JS_CHALLENGE pages, NOT WAF "Attention Required"
             # (which shows "Sorry, you have been blocked" and can't auto-solve).
             if body_text and 512 <= len(body_text) <= 20_000:
-                import re as _re_cf
                 _CF_JS_PATTERNS = (
                     b"Just a moment", b"challenge-platform", b"__cf_chl_",
                     b"Checking your browser",
@@ -796,12 +867,13 @@ class Fetcher:
                 learned_wait = landed_host in _LATE_RENDER_HOSTS if landed_host else False
 
                 if portal_match or learned_wait:
-                    import re as _re_q
-
-                    has_dollar_rent = bool(
-                        _re_q.search(r"\$\s?\d{3,4}(?:[,.]\d{3})?", body_text)
+                    # B1: wait only when the page lacks structural floor-plan data.
+                    # SIGNAL_THRESHOLD_STRUCTURAL (≥2 types) means genuinely rich.
+                    from ma_poc.pms.signal_engine.floor_plan_signals import (
+                        has_floor_plan_signals as _has_fp_portal,
+                        SIGNAL_THRESHOLD_STRUCTURAL as _FP_STRUCTURAL,
                     )
-                    if not has_dollar_rent:
+                    if not _has_fp_portal(body_text, _FP_STRUCTURAL):
                         try:
                             wait_sec = 12.0 if portal_match else 5.0
                             await asyncio.sleep(wait_sec)
@@ -1008,7 +1080,8 @@ class Fetcher:
                 proxy_used=_redact_proxy(proxy),
             )
         finally:
-            await self._browsers.release(page)
+            if _page_owned:
+                await self._browsers.release(page)
 
 
 def _now_ms() -> int:

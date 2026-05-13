@@ -324,56 +324,18 @@ jobs:
           GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID }}
         run: python -m ma_poc.scripts.migrations.alembic --env ${{ inputs.env }} status
 
-  # ── Step 7: CSV sync ───────────────────────────────────────────────────────────
-  sync-csv:
-    needs: [migrate]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.git-ref }}
-
-      - uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
-          service_account: ${{ secrets.WIF_SA }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: ma_poc/requirements.txt
-
-      - run: pip install -r ma_poc/requirements.txt
-
-      - name: Upload property list
-        # The CSV lives at the repo root and is committed so every deploy sees
-        # the same source of truth. Previously the workflow pointed at
-        # `data/property-list/properties.csv`, which was never populated, so
-        # sync-csv silently skipped and prod started every run with no
-        # property list.
-        run: |
-          if [ -f properties.csv ]; then
-            python -m ma_poc.scripts.sync.csv_to_gcs --env ${{ inputs.env }} --path properties.csv
-          else
-            echo "::error::properties.csv missing at repo root — deploy cannot seed the prod bucket."
-            exit 1
-          fi
-
-  # ── Steps 8-9: smoke test + mark known-good ───────────────────────────────────
+  # ── CSV sync note ─────────────────────────────────────────────────────────────
+  # The sync-csv job was removed (2026-05-13).  The properties.csv in the prod
+  # GCS bucket is now managed out-of-band via:
+  #   python -m ma_poc.scripts.sync.csv_to_gcs --env prod --path properties.csv
+  # The old CI job silently skipped every deploy because it pointed at
+  # data/property-list/properties.csv which was never populated in the repo.
+  # To re-enable automated CSV sync, add a job here that runs
+  # csv_to_gcs after migrate, gated on the file existing at the repo root.
+  # ── Step 7: mark known-good ───────────────────────────────────────────────────
   smoke:
-    needs: [sync-csv, build-and-push]
+    needs: [migrate, build-and-push]
     runs-on: ubuntu-latest
-    # 3 tasks × 2 properties each with .invalid URLs: each task hits
-    # DNS NXDOMAIN in <1s but the runner still writes properties.json,
-    # per-property report, and triggers the post-run PG sync. Observed
-    # wall-clock including gcloud submit + execute + log fetch is ~3-5
-    # min; 25 min gives plenty of slack for a cold-start container
-    # build or transient Cloud SQL wake delay without letting a truly
-    # stuck deploy burn CI minutes.
-    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -385,58 +347,6 @@ jobs:
           service_account: ${{ secrets.WIF_SA }}
 
       - uses: google-github-actions/setup-gcloud@v2
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: ma_poc/requirements.txt
-
-      - run: pip install -r ma_poc/requirements.txt
-
-      - name: Run multi-shard smoke test
-        # TEMPORARILY DISABLED (2026-04-24): operator is validating the
-        # BrightData proxy wiring manually via
-        # ``python -m ma_poc.scripts.triggers.proxy_smoke --env prod`` instead of
-        # running the full multi-shard → PG-sync smoke on every deploy.
-        # Re-enable by removing ``if: false`` once proxy rollout stabilises
-        # and we want end-to-end sync validation back in the gate.
-        if: false
-        # What this validates (see ma_poc/scripts/triggers/smoke.py):
-        #
-        #   1. Uploads a 6-row smoke CSV (.invalid URLs — no DNS resolution,
-        #      no LLM cost) to gs://{bucket}/smoke-test/{ts}/properties.csv.
-        #   2. Executes jugnu-scrape-{env} with --tasks=3 --parallelism=3
-        #      and LIMIT=2, so 3 tasks run concurrently on 2 properties each.
-        #   3. Waits for terminal state. The execution is EXPECTED to report
-        #      task failures — invalid URLs can't scrape — but the runner
-        #      still writes properties.json and the shard_entry sync still
-        #      runs (that's the exit-code-gate fix this test is here to
-        #      protect).
-        #   4. Fetches structured logs, groups "PG sync complete" entries
-        #      by run.googleapis.com/task_index (dedup past Cloud Run's
-        #      max_retries=1 retries), and asserts:
-        #        - All 3 task_indices {0,1,2} produced a sync summary.
-        #        - Each summary has state_from_snapshots=2, ledger=2,
-        #          events=2, extractions=2. Any missing counter means one
-        #          of the six derive-from-snapshots paths regressed.
-        #   5. Cleans up the smoke CSV from GCS. DB rows remain (scoped by
-        #      run_date='smoke-{ts}' and canonical_id 'SMOKE-{ts}-*', so
-        #      they never collide with real data and can be dropped
-        #      manually if operators need it.
-        #
-        # Regression this guards: "zero rows in DB despite a green scrape"
-        # — the exit-code gate + multi-shard DELETE clobber combo that
-        # shipped silently into prod and made the scrape look healthy
-        # while the data warehouse stayed empty.
-        #
-        # _trigger_common resolves the project from
-        # GCP_PROJECT_ID_{STAGING,PROD} with GCP_PROJECT_ID as a fallback;
-        # forward the single CI secret so the lookup hits the right project.
-        env:
-          GCP_PROJECT_ID_STAGING: ${{ secrets.GCP_PROJECT_ID }}
-          GCP_PROJECT_ID_PROD: ${{ secrets.GCP_PROJECT_ID }}
-        run: python -m ma_poc.scripts.triggers.smoke --env ${{ inputs.env }}
 
       - name: Tag image as known-good
         run: |

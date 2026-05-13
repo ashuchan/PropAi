@@ -10,7 +10,10 @@ failures never affect the merge result.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 # ── Field categories (H9) ──────────────────────────────────────────────────────
 
@@ -67,16 +70,25 @@ AMBIGUITY_RANKS: frozenset[str] = frozenset({"R1a", "R1b", "R1c", "R1d", "R1e", 
 # Keys used by _has_unit_signals to detect unit-shaped responses.
 _UNIT_SIGNAL_KEYS: frozenset[str] = frozenset(
     {
+        # ── Rent / price ───────────────────────────────────────────────────
         "rent", "minRent", "maxRent", "min_rent", "max_rent", "price",
         "askingRent", "monthlyRent", "baseRent",
-        "bedrooms", "beds", "bedRooms", "bed",
-        "sqft", "squareFeet", "square_footage", "sq_ft", "minimumSquareFeet",
-        "no_of_bedroom",
-        "unitNumber", "unit_number", "unitId", "unit_id",
-        "floorPlanName", "floor_plan_name", "floorplan_name", "floorplan-name",
-        "availableDate", "available_date", "availableCount", "available_on",
         "minimumRent", "maximumRent", "minimumMarketRent", "maximumMarketRent",
         "rentRange", "depositAmount", "numberOfUnitsDisplay",
+        # ── Bedrooms ───────────────────────────────────────────────────────
+        "bedrooms", "beds", "bedRooms", "bed",
+        "no_of_bedroom",                      # Entrata
+        # ── Bathrooms ──────────────────────────────────────────────────────
+        "bathrooms", "baths",
+        "no_of_bathroom", "no_of_bath",       # Entrata
+        # ── Area / sqft ────────────────────────────────────────────────────
+        "sqft", "squareFeet", "square_footage", "sq_ft", "minimumSquareFeet",
+        "area",                               # generic alias used by SightMap
+        # ── Unit / floor-plan identity ─────────────────────────────────────
+        "unitNumber", "unit_number", "unitId", "unit_id",
+        "floorPlanName", "floor_plan_name", "floorplan_name", "floorplan-name",
+        # ── Availability ───────────────────────────────────────────────────
+        "availableDate", "available_date", "availableCount", "available_on",
     }
 )
 
@@ -424,28 +436,44 @@ def find_unit_list(body: Any) -> list[dict[str, Any]]:
 def has_unit_signals(items: list[dict[str, Any]]) -> bool:
     """Return True when a sample of items has ≥2 signal keys with non-null values.
 
+    E: field keys are normalised via the signal-engine alias table before
+    intersection with ``_UNIT_SIGNAL_KEYS``.  This allows Entrata-specific
+    names (no_of_bedroom, no_of_bathroom, square_footage) and camelCase
+    variants (squareFeet, bedRooms) to match without every variant needing
+    an explicit entry in ``_UNIT_SIGNAL_KEYS``.
+
     Previous check only verified key *names* on items[0]. A response like
     ``[{"name": "Hoboken", "minRent": null, "bedrooms": null}, ...]`` has 3
     matching key names but zero real data — the Nestiolistings locations
     endpoint that polluted 52 properties in the 2026-05-11 run.
-
-    Fix: sample up to 5 items, require that ≥2 signal keys carry a
-    non-null, non-empty-string value on a *majority* (≥50%) of the sample.
-    A list where every sampled item has only null signal values is noise.
     """
     if not items:
         return False
     sample = items[: min(5, len(items))]
     quorum = max(1, len(sample) // 2)  # majority of the sample
 
+    try:
+        from ma_poc.pms.signal_engine.floor_plan_signals import normalize_field_key as _nfk
+    except Exception as _nfk_err:
+        log.warning(
+            "has_unit_signals: floor_plan_signals import failed — "
+            "field-key normalisation disabled (Entrata/camelCase keys may miss): %s",
+            _nfk_err,
+        )
+        _nfk = None  # type: ignore[assignment]
+
     items_with_values = 0
     for item in sample:
         if not isinstance(item, dict):
             continue
+        if _nfk is not None:
+            normalised: dict[str, Any] = {_nfk(k): v for k, v in item.items()}
+        else:
+            normalised = item
         valued_signal_keys = sum(
             1
-            for k in (item.keys() & _UNIT_SIGNAL_KEYS)
-            if item[k] not in (None, "", 0)
+            for k in (normalised.keys() & _UNIT_SIGNAL_KEYS)
+            if normalised[k] not in (None, "", 0)
         )
         if valued_signal_keys >= 2:
             items_with_values += 1

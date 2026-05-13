@@ -220,6 +220,78 @@ apiKey: 'c2f6b6be-c513-44bd-96e6-1f69efb66cbc',
 **SecureCafe URL synthesis** (`pms/adapters/_html_extract.py:detect_securecafe_portal_url()`): when HTML contains `href="/onlineleasing/{path-slug}"`, constructs `https://{domain-slug}.securecafe.com/onlineleasing/{path-slug}/floorplans.aspx`. The domain slug is the property hostname with TLD stripped; the path slug comes directly from the href (SecureCafe always matches them).  
 **Examples (2026-05-12):** pid=272521 (villageatthegateway.com → 8 units), pid=25964 (carrolltoncrossingapt.com → 1 unit).
 
+### Class 11: Securecafe slug derived from wrong domain after cross-host redirect (L2 navigation)
+
+**Signal:** The synthesised securecafe URL uses the ORIGINAL entry domain slug (e.g., `affinity56.securecafe.com`) even though the entry page redirected to a different host (e.g., `elevation56.com`). The hop fetches a generic rentcafe.com page or a wrong-tenant securecafe page — body is large (400KB+) but `rent_signal_count=0` on the target and `final_url` shows the generic domain.
+
+**Root cause:** `detect_securecafe_portal_url()` derives the securecafe subdomain slug from `ctx.base_url` (the original entry URL), not from `fetch_result.final_url` (the post-redirect URL). When a property domain has been aliased or rebranded (e.g., affinity56.com → elevation56.com), the slug is wrong.
+
+**Fixed in:** `pms/adapters/generic.py` — when calling `detect_securecafe_portal_url()`, the code now reads `ctx.fetch_result.final_url` and compares its hostname against `ctx.base_url`. If the redirect crossed to a **different host**, `final_url` is used as the slug base; same-host redirects (path changes only) keep `ctx.base_url`.
+
+**Diagnosis:** Look at `fetch.completed` for the entry page — if `final_url` hostname differs from the original URL hostname, and then securecafe hops return a generic or wrong-tenant page, this is the cause. Check the slug in `extract.tier_attempted: generic:securecafe_portal_detected` — if it uses the OLD hostname, the fix applies.
+
+**Example (2026-05-12 canary):** pid=256537 (affinity56.com → elevation56.com) — securecafe hop returned rentcafe.com homepage. After fix: 6 units extracted from `elevation56.securecafe.com`.
+
+### Class 12: Infra/media API URL saved as `profile:winning_page_url` (Profile bug)
+
+**Signal:** First hop candidate is `profile:winning_page_url` but it immediately hard-fails (HTTP 400/401/0 bytes). The URL is an AWS Lambda endpoint (`execute-api.*.amazonaws.com`), a media/CDN API (`matterport.com`, `omappapi.com`, `theconversioncloud.com`, `nestiolistings.com/api/`), or another third-party backend — not a property leasing page.
+
+**Root cause:** A previous run captured one of these infra API responses as the "winning" page because it returned unit-shaped JSON (e.g., neighbourhood data, config blobs). `profile_updater` saved it without the infra-URL guard applying to `winning_page_url`. On the next run, hop #1 hard-fails immediately, consuming the budget slot before the actual floor-plans page is tried.
+
+**Fixed in:** 
+- `services/profile_updater.py` — `_INFRA_API_DOMAINS` extended with `execute-api.`, `matterport.com`, `omappapi.com`, `theconversioncloud.com`, `nestiolistings.com/api/`, `s3.amazonaws.com`, `cloudfront.net`
+- `pms/scraper.py` — `_try_link_hop` now checks `_is_infra_api_url(wpu)` before injecting `winning_page_url` into the hop queue; infra URLs are silently skipped at queue-build time
+- `services/profile_updater.py` — invalidation path: when the `profile:winning_page_url` hop returns non-OK, the URL is cleared from the profile and maturity is reset to COLD
+
+**Domains to recognise:** `nestiolistings.com`, `api.omappapi.com`, `api.theconversioncloud.com`, `*.execute-api.*.amazonaws.com`, `my.matterport.com`, `*.cloudfront.net`, `*.supabase.co`, `browse.search.hereapi.com`.
+
+**Examples (2026-05-12):** pid=29995 (canoanvillageapts.com): `nestiolistings.com/api/v2/neighborhoods` was WPU — blocked, property succeeded. pid=277774 (byredwood.com): `api.omappapi.com` was WPU — blocked, correct rentatredwood.com URL found instead.
+
+### Class 13: RC3 monolithic LLM deferred to hop, then re-deferred on hop page (cascading deferral)
+
+**Signal:** On the entry page, `generic:llm` shows `skipped, reason="rc3_defer_monolithic_to_hop"`. The hop reaches a valid sub-page (e.g., `/floorplans`, 699KB, 15+ rent signals). But on THAT hop page, `generic:llm` ALSO shows `skipped, reason="rc3_defer_monolithic_to_hop"` — deferring to the securecafe portal, which is already BOT_BLOCKED. The monolithic LLM never runs on either page.
+
+**Root cause:** `ActionDecider.decide()` had no `hop_depth == 0` guard. RC3 Rule 2 fires identically on the entry page and every hop page. `DecisionContext.hop_depth` was populated but never read inside `decide()`.
+
+**Fixed in:** `pms/signal_engine/decider.py` — Rule 2 now requires `ctx.hop_depth == 0`. The monolithic LLM is only deferred from the **entry page**; on hop pages it runs immediately if the budget allows.
+
+**Diagnosis:** If `generic:llm` shows `rc3_defer_monolithic_to_hop` on a hop page (not the entry page), this was the bug. Check `hop_index` in `extract.link_hop_fetched` — if it's ≥ 1, the LLM should not be deferred.
+
+### Class 14: Silent homepage redirect consuming hop budget (L2 navigation)
+
+**Signal:** A hop path (e.g., `/availability`) returns HTTP 200 but `final_url` equals the homepage URL. The scraper runs the full extraction cascade (including expensive LLM calls) on what is functionally the same homepage body, consuming both a hop slot and LLM budget before the correct sub-page (e.g., `/floorplans/`) is reached.
+
+**Root cause:** The scraper treated any HTTP 200 as a valid hop result. Some sites redirect `/availability` → `/` (homepage) with a 200 status, not a 301/302. The scraper had no mechanism to detect same-host+same-path redirects.
+
+**Fixed in:** `pms/scraper.py:_try_link_hop` — after each successful hop fetch, compares `fetch_result.final_url` host+path against `entry_url`. If they match (same host, root path or identical path), the hop is skipped with `redirect_to_homepage` and the loop continues to the next candidate without consuming LLM budget.
+
+**Example (2026-05-12):** pid=217930 (reserveatcityplace.com) — `/availability` → homepage (200 OK). Hop budget consumed on homepage re-extraction before `/floorplans/` (which had real data) could be reached.
+
+### Class 15: CSV entry URL is dead or wrong domain — data unreachable (Data quality)
+
+**Signal:** Entry page returns HTTP 404 with a small body (< 10KB), `outcome=DEAD_URL`. The actual property data is on a completely different domain that was never discovered. No hops attempted (property killed on fetch failure).
+
+**Root cause:** The URL in `properties.csv` is stale — the property management company has rebranded, moved domains, or the specific sub-page path no longer exists. The scraper cannot recover because no redirect exists to the new domain.
+
+**Action:** Update the CSV entry URL directly. Do NOT attempt code fixes for these — the problem is data, not code.
+
+**Confirmed examples (2026-05-12):**
+
+| PID | Stale URL (404) | Correct URL |
+|---|---|---|
+| 277774 | `byredwood.com/apartments/mi/superior-township/` | `rentatredwood.com/apartments/mi/superior-township/redwood-superior-township/floorplans/` |
+| 2166 | `judwin.com/apartments/tx/houston/reserve-at-creekside/` | `reserveatcreekbend.com/` |
+| 40989 | `savoyeaddison.com/` (marketing wrapper, no data) | `udr.com/dallas-apartments/addison/savoye/` |
+| 220156 | `amli.com/apartments/dallas/las-colinas-apartments/` (neighborhood listing) | `amli.com/apartments/dallas/las-colinas-apartments/amli-at-escena/` |
+
+**Production SQL to apply corrections:**
+```sql
+UPDATE properties SET website = 'https://rentatredwood.com/apartments/mi/superior-township/redwood-superior-township/floorplans/' WHERE property_id = '277774';
+UPDATE properties SET website = 'https://www.reserveatcreekbend.com/' WHERE property_id = '2166';
+UPDATE properties SET website = 'https://www.udr.com/dallas-apartments/addison/savoye/' WHERE property_id = '40989';
+UPDATE properties SET website = 'https://www.amli.com/apartments/dallas/las-colinas-apartments/amli-at-escena/' WHERE property_id = '220156';
+```
+
 ---
 
 ## Phase 3b — Profile-level bugs (WARM/HOT regressions)
@@ -702,3 +774,96 @@ pytest tests/pms tests/fetch -q --tb=line  # ~60s
 | 2026-05-12 | `2026-05-12_securecafe_v7_anchor_stable` | Anchor-link DOM stability gate | 2/2 (272521, 25964) |
 
 All canary outputs: `data/canary/local_runs/`
+
+---
+
+## 2026-05-12 production run analysis (100 shards, 4982 properties)
+
+**Run result:** 3780/4982 succeeded (75.87%). LLM cost $15.05. All 100 shards breached the 95% SLO.
+
+### Top failure tiers
+
+| Terminal tier | Count | Root cause |
+|---|---|---|
+| `TIER_1_API` (generic, no PMS) | 453 failures | Cluster by management-company domain; P3 pattern |
+| `TIER_1_API_ENTRATA` | 241 failures | Entrata adapter bug or CF-blocked |
+| `TIER_1_API_RENTCAFE_SHAPE_REJECTED` | **190 new failures** | SecureCafe.com CF-blocked on all hops (no proxy); or wrong securecafe slug after redirect |
+| `TIER_1_API_ONESITE` | 46 failures | OneSite adapter zero |
+| `TIER_1_API_SIGHTMAP_SHAPE_REJECTED` | **26 new failures** | equityapartments.com uses SightMap as display widget only; RC3 cascading deferral bug |
+| `GENERIC_VALIDITY_REJECTED` | **21 new failures** | api_broad finding dimensionless CMS rows; infra WPU consuming hop #1 |
+| `FAILED` (timeout kill) | **187 no-emit** | Unbounded `llm_dom_targeted` calls on per-floor-plan sub-pages (3s–421s each) |
+
+### Key regressions vs 2026-05-11
+
+- **TIER_1_API_RENTCAFE_SHAPE_REJECTED (+190)**: RC3 cascading deferral (fixed: `hop_depth == 0` guard) + securecafe CF-blocked without proxy
+- **Timeout kills (+183)**: LLM DOM now the dominant tier (1811 calls/run). Individual calls of 7–40 minutes wedge properties. Partial recovery now implemented.
+- **TIER_MERGED_CROSS_PAGE −617**: Fewer cross-page merges due to RC3 deferral bug
+
+### Key improvements vs 2026-05-11
+
+- FAILED_NO_DATA: 869 today vs 1877 yesterday (-1008)
+- 1141 recoveries (properties that previously failed now succeed via TIER_4_LLM_DOM)
+- LLM cost: $15.05 vs $26.46 yesterday
+
+### Persistence health alert
+
+`profile_replay_hit_rate = 7.4%` (SLO threshold: 30%). Root cause: `TIER_4_LLM_DOM` (dominant at 1811 calls) structurally never saves a replayable `LlmFieldMapping` — it saves CSS selectors to `dom_hints.field_selectors` via a separate channel. `generic:profile_replay` only replays API URL + JSON-path mappings from `TIER_4_LLM_API`. The 30% SLO is inappropriate for DOM-heavy property mixes; the correct SLO is CSS selector replay rate from `generic:llm_dom_targeted` with `fp_css_hint_replay` reason.
+
+### Code fixes shipped from this run
+
+| Fix | File | Impact |
+|---|---|---|
+| RC3 `hop_depth == 0` guard — prevents cascading deferral from hop pages | `pms/signal_engine/decider.py` | Fixes ~30 regressions per run |
+| `_is_infra_api_url()` extended + checked at hop-queue injection | `services/profile_updater.py`, `pms/scraper.py` | Fixes nestiolistings/omappapi/matterport WPU pollution |
+| `winning_page_url` invalidation on hop failure (clear + reset to COLD) | `services/profile_updater.py` | Prevents stale WPU from blocking hop #1 every run |
+| Securecafe slug from `final_url` on cross-host redirect | `pms/adapters/generic.py` | Fixes alias-domain properties (affinity56→elevation56) |
+| `_session_blocked_urls` — no re-synthesis of already-BOT_BLOCKED URLs | `pms/scraper.py`, `pms/adapters/generic.py` | Stops ~4-8s wasted securecafe re-synthesis on every hop page |
+| Silent homepage redirect detection — skip hop if `final_url == entry_url` | `pms/scraper.py` | Preserves hop budget and LLM budget for real sub-pages |
+| Anchor links ranked above PMS/universal priors (score 5100–5600) | `pms/scraper.py:_rank_internal_links` | Page-discovered floor-plan CTAs tried before guessed template paths |
+| Property sub-path priors on deep hop URLs (/floorplans appended to 3+ segment hops) | `pms/scraper.py:_try_link_hop` | Fixes AMLI-style sites where PMS priors pointed to wrong base URL |
+| `api_broad` pre-filter: dimensionless rows rejected before planner sees them | `pms/adapters/generic.py` | Stops false `ESCALATE_LINK_HOP` on CMS config rows |
+| JSON-LD filter: `floor_plan_name + beds/baths` accepted as valid partial record | `pms/adapters/generic.py` | Allows AMLI-style floor plans with dynamic pricing to pass through |
+| `numberOfBedrooms`/`numberOfBathroomsTotal` extracted from JSON-LD | `pms/adapters/_html_extract.py` | Schema.org Apartment nodes now populate beds/baths correctly |
+| Partial result recovery on timeout (units accumulated in hop are persisted) | `scripts/runners/jugnu.py`, `pms/scraper.py` | Saves 7–31 units that were previously discarded on 600s kill |
+| `_detect_url_extension` (.aspx → rentcafe) confidence lowered to 0.40 | `pms/detector.py` | Requires HTML corroboration; prevents yottareal.com misrouting |
+| `_analyzed_api_urls` dedup before LLM calls | `pms/adapters/generic.py` | Prevents same API being analyzed by LLM on every hop page |
+
+---
+
+## 2026-05-12 targeted canary results (fixes_v1 + fixes_v2)
+
+**Setup:** 24 properties — 5 per failure cluster (C1 RentCafe, C3 SightMap, C4 Validity, C2 Timeout) + 5 regression sentinels. Production profiles seeded into local postgres from studio_results CSV.
+
+| Canary | IMPROVED | UNCHANGED_OK | UNCHANGED_FAIL | REGRESSED | Key validation |
+|---|---|---|---|---|---|
+| fixes_v1 (original bugs) | 6 | 5 | 13 | 0 | RC3, infra WPU, api_broad, sentinels |
+| fixes_v2 (+ URL corrections) | **9** | **5** | **7** | **0** | CSV corrections validated |
+
+**Notable fixes_v2 improvements over fixes_v1:**
+
+| PID | Domain | Result | Fix |
+|---|---|---|---|
+| 256537 | affinity56.com | **6 units** | Securecafe slug from `final_url` after cross-host redirect (Class 11) |
+| 277774 | rentatredwood.com | **5 units** | CSV URL corrected (was byredwood.com/404) |
+| 40989 | udr.com | **60 units** | CSV URL corrected (was savoyeaddison.com marketing wrapper) |
+| 2166 | reserveatcreekbend.com | **6 units** | CSV URL corrected (was judwin.com/404) |
+
+**Persistent failures confirmed as ENV_MISMATCH or architectural limits:**
+- equityapartments.com (C3): Angular SPA — data requires browser JS execution + proxy. No code fix applicable.
+- thecurtisapts.com, ascentfitzsimons.com: Data behind dynamic widget (Fiona/ProspectPortal). Needs XHR capture on hop pages.
+- AMLI 220156, reserveatcityplace 217930: ProspectPortal iframe + LLM wedging. 120s local limit insufficient; production (600s) may succeed.
+
+**Pre-deploy gate: REGRESSED=0 on both canary runs. Safe to push.**
+
+### How to seed production profiles for a canary
+
+```sql
+-- Export from Cloud SQL
+SELECT canonical_id, payload, updated_at FROM scrape_profiles WHERE canonical_id IN (...);
+```
+
+Save the output as a CSV (`canonical_id, payload, updated_at`), then seed into local postgres:
+```bash
+python C:/tmp/seed_all_profiles.py  # reads studio_results_YYYYMMDD_HHMM.csv
+```
+The canary writes profiles to `canary.sqlite` (isolated), not proppy postgres. Improvements from cold-start are therefore genuine code improvements, not profile-assisted wins.

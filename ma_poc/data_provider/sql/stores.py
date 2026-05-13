@@ -530,8 +530,9 @@ class SqlUnitStateStore(IUnitStateStore):
     @staticmethod
     def _read_first(d: dict[str, Any], keys: tuple[str, ...]) -> Any:
         for k in keys:
-            if d.get(k) is not None:
-                return d[k]
+            v = d.get(k)
+            if v is not None and v != "":
+                return v
         return None
 
     def get_units(self, canonical_id: str) -> dict[str, UnitIndexEntry]:

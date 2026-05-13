@@ -127,6 +127,72 @@ def test_anchorless_record_persisted_in_units_table(provider: DataProvider) -> N
     assert rows[0][1].startswith("2026-05-06")
 
 
+# ── Empty-string coercion (Cloud Run regression 2026-05-12) ────────────────
+
+
+def test_empty_string_numeric_fields_coerced_to_none(provider: DataProvider) -> None:
+    """Partial recovery can emit beds/baths/area/rent as '' instead of None.
+
+    _read_first must treat '' the same as None so SQLAlchemy does not try to
+    cast '' to Integer/Float — which raises StatementError or DatabaseError
+    and kills the whole shard's PG sync.
+    """
+    diff = provider.unit_state.upsert_units(
+        "P_empty_str",
+        [
+            _u(
+                unit_id="101",
+                beds="",
+                baths="",
+                area="",
+                rent_low="",
+                rent_high="",
+                lease_term="",
+            )
+        ],
+        "2026-05-12",
+    )
+    assert diff.input_count == 1
+    assert diff.new == ["101"]
+
+    with provider.engine.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT beds, baths, area, rent_low, rent_high"
+                " FROM units WHERE canonical_id='P_empty_str'"
+            )
+        ).fetchone()
+    assert row is not None
+    assert row[0] is None, "beds should be NULL, not empty string"
+    assert row[1] is None, "baths should be NULL, not empty string"
+    assert row[2] is None, "area should be NULL, not empty string"
+    assert row[3] is None, "rent_low should be NULL, not empty string"
+    assert row[4] is None, "rent_high should be NULL, not empty string"
+
+
+def test_zero_numeric_fields_not_coerced(provider: DataProvider) -> None:
+    """Falsy-but-valid values (0, 0.0) must NOT be treated as None."""
+    diff = provider.unit_state.upsert_units(
+        "P_zeros",
+        [_u(unit_id="102", beds=0, baths=0.0, area=0, rent_low=0.0)],
+        "2026-05-12",
+    )
+    assert diff.new == ["102"]
+
+    with provider.engine.connect() as c:
+        row = c.execute(
+            text(
+                "SELECT beds, baths, area, rent_low"
+                " FROM units WHERE canonical_id='P_zeros'"
+            )
+        ).fetchone()
+    assert row is not None
+    assert row[0] == 0
+    assert row[1] == 0.0
+    assert row[2] == 0
+    assert row[3] == 0.0
+
+
 def test_synthetic_key_collides_for_byte_identical_payloads(provider: DataProvider) -> None:
     """Two anchorless records with identical payloads must collapse to one
     row. Distinct anchorless payloads must NOT collapse — that would be a

@@ -25,6 +25,16 @@ class MediaTypeFilter:
 
     Fixes RC4: JS files from cdngeneralmvc.rentcafe.com were passing to
     TIER_6_LLM which correctly returned no units, but consumed budget.
+
+    Two entry points:
+    - ``blocks(signal)``    — used by SourceQualifier.qualify() with a
+                              pre-constructed SourceSignal.
+    - ``blocks_raw(url, content_type)`` — used by layers (e.g. llm_api_rescue,
+                              is_api_noise_response in defaults.py) that work
+                              directly with raw HTTP response dicts and do not
+                              construct a SourceSignal.  Content-type is split
+                              on ';' to strip charset/boundary parameters before
+                              comparison.
     """
 
     blocked_content_types: frozenset[str]
@@ -35,6 +45,22 @@ class MediaTypeFilter:
         if any(ct.startswith(b) for b in self.blocked_content_types):
             return True
         suffix = (signal.url_suffix or "").lower()
+        return bool(suffix and suffix in self.blocked_url_suffixes)
+
+    def blocks_raw(self, url: str, content_type: str | None = None) -> bool:
+        """Check a raw URL + content-type without constructing a SourceSignal.
+
+        Used by layers (e.g. llm_api_rescue) that work with raw HTTP response
+        dicts rather than the unified SourceSignal abstraction.
+        """
+        ct = (content_type or "").lower().split(";")[0].strip()
+        if any(ct.startswith(b) for b in self.blocked_content_types):
+            return True
+        try:
+            from pathlib import PurePosixPath
+            suffix = PurePosixPath(url.split("?")[0]).suffix.lower()
+        except Exception:
+            suffix = ""
         return bool(suffix and suffix in self.blocked_url_suffixes)
 
 

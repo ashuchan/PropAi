@@ -423,3 +423,113 @@ def test_bug4_pass3_handles_offers_nested_in_brand() -> None:
     # Pass 3 walks dict.values() so the "makesOffer" array is reached and the
     # bare Offers inside are emitted.
     assert len(units) >= 2
+
+
+# ── sweep_raw_html_for_portal_urls ─────────────────────────────────────────────
+
+
+class TestSweepRawHtmlForPortalUrls:
+    """Tests for sweep_raw_html_for_portal_urls — catches portal URLs that live
+    inside JSON.parse('...') blobs, obfuscated JS assignments, and other
+    structures that extract_embedded_blobs_from_html cannot decode."""
+
+    def _sweep(self, html: str):
+        from ma_poc.pms.adapters._html_extract import sweep_raw_html_for_portal_urls
+        return sweep_raw_html_for_portal_urls(html)
+
+    def test_empty_html_returns_empty(self) -> None:
+        assert self._sweep("") == []
+
+    def test_resman_url_in_json_parse_blob_detected(self) -> None:
+        """Primary regression case: Canva SPA encodes links inside JSON.parse('...')."""
+        html = (
+            "<script>window['bootstrap'] = JSON.parse('{\"link\":{\"B\":"
+            "\"https://rwfmat.myresman.com/Portal/Applicants/Availability"
+            "?a=1863&p=abc123\"}}');</script>"
+        )
+        results = self._sweep(html)
+        assert len(results) == 1
+        url, portal = results[0]
+        assert "myresman.com" in url
+        assert portal == "resman"
+
+    def test_sightmap_url_detected(self) -> None:
+        html = '<script>var cfg = {"embed": "https://sightmap.com/embed/abc123"};</script>'
+        results = self._sweep(html)
+        assert any("sightmap.com" in url for url, _ in results)
+        assert any(p == "sightmap" for _, p in results)
+
+    def test_rentcafe_url_detected(self) -> None:
+        html = '<a href="https://www.rentcafe.com/apartments/wa/seattle/my-property/"></a>'
+        results = self._sweep(html)
+        assert any("rentcafe.com" in url for url, _ in results)
+
+    def test_non_portal_urls_not_returned(self) -> None:
+        html = '<img src="https://cdn.example.com/image.png"> <a href="https://google.com/"></a>'
+        assert self._sweep(html) == []
+
+    def test_deduplication(self) -> None:
+        """Same portal URL appearing twice in the HTML returns only one entry."""
+        url = "https://rwfmat.myresman.com/Portal/Applicants/Availability?a=1"
+        html = f'<p>{url}</p><p>{url}</p>'
+        results = self._sweep(html)
+        urls = [u for u, _ in results]
+        assert urls.count(urls[0]) == 1 if urls else True
+
+    def test_trailing_punctuation_stripped(self) -> None:
+        """URLs followed by quotes/parens in JS context are cleaned."""
+        html = "<script>window.x = 'https://sightmap.com/embed/abc';</script>"
+        results = self._sweep(html)
+        # The trailing "'" and ";" must not be part of the URL
+        for url, _ in results:
+            assert not url.endswith("'")
+            assert not url.endswith(";")
+
+
+# ── _container_yields_unit: rent-optional behavior ───────────────────────────
+
+class TestContainerYieldsUnitRentOptional:
+    """dom_scan now extracts floor-plan data even when rent is absent."""
+
+    def _call(self, text: str):
+        from ma_poc.pms.adapters._html_extract import _container_yields_unit
+        return _container_yields_unit(text)
+
+    def test_struct_signals_without_rent_accepted(self) -> None:
+        """Container with beds + sqft but no price must still yield a unit."""
+        result = self._call("1 Bedroom / 1 Bathroom  750 sqft")
+        assert result is not None
+        assert result["bedrooms"] == "1"
+        assert result["sqft"] == "750"
+        assert result["market_rent_low"] is None
+        assert result["market_rent_high"] is None
+        assert result["rent_range"] is None
+
+    def test_dollar_rent_still_extracted_when_present(self) -> None:
+        """Dollar rent is extracted normally when both signals are present."""
+        result = self._call("2BR / 2BA  1050 sqft  $1,850/mo")
+        assert result is not None
+        assert result["market_rent_low"] == 1850
+        assert result["market_rent_high"] == 1850
+
+    def test_price_range_label_extracted(self) -> None:
+        """'Price Range: 1,200 - 1,500' without $ prefix is captured."""
+        result = self._call("Hummingbird  1BR / 1BA  680 sqft  Price Range: 1,200 - 1,500 /mo")
+        assert result is not None
+        assert result["market_rent_low"] == 1200
+        assert result["market_rent_high"] == 1500
+
+    def test_starting_from_label_extracted(self) -> None:
+        result = self._call("Studio  450 sqft  Starting from 950 /month")
+        assert result is not None
+        assert result["market_rent_low"] == 950
+
+    def test_no_structural_signals_still_rejected(self) -> None:
+        """A container with only a price and no structural signals is rejected."""
+        result = self._call("Special offer $500 off first month")
+        assert result is None
+
+    def test_studio_without_rent_accepted(self) -> None:
+        result = self._call("Studio  420 sqft")
+        assert result is not None
+        assert result["market_rent_low"] is None

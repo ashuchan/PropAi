@@ -583,7 +583,7 @@ def replay(
         canary_input_csv: Path to the property CSV produced by select_properties.
         canary_dsn: SQLAlchemy DSN for the canary DB.
         out_dir: Base data directory for the jugnu subprocess (run output lands
-            under ``{out_dir}/runs/{run_date}/``).
+            under ``{out_dir}/runs/{run_date}/`` for v1 or ``{out_dir}/v2/runs/{run_date}/`` for v2).
         run_date: YYYY-MM-DD string passed to jugnu via ``--run-date``.
         flag_overrides: ``{ENV_VAR: value}`` dict injected into the subprocess
             env — the mechanism for feature-flag toggling without side-effects.
@@ -666,7 +666,15 @@ def read_canary_outcomes(out_dir: Path, run_date: str) -> dict[str, _CanaryOutco
         no PROPERTY_EMITTED event are absent (caller treats them as
         TIMEOUT_IN_CANARY).
     """
-    events_path = out_dir / "runs" / run_date / "events.jsonl"
+    # Try v2 path first (SCHEMA_VERSION=v2 written by Jugnu), then v1 fallback.
+    # We probe the filesystem rather than reading the env var because Jugnu
+    # loads SCHEMA_VERSION from .env (python-dotenv) while the canary process
+    # itself may not have that var in its shell environment.
+    _candidate_paths = [
+        out_dir / "v2" / "runs" / run_date / "events.jsonl",
+        out_dir / "runs" / run_date / "events.jsonl",
+    ]
+    events_path = next((p for p in _candidate_paths if p.exists()), _candidate_paths[0])
     if not events_path.exists():
         log.warning("events.jsonl not found at %s", events_path)
         return {}
@@ -1044,7 +1052,7 @@ def _main_compare(argv: list[str]) -> int:
             treatment.get("passed", False)
             and delta["delta_regressed"] <= 0
         )
-        print(f"\n  Gate: treatment_passed AND no new regressions → {'PASS' if passed else 'FAIL'}")
+        print(f"\n  Gate: treatment_passed AND no new regressions -> {'PASS' if passed else 'FAIL'}")
 
     # Return 1 if treatment introduced new regressions vs. baseline.
     return 0 if delta["delta_regressed"] <= 0 else 1
@@ -1532,7 +1540,7 @@ def _run_baseline_treatment(
     print(f"  ΔIMPROVED:  {delta_improved:+d}")
     print(f"  ΔREGRESSED: {delta_regressed:+d}")
     gate = delta_regressed <= 0 and report_t.passed
-    print(f"\n  Gate: treatment no new regressions → {'PASS' if gate else 'FAIL'}")
+    print(f"\n  Gate: treatment no new regressions -> {'PASS' if gate else 'FAIL'}")
 
     return 0, report_t
 
@@ -1546,7 +1554,7 @@ def _print_summary(report: CanaryReport, out_dir: Path | None = None) -> None:
     print(f"  UNCHANGED_FAIL:  {report.unchanged_fail:4d}  (was failing, still failing)")
     print(f"  REGRESSED:       {report.regressed:4d}  (was succeeding, now fail — STOP)")
     print(f"  TIMEOUT:         {report.timeout_in_canary:4d}  (no PROPERTY_EMITTED — infra issue)")
-    print(f"\nPre-deploy gate: REGRESSED == 0 → {gate}")
+    print(f"\nPre-deploy gate: REGRESSED == 0 -> {gate}")
     if report.regressed > 0:
         print("\nREGRESSED properties (must investigate before deploy):")
         for row in report.rows:

@@ -40,6 +40,9 @@ class CrawlTask:
     last_modified: str | None = None
     # Per-host session token if profile stickied one
     session_key: str | None = None
+    # Pattern A: when set, _do_render skips pool acquire/release and navigates
+    # this existing Playwright Page instead.  The caller retains context ownership.
+    reuse_page: Any | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a plain dict for event emission."""

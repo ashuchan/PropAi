@@ -135,6 +135,14 @@ DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("knockrentals.com", 115),      # Knock CRM leasing portal
     ("leasehawk.com", 115),         # LeasHawk leasing CRM
     ("rentgrata.com", 80),          # Referral, lower priority
+    # ResMan property-management portal (rwfmat.myresman.com etc.)
+    ("myresman.com", 115),
+    # Yardi-hosted leasing portals
+    ("yardi.com", 110),
+    # BuildingLink / ResPage
+    ("respage.com", 100),
+    # Buildium tenant / prospect portal
+    ("buildium.com", 100),
 )
 
 DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
@@ -161,6 +169,116 @@ DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (
     "/units",
     "/leasing",
 )
+
+# ── API noise blocklists (signal-level, not unit-level) ───────────────────────
+# Hosts that are definitionally noise for captured API responses — analytics
+# CDNs, captcha providers, OIDC endpoints, map tiles. These hosts appear in
+# XHR/fetch interceptions but carry zero unit data regardless of URL path.
+# Used by ``is_api_noise_response`` which is the single gate for all LLM-rescue
+# candidate filtering — llm_api_rescue imports from here, not from its own defs.
+DEFAULT_API_NOISE_HOSTS: frozenset[str] = frozenset({
+    # Analytics / tag managers:
+    "googleapis.com",
+    "go-mpulse.net",
+    "googletagmanager.com",
+    "doubleclick.net",
+    "facebook.com",
+    "hotjar.com",
+    "sentry.io",
+    "userway.org",
+    "omni.cafe",
+    # Email / marketing automation:
+    "klaviyo.com",
+    # CMS CDNs:
+    "static.cdn-website.com",       # Duda CMS
+    # Widget / tour analytics:
+    "enormapps.com",
+    "tour.tourbuilder.com",
+    # Map tiles (never unit data):
+    "places.googleapis.com",
+    "maps.googleapis.com",
+    # Consent managers:
+    "cmp.osano.com",
+    "osano.com",
+    # Chatbots:
+    "app.meetelise.com",
+    # Captcha providers:
+    "challenges.cloudflare.com",
+    "hcaptcha.com",
+    "recaptcha.net",
+})
+
+# URL path fragments that are always noise regardless of host.
+# These identify tag-managers, PWA manifests, auth flows, and CDN static bundles.
+DEFAULT_API_NOISE_PATH_FRAGMENTS: frozenset[str] = frozenset({
+    # Tag / analytics paths:
+    "/tag-manager/",
+    "/mapsjs/",
+    "/gen_204",
+    "/analytics/",
+    "/gtag/",
+    "/pixel",
+    "/beacon",
+    # Form / widget endpoints with no unit data:
+    "/tour/availabilities",
+    "/html_forms/",
+    "/yext_reviews/",
+    "/blurb/v1/",
+    "/popdown/",
+    "/forms/api/",
+    "/speculations/rules/",
+    # Realpage CMS module endpoints (config, not unit data):
+    "/Apartments/module/widgets/",
+    "/Apartments/module/application_authentication/",
+    "/Apartments/module/property_info/",
+    # Map / auth:
+    "$rpc/",
+    "/realms/",
+    "/openid-connect/",
+    "/recaptcha",
+    # Static asset bundles — CDN packs from AppFolio, RentCafe, Entrata etc:
+    "/packs/",
+    "/packs-test/",
+    "/assets/application-",     # webpack fingerprinted bundles
+    "/assets/vendor-",
+    "/fonts/",
+    # PWA / service worker:
+    "/manifest.json",
+    "/service-worker",
+    "/sw.js",
+})
+
+
+def is_api_noise_response(url: str, content_type: str | None = None) -> bool:
+    """Return True when the URL/content-type combination is definitionally noise.
+
+    Single gate for LLM-rescue candidate filtering — replaces the scattered
+    ``_RESCUE_NOISE_HOSTS``, ``_RESCUE_NOISE_PATH_FRAGMENTS``, and
+    ``_STATIC_CONTENT_TYPES`` constants that used to live in llm_api_rescue.py.
+
+    Check order (stops at first True):
+      1. Content-type media check via ``DEFAULT_MEDIA_FILTER.blocks_raw()``
+         (JS, CSS, fonts, images, text/html are never JSON unit data).
+      2. Known-noise host match — subdomain-aware.
+      3. Known-noise path fragment match.
+    """
+    if not url:
+        return True
+    if DEFAULT_MEDIA_FILTER.blocks_raw(url, content_type):
+        return True
+    try:
+        from urllib.parse import urlparse
+        host = (urlparse(url).hostname or "").lower()
+    except Exception:
+        host = ""
+    for h in DEFAULT_API_NOISE_HOSTS:
+        if host == h or host.endswith("." + h):
+            return True
+    url_lower = url.lower()
+    for frag in DEFAULT_API_NOISE_PATH_FRAGMENTS:
+        if frag.lower() in url_lower:
+            return True
+    return False
 
 
 # ── Qualifier toggle flags ────────────────────────────────────────────────────
@@ -227,16 +345,16 @@ def create_default_qualifier() -> SourceQualifier:
             # admitted — it carries no meaningful unit data.
             FieldCombination(
                 keys=frozenset({
-                    "beds", "bedrooms",
-                    "baths", "bathrooms",
-                    "sqft", "area",
+                    "beds", "bedrooms", "no_of_bedroom",
+                    "baths", "bathrooms", "no_of_bathroom", "no_of_bath",
+                    "sqft", "area", "square_footage",
                 }),
                 min_count=3,
                 label="floor_plan_bed_bath_area",
                 required_groups=(
-                    frozenset({"beds", "bedrooms"}),
-                    frozenset({"baths", "bathrooms"}),
-                    frozenset({"sqft", "area"}),
+                    frozenset({"beds", "bedrooms", "no_of_bedroom"}),
+                    frozenset({"baths", "bathrooms", "no_of_bathroom", "no_of_bath"}),
+                    frozenset({"sqft", "area", "square_footage"}),
                 ),
             ),
             # ── Floor plan: bed + bath + floor plan name ──────────────────────
@@ -244,16 +362,16 @@ def create_default_qualifier() -> SourceQualifier:
             # name field. Catches plan-level APIs that separate rent from layout.
             FieldCombination(
                 keys=frozenset({
-                    "beds", "bedrooms",
-                    "baths", "bathrooms",
-                    "floor_plan_name", "floorplanname",
+                    "beds", "bedrooms", "no_of_bedroom",
+                    "baths", "bathrooms", "no_of_bathroom", "no_of_bath",
+                    "floor_plan_name", "floorplanname", "floorplan-name",
                 }),
                 min_count=3,
                 label="floor_plan_bed_bath_name",
                 required_groups=(
-                    frozenset({"beds", "bedrooms"}),
-                    frozenset({"baths", "bathrooms"}),
-                    frozenset({"floor_plan_name", "floorplanname"}),
+                    frozenset({"beds", "bedrooms", "no_of_bedroom"}),
+                    frozenset({"baths", "bathrooms", "no_of_bathroom", "no_of_bath"}),
+                    frozenset({"floor_plan_name", "floorplanname", "floorplan-name"}),
                 ),
             ),
         ],

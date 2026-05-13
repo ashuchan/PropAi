@@ -351,12 +351,20 @@ async def test_try_link_hop_queues_portal_hint_from_sub_fetch() -> None:
 
     fetched_urls: list[str] = []
 
+    # Each URL returns distinct body content so the body-hash dedup in
+    # _try_link_hop does not mistake the SightMap embed page for the
+    # /floorplans/ shell (both would be tiny if we used the same stub body).
+    _FAKE_BODIES: dict[str, bytes] = {
+        floorplans_url: b"<html><body><section id='floor-plans'>loading...</section></body></html>",
+        sightmap_url: b"<html><body><div class='sm-embed'>1BR 750sqft sightmap unit data</div></body></html>",
+    }
+
     async def _fake_fetch(task):
         fetched_urls.append(task.url)
         fake_result = MagicMock()
         fake_result.outcome = MagicMock(value="OK")
         fake_result.elapsed_ms = 100
-        fake_result.body = b"<html><body>x</body></html>"
+        fake_result.body = _FAKE_BODIES.get(task.url, b"<html><body>other</body></html>")
         fake_result.network_log = []
         return fake_result
 

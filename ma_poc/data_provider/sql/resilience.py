@@ -73,6 +73,12 @@ TRANSIENT_DB_ERRORS: tuple[type[Exception], ...] = (
 # and skip. `DataError` is the 22001 / 22003 family; `IntegrityError`
 # is FK / unique violations. These are logic bugs in the writer or
 # upstream pipeline and a retry would produce the same failure.
+#
+# Note: StatementError is NOT listed here even though it covers
+# Python-level type coercion errors (e.g. float('')). StatementError is
+# a superclass of DBAPIError — adding it here would catch OperationalError
+# as permanent instead of transient. The right fix is upstream coercion
+# (see _read_first in stores.py treating '' as None).
 PERMANENT_ROW_ERRORS: tuple[type[Exception], ...] = (
     DataError,
     IntegrityError,

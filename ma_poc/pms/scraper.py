@@ -14,6 +14,7 @@ Jugnu deltas applied:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import urllib.parse
@@ -197,19 +198,16 @@ _RICH_HOP_MIN_BODY_BYTES = 50_000
 # Cheap content markers that suggest unit-bearing structured data is present.
 # Either marker + body size threshold qualifies the hop as "rich."
 _RICH_HOP_JSONLD_MARKERS = ("FloorPlan", "ApartmentComplex", "Apartment\"")
-# Heuristic: at least N rent-shaped tokens ($1234 or $1234/mo) anywhere in
-# the body. Five distinct hits is uncommon outside an actual pricing page.
-_RICH_HOP_RENT_TOKEN_RE = re.compile(r"\$\d{3,4}")
-_RICH_HOP_MIN_RENT_TOKENS = 5
 
 
 def _link_hop_is_rich(fetch_result: Any) -> bool:
     """Bug 5 alignment: should this hop's body trigger a cost-cap refresh?
 
     True only when the body is large enough AND carries a positive content
-    signal (JSON-LD FloorPlan/Apartment OR enough rent-shaped tokens).
-    Filters out redirect bodies, login walls, and Cloudflare interstitials
-    that the previous unconditional refresh blindly subsidised.
+    signal (JSON-LD FloorPlan/Apartment OR ≥2 structural floor-plan signal
+    types from the signal engine).  Filters out redirect bodies, login walls,
+    and Cloudflare interstitials that the previous unconditional refresh
+    blindly subsidised.
     """
     if fetch_result is None:
         return False
@@ -233,8 +231,11 @@ def _link_hop_is_rich(fetch_result: Any) -> bool:
     for marker in _RICH_HOP_JSONLD_MARKERS:
         if marker in body_str:
             return True
-    rent_hits = sum(1 for _ in _RICH_HOP_RENT_TOKEN_RE.finditer(body_str))
-    return rent_hits >= _RICH_HOP_MIN_RENT_TOKENS
+    from ma_poc.pms.signal_engine.floor_plan_signals import (
+        has_floor_plan_signals,
+        SIGNAL_THRESHOLD_STRUCTURAL,
+    )
+    return has_floor_plan_signals(body_str, SIGNAL_THRESHOLD_STRUCTURAL)
 
 
 def _refresh_cost_cap_for_hop(
@@ -579,6 +580,7 @@ async def scrape(
             except Exception:
                 pass
 
+    _html_char = result.get("_html_characterization") or {}
     ctx = AdapterContext(
         base_url=resolved.resolved_url,
         detected=detection,
@@ -592,6 +594,7 @@ async def scrape(
         zip_code=_from_csv("zip", "Zip", "zip_code", "ZIP Code"),
         pmc=_from_csv("Management Company", "pmc"),
         budget=budget,
+        floor_plan_signal_count=int(_html_char.get("floor_plan_signal_count", 0) or 0),
     )
 
     # Phase F: populate cluster_key from PMS client account ID on first detection
@@ -740,7 +743,7 @@ async def scrape(
                 EventKind.LLM_RESCUE_ATTEMPTED,
                 ctx.property_id,
                 source_adapter=adapter_name,
-                n_candidates=len(raw_api_responses),
+                n_raw_candidates=len(raw_api_responses),
             )
 
             rescue = await rescue_from_api_responses(
@@ -761,6 +764,7 @@ async def scrape(
             )
 
             result["_rescue_cost_usd"] = rescue.cost_usd
+            result["_rescue_n_filtered_candidates"] = rescue.n_filtered_candidates
 
             if rescue.units:
                 adapter_result.units = rescue.units
@@ -971,7 +975,6 @@ async def scrape(
 # ---------------------------------------------------------------------------
 
 
-_RENT_SIGNAL_RE = re.compile(r"\$\s?\d{3,4}(?:[,.]\d{3})?(?:/mo|\s*/\s*month)?", re.IGNORECASE)
 _FRAMEWORK_HINTS: tuple[tuple[str, str], ...] = (
     ("__NEXT_DATA__", "next"),
     ("__NUXT__", "nuxt"),
@@ -1016,16 +1019,21 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
             break
 
     frameworks = [label for needle, label in _FRAMEWORK_HINTS if needle in page_html]
-    rent_signals = len(_RENT_SIGNAL_RE.findall(page_html))
 
-    # SPA heuristic: lots of script, little text, no JSON-LD, rent signals nil.
+    # B1: floor-plan structural signal count replaces the $NNN rent-signal count.
+    # clean_text is already stripped of HTML tags (re-use the tag-stripped version).
+    from ma_poc.pms.signal_engine.floor_plan_signals import count_floor_plan_signals
+    clean_text = re.sub(r"<[^>]+>", "", stripped)
+    floor_plan_signals = count_floor_plan_signals(clean_text)
+
+    # SPA heuristic: lots of script, little text, no floor-plan signals.
     spa_score = 0.0
     if body_bytes > 0:
         script_ratio = 1.0 - min(1.0, text_bytes / max(1, body_bytes))
         spa_score += 0.4 * script_ratio
     if "__NEXT_DATA__" in page_html or "__NUXT__" in page_html:
         spa_score += 0.3
-    if rent_signals == 0 and text_bytes < 5000:
+    if floor_plan_signals == 0 and text_bytes < 5000:
         spa_score += 0.3
     spa_score = round(min(1.0, spa_score), 2)
 
@@ -1038,7 +1046,7 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
         "jsonld_types": jsonld_types[:10],
         "framework_hints": frameworks,
         "spa_confidence": spa_score,
-        "rent_signal_count": rent_signals,
+        "floor_plan_signal_count": floor_plan_signals,
     }
 
 
@@ -1069,6 +1077,54 @@ from ma_poc.pms.signal_engine.defaults import (  # noqa: E402
 _LLM_HINT_ANCHOR_PREFIX = "llm-hint:"
 _EMBEDDED_PORTAL_ANCHOR_PREFIX = "embedded-portal:"
 
+# Maximum number of floor-plan sub-pages to accumulate before stopping.
+# Prevents timeout spirals where Entrata/ProspectPortal sites with 10+
+# individual /floorplans/<name> sub-pages exhaust the 600 s budget.
+_MAX_FLOORPLAN_ACCUM_PAGES = 8
+
+# Pre-compiled regex for extracting iframe src attributes from raw HTML.
+# Used to discover portal iframes (AppFolio, SightMap, etc.) on hop pages
+# that have no floor-plan signals in the outer DOM.
+_IFRAME_SRC_RE = re.compile(
+    r'<iframe[^>]+\bsrc=["\']([^"\'>\s]+)["\']',
+    re.IGNORECASE,
+)
+
+
+def _extract_portal_iframe_hints(html: str) -> list[tuple[str, str]]:
+    """Extract leasing-portal URLs from <iframe src> attributes.
+
+    When a hop page has no floor-plan signals in its outer HTML (i.e., the
+    unit data lives inside a cross-origin iframe such as an AppFolio or
+    SightMap embed), this function discovers those iframe URLs so they can
+    be added to the hop queue instead of burning LLM budget on the empty
+    outer shell.
+
+    Args:
+        html: Rendered outer-frame HTML of the hop page.
+
+    Returns:
+        List of ``(url, portal_name)`` tuples for iframe srcs that match
+        known leasing-portal patterns.  Empty list if none found.
+    """
+    try:
+        from ma_poc.pms.adapters._html_extract import _PORTAL_URL_PATTERNS
+    except Exception:
+        return []
+
+    hints: list[tuple[str, str]] = []
+    for match in _IFRAME_SRC_RE.finditer(html):
+        src = match.group(1).strip()
+        if not src or not src.startswith("http"):
+            continue
+        lower = src.lower()
+        for needle, portal_name in _PORTAL_URL_PATTERNS:
+            if needle in lower:
+                hints.append((src, portal_name))
+                break
+    return hints
+
+
 # RC5: maps FetchOutcome values to the verdict prefix written into errors[].
 # Module-level so tests can import rather than redefine.
 _OUTCOME_VERDICT_PREFIX: dict[str, str] = {
@@ -1098,6 +1154,7 @@ def _augment_ranked_with_hints(
     """
     if not hints:
         return ranked
+    from ma_poc.pms.signal_engine.filters import is_infra_url as _infra_check
     augmented: list[tuple[str, int, str]] = []
     hinted_urls: set[str] = set()
     for raw in hints:
@@ -1110,7 +1167,7 @@ def _augment_ranked_with_hints(
             continue
         if not abs_url.startswith(("http://", "https://")):
             continue
-        if abs_url in hinted_urls:
+        if abs_url in hinted_urls or _infra_check(abs_url):
             continue
         hinted_urls.add(abs_url)
         augmented.append(
@@ -1206,6 +1263,16 @@ _LINK_SKIP_PATTERNS: tuple[str, ...] = (
     "/contact",
     "/careers",
     "/jobs",
+    # Auth-wall patterns — these URLs require credentials and will always return
+    # a login page rather than unit data.  AppFolio /connect/users/sign_in/* is
+    # the canonical offender: every floor-plan sub-path gets appended to the
+    # sign-in URL, burning one LLM call per variant.  Filter them before ranking.
+    "/sign_in",
+    "/signin",
+    "/login",
+    "/log-in",
+    "/auth",
+    "/sso",
 )
 
 
@@ -1359,6 +1426,7 @@ async def _try_link_hop(
     embedded_portal_hints: list[tuple[str, str]] | None = None,
     visited_urls: set[str] | None = None,
     shared_budget: dict | None = None,
+    browser_page: Any | None = None,
 ) -> dict[str, Any] | None:
     """One-level BFS over home-page links when primary extraction is empty.
 
@@ -1403,28 +1471,33 @@ async def _try_link_hop(
     profile_top: list[tuple[str, int, str]] = []
     explored_skip: set[str] = set()
     if profile is not None:
-        try:
-            from services.profile_updater import _is_infra_api_url as _infra_check
-        except Exception:
-            _infra_check = None  # type: ignore[assignment]
+        from ma_poc.pms.signal_engine.filters import is_infra_url as _infra_check
         try:
             nav = profile.navigation
             wpu = getattr(nav, "winning_page_url", None)
             # Guard: never inject infra/media API endpoints as hop candidates.
-            # These were saved before _is_infra_api_url guarded the persist
-            # path, so they may still exist in older profiles. Checking here
-            # prevents wasting hop #1 on an endpoint that hard-fails (HTTP
-            # 400/401) before the actual floor-plans page is ever reached.
-            _wpu_is_infra = bool(_infra_check and isinstance(wpu, str) and _infra_check(wpu))
-            if isinstance(wpu, str) and wpu and wpu not in visited and not _wpu_is_infra:
-                # Highest possible score so it always lands first.
+            if isinstance(wpu, str) and wpu and wpu not in visited and not _infra_check(wpu):
                 profile_top.append((wpu, _LLM_HINT_SCORE + 1, "profile:winning_page_url"))
             for link in getattr(nav, "availability_links", []) or []:
-                if isinstance(link, str) and link and link not in visited:
+                if isinstance(link, str) and link and link not in visited and not _infra_check(link):
                     profile_top.append((link, _LLM_HINT_SCORE, "profile:availability_link"))
             for dead in getattr(nav, "explored_links", []) or []:
                 if isinstance(dead, str) and dead:
                     explored_skip.add(dead)
+            # Dead-link TTL blocklist: skip URLs confirmed dead within
+            # the last 14 days so stale universal-prior 404s don't burn
+            # hop budget on repeated runs.
+            _dead_links: dict[str, str] = getattr(nav, "dead_links", {}) or {}
+            _dead_ttl_days = 14
+            import datetime as _dt
+            _now = _dt.datetime.now(_dt.timezone.utc)
+            for dead_url, dead_ts in list(_dead_links.items()):
+                try:
+                    age_days = (_now - _dt.datetime.fromisoformat(dead_ts)).days
+                    if age_days < _dead_ttl_days:
+                        explored_skip.add(dead_url)
+                except Exception:
+                    pass
             # Priority pages were explored in past runs and land in
             # explored_links, but they must NEVER be skipped — they are
             # the highest-confidence candidates.  Strip them back out.
@@ -1454,13 +1527,14 @@ async def _try_link_hop(
     # PMS template priors.
     portal_candidates: list[tuple[str, int, str]] = []
     if embedded_portal_hints:
+        from ma_poc.pms.signal_engine.filters import is_infra_url as _infra_check_portal
         for hint in embedded_portal_hints:
             try:
                 url_s, portal_name = hint
             except Exception:
                 continue
             url_s = str(url_s or "").strip()
-            if not url_s or url_s in visited:
+            if not url_s or url_s in visited or _infra_check_portal(url_s):
                 continue
             portal_candidates.append(
                 (url_s, _EMBEDDED_PORTAL_SCORE, f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}")
@@ -1623,6 +1697,19 @@ async def _try_link_hop(
     # Passed via shared_budget so subsequent sub-pages skip the LLM DOM call.
     _fp_llm_selectors: dict[str, Any] | None = None
 
+    # Body-hash dedup: prevents LLM analysis on pages whose content is identical
+    # to one already analysed (JS-silent-redirect cycles, AppFolio /sign_in/*
+    # auth walls where every path variant returns the same login page).
+    # Seeded with the entry page so redirect-to-entry cases are caught immediately.
+    _seen_body_hashes: set[str] = {
+        hashlib.sha256(entry_page_html.encode("utf-8", errors="replace")).hexdigest()[:16]
+    }
+
+    # Count of pages processed while in floor-plan accumulation mode.
+    # Capped at _MAX_FLOORPLAN_ACCUM_PAGES to prevent timeout spirals on
+    # sites with many individual /floorplans/<name> sub-pages.
+    _accum_pages_fetched = 0
+
     while queue_idx < len(queue):
         sub_url, score, anchor = queue[queue_idx]
         idx = queue_idx + 1
@@ -1644,6 +1731,7 @@ async def _try_link_hop(
             reason=TaskReason.SCHEDULED,
             render_mode=RenderMode.RENDER,
             parent_task_id=None,
+            reuse_page=browser_page,  # Pattern A: share entry-page session
         )
         try:
             sub_fetch = await jugnu_fetch(sub_task)
@@ -1654,6 +1742,36 @@ async def _try_link_hop(
         outcome_val = (
             sub_fetch.outcome.value if hasattr(sub_fetch.outcome, "value") else str(sub_fetch.outcome)
         )
+
+        # Retry TRANSIENT failures once for property-specific URLs (3+ path
+        # segments).  Entrata /conventional/ and ProspectPortal /brookhaven/
+        # /royale/conventional/ pages occasionally time out on the first attempt
+        # when the browser pool is under memory pressure; a single retry with the
+        # same budget_ms succeeds most of the time.  Generic top-level priors
+        # (/availability, /floorplans) are NOT retried — TRANSIENT there usually
+        # means a bot-block or dead link, not a load-timing issue.
+        if outcome_val == "TRANSIENT" and not (sub_fetch.body):
+            try:
+                _path_parts = [
+                    p for p in urllib.parse.urlparse(sub_url).path.split("/") if p
+                ]
+            except Exception:
+                _path_parts = []
+            if len(_path_parts) >= 3:
+                log.debug(
+                    "link-hop %s: TRANSIENT on property-specific URL — retrying once",
+                    sub_url,
+                )
+                try:
+                    sub_fetch = await jugnu_fetch(sub_task)
+                    outcome_val = (
+                        sub_fetch.outcome.value
+                        if hasattr(sub_fetch.outcome, "value")
+                        else str(sub_fetch.outcome)
+                    )
+                except Exception:
+                    pass  # keep original TRANSIENT outcome
+
         emit(
             EventKind.LINK_HOP_FETCHED,
             property_id,
@@ -1666,21 +1784,99 @@ async def _try_link_hop(
             anchor=anchor[:60],
         )
 
+        # B2: block the resolved final URL so redirect-identical pages are never
+        # processed twice in the same session (e.g. two different requested paths
+        # that both redirect to /floorplans would otherwise burn extraction twice).
+        # If the final URL was ALREADY visited (redirect back to a page we already
+        # have results for), skip extraction entirely — the body-hash dedup will
+        # also catch JS-silent-redirects, but this short-circuits before the hash.
+        _sub_final = getattr(sub_fetch, "final_url", None) or ""
+        if _sub_final and _sub_final != sub_url:
+            if _sub_final in visited:
+                log.debug(
+                    "link-hop %s: server redirect to already-visited %s — skipping",
+                    sub_url, _sub_final,
+                )
+                explored[sub_url] = False
+                continue
+            visited.add(_sub_final)
+
         if outcome_val != "OK":
             explored[sub_url] = False
             # Record this URL as blocked/failed in the session so adapter-level
             # hint synthesisers (securecafe_portal_detected, etc.) don't re-queue
-            # it on subsequent hop pages. Works for BOT_BLOCKED, HARD_FAIL, and
-            # TRANSIENT — any outcome that is not "OK" is not worth retrying
-            # within the same scrape session.
+            # it on subsequent hop pages.
             if shared_budget is not None:
                 _blocked_set: set[str] = shared_budget.setdefault("_session_blocked_urls", set())
                 _blocked_set.add(sub_url)
+            # Persist confirmed-dead URLs (DEAD_URL / HARD_FAIL with tiny body)
+            # to the profile blocklist so future runs skip them within the TTL.
+            _body_bytes = len(sub_fetch.body) if sub_fetch.body else 0
+            if outcome_val in ("DEAD_URL", "HARD_FAIL") and _body_bytes < 2048 and profile is not None:
+                import datetime as _dt
+                _dead_ts = _dt.datetime.now(_dt.timezone.utc).isoformat()
+                _nav = getattr(profile, "navigation", None)
+                _dl = getattr(_nav, "dead_links", None) if _nav is not None else None
+                if isinstance(_dl, dict):
+                    _dl[sub_url] = _dead_ts
             # Signal back to profile_updater that profile:winning_page_url
             # hard-failed so it can be cleared and the profile reset to COLD.
             if anchor == "profile:winning_page_url" and shared_budget is not None:
                 shared_budget["_winning_page_url_hop_outcome"] = "profile:winning_page_url:failed"
             continue
+
+        # Body-hash dedup: if this hop's body is byte-identical to a page we
+        # already analysed (AppFolio /sign_in/* auth wall returning the same
+        # 15 KB login page under every path, JS-silent-redirect-to-homepage
+        # that leaves the URL unchanged), skip extraction entirely.
+        # The entry page is pre-seeded into _seen_body_hashes so redirect-to-
+        # entry cases are caught on the first hop without a separate URL check.
+        _hop_body_bytes = sub_fetch.body or b""
+        _hop_body_hash = hashlib.sha256(_hop_body_bytes).hexdigest()[:16]
+        if _hop_body_hash in _seen_body_hashes:
+            log.debug(
+                "link-hop %s: duplicate body (hash=%s) — auth wall or content loop, skipping",
+                sub_url, _hop_body_hash,
+            )
+            explored[sub_url] = False
+            continue
+        _seen_body_hashes.add(_hop_body_hash)
+
+        # Iframe portal pre-check: when the hop page has NO floor-plan signals
+        # in its outer HTML, the unit data may live inside a cross-origin
+        # <iframe> (e.g. AppFolio widget on a Squarespace property site).
+        # Playwright's page.content() never includes cross-origin iframe body,
+        # so passing the outer HTML to LLM would be waste.  Instead, discover
+        # portal iframe src URLs and queue them as high-priority portal hops,
+        # then skip extraction on this shell page entirely.
+        _hop_body_text = _hop_body_bytes.decode("utf-8", errors="replace")
+        try:
+            from ma_poc.pms.signal_engine.floor_plan_signals import (
+                has_floor_plan_signals as _has_fp,
+                SIGNAL_THRESHOLD_ANY as _FP_ANY,
+            )
+            _outer_has_fp = _has_fp(_hop_body_text, _FP_ANY)
+        except Exception:
+            _outer_has_fp = True  # safe: don't skip on import failure
+
+        if not _outer_has_fp:
+            _iframe_portal_hints = _extract_portal_iframe_hints(_hop_body_text)
+            if _iframe_portal_hints:
+                log.debug(
+                    "link-hop %s: no floor-plan signals in outer HTML — "
+                    "found %d portal iframe(s), queueing them instead of LLM",
+                    sub_url, len(_iframe_portal_hints),
+                )
+                for _ih_url, _ih_name in _iframe_portal_hints:
+                    if _ih_url not in visited and not any(u == _ih_url for u, _, _ in queue):
+                        queue.append((
+                            _ih_url,
+                            _EMBEDDED_PORTAL_SCORE,
+                            f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}iframe:{_ih_name}",
+                        ))
+                        dynamic_appended += 1
+                explored[sub_url] = False
+                continue
 
         # Bug 5 alignment (2026-05-09 deep-dive): if this hop's body looks
         # rich (≥50KB AND JSON-LD FloorPlan/Apartment OR ≥5 rent tokens),
@@ -1737,9 +1933,17 @@ async def _try_link_hop(
         # add /floorplans and /floor-plans relative to that URL. This catches
         # sites like amli.com where the PMS prior is appended to the base
         # domain instead of the property's own deep URL.
+        # Skip when in accumulation mode — the index page already queued its
+        # sub-pages; adding more Entrata-style subpath variants here would create
+        # a timeout spiral (e.g. chopakaapartments.com /conventional/floorplans,
+        # /conventional/pricing, etc. all returning the same 4-unit listing).
         try:
             _hop_path_parts = [p for p in urllib.parse.urlparse(sub_url).path.split("/") if p]
-            if len(_hop_path_parts) >= 3 and dynamic_appended < max_dynamic_appends:
+            if (
+                len(_hop_path_parts) >= 3
+                and dynamic_appended < max_dynamic_appends
+                and not _in_floorplan_accumulation
+            ):
                 _prop_sub_paths = ("/floorplans", "/floor-plans", "/pricing", "/apartments-pricing")
                 for _psp in _prop_sub_paths:
                     _psp_url = sub_url.rstrip("/") + _psp
@@ -1892,57 +2096,74 @@ async def _try_link_hop(
                                     continue
                         fp_hints.append((lnk_url, "html_subpage"))
             if fp_hints and not _in_floorplan_accumulation:
-                # Mark accumulation mode so recursive sub-pages are merged,
-                # not treated as new floor-plan index pages.
-                _in_floorplan_accumulation = True
-                _first_successful_result = sub_result
-                _accumulated_units.extend(sub_result.get("units") or [])
-                # Checkpoint partial results so the timeout handler can
-                # salvage accumulated units if the property wall-clock budget
-                # expires mid-hop. Write to both shared_budget (in-process
-                # visibility) and _external_partial_ref (survives coroutine
-                # cancellation — the dict lives in _process_one's scope).
-                if shared_budget is not None:
-                    shared_budget["_partial_units"] = list(_accumulated_units)
-                    shared_budget["_partial_result"] = sub_result
-                    _ext_ref = shared_budget.get("_external_partial_ref")
-                    if isinstance(_ext_ref, dict):
-                        _ext_ref["units"] = list(_accumulated_units)
-                # Cache the LLM DOM selectors from this index page so
-                # sub-pages can replay them without another LLM call.
-                if _fp_llm_selectors is None:
-                    _css = (sub_result.get("_llm_hints") or {}).get("css_selectors")
-                    if isinstance(_css, dict) and _css.get("container"):
-                        _fp_llm_selectors = _css
-                        if shared_budget is not None:
-                            shared_budget["_fp_css_hint"] = _css
-                # Queue all floor-plan sub-page hints (within dynamic cap).
-                for fp_url, fp_kind in fp_hints:
-                    if dynamic_appended >= max_dynamic_appends:
-                        break
-                    if fp_url in visited or any(u == fp_url for u, _, _ in queue):
-                        continue
-                    queue.append(
-                        (fp_url, _EMBEDDED_PORTAL_SCORE,
-                         f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{fp_kind}")
-                    )
-                    dynamic_appended += 1
-                emit(
-                    EventKind.LINK_HOP_RECOVERED,
-                    property_id,
-                    entry_url=entry_url,
-                    sub_url=sub_url,
-                    units=len(sub_result["units"]),
-                    tier=sub_result.get("extraction_tier_used"),
-                    hop_index=idx,
-                    score=score,
+                # Guard: only enter accumulation when at least one index-page
+                # unit carries a non-null rent.  Entrata /conventional/ JSON-LD
+                # summary cards have beds/sqft but no pricing — accumulating
+                # their sub-pages only collects duplicate plan-name records.
+                # When rent is absent, treat this hop as an ordinary leaf result
+                # and fall through to the emit+return path below.
+                _index_units = sub_result.get("units") or []
+                _any_rent = any(
+                    u.get("rent_low") or u.get("rent_high") or u.get("asking_rent")
+                    for u in _index_units
                 )
-                # Continue the loop — DON'T return yet.
-                continue
+                if _any_rent:
+                    # Mark accumulation mode so recursive sub-pages are merged,
+                    # not treated as new floor-plan index pages.
+                    _in_floorplan_accumulation = True
+                    _first_successful_result = sub_result
+                    _accumulated_units.extend(sub_result.get("units") or [])
+                    # Checkpoint partial results so the timeout handler can
+                    # salvage accumulated units if the property wall-clock budget
+                    # expires mid-hop.
+                    if shared_budget is not None:
+                        shared_budget["_partial_units"] = list(_accumulated_units)
+                        shared_budget["_partial_result"] = sub_result
+                        _ext_ref = shared_budget.get("_external_partial_ref")
+                        if isinstance(_ext_ref, dict):
+                            _ext_ref["units"] = list(_accumulated_units)
+                    # Cache the LLM DOM selectors from this index page so
+                    # sub-pages can replay them without another LLM call.
+                    if _fp_llm_selectors is None:
+                        _css = (sub_result.get("_llm_hints") or {}).get("css_selectors")
+                        if isinstance(_css, dict) and _css.get("container"):
+                            _fp_llm_selectors = _css
+                            if shared_budget is not None:
+                                shared_budget["_fp_css_hint"] = _css
+                    # Queue all floor-plan sub-page hints (within dynamic cap).
+                    for fp_url, fp_kind in fp_hints:
+                        if dynamic_appended >= max_dynamic_appends:
+                            break
+                        if fp_url in visited or any(u == fp_url for u, _, _ in queue):
+                            continue
+                        queue.append(
+                            (fp_url, _EMBEDDED_PORTAL_SCORE,
+                             f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{fp_kind}")
+                        )
+                        dynamic_appended += 1
+                    emit(
+                        EventKind.LINK_HOP_RECOVERED,
+                        property_id,
+                        entry_url=entry_url,
+                        sub_url=sub_url,
+                        units=len(sub_result["units"]),
+                        tier=sub_result.get("extraction_tier_used"),
+                        hop_index=idx,
+                        score=score,
+                    )
+                    # Continue the loop — DON'T return yet.
+                    continue
+                else:
+                    log.debug(
+                        "link-hop %s: floor-plan index has %d units but all-null rent "
+                        "— returning as leaf (no accumulation)",
+                        sub_url, len(_index_units),
+                    )
 
             elif _in_floorplan_accumulation:
                 # Accumulating sub-page units — merge into the running total.
                 _accumulated_units.extend(sub_result.get("units") or [])
+                _accum_pages_fetched += 1
                 if shared_budget is not None:
                     shared_budget["_partial_units"] = list(_accumulated_units)
                     shared_budget["_partial_result"] = _first_successful_result or sub_result
@@ -1966,6 +2187,12 @@ async def _try_link_hop(
                     hop_index=idx,
                     score=score,
                 )
+                if _accum_pages_fetched >= _MAX_FLOORPLAN_ACCUM_PAGES:
+                    log.debug(
+                        "link-hop %s: floor-plan accumulation cap (%d pages) reached — stopping",
+                        entry_url, _MAX_FLOORPLAN_ACCUM_PAGES,
+                    )
+                    break
                 continue
 
             emit(
@@ -2263,6 +2490,7 @@ async def scrape_jugnu(
                     embedded_portal_hints=result.get("_embedded_portal_hints"),
                     visited_urls={base_url},  # Phase 9: cycle protection (H5)
                     shared_budget=_jugnu_budget,
+                    browser_page=page,  # Pattern A: share entry-page session
                 )
             except Exception as exc:
                 log.warning("link-hop orchestration failed for %s: %s", property_id, exc)

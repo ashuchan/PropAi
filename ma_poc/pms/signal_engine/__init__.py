@@ -33,16 +33,21 @@ from ma_poc.pms.signal_engine.decider import (
     ExtractionAction,
 )
 from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_API_NOISE_HOSTS,
+    DEFAULT_API_NOISE_PATH_FRAGMENTS,
     DEFAULT_MEDIA_FILTER,
     create_default_qualifier,
     create_default_ranker,
     create_rentcafe_qualifier,
+    is_api_noise_response,
 )
 
 __all__ = [
     "ActionDecider",
     "ActionType",
     "DecisionContext",
+    "DEFAULT_API_NOISE_HOSTS",
+    "DEFAULT_API_NOISE_PATH_FRAGMENTS",
     "DEFAULT_MEDIA_FILTER",
     "DOMAnalysisResult",
     "ExtractionAction",
@@ -58,4 +63,5 @@ __all__ = [
     "create_default_qualifier",
     "create_default_ranker",
     "create_rentcafe_qualifier",
+    "is_api_noise_response",
 ]

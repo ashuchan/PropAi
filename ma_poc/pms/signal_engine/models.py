@@ -60,7 +60,11 @@ class SourceSignal:
     def __post_init__(self) -> None:
         # Normalise all field keys to lowercase unconditionally (M7).
         # This eliminates the PascalCase key mismatch that caused RC2:
-        # "RentCafeApartmentId" vs "rentcafeapartmentid" in _is_rentcafe_response.
+        # "RentCafeApartmentId" vs "rentcafeapartmentid".
+        # Note: full alias normalisation (squareFeet→sqft etc.) is NOT applied
+        # here — it would change native PMS field names and break PMS-specific
+        # fingerprint checks (e.g. RentCafe's "floorplanname" key). Alias
+        # normalisation is applied only in has_unit_signals() (E, _merge_fns.py).
         object.__setattr__(
             self,
             "field_keys",

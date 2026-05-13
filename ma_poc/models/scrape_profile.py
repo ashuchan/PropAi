@@ -109,6 +109,10 @@ class NavigationConfig(BaseModel):
     block_resource_domains: list[str] = Field(default_factory=list)
     availability_links: list[str] = Field(default_factory=list)  # All links that led to availability data
     explored_links: list[str] = Field(default_factory=list)  # Links explored that had no data (skip next run)
+    # URL → ISO-8601 timestamp of when it was confirmed dead (DEAD_URL / HARD_FAIL
+    # with < 2 KB body). Entries are skipped for dead_link_ttl_days (default 14)
+    # so stale 404s don't consume hop budget. Cleared automatically when TTL expires.
+    dead_links: dict[str, str] = Field(default_factory=dict)
     # Raw navigation hints emitted by the LLM (e.g. "/Marketing/FloorPlans").
     # Captured even when the link-hop didn't take them so the next run can
     # still prioritise them — and so a human reviewer can see what the LLM

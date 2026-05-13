@@ -17,14 +17,13 @@ from ma_poc.services.llm_api_rescue import (
     RescueOutput,
     _build_prompt,
     _filter_candidates,
-    _is_noise_url,
-    _noise_blocklist_enabled,
     _rank_candidates,
     _tier_label_for,
     _trim_body,
     _url_to_pattern,
     rescue_from_api_responses,
 )
+from ma_poc.pms.signal_engine.defaults import is_api_noise_response as _is_noise_url
 
 FIXTURES = Path(__file__).parent / "fixtures" / "llm_rescue"
 
@@ -224,51 +223,15 @@ def test_f1_1_noise_blocklist_keeps_real_data_hosts(url: str) -> None:
     assert _is_noise_url(url) is False
 
 
-def test_f1_1_filter_drops_static_noise_when_flag_enabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("ENABLE_RESCUE_NOISE_BLOCKLIST", "true")
+def test_f1_1_filter_drops_noise_via_signal_engine() -> None:
+    """Noise filtering is delegated to signal_engine.is_api_noise_response.
+    Klaviyo (analytics CDN) is classified as noise; a generic /api/units path is not."""
     responses = [
         {"url": "https://klaviyo.com/api/track", "body": {"x": 1}},
         {"url": "https://example.com/api/units", "body": {"units": [{"id": 1}]}},
     ]
     kept = _filter_candidates(responses, None)
     assert [r["url"] for r in kept] == ["https://example.com/api/units"]
-
-
-def test_f1_1_filter_keeps_static_noise_when_flag_disabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """F1.1: when ENABLE_RESCUE_NOISE_BLOCKLIST=false, the blocklist is skipped
-    entirely. Real-data filtering still applies (non-JSON bodies dropped)."""
-    monkeypatch.setenv("ENABLE_RESCUE_NOISE_BLOCKLIST", "false")
-    responses = [
-        {"url": "https://klaviyo.com/api/track", "body": {"x": 1}},
-        {"url": "https://example.com/api/units", "body": {"units": [{"id": 1}]}},
-    ]
-    kept = _filter_candidates(responses, None)
-    # Both kept — flag-off bypasses _is_noise_url
-    assert {r["url"] for r in kept} == {
-        "https://klaviyo.com/api/track",
-        "https://example.com/api/units",
-    }
-
-
-def test_f1_1_blocklist_default_is_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Default behaviour: when env var is unset, blocklist is enabled."""
-    monkeypatch.delenv("ENABLE_RESCUE_NOISE_BLOCKLIST", raising=False)
-    assert _noise_blocklist_enabled() is True
-
-
-def test_f1_1_blocklist_flag_accepts_truthy_strings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    for val in ("false", "FALSE", "0", "no", "off"):
-        monkeypatch.setenv("ENABLE_RESCUE_NOISE_BLOCKLIST", val)
-        assert _noise_blocklist_enabled() is False, val
-    for val in ("true", "1", "yes", "on", "anything-else"):
-        monkeypatch.setenv("ENABLE_RESCUE_NOISE_BLOCKLIST", val)
-        assert _noise_blocklist_enabled() is True, val
 
 
 def test_f1_1_subdomain_match_works() -> None:
@@ -322,7 +285,9 @@ def test_rescue_rank_prefers_availability_url_pattern() -> None:
 
 
 def test_rescue_rank_prefers_unit_shaped_body() -> None:
-    a = {"url": "https://x.com/a", "body": {"units": [{"rent": 1200}]}}
+    # Body `a` has ≥2 unit signal keys with real values → passes has_unit_signals (+3.0 bonus).
+    # Body `b` is a config/meta dict with no unit-shaped array → no bonus.
+    a = {"url": "https://x.com/a", "body": {"units": [{"rent": 1200, "beds": 1}]}}
     b = {"url": "https://x.com/b", "body": {"meta": "stuff"}}
     ranked = _rank_candidates([b, a])
     assert ranked[0]["url"] == a["url"]
@@ -607,8 +572,8 @@ async def test_rescue_cost_accumulates_across_retries() -> None:
         )
 
     responses = [
-        {"url": "https://test.com/api/1", "body": {"units": [{"beds": 1}]}},
-        {"url": "https://test.com/api/2", "body": {"units": [{"beds": 2}]}},
+        {"url": "https://test.com/api/1", "body": {"units": [{"beds": 1, "rent": 1200}]}},
+        {"url": "https://test.com/api/2", "body": {"units": [{"beds": 2, "rent": 1500}]}},
     ]
     with patch("ma_poc.services.llm_api_rescue._call_llm", side_effect=fake_call):
         result = await rescue_from_api_responses(_inp(api_responses=responses))

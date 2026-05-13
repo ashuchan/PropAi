@@ -90,4 +90,8 @@ class RobotsConsumer:
                 return parser
         except Exception as exc:
             log.debug("Failed to fetch robots.txt for %s: %s", host, exc)
+            # Cache the failure so repeated fetch attempts for the same host
+            # (e.g. rwfmat.myresman.com/robots.txt returning 302-loop) don't
+            # re-issue an HTTP request on every retry of the portal page.
+            self._cache[host] = (None, time.monotonic())  # type: ignore[assignment]
             return None

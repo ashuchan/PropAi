@@ -240,37 +240,9 @@ def _response_looks_like_units(body: Any) -> bool:
     return any(k in text for k in ("unit", "floor", "plan", "rent", "price", "sqft"))
 
 
-# Domains that provide infrastructure / third-party backend services and
-# should never be saved as winning_page_url or known_endpoints.  Fetching
-# these directly without the originating browser session will always fail
-# (401/403/0-byte body) and pollutes the profile with unreplayable hints.
-_INFRA_API_DOMAINS: tuple[str, ...] = (
-    "supabase.co",          # Supabase REST / Realtime backend
-    "supabase.io",
-    "hereapi.com",          # HERE Location Services (maps/geocoding POIs)
-    "here.com/v1/",
-    "browse.search.hereapi",
-    "googleapis.com",       # Google APIs
-    "firebase.com",
-    "firebaseio.com",
-    "amazonaws.com/",       # AWS S3 / Lambda paths
-    "execute-api.",         # AWS API Gateway custom domains (*.execute-api.*.amazonaws.com)
-    "cloudfront.net",       # AWS CloudFront CDN assets (no /api/ restriction)
-    "matterport.com",       # 3-D virtual tour API — never serves apartment data
-    "omappapi.com",         # OptinMonster popup service
-    "omappa.com",
-    "theconversioncloud.com",   # Conversion Cloud widget
-    "nestiolistings.com/api/",  # Nestio/Funnel neighborhoods/config API
-    "sightmap.com/app/api/",    # SightMap internal config (not the unit data endpoint)
-    "s3.amazonaws.com",     # S3 direct object URLs
-)
-
-
-def _is_infra_api_url(url: str) -> bool:
-    """Return True when url is a third-party infrastructure endpoint that
-    cannot be replayed without the originating browser session."""
-    lower = url.lower()
-    return any(domain in lower for domain in _INFRA_API_DOMAINS)
+# Centralised infra-URL detection lives in the signal engine so every layer
+# (scraper, profile persistence, signal qualification) uses one definition.
+from ma_poc.pms.signal_engine.filters import is_infra_url as _is_infra_api_url  # noqa: E402
 
 
 _MAX_BLOCKED_ENDPOINTS = 50
@@ -562,6 +534,8 @@ def record_explored_link(
     had_data: bool,
 ) -> None:
     """Record a link as having data (availability_links) or no data (explored_links)."""
+    if _is_infra_api_url(link):
+        return
     if had_data:
         if link not in profile.navigation.availability_links:
             profile.navigation.availability_links.append(link)
@@ -673,6 +647,8 @@ def update_profile_after_extraction(
         raw_apis = scrape_result.get("_raw_api_responses", [])
         for api in raw_apis:
             url = api.get("url", "")
+            if not url or _is_infra_api_url(url):
+                continue
             if _response_looks_like_units(api.get("body")):
                 # Track widget endpoints separately (they need special handling)
                 if "/apartments/module/widgets/" in url.lower():
@@ -708,6 +684,8 @@ def update_profile_after_extraction(
         # crash ``ApiEndpoint(json_paths: dict[str, str])`` on a null value.
         clean_paths = clean_string_value_dict(llm_hints.get("json_paths"))
         for api_url in llm_hints.get("api_urls_with_data") or []:
+            if not api_url or _is_infra_api_url(api_url):
+                continue
             if not any(ep.url_pattern == api_url for ep in profile.api_hints.known_endpoints):
                 profile.api_hints.known_endpoints.append(
                     ApiEndpoint(
