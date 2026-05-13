@@ -457,7 +457,17 @@ def make_unit_dict(
         "concession": concession,
         "availability_status": availability_status,
         "available_units": available_units,
+        # Bug 2026-05-13: the v2 schema reader (core/schema_v2.py:242) looks
+        # for ``available_date`` (short form), but every adapter has been
+        # writing ``availability_date`` (long form) since the helper was
+        # introduced. The reader silently returned None for ~6,900 Tier-1
+        # API rows/day across RentCafe, Entrata, AvalonBay, AppFolio,
+        # OneSite, and SightMap. Emit BOTH keys so a reader on either
+        # convention sees the date. The reader-side fallback in
+        # schema_v2.py covers the few direct-write paths in
+        # ``_api_parser.py`` that bypass this helper.
         "availability_date": availability_date,
+        "available_date": availability_date,
         "lease_term": lease_term,
         "move_in_date": move_in_date,
         "source_api_url": source_api_url,

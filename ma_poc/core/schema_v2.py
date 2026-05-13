@@ -239,7 +239,15 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         "rent_low": _format_rent(rent_lo),
         "rent_high": _format_rent(rent_hi),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
-        "available_date": _format_date(unit.get("available_date")),
+        # Bug 2026-05-13: most adapters emit the long-form key
+        # ``availability_date`` (via ``make_unit_dict`` in
+        # ``adapters/_parsing.py``). Three direct-write paths in
+        # ``adapters/_api_parser.py`` (SightMap line 305, RealPage line
+        # 450, generic line 611) also emit the long form. Accept either
+        # — ``available_date`` wins when both are populated.
+        "available_date": _format_date(
+            unit.get("available_date") or unit.get("availability_date")
+        ),
         "lease_term": _safe_lease_term(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
         # F10 additions — always present (None when unset).

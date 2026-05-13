@@ -165,3 +165,122 @@ def test_date_placeholder_flag_passthrough() -> None:
 ])
 def test_normalize_amenities_table_driven(raw, expected) -> None:
     assert _normalize_amenities(raw) == expected
+
+
+# ── Available-date bug 2026-05-13 ─────────────────────────────────────
+# All Tier-1 adapters emit the long-form key ``availability_date``; the
+# reader previously looked for the short-form ``available_date`` only,
+# so ~6,900 Tier-1 rows/day across RentCafe/Entrata/AvalonBay/AppFolio/
+# OneSite/SightMap had a NULL availability date even though the source
+# payload contained one. The fix accepts either key in the reader and
+# emits both keys from the canonical writer (``make_unit_dict``). These
+# tests pin both directions so neither side can regress silently.
+
+
+def test_available_date_reads_short_form() -> None:
+    """Reader returns ``available_date`` when the unit dict uses the
+    short-form key (canonical going forward)."""
+    unit = {
+        "unit_id": "u101",
+        "floor_plan_name": "A1",
+        "available_date": "2026-06-20",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == "2026-06-20"
+
+
+def test_available_date_reads_long_form_fallback() -> None:
+    """Reader falls back to ``availability_date`` (long form) when the
+    short-form key is absent — covers every adapter that emits via
+    ``make_unit_dict`` plus the three direct-write paths in
+    ``adapters/_api_parser.py``. This is the actual regression that the
+    fix corrects."""
+    unit = {
+        "unit_id": "u202",
+        "floor_plan_name": "B1",
+        "availability_date": "2026-07-15",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == "2026-07-15"
+
+
+def test_available_date_neither_key_returns_none() -> None:
+    """Unit dict with neither key → ``available_date`` is None.
+    Distinguishes a real null (no date in the source) from the silent
+    drop the bug used to produce."""
+    unit = {"unit_id": "u303", "floor_plan_name": "C1"}
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] is None
+
+
+def test_available_date_short_form_wins_when_both_set() -> None:
+    """When BOTH keys are populated with different values, the short
+    form (``available_date``) wins. This is the documented tiebreaker
+    so callers can override the long-form value by also setting the
+    short form."""
+    unit = {
+        "unit_id": "u404",
+        "floor_plan_name": "D1",
+        "available_date": "2026-06-01",
+        "availability_date": "2026-07-01",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == "2026-06-01"
+
+
+def test_available_date_empty_string_long_form_falls_through() -> None:
+    """An empty-string short-form key (which is falsy) falls through to
+    the long form. Adapters that emit ``available_date=""`` for missing
+    data should still surface a populated long-form key when present."""
+    unit = {
+        "unit_id": "u505",
+        "floor_plan_name": "E1",
+        "available_date": "",
+        "availability_date": "2026-08-10",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == "2026-08-10"
+
+
+def test_make_unit_dict_emits_both_available_date_keys() -> None:
+    """Option A in ``adapters/_parsing.py``: the canonical writer emits
+    BOTH ``availability_date`` (legacy long form, used by every adapter)
+    AND ``available_date`` (short form, matches schema_v2 reader). This
+    pins the contract so a future cleanup that drops the alias is a
+    deliberate, test-flagged change."""
+    from ma_poc.pms.adapters._parsing import make_unit_dict
+
+    unit = make_unit_dict(
+        unit_number="101",
+        availability_date="2026-06-20",
+    )
+    assert unit["availability_date"] == "2026-06-20"
+    assert unit["available_date"] == "2026-06-20"
+
+
+def test_make_unit_dict_no_date_emits_empty_both_keys() -> None:
+    """When no availability date is passed, both keys are present as
+    empty strings (the existing default) — keeps the v2 schema reader
+    seeing a stable shape across rows."""
+    from ma_poc.pms.adapters._parsing import make_unit_dict
+
+    unit = make_unit_dict(unit_number="101")
+    assert unit["availability_date"] == ""
+    assert unit["available_date"] == ""
+
+
+def test_make_unit_dict_then_format_v2_unit_integration() -> None:
+    """End-to-end: writer → reader chain produces a populated
+    ``available_date``. This is the failure mode of the bug — adapters
+    wrote correctly, but the reader dropped it. Pinning this asserts
+    both halves of the fix work together."""
+    from ma_poc.pms.adapters._parsing import make_unit_dict
+
+    unit = make_unit_dict(
+        unit_number="101",
+        bedrooms="1",
+        floor_plan_name="A1",
+        availability_date="2026-06-20",
+    )
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == "2026-06-20"
