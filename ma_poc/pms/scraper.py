@@ -675,6 +675,25 @@ async def scrape(
         fallback_chain.append(adapter_name)
         result["_detected_pms"] = _detection_to_dict(detection)
 
+    # --- Pattern B reveal: click "View Availability" / "Show Units" cards ----
+    # Some marketing sites render plan cards collapsed and only reveal
+    # rents on click (no XHR). When the rendered HTML has < 3 dollar
+    # amounts AND has reveal-shaped button text, click them and let the
+    # adapter see the post-click DOM via page.content(). No-ops when
+    # ``page is None`` (Jugnu fetch-only path) or when the page already
+    # has rent content. See ``ma_poc.pms.interactive_reveal`` for the
+    # full design rationale and gating heuristics.
+    try:
+        from ma_poc.pms.interactive_reveal import maybe_reveal as _maybe_reveal
+
+        reveal_telemetry = await _maybe_reveal(page, page_html=page_html)
+        result["_interactive_reveal"] = reveal_telemetry
+    except Exception as exc:  # pragma: no cover - defensive
+        result["_interactive_reveal"] = {
+            "triggered": False,
+            "reason": f"exception: {exc}",
+        }
+
     adapter_result: AdapterResult
     try:
         adapter_result = await adapter.extract(page, ctx)  # type: ignore[arg-type]
