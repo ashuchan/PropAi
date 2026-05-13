@@ -23,7 +23,6 @@ from ma_poc.pms.signal_engine.qualifier import (
 )
 from ma_poc.pms.signal_engine.ranker import ScoringTables, SourceRanker
 
-
 # ── Scoring constants (single source of truth) ────────────────────────────────
 # These replace the scattered constants in scraper.py.
 # scraper.py imports these during Phase 2; the definitions there are removed
@@ -120,6 +119,34 @@ DEFAULT_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("/models", 85),
     ("/find-your-home", 88),
     ("/search", 50),
+    # 2026-05-13 (May-13 manual QC): patterns added based on 400-property
+    # ground-truth tagging. Sync with resolver._CTA_PATH_RE.
+    ("/floor-plans-and-pricing", 95),  # verbose variant
+    ("/floor-plans.aspx", 90),
+    ("/floorplans.aspx", 90),
+    ("/plans.html", 85),
+    ("/plans.asp", 85),
+    ("/units-available", 88),
+    ("/townhome-floorplans", 90),
+    ("/vacancies", 85),
+    ("/check-availability", 90),
+    ("/floorplan-availability", 90),
+    ("/interactive-site-map", 85),     # RentManager sitemap with embedded units
+    ("/oleapplication", 70),           # Entrata Online Leasing Application
+    # Pattern A: per-floor-plan detail-page navigation. Floor-plan card
+    # sites like liveatsurf.com link from /floor-plans/ to /apartment/<slug>/
+    # for each plan. The detail page has the actual rent. Singular
+    # `/apartment/` (NOT `/apartments`) is the differentiator.
+    ("/apartment/", 78),
+    ("/home/", 50),                    # /home/<slug> per-property detail
+    # Portfolio PMC site patterns — Princeton Mgmt, Beacon Mgmt etc.
+    ("/communities/", 75),
+    ("/community/", 70),
+    ("/property/", 70),
+    ("/properties/", 70),
+    ("/apartment-communities/", 75),
+    ("/our-properties/", 70),
+    ("/our-communities/", 70),
 )
 
 DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
@@ -135,6 +162,20 @@ DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("knockrentals.com", 115),      # Knock CRM leasing portal
     ("leasehawk.com", 115),         # LeasHawk leasing CRM
     ("rentgrata.com", 80),          # Referral, lower priority
+    # 2026-05-13 (May-13 manual QC + live-probe): cross-domain portals
+    # observed on 98 rebrand cases + 30-property untagged sample.
+    # Sync with resolver._LEASING_PORTAL_DOMAINS.
+    (".securecafenet.com", 115),     # SecureCafe alt domain
+    ("yottareal.com", 115),          # adaraportal.yottareal.com (Yardi product)
+    ("mriprospectconnect.com", 115), # MRI Software portal
+    ("showmojo.com", 110),           # ShowMojo unit-tour platform
+    ("apartmentsearch.com", 105),    # CORT aggregator
+    ("selftournow.com", 110),        # TouchTour / Engrain self-tour
+    ("ovationco.com", 110),          # Ovation Property Management
+    ("doorway.knck.io", 115),        # Knock subdomain
+    ("myresman.com", 115),           # ResMan PMS portal
+    ("reslisting.com", 110),         # marquette-management.reslisting.com
+    ("rentcafewebsite.com", 115),    # legacy *.rentcafewebsite.com
 )
 
 DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
