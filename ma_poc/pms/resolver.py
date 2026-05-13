@@ -136,6 +136,14 @@ _LEASING_PORTAL_DOMAINS = frozenset(
         "ovationco.com",
         "knockrentals.com",
         "doorway.knck.io",
+        # 2026-05-13 (Round 3): from 30-property live-probe sample
+        "myresman.com",      # ResMan PMS portal — areac.myresman.com,
+                             # rudeenmgt.myresman.com observed on
+                             # crestriverdistrict, riverviewapts
+        "loftliving.com",    # Loft Living portal (already in earlier set —
+                             # de-dup; left as-is for clarity)
+        "reslisting.com",    # marquette-management.reslisting.com style
+        "rentcafewebsite.com",  # legacy *.rentcafewebsite.com URLs
     }
 )
 
