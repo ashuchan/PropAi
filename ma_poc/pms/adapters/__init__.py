@@ -18,6 +18,7 @@ from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
 from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
 from ma_poc.pms.adapters.sightmap import SightMapAdapter
+from ma_poc.pms.adapters.spherexx import SpherexxAdapter
 from ma_poc.pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
 from ma_poc.pms.adapters.touchtour import TouchTourAdapter
 from ma_poc.pms.adapters.wix_nopms import WixNoPmsAdapter
@@ -49,6 +50,7 @@ def _bootstrap_registry() -> None:
         AmliAdapter,
         FunnelAdapter,
         TouchTourAdapter,
+        SpherexxAdapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,

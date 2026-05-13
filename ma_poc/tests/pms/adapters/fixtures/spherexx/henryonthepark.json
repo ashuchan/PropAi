@@ -1,0 +1,663 @@
+[
+  {
+    "url": "https://presentation.spherexx.app/api/unit",
+    "body": [
+      {
+        "ID": 569180,
+        "PriceFeedID": "2427",
+        "Name": "B102",
+        "Description": "",
+        "Building": "B",
+        "Number": "02",
+        "Sqft": 1000,
+        "Bed": 1.0,
+        "Bath": 1.0,
+        "Floor": "1",
+        "Price": 1592.0,
+        "PriceMin": 1592.0,
+        "PriceMax": 1970.0,
+        "EffectivePrice": 0.0,
+        "EffectivePriceMin": 0.0,
+        "EffectivePriceMax": 0.0,
+        "ConcessionRecurring": 0.0,
+        "ConcessionFreeMonths": 0.0,
+        "ConcessionLeaseTerm": 0.0,
+        "AvailableDate": "2026-06-29T00:00:00",
+        "BestFirstAvailablePrice": 1592.0,
+        "BestFirstAvailableTerm": 12.0,
+        "Amenity": [
+          "1st Floor"
+        ],
+        "FilterableAmenity": [
+          "1st Floor"
+        ],
+        "FloorplanID": 1250,
+        "FloorplanOriginalID": 58711,
+        "FloorplanName": "Olive",
+        "Thumb": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup996339262_1x1_The_Olive_1000sqft.jpg",
+        "Image": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup996339262_1x1_The_Olive_1000sqft.jpg",
+        "AltText": "Olive Floorplan Layout",
+        "Gallery": [
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_bedroom.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_bed1.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_bedroom.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_bathroom_.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen_1_.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen_hop.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_1_.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_livingroom.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_bed.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_living_room.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_dining_room.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_balc.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_unit_balcony.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_ensuite_bathroolm.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          }
+        ],
+        "Direction": "",
+        "ApplicationLinkURL": "https://www.henryonthepark.com/apply/",
+        "Concessions": []
+      },
+      {
+        "ID": 569202,
+        "PriceFeedID": "2449",
+        "Name": "B212",
+        "Description": "",
+        "Building": "B",
+        "Number": "12",
+        "Sqft": 1050,
+        "Bed": 1.0,
+        "Bath": 1.0,
+        "Floor": "2",
+        "Price": 1592.0,
+        "PriceMin": 1592.0,
+        "PriceMax": 1936.0,
+        "EffectivePrice": 0.0,
+        "EffectivePriceMin": 0.0,
+        "EffectivePriceMax": 0.0,
+        "ConcessionRecurring": 0.0,
+        "ConcessionFreeMonths": 0.0,
+        "ConcessionLeaseTerm": 0.0,
+        "AvailableDate": "2026-07-06T00:00:00",
+        "BestFirstAvailablePrice": 1592.0,
+        "BestFirstAvailableTerm": 12.0,
+        "Amenity": [
+          "2nd Floor"
+        ],
+        "FilterableAmenity": [
+          "2nd Floor"
+        ],
+        "FloorplanID": 1251,
+        "FloorplanOriginalID": 58712,
+        "FloorplanName": "Magnolia",
+        "Thumb": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup996339262_1x1_The_Magnolia_1050sqft.jpg",
+        "Image": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup996339262_1x1_The_Magnolia_1050sqft.jpg",
+        "AltText": "Magnolia Floorplan Layout",
+        "Gallery": [
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen_hop.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen_1_.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_ensuite_bathroolm.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_bathroom_.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_bedroom.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_bed1.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_bedroom.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_unit_balcony.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_dining_room.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_balc.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_living_room.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_bed.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_livingroom.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_1_.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          }
+        ],
+        "Direction": "",
+        "ApplicationLinkURL": "https://www.henryonthepark.com/apply/",
+        "Concessions": []
+      },
+      {
+        "ID": 569244,
+        "PriceFeedID": "2491",
+        "Name": "C106",
+        "Description": "",
+        "Building": "C",
+        "Number": "06",
+        "Sqft": 1100,
+        "Bed": 1.0,
+        "Bath": 1.0,
+        "Floor": "1",
+        "Price": 1592.0,
+        "PriceMin": 1592.0,
+        "PriceMax": 2206.0,
+        "EffectivePrice": 0.0,
+        "EffectivePriceMin": 0.0,
+        "EffectivePriceMax": 0.0,
+        "ConcessionRecurring": 0.0,
+        "ConcessionFreeMonths": 0.0,
+        "ConcessionLeaseTerm": 0.0,
+        "AvailableDate": "2026-05-07T00:00:00",
+        "BestFirstAvailablePrice": 1592.0,
+        "BestFirstAvailableTerm": 12.0,
+        "Amenity": [
+          "1st Floor"
+        ],
+        "FilterableAmenity": [
+          "1st Floor"
+        ],
+        "FloorplanID": 1252,
+        "FloorplanOriginalID": 58713,
+        "FloorplanName": "Juniper",
+        "Thumb": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup996339262_1x1_The_Juniper_1100sqft.jpg",
+        "Image": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup996339262_1x1_The_Juniper_1100sqft.jpg",
+        "AltText": "Juniper Floorplan Layout",
+        "Gallery": [
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_1_.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen_hop.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen_1_.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_bathroom_.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_bedroom.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_bed1.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_bedroom.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_unit_balcony.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_balc.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_living_room.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_dining_room.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_bed.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_livingroom.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_ensuite_bathroolm.jpg",
+            "Alt": "",
+            "Description": "",
+            "IsView": false
+          }
+        ],
+        "Direction": "",
+        "ApplicationLinkURL": "https://www.henryonthepark.com/apply/",
+        "Concessions": [
+          {
+            "ConcessionType": "Special Offer",
+            "Origin": "Spherexx",
+            "EffectiveStart": "2026-05-05T00:00:00",
+            "EffectiveEnd": "2026-06-05T00:00:00",
+            "Amount": 0,
+            "LeaseTerm": 0,
+            "Special": "Fresh Starts Begin Here \u00e2\u20ac&#8221; Enjoy a $750 Move-In Bonus on select apartment homes. Offer expires 5/31/2026. Terms & conditions apply."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "url": "https://presentation.spherexx.app/api/floorplan",
+    "body": [
+      {
+        "ID": 1249,
+        "Name": "Elm",
+        "Description": "Residents will love the open living space in this studio apartment home.",
+        "InternetOffer": "",
+        "Bed": 0.0,
+        "Bath": 1.0,
+        "MinSqFt": 600,
+        "MaxSqFt": 600,
+        "Amenity": [
+          "Dishwasher",
+          "Hall Closet",
+          "Walk-In Closet",
+          "Open Floorplan",
+          "9 Ft. Ceilings",
+          "Reserved Parking",
+          "Garbage Disposal",
+          "Granite Countertops",
+          "Cable/Internet Ready",
+          "Mosaic Tile Backsplash",
+          "Full Size Washer/Dryer",
+          "Built-In Microwave Oven",
+          "Brushed Nickel Fixtures",
+          "Over-sized Patio/Balcony",
+          "Stainless Steel Appliances",
+          "Plank Flooring in the Kitchen",
+          "Gas Heating and Central Air Conditioning"
+        ],
+        "FilterableAmenity": [],
+        "Thumb": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup996339262_0x1_The_Elm_600sqft.jpg",
+        "Image": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup996339262_0x1_The_Elm_600sqft.jpg",
+        "AltText": "Elm Floorplan Layout",
+        "Gallery": [
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen_1_.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen_hop.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_1_.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_livingroom.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_bed.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_living_room.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_dining_room.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_balc.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_unit_balcony.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_bedroom.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_bed1.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_bedroom.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_bathroom_.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_ensuite_bathroolm.jpg",
+            "Alt": "",
+            "IsView": false
+          }
+        ]
+      },
+      {
+        "ID": 1253,
+        "Name": "Ash",
+        "Description": "Enjoy the convenience with a dedicated home office space in this one bedroom home.",
+        "InternetOffer": "",
+        "Bed": 1.0,
+        "Bath": 1.0,
+        "MinSqFt": 1150,
+        "MaxSqFt": 1150,
+        "Amenity": [
+          "Dishwasher",
+          "Hall Closet",
+          "Walk-In Closet",
+          "Open Floorplan",
+          "9 Ft. Ceilings",
+          "Reserved Parking",
+          "Garbage Disposal",
+          "Granite Countertops",
+          "Cable/Internet Ready",
+          "Mosaic Tile Backsplash",
+          "Full Size Washer/Dryer",
+          "Built-In Microwave Oven",
+          "Brushed Nickel Fixtures",
+          "Over-sized Patio/Balcony",
+          "Stainless Steel Appliances",
+          "Plank Flooring in the Kitchen",
+          "Gas Heating and Central Air Conditioning"
+        ],
+        "FilterableAmenity": [],
+        "Thumb": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup996339262_1x1_The_Ash_1150sqft.jpg",
+        "Image": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup996339262_1x1_The_Ash_1150sqft.jpg",
+        "AltText": "Ash Floorplan Layout",
+        "Gallery": [
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen_1_.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_kitchen_hop.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_1_.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_livingroom.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_bed.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_living_room.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_dining_room.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_balc.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_unit_balcony.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_renovated_kitchen_bedroom.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_hop_bed1.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_bedroom.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_bathroom_.jpg",
+            "Alt": "",
+            "IsView": false
+          },
+          {
+            "URL": "https://optimize.spherexx.com/app/assets/communities/5671/rollups/cRollup530263380_ensuite_bathroolm.jpg",
+            "Alt": "",
+            "IsView": false
+          }
+        ]
+      }
+    ]
+  }
+]

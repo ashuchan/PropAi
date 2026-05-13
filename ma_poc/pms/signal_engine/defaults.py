@@ -194,6 +194,12 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     "avalonbay": ("/floor-plans-pricing", "/apartments"),
     "amli": ("/floor-plans", "/availability"),
     "funnel": ("/floorplans", "/availability"),
+    # 2026-05-13 — Spherexx Presentation Software ("Convert"). Properties
+    # using Spherexx commonly land at /interactive-site-map/ on the vanity
+    # host; the actual data API lives on presentation.spherexx.app/api/unit.
+    # Resolver-only fallback paths — when host detection picks "spherexx"
+    # without a same-page widget, prefer these vanity sub-paths first.
+    "spherexx": ("/interactive-site-map", "/floor-plans", "/availability"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (

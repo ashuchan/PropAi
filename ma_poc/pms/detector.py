@@ -50,6 +50,7 @@ PmsName = Literal[
     "amli",
     "funnel",
     "touchtour",
+    "spherexx",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -76,6 +77,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "amli": "api_first",
     "funnel": "api_first",
     "touchtour": "cascade",
+    "spherexx": "api_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -378,6 +380,21 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         )
     if "mytouchtour.com" in h:
         return "touchtour", 0.85, ["TouchTour portal marker in HTML (mytouchtour.com)"]
+    # Spherexx Presentation Software ("Convert") — Leaflet-based interactive
+    # building site-map widget. Identified by the ssploader.js script tag
+    # and/or window.sspcfg config. Confirmed via 2026-05-13 deep probe of
+    # henryonthepark.com — /api/unit returns a 176KB array of structured
+    # unit data (ID/Name/Sqft/Bed/Bath/Price/FloorplanID/FloorplanName).
+    if (
+        "presentation.spherexx.app" in h
+        or "ssploader.js" in h
+        or "sspcfg" in h
+    ):
+        return (
+            "spherexx",
+            0.90,
+            ["Spherexx marker in HTML (presentation.spherexx.app / ssploader.js / sspcfg)"],
+        )
 
     # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong
     # "not-a-PMS" signals when no strong PMS marker appeared in pass 1.
@@ -440,6 +457,7 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "amli": ("amli.com",),
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
+    "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
     # Marketing / lead-capture stacks — observed in 10-property roll-up
     # (doorway.knck.io, cdn-media.hy.ly, chat.hyly.ai, marketapts.com).
     "marketing_knock": ("doorway.knck.io", "knockrentals.com"),
