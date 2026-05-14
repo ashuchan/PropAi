@@ -34,3 +34,12 @@ gmail_delegated_user   = "khabrilal@surgexdigital.com"
 email_transport        = "gmail_api"
 report_recipients      = "ashu@surgexdigital.com"
 report_sender_name     = "PropAi Daily Reports (staging)"
+
+# ── propai-frontend (UI + API) ──────────────────────────────────────────────
+# TODO(staging-frontend): not deployed in staging today (per ashu, 2026-05-15).
+# To turn on:
+#   1. Add a deploy-frontend-staging.yml workflow mirroring the production one
+#      but pointing at staging secrets + the staging cloud SQL instance.
+#   2. Bump frontend_image_tag below the first time the staging workflow runs.
+# Until then, only production has the propai-frontend service.
+frontend_image_tag = "bootstrap"

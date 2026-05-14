@@ -19,9 +19,14 @@ function resolveDataDir(): string {
 }
 
 export const config = {
-  port: parseInt(process.env.API_PORT || '3001', 10),
+  // Cloud Run injects PORT; honour it before the local-dev API_PORT fallback.
+  port: parseInt(process.env.PORT || process.env.API_PORT || '3001', 10),
   dataDir: resolveDataDir(),
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   logLevel: process.env.LOG_LEVEL || 'info',
   schemaVersion: (process.env.SCHEMA_VERSION || 'v1') as 'v1' | 'v2',
+  // SPA serving for the Cloud Run single-container deploy. Off in local dev
+  // (Vite serves the SPA at :5173 and proxies /api to this server at :3001).
+  serveStatic: process.env.SERVE_STATIC === 'true',
+  staticDir: process.env.STATIC_DIR || resolve(maPocRoot, 'frontend', 'dist'),
 };

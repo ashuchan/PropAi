@@ -52,3 +52,13 @@ output "scheduler_job_names" {
   description = "Cloud Scheduler job names"
   value       = module.scheduler.scheduler_job_names
 }
+
+output "frontend_service_url" {
+  description = "Public *.run.app URL for the propai-frontend service. Open in a browser; IAP gates access via Google login."
+  value       = module.cloud_run_service.service_url
+}
+
+output "frontend_service_name" {
+  description = "Cloud Run service name (e.g. propai-frontend-production). Used by gcloud to push image updates outside Terraform."
+  value       = module.cloud_run_service.service_name
+}

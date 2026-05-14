@@ -186,3 +186,16 @@ variable "report_sender_name" {
   default     = "PropAi Daily Reports"
   description = "Display name in the email From header."
 }
+
+# ── propai-frontend (UI + API) Cloud Run service ────────────────────────────
+# A separate image_tag from the scrape image is intentional: UI and scraper
+# release on different cadences, and pinning them together would couple a
+# CSS tweak to a 7-hour scrape validation pass.
+# IAP user grants are applied out-of-band by the deploy workflow's gcloud
+# steps — provider 5.x does not have IAP-on-Cloud-Run resources. See
+# .github/workflows/deploy-frontend.yml for the member list.
+variable "frontend_image_tag" {
+  type        = string
+  default     = "latest"
+  description = "Tag of the propai-frontend image in Artifact Registry. Bumped by the build+push step in .github/workflows/deploy-frontend.yml."
+}

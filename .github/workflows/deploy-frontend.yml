@@ -1,0 +1,317 @@
+name: Deploy frontend (production)
+
+# UI + API deploy. Independent of the scraper deploy on purpose — UI changes
+# ship at a different cadence than the scraper, and tying them would force a
+# CSS tweak to wait for the next scrape-image validation pass.
+#
+# Trigger model:
+#   - push to main with changes under the frontend / services / cloud_run_service
+#     paths (auto-deploy on merge)
+#   - manual workflow_dispatch (deploy any ref on demand)
+#
+# Auth: same Workload Identity Federation setup as the scrape deploy. Uses
+# the existing WIF_PROVIDER + WIF_SA_PROD + GCP_PROJECT_ID_PROD secrets.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ma_poc/frontend/**"
+      - "ma_poc/services/**"
+      - "infra/terraform/modules/cloud_run_service/**"
+      - "infra/terraform/main.tf"
+      - "infra/terraform/variables.tf"
+      - "infra/terraform/outputs.tf"
+      - "infra/terraform/envs/prod.tfvars"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to deploy (defaults to main)"
+        required: false
+        default: "main"
+
+# Never cancel a deploy mid-apply.
+concurrency:
+  group: deploy-frontend-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: us-central1
+  AR_REPO: jugnu-images
+  IMAGE_NAME: propai-frontend
+  TF_ENV: production # value of `env` in envs/prod.tfvars
+  SERVICE_NAME: propai-frontend-production
+  # Google identities granted IAP web access. Newline-separated; the
+  # add-iap-bindings step iterates these. Add a teammate by appending an
+  # `${{ ... }}` line below — or move to `vars.IAP_MEMBERS` for repo-level
+  # management. Anyone NOT listed lands on a Google login page that
+  # rejects them, so this is the single source of truth for "who can see
+  # the UI".
+  IAP_MEMBERS: |
+    ashu@surgexdigital.com
+
+jobs:
+  # ── Step 1: build + push the propai-frontend image ──────────────────────────
+  build-image:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.sha }}
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SA_PROD }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - id: tag
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-12)
+          TAG="frontend-prod-${SHORT_SHA}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Image tag: ${TAG}"
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ma_poc/frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID_PROD }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID_PROD }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:frontend-prod-latest
+          # Scoped GHA cache so the frontend cache key doesn't collide with the
+          # scrape image's cache. Both deploys can warm-cache independently.
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  # ── Step 2: terraform apply (cloud_run_service module only) ─────────────────
+  terraform-apply:
+    needs: [build-image]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    outputs:
+      service-url: ${{ steps.url.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.sha }}
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SA_PROD }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+
+      - name: Init
+        run: |
+          terraform init \
+            -backend-config="bucket=jugnu-tfstate-prod" \
+            -backend-config="prefix=terraform/state"
+
+      # Plan refresh reads google_sql_user, which fails when the instance is
+      # STOPPED. Wake it before plan; on a first-time deploy (instance doesn't
+      # exist yet) skip silently.
+      - name: Wake Cloud SQL before plan
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID_PROD }}
+        run: |
+          INSTANCE="jugnu-db-${{ env.TF_ENV }}"
+          state=$(gcloud sql instances describe "$INSTANCE" \
+            --project="$PROJECT" --format='value(state)' 2>/dev/null || echo "NOT_FOUND")
+          case "$state" in
+            NOT_FOUND) echo "No SQL instance yet — first-time deploy"; exit 0 ;;
+            RUNNABLE)  echo "SQL already RUNNABLE"; exit 0 ;;
+          esac
+          echo "SQL state: $state — submitting wake operation..."
+          gcloud sql instances patch "$INSTANCE" \
+            --project="$PROJECT" --activation-policy=ALWAYS --async --quiet
+          deadline=$(( $(date +%s) + 600 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            sleep 10
+            state=$(gcloud sql instances describe "$INSTANCE" \
+              --project="$PROJECT" --format='value(state)' 2>/dev/null || echo "UNKNOWN")
+            echo "  state=$state"
+            case "$state" in
+              RUNNABLE) exit 0 ;;
+              MAINTENANCE|PENDING_CREATE|UNKNOWN) continue ;;
+              *) echo "::error::Unexpected SQL state '$state'"; exit 1 ;;
+            esac
+          done
+          echo "::error::SQL not RUNNABLE after 10 min (last: $state)"
+          exit 1
+
+      # The scrape job's image_tag is a required variable. Reading the
+      # currently-deployed tag from Cloud Run and passing it back means the
+      # plan no-ops on cloud_run_jobs — a frontend deploy never moves the
+      # scrape image. On first-time deploys (no job exists), fall back to
+      # "prod-known-good" which the scrape pipeline maintains.
+      - name: Resolve current scrape image tag
+        id: scrape
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID_PROD }}
+        run: |
+          IMAGE=$(gcloud run jobs describe jugnu-scrape-${{ env.TF_ENV }} \
+            --region=${{ env.REGION }} --project="$PROJECT" \
+            --format='value(spec.template.template.containers[0].image)' 2>/dev/null || echo "")
+          if [ -z "$IMAGE" ]; then
+            TAG="prod-known-good"
+            echo "::notice::No scrape job yet — using fallback tag '$TAG'"
+          else
+            TAG="${IMAGE##*:}"
+            echo "::notice::Locked scrape image_tag to current deployment: $TAG"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Plan
+        id: plan
+        run: |
+          # -detailed-exitcode: 0=no changes, 1=plan error, 2=changes present.
+          # On a frontend-only deploy expect rc=2 (frontend changes) or rc=0
+          # (no-op). rc=1 means a real planning error — fail fast.
+          set +e
+          terraform plan \
+            -var-file=envs/prod.tfvars \
+            -var="image_tag=${{ steps.scrape.outputs.tag }}" \
+            -var="frontend_image_tag=${{ needs.build-image.outputs.image-tag }}" \
+            -var="project_id=${{ secrets.GCP_PROJECT_ID_PROD }}" \
+            -out=tfplan \
+            -detailed-exitcode \
+            -no-color > plan.txt 2>&1
+          rc=$?
+          set -e
+          cat plan.txt
+          if [ "$rc" -eq 1 ]; then
+            echo "::error::terraform plan failed"
+            exit 1
+          fi
+          # Hard guard: a frontend deploy should NEVER destroy a resource.
+          # If the plan says it will, something is wrong — likely a tfvars
+          # drift between the scrape and frontend deploys. Refuse to apply.
+          if grep -qE '# .+ will be destroyed' plan.txt; then
+            echo "::error::Destructive change in plan. Aborting."
+            grep -E '# .+ will be destroyed' plan.txt
+            exit 1
+          fi
+
+      - name: Apply
+        run: terraform apply -auto-approve tfplan
+
+      - id: url
+        name: Read service URL
+        run: |
+          URL=$(terraform output -raw frontend_service_url)
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Service URL: ${URL}"
+
+      # ── Post-apply IAP setup ─────────────────────────────────────────────
+      # Provider 5.x in this repo lacks `iap_enabled` on
+      # google_cloud_run_v2_service, so we toggle IAP via gcloud after
+      # Terraform has materialised the service. Both calls are idempotent —
+      # a re-run on an already-IAP-enabled service is a no-op.
+      - name: Enable IAP on the service
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID_PROD }}
+        run: |
+          gcloud beta run services update ${{ env.SERVICE_NAME }} \
+            --iap \
+            --region=${{ env.REGION }} \
+            --project="$PROJECT" \
+            --quiet
+          echo "::notice::IAP enabled on ${{ env.SERVICE_NAME }}"
+
+      # Idempotent grants: gcloud is happy to re-add the same binding —
+      # the API treats it as a no-op. Removed users are NOT cleaned up
+      # automatically; to revoke, remove the line from IAP_MEMBERS and
+      # then run `gcloud beta iap web remove-iam-policy-binding` once
+      # manually (documented in docs/DEPLOY_FRONTEND.md).
+      - name: Grant IAP access to allowed users
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID_PROD }}
+          MEMBERS: ${{ env.IAP_MEMBERS }}
+        run: |
+          # Strip blank lines and trim whitespace so a stray newline in
+          # the env var doesn't try to bind an empty member.
+          echo "$MEMBERS" | awk 'NF' | while IFS= read -r email; do
+            email="$(echo "$email" | xargs)"
+            [ -z "$email" ] && continue
+            echo "Granting IAP access to ${email}..."
+            gcloud beta iap web add-iam-policy-binding \
+              --resource-type=cloud-run \
+              --service=${{ env.SERVICE_NAME }} \
+              --region=${{ env.REGION }} \
+              --project="$PROJECT" \
+              --member="user:${email}" \
+              --role=roles/iap.httpsResourceAccessor \
+              --quiet
+          done
+
+  # ── Step 3: smoke probe (IAP-aware) ─────────────────────────────────────────
+  smoke:
+    needs: [terraform-apply]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SA_PROD }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Probe service URL
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID_PROD }}
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} --project="$PROJECT" \
+            --format='value(status.url)')
+          echo "Service URL: $URL"
+          # IAP rejects unauthenticated requests with a 302 redirect to
+          # accounts.google.com. That's the success signal — it proves the
+          # service is up AND IAP is gating it. -L would follow the
+          # redirect; we deliberately don't.
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$URL")
+          echo "Initial HTTP response: $CODE"
+          case "$CODE" in
+            302|303)
+              echo "::notice::✓ Service reachable, IAP redirect active. Production ready."
+              ;;
+            200)
+              echo "::warning::Service returned 200 without IAP redirect. Verify IAP is enabled."
+              ;;
+            *)
+              echo "::error::Unexpected HTTP $CODE from service. Check Cloud Run logs."
+              exit 1
+              ;;
+          esac
+
+      - name: Print deploy summary
+        run: |
+          echo "## Frontend deploy successful" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Image tag:** \`${{ needs.build-image.outputs.image-tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Service URL:** ${{ needs.terraform-apply.outputs.service-url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Sign in with a Google identity in \`frontend_iap_member_emails\` (envs/prod.tfvars) to access." >> "$GITHUB_STEP_SUMMARY"

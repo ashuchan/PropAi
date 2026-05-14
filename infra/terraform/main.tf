@@ -78,3 +78,27 @@ module "scheduler" {
   project_id             = var.project_id
   retry_scheduler_paused = true # disabled by default; enable when auto-retry is ready
 }
+
+# ── propai-frontend Cloud Run service ────────────────────────────────────────
+# Public UI + API. IAP gates access; only emails in iap_member_emails can hit
+# it. Image is built+pushed separately from the jugnu scraper image — see
+# docs/DEPLOY_FRONTEND.md.
+#
+# TODO(staging): only wired into production today. To enable for staging,
+# create envs/staging.tfvars values for iap_member_emails and (optionally)
+# frontend_image_tag, then this module call will fan out to both envs.
+module "cloud_run_service" {
+  source = "./modules/cloud_run_service"
+
+  env                          = var.env
+  project_id                   = var.project_id
+  region                       = var.region
+  repository_url               = module.artifact_registry.repository_url
+  image_tag                    = var.frontend_image_tag
+  worker_sa_email              = module.iam.worker_sa_email
+  vpc_connector_id             = module.cloud_sql.vpc_connector_id
+  sql_instance_connection_name = module.cloud_sql.instance_connection_name
+  # IAP user grants are applied by the GitHub workflow's post-apply gcloud
+  # step (see .github/workflows/deploy-frontend.yml). Provider 5.x lacks
+  # the IAP resource family for Cloud Run; this is the documented workaround.
+}

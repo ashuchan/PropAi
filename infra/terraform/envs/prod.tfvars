@@ -38,3 +38,11 @@ gmail_delegated_user   = "khabrilal@surgexdigital.com"
 email_transport        = "gmail_api"
 report_recipients      = "ashu@surgexdigital.com"
 report_sender_name     = "PropAi Daily Reports"
+
+# ── propai-frontend (UI + API) ──────────────────────────────────────────────
+# Initial tag is "bootstrap" — only used if someone runs `terraform apply`
+# directly without going through .github/workflows/deploy-frontend.yml. The
+# workflow always overrides this via -var="frontend_image_tag=frontend-prod-<sha>"
+# after pushing a fresh image. IAP user grants live in the workflow file's
+# IAP_MEMBERS env var, not here, because provider 5.x cannot express them.
+frontend_image_tag = "bootstrap"

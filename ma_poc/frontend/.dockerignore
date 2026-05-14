@@ -1,0 +1,71 @@
+# Build context is the repo root (so the Dockerfile can `COPY ma_poc/...`)
+# but most of the repo isn't relevant to the frontend image. Anchor patterns
+# at the root.
+
+# Repo-wide noise
+.git
+.github
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/node_modules
+**/dist
+**/.venv
+
+# Python — none of this belongs in the node runtime image.
+ma_poc/*.py
+ma_poc/__pycache__
+ma_poc/__init__.py
+ma_poc/alembic.ini
+ma_poc/pyproject.toml
+ma_poc/requirements*.txt
+ma_poc/brightdata
+ma_poc/core
+ma_poc/data
+ma_poc/data_provider
+ma_poc/discovery
+ma_poc/docs
+ma_poc/extraction
+ma_poc/fetch
+ma_poc/llm
+ma_poc/ma_poc
+ma_poc/models
+ma_poc/observability
+ma_poc/output
+ma_poc/pms
+ma_poc/reporting
+ma_poc/scraper
+ma_poc/scripts
+ma_poc/storage
+ma_poc/templates
+ma_poc/tests
+ma_poc/validation
+ma_poc/config
+
+# Scraper backend
+Dockerfile
+Makefile
+infra
+gcp
+jugnu
+docs
+
+# Frontend-side outputs that will be rebuilt
+ma_poc/frontend/dist
+ma_poc/frontend/node_modules
+ma_poc/services/node_modules
+ma_poc/services/dist
+ma_poc/frontend/api/node_modules
+ma_poc/frontend/api/dist
+
+# Frontend test artifacts — not needed in prod image
+ma_poc/frontend/tests
+ma_poc/frontend/playwright-report
+ma_poc/frontend/test-results
+ma_poc/services/tests
+
+# Local secrets
+*.env
+.env*
+!.env.example
