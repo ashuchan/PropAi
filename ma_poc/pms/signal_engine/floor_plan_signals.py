@@ -84,7 +84,7 @@ _RE_BEDROOMS = re.compile(
         \b(?P<studio>studio|efficiency|eff)\b          # Studio / Efficiency (0 BR)
         |
         \b(?P<n>\d+)\s*                                # leading digit
-        (?:br|bed(?:room)?s?|r(?:oom)?s?)             # br / bed / room
+        (?:br|bd|bed(?:room)?s?|r(?:oom)?s?)          # br / bd / bed / room
         \b
     )
     """,

@@ -50,6 +50,10 @@ log = logging.getLogger(__name__)
 # same origin so cookies/session/CSRF are preserved without us re-creating
 # the auth flow.
 _ENTRATA_PROBES: tuple[str, ...] = (
+    # widgets/ is the canonical Entrata endpoint confirmed by production traces —
+    # it returns the full floor_plans + availability widget payload in one call.
+    # The older module paths below fire on non-standard Entrata deployments.
+    "/Apartments/module/widgets/",
     "/Apartments/module/floor_plans/",
     "/Apartments/module/availability_pricing/",
     "/Apartments/module/property_info/",

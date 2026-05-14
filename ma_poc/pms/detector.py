@@ -445,6 +445,13 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "marketing_knock": ("doorway.knck.io", "knockrentals.com"),
     "marketing_hyly": ("hy.ly", "hyly.ai"),
     "marketing_marketapts": ("marketapts.com",),
+    # G5 website platform (Pegasus Residential and similar companies).
+    # Unit data is loaded by the G5 Listing Widget via api.g5marketingcloud.com,
+    # which fires async after networkidle — not captured by standard interception.
+    # Detected here so G5 sites can be identified for extended-wait treatment
+    # and so the API pattern catalogue can be targeted.  Falls through to
+    # GenericAdapter (no dedicated adapter exists).
+    "g5": ("g5-c-", "g5marketingcloud.com", "g5assets.com", "g5.com/api/"),
 }
 
 

@@ -31,6 +31,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
+from ma_poc.pms.adapters._merge_fns import _UNIT_SIGNAL_KEYS as _MERGE_UNIT_SIGNAL_KEYS
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     format_rent_range,
@@ -273,26 +274,12 @@ def _is_appfolio_response(body: Any) -> bool:
     AppFolio/Apts247 uses: bed, bath, rent, sq_ft, name (floorplans endpoint)
     or bedrooms, price, sqft (listings endpoint).
     """
-    _UNIT_SIGNAL_KEYS = {
-        "sqft",
-        "bedrooms",
-        "price",
-        "rent",
-        "listing_type",
-        "square_feet",
-        "asking_rent",
-        "beds",
-        "bathrooms",
-        "bed",
-        "bath",
-        "sq_ft",
-        "rent_from",
-    }
-
     def _has_signals(items: list[dict[str, Any]]) -> bool:
         if not items or not isinstance(items[0], dict):
             return False
-        return len(_UNIT_SIGNAL_KEYS & set(items[0].keys())) >= 2
+        # Use the centralized unit-signal key set from _merge_fns so any
+        # new field-name additions automatically apply here too.
+        return len(_MERGE_UNIT_SIGNAL_KEYS & set(items[0].keys())) >= 2
 
     if isinstance(body, dict):
         objects = body.get("objects") or body.get("results") or body.get("listings")

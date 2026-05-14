@@ -434,19 +434,20 @@ def _mark_patch_miss(patch: Any, reason: str) -> None:
 
 
 def _extract_rent_dom_section(html: str, max_bytes: int = 20_000) -> str | None:
-    """Return the smallest HTML chunk that contains the site's rent signals.
+    """Return the smallest HTML chunk that contains floor-plan structural signals.
 
-    We pick the tightest ancestor around rent-looking text rather than
-    sending the entire page to the DOM-analysis LLM. This keeps the prompt
-    small enough to meet per-call token limits and biases the model toward
-    the unit/floor-plan container instead of global layout chrome.
+    We pick the tightest ancestor around floor-plan content rather than
+    sending the entire page to the DOM-analysis LLM.  Selection is based
+    purely on floor-plan structural signals (beds/baths/sqft/plan-type) —
+    rent is NEVER used as a selection criterion because it is not a required
+    field for a valid unit record.
 
     Strategy:
-      1. Prefer ``<main>`` when present — apartment sites almost always put
-         availability content there.
-      2. Otherwise find the smallest container with 2+ rent-pattern matches.
-      3. Cap at ``max_bytes`` so oversized ``<main>`` tags don't blow the
-         per-call token budget.
+      1. Prefer ``<main>`` when present.
+      2. Otherwise find the element with the highest floor-plan signal count
+         that has ≥ SIGNAL_THRESHOLD_STRUCTURAL distinct signal types.
+      3. Tie-break on smaller element size to get the tightest container.
+      4. Cap at ``max_bytes`` so oversized tags don't blow the token budget.
     """
     if not html:
         return None
@@ -473,17 +474,10 @@ def _extract_rent_dom_section(html: str, max_bytes: int = 20_000) -> str | None:
             block = block[:max_bytes] + "<!-- truncated -->"
         return block
 
-    # E: find the element that best combines rent signals WITH floor-plan
-    # structural signals.  A unit table with "1BR/1BA 750sqft $1,500" scores
-    # higher (combined=5) than a marketing banner with two price mentions
-    # (combined=2).  Tie-break on smaller element size.
-    #
-    # Rent is no longer required — a section with strong floor-plan structure
-    # (≥2 distinct signal types: beds, baths, sqft, plan-type shorthand) is
-    # accepted even when pricing is absent.  This handles sites like
-    # sabalclub.com where pricing is labelled "Price Range" or arrives from a
-    # separate API call; the floor-plan skeleton is still useful for unit
-    # identity and can be merged with rent data from another hop.
+    # Find the element with the most floor-plan structural signals that has
+    # ≥ SIGNAL_THRESHOLD_STRUCTURAL distinct signal types.  Rent is not part of
+    # the selection — floor-plan identity (beds/baths/sqft/plan-type) is the
+    # sole criterion for "this section contains unit data."
     best: Any = None
     best_len = 10**9
     best_combined = -1
@@ -492,29 +486,16 @@ def _extract_rent_dom_section(html: str, max_bytes: int = 20_000) -> str | None:
             text = el.get_text(" ", strip=True)
         except Exception:
             continue
-        _rent_count = len(_re_rent.findall(text))
         _fp_score = _count_fp_signals(text)
-        _combined = _rent_count + _fp_score
-        # Accept if any of:
-        #   (a) ≥2 dollar-rent signals (classic unit table)
-        #   (b) ≥1 rent AND structurally rich floor-plan section
-        #   (c) ≥2 floor-plan structural signals even without rent
-        #       (pricing may be in a separate API or labelled "Price Range")
-        _has_rent = _rent_count >= 1
-        _rich_fp = _has_fp_signals(text, SIGNAL_THRESHOLD_STRUCTURAL)
-        if not (
-            _rent_count >= 2
-            or (_has_rent and _rich_fp)
-            or _rich_fp
-        ):
+        if not _has_fp_signals(text, SIGNAL_THRESHOLD_STRUCTURAL):
             continue
         s = str(el)
         if len(s) < 500 or len(s) > max_bytes:
             continue
-        if _combined > best_combined or (
-            _combined == best_combined and len(s) < best_len
+        if _fp_score > best_combined or (
+            _fp_score == best_combined and len(s) < best_len
         ):
-            best, best_len, best_combined = el, len(s), _combined
+            best, best_len, best_combined = el, len(s), _fp_score
 
     if best is not None:
         return str(best)
@@ -1913,47 +1894,29 @@ class GenericAdapter:
         #   • page body has >= 3KB of visible text (any reasonable HTML page)
         # Cost is bounded by the per-property LLM budget (3 API + 1 DOM + 1
         # mono = 5 calls max), so worst-case impact is ~$0.05/property.
-        _RENT_KEYWORDS = (
-            "$",
-            "rent",
-            "/mo",
-            "/month",
-            "bedroom",
-            "studio",
-            "sqft",
-            "sq. ft",
-            "sq ft",
-            "floor plan",
-            "floorplan",
-            "available",
-        )
-
         if skip_llm and html:
             try:
                 _text = _re_strip_script.sub("", html)
                 _text = _re_strip_tag.sub(" ", _text)
-                _text_lower = _text.lower()
                 _text_bytes = len(_text.encode("utf-8", errors="ignore"))
-                # B1: floor-plan structural signals replace dollar-sign rent count.
+                # Floor-plan structural signal count — single source of truth
+                # for "does this page have unit data worth sending to the LLM".
+                # Rent signals are deliberately excluded: a page with "$1,500"
+                # but zero floor-plan structure has no extractable unit records.
                 _fp_hits = _count_fp_signals(_text)
-                _kw_hits = sum(1 for kw in _RENT_KEYWORDS if kw in _text_lower)
+                _any_fp = _has_fp_signals(_text, SIGNAL_THRESHOLD_ANY)
 
-                # Two relaxation triggers (any one suffices):
-                #   strict — body >= 5KB AND >= 1 floor-plan structural signal type
-                #            (previously $NNN count; FP signals are more precise)
-                #   broad  — body >= 2KB AND >= 2 rent-related keywords
-                #   tiny   — body >= 1KB AND >= 1 keyword for known small-shell PMS
-                strict_match = _text_bytes >= 5000 and _has_fp_signals(_text, SIGNAL_THRESHOLD_ANY)
-                broad_match = _text_bytes >= 2000 and _kw_hits >= 2
-                # Fix 4: third trigger — for very small pages (< 2KB stripped
-                # text) that look like AppFolio / Wix / SquareSpace marketing
-                # shells, allow LLM if there's at least 1 rent keyword. These
-                # are typically tiny landing pages that point to a hosted
-                # portal; the LLM may extract a "schedule a tour" hint or
-                # link the runner can follow. Threshold lowered to 1KB.
+                # Three relaxation triggers (any one suffices):
+                #   strict — body >= 5KB AND >= 1 floor-plan structural signal
+                #   broad  — body >= 2KB AND >= 1 floor-plan signal (lower size bar)
+                #   tiny   — body >= 1KB AND >= 1 signal, for known small-shell PMS
+                #            (these tiny landing pages often have just a plan-name
+                #            hint that the LLM can turn into a hop nav_hint)
+                strict_match = _text_bytes >= 5000 and _any_fp
+                broad_match = _text_bytes >= 2000 and _any_fp
                 tiny_marketing_match = (
                     _text_bytes >= 1000
-                    and _kw_hits >= 1
+                    and _any_fp
                     and ctx.detected.pms in ("appfolio", "wix_nopms", "squarespace_nopms", "unknown")
                 )
 
@@ -1968,7 +1931,7 @@ class GenericAdapter:
                             detected_pms=ctx.detected.pms,
                             text_bytes=_text_bytes,
                             floor_plan_signals=_fp_hits,
-                            keyword_hits=_kw_hits,
+                            fp_signal_count=_fp_hits,
                             reason=(
                                 "detected_adapter_empty_strict"
                                 if strict_match
@@ -2699,11 +2662,9 @@ class GenericAdapter:
             import os as _os_q
             vision_enabled = _os_q.getenv("ENABLE_TIER5_VISION", "true").lower() in ("1", "true", "yes")
             page_obj = getattr(ctx, "_page", None) or getattr(ctx, "page", None)
-            # Cheap rent-keyword check on stripped html
-            has_rent_kw = False
-            if html:
-                _hl = html.lower()
-                has_rent_kw = any(kw in _hl for kw in ("rent", "bedroom", "studio", "sqft", "floor plan", "$"))
+            # Gate: only invoke vision when floor-plan structural signals are
+            # present in the HTML — rent keywords alone are not sufficient.
+            has_rent_kw = _has_fp_signals(html, SIGNAL_THRESHOLD_ANY) if html else False
             if vision_enabled and page_obj is not None and has_rent_kw and hasattr(page_obj, "screenshot") and not _llm_cost_exceeded():
                 t_v = _time.monotonic()
                 try:

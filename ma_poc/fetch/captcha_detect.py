@@ -34,6 +34,15 @@ _FINGERPRINTS: dict[str, list[bytes]] = {
         b"_pxhd",
         b"PerimeterX",
     ],
+    # SGCaptcha — HTTP 202 response; final_url redirects to
+    # /.well-known/sgcaptcha/.  Body is a JS interstitial wrapper.
+    # Primary detection is via final_url (see fetcher.py), but the body
+    # fingerprint catches cases where the redirect didn't update page.url.
+    "sgcaptcha": [
+        b"sgcaptcha",
+        b"/.well-known/sgcaptcha/",
+        b"sg-captcha",
+    ],
 }
 
 

@@ -598,6 +598,11 @@ class SqlUnitStateStore(IUnitStateStore):
                 for col, sources in self._SNAPSHOT_SOURCES.items():
                     snap[col] = self._read_first(u, sources)
 
+                # -1 is used as a sentinel for "unknown area" by several adapters;
+                # store null rather than a nonsensical numeric value.
+                if snap.get("area") == -1:
+                    snap["area"] = None
+
                 prior = prior_by_id.get(uid)
                 if prior is None:
                     diff.new.append(uid)

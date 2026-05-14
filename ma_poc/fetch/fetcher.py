@@ -723,27 +723,51 @@ class Fetcher:
                 and len(body_text) >= 50_000
                 and not _has_fp_signals_fetch(body_text, _FP_THRESHOLD_ANY)
             ):
-                # Progressive scroll: step through 25%→50%→75%→100% of page height
-                # with 200ms pauses at each stop. Real users don't jump instantly to
-                # the bottom; single-jump scrolls are a detectable bot signal for
-                # IntersectionObserver-based sites. After reaching 100%, wait 1.5s
-                # for XHR round-trips to complete.
+                # Slow mouse-wheel scroll: 2 seconds of continuous scrolling via
+                # page.mouse.wheel() instead of window.scrollTo() jumps.
+                #
+                # WHY mouse.wheel NOT window.scrollTo:
+                #   window.scrollTo() sets an absolute position instantly — the
+                #   element was never "in view" during the jump, so
+                #   IntersectionObserver callbacks never fire.  page.mouse.wheel()
+                #   sends real WheelEvents that the browser propagates through the
+                #   scroll pipeline, correctly triggering IntersectionObserver on
+                #   every element that passes through the viewport.
+                #
+                # Strategy: 20 incremental steps over 2 s (100 ms / step),
+                # distributing the scroll distance evenly across the page height.
+                # Mouse is centred in the viewport so wheel events hit the page
+                # rather than an overflow-hidden child.
                 _body_before_scroll = len(body_text)
                 try:
-                    await page.evaluate("""() => {
-                        const h = document.body.scrollHeight;
-                        const steps = [0.25, 0.5, 0.75, 1.0];
-                        let i = 0;
-                        function step() {
-                            if (i >= steps.length) return;
-                            window.scrollTo(0, Math.round(h * steps[i]));
-                            i++;
-                            if (i < steps.length) setTimeout(step, 200);
-                        }
-                        step();
-                    }""")
-                    # 4 steps × 200ms + 600ms headroom for the last step + 1.5s XHR wait
-                    await asyncio.sleep(2.5)
+                    # Get page dimensions.
+                    _dims = await page.evaluate("""() => ({
+                        scrollHeight: document.body.scrollHeight,
+                        viewportHeight: window.innerHeight,
+                        viewportWidth: window.innerWidth
+                    })""")
+                    _scroll_h = int(_dims.get("scrollHeight") or 0)
+                    _vp_h = int(_dims.get("viewportHeight") or 1080)
+                    _vp_w = int(_dims.get("viewportWidth") or 1920)
+                    _total_scroll = max(0, _scroll_h - _vp_h)
+
+                    # Centre the mouse in the viewport so wheel events hit the
+                    # main document scroll area (not a fixed sidebar or overlay).
+                    await page.mouse.move(_vp_w // 2, _vp_h // 2)
+
+                    # 20 wheel steps over 2 seconds = 100 ms / step.
+                    _SCROLL_STEPS = 20
+                    _STEP_DELAY_S = 0.10        # 100 ms between each step
+                    _step_delta = max(120, _total_scroll // _SCROLL_STEPS)
+
+                    for _ in range(_SCROLL_STEPS):
+                        await page.mouse.wheel(0, _step_delta)
+                        await asyncio.sleep(_STEP_DELAY_S)
+
+                    # Allow 1.5 s for IntersectionObserver callbacks to fire and
+                    # any newly triggered XHRs to complete.
+                    await asyncio.sleep(1.5)
+
                     _body_after_scroll_text = await page.content()
                     _body_after_size = len(_body_after_scroll_text or "")
                     _body_grew = _body_after_size > _body_before_scroll
@@ -1020,6 +1044,30 @@ class Fetcher:
             final_url = page.url
             resp_headers = {k.lower(): v for k, v in (resp.headers if resp else {}).items()}
             body_head = body[:4096]
+
+            # SGCaptcha early exit: HTTP 202 + redirect to /.well-known/sgcaptcha/
+            # The entire interstitial page (11–12 KB) is a bot-wall with zero unit
+            # data. Skip all tier cascade — returning BOT_BLOCKED here saves ~25 s
+            # of wasted extraction per property.
+            if "/.well-known/sgcaptcha/" in (final_url or ""):
+                log.debug(
+                    "_do_render %s: sgcaptcha wall detected via final_url — marking BOT_BLOCKED",
+                    task.url,
+                )
+                return FetchResult(
+                    url=task.url,
+                    outcome=FetchOutcome.BOT_BLOCKED,
+                    status=resp.status if resp else 202,
+                    body=body,
+                    headers=resp_headers,
+                    render_mode=RenderMode.RENDER,
+                    final_url=final_url,
+                    attempts=attempt,
+                    elapsed_ms=_now_ms() - start_ms,
+                    network_log=network_log,
+                    error_signature="SGCAPTCHA_WALL",
+                    proxy_used=_redact_proxy(proxy),
+                )
 
             if nav_exc is not None:
                 # Timeout/abort but body salvaged. If the salvaged page looks

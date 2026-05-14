@@ -143,6 +143,9 @@ DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("respage.com", 100),
     # Buildium tenant / prospect portal
     ("buildium.com", 100),
+    # G5 Listing Widget API — unit/floor-plan data endpoint for G5-platform sites
+    ("g5marketingcloud.com", 110),
+    ("api.g5.com", 110),
 )
 
 DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
@@ -227,8 +230,11 @@ DEFAULT_API_NOISE_PATH_FRAGMENTS: frozenset[str] = frozenset({
     "/popdown/",
     "/forms/api/",
     "/speculations/rules/",
-    # Realpage CMS module endpoints (config, not unit data):
-    "/Apartments/module/widgets/",
+    # Entrata CMS module endpoints that are config-only (not unit data):
+    # NOTE: /Apartments/module/widgets/ is INTENTIONALLY excluded from this
+    # blocklist — it IS the primary Entrata floor-plan/availability data endpoint
+    # (confirmed by production traces on PIDs 257356 and 252511). Blocking it
+    # causes all intercepted Entrata widget responses to be silently discarded.
     "/Apartments/module/application_authentication/",
     "/Apartments/module/property_info/",
     # Map / auth:

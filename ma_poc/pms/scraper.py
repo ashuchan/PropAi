@@ -1270,6 +1270,7 @@ _LINK_SKIP_PATTERNS: tuple[str, ...] = (
     "/sign_in",
     "/signin",
     "/login",
+    "/log_in",   # AppFolio oportal/users/log_in
     "/log-in",
     "/auth",
     "/sso",
@@ -1978,7 +1979,13 @@ async def _try_link_hop(
                 base_url=sub_url,
                 profile=profile,
                 expected_total_units=expected_total_units,
-                page=None,
+                # Pass the shared browser page so adapter probes (e.g. Entrata's
+                # _probe_known_endpoints) can fire via page.evaluate() on the hop
+                # page.  With Pattern A (reuse_page), the shared page has already
+                # navigated to sub_url, so page.url reflects the hop URL and
+                # _origin_from_ctx() derives the correct probe origin.
+                # Falls back to None when no shared browser session is active.
+                page=browser_page,
                 fetch_result=sub_fetch,
                 csv_row=csv_row,
                 property_id=property_id,

@@ -34,6 +34,11 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
+from ma_poc.pms.signal_engine.floor_plan_signals import (
+    has_floor_plan_signals as _has_fp_signals,
+    SIGNAL_THRESHOLD_STRUCTURAL as _FP_STRUCTURAL,
+)
+
 from ma_poc.pms.adapters._daily_runner_parsers import (
     _jsonld_floor_size,
     _jsonld_item_has_unit_signal,
@@ -73,9 +78,13 @@ _PROPERTY_VARS: tuple[str, ...] = (
     "buildingData",
 )
 
-# Signal keywords that make an inline script worth JSON-extracting.
+# Structural floor-plan keywords that make an inline script worth JSON-extracting.
+# Only structural unit-dimension terms — "rent"/"avail"/"pricing"/"units" are
+# too broad and match chatbot configs, analytics, and amenity feeds that have
+# zero floor-plan data.  Blobs are screened again by has_floor_plan_signals
+# after extraction so false positives from this gate are cheap.
 _UNIT_KEYWORD_RE = re.compile(
-    r"floor.?plan|floorPlan|units|avail|rent|bedroom|sqft|pricing",
+    r"floor.?plan|floorPlan|bedroom|sqft|studio|unitType|floorplanName",
     re.IGNORECASE,
 )
 
@@ -1220,21 +1229,20 @@ def _sqft_match_is_valid(text: str, m: re.Match) -> bool:
 def _container_yields_unit(text: str) -> dict[str, Any] | None:
     """Return a unit dict when ``text`` has floor-plan structural signals.
 
-    Rent is extracted when present but is NOT required — a floor-plan record
-    with bedrooms/sqft and no price is still valid data.  The caller (schema
-    gate) can merge rent later if it arrives from a different hop page.
+    Gate: requires ≥2 distinct floor-plan signal types (SIGNAL_THRESHOLD_STRUCTURAL)
+    so the canonical qualifiers are:
+      • floor_plan_name + beds + baths  (e.g. "1BR/1BA" or "Studio")
+      • beds + baths + area             (e.g. "1 bed / 1 bath  750 sqft")
 
-    Structural signals are required (at least one of sqft, beds, studio) so
-    we don't pick up navigation links or marketing banners that lack any unit
-    dimension.
-
-    Rent extraction tries two patterns in order:
-      1. Dollar-prefixed amounts  ($1,200 / $1,200.00)
-      2. Price-range labels without $ (Price Range: 1,200 – 1,500 /mo)
+    Rent is NEVER a gate criterion — a floor-plan record with no price is still
+    valid data.  Rent is extracted as enrichment when present.
     """
-    # Find the best (largest) valid sqft match in the container text.
-    # Using the largest value avoids picking up sub-unit amenity areas that
-    # appear in the same container as the real unit sqft.
+    # Gate: use the canonical floor-plan signal detector as the single check.
+    # This covers bed/bath/sqft/studio/floor-plan-type in all their variants.
+    if not _has_fp_signals(text, _FP_STRUCTURAL):
+        return None
+
+    # Value extraction — run the specific patterns to pull out numeric values.
     valid_sqft_matches = [
         m for m in _SQFT_PATTERN.finditer(text) if _sqft_match_is_valid(text, m)
     ]
@@ -1244,11 +1252,6 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
     m_baths = _BATHS_PATTERN.search(text)
     m_unit = _UNIT_NUM_PATTERN.search(text)
     is_studio = bool(_STUDIO_RE.search(text))
-
-    # Require at least one structural signal so we don't accept hero banners
-    # or generic navigation entries with no unit dimension.
-    if not (m_sqft or m_beds or is_studio):
-        return None
 
     # --- rent (optional) ---
     rent_ints: list[int] = []
