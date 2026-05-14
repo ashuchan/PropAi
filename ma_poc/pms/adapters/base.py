@@ -45,6 +45,13 @@ class AdapterContext:
     # Used by page_has_content_signals to suppress RC3 deferral when the
     # entry page already has genuine unit-data structure.
     floor_plan_signal_count: int = 0
+    # Hop depth: 0 on the entry page, 1+ when scrape() recurses from
+    # _try_link_hop. Read by signal_engine.decider to gate RC3 monolithic
+    # deferral — Rule 2 only fires on the entry page (depth=0). Without
+    # this field, getattr(ctx, "hop_depth", 0) always returned 0 and the
+    # decider deferred the LLM on every hop too, exhausting budget on
+    # nothing. Observed 2026-05-14 on PIDs 290347, 246710.
+    hop_depth: int = 0
 
 
 @dataclass

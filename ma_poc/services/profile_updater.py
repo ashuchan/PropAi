@@ -555,6 +555,14 @@ def update_profile_after_extraction(
     """Update profile based on what worked during this scrape."""
     tier = scrape_result.get("extraction_tier_used")
 
+    # Track whether DOM selectors were saved on THIS run. Read further down
+    # by the consecutive_misses block so a degraded save (quality=0.4) isn't
+    # evicted by the same-run DOM-cascade miss that triggered it. Without
+    # this, the eviction_threshold=1 path always wipes a fresh save before
+    # the next run can replay it (PID 253126 — 2u yesterday, 0u today after
+    # selectors were saved-then-immediately-evicted yesterday).
+    dom_hints_saved_this_run = False
+
     # Phase 1: monotonic stats — never go backward
     profile.stats.total_scrapes += 1
     profile.stats.last_tier_used = tier or None
@@ -702,6 +710,7 @@ def update_profile_after_extraction(
             # (the LLM returns them, the model has the fields, the writer
             # forgot to pass them through). amenities + concession are new
             # slots — DOM analysis prompts ask for them, so save them too.
+            dom_hints_saved_this_run = True
             profile.dom_hints.field_selectors = FieldSelectorMap(
                 container=css.get("container"),
                 rent=css.get("rent"),
@@ -934,6 +943,24 @@ def update_profile_after_extraction(
                         DOM_HINT_QUALITY_MAX,
                         round(cur_q + DOM_HINT_QUALITY_PROMOTE_STEP, 2),
                     )
+            except Exception:
+                pass
+        elif dom_hints_saved_this_run:
+            # 2026-05-14 fix: DOM cascade missed BEFORE this run's freshly
+            # saved selectors had a chance to replay. Don't increment the
+            # consecutive_misses counter — the upstream LLM_DOM tier
+            # extracted units this run, and the selectors recorded above
+            # describe HOW it did so. Charging this miss would evict them
+            # before the next run can validate them (degraded selectors at
+            # quality<0.8 trip eviction on a single miss).
+            try:
+                from ma_poc.observability.events import EventKind, emit
+                emit(
+                    EventKind.DOM_HINTS_MISS,
+                    profile.canonical_id,
+                    count=getattr(profile.dom_hints, "consecutive_misses", 0),
+                    reason="suppressed_save_run",
+                )
             except Exception:
                 pass
         else:

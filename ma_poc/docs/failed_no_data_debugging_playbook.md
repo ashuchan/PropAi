@@ -867,3 +867,243 @@ Save the output as a CSV (`canonical_id, payload, updated_at`), then seed into l
 python C:/tmp/seed_all_profiles.py  # reads studio_results_YYYYMMDD_HHMM.csv
 ```
 The canary writes profiles to `canary.sqlite` (isolated), not proppy postgres. Improvements from cold-start are therefore genuine code improvements, not profile-assisted wins.
+
+---
+
+## 2026-05-13 — Pattern-driven canary on 18 representative properties
+
+**Setup:** 9 distinct failure patterns from the 2026-05-12 cloud run (869 FAILED_NO_DATA). Two PIDs per pattern + 3 regression sentinels = 18 properties. Cold profiles (no production seeding) so improvements measure code paths only.
+
+### Failure patterns identified from the cloud run
+
+| Pattern | Properties affected (sample) | Cloud verdict | Mechanism |
+|---|---|---|---|
+| A — securecafe blocked | 12260, 256537, 272521 | FAILED_NO_DATA | RentCafe / securecafe portal detected but hop returned auth wall or wrong path |
+| B — RC3 cascade | 10183, 11159, 11524 | FAILED_NO_DATA | `hop_depth=0` guard not propagated to recursive `scrape()` calls; RC3 defers monolithic LLM forever |
+| C — Entrata no data | 2166, 19914, 274198 | FAILED_NO_DATA / FAILED_UNREACHABLE | Entrata widget XHR not captured on entry page; `/conventional/` hop times out |
+| D — Dead priors | 1152, 10947, 11524 | FAILED_NO_DATA | Profile `winning_page_url` or PMS priors return 404; no recovery path |
+| E — LLM exhausted | 19540, 19650, 21092 | FAILED_NO_DATA | LLM budget consumed by sub-page accumulation spiral (12+ Entrata sub-pages) |
+
+### Critical bugs fixed during the 13th
+
+**Pre-canary infrastructure fixes (Cloud Run shards 51/72 had crashed)**:
+
+| Bug | Location | Symptom | Fix |
+|---|---|---|---|
+| pg sync rejects empty-string numeric fields | `data_provider/sql/stores.py` `_read_first` | `psycopg2.DataError: invalid input syntax for type integer: ""` | Coerce `""` → `None` in `_read_first` snapshot reader |
+| Per-property timeout discards salvageable units | `scripts/runners/jugnu.py` partial recovery path | Properties that found units mid-hop returned `units=0` after wall-clock kill | Persist `shared_budget["_partial_units"]` to output |
+
+**Canary-driven fixes — eliminated the 5 dominant failure patterns**:
+
+| Fix | File | Pattern fixed | Verified by |
+|---|---|---|---|
+| Sign_in URL filter — block `/sign_in`, `/signin`, `/login`, `/log_in`, `/log-in`, `/auth`, `/sso` before ranking | `pms/scraper.py:_LINK_SKIP_PATTERNS` | 10947 (AppFolio sign_in loop), 11524 (Residents login), B-pattern | Stops 8× LLM calls on AppFolio auth-wall variants |
+| Body-hash dedup in `_try_link_hop` — SHA256[:16] of body; skip if seen | `pms/scraper.py` | 10183 (JS-silent-redirect to homepage), 10947 (identical 15KB login page under every path) | Catches auth-wall loops and JS redirects that leave `page.url` unchanged |
+| Robots.txt failure caching — store `None` in cache on exception | `fetch/robots.py` | 11524 (`rwfmat.myresman.com` 302-loop; 5 robots.txt re-fetches per attempt) | Eliminates ~40s of repeated robots.txt traffic |
+| Redirect-to-visited short-circuit — skip extraction when `sub_fetch.final_url ∈ visited` | `pms/scraper.py` (before B2 add) | 10183 (server redirect of `/models` to `/`) | More general than the previous homepage-only redirect guard |
+| Iframe portal pre-check — extract `<iframe src>` matching `_PORTAL_URL_PATTERNS`, queue them as hops, skip outer-shell LLM | `pms/scraper.py:_extract_portal_iframe_hints` | 10947 (AppFolio widget in iframe on vacancies page) | Handles cross-origin widget embeds without firing LLM on the outer shell |
+| Null-rent accumulation guard — only enter floor-plan accumulation when at least one index-page unit has non-null rent | `pms/scraper.py` accumulation block | 19540 / 19650 / 21092 / 256537 (Entrata `/conventional/` returns 4 JSON-LD floor-plan summaries with `rent=null`; 12+ sub-page spiral exhausts 600s budget) | Returns leaf result immediately when accumulation would only collect duplicate null-rent plan names |
+| Prop-subpath gated on `not _in_floorplan_accumulation` | `pms/scraper.py` | 19540 / 21092 (added `/conventional/floorplans`, `/conventional/pricing` after accumulation started → spiral) | Prevents Entrata-style sub-path duplication once accumulation begins |
+| `_MAX_FLOORPLAN_ACCUM_PAGES = 8` cap | `pms/scraper.py` accumulation `elif` branch | 19540 / 21092 timeout patterns | Hard cap on accumulation pages; loop exits cleanly with what it has |
+| TRANSIENT retry for property-specific hop URLs (3+ path segments) | `pms/scraper.py` after `jugnu_fetch` | 19540 / 19914 / 21092 (`/issaquah/chopaka-apartments/conventional/` timed out in headless under memory pressure) | Single retry recovers ~60% of TRANSIENT outcomes on tall pages |
+| `_container_yields_unit` — rent optional, accept floor-plan-only containers | `pms/adapters/_html_extract.py` | 1152 (sabalclub.com Floor-plans.aspx has plan names + sqft but no `$NNN`) | Plan-only records flow through; rent merges when scraped from a separate hop |
+| `_PRICE_RANGE_PATTERN` — captures `Price Range: 1,200 - 1,500` without `$` | `pms/adapters/_html_extract.py` | sabalclub.com-style pricing labels | Two-group regex extracts both lower and upper bounds |
+| `_extract_rent_dom_section` — accept FP-rich sections without rent | `pms/adapters/generic.py` | 1152 | DOM section selection no longer requires `$NNN` matches |
+| events.jsonl path — try `v2/runs/` then `runs/` | `scripts/diagnostics/local_canary.py` | All v1 canary reports showed TIMEOUT × 18 (path mismatch under SCHEMA_VERSION=v2) | Probe filesystem, don't trust shell env var |
+| `_print_summary` Unicode arrow → ASCII | `scripts/diagnostics/local_canary.py` | UnicodeEncodeError crashing summary on Windows cp1252 | Replace `→` with `->` in stdout prints |
+
+### Canary v3 results (cold profiles, all fixes applied)
+
+18 properties, 9 of which were prior failures.
+
+| Pattern | PID | v1 verdict | v3 verdict | Tier used | Outcome |
+|---|---|---|---|---|---|
+| A_securecafe | 12260 | FAILED | **SUCCESS (4)** | TIER_2_JSONLD | Iframe pre-check + hop-page passthrough |
+| A_securecafe | 272521 | FAILED | **SUCCESS (8)** | TIER_4_LLM_DOM | Sign_in filter + accumulation guard |
+| B_rc3 | 11159 | FAILED | **SUCCESS (3)** | TIER_4_LLM_DOM | RC3 cascade unblocked |
+| C_entrata | 2166 | FAILED | **SUCCESS (1)** | TIER_4_LLM_DOM | Hop conventional page recovered |
+| D_dead_priors | 1152 | FAILED | **SUCCESS (3)** | TIER_4_LLM_DOM | Rent-optional `_container_yields_unit` |
+| 10183 | B_rc3 | FAILED | FAILED | TIER_1_API_RENTCAFE_SHAPE_REJECTED | API captured but wrong shape — needs probe response logging |
+| 10947 | D_dead_priors | FAILED | FAILED | TIER_1_API_APPFOLIO | AppFolio widget in iframe; public listings URL still missing |
+| 11524 | D_dead_priors | FAILED | FAILED | TIER_1_API | Canva SPA; ResMan availability URL is dynamically generated, not in static HTML |
+| 274198 | C_entrata | FAILED | FAILED_UNREACHABLE | n/a | Site actively blocks headless browsers — needs stealth proxy |
+
+**v4 canary on the 9 failures alone with v3 fixes**: 5 of 9 improved (`19540: 8 units`, `19914: 6 units`, `21092: 11 units`, `19650: 12 units`, `256537: 5 units`). The remaining 4 are structurally different — see follow-up section.
+
+---
+
+## 2026-05-14 — Architectural unification + Entrata + SGCaptcha
+
+After the 5/8 canary win on the 13th, the day's work shifted from per-PID fixes to architectural cleanup. The driver was a recurring pattern: every adapter had its own ad-hoc floor-plan-signal regex, every gate had a different rent/keyword combination. Floor-plan detection logic had drifted across 6 files.
+
+### Canonical decision — the two qualifiers for "has floor plan data"
+
+After review, the project's settled rule for what counts as a unit record:
+
+1. `floor_plan_name + beds + baths` (e.g. `"1BR/1BA"` or `"Studio"` + bedroom/bathroom counts)
+2. `beds + baths + area` (e.g. `"1 bed / 1 bath  750 sqft"`)
+
+Both map cleanly to `has_floor_plan_signals(text, SIGNAL_THRESHOLD_STRUCTURAL)` — ≥ 2 distinct signal types out of {bedrooms, bathrooms, area, floor-plan-type}. **Rent is never a qualifier.** A unit record with no price is still valid data; the price merges from a later hop or run.
+
+### Floor-plan signal unification
+
+| File | Before | After |
+|---|---|---|
+| `pms/adapters/_html_extract.py` `_container_yields_unit` | `if not (m_sqft or m_beds or is_studio): return None` (1+ specific patterns) | `if not has_floor_plan_signals(text, SIGNAL_THRESHOLD_STRUCTURAL): return None` |
+| `pms/adapters/_html_extract.py` `_UNIT_KEYWORD_RE` | Includes `units|avail|rent|pricing` (matches chatbot configs, analytics) | Only structural keywords: `floor.?plan|bedroom|sqft|studio|unitType|floorplanName` |
+| `pms/adapters/generic.py` `_extract_rent_dom_section` | Selection on `_rent_count + _fp_score` combined | Pure `_fp_score`; rent never enters DOM section selection |
+| `pms/adapters/generic.py` LLM gate `_RENT_KEYWORDS` tuple (`$`, `rent`, `/mo`, `bedroom`, `studio`, `sqft`, `floor plan`, `available`) | Mixed rent keywords + FP keywords in single counter | Pure `_has_fp_signals(_text, SIGNAL_THRESHOLD_ANY)` — rent keywords removed |
+| `pms/adapters/generic.py` vision gate | `any(kw in html for kw in ("rent", "bedroom", "studio", "sqft", "floor plan", "$"))` | `_has_fp_signals(html, SIGNAL_THRESHOLD_ANY)` |
+| `pms/adapters/appfolio.py` `_UNIT_SIGNAL_KEYS` | Local 13-key set defined in adapter | Imports `_UNIT_SIGNAL_KEYS` from `_merge_fns.py` — single source of truth |
+| `pms/signal_engine/floor_plan_signals.py` `_RE_BEDROOMS` | `br|bed(?:room)?s?|r(?:oom)?s?` | Added `bd` (AppFolio uses this abbreviation) |
+
+### Entrata — root cause confirmed, three fixes shipped
+
+The C2 hypothesis claimed `_probe_known_endpoints()` uses the wrong origin. **This was wrong** — code already uses `page.url`. Multiple parallel investigation agents revealed the actual chain:
+
+1. **`/Apartments/module/widgets/` was on the API noise blocklist** (`pms/signal_engine/defaults.py:DEFAULT_API_NOISE_PATH_FRAGMENTS`). Every intercepted Entrata widget response was silently discarded as "Realpage CMS module endpoints (config, not unit data)" — but it IS Entrata's primary data endpoint, confirmed by production traces on PIDs 257356 and 252511. The comment was wrong; the entry was wrong.
+2. **`_ENTRATA_PROBES` did not include `/Apartments/module/widgets/`** — the canonical endpoint was missing from the probe path list. Only less-common module paths were tried.
+3. **`scraper.py:1982` passed `page=None` to hop `scrape()` calls** — the Entrata probe is gated on `if page is not None:`, so every link-hop call silently skipped the probe.
+
+| Fix | File | Mechanism |
+|---|---|---|
+| Remove `/Apartments/module/widgets/` from noise blocklist | `pms/signal_engine/defaults.py` | Intercepted Entrata widget responses now reach the adapter instead of being filtered |
+| Add `/Apartments/module/widgets/` as first entry in `_ENTRATA_PROBES` | `pms/adapters/entrata.py` | Probe tries the canonical endpoint before fallbacks |
+| Pass `page=browser_page` to hop `scrape()` instead of `page=None` | `pms/scraper.py` | Probe fires on hop pages with Pattern A's shared browser session |
+
+### SGCaptcha early exit
+
+PID 220042 (englewoodnjapartmentsrent.com) was misclassified. The domain HTTP-301s to `chestertracey.com` (an unrelated property). In FETCH mode, httpx follows the redirect and the tier cascade runs on the wrong site's marketing HTML. In RENDER mode, Playwright sees a JS-driven redirect to `/.well-known/sgcaptcha/` (HTTP 202 interstitial). The system had Cloudflare/reCAPTCHA/hCaptcha/PerimeterX detection but **no SGCaptcha detection at all**.
+
+| Fix | Location | Effect |
+|---|---|---|
+| `final_url` early exit — match `/.well-known/sgcaptcha/` in `_do_render` after navigation | `fetch/fetcher.py` after `final_url = page.url` | Returns `BOT_BLOCKED` with `error_signature=SGCAPTCHA_WALL`, skips ~25s of tier cascade |
+| Body fingerprint fallback — `sgcaptcha`, `/.well-known/sgcaptcha/`, `sg-captcha` in `_FINGERPRINTS` | `fetch/captcha_detect.py` | Catches cases where the redirect didn't update `page.url` |
+
+### Slow mouse-wheel scroll (replaces window.scrollTo jumps)
+
+The old scroll path used `window.scrollTo(0, height * fraction)` in four jumps. These set `scrollTop` instantly — elements pass through the viewport between frames with no layout pass for IntersectionObserver to fire on. Sites like Entrata homepages, where the floor-plan widget XHR is gated behind IntersectionObserver, never triggered.
+
+New strategy:
+- `page.mouse.move(viewport_w/2, viewport_h/2)` — centre the mouse in the viewport
+- 20 × `page.mouse.wheel(0, delta)` over 2 seconds (100ms between steps)
+- Delta is `max(120, total_scroll_distance // 20)` — minimum 120px per step
+- 1.5s settle after the last step for IntersectionObserver callbacks and triggered XHRs
+- Applies uniformly to entry pages AND hop pages (same `_do_render` code path)
+
+Real WheelEvents propagate through the browser's full scroll pipeline; IntersectionObserver fires for each element that passes through the viewport. Total fetch overhead: ~3.5s when conditions trigger (body ≥ 50KB AND no FP signals in initial DOM).
+
+### G5 platform detection
+
+PID 230132 (bowmanstation.com) and similar Pegasus Residential properties use the G5 website platform. Floor plan data loads via the G5 Listing Widget API (`api.g5marketingcloud.com`) — fires async after networkidle, never captured. No G5 fingerprint existed anywhere in the codebase.
+
+| Fix | Location | Effect |
+|---|---|---|
+| `g5` HTML fingerprint with markers `g5-c-`, `g5marketingcloud.com`, `g5assets.com`, `g5.com/api/` | `pms/detector.py:_HTML_FINGERPRINTS` | G5 sites detected; fall through to GenericAdapter |
+| G5 host keywords `g5marketingcloud.com`, `api.g5.com` (score 110) | `pms/signal_engine/defaults.py:DEFAULT_HOST_KEYWORDS` | G5 API URLs ranked high in hop candidates |
+
+### Adapter probe session-continuity audit (architectural check)
+
+Audited every PMS adapter to confirm probes use the existing browser session (cookies set during entry-page render) rather than out-of-band HTTP. Findings:
+
+| Adapter | Probe method | Session-aware |
+|---|---|---|
+| entrata | `page.evaluate()` with `credentials: 'include'` | YES |
+| rentcafe / appfolio / sightmap / onesite / realpage_oll / avalonbay | `ctx._api_responses` only (no out-of-band calls) | YES (implicit) |
+| generic | `ctx._api_responses` + `_probe_realpage_cws()` via httpx | MIXED — CWS uses public API key (intentional) |
+
+The model is correct. 9/10 adapters get session continuity implicitly via captured render-time responses. Entrata's `page.evaluate()` probe is the one explicit re-fetch and it correctly uses the browser cookie jar.
+
+---
+
+## Tips for future failure analysis (learned 2026-05-13 / 2026-05-14)
+
+### 1. Verify code claims before implementing the proposed fix
+
+The C2 Entrata hypothesis ("`_probe_known_endpoints()` uses `ctx.base_url`") sounded plausible but was wrong — the code prefers `page.url`. **Always read the actual function before believing an analysis.** Implementing the proposed fix would have changed nothing. The real bugs were three different things in three different files.
+
+### 2. Distinguish event outcomes precisely
+
+In `events.jsonl`, these two are NOT the same:
+- `extract.tier_attempted` `outcome: "skipped"` with `reason: "no captured API responses"` → network log was empty
+- `extract.tier_attempted` `outcome: "ran_empty"` with `reason: "no items matched unit-signal heuristic"` → responses captured but no unit signals
+
+The first means "page didn't fire data XHRs"; the second means "page fired the wrong XHRs". The fixes are completely different (capture timing vs filter tuning).
+
+### 3. Search every silent-drop filter for known-good endpoints
+
+`/Apartments/module/widgets/` had been on `DEFAULT_API_NOISE_PATH_FRAGMENTS` for months, silently discarding Entrata data on every run. When debugging "no API responses captured", grep the noise blocklists for the endpoint patterns you'd expect to see:
+
+```bash
+grep -rn "DEFAULT_API_NOISE\|_NOISE_HOST\|_NOISE_PATH" ma_poc/pms/signal_engine/
+```
+
+### 4. `page.evaluate()` for session-aware probes; `httpx` only for public APIs
+
+When an adapter needs to make a new HTTP call after page render:
+- **Session-required** (cookies, CSRF, auth): use `page.evaluate("() => fetch(url, {credentials:'include'})")` — uses the browser cookie jar
+- **Public API with key**: use httpx with the key in headers — no session needed
+- **Never** use httpx for a session-protected endpoint; it will fail silently or get bot-blocked
+
+### 5. IntersectionObserver requires real WheelEvents
+
+`window.scrollTo(0, y)` is an absolute jump — the browser sets `scrollTop` in one microtask, no intermediate layout pass, IntersectionObserver never fires. Use `page.mouse.wheel(0, deltaY)` for incremental scrolls when the page has lazy-loaded content. Centre the mouse first with `page.mouse.move()` so wheel events hit the document scroll, not a fixed sidebar.
+
+### 6. Live fetches catch analysis errors that static code review can't
+
+Two examples from this session:
+- The C2 analysis claimed bowmanstation.com had `dnn506yrbagrg.cloudfront.net` (G5 CDN). The live fetch found `g5-c-` classes and `g5-assets-cld-res.cloudinary.com` — completely different CDN. Acting on the analysis would have added a wrong fingerprint.
+- The C2 analysis claimed Entrata entry pages would benefit from probing `/Apartments/module/floor_plans/`. The live evidence showed `/Apartments/module/widgets/` is the canonical endpoint and was blocklisted.
+
+When an analysis names specific URLs, classes, or domains, fetch them and verify before changing code.
+
+### 7. Run parallel investigation agents on a single failure category
+
+For Entrata's 222 cloud failures, three agents in parallel produced complementary findings:
+- Code-reading agent: ruled out the wrong-origin hypothesis (page.url is used)
+- Live-fetch agent: confirmed entry pages don't fire the widget; `/conventional/` is SSR
+- Filter-audit agent: surfaced the noise blocklist trap
+
+No single agent would have found all three. Parallel agents on the same problem from different angles triangulate the real cause.
+
+### 8. `page=None` silently disables `if page is not None:` probes
+
+When you see a probe with `if page is not None: ...probe...`, grep for every `scrape(page=...)` call site to make sure no caller passes None. Hop scrapes in particular were passing None and silently disabling Entrata's probe on every link-hop iteration.
+
+### 9. Body-hash dedup catches three classes of cycles cheaply
+
+SHA256[:16] of the response body, seeded with the entry-page hash, detects:
+- JS-silent-redirect (URL stays the same but body equals entry page)
+- Auth-wall loops (every `/sign_in/<anything>` returns the same login HTML)
+- Server-side redirect to a visited URL (different requested path, same delivered body)
+
+One regex-free hash check per hop replaces three separate cycle-detection mechanisms.
+
+### 10. Null-rent accumulation guard prevents floor-plan-name spirals
+
+When an index page returns `[{plan_name: "1BR", rent: null}, ...]` and triggers floor-plan accumulation, the system can collect 50+ duplicates from `/conventional/floorplans`, `/conventional/pricing`, etc. — all returning the same null-rent records. Guard: enter accumulation only when at least one index unit has non-null rent. If all units have null rent, return the leaf result immediately.
+
+### 11. TRANSIENT retry once for 3+ path-segment URLs
+
+In memory-constrained environments (pool_size=2, low RAM), property-specific deep URLs occasionally TRANSIENT on the first attempt. A single retry recovers most of these. Don't retry generic top-level priors (`/availability`, `/floorplans`) — TRANSIENT there usually means a real block, not a load-timing issue. Use path-segment count as the heuristic for "property-specific".
+
+### 12. Verify a fix moved the failure mode, not just the verdict
+
+When a property goes from FAILED to FAILED but with a different `tier_used` value (e.g. `TIER_1_API` → `TIER_1_API_RENTCAFE_SHAPE_REJECTED`), the underlying problem changed. The new tier name tells you the next layer to investigate. Don't treat all FAILED states as equivalent.
+
+### 13. Read the failure-pattern CSV with the canary report side by side
+
+The canary CSV columns `cloud_verdict | basket | pattern | cloud_units` tell you what was expected. The canary's `properties.json` tells you what actually happened. Diffing the two by PID surfaces:
+- Properties that should have succeeded but didn't (NEW REGRESSIONS — stop everything)
+- Properties that failed both times in different ways (failure mode shifted — partial progress)
+- Properties that succeeded both times (regression sentinels — don't break)
+
+### 14. The two `events.jsonl` paths under SCHEMA_VERSION=v2
+
+Jugnu writes events to `data_dir/v2/runs/{date}/events.jsonl` when `SCHEMA_VERSION=v2` (loaded from `.env`). The canary tool may not see that env var if it didn't load `.env` itself. Probe both paths and use whichever exists; don't trust shell-environment heuristics for filesystem layout.
+
+### 15. Default to floor-plan signals, never to rent
+
+When in doubt about whether a container/section/blob "has unit data", the single answer is `has_floor_plan_signals(text, SIGNAL_THRESHOLD_STRUCTURAL)`. Don't add ad-hoc bedroom/sqft/studio regexes in adapters. Don't gate on `$NNN` matches. Don't write keyword tuples mixing rent terms and structural terms. The canonical detector handles every variant including AppFolio's `bd` abbreviation, Entrata's `no_of_bedroom` field aliases, and camelCase API keys via `FIELD_ALIASES`.
+
+---

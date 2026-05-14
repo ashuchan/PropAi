@@ -2354,7 +2354,23 @@ class GenericAdapter:
                 pass  # fall through to LLM DOM call below
 
         dom_section_html = _extract_rent_dom_section(html) if html else None
-        if not dom_units and dom_section_html and int(_budget.get("llm_dom_calls", 0)) > 0 and not _llm_cost_exceeded():
+        # Floor-plan signal gate: do not invoke the targeted DOM LLM on pages
+        # whose visible body has NO floor-plan signals (no beds/baths/sqft/
+        # floor-plan-type/studio markers). _extract_rent_dom_section can fall
+        # back to body[:cap] when no structural container is found, which
+        # would otherwise feed the LLM a SPA shell or marketing page and
+        # waste budget. Project rule (2026-05-14 unification): default to
+        # floor-plan signals, never to rent.
+        _llm_dom_gate_ok = bool(
+            html and _has_fp_signals(html, SIGNAL_THRESHOLD_ANY)
+        )
+        if (
+            not dom_units
+            and dom_section_html
+            and _llm_dom_gate_ok
+            and int(_budget.get("llm_dom_calls", 0)) > 0
+            and not _llm_cost_exceeded()
+        ):
             t0 = _time.monotonic()
             _budget["llm_dom_calls"] = int(_budget.get("llm_dom_calls", 0)) - 1
             try:
@@ -2387,6 +2403,71 @@ class GenericAdapter:
                 units=len(dom_units or []),
                 reason="" if dom_units else "targeted DOM LLM returned no units",
                 duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
+
+            # Retry once if profile previously won via TIER_4_LLM_DOM.
+            # Yesterday's LLM-DOM persisted CSS selectors at quality=0.4
+            # (degraded) which evict on the first miss in the same run, so
+            # today's run lands with no replay-able selectors AND the LLM
+            # is non-deterministic on Anthropic provider (temperature
+            # defaults to 1.0 — services/llm_extractor.py call does not
+            # pin it). One retry recovers the same-content
+            # marketing-shell regressions (e.g. PID 253126 conklintowns
+            # — 2u yesterday, 0u today on byte-identical HTML).
+            _last_success_tier = None
+            try:
+                _last_success_tier = int(
+                    getattr(getattr(ctx.profile, "confidence", None),
+                            "last_success_tier", None) or 0
+                )
+            except Exception:
+                _last_success_tier = 0
+            if not dom_units and _last_success_tier == 4 and not _llm_cost_exceeded():
+                t1 = _time.monotonic()
+                try:
+                    _retry_ctx = dict(property_context)
+                    _retry_ctx["_retry_hint"] = "prior_llm_dom_win_empty_today"
+                    dom_units, dom_hints, interaction = await analyze_dom_with_llm(
+                        dom_section_html,
+                        ctx.base_url,
+                        _retry_ctx,
+                        ctx.property_id or "unknown",
+                    )
+                except Exception as exc:
+                    result.errors.append(f"dom-retry-error: {exc}")
+                    dom_units, dom_hints, interaction = [], None, None
+                if interaction:
+                    llm_interactions.append(interaction)
+                    _record_interaction_cost(interaction)
+                if isinstance(dom_hints, dict):
+                    css_from_dom = dom_hints.get("css_selectors")
+                    if isinstance(css_from_dom, dict) and css_from_dom.get("container"):
+                        llm_css_selectors = css_from_dom
+                    _merge_hint_extras(dom_hints)
+                _log_attempt(
+                    "generic:llm_dom_targeted_retry",
+                    "ran_units" if dom_units else "ran_empty",
+                    units=len(dom_units or []),
+                    reason=("profile_signal_retry" if dom_units
+                            else "retry_also_empty_prior_llm_dom_winner"),
+                    duration_ms=int((_time.monotonic() - t1) * 1000),
+                )
+        elif (
+            not dom_units
+            and dom_section_html
+            and not _llm_dom_gate_ok
+            and int(_budget.get("llm_dom_calls", 0)) > 0
+            and not _llm_cost_exceeded()
+        ):
+            # Visible diagnostic: gate prevented an LLM_DOM call on a page with
+            # no floor-plan signals. Without this event the skip would be silent
+            # and indistinguishable from a "page already extracted units" path.
+            _log_attempt(
+                "generic:llm_dom_targeted",
+                "skipped",
+                units=0,
+                reason="no floor-plan signals in body — skipping LLM DOM",
+                duration_ms=0,
             )
         # RC3 tracking: capture the nav hint from DOM analysis specifically
         # (distinct from llm_navigation_hints which aggregates across all tiers).

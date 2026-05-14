@@ -188,9 +188,20 @@ async def test_explored_links_filtered_from_candidates() -> None:
             visited_urls={"https://x.com/"},
         )
 
-    # Neither dead-end URL was visited:
-    assert "https://x.com/availability" not in visit_log
-    assert "https://x.com/floor-plans" not in visit_log
+    # 2026-05-14 carve-out: high-score sources (>= _PMS_PRIOR_SCORE)
+    # survive the explored_skip filter. Universal PMS priors fire at
+    # _PMS_PRIOR_SCORE for unknown-PMS sites, so these candidates are
+    # retried even when previously empty — one empty extraction must
+    # not permanently poison a known floor-plan path. Lower-score
+    # keyword-only candidates are still filtered.
+    assert "https://x.com/availability" in visit_log, (
+        f"Universal PMS prior /availability should survive explored_skip; "
+        f"visit_log={visit_log}"
+    )
+    assert "https://x.com/floor-plans" in visit_log, (
+        f"Universal PMS prior /floor-plans should survive explored_skip; "
+        f"visit_log={visit_log}"
+    )
 
 
 @pytest.mark.asyncio

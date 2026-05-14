@@ -364,7 +364,36 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # platform.
     if "onlineleasing.realpage.com" in h:
         return "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
-    if "/apartments/module/" in h or "entrata-widget" in h or "commoncf.entrata.com" in h:
+    # Multi-PMS routing: when a page contains BOTH an Entrata widget marker
+    # AND a SightMap embed iframe (sightmap.com/embed/), the unit data lives
+    # in the SightMap iframe — the Entrata widget on the same page is
+    # typically a contact/amenities/photo module that doesn't carry units.
+    # Promote SightMap to STRONG in this case so it beats the Entrata-widget
+    # path that would otherwise lock the SightMap adapter out (PID 16139
+    # chaseknollsapts.com observed 2026-05-14: Entrata STRONG won, SightMap
+    # iframe with 9 units never got read).
+    # Note: bare ``sightmap.com`` substring is NOT enough — could be a CDN
+    # asset or analytics link. ``sightmap.com/embed/`` is iframe-specific.
+    _has_sightmap_embed = "sightmap.com/embed/" in h
+    _has_entrata_widget = (
+        "/apartments/module/" in h
+        or "entrata-widget" in h
+        or "commoncf.entrata.com" in h
+    )
+    if _has_sightmap_embed and _has_entrata_widget:
+        return (
+            "sightmap",
+            0.90,
+            ["SightMap embed iframe + Entrata widget both present — "
+             "SightMap carries unit data, routed there"],
+        )
+    if _has_sightmap_embed:
+        return (
+            "sightmap",
+            0.90,
+            ["SightMap embed iframe in HTML (sightmap.com/embed/)"],
+        )
+    if _has_entrata_widget:
         return (
             "entrata",
             0.85,

@@ -371,6 +371,7 @@ async def scrape(
     csv_row: dict[str, Any] | None = None,
     property_id: str | None = None,
     shared_budget: dict | None = None,
+    hop_depth: int = 0,
 ) -> dict[str, Any]:
     """Scrape a property URL through detect -> resolve -> adapt pipeline.
 
@@ -595,6 +596,7 @@ async def scrape(
         pmc=_from_csv("Management Company", "pmc"),
         budget=budget,
         floor_plan_signal_count=int(_html_char.get("floor_plan_signal_count", 0) or 0),
+        hop_depth=hop_depth,
     )
 
     # Phase F: populate cluster_key from PMS client account ID on first detection
@@ -865,6 +867,8 @@ async def scrape(
             state=ctx.state,
             zip_code=ctx.zip_code,
             pmc=ctx.pmc,
+            hop_depth=ctx.hop_depth,
+            floor_plan_signal_count=ctx.floor_plan_signal_count,
         )
         fallback_ctx._api_responses = getattr(ctx, "_api_responses", [])  # type: ignore[attr-defined]
         # F12: surface the upstream adapter's unit count so generic.extract
@@ -952,6 +956,28 @@ async def scrape(
     portal_hints = getattr(adapter_result, "_embedded_portal_hints", None)
     if portal_hints:
         result["_embedded_portal_hints"] = list(portal_hints)
+
+    # Scan entry-page raw HTML for portal iframes (sightmap.com/embed/,
+    # AppFolio widget, etc.). detect_embedded_portal_urls (called inside
+    # generic adapter) only walks embedded JSON blobs; raw <iframe src>
+    # attributes are surfaced separately by _extract_portal_iframe_hints.
+    # A page can legitimately carry BOTH outer-HTML units AND an iframe
+    # portal containing more (or higher-quality) data — PID 229594
+    # venterraliving is the canonical case: 4 outer FP signals AND a
+    # sightmap.com/embed/n9w6mmzrv71 iframe with 50+ units behind it.
+    if page_html:
+        try:
+            _entry_iframe_hints = _extract_portal_iframe_hints(page_html)
+        except Exception:
+            _entry_iframe_hints = []
+        if _entry_iframe_hints:
+            _existing_hints = list(result.get("_embedded_portal_hints") or [])
+            _seen_urls = {u for u, _ in _existing_hints}
+            for _ih_url, _ih_name in _entry_iframe_hints:
+                if _ih_url not in _seen_urls:
+                    _existing_hints.append((_ih_url, f"iframe:{_ih_name}"))
+                    _seen_urls.add(_ih_url)
+            result["_embedded_portal_hints"] = _existing_hints
 
     floorplan_hints = getattr(adapter_result, "_embedded_floorplan_subpage_hints", None)
     if floorplan_hints:
@@ -1090,22 +1116,70 @@ _IFRAME_SRC_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Anchor hrefs — second pass of _extract_portal_iframe_hints, catches
+# portal URLs linked rather than iframed.
+_ANCHOR_HREF_RE = re.compile(
+    r'<a[^>]+\bhref=["\']([^"\'>\s]+)["\']',
+    re.IGNORECASE,
+)
+
+# Quoted absolute URL inside any HTML — third pass. Catches portal URLs
+# embedded in inline JavaScript objects (e.g. mark-taylor.com ships
+# ``"yardi_apply_now_link":"https://9026050.onlineleasing.realpage.com/..."``
+# inside a regular <script> tag whose JSON-string-literal members are not
+# parsed by extract_embedded_blobs_from_html). Pattern is conservative —
+# requires the URL to be wrapped in single or double quotes so we don't
+# match URL-like substrings in comments or stack traces.
+_QUOTED_URL_RE = re.compile(
+    r'''["'](https?://[^"'\s<>]+)["']''',
+)
+
+# Regexes used by _strip_html_for_dedup. Visible text only — script/style
+# blocks and their content are removed, tags stripped, whitespace collapsed.
+# Same SPA shell delivered under different URL paths (Angular tab-switcher,
+# AppFolio /sign_in/* auth wall) shares the same stripped text even when the
+# raw body differs by 26KB of inline state (timestamps, CSRF, chunk URLs).
+_SCRIPT_STYLE_RE = re.compile(
+    r"<(script|style)\b[^>]*>.*?</\1>", re.IGNORECASE | re.DOTALL
+)
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+
+
+def _strip_html_for_dedup(html: str) -> str:
+    """Strip HTML to visible text for dedup hashing.
+
+    Removes <script> and <style> blocks (including content), all tags, then
+    collapses whitespace. The result is a deterministic representation of
+    what a reader sees — robust against inline-state churn that breaks raw
+    byte hashing.
+    """
+    if not html:
+        return ""
+    s = _SCRIPT_STYLE_RE.sub(" ", html)
+    s = _TAG_RE.sub(" ", s)
+    return _WS_RE.sub(" ", s).strip()
+
 
 def _extract_portal_iframe_hints(html: str) -> list[tuple[str, str]]:
-    """Extract leasing-portal URLs from <iframe src> attributes.
+    """Extract leasing-portal URLs from <iframe src> AND <a href> attributes.
 
-    When a hop page has no floor-plan signals in its outer HTML (i.e., the
-    unit data lives inside a cross-origin iframe such as an AppFolio or
-    SightMap embed), this function discovers those iframe URLs so they can
-    be added to the hop queue instead of burning LLM budget on the empty
-    outer shell.
+    Two discovery paths:
+      • iframe src — covers cross-origin embeds (AppFolio listings iframe,
+        SightMap embed, etc.)
+      • anchor href — covers portal CTAs ("Apply Now" links to
+        ``{property-id}.onlineleasing.realpage.com``, etc.) which previously
+        only got the low keyword-anchor score and lost to 404-ing PMS priors
+
+    Hits are returned with their portal-name tag; the caller promotes them
+    to ``_EMBEDDED_PORTAL_SCORE`` so they outrank PMS priors.
 
     Args:
-        html: Rendered outer-frame HTML of the hop page.
+        html: Rendered outer-frame HTML of the hop or entry page.
 
     Returns:
-        List of ``(url, portal_name)`` tuples for iframe srcs that match
-        known leasing-portal patterns.  Empty list if none found.
+        List of ``(url, portal_name)`` tuples in iframe-first then
+        anchor-first order. Duplicates by URL are dropped.
     """
     try:
         from ma_poc.pms.adapters._html_extract import _PORTAL_URL_PATTERNS
@@ -1113,15 +1187,23 @@ def _extract_portal_iframe_hints(html: str) -> list[tuple[str, str]]:
         return []
 
     hints: list[tuple[str, str]] = []
-    for match in _IFRAME_SRC_RE.finditer(html):
-        src = match.group(1).strip()
-        if not src or not src.startswith("http"):
-            continue
-        lower = src.lower()
-        for needle, portal_name in _PORTAL_URL_PATTERNS:
-            if needle in lower:
-                hints.append((src, portal_name))
-                break
+    seen: set[str] = set()
+
+    def _scan(regex: re.Pattern[str]) -> None:
+        for match in regex.finditer(html):
+            src = match.group(1).strip()
+            if not src or not src.startswith("http") or src in seen:
+                continue
+            lower = src.lower()
+            for needle, portal_name in _PORTAL_URL_PATTERNS:
+                if needle in lower:
+                    seen.add(src)
+                    hints.append((src, portal_name))
+                    break
+
+    _scan(_IFRAME_SRC_RE)
+    _scan(_ANCHOR_HREF_RE)
+    _scan(_QUOTED_URL_RE)
     return hints
 
 
@@ -1476,11 +1558,38 @@ async def _try_link_hop(
         try:
             nav = profile.navigation
             wpu = getattr(nav, "winning_page_url", None)
+            # Self-fetch suppression: if winning_page_url equals (or is path-
+            # equivalent to) the entry URL, do NOT inject it as a hop
+            # candidate. Otherwise the homepage prior consumes the top hop
+            # slot, ranks above every real anchor (LLM_HINT_SCORE+1 = 10001),
+            # and the runner re-extracts the same body it just fetched —
+            # PID 246152 oxfordlakeview observed 2026-05-14: single candidate
+            # was the homepage itself, the legit `/Marketing/FloorPlans`
+            # anchor was squeezed out. _normalize_url collapses trailing
+            # slashes / lowercase host so the comparison handles common
+            # variants.
+            def _same_as_entry(u: str) -> bool:
+                try:
+                    return _normalize_url(u) == _normalize_url(entry_url)
+                except Exception:
+                    return u == entry_url
             # Guard: never inject infra/media API endpoints as hop candidates.
-            if isinstance(wpu, str) and wpu and wpu not in visited and not _infra_check(wpu):
+            if (
+                isinstance(wpu, str)
+                and wpu
+                and wpu not in visited
+                and not _infra_check(wpu)
+                and not _same_as_entry(wpu)
+            ):
                 profile_top.append((wpu, _LLM_HINT_SCORE + 1, "profile:winning_page_url"))
             for link in getattr(nav, "availability_links", []) or []:
-                if isinstance(link, str) and link and link not in visited and not _infra_check(link):
+                if (
+                    isinstance(link, str)
+                    and link
+                    and link not in visited
+                    and not _infra_check(link)
+                    and not _same_as_entry(link)
+                ):
                     profile_top.append((link, _LLM_HINT_SCORE, "profile:availability_link"))
             for dead in getattr(nav, "explored_links", []) or []:
                 if isinstance(dead, str) and dead:
@@ -1633,9 +1742,14 @@ async def _try_link_hop(
 
     # Phase 9: drop URLs already visited (cycle break) — and skip the
     # profile's recorded dead ends so we don't re-pay for them.
+    # Carve-out: high-score sources (PMS priors, embedded portal hints,
+    # LLM nav-hints, anchor links elevated above PMS_PRIOR_SCORE) survive
+    # the explored_skip filter. Otherwise a single empty-extraction run
+    # poisons the candidate forever (Profile Bug 1 extension — wpu and
+    # availability_links are already carved out earlier).
     ranked = [
         (u, s, a) for (u, s, a) in ranked
-        if u not in visited and u not in explored_skip
+        if u not in visited and (s >= _PMS_PRIOR_SCORE or u not in explored_skip)
     ]
     # Phase 9: hard-cap at max_hops (defensive — _rank_internal_links has
     # its own limit, but enforcing here protects against augment-with-hints
@@ -1698,12 +1812,17 @@ async def _try_link_hop(
     # Passed via shared_budget so subsequent sub-pages skip the LLM DOM call.
     _fp_llm_selectors: dict[str, Any] | None = None
 
-    # Body-hash dedup: prevents LLM analysis on pages whose content is identical
-    # to one already analysed (JS-silent-redirect cycles, AppFolio /sign_in/*
-    # auth walls where every path variant returns the same login page).
-    # Seeded with the entry page so redirect-to-entry cases are caught immediately.
+    # Body-hash dedup: prevents LLM analysis on pages whose visible text is
+    # identical to one already analysed (JS-silent-redirect cycles, AppFolio
+    # /sign_in/* auth walls, SPA tab-switcher shells). Hashes stripped text
+    # (script/style/tags removed, whitespace collapsed) rather than raw bytes
+    # so inline-state churn (timestamps, CSRF, Angular chunk URLs) doesn't
+    # mask a real duplicate. Seeded with the entry page so redirect-to-entry
+    # cases are caught immediately.
     _seen_body_hashes: set[str] = {
-        hashlib.sha256(entry_page_html.encode("utf-8", errors="replace")).hexdigest()[:16]
+        hashlib.sha256(
+            _strip_html_for_dedup(entry_page_html).encode("utf-8")
+        ).hexdigest()[:16]
     }
 
     # Count of pages processed while in floor-plan accumulation mode.
@@ -1798,7 +1917,9 @@ async def _try_link_hop(
                     "link-hop %s: server redirect to already-visited %s — skipping",
                     sub_url, _sub_final,
                 )
-                explored[sub_url] = False
+                # B3 writer fix: cycle, not a dead URL. Don't poison
+                # explored_links — the redirect target may be valid next
+                # run from a different entry path.
                 continue
             visited.add(_sub_final)
 
@@ -1826,31 +1947,42 @@ async def _try_link_hop(
                 shared_budget["_winning_page_url_hop_outcome"] = "profile:winning_page_url:failed"
             continue
 
-        # Body-hash dedup: if this hop's body is byte-identical to a page we
-        # already analysed (AppFolio /sign_in/* auth wall returning the same
-        # 15 KB login page under every path, JS-silent-redirect-to-homepage
-        # that leaves the URL unchanged), skip extraction entirely.
-        # The entry page is pre-seeded into _seen_body_hashes so redirect-to-
-        # entry cases are caught on the first hop without a separate URL check.
+        # Body-hash dedup: if this hop's visible text is identical to a page
+        # we already analysed (AppFolio /sign_in/* auth wall, JS-silent-redirect
+        # to homepage, SPA tab-switcher URLs that return the same rendered shell
+        # with different inline state like timestamps/CSRF/Angular chunk URLs),
+        # skip extraction entirely. The entry page is pre-seeded into
+        # _seen_body_hashes so redirect-to-entry cases are caught on the first
+        # hop without a separate URL check.
+        #
+        # We hash STRIPPED TEXT (script/style removed, whitespace collapsed),
+        # not raw bytes. Raw-byte hashing missed SPA shell loops (PID 229594
+        # venterraliving) where bodies differed by 26KB of inline state but
+        # the rendered text was byte-identical.
         _hop_body_bytes = sub_fetch.body or b""
-        _hop_body_hash = hashlib.sha256(_hop_body_bytes).hexdigest()[:16]
+        _hop_body_text = _hop_body_bytes.decode("utf-8", errors="replace")
+        _hop_stripped = _strip_html_for_dedup(_hop_body_text)
+        _hop_body_hash = hashlib.sha256(_hop_stripped.encode("utf-8")).hexdigest()[:16]
         if _hop_body_hash in _seen_body_hashes:
             log.debug(
-                "link-hop %s: duplicate body (hash=%s) — auth wall or content loop, skipping",
+                "link-hop %s: duplicate visible text (hash=%s) — auth wall or content loop, skipping",
                 sub_url, _hop_body_hash,
             )
-            explored[sub_url] = False
+            # B3 writer fix: content loop within a single session, not a
+            # dead URL. The same URL fetched on a different day from a
+            # different entry path may yield different content (auth
+            # cookies, A/B variants).
             continue
         _seen_body_hashes.add(_hop_body_hash)
 
-        # Iframe portal pre-check: when the hop page has NO floor-plan signals
-        # in its outer HTML, the unit data may live inside a cross-origin
-        # <iframe> (e.g. AppFolio widget on a Squarespace property site).
-        # Playwright's page.content() never includes cross-origin iframe body,
-        # so passing the outer HTML to LLM would be waste.  Instead, discover
-        # portal iframe src URLs and queue them as high-priority portal hops,
-        # then skip extraction on this shell page entirely.
-        _hop_body_text = _hop_body_bytes.decode("utf-8", errors="replace")
+        # Iframe portal scan: scan EVERY hop body for portal iframes
+        # (sightmap.com, securecafe.com, AppFolio widget, etc.) regardless of
+        # whether the outer HTML has floor-plan signals. A page can legitimately
+        # have BOTH outer-HTML signals AND a portal iframe carrying the actual
+        # unit data — PID 229594 venterraliving is the canonical example
+        # (sightmap.com/embed/n9w6mmzrv71 iframe + 4 outer FP signals).
+        # Queue the iframes as high-priority portal hops; do NOT skip the
+        # outer-page extraction (it may also yield units).
         try:
             from ma_poc.pms.signal_engine.floor_plan_signals import (
                 has_floor_plan_signals as _has_fp,
@@ -1858,25 +1990,33 @@ async def _try_link_hop(
             )
             _outer_has_fp = _has_fp(_hop_body_text, _FP_ANY)
         except Exception:
-            _outer_has_fp = True  # safe: don't skip on import failure
+            _outer_has_fp = True  # safe default
 
-        if not _outer_has_fp:
-            _iframe_portal_hints = _extract_portal_iframe_hints(_hop_body_text)
-            if _iframe_portal_hints:
-                log.debug(
-                    "link-hop %s: no floor-plan signals in outer HTML — "
-                    "found %d portal iframe(s), queueing them instead of LLM",
-                    sub_url, len(_iframe_portal_hints),
-                )
-                for _ih_url, _ih_name in _iframe_portal_hints:
-                    if _ih_url not in visited and not any(u == _ih_url for u, _, _ in queue):
-                        queue.append((
-                            _ih_url,
-                            _EMBEDDED_PORTAL_SCORE,
-                            f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}iframe:{_ih_name}",
-                        ))
-                        dynamic_appended += 1
-                explored[sub_url] = False
+        _iframe_portal_hints = _extract_portal_iframe_hints(_hop_body_text)
+        if _iframe_portal_hints:
+            log.debug(
+                "link-hop %s: found %d portal iframe(s) — queueing as hops "
+                "(outer_has_fp=%s)",
+                sub_url, len(_iframe_portal_hints), _outer_has_fp,
+            )
+            for _ih_url, _ih_name in _iframe_portal_hints:
+                if _ih_url not in visited and not any(u == _ih_url for u, _, _ in queue):
+                    queue.append((
+                        _ih_url,
+                        _EMBEDDED_PORTAL_SCORE,
+                        f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}iframe:{_ih_name}",
+                    ))
+                    dynamic_appended += 1
+            # If outer HTML has no FP signals at all, the page is just a
+            # marketing/portal shell — skip its extraction entirely (LLM
+            # would burn budget on nothing). When outer HAS signals, fall
+            # through to extraction normally; the iframe candidate is in
+            # the queue for later.
+            if not _outer_has_fp:
+                # B3 writer fix: this URL is a routing hop (portal iframe
+                # found, we're going inside it instead). The outer URL
+                # isn't dead — it's just not where the units live. Don't
+                # poison explored_links.
                 continue
 
         # Bug 5 alignment (2026-05-09 deep-dive): if this hop's body looks
@@ -1922,7 +2062,9 @@ async def _try_link_hop(
         if _redirected_to_entry and _sub_final_url != sub_url:
             # The server redirected our sub-path hop back to the homepage —
             # identical content, no value in running extraction again.
-            explored[sub_url] = False
+            # B3 writer fix: this is a server-side transient redirect, not
+            # a dead URL. The site may serve different content from this
+            # URL once a session cookie or query param is in place.
             log.debug(
                 "link-hop %s: silent redirect to homepage (%s) — skipping extraction",
                 sub_url, _sub_final_url,
@@ -1939,15 +2081,22 @@ async def _try_link_hop(
         # a timeout spiral (e.g. chopakaapartments.com /conventional/floorplans,
         # /conventional/pricing, etc. all returning the same 4-unit listing).
         try:
-            _hop_path_parts = [p for p in urllib.parse.urlparse(sub_url).path.split("/") if p]
+            _hop_parsed = urllib.parse.urlparse(sub_url)
+            _hop_path_parts = [p for p in _hop_parsed.path.split("/") if p]
             if (
                 len(_hop_path_parts) >= 3
                 and dynamic_appended < max_dynamic_appends
                 and not _in_floorplan_accumulation
             ):
                 _prop_sub_paths = ("/floorplans", "/floor-plans", "/pricing", "/apartments-pricing")
+                # Compose subpaths into the PATH component only, preserving query
+                # string and fragment. Naïve `sub_url + _psp` corrupts URLs with a
+                # query string (e.g. `?id=X` + `/floorplans` -> `?id=X/floorplans`)
+                # which many SPAs return 200 OK for, creating an extraction spiral.
+                _hop_base_path = _hop_parsed.path.rstrip("/")
                 for _psp in _prop_sub_paths:
-                    _psp_url = sub_url.rstrip("/") + _psp
+                    _new_path = _hop_base_path + _psp
+                    _psp_url = urllib.parse.urlunparse(_hop_parsed._replace(path=_new_path))
                     if _psp_url not in visited and not any(u == _psp_url for u, _, _ in queue):
                         queue.append((_psp_url, _PMS_PRIOR_SCORE + 200, f"prop_subpath:{_psp}"))
                         dynamic_appended += 1
@@ -1990,6 +2139,13 @@ async def _try_link_hop(
                 csv_row=csv_row,
                 property_id=property_id,
                 shared_budget=shared_budget,
+                # Mark this scrape as a hop so the RC3 monolithic-LLM deferral
+                # gate in signal_engine/decider.py does NOT fire — Rule 2 is
+                # designed for the entry page only (defer the heavyweight LLM
+                # to a hop that's about to happen). On a hop page, the LLM
+                # should run immediately; deferring again is the cascading
+                # bug that left 290347 + 246710 with no LLM run on any page.
+                hop_depth=1,
             )
         except Exception as exc:
             log.warning("link-hop scrape failed for %s: %s", sub_url, exc)
@@ -1997,8 +2153,16 @@ async def _try_link_hop(
             continue
 
         had_data = bool(sub_result.get("units"))
-        explored[sub_url] = had_data
+        # B3 writer fix: only record had_data=True ("this URL gave us units,
+        # prioritise it next run" → availability_links). A successful
+        # 200-OK fetch that produced 0 units is NOT a dead URL — extraction
+        # may succeed tomorrow under a different LLM completion, a freshly
+        # added FieldCombination, or a relaxed gate. Recording False here
+        # poisoned known-good endpoints permanently — the dominant cause of
+        # 147/209 generic and 186/221 Entrata zero-hop failures observed
+        # on 2026-05-14.
         if had_data:
+            explored[sub_url] = True
             sub_result["_link_hop_from"] = entry_url
             sub_result["_link_hop_depth"] = 1
             sub_result["_link_hop_score"] = score
@@ -2284,6 +2448,7 @@ async def scrape_jugnu(
     expected_total_units: int | None = None,
     csv_row: dict[str, Any] | None = None,
     partial_state: dict[str, Any] | None = None,
+    force_cold: bool = False,
 ) -> dict[str, Any]:
     """Jugnu L3 entry point — scrape using pre-fetched result.
 
@@ -2303,6 +2468,14 @@ async def scrape_jugnu(
         Profile from the profile store.
     expected_total_units : int | None
         Hint for expected unit count.
+    force_cold : bool
+        When True, treat the property as a fresh COLD scrape: clear
+        ``profile.navigation.winning_page_url``, ``availability_links``,
+        ``explored_links``, ``dead_links``, and ``dom_hints.field_selectors``
+        for THIS run only — do not mutate the persisted profile. Used by
+        the runner's recovery loop when a WARM/HOT profile fails today
+        (PMS provider can change without notice; the prior winning URL or
+        cached selectors may be stale).
 
     Returns
     -------
@@ -2314,6 +2487,38 @@ async def scrape_jugnu(
 
     base_url = task.url if hasattr(task, "url") else str(task)
     property_id = task.property_id if hasattr(task, "property_id") else "unknown"
+
+    # Cold-profile retry: when force_cold=True, build an in-memory copy of
+    # the profile with the stale navigation / DOM hints cleared so this
+    # run behaves as if the property had never been scraped before. The
+    # persisted profile is NOT mutated — the runner only flips the flag
+    # for the retry attempt.
+    if force_cold and profile is not None:
+        try:
+            from ma_poc.models.scrape_profile import ProfileMaturity as _PM_CLR
+            profile = profile.model_copy(deep=True)
+            nav = getattr(profile, "navigation", None)
+            if nav is not None:
+                nav.winning_page_url = None
+                nav.availability_links = []
+                nav.explored_links = []
+                nav.dead_links = {}
+            dh = getattr(profile, "dom_hints", None)
+            if dh is not None:
+                # Don't carry the prior selector set — it's a likely
+                # reason the warm run failed today.
+                dh.field_selectors = None
+            # Force COLD maturity so the planner gives a generous budget
+            # (consecutive_successes is NOT reset on the persisted profile;
+            # this is in-memory only).
+            try:
+                profile.confidence.maturity = _PM_CLR.COLD
+            except Exception:
+                pass
+        except Exception:
+            # Defensive: if cloning fails, fall back to using the original
+            # profile rather than crashing the retry.
+            pass
 
     # Phase G2: compute budget here so link-hop guard can respect it.
     # F0.1: env-driven _cost_cap_usd injected via the fallback dict and

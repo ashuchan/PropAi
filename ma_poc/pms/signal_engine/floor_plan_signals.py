@@ -182,6 +182,8 @@ FIELD_ALIASES: dict[str, str] = {
     "area":               "sqft",
     "minimumsquarefeet":  "sqft",
     "squarefeet_min":     "sqft",
+    # Schema.org Apartment.floorSize (after lowercase normalisation).
+    "floorsize":          "sqft",
     # ── Floor-plan name / ID ──────────────────────────────────────────────
     "floorplan_name":     "floor_plan_name",
     "floorplanname":      "floor_plan_name",

@@ -711,9 +711,16 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
     found: list[dict[str, Any]] = []
 
     # ── Strategy A: <script type="application/json"> (incl. __NEXT_DATA__) ──
+    # Upper cap raised from 1 MB → 4 MB. The Razz / MyRazz CMS platform
+    # serialises ENTIRE inventory state inline (PID 246710 8181medcenter
+    # ships 678 units + 5 plan models in a ~1.02 MB blob — just over the
+    # old cap). 4 MB still bounds the per-page memory budget but covers
+    # every observed inline-inventory CMS so far. Pages above that limit
+    # are almost certainly mis-rendered (the rendered HTML wraps real
+    # data plus minified component code).
     for script in soup.find_all("script", attrs={"type": "application/json"}):
         text = script.string or script.get_text()
-        if not text or len(text) < 200 or len(text) > 1_000_000:
+        if not text or len(text) < 200 or len(text) > 4_000_000:
             continue
         try:
             data = json.loads(text)
@@ -891,6 +898,13 @@ _PORTAL_URL_PATTERNS: tuple[tuple[str, str], ...] = (
     ("funnelleasing.com/embed", "funnel"),
     ("apartments.appfolio.com", "appfolio"),
     ("widgets.appfolio.com", "appfolio"),
+    # AppFolio per-property widget — the actual listings live at
+    # ``{property-slug}.appfolio.com/listings`` (e.g. ``franklin.appfolio.com``,
+    # ``postroadmgmt.appfolio.com``). Observed 2026-05-14 on PIDs 219388 +
+    # 46582 where this iframe carries the inventory but pattern-matching
+    # only knew about the legacy ``apartments.appfolio.com`` host.
+    (".appfolio.com/listings", "appfolio"),
+    (".appfolio.com/connect", "appfolio"),
     # ResMan property-management portal
     ("myresman.com/portal/applicants", "resman"),
     ("myresman.com/portal/prospects", "resman"),

@@ -308,11 +308,55 @@ def _classify_rentcafe_failure(api_responses: list[dict[str, Any]]) -> tuple[str
     """Return (tier_code, machine-readable error message) for a failed run."""
     if not api_responses:
         return (_TIER_NO_RESPONSE, "RENTCAFE_NO_RESPONSE: no network responses captured during page load")
-    shape_matches = [r for r in api_responses if _is_rentcafe_response(r.get("body"))]
+    # Gate SHAPE_REJECTED on JSON-shaped responses. The L1 fetcher's
+    # network log buffers every response with content-type containing
+    # json|xml|html|text — so the entry page's own HTML body alone makes
+    # ``api_responses`` non-empty for every successful fetch. Without this
+    # gate the run mislabels marketing-shell sites (where no RentCafe JSON
+    # XHR was ever intercepted) as SHAPE_REJECTED, hiding the real failure
+    # mode (no API capture, usually because data lives behind a CF-blocked
+    # securecafe.com portal hop).
+    #
+    # A response counts as a RentCafe-API candidate when EITHER:
+    #  - content-type contains "json" AND the host is in the RentCafe/Yardi
+    #    family (rentcafe.com, securecafe.com, yardi*.com, etc.), OR
+    #  - the body is already a dict/list with no content_type tag (test
+    #    fixtures and pre-parsed callers).
+    # Without the host gate, third-party tracking JSON (callrail, gtm,
+    # osano consent banners, etc.) sneaks through and the run mislabels
+    # marketing-shell properties as SHAPE_REJECTED.
+    _RC_FAMILY_HOST_TOKENS = (
+        "rentcafe.com",
+        "securecafe.com",
+        "yardi.com",
+        "yardione.com",
+        "yardiasp.com",
+    )
+
+    def _is_rentcafe_candidate(resp: dict[str, Any]) -> bool:
+        ct = str(resp.get("content_type") or "").lower()
+        url = str(resp.get("url") or "").lower()
+        if "json" in ct:
+            # Only count JSONs hosted on the RentCafe/Yardi family — third-party
+            # trackers (callrail, gtm, osano, …) are not API candidates here.
+            return any(tok in url for tok in _RC_FAMILY_HOST_TOKENS)
+        if not ct and isinstance(resp.get("body"), (dict, list)):
+            return True
+        return False
+
+    json_responses = [r for r in api_responses if _is_rentcafe_candidate(r)]
+    if not json_responses:
+        return (
+            _TIER_NO_RESPONSE,
+            f"RENTCAFE_NO_RESPONSE: {len(api_responses)} non-JSON responses captured "
+            "(HTML/text only — no API XHR intercepted on entry or hops; "
+            "RentCafe data likely behind a portal that didn't fire its API)",
+        )
+    shape_matches = [r for r in json_responses if _is_rentcafe_response(r.get("body"))]
     if not shape_matches:
         return (
             _TIER_SHAPE_REJECTED,
-            f"RENTCAFE_SHAPE_REJECTED: {len(api_responses)} responses captured, "
+            f"RENTCAFE_SHAPE_REJECTED: {len(json_responses)} JSON responses captured, "
             "none matched RentCafe envelope/key signature",
         )
     total_items = 0

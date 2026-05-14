@@ -624,15 +624,21 @@ async def test_link_hop_priors_respect_explored_skip_list() -> None:
             max_hops=3,
         )
 
-    assert "https://example.com/floorplans" not in fetch_calls, (
-        f"Prior URL was in profile.explored_links but still got fetched: "
-        f"{fetch_calls}. The skip-list must apply to priors the same way "
-        f"it applies to keyword candidates."
+    # 2026-05-14 carve-out: PMS priors and other high-score sources
+    # (>= _PMS_PRIOR_SCORE) survive the explored_skip filter. A single
+    # empty-extraction run must NOT permanently poison a known PMS
+    # endpoint — that was the dominant cause of 147/209 Generic and
+    # 186/221 Entrata zero-hop failures in the 2026-05-14 cloud run.
+    # The complementary writer-side fix (don't append "OK + 0 units"
+    # URLs to explored_links at all) is tracked separately.
+    assert "https://example.com/floorplans" in fetch_calls, (
+        f"PMS-prior URL was suppressed by explored_skip even though its "
+        f"score (>= _PMS_PRIOR_SCORE) should bypass the filter; "
+        f"fetch_calls={fetch_calls}"
     )
-    # The OTHER priors (/availability, /apartments) should still fire.
+    # The other priors should also still fire.
     assert any("availability" in u or "apartments" in u for u in fetch_calls), (
-        f"Skipping /floorplans should not suppress the rest of the "
-        f"RentCafe priors; got fetch_calls={fetch_calls}"
+        f"Other RentCafe priors should also fire; got fetch_calls={fetch_calls}"
     )
 
 

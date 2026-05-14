@@ -684,6 +684,48 @@ async def _process_property(
         partial_state=partial_state,
     )
 
+    # Cold-profile recovery retry. PMS providers change without notice
+    # (a property can migrate from RentCafe to Entrata between runs); the
+    # prior winning URL or cached selectors then misdirect the scraper.
+    # When today's extraction returned no units AND yesterday's profile
+    # was WARM/HOT (it succeeded recently), retry once with a profile-blind
+    # cold scrape so fresh discovery + universal priors get a clean shot.
+    # The persisted profile is NOT mutated by scrape_jugnu's cold path —
+    # the original profile flows into update_profile_after_extraction below.
+    try:
+        _has_units = bool(result.get("units"))
+        _is_warm_or_hot = False
+        if profile is not None and not _has_units:
+            from ma_poc.models.scrape_profile import ProfileMaturity as _PM_RTR
+            _maturity = getattr(getattr(profile, "confidence", None), "maturity", None)
+            _is_warm_or_hot = _maturity in (_PM_RTR.WARM, _PM_RTR.HOT)
+        if _is_warm_or_hot:
+            log.info(
+                "cold-profile retry for %s: warm/hot profile but 0 units extracted — "
+                "retrying with force_cold=True",
+                task.property_id,
+            )
+            _cold_result = await scrape_jugnu(
+                task=task,
+                fetch_result=fetch_result,
+                page=None,
+                profile=profile,
+                csv_row=csv_row,
+                partial_state=partial_state,
+                force_cold=True,
+            )
+            # Adopt the cold result only if it actually recovered units.
+            # Otherwise keep the original so we don't lose its diagnostic
+            # signal (errors, tier_used, fetch_diagnostic).
+            if _cold_result.get("units"):
+                _cold_result["_cold_retry_applied"] = True
+                result = _cold_result
+    except Exception as exc:
+        log.warning(
+            "cold-profile retry failed for %s: %s",
+            task.property_id, exc, exc_info=True,
+        )
+
     # F6 (H6/H11) — surface the propertyId we used (resolved or cached)
     # so the profile_updater can persist it. Read by
     # update_profile_after_extraction; only written there when the tier

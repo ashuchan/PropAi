@@ -90,6 +90,103 @@ def _find_list(obj: Any, keys: tuple[str, ...]) -> list:
     return []
 
 
+# Canonical unit-signal keys for the recursive walker. After
+# normalize_field_key() collapses vendor variants (camelCase / PascalCase /
+# snake_case / vendor abbreviations) these are the field-names that count.
+# An item with >= 2 canonical signals is treated as unit-shaped.
+_CANON_UNIT_SIGNAL_KEYS: frozenset[str] = frozenset({
+    "rent", "min_rent", "max_rent",
+    "sqft",
+    "bedrooms", "bathrooms",
+    "floor_plan_name",
+    "unit_number", "unit_id",
+    "available_date",
+})
+
+# Defensive cap on the recursive walker. The Razz blob is ~1 MB but well-
+# structured; pathological pages (mis-rendered SPAs, infinitely nested
+# logger payloads) can dwarf that. Capping nodes visited keeps the worst
+# case bounded.
+_WALK_MAX_NODES = 50_000
+
+
+def _item_has_unit_signals(item: Any, min_signals: int = 2) -> bool:
+    """True iff ``item`` is a dict whose keys (normalised) include at least
+    ``min_signals`` distinct canonical unit signal keys.
+
+    Skips keys starting with '@' (Schema.org reserved). Uses
+    normalize_field_key from floor_plan_signals to collapse vendor variants
+    so ``monthlyRent``/``minRent``/``rentTerms``/``floorPlanName``/
+    ``bedroomCount``/``squareFootage``/``SquareFeet`` all map to canonical
+    keys without per-call regex work.
+    """
+    if not isinstance(item, dict):
+        return False
+    try:
+        from ma_poc.pms.signal_engine.floor_plan_signals import (
+            normalize_field_key as _norm,
+        )
+    except Exception:
+        return False
+    found: set[str] = set()
+    for k, v in item.items():
+        if not isinstance(k, str) or k.startswith("@"):
+            continue
+        # Treat dict/list values as "present" if they are non-empty —
+        # nested ``rent: {min, max}`` and ``rentTerms: [...]`` count as
+        # the rent signal even though the value isn't a scalar.
+        if v in (None, "", [], {}):
+            continue
+        canon = _norm(k)
+        if canon in _CANON_UNIT_SIGNAL_KEYS:
+            found.add(canon)
+            if len(found) >= min_signals:
+                return True
+    return False
+
+
+def find_unit_arrays(blob: Any, min_signals: int = 2) -> list[list[dict]]:
+    """Recursively walk ``blob`` and return every list whose first dict-typed
+    item satisfies :func:`_item_has_unit_signals`.
+
+    Designed for SSR JSON blobs that bury inventory under vendor-specific
+    paths (Razz: ``initialStoreState.$inventory.units`` 4 levels deep; some
+    Wix / custom CMSes go even deeper). Returns each candidate list in
+    discovery order. Caller is responsible for deduplicating units between
+    lists if multiple matches are returned.
+
+    Node-visit cap (``_WALK_MAX_NODES``) bounds the worst case on
+    pathological / mis-rendered payloads.
+    """
+    if blob is None:
+        return []
+    results: list[list[dict]] = []
+    visited = 0
+    stack: list[Any] = [blob]
+    while stack:
+        node = stack.pop()
+        visited += 1
+        if visited > _WALK_MAX_NODES:
+            break
+        if isinstance(node, list):
+            # If this list itself is unit-shaped, capture it; do NOT recurse
+            # into its items (each item would just yield itself again).
+            if node and any(
+                _item_has_unit_signals(it, min_signals) for it in node[:5]
+            ):
+                results.append([it for it in node if isinstance(it, dict)])
+                continue
+            # Otherwise, look inside for nested unit arrays.
+            for child in node:
+                if isinstance(child, (dict, list)):
+                    stack.append(child)
+        elif isinstance(node, dict):
+            for v in node.values():
+                if isinstance(v, (dict, list)):
+                    stack.append(v)
+    return results
+
+
 def _extract_rent(u: dict) -> tuple[int | None, int | None]:
     """Extract (rent_low, rent_high) from a unit/floorplan dict.
 
@@ -178,7 +275,17 @@ def _walk_jsonld(node: Any, out: list[dict]) -> None:
 
 
 def _jsonld_item_has_unit_signal(item: dict) -> bool:
-    """True if a JSON-LD node has offers/pricing/rooms data — i.e. unit-level."""
+    """True if a JSON-LD node has offers/pricing/rooms data — i.e. unit-level.
+
+    Two signal-detection passes. The first uses Schema.org canonical keys
+    (``offers``, ``numberOfRooms``, ``floorSize``); the second runs the
+    item's keys through ``normalize_field_key`` so PMS-vendor variants
+    (``floorPlanName``, ``numberOfBedrooms``, ``monthlyRent``,
+    ``bedroomCount``, ``squareFootage`` …) also count as signals. Without
+    the second pass, ApartmentComplex blocks that ship vendor-specific
+    keys are rejected as "no unit signal" even when the data is plainly
+    present (PID 290347 29washington.com observed 2026-05-14).
+    """
     offers = item.get("offers")
     if isinstance(offers, dict) and (
         offers.get("price") or offers.get("lowPrice") or offers.get("highPrice")
@@ -198,11 +305,38 @@ def _jsonld_item_has_unit_signal(item: dict) -> bool:
         return True
     t = item.get("@type")
     t_list = t if isinstance(t, list) else [t]
-    return any(
+    if any(
         x in ("Apartment", "FloorPlan", "Residence", "Offer", "SingleFamilyResidence")
         for x in t_list
         if isinstance(x, str)
-    )
+    ):
+        return True
+    # Second pass: any key that normalises to a canonical unit signal counts.
+    # Picks up Schema.org camelCase + PMS-vendor variants without modifying
+    # the item or breaking downstream extractors that read Schema.org keys
+    # directly.
+    try:
+        from ma_poc.pms.signal_engine.floor_plan_signals import (
+            normalize_field_key as _norm_key,
+        )
+    except Exception:
+        return False
+    _unit_signal_canon = {
+        "rent", "min_rent", "max_rent",
+        "sqft",
+        "bedrooms", "bathrooms",
+        "floor_plan_name",
+        "unit_number", "unit_id",
+        "available_date",
+    }
+    for k, v in item.items():
+        if not isinstance(k, str) or k.startswith("@"):
+            continue
+        if v in (None, ""):
+            continue
+        if _norm_key(k) in _unit_signal_canon:
+            return True
+    return False
 
 
 # ── Quality checks ─────────────────────────────────────────────────────────────
@@ -507,6 +641,25 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
                                 if candidates:
                                     break
 
+        # Fallback: recursive search for ANY array whose items have >= 2
+        # canonical unit-signal keys (after vendor-variant normalisation).
+        # Picks up CMS inventory blobs that bury units under non-standard
+        # paths (Razz / MyRazz: ``initialStoreState.$inventory.units`` 4
+        # levels deep; observed 678 units on PID 246710 8181medcenter).
+        # Only runs when the keyed walker found nothing — the keyed walker
+        # is cheaper and produces cleaner matches when its key names hit.
+        if not candidates and isinstance(data, (dict, list)):
+            try:
+                walker_lists = find_unit_arrays(data, min_signals=2)
+            except Exception:
+                walker_lists = []
+            if walker_lists:
+                # Prefer the LARGEST list — it's almost always the per-unit
+                # inventory rather than a 5-row floor-plan summary that
+                # would also pass the signal gate.
+                walker_lists.sort(key=len, reverse=True)
+                candidates = walker_lists[0]
+
         for item in candidates:
             if not isinstance(item, dict):
                 continue
@@ -552,9 +705,15 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
                 "available_on", "availableOn", "display_available_on", "readyDate",
             )
             status = _get(item, "status", "availability_status", "leaseStatus", "Status", "unit_status")
+            # ``id`` is intentionally last so it only fires when no specific
+            # unit_number key matched — guards against picking a row's
+            # database PK on JSON shapes where ``id`` is non-unit semantics.
+            # Razz/MyRazz uses ``id`` directly as the unit identifier (e.g.
+            # ``{id: '21110', rent: {...}, sqft: {...}}``).
             unit_num = _get(item,
                 "unitNumber", "unit_number", "unitId", "unit_id", "UnitNumber",
                 "label", "display_unit_number", "unitCode", "unit_code",
+                "id",
             )
             floor_num = _get(item, "floor", "floorNumber", "FloorNumber", "floor_id", "floorId")
             building = _get(item, "building", "buildingName", "BuildingName", "building_name")
