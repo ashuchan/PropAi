@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # ── Stage 1: builder — install all deps, build the SPA ────────────────────────
 # Builds three node packages that ship together in one image:
 #   - ma_poc/services         (TS source, loaded at runtime by tsx)
@@ -10,27 +12,37 @@
 # layout. We keep services as TS source (loaded by tsx) instead of building
 # it to dist/ because that's what the in-tree `npm start` script does, and
 # duplicating that contract here keeps prod ≈ dev.
+#
+# Why ONE COPY per source path + cache mount, not the
+# "package.json early → npm ci → COPY source" pattern: BuildKit (5.x in CI)
+# was failing the second COPY of an already-partially-copied path with
+# "failed to compute cache key … not found" — a known interaction between
+# granular file COPYs and a subsequent whole-directory COPY of the same
+# source. `COPY --link` + cache mounts on /root/.npm gets us back the
+# performance the granular pattern was buying without that pitfall.
+
 FROM node:20-slim AS builder
 
 WORKDIR /build
 
-# Install deps first so the layer caches across source-only changes.
-# Each subpackage has its own lockfile; using `npm ci` enforces the lock.
-COPY ma_poc/services/package.json ma_poc/services/package-lock.json* ./services/
-COPY ma_poc/frontend/package.json ma_poc/frontend/package-lock.json* ./frontend/
-COPY ma_poc/frontend/api/package.json ma_poc/frontend/api/package-lock.json* ./frontend/api/
+# --link decouples this layer from its parent in BuildKit's storage model,
+# avoiding the cache-key churn that the previous granular+bulk COPY pattern
+# tripped on. Dockerignore at ma_poc/frontend/Dockerfile.dockerignore keeps
+# node_modules/dist/git out of the upload.
+COPY --link ma_poc/services ./services
+COPY --link ma_poc/frontend ./frontend
 
-RUN cd services && npm ci --no-audit --no-fund
-RUN cd frontend && npm ci --no-audit --no-fund
-RUN cd frontend/api && npm ci --no-audit --no-fund
-
-# Sources — copied after deps so source edits don't bust npm-install layers.
-COPY ma_poc/services ./services
-COPY ma_poc/frontend ./frontend
+# All three installs share the same /root/.npm cache mount, so a re-run
+# after a source change skips redownloading any package it has seen before.
+# Fused into one RUN so npm doesn't have to warm its cache three times.
+RUN --mount=type=cache,target=/root/.npm \
+    cd /build/services && npm ci --no-audit --no-fund \
+ && cd /build/frontend && npm ci --no-audit --no-fund \
+ && cd /build/frontend/api && npm ci --no-audit --no-fund
 
 # Build the SPA. `tsc && vite build` is the npm script; output is
 # /build/frontend/dist (static files + index.html, ready for express.static).
-RUN cd frontend && npm run build
+RUN cd /build/frontend && npm run build
 
 # ── Stage 2: runtime — slim node + production deps + built SPA ────────────────
 FROM node:20-slim
@@ -46,23 +58,23 @@ WORKDIR /app/ma_poc/frontend/api
 RUN groupadd --system --gid 1001 propai \
  && useradd --system --uid 1001 --gid propai --create-home propai
 
-# Re-install production deps in the runtime stage so dev deps (tsx is a
-# `dependencies` entry, so it stays; vitest etc. drop out) are not shipped.
-COPY --from=builder /build/services/package.json /build/services/package-lock.json* /app/ma_poc/services/
-COPY --from=builder /build/frontend/api/package.json /build/frontend/api/package-lock.json* /app/ma_poc/frontend/api/
+# Re-install production-only deps in the runtime stage so dev deps (vitest,
+# etc.) don't ship. tsx is in `dependencies` and survives --omit=dev.
+COPY --link --from=builder /build/services/package.json /build/services/package-lock.json* /app/ma_poc/services/
+COPY --link --from=builder /build/frontend/api/package.json /build/frontend/api/package-lock.json* /app/ma_poc/frontend/api/
 
-RUN cd /app/ma_poc/services && npm ci --omit=dev --no-audit --no-fund \
- && cd /app/ma_poc/frontend/api && npm ci --omit=dev --no-audit --no-fund \
- && npm cache clean --force
+RUN --mount=type=cache,target=/root/.npm \
+    cd /app/ma_poc/services && npm ci --omit=dev --no-audit --no-fund \
+ && cd /app/ma_poc/frontend/api && npm ci --omit=dev --no-audit --no-fund
 
 # TS sources (runtime — tsx loads them on demand)
-COPY --from=builder /build/services/src /app/ma_poc/services/src
-COPY --from=builder /build/services/tsconfig.json /app/ma_poc/services/tsconfig.json
-COPY --from=builder /build/frontend/api/src /app/ma_poc/frontend/api/src
-COPY --from=builder /build/frontend/api/tsconfig.json /app/ma_poc/frontend/api/tsconfig.json
+COPY --link --from=builder /build/services/src /app/ma_poc/services/src
+COPY --link --from=builder /build/services/tsconfig.json /app/ma_poc/services/tsconfig.json
+COPY --link --from=builder /build/frontend/api/src /app/ma_poc/frontend/api/src
+COPY --link --from=builder /build/frontend/api/tsconfig.json /app/ma_poc/frontend/api/tsconfig.json
 
 # Built SPA (static-only at runtime — no source needed)
-COPY --from=builder /build/frontend/dist /app/ma_poc/frontend/dist
+COPY --link --from=builder /build/frontend/dist /app/ma_poc/frontend/dist
 
 RUN chown -R propai:propai /app
 

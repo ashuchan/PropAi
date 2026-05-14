@@ -1,0 +1,65 @@
+# Picked up by BuildKit as the Dockerfile-specific ignore because it sits
+# next to `Dockerfile` with the `<dockerfile-name>.dockerignore` convention.
+# This file is unrelated to the repo-root scrape image build — it only
+# applies when `--file ma_poc/frontend/Dockerfile` is used.
+
+# Heavy directories that should never enter the build context.
+**/node_modules
+**/dist
+**/.git
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+
+# Test artifacts not needed in the runtime image.
+ma_poc/frontend/tests
+ma_poc/frontend/playwright-report
+ma_poc/frontend/test-results
+ma_poc/services/tests
+
+# Python source — irrelevant to the node-only frontend image. Excluding
+# trims the context upload from ~hundreds of MB to a few MB.
+ma_poc/*.py
+ma_poc/alembic.ini
+ma_poc/pyproject.toml
+ma_poc/requirements*.txt
+ma_poc/brightdata
+ma_poc/core
+ma_poc/data
+ma_poc/data_provider
+ma_poc/discovery
+ma_poc/docs
+ma_poc/extraction
+ma_poc/fetch
+ma_poc/llm
+ma_poc/ma_poc
+ma_poc/models
+ma_poc/observability
+ma_poc/output
+ma_poc/pms
+ma_poc/reporting
+ma_poc/scraper
+ma_poc/scripts
+ma_poc/storage
+ma_poc/templates
+ma_poc/tests
+ma_poc/validation
+ma_poc/config
+
+# Repo-level paths not relevant to the frontend image. Note: `Dockerfile`
+# matches the *scrape* Dockerfile at repo root. The frontend Dockerfile is
+# loaded via --file and isn't subject to this exclusion.
+.git
+.github
+Dockerfile
+infra
+gcp
+jugnu
+docs
+
+# Local secrets — guard rail.
+*.env
+.env*
+!.env.example
