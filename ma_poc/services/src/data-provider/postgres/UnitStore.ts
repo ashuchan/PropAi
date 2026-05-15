@@ -51,7 +51,10 @@ export class PgUnitStore implements IUnitStore {
   }
 
   async listStateForPropertyToday(canonicalId: string): Promise<UnitStateRecord[]> {
-    // Half-open range so the index on `last_seen_at` stays sargable.
+    // `last_seen_at` is varchar (ISO 8601 text), `run_date` is varchar
+    // (`YYYY-MM-DD`). LIKE on the date prefix is type-safe — comparing
+    // against `run_date::timestamp` would 500 because postgres won't
+    // implicitly cast varchar to timestamp.
     const { rows } = await this.pool.query<Row>(
       `with latest_run as (
          select run_date from runs order by run_date desc limit 1
@@ -59,8 +62,7 @@ export class PgUnitStore implements IUnitStore {
        select ${COLS}
          from units
         where canonical_id = $1
-          and last_seen_at >= (select run_date::timestamp from latest_run)
-          and last_seen_at <  (select (run_date + interval '1 day')::timestamp from latest_run)
+          and last_seen_at like (select run_date || '%' from latest_run)
         order by unit_id`,
       [canonicalId],
     );

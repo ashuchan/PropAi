@@ -692,7 +692,7 @@ GET  /api/health/identity                # Entity resolution stats
 
 ```typescript
 // vite.config.ts
-server: { proxy: { '/api': 'http://localhost:3001' } }
+server: { proxy: { '/api': 'http://localhost:3005' } }
 ```
 
 ---

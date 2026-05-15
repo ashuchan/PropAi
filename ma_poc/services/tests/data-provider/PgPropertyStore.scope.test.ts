@@ -28,21 +28,25 @@ function makePool(): { pool: PgPool; lastSql: () => string } {
 }
 
 describe('PgPropertyStore.listSummariesFast — SQL shape', () => {
-  test('scope="today" emits half-open range, no ::date cast', async () => {
+  test('scope="today" emits LIKE on date prefix, NEVER a timestamp cast', async () => {
     const { pool, lastSql } = makePool();
     const store = new PgPropertyStore(pool);
 
     await store.listSummariesFast('today');
 
     const sql = lastSql();
-    // The whole point of the range predicate: never cast the indexed
-    // column with `::date`. If a future edit reintroduces it, this fails.
-    expect(sql).not.toMatch(/last_seen_at::date/);
-    // Unit side: half-open range on units.last_seen_at.
-    expect(sql).toMatch(/last_seen_at\s*>=\s*\(select run_date::timestamp/);
-    expect(sql).toMatch(/last_seen_at\s*<\s*\(select\s*\(run_date\s*\+\s*interval\s*'1 day'\)/);
-    // Property side: inner join that drops properties not touched today.
-    expect(sql).toMatch(/inner join latest_run lr\s+on p\.last_seen_at\s*>=/);
+    // Regression guard: comparing the varchar `last_seen_at` column
+    // against a timestamp value 500s at runtime ("operator does not
+    // exist: character varying >= timestamp without time zone").
+    // The query MUST stay type-safe — no ::timestamp casts on the
+    // run_date side of the comparison.
+    expect(sql).not.toMatch(/run_date::timestamp/);
+    expect(sql).not.toMatch(/interval\s*'1 day'/);
+    // LIKE on the ISO-8601 date prefix is the type-safe shape.
+    expect(sql).toMatch(/last_seen_at\s+like\s+\(select run_date\s*\|\|\s*'%'/);
+    // Property side: inner join that drops properties not touched today,
+    // also via LIKE.
+    expect(sql).toMatch(/inner join latest_run lr\s+on p\.last_seen_at\s+like/);
   });
 
   test('scope="all" emits no last_seen_at predicate (legacy behaviour)', async () => {
@@ -53,8 +57,6 @@ describe('PgPropertyStore.listSummariesFast — SQL shape', () => {
 
     const sql = lastSql();
     // Outside the per-row mapping, there is no last_seen_at predicate.
-    // (We allow the column to appear in the SELECT list; we don't allow
-    // it in a WHERE/JOIN that filters rows.)
     expect(sql).not.toMatch(/where\s+last_seen_at/);
     expect(sql).not.toMatch(/inner join latest_run/);
   });

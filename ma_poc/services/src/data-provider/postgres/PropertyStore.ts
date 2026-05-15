@@ -72,18 +72,22 @@ export class PgPropertyStore implements IPropertyStore {
     // outer `inner join` against latest_run on the property side drops
     // properties whose own `last_seen_at` predates the run.
     //
-    // Half-open range (>= start AND < start + 1 day) so an index on
-    // `last_seen_at` is sargable. `last_seen_at::date = X` would force
-    // a seq scan because the function call on the column suppresses
-    // the index.
+    // Storage shape: `last_seen_at` is `varchar(64)` storing ISO 8601
+    // (`YYYY-MM-DDTHH:MM:SS...`), `run_date` is `varchar(16)` storing
+    // `YYYY-MM-DD`. We can't use timestamp arithmetic — there's no
+    // implicit text→timestamp cast in postgres, so `last_seen_at >=
+    // run_date::timestamp` errors at runtime ("operator does not exist:
+    // character varying >= timestamp without time zone").
+    // LIKE on the date prefix is type-safe (text-vs-text) and exploits
+    // ISO 8601's lexicographic date-ordering. A `varchar_pattern_ops`
+    // index on `last_seen_at` would make it sargable; without one this
+    // is a seq scan, fine at ~20K rows and consistent with the legacy
+    // `last_seen_at::date = X` pattern in the codebase.
     const unitWhere = scope === 'today'
-      ? `where last_seen_at >= (select run_date::timestamp from latest_run)
-           and last_seen_at <  (select (run_date + interval '1 day')::timestamp from latest_run)`
+      ? `where last_seen_at like (select run_date || '%' from latest_run)`
       : '';
     const propertyJoin = scope === 'today'
-      ? `inner join latest_run lr
-           on p.last_seen_at >= lr.run_date::timestamp
-          and p.last_seen_at <  (lr.run_date + interval '1 day')::timestamp`
+      ? `inner join latest_run lr on p.last_seen_at like lr.run_date || '%'`
       : '';
 
     const { rows } = await this.pool.query<SummaryDbRow>(`
