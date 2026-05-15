@@ -196,14 +196,40 @@ jobs:
             *)    TF_ENV="${{ inputs.env }}" ;;
           esac
           SERVICE="propai-frontend-${TF_ENV}"
+
+          # gcloud serves Cloud Run v2 services via the Knative v1 surface,
+          # so the image lives at spec.template.spec.containers[0].image
+          # (NOT template.containers[0].image, which is the admin-v2 schema
+          # gcloud doesn't expose). Empty output here means the service
+          # doesn't exist yet.
           IMAGE=$(gcloud run services describe "$SERVICE" \
             --region=${{ env.REGION }} --project="$PROJECT" \
-            --format='value(template.containers[0].image)' 2>/dev/null || echo "")
+            --format='value(spec.template.spec.containers[0].image)' 2>/dev/null || echo "")
+          echo "Resolved current image: '${IMAGE}'"
+
           if [ -z "$IMAGE" ]; then
-            TAG="bootstrap"
-            echo "::notice::No frontend service yet — leaving sentinel '$TAG'. Run deploy-frontend.yml first to materialise the service."
+            CURRENT_TAG=""
           else
-            TAG="${IMAGE##*:}"
+            CURRENT_TAG="${IMAGE##*:}"
+          fi
+
+          # "bootstrap" is the sentinel baked into envs/*.tfvars — it was
+          # never pushed to Artifact Registry, so passing it back to TF
+          # just reproduces the original failure. If we read bootstrap (or
+          # nothing), fall back to "${{ inputs.env }}-prod-latest" tag style
+          # that deploy-frontend.yml always pushes on every successful frontend
+          # deploy (line 97 of that workflow). For prod that's
+          # "frontend-prod-latest"; staging has no frontend deploy today so
+          # the bootstrap sentinel is still the right answer there — but the
+          # apply will still 404 until staging actually pushes a frontend image.
+          if [ -z "$CURRENT_TAG" ] || [ "$CURRENT_TAG" = "bootstrap" ]; then
+            case "${{ inputs.env }}" in
+              prod) TAG="frontend-prod-latest" ;;
+              *)    TAG="bootstrap" ;;
+            esac
+            echo "::notice::Frontend image is ${CURRENT_TAG:-<absent>} (broken/missing) — falling back to '$TAG'"
+          else
+            TAG="$CURRENT_TAG"
             echo "::notice::Locked frontend_image_tag to current deployment: $TAG"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
