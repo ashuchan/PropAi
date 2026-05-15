@@ -8,7 +8,9 @@
 import type { IDataProvider } from '../data-provider/contracts.js';
 import type { IUnitService } from '../interfaces/IUnitService.js';
 import type { Unit } from '../types/property.js';
+import type { DataScope } from '../types/common.js';
 import type { FloorPlanGroup, UnitHistoryEntry } from '../types/unit.js';
+import { recordToUnit } from './PropertyService.js';
 
 interface RawV1Unit {
   unit_id: string;
@@ -38,7 +40,15 @@ interface RawV2Unit {
 export class UnitService implements IUnitService {
   constructor(private readonly provider: IDataProvider) {}
 
-  async getUnitsByProperty(propertyId: string): Promise<Unit[]> {
+  async getUnitsByProperty(propertyId: string, scope: DataScope = 'today'): Promise<Unit[]> {
+    // scope=today  — read from latest run snapshot (units that appeared
+    //                in this run only; matches PropertyService.fast path).
+    // scope=all    — read from `units` table directly via the unit store,
+    //                which is the cumulative current-state view across runs.
+    if (scope === 'all') {
+      const records = await this.provider.units.listStateForProperty(propertyId);
+      return records.map((r) => recordToUnit(r, propertyId));
+    }
     const latest = await this.provider.runs.getLatestDate();
     if (!latest) return [];
     const rawProp = await this.provider.properties.getForRun(latest, propertyId);
@@ -49,8 +59,8 @@ export class UnitService implements IUnitService {
       : this.transformV1(units as RawV1Unit[], propertyId);
   }
 
-  async getUnitsByFloorPlan(propertyId: string): Promise<FloorPlanGroup[]> {
-    const units = await this.getUnitsByProperty(propertyId);
+  async getUnitsByFloorPlan(propertyId: string, scope: DataScope = 'today'): Promise<FloorPlanGroup[]> {
+    const units = await this.getUnitsByProperty(propertyId, scope);
     const groups = new Map<string, Unit[]>();
     for (const unit of units) {
       const key = unit.floorPlanType || 'Unknown';

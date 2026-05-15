@@ -6,7 +6,7 @@
  */
 
 import type { PgPool } from './client.js';
-import type { IPropertyStore, PropertySummaryRow, RawRunProperty } from '../contracts.js';
+import type { IPropertyStore, PropertySummaryRow, RawRunProperty, SummaryScope } from '../contracts.js';
 
 interface SummaryDbRow {
   canonical_id: string;
@@ -65,9 +65,32 @@ export class PgPropertyStore implements IPropertyStore {
    * the cache for every page change. ~5K-row aggregate is small enough
    * that fetching once is cheaper than re-querying per page.
    */
-  async listSummariesFast(): Promise<PropertySummaryRow[]> {
+  async listSummariesFast(scope: SummaryScope = 'today'): Promise<PropertySummaryRow[]> {
+    // scope=today → restrict the unit aggregate AND property visibility
+    // to rows touched by the latest run. The unit-side `where` strips
+    // carried-forward unit rows that didn't appear in this run; the
+    // outer `inner join` against latest_run on the property side drops
+    // properties whose own `last_seen_at` predates the run.
+    //
+    // Half-open range (>= start AND < start + 1 day) so an index on
+    // `last_seen_at` is sargable. `last_seen_at::date = X` would force
+    // a seq scan because the function call on the column suppresses
+    // the index.
+    const unitWhere = scope === 'today'
+      ? `where last_seen_at >= (select run_date::timestamp from latest_run)
+           and last_seen_at <  (select (run_date + interval '1 day')::timestamp from latest_run)`
+      : '';
+    const propertyJoin = scope === 'today'
+      ? `inner join latest_run lr
+           on p.last_seen_at >= lr.run_date::timestamp
+          and p.last_seen_at <  (lr.run_date + interval '1 day')::timestamp`
+      : '';
+
     const { rows } = await this.pool.query<SummaryDbRow>(`
-      with unit_agg as (
+      with latest_run as (
+        select run_date from runs order by run_date desc limit 1
+      ),
+      unit_agg as (
         select
           canonical_id,
           count(*)::int as total_units,
@@ -93,10 +116,8 @@ export class PgPropertyStore implements IPropertyStore {
             end
           ) as median_rent
         from units
+        ${unitWhere}
         group by canonical_id
-      ),
-      latest_run as (
-        select run_date from runs order by run_date desc limit 1
       ),
       ledger_latest as (
         select canonical_id, status, extra
@@ -119,6 +140,7 @@ export class PgPropertyStore implements IPropertyStore {
         (l.extra->>'extraction_tier') as extraction_tier,
         p.concessions
       from properties p
+      ${propertyJoin}
       left join unit_agg u  on u.canonical_id = p.canonical_id
       left join ledger_latest l on l.canonical_id = p.canonical_id
     `);

@@ -26,14 +26,15 @@ interface RawProperty {
 export class JsonFileUnitService implements IUnitService {
   constructor(private readonly dataDir: string) {}
 
-  async getUnitsByProperty(propertyId: string): Promise<Unit[]> {
+  // _scope unused: json-file only sees the latest run snapshot.
+  async getUnitsByProperty(propertyId: string, _scope?: 'today' | 'all'): Promise<Unit[]> {
     const rawProp = await this.findProperty(propertyId);
     if (!rawProp) return [];
     return this.transformUnits(rawProp.units || [], propertyId);
   }
 
-  async getUnitsByFloorPlan(propertyId: string): Promise<FloorPlanGroup[]> {
-    const units = await this.getUnitsByProperty(propertyId);
+  async getUnitsByFloorPlan(propertyId: string, scope?: 'today' | 'all'): Promise<FloorPlanGroup[]> {
+    const units = await this.getUnitsByProperty(propertyId, scope);
     const groups = new Map<string, Unit[]>();
     for (const unit of units) {
       const key = unit.floorPlanType || 'Unknown';

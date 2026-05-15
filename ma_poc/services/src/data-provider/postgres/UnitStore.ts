@@ -50,6 +50,23 @@ export class PgUnitStore implements IUnitStore {
     return rows.map(this.toRecord);
   }
 
+  async listStateForPropertyToday(canonicalId: string): Promise<UnitStateRecord[]> {
+    // Half-open range so the index on `last_seen_at` stays sargable.
+    const { rows } = await this.pool.query<Row>(
+      `with latest_run as (
+         select run_date from runs order by run_date desc limit 1
+       )
+       select ${COLS}
+         from units
+        where canonical_id = $1
+          and last_seen_at >= (select run_date::timestamp from latest_run)
+          and last_seen_at <  (select (run_date + interval '1 day')::timestamp from latest_run)
+        order by unit_id`,
+      [canonicalId],
+    );
+    return rows.map(this.toRecord);
+  }
+
   async count(): Promise<number> {
     const { rows } = await this.pool.query<{ n: string }>('select count(*)::text as n from units');
     return Number(rows[0]?.n ?? 0);

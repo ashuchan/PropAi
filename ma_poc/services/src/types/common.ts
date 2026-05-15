@@ -12,6 +12,15 @@ export type ScrapeStatus = 'SUCCESS' | 'FAILED' | 'CARRIED_FORWARD' | 'SKIPPED' 
 /** Property lifecycle status */
 export type PropertyStatus = 'ACTIVE' | 'LEASE_UP' | 'STABILISED' | 'OFFLINE';
 
+/**
+ * Data freshness scope applied to every list/aggregate endpoint.
+ * `today`  — restrict to rows whose `last_seen_at::date` matches the
+ *            most recent `run_date` in the `runs` table.
+ * `all`    — no time filter; current-state view across every unit/property
+ *            on record.
+ */
+export type DataScope = 'today' | 'all';
+
 /** Paginated result wrapper */
 export interface PaginatedResult<T> {
   items: T[];
@@ -21,7 +30,10 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
-/** Filter options for property queries */
+/** Filter options for property queries. `scope` is intentionally NOT
+ *  in here — it's a freshness axis (like pagination), passed as its own
+ *  parameter. Keeping it out of PropertyFilters prevents accidental use
+ *  by filter-iteration logic. */
 export interface PropertyFilters {
   search?: string;
   cities?: string[];

@@ -131,6 +131,11 @@ export interface PropertySummaryRow {
   concessions: string | null;
 }
 
+/** Optional scope passed to the fast summary path. When `today`, the
+ *  adapter must restrict to rows whose `last_seen_at::date` matches the
+ *  latest `run_date` in the `runs` table. Default: 'all'. */
+export type SummaryScope = 'today' | 'all';
+
 /** Per-run property payloads (properties.json / `property_snapshots` table). */
 export interface IPropertyStore {
   listForRun(runDate: string): Promise<RawRunProperty[]>;
@@ -140,8 +145,12 @@ export interface IPropertyStore {
    * for ALL canonical properties (not just the latest-run subset).
    * Optional — adapters that can't compute it (json-file) leave it
    * undefined and PropertyService falls back to the JSONB-snapshot path.
+   *
+   * `scope='today'` filters the unit aggregate and property visibility
+   * to the latest run_date; `scope='all'` (default) reproduces the
+   * legacy "all-time current state" view.
    */
-  listSummariesFast?(): Promise<PropertySummaryRow[]>;
+  listSummariesFast?(scope?: SummaryScope): Promise<PropertySummaryRow[]>;
 }
 
 /** Per-property cumulative state. Mirrors IPropertyStateStore on the Py side. */
@@ -155,6 +164,13 @@ export interface IUnitStore {
   listStateForProperty(canonicalId: string): Promise<UnitStateRecord[]>;
   /** Total unit count across all properties (`select count(*) from units`). */
   count(): Promise<number>;
+  /**
+   * Same as `listStateForProperty` but filtered to units whose
+   * `last_seen_at::date` matches the latest `run_date`. Optional —
+   * adapters without a SQL backend can omit it and the service layer
+   * will fall back to the per-run snapshot path.
+   */
+  listStateForPropertyToday?(canonicalId: string): Promise<UnitStateRecord[]>;
 }
 
 /** Run registry + per-run report + ledger. */

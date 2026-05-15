@@ -321,11 +321,13 @@ export class JsonFilePropertyService implements IPropertyService {
     return 'ACTIVE';
   }
 
+  // _scope unused: json-file only sees the latest run snapshot.
   async getProperties(
     filters?: PropertyFilters,
     sort?: SortOptions,
     page: number = 1,
-    pageSize: number = 25
+    pageSize: number = 25,
+    _scope?: 'today' | 'all',
   ): Promise<PaginatedResult<PropertySummary>> {
     let items = await this.loadProperties();
     if (filters) items = this.applyFilters(items, filters);
@@ -339,7 +341,8 @@ export class JsonFilePropertyService implements IPropertyService {
     return { items: paged, total, page, pageSize, totalPages };
   }
 
-  async getPropertyById(id: string): Promise<Property | null> {
+  // _scope unused: json-file only sees the latest run snapshot.
+  async getPropertyById(id: string, _scope?: 'today' | 'all'): Promise<Property | null> {
     const latestDate = await getLatestRunDate(this.dataDir);
     if (!latestDate) return null;
 
@@ -429,7 +432,7 @@ export class JsonFilePropertyService implements IPropertyService {
     };
   }
 
-  async getAggregateStats(filters?: PropertyFilters): Promise<PropertyAggregates> {
+  async getAggregateStats(filters?: PropertyFilters, _scope?: 'today' | 'all'): Promise<PropertyAggregates> {
     let items = await this.loadProperties();
     if (filters) items = this.applyFilters(items, filters);
 
@@ -457,7 +460,9 @@ export class JsonFilePropertyService implements IPropertyService {
     return { totalProperties, totalUnits, avgRent: Math.round(avgRent), medianRent: Math.round(medianRent), availabilityRate, successRate, tierDistribution, cityDistribution };
   }
 
-  async searchProperties(query: string, limit: number = 20): Promise<PropertySummary[]> {
+  // _scope intentionally unused: the json-file backend only reads from
+  // the latest-run snapshot, which is already today-scoped by construction.
+  async searchProperties(query: string, limit: number = 20, _scope?: 'today' | 'all'): Promise<PropertySummary[]> {
     const items = await this.loadProperties();
     const q = query.toLowerCase();
     return items
@@ -465,7 +470,7 @@ export class JsonFilePropertyService implements IPropertyService {
       .slice(0, limit);
   }
 
-  async getRankedProperties(metric: string, direction: 'asc' | 'desc', limit: number = 10): Promise<PropertySummary[]> {
+  async getRankedProperties(metric: string, direction: 'asc' | 'desc', limit: number = 10, _scope?: 'today' | 'all'): Promise<PropertySummary[]> {
     const items = await this.loadProperties();
     const sorted = this.applySort(items, { field: metric, direction });
     return sorted.slice(0, limit);

@@ -9,7 +9,7 @@
 import type { IDataProvider } from '../data-provider/contracts.js';
 import type { IPropertyService, PropertyReport, PropertyProfile } from '../interfaces/IPropertyService.js';
 import type {
-  PaginatedResult, PropertyFilters, SortOptions, ExtractionTier, ScrapeStatus,
+  PaginatedResult, PropertyFilters, SortOptions, ExtractionTier, ScrapeStatus, DataScope,
 } from '../types/common.js';
 import type {
   PropertySummary, Property, PropertyAggregates, Unit, FloorPlan,
@@ -114,6 +114,46 @@ function detectSchemaVersion(raw: unknown[]): SchemaVersion {
   return 'v1';
 }
 
+/** Project a cumulative `units` table row (UnitStateRecord) into the
+ *  Unit shape the API contract expects. Shared between PropertyService
+ *  (detail page, scope='all' override) and UnitService (units endpoint,
+ *  scope='all'). Exported for tests. */
+export function recordToUnit(
+  r: import('../data-provider/contracts.js').UnitStateRecord,
+  propertyId: string,
+): Unit {
+  const lo = r.rentLow ?? r.marketRentLow ?? 0;
+  const hi = r.rentHigh ?? r.marketRentHigh ?? 0;
+  const askingRent = lo > 0 && hi > 0 ? (lo + hi) / 2 : lo > 0 ? lo : hi;
+  const sqft = r.area ?? r.sqft ?? null;
+  const concessions = typeof r.concessions === 'string' ? r.concessions : null;
+  return {
+    unitId: r.unitId,
+    propertyId,
+    floorPlanType: r.floorPlanName ?? null,
+    marketRentLow: lo,
+    marketRentHigh: hi,
+    askingRent: Math.round(askingRent),
+    effectiveRent: null,
+    sqft,
+    availabilityStatus: r.availableDate ? 'AVAILABLE' : 'UNKNOWN',
+    availableDate: r.availableDate ?? null,
+    leaseLink: '',
+    concessions,
+    amenities: null,
+    daysOnMarket: null,
+    rentPerSqft: sqft && sqft > 0 && askingRent > 0 ? Math.round((askingRent / sqft) * 100) / 100 : null,
+    floorplanImageUrl: null,
+    beds: r.beds ?? r.bedrooms ?? null,
+    baths: r.baths ?? r.bathrooms ?? null,
+    area: sqft,
+    floorPlanName: r.floorPlanName ?? null,
+    leaseTerm: r.leaseTerm ?? null,
+    moveInDate: r.moveInDate ?? null,
+    dateCaptured: r.dateCaptured ?? null,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class PropertyService implements IPropertyService {
@@ -121,8 +161,8 @@ export class PropertyService implements IPropertyService {
 
   private detectedSchema: SchemaVersion = 'v1';
 
-  // Memoize the materialized PropertySummary[] for the latest run.
-  // Without this, each call to /api/properties, /api/properties/stats,
+  // Memoize the materialized PropertySummary[] for each scope. Without
+  // this, each call to /api/properties, /api/properties/stats,
   // /api/properties/search, and /api/properties/ranked re-issues 5 Cloud
   // SQL round-trips (listForRun, propertyState.all, runs.readLedger,
   // getLlmReport) — ~15s each over the public Cloud SQL Connector for the
@@ -130,27 +170,30 @@ export class PropertyService implements IPropertyService {
   // up, the API process to hit per-request timeouts, and Vite to log
   // ECONNRESET / ECONNREFUSED. The single-flight promise also dedupes
   // concurrent loads so the "page-load fires N queries at once" pattern
-  // costs one Cloud SQL trip, not N.
-  private propertyCache: { date: string; expires: number; items: PropertySummary[] } | null = null;
-  private propertyCacheInflight: Promise<PropertySummary[]> | null = null;
+  // costs one Cloud SQL trip, not N. Keyed by scope so today/all don't
+  // evict each other.
+  private propertyCache: Map<DataScope, { expires: number; items: PropertySummary[] }> = new Map();
+  private propertyCacheInflight: Map<DataScope, Promise<PropertySummary[]>> = new Map();
   private static readonly PROPERTY_CACHE_TTL_MS = 60_000;
 
-  private async loadProperties(): Promise<PropertySummary[]> {
+  private async loadProperties(scope: DataScope = 'today'): Promise<PropertySummary[]> {
     const now = Date.now();
-    if (this.propertyCache && this.propertyCache.expires > now) {
-      return this.propertyCache.items;
+    const cached = this.propertyCache.get(scope);
+    if (cached && cached.expires > now) {
+      return cached.items;
     }
-    if (this.propertyCacheInflight) {
-      return this.propertyCacheInflight;
+    const inflight = this.propertyCacheInflight.get(scope);
+    if (inflight) {
+      return inflight;
     }
-    this.propertyCacheInflight = this.loadPropertiesUncached().finally(() => {
-      this.propertyCacheInflight = null;
+    const promise = this.loadPropertiesUncached(scope).finally(() => {
+      this.propertyCacheInflight.delete(scope);
     });
-    const items = await this.propertyCacheInflight;
-    return items;
+    this.propertyCacheInflight.set(scope, promise);
+    return promise;
   }
 
-  private async loadPropertiesUncached(): Promise<PropertySummary[]> {
+  private async loadPropertiesUncached(scope: DataScope): Promise<PropertySummary[]> {
     // Fast path: providers that can compute summaries via SQL (postgres)
     // skip the per-snapshot JSONB load entirely. This is what makes the
     // /api/properties* endpoints sub-second AND correct — counts come from
@@ -160,25 +203,27 @@ export class PropertyService implements IPropertyService {
     // ALL canonical properties (4981) instead of just today's scrape
     // subset (4482).
     if (this.provider.properties.listSummariesFast) {
-      const fast = await this.provider.properties.listSummariesFast();
+      const fast = await this.provider.properties.listSummariesFast(scope);
       const items: PropertySummary[] = fast.map((r) => this.fastRowToSummary(r));
-      this.propertyCache = {
-        date: 'fast', expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS, items,
-      };
-      this.detectedSchema = 'v2';
+      this.propertyCache.set(scope, {
+        expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS, items,
+      });
       return items;
     }
 
     // Slow path: json-file (and any future adapter without the fast hook)
-    // — load the per-run JSONB payload list and project it in JS.
+    // — load the per-run JSONB payload list and project it in JS. Note
+    // that for json-file scope is moot: the snapshot list IS the latest
+    // run, so today and all return the same set. The toggle is a no-op
+    // for that backend.
     const latestDate = await this.provider.runs.getLatestDate();
     if (!latestDate) {
-      this.propertyCache = { date: '', expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS, items: [] };
+      this.propertyCache.set(scope, { expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS, items: [] });
       return [];
     }
     const raw = await this.provider.properties.listForRun(latestDate);
     if (raw.length === 0) {
-      this.propertyCache = { date: latestDate, expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS, items: [] };
+      this.propertyCache.set(scope, { expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS, items: [] });
       return [];
     }
 
@@ -196,11 +241,10 @@ export class PropertyService implements IPropertyService {
       ? (raw as unknown as RawV2Property[]).map((p) => this.toSummaryV2(p, stateMap, ledgerMap, llmMap))
       : (raw as unknown as RawV1Property[]).map((p) => this.toSummaryV1(p, stateMap, ledgerMap, llmMap));
 
-    this.propertyCache = {
-      date: latestDate,
+    this.propertyCache.set(scope, {
       expires: Date.now() + PropertyService.PROPERTY_CACHE_TTL_MS,
       items,
-    };
+    });
     return items;
   }
 
@@ -438,8 +482,9 @@ export class PropertyService implements IPropertyService {
     sort?: SortOptions,
     page = 1,
     pageSize = 25,
+    scope: DataScope = 'today',
   ): Promise<PaginatedResult<PropertySummary>> {
-    let items = await this.loadProperties();
+    let items = await this.loadProperties(scope);
     if (filters) items = this.applyFilters(items, filters);
     if (sort) items = this.applySort(items, sort);
 
@@ -450,12 +495,16 @@ export class PropertyService implements IPropertyService {
     return { items: paged, total, page, pageSize, totalPages };
   }
 
-  async getPropertyById(id: string): Promise<Property | null> {
+  async getPropertyById(id: string, scope: DataScope = 'today'): Promise<Property | null> {
     const latestDate = await this.provider.runs.getLatestDate();
-    if (!latestDate) return null;
+    if (!latestDate) {
+      // No run on record. For scope='all' we can still synthesise a
+      // property from the propertyState + units tables. For 'today'
+      // there's literally no "today" to read from.
+      return scope === 'all' ? this.buildPropertyFromState(id) : null;
+    }
     const rawList = await this.provider.properties.listForRun(latestDate);
-    if (rawList.length === 0) return null;
-    const schema = detectSchemaVersion(rawList);
+    const schema = rawList.length > 0 ? detectSchemaVersion(rawList) : 'v2';
     const stateList = await this.provider.propertyState.all();
     const stateMap = new Map(stateList.map((s) => [s.canonicalId, s]));
     const ledger = await this.provider.runs.readLedger(latestDate);
@@ -464,16 +513,114 @@ export class PropertyService implements IPropertyService {
     );
     const llmMap = await this.loadLlmCosts(latestDate);
 
-    if (schema === 'v2') {
-      const rawProp = (rawList as unknown as RawV2Property[]).find((p) => String(p.apartment_id) === id);
-      if (!rawProp) return null;
-      return this.buildPropertyV2(rawProp, id, stateMap, ledgerMap, llmMap);
+    const rawProp = schema === 'v2'
+      ? (rawList as unknown as RawV2Property[]).find((p) => String(p.apartment_id) === id)
+      : (rawList as unknown as RawV1Property[]).find(
+          (p) => (p['Unique ID'] || p['Property ID']) === id,
+        );
+
+    // Missing from today's snapshot:
+    //   - scope='today' → 404 (not in today's roster)
+    //   - scope='all'   → fall back to propertyState + units tables so
+    //                     properties not scraped today still resolve.
+    if (!rawProp) {
+      return scope === 'all' ? this.buildPropertyFromState(id) : null;
     }
-    const rawProp = (rawList as unknown as RawV1Property[]).find(
-      (p) => (p['Unique ID'] || p['Property ID']) === id,
-    );
-    if (!rawProp) return null;
-    return this.buildPropertyV1(rawProp, id, stateMap, ledgerMap, llmMap);
+
+    const built = schema === 'v2'
+      ? this.buildPropertyV2(rawProp as RawV2Property, id, stateMap, ledgerMap, llmMap)
+      : this.buildPropertyV1(rawProp as RawV1Property, id, stateMap, ledgerMap, llmMap);
+
+    // scope='all' overrides the snapshot unit array with the cumulative
+    // current-state roster from the `units` table. Loaded LAZILY here —
+    // only after we know the property exists — to avoid a wasted Cloud
+    // SQL round-trip on 404s.
+    if (scope === 'all') {
+      const overrideUnits = await this.provider.units.listStateForProperty(id);
+      return this.overrideUnitArray(built, overrideUnits);
+    }
+    return built;
+  }
+
+  /** Synthesise a Property from `properties` ⨝ `units` state tables when
+   *  the property has no entry in the latest run snapshot. Used by
+   *  scope='all' to keep historical properties addressable. */
+  private async buildPropertyFromState(id: string): Promise<Property | null> {
+    const state = await this.provider.propertyState.get(id);
+    if (!state) return null;
+    const units = await this.provider.units.listStateForProperty(id);
+    if (units.length === 0 && !state.projName && !state.name) return null;
+
+    const transformed: Unit[] = units.map((r) => recordToUnit(r, id));
+    return {
+      id,
+      name: state.projName ?? state.name ?? '',
+      address: state.address ?? '',
+      city: state.city ?? '',
+      state: state.state ?? '',
+      zip: state.zipCode ?? state.zip ?? '',
+      latitude: 0,
+      longitude: 0,
+      managementCompany: state.pmc ?? '',
+      totalUnits: transformed.length,
+      avgAskingRent: 0,
+      medianAskingRent: 0,
+      availabilityRate: 0,
+      availableUnits: transformed.filter((u) => u.availabilityStatus === 'AVAILABLE').length,
+      extractionTier: 'TIER_1_API',
+      scrapeStatus: (state.lastScrapeStatus as ScrapeStatus | null) ?? 'SUCCESS',
+      propertyStatus: 'ACTIVE',
+      yearBuilt: null,
+      stories: null,
+      activeConcession: typeof state.concessions === 'string' ? state.concessions : null,
+      lastScrapeTimestamp: state.lastSeenAt ?? '',
+      carryForwardDays: 0,
+      imageUrl: null,
+      galleryUrls: [],
+      websiteUrl: state.website ?? '',
+      llmCostUsd: 0,
+      llmCallCount: 0,
+      llmTokensTotal: 0,
+      units: transformed,
+      floorPlans: this.buildFloorPlans(transformed),
+      marketMetrics: this.computeMetrics(transformed),
+      scrapeHistory: [],
+      screenshotPaths: { pricingPage: null, banner: null },
+      media: {
+        heroImageUrl: null,
+        galleryUrls: [],
+        screenshots: { pricingPage: null, banner: null, homepage: null },
+        floorPlanImages: [],
+      },
+      developmentCompany: '',
+      propertyOwner: '',
+      marketName: '',
+      submarketName: '',
+      region: '',
+      phone: state.phone ?? '',
+      unitMix: '',
+      assetGradeSubmarket: '',
+      assetGradeMarket: '',
+      averageUnitSizeSf: null,
+      emailAddress: state.emailAddress ?? null,
+      websiteDesign: state.websiteDesign ?? null,
+      schemaVersion: 'v2',
+    };
+  }
+
+  /** Replace `units` and recompute `floorPlans` + `marketMetrics` from the
+   *  cumulative `UnitStateRecord[]` view. Used for scope='all' on the
+   *  detail endpoint. */
+  private overrideUnitArray(prop: Property, records: import('../data-provider/contracts.js').UnitStateRecord[]): Property {
+    const units: Unit[] = records.map((r) => recordToUnit(r, prop.id));
+    return {
+      ...prop,
+      units,
+      floorPlans: this.buildFloorPlans(units),
+      marketMetrics: this.computeMetrics(units),
+      totalUnits: units.length,
+      availableUnits: units.filter((u) => u.availabilityStatus === 'AVAILABLE').length,
+    };
   }
 
   private buildPropertyV1(
@@ -550,8 +697,8 @@ export class PropertyService implements IPropertyService {
     };
   }
 
-  async getAggregateStats(filters?: PropertyFilters): Promise<PropertyAggregates> {
-    let items = await this.loadProperties();
+  async getAggregateStats(filters?: PropertyFilters, scope: DataScope = 'today'): Promise<PropertyAggregates> {
+    let items = await this.loadProperties(scope);
     if (filters) items = this.applyFilters(items, filters);
 
     const totalProperties = items.length;
@@ -584,8 +731,8 @@ export class PropertyService implements IPropertyService {
     };
   }
 
-  async searchProperties(query: string, limit = 20): Promise<PropertySummary[]> {
-    const items = await this.loadProperties();
+  async searchProperties(query: string, limit = 20, scope: DataScope = 'today'): Promise<PropertySummary[]> {
+    const items = await this.loadProperties(scope);
     const q = query.toLowerCase();
     return items
       .filter(
@@ -598,8 +745,8 @@ export class PropertyService implements IPropertyService {
       .slice(0, limit);
   }
 
-  async getRankedProperties(metric: string, direction: 'asc' | 'desc', limit = 10): Promise<PropertySummary[]> {
-    const items = await this.loadProperties();
+  async getRankedProperties(metric: string, direction: 'asc' | 'desc', limit = 10, scope: DataScope = 'today'): Promise<PropertySummary[]> {
+    const items = await this.loadProperties(scope);
     return this.applySort(items, { field: metric, direction }).slice(0, limit);
   }
 

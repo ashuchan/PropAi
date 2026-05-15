@@ -62,13 +62,15 @@ export interface ApiPaginatedResult<T> { items: T[]; total: number; page: number
 export interface ApiPropertyAggregates { totalProperties: number; totalUnits: number; avgRent: number; medianRent: number; availabilityRate: number; successRate: number; tierDistribution: Record<string, number>; cityDistribution: Record<string, number>; }
 export interface ApiConfig { schemaVersion: SchemaVersion; }
 
+export type ApiScope = 'today' | 'all';
+
 export async function fetchProperties(params?: Record<string, string | number | undefined>): Promise<ApiPaginatedResult<ApiPropertySummary>> {
   const cleanParams = Object.fromEntries(Object.entries(params || {}).filter(([, v]) => v != null));
   const { data } = await apiClient.get('/properties', { params: cleanParams }); return data;
 }
-export async function fetchPropertyById(id: string): Promise<ApiPropertyDetail> { const { data } = await apiClient.get(`/properties/${id}`); return data; }
+export async function fetchPropertyById(id: string, scope: ApiScope = 'today'): Promise<ApiPropertyDetail> { const { data } = await apiClient.get(`/properties/${id}`, { params: { scope } }); return data; }
 export async function fetchPropertyReport(id: string) { const { data } = await apiClient.get(`/properties/${id}/report`); return data; }
 export async function fetchPropertyProfile(id: string) { const { data } = await apiClient.get(`/properties/${id}/profile`); return data; }
-export async function fetchPropertyStats(): Promise<ApiPropertyAggregates> { const { data } = await apiClient.get('/properties/stats'); return data; }
-export async function searchProperties(q: string, limit = 20): Promise<ApiPropertySummary[]> { const { data } = await apiClient.get('/properties/search', { params: { q, limit } }); return data; }
+export async function fetchPropertyStats(scope: ApiScope = 'today'): Promise<ApiPropertyAggregates> { const { data } = await apiClient.get('/properties/stats', { params: { scope } }); return data; }
+export async function searchProperties(q: string, limit = 20, scope: ApiScope = 'today'): Promise<ApiPropertySummary[]> { const { data } = await apiClient.get('/properties/search', { params: { q, limit, scope } }); return data; }
 export async function fetchConfig(): Promise<ApiConfig> { const { data } = await apiClient.get('/config'); return data; }
