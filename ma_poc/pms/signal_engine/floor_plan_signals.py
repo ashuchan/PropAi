@@ -580,6 +580,134 @@ def has_listing_structure(html: str, threshold: int = 1) -> bool:
     return count_listing_structural_signals(html) >= threshold
 
 
+# ---------------------------------------------------------------------------
+# Cardinality metrics — uncapped volume signals for source ranking
+# ---------------------------------------------------------------------------
+#
+# RC-CARD (2026-05-15 PM): ``count_floor_plan_signals`` returns 0-4 (one
+# point per signal TYPE — bedroom/bathroom/area/floor-plan-type). That
+# scoring is by-design for the boolean ``has_floor_plan_signals`` gate
+# but it destroys volume information — a 25-unit listings page is
+# indistinguishable from a 5-signal stub. Source ranking would benefit
+# from knowing whether a page has 1 rent value vs 50.
+#
+# These additional metrics live alongside the type-score (preserved
+# for backward compat with the `floor_plan_signal_count` field name
+# in `extract.html_characterized` events) and add cardinality:
+#
+#   - unique_rents              — distinct $NNN dollar values
+#   - unique_bed_bath_pairs     — distinct (beds, baths) tuples
+#   - listing_rows_with_rent    — `<tr>` rows containing a $NNN cell
+#   - jsonld_offer_count        — schema.org Offer/Apartment/FloorPlan
+#   - property_value_bed_bath   — JSON-LD PropertyValue dimension entries
+#   - matched_signal_bytes      — total bytes of matched signal substrings
+
+from dataclasses import dataclass as _dc
+
+_RE_DOLLAR = re.compile(r"\$\s?(\d{2,5}(?:,\d{3})?(?:\.\d+)?)")
+_RE_BED_BATH_PAIR = re.compile(
+    r"(\d)\s*(?:br|bed|bedroom)s?\b[^\n.;]{0,40}?(\d(?:\.5)?)\s*(?:ba|bath)s?\b",
+    re.IGNORECASE,
+)
+
+
+@_dc(frozen=True)
+class FloorPlanSignalCardinality:
+    """Volume metrics for floor-plan / listing signals on a page.
+
+    ``total_count`` preserves the existing 0-4 type-score for backward
+    compatibility with ``floor_plan_signal_count``. The remaining fields
+    are uncapped volume metrics used by the source ranker to discriminate
+    a 50-unit listings page from a 1-rent marketing aggregate.
+    """
+
+    total_count: int = 0
+    unique_rents: int = 0
+    unique_bed_bath_pairs: int = 0
+    listing_rows_with_rent: int = 0
+    jsonld_offer_count: int = 0
+    jsonld_apartment_count: int = 0
+    property_value_bed_bath: int = 0
+    matched_signal_bytes: int = 0
+
+
+def count_floor_plan_signal_cardinality(
+    text: str, html: str
+) -> FloorPlanSignalCardinality:
+    """Compute uncapped volume metrics.
+
+    Args:
+        text: HTML-stripped visible-text version (used for rent / bed-bath
+              pattern matching to avoid script/style contamination).
+        html: Raw HTML body (used for the structural / JSON-LD counts which
+              need the tags + attributes intact).
+
+    Returns:
+        A frozen ``FloorPlanSignalCardinality`` snapshot.
+    """
+    if not text and not html:
+        return FloorPlanSignalCardinality()
+
+    total_count = count_floor_plan_signals(text or "")
+
+    # Unique rent values — extract numeric, dedup.
+    unique_rents: set[int] = set()
+    matched_bytes = 0
+    if text:
+        for m in _RE_DOLLAR.finditer(text):
+            raw = m.group(1)
+            matched_bytes += len(m.group(0))
+            try:
+                num = int(float(raw.replace(",", "")))
+                # Filter implausible dollar amounts (deposits like $50,
+                # phone numbers, etc. — keep only $200-$50,000 range that
+                # plausibly represents rent).
+                if 200 <= num <= 50_000:
+                    unique_rents.add(num)
+            except (TypeError, ValueError):
+                continue
+
+    # Unique (beds, baths) pairs.
+    bed_bath_pairs: set[tuple[str, str]] = set()
+    if text:
+        for m in _RE_BED_BATH_PAIR.finditer(text):
+            bed_bath_pairs.add((m.group(1), m.group(2)))
+            matched_bytes += len(m.group(0))
+
+    # Listing rows (uncapped count of `<tr>` rows with a rent value).
+    listing_rows_with_rent = (
+        len(_RE_LISTING_REPEAT_TABLE.findall(html)) if html else 0
+    )
+
+    # JSON-LD type counts — break apart Apartment/FloorPlan from Offer/Product
+    # so the cardinality signal can distinguish "5 floor-plan stubs" from
+    # "5 priced offers".
+    jsonld_apartment_count = 0
+    jsonld_offer_count = 0
+    if html:
+        for m in _RE_LISTING_REPEAT_OFFER_ARRAY.finditer(html):
+            matched_bytes += len(m.group(0))
+            type_str = m.group(0).lower()
+            if "apartment" in type_str or "floorplan" in type_str:
+                jsonld_apartment_count += 1
+            else:
+                jsonld_offer_count += 1
+    property_value_bed_bath = (
+        len(_RE_LISTING_PROPERTY_VALUE_BEDS.findall(html)) if html else 0
+    )
+
+    return FloorPlanSignalCardinality(
+        total_count=total_count,
+        unique_rents=len(unique_rents),
+        unique_bed_bath_pairs=len(bed_bath_pairs),
+        listing_rows_with_rent=listing_rows_with_rent,
+        jsonld_offer_count=jsonld_offer_count,
+        jsonld_apartment_count=jsonld_apartment_count,
+        property_value_bed_bath=property_value_bed_bath,
+        matched_signal_bytes=matched_bytes,
+    )
+
+
 def has_floor_plan_signals(
     text: str,
     threshold: int = SIGNAL_THRESHOLD_STRUCTURAL,

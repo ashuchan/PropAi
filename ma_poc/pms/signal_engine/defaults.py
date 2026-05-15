@@ -205,6 +205,15 @@ DEFAULT_API_NOISE_HOSTS: frozenset[str] = frozenset({
     "osano.com",
     # Chatbots:
     "app.meetelise.com",
+    # Hyly EliseAI chatbot family — observed on PIDs 69188 (727westmadison),
+    # 16139 (chaseknollsapts), 20959 (dovevalleyapts) in cloud run 2026-05-15.
+    # The `my.hy.ly/chat/ssid` iframe returns chat-config JSON (NOT unit
+    # data) but was getting counted as a candidate response because no
+    # noise-host entry caught it. Already blacklisted at the portal-discovery
+    # layer (_PORTAL_INFRA_BLACKLIST in _html_extract.py) — adding here
+    # closes the rescue-path side too.
+    "my.hy.ly",
+    "chat.hy.ly",
     # Captcha providers:
     "challenges.cloudflare.com",
     "hcaptcha.com",

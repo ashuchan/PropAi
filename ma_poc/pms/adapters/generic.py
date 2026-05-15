@@ -1861,6 +1861,33 @@ class GenericAdapter:
                 result.tier_used = "TIER_3_DOM"
                 result.winning_url = ctx.base_url
                 result.confidence = min(0.75, 0.5 + 0.04 * len(result.units))
+                # RC-G (2026-05-15 PM): emit PROFILE_REPLAY_HIT when the DOM
+                # cascade succeeded because of saved field_selectors hints.
+                # The replay numerator in analyze_cloud_run.py counts only
+                # PROFILE_REPLAY_HIT events; before this emission, every DOM-
+                # cascade replay registered as TIER_3_DOM with zero credit
+                # toward profile_replay_hit_rate (the SLO showed 23.7%
+                # against a 30% threshold despite 1170 LLM_DOM wins/run
+                # already persisting selectors via profile_updater.py:706).
+                # This closes the LLM_DOM-channel side of the persistence
+                # loop. See data/reports/cloud_run_2026-05-15/TRIAGE.md RC-G.
+                if hints_hit:
+                    try:
+                        from ma_poc.observability.events import EventKind, emit
+                        _fs_quality = float(
+                            getattr(ctx.profile.dom_hints, "field_selectors_quality", 1.0)
+                            or 1.0
+                        )
+                        emit(
+                            EventKind.PROFILE_REPLAY_HIT,
+                            ctx.property_id or "unknown",
+                            units=len(dom_units),
+                            quality=round(_fs_quality, 3),
+                            mappings_used=1,
+                            channel="dom_selectors",
+                        )
+                    except Exception:
+                        pass
                 # Fix 13: planner gate — stop only if complete, else fall through to LLM
                 from ma_poc.models.source import SourceId as _SI4
                 sources_already_run.add(_SI4.DOM_CASCADE)
@@ -2183,6 +2210,23 @@ class GenericAdapter:
         _analyzed_api_urls: set[str] = _budget.setdefault("_analyzed_api_urls", set())
 
         targeted_units: list[dict[str, Any]] = []
+        # RC-LLM-API (2026-05-15 PM): diagnostic counters so the skip log
+        # can distinguish the 5 distinct causes of the 99.96% skip rate
+        # observed on 2026-05-15 (6,918 of 6,921). Pre-fix every skip
+        # collapsed to "no API responses with unit signals", making it
+        # impossible to tell "no captured responses" from "all captured
+        # responses were CF interstitials" from "items found but none
+        # qualified" — the persistence loop is starving on input scarcity
+        # not gate-strictness, and this distinction is needed to know
+        # WHERE to relax (CF rescue path? add hosts to alias table?
+        # broaden the qualifier?). Counters incremented at every
+        # `continue` inside the loop and emitted in the _log_attempt
+        # reason field. Cheap: 5 integer increments per response.
+        n_total = len(api_responses) if api_responses else 0
+        n_nondata = 0
+        n_no_list = 0
+        n_no_signals = 0
+        n_deduped = 0
         if api_responses and int(_budget.get("llm_api_calls", 0)) > 0 and not _llm_cost_exceeded():
             t0 = _time.monotonic()
             api_calls_made = 0
@@ -2193,21 +2237,26 @@ class GenericAdapter:
                     break
                 # RC4: skip non-data media types before LLM
                 if _is_non_data_response(resp):
+                    n_nondata += 1
                     continue
                 body = resp.get("body")
                 items = _find_unit_list(body)
+                if not items:
+                    n_no_list += 1
                 # Only spend budget on responses where something looks like a
                 # unit list — avoids feeding analytics payloads to the LLM.
                 # _api_signal_qualifies() runs the full SourceQualifier gate
                 # (including the RC4 MediaTypeFilter), so JS/CSS/font responses
                 # are dropped here too, not just in the api_narrow path.
                 if not _api_signal_qualifies(resp, items):
+                    n_no_signals += 1
                     continue
                 url = resp.get("url", "")
                 # Skip if this API URL was already analyzed in this session
                 # (same endpoint reappears across multiple hop pages). Prior
                 # result is already in llm_analysis_results via shared_budget.
                 if url and url in _analyzed_api_urls:
+                    n_deduped += 1
                     continue
                 # Mark as analyzed before the await so concurrent hops see it.
                 if url:
@@ -2286,6 +2335,19 @@ class GenericAdapter:
                         if not result.api_responses:
                             result.api_responses.append(resp)
 
+            # RC-LLM-API: surface the per-cause counters in the reason
+            # field so offline aggregation can tell which gate is firing.
+            # Example payloads:
+            #   no_captures:        "n_total=0"
+            #   all_noise_hosts:    "n_total=33 nondata=4 no_list=29 no_signals=29"
+            #   all_qualifier_fail: "n_total=53 nondata=0 no_list=0 no_signals=53"
+            #   session_dedupe:     "n_total=12 nondata=0 no_list=0 no_signals=0 deduped=12"
+            #   gate_passed_partial:"n_total=53 ... n_calls=3, no units returned"
+            _skip_reason = (
+                f"n_total={n_total} nondata={n_nondata} "
+                f"no_list={n_no_list} no_signals={n_no_signals} "
+                f"deduped={n_deduped}"
+            )
             _log_attempt(
                 "generic:llm_api_targeted",
                 "ran_units" if targeted_units else ("ran_empty" if api_calls_made else "skipped"),
@@ -2293,9 +2355,9 @@ class GenericAdapter:
                 reason=""
                 if targeted_units
                 else (
-                    f"{api_calls_made} API(s) analysed, no units"
+                    f"{api_calls_made} API(s) analysed, no units; {_skip_reason}"
                     if api_calls_made
-                    else "no API responses with unit signals"
+                    else _skip_reason
                 ),
                 duration_ms=int((_time.monotonic() - t0) * 1000),
             )
@@ -2373,8 +2435,20 @@ class GenericAdapter:
         # See data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md
         # PID 119144 (windsorburnet.com) — priceRange + amenityFeature text
         # tricked fp_signals into firing on a marketing-only page.
+        #
+        # Hop-depth scoping (2026-05-15 PM): gate fires only on entry pages
+        # (hop_depth == 0). On hop pages the discovery-side ranker already
+        # chose this URL as promising (it scored >= 5095 with either a
+        # known-portal anchor, profile:winning_page_url, or a strong floor-plan
+        # keyword); second-guessing it with has_listing_structure() costs us
+        # real recoveries on Entrata/RentCafe hop pages whose listing tables
+        # don't match the structural-signal regexes (e.g. units rendered as
+        # `<div class="unit-row">` rather than `<tr>` with `$NNN`). Fresh-data
+        # measurement: gate fires on 3490 entry pages + 1479 hop pages,
+        # affecting 3549 PIDs of which 364 ultimately FAILED_NO_DATA. The hop
+        # firings are the recoverable subset.
         _stub_aggregate_copy = False
-        if html and _llm_dom_gate_ok:
+        if html and _llm_dom_gate_ok and getattr(ctx, "hop_depth", 0) == 0:
             try:
                 from ma_poc.pms.signal_engine.floor_plan_signals import (
                     has_listing_structure as _has_listing_structure,

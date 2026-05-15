@@ -1064,9 +1064,20 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
 
     # B1: floor-plan structural signal count replaces the $NNN rent-signal count.
     # clean_text is already stripped of HTML tags (re-use the tag-stripped version).
-    from ma_poc.pms.signal_engine.floor_plan_signals import count_floor_plan_signals
+    from ma_poc.pms.signal_engine.floor_plan_signals import (
+        count_floor_plan_signals,
+        count_floor_plan_signal_cardinality,
+    )
     clean_text = re.sub(r"<[^>]+>", "", stripped)
     floor_plan_signals = count_floor_plan_signals(clean_text)
+    # RC-CARD (2026-05-15 PM): uncapped cardinality metrics. The existing
+    # floor_plan_signal_count is the 0-4 type-score (preserved); these
+    # new fields expose volume so a 50-unit listings page can be
+    # distinguished from a 5-signal stub when ranking sources downstream.
+    # See FloorPlanSignalCardinality docstring + cloud_run_2026-05-15
+    # TRIAGE for the motivation (fp_signal_count caps at 4, hiding the
+    # difference between 25-signal real listings and 5-signal stubs).
+    fp_card = count_floor_plan_signal_cardinality(clean_text, page_html)
 
     # SPA heuristic: lots of script, little text, no floor-plan signals.
     spa_score = 0.0
@@ -1089,6 +1100,14 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
         "framework_hints": frameworks,
         "spa_confidence": spa_score,
         "floor_plan_signal_count": floor_plan_signals,
+        # Cardinality fields (RC-CARD 2026-05-15) — uncapped volume.
+        "fp_unique_rents": fp_card.unique_rents,
+        "fp_unique_bed_bath_pairs": fp_card.unique_bed_bath_pairs,
+        "fp_listing_rows_with_rent": fp_card.listing_rows_with_rent,
+        "fp_jsonld_offer_count": fp_card.jsonld_offer_count,
+        "fp_jsonld_apartment_count": fp_card.jsonld_apartment_count,
+        "fp_property_value_bed_bath": fp_card.property_value_bed_bath,
+        "fp_matched_signal_bytes": fp_card.matched_signal_bytes,
     }
 
 
@@ -1303,8 +1322,27 @@ def _extract_portal_iframe_hints(html: str) -> list[tuple[str, str]]:
         # video players) can't blow up the hop queue. 3 is enough to catch
         # the property's leasing widget while leaving budget for PMS priors.
         _UNKNOWN_PORTAL_CAP = 3
-        # Score sits between PMS_PRIOR (5_000) and known-portal (10_000).
-        _UNKNOWN_PORTAL_SCORE = 9_000
+        # Score positioning (revised 2026-05-15 PM):
+        #   - PROFILE_WINNING: 10_001
+        #   - LLM_HINT / EXTERNAL_PORTAL (known): 10_000
+        #   - PROFILE_NAV_HINT / API_RESPONSE: 9_500
+        #   - strong anchor (apply/floor-plan + path match): 5_600
+        #   - PMS_PRIOR: 5_000
+        #   - UNIVERSAL_PRIOR: 4_500
+        #   - INTERNAL_LINK base + keyword bonuses: 4_000–4_300
+        #
+        # The original 9_000 placed unknown iframes ABOVE every real anchor on
+        # the page, even ones with floor-plan keywords. Cloud run 2026-05-15
+        # caught chat widgets (my.hy.ly/chat/ssid), graphic embeds
+        # (canva.com/design/.../view), and similar non-leasing iframes ranked
+        # at 9_000 — outranking the actual `<a href="/floor-plans">` link.
+        # Lowered to 4_700 so unknown portals still beat PMS_PRIOR (when a
+        # known PMS template doesn't apply) and UNIVERSAL_PRIOR fallbacks,
+        # but lose to a real on-page anchor with a floor-plan keyword. Known
+        # portals (in _PORTAL_URL_PATTERNS) still score 10_000 via the
+        # earlier passes — this change only affects the open-by-default
+        # 6th-pass discovery for vendors we haven't catalogued.
+        _UNKNOWN_PORTAL_SCORE = 4_700
 
         for match in _IFRAME_SRC_RE.finditer(html):
             if unknown_emit_count >= _UNKNOWN_PORTAL_CAP:
@@ -1610,6 +1648,22 @@ _LINK_SKIP_PATTERNS: tuple[str, ...] = (
     "/log-in",
     "/auth",
     "/sso",
+    # Entrata CMS module dead-ends — these are auth / detail shell paths that
+    # the Entrata template renders on every property page (e.g. "Apply Now"
+    # CTA → `/Apartments/module/application_authentication/`). They have an
+    # "apply" anchor that scores 30 + "/apartments" path keyword 80 → the
+    # _rank_internal_links floor at scraper.py:1767-1771 lifts them to 5600,
+    # outranking real anchors. The endpoint returns a 307KB apply portal HTML
+    # with zero unit data on every variant. Companion to the subpath-
+    # composition guard at scraper.py:2397-2425 (which prevents derived
+    # /floorplans suffixes but not the bare endpoint).
+    # NOTE: /Apartments/module/widgets/ is INTENTIONALLY excluded — that IS
+    # Entrata's data widget endpoint (entrata.py:10,56).
+    # PIDs 37719 (1611onlakeunion), 16139 (chaseknollsapts) — 2026-05-15.
+    "/module/application_authentication",
+    "/module/application-authentication",
+    "/module/unit-detail",
+    "/module/unit_detail",
 )
 
 
@@ -2500,6 +2554,32 @@ async def _try_link_hop(
             if unit_count > _best_units_page[1]:
                 _best_units_page = (sub_url, unit_count)
 
+            # RC-PARTIAL (2026-05-15 PM): checkpoint EVERY non-empty sub_result
+            # to _external_partial_ref, not just floor-plan-accumulation hits.
+            # Pre-fix, the _external_partial_ref write at lines 2649-2651 only
+            # fired inside the floor-plan-accumulation branch (gated on
+            # `_any_rent` at line 2637). PIDs whose units came from a single
+            # JSON-LD hop (no rent, e.g. AMLI's plan-only schema) returned
+            # via the single-hop path at line ~2737 without ever updating
+            # _external_partial_ref — so when the property wallclock expired
+            # later (additional hops or LLM monolithic), the timeout handler
+            # at scripts/runners/jugnu.py:391 saw _partial_state.get("units")
+            # == None and SILENTLY DISCARDED the units. Cloud run 2026-05-15:
+            # 5 of 6 AMLI PIDs (239952 24u, 249898 38u, 261770 60u, 40185
+            # 15u, 62778 36u) lost their data this way; only 40193 (which
+            # hit the accumulation branch) had the rescue fire.
+            #
+            # Maintain "best units" semantics so a subsequent empty hop
+            # doesn't overwrite the running best — we keep whichever hop's
+            # result has the most units. This mirrors _best_units_page above.
+            if shared_budget is not None:
+                _ext_ref = shared_budget.get("_external_partial_ref")
+                if isinstance(_ext_ref, dict):
+                    _existing = _ext_ref.get("units") or []
+                    if unit_count > len(_existing):
+                        _ext_ref["units"] = list(sub_result.get("units") or [])
+                        _ext_ref["best_units_page"] = sub_url
+
             # Once profile:winning_page_url delivers >1 units on a WARM/HOT
             # profile with no recent failures (successfully yielded data in
             # the last 3 days by proxy), skip lower-scored priors.
@@ -2588,18 +2668,46 @@ async def _try_link_hop(
                                     continue
                         fp_hints.append((lnk_url, "html_subpage"))
             if fp_hints and not _in_floorplan_accumulation:
-                # Guard: only enter accumulation when at least one index-page
-                # unit carries a non-null rent.  Entrata /conventional/ JSON-LD
-                # summary cards have beds/sqft but no pricing — accumulating
-                # their sub-pages only collects duplicate plan-name records.
-                # When rent is absent, treat this hop as an ordinary leaf result
-                # and fall through to the emit+return path below.
+                # Guard: enter accumulation when the index page has any
+                # genuine floor-plan content — at least one bed/bath/sqft/
+                # plan-name signal per unit. The earlier gate required
+                # non-null RENT to enter accumulation, which rejected
+                # LEASE_UP properties, "Starting from / Call for Pricing"
+                # marketing pages, JSON-LD ApartmentComplex summaries, and
+                # any property whose index lists plan structure but defers
+                # pricing to the sub-pages — exactly the case where
+                # accumulation is most valuable (sub-pages CARRY the rent).
+                #
+                # The original concern was Entrata /conventional/ summary
+                # cards producing duplicate-plan-name records. That's a
+                # dedup concern, not an admission concern — handled by the
+                # accumulation-loop dedup at lines ~2820+ which keys on
+                # (unit_id|unit_number, floor_plan_name, rent_low). Two
+                # plan-name-only cards with the same name dedup to one.
+                #
+                # 2026-05-16 — see TRIAGE for cloud_run_2026-05-15: this
+                # gate prevented ~5 of 6 AMLI timeout-killed PIDs (and an
+                # unknown number of LEASE_UP properties) from accumulating
+                # sub-page units even though their index pages carried
+                # full floor-plan structure.
                 _index_units = sub_result.get("units") or []
-                _any_rent = any(
-                    u.get("rent_low") or u.get("rent_high") or u.get("asking_rent")
+                _has_fp_data = any(
+                    (
+                        u.get("beds") is not None
+                        or u.get("bedrooms") is not None
+                        or u.get("baths") is not None
+                        or u.get("bathrooms") is not None
+                        or u.get("sqft")
+                        or u.get("area")
+                        or u.get("floor_plan_name")
+                        or u.get("floorplan_name")
+                        or u.get("rent_low")
+                        or u.get("rent_high")
+                        or u.get("asking_rent")
+                    )
                     for u in _index_units
                 )
-                if _any_rent:
+                if _has_fp_data:
                     # Mark accumulation mode so recursive sub-pages are merged,
                     # not treated as new floor-plan index pages.
                     _in_floorplan_accumulation = True
@@ -2647,7 +2755,8 @@ async def _try_link_hop(
                     continue
                 else:
                     log.debug(
-                        "link-hop %s: floor-plan index has %d units but all-null rent "
+                        "link-hop %s: floor-plan index has %d units but NO "
+                        "fp-data signal (no beds/baths/sqft/plan_name/rent) "
                         "— returning as leaf (no accumulation)",
                         sub_url, len(_index_units),
                     )
@@ -2920,6 +3029,29 @@ async def scrape_jugnu(
         shared_budget=_jugnu_budget,
     )
     result["_property_id"] = property_id
+
+    # RC-PARTIAL (2026-05-15 PM): mirror the entry-page result's units to
+    # _external_partial_ref so the per-property timeout handler in
+    # scripts/runners/jugnu.py:387 sees them. Pre-fix only the
+    # _try_link_hop floor-plan-accumulation branch updated this ref —
+    # if the entry-page extraction produced units but cancellation hit
+    # AFTER entry returned and DURING link_hop (additional discovery,
+    # LLM monolithic on a hop, etc.), the entry units would be silently
+    # discarded by the timeout handler. Now: any entry-page result with
+    # ≥1 unit is checkpointed before link_hop runs. Subsequent hop
+    # writes use the "most units wins" rule at scraper.py:2580 so a
+    # hop with MORE units replaces the entry value, but a hop with
+    # FEWER (or zero) does NOT overwrite the entry's checkpoint.
+    if partial_state is not None:
+        try:
+            _entry_units = result.get("units") if isinstance(result, dict) else None
+            if _entry_units:
+                _existing = partial_state.get("units") or []
+                if len(_entry_units) > len(_existing):
+                    partial_state["units"] = list(_entry_units)
+                    partial_state["best_units_page"] = base_url
+        except Exception:
+            pass  # never let partial-state book-keeping mask the scrape result
 
     # Telemetry B: attach fetch diagnostic (error_signature, final_url, body
     # size, captcha, proxy, identity) so the per-property report can render

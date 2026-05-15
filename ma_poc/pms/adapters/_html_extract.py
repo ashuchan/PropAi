@@ -1191,6 +1191,22 @@ _PORTAL_INFRA_BLACKLIST: tuple[str, ...] = (
     "rentgrata.com",
     "g5marketingcloud.com",
     "g5-c-",  # g5 marketing widget CDN
+    # Hyly / EliseAI chat widgets — `my.hy.ly/chat/ssid?page_url=...`
+    # is the per-property chatbot iframe, NOT a leasing portal. The
+    # 6th-pass unknown-portal scan was picking it up at score 9000
+    # and burning hops on chat endpoints that return chat-config JSON.
+    # PIDs 69188 (727westmadison), 16139 (chaseknollsapts), 20959
+    # (dovevalleyapts) — 2026-05-15 cloud run.
+    "my.hy.ly/chat",
+    "chat.hy.ly",
+    "hy.ly/chat",
+    # Canva design embeds — sites use Canva to render marketing graphics
+    # (e.g. floor-plan diagrams as Canva designs). The /design/{id}/view
+    # iframe is a graphic, not a data widget. When the hop walker queues
+    # the Canva URL, the subpath-prior helper appends /floorplans, /pricing
+    # etc. and Canva 403s every variant. Wasted hop budget.
+    # PIDs 37719 (1611onlakeunion), 20959 (dovevalleyapts) — 2026-05-15.
+    "canva.com/design",
     # CAPTCHA / bot protection
     "recaptcha.net",
     "google.com/recaptcha",

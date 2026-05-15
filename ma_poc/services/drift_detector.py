@@ -33,10 +33,22 @@ def detect_drift(
     if expected > 0 and units_extracted < expected * 0.7:
         reasons.append(f"unit_count_drop: expected ~{expected}, got {units_extracted}")
 
-    # All rents null (extracted shells without data). Covers both v1
+    # All rents null (extracted units with no rent data). Covers both v1
     # (market_rent_low/high, asking_rent, rent_range) and v2 (rent_low/high)
     # — a v2 success was otherwise spuriously demoted to COLD because the
     # updater promotes COLD→WARM and drift then saw zero recognized rents.
+    #
+    # 2026-05-16: relaxed from "severe" → "soft". A property whose floor-
+    # plans carry beds/baths/sqft but no rent (LEASE_UP, "Call for
+    # Pricing", syndication-only sites, JSON-LD ApartmentComplex with no
+    # Offer arrays, AMLI-style index pages where pricing lives on per-
+    # plan sub-pages) was being demoted to COLD on every run despite
+    # legitimately extracted floor-plan data. The demotion wiped out
+    # winning_page_url + dom_hints + llm_field_mappings, forcing a full
+    # rediscovery on the next run — exactly the opposite of what the
+    # self-learning loop is supposed to do for stable properties. The
+    # reason is still recorded for telemetry but `severe` no longer
+    # triggers on it (see apply_drift_demotion).
     units = scrape_result.get("units", [])
     _rent_keys = (
         "rent_range",
@@ -60,8 +72,18 @@ def detect_drift(
 
 
 def apply_drift_demotion(profile: ScrapeProfile, reasons: list[str]) -> ScrapeProfile:
-    """Demote profile maturity based on drift signals."""
-    severe = any("all_rents_null" in r or "timeout_pattern" in r for r in reasons)
+    """Demote profile maturity based on drift signals.
+
+    2026-05-16: `all_rents_null` removed from the severe-demotion list
+    (it now drops one step HOT→WARM via the soft branch below, instead
+    of slamming straight to COLD). The reason is still surfaced for
+    telemetry but no longer wipes out winning_page_url / dom_hints /
+    llm_field_mappings on properties that legitimately have floor-plan
+    data without rent. Only `timeout_pattern` (3+ consecutive timeouts)
+    remains severe — that signal is unambiguous: the property isn't
+    extracting, period.
+    """
+    severe = any("timeout_pattern" in r for r in reasons)
 
     # Resolve the enum class from the instance's own schema rather than the
     # module-level ``ProfileMaturity`` import — the codebase has both

@@ -597,6 +597,97 @@ _LIST_KEYS = (
 )
 
 
+def _emit_signal_inspection(
+    resp: dict,
+    data: Any,
+    candidates: list,
+    qualifier_admitted: bool,
+    qualifier_reason: str,
+) -> None:
+    """Emit a per-response key-classification trace for offline alias-table tuning.
+
+    Captures the response URL + observed keys + which keys normalize_field_key
+    matched into canonical signal keys + which keys LOOK unit-shaped but
+    didn't normalize (alias-table miss candidates). Weekly aggregation over
+    `keys_unmatched_unit_shape` produces the canonical "missing aliases" report.
+
+    Sampled by SIGNAL_INSPECTION_SAMPLE_RATE env (default 10%) — sample key is
+    `property_id + scrape_date` so the same property is always or never sampled
+    on a given day. Always-on for properties on the FAILED_NO_DATA allowlist
+    (when present in env).
+
+    Best-effort — telemetry must never break extraction.
+    """
+    try:
+        import hashlib
+        import os
+        import datetime as _dt
+
+        # Deterministic sample. Default 10% by SHA-256(property_id + date).
+        sample_rate = float(os.getenv("SIGNAL_INSPECTION_SAMPLE_RATE", "0.10"))
+        pid = str(resp.get("property_id") or "unknown")
+        today = _dt.datetime.utcnow().strftime("%Y-%m-%d")
+        h = int(hashlib.sha256(f"{pid}|{today}".encode()).hexdigest()[:8], 16)
+        if (h % 1000) >= int(sample_rate * 1000):
+            return
+
+        # Collect a sample of dict-items from the candidate list (max 3),
+        # falling back to data if no candidates were resolved.
+        sample_items: list[dict] = []
+        if candidates:
+            for c in candidates[:3]:
+                if isinstance(c, dict):
+                    sample_items.append(c)
+        elif isinstance(data, dict):
+            sample_items.append(data)
+
+        # Unit-shaped key heuristic: a key NAME that contains any of these
+        # tokens almost certainly represents per-unit data even if the alias
+        # table missed it.
+        _UNIT_SHAPE_TOKENS = (
+            "bed", "bath", "rent", "price", "sqft", "sq_ft", "sqf", "size",
+            "area", "unit", "floor", "plan", "available", "vacant",
+        )
+
+        from ma_poc.pms.signal_engine.floor_plan_signals import (
+            normalize_field_key as _norm,
+        )
+
+        observed: list[str] = []
+        matched: dict[str, str] = {}
+        unmatched_unit_shape: list[str] = []
+        for item in sample_items:
+            for k in item.keys():
+                if not isinstance(k, str) or k.startswith("@"):
+                    continue
+                if k not in observed:
+                    observed.append(k)
+                canon = _norm(k)
+                if canon in _CANON_UNIT_SIGNAL_KEYS:
+                    matched.setdefault(k, canon)
+                else:
+                    kl = k.lower()
+                    if any(tok in kl for tok in _UNIT_SHAPE_TOKENS):
+                        if k not in unmatched_unit_shape:
+                            unmatched_unit_shape.append(k)
+
+        from ma_poc.observability.events import EventKind, emit
+        emit(
+            EventKind.SIGNAL_INSPECTION,
+            pid,
+            url=str(resp.get("url") or "")[:300],
+            source_kind="api",
+            item_count=len(candidates) if isinstance(candidates, list) else 0,
+            keys_observed=observed[:20],
+            keys_matched=matched,
+            keys_unmatched_unit_shape=unmatched_unit_shape[:20],
+            qualifier_admitted=bool(qualifier_admitted),
+            qualifier_reason=str(qualifier_reason)[:80],
+        )
+    except Exception:
+        pass  # never let telemetry mask extraction
+
+
 def parse_api_responses(api_responses: list[dict]) -> list[dict]:
     """Parse captured API JSON into normalised unit/floor-plan records.
 
@@ -659,6 +750,22 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
                 # would also pass the signal gate.
                 walker_lists.sort(key=len, reverse=True)
                 candidates = walker_lists[0]
+
+        # RC-TRACE (2026-05-15 PM): sampled trace event for offline alias
+        # analysis. Emits keys_observed + keys_matched + keys_unmatched_unit_shape
+        # for ~10% of properties (deterministic by SHA-256(pid|date)). The
+        # `keys_unmatched_unit_shape` field is the gold output: vendor key
+        # names that look unit-shaped (contain "bed"/"bath"/"rent"/"sqft"/etc.)
+        # but didn't normalize to a canonical alias. Weekly aggregation
+        # surfaces the top N misses as alias-table candidates. Never raises.
+        _emit_signal_inspection(
+            resp,
+            data,
+            candidates if isinstance(candidates, list) else [],
+            qualifier_admitted=bool(candidates),
+            qualifier_reason=("admitted_via_keyed_walker_or_fallback"
+                              if candidates else "no_candidates_resolved"),
+        )
 
         for item in candidates:
             if not isinstance(item, dict):

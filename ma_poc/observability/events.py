@@ -97,6 +97,16 @@ class EventKind(StrEnum):
     MAPPING_EVICTED = "mapping.evicted"
     DOM_HINTS_MISS = "dom_hints.miss"
     DOM_HINTS_EVICTED = "dom_hints.evicted"
+    # RC-TRACE (2026-05-15 PM): per-response key-classification trace so
+    # offline aggregation can surface vendor key variants the FIELD_ALIASES
+    # table is missing. Emitted once per API/JSON-LD/embedded-JSON response
+    # considered by the unit-signal qualifier, sampled (default 10% of
+    # properties via SIGNAL_INSPECTION_SAMPLE_RATE env). Payload includes
+    # the response URL, source_kind, observed keys, normalized matches, and
+    # unmatched-but-unit-shaped keys (the alias-table miss candidates).
+    # A weekly aggregation over `keys_unmatched_unit_shape` produces the
+    # canonical "alias misses" report to feed the alias table.
+    SIGNAL_INSPECTION = "extract.signal_inspection"
     # PR 6 (2026-05-10): emitted when self-validation < 0.4 but the
     # ENABLE_DEGRADED_DOM_PERSIST flag let the selectors save anyway.
     # Pair with DOM_HINTS_MISS counts to track how much the loosened gate

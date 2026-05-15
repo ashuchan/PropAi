@@ -164,14 +164,38 @@ class BrowserContextPool:
 
         Args:
             page: The page to release.
+
+        RC-A (2026-05-15 PM): wrap ``context.close()`` in
+        ``asyncio.wait_for(timeout=10s)``. If a Chromium renderer is wedged
+        (dead IPC, hung CF JS challenge in the page's event loop),
+        ``context.close()`` can park forever waiting on a websocket reply
+        that never arrives. The pre-fix code's ``except Exception`` did NOT
+        catch that hang — the semaphore was held indefinitely and every
+        subsequent ``acquire()`` on the same shard blocked silently,
+        emitting only ``fetch.started`` for downstream PIDs. Shard 64 on
+        2026-05-15 wedged 29 of 50 PIDs through exactly this mechanism.
+        On timeout we forget the dead context (the OS-level Chromium child
+        will be reaped when the worker process exits or the browser
+        restarts) and release the semaphore so subsequent fetches proceed.
         """
+        context = page.context
         try:
-            context = page.context
-            await context.close()
+            try:
+                await asyncio.wait_for(context.close(), timeout=10.0)
+            except asyncio.TimeoutError:
+                log.warning(
+                    "browser_pool.release: context.close() exceeded 10s — "
+                    "abandoning the wedged Chromium context to unblock the "
+                    "shard semaphore. The renderer's OS process will be "
+                    "reaped on next browser restart."
+                )
+            except Exception as exc:
+                log.warning("Error releasing browser context: %s", exc)
             if context in self._active_contexts:
-                self._active_contexts.remove(context)
-        except Exception as exc:
-            log.warning("Error releasing browser context: %s", exc)
+                try:
+                    self._active_contexts.remove(context)
+                except ValueError:
+                    pass
         finally:
             self._semaphore.release()
 

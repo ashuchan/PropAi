@@ -50,6 +50,20 @@ class FetchOutcome(StrEnum):
     #: Routes to a ``FAILED_FETCH_EMPTY`` verdict in scraper.py so dashboards
     #: can distinguish bot-wall blank pages from real server errors.
     EMPTY_BODY = "EMPTY_BODY"
+    #: RC-A (2026-05-15 PM): the per-property `asyncio.wait_for` deadline at
+    #: scripts/runners/jugnu.py:_process_property fired while the fetcher was
+    #: parked inside Playwright IPC (page.goto, page.content, the 20s CF
+    #: auto-solve sleep at fetcher.py:821, or a wedged `context.close()`).
+    #: Pre-fix the `except Exception` at fetcher.py:256 did not catch
+    #: asyncio.CancelledError (a BaseException since 3.8), so the
+    #: `FETCH_COMPLETED` emit at fetcher.py:295 was skipped entirely — the
+    #: PID showed only `fetch.started` with no completion event and the
+    #: shard wallclock-killed the whole worker after 30+ minutes (cloud run
+    #: 2026-05-15 shard 64: 29 of 50 PIDs orphan-killed this way). The
+    #: try/finally added 2026-05-15 PM now emits this outcome on the path
+    #: out so the analyzer sees the property's death cause instead of
+    #: silence. See data/reports/cloud_run_2026-05-15/TRIAGE.md RC-A.
+    CANCELLED = "CANCELLED"
 
 
 @dataclass(slots=True, frozen=True)

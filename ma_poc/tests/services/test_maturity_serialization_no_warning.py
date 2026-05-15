@@ -143,13 +143,15 @@ def test_drift_demotion_emits_no_serializer_warning(tmp_path: Path) -> None:
     assert [w for w in ws if _is_serializer_warning(w)] == []
     assert profile_warm.confidence.maturity == PM.WARM
 
-    # HOT → COLD (severe drift signal)
+    # HOT → COLD (severe drift signal) — `timeout_pattern` is the only
+    # remaining severe trigger after 2026-05-16 (all_rents_null was
+    # downgraded to soft demotion; see drift_detector.py for rationale).
     profile_cold = ScrapeProfile(canonical_id="drift-cold-001")
     profile_cold.confidence.maturity = PM.HOT
     profile_cold.confidence.consecutive_successes = 5
     with warnings.catch_warnings(record=True) as ws:
         warnings.simplefilter("always")
-        apply_drift_demotion(profile_cold, ["all_rents_null"])
+        apply_drift_demotion(profile_cold, ["timeout_pattern"])
         store.save(profile_cold)
     assert [w for w in ws if _is_serializer_warning(w)] == []
     assert profile_cold.confidence.maturity == PM.COLD

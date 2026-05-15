@@ -243,6 +243,21 @@ class Fetcher:
                 pass
 
             # 4-5. Issue request
+            #
+            # RC-A (2026-05-15 PM): catch asyncio.CancelledError so we emit a
+            # synthetic FETCH_COMPLETED before the cancellation propagates up
+            # to the per-property guard at scripts/runners/jugnu.py. Without
+            # this, when `asyncio.wait_for(_process_property, 600s)` fires
+            # while we're parked inside Playwright IPC (page.goto, page.content,
+            # the 20s CF auto-solve sleep, or a wedged `context.close()`),
+            # CancelledError flies past the bare `except Exception` below
+            # (BaseException since Python 3.8) and the FETCH_COMPLETED emit
+            # 40 lines down is never reached. The PID then shows only
+            # `fetch.started` in events.jsonl — invisible to the analyzer.
+            # Shard 64 on 2026-05-15 had 29/50 PIDs killed this way (see
+            # data/reports/cloud_run_2026-05-15/TRIAGE.md RC-A). On
+            # cancellation we synthesise a FetchResult with outcome=CANCELLED
+            # so the existing telemetry path runs, then re-raise.
             try:
                 result = await self._do_request(
                     task,
@@ -253,6 +268,41 @@ class Fetcher:
                     attempt,
                     start_ms,
                 )
+            except asyncio.CancelledError:
+                cancel_result = FetchResult(
+                    url=task.url,
+                    outcome=FetchOutcome.CANCELLED,
+                    status=None,
+                    body=None,
+                    headers={},
+                    render_mode=task.render_mode,
+                    final_url=task.url,
+                    attempts=attempt,
+                    elapsed_ms=_now_ms() - start_ms,
+                    error_signature="per_property_timeout_or_cancel",
+                    proxy_used=_redact_proxy(proxy),
+                )
+                try:
+                    emit(
+                        EventKind.FETCH_COMPLETED,
+                        task.property_id,
+                        outcome=cancel_result.outcome.value,
+                        status=None,
+                        elapsed_ms=cancel_result.elapsed_ms,
+                        attempt=attempt,
+                        error_signature=cancel_result.error_signature,
+                        final_url=cancel_result.final_url,
+                        body_bytes=0,
+                        content_type="",
+                        captcha_detected=False,
+                        captcha_provider=None,
+                        proxy_used=cancel_result.proxy_used,
+                        identity_ua_hash=_short_hash(identity.user_agent),
+                        render_mode=cancel_result.render_mode.value,
+                    )
+                except Exception:
+                    pass  # never let telemetry mask the cancel
+                raise
             except Exception as exc:
                 outcome, sig = classify(None, {}, None, exception=exc)
                 result = FetchResult(
