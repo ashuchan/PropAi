@@ -72,7 +72,7 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SA_PROD }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
 
       - id: tag
         run: |
@@ -123,7 +123,7 @@ jobs:
       # update --iap` and `gcloud beta iap web add-iam-policy-binding`,
       # which run in the post-apply IAP setup steps. Without this preload
       # the first beta call hits an interactive prompt and fails in CI.
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
         with:
           install_components: beta
 
@@ -284,7 +284,7 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SA_PROD }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
 
       - name: Probe service URL
         env:

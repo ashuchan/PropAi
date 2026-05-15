@@ -106,7 +106,7 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ steps.env_pick.outputs.wif_sa }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
 
       - uses: actions/setup-python@v5
         with:
