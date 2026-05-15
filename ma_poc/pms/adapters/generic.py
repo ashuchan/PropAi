@@ -2364,6 +2364,26 @@ class GenericAdapter:
         _llm_dom_gate_ok = bool(
             html and _has_fp_signals(html, SIGNAL_THRESHOLD_ANY)
         )
+        # STUB_AGGREGATE_COPY gate: when the body has fp_signals (rent / bed /
+        # sqft text appears somewhere) BUT no listing structure (no repeating
+        # unit containers, no Offer/Product/PropertyValue arrays), the
+        # patterns are marketing aggregate copy ("Choose from 1, 2, 3-bedroom
+        # apartments"), not per-unit listings. Running the DOM-LLM on such
+        # a page burns budget for guaranteed-empty output.
+        # See data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md
+        # PID 119144 (windsorburnet.com) — priceRange + amenityFeature text
+        # tricked fp_signals into firing on a marketing-only page.
+        _stub_aggregate_copy = False
+        if html and _llm_dom_gate_ok:
+            try:
+                from ma_poc.pms.signal_engine.floor_plan_signals import (
+                    has_listing_structure as _has_listing_structure,
+                )
+                if not _has_listing_structure(html):
+                    _stub_aggregate_copy = True
+                    _llm_dom_gate_ok = False
+            except Exception:
+                pass
         if (
             not dom_units
             and dom_section_html
@@ -2462,11 +2482,16 @@ class GenericAdapter:
             # Visible diagnostic: gate prevented an LLM_DOM call on a page with
             # no floor-plan signals. Without this event the skip would be silent
             # and indistinguishable from a "page already extracted units" path.
+            _skip_reason = (
+                "stub_aggregate_copy — fp_signals present but no listing structure"
+                if _stub_aggregate_copy
+                else "no floor-plan signals in body — skipping LLM DOM"
+            )
             _log_attempt(
                 "generic:llm_dom_targeted",
                 "skipped",
                 units=0,
-                reason="no floor-plan signals in body — skipping LLM DOM",
+                reason=_skip_reason,
                 duration_ms=0,
             )
         # RC3 tracking: capture the nav hint from DOM analysis specifically
@@ -2652,7 +2677,18 @@ class GenericAdapter:
                         ),
                     )
                     _decision = _action_decider.decide(_dctx)
-                    if _decision.action_type == _SEActionType.HOP_TO_URL:
+                    # Only treat this as an RC3 deferral when the decider's
+                    # Rule 2 fired. Rule 4 ("top-ranked signal dispatch") also
+                    # returns HOP_TO_URL for LLM_HINT/PROFILE_WINNING/PMS_PRIOR
+                    # signals — on hop pages where Rule 2 is correctly skipped
+                    # (hop_depth=1), Rule 4 still fires for the LLM_HINT signal
+                    # we just constructed, and prior code mislabeled it as an
+                    # RC3 defer — suppressing the monolithic LLM on every hop.
+                    # See data/reports/cloud_run_2026-05-15/TRIAGE.md RC #1.
+                    if (
+                        _decision.action_type == _SEActionType.HOP_TO_URL
+                        and _decision.rationale == "dom_analysis_defer_monolithic_to_hop"
+                    ):
                         _rc3_deferred = True
                         _log_attempt(
                             "generic:llm",

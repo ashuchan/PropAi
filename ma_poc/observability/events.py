@@ -147,6 +147,16 @@ class EventKind(StrEnum):
     # analytics, gallery metadata, etc.). Carries the LLM's free-text
     # reason so analysers can cluster and tune the static blocklist.
     LLM_API_NOISE = "extract.llm_api_noise"
+    # 2026-05-15: emitted when the open-by-default unknown-portal scan
+    # discovers a cross-origin iframe whose host is NOT on the hardcoded
+    # `_PORTAL_URL_PATTERNS` list AND NOT on the infra blacklist. Each
+    # event carries the host and URL so cross-run aggregation can surface
+    # trending unknown vendors (frequency, first-seen date, properties
+    # affected). Hosts with high frequency + successful unit emission
+    # are promotion candidates to the hardcoded allow-list. See
+    # data/canary/local_runs/fix-validation-v4-wix-2026-05-15/ for the
+    # architectural rationale (closed lists block runtime learning).
+    EMBEDDED_PORTAL_UNKNOWN_HOST_SEEN = "embedded_portal.unknown_host_seen"
 
 
 @dataclass(slots=True, frozen=True)

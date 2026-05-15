@@ -77,6 +77,11 @@ BEDS_KEYS: Final[tuple[str, ...]] = (
     "numbedrooms", "num_bedrooms",
     "no_of_bedroom",
     "bed",
+    # Schema.org Apartment/FloorPlan canonical key (after lowercase normalisation).
+    # PID 61950 250high.com 2026-05-15 — Squarespace /pricing JSON-LD emitted
+    # `numberOfBedrooms` and validity dropped 6 units because the lookup tuple
+    # didn't include this Schema.org name.
+    "numberofbedrooms",
 )
 
 BATHS_KEYS: Final[tuple[str, ...]] = (
@@ -86,6 +91,9 @@ BATHS_KEYS: Final[tuple[str, ...]] = (
     "bathroom_count", "bathroomcount",
     "numbathrooms", "num_bathrooms",
     "no_of_bathroom",
+    # Schema.org Apartment/FloorPlan canonical key (after lowercase normalisation).
+    "numberofbathroomstotal",
+    "numberofbathrooms",
 )
 
 SQFT_KEYS: Final[tuple[str, ...]] = (
@@ -98,6 +106,8 @@ SQFT_KEYS: Final[tuple[str, ...]] = (
     "size",
     "square_footage", "squarefootage",
     "sq_ft",
+    # Schema.org Apartment.floorSize (after lowercase normalisation).
+    "floorsize",
 )
 # ``area`` is admitted as a sqft alias ONLY because ``get_numeric`` rejects
 # non-numeric values. Some neighborhoods / locator APIs (e.g. nestiolistings

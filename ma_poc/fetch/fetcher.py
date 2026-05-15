@@ -876,6 +876,20 @@ class Fetcher:
                             # asynchronously (~3-4s after page load). The standard 2s
                             # settle is not enough for the SightMap REST API call to fire.
                             "prospectportal.com",
+                            # Funnel / FortressTech: React SPA shells that fetch
+                            # inventory via XHR ~8-12 sec after mount. PID 1713
+                            # brooklaneapts.com 2026-05-15: portal.fortresstech.io
+                            # returned 476K body / 1.4K visible text → LLM rejected.
+                            ".fortresstech.io",
+                            "funnelleasing.com",
+                            # Wix Visual Data widget: AngularJS SPA rendering Wix
+                            # Collection rows as a <table>. Initial GET returns the
+                            # AngularJS shell; the table populates after the SDK
+                            # parses the page query params (pageId/compId/siteRevision)
+                            # and fetches the collection. PIDs 46179 + 118965.
+                            "wix-visual-data.appspot.com",
+                            # Cross Street leasing widget — React SPA. PID 292955.
+                            "yourcrossstreet.com",
                         )
                     )
                 except Exception:
@@ -890,7 +904,59 @@ class Fetcher:
                 # shard learns its own slice.
                 learned_wait = landed_host in _LATE_RENDER_HOSTS if landed_host else False
 
-                if portal_match or learned_wait:
+                # Generic SPA-shell detector — extends the late-render path
+                # beyond the host whitelist. Catches React/Vue/Angular SPAs
+                # we haven't explicitly listed by looking at the body itself:
+                # (a) high body/text ratio (>25), (b) at least one SPA-framework
+                # marker, (c) low anchor count, (d) no structural fp signals.
+                # When all four hold, the body is a JS-heavy shell that hasn't
+                # rendered its inventory yet — wait 6s (between learned_wait
+                # 5s and portal_match 12s) so the SPA can hydrate.
+                # See data/canary/local_runs/fix-validation-2026-05-15/
+                # UNCHANGED_FAIL_ANALYSIS.md PID 1713 — FortressTech is a
+                # React shell; whitelist now covers it but the heuristic
+                # catches other vendors we haven't catalogued yet.
+                spa_shell = False
+                if body_text is not None and len(body_text) >= 50_000 and not portal_match and not learned_wait:
+                    try:
+                        import re as _re_spa
+                        # Cheap visible-text length estimate (strip tags only).
+                        _visible = _re_spa.sub(r"<[^>]+>", " ", body_text)
+                        _visible = _re_spa.sub(r"\s+", " ", _visible).strip()
+                        _ratio = len(body_text) / max(len(_visible), 1)
+                        _anchor_count = len(_re_spa.findall(r"<a\s+[^>]*href=", body_text, _re_spa.IGNORECASE))
+                        # SPA framework markers — broad on purpose, false positives
+                        # only cost an extra 6s wait, false negatives lose data.
+                        _spa_markers = (
+                            'id="root"',
+                            "id='root'",
+                            'id="__next"',
+                            'data-reactroot',
+                            'ng-app',
+                            'ng-version',
+                            '__NEXT_DATA__',
+                            '__NUXT__',
+                            'data-v-app',  # Vue 3
+                            'data-server-rendered',  # Nuxt
+                            'window.__INITIAL_STATE__',
+                            'wix-warmup-data',  # Wix
+                            '/static/js/main.',  # CRA bundle
+                            'webpack-runtime',
+                        )
+                        _has_marker = any(m in body_text for m in _spa_markers)
+                        # Trigger when: ratio is high AND framework marker present
+                        # AND nav links not yet rendered AND no fp signals.
+                        if _ratio > 25 and _has_marker and _anchor_count < 20:
+                            from ma_poc.pms.signal_engine.floor_plan_signals import (
+                                has_floor_plan_signals as _has_fp_spa,
+                                SIGNAL_THRESHOLD_STRUCTURAL as _FP_STRUCTURAL_SPA,
+                            )
+                            if not _has_fp_spa(body_text, _FP_STRUCTURAL_SPA):
+                                spa_shell = True
+                    except Exception:
+                        spa_shell = False
+
+                if portal_match or learned_wait or spa_shell:
                     # B1: wait only when the page lacks structural floor-plan data.
                     # SIGNAL_THRESHOLD_STRUCTURAL (≥2 types) means genuinely rich.
                     from ma_poc.pms.signal_engine.floor_plan_signals import (
@@ -899,7 +965,7 @@ class Fetcher:
                     )
                     if not _has_fp_portal(body_text, _FP_STRUCTURAL):
                         try:
-                            wait_sec = 12.0 if portal_match else 5.0
+                            wait_sec = 12.0 if portal_match else (6.0 if spa_shell else 5.0)
                             await asyncio.sleep(wait_sec)
                             body_text_2 = await page.content()
                             if body_text_2 and len(body_text_2) > len(body_text):

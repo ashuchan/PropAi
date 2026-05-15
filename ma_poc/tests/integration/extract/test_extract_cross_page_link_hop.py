@@ -114,7 +114,7 @@ def test_h5_max_hops_caps_fetches() -> None:
         fetched_urls.append(task.url)
         return FakeFetch()
 
-    def many_candidates(html, entry_url, limit=3):
+    def many_candidates(html, entry_url, limit=3, **_kwargs):
         return [(f"https://example.com/p{i}", 0.5, f"p{i}") for i in range(20)]
 
     detected = DetectedPMS(pms="unknown", confidence=0.5)
@@ -157,7 +157,7 @@ def test_phase9_visited_urls_default_includes_entry_url() -> None:
         fetched.append(task.url)
         return FakeFetch()
 
-    def candidates_include_entry(html, entry_url, limit=3):
+    def candidates_include_entry(html, entry_url, limit=3, **_kwargs):
         return [
             (entry_url, 0.99, "self"),  # adversarial — points back to entry
             ("https://example.com/floor-plans", 0.85, "fp"),

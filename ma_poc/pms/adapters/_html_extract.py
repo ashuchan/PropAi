@@ -123,6 +123,68 @@ def _money_int_or_none(v: Any) -> int | None:
     return _money_to_int(str(v))
 
 
+def _read_additional_property(item: dict[str, Any]) -> dict[str, Any]:
+    """Schema.org Product ``additionalProperty: [PropertyValue]`` reader.
+
+    Squarespace, Shopify, and several other e-commerce CMSes serialise
+    apartment dimensions as a list of PropertyValue ``{name, value}`` pairs
+    rather than as direct Schema.org keys. The Squarespace "Apartment
+    Floor Plan" template produces:
+
+        {"@type": "Product",
+         "additionalProperty": [
+           {"@type": "PropertyValue", "name": "Bedrooms",      "value": 1},
+           {"@type": "PropertyValue", "name": "Bathrooms",     "value": 1},
+           {"@type": "PropertyValue", "name": "Square Footage","value": 830}
+         ]}
+
+    Returns a dict keyed by canonical field names (``bedrooms``, ``bathrooms``,
+    ``sqft``) — empty when no recognisable PropertyValue is present.
+    Caller MERGEs this into the unit dict alongside Offer fields. Never raises.
+
+    See data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md
+    PID 61950 (250high.com) for the canonical case.
+    """
+    out: dict[str, Any] = {}
+    aps = item.get("additionalProperty") or item.get("additionalproperty") or []
+    if not isinstance(aps, list):
+        return out
+    # Mapping from PropertyValue.name (lowercased) → canonical key.
+    _NAME_TO_CANON: dict[str, str] = {
+        "bedrooms":         "bedrooms",
+        "bedroom":          "bedrooms",
+        "beds":             "bedrooms",
+        "bed":              "bedrooms",
+        "number of bedrooms": "bedrooms",
+        "bathrooms":        "bathrooms",
+        "bathroom":         "bathrooms",
+        "baths":            "bathrooms",
+        "bath":             "bathrooms",
+        "number of bathrooms": "bathrooms",
+        "square footage":   "sqft",
+        "square feet":      "sqft",
+        "square foot":      "sqft",
+        "sqft":             "sqft",
+        "sq ft":            "sqft",
+        "size":             "sqft",
+        "area":             "sqft",
+        "floor size":       "sqft",
+        "floor area":       "sqft",
+    }
+    for ap in aps:
+        if not isinstance(ap, dict):
+            continue
+        name = str(ap.get("name", "")).strip().lower()
+        val = ap.get("value")
+        canon = _NAME_TO_CANON.get(name)
+        if canon and val not in (None, ""):
+            # Don't overwrite a value already present (e.g. earlier
+            # PropertyValue with the same canonical name).
+            if canon not in out:
+                out[canon] = val
+    return out
+
+
 def _build_unit_from_offer(
     offer: dict[str, Any], parent_name: str, source_url: str
 ) -> dict[str, Any] | None:
@@ -176,6 +238,38 @@ def _build_unit_from_offer(
         num_rooms = num_rooms.get("value", "")
     if num_rooms not in (None, ""):
         bedrooms = str(num_rooms)
+    # numberOfBedrooms — populated by Pass-1 path but also surfaces on some
+    # Product/Offer containers (Squarespace e-commerce uses both).
+    if not bedrooms:
+        for src in (item, offer):
+            if isinstance(src, dict):
+                nb = src.get("numberOfBedrooms")
+                if nb not in (None, ""):
+                    bedrooms = str(nb)
+                    break
+
+    bathrooms = ""
+    for src in (item, offer):
+        if isinstance(src, dict):
+            nb = src.get("numberOfBathroomsTotal") or src.get("numberOfBathrooms")
+            if nb not in (None, ""):
+                bathrooms = str(nb)
+                break
+
+    # additionalProperty: [PropertyValue] — Schema.org list-shaped dimension
+    # carrier used by Squarespace's "Apartment Floor Plan" Product template
+    # and Shopify/other e-commerce CMSes. Only fills slots still empty so
+    # direct Schema.org keys remain authoritative.
+    for src in (offer, item):
+        if not isinstance(src, dict):
+            continue
+        ap = _read_additional_property(src)
+        if not bedrooms and ap.get("bedrooms") not in (None, ""):
+            bedrooms = str(ap["bedrooms"])
+        if not bathrooms and ap.get("bathrooms") not in (None, ""):
+            bathrooms = str(ap["bathrooms"])
+        if not sqft and ap.get("sqft") not in (None, ""):
+            sqft = str(ap["sqft"])
 
     avail = ""
     if isinstance(item, dict):
@@ -192,7 +286,7 @@ def _build_unit_from_offer(
         "floor_plan_name": name,
         "bed_label": "",
         "bedrooms": bedrooms,
-        "bathrooms": "",
+        "bathrooms": bathrooms,
         "sqft": sqft,
         "unit_number": "",
         "floor": "",
@@ -344,6 +438,89 @@ def _extract_standalone_offers(data: Any, source_url: str) -> list[dict[str, Any
     units: list[dict[str, Any]] = []
     for o in offers:
         u = _build_unit_from_offer(o, "", source_url)
+        if u:
+            units.append(u)
+    return units
+
+
+def _extract_product_floorplans_as_units(
+    data: Any, source_url: str
+) -> list[dict[str, Any]]:
+    """Pass 4: emit units from Schema.org ``Product`` siblings that each
+    represent a single floor-plan.
+
+    The Squarespace e-commerce extension for property listings emits a graph
+    of multiple ``Product`` nodes (one per floor plan) where:
+      * ``@type`` is ``Product``
+      * ``category`` is ``"Apartment Floor Plan"`` (or contains "Apartment"
+        or "Floor Plan")
+      * ``offers`` is a SINGLE dict (with ``price`` / ``lowPrice`` /
+        ``highPrice``), NOT a list — so the existing ``_extract_offers_as_units``
+        skip at ``len(arr) < 2`` rejects each Product individually
+      * ``additionalProperty: [PropertyValue]`` carries the dimensions
+
+    Pass 2 misses this pattern because each Product has only one offer.
+    Pass 3 misses it because the Offers are nested (not bare). This pass
+    closes the gap: collects every Product whose ``category`` smells like
+    apartment-floor-plan, and emits each as a unit via ``_build_unit_from_offer``
+    on its single offer dict.
+
+    Distinguishing-fields guard: require ≥2 distinct Products to qualify
+    (each is a separate floor plan; a single Product is property metadata).
+
+    See data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md
+    PID 61950 (250high.com) — 5 Product siblings with single offers each.
+    """
+    products: list[dict[str, Any]] = []
+    _APARTMENT_CATEGORY_HINTS = (
+        "apartment",
+        "floor plan",
+        "floorplan",
+        "rental",
+        "residence",
+        "unit",
+    )
+
+    def _walk(node: Any) -> None:
+        if isinstance(node, dict):
+            t = node.get("@type")
+            t_list: list[str] = []
+            if isinstance(t, str):
+                t_list = [t]
+            elif isinstance(t, list):
+                t_list = [x for x in t if isinstance(x, str)]
+            if "Product" in t_list:
+                cat = node.get("category", "")
+                if isinstance(cat, str):
+                    cat_lower = cat.lower()
+                    if any(h in cat_lower for h in _APARTMENT_CATEGORY_HINTS):
+                        products.append(node)
+                        # Don't recurse into a matched Product's children;
+                        # additionalProperty / offers are leaf data.
+                        return
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                _walk(v)
+
+    _walk(data)
+    if len(products) < 2:
+        return []
+
+    units: list[dict[str, Any]] = []
+    for p in products:
+        offer = p.get("offers")
+        # Wrap a singular offer dict in a synthetic "offer-shape" view so
+        # _build_unit_from_offer can read price + the Product's
+        # additionalProperty in one pass.
+        synthetic_offer: dict[str, Any] = {}
+        if isinstance(offer, dict):
+            synthetic_offer.update(offer)
+        synthetic_offer["itemOffered"] = p
+        synthetic_offer.setdefault("name", p.get("name", ""))
+        parent_name = p.get("name", "") if isinstance(p.get("name"), str) else ""
+        u = _build_unit_from_offer(synthetic_offer, parent_name, source_url)
         if u:
             units.append(u)
     return units
@@ -537,7 +714,21 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
         for data in parsed_blocks:
             units.extend(_extract_offers_as_units(data, source_url))
 
-    # Pass 3 (Bug 4, 2026-05-09): standalone Offer arrays — bare ``Offer``
+    # Pass 3 (2026-05-15): Product siblings each representing a single
+    # floor-plan. Squarespace e-commerce property listings use this pattern:
+    # multiple Product nodes at @graph level, each with a single Offer +
+    # additionalProperty: [PropertyValue] carrying bedrooms/bathrooms/sqft.
+    # MUST run BEFORE the bare-Offer pass — Squarespace nests its individual
+    # offers inside an AggregateOffer dict on each Product, and the bare-Offer
+    # walker picks those up with no parent context, dropping the
+    # additionalProperty dimensions.
+    # See PID 61950 (250high.com) in
+    # data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md.
+    if not units:
+        for data in parsed_blocks:
+            units.extend(_extract_product_floorplans_as_units(data, source_url))
+
+    # Pass 4 (Bug 4, 2026-05-09): standalone Offer arrays — bare ``Offer``
     # nodes that are siblings of ``Brand``/``PostalAddress``/etc., or nested
     # inside non-listed containers like ``Brand``. Closes the gscapts.com /
     # Jonah Systems / Knock CMS gap where Offers are present but neither
@@ -904,14 +1095,171 @@ _PORTAL_URL_PATTERNS: tuple[tuple[str, str], ...] = (
     # 46582 where this iframe carries the inventory but pattern-matching
     # only knew about the legacy ``apartments.appfolio.com`` host.
     (".appfolio.com/listings", "appfolio"),
-    (".appfolio.com/connect", "appfolio"),
+    # NOTE: `.appfolio.com/connect` removed 2026-05-15. AppFolio's `/connect/*`
+    # paths are Keycloak auth shells (`/connect/users/sign_in`,
+    # `/connect/users/oauth/callback`, `/connect/signout`, literal
+    # `/connect/*`) — 29 KB login pages with zero unit data. Marketing sites
+    # embed "Pay Rent" / "Tenant Portal" iframes pointing at these and the
+    # per-hop quoted-URL re-scan keeps re-queueing more auth URLs from the
+    # login page body, burning the entire hop budget. The `.appfolio.com/listings`
+    # pattern above already covers the canonical inventory iframe.
+    # See data/reports/cloud_run_2026-05-15/TRIAGE.md RC #3b.
     # ResMan property-management portal
     ("myresman.com/portal/applicants", "resman"),
     ("myresman.com/portal/prospects", "resman"),
     ("resman.com/portal/", "resman"),
     # Yardi RentCafe variants
     (".yardi.com", "yardi"),
+    # FortressTech: leasing-portal vendor. Observed on Squarespace marketing
+    # sites embedding ``embed.fortresstech.io`` + ``portal.fortresstech.io``
+    # iframes (e.g. PID 1713 brooklaneapts.com — 2026-05-15).
+    # See data/reports/cloud_run_2026-05-15/TRIAGE.md RC #10.
+    ("fortresstech.io", "fortresstech"),
+    # Wix Visual Data widget: AngularJS SPA that renders a tabular Wix
+    # Collection inside an iframe. Wix sites with the "Visual Data" Wix-App
+    # embed inventory here — the marketing page's main DOM has no inventory
+    # text, just a placeholder iframe. URL shape:
+    #   wix-visual-data.appspot.com/index?pageId={page}&compId={comp}&siteRevision={n}...
+    # Observed 2026-05-15 on PIDs 46179 hayloft east-hampton-estates (5 floor
+    # plans) and 118965 16bennett (30+ unit-level table rows with rent).
+    ("wix-visual-data.appspot.com", "wix_visual_data"),
+    # Cross Street Leasing — third-party leasing widget embedded as an iframe
+    # by some Wix / Squarespace marketing sites. URL shape:
+    #   yourcrossstreet.com/property/{slug}/?floorplan={id}&...
+    # Observed 2026-05-15 on PID 292955 3140clybourn.com /floor-plans
+    # (6 floor plans with availability counts, rent, sqft).
+    ("yourcrossstreet.com/property", "yourcrossstreet"),
 )
+
+
+# ---------------------------------------------------------------------------
+# Generic unknown-portal discovery
+# ---------------------------------------------------------------------------
+# The hardcoded ``_PORTAL_URL_PATTERNS`` above is a high-precision allow-list:
+# we know these hosts are leasing portals and queue them at a top score.
+# But when a property site embeds inventory in a NEW vendor's iframe we
+# haven't catalogued, the scraper has no way to learn — every property using
+# that vendor fails until someone notices and ships a new pattern.
+#
+# The blacklist below is the COMPLEMENT: hosts we're confident are NOT
+# leasing portals — analytics, maps, chat, captcha, social, third-party
+# trackers, and Wix/Squarespace internal CDNs. Any cross-origin iframe with
+# a host NOT on this blacklist is a CANDIDATE unknown portal: queue it at
+# a medium score (below known-portal 10_000 but above PMS_PRIOR 5_000),
+# emit a telemetry event so cross-run aggregation can identify trending
+# unknown vendors, and let the existing fetch/extract path try it.
+#
+# Goal: open-by-default discovery so an unknown vendor either yields data
+# (recovery without a code change) or is added to the blacklist with one
+# line if it proves to be noise.
+
+_PORTAL_INFRA_BLACKLIST: tuple[str, ...] = (
+    # Analytics + tag managers
+    "google-analytics.com",
+    "googletagmanager.com",
+    "doubleclick.net",
+    "googleadservices.com",
+    "bat.bing.com",
+    "facebook.com/tr",
+    "hotjar.com",
+    "fullstory.com",
+    "sentry.io",
+    "mixpanel.com",
+    "segment.com",
+    "omappapi.com",
+    "theconversioncloud.com",
+    "visitor-analytics.io",
+    "walkme.com",
+    "userway.org",
+    "callrail.com",
+    "osano.com",
+    # Maps / geo
+    "maps.google",
+    "googleapis.com/maps",
+    "mapbox.com",
+    "openstreetmap.org",
+    # Chat / lead-capture / accessibility
+    "drift.com",
+    "intercom.io",
+    "zendesk.com",
+    "livechatinc.com",
+    "tawk.to",
+    "crisp.chat",
+    "meetelise.com",
+    "sierra.chat",
+    "nestiolistings.com",
+    "rentgrata.com",
+    "g5marketingcloud.com",
+    "g5-c-",  # g5 marketing widget CDN
+    # CAPTCHA / bot protection
+    "recaptcha.net",
+    "google.com/recaptcha",
+    "hcaptcha.com",
+    "perimeterx.net",
+    "geetest.com",
+    "friendlycaptcha.com",
+    "cloudflare.com/cdn-cgi",
+    # Social / sharing
+    "facebook.com/plugins",
+    "twitter.com/widgets",
+    "instagram.com/embed",
+    "linkedin.com/embed",
+    "youtube.com/embed",
+    "vimeo.com",
+    "pinterest.com/widget",
+    # Wix / Squarespace / parastorage internal infrastructure
+    # (parastorage hosts UI components, not inventory — but
+    # wix-visual-data.appspot.com IS inventory and is NOT in this blacklist)
+    "parastorage.com",
+    "wixstatic.com",
+    "static1.squarespace.com",
+    "images.squarespace-cdn.com",
+    "wix-instantsearchplus",
+    "filesusr.com",
+    # CDN-only assets
+    "cloudfront.net/assets",
+    "cdnjs.cloudflare.com",
+    "jsdelivr.net",
+    "unpkg.com",
+    # Email / contact form services
+    "mailchimp.com",
+    "constantcontact.com",
+    "typeform.com",
+    "jotform.com",
+    "wufoo.com",
+    "google.com/forms",
+    # Misc
+    "tour-virtual",  # virtual tour widgets (matterport, etc — could be promoted later)
+    "matterport.com",
+    "kuula.co",
+)
+
+
+def _is_portal_infra_blacklisted(url: str) -> bool:
+    """True when *url*'s host/path is on the no-portal blacklist.
+
+    Cheap substring check — runs on every iframe src during unknown-portal
+    discovery. Order doesn't matter; first hit wins.
+    """
+    if not url:
+        return True
+    lower = url.lower()
+    return any(needle in lower for needle in _PORTAL_INFRA_BLACKLIST)
+
+
+def _iframe_host(url: str) -> str:
+    """Extract the host (registered domain + subdomain) from a URL.
+
+    Returns lowercased host or "" on parse failure. Used for telemetry
+    deduplication so the same vendor's URL with different query params
+    aggregates as one entry.
+    """
+    try:
+        import urllib.parse as _up
+        parsed = _up.urlparse(url)
+        return (parsed.hostname or "").lower()
+    except Exception:
+        return ""
 
 # Cap the recursion depth so a self-referential JSON blob can't blow
 # the stack. 12 is deep enough for every realistic portal-config shape

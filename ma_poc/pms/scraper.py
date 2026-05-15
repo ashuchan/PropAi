@@ -977,6 +977,22 @@ async def scrape(
                 if _ih_url not in _seen_urls:
                     _existing_hints.append((_ih_url, f"iframe:{_ih_name}"))
                     _seen_urls.add(_ih_url)
+                    # Telemetry: surface unknown-portal discoveries so
+                    # cross-run aggregation can identify trending vendors
+                    # we haven't catalogued. Hosts with high success rates
+                    # are promotion candidates to _PORTAL_URL_PATTERNS.
+                    if _ih_name.startswith("unknown:"):
+                        try:
+                            from ma_poc.observability.events import EventKind
+                            emit(
+                                EventKind.EMBEDDED_PORTAL_UNKNOWN_HOST_SEEN,
+                                property_id,
+                                host=_ih_name.split(":", 1)[1],
+                                url=_ih_url[:300],
+                                source="iframe_src",
+                            )
+                        except Exception:
+                            pass
             result["_embedded_portal_hints"] = _existing_hints
 
     floorplan_hints = getattr(adapter_result, "_embedded_floorplan_subpage_hints", None)
@@ -1195,6 +1211,16 @@ def _extract_portal_iframe_hints(html: str) -> list[tuple[str, str]]:
             if not src or not src.startswith("http") or src in seen:
                 continue
             lower = src.lower()
+            # SightMap SDK loader: the JS bundle at sightmap.com/embed/api.js
+            # matches the same "sightmap.com/embed/" needle as the real
+            # iframe data URL (sightmap.com/embed/{embedId}). All SightMap
+            # properties load the SDK from the same URL — body=5649 bytes,
+            # zero unit data. The 3rd-pass quoted-URL scan picks it up when
+            # the iframe is JS-injected at runtime. Skip the SDK and let the
+            # iframe-src / anchor scan catch the real data URL when present.
+            # See data/reports/cloud_run_2026-05-15/TRIAGE.md RC #3a.
+            if lower.endswith("/embed/api.js") or "/embed/api.js?" in lower:
+                continue
             for needle, portal_name in _PORTAL_URL_PATTERNS:
                 if needle in lower:
                     seen.add(src)
@@ -1204,7 +1230,206 @@ def _extract_portal_iframe_hints(html: str) -> list[tuple[str, str]]:
     _scan(_IFRAME_SRC_RE)
     _scan(_ANCHOR_HREF_RE)
     _scan(_QUOTED_URL_RE)
+
+    # 4th pass: inline-JS PMS init parser. Catches portals whose iframe is
+    # injected by JS at runtime (no static <iframe src>) — the entry HTML
+    # contains only an init call like SightMap.init({sightmap_id: "x"}) or a
+    # data-* attribute placeholder. We extract the property-specific key and
+    # synthesize the canonical data URL ourselves.
+    # See data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md
+    # PID 20959 (dovevalleyapts.com) — SightMap iframe is JS-injected.
+    for synth_url, portal_name in _scan_inline_js_pms_init(html):
+        if synth_url not in seen:
+            seen.add(synth_url)
+            hints.append((synth_url, portal_name))
+
+    # 5th pass: AppFolio slug synthesis. AppFolio CMS marketing sites often
+    # embed Pay-Rent / Tenant-Portal iframes at
+    # {slug}.appfolio.com/connect/users/sign_in (auth shells with zero unit
+    # data) but NOT a listings iframe. We detect the slug via the
+    # _APPFOLIO_SUBDOMAIN_RE regex and synthesize {slug}.appfolio.com/listings
+    # so the AppFolio adapter's existing SSR-DOM / API-capture paths can run.
+    # See data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md
+    # PIDs 259733, 11399, 50178 — AppFolio cluster.
+    has_listings = any("/listings" in u.lower() for u, _ in hints)
+    if not has_listings:
+        try:
+            from ma_poc.pms.detector import _APPFOLIO_SUBDOMAIN_RE
+
+            appfolio_slugs: set[str] = set()
+            for m in _APPFOLIO_SUBDOMAIN_RE.finditer(html):
+                slug = m.group(1).lower()
+                # Skip generic / non-tenant subdomains.
+                if slug not in {"www", "app", "apartments", "widgets", "account", "static"}:
+                    appfolio_slugs.add(slug)
+            for slug in appfolio_slugs:
+                synthetic = f"https://{slug}.appfolio.com/listings"
+                if synthetic not in seen:
+                    seen.add(synthetic)
+                    # Prepend so the listings URL fires before any AppFolio
+                    # auth-side hits the caller's hop queue.
+                    hints.insert(0, (synthetic, "appfolio"))
+        except Exception:
+            pass
+
+    # 6th pass: generic unknown-portal discovery. Catches NEW vendor iframes
+    # we haven't catalogued in _PORTAL_URL_PATTERNS yet. Walks every
+    # <iframe src>, skips anything on the infra blacklist (analytics, maps,
+    # chat, social, parastorage CDN, etc.), and queues remaining cross-origin
+    # iframes as candidates. Score is LOWER than known-portal (10_000) but
+    # higher than PMS_PRIOR (5_000) so a NEW vendor still beats template
+    # guesses without overshadowing known-good portals.
+    #
+    # The user's 2026-05-15 architectural feedback: hardcoded patterns
+    # prevent the system from learning at runtime. This generic pass +
+    # the telemetry event below close the loop:
+    # 1. Unknown vendor iframe → queued + telemetry emit
+    # 2. If the URL yields units, the success-rate metric improves immediately
+    # 3. Cross-run aggregation of `embedded_portal.unknown_host_seen` events
+    #    surfaces trending hosts → promote to hardcoded list in a follow-up
+    # 4. Per-property profile (Phase 3, deferred) persists known-good hosts
+    #    so the same property's next run skips the discovery probe
+    try:
+        from ma_poc.pms.adapters._html_extract import (
+            _is_portal_infra_blacklisted,
+            _iframe_host,
+        )
+
+        # Discover hosts already hinted (any known-portal pass plus the
+        # 4th/5th passes above) so the unknown scan doesn't duplicate them.
+        already_hosted = {_iframe_host(u) for u, _ in hints if u}
+        unknown_emit_count = 0
+        # Hard cap so a page with many vendor iframes (e.g. social embeds,
+        # video players) can't blow up the hop queue. 3 is enough to catch
+        # the property's leasing widget while leaving budget for PMS priors.
+        _UNKNOWN_PORTAL_CAP = 3
+        # Score sits between PMS_PRIOR (5_000) and known-portal (10_000).
+        _UNKNOWN_PORTAL_SCORE = 9_000
+
+        for match in _IFRAME_SRC_RE.finditer(html):
+            if unknown_emit_count >= _UNKNOWN_PORTAL_CAP:
+                break
+            src = match.group(1).strip()
+            if not src or not src.startswith("http") or src in seen:
+                continue
+            # Skip the SightMap SDK loader (already handled in the known scan).
+            lower = src.lower()
+            if lower.endswith("/embed/api.js") or "/embed/api.js?" in lower:
+                continue
+            host = _iframe_host(src)
+            if not host or host in already_hosted:
+                continue
+            if _is_portal_infra_blacklisted(src):
+                continue
+            # Queue as unknown — same shape as known-portal hints, but the
+            # portal_name marks it for telemetry / debugging.
+            seen.add(src)
+            already_hosted.add(host)
+            hints.append((src, f"unknown:{host}"))
+            unknown_emit_count += 1
+    except Exception:
+        pass
+
     return hints
+
+
+# ---------------------------------------------------------------------------
+# Inline-JS PMS init pattern library
+# ---------------------------------------------------------------------------
+# Each entry: (compiled regex with ONE capture group for the key, pms_name,
+# url_synth_fn(key) -> str|None). Patterns deliberately match across
+# whitespace/quote-style variants. Order matters only for tie-breaking;
+# different patterns can match the same key on the same page and the
+# synthesized URL dedups via the caller's ``seen`` set.
+
+_INLINE_JS_INIT_PATTERNS: list[tuple[re.Pattern[str], str, "Callable[[str], str | None]"]] = [
+    # SightMap (Engrain) — JS init: `SightMap.init({sightmap_id: "n9w6mmzrv71"})`
+    # or `new SightMap({...})` or `Engrain.SightMap.create({"map_id": ...})`.
+    # Also covers data-* placeholders: `<div data-sightmap-id="n9w6mmzrv71">`.
+    (
+        re.compile(r'sightmap[_\-]?id["\']?\s*[:=]\s*["\']([\w-]{6,})["\']', re.IGNORECASE),
+        "sightmap",
+        lambda k: f"https://sightmap.com/embed/{k}",
+    ),
+    (
+        re.compile(r'data-sightmap[_\-]?id\s*=\s*["\']([\w-]{6,})["\']', re.IGNORECASE),
+        "sightmap",
+        lambda k: f"https://sightmap.com/embed/{k}",
+    ),
+    # AppFolio CMS slug — covers both data-attr and JS config patterns.
+    # The slug-to-listings synthesis also happens via the dedicated
+    # _synthesize_appfolio_listings_urls helper below, but this catches
+    # cases where the AppFolio host doesn't appear in any href at all.
+    (
+        re.compile(r'data-appfolio[_\-]?(?:tenant|slug)\s*=\s*["\']([\w-]+)["\']', re.IGNORECASE),
+        "appfolio",
+        lambda k: f"https://{k}.appfolio.com/listings",
+    ),
+    # RealPage OneSite — JS embed or data attr declaring the client ID.
+    # Synthesizes the canonical `{clientId}.onlineleasing.realpage.com` host.
+    (
+        re.compile(
+            r'data-(?:realpage[_\-])?client[_\-]?id\s*=\s*["\'](\d{6,})["\']',
+            re.IGNORECASE,
+        ),
+        "realpage_oll",
+        lambda k: f"https://{k}.onlineleasing.realpage.com/",
+    ),
+    # Funnel / FortressTech — UUID-style portal IDs embedded in JS state.
+    # The UUID is the property-specific portal address.
+    (
+        re.compile(r'fortresstech\.io/[\w/-]*?/([0-9a-f]{8}-[0-9a-f-]{20,})', re.IGNORECASE),
+        "fortresstech",
+        lambda k: f"https://portal.fortresstech.io/{k}",
+    ),
+    # Hyly — typical config: `hyly.config = { propertyId: "..." }`
+    (
+        re.compile(r'hy(?:ly)?[._]config[\s\S]{0,200}?propertyid["\']?\s*[:=]\s*["\']([\w-]+)["\']', re.IGNORECASE),
+        "hyly",
+        lambda k: f"https://my.hy.ly/property/{k}",
+    ),
+    # FunnelLeasing portal — `funnelleasing.com/embed/{guid}`
+    (
+        re.compile(r'funnelleasing\.com/embed/([\w-]{8,})', re.IGNORECASE),
+        "funnel",
+        lambda k: f"https://www.funnelleasing.com/embed/{k}",
+    ),
+]
+
+
+def _scan_inline_js_pms_init(html: str) -> list[tuple[str, str]]:
+    """Parse inline JavaScript and data-* attributes for PMS init patterns.
+
+    Synthesizes the canonical iframe / data URL from the property-specific
+    key (sightmap_id, appfolio slug, realpage client ID, fortresstech UUID,
+    hyly propertyId, funnel portal GUID). Hits are returned as
+    ``(synthesized_url, portal_name)`` tuples.
+
+    Pure function — never raises. Designed to be cheap (small set of regexes,
+    no DOM parsing) so it can run on every entry-page HTML.
+    """
+    if not html or len(html) < 100:
+        return []
+    out: list[tuple[str, str]] = []
+    seen_keys: set[tuple[str, str]] = set()  # (pms_name, key) dedup within scan
+    for pattern, pms_name, url_fn in _INLINE_JS_INIT_PATTERNS:
+        try:
+            for match in pattern.finditer(html):
+                key = (match.group(1) or "").strip()
+                if not key:
+                    continue
+                if (pms_name, key) in seen_keys:
+                    continue
+                seen_keys.add((pms_name, key))
+                try:
+                    url = url_fn(key)
+                except Exception:
+                    url = None
+                if url:
+                    out.append((url, pms_name))
+        except Exception:
+            continue
+    return out
 
 
 # RC5: maps FetchOutcome values to the verdict prefix written into errors[].
@@ -1303,13 +1528,42 @@ def _pms_priors_for(
         anchor = "pms_prior:universal"
 
     out: list[tuple[str, int, str]] = []
+    seen: set[str] = set()
+    # Detect multi-property hosts: when entry_url has a non-trivial path
+    # (>=2 chars after host, ignoring trailing slash), the property lives at a
+    # sub-path and `/floorplans` resolved via urljoin would land on the host
+    # root — wrong site for multi-property hosts (e.g. PID 46179
+    # hayloftapartmenthomes.com/east-hampton-estates 2026-05-15). Also generate
+    # priors RELATIVE to the entry path so we try /east-hampton-estates/floor-plans
+    # as well as /floor-plans. See data/reports/cloud_run_2026-05-15/TRIAGE.md RC #12.
+    try:
+        _entry_parsed = urllib.parse.urlparse(entry_url)
+        _entry_path = _entry_parsed.path.rstrip("/")
+        _has_property_subpath = bool(_entry_path) and _entry_path not in ("", "/")
+    except Exception:
+        _entry_path = ""
+        _has_property_subpath = False
+
     for path in template_paths:
         prior_url = urllib.parse.urljoin(entry_url, path)
-        # urljoin returns entry_url itself when path is "" or "/", and
-        # may produce malformed output when entry_url is unparseable.
-        # Filter both — we only emit strictly-distinct sub-page URLs.
-        if prior_url and prior_url != entry_url:
+        if prior_url and prior_url != entry_url and prior_url not in seen:
             out.append((prior_url, _PMS_PRIOR_SCORE, anchor))
+            seen.add(prior_url)
+        # Property-subpath variant for multi-property hosts. Only emit when
+        # entry_url has a real sub-path AND the universal prior is absolute
+        # (starts with /); skip already-rooted priors.
+        if _has_property_subpath and path.startswith("/"):
+            try:
+                _subpath_prior = urllib.parse.urlunparse(
+                    _entry_parsed._replace(path=_entry_path + path)
+                )
+                if _subpath_prior and _subpath_prior != entry_url and _subpath_prior not in seen:
+                    # Slight boost so the sub-path variant outranks the host-root
+                    # variant for multi-property hosts where the host root often 404s.
+                    out.append((_subpath_prior, _PMS_PRIOR_SCORE + 10, f"{anchor}:prop_subpath"))
+                    seen.add(_subpath_prior)
+            except Exception:
+                pass
     return out
 
 
@@ -1363,12 +1617,22 @@ def _rank_internal_links(
     page_html: str,
     base_url: str,
     limit: int = 5,
+    landed_url: str | None = None,
 ) -> list[tuple[str, int, str]]:
     """Rank internal links on a page for likelihood of carrying unit data.
 
     Scores each link by anchor text, path keywords, and host (portal
     subdomains). Returns ``[(url, score, anchor_text), ...]`` sorted best
     first. Never raises — parser errors yield an empty list.
+
+    When ``landed_url`` is provided (entry-page final URL after redirects,
+    e.g. 1701arch.com → livethearch.com), its host is ALSO accepted as
+    same-site so cross-domain anchors on the redirected page survive the
+    same-site filter. Relative anchors (``href="floorplans/"``) are
+    resolved against ``landed_url`` so they pick up the post-redirect
+    host instead of the CSV's pre-redirect host.
+    See data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md
+    PIDs 53592 (livethearch.com) and 119144 (windsorcommunities.com).
     """
     if not page_html:
         return []
@@ -1389,6 +1653,19 @@ def _rank_internal_links(
     except Exception:
         return []
     base_host = (base.hostname or "").lower()
+    # Landed host = post-redirect host; used as a secondary same-site reference
+    # AND as the URL-resolution base for relative anchors when the entry page
+    # redirected to a different host.
+    landed_host = ""
+    resolve_base = base_url
+    if landed_url:
+        try:
+            _landed_parsed = urllib.parse.urlparse(landed_url)
+            landed_host = (_landed_parsed.hostname or "").lower()
+            if landed_host and landed_host != base_host:
+                resolve_base = landed_url
+        except Exception:
+            pass
 
     candidates: dict[str, tuple[int, str]] = {}
 
@@ -1419,9 +1696,13 @@ def _rank_internal_links(
         if any(skip in lower for skip in _LINK_SKIP_PATTERNS):
             continue
 
-        # Resolve relative → absolute
+        # Resolve relative → absolute. Use landed_url as the base when the
+        # entry page redirected to a different host so relative anchors
+        # like href="floorplans/" land on the post-redirect host
+        # (e.g. windsorcommunities.com/properties/windsor-burnet/floorplans/)
+        # rather than the CSV pre-redirect host.
         try:
-            resolved = urllib.parse.urljoin(base_url, href)
+            resolved = urllib.parse.urljoin(resolve_base, href)
         except Exception:
             continue
         if not resolved.startswith(("http://", "https://")):
@@ -1445,12 +1726,21 @@ def _rank_internal_links(
             if link_host.endswith(suffix):
                 score += weight
 
-        # Stay on-site or go to a known portal subdomain
-        is_same_site = (
-            link_host == base_host
-            or link_host.endswith("." + base_host)
-            or base_host.endswith("." + link_host)
-        )
+        # Stay on-site or go to a known portal subdomain. "Same-site" matches
+        # the CSV base host OR the post-redirect landed host — the latter
+        # admits cross-domain anchors on redirected entry pages (e.g.
+        # 1701arch.com landed on livethearch.com, anchors point at
+        # livethearch.com/.../conventional/).
+        def _matches_host(target_host: str) -> bool:
+            if not target_host:
+                return False
+            return (
+                link_host == target_host
+                or link_host.endswith("." + target_host)
+                or target_host.endswith("." + link_host)
+            )
+
+        is_same_site = _matches_host(base_host) or _matches_host(landed_host)
         is_portal = any(link_host.endswith(suf) for suf, _ in _LINK_HOST_KEYWORDS)
         if not (is_same_site or is_portal):
             continue
@@ -1510,6 +1800,7 @@ async def _try_link_hop(
     visited_urls: set[str] | None = None,
     shared_budget: dict | None = None,
     browser_page: Any | None = None,
+    landed_url: str | None = None,
 ) -> dict[str, Any] | None:
     """One-level BFS over home-page links when primary extraction is empty.
 
@@ -1536,8 +1827,15 @@ async def _try_link_hop(
     """
     visited: set[str] = set(visited_urls) if visited_urls else set()
     visited.add(entry_url)
+    # Add landed_url to visited so we don't re-fetch the post-redirect
+    # entry. _rank_internal_links's own same-URL skip already handles this
+    # for the base case, but explicit add covers any path variations.
+    if landed_url and landed_url != entry_url:
+        visited.add(landed_url)
 
-    ranked = _rank_internal_links(entry_page_html, entry_url, limit=max_hops)
+    ranked = _rank_internal_links(
+        entry_page_html, entry_url, limit=max_hops, landed_url=landed_url
+    )
     if llm_navigation_hints:
         ranked = _augment_ranked_with_hints(ranked, llm_navigation_hints, entry_url)
         # Cap to keep budget bounded even with hints merged in.
@@ -1629,7 +1927,12 @@ async def _try_link_hop(
     # produces candidates (SPA marketing shell with detected PMS — the
     # 2026-05-11 Bug B shape), this guarantees at least one well-typed
     # candidate to try. See docs/2026_05_11_regressions_fix_design.md.
-    pms_priors = _pms_priors_for(detected, entry_url)
+    # Use landed_url (post-redirect host) as the prior-synthesis base when
+    # the entry redirected to a different host. For 1701arch.com →
+    # livethearch.com / windsorburnet.com → windsorcommunities.com, priors
+    # synthesised against entry_url would land on the wrong host.
+    _prior_base = landed_url if (landed_url and landed_url != entry_url) else entry_url
+    pms_priors = _pms_priors_for(detected, _prior_base)
 
     # Leasing-portal pointers from embedded JSON (Jonah Digital widget
     # config etc. point at SightMap / RealPage OLL). High-confidence —
@@ -2083,10 +2386,28 @@ async def _try_link_hop(
         try:
             _hop_parsed = urllib.parse.urlparse(sub_url)
             _hop_path_parts = [p for p in _hop_parsed.path.split("/") if p]
+            # Entrata module dead-ends: when the hop URL ends in a known Entrata
+            # auth/widget module path, appending /floorplans etc. just produces
+            # more auth-protected variants that return the same 300K shell.
+            # PID 37719 1611onlakeunion.com 2026-05-15 burned 4 hops on
+            # /Apartments/module/application_authentication/{floorplans,floor-plans,
+            # pricing,apartments-pricing}. Strip these segments before composing
+            # subpaths — let the universal-prior path try /floorplans at host root.
+            # See data/reports/cloud_run_2026-05-15/TRIAGE.md RC #5.
+            _ENTRATA_MODULE_DEAD_ENDS = (
+                "application_authentication",
+                "application-authentication",
+                "unit-detail",
+                "unit_detail",
+            )
+            _has_entrata_dead_end = any(
+                p.lower() in _ENTRATA_MODULE_DEAD_ENDS for p in _hop_path_parts
+            )
             if (
                 len(_hop_path_parts) >= 3
                 and dynamic_appended < max_dynamic_appends
                 and not _in_floorplan_accumulation
+                and not _has_entrata_dead_end
             ):
                 _prop_sub_paths = ("/floorplans", "/floor-plans", "/pricing", "/apartments-pricing")
                 # Compose subpaths into the PATH component only, preserving query
@@ -2687,6 +3008,21 @@ async def scrape_jugnu(
                     pms=detected_pms.get("pms", "unknown"),
                     confidence=float(detected_pms.get("confidence", 0.0)),
                 )
+                # Extract the post-redirect landed URL from the fetcher so
+                # the link-hop ranker can: (a) accept cross-domain anchors
+                # on the landed host as same-site, (b) resolve relative
+                # anchors against the post-redirect base, and (c) synthesise
+                # PMS priors against the post-redirect host. Without this,
+                # 1701arch.com (CSV) → livethearch.com (landed) loses the
+                # "Floor Plans" anchor at livethearch.com/.../conventional/.
+                # See data/canary/local_runs/fix-validation-2026-05-15/
+                # UNCHANGED_FAIL_ANALYSIS.md PIDs 53592 + 119144.
+                _landed_url = getattr(fetch_result, "final_url", None) or None
+                if _landed_url == base_url:
+                    _landed_url = None
+                _initial_visited = {base_url}
+                if _landed_url:
+                    _initial_visited.add(_landed_url)
                 # Phase 5: feed LLM navigation hints (if any) into the
                 # ranker so they outrank keyword candidates.
                 hop_result = await _try_link_hop(
@@ -2700,9 +3036,10 @@ async def scrape_jugnu(
                     max_hops=7,
                     llm_navigation_hints=result.get("_llm_navigation_hints"),
                     embedded_portal_hints=result.get("_embedded_portal_hints"),
-                    visited_urls={base_url},  # Phase 9: cycle protection (H5)
+                    visited_urls=_initial_visited,  # Phase 9: cycle protection (H5)
                     shared_budget=_jugnu_budget,
                     browser_page=page,  # Pattern A: share entry-page session
+                    landed_url=_landed_url,
                 )
             except Exception as exc:
                 log.warning("link-hop orchestration failed for %s: %s", property_id, exc)

@@ -32,6 +32,8 @@ from typing import Any
 __all__ = [
     "count_floor_plan_signals",
     "has_floor_plan_signals",
+    "count_listing_structural_signals",
+    "has_listing_structure",
     "normalize_field_key",
     "normalize_field_keys",
     "normalize_field_dict",
@@ -153,6 +155,8 @@ FIELD_ALIASES: dict[str, str] = {
     "no_of_bedroom":      "bedrooms",
     "numberofbedrooms":   "bedrooms",
     "num_bedrooms":       "bedrooms",
+    "numbedrooms":        "bedrooms",      # Wix wix-data collection (no underscore)
+    "bedroomsnumber":     "bedrooms",      # Wix Repeater itemData
     "bedcount":           "bedrooms",
     "bedsnumber":         "bedrooms",
     "bedroom_count":      "bedrooms",
@@ -165,7 +169,10 @@ FIELD_ALIASES: dict[str, str] = {
     "no_of_bathroom":     "bathrooms",
     "no_of_bath":         "bathrooms",
     "numberofbathrooms":  "bathrooms",
+    "numberofbathroomstotal": "bathrooms",  # Schema.org
     "num_bathrooms":      "bathrooms",
+    "numbathrooms":       "bathrooms",      # Wix wix-data collection
+    "bathroomsnumber":    "bathrooms",      # Wix Repeater itemData
     "bathcount":          "bathrooms",
     "bathroom_count":     "bathrooms",
     "bathroomcount":      "bathrooms",
@@ -206,6 +213,10 @@ FIELD_ALIASES: dict[str, str] = {
     "monthlyrent":        "rent",
     "baserent":           "rent",
     "market_rent":        "rent",
+    "pricetext":          "rent",        # Wix display string ("$1,450")
+    "pricepermonth":      "rent",        # Wix monthly rent
+    "rentpermonth":       "rent",        # Wix variant
+    "priceamount":        "rent",        # Wix Studio numeric
     # ── Unit / availability ───────────────────────────────────────────────
     "unitnumber":         "unit_number",
     "unitid":             "unit_id",
@@ -213,6 +224,110 @@ FIELD_ALIASES: dict[str, str] = {
     "availableon":        "available_date",
     "availablecount":     "unit_count",
 }
+
+
+# ---------------------------------------------------------------------------
+# Fuzzy normalisation for camelCase / snake_case / vendor-prefix variants
+# ---------------------------------------------------------------------------
+# When the exact-match table above misses, try a small set of structural
+# rewrites BEFORE returning the unchanged key. Each rewrite is conservative
+# (matches a small fixed set of patterns) so we don't accidentally map
+# unrelated keys to canonical names.
+#
+# Common pattern families:
+#   num<X>         → <X>s         (numBedrooms → bedrooms)
+#   number<X>      → <X>s         (numberBedrooms → bedrooms; handled separately for "of")
+#   <X>Number      → <X>s         (bedroomsNumber → bedrooms)
+#   <X>Count       → <X>s         (bedroomCount → bedrooms; already aliased)
+#   total<X>       → <X>s         (totalBedrooms → bedrooms)
+#
+# The rewrites run in fixed order; first hit wins.
+
+_FUZZY_STEM_CANONICAL: dict[str, str] = {
+    # stem (after pluralisation) → canonical key
+    "bedroom":  "bedrooms",
+    "bedrooms": "bedrooms",
+    "bed":      "bedrooms",
+    "beds":     "bedrooms",
+    "bathroom": "bathrooms",
+    "bathrooms":"bathrooms",
+    "bath":     "bathrooms",
+    "baths":    "bathrooms",
+    "sqft":     "sqft",
+    "sqfeet":   "sqft",
+    "squarefoot": "sqft",
+    "squarefootage": "sqft",
+    "squarefeet": "sqft",
+    "floorsize": "sqft",
+    "rent":     "rent",
+}
+
+# Prefix rewrites: only "num/number" and "total" variants. We deliberately
+# do NOT include "min" / "max" prefixes because min_rent / max_rent ARE
+# distinct canonical keys (the rent range) and must survive normalization
+# unchanged. Quantity-of-units prefixes don't apply to rent.
+_FUZZY_PREFIX_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"^num(?:ber)?(?:of)?_?([a-z]+)$"),   # numBedrooms, numberOfBedrooms, num_bedrooms
+    re.compile(r"^total_?([a-z]+)$"),                 # totalBedrooms
+)
+
+_FUZZY_SUFFIX_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"^([a-z]+)_?count$"),                 # bedroomCount, bedroom_count
+    re.compile(r"^([a-z]+)_?number$"),                # bedroomsNumber
+    re.compile(r"^([a-z]+)_?total$"),                 # bedroomsTotal
+)
+
+# Protected canonical keys: never let the fuzzy rewriter touch these. They're
+# the OUTPUT names that downstream code (BEDS_KEYS, FieldCombination,
+# has_unit_signals) reads. min_rent / max_rent are particularly important —
+# the "min" / "max" prefixes there are SEMANTIC, not vendor decoration.
+_PROTECTED_CANONICAL_KEYS: frozenset[str] = frozenset({
+    "rent", "min_rent", "max_rent", "asking_rent", "market_rent",
+    "sqft", "area",
+    "bedrooms", "bathrooms", "beds", "baths",
+    "floor_plan_name", "floor_plan_id",
+    "unit_number", "unit_id", "unit_count",
+    "available_date",
+})
+
+
+def _fuzzy_normalize(key: str) -> str | None:
+    """Try a small fixed set of camelCase / vendor-prefix structural rewrites.
+
+    Returns the canonical key when a rewrite matches and the stem is in
+    ``_FUZZY_STEM_CANONICAL``. Returns None when no rewrite applies — the
+    caller should fall back to the unchanged key.
+
+    Conservative on purpose:
+      * Each rewrite produces a stem that must be in the canonical-stem
+        table to be accepted. ``foo`` → returns None.
+      * Protected canonical keys (``min_rent``, ``max_rent``, etc.) are
+        returned unchanged so semantic prefixes survive.
+
+    Examples (after the caller lowercases + replaces hyphens with underscores):
+        numbedrooms       → bedrooms   (prefix rewrite, stem "bedrooms")
+        bedroomsnumber    → bedrooms   (suffix rewrite, stem "bedrooms")
+        totalbathrooms    → bathrooms  (prefix rewrite, stem "bathrooms")
+        min_rent          → None       (protected canonical — caller preserves)
+        squarefootagemin  → None       (no rewrite + stem isn't in canon)
+    """
+    if key in _PROTECTED_CANONICAL_KEYS:
+        return None
+    for pat in _FUZZY_PREFIX_PATTERNS:
+        m = pat.match(key)
+        if m:
+            stem = m.group(1)
+            canon = _FUZZY_STEM_CANONICAL.get(stem)
+            if canon:
+                return canon
+    for pat in _FUZZY_SUFFIX_PATTERNS:
+        m = pat.match(key)
+        if m:
+            stem = m.group(1)
+            canon = _FUZZY_STEM_CANONICAL.get(stem)
+            if canon:
+                return canon
+    return None
 
 
 def normalize_field_key(key: str) -> str:
@@ -239,7 +354,17 @@ def normalize_field_key(key: str) -> str:
     'rent'
     """
     normalised = key.lower().replace("-", "_").replace(" ", "_")
-    return FIELD_ALIASES.get(normalised, normalised)
+    # Exact-match alias table first — fastest and most precise.
+    canon = FIELD_ALIASES.get(normalised)
+    if canon is not None:
+        return canon
+    # Fuzzy structural rewrite for camelCase / vendor-prefix near-misses.
+    # Only kicks in for the exact-match misses, and only succeeds when the
+    # rewritten stem is in the canonical-stem table. Conservative.
+    fuzzy = _fuzzy_normalize(normalised)
+    if fuzzy is not None:
+        return fuzzy
+    return normalised
 
 
 def normalize_field_keys(keys: frozenset[str] | set[str]) -> frozenset[str]:
@@ -352,6 +477,107 @@ def count_floor_plan_signals(text: str) -> int:
     if _RE_FLOOR_PLAN_TYPE.search(text):
         score += 1
     return score
+
+
+# Listing-structure heuristics — distinguish "page lists individual units"
+# from "page has marketing copy mentioning units".
+#
+# PID 119144 windsorburnet.com 2026-05-15 surfaced the false-positive case:
+# count_floor_plan_signals returned 3 from `priceRange: "$1490 - $3824"` (a
+# LocalBusiness JSON-LD aggregate field), "Choose from 1, 2, 3-bedroom"
+# marketing copy, and "793 square feet fitness center" amenity description.
+# All three are pattern matches; none are unit listings.
+#
+# A real unit listing has REPEATING containers (table rows, list items,
+# repeater nodes, schema.org Offer arrays). Marketing aggregates have NONE.
+#
+# _RE_LISTING_REPEAT_SQL_HTML: 2+ <tr> rows with at least one rent-shaped
+#   cell — covers entrata/rentcafe pricing tables.
+# _RE_LISTING_REPEAT_CARDS: 2+ DOM nodes whose class/id contains a unit-card
+#   marker (unit-card, fp-card, floorplan-card, unit-row, listing-card).
+# _RE_LISTING_REPEAT_JSONLD: schema.org Offer/Apartment array with 2+ items.
+# _RE_LISTING_REPEAT_PRODUCT: schema.org Product with additionalProperty
+#   carrying bed/bath/sqft PropertyValue entries — covers Squarespace 250high.
+
+_RE_LISTING_REPEAT_TABLE = re.compile(
+    r"<tr[\s>][\s\S]{1,1500}?\$\s?\d{2,5}",
+    re.IGNORECASE,
+)
+_RE_LISTING_REPEAT_CARDS = re.compile(
+    r"""
+    (?:class|id)\s*=\s*["'][^"']*?
+    (?:
+        unit[-_]card | unit[-_]row | unit[-_]item | unit[-_]list
+        | floorplan[-_]card | floorplan[-_]row | floorplan[-_]item
+        | fp[-_]card | fp[-_]row | fp[-_]item
+        | listing[-_]card | listing[-_]row
+        | availability[-_](?:card|row|item|list)
+    )
+    [^"']*["']
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+_RE_LISTING_REPEAT_OFFER_ARRAY = re.compile(
+    r'"@type"\s*:\s*"(?:Apartment|FloorPlan|Offer|Product)"',
+    re.IGNORECASE,
+)
+_RE_LISTING_PROPERTY_VALUE_BEDS = re.compile(
+    r'"name"\s*:\s*"(?:Bedrooms?|Beds?|Bathrooms?|Baths?|Square\s*F(?:ootage|eet|t))"',
+    re.IGNORECASE,
+)
+
+
+def count_listing_structural_signals(html: str) -> int:
+    """Count how many distinct LISTING-STRUCTURE signals are present.
+
+    Unlike :func:`count_floor_plan_signals` which counts text-pattern matches
+    (and is fooled by marketing aggregate copy), this scans the HTML for
+    structural evidence of REPEATING per-unit containers.
+
+    Returns 0-4:
+    - 1 point: 2+ ``<tr>`` rows where a row carries a rent shape — classic
+      Entrata/RentCafe/RealPage pricing tables.
+    - 1 point: 2+ DOM nodes with a unit-card / floorplan-card / listing-card
+      class or id marker.
+    - 1 point: 2+ JSON-LD blocks declaring ``@type: Apartment|FloorPlan|
+      Offer|Product`` — the listing is structured data.
+    - 1 point: 2+ JSON-LD ``PropertyValue`` entries naming a dimension
+      (Bedrooms/Bathrooms/Square Footage) — covers Squarespace's
+      Product + additionalProperty shape.
+
+    Args:
+        html: Full HTML body. Pattern matches run directly against the markup,
+              not the stripped-text. Marketing aggregate copy lacks these
+              repeating-container patterns.
+
+    Returns:
+        Integer 0-4.
+    """
+    if not html:
+        return 0
+    score = 0
+    if len(_RE_LISTING_REPEAT_TABLE.findall(html)) >= 2:
+        score += 1
+    if len(_RE_LISTING_REPEAT_CARDS.findall(html)) >= 2:
+        score += 1
+    if len(_RE_LISTING_REPEAT_OFFER_ARRAY.findall(html)) >= 2:
+        score += 1
+    if len(_RE_LISTING_PROPERTY_VALUE_BEDS.findall(html)) >= 2:
+        score += 1
+    return score
+
+
+def has_listing_structure(html: str, threshold: int = 1) -> bool:
+    """True when *html* has at least *threshold* listing-structure signals.
+
+    Use ALONGSIDE ``has_floor_plan_signals`` to discriminate:
+
+    - ``fp_signals >= 2 AND listing_structure >= 1``  → real unit listing
+    - ``fp_signals >= 2 AND listing_structure == 0``  → marketing aggregate copy
+                                                        (STUB_AGGREGATE_COPY)
+    - ``fp_signals == 0``                              → genuine stub
+    """
+    return count_listing_structural_signals(html) >= threshold
 
 
 def has_floor_plan_signals(
