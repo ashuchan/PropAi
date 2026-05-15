@@ -109,9 +109,20 @@ resource "google_cloud_run_v2_service" "propai_frontend" {
       }
       # Host + port are stripped by the connector path (see client.ts:99);
       # only user + database are parsed out.
+      #
+      # The user is the SA email WITHOUT `.gserviceaccount.com` and with the
+      # `@` URL-encoded as `%40`. This is the Cloud SQL IAM-auth convention:
+      # `gcloud sql users create --type=cloud_iam_service_account` creates a
+      # Postgres role named `jugnu-worker-production@jugnu-494013.iam`, and
+      # alembic migration 0007 grants tables to that exact name. The Python
+      # connector strips `.gserviceaccount.com` automatically when
+      # `enable_iam_auth=True` — the Node connector does NOT, so the trim
+      # must happen here. Without it, pg.Pool hands the full SA email to
+      # Postgres, Postgres can't find the role, and the error surfaces as
+      # `password authentication failed for user "<full-sa-email>"`.
       env {
         name  = "DATABASE_URL"
-        value = "postgresql://${var.worker_sa_email}@/jugnu?sslmode=require"
+        value = "postgresql://${replace(trimsuffix(var.worker_sa_email, ".gserviceaccount.com"), "@", "%40")}@/jugnu?sslmode=require"
       }
       env {
         name  = "SCHEMA_VERSION"
