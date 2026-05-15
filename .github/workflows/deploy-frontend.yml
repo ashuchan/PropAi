@@ -119,7 +119,13 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SA_PROD }}
 
+      # `beta` component is required for both `gcloud beta run services
+      # update --iap` and `gcloud beta iap web add-iam-policy-binding`,
+      # which run in the post-apply IAP setup steps. Without this preload
+      # the first beta call hits an interactive prompt and fails in CI.
       - uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: beta
 
       - uses: hashicorp/setup-terraform@v3
         with:
