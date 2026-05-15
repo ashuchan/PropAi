@@ -2,7 +2,8 @@
 
 **Working directory for every command:** `ma_poc/`
 **Audience:** Claude Code (or any engineer) debugging extraction failures after a cloud run.
-**Updated:** 2026-05-15. Last campaign reviewed: 2026-05-14.
+**Updated:** 2026-05-15 (afternoon). Last campaign reviewed: 2026-05-15 cloud run.
+**This update:** added §0 anti-patterns 11-13 (STUB-without-frames, redirect-host-anchor, fp_signal-without-structure); added Q10-Q12 to §3 diagnostic; new §8.9-§8.17 extraction gaps (redirect landed_url, listing-structure gate, JSON-LD Product+additionalProperty, generic inline-JS PMS parser, AppFolio slug synth, vendor-iframe widgets, open-by-default discovery, decider rule conflation, Wix fuzzy normalize); §11 STUB classifier updated with frame-enumeration requirement; §14 added Playwright frame-enumeration snippet; §15 file reference appended with all 2026-05-15 additions.
 
 ---
 
@@ -36,6 +37,9 @@ Be explicit with yourself when you catch yourself doing any of these. Most "obvi
 | **Delegating live fetches to agents** | Agent got blocked on Bash perms; I waited and re-launched 3 times. | Run urllib live fetches in your own Bash. 30 seconds vs 3 minutes. |
 | **Surface diff reading** | "17 LLM_DOM regressions" with no per-PID divergence point. | Diff events.jsonl for ONE PID between yesterday and today; the divergence appears immediately. |
 | **Treating FAILED_NO_DATA as homogeneous** | "676 failures" without splitting by terminal_tier. | Always cluster by `terminal_tier` first, then by `fetch_outcome` to separate ENV_MISMATCH (CF-blocked locally) from real extraction misses. |
+| **Declaring STUB without enumerating frames** | Called 3 Wix sites (46179 / 118965 / 292955) "STUB sites" after a Playwright probe that only checked top-level `document.body.innerText`. Reality: each had real unit data in cross-origin iframes (`wix-visual-data.appspot.com/index?pageId=...&compId=...` with the table; `yourcrossstreet.com/property/...` with availability). The static HTML and even top-level rendered text had nothing — but `page.frames` enumeration would have surfaced the data. | Before declaring STUB, enumerate `page.frames` (Playwright) AND grep the rendered HTML for iframe `src=` patterns. See §11 *STUB classifier* and §14 *Frame enumeration snippet*. |
+| **Trusting a CSV URL when the redirect host owns the inventory** | For 53592 (1701arch.com) and 119144 (windsorburnet.com), `_rank_internal_links` filtered out the actual unit-page anchors because they pointed at `livethearch.com` / `windsorcommunities.com` (the redirect target), not the CSV host. Same-host filter dropped the only correct links. | When `fetch_result.final_url` host ≠ `base_url` host, ALSO accept anchors on the landed host as "same-site". PMS-priors should be synthesised against the landed host too. See §8.9 *Redirect-aware landed_url*. |
+| **Trusting fp_signal count without listing-structure check** | PID 119144 had fp_signals=3 from `priceRange: "$1490 - $3824"` (LocalBusiness JSON-LD aggregate) + marketing copy ("Choose from our 1, 2, 3-bedroom apartments") + amenityFeature description. LLM_DOM ran and correctly returned 0 units — but $0.005 wasted and the page was misclassified as "extractable but extraction failed" rather than STUB_AGGREGATE_COPY. | When fp_signals ≥ 2 AND `has_listing_structure(html) == False` → STUB_AGGREGATE_COPY. The structural check looks for ≥2 `<tr>` rows with rent / ≥2 unit-card class markers / ≥2 Offer-array entries / ≥2 PropertyValue dimension entries. See §8.10 *fp_signal listing-structure gate*. |
 
 ---
 
@@ -90,8 +94,11 @@ For EVERY FAILED_NO_DATA PID you investigate, answer all 9 in order before formi
 | **Q7** | Terminal label vs reality | last `extract.tier_won` or terminal in CSV | SHAPE_REJECTED tier without ANY captured rentcafe-host JSON → §5 label leak |
 | **Q8** | Profile state | prod DB query (§6) | `wpu` matches infra-URL pattern → profile-poisoning; `wpu == entry_url` → §6 self-fetch eligible; `explored_links > 10` and includes a PMS prior → §6 explored_skip eligible |
 | **Q9** | Portal URLs anywhere in HTML | live fetch + grep | `sightmap.com/embed/`, `*.appfolio.com/listings`, `*.onlineleasing.realpage.com` present but NOT in candidate list → §8 portal scan miss |
+| **Q10** | Cross-origin iframes rendered into the DOM | Playwright `page.frames` + Playwright `page.content()` after scroll/wait | Any frame URL not on a known infra host (Google analytics, maps, parastorage CDN, social) with unit-shaped innerText (`\d+ bed`, `$NNN`, `sqft`) → §8.11/§8.15 vendor-iframe widget. Common offenders: `wix-visual-data.appspot.com`, `yourcrossstreet.com/property/`, `embed.fortresstech.io`, `my.hy.ly`. Static-HTML grep can MISS these — Wix injects the iframe post-hydration. |
+| **Q11** | Entry-page redirect host vs CSV host | `fetch_result.final_url` vs `base_url` | When hosts differ, anchors on the page point at the LANDED host (cross-domain). The CSV-host filter in `_rank_internal_links` drops them. → §8.9 redirect-aware landed_url. Diagnostic command: live-fetch the CSV URL with `urllib.request.urlopen(...)`; if `resp.geturl()` returns a different host, that host owns the inventory. |
+| **Q12** | Listing structure vs fp_signals | `has_listing_structure(html)` against entry/hop HTML | fp_signals ≥ 2 BUT `count_listing_structural_signals == 0` → marketing aggregate copy (priceRange in LocalBusiness JSON-LD, "Choose from 1, 2, 3-bedroom"), not real listings. Classify as STUB_AGGREGATE_COPY rather than chasing extraction. → §8.10. |
 
-When you finish Q1–Q9, the root cause is almost always one of: § ENV_MISMATCH (CF-blocked locally only), §6 profile poisoning, §8 extraction gap, §10 architectural invariant violation, §11 STUB_URL.
+When you finish Q1–Q12, the root cause is almost always one of: § ENV_MISMATCH (CF-blocked locally only), §6 profile poisoning, §8 extraction gap, §10 architectural invariant violation, §11 STUB_URL.
 
 ---
 
@@ -287,6 +294,89 @@ myresman.com/portal/*, resman.com/portal/      → resman
 **Cause:** `_extract_rent_dom_section` falls back to `body[:cap]` when no structural container exists, so the LLM gets a non-empty input. Burns ~$0.01 per property × thousands of properties.
 **Fix:** [pms/adapters/generic.py:2356-2375](ma_poc/pms/adapters/generic.py#L2356-L2375) — `if html and _has_fp_signals(html, SIGNAL_THRESHOLD_ANY)` gate before invoking the DOM-LLM. Emits visible `skipped, reason="no floor-plan signals in body — skipping LLM DOM"` event.
 
+### 8.9 Redirect-aware `landed_url` for cross-domain anchor admit (2026-05-15)
+
+**Signal:** Entry URL is `https://X.com/`; after fetch `final_url` lands on `https://Y.com/properties/X/`. Page has anchors pointing at `Y.com/properties/X/floorplans/` ("View Availability" link) and `Y.com/properties/X/find-apartments/`. None of those make it into the `extract.link_hop_started.candidates` list — only Y-host PMS-priors at score 5095 appear. PIDs 53592 (1701arch.com → livethearch.com) and 119144 (windsorburnet.com → windsorcommunities.com) are canonical.
+
+**Cause:** `_rank_internal_links` at [pms/scraper.py:1487-1495](ma_poc/pms/scraper.py#L1487-L1495) had a `is_same_site = link_host == base_host …` check. With `base_host = "windsorburnet.com"` and `link_host = "windsorcommunities.com"`, the check fails and the anchor is dropped. Even relative anchors like `href="floorplans/"` resolve against `base_url` (CSV's pre-redirect host), so the resolved URL lands on the wrong host. PMS-prior synthesis has the same bug.
+
+**Fix:** [pms/scraper.py:1401-1556](ma_poc/pms/scraper.py#L1401-L1556) — `_rank_internal_links` now takes an optional `landed_url` parameter. Accepts BOTH `base_host` and `landed_host` as same-site. Uses `landed_url` as the `urljoin` base when entry redirected to a different host. [pms/scraper.py:2790+](ma_poc/pms/scraper.py#L2790) — caller extracts `fetch_result.final_url` and passes as `landed_url` to `_try_link_hop`, which propagates into the ranker AND uses it as the PMS-prior synthesis base when present.
+
+### 8.10 fp_signal listing-structure gate (STUB_AGGREGATE_COPY) (2026-05-15)
+
+**Signal:** `floor_plan_signal_count >= 2` triggers extraction tiers but every tier returns 0 units. Live-grep of the page shows the patterns came from marketing copy ("Choose from our 1, 2, or 3-bedroom apartments") + a `LocalBusiness` JSON-LD `priceRange: "$1490 - $3824"` aggregate + amenity descriptions ("793 square feet fitness center"). NO actual per-unit table or Offer array exists. PID 119144 (windsorburnet.com) is canonical.
+
+**Cause:** `count_floor_plan_signals` matches raw text patterns. It can't distinguish a unit listing from marketing aggregate copy that happens to mention bedrooms/baths/sqft.
+
+**Fix:** new `count_listing_structural_signals(html)` + `has_listing_structure(html)` in [pms/signal_engine/floor_plan_signals.py:391-490](ma_poc/pms/signal_engine/floor_plan_signals.py#L391-L490) that checks for:
+- ≥2 `<tr>` rows containing a rent shape ($NNN) — covers Entrata/RentCafe/RealPage pricing tables
+- ≥2 DOM nodes with unit-card / floorplan-card / listing-card class markers
+- ≥2 JSON-LD `@type: Apartment|FloorPlan|Offer|Product` declarations
+- ≥2 JSON-LD `PropertyValue` entries naming a dimension (covers Squarespace `Product + additionalProperty`)
+
+Gate is plumbed into the LLM_DOM tier at [pms/adapters/generic.py:2367-2389](ma_poc/pms/adapters/generic.py#L2367-L2389) — when fp_signals fire but `has_listing_structure == False`, the LLM_DOM call is skipped with reason `stub_aggregate_copy — fp_signals present but no listing structure`. Saves ~$0.005/property × N marketing-aggregate sites.
+
+### 8.11 JSON-LD `Product + additionalProperty: [PropertyValue]` (Squarespace e-commerce) (2026-05-15)
+
+**Signal:** `extract.tier_attempted generic:jsonld ran_empty "no Apartment/Offer schema in HTML"` despite the page having structured product data. JSON-LD `@graph` contains multiple sibling `Product` nodes each with `category: "Apartment Floor Plan"`, a SINGLE `offers` dict (not a list), and `additionalProperty: [{name: "Bedrooms", value: 1}, {name: "Bathrooms", value: 1}, {name: "Square Footage", value: 830}]`. The original parser only knew `numberOfBedrooms` / `numberOfBathroomsTotal` / `floorSize` as direct keys. PID 61950 (250high.com) is canonical — 5 floor plans, $1,723-$2,447.
+
+**Cause:** Pass 2 `_extract_offers_as_units` requires `offers: [...]` with len ≥ 2; the per-Product single-offer dict fails the check. Pass 3 `_extract_standalone_offers` walks bare Offers nested inside AggregateOffer dicts but loses the parent Product context, so `additionalProperty` is never read.
+
+**Fix:** new `_read_additional_property(item)` helper + new `_extract_product_floorplans_as_units` Pass 4 at [pms/adapters/_html_extract.py:445-525](ma_poc/pms/adapters/_html_extract.py#L445-L525). Pass 4 collects Products with `apartment` / `floor plan` / `rental` category hints, wraps each Product's single `offers` dict + sets `itemOffered = product`, then calls `_build_unit_from_offer`. The unit builder at [_html_extract.py:232-310](ma_poc/pms/adapters/_html_extract.py#L232-L310) reads `additionalProperty` and fills missing `bedrooms` / `bathrooms` / `sqft` from PropertyValue entries. **Pass 4 must run BEFORE Pass 3** otherwise the bare-Offer walker eats the nested per-Product offers with no parent context.
+
+### 8.12 Generic inline-JS PMS init parser (JS-injected iframes) (2026-05-15)
+
+**Signal:** Live HTML grep finds `SightMap.init({sightmap_id: "..."})` or `<div data-sightmap-id="...">` or fortresstech UUID embedded in inline JS, but NO `<iframe src="sightmap.com/embed/...">` in static HTML. The 3-pass iframe / anchor / quoted-URL scan returns empty for these portals because the iframe is JS-injected at runtime.
+
+**Cause:** SightMap (and several other portals) ship a script loader (`sightmap.com/embed/api.js`) that hydrates the iframe at runtime. The static HTML the L1 fetcher saved BEFORE hydration only contains the loader tag. PID 20959 dovevalleyapts.com is canonical.
+
+**Fix:** new `_scan_inline_js_pms_init(html)` 4th pass in `_extract_portal_iframe_hints` at [pms/scraper.py:1218-1330](ma_poc/pms/scraper.py#L1218-L1330). Pattern library (`_INLINE_JS_INIT_PATTERNS`) covers SightMap, AppFolio `data-tenant`, RealPage OLL `clientId`, FortressTech UUID, Hyly `propertyId`, FunnelLeasing GUID. Each pattern captures the property-specific key; `url_synth_fn(key)` returns the canonical data URL.
+
+### 8.13 AppFolio slug-to-listings synthesis (2026-05-15)
+
+**Signal:** Marketing site embeds `{slug}.appfolio.com/connect/users/sign_in` iframes (Pay-Rent / Tenant-Portal CTAs) but NO `/listings` iframe. After RC #3b removed `.appfolio.com/connect` from `_PORTAL_URL_PATTERNS`, no AppFolio URL gets queued at all → all hops are host-root 404s. PIDs 259733 (ekoliving.life), 11399 (ironridge-capital.com), 50178 (leescrossingapartments.net) canonical.
+
+**Cause:** The fix removed the wrong-target match but didn't add affirmative listings-URL discovery.
+
+**Fix:** 5th pass in `_extract_portal_iframe_hints` at [pms/scraper.py:1232-1262](ma_poc/pms/scraper.py#L1232-L1262). Uses [`_APPFOLIO_SUBDOMAIN_RE`](ma_poc/pms/detector.py#L173) to detect the CMS slug from any `{slug}.appfolio.com` occurrence in HTML; when no `/listings` URL is already queued, prepends `https://{slug}.appfolio.com/listings` at portal score 10000. AppFolio adapter's existing 4 extraction modes (XHR capture, SSR DOM parse, /detail page, offboarded-tenant detection) handle the rest. PID 259733 ekoliving.life recovered 122 units this way.
+
+### 8.14 Vendor-iframe widgets — Wix Visual Data + Cross Street + Fortress (2026-05-15)
+
+**Signal:** PIDs 46179 hayloft / 118965 16bennett / 292955 3140clybourn / 1713 brooklaneapts. Static HTML / urllib fetch shows no inventory text. Live Playwright fetch enumerates `page.frames` and finds a cross-origin frame holding the actual data — host varies per vendor:
+- `wix-visual-data.appspot.com/index?pageId={page}&compId={comp}&siteRevision={n}` — Wix Visual Data widget; AngularJS shell renders a Wix Collection as a table
+- `yourcrossstreet.com/property/{slug}/?floorplan={id}` — Cross Street leasing widget; React SPA  
+- `embed.fortresstech.io/unit-availability/{guid}` + `portal.fortresstech.io/{guid}/` — Funnel/FortressTech React SPA
+
+**Fix:** added to `_PORTAL_URL_PATTERNS` at [pms/adapters/_html_extract.py:891-1135](ma_poc/pms/adapters/_html_extract.py#L891-L1135) + late-render whitelist at [fetch/fetcher.py:866-895](ma_poc/fetch/fetcher.py#L866-L895). 292955 (yourcrossstreet) recovered. 46179 / 118965 still fail because the Wix Visual Data iframe URL is JS-injected with query params that come from the Wix component config — static HTML scan only sees the BASE URL without `pageId` / `compId`. URL synthesis from `wix-viewer-model` blob is deferred to a follow-up.
+
+### 8.15 Open-by-default unknown-portal discovery + telemetry (2026-05-15)
+
+**Signal:** A new vendor's iframe widget hosts inventory; every property on that vendor fails until someone hand-edits `_PORTAL_URL_PATTERNS`. No runtime learning.
+
+**Fix:** added 6th pass in `_extract_portal_iframe_hints` at [pms/scraper.py:1264-1303](ma_poc/pms/scraper.py#L1264-L1303). Walks every `<iframe src>` in entry HTML; skips known portals (already queued), same-origin URLs, and any host on `_PORTAL_INFRA_BLACKLIST` ([pms/adapters/_html_extract.py:1135-1240](ma_poc/pms/adapters/_html_extract.py#L1135-L1240) — analytics, maps, chat, social, parastorage CDN, Wix internal services). Remaining hosts are queued at `_UNKNOWN_PORTAL_SCORE = 9_000` with anchor `unknown:{host}`, capped at 3 per property.
+
+Each unknown emits `embedded_portal.unknown_host_seen` event ([observability/events.py](ma_poc/observability/events.py)) so cross-run aggregation can identify trending vendors. Full design doc at [docs/generic_portal_discovery.md](ma_poc/docs/generic_portal_discovery.md). Phase 3 (profile-persisted learned hosts) + Phase 4 (cross-run promotion to `_PORTAL_URL_PATTERNS`) are planned but not yet shipped.
+
+### 8.16 Decider rule conflation — Rule 2 vs Rule 4 both return HOP_TO_URL (2026-05-15)
+
+**Signal:** `extract.tier_attempted reason=rc3_defer_monolithic_to_hop` fires on a hop page (`hop_index ≥ 1`) even AFTER the 2026-05-15 `hop_depth` wiring fix landed in production. 53.7% of FAILED_NO_DATA had this — meaning the monolithic LLM was suppressed on every hop, never running anywhere.
+
+**Cause:** the `ActionDecider` ([pms/signal_engine/decider.py](ma_poc/pms/signal_engine/decider.py)) has TWO rules that return `ActionType.HOP_TO_URL`:
+- Rule 2 (RC3 deferral) — rationale `dom_analysis_defer_monolithic_to_hop`, gated on `hop_depth == 0`
+- Rule 4 (top-signal dispatch via `_map_to_action`) — rationale `top_signal:{...}`, NOT gated; returns HOP_TO_URL for LLM_HINT / PROFILE_WINNING / PMS_PRIOR signals
+
+The caller in [pms/adapters/generic.py:2655](ma_poc/pms/adapters/generic.py#L2655) only checked `action_type == HOP_TO_URL` and set `_rc3_deferred = True`. On hop pages Rule 2 correctly skipped (hop_depth=1), but Rule 4 still returned HOP_TO_URL because the LLM_HINT signal was in the ranker → caller mislabeled it as rc3_defer and suppressed the LLM.
+
+**Fix:** [pms/adapters/generic.py:2655-2670](ma_poc/pms/adapters/generic.py#L2655-L2670) — check rationale, not just action_type: `if _decision.action_type == HOP_TO_URL and _decision.rationale == "dom_analysis_defer_monolithic_to_hop"`. **Architectural lesson** (now in §10): when reading an `ActionDecider` decision, the action_type alone is ambiguous — read the rationale for which rule fired.
+
+### 8.17 Wix vendor-key fuzzy normalization (2026-05-15)
+
+**Signal:** SSR JSON blobs contain unit-shaped items (e.g. `{numBedrooms: 1, numBathrooms: 1, floorSize: 750, priceText: "$1,450"}`), but `find_unit_arrays` walker reports `0 SSR blob(s) had no unit signals`. `_item_has_unit_signals` runs each key through `normalize_field_key`, but Wix camelCase variants weren't in the alias table.
+
+**Cause:** `FIELD_ALIASES` had `bedroomcount` / `bedroom_count` / `numberofbedrooms` but NOT `numbedrooms` / `bedroomsnumber` / `pricetext` (Wix wix-data collection vendor spellings).
+
+**Fix:** [pms/signal_engine/floor_plan_signals.py:151-280](ma_poc/pms/signal_engine/floor_plan_signals.py#L151-L280) — added exact aliases for the observed Wix keys, AND added a `_fuzzy_normalize` helper with prefix patterns (`num<X>` / `number<X>` / `total<X>`) and suffix patterns (`<X>Count` / `<X>Number` / `<X>Total`) that maps to canonical when the stem is in `_FUZZY_STEM_CANONICAL`. Critically: `_PROTECTED_CANONICAL_KEYS` guards `min_rent` / `max_rent` etc. so the `min<X>` / `max<X>` semantic prefixes survive normalisation.
+
 ---
 
 ## Phase 9 — Profile-state and recovery mechanisms
@@ -367,11 +457,24 @@ Some properties have a perfectly-loaded entry page with ZERO unit data — they'
 | Portal URLs anywhere in HTML (iframe/anchor/quoted) | 3-pass scan in §8.2 |
 | Captured API JSON responses with ≥2 unit-signal keys | `_api_responses` count |
 | Internal anchors matching floor-plan keywords that loaded OK | `extract.link_hop_fetched` outcomes |
+| **Cross-origin iframe frames** (Playwright `page.frames`) carrying unit-shaped innerText | Playwright frame enumeration |
+| **Listing structure** (`<tr>` + rent, unit-card classes, Offer/Product arrays, PropertyValue dims) | `count_listing_structural_signals(html)` ≥ 1 |
 
-**Example confirmed STUB_URL (2026-05-15):**
+**Critical precondition before declaring STUB:** ENUMERATE FRAMES. The 2026-05-15 false-STUB call on 46179 / 118965 / 292955 happened because I only checked top-level `document.body.innerText`. Each had real inventory inside a cross-origin iframe (`wix-visual-data.appspot.com`, `yourcrossstreet.com/property/`). Static HTML grep would have missed it too — Wix injects the iframe post-hydration. Per §14 *Frame enumeration snippet*: open with Playwright, scroll, then iterate `page.frames` and read each frame's `document.body.innerText`. ONLY declare STUB when EVERY frame returns marketing-only text.
+
+**Two distinct STUB classes:**
+- **STUB_URL** — no rent / bed / sqft anywhere in HTML or any frame. Truly no data.
+- **STUB_AGGREGATE_COPY** — `fp_signals ≥ 2` BUT `has_listing_structure(html) == 0`. The signals come from marketing copy ("Choose from 1, 2, 3-bedroom") + a LocalBusiness JSON-LD `priceRange` aggregate. PID 119144 windsorburnet.com canonical. Use `has_listing_structure` from [pms/signal_engine/floor_plan_signals.py](ma_poc/pms/signal_engine/floor_plan_signals.py) to discriminate.
+
+**Examples confirmed STUB (2026-05-15):**
 - PID 267183 thesiennaapartments.com — 3 application/json blocks, all are Squarespace form configs (`formFields`, `submissionTextAlignment`); 0 `$NNN`, 0 bed, 0 sqft. `/floorplans` and `/floor-plans` both 404.
 
-**Status:** classifier not yet shipped — proposed for follow-up. Goal is to emit a separate `stub_url_properties.json` artifact (parallel to `bot_blocked_properties.json`) and exclude these from the FAILED_NO_DATA denominator.
+**False-STUB war stories (don't repeat these):**
+- 2026-05-15: 46179 hayloftapartmenthomes.com declared STUB after `body.innerText = 1442 chars` marketing-only check. Reality: `wix-visual-data.appspot.com/index?pageId=q0o07&compId=ja77je2z` iframe held 5 floor plans + rent + sqft. User correction caught this.
+- 2026-05-15: 118965 16bennett.com same pattern — wix-visual-data iframe had 30+ per-unit table rows.
+- 2026-05-15: 292955 3140clybourn.com same pattern — `yourcrossstreet.com/property/the-clybourn-2/?floorplan=4` iframe had 6 floor plans.
+
+**Status:** STUB_URL / STUB_AGGREGATE_COPY classifier not yet emitted as a distinct verdict. The `has_listing_structure` gate is in place at the LLM_DOM tier (cost savings) but properties still emit `FAILED_NO_DATA` externally. Verdict-level classification (separate from FAILED_NO_DATA in metrics) is P3 work — requires changes to `reporting/verdict.py`, `slo_watcher.py`, `analyze_cloud_run.py`, frontend schema, DB.
 
 ---
 
@@ -550,6 +653,63 @@ print('  sqft:',    len(re.findall(r'\b\d{2,5}\s?(?:sqft|sq\.?\s?ft|square\s?fee
 print('  studio:',  len(re.findall(r'\bstudio\b', html, re.IGNORECASE)))
 ```
 
+### Frame enumeration — required before declaring STUB (2026-05-15)
+
+The `urllib` live-fetch above only sees the static HTML. Many sites (Wix Visual Data, FortressTech, AppFolio iframes, SightMap JS-injected embeds) inject the data-bearing iframe AFTER hydration. Walk every Playwright frame before concluding "no data anywhere".
+
+```python
+import asyncio, re
+from playwright.async_api import async_playwright
+
+async def enumerate_data_frames(url: str) -> None:
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        ctx = await browser.new_context(
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0',
+            viewport={'width': 1920, 'height': 1080},
+        )
+        page = await ctx.new_page()
+        await page.goto(url, wait_until='domcontentloaded', timeout=45000)
+        await asyncio.sleep(3)
+        # Scroll slowly to trigger lazy / on-scroll iframe injection
+        for y in range(0, 4500, 400):
+            await page.evaluate(f'window.scrollTo(0, {y})')
+            await asyncio.sleep(0.8)
+        await asyncio.sleep(4)
+        # Walk every frame
+        for fr in page.frames:
+            if not fr.url or 'about:blank' in fr.url or 'data:' in fr.url:
+                continue
+            # Skip CDN-only / asset frames
+            if any(s in fr.url for s in (
+                'parastorage.com', 'wixstatic.com', 'images.squarespace-cdn',
+                'googleapis.com/maps', 'wix-instantsearchplus', 'filesusr.com',
+            )):
+                continue
+            try:
+                text = await fr.evaluate('document.body ? document.body.innerText : ""')
+            except Exception:
+                continue
+            if len(text) < 50:
+                continue
+            # Unit-data heuristic — same logic as STUB classifier
+            has_unit_data = bool(re.search(
+                r'\d+\s*(?:bed|bath|sqft|sq\.?\s?ft|square)|\$\s?\d{3,5}',
+                text, re.IGNORECASE
+            ))
+            if has_unit_data:
+                print(f'*** FRAME WITH DATA: {fr.url[:200]}')
+                print(f'    text first 800 chars: {text[:800]!r}')
+            else:
+                print(f'    frame (no data): {fr.url[:160]}')
+        await browser.close()
+
+# Example: confirm a "STUB" claim
+# asyncio.run(enumerate_data_frames('https://www.16bennett.com/'))
+```
+
+When `*** FRAME WITH DATA` prints with `wix-visual-data.appspot.com/index?pageId=...` or `yourcrossstreet.com/property/...` or `embed.fortresstech.io/...`, the property is NOT a stub — the parent scraper just didn't hop into that iframe. Check `_PORTAL_URL_PATTERNS` + `_PORTAL_INFRA_BLACKLIST` semantics before recommending classification.
+
 ### Profile inspection via local proppy
 
 ```python
@@ -613,6 +773,19 @@ The deselect-list captures known pre-existing failures (`test_h5_visited_urls_de
 | `local_canary.py` (canary tool) | `scripts/diagnostics/local_canary.py` |
 | Profile seeder for canary (CSV → local proppy) | `C:/tmp/seed_canary_profiles.py` |
 | Cloud SQL profile export query | §6.3 of this document |
+| **2026-05-15 additions** | |
+| `_extract_portal_iframe_hints` 6-pass scanner (incl. unknown-portal discovery, AppFolio slug synth, inline-JS PMS parser) | `pms/scraper.py:1164-1330` |
+| `_PORTAL_INFRA_BLACKLIST` (open-by-default complement) | `pms/adapters/_html_extract.py:1135-1240` |
+| `_INLINE_JS_INIT_PATTERNS` (inline-JS PMS init capture) | `pms/scraper.py:1228+` |
+| `_read_additional_property` (Schema.org `Product + additionalProperty` reader) | `pms/adapters/_html_extract.py:119-198` |
+| `_extract_product_floorplans_as_units` (JSON-LD Pass 4 — Squarespace e-commerce) | `pms/adapters/_html_extract.py:445-525` |
+| `count_listing_structural_signals` + `has_listing_structure` (STUB_AGGREGATE_COPY gate) | `pms/signal_engine/floor_plan_signals.py:391-490` |
+| `_fuzzy_normalize` + `_PROTECTED_CANONICAL_KEYS` (camelCase vendor-key learning) | `pms/signal_engine/floor_plan_signals.py:230-356` |
+| Redirect-aware `landed_url` in `_rank_internal_links` and `_try_link_hop` | `pms/scraper.py:1401-1556` + `pms/scraper.py:2790+` |
+| Decider rule-conflation fix (rationale check at HOP_TO_URL) | `pms/adapters/generic.py:2655-2670` |
+| Generic SPA-shell late-render detector (content-based, no host whitelist) | `fetch/fetcher.py:903-955` |
+| `EMBEDDED_PORTAL_UNKNOWN_HOST_SEEN` event for cross-run aggregation | `observability/events.py` |
+| Generic portal discovery design doc | `docs/generic_portal_discovery.md` |
 
 ---
 

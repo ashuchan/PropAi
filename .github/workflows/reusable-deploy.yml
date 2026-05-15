@@ -179,6 +179,35 @@ jobs:
           echo "::error::Instance $INSTANCE still not RUNNABLE after 10 minutes (last state: $state)."
           exit 1
 
+      # Symmetric to deploy-frontend.yml's "Resolve current scrape image tag":
+      # the scrape deploy must not move the frontend image. Read the currently
+      # deployed frontend tag and pass it back as a TF var so the
+      # cloud_run_service module no-ops. Without this, terraform falls back to
+      # frontend_image_tag in envs/*.tfvars (the "bootstrap" sentinel), which
+      # is not a real image in Artifact Registry — and the apply 500s with
+      # "Image ... :bootstrap not found".
+      - name: Resolve current frontend image tag
+        id: frontend
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          case "${{ inputs.env }}" in
+            prod) TF_ENV="production" ;;
+            *)    TF_ENV="${{ inputs.env }}" ;;
+          esac
+          SERVICE="propai-frontend-${TF_ENV}"
+          IMAGE=$(gcloud run services describe "$SERVICE" \
+            --region=${{ env.REGION }} --project="$PROJECT" \
+            --format='value(template.containers[0].image)' 2>/dev/null || echo "")
+          if [ -z "$IMAGE" ]; then
+            TAG="bootstrap"
+            echo "::notice::No frontend service yet — leaving sentinel '$TAG'. Run deploy-frontend.yml first to materialise the service."
+          else
+            TAG="${IMAGE##*:}"
+            echo "::notice::Locked frontend_image_tag to current deployment: $TAG"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
       - name: Plan
         id: plan
         run: |
@@ -191,6 +220,7 @@ jobs:
           terraform plan \
             -var-file=envs/${{ inputs.env }}.tfvars \
             -var="image_tag=${{ needs.build-and-push.outputs.image-tag }}" \
+            -var="frontend_image_tag=${{ steps.frontend.outputs.tag }}" \
             -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
             -out=tfplan \
             -detailed-exitcode \
