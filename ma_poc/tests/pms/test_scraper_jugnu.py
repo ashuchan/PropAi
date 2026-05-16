@@ -38,13 +38,19 @@ def _make_outcome(value: str) -> object:
 
 @pytest.mark.asyncio
 async def test_scrape_jugnu_short_circuits_on_hard_fail() -> None:
-    """Delta 2: non-OK fetch -> no adapter invoked, tier='generic:no_body_short_circuit'."""
+    """Delta 2: non-OK fetch -> no adapter invoked, tier='generic:no_body_short_circuit'.
+
+    Bug #2 update (2026-05-16): HARD_FAIL now gets its own verdict prefix
+    (``FAILED_HARD_FAIL``) instead of falling through to the generic
+    ``FAILED_UNREACHABLE`` bucket. The shape of the error string is the
+    same — only the prefix changed.
+    """
     task = FakeCrawlTask()
     fetch = FakeFetchResult(outcome=_make_outcome("HARD_FAIL"), body=None)
     result = await scrape_jugnu(task, fetch)
     assert result["extraction_tier_used"] == "generic:no_body_short_circuit"
     assert result.get("_llm_interactions", []) == []
-    assert "FAILED_UNREACHABLE" in str(result["errors"])
+    assert "FAILED_HARD_FAIL" in str(result["errors"])
 
 
 @pytest.mark.asyncio

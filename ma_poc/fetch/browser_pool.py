@@ -177,18 +177,29 @@ class BrowserContextPool:
         On timeout we forget the dead context (the OS-level Chromium child
         will be reaped when the worker process exits or the browser
         restarts) and release the semaphore so subsequent fetches proceed.
+
+        Shard_84 follow-up (2026-05-16): in addition to abandoning the
+        wedged context, FORCE A FULL BROWSER RESTART after the first
+        timeout. Shard_84 on 2026-05-16 had 26/50 PIDs wedge at the
+        ``page.goto`` step (renderer IPC unresponsive) — that meant every
+        new ``acquire()`` on the same ``_browser`` instance re-hit the
+        degraded Chromium process and re-wedged. By closing the parent
+        browser and resetting ``self._browser = None``, the next
+        ``_ensure_browser()`` launches a fresh Chromium child with a fresh
+        IPC channel — turning a shard-killing wedge into a one-PID cost.
         """
         context = page.context
+        force_restart = False
         try:
             try:
                 await asyncio.wait_for(context.close(), timeout=10.0)
             except asyncio.TimeoutError:
                 log.warning(
                     "browser_pool.release: context.close() exceeded 10s — "
-                    "abandoning the wedged Chromium context to unblock the "
-                    "shard semaphore. The renderer's OS process will be "
-                    "reaped on next browser restart."
+                    "abandoning the wedged Chromium context AND restarting "
+                    "the browser to avoid further IPC-dead acquires."
                 )
+                force_restart = True
             except Exception as exc:
                 log.warning("Error releasing browser context: %s", exc)
             if context in self._active_contexts:
@@ -198,6 +209,34 @@ class BrowserContextPool:
                     pass
         finally:
             self._semaphore.release()
+
+        # Shard_84 fix (2026-05-16): browser-level restart on detected
+        # wedge. Done outside the try/finally so the semaphore is released
+        # FIRST — restart can itself take a few seconds, and we don't want
+        # downstream acquires waiting on the broken pool.
+        if force_restart:
+            try:
+                async with self._lock:
+                    # Re-check inside the lock — another release() may have
+                    # already restarted concurrently.
+                    if self._browser is not None:
+                        try:
+                            await asyncio.wait_for(
+                                self._browser.close(), timeout=5.0
+                            )
+                        except Exception as exc:
+                            log.warning(
+                                "browser_pool: force-restart close failed: %s — "
+                                "abandoning the parent browser; next acquire "
+                                "will launch a fresh one.",
+                                exc,
+                            )
+                        self._browser = None
+                        # Clear remaining stale context refs; OS will reap
+                        # the children.
+                        self._active_contexts.clear()
+            except Exception as exc:
+                log.warning("browser_pool: force-restart failed: %s", exc)
 
     async def close(self) -> None:
         """Close all contexts and the browser."""

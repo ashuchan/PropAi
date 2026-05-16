@@ -49,6 +49,11 @@ def _get(d: dict, *keys: str) -> str:
     """Try multiple key names, return first non-empty string found.
 
     Unwraps nested rent/sqft objects like ``{rent: {min: 1351, max: 1351}}``.
+    Also unwraps name-shaped dicts ``{name: "...", provider_id: "..."}`` —
+    some upstream APIs (Morgan Properties / RentCafe family) return the
+    floor-plan-name field as a dict; without unwrap we serialise the whole
+    dict and emit ``floor_plan_name='{"name":"One Bedroom","provider_id":...}'``
+    See PID 161 Hickory Mill 2026-05-14.
     """
     for k in keys:
         v = d.get(k)
@@ -57,6 +62,11 @@ def _get(d: dict, *keys: str) -> str:
         if isinstance(v, list):
             continue
         if isinstance(v, dict):
+            # Try name-shaped subkeys first (B3 fix), then rent/sqft subkeys.
+            for sub_k in ("name", "label", "title", "display_name", "displayName"):
+                sv = v.get(sub_k)
+                if isinstance(sv, str) and sv:
+                    return sv
             for sub_k in ("min", "low", "amount", "value", "effectiveRent", "max", "high"):
                 sv = v.get(sub_k)
                 if sv is not None and sv != "":
@@ -64,6 +74,26 @@ def _get(d: dict, *keys: str) -> str:
             continue
         return str(v)
     return ""
+
+
+def _unwrap_name(v: Any) -> str:
+    """Coerce a possibly-dict-shaped name field to a plain string.
+
+    Some PMS APIs (RealPage via Morgan Properties is a confirmed case) emit
+    ``floor_plan`` / ``floorPlanName`` as a dict ``{"name": "...", "provider_id":
+    "..."}``. A naive ``str(v)`` then serialises the whole dict and the row
+    surfaces with ``floor_plan_name`` set to a stringified JSON object.
+    This helper extracts the human-readable name when present.
+    """
+    if v is None:
+        return ""
+    if isinstance(v, dict):
+        for k in ("name", "label", "title", "display_name", "displayName"):
+            sv = v.get(k)
+            if isinstance(sv, str) and sv:
+                return sv
+        return ""
+    return str(v) if v != "" else ""
 
 
 def _money_to_int(s: Any) -> int | None:
@@ -413,7 +443,8 @@ def parse_sightmap_payload(body: Any, url: str) -> list[dict]:
 
         beds = fp.get("bedroom_count")
         baths = fp.get("bathroom_count")
-        name = fp.get("name") or fp.get("filter_label") or ""
+        # B3 (2026-05-16): unwrap dict-shaped names — see PID 161 Hickory Mill.
+        name = _unwrap_name(fp.get("name")) or _unwrap_name(fp.get("filter_label")) or ""
 
         if beds == 0 or (isinstance(name, str) and "studio" in name.lower()):
             bed_label = "Studio"
@@ -492,7 +523,9 @@ def realpage_units_from_body(body: Any, source_url: str) -> list[dict]:
         for fp in resp.get("floorplans") or []:
             if not isinstance(fp, dict):
                 continue
-            fp_id = str(fp.get("id") or fp.get("name") or "")
+            # B3 (2026-05-16): unwrap dict-shaped name fields.
+            fp_name = _unwrap_name(fp.get("name"))
+            fp_id = str(fp.get("id") or fp_name or "")
             beds = fp.get("bedRooms") or fp.get("bedrooms")
             sqft = fp.get("sqft") or fp.get("squareFeet")
             sqft_v = int(sqft) if isinstance(sqft, (int, float)) and sqft > 0 else None
@@ -508,7 +541,7 @@ def realpage_units_from_body(body: Any, source_url: str) -> list[dict]:
                 "amenities": None,
                 "floorplan_image_url": fp.get("imageUrl") or fp.get("image") or None,
                 "_sqft": sqft_v,
-                "_floor_plan": fp.get("name") or fp_id,
+                "_floor_plan": fp_name or fp_id,
                 "_bedrooms": beds,
             })
         return out
@@ -537,7 +570,8 @@ def realpage_units_from_body(body: Any, source_url: str) -> list[dict]:
                     u.get("floorPlanImage") or u.get("floorplanImage") or u.get("imageUrl") or None
                 ),
                 "_sqft": int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
-                "_floor_plan": u.get("floorPlanName") or u.get("floorplanName") or "",
+                # B3 (2026-05-16): unwrap dict-shaped floorPlanName.
+                "_floor_plan": _unwrap_name(u.get("floorPlanName")) or _unwrap_name(u.get("floorplanName")) or "",
                 "_bedrooms": u.get("bedrooms") or u.get("bedRooms"),
             })
         return out
@@ -603,6 +637,7 @@ def _emit_signal_inspection(
     candidates: list,
     qualifier_admitted: bool,
     qualifier_reason: str,
+    property_id: str | None = None,
 ) -> None:
     """Emit a per-response key-classification trace for offline alias-table tuning.
 
@@ -612,9 +647,19 @@ def _emit_signal_inspection(
     `keys_unmatched_unit_shape` produces the canonical "missing aliases" report.
 
     Sampled by SIGNAL_INSPECTION_SAMPLE_RATE env (default 10%) — sample key is
-    `property_id + scrape_date` so the same property is always or never sampled
-    on a given day. Always-on for properties on the FAILED_NO_DATA allowlist
-    (when present in env).
+    ``property_id + scrape_date`` so the same property is always or never
+    sampled on a given day. Always-on for properties on the FAILED_NO_DATA
+    allowlist (when present in env).
+
+    Bug #10 fix (2026-05-16): the original implementation read
+    ``resp.get("property_id")`` but API-response dicts carry only ``url`` /
+    ``body`` (per the L1 fetcher's network_log shape) — never property_id.
+    The fallback ``"unknown"`` collapsed every response into one SHA bucket,
+    so the sample either fired for everything or nothing on a given day. On
+    the 2026-05-16 cloud run, 0 of an expected ~500 SIGNAL_INSPECTION events
+    were emitted across 4982 properties. The new ``property_id`` parameter
+    lets the caller plumb the canonical_id from AdapterContext so the sample
+    is genuinely per-property.
 
     Best-effort — telemetry must never break extraction.
     """
@@ -625,7 +670,10 @@ def _emit_signal_inspection(
 
         # Deterministic sample. Default 10% by SHA-256(property_id + date).
         sample_rate = float(os.getenv("SIGNAL_INSPECTION_SAMPLE_RATE", "0.10"))
-        pid = str(resp.get("property_id") or "unknown")
+        # Bug #10 fix: prefer explicit caller-supplied property_id; fall back
+        # to the (always-missing) resp key for back-compat with older callers
+        # before finally defaulting to "unknown".
+        pid = str(property_id or resp.get("property_id") or "unknown")
         today = _dt.datetime.utcnow().strftime("%Y-%m-%d")
         h = int(hashlib.sha256(f"{pid}|{today}".encode()).hexdigest()[:8], 16)
         if (h % 1000) >= int(sample_rate * 1000):
@@ -688,12 +736,22 @@ def _emit_signal_inspection(
         pass  # never let telemetry mask extraction
 
 
-def parse_api_responses(api_responses: list[dict]) -> list[dict]:
+def parse_api_responses(
+    api_responses: list[dict],
+    *,
+    property_id: str | None = None,
+) -> list[dict]:
     """Parse captured API JSON into normalised unit/floor-plan records.
 
     Handles SightMap (dedicated parser), generic REST, and GraphQL-style
     responses with 50+ key-name variants. Output is adapter-compatible
     (``floor_plan_name``, ``bed_label``, ``rent_range``, etc.).
+
+    Bug #10 fix (2026-05-16): accepts ``property_id`` for
+    ``_emit_signal_inspection`` deterministic per-PID sampling. Callers
+    should pass ``ctx.property_id`` when available; legacy callers that
+    omit it still work (signal-inspection bucket falls back to "unknown",
+    matching pre-fix behaviour rather than breaking the parser).
     """
     units: list[dict] = []
     seen: set[str] = set()
@@ -765,6 +823,7 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
             qualifier_admitted=bool(candidates),
             qualifier_reason=("admitted_via_keyed_walker_or_fallback"
                               if candidates else "no_candidates_resolved"),
+            property_id=property_id,  # Bug #10 fix: per-PID sampling
         )
 
         for item in candidates:

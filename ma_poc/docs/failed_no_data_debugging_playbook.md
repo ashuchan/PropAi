@@ -786,6 +786,55 @@ The deselect-list captures known pre-existing failures (`test_h5_visited_urls_de
 | Generic SPA-shell late-render detector (content-based, no host whitelist) | `fetch/fetcher.py:903-955` |
 | `EMBEDDED_PORTAL_UNKNOWN_HOST_SEEN` event for cross-run aggregation | `observability/events.py` |
 | Generic portal discovery design doc | `docs/generic_portal_discovery.md` |
+| **2026-05-16 additions** | |
+| Partial-recovery verdict emit (Bug #1) | `scripts/runners/jugnu.py:415-465` |
+| `_OUTCOME_VERDICT_PREFIX` extended for CANCELLED + 4 more (Bug #2) | `pms/scraper.py:1473-1495` |
+| `extract.adapter_selected` field-name fix (Bug #3) | `scripts/diagnostics/analyze_cloud_run.py:298` |
+| `_IFRAME_DATA_SRC_RE` + `_SIGHTMAP_EMBED_URL_RE` (Bug #4 — partial; see "Phase 17") | `pms/scraper.py:1149-1198` |
+| `AdapterContext.candidate_portal_urls` + Entrata candidate-derived probe (Bug #5) | `pms/adapters/base.py:55-65` + `pms/adapters/entrata.py:284-317` |
+| Redirect-to-entry persistence into shared_budget (Bug #6) | `pms/scraper.py:2634-2655` |
+| `entry_captcha_detected` / `entry_bot_blocked` split (Bug #7 + #11) | `scripts/diagnostics/analyze_cloud_run.py:85-96, 442-465` |
+| `--expected-shards` default 100 + clamped denominator (Bug #8) | `scripts/diagnostics/analyze_cloud_run.py:1115-1124, 629` |
+| `count_floor_plan_signal_cardinality` tests (Bug #9) | `tests/pms/signal_engine/test_floor_plan_cardinality.py` |
+| `_emit_signal_inspection` property_id parameter (Bug #10) | `pms/adapters/_api_parser.py:634-689` |
+| Wedge-rescue HTTP_ONLY retry pass | `scripts/runners/jugnu.py:497-680` |
+| Hop-count cap on zero-signal entry pages | `pms/scraper.py:3375-3405` |
+| `_HOP_CUMULATIVE_BUDGET_MS = 240_000` cap | `pms/scraper.py:2402-2435` + accumulator at 2504-2518 |
+| Browser-restart on `context.close()` timeout | `fetch/browser_pool.py:165-240` |
+| Host-level `page.goto` timeout (`asyncio.wait_for`) | `fetch/fetcher.py:694-722` |
+| AsyncPool capped to `MAX_CONCURRENT_BROWSERS` | `scripts/runners/jugnu.py:307-329` |
+| `WEDGE_RESCUE_RETRY_STARTED` / `_RESOLVED` EventKinds | `observability/events.py` (Phase 17) |
+| Alternate SightMap init patterns (Bug #4 follow-up) | `pms/scraper.py:1438+` |
+
+---
+
+## Phase 17 — Deferred follow-ups (2026-05-16)
+
+### Bug #4 — parent-marketing-site detection (PIDs 14524, 234945, similar)
+
+**Diagnosis from 2026-05-16 Playwright forensic:**
+- **14524 venterraliving.com** — corporate parent. 130 KB HTML, 0 SightMap/Engrain references in static or rendered HTML, only GTM iframe. The detector routed to `sightmap` because `pms_detected` was carried over from an earlier cloud run, but the entry page has no inventory at all. Inventory lives on `/apartments/<city>/<property-slug>/` sub-pages that the link-hop scheduler doesn't currently surface from a corporate-tier URL.
+- **234945 imtresidential.com** — corporate parent. 9.6 MB HTML, **1838 'engrain' substrings** but **zero `engrain.com/<id>` URLs**. The substring count was a misleading signal — the 'engrain' references are CSS class names / content metadata, not SDK integration. Inventory lives on per-property sub-pages.
+
+**Why the existing fixes don't help:**
+- `_extract_portal_iframe_hints` requires an actual iframe `src=` / `data-src=` / quoted-URL match. Corporate marketing pages don't have those.
+- `_scan_inline_js_pms_init` requires a SightMap-init call. Corporate pages don't have those either.
+- The PMS detector's substring-only check (`if "sightmap.com" in h` at `pms/detector.py:427`) is the culprit for routing label; demoting it without corroboration is risky because some legitimate properties only have the SightMap host in a CDN reference + a JS-injected iframe.
+
+**Recommended fix path (not yet shipped):**
+1. **PARENT_SITE detector**: when a page has (a) multi-state property nav (≥3 state-name anchors), (b) zero per-unit signals (rent/bed/bath count == 0), (c) iframe count ≤1 AND the only iframe is on `_PORTAL_INFRA_BLACKLIST` (GTM, reCAPTCHA, AudioEye), classify as `PARENT_SITE_NEEDS_HOP` and surface a list of property-sub-anchors as hop candidates at score 9_500 (above PMS_PRIOR, below known-portal).
+2. **Detector tightening**: at `pms/detector.py:427`, require `sightmap.com/(embed|api|app)/[\w-]+` rather than the bare substring. The strong path at lines 377-395 stays. Properties that match the bare host but not the structured path get DEMOTED from `sightmap` routing and fall through to the generic cascade.
+3. **Telemetry**: emit `PARENT_SITE_DETECTED` event so cross-run aggregation can quantify how many failures fall into this category. Initial estimate: 2 of 4 SightMap_SHAPE_REJECTED canary failures, ~6-15 of the 25 cloud SightMap_SHAPE_REJECTED bucket.
+
+Deferred because: requires new heuristic + telemetry + a new hop-candidate score band. Lower ROI than the immediate post-deploy Bug #4 alternate-init-pattern fix.
+
+### Bug #4 — CF-protected SightMap properties (PID 16139)
+
+**Diagnosis from Playwright forensic:** chaseknollsapts.com returns CF 403 on urllib but renders fine in Playwright with the default Chrome UA. The rendered HTML contains `sightmap.com/embed/api` (the SDK endpoint, not the iframe URL — the property-specific embed-id is supplied via an init call the agent couldn't enumerate).
+
+**Status:** Partially fixed. The 2026-05-16 patch added 3 more inline-JS init patterns to `_INLINE_JS_INIT_PATTERNS` (`embed_id` / `mapId` / `<sightmap-*>` custom element + an Engrain-context permissive last-resort). If the chaseknolls SDK uses any of those, the iframe URL will be synthesized correctly. If not, a Playwright-rendered scan is the only fix — deferred.
+
+**To verify after next cloud deploy:** check whether 16139 appears in the new run's `TIER_1_API_SIGHTMAP` (success) or stays in `TIER_1_API_SIGHTMAP_SHAPE_REJECTED`. If still failing, dispatch a follow-up Playwright forensic with `page.evaluate("window.SightMap")` to dump the actual SDK config blob.
 
 ---
 

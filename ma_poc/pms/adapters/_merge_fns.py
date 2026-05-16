@@ -133,13 +133,52 @@ def merge_field_present(unit: dict[str, Any], *keys: str) -> Any:
     return None
 
 
+def _normalise_fp_name(name: Any) -> str:
+    """Strip stringified-JSON wrapper and lowercase the floor-plan name.
+
+    D8 (2026-05-16): The B3 dict-unwrap fix in _api_parser.py corrected ONE
+    code path that emitted ``floor_plan_name='{"name":"1x1Ac T1","provider_id":
+    "6093286"}'`` but other paths (e.g. older saved profile data, legacy LLM
+    output) may still emit the stringified-JSON shape. When the merge layer
+    compares fp_name across cascade passes, the stringified-JSON form fails
+    to match the unwrapped form → different rank-signature → records that
+    describe the same unit are emitted twice.
+
+    Two-pass normalisation:
+      1. If the value looks like a JSON object string ('{...}'), parse it
+         and extract the .name field.
+      2. Lowercase + strip the result (existing merge_norm behaviour).
+    """
+    if name is None:
+        return ""
+    if not isinstance(name, str):
+        return merge_norm(name)
+    stripped = name.strip()
+    # Cheap pre-check: only attempt JSON parse if it looks like a dict literal.
+    if stripped.startswith("{") and stripped.endswith("}"):
+        try:
+            import json as _json
+            obj = _json.loads(stripped)
+            if isinstance(obj, dict):
+                for k in ("name", "label", "title", "display_name", "displayName"):
+                    v = obj.get(k)
+                    if isinstance(v, str) and v:
+                        return merge_norm(v)
+        except (ValueError, TypeError):
+            pass
+    return merge_norm(name)
+
+
 # ── Rank signature ─────────────────────────────────────────────────────────────
 
 def merge_rank_signature(unit: dict[str, Any]) -> dict[str, Any]:
     """Extract the comparable identity fields from a unit (H2 strict sqft)."""
     fp_id = merge_field_present(unit, "floor_plan_id")
     uid = merge_field_present(unit, "unit_id", "unit_number", "_unit_number")
-    fp_name = merge_norm(merge_field_present(unit, "floor_plan_name", "_floor_plan", "floorplan_name"))
+    # D8 (2026-05-16): unwrap stringified-JSON fp_name before comparison.
+    fp_name = _normalise_fp_name(
+        merge_field_present(unit, "floor_plan_name", "_floor_plan", "floorplan_name")
+    )
     beds = merge_int_or_none(merge_field_present(unit, "beds", "bedrooms", "_bedrooms"))
     baths = merge_float_or_none(merge_field_present(unit, "baths", "bathrooms", "_bathrooms"))
     sqft = merge_int_or_none(merge_field_present(unit, "sqft", "area", "_sqft"))
@@ -156,6 +195,18 @@ def merge_rank_signature(unit: dict[str, Any]) -> dict[str, Any]:
 def rank_matches(rank: str, ex_sig: dict[str, Any], inc_sig: dict[str, Any]) -> bool:
     """Return True when the incoming signature matches existing at ``rank``."""
     if rank == "R0":
+        # D7 follow-up (2026-05-16): R0 is the plan-level merge rank — used to
+        # collapse two records describing the SAME PLAN. But when both records
+        # are UNIT-LEVEL (each has its own uid), many units legitimately share
+        # the same floor_plan_id (they're all units of plan "Baywood"), and
+        # collapsing them at R0 destroys real units.  Require BOTH sides to
+        # lack a uid before allowing the R0 fp_id-only match: that way R0
+        # only fires for plan-aggregate records and unit-level dedup must
+        # come through R0a (uid match) or R1* (physical-attr match).
+        # Canary 2026-05-16 D6/D7/D8: pre-guard had Canyon Ridge collapse
+        # 17 distinct units into 4, Olympic 49 into 3.
+        if ex_sig["uid"] and inc_sig["uid"]:
+            return False
         return bool(ex_sig["fp_id"]) and ex_sig["fp_id"] == inc_sig["fp_id"]
     if rank == "R0a":
         return bool(ex_sig["uid"]) and ex_sig["uid"] == inc_sig["uid"]

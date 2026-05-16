@@ -280,13 +280,42 @@ class EntrataAdapter:
 
         Returns the first probe's parsed units. Probes never raise — a
         404/CORS/error simply moves to the next path.
+
+        Bug #5 fix (2026-05-16): also probe ``candidate_portal_urls``
+        passed in by the orchestrator. ``_extract_portal_iframe_hints``
+        harvests ``comms.entrata.com/widget?website_token=...`` URLs from
+        entry-page iframes, but the link-hop scheduler can't fetch them
+        because they require the CF clearance cookie set on the entry
+        load. ``page.evaluate(fetch, url, {credentials: 'include'})``
+        inherits that cookie automatically. Filtered to Entrata-shaped
+        hosts so a SightMap or AppFolio candidate URL doesn't accidentally
+        get probed by the Entrata adapter.
         """
         origin = self._origin_from_ctx(page, ctx)
         if not origin:
             return []
 
-        for path in _ENTRATA_PROBES:
-            url = origin + path
+        # Bug #5 fix: candidate-derived URLs first. These are higher
+        # confidence than the catalogue (the entry page explicitly
+        # referenced them via iframe src / inline JS) so probe them
+        # before the generic ``/Apartments/module/widgets/`` fallback.
+        candidate_urls: list[str] = []
+        for u in getattr(ctx, "candidate_portal_urls", None) or []:
+            try:
+                u_low = str(u).lower()
+            except Exception:
+                continue
+            if not u_low.startswith("http"):
+                continue
+            # Entrata-shaped: comms.entrata.com widget endpoints, or
+            # /Apartments/module/widgets/ on the property's own host.
+            if "comms.entrata.com" in u_low or "/apartments/module/widgets" in u_low:
+                if u not in candidate_urls:
+                    candidate_urls.append(u)
+
+        probe_urls = candidate_urls + [origin + path for path in _ENTRATA_PROBES]
+
+        for url in probe_urls:
             # Defensive: if the SDK doesn't expose evaluate (test stubs),
             # bail entire probe loop rather than misbehave.
             evaluate = getattr(page, "evaluate", None)

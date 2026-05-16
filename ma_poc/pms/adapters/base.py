@@ -52,6 +52,18 @@ class AdapterContext:
     # decider deferred the LLM on every hop too, exhausting budget on
     # nothing. Observed 2026-05-14 on PIDs 290347, 246710.
     hop_depth: int = 0
+    # Bug #5 fix (2026-05-16): harvested portal-iframe URLs from
+    # _extract_portal_iframe_hints. The Entrata adapter consumes these as
+    # additional probe targets so candidate-derived ``comms.entrata.com/
+    # widget?website_token=...`` URLs from the entry page can be fetched
+    # via ``page.evaluate(fetch ...)`` with the CF clearance cookies the
+    # entry-page load established. Without this, the candidate is queued
+    # only for the link-hop scheduler — which fetches as top-level
+    # navigation and is rejected by CF (HARD_FAIL 400) since the cookie
+    # didn't carry. PID 40867 gardenparkinfo.com is the canonical case;
+    # 13+ Entrata properties on 2026-05-16 cloud run carry comms.entrata
+    # iframe markers that landed here.
+    candidate_portal_urls: list[str] = field(default_factory=list)
 
 
 @dataclass

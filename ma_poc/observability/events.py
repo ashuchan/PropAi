@@ -168,6 +168,25 @@ class EventKind(StrEnum):
     # architectural rationale (closed lists block runtime learning).
     EMBEDDED_PORTAL_UNKNOWN_HOST_SEEN = "embedded_portal.unknown_host_seen"
 
+    # Shard_84 fix follow-up (2026-05-16): wedge-rescue retry telemetry.
+    # The runner's wedge-rescue pass (scripts/runners/jugnu.py) detects
+    # properties whose RENDER-mode fetch wedged on Playwright IPC and
+    # re-queues them with RenderMode.GET. These two events bracket each
+    # retry so cross-run aggregation can compute:
+    #   - rescue_attempt_rate    = STARTED count / shard-property count
+    #   - rescue_recovery_rate   = SUCCEEDED count / STARTED count
+    #   - bytes_saved            = (600s wallclock - actual retry seconds)
+    #                              × STARTED count
+    # WEDGE_RESCUE_RETRY_STARTED fires when the retry CrawlTask is built;
+    # WEDGE_RESCUE_RETRY_RESOLVED fires after the retry completes carrying
+    # the resolution (UPGRADED_TO_SUCCESS | RETRY_ALSO_FAILED | CRASHED).
+    # Until 2026-05-16 the retry started was piggybacked onto
+    # PROPERTY_EMITTED with a custom verdict string — that conflated
+    # retry telemetry with verdict telemetry and made the rescue rate
+    # invisible to the analyzer. These distinct kinds fix that.
+    WEDGE_RESCUE_RETRY_STARTED = "extract.wedge_rescue_retry_started"
+    WEDGE_RESCUE_RETRY_RESOLVED = "extract.wedge_rescue_retry_resolved"
+
 
 @dataclass(slots=True, frozen=True)
 class Event:

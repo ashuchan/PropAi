@@ -694,11 +694,33 @@ class Fetcher:
             timeout_ms = min(task.budget_ms, 20000)
             resp: Any = None
             nav_exc: Exception | None = None
+            # Shard_84 fix (2026-05-16): wrap page.goto in asyncio.wait_for
+            # with a hard 5s overhead beyond Playwright's own timeout. When
+            # the Chromium renderer wedges in IPC (observed on shard_84:
+            # 26 of 50 PIDs had ``page.goto`` never raise, never return,
+            # the call simply parked until the 600s per-property wallclock
+            # killed the task), Playwright's internal timeout never fires
+            # because the timeout-watcher coroutine waits on the same
+            # broken IPC channel. asyncio.wait_for is a host-level guard
+            # that interrupts the await regardless of Playwright's state.
             try:
-                resp = await page.goto(
+                resp = await asyncio.wait_for(
+                    page.goto(
+                        task.url,
+                        wait_until="domcontentloaded",
+                        timeout=timeout_ms,
+                    ),
+                    timeout=(timeout_ms / 1000.0) + 5.0,
+                )
+            except asyncio.TimeoutError as exc:
+                # IPC wedge — raise the same exception shape page.goto
+                # would have used so the salvage path treats both the
+                # same.
+                nav_exc = exc
+                log.warning(
+                    "page.goto host-level timeout for %s — Chromium IPC "
+                    "likely wedged; release() will force browser restart",
                     task.url,
-                    wait_until="domcontentloaded",
-                    timeout=timeout_ms,
                 )
             except Exception as exc:
                 nav_exc = exc

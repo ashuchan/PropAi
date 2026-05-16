@@ -232,6 +232,163 @@ def _clip_to_column_limits(
     return values
 
 
+# Per-table cache of {column_name -> int | float} for Integer/Float columns.
+# Built once on first use so ``_coerce_numeric_columns`` can convert stringy
+# numerics at the write boundary instead of letting pg8000 hand them
+# straight to Postgres as text.
+#
+# Why coerce rather than fail loudly: LLM-rescue / JSON-LD-derived paths
+# occasionally emit values like ``"1.0"`` / ``"812.0"`` (strings, not
+# floats) into legacy keys (``bedrooms`` / ``sqft``). When those keys are
+# the only populated source for an Integer column (``beds`` / ``area``)
+# pg8000 sends them to Postgres verbatim and gets SQLSTATE 22P02
+# (``invalid input syntax for type integer: "1.0"``). The 2026-05-16
+# shard-48 incident: 108 such fields in one property aborted the whole
+# shard's PG sync. Coercing at the write boundary keeps the data flowing;
+# values that cannot be made numeric become NULL with a WARN.
+_NUMERIC_PYTHON_TYPES: dict[type, dict[str, type]] = {}
+
+
+def _numeric_python_types(model_cls: type) -> dict[str, type]:
+    """Return ``{col_name: int | float}`` for every Integer/Float column on
+    ``model_cls``. Boolean columns (a subclass of Integer in Python) are
+    excluded so they don't accidentally route through int coercion.
+    """
+    cache = _NUMERIC_PYTHON_TYPES.get(model_cls)
+    if cache is not None:
+        return cache
+    out: dict[str, type] = {}
+    table = getattr(model_cls, "__table__", None)
+    if table is not None:
+        for col in table.columns:
+            try:
+                py = col.type.python_type
+            except (AttributeError, NotImplementedError):
+                continue
+            # ``bool`` is a Python subclass of ``int`` — exclude it
+            # explicitly so Boolean columns don't get pulled into
+            # numeric coercion. We have ``Boolean`` columns on
+            # ``run_ledger`` etc. and accept True/False directly.
+            if py is bool:
+                continue
+            if py is int or py is float:
+                out[col.name] = py
+    _NUMERIC_PYTHON_TYPES[model_cls] = out
+    return out
+
+
+# Tokens the extractor uses interchangeably with NULL. Strings the writer
+# coerces to ``None`` silently (no WARN — they aren't a data-quality
+# regression, just sloppy upstream nullability).
+_NUMERIC_NULL_TOKENS: frozenset[str] = frozenset(
+    {"", "n/a", "na", "none", "null", "-", "—"}
+)
+
+
+def _coerce_one_numeric(raw: Any, py: type) -> tuple[Any, bool]:
+    """Coerce ``raw`` to the column's Python type.
+
+    Returns ``(value, warn?)`` where ``warn`` is True when the value
+    could not be coerced cleanly (we set it to ``None`` rather than
+    truncate / guess). Pure function — ``_coerce_numeric_columns`` is
+    where the WARN actually fires.
+    """
+    if raw is None:
+        return None, False
+    # Pass booleans through untouched — they don't appear in our Integer
+    # columns today but `bool` is an `int` subclass, so an explicit branch
+    # avoids losing semantic information if a caller ever does pass one.
+    if isinstance(raw, bool):
+        return raw, False
+    if py is int:
+        if isinstance(raw, int):
+            return raw, False
+        if isinstance(raw, float):
+            if raw != raw:  # NaN
+                return None, True
+            return (int(raw), False) if raw.is_integer() else (None, True)
+        if isinstance(raw, str):
+            s = raw.strip()
+            if not s or s.lower() in _NUMERIC_NULL_TOKENS:
+                return None, False
+            try:
+                return int(s), False
+            except ValueError:
+                pass
+            try:
+                f = float(s)
+            except ValueError:
+                return None, True
+            if f != f:  # NaN
+                return None, True
+            return (int(f), False) if f.is_integer() else (None, True)
+        return None, True
+    if py is float:
+        if isinstance(raw, (int, float)):
+            return float(raw), False
+        if isinstance(raw, str):
+            s = raw.strip()
+            if not s or s.lower() in _NUMERIC_NULL_TOKENS:
+                return None, False
+            try:
+                return float(s), False
+            except ValueError:
+                return None, True
+        return None, True
+    return raw, False
+
+
+def _coerce_numeric_columns(
+    values: dict[str, Any],
+    model_cls: type,
+    *,
+    log_prefix: str = "",
+) -> dict[str, Any]:
+    """Coerce stringy/float-shaped values to the int/float column types.
+
+    Mutates and returns ``values``. Behaviour, by column type:
+
+    Integer
+      • ``int`` passes through.
+      • ``float`` with ``.is_integer()`` becomes ``int(value)``; a
+        fractional float (``1.5``) becomes ``None`` + WARN.
+      • Numeric strings (``"1"``, ``"1.0"``, ``" 3 "``) parse to ``int``;
+        whitespace + null tokens (``""``, ``"N/A"``) become ``None`` (no
+        WARN — they read as null, not as bad data).
+      • Anything else (``"call for price"``, ``object()``) → ``None`` +
+        WARN. We don't truncate fractional values; an LLM that emits
+        ``1.7 beds`` is broken upstream and silent rounding would hide it.
+
+    Float
+      • ``int`` / ``float`` pass through (int promotes to float).
+      • Numeric strings parse.
+      • Null tokens / unparseable strings → ``None`` (WARN only for the
+        unparseable case).
+
+    Always runs BEFORE ``_clip_to_column_limits`` — clipping is for the
+    String columns the coercion doesn't touch.
+    """
+    coercions = _numeric_python_types(model_cls)
+    if not coercions:
+        return values
+    for col, py in coercions.items():
+        if col not in values:
+            continue
+        raw = values[col]
+        coerced, warn = _coerce_one_numeric(raw, py)
+        if warn:
+            log.warning(
+                "%s coerced bad numeric for %s.%s: raw=%r -> %r",
+                log_prefix or "_coerce_numeric_columns",
+                model_cls.__name__,
+                col,
+                raw,
+                coerced,
+            )
+        values[col] = coerced
+    return values
+
+
 def _hydrate_property(row: PropertyRow) -> PropertyIndexEntry:
     base = {
         "canonical_id": row.canonical_id,
@@ -353,6 +510,9 @@ class SqlPropertyStateStore(IPropertyStateStore):
 
             known, extra = _split_known_extra(merged, _PROPERTY_COLS)
             values = {**known, "extra": extra}
+            _coerce_numeric_columns(
+                values, PropertyRow, log_prefix=f"property upsert cid={canonical_id}"
+            )
             _clip_to_column_limits(values, PropertyRow, log_prefix=f"property upsert cid={canonical_id}")
 
             stmt = dialect_insert(self._h.engine, PropertyRow).values(**values)
@@ -619,6 +779,9 @@ class SqlUnitStateStore(IUnitStateStore):
 
                 known, extra = _split_known_extra(snap, _UNIT_COLS)
                 values = {**known, "extra": extra}
+                _coerce_numeric_columns(
+                    values, UnitRow, log_prefix=f"upsert_units cid={canonical_id} uid={uid}"
+                )
                 _clip_to_column_limits(values, UnitRow, log_prefix=f"upsert_units cid={canonical_id}")
                 stmt = dialect_insert(self._h.engine, UnitRow).values(**values)
                 update_cols = {k: stmt.excluded[k] for k in values if k not in ("canonical_id", "unit_id")}

@@ -39,6 +39,7 @@ from typing import Any, TypeVar
 
 from sqlalchemy.exc import (
     DataError,
+    DBAPIError,
     DisconnectionError,
     IntegrityError,
     InterfaceError,
@@ -83,6 +84,80 @@ PERMANENT_ROW_ERRORS: tuple[type[Exception], ...] = (
     DataError,
     IntegrityError,
 )
+
+# Postgres SQLSTATE classes that mean "the row is broken, don't retry":
+#   22 — data exception (invalid input syntax, numeric overflow, etc.)
+#   23 — integrity constraint violation
+# We classify by SQLSTATE in addition to type because pg8000 collapses
+# every server error into the generic ``DatabaseError`` rather than the
+# specific subclass — a 22P02 ``invalid input syntax for type integer``
+# arrives wrapped as ``sqlalchemy.exc.DatabaseError`` (not ``DataError``)
+# and slips past the type-based filter. See the 2026-05-16 shard-48
+# incident where one bad property nuked the whole shard's PG sync.
+_PERMANENT_SQLSTATE_PREFIXES: tuple[str, ...] = ("22", "23")
+
+
+def _pg_sqlstate(exc: BaseException) -> str | None:
+    """Best-effort extraction of a Postgres SQLSTATE from a DBAPI / SQLAlchemy
+    exception. Returns the 5-char code or None.
+
+    Handles the two driver shapes we see in production:
+      • pg8000 — the original ``pg8000.exceptions.DatabaseError`` is
+        constructed with a single ``dict`` argument carrying
+        ``{'C': '<sqlstate>', ...}``. SQLAlchemy nests that exception
+        under ``DBAPIError.orig``.
+      • psycopg2/3 — expose ``.sqlstate`` / ``.pgcode`` directly on the
+        driver exception.
+
+    Never raises — a classification helper that crashes the savepoint
+    loop would be worse than the bug we are trying to fix.
+    """
+    candidates: list[BaseException] = [exc]
+    orig = getattr(exc, "orig", None)
+    if orig is not None and orig is not exc:
+        candidates.append(orig)
+
+    for cand in candidates:
+        for attr in ("sqlstate", "pgcode"):
+            code = getattr(cand, attr, None)
+            if isinstance(code, str) and len(code) == 5:
+                return code
+        args = getattr(cand, "args", None) or ()
+        for a in args:
+            if isinstance(a, dict):
+                code = a.get("C") or a.get("sqlstate")
+                if isinstance(code, str) and len(code) == 5:
+                    return code
+    return None
+
+
+def is_permanent_row_error(
+    exc: BaseException,
+    *,
+    permanent_types: tuple[type[Exception], ...] = PERMANENT_ROW_ERRORS,
+) -> bool:
+    """Classify ``exc`` as a permanent per-row failure that ``isolate_row_writes``
+    should skip rather than re-raise.
+
+    Returns True when:
+      • ``exc`` is one of ``permanent_types`` (DataError, IntegrityError
+        by default), OR
+      • ``exc`` carries a Postgres SQLSTATE whose 2-char class is in
+        ``_PERMANENT_SQLSTATE_PREFIXES`` (``22`` data exception or
+        ``23`` integrity violation).
+
+    The SQLSTATE branch is what fixes the 2026-05-16 incident: pg8000
+    raises plain ``DatabaseError`` for SQLSTATE 22P02, so the type-based
+    check alone misses it and the savepoint loop bubbles the error up,
+    aborting Stage 1 of the shard's PG sync.
+    """
+    if isinstance(exc, permanent_types):
+        return True
+    if isinstance(exc, DBAPIError):
+        code = _pg_sqlstate(exc)
+        if code and code[:2] in _PERMANENT_SQLSTATE_PREFIXES:
+            return True
+    return False
 
 
 def with_db_retry(
@@ -190,37 +265,42 @@ def isolate_row_writes(
                 success += 1
                 last_exc = None
                 break
-            except permanent_errors as exc:
+            except Exception as exc:
                 sp.rollback()
-                log.warning(
-                    "isolate_row_writes: permanent error on %s — skipping. %s: %s",
-                    label,
-                    type(exc).__name__,
-                    str(exc).splitlines()[0] if str(exc) else "",
-                )
-                last_exc = exc
-                break
-            except transient_errors as exc:
-                sp.rollback()
-                last_exc = exc
-                if attempt >= transient_attempts:
+                # Order matters. SQLSTATE-based permanent detection runs
+                # before the transient-type check because pg8000 collapses
+                # data errors into the generic ``DatabaseError`` — leaving
+                # the type check first would either misclassify them as
+                # unknown (and re-raise) or, worse, waste retries on a row
+                # that can never succeed.
+                if is_permanent_row_error(exc, permanent_types=permanent_errors):
                     log.warning(
-                        "isolate_row_writes: transient error on %s after %d attempts — skipping. %s: %s",
+                        "isolate_row_writes: permanent error on %s — skipping. %s: %s",
                         label,
-                        attempt,
                         type(exc).__name__,
                         str(exc).splitlines()[0] if str(exc) else "",
                     )
+                    last_exc = exc
                     break
-                log.info(
-                    "isolate_row_writes: transient error on %s (attempt %d) — retrying. %s",
-                    label,
-                    attempt,
-                    type(exc).__name__,
-                )
-                continue
-            except Exception:
-                sp.rollback()
+                if isinstance(exc, transient_errors):
+                    last_exc = exc
+                    if attempt >= transient_attempts:
+                        log.warning(
+                            "isolate_row_writes: transient error on %s after %d attempts — skipping. %s: %s",
+                            label,
+                            attempt,
+                            type(exc).__name__,
+                            str(exc).splitlines()[0] if str(exc) else "",
+                        )
+                        break
+                    log.info(
+                        "isolate_row_writes: transient error on %s (attempt %d) — retrying. %s",
+                        label,
+                        attempt,
+                        type(exc).__name__,
+                    )
+                    continue
+                # Unknown error — propagate so silent bugs surface.
                 raise
 
         if last_exc is not None:
@@ -239,6 +319,7 @@ def isolate_row_writes(
 __all__ = [
     "TRANSIENT_DB_ERRORS",
     "PERMANENT_ROW_ERRORS",
+    "is_permanent_row_error",
     "with_db_retry",
     "row_savepoint",
     "isolate_row_writes",

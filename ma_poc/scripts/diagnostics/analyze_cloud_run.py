@@ -84,6 +84,16 @@ class PropertyOutcome:
     body_bytes: int | None = None
     captcha_detected: bool = False
     bot_blocked: bool = False
+    # Bug #7 + #11 fix (2026-05-16): entry-page CF detection, separate from
+    # the aggregate above which collects any CF hit including hop-side.
+    # Distinguishes "entry page is CF-walled" (real SLO signal) from
+    # "Entrata deep-link is CF-protected but entry loaded fine" (extraction
+    # gap, not an infra problem). Canonical case: 174/175 TIER_1_API_ENTRATA
+    # failures on 2026-05-16 had bot_blocked=True from hop-side CF; only 1
+    # actually had entry-page CF. The conflated label drove operators to
+    # blame CF/proxy when the real bug was iframe-harvest miss.
+    entry_captcha_detected: bool = False
+    entry_bot_blocked: bool = False
     llm_rescue_attempted: bool = False
     llm_rescue_succeeded: bool = False
     llm_cost: float = 0.0
@@ -276,7 +286,8 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
                 o.url = ev.get("url")
         elif kind == "fetch.completed":
             # Carry the *last* fetch outcome. Earlier ones are usually link-hops.
-            if (ev.get("attempt") or 1) == 1 and o.fetch_outcome is None:
+            _is_entry_attempt = (ev.get("attempt") or 1) == 1 and o.fetch_outcome is None
+            if _is_entry_attempt:
                 o.fetch_outcome = ev.get("outcome")
                 o.fetch_error_signature = ev.get("error_signature")
                 o.fetch_status = ev.get("status")
@@ -284,6 +295,13 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
                 o.body_bytes = ev.get("body_bytes")
                 if ev.get("captcha_detected"):
                     o.captcha_detected = True
+                    o.entry_captcha_detected = True
+                # Bug #7/#11 fix (2026-05-16): mark entry-level bot block
+                # so the pattern classifier can distinguish from hop-side
+                # CF (which sets only the aggregate ``bot_blocked``).
+                if ev.get("outcome") == "BOT_BLOCKED":
+                    o.entry_bot_blocked = True
+                    o.bot_blocked = True
         elif kind == "fetch.bot_blocked":
             o.bot_blocked = True
         elif kind == "fetch.captcha_detected":
@@ -291,7 +309,11 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
         elif kind == "extract.pms_detected":
             o.pms_detected = ev.get("pms")
         elif kind == "extract.adapter_selected":
-            o.adapter_selected = ev.get("adapter")
+            # Bug #3 fix (2026-05-16): orchestrator emits with key
+            # ``adapter_name`` (pms/scraper.py:_emit_adapter_selected); the
+            # old ``adapter`` key was never written. Accept either for
+            # backward compatibility with older event logs.
+            o.adapter_selected = ev.get("adapter_name") or ev.get("adapter")
         elif kind == "extract.tier_won":
             o.terminal_tier = ev.get("tier_used")
         elif kind == "extract.tier_failed":
@@ -414,7 +436,18 @@ def categorise_failure(o: PropertyOutcome) -> tuple[str, str]:
       P10 — Quality warning UNITS_KEYLESS_HIGH (info, not failure — emitted on success too)
       Pother — anything else
     """
-    cf_blocked = (
+    # Bug #7 fix (2026-05-16): split CF detection into entry-level (real
+    # SLO signal) vs aggregate (entry OR any hop). 174 of 175 Entrata
+    # failures on 2026-05-16 had ``bot_blocked=True`` from hop-side CF
+    # while the entry page loaded fine — labelling them ``cloudflare_
+    # entrata`` misdirects triage to fetch/proxy infrastructure when the
+    # actual bug is portal-iframe harvest (Bug #4/#5).
+    entry_cf_blocked = (
+        o.fetch_error_signature == "CF_CHALLENGE"
+        or o.entry_captcha_detected
+        or o.entry_bot_blocked
+    )
+    cf_blocked_anywhere = (
         o.fetch_error_signature == "CF_CHALLENGE"
         or o.captcha_detected
         or o.bot_blocked
@@ -424,8 +457,13 @@ def categorise_failure(o: PropertyOutcome) -> tuple[str, str]:
     if tier == "LLM_GATE_NO_BODY" or "LLM_GATE_NO_BODY" in tier:
         return ("P8", "llm_gate_no_body")
 
-    if cf_blocked and (tier == "TIER_1_API_ENTRATA" or "no_body" in tier or o.verdict == "FAILED_UNREACHABLE"):
+    if entry_cf_blocked and (tier == "TIER_1_API_ENTRATA" or "no_body" in tier or o.verdict == "FAILED_UNREACHABLE"):
         return ("P2", "cloudflare_entrata")
+    # Bug #7 fix: explicit bucket for entrata sites whose entry loaded OK
+    # but the deep-link/widget hop hit CF. These are extraction gaps
+    # (iframe-harvest miss, hop-redirect-loop), not infra failures.
+    if cf_blocked_anywhere and tier == "TIER_1_API_ENTRATA" and not entry_cf_blocked:
+        return ("P2", "entrata_subpage_cf")
 
     if tier in PLATFORM_TIERS:
         platform = PLATFORM_TIERS[tier]
@@ -588,7 +626,10 @@ def render_summary_md(stats: RunStats, outcomes: dict[str, PropertyOutcome]) -> 
         "",
         f"**Generated:** {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
         f"**Source:** `{GCS_BUCKET}/runs/{stats.run_date}/`",
-        f"**Shards seen:** {len(stats.shards_seen)} / {stats.shards_expected}",
+        # Bug #8 fix (2026-05-16): clamp denominator to max(seen, expected)
+        # so we never render confusing "100 / 20" when the CLI invocation
+        # forgot --expected-shards. The shards_seen count is authoritative.
+        f"**Shards seen:** {len(stats.shards_seen)} / {max(stats.shards_expected, len(stats.shards_seen))}",
         "",
         "## Top-line numbers",
         "",
@@ -637,6 +678,32 @@ def render_summary_md(stats: RunStats, outcomes: dict[str, PropertyOutcome]) -> 
     ]
     for (outcome, sig), n in stats.fetch_signatures.most_common():
         lines.append(f"| {outcome} | {sig or '(none)'} | {n} |")
+
+    # Bug #11 fix (2026-05-16): entry-vs-subpath bot-block split. The raw
+    # ``fetch_signatures`` above counts only the FIRST fetch attempt per
+    # property — that's correct for entry-level. But the per-property
+    # ``bot_blocked`` boolean (used by the pattern classifier and the
+    # ``bot_blocked_properties.json`` artifact) gets set by any hop-side
+    # CF hit, inflating the apparent CF-block rate. Surface the split
+    # explicitly here so operators triaging a SLO miss know which is
+    # which.
+    _entry_bb = sum(1 for o in outcomes.values() if o.entry_bot_blocked)
+    _entry_cd = sum(1 for o in outcomes.values() if o.entry_captcha_detected)
+    _agg_bb = sum(1 for o in outcomes.values() if o.bot_blocked)
+    _agg_cd = sum(1 for o in outcomes.values() if o.captcha_detected)
+    lines += [
+        "",
+        "## Bot-block / captcha — entry vs subpath split",
+        "",
+        "| Signal | Entry-level (SLO signal) | Anywhere (entry OR hop) | Δ (subpath-only) |",
+        "|---|---|---|---|",
+        f"| BOT_BLOCKED | {_entry_bb} | {_agg_bb} | {_agg_bb - _entry_bb} |",
+        f"| captcha_detected | {_entry_cd} | {_agg_cd} | {_agg_cd - _entry_cd} |",
+        "",
+        "> Subpath-only counts are extraction gaps (iframe-harvest miss, "
+        "hop-redirect-loop), not fetch-infrastructure problems. Treat them "
+        "as adapter bugs, not proxy issues.",
+    ]
 
     lines += [
         "",
@@ -749,6 +816,11 @@ def render_failures_csv(outcomes: dict[str, PropertyOutcome], out_path: Path) ->
             "body_bytes": o.body_bytes or 0,
             "captcha_detected": o.captcha_detected,
             "bot_blocked": o.bot_blocked,
+            # Bug #11 fix (2026-05-16): entry-vs-aggregate split surfaced in
+            # failures.csv so triage can sort to "real entry-CF" cases
+            # without grep-fighting the hop-side label leak.
+            "entry_captcha_detected": o.entry_captcha_detected,
+            "entry_bot_blocked": o.entry_bot_blocked,
             "llm_rescue_attempted": o.llm_rescue_attempted,
             "llm_rescue_succeeded": o.llm_rescue_succeeded,
             "llm_cost": round(o.llm_cost, 5),
@@ -798,6 +870,11 @@ def render_successes_csv(outcomes: dict[str, PropertyOutcome], out_path: Path) -
             "units": o.units,
             "captcha_detected": o.captcha_detected,
             "bot_blocked": o.bot_blocked,
+            # Bug #11 fix (2026-05-16): entry-vs-aggregate split surfaced in
+            # failures.csv so triage can sort to "real entry-CF" cases
+            # without grep-fighting the hop-side label leak.
+            "entry_captcha_detected": o.entry_captcha_detected,
+            "entry_bot_blocked": o.entry_bot_blocked,
             "llm_rescue_attempted": o.llm_rescue_attempted,
             "llm_rescue_succeeded": o.llm_rescue_succeeded,
             "llm_cost": round(o.llm_cost, 5),
@@ -1075,8 +1152,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--expected-shards",
         type=int,
-        default=20,
-        help="Expected shard count (for missing-shard detection)",
+        default=100,
+        help="Expected shard count (for missing-shard detection). Default "
+        "100 matches production shard fan-out as of 2026-05. Bug #8 fix "
+        "(2026-05-16): old default of 20 caused summary.md to render "
+        "'Shards seen: 100 / 20' when invoked without --expected-shards, "
+        "which read as a regression to anyone skimming the report.",
     )
     p.add_argument(
         "--check-db",

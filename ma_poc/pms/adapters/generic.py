@@ -284,6 +284,23 @@ def _assess_and_decide(
                     floor = {"complete": 0.90, "transactional": 0.80}
             except Exception:
                 pass
+        # B5 (2026-05-16): tell the planner when every emitted unit is
+        # plan-level (no natural unit_id, only inferred fallback ids). The
+        # planner uses this to bypass STOP when link-hop budget remains —
+        # plan-level data alone is not "completeness", real per-unit detail
+        # may be one hop away. See PID 2982 Cortland on Pike, 5822 The Izzy.
+        def _is_inferred_id(u: dict) -> bool:
+            if u.get("_inferred_id") is True:
+                return True
+            uid = u.get("unit_id") or u.get("unit_number") or ""
+            return (not uid) or str(uid).startswith("inferred_")
+        try:
+            units_all_inferred = bool(units_so_far) and all(
+                _is_inferred_id(u) for u in units_so_far if isinstance(u, dict)
+            )
+        except Exception:
+            units_all_inferred = False
+
         decision = plan_next_action(
             report,
             sources_already_run=sources_already_run,
@@ -293,6 +310,7 @@ def _assess_and_decide(
             profile_preferences=(
                 list(profile.api_hints.source_observations) if profile is not None else []
             ),
+            units_all_inferred=units_all_inferred,
         )
         decision_log.append(decision)
         try:
@@ -433,21 +451,59 @@ def _mark_patch_miss(patch: Any, reason: str) -> None:
         pass
 
 
-def _extract_rent_dom_section(html: str, max_bytes: int = 20_000) -> str | None:
-    """Return the smallest HTML chunk that contains floor-plan structural signals.
+# D3 (2026-05-16): priority selectors for known multi-unit listing containers.
+# When any of these match, prefer them OVER <main> so we don't truncate the
+# unit table off the end of a 80-100 KB <main>. Selectors target the actual
+# repeating-unit DOM that holds inventory across the PMS landscape.
+#
+# The pre-2026-05-16 design preferred <main> blindly, then truncated to 20 KB.
+# On RentCafe per-plan availability pages (PID 5822 The Izzy 2x2_reno page is
+# 240 KB total — plan summary + amenities + gallery + 58-unit option-row block
+# at the bottom), the 20 KB cap chopped the option-row block entirely.
+# Reference: C:/tmp/rp_sx_analysis_2026_05_14/DETAIL_PAGE_GAPS.md §5822.
+_PRIORITY_LISTING_SELECTORS: tuple[str, ...] = (
+    # RentCafe per-plan availability table
+    "#showPricingTable", ".availability-table", ".pricing-availability-table",
+    # RentCafe option-row (PID 5822 The Izzy — 58 rows per per-plan page)
+    ".option-row",
+    # Cortland-style inventory grid (PID 2982 — 79 data-unit-id cards)
+    "[data-js-hook='apartment']", ".apartments-list", ".apartments__list",
+    ".apartments__card",
+    # Brook / generic .card containers with apartment-number title (PID 3483)
+    "#availApts",
+    # Entrata / RealPage availability rows
+    ".unit-row", ".unit-card", "table.unit-table", "tbody.unit-rows",
+    # Generic semantic class patterns
+    "[id*='available-units']", "[class*='available-units']",
+    "[class*='availability-row']", "[class*='availability-list']",
+    "[class*='unit-list']",
+)
 
-    We pick the tightest ancestor around floor-plan content rather than
-    sending the entire page to the DOM-analysis LLM.  Selection is based
-    purely on floor-plan structural signals (beds/baths/sqft/plan-type) —
-    rent is NEVER used as a selection criterion because it is not a required
-    field for a valid unit record.
 
-    Strategy:
-      1. Prefer ``<main>`` when present.
-      2. Otherwise find the element with the highest floor-plan signal count
-         that has ≥ SIGNAL_THRESHOLD_STRUCTURAL distinct signal types.
-      3. Tie-break on smaller element size to get the tightest container.
-      4. Cap at ``max_bytes`` so oversized tags don't blow the token budget.
+def _extract_rent_dom_section(html: str, max_bytes: int = 60_000) -> str | None:
+    """Return the HTML chunk most likely to contain a multi-unit table.
+
+    Three-phase selection (D3 redesign, 2026-05-16):
+
+      Phase 1 — PRIORITY listing-container pre-scan. Try each selector in
+        ``_PRIORITY_LISTING_SELECTORS`` (known multi-unit container patterns
+        across RentCafe / Cortland / Brook / Entrata / generic shapes).
+        Return the first selector that matches. When multiple matches exist
+        (e.g. 58 separate ``.option-row`` divs), wrap them in a synthetic
+        container so the LLM / regex sees the whole list, not just the first.
+
+      Phase 2 — dense-signal scan. Walk all elements; pick the one with the
+        most floor-plan signals AND ``≥SIGNAL_THRESHOLD_STRUCTURAL`` distinct
+        signal types. Tie-break on smaller size. This is the unchanged
+        behaviour from pre-D3 — kept for pages whose listing structure
+        doesn't match any priority selector.
+
+      Phase 3 — fallback to ``<main>``, then ``<body>``, truncated.
+
+    Cap raised from 20_000 → 60_000 bytes to fit ~50-80 unit-table rows
+    (each option-row is ~700-900 bytes; 60 KB holds ~70-85 rows). LLM cost
+    increase per call: ~$0.005 → ~$0.015 — bounded by per-property budget
+    (1 LLM_DOM call).
     """
     if not html:
         return None
@@ -467,17 +523,31 @@ def _extract_rent_dom_section(html: str, max_bytes: int = 20_000) -> str | None:
     for tag in soup.find_all(["script", "style", "svg", "noscript", "nav", "footer", "header", "iframe"]):
         tag.decompose()
 
-    main = soup.find("main")
-    if main:
-        block = str(main)
+    # Phase 1: priority listing-container pre-scan.
+    # Loop selectors in order; first match wins. When the selector matches
+    # ≥2 elements, wrap them so the LLM sees the whole repeating list.
+    for selector in _PRIORITY_LISTING_SELECTORS:
+        try:
+            matches = soup.select(selector)
+        except Exception:
+            continue
+        if not matches:
+            continue
+        if len(matches) == 1:
+            block = str(matches[0])
+        else:
+            # Cap at 80 matches so a degenerate selector (e.g. matches every
+            # element on the page) can't blow the byte budget. The byte cap
+            # below is the real backstop.
+            wrapped_inner = "".join(str(m) for m in matches[:80])
+            block = f"<div class='_unit-list-wrapper'>{wrapped_inner}</div>"
         if len(block) > max_bytes:
             block = block[:max_bytes] + "<!-- truncated -->"
         return block
 
-    # Find the element with the most floor-plan structural signals that has
-    # ≥ SIGNAL_THRESHOLD_STRUCTURAL distinct signal types.  Rent is not part of
-    # the selection — floor-plan identity (beds/baths/sqft/plan-type) is the
-    # sole criterion for "this section contains unit data."
+    # Phase 2: dense-signal scan — the original pre-D3 behaviour. Find the
+    # element with the most floor-plan structural signals AND a smaller
+    # size (tighter container). Rent is not part of the selection.
     best: Any = None
     best_len = 10**9
     best_combined = -1
@@ -500,7 +570,14 @@ def _extract_rent_dom_section(html: str, max_bytes: int = 20_000) -> str | None:
     if best is not None:
         return str(best)
 
-    # Last resort: strip to body, then truncate.
+    # Phase 3: fallback to <main>, then <body>, truncated.
+    main = soup.find("main")
+    if main:
+        block = str(main)
+        if len(block) > max_bytes:
+            block = block[:max_bytes] + "<!-- truncated -->"
+        return block
+
     body = soup.find("body")
     fallback = str(body) if body else str(soup)
     return fallback[:max_bytes]
@@ -874,8 +951,36 @@ class GenericAdapter:
                     result.units, property_id=getattr(ctx, "property_id", None)
                 )
                 if _pp.n_admitted > 0:
-                    result.units = _pp.admitted
-                    result.plan_summaries = _pp.plan_summaries
+                    # B4 (2026-05-16): when actual unit-level rows exist,
+                    # drop plan-level rows that describe the same floor plan
+                    # as any unit-level row. Without this guard, JSON-LD
+                    # FloorPlan or LLM-DOM plan rows pile on top of per-unit
+                    # API output and inflate the unit count — see PID 67327
+                    # Windsong Estates 2026-05-14 (18 real units + 9 phantom
+                    # plan-only inferred rows = 27 emitted).
+                    if _pp.n_unit_level > 0 and _pp.n_plan_level > 0:
+                        unit_fpids: set[str] = {
+                            str(u.get("floor_plan_id"))
+                            for u in _pp.units
+                            if u.get("floor_plan_id")
+                        }
+                        kept_plans = [
+                            p for p in _pp.plan_summaries
+                            if str(p.get("floor_plan_id") or "") not in unit_fpids
+                        ]
+                        dropped = len(_pp.plan_summaries) - len(kept_plans)
+                        result.units = list(_pp.units) + list(kept_plans)
+                        result.plan_summaries = list(kept_plans)
+                        if dropped:
+                            log.info(
+                                "B4 dedup: dropped %d plan-level rows that duplicated "
+                                "existing unit-level rows for property %s",
+                                dropped,
+                                getattr(ctx, "property_id", "?"),
+                            )
+                    else:
+                        result.units = _pp.admitted
+                        result.plan_summaries = _pp.plan_summaries
                     # confidence already set by the winning sub-tier; only
                     # rescale if the validity-drop changes its denominator
                     # materially. Leave alone to preserve sub-tier scoring.
@@ -1488,7 +1593,12 @@ class GenericAdapter:
                     result.api_responses.append(resp)
             if not all_units:
                 try:
-                    broad = _dr_parse_api_responses(list(api_responses)) or []
+                    # Bug #10 fix: thread property_id for per-PID
+                    # _emit_signal_inspection sampling.
+                    broad = _dr_parse_api_responses(
+                        list(api_responses),
+                        property_id=getattr(ctx, "property_id", None),
+                    ) or []
                 except Exception as exc:
                     broad = []
                     result.errors.append(f"daily-runner-parser-error: {exc}")
@@ -1617,7 +1727,11 @@ class GenericAdapter:
             embedded = extract_embedded_blobs_from_html(html)
             if embedded:
                 try:
-                    embedded_units = _dr_parse_api_responses(embedded) or []
+                    # Bug #10 fix: per-PID signal-inspection sampling.
+                    embedded_units = _dr_parse_api_responses(
+                        embedded,
+                        property_id=getattr(ctx, "property_id", None),
+                    ) or []
                 except Exception as exc:
                     embedded_units = []
                     result.errors.append(f"embedded-parse-error: {exc}")

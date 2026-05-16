@@ -29,8 +29,19 @@ from ma_poc.pms.adapters.generic import (
 # ── R0 / R0a ───────────────────────────────────────────────────────────────
 
 
-def test_R0_floor_plan_id_wins_over_R0a_unit_id() -> None:
-    """When floor_plan_id matches on both sides, R0 fires first regardless of unit_id."""
+def test_R0_does_not_collapse_distinct_units_sharing_plan_id() -> None:
+    """When two records have DIFFERENT unit_ids but share floor_plan_id,
+    they are distinct units of the same plan — not the same unit.
+
+    D7 follow-up (2026-05-16): pre-fix R0 fp_id-only match collapsed
+    distinct units of the same plan into one, which destroyed real
+    inventory (Canyon Ridge 17 units → 4 after merge, Olympic 49 → 3).
+    R0 now requires BOTH sides to lack a uid before firing; unit-level
+    dedup must come through R0a (uid match) or R1* (ambiguity ranks).
+
+    See test_R0_still_merges_plan_aggregates below for the case R0
+    SHOULD still fire (both sides plan-aggregate, no uid).
+    """
     existing = [
         {"unit_id": "OLD", "floor_plan_id": "P1_1", "beds": 1, "rent_low": 1000},
     ]
@@ -38,11 +49,27 @@ def test_R0_floor_plan_id_wins_over_R0a_unit_id() -> None:
         {"unit_id": "NEW", "floor_plan_id": "P1_1", "rent_low": 1100},
     ]
     result = _merge_into_result_units(existing, incoming, property_id="P1")
+    # Both records carry uid → R0 blocked, R0a fails (uids differ), R1*
+    # falls through (no shared physical attrs) → both records kept.
+    assert len(result) == 2
+    uids = sorted(str(u["unit_id"]) for u in result)
+    assert uids == ["NEW", "OLD"]
+
+
+def test_R0_still_merges_plan_aggregates_with_no_uid() -> None:
+    """R0 fp_id-only match still fires for plan-aggregate records (neither
+    side has a uid) — that's R0's original purpose. JSON-LD FloorPlan
+    aggregates from entry + hop pages should still dedup at R0."""
+    existing = [
+        {"floor_plan_id": "P1_1", "beds": 1, "rent_low": 1000},
+    ]
+    incoming = [
+        {"floor_plan_id": "P1_1", "rent_low": 1100},
+    ]
+    result = _merge_into_result_units(existing, incoming, property_id="P1")
     assert len(result) == 1
     # rent_low is mutable → latest wins (1100); floor_plan_id was the anchor.
     assert result[0]["rent_low"] == 1100
-    # unit_id is physical → existing wins on conflict.
-    assert result[0]["unit_id"] == "OLD"
 
 
 # ── H2: strict sqft ────────────────────────────────────────────────────────

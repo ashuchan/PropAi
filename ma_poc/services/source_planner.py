@@ -292,6 +292,7 @@ def plan_next_action(
     pms_name: str = "unknown",
     profile_completeness_floor: dict | None = None,
     profile_preferences: list[Any] | None = None,
+    units_all_inferred: bool = False,
 ) -> Decision:
     """The decision map. Returns at most ONE Decision per call.
 
@@ -301,10 +302,44 @@ def plan_next_action(
                       → identify smallest axis; pick best untried LLM/link-hop
       BROAD_RECOVERY: pct_complete < 0.50
                       → link-hop preferred, then llm_monolithic
+
+    ``units_all_inferred`` (B5, 2026-05-16): when True, the caller has
+    determined that every emitted unit has an inferred (not natural)
+    identifier — i.e. these are plan-level summaries, not specific
+    apartments. Even if the completeness math says STOP, we should
+    continue link-hopping to discover the per-unit detail pages.
+    Without this guard, properties like 2982 Cortland on Pike (1 spurious
+    DOM unit, manual=80) and 5822 The Izzy (6 JSON-LD floor-plan rows,
+    manual=75) STOP at pct_complete=1.0 and never reach /available-apartments/.
     """
     floor = profile_completeness_floor or {}
     floor_pct_complete = max(0.50, float(floor.get("complete", 0.90)))
     floor_pct_trans = max(0.50, float(floor.get("transactional", 0.70)))
+
+    # B5 (2026-05-16): if every emitted unit is plan-level (inferred id),
+    # do NOT stop the cascade — there are likely real per-unit rows
+    # behind a link-hop or in a portal iframe. Bounded by:
+    #   • n_units <= _B5_MAX_INFERRED_FOR_ESCALATION — beyond that, the
+    #     cascade has produced enough plan rows that further hops just
+    #     inflate the count without adding real units (the 2026-05-16
+    #     canary on 722 Canyon Ridge / 8188 Montclair / 67327 Windsong
+    #     showed B5 over-firing when the LLM_DOM tier already returned
+    #     12+ plan rows).
+    #   • link-hop budget > 0 — otherwise we have nothing to escalate to.
+    _B5_MAX_INFERRED_FOR_ESCALATION = 6
+    if (
+        units_all_inferred
+        and 0 < report.n_units <= _B5_MAX_INFERRED_FOR_ESCALATION
+        and budget_remaining.get("link_hop", 0) > 0
+    ):
+        return Decision(
+            action="ESCALATE_LINK_HOP",
+            target_field_group="identity",
+            rationale=(
+                f"all {report.n_units} units are plan-level (inferred ids); "
+                "hop for per-unit detail"
+            ),
+        )
 
     # STOP
     if report.pct_complete >= floor_pct_complete and report.pct_with_transactional >= floor_pct_trans:

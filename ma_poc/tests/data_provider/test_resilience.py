@@ -26,13 +26,15 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from sqlalchemy.exc import DataError, IntegrityError, OperationalError
+from sqlalchemy.exc import DatabaseError, DataError, IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from data_provider.sql.models import PropertyRow, UnitRow
 from data_provider.sql.resilience import (
     PERMANENT_ROW_ERRORS,
     TRANSIENT_DB_ERRORS,
+    _pg_sqlstate,
+    is_permanent_row_error,
     isolate_row_writes,
     row_savepoint,
     with_db_retry,
@@ -410,3 +412,178 @@ class TestRowSavepoint:
 
 class _FakeRoll(Exception):
     """Sentinel to trigger savepoint rollback in a test."""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SQLSTATE-based permanent error detection (2026-05-16 shard-48 incident)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class _FakePg8000DatabaseError(Exception):
+    """Mimics pg8000.exceptions.DatabaseError — single-dict ``args[0]``
+    carrying ``{'C': '<sqlstate>', ...}``. pg8000 collapses every server
+    error into this class instead of the specific Data/Integrity subclass,
+    which is exactly why ``_pg_sqlstate`` exists."""
+
+
+def _wrap_pg8000_error(sqlstate: str, message: str = "fake error") -> DatabaseError:
+    """Build a SQLAlchemy DatabaseError around a pg8000-shaped orig."""
+    orig = _FakePg8000DatabaseError(
+        {"S": "ERROR", "V": "ERROR", "C": sqlstate, "M": message}
+    )
+    return DatabaseError("INSERT INTO units …", {}, orig)
+
+
+class TestPgSqlstateExtraction:
+    """Direct unit coverage of ``_pg_sqlstate`` across driver shapes."""
+
+    def test_extracts_pg8000_dict_args(self) -> None:
+        err = _wrap_pg8000_error("22P02")
+        assert _pg_sqlstate(err) == "22P02"
+
+    def test_extracts_psycopg_sqlstate_attribute(self) -> None:
+        class _FakePsycopgError(Exception):
+            sqlstate = "23505"
+
+        wrapped = DatabaseError("INSERT …", {}, _FakePsycopgError("dup"))
+        assert _pg_sqlstate(wrapped) == "23505"
+
+    def test_extracts_psycopg_pgcode_attribute(self) -> None:
+        class _FakePsycopg2Error(Exception):
+            pgcode = "22001"
+
+        wrapped = DatabaseError("INSERT …", {}, _FakePsycopg2Error("too long"))
+        assert _pg_sqlstate(wrapped) == "22001"
+
+    def test_returns_none_when_no_sqlstate_available(self) -> None:
+        err = DatabaseError("INSERT …", {}, RuntimeError("opaque"))
+        assert _pg_sqlstate(err) is None
+
+    def test_returns_none_on_short_or_garbage_codes(self) -> None:
+        # Anything not 5 chars is rejected — defends against random
+        # dict keys that happen to be called 'C'.
+        orig = _FakePg8000DatabaseError({"C": "abc"})
+        err = DatabaseError("INSERT …", {}, orig)
+        assert _pg_sqlstate(err) is None
+
+    def test_does_not_raise_on_orig_lacking_args(self) -> None:
+        class _Bare(Exception):
+            pass
+
+        bare = _Bare()
+        # Should not crash even when args is empty / missing.
+        assert _pg_sqlstate(bare) is None
+
+
+class TestIsPermanentRowError:
+    """``is_permanent_row_error`` decides what isolate_row_writes skips."""
+
+    def test_data_error_is_permanent_by_type(self) -> None:
+        assert is_permanent_row_error(_fake_data_error())
+
+    def test_integrity_error_is_permanent_by_type(self) -> None:
+        ie = IntegrityError("INSERT …", {}, Exception("dup key"))
+        assert is_permanent_row_error(ie)
+
+    def test_pg8000_22p02_in_database_error_is_permanent_by_sqlstate(self) -> None:
+        # The headline case — pg8000 raises plain DatabaseError, SQLAlchemy
+        # wraps it as DatabaseError (not DataError). Type check alone
+        # would miss it. This is the 2026-05-16 shard-48 incident.
+        err = _wrap_pg8000_error("22P02", "invalid input syntax for type integer")
+        assert is_permanent_row_error(err)
+        assert not isinstance(err, PERMANENT_ROW_ERRORS), (
+            "regression guard: if SQLAlchemy ever starts wrapping pg8000's "
+            "22P02 as DataError directly, the SQLSTATE branch becomes "
+            "redundant and the comment in resilience.py should be revisited"
+        )
+
+    def test_pg8000_23505_unique_violation_is_permanent_by_sqlstate(self) -> None:
+        err = _wrap_pg8000_error("23505", "duplicate key value violates …")
+        assert is_permanent_row_error(err)
+
+    def test_operational_error_is_not_permanent(self) -> None:
+        # Connection blips must remain in the transient-retry path.
+        assert not is_permanent_row_error(_fake_operational_error())
+
+    def test_pg8000_08006_connection_failure_is_not_permanent(self) -> None:
+        # Class 08 = connection exception — explicitly NOT in the permanent
+        # SQLSTATE set. Treating it as permanent would defeat the retry
+        # decorator's whole purpose during Cloud SQL failover.
+        err = _wrap_pg8000_error("08006", "connection_failure")
+        assert not is_permanent_row_error(err)
+
+    def test_random_runtime_exception_is_not_permanent(self) -> None:
+        assert not is_permanent_row_error(RuntimeError("nope"))
+
+
+class TestIsolateRowWritesUnderPg8000Shape:
+    """End-to-end: the exact 2026-05-16 shard-48 failure mode.
+
+    Before the SQLSTATE branch landed, a pg8000-shaped ``DatabaseError``
+    raised inside ``apply_row`` would slip past the (DataError,
+    IntegrityError) catch and hit ``except Exception: raise`` — bubbling
+    out and rolling back every prior row's savepoint. One bad property
+    nuked the whole shard's PG sync.
+    """
+
+    def test_pg8000_22p02_is_isolated_not_bubbled(
+        self, sqlite_provider: SqliteDataProvider
+    ) -> None:
+        s = Session(sqlite_provider.engine, future=True)
+        s.begin()
+        try:
+            applied_ok: list[str] = []
+
+            def apply(item: dict[str, Any]) -> None:
+                if item.get("bad"):
+                    # Same shape as Cloud Logging shows: pg8000 DatabaseError
+                    # with SQLSTATE 22P02 wrapped in SQLAlchemy DatabaseError.
+                    raise _wrap_pg8000_error(
+                        "22P02",
+                        'invalid input syntax for type integer: "1.0"',
+                    )
+                sqlite_provider.unit_state.upsert_units(
+                    "CID-PG",
+                    [{"unit_id": item["uid"], "floor_plan_name": "1BR"}],
+                    "2026-05-16",
+                )
+                applied_ok.append(item["uid"])
+
+            rows = [
+                {"uid": "u1"},
+                {"uid": "u2", "bad": True},  # would have nuked the batch
+                {"uid": "u3"},
+                {"uid": "u4"},
+            ]
+            success, failures = isolate_row_writes(
+                s, rows, apply, label_for=lambda r: f"uid={r['uid']}"
+            )
+            s.commit()
+
+            assert success == 3
+            assert [lbl for lbl, _ in failures] == ["uid=u2"]
+            assert isinstance(failures[0][1], DatabaseError)
+        finally:
+            s.close()
+
+        stored = sqlite_provider.unit_state.get_units("CID-PG")
+        # All three good rows must have landed despite u2 blowing up.
+        assert set(stored.keys()) == {"u1", "u3", "u4"}
+
+    def test_unknown_database_error_without_sqlstate_propagates(
+        self, sqlite_provider: SqliteDataProvider
+    ) -> None:
+        # Defence in depth: a DatabaseError with no recoverable SQLSTATE
+        # is genuinely opaque. We don't pretend it's permanent — better
+        # to surface the bug than silently drop the row.
+        s = Session(sqlite_provider.engine, future=True)
+        s.begin()
+        try:
+            def apply(_: int) -> None:
+                raise DatabaseError("INSERT …", {}, RuntimeError("opaque driver bug"))
+
+            with pytest.raises(DatabaseError):
+                isolate_row_writes(s, [1], apply)
+        finally:
+            s.rollback()
+            s.close()

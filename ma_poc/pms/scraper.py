@@ -609,6 +609,21 @@ async def scrape(
                 profile.canonical_id,
                 pms_client_id[:30],
             )
+
+    # Bug #5 fix (2026-05-16): populate candidate_portal_urls from
+    # entry-page iframe / inline-JS / data-attribute scan so the Entrata
+    # adapter's ``_probe_known_endpoints`` can hit ``comms.entrata.com/
+    # widget?...`` URLs via ``page.evaluate(fetch ...)`` and inherit the
+    # CF clearance cookie. ``_extract_portal_iframe_hints`` already runs
+    # later (line ~970) to feed link-hop candidates; we mirror it here so
+    # the adapter sees the URLs first, before link-hop scheduling.
+    if page_html:
+        try:
+            _entry_portal_hints = _extract_portal_iframe_hints(page_html)
+        except Exception:
+            _entry_portal_hints = []
+        if _entry_portal_hints:
+            ctx.candidate_portal_urls = [u for u, _ in _entry_portal_hints]
     # Attach API responses to context for generic adapter. Prefer the
     # explicit ``api_responses`` arg (tests pass this directly); otherwise
     # promote the L1 fetcher's captured ``network_log`` so adapters can
@@ -1151,6 +1166,30 @@ _IFRAME_SRC_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Bug #4 fix (2026-05-16): lazy-loaded iframes use ``data-src`` /
+# ``data-iframe-src`` so the real URL isn't in ``src=`` until JS hydration
+# fires. SightMap properties on Squarespace/Wix Studio embed via lazy-load
+# pattern; static-HTML iframe scan misses them entirely. Canonical victims:
+# PID 16139 chaseknollsapts.com, 20959 dovevalleyapts.com — both have
+# ``sightmap.com/embed/`` in HTML (so the PMS detector routes correctly)
+# but the URL is buried in ``data-*`` attributes the original scan ignored.
+_IFRAME_DATA_SRC_RE = re.compile(
+    r'<iframe[^>]+\bdata(?:-iframe)?-src=["\']([^"\'>\s]+)["\']',
+    re.IGNORECASE,
+)
+
+# Bug #4 fix (2026-05-16): catch-all for SightMap embed URLs anywhere in
+# HTML — covers data-attribute placeholders, inline JS config blobs, and
+# rendered iframe URLs that ``_IFRAME_SRC_RE`` / ``_IFRAME_DATA_SRC_RE``
+# miss because the attribute name varies per CMS. The 11-char embed-ID
+# alphabet is empirically observed: lowercase alphanumeric, occasional
+# hyphens. Matches: ``https://sightmap.com/embed/n9w6mmzrv71``, ``https://
+# embed.engrain.com/{id}``.
+_SIGHTMAP_EMBED_URL_RE = re.compile(
+    r'https?://(?:sightmap\.com/embed|embed\.engrain\.com)/[a-zA-Z0-9_-]{4,}',
+    re.IGNORECASE,
+)
+
 # Anchor hrefs — second pass of _extract_portal_iframe_hints, catches
 # portal URLs linked rather than iframed.
 _ANCHOR_HREF_RE = re.compile(
@@ -1247,8 +1286,24 @@ def _extract_portal_iframe_hints(html: str) -> list[tuple[str, str]]:
                     break
 
     _scan(_IFRAME_SRC_RE)
+    _scan(_IFRAME_DATA_SRC_RE)  # Bug #4 fix: lazy-loaded iframes
     _scan(_ANCHOR_HREF_RE)
     _scan(_QUOTED_URL_RE)
+
+    # Bug #4 fix (2026-05-16): explicit SightMap embed-URL scan. Belt-and-
+    # braces for cases where the URL is buried in a context the four passes
+    # above don't match (data-* attribute we haven't enumerated, inline JS
+    # object literal without quote-wrapping, etc.). Hits go to the
+    # ``sightmap`` portal tag directly.
+    for match in _SIGHTMAP_EMBED_URL_RE.finditer(html):
+        src = match.group(0).strip()
+        if src and src not in seen:
+            # Skip the SDK loader — same rule as the iframe-src scan.
+            lower = src.lower()
+            if lower.endswith("/embed/api.js") or "/embed/api.js?" in lower:
+                continue
+            seen.add(src)
+            hints.append((src, "sightmap"))
 
     # 4th pass: inline-JS PMS init parser. Catches portals whose iframe is
     # injected by JS at runtime (no static <iframe src>) — the entry HTML
@@ -1394,6 +1449,123 @@ _INLINE_JS_INIT_PATTERNS: list[tuple[re.Pattern[str], str, "Callable[[str], str 
         "sightmap",
         lambda k: f"https://sightmap.com/embed/{k}",
     ),
+    # Bug #4 follow-up (2026-05-16): the Playwright forensic on PID 16139
+    # chaseknollsapts.com found `sightmap.com/embed/api` in the rendered
+    # HTML but neither `sightmap_id` nor `data-sightmap-id` matched. The
+    # site uses an SDK init pattern that names the property key
+    # differently (`embed_id` / `mapId` / `mapID`) — see playbook §15.
+    # Three new patterns cover the most common alternative SDK shapes
+    # observed across SightMap integrations:
+    #   1. `embed_id` / `embedId` (engrain.com SDK newer versions)
+    #   2. `mapId` / `map_id` (some white-label embeds)
+    #   3. `<sightmap-app embed="...">` / `<sightmap-embed id="...">`
+    #      custom elements (used by SDK v3+)
+    # The 6+-char minimum guards against false positives on tiny IDs
+    # (e.g. "1" or "abc") that aren't real SightMap embed tokens.
+    (
+        re.compile(
+            r'(?:embed[_\-]?id|map[_\-]?id)["\']?\s*[:=]\s*["\']([\w-]{6,})["\']',
+            re.IGNORECASE,
+        ),
+        "sightmap",
+        lambda k: f"https://sightmap.com/embed/{k}",
+    ),
+    (
+        re.compile(
+            r'<sightmap[\w-]*[^>]*\b(?:embed|id|map[_\-]?id)\s*=\s*["\']([\w-]{6,})["\']',
+            re.IGNORECASE,
+        ),
+        "sightmap",
+        lambda k: f"https://sightmap.com/embed/{k}",
+    ),
+    # Engrain CDN SDK loader leaves a global config blob. Look for any
+    # quoted string within ~200 chars of `engrain.com/embed` or
+    # `SightMap` that matches the SightMap embed-ID alphabet+length.
+    # This is intentionally a "best-effort last resort" — fires only
+    # when the canonical `sightmap_id` / `data-sightmap-id` haven't.
+    (
+        re.compile(
+            r'(?:SightMap|engrain\.com/embed)[\s\S]{0,200}?["\']([a-z0-9]{8,16})["\']',
+            re.IGNORECASE,
+        ),
+        "sightmap",
+        lambda k: f"https://sightmap.com/embed/{k}",
+    ),
+    # D14a (2026-05-16): G5 Marketing Cloud floor-plans-plus widget config.
+    # PID 161 Hickory Mill (and the entire Morgan Properties portfolio):
+    #   <script id="floor-plans-plus-config" type="application/json">
+    #   {..., "sightmapID": "ryzvg6mywln", "inventoryHost": "...", ...}
+    # The sightmapID is the Engrain embed ID that the runtime widget
+    # injects as an iframe. Extracting it server-side and queueing the
+    # canonical sightmap.com/embed/{id} URL routes the property through
+    # the existing Sightmap adapter, which already knows how to parse
+    # Engrain's API responses.
+    (
+        re.compile(
+            r'["\']sightmapid["\']\s*[:=]\s*["\']([a-z0-9]{6,16})["\']',
+            re.IGNORECASE,
+        ),
+        "sightmap",
+        lambda k: f"https://sightmap.com/embed/{k}",
+    ),
+    # D19a (2026-05-16): SightMap clientKey + sightmapID → DIRECT API URL.
+    # The embed URL `sightmap.com/embed/{id}` is an empty SPA shell; real
+    # unit data arrives via a separate XHR to
+    # `sightmap.com/app/api/v1/{clientKey}/sightmaps/{sightmap_id}`.
+    # When both keys appear in the same JSON config block (G5 widget,
+    # SightMap SDK init), synthesise the direct API URL so the existing
+    # SightMap adapter (body-shape-aware at pms/adapters/sightmap.py:155-186)
+    # gets fed the unit JSON without needing the SPA to boot.
+    # Two-group pattern: group(1)=clientKey, group(2)=sightmapID.
+    # The order can be either way in source — pattern matches both.
+    (
+        re.compile(
+            r'["\']clientkey["\']\s*[:=]\s*["\']([\w\-]{6,})["\']'
+            r'[\s\S]{0,400}?'
+            r'["\']sightmapid["\']\s*[:=]\s*["\']([a-z0-9]{6,16})["\']',
+            re.IGNORECASE,
+        ),
+        "sightmap",
+        lambda client_key, sightmap_id: (
+            f"https://sightmap.com/app/api/v1/{client_key}/sightmaps/{sightmap_id}"
+        ),
+    ),
+    (
+        # Same as above but with the keys in reverse order in source.
+        re.compile(
+            r'["\']sightmapid["\']\s*[:=]\s*["\']([a-z0-9]{6,16})["\']'
+            r'[\s\S]{0,400}?'
+            r'["\']clientkey["\']\s*[:=]\s*["\']([\w\-]{6,})["\']',
+            re.IGNORECASE,
+        ),
+        "sightmap",
+        lambda sightmap_id, client_key: (
+            f"https://sightmap.com/app/api/v1/{client_key}/sightmaps/{sightmap_id}"
+        ),
+    ),
+    # D17a (2026-05-16): hy.ly Marketing Cloud bootstrap.
+    # Pattern: `my.hy.ly/mktg/fjs/{tenant}/0.js?pid={pid}`. The bootstrap
+    # script returns an HTML shell; the actual unit data loads via runtime
+    # XHRs to `my.hy.ly/api/properties/{pid}/...`. Synthesise the most
+    # likely data-endpoint URLs as a guess — even if they 404, the
+    # `embedded_portal.unknown_host_seen` telemetry shows what was
+    # attempted, which is the path to learn the right endpoints. After
+    # one Playwright forensic confirms the actual API shape, this list
+    # can be tightened.
+    # Property example: PID 1085 Sound at Peninsula
+    # (livesoundatpeninsulajax.com); ZRS Management portfolio uses this.
+    (
+        re.compile(
+            r'my\.hy\.ly/mktg/fjs/(\w+)/[\w.]+\?[^"\']*?pid=(\d{8,})',
+            re.IGNORECASE,
+        ),
+        "hyly",
+        lambda tenant, pid: [
+            f"https://my.hy.ly/api/properties/{pid}/availabilities",
+            f"https://my.hy.ly/api/properties/{pid}/floorplans",
+            f"https://my.hy.ly/api/{tenant}/properties/{pid}",
+        ],
+    ),
     # AppFolio CMS slug — covers both data-attr and JS config patterns.
     # The slug-to-listings synthesis also happens via the dedicated
     # _synthesize_appfolio_listings_urls helper below, but this catches
@@ -1439,9 +1611,19 @@ def _scan_inline_js_pms_init(html: str) -> list[tuple[str, str]]:
     """Parse inline JavaScript and data-* attributes for PMS init patterns.
 
     Synthesizes the canonical iframe / data URL from the property-specific
-    key (sightmap_id, appfolio slug, realpage client ID, fortresstech UUID,
-    hyly propertyId, funnel portal GUID). Hits are returned as
-    ``(synthesized_url, portal_name)`` tuples.
+    key(s) (sightmap_id, appfolio slug, realpage client ID, fortresstech UUID,
+    hyly propertyId, funnel portal GUID, plus combined clientKey+resourceId
+    shapes per D19a). Hits are returned as ``(synthesized_url, portal_name)``
+    tuples.
+
+    Pattern entries support two shapes:
+      • Single-group (existing): `url_fn(key: str) -> str | None`
+      • Multi-group (D19a, 2026-05-16): the regex has 2+ capture groups, and
+        `url_fn(*groups) -> str | list[str] | None`. Used when a vendor's
+        canonical API URL requires BOTH a tenant/clientKey AND a resourceId
+        (SightMap `app/api/v1/{clientKey}/sightmaps/{id}`) or when one
+        bootstrap pattern should synthesise MULTIPLE candidate API URLs
+        (hy.ly: `/availabilities` AND `/floorplans` from the same `pid`).
 
     Pure function — never raises. Designed to be cheap (small set of regexes,
     no DOM parsing) so it can run on every entry-page HTML.
@@ -1453,18 +1635,35 @@ def _scan_inline_js_pms_init(html: str) -> list[tuple[str, str]]:
     for pattern, pms_name, url_fn in _INLINE_JS_INIT_PATTERNS:
         try:
             for match in pattern.finditer(html):
-                key = (match.group(1) or "").strip()
-                if not key:
+                groups = tuple((g or "").strip() for g in match.groups())
+                # Require at least one non-empty group.
+                if not any(groups):
                     continue
-                if (pms_name, key) in seen_keys:
+                key_id = "|".join(groups)
+                if (pms_name, key_id) in seen_keys:
                     continue
-                seen_keys.add((pms_name, key))
+                seen_keys.add((pms_name, key_id))
+                # Call url_fn with positional args matching the capture-group
+                # count. Fall back to single-arg call (groups[0]) when the
+                # url_fn signature only accepts one parameter — preserves
+                # backward compatibility with existing 1-group entries that
+                # use `lambda k: ...`.
                 try:
-                    url = url_fn(key)
+                    url = url_fn(*groups)
+                except TypeError:
+                    url = url_fn(groups[0]) if groups else None
                 except Exception:
                     url = None
-                if url:
+                if not url:
+                    continue
+                # url may be a string OR a list of strings (D19a allows one
+                # pattern to fan out into multiple candidate API URLs).
+                if isinstance(url, str):
                     out.append((url, pms_name))
+                elif isinstance(url, (list, tuple)):
+                    for u in url:
+                        if isinstance(u, str) and u:
+                            out.append((u, pms_name))
         except Exception:
             continue
     return out
@@ -1472,9 +1671,23 @@ def _scan_inline_js_pms_init(html: str) -> list[tuple[str, str]]:
 
 # RC5: maps FetchOutcome values to the verdict prefix written into errors[].
 # Module-level so tests can import rather than redefine.
+#
+# Bug #2 fix (2026-05-16): added CANCELLED (from commit 1d068dd's
+# per-property-timeout cancel path in fetch/fetcher.py) and the four other
+# outcomes that previously fell through to the FAILED_UNREACHABLE default at
+# scraper.py:~2994. Without these mappings, a property cancelled mid-fetch
+# was indistinguishable from a DNS/TCP failure — blocking the analyzer from
+# separating recoverable-by-retrying issues from permanent infrastructure
+# breakage.
 _OUTCOME_VERDICT_PREFIX: dict[str, str] = {
-    "EMPTY_BODY": "FAILED_FETCH_EMPTY",
-    "DEAD_URL":   "FAILED_DEAD_URL",
+    "EMPTY_BODY":   "FAILED_FETCH_EMPTY",
+    "DEAD_URL":     "FAILED_DEAD_URL",
+    "CANCELLED":    "FAILED_TIMEOUT",
+    "RATE_LIMITED": "FAILED_RATE_LIMITED",
+    "HARD_FAIL":    "FAILED_HARD_FAIL",
+    "PROXY_ERROR":  "FAILED_PROXY",
+    "BOT_BLOCKED":  "FAILED_BOT_BLOCKED",
+    "TRANSIENT":    "FAILED_TRANSIENT",
 }
 
 
@@ -1667,6 +1880,131 @@ _LINK_SKIP_PATTERNS: tuple[str, ...] = (
 )
 
 
+# ── D2 (2026-05-16): URL-shape scoring patterns ──────────────────────────────
+# When ranking anchors, the URL STRUCTURE (path shape) is a more reliable
+# signal than the anchor TEXT. A bare anchor "<a href='/floorplans/1-bed-1-bath'>
+# View Details</a>" is high-value because the URL is a slugged-child path —
+# the anchor text "View Details" appears on galleries / news / amenities too,
+# so we never key off it directly. The url_shape_score below is composable
+# with anchor_score / path_keyword_score (additive, not bucketed), and
+# explicit anti-signals subtract.
+#
+# Higher score wins. Floors below are scored as deltas added on top of the
+# base internal-link score (4_000 from DEFAULT_KIND_BASE_SCORES).
+#
+# Reference: C:/tmp/rp_sx_analysis_2026_05_14/DETAIL_PAGE_GAPS.md
+_URL_SHAPE_PATTERNS: tuple[tuple[re.Pattern[str], int, str], ...] = (
+    # NOTE: regexes are tried in order; first match wins. Order matters
+    # AND so does score — the FIRST match's score is what gets added.
+    #
+    # Yield-per-hop ordering (D11, 2026-05-16):
+    #   canonical_inventory (one fetch → ALL units)         HIGHEST
+    #   rentcafe_per_plan   (one fetch → ~20-60 units)      mid
+    #   slugged_plan_detail (one fetch → ~5-30 units)       mid
+    #   per_unit_detail     (one fetch → 1 unit)            low
+    #
+    # Pre-D11 ordering put per_unit_detail above canonical_inventory,
+    # which caused PID 2982 Cortland on Pike to consume 7 hops on 7
+    # per-unit pricing pages (= 7 units) while missing the single
+    # `/available-apartments/` page that holds all 79 data-unit-id cards.
+    #
+    # Patterns use `re.search` (no start anchor) because portfolio sites
+    # nest paths like `/apartments/{property-slug}/available-apartments/`,
+    # but end-anchor (`/?$`) keeps each pattern matching the URL terminus.
+
+    # Canonical inventory page — THE JACKPOT URL. One fetch returns every
+    # available unit's data-unit-id, rent, sqft, availability date in a
+    # single HTML response. Cortland's `/available-apartments/` = 79 cards.
+    # Pattern intentionally does NOT match `/available-apartments/{slug}/
+    # pricing/` shape (per_unit_detail handles that) — only the bare
+    # `/available-apartments/` terminus.
+    (
+        re.compile(r"/(available[-_]?apartments?|all[-_]?availability|availability[-_]?list)/?$", re.IGNORECASE),
+        7_500,
+        "canonical_inventory",
+    ),
+    # RentCafe per-plan availability URL (PID 5822 The Izzy).
+    # Shape: /floorplans/{slug}-{id}/fp_name/occupancy_type/{type}/
+    # One fetch = ~20-60 units (option-row table per per-plan page).
+    (
+        re.compile(r"/floor[-_]?plans?/[a-z0-9\-_]+/fp_name/occupancy_type/[a-z\-]+/?$", re.IGNORECASE),
+        5_500,
+        "rentcafe_per_plan",
+    ),
+    # Generic slugged plan-detail (PID 3483 Brook `/floorplans/1-bed-1-bath`).
+    # One fetch = ~5-30 units. Restricted to `/floor-plans|units|residences/
+    # {slug}` — NOT `/apartments/{slug}` (ambiguous: portfolio sites use
+    # `/apartments/{property-slug}/` for sibling-property links).
+    (
+        re.compile(r"/(?:floor[-_]?plans?|units?|residences?)/[a-z0-9][a-z0-9\-_]+/?$", re.IGNORECASE),
+        5_000,
+        "slugged_plan_detail",
+    ),
+    # Per-unit detail page (Cortland `/available-apartments/1n-131/pricing/`).
+    # One fetch = ONE unit. Lowest-yield-per-hop tier among "real data"
+    # patterns. Kept above bare_index because per-unit pages do contain
+    # real unit data, but below canonical / per-plan since a typical hop
+    # budget should be spent on multi-unit pages first.
+    # D11 (2026-05-16): score 6_500 → 4_700 (below canonical 7_500 and
+    # per-plan 5_000-5_500 but above bare_index 1_500).
+    (
+        re.compile(
+            r"/(?:available[-_]?apartments?|floor[-_]?plans?|apartments?|units?)/"
+            r"[a-z0-9][a-z0-9\-_]+/(pricing|details?|availability|info)/?$",
+            re.IGNORECASE,
+        ),
+        4_700,
+        "per_unit_detail",
+    ),
+    # Bare index page — discovery, not data. Should rank below detail pages
+    # so the cascade prefers detail when both are present.
+    # Use `^/{kw}/?$` (start-anchored) for the index — we ONLY want to match
+    # the literal `/floorplans/` etc. at root, not `/apartments/{prop}/`.
+    (
+        re.compile(r"^/(?:floor[-_]?plans?|availability|leasing|find[-_]?(?:a[-_]?)?home|rent)/?$", re.IGNORECASE),
+        1_500,
+        "bare_index",
+    ),
+    # Marketing aggregate — lower than the real index, never the data page.
+    (
+        re.compile(r"/(?:featured[-_]?(?:floor[-_]?plans?|apartments?)|virtual[-_]?tour|models?)/?", re.IGNORECASE),
+        500,
+        "marketing_aggregate",
+    ),
+    # Anti-signals — explicit non-inventory paths. Negative score so the
+    # additive sum can never elevate them above the base internal-link tier.
+    # Use start-anchor `^/` since these are TOP-LEVEL paths like /tour/, /gallery/
+    # — we don't want to penalize `/apartments/{slug}/photos/{n}` (which still
+    # may be a per-unit page); only penalise when the URL itself IS the page.
+    (
+        re.compile(
+            r"^/(?:schedule[-_]?(?:a[-_]?)?tour|tour|gallery|photos?|amenities?|"
+            r"neighborhood|reviews?|about|contact|faq|policies?|residents?|"
+            r"news|blog|events?|sitemap|careers?|privacy|terms|accessibility|"
+            r"login|sign[-_]?(?:up|in)|register|application|account)/?",
+            re.IGNORECASE,
+        ),
+        -2_000,
+        "anti_signal_non_inventory",
+    ),
+)
+
+
+def _url_shape_score(link_path: str) -> tuple[int, str]:
+    """Return (score_delta, shape_label) for a resolved URL path.
+
+    Reads only the URL path — never the anchor text. The shape labels are
+    surfaced into the anchor field for telemetry so we can confirm a hop
+    fired because the URL pattern matched the canonical_inventory class.
+    """
+    if not link_path:
+        return 0, ""
+    for pattern, delta, label in _URL_SHAPE_PATTERNS:
+        if pattern.search(link_path):
+            return delta, label
+    return 0, ""
+
+
 def _rank_internal_links(
     page_html: str,
     base_url: str,
@@ -1723,6 +2061,22 @@ def _rank_internal_links(
 
     candidates: dict[str, tuple[int, str]] = {}
 
+    # D2 (2026-05-16): compute fp_signal context boost from the source page.
+    # When the page we're discovering links FROM has ≥3 floor-plan signals,
+    # its same-host anchors are more likely to also have data — the page
+    # author is in the inventory-display context. +800 helps real per-plan
+    # / per-unit anchors outrank infra-iframe noise scored at 10_000.
+    _ctx_boost = 0
+    try:
+        from ma_poc.pms.signal_engine.floor_plan_signals import (
+            count_floor_plan_signals,
+        )
+        _src_fp_count = count_floor_plan_signals(soup.get_text(" ", strip=True)[:200_000])
+        if _src_fp_count >= 3:
+            _ctx_boost = 800
+    except Exception:
+        pass
+
     # Build a unified iterable of (href_value, anchor_text) from both
     # <a href> links and <form action> attributes. Form actions are scored
     # the same way as links — some Entrata / Yardi custom-domain sites
@@ -1769,16 +2123,28 @@ def _rank_internal_links(
         link_host = (parsed.hostname or "").lower()
         link_path = (parsed.path or "").lower()
 
-        score = 0
+        # D2 additive composition:
+        #   anchor_text_score: existing keyword bag (max ~+500)
+        #   path_keyword_score: existing keyword bag (max ~+200)
+        #   host_score: existing host keyword bag (max +120, but +2_000 for
+        #     known leasing-portal hosts)
+        #   url_shape_score: NEW — structural URL pattern recognition
+        #     (-2_000 anti-signals → +4_500 per-unit detail)
+        #   ctx_boost: NEW — +800 when source page has ≥3 fp_signals
+        anchor_score = 0
         for kw, weight in _LINK_ANCHOR_KEYWORDS:
             if kw in anchor:
-                score += weight
+                anchor_score += weight
+        path_score = 0
         for kw, weight in _LINK_PATH_KEYWORDS:
             if kw in link_path:
-                score += weight
+                path_score += weight
+        host_score = 0
         for suffix, weight in _LINK_HOST_KEYWORDS:
             if link_host.endswith(suffix):
-                score += weight
+                host_score += weight
+        url_shape, shape_label = _url_shape_score(link_path)
+        score = anchor_score + path_score + host_score + url_shape + _ctx_boost
 
         # Stay on-site or go to a known portal subdomain. "Same-site" matches
         # the CSV base host OR the post-redirect landed host — the latter
@@ -1805,33 +2171,34 @@ def _rank_internal_links(
         if score <= 0:
             continue
 
-        # Anchor-link elevation: a link that actually exists on the page and
-        # carries floor-plan / availability signals should outrank guessed
-        # template priors (PMS_PRIOR=5000, UNIVERSAL_PRIOR=4500) because the
-        # page author placed it there intentionally. Two tiers:
-        #
-        #   Strong anchor only (anchor_score > 50): e.g. "Floor Plans" anchor
-        #   on a page that uses a non-standard path. Lift above PMS_PRIOR so
-        #   it's tried before template guesses like /floorplans.aspx.
-        #   → floor = PMS_PRIOR_SCORE + 100 (= 5_100)
-        #
-        #   Anchor + path both signal intent: doubly-confirmed, highest
-        #   confidence for a page-discovered link.
-        #   → floor = PMS_PRIOR_SCORE + 600 (= 5_600)
-        _anchor_score = sum(w for kw, w in _LINK_ANCHOR_KEYWORDS if kw in anchor)
-        _path_score = sum(w for kw, w in _LINK_PATH_KEYWORDS if kw in link_path)
-        if _anchor_score > 0 and _path_score > 0:
-            # Both anchor text and path keyword signal intent — highest confidence.
-            score = max(score, _PMS_PRIOR_SCORE + 600)
-        elif _anchor_score > 50:
-            # Strong anchor text alone (e.g. "floor plans", "availability") —
-            # outrank template priors since the link is real, not a guess.
+        # D2 (2026-05-16): replace bucketed floor-lift with additive
+        # composition. The pre-D2 design FLATTENED any link with
+        # anchor+path keywords to a uniform PMS_PRIOR_SCORE+600 = 5_600,
+        # making `/floorplans/` (index) score-equal to `/floorplans/{slug}`
+        # (per-plan detail) and `/available-apartments/` (canonical
+        # inventory). With url_shape_score now graded, that ceiling would
+        # cap the genuinely-best URLs. We keep ONE narrow safety lift:
+        # when a same-site anchor has BOTH anchor and path keywords AND
+        # url_shape didn't already award it ≥3_000, lift to PMS_PRIOR+100
+        # so it still beats `_UNIVERSAL_PRIOR=4_500`. Detail-class shapes
+        # (≥3_000 url_shape) are already on their own additive trajectory
+        # (typical: 4000 base + 3000 shape + 800 ctx = 7_800).
+        if anchor_score > 0 and path_score > 0 and url_shape < 3_000:
             score = max(score, _PMS_PRIOR_SCORE + 100)
+        elif anchor_score > 50 and url_shape < 3_000:
+            score = max(score, _PMS_PRIOR_SCORE + 100)
+
+        # Annotate anchor with shape label so telemetry shows WHY the link
+        # ranked where it did — invaluable when debugging "why did we hop
+        # to the index instead of the per-plan page?" questions.
+        labelled_anchor = (
+            f"{anchor[:40]} [{shape_label}]" if shape_label else anchor[:60]
+        )
 
         # Keep best score per URL
         existing = candidates.get(resolved)
         if existing is None or score > existing[0]:
-            candidates[resolved] = (score, anchor)
+            candidates[resolved] = (score, labelled_anchor)
 
     ranked = sorted(
         ((u, s, a) for u, (s, a) in candidates.items()),
@@ -2187,10 +2554,42 @@ async def _try_link_hop(
     # sites with many individual /floorplans/<name> sub-pages.
     _accum_pages_fetched = 0
 
+    # Shard_84 defensive backstop (2026-05-16): cumulative hop-fetch time
+    # budget. Even with hop COUNT capped, a single slow hop can park
+    # for 35s × multiple retries × 7 hops = enough to exhaust the
+    # per-property 600s budget. Cap the SUM of hop-fetch elapsed times
+    # at 240s — generous enough for legitimate slow sites (Cloud Run
+    # observed p95 hop time ~6s, p99 ~25s) but tight enough that one
+    # property can't burn 80% of its budget in hops alone.
+    _HOP_CUMULATIVE_BUDGET_MS = 240_000
+    _hop_elapsed_total_ms = 0
+
     while queue_idx < len(queue):
         sub_url, score, anchor = queue[queue_idx]
         idx = queue_idx + 1
         queue_idx += 1
+
+        # Shard_84 fix: hard-stop when cumulative hop time exceeds budget.
+        # The check runs BEFORE fetching the next sub_url so we don't
+        # spend an additional 25s on a hop we already can't afford.
+        if _hop_elapsed_total_ms >= _HOP_CUMULATIVE_BUDGET_MS:
+            log.info(
+                "link-hop cumulative budget exhausted for %s: %dms used, "
+                "%d hops remaining — stopping hop cascade",
+                property_id, _hop_elapsed_total_ms, len(queue) - queue_idx,
+            )
+            try:
+                emit(
+                    EventKind.LINK_HOP_FETCHED,
+                    property_id,
+                    url=sub_url,
+                    error="cumulative_hop_budget_exhausted",
+                    hop_index=idx,
+                    elapsed_total_ms=_hop_elapsed_total_ms,
+                )
+            except Exception:
+                pass
+            break
 
         # Skip lower-scored priors once the profile winning page delivered data.
         if _winning_page_satisfied and score < _LLM_HINT_SCORE and not _in_floorplan_accumulation:
@@ -2260,6 +2659,17 @@ async def _try_link_hop(
             score=score,
             anchor=anchor[:60],
         )
+
+        # Shard_84 fix (2026-05-16): accumulate hop-fetch elapsed_ms into
+        # the cumulative budget tracker. Counted regardless of outcome —
+        # a TRANSIENT/timeout hop also spent the time. Retries (in the
+        # block above) ALSO add their elapsed_ms via the second
+        # sub_fetch assignment, so retried hops cost their full clock
+        # time toward the budget.
+        try:
+            _hop_elapsed_total_ms += int(sub_fetch.elapsed_ms or 0)
+        except Exception:
+            pass
 
         # B2: block the resolved final URL so redirect-identical pages are never
         # processed twice in the same session (e.g. two different requested paths
@@ -2426,6 +2836,23 @@ async def _try_link_hop(
                 "link-hop %s: silent redirect to homepage (%s) — skipping extraction",
                 sub_url, _sub_final_url,
             )
+            # Bug #6 enhancement (2026-05-16): persist the
+            # redirected-to-entry URL into explored_links so subsequent
+            # runs don't re-try it. Until today, the skip only saved
+            # runtime on this run; next run would queue the same dead
+            # URL again because nothing wrote the discovery.
+            # Canonical victims: 1611onlakeunion.com hops 1/4/7/8 and
+            # 1701arch.com hops 3/4/6/7 (2026-05-16 cloud run) burned
+            # 7+ hop budget slots per property on URLs that always
+            # redirect to the homepage.
+            try:
+                _explored_redirect = shared_budget.setdefault(
+                    "_redirect_to_entry_urls", []
+                )
+                if sub_url not in _explored_redirect:
+                    _explored_redirect.append(sub_url)
+            except Exception:
+                pass
             continue
 
         # Property sub-path priors: when the hop URL has 3+ path segments
@@ -2712,7 +3139,26 @@ async def _try_link_hop(
                     # not treated as new floor-plan index pages.
                     _in_floorplan_accumulation = True
                     _first_successful_result = sub_result
-                    _accumulated_units.extend(sub_result.get("units") or [])
+                    # D7 (2026-05-16): use merge_into_result_units instead of
+                    # blind .extend() so cross-hop emissions of the same unit
+                    # (rank R0a uid match, R0 fp_id match) dedup. Pre-D7 this
+                    # was .extend() which produced 29 records for 12 real units
+                    # on PID 722 Canyon Ridge.
+                    try:
+                        from ma_poc.pms.adapters._merge_fns import (
+                            merge_into_result_units,
+                        )
+                        _new_units = sub_result.get("units") or []
+                        _accumulated_units = merge_into_result_units(
+                            _accumulated_units, _new_units,
+                            property_id=property_id,
+                        )
+                    except Exception as _merge_err:
+                        log.debug(
+                            "D7 merge fallback (extend) for %s: %s",
+                            property_id, _merge_err,
+                        )
+                        _accumulated_units.extend(sub_result.get("units") or [])
                     # Checkpoint partial results so the timeout handler can
                     # salvage accumulated units if the property wall-clock budget
                     # expires mid-hop.
@@ -2763,7 +3209,24 @@ async def _try_link_hop(
 
             elif _in_floorplan_accumulation:
                 # Accumulating sub-page units — merge into the running total.
-                _accumulated_units.extend(sub_result.get("units") or [])
+                # D7 (2026-05-16): use rank-ladder merge instead of blind
+                # extend so the same unit emitted from multiple per-plan
+                # hop pages dedups at R0a (uid match).
+                try:
+                    from ma_poc.pms.adapters._merge_fns import (
+                        merge_into_result_units,
+                    )
+                    _new_units = sub_result.get("units") or []
+                    _accumulated_units = merge_into_result_units(
+                        _accumulated_units, _new_units,
+                        property_id=property_id,
+                    )
+                except Exception as _merge_err:
+                    log.debug(
+                        "D7 merge fallback (extend) for %s: %s",
+                        property_id, _merge_err,
+                    )
+                    _accumulated_units.extend(sub_result.get("units") or [])
                 _accum_pages_fetched += 1
                 if shared_budget is not None:
                     shared_budget["_partial_units"] = list(_accumulated_units)
@@ -3155,6 +3618,50 @@ async def scrape_jugnu(
                 _initial_visited = {base_url}
                 if _landed_url:
                     _initial_visited.add(_landed_url)
+
+                # Shard_84 fix (2026-05-16): early-termination hop budget.
+                # When the entry page has ZERO floor-plan signals AND no
+                # embedded portal hints AND no profile.winning_page_url,
+                # there's no positive evidence that this property has
+                # unit data anywhere. The hop scheduler would otherwise
+                # burn 7 hops × ~25s each = up to 175s on PMS-prior
+                # guesses that overwhelmingly return the homepage shell
+                # again (see Bug #6 redirect-loop diagnosis). Cap at 2
+                # hops in this scenario — enough to try /floor-plans and
+                # /availability one time, fail fast, and surrender the
+                # budget to the LLM rescue path.
+                #
+                # Canonical victims on 2026-05-16 shard_84: PIDs 63485,
+                # 63486, 63534, 6395 — each burned 9-11 hops on dead
+                # RentCafe/RealPage portal cycles before the 600s
+                # wallclock killed the property.
+                _entry_fp_count = int(
+                    (result.get("_html_characterization") or {}).get(
+                        "floor_plan_signal_count", 0
+                    ) or 0
+                )
+                _has_portal_hints = bool(result.get("_embedded_portal_hints"))
+                _has_winning_page = False
+                try:
+                    _wpu = (
+                        profile.navigation.winning_page_url if profile else None
+                    )
+                    _has_winning_page = bool(_wpu)
+                except Exception:
+                    _has_winning_page = False
+                _max_hops_effective = 7
+                if (
+                    _entry_fp_count == 0
+                    and not _has_portal_hints
+                    and not _has_winning_page
+                ):
+                    _max_hops_effective = 2
+                    log.debug(
+                        "link-hop budget capped at 2 for %s: entry has "
+                        "0 fp_signals, no portal hints, no winning_page_url",
+                        property_id,
+                    )
+
                 # Phase 5: feed LLM navigation hints (if any) into the
                 # ranker so they outrank keyword candidates.
                 hop_result = await _try_link_hop(
@@ -3165,7 +3672,7 @@ async def scrape_jugnu(
                     expected_total_units=expected_total_units,
                     property_id=property_id,
                     csv_row=csv_row,
-                    max_hops=7,
+                    max_hops=_max_hops_effective,
                     llm_navigation_hints=result.get("_llm_navigation_hints"),
                     embedded_portal_hints=result.get("_embedded_portal_hints"),
                     visited_urls=_initial_visited,  # Phase 9: cycle protection (H5)

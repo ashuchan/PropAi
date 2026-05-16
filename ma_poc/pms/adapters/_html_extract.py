@@ -1129,6 +1129,19 @@ _PORTAL_URL_PATTERNS: tuple[tuple[str, str], ...] = (
     # Observed 2026-05-15 on PID 292955 3140clybourn.com /floor-plans
     # (6 floor plans with availability counts, rent, sqft).
     ("yourcrossstreet.com/property", "yourcrossstreet"),
+    # D17a (2026-05-16): hy.ly Marketing Cloud API endpoints.
+    # The chat widget at `my.hy.ly/chat` is BLACKLISTED below (line 1221)
+    # to prevent the 6th-pass discovery from queueing chatbot configs as
+    # inventory portals. But `my.hy.ly/api/` IS inventory data — explicitly
+    # allowed here so synthesised hy.ly API URLs (from `_INLINE_JS_INIT_PATTERNS`
+    # at scraper.py) get routed correctly. PID 1085 Sound at Peninsula +
+    # the ZRS Management portfolio (~30+ properties).
+    ("my.hy.ly/api/", "hyly"),
+    # SightMap direct API endpoint (D19a, 2026-05-16). Distinct from the
+    # `sightmap.com/embed/` allow-list entry above — `/app/api/v1/`
+    # returns the unit JSON directly. Routed through the existing SightMap
+    # adapter which is body-shape-aware.
+    ("sightmap.com/app/api", "sightmap"),
 )
 
 
@@ -1173,6 +1186,27 @@ _PORTAL_INFRA_BLACKLIST: tuple[str, ...] = (
     "userway.org",
     "callrail.com",
     "osano.com",
+    # A/B-testing + consent management — emit user-keyed config iframes that
+    # look like portals (cdn.optimizely.com/client_storage/<key>.html) but
+    # carry no inventory. PID 2982 Cortland on Pike 2026-05-16 wasted hop 1
+    # on a19749172433.cdn.optimizely.com — the same Optimizely iframe will
+    # appear on any A/B-tested property site.
+    "optimizely.com",
+    "cdn.optimizely.com",
+    "cookiebot.com",
+    "consensu.org",
+    "onetrust.com",
+    "trustarc.com",
+    "termly.io",
+    "iubenda.com",
+    # Ad-tech / programmatic — never inventory
+    "doubleverify.com",
+    "adnxs.com",
+    "pubmatic.com",
+    "rubiconproject.com",
+    "adsystem.com",
+    "scorecardresearch.com",
+    "quantserve.com",
     # Maps / geo
     "maps.google",
     "googleapis.com/maps",
@@ -1429,29 +1463,61 @@ _TLD_RE = re.compile(
     r'\.(com|net|org|apartments|info|biz|co|us|homes|live|apts)$',
     re.IGNORECASE,
 )
+# D5 (2026-05-16): direct SecureCafe href detection. Multi-property portfolios
+# (Morgan Properties, Greystar, etc.) use per-property securecafe subdomains
+# like ``hickorymilloh.securecafe.com`` — synthesising from the portfolio's
+# base hostname (``morgan-properties.securecafe.com``) produces a 404.
+# When the page already contains an explicit ``<a href="https://{slug}.
+# securecafe.com/onlineleasing/{path}/...">``, USE THAT URL VERBATIM and skip
+# the synthesiser.  PID 161 Hickory Mill 2026-05-16: line 558 has the right
+# host but our synthesiser built the wrong one.
+_DIRECT_SECURECAFE_RE = re.compile(
+    r'href=["\'](https?://[a-z0-9][a-z0-9-]+\.securecafe\.com/onlineleasing/[a-z0-9][a-z0-9-]+(?:/[^"\'\s]*)?)',
+    re.IGNORECASE,
+)
 
 
 def detect_securecafe_portal_url(html: str, base_url: str) -> str | None:
-    """Construct a SecureCafe floor-plans URL from /onlineleasing/ href + domain.
+    """Construct a SecureCafe floor-plans URL.
 
-    Matches Shape-B SecureCafe sites where the property domain has a JS-only
-    route ``/onlineleasing/{slug}`` that client-side-redirects to the securecafe
-    subdomain.  Because the JS redirect is never followed in HTTP-fetch mode,
-    we synthesise the canonical URL instead:
+    Two-phase detection (D5 redesign, 2026-05-16):
 
-        https://{domain_slug}.securecafe.com/onlineleasing/{path_slug}/floorplans.aspx
+      Phase 1 — direct href. When the page already carries an explicit
+        ``<a href="https://{slug}.securecafe.com/onlineleasing/{path}/...">``,
+        use that URL verbatim. Preferred for multi-property portfolios
+        where each property has its own securecafe subdomain (PID 161
+        Hickory Mill → ``hickorymilloh.securecafe.com``).
 
-    The domain slug is the property hostname with ``www.`` and TLD stripped.
-    The path slug comes directly from the ``/onlineleasing/`` href — it always
-    matches the SecureCafe path because the property developer sets both.
-
-    Args:
-        html: Full Playwright-rendered page HTML.
-        base_url: The property entry URL (used to derive the subdomain).
+      Phase 2 — slug synthesis. When no direct href exists but the page
+        has a local ``/onlineleasing/{slug}`` route (JS SPA redirect),
+        synthesise:
+            https://{domain_slug}.securecafe.com/onlineleasing/{path_slug}/floorplans.aspx
+        ``domain_slug`` = base hostname minus ``www.`` and TLD.
 
     Returns:
-        Absolute floorplans.aspx URL, or None when the pattern is absent.
+        Absolute SecureCafe URL, or None when no pattern matched.
     """
+    # Phase 1: direct securecafe href present? Use it verbatim.
+    direct_m = _DIRECT_SECURECAFE_RE.search(html)
+    if direct_m:
+        direct_url = direct_m.group(1)
+        # Heuristic — strip ``/userlogin.aspx`` etc. and prefer the floorplans
+        # endpoint when the matched path is a sign-in / application form
+        # rather than the listing page.
+        if any(noise in direct_url.lower() for noise in (
+            "userlogin", "oleapplication", "guestlogin", "residentservices",
+        )):
+            # Trim back to the property root and append floorplans.aspx
+            stem = re.sub(
+                r"(/onlineleasing/[a-z0-9][a-z0-9-]+)/.*$",
+                r"\1/floorplans.aspx",
+                direct_url,
+                flags=re.IGNORECASE,
+            )
+            return stem
+        return direct_url
+
+    # Phase 2: synthesise from /onlineleasing/{slug} JS route + base hostname.
     path_m = _ONLINELEASING_RE.search(html)
     if not path_m:
         return None
@@ -1484,6 +1550,21 @@ def detect_securecafe_portal_url(html: str, base_url: str) -> str | None:
 # adapter-shape unit dict.
 
 _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
+    # D4 (2026-05-16): RentCafe per-plan availability rows. Each row holds
+    # one unit with Unit#, rent, sqft, deposit, availability date. 58-59
+    # rows per page on PID 5822 The Izzy. Must come BEFORE the generic
+    # ".unit-card" so the more specific selector wins for RentCafe sites.
+    "div.option-row",
+    ".option-row",
+    # Cortland-style apartment grid (PID 2982): 79 anchors with
+    # data-js-hook="apartment" + data-unit-id / data-apartment-id attrs.
+    "a[data-js-hook='apartment']",
+    ".apartments__card",
+    # Brook-style apartment card (PID 3483): `<div class="card">` wrapping
+    # `<h3>Apartment: <span># NNNNNN</span></h3>` blocks. Scoped to the
+    # availability container `#availApts` so we don't pick up unrelated
+    # marketing cards on the same site.
+    "#availApts .card",
     # Common PMS / CMS container patterns. Specific-first, generic-last so a
     # site with both `.unit-card` and `.card` prefers the specific one.
     ".unit-card",
@@ -1552,6 +1633,39 @@ _UNIT_NUM_PATTERN = re.compile(
     r"(?:unit|apt|apartment|#)\s*#?\s*([A-Za-z0-9][A-Za-z0-9\-]{0,10})",
     re.IGNORECASE,
 )
+# Stop-words that appear directly after the regex anchors ("apartment Details",
+# "apartment with", "apartment for", "apartment Bed") in marketing prose. The
+# regex captures the next 1–11-char token regardless of meaning, so without
+# this filter we emit a phantom unit with unit_number="Details" / "with" /
+# "for" / "Bed", whose existence makes the planner stop at pct_complete=1.0
+# and the link-hop never fires (see PID 2982 Cortland on Pike 2026-05-14).
+# Tokens that contain a digit are always accepted — those look like real
+# unit numbers ("A-301", "203B"). Tokens that are pure-alphabetic AND in the
+# stop-word list are rejected.
+_UNIT_NUM_STOPWORDS: frozenset[str] = frozenset({
+    "details", "with", "for", "and", "the", "near", "info", "tour", "now",
+    "today", "view", "more", "see", "from", "starting", "rent", "lease",
+    "bed", "bath", "beds", "baths", "bedroom", "bathroom", "sqft", "studio",
+    "available", "available", "homes", "home", "house", "loft", "lofts",
+    "this", "that", "your", "our", "is", "are",
+})
+
+
+def _is_valid_unit_number(token: str) -> bool:
+    """Reject English stop-words masquerading as unit numbers.
+
+    Production-emitted bogus ids on 2026-05-14: "Details", "with", "for",
+    "Bed". Each came from a regex that anchors on "apartment"|"apt"|
+    "unit"|"#" and captures the next word — which in marketing prose is
+    typically an English preposition or label. Real unit numbers almost
+    always contain at least one digit ("203", "A-12", "3B", "Loft-5").
+    Accept tokens containing a digit; reject pure-alphabetic stop-words.
+    """
+    if not token:
+        return False
+    if any(ch.isdigit() for ch in token):
+        return True
+    return token.strip().lower() not in _UNIT_NUM_STOPWORDS
 _FP_NAME_PATTERN = re.compile(
     r"(?:the\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)",
 )
@@ -1657,7 +1771,8 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
     beds_val = m_beds.group(1) if m_beds else ("0" if is_studio else "")
     baths_val = m_baths.group(1) if m_baths else ""
     sqft_val = m_sqft.group(1) if m_sqft else ""
-    unit_num = m_unit.group(1) if m_unit else ""
+    unit_num_raw = m_unit.group(1) if m_unit else ""
+    unit_num = unit_num_raw if _is_valid_unit_number(unit_num_raw) else ""
 
     return {
         "floor_plan_name": "",
@@ -1678,6 +1793,347 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
         "availability_date": "",
         "extraction_tier": "TIER_3_DOM",
     }
+
+
+# D6 (2026-05-16): attributes that carry per-unit identity when present.
+# Order matters — most specific first. ``data-unit-id`` is the truly-unique
+# database PK on most PMS embeds (Cortland 2604014, RentCafe 5704854). The
+# ``data-unit-number`` is human-readable (Cortland "4", "#C-113") and is a
+# weaker uniqueness signal but more useful for output. ``data-apartment-id``
+# is the apartment-level PK (one apartment can have multiple unit records
+# over time as availability changes).
+_DATA_UID_ATTRS: tuple[str, ...] = (
+    "data-unit-id",
+    "data-unit",
+    "data-unitid",
+    "data-unit_id",
+)
+_DATA_APT_ATTRS: tuple[str, ...] = (
+    "data-apartment-id",
+    "data-apartmentid",
+    "data-apartment_id",
+)
+_DATA_UNUM_ATTRS: tuple[str, ...] = (
+    "data-unit-number",
+    "data-unitnumber",
+    "data-unit_number",
+)
+
+
+def _extract_data_uid_from_node(node: Any) -> tuple[str, str, str]:
+    """Pull per-unit identifiers from data-* attributes on the node OR its descendants.
+
+    Returns ``(unit_id, apartmentid, unit_number)`` — any field may be empty.
+
+    Walks node first, then descendants. Returns the first non-empty
+    attribute value for each kind; doesn't try to reconcile competing
+    values (rare in practice — a single container usually has one set).
+    """
+    uid = apt = unum = ""
+    try:
+        descendants = [node] + list(node.find_all(True))
+    except Exception:
+        descendants = [node]
+    for el in descendants:
+        if not hasattr(el, "get"):
+            continue
+        if not uid:
+            for a in _DATA_UID_ATTRS:
+                v = el.get(a) or ""
+                if isinstance(v, str) and v.strip():
+                    uid = v.strip()
+                    break
+        if not apt:
+            for a in _DATA_APT_ATTRS:
+                v = el.get(a) or ""
+                if isinstance(v, str) and v.strip():
+                    apt = v.strip()
+                    break
+        if not unum:
+            for a in _DATA_UNUM_ATTRS:
+                v = el.get(a) or ""
+                if isinstance(v, str) and v.strip():
+                    unum = v.strip()
+                    break
+        if uid and apt and unum:
+            break
+    return uid, apt, unum
+
+
+# D13 (2026-05-16): page-level plan attributes used by compact-row extractors.
+# Per-plan availability pages render each unit as a short row carrying only
+# unit-level data (unit#, rent, sqft, availability). The plan-level data
+# (beds/baths/plan_name) lives in the page header. To assemble a complete
+# unit record, the compact-row extractors read page-level attrs ONCE and
+# apply to every row.
+_PAGE_CTX_BEDS_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:bedroom|bed\b|br\b)",
+    re.IGNORECASE,
+)
+_PAGE_CTX_BATHS_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:bathroom|bath\b|ba\b)",
+    re.IGNORECASE,
+)
+_PAGE_CTX_STUDIO_RE = re.compile(r"\bstudio\b", re.IGNORECASE)
+# Plan-name patterns commonly seen in <h1>/<title>/<meta property="og:title">.
+# "Floor Plan: 1x1 Reno" / "1 Bed / 1 Bath - A1B" / "Baywood Floor Plan"
+_PAGE_CTX_FP_NAME_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"floor\s*plan[:\s]+([^|<]{2,80})", re.IGNORECASE),
+    re.compile(r"([A-Za-z0-9][A-Za-z0-9 /+\-_.]{1,50})\s+floor\s*plan", re.IGNORECASE),
+)
+
+
+def _extract_page_ctx(soup: Any) -> dict[str, Any]:
+    """Extract page-level plan attributes (beds/baths/fp_name) once per page.
+
+    Read order: <h1> → <h2> → <title> → og:title meta.  First non-empty
+    plan-name pattern wins.  Beds/baths/studio are coalesced across all
+    these sources so a value present in ANY of them lifts the row.
+    """
+    ctx: dict[str, Any] = {
+        "beds": "",
+        "baths": "",
+        "fp_name": "",
+        "is_studio": False,
+    }
+    chunks: list[str] = []
+    try:
+        for tag in ("h1", "h2", "title"):
+            for el in soup.find_all(tag):
+                t = (el.get_text(" ", strip=True) or "")[:300]
+                if t:
+                    chunks.append(t)
+        meta = soup.find("meta", attrs={"property": "og:title"})
+        if meta and isinstance(meta.get("content"), str):
+            chunks.append(meta["content"][:300])
+    except Exception:
+        return ctx
+
+    combined = " | ".join(chunks)
+    if not combined:
+        return ctx
+
+    if _PAGE_CTX_STUDIO_RE.search(combined):
+        ctx["is_studio"] = True
+        ctx["beds"] = "0"
+    m_beds = _PAGE_CTX_BEDS_RE.search(combined)
+    if m_beds and not ctx["beds"]:
+        ctx["beds"] = m_beds.group(1)
+    m_baths = _PAGE_CTX_BATHS_RE.search(combined)
+    if m_baths:
+        ctx["baths"] = m_baths.group(1)
+    for pat in _PAGE_CTX_FP_NAME_PATTERNS:
+        m = pat.search(combined)
+        if m:
+            ctx["fp_name"] = m.group(1).strip()
+            break
+    if not ctx["fp_name"] and chunks:
+        # Fallback: shortest <h1>/<h2>/<title> chunk that looks plan-name-ish.
+        # Reject ones that are too generic ("Available Floor Plans", "Apply Now").
+        for c in chunks:
+            cl = c.lower()
+            if 3 <= len(c) <= 60 and not any(
+                kw in cl for kw in ("apply", "schedule", "available floor", "all floor", "our community")
+            ):
+                ctx["fp_name"] = c
+                break
+    return ctx
+
+
+def _empty_unit_with_ctx(page_ctx: dict[str, Any], source: str, source_url: str) -> dict[str, Any]:
+    """Build a unit dict pre-populated with page-level plan attributes."""
+    return {
+        "floor_plan_name": page_ctx.get("fp_name", ""),
+        "bed_label": (
+            "Studio" if page_ctx.get("is_studio")
+            else (f"{page_ctx['beds']}BR" if page_ctx.get("beds") and page_ctx["beds"] != "0" else "")
+        ),
+        "bedrooms": page_ctx.get("beds", ""),
+        "bathrooms": page_ctx.get("baths", ""),
+        "sqft": "",
+        "unit_number": "",
+        "floor": "",
+        "building": "",
+        "rent_range": None,
+        "market_rent_low": None,
+        "market_rent_high": None,
+        "deposit": "",
+        "concession": "",
+        "availability_status": "AVAILABLE",
+        "available_units": "",
+        "availability_date": "",
+        "extraction_tier": "TIER_3_DOM",
+        "source_api_url": source,
+        "_source_url": source_url,
+    }
+
+
+# Compact-row extractors. Each takes (node, page_ctx, source_url) and returns a
+# unit dict OR None when the row doesn't carry per-unit data.
+_RENTCAFE_DETAIL_FIRST_RE = re.compile(r"unit\s*[#:]?\s*(\S+)", re.IGNORECASE)
+_RENTCAFE_RENT_RE = re.compile(r"\$\s?(\d{1,3}(?:,\d{3})*|\d{3,5})", re.IGNORECASE)
+_RENTCAFE_SQFT_NUM_RE = re.compile(r"sq\.?\s*ft\.?\s*[:\s]*(\d{1,3}(?:,\d{3})*|\d{3,5})", re.IGNORECASE)
+
+
+def _extract_rentcafe_option_row(
+    node: Any, page_ctx: dict[str, Any], source_url: str
+) -> dict[str, Any] | None:
+    """RentCafe per-plan availability row (Yardi).
+
+    Row text is short ("Unit 138 Rent $1,115 Sq.ft. 1,025 Available Now"); the
+    generic `_container_yields_unit` rejects it because the row alone lacks the
+    ≥2 structural signals it requires. The plan-level beds/baths/plan_name
+    come from `page_ctx`; per-unit fields come from specific child selectors.
+    """
+    try:
+        text = node.get_text(" ", strip=True)
+    except Exception:
+        return None
+    if not text or len(text) < 5:
+        return None
+
+    unit = _empty_unit_with_ctx(page_ctx, source=f"dom:option-row", source_url=source_url)
+
+    # unit_number: ".detail.first" child OR the row's leading "Unit NNN" text.
+    unit_num = ""
+    try:
+        first = node.select_one(".detail.first")
+        if first:
+            ft = first.get_text(" ", strip=True)
+            m = _RENTCAFE_DETAIL_FIRST_RE.search(ft) or re.match(r".*?(\b[A-Z0-9][A-Z0-9\-]{0,10}\b)$", ft, re.IGNORECASE)
+            if m:
+                unit_num = m.group(1).strip()
+    except Exception:
+        pass
+    if not unit_num:
+        m = _RENTCAFE_DETAIL_FIRST_RE.search(text)
+        if m:
+            unit_num = m.group(1).strip()
+    if unit_num and _is_valid_unit_number(unit_num):
+        unit["unit_number"] = unit_num
+
+    # rent: "$1,115" → first $NNN match
+    m_rent = _RENTCAFE_RENT_RE.search(text)
+    if m_rent:
+        try:
+            rent = int(m_rent.group(1).replace(",", ""))
+            if _RENT_LO_BOUND <= rent <= _RENT_HI_BOUND:
+                unit["market_rent_low"] = rent
+                unit["market_rent_high"] = rent
+                unit["rent_range"] = str(rent)
+        except (ValueError, TypeError):
+            pass
+
+    # sqft: try "Sq.ft. NNN" (number AFTER keyword — RentCafe shape) FIRST,
+    # because the row also contains "$1,115" which can fool _SQFT_PATTERN into
+    # extracting "115" as the sqft. The more specific pattern wins.
+    m_sqft = _RENTCAFE_SQFT_NUM_RE.search(text) or _SQFT_PATTERN.search(text)
+    if m_sqft:
+        try:
+            sqft = int(m_sqft.group(1).replace(",", ""))
+            if _SQFT_MIN <= sqft <= 10_000:
+                unit["sqft"] = str(sqft)
+        except (ValueError, TypeError):
+            pass
+
+    # availability: look for "Available Now" or a date
+    if re.search(r"available\s+now|^\s*now\b", text, re.IGNORECASE):
+        unit["availability_date"] = "Now"
+        unit["availability_status"] = "AVAILABLE"
+
+    # button[data-unit] holds the RentCafe internal unit ID
+    d_uid, d_apt, d_unum = _extract_data_uid_from_node(node)
+    if d_uid:
+        unit["unit_id"] = d_uid
+    if d_apt:
+        unit["apartmentid"] = d_apt
+
+    # Only emit if the row has at least a unit number OR rent + sqft.
+    # Rejects "See Details" / "Apply Now" buttons that match the selector
+    # accidentally.
+    has_identity = bool(unit.get("unit_id") or unit["unit_number"])
+    has_unit_data = bool(unit["market_rent_low"]) or bool(unit["sqft"])
+    if not (has_identity or has_unit_data):
+        return None
+    return unit
+
+
+_BROOK_APT_NUM_RE = re.compile(r"Apartment\s*[:\s]*#?\s*([A-Za-z0-9][A-Za-z0-9\-]{1,20})", re.IGNORECASE)
+
+
+def _extract_brook_availapts_card(
+    node: Any, page_ctx: dict[str, Any], source_url: str
+) -> dict[str, Any] | None:
+    """Brook-at-Columbia `<div class="card">` row inside `#availApts`.
+
+    Row text shape: "Apartment: # 517001 Available Now Starting at: $1,745.00".
+    Unit number is in the <h3 class="card-title"> span; rent in a
+    `.card-subtitle` with "Starting at:" prefix.
+    """
+    try:
+        text = node.get_text(" ", strip=True)
+    except Exception:
+        return None
+    if not text or len(text) < 5:
+        return None
+
+    unit = _empty_unit_with_ctx(page_ctx, source="dom:availApts-card", source_url=source_url)
+
+    # unit_number from "Apartment: # NNNNNN"
+    m_unum = _BROOK_APT_NUM_RE.search(text)
+    if m_unum and _is_valid_unit_number(m_unum.group(1)):
+        unit["unit_number"] = m_unum.group(1).strip()
+
+    # rent from "Starting at: $1,745.00" or any $NNN
+    m_rent = re.search(r"\$\s?(\d{1,3}(?:,\d{3})*|\d{3,5})", text)
+    if m_rent:
+        try:
+            rent = int(m_rent.group(1).replace(",", ""))
+            if _RENT_LO_BOUND <= rent <= _RENT_HI_BOUND:
+                unit["market_rent_low"] = rent
+                unit["market_rent_high"] = rent
+                unit["rent_range"] = str(rent)
+        except (ValueError, TypeError):
+            pass
+
+    # availability "Available Now" or move-in date
+    if re.search(r"available\s+now", text, re.IGNORECASE):
+        unit["availability_date"] = "Now"
+
+    # Try data-* attributes on Apply Now link (it embeds UnitID=N as href param)
+    try:
+        apply_link = node.select_one("a[href*='UnitID']")
+        if apply_link:
+            href = apply_link.get("href", "")
+            m_uid = re.search(r"UnitID=(\d+)", href, re.IGNORECASE)
+            if m_uid:
+                unit["unit_id"] = m_uid.group(1)
+            m_fp = re.search(r"FloorPlanID=(\d+)", href, re.IGNORECASE)
+            if m_fp:
+                # FloorPlanID becomes a stable cross-page id but isn't
+                # the floor_plan_id we hash later — leave it as telemetry.
+                unit["_rentcafe_floor_plan_id"] = m_fp.group(1)
+    except Exception:
+        pass
+
+    if not unit.get("unit_number") and not unit.get("unit_id"):
+        return None
+    return unit
+
+
+# Selectors mapped to specialised extractors. When the DOM container loop
+# matches one of these selectors, the matching extractor is used INSTEAD of
+# `_container_yields_unit`. This bypasses the ≥2 structural-signal gate that
+# rejects compact per-unit rows where bed/bath/sqft live in the page header.
+_COMPACT_ROW_EXTRACTORS: tuple[tuple[str, Any], ...] = (
+    # RentCafe per-plan availability — both `.option-row` and `div.option-row`
+    # patterns map to the same extractor.
+    ("div.option-row", _extract_rentcafe_option_row),
+    (".option-row", _extract_rentcafe_option_row),
+    # Brook-at-Columbia (RentCafe variant where the card structure differs).
+    ("#availApts .card", _extract_brook_availapts_card),
+)
+_COMPACT_ROW_SELECTOR_SET = frozenset(sel for sel, _ in _COMPACT_ROW_EXTRACTORS)
 
 
 def extract_units_from_dom(
@@ -1721,6 +2177,12 @@ def extract_units_from_dom(
 
     units: list[dict[str, Any]] = []
     seen: set[str] = set()
+    # D13 (2026-05-16): page-level plan attributes shared by every compact row.
+    # Computed once per page (cheap header-only read). Used by the compact-row
+    # extractors when a selector hit maps into _COMPACT_ROW_EXTRACTORS.
+    _page_ctx = _extract_page_ctx(soup)
+    # Lookup map for compact-row selectors → extractor function.
+    _compact_extractor_map = dict(_COMPACT_ROW_EXTRACTORS)
     for selector in _DOM_CONTAINER_SELECTORS:
         try:
             nodes = soup.select(selector)
@@ -1728,20 +2190,68 @@ def extract_units_from_dom(
             continue
         if not nodes:
             continue
-        # If we found >80 of the same selector, it probably matched
+        # If we found >200 of the same selector, it probably matched
         # something too generic (like every `.apartment` article on a blog).
-        if len(nodes) > 80:
+        # D6 (2026-05-16): raised from 80 → 200. Large multifamily
+        # properties legitimately have 80-200 per-unit cards on their
+        # availability page (Cortland on Pike has 79 active units;
+        # bigger lease-up properties can easily exceed 100).
+        if len(nodes) > 200:
             continue
+        # D13 (2026-05-16): when the selector matches a compact-row pattern
+        # (RentCafe option-row, Brook availApts-card), use the specialised
+        # extractor that bypasses the generic ≥2-structural-signal gate.
+        # The row text alone is too short to pass that gate (unit-level
+        # data only: unit#/rent/sqft/avail — bed/bath live in the page
+        # header). Page-level beds/baths/plan_name come from `_page_ctx`.
+        compact_extractor = _compact_extractor_map.get(selector)
         for node in nodes:
-            text = node.get_text(" ", strip=True)
-            if len(text) < 10 or len(text) > 3000:
-                continue
-            unit = _container_yields_unit(text)
-            if unit is None:
-                continue
-            unit["source_api_url"] = f"dom:{selector}"
-            unit["_source_url"] = source_url
-            dedup = unit["unit_number"] or f"{unit['rent_range']}|{unit['sqft']}|{unit['bedrooms']}"
+            if compact_extractor is not None:
+                unit = compact_extractor(node, _page_ctx, source_url)
+                if unit is None:
+                    continue
+            else:
+                text = node.get_text(" ", strip=True)
+                if len(text) < 10 or len(text) > 3000:
+                    continue
+                unit = _container_yields_unit(text)
+                if unit is None:
+                    continue
+            # D6 (2026-05-16): Read per-unit identity from data-* attributes
+            # when present on the container or any descendant. Real database
+            # PKs from data-unit-id beat the inferred-id hash collision that
+            # happens when many units share the same plan dimensions.
+            # PID 2982 Cortland on Pike: 79 anchors carry
+            # data-unit-id="2604014" / data-unit-number="4" — without this
+            # the 25 cards for plan "1 Bed/1 Bath - A1B" all hash to the
+            # same inferred_* id.
+            #
+            # D13 (2026-05-16): compact-row extractors already read data-*
+            # internally and may pull a unit_id from a child link's UnitID
+            # query param. Don't overwrite a richer unit_id with the
+            # generic helper's value.
+            if compact_extractor is None:
+                d_uid, d_apt, d_unum = _extract_data_uid_from_node(node)
+                if d_uid:
+                    unit["unit_id"] = d_uid
+                if d_apt:
+                    unit["apartmentid"] = d_apt
+                if d_unum and not unit.get("unit_number"):
+                    # Only set unit_number from data-* when the text-regex didn't
+                    # already extract one — preserves backward-compatible behaviour
+                    # for sites that have BOTH a visible unit number AND a
+                    # data-unit-number attribute (rare but possible).
+                    unit["unit_number"] = d_unum
+                unit["source_api_url"] = f"dom:{selector}"
+                unit["_source_url"] = source_url
+
+            # Dedup priority: real unit_id (truly unique) > unit_number >
+            # composite fingerprint.
+            dedup = (
+                unit.get("unit_id")
+                or unit.get("unit_number")
+                or f"{unit.get('rent_range') or ''}|{unit.get('sqft') or ''}|{unit.get('bedrooms') or ''}"
+            )
             if dedup in seen:
                 continue
             seen.add(dedup)
@@ -1916,9 +2426,23 @@ def extract_with_hints(
             unit["concession_text"] = conc_text
             unit["concession_source"] = "strikethrough_dom"
 
+        # D6 (2026-05-16): also harvest data-* identifiers under the
+        # hint-driven path. Same rationale as the default-cascade branch.
+        d_uid, d_apt, d_unum = _extract_data_uid_from_node(node)
+        if d_uid:
+            unit["unit_id"] = d_uid
+        if d_apt:
+            unit["apartmentid"] = d_apt
+        if d_unum and not unit.get("unit_number"):
+            unit["unit_number"] = d_unum
+
         unit["source_api_url"] = f"dom_hints:{container_sel}"
         unit["_source_url"] = source_url
-        dedup = unit["unit_number"] or f"{unit['rent_range']}|{unit['sqft']}|{unit['bedrooms']}"
+        dedup = (
+            d_uid
+            or unit["unit_number"]
+            or f"{unit['rent_range']}|{unit['sqft']}|{unit['bedrooms']}"
+        )
         if dedup in seen:
             continue
         seen.add(dedup)

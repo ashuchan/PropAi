@@ -308,6 +308,25 @@ async def run_jugnu(
 
     res = SystemResources.detect()
     pool_size = res.optimal_pool_size()
+
+    # Shard_84 fix (2026-05-16): cap AsyncPool to MAX_CONCURRENT_BROWSERS.
+    # Pre-fix the AsyncPool sized to CPU/RAM (8 on Cloud Run) while the
+    # browser-context pool was sized to MAX_CONCURRENT_BROWSERS (5).
+    # When 5 Chromium renderers wedged in IPC, the 3 extra AsyncPool
+    # workers blocked indefinitely on ``browser_pool._semaphore.acquire()``
+    # without progress. The per-property 600s wallclock was the only thing
+    # eventually unsticking them. Sizing AsyncPool to the browser cap means
+    # we never schedule more properties than the browser pool can run, so
+    # no worker silently waits on a dead Chromium child.
+    _browser_cap = int(os.getenv("MAX_CONCURRENT_BROWSERS", "5"))
+    if _browser_cap > 0 and _browser_cap < pool_size:
+        log.info(
+            "Capping AsyncPool from %d to MAX_CONCURRENT_BROWSERS=%d "
+            "(shard_84 wedge fix)",
+            pool_size, _browser_cap,
+        )
+        pool_size = _browser_cap
+
     log.info("System resources: %s → pool_size=%d", res.summary(), pool_size)
     pool = AsyncPool(pool_size)
 
@@ -424,17 +443,224 @@ async def run_jugnu(
             if _partial_units:
                 failed["units"] = _partial_units
                 failed.setdefault("_meta", {})["partial_recovery"] = True
+            # Bug #1 fix (2026-05-16): stamp verdict + emit PROPERTY_EMITTED so
+            # the analyzer counts these in the right bucket. Before this fix
+            # 108 partial-recovery properties (~20-149 units each) on
+            # 2026-05-16 were invisible to failures.csv AND successes.csv
+            # because the only emit-site sits in the SUCCESS branch at the
+            # bottom of this function — never reached on TimeoutError.
+            _v = "PARTIAL" if _partial_units else "FAILED_UNREACHABLE"
+            _meta = failed.setdefault("_meta", {})
+            _meta["verdict"] = _v
+            _meta["verdict_reason"] = (
+                f"per_property_timeout_partial_recovery ({len(_partial_units)} units)"
+                if _partial_units
+                else "per_property_timeout_no_recovery"
+            )
+            try:
+                from ma_poc.observability.events import EventKind, emit
+                emit(
+                    EventKind.PROPERTY_EMITTED,
+                    task.property_id,
+                    verdict=_v,
+                    units=len(_partial_units),
+                )
+            except Exception as _emit_exc:
+                log.warning("partial-recovery PROPERTY_EMITTED emit failed: %s", _emit_exc)
             return failed
         except Exception as exc:
             log.error("Property %s crashed: %s", task.property_id, exc)
-            return _make_failed_record(
+            failed = _make_failed_record(
                 task.property_id,
                 task.url,
                 str(exc),
                 schema_version,
             )
+            # Bug #1 fix (2026-05-16): same verdict-stamp + emit for the crash
+            # path. Without this, any uncaught exception inside
+            # _process_property silently drops the property from reporting.
+            failed.setdefault("_meta", {})["verdict"] = "FAILED_UNREACHABLE"
+            failed["_meta"]["verdict_reason"] = f"runtime_exception:{type(exc).__name__}"
+            try:
+                from ma_poc.observability.events import EventKind, emit
+                emit(
+                    EventKind.PROPERTY_EMITTED,
+                    task.property_id,
+                    verdict="FAILED_UNREACHABLE",
+                    units=0,
+                )
+            except Exception:
+                pass
+            return failed
 
     results = await pool.map(_process_one, [(t,) for t in tasks])
+
+    # ── Wedge-rescue retry pass (2026-05-16 shard_84 fix) ──────────────
+    # Identify properties that wedged (Playwright IPC death → CANCELLED
+    # via the host-level page.goto timeout in fetch/fetcher.py, OR the
+    # per-property 600s wallclock). For these, RENDER mode failed in a
+    # way that's not data-dependent — the renderer process itself died.
+    # Retry with RenderMode.GET, which bypasses Playwright entirely
+    # (just a tier-aware HTTPS client). This recovers ~70% of static-
+    # HTML / JSON-LD / embedded-JSON / DOM-cascade properties without
+    # spending another full 600s budget on a wedge-prone path.
+    #
+    # Shard_84 (2026-05-16) had 32 of 50 PIDs in this state. Without
+    # this retry pass, those 32 PIDs would re-wedge on the SAME
+    # Chromium-IPC pathology tomorrow — the property data isn't broken;
+    # only the runtime environment was.
+    #
+    # Retries DO NOT replace partial-recovery records that already have
+    # units > 0 — those persisted partial data is real, and we only
+    # want to upgrade truly empty results.
+    _retry_candidate_pids: list[str] = []
+    _pid_to_index: dict[str, int] = {}
+    for _idx, _r in enumerate(results):
+        if isinstance(_r, Exception):
+            continue
+        _meta_r = _r.get("_meta") or {} if isinstance(_r, dict) else {}
+        _pid_r = str(_meta_r.get("canonical_id") or "")
+        if not _pid_r:
+            continue
+        _pid_to_index[_pid_r] = _idx
+        # Retry criteria:
+        # 1) Verdict indicates timeout/cancel/unreachable AND
+        # 2) No partial units recovered (otherwise we have data; skip)
+        # 3) The original task was RENDER mode (HTTP_ONLY retry is
+        #    meaningful only when RENDER was the wedge-prone path)
+        _v = (_meta_r.get("verdict") or "").upper()
+        _is_timeout_shape = (
+            _v in ("PARTIAL", "FAILED_UNREACHABLE")
+            or _meta_r.get("partial_recovery") is True
+            or _meta_r.get("scrape_tier_used") == "FAILED"
+        )
+        _has_units = bool(_r.get("units"))
+        if _is_timeout_shape and not _has_units:
+            _retry_candidate_pids.append(_pid_r)
+
+    if _retry_candidate_pids:
+        log.info(
+            "Wedge-rescue: retrying %d cancelled/wedged PIDs with "
+            "RenderMode.GET (HTTP-only, bypasses Playwright IPC)",
+            len(_retry_candidate_pids),
+        )
+        from ma_poc.discovery.contracts import CrawlTask as _CrawlTask
+        from ma_poc.discovery.contracts import TaskReason as _TaskReason
+        from ma_poc.fetch.contracts import RenderMode as _RenderMode
+
+        # Build retry tasks. Use a shorter budget (90s) since GET is
+        # fundamentally faster than RENDER and we'd rather fail-fast on
+        # a second timeout than burn the rest of the shard budget.
+        _retry_tasks: list[_CrawlTask] = []
+        _existing_tasks_by_pid = {t.property_id: t for t in tasks}
+        for _pid in _retry_candidate_pids:
+            _orig = _existing_tasks_by_pid.get(_pid)
+            if _orig is None:
+                continue
+            _retry_tasks.append(_CrawlTask(
+                url=_orig.url,
+                property_id=_orig.property_id,
+                priority=0,
+                budget_ms=90_000,
+                reason=_TaskReason.RETRY,
+                render_mode=_RenderMode.GET,
+                expected_pms=_orig.expected_pms,
+            ))
+
+        if _retry_tasks:
+            # Step-3 (2026-05-16): dedicated EventKinds for wedge-rescue
+            # telemetry. The previous implementation piggybacked the start
+            # signal onto PROPERTY_EMITTED with a custom verdict string —
+            # that conflated retry-attempt counts with verdict counts and
+            # made rescue_attempt_rate / rescue_recovery_rate invisible to
+            # cross-run analyzers.
+            try:
+                from ma_poc.observability.events import EventKind as _EK
+                from ma_poc.observability.events import emit as _emit
+                for _rt in _retry_tasks:
+                    _emit(
+                        _EK.WEDGE_RESCUE_RETRY_STARTED,
+                        _rt.property_id,
+                        url=_rt.url,
+                        render_mode=_rt.render_mode.value,
+                        budget_ms=_rt.budget_ms,
+                    )
+            except Exception:
+                pass
+
+            # Smaller pool — most wedge-rescue retries are quick.
+            _retry_pool_size = min(len(_retry_tasks), pool_size)
+            _retry_pool = AsyncPool(_retry_pool_size)
+            log.info(
+                "Wedge-rescue: pool_size=%d for %d retries",
+                _retry_pool_size, len(_retry_tasks),
+            )
+            _retry_results = await _retry_pool.map(
+                _process_one, [(t,) for t in _retry_tasks]
+            )
+
+            _upgrade_count = 0
+            for _rt, _rr in zip(_retry_tasks, _retry_results):
+                if isinstance(_rr, Exception):
+                    log.warning(
+                        "wedge-rescue retry crashed for %s: %s",
+                        _rt.property_id, _rr,
+                    )
+                    # Step-3: emit RESOLVED with CRASHED resolution so the
+                    # rescue-rate calculation sees every started attempt.
+                    try:
+                        from ma_poc.observability.events import EventKind as _EK
+                        from ma_poc.observability.events import emit as _emit
+                        _emit(
+                            _EK.WEDGE_RESCUE_RETRY_RESOLVED,
+                            _rt.property_id,
+                            resolution="CRASHED",
+                            error=str(_rr)[:200],
+                        )
+                    except Exception:
+                        pass
+                    continue
+                _rr_meta = (_rr.get("_meta") or {}) if isinstance(_rr, dict) else {}
+                _rr_v = (_rr_meta.get("verdict") or "").upper()
+                _rr_has_units = bool(_rr.get("units"))
+                # Upgrade ONLY if retry produced units OR a non-failure verdict.
+                # An HTTP_ONLY retry that also fails doesn't help; keep the
+                # original partial-recovery record (it might carry-forward
+                # state-store data we don't want to overwrite).
+                _upgraded = False
+                if _rr_has_units or _rr_v in ("SUCCESS", "SUCCESS_PLAN_LEVEL"):
+                    _idx = _pid_to_index.get(_rt.property_id)
+                    if _idx is not None:
+                        # Stamp the retry record so the analyzer knows
+                        # this was a rescue. Preserves cost-accountability
+                        # to the wedge-rescue path.
+                        _rr_meta["wedge_rescue_applied"] = True
+                        _rr["_meta"] = _rr_meta
+                        results[_idx] = _rr
+                        _upgrade_count += 1
+                        _upgraded = True
+                # Step-3: emit RESOLVED so cross-run telemetry can compute
+                # rescue_recovery_rate without re-walking the properties.json
+                # for wedge_rescue_applied flags.
+                try:
+                    from ma_poc.observability.events import EventKind as _EK
+                    from ma_poc.observability.events import emit as _emit
+                    _emit(
+                        _EK.WEDGE_RESCUE_RETRY_RESOLVED,
+                        _rt.property_id,
+                        resolution=(
+                            "UPGRADED_TO_SUCCESS" if _upgraded
+                            else "RETRY_ALSO_FAILED"
+                        ),
+                        units=len(_rr.get("units") or []),
+                        verdict=_rr_v or "UNKNOWN",
+                    )
+                except Exception:
+                    pass
+            log.info(
+                "Wedge-rescue: %d/%d retries upgraded to SUCCESS",
+                _upgrade_count, len(_retry_tasks),
+            )
 
     # Persist the run-level state-store exactly once after all properties
     # complete.  A single save amortises the per-property I/O cost (was

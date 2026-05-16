@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
-import { CheckCircle2, XCircle, AlertTriangle, Info, Clock, FileText, DollarSign, X } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Info, Clock, FileText } from 'lucide-react';
 import { useRunHistory } from '@/hooks/useRunHistory';
 import { useQuery } from '@tanstack/react-query';
-import {
-  fetchRunByDate, fetchLlmReport, fetchLlmPropertyDetail,
-  type LlmPropertySummary, type LlmPropertyDetail, type LlmBreakdownEntry,
-} from '@/api/runs';
+import { fetchRunByDate } from '@/api/runs';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
-import { formatPercent, formatNumber, formatDuration, formatDate, formatCostUsd } from '@/utils/formatters';
+import { formatPercent, formatNumber, formatDuration, formatDate } from '@/utils/formatters';
 
 export function ReportsPage() {
   const { data: history, isLoading } = useRunHistory(60);
@@ -67,7 +64,6 @@ export function ReportsPage() {
                     <span>·</span>
                     <span>{formatDuration(run.durationSeconds)}</span>
                   </div>
-                  {run.llmCostUsd > 0 && <div className="mt-0.5 flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400"><DollarSign size={10} /><span className="font-mono">{formatCostUsd(run.llmCostUsd)}</span><span className="text-slate-500">· {run.llmCallCount} calls</span></div>}
                 </div>
               </button>
             );
@@ -121,16 +117,13 @@ function ReportContent({ report }: { report: any }) {
 
       <section>
         <h3 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">Totals</h3>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <MetricCard label="Success Rate" value={formatPercent(report.successRate)} accentColor={successRateColor} />
           <MetricCard label="Properties" value={`${formatNumber(report.succeeded)} / ${formatNumber(report.totalProperties)}`} />
           <MetricCard label="Failed" value={formatNumber(report.failed)} accentColor={report.failed > 0 ? '#E24B4A' : undefined} />
           <MetricCard label="Units Extracted" value={formatNumber(report.unitsExtracted)} />
-          <MetricCard label="LLM Cost" value={formatCostUsd(report.llmCostUsd)} subtitle={`${formatNumber(report.llmCallCount)} calls`} accentColor={report.llmCostUsd > 0 ? '#EF9F27' : undefined} />
         </div>
       </section>
-
-      <LlmSection report={report} />
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
         <h3 className="mb-3 text-[16px] font-medium text-slate-900 dark:text-slate-100">Pipeline Breakdown</h3>
@@ -202,248 +195,6 @@ function ReportContent({ report }: { report: any }) {
           </div>
         </section>
       )}
-    </div>
-  );
-}
-
-function LlmSection({ report }: { report: any }) {
-  const br = report.llmBreakdown || {};
-  const hasLlm = (report.llmCostUsd || 0) > 0 || (report.llmCallCount || 0) > 0;
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
-
-  // Run-wide LLM report (for by_property list). Enabled only when LLM data exists.
-  const { data: llmReport } = useQuery({
-    queryKey: ['llm-report', report.date],
-    queryFn: () => fetchLlmReport(report.date),
-    enabled: hasLlm && !!report.date,
-  });
-
-  return (
-    <section className="rounded-xl border border-amber-200 bg-amber-50/40 p-5 dark:border-amber-900/50 dark:bg-amber-950/20">
-      <div className="mb-3 flex items-center gap-2">
-        <DollarSign size={18} className="text-amber-600 dark:text-amber-400" />
-        <h3 className="text-[16px] font-medium text-slate-900 dark:text-slate-100">LLM Cost & Usage</h3>
-      </div>
-      {!hasLlm && <p className="text-[12px] text-slate-500">No LLM calls were made during this run.</p>}
-      {hasLlm && (
-        <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <MetricCard label="Total Cost" value={formatCostUsd(report.llmCostUsd)} accentColor="#EF9F27" />
-            <MetricCard label="Total Calls" value={formatNumber(report.llmCallCount)} subtitle={`${br.successfulCalls ?? 0} ok · ${br.failedCalls ?? 0} failed`} />
-            <MetricCard label="Total Tokens" value={formatNumber(report.llmTokensTotal)} subtitle={`${formatNumber(br.tokensInput ?? 0)} in / ${formatNumber(br.tokensOutput ?? 0)} out`} />
-            <MetricCard label="Properties Using LLM" value={formatNumber(br.propertiesWithLlm ?? 0)} />
-          </div>
-          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <LlmBreakdownCard title="By Tier" entries={br.byTier} />
-            <LlmBreakdownCard title="By Provider" entries={br.byProvider} />
-            <LlmBreakdownCard title="By Model" entries={br.byModel} />
-          </div>
-          {llmReport && llmReport.byProperty.length > 0 && (
-            <LlmPerPropertyTable
-              rows={llmReport.byProperty}
-              onSelect={setSelectedPropertyId}
-            />
-          )}
-        </>
-      )}
-      {selectedPropertyId && (
-        <LlmPropertyDrawer
-          date={report.date}
-          propertyId={selectedPropertyId}
-          onClose={() => setSelectedPropertyId(null)}
-        />
-      )}
-    </section>
-  );
-}
-
-function LlmBreakdownCard({ title, entries }: { title: string; entries?: Record<string, LlmBreakdownEntry> }) {
-  const rows = Object.entries(entries || {}).sort((a, b) => b[1].costUsd - a[1].costUsd);
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-      <h4 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">{title}</h4>
-      {rows.length === 0 ? (
-        <p className="text-[11px] text-slate-500">—</p>
-      ) : (
-        <ul className="space-y-1.5">
-          {rows.map(([key, v]) => (
-            <li key={key} className="flex items-center justify-between gap-2 text-[12px]">
-              <span className="truncate text-slate-700 dark:text-slate-300" title={key}>{key}</span>
-              <span className="font-mono text-slate-900 dark:text-slate-100">{formatCostUsd(v.costUsd)}</span>
-              <span className="w-12 text-right font-mono text-[10px] text-slate-500">{v.calls}×</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function LlmPerPropertyTable({
-  rows, onSelect,
-}: { rows: LlmPropertySummary[]; onSelect: (id: string) => void }) {
-  const sorted = [...rows].sort((a, b) => b.costUsd - a.costUsd);
-  return (
-    <div className="mt-5 rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 dark:border-slate-700">
-        <h4 className="text-[13px] font-medium text-slate-900 dark:text-slate-100">Per-Property LLM Cost</h4>
-        <span className="font-mono text-[11px] text-slate-500">{sorted.length} properties</span>
-      </div>
-      <div className="max-h-[420px] overflow-auto">
-        <table className="w-full text-[12px]">
-          <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/80">
-            <tr className="border-b border-slate-200 dark:border-slate-700">
-              <th className="px-3 py-2 text-left font-medium uppercase tracking-wide text-slate-500">Property</th>
-              <th className="px-3 py-2 text-right font-medium uppercase tracking-wide text-slate-500">Calls</th>
-              <th className="px-3 py-2 text-right font-medium uppercase tracking-wide text-slate-500">Tokens</th>
-              <th className="px-3 py-2 text-right font-medium uppercase tracking-wide text-slate-500">Cost</th>
-              <th className="px-3 py-2 text-right font-medium uppercase tracking-wide text-slate-500">OK / Fail</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map(r => (
-              <tr
-                key={r.propertyId}
-                onClick={() => onSelect(r.propertyId)}
-                className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-amber-50/50 dark:border-slate-800 dark:hover:bg-amber-950/20"
-                title="Click for call-by-call detail"
-              >
-                <td className="px-3 py-2 font-mono text-slate-900 dark:text-slate-100">{r.propertyId}</td>
-                <td className="px-3 py-2 text-right font-mono text-slate-700 dark:text-slate-300">{formatNumber(r.calls)}</td>
-                <td className="px-3 py-2 text-right font-mono text-slate-700 dark:text-slate-300">{formatNumber(r.tokensTotal)}</td>
-                <td className="px-3 py-2 text-right font-mono text-amber-700 dark:text-amber-400">{formatCostUsd(r.costUsd)}</td>
-                <td className="px-3 py-2 text-right font-mono text-[11px]">
-                  <span className="text-emerald-600 dark:text-emerald-400">{r.successful}</span>
-                  <span className="text-slate-400"> / </span>
-                  <span className={r.failed > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-400'}>{r.failed}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function LlmPropertyDrawer({
-  date, propertyId, onClose,
-}: { date: string; propertyId: string; onClose: () => void }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['llm-property', date, propertyId],
-    queryFn: () => fetchLlmPropertyDetail(date, propertyId),
-  });
-  return (
-    <div
-      className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="h-full w-full max-w-[720px] overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-950"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="font-display text-[20px] text-slate-900 dark:text-slate-100">LLM Call Detail</h3>
-            <p className="mt-0.5 font-mono text-[12px] text-slate-500">{propertyId} · {date}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        {isLoading && <LoadingSkeleton variant="card" count={2} />}
-        {!isLoading && !data && <EmptyState title="No detail report" description="Per-property LLM report was not written for this run." />}
-        {!isLoading && data && <LlmPropertyDetailBody detail={data} />}
-      </div>
-    </div>
-  );
-}
-
-function LlmPropertyDetailBody({ detail }: { detail: LlmPropertyDetail }) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <MetricCard label="Cost" value={formatCostUsd(detail.totalCostUsd)} accentColor="#EF9F27" />
-        <MetricCard label="Calls" value={formatNumber(detail.totalCalls)} subtitle={`${detail.successfulCalls} ok · ${detail.failedCalls} failed`} />
-        <MetricCard label="Tokens In" value={formatNumber(detail.tokensInput)} />
-        <MetricCard label="Tokens Out" value={formatNumber(detail.tokensOutput)} />
-      </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <LlmBreakdownCard title="By Tier" entries={detail.byTier} />
-        <LlmBreakdownCard title="By Provider" entries={detail.byProvider} />
-        <LlmBreakdownCard title="By Model" entries={detail.byModel} />
-      </div>
-      <div>
-        <h4 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-          Interactions ({detail.interactions.length})
-        </h4>
-        <div className="space-y-2">
-          {detail.interactions.map((i, idx) => (
-            <InteractionRow key={idx} i={i} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InteractionRow({ i }: { i: LlmPropertyDetail['interactions'][number] }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div className={clsx(
-      'rounded-lg border p-3 text-[12px]',
-      i.success
-        ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
-        : 'border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/20'
-    )}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className={clsx(
-            'rounded px-1.5 py-0.5 font-mono text-[10px]',
-            'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
-          )}>{i.tier || '—'}</span>
-          <span className="font-mono text-[11px] text-slate-500">{i.provider} · {i.model}</span>
-          {!i.success && <span className="rounded bg-red-100 px-1.5 py-0.5 font-mono text-[10px] text-red-800 dark:bg-red-950 dark:text-red-200">FAILED</span>}
-        </div>
-        <div className="flex items-center gap-3 font-mono text-[11px]">
-          <span className="text-slate-500">{formatNumber(i.tokensTotal)} tok</span>
-          <span className="text-slate-500">{i.latencyMs}ms</span>
-          <span className="text-amber-700 dark:text-amber-400">{formatCostUsd(i.costUsd)}</span>
-          <button
-            onClick={() => setExpanded(e => !e)}
-            className="text-rent-600 hover:underline dark:text-rent-400"
-          >
-            {expanded ? 'hide' : 'prompts'}
-          </button>
-        </div>
-      </div>
-      {i.error && <div className="mt-1.5 font-mono text-[11px] text-red-700 dark:text-red-300">{i.error}</div>}
-      {expanded && (
-        <div className="mt-3 space-y-2">
-          {i.systemPrompt && (
-            <PromptBlock label="System" text={i.systemPrompt} />
-          )}
-          {i.userPrompt && (
-            <PromptBlock label="User" text={i.userPrompt} />
-          )}
-          {i.rawResponse && (
-            <PromptBlock label="Response" text={i.rawResponse} />
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PromptBlock({ label, text }: { label: string; text: string }) {
-  return (
-    <div>
-      <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <pre className="max-h-[240px] overflow-auto rounded bg-slate-50 p-2 font-mono text-[11px] leading-relaxed text-slate-800 dark:bg-slate-800 dark:text-slate-200">{text}</pre>
     </div>
   );
 }

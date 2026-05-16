@@ -1,8 +1,8 @@
-import { Newspaper, Terminal, Map } from 'lucide-react';
+import { Newspaper, Terminal } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useViewStore } from '@/stores/viewStore';
 import type { ViewMode } from '@/types/views';
-const VIEW_OPTIONS: Array<{ mode: ViewMode; label: string; icon: typeof Newspaper }> = [{ mode: 'editorial', label: 'Magazine', icon: Newspaper }, { mode: 'terminal', label: 'Terminal', icon: Terminal }, { mode: 'spatial', label: 'Map', icon: Map }];
+const VIEW_OPTIONS: Array<{ mode: ViewMode; label: string; icon: typeof Newspaper }> = [{ mode: 'editorial', label: 'Magazine', icon: Newspaper }, { mode: 'terminal', label: 'Terminal', icon: Terminal }];
 export function ViewSwitcher() {
   const { activeView, setActiveView } = useViewStore();
   return (
