@@ -29,3 +29,4 @@ n,url,verdict,pattern
 28,liveatechopointe.com,U,per-unit page /unit/<slug>
 29,liveatbrookstoneapartments.com,U,/apartments/1-bedroom unit-level (user-confirmed)
 30,syncatharmony.com,U,image-confirmed unit table (Unit#+rent+avail+term+floor)
+31,lochravenapts.com,U-deep,multi-step: viewfp->config-dropdown->page->check-availability->/content/apply#k=<id> portal->click (N)Available->units (likely CLUSTER - investigating)
