@@ -1,0 +1,15 @@
+  https://thearno.com                         run_extracted= 36 live_aspx_rows= 38 live_parsed= 36  OK
+  https://www.thehenryapartments.com          run_extracted=  7 live_aspx_rows=  9 live_parsed=  7  OK
+  http://www.theplatformkent.com              run_extracted=  8 live_aspx_rows= 10 live_parsed=  8  OK
+  https://www.residencesatkingfarm.com        run_extracted= 32 live_aspx_rows= 34 live_parsed= 32  OK
+  http://www.woodlandparktopeka.com           run_extracted= 20 live_aspx_rows= 22 live_parsed= 20  OK
+  https://www.parcviewisyourhome.com/?rcstdi  run_extracted= 15 live_aspx_rows= 17 live_parsed= 15  OK
+  https://www.waterlynnatconcord.com          run_extracted= 15 live_aspx_rows= 17 live_parsed= 15  OK
+  http://www.bishopsgateapts.com              run_extracted= 12 live_aspx_rows= 14 live_parsed= 12  OK
+  https://cortland.com/apartments/cortland-o  run_extracted= 27 live_aspx_rows= 29 live_parsed= 27  OK
+  http://www.909flats.com                     run_extracted= 19 live_aspx_rows= 23 live_parsed= 21  OK
+  https://www.belmontapts.com                 run_extracted= 20 live_aspx_rows= 22 live_parsed= 20  OK
+  https://www.infinityonyorktown.com/?rcstdi  run_extracted= 22 live_aspx_rows= 24 live_parsed= 22  OK
+
+  comparable=12  not-systematically-undercounting (run>=70% of live): 12/12
+  (time-drift expected: availability changes day-to-day; flag only large systematic gaps)

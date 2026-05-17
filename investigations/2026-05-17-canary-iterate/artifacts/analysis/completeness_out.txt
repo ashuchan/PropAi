@@ -1,0 +1,36 @@
+=== APTS247 (extracted vs source-truth) ===
+  https://www.thesilverstoneapts.com              got=5 truth=4
+  https://www.crockerparkliving.com               got=9 truth=9
+  https://www.creeksidevillageclovis.com          got=5 truth=4
+  https://www.liveuniversityplaza.com             got=14 truth=14
+  https://www.chaseonmonroeapts.com               got=4 truth=0
+  www.aspencourtapartmenthomes.com                got=3 truth=0
+  http://www.dellagohouston.com                   got=26 truth=26
+  https://www.zurabay.com                         got=5 truth=0
+  https://www.reverbapartments.com                got=16 truth=17 UNDER
+  https://www.montaraapts.com                     got=3 truth=3
+  www.centerparkapartments.com                    got=3 truth=0
+  https://www.stoneoakapt.com                     got=6 truth=6
+  http://www.lakeviewatthebayapartments.com       got=18 truth=16
+  https://www.luxorgardens.com                    got=3 truth=0
+  www.harborview-apartments.com                   got=6 truth=0
+  COMPLETE 8/9 (got>=source truth)
+
+=== SECURECAFE (extracted vs source-truth) ===
+  https://liveatrvr.com/                          got=4 truth=no-url
+  http://www.belmontatfreemason.com               got=10 truth=no-url
+  https://www.livesevenoaks.com/                  got=42 truth=no-url
+  https://www.bellbradburn.com/                   got=26 truth=no-url
+  https://www.parkwoodplazaapts.com/              got=10 truth=no-url
+  https://www.mtcarmelapts.com/                   got=12 truth=no-url
+  https://www.thevillageboise.com                 got=17 truth=no-url
+  https://www.castlerockbillings.com/?rcstdid=Mg  got=8 truth=no-url
+  https://www.shadetreetrace.com/?rcstdid=Mg%3D%  got=14 truth=no-url
+  https://www.cliffsatbartoncreek.com/            got=12 truth=no-url
+  https://www.livesunsetgardens.com/              got=11 truth=no-url
+  http://www.renthamiltonhouse.com/hamilton-hous  got=24 truth=no-url
+  https://www.argentoatsugarloaf.com/             got=49 truth=no-url
+  https://www.woodsofposthouse.com/               got=9 truth=no-url
+  www.rent2700.com                                got=31 truth=no-url
+  COMPLETE 0/0 (got>=source truth)
+

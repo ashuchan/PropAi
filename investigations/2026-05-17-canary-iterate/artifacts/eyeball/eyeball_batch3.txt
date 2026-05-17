@@ -1,0 +1,55 @@
+NEEDS-EYEBALL BATCH 3 — 50 sites (sample of 385 JS-rendered 'no static signal')
+For each: open site -> go to its Floor Plans / Availability (and a specific floorplan if needed).
+Verdict per #: U = has per-unit data (unit/apt/suite# + $ + avail) | F = floorplan-only (from $X) | D = dead/no site
+Fast format to reply: e.g. 1U 2F 3U 4D ...
+
+ 1. https://www.royceattrumbull.com/
+ 2. https://www.solanobelleair.com/
+ 3. https://www.summitonthehudson.com/
+ 4. http://www.parkvanness.com/
+ 5. https://www.elevatetosequoia.com/apartments/ca/sacramento/shore-park-at-riverlake/
+ 6. https://www.1900pacific.com/
+ 7. https://www.smdproperty.com/resident-properties/country-club-apartments/
+ 8. https://ascendnonawest.com/?utm_source=gbp&utm_medium=organic&utm_campaign=website_clicks
+ 9. https://www.liveatcivicsquare.com/
+10. https://tvcproperties.com/community-detail/?pid=19
+11. https://integrapalms.com/
+12. https://www.solaire7607.com/
+13. https://www.alapts.com/apartments/tx/spring/waterford-trails/
+14. https://www.aspenmeadowky.com/
+15. https://livevictorprosper.com/
+16. https://www.liveastonpointe.com/
+17. https://broadstoneparagon.com/
+18. https://parkplace380.com/listings/aster-village-two/
+19. https://www.residecrosbyhill.com/
+20. https://www.liveemersonpark.com/
+21. http://www.colonialcourtapts.com
+22. https://www.irvinecompanyapartments.com/locations/orange-county/irvine/oak-creek/oak-glen.html
+23. https://www.westwoodterraceliving.com/
+24. https://www.independenceplaceapts.com
+25. https://www.marqonburnet.com/
+26. https://www.theridgehagerstown.com/
+27. http://www.stewartlangleyproperties.com/kendall-square/
+28. https://www.liveatechopointe.com/
+29. https://www.liveatbrookstoneapartments.com/?utm_source=GMB&utm_medium=organic
+30. http://www.syncatharmony.com/
+31. https://www.lochravenapts.com/
+32. https://www.thecoloniesapartments.com/
+33. https://www.edgemerecrossing.com/
+34. https://www.ishranchestates.com/allen-ranch
+35. https://www.aspirethunderbird.com/
+36. https://www.lewisapartments.com/the-enclave-at-homecoming-terra-vista-rancho-cucamonga-ca/
+37. https://www.6151winthrop.com/
+38. http://www.woodviewatrandolph.com/
+39. https://www.grandpalms.com/
+40. https://www.springsapartments.com/apartments/co/denver/springs-at-pena-station/
+41. https://www.centuryatballpark.com/#Home
+42. https://www.mqsonoranpreserve.com/
+43. http://www.socoapartments.com/
+44. https://www.villamilano.us/
+45. https://www.thekentcarmel.com/
+46. https://karademas.org/properties/windpoint
+47. https://www.emersonparkapartmenthomes.com/
+48. https://waynewoodapts.com/
+49. https://www.irvinecompanyapartments.com/locations/san-diego/carlsbad/pacific-view.html
+50. https://www.spearheadproperties.com/property/elm/
