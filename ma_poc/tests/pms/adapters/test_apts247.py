@@ -68,6 +68,10 @@ def test_parse_emits_unit_level_rows() -> None:
     assert studio["bedrooms"] == "0"
     assert studio["availability_status"] == "AVAILABLE"
     assert studio["availability_date"] == "2025-12-02"
+    # Regression: blank API ``number`` must fall back to the real unit
+    # ``id`` so the row keeps a natural identity (not an inferred_ id)
+    # and is admitted as true unit-level, not demoted to floorplan.
+    assert studio["unit_number"] == "apt-1622720"
 
     a1_units = [r for r in rows if r["floor_plan_name"] == "A1"]
     assert {u["unit_number"] for u in a1_units} == {"204", "311"}

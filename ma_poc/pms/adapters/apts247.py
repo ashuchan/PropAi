@@ -105,6 +105,15 @@ def parse_apts247_floorplans(
                 rent_i = _rent_to_int(u.get("rent"))
                 if rent_i is None:
                     rent_i = plan_rent
+                # Apts247 frequently leaves ``number`` blank but every unit
+                # carries a real, stable PMS ``id`` (e.g. 1785008). Without a
+                # natural identifier the row gets an ``inferred_`` fallback
+                # unit_id and is demoted to floorplan-level. The numeric id
+                # IS the unit's canonical system identity — use it so the
+                # row is admitted as true unit-level.
+                unum = str(u.get("number") or "").strip()
+                if not unum and u.get("id") is not None:
+                    unum = f"apt-{u.get('id')}"
                 units.append(
                     make_unit_dict(
                         floor_plan_name=plan_name,
@@ -115,7 +124,7 @@ def parse_apts247_floorplans(
                         or beds,
                         bathrooms=baths_s,
                         sqft=str(u.get("sq_ft") or plan_sqft or ""),
-                        unit_number=str(u.get("number") or "").strip(),
+                        unit_number=unum,
                         floor=str(u.get("floor") or ""),
                         building=str(u.get("building") or ""),
                         rent_low=rent_i,

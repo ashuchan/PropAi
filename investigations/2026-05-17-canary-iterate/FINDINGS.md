@@ -440,3 +440,75 @@ Chrome-probe, absent from 295 curl-probe top platforms). These sites
 correctly belong to DOM/Tier-3/LLM, usually floorplan-level. Do NOT
 build a RentManager adapter. apts247 remains the only genuine
 no-signature cluster win.
+
+## ★ bigpool skm2m — slow, not failed (diagnosis) ★
+skm2m describe reports succeeded=9/10 but only shard_7 uploaded
+(139 props, 20 failed, 82/139 Tier-1 — securecafe-heavy via proxy,
+proxy path WORKS). 75+min in, other 9 shards still actively logging
+LLM/DOM analysis (17:47) — NOT dead, just slow: iter-13 = heavy
+full patchright renders × ~138 sites/shard through residential proxy
+= throughput-bound. Cloud Run succeededCount is unreliable mid-exec;
+GCS uploads + "Jugnu run complete" logs are authoritative (=1 so far).
+TAKEAWAY: confirms probe-only proxying (iter-13 _probe.py design) is
+the cost+throughput-correct path; full proxied renders do not scale
+in a Cloud Run task. #2-cohort derivation: use qualgap residual +
+securecafe failures rather than waiting on this slow run.
+
+## ★ DOM/LLM EXHAUSTIVE CAMPAIGN (user-directed, no sampling) ★
+Residual = prod 2026-05-17 props NOT genuine Tier-1 unit-level =
+3,456 sites. Ledger /tmp/domllm_ledger.json (resumable). Method:
+exhaustive curl-fingerprint ALL 3,456 (checks every site, not a
+sample) → Chrome-MCP deep-probe per CLUSTER + every true one-off →
+cluster adapter per cluster (apts247 model: 1 adapter=223 sites) →
+bespoke only for irreducible uniques. Phase 1 (fingerprint all)
+running brmgnez2e.
+
+## ★ EXHAUSTIVE 3,456 TRIAGE — 0 need bespoke code (decisive) ★
+Fingerprinted ALL 3,456 DOM/LLM-residual sites (every one, no
+sample). Full disposition:
+  2,861 KNOWN-adapter platforms (securecafe 1400, sightmap 421,
+        rentcafe 195, apts247 168, onesite 165, g5/appfolio/funnel/
+        entrata/resman 470, realpage/spherexx) — adapter EXISTS;
+        residual cause = CF GCP-IP block + detection-miss, NOT
+        missing code. Fix = iter-14/15 proxy+WU+adapters (proven:
+        cohort63 70%, qualgap 57%).
+   246 site-builders (duda/wix/sqsp/webflow/elfsight/wp) — templated,
+        generic/LLM tier (not per-site bespoke).
+    50 none+JSON-LD → Tier-2 (existing).
+   116 none+bot-walled (recaptcha/CF) → WU/proxy (iter-14).
+    35 ERR/dead-domain → genuinely unscrapeable.
+     0 genuinely bespoke / needs custom per-site code.
+⇒ "each site is different, build custom code per site" is empirically
+  FALSE for the residual: 100% clustered/categorised, 0% bespoke.
+  Correct action = run through iter-15 stack & measure, NOT 3,456
+  scripts. Launched: securecafe-1400 cohort (t4g77, biggest lever,
+  40% of residual) + apts247-223 (hfddn) on iter-15.
+
+## ★ SEQUENTIAL CLUSTER COHORTS (user: one-by-one, securecafe LAST) ★
+Speed disclosure: the 3,456 fingerprint = parallel static curl_cffi
+(40 workers), NOT Chrome-MCP per-site → fast but under-detects JS-
+injected platforms (apts247 trap). Triage, not ground truth.
+Order: resman→spherexx→realpage→entrata→funnel→appfolio→g5→onesite
+→rentcafe→sightmap→securecafe(1400, LAST). securecafe t4g77 premature
+run CANCELLED per user sequencing.
+COHORT0 apts247 (hfddn, iter-15, 223): TIER_1_API_APTS247 won 99;
+TRUE Tier-1 unit 92/223 (41%); any unit-level 171/223 (77%). New
+adapter validated at scale (99 deterministic wins vs 0 pre-iter15).
+
+## ★ ROOT-CAUSE PIVOT: "partial" = unit data reached but IDENTITY dropped ★
+User reframe: assume units exist; floorplan-level output = we failed
+to reach them. Diagnosed 489 cohort sites: dominant failure is NOT
+unreachable (bot/dead = 4%) but "partial floorplan/no-rent" = 30%
+(data reached, extracted shallow). Probed apts247-partial: 4/5 truly
+have 0 current units (plan-level correct) but cypresslakeapartments
+had real units (id 1785008 rent $1019) my adapter MISSED.
+ROOT CAUSE (identity.py:233 assign_fallback_unit_id): empty
+unit_number → inferred_ unit_id → fails Tier-1 unit-level test →
+demoted to floorplan despite TIER_1_API_APTS247 winning. Apts247
+leaves ``number`` blank but every unit has a real PMS ``id``.
+ITER-16 FIX: apts247 blank number → unit_number=f"apt-{id}" (real
+canonical identity). Live re-validate: cypress 0→10 unit-level,
+thelakelofts 63/63. Flips the ~23 apts247-partial (TIER_1_API_APTS247
+-but-floorplan) to true Tier-1. Same bug-class candidate: ResMan
+(Number sometimes blank) — needs its own probe (confirm stable id
+field exists before applying).
