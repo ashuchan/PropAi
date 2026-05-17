@@ -512,3 +512,21 @@ thelakelofts 63/63. Flips the ~23 apts247-partial (TIER_1_API_APTS247
 -but-floorplan) to true Tier-1. Same bug-class candidate: ResMan
 (Number sometimes blank) — needs its own probe (confirm stable id
 field exists before applying).
+
+## ★ ResMan partial root-cause (iter-17 design, not rushed) ★
+Chrome-MCP probe barrettcreekapts.com/floorplans/: portal link
+DOES exist — milkman.myresman.com/Portal/Applicants/Availability
+?a=&p= — as a JS-rendered <a href>, NOT in static HTML and NOT in
+any inline <script> (so curl_cffi _fetch can't see it; adapter
+returns NO_PORTAL → floorplan demote). The a=/p= params are only in
+the rendered link, so the portal can't be reconstructed without the
+rendered DOM. FIX (iter-17, deferred — pipeline integration, not a
+safe one-liner): ResMan discovery must read the portal link from the
+patchright-RENDERED /floorplans/ DOM the pipeline already produces,
+not a static curl refetch. Affects ~37-39 resman-partial + likely
+much of the 1,400-class portal-hop pool. Documented; not rushed.
+
+## ITER-16 image build in progress (buhqzdlu6) for apts247-fix re-run.
+Method validated end-to-end: diagnose partial → confirm unit data
+exists → root-cause why unreached → fix (apts247) or design (resman).
+This is "see what works/what doesn't", not blind scraping.
