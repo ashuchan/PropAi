@@ -469,6 +469,44 @@ async def scrape(
             initial_detection = html_detection
             result["_detected_pms"] = _detection_to_dict(initial_detection)
 
+    # --- Step 4b: detection rescue via curl_cffi homepage refetch -----------
+    # 2026-05-17 iter-11 (canary 842-pool deep-probe): the patchright-
+    # rendered page_html frequently hides PMS markers that ARE present in
+    # the raw server HTML (post-render mutation / behind menus / CF shell).
+    # Same root-cause class as the securecafe iter-9 fix. When detection is
+    # still unknown/custom, curl_cffi-refetch the homepage (CF-bypass,
+    # proxy-independent) and re-detect on that. Recovers the misclassified-
+    # but-adapter-exists clusters (RealPage/OneSite, Funnel, Spherexx,
+    # ResMan, Entrata, securecafe, …) the 842 probe surfaced.
+    if initial_detection.pms in ("unknown", "custom"):
+        try:
+            from urllib.parse import urlparse as _up
+
+            _p = _up(_effective_url)
+            if _p.scheme and _p.netloc:
+                from curl_cffi import requests as _creqd
+
+                _rr = _creqd.get(
+                    f"{_p.scheme}://{_p.netloc}/",
+                    impersonate="chrome120",
+                    timeout=20,
+                    allow_redirects=True,
+                )
+                if _rr.status_code == 200 and _rr.text:
+                    _rd = detect_pms(_effective_url, csv_row=csv_row, page_html=_rr.text)
+                    if (
+                        _rd.pms not in ("unknown", "custom")
+                        and _rd.confidence > initial_detection.confidence
+                    ):
+                        initial_detection = _rd
+                        result["_detected_pms"] = _detection_to_dict(initial_detection)
+                        result["_detection_rescued"] = {
+                            "via": "curl_cffi_homepage_refetch",
+                            "pms": _rd.pms,
+                        }
+        except Exception as _dr_exc:  # pragma: no cover - defensive
+            log.warning("detection-rescue failed for %s: %s", property_id, _dr_exc)
+
     # --- Telemetry A: detector signals ----------------------------------------
     # Attach raw detector inputs to the result so the per-property report can
     # render them, and emit DETECTOR_SIGNALS for ledger-level analytics.
