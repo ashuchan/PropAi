@@ -871,6 +871,40 @@ async def scrape(
     except Exception as _rescue_exc:
         log.warning("F2 rescue orchestration failed for %s: %s", property_id, _rescue_exc)
 
+    # --- Step 7b: Entrata→SightMap secondary adapter -----------------------
+    # Many Entrata-hosted communities embed a SightMap interactive map that
+    # carries the real unit inventory (the Entrata floorplan module returns
+    # nothing). Both fingerprints match; the router commits to Entrata, it
+    # yields 0 units, and we'd otherwise drop to the generic LLM cascade.
+    # When the rendered HTML carries a SightMap embed code or inline API
+    # URL, run the SightMap adapter first — it's a deterministic Tier-1
+    # path that beats the LLM fallback on cost and accuracy.
+    if (
+        not adapter_result.units
+        and pms_name == "entrata"
+        and page_html
+    ):
+        try:
+            from ma_poc.pms.adapters.sightmap import (
+                SightMapAdapter,
+                find_sightmap_direct_api_urls,
+                find_sightmap_embed_codes,
+            )
+
+            if find_sightmap_embed_codes(page_html) or find_sightmap_direct_api_urls(page_html):
+                sm_result = await SightMapAdapter().extract(page, ctx)  # type: ignore[arg-type]
+                if sm_result.units:
+                    adapter_result = sm_result
+                    adapter_name = "sightmap"
+                    result["_adapter_used"] = "sightmap"
+                    fallback_chain.append("sightmap:entrata_secondary")
+        except Exception as _sm_exc:  # pragma: no cover - defensive
+            log.warning(
+                "Entrata→SightMap secondary failed for %s: %s",
+                property_id,
+                _sm_exc,
+            )
+
     # --- Step 8: Fallback to generic if adapter returned empty ---
     if not adapter_result.units and pms_name != "unknown" and adapter_name != "generic":
         generic = get_adapter("unknown")  # resolves to generic
