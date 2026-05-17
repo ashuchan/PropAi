@@ -484,7 +484,7 @@ async def scrape(
 
             _p = _up(_effective_url)
             if _p.scheme and _p.netloc:
-                from curl_cffi import requests as _creqd
+                from ma_poc.pms.adapters._probe import probe_get as _creqd_get
 
                 _root = f"{_p.scheme}://{_p.netloc}"
                 # iter-12 (2026-05-17, 604-probe finding): the PMS marker
@@ -504,12 +504,7 @@ async def scrape(
                     "/apartments/",
                 ):
                     try:
-                        _rr = _creqd.get(
-                            _root + _suffix,
-                            impersonate="chrome120",
-                            timeout=15,
-                            allow_redirects=True,
-                        )
+                        _rr = _creqd_get(_root + _suffix, timeout=15)
                     except Exception:
                         continue
                     if _rr.status_code != 200 or not _rr.text:
@@ -1010,9 +1005,9 @@ async def scrape(
                         if _p.scheme and _p.netloc:
                             sub = f"{_p.scheme}://{_p.netloc}{sub}"
                     try:
-                        from curl_cffi import requests as _creq
+                        from ma_poc.pms.adapters._probe import probe_get as _pg
 
-                        _r = _creq.get(sub, impersonate="chrome120", timeout=25)
+                        _r = _pg(sub, timeout=25)
                         if _r.status_code == 200 and "sightmap.com" in (_r.text or "").lower():
                             # Splice sub-page HTML in so SightMapAdapter's
                             # _entry_html_from_ctx picks up the embed code.

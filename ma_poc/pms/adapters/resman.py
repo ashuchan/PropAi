@@ -167,9 +167,9 @@ def find_resman_availability_url(html: str) -> str | None:
 
 
 async def _fetch(url: str) -> str:
-    from curl_cffi import requests as _creq
+    from ma_poc.pms.adapters._probe import probe_get
 
-    r = _creq.get(url, impersonate="chrome120", timeout=25, allow_redirects=True)
+    r = probe_get(url, timeout=25)
     if r.status_code != 200:
         return ""
     # Auth-redirect (no public availability) → empty.

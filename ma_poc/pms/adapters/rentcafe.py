@@ -735,9 +735,9 @@ async def _try_rentcafe_securecafe_probe(
         origin = _origin_from_ctx(ctx)
         if origin:
             try:
-                from curl_cffi import requests as _creq0
+                from ma_poc.pms.adapters._probe import probe_get
 
-                _hr = _creq0.get(origin, impersonate="chrome120", timeout=20)
+                _hr = probe_get(origin, timeout=20)
                 if _hr.status_code == 200 and _hr.text:
                     base = _find_securecafe_base(_hr.text, ctx)
             except Exception as _hp_exc:
@@ -750,13 +750,13 @@ async def _try_rentcafe_securecafe_probe(
     au_url = f"{base}/availableunits.aspx"
 
     try:
-        from curl_cffi import requests as _creq
+        from ma_poc.pms.adapters._probe import probe_get
     except ImportError:
         result.errors.append("rentcafe-securecafe: curl_cffi not installed")
         return []
 
     try:
-        r = _creq.get(au_url, impersonate="chrome120", timeout=25)
+        r = probe_get(au_url, timeout=25)
     except Exception as exc:
         result.errors.append(
             f"rentcafe-securecafe-fetch-error: {type(exc).__name__}: {str(exc)[:120]}"
