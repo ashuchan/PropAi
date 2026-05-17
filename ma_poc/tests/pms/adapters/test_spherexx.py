@@ -224,3 +224,53 @@ def test_detector_recognizes_spherexx_via_iframe_src() -> None:
         ),
     )
     assert detection.pms == "spherexx"
+
+ZRS_FIXTURE = '''<table><tbody>
+<tr><td style="display:none;">
+<input type="hidden" data-type="uid" value="1341177" />
+<input type="hidden" data-type="unitNumber" value="101" />
+<input type="hidden" data-type="bid" value="05" />
+<input type="hidden" data-type="priceDisplayType" value="lowest" /></td>
+<td class="floorplan-detail__units__number"><span><a href="05-101/">05 - 101</a></span></td>
+<td class="floorplan-detail__units__price" data-base-unit-price="2389.0"><span><span style="order:1;">$2510.00</span></span></td></tr>
+<tr><td style="display:none;">
+<input type="hidden" data-type="uid" value="1341190" />
+<input type="hidden" data-type="unitNumber" value="104" />
+<input type="hidden" data-type="bid" value="06" /></td>
+<td class="floorplan-detail__units__number"><a href="06-104/">06 - 104</a></td>
+<td class="floorplan-detail__units__price" data-base-unit-price="2439.0"><span>$2560.00</span></td></tr>
+</tbody></table>'''
+
+
+def test_zrs_floorplan_detail_parses_unit_level():
+    from ma_poc.pms.adapters.spherexx import parse_zrs_floorplan_detail
+    rows = parse_zrs_floorplan_detail(
+        ZRS_FIXTURE, "https://x.com/floorplans/4bedroom/d1/"
+    )
+    assert len(rows) == 2
+    by = {r["unit_number"]: r for r in rows}
+    assert "05-101" in by and "06-104" in by
+    u = by["05-101"]
+    assert u["bedrooms"] == "4"
+    assert u["floor_plan_name"] == "D1"
+    assert u["market_rent_low"] == 2389  # data-base-unit-price
+    assert u["availability_status"] == "AVAILABLE"
+    # never inferred_ — real bid-unitNumber identity
+    assert not u["unit_number"].startswith("inferred_")
+
+
+def test_zrs_detail_links_variants():
+    from ma_poc.pms.adapters.spherexx import find_zrs_detail_links
+    html = ('<a href="/floorplans/4bedroom/d1/">x</a>'
+            '<a href="/floorplans-and-pricing/1-bed/11649">y</a>'
+            '<a href="/floor-plans/2-bed/a2/">z</a><a href="/about/">no</a>')
+    links = find_zrs_detail_links(html, "https://x.com")
+    assert "https://x.com/floorplans/4bedroom/d1/" in links
+    assert "https://x.com/floorplans-and-pricing/1-bed/11649/" in links
+    assert "https://x.com/floor-plans/2-bed/a2/" in links
+    assert len(links) == 3
+
+
+def test_zrs_no_markup_returns_empty():
+    from ma_poc.pms.adapters.spherexx import parse_zrs_floorplan_detail
+    assert parse_zrs_floorplan_detail("<html>no units here</html>", "u") == []

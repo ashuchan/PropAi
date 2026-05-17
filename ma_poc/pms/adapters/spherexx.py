@@ -35,6 +35,7 @@ Key findings:
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
@@ -52,6 +53,115 @@ _TIER_BASE = "TIER_1_API_SPHEREXX"
 _TIER_NO_RESPONSE = f"{_TIER_BASE}_NO_RESPONSE"
 _TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
 _TIER_PARSE_FAILED = f"{_TIER_BASE}_PARSE_FAILED"
+# ZRS/spherexx server-rendered floorplan-detail path (no API iframe).
+# chathamsquare/mirabella-class: units are server-rendered in an HTML
+# table on /floorplans/<bed>/<plan>/ detail pages, NOT via the
+# presentation.spherexx.app /api/unit iframe. Deterministic Tier-1.
+_TIER_ZRS = "TIER_1_DOM_SPHEREXX_ZRS"
+
+
+
+# Detail-page paths across ZRS template variants:
+#   /floorplans/4bedroom/d1/            (chathamsquare)
+#   /floorplans-and-pricing/1-bed/11649 (mirabella)
+#   /floor-plans/2-bed/a2/
+_ZRS_DETAIL_RE = re.compile(
+    r"/floor-?plans(?:-and-pricing)?/[a-z0-9-]+/[a-z0-9-]+/?",
+    re.IGNORECASE,
+)
+# Per-unit hidden-input block + adjacent price cell.
+_ZRS_UID_RE = re.compile(
+    r'data-type="uid"\s+value="(\d+)"', re.IGNORECASE
+)
+_ZRS_UNITNO_RE = re.compile(
+    r'data-type="unitNumber"\s+value="([^"]*)"', re.IGNORECASE
+)
+_ZRS_BID_RE = re.compile(r'data-type="bid"\s+value="([^"]*)"', re.IGNORECASE)
+_ZRS_BASEPRICE_RE = re.compile(
+    r'data-base-unit-price="([\d.]+)"', re.IGNORECASE
+)
+
+
+def _beds_from_url_seg(seg: str) -> str:
+    """``4bedroom`` → ``4``; ``studio`` → ``0``; else ''."""
+    s = (seg or "").lower()
+    if "studio" in s:
+        return "0"
+    m = re.search(r"\d+", s)
+    return m.group(0) if m else ""
+
+
+def parse_zrs_floorplan_detail(html: str, url: str) -> list[dict[str, str]]:
+    """Parse a ZRS/spherexx ``/floorplans/<bed>/<plan>/`` detail page.
+
+    Each available unit is a row carrying hidden inputs
+    ``data-type="uid|unitNumber|bid"`` and a price cell with
+    ``data-base-unit-price``. Emits one unit-level row per unit with a
+    real ``bid-unitNumber`` identity (never ``inferred_``).
+    """
+    if not html or "floorplan-detail__units" not in html:
+        return []
+    # Derive beds + plan name from the URL: /floorplans/<bed>/<plan>/
+    beds = plan = ""
+    mu = re.search(
+        r"/floor-?plans(?:-and-pricing)?/([a-z0-9-]+)/([a-z0-9-]+)",
+        url,
+        re.IGNORECASE,
+    )
+    if mu:
+        beds = _beds_from_url_seg(mu.group(1))
+        plan = mu.group(2).upper()
+    units: list[dict[str, str]] = []
+    for m in _ZRS_UID_RE.finditer(html):
+        uid = m.group(1)
+        win = html[m.start() : m.start() + 1600]
+        un = _ZRS_UNITNO_RE.search(win)
+        bd = _ZRS_BID_RE.search(win)
+        pr = _ZRS_BASEPRICE_RE.search(win)
+        unit_no = (un.group(1) if un else "").strip()
+        bid = (bd.group(1) if bd else "").strip()
+        ident = "-".join(p for p in (bid, unit_no) if p) or f"sxx-{uid}"
+        rent_i: int | None = None
+        if pr:
+            try:
+                rent_i = int(round(float(pr.group(1))))
+            except (TypeError, ValueError):
+                rent_i = None
+        units.append(
+            make_unit_dict(
+                floor_plan_name=plan,
+                bedrooms=beds,
+                unit_number=ident,
+                rent_low=rent_i,
+                rent_high=rent_i,
+                availability_status="AVAILABLE",
+                source_api_url=url,
+                extraction_tier=_TIER_ZRS,
+            )
+        )
+    return units
+
+
+def find_zrs_detail_links(index_html: str, origin: str) -> list[str]:
+    """Absolute ``/floorplans/<bed>/<plan>/`` detail URLs from the index."""
+    if not index_html:
+        return []
+    seen: list[str] = []
+    for m in _ZRS_DETAIL_RE.finditer(index_html):
+        path = m.group(0)
+        if not path.endswith("/"):
+            path += "/"
+        u = origin.rstrip("/") + path
+        if u not in seen:
+            seen.append(u)
+    return seen
+
+
+async def _zrs_fetch(url: str) -> str:
+    from ma_poc.pms.adapters._probe import probe_get
+
+    r = probe_get(url, timeout=20)
+    return r.text or "" if r.status_code == 200 else ""
 
 
 # Field names that uniquely identify a Spherexx /api/unit response. The
@@ -246,6 +356,56 @@ class SpherexxAdapter:
             result.confidence = min(0.95, 0.7 + 0.04 * len(all_units))
             result.tier_used = _TIER_BASE
             return result
+
+        # ZRS server-rendered fallback: chathamsquare/mirabella-class
+        # spherexx sites render units in an HTML table on
+        # /floorplans/<bed>/<plan>/ detail pages (no API iframe). The
+        # API path above captured nothing — crawl the detail pages.
+        origin = ""
+        fr = getattr(ctx, "fetch_result", None)
+        if fr is not None:
+            origin = str(getattr(fr, "final_url", "") or "")
+        origin = origin or getattr(ctx, "base_url", "") or ""
+        if origin:
+            from urllib.parse import urlparse
+
+            p = urlparse(origin)
+            if p.scheme and p.netloc:
+                base = f"{p.scheme}://{p.netloc}"
+                try:
+                    idx = await _zrs_fetch(base + "/floorplans/")
+                except Exception:
+                    idx = ""
+                links = find_zrs_detail_links(idx, base)[:30]
+                zrs_units: list[dict[str, str]] = []
+                for du in links:
+                    try:
+                        dh = await _zrs_fetch(du)
+                    except Exception:
+                        continue
+                    zrs_units.extend(parse_zrs_floorplan_detail(dh, du))
+                if zrs_units:
+                    from ma_poc.extraction.post_process import post_process
+
+                    pp = post_process(
+                        zrs_units,
+                        property_id=getattr(ctx, "property_id", None),
+                    )
+                    if pp.n_admitted > 0:
+                        result.units = pp.admitted
+                        result.plan_summaries = pp.plan_summaries
+                        result.winning_url = base + "/floorplans/"
+                        result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
+                        result.tier_used = _TIER_ZRS
+                        result.api_responses.append(
+                            {
+                                "url": base + "/floorplans/",
+                                "status": 200,
+                                "body": "<zrs-floorplan-detail>",
+                                "via": "spherexx_zrs_probe",
+                            }
+                        )
+                        return result
 
         # Failure-mode classification.
         result.confidence = 0.0

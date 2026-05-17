@@ -576,3 +576,22 @@ Recoverable = clean-API/portal clusters only (apts247 done,
 securecafe/resman portal-hop, sightmap/knock/onesite APIs). The
 floorplan-marketing long tail is a HARD CEILING, not a fix backlog.
 Tier-1 unit-level is bounded by what sites actually publish publicly.
+
+## ★ iter-17: spherexx ZRS server-rendered unit path (RECOVERABLE, proven) ★
+User caught my false "no units" call on chathamsquare via screenshot:
+05-101 $2510, 13-104 $2510, 06-101 $2560, 06-104 $2560 = real units.
+ROOT CAUSE: SpherexxAdapter only handled the presentation.spherexx.app
+/api/unit iframe; ZRS-template sites (chathamsquare/mirabella) server-
+render units in an HTML table on /floorplans/<bed>/<plan>/ detail
+pages → adapter got NO_RESPONSE → LLM_DOM → 0 unit-level. NOT a
+ceiling — a crawl-depth + parse gap (exactly the user's thesis).
+FIX: added ZRS path — crawl /floor(-/and-pricing)?plans/ index →
+detail links → parse hidden inputs data-type=uid/unitNumber/bid +
+data-base-unit-price. probe_get (proxy/WU-aware). Additive: API path
+unchanged; ZRS only on API-empty; gated on floorplan-detail__units
+markup (no fabrication). Live: chathamsquare 0→16 unit-level
+(05-101/$2389 …). mirabella/hurston correctly 0 (variant/no-avail —
+conservative). 18 tests pass, ruff clean.
+HONEST: proven on 1 template variant; full spherexx coverage unknown
+until PIPELINE-measured (hand-probing unreliable — proven). realpage
+on-index unit-table parser still TODO (farnhampark 618 A1-1X1 $1146).
