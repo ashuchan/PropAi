@@ -54,7 +54,7 @@ _NAV_TIMEOUT = 30000
 _UNIT_TOK = re.compile(
     r"\b(?:apt|unit|suite|apartment|residence)\s*#?\s*[A-Za-z]?\d{1,4}\b", re.I
 )
-_RENT = re.compile(r"\$\s?[1-9]\d{2,3}(?:\.\d{2})?")
+_RENT = re.compile(r"\$\s?[1-9]\d{0,2}(?:,\d{3})?\d{0,3}(?:\.\d{2})?")
 _AVAIL = re.compile(
     r"avail\w*|\bnow\b|\d{1,2}/\d{1,2}/\d{2,4}|move[- ]?in", re.I
 )
@@ -151,49 +151,141 @@ async def _content(page: Any) -> str:
         return ""
 
 
-async def _goto(page: Any, url: str) -> bool:
+async def _text(page: Any) -> str:
     try:
-        await page.goto(url, wait_until="networkidle", timeout=_NAV_TIMEOUT)
+        return await page.evaluate(
+            "() => document.body ? document.body.innerText : ''"
+        )
+    except Exception:
+        return ""
+
+
+# Bare unit-id token as it appears in a table CELL (NOT preceded by a
+# 'unit' keyword): "202", "4114", "05-101", "6203", "H0225", "A-204".
+_ID_TOK = re.compile(r"^[A-Za-z]{0,2}\d{1,4}(?:[-\s]\d{1,4})?$")
+_AVAIL_LINE = re.compile(
+    r"available\s*(?:now|soon|\w+\.?\s?\d{0,2}|\d{1,2}/\d{1,2})|"
+    r"\d{1,2}/\d{1,2}/\d{2,4}|move[- ]?in", re.I
+)
+_BAD_TOK = re.compile(r"^(?:19|20)\d{2}$")  # years
+_FLOOR_WORDS = re.compile(
+    r"\b(studio|bed(room)?s?|bath|sq\.?\s?ft|square feet)\b", re.I
+)
+
+
+def _generic_text_rows(text: str, src: str) -> list[dict[str, Any]]:
+    """Keyword-free, row/line-based unit-table parser on rendered text.
+
+    The recurring failure: unit numbers in these tables are BARE tokens
+    in a column ("202", "118", "05-101", "4114"), not "Unit 202". A
+    keyword regex can't read a columnar table. So instead: split the
+    rendered innerText into lines; a unit row = a line that has a $rent
+    AND an availability cue AND a short discrete id token (and isn't a
+    floorplan-summary line). Conservative — under-emits rather than
+    fabricates (floorplan-level fallback is acceptable per policy).
+    """
+    if not text:
+        return []
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw in re.split(r"[\n\r]+|(?<=Lease Now)|(?<=Apply Now)", text):
+        line = re.sub(r"\s+", " ", raw).strip()
+        if not (10 <= len(line) <= 240):
+            continue
+        rent = _RENT.search(line)
+        if not rent or not _AVAIL_LINE.search(line):
+            continue
+        # find a discrete id token among the first few whitespace tokens
+        rent_digits = rent.group(0).lstrip("$").replace(",", "")
+        tok = ""
+        for cand in line.split(" ")[:5]:
+            c = cand.strip("#:,").strip()
+            if not _ID_TOK.match(c) or _BAD_TOK.match(c):
+                continue
+            if c.replace("-", "").replace(" ", "") == rent_digits:
+                continue  # the token IS the rent number
+            # on a floorplan-summary line, a bare 3-4 digit is sqft, skip
+            if _FLOOR_WORDS.search(line) and re.fullmatch(r"\d{3,4}", c):
+                continue
+            tok = c
+            break
+        if not tok or tok.lower() in seen:
+            continue
+        seen.add(tok.lower())
+        try:
+            ri = int(round(float(
+                rent.group(0).lstrip("$").replace(",", "").strip()
+            )))
+        except (TypeError, ValueError):
+            ri = None
+        rows.append(
+            {
+                "unit_number": tok,
+                "market_rent_low": ri,
+                "market_rent_high": ri,
+                "availability_status": "AVAILABLE",
+                "source_api_url": src,
+                "extraction_tier": "STANDALONE_GENERIC_TEXT",
+            }
+        )
+    return rows
+
+
+async def _goto(page: Any, url: str) -> bool:
+    # domcontentloaded (NOT networkidle): analytics/pixel-heavy sites
+    # never reach networkidle and time out (ironhorse). Settle covers
+    # JS hydration of the unit table.
+    try:
+        await page.goto(url, wait_until="domcontentloaded", timeout=_NAV_TIMEOUT)
         await page.wait_for_timeout(_SETTLE_MS)
         return True
     except Exception:
         try:
             await page.wait_for_timeout(1500)
-            return True
+            return bool(await _content(page))
         except Exception:
             return False
 
 
-async def _phase_a_sightmap(page: Any, url: str, res: PropResult) -> bool:
-    """Engrain/SightMap: capture the sightmap API JSON and parse it."""
+async def _phase_a_sightmap(page: Any, base: str, res: PropResult) -> bool:
+    """Engrain/SightMap: trigger the embed, parse captured API responses.
+
+    SightMap embeds as ``sightmap.com/embed/<key>?enable_api=1`` and the
+    real unit data arrives as XHR responses from sightmap.com. We let the
+    page's response collector capture them (same shape the production
+    SightMapAdapter consumes) and reuse ``parse_sightmap_payload``.
+    """
+    from ma_poc.pms.adapters.sightmap import (
+        _is_sightmap_response,
+        parse_sightmap_payload,
+    )
+
+    captured: list[dict[str, Any]] = getattr(page, "_cap", [])
+    # SightMap usually lives on the floorplans page, not home — visit it
+    # so the iframe loads and fires its API.
+    for path in ("/floorplans/", "/floor-plans/", "/floorplans", ""):
+        html = await _content(page)
+        if "sightmap.com" in html.lower() or "engrain" in html.lower():
+            break
+        if not await _goto(page, base.rstrip("/") + path):
+            continue
     html = await _content(page)
     if "sightmap.com" not in html.lower() and "engrain" not in html.lower():
         return False
-    # The page already loaded the sightmap iframe/app; its API response
-    # carries units. Pull it via an in-page fetch of the embed key.
-    m = re.search(r"sightmap\.com/app/api/v1/([a-z0-9_-]+)", html, re.I)
-    if not m:
-        m = re.search(r"sightmap\.com/embed/([a-z0-9_-]+)", html, re.I)
-    if not m:
-        res.signal = "sightmap_detected_no_key"
-        return False
-    key = m.group(1)
-    api = f"https://sightmap.com/app/api/v1/{key}"
-    try:
-        body = await page.evaluate(
-            "async (u) => { try { const r = await fetch(u);"
-            " return await r.text(); } catch(e){ return ''; } }",
-            api,
-        )
-        from ma_poc.pms.adapters.sightmap import parse_sightmap_payload
-
-        data = json.loads(body) if body else None
-        units, _ = parse_sightmap_payload(data, api)
-        if units:
-            res.units, res.signal, res.phase = units, "sightmap_api", "A_sightmap"
-            return True
-    except Exception as exc:
-        res.error = f"sightmap:{type(exc).__name__}"
+    await page.wait_for_timeout(2500)  # let the iframe XHRs land
+    for rsp in list(captured):
+        body = rsp.get("body")
+        try:
+            if _is_sightmap_response(body):
+                units, _n = parse_sightmap_payload(body, rsp.get("url", ""))
+                if units:
+                    res.units = units
+                    res.signal = "sightmap_api"
+                    res.phase = "A_sightmap"
+                    return True
+        except Exception:
+            continue
+    res.signal = "sightmap_detected_no_parseable_response"
     return False
 
 
@@ -201,13 +293,28 @@ async def _phase_b_url(page: Any, base: str, res: PropResult) -> bool:
     """Discover detail-page links, render+parse each."""
     home = await _content(page)
     links: list[str] = []
-    links += find_zrs_detail_links(home, base)
-    links += find_entrata_fp_detail_links(home, base)
-    for mm in _DETAIL_LINK.finditer(home):
-        p = mm.group(0)
-        full = p if p.startswith("http") else base.rstrip("/") + p
-        if full not in links:
-            links.append(full)
+    # Harvest detail links from the home AND the floorplans index pages
+    # (detail links + the unit table itself often live on /floorplans/,
+    # not the homepage — chathamsquare had them on home by luck).
+    pages_html = [home]
+    for idx in ("/floorplans/", "/floor-plans/", "/floorplans"):
+        if await _goto(page, base.rstrip("/") + idx):
+            ih = await _content(page)
+            if ih and ih not in pages_html:
+                pages_html.append(ih)
+                # the index page may itself carry the unit table
+                u0, s0 = _proven_parsers(ih, base.rstrip("/") + idx)
+                if u0:
+                    res.units, res.signal, res.phase = u0, s0, "B_url"
+                    return True
+    for ph in pages_html:
+        links += find_zrs_detail_links(ph, base)
+        links += find_entrata_fp_detail_links(ph, base)
+        for mm in _DETAIL_LINK.finditer(ph):
+            p = mm.group(0)
+            full = p if p.startswith("http") else base.rstrip("/") + p
+            if full not in links:
+                links.append(full)
     # apts247 same-origin API (no page nav needed)
     key = find_apts247_api_key(home)
     if key:
@@ -230,6 +337,12 @@ async def _phase_b_url(page: Any, base: str, res: PropResult) -> bool:
             continue
         h = await _content(page)
         units, sig = _proven_parsers(h, du)
+        if not units:
+            # JS-rendered template detail pages (jaxon/caf_v2): the
+            # structured parsers don't match; the unit table is only
+            # reliable in rendered innerText.
+            units = _generic_text_rows(await _text(page), du)
+            sig = "generic_text" if units else ""
         if units:
             res.units, res.signal, res.phase = units, sig, "B_url"
             return True
@@ -260,9 +373,12 @@ async def _phase_c_interact(page: Any, res: PropResult) -> bool:
                    if(els[i]) els[i].click(); }""",
                 idx,
             )
-            await page.wait_for_timeout(2200)
+            await page.wait_for_timeout(2500)
             h = await _content(page)
             units, sig = _proven_parsers(h, page.url)
+            if not units:
+                units = _generic_text_rows(await _text(page), page.url)
+                sig = "generic_text" if units else ""
             if units:
                 res.units = units
                 res.signal = f"interact:{sig}"
@@ -273,11 +389,19 @@ async def _phase_c_interact(page: Any, res: PropResult) -> bool:
     return False
 
 
+def _has_rent(u: dict[str, Any]) -> bool:
+    # make_unit_dict (used by every proven parser) emits market_rent_*,
+    # NOT rent_*. Accept both so parsed units aren't silently discarded.
+    return bool(
+        u.get("market_rent_low") or u.get("market_rent_high")
+        or u.get("rent_low") or u.get("rent_high")
+    )
+
+
 def _classify(res: PropResult, home_html: str) -> None:
     real = [
         u for u in res.units
-        if str(u.get("unit_number") or "").strip()
-        and (u.get("rent_low") or u.get("rent_high"))
+        if str(u.get("unit_number") or "").strip() and _has_rent(u)
     ]
     if real:
         res.klass = "UNIT"
@@ -303,14 +427,14 @@ async def extract_property(page: Any, url: str) -> PropResult:
         return res
     home = await _content(page)
     try:
-        if await _phase_a_sightmap(page, url, res):
+        if await _phase_a_sightmap(page, base, res):
             _classify(res, home)
             return res
+        await _goto(page, url)  # restore home (Phase A may have navigated)
         if await _phase_b_url(page, base, res):
             _classify(res, home)
             return res
-        if not await _goto(page, url):
-            pass
+        await _goto(page, url)
         if await _phase_c_interact(page, res):
             _classify(res, home)
             return res
@@ -333,6 +457,22 @@ async def run(urls: list[str], concurrency: int = 6) -> list[PropResult]:
             async with sem:
                 ctx = await browser.new_context()
                 page = await ctx.new_page()
+                cap: list[dict[str, Any]] = []
+                page._cap = cap  # type: ignore[attr-defined]
+
+                async def _on_resp(resp: Any) -> None:
+                    try:
+                        u = resp.url
+                        if "sightmap" not in u.lower():
+                            return
+                        ct = (resp.headers or {}).get("content-type", "")
+                        if "json" not in ct.lower():
+                            return
+                        cap.append({"url": u, "body": await resp.json()})
+                    except Exception:
+                        pass
+
+                page.on("response", lambda r: asyncio.create_task(_on_resp(r)))
                 try:
                     r = await asyncio.wait_for(
                         extract_property(page, u), timeout=120
