@@ -530,3 +530,25 @@ much of the 1,400-class portal-hop pool. Documented; not rushed.
 Method validated end-to-end: diagnose partial → confirm unit data
 exists → root-cause why unreached → fix (apts247) or design (resman).
 This is "see what works/what doesn't", not blind scraping.
+
+## ★ DEBUG-ALL-NO-UNIT taxonomy (per-cluster root cause) ★
+"No unit-level" splits into recoverable vs genuinely-no-units. Method
+= per-cluster: one probe → one root cause → fix or document.
+ - apts247: blank API number → inferred_ id → demoted. ADAPTER BUG.
+   FIXED iter-16 (cypress 0→10, lakelofts 63/63). Recoverable.
+ - resman: portal link JS-injected, static fetch misses ?a=&p=.
+   DISCOVERY GAP. iter-17 design (rendered-DOM). Recoverable.
+ - entrata "no records extracted" subset (ironhorseflats etc.):
+   site is WordPress floorplan-marketing; only Entrata integration is
+   the auth login popup (/module/application_authentication, detector
+   correctly excludes). NO public unit API; live units behind authed
+   resident portal. NOT a bug, NOT recoverable w/o auth → correctly
+   not-unit-level. Stop counting as failure.
+ - bare-NONE (no adapter fired, no error): static-fingerprint over-
+   inclusion (site isn't really that PMS) → detector/triage noise.
+CONCLUSION: a real fraction of "no unit-level" is CORRECT output
+(no public units / floorplan-only / auth-gated), not a recoverable
+miss. Honest denominator for "recoverable" is smaller than the raw
+residual; the wins are the adapter-bug + discovery-gap classes.
+Parallel run (7 execs, ~1hr) provides big-cluster no-unit rows to
+apply this taxonomy at scale.
