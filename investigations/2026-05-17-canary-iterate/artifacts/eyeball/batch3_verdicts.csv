@@ -31,3 +31,11 @@ n,url,verdict,pattern
 30,syncatharmony.com,U,image-confirmed unit table (Unit#+rent+avail+term+floor)
 31,lochravenapts.com,U,CAF-version2 template -> Check-Availability hops to RealPage OneSite (property.onesite.realpage.com)+Knock (doorway.knck.io) = EXISTING adapters; cluster=caf_v2 (jaxon/marion/lochraven 26 sites)
 32,thecoloniesapartments.com,U,caf_v2/jaxon-template - dropdown then units on /floorplans/<bed>/<plan> detail page same-page (Phase B detail)
+33,edgemerecrossing.com,U,popup (caf_v2 family)
+34,ishranchestates.com,F,homepage no-availability msg -> no units (policy F record floorplan)
+35,aspirethunderbird.com,U,/unit/<slug> per-unit detail page
+36,lewisapartments.com,U,/online-leasing#k= portal-hop (caf-style -> OneSite/Knock)
+37,6151winthrop.com,F,image: $995-$1140 per bed-type no unit# (policy F)
+38,woodviewatrandolph.com,U,image: caf_v2 popup = Bldg#/Unit#/$2515/Available unit-table
+39,grandpalms.com,U,caf_v2 dropdown -> /floorplans/<bed>/<layout> detail units
+40,springsapartments.com,U,engrain-sightmap (MISFP)
