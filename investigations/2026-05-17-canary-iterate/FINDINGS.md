@@ -332,3 +332,19 @@ Earlier "fragmented long-tail, no high-leverage pattern" was WRONG
 NEXT FIXES (iter-10+): (a) detector markers for misdetected clusters
 (Spherexx/Funnel/RealPage/Yardi/ActiveBuilding — adapters exist,
 proxy-independent); (b) NEW adapters: ResMan (67), Rently (63).
+
+## ★ WEB UNLOCKER VALIDATION (2026-05-17, 3-req, $0.0045) ★
+The #2 subset (CF *managed challenge* / Turnstile-class) defeated raw
+residential proxy + patchright + camoufox. BrightData Web Unlocker
+API (api.brightdata.com/request, zone web_unlocker1, $1.50/CPM)
+auto-solves it. 3-request validation, all PASS:
+  • nl.prospectportal (CF managed-challenge) 139KB cf_shell=F real_data=T 4s
+  • chaseknolls conventional (#2 failed-all) 254KB cf_shell=F real_data=T 4s
+  • securecafe availableunits (control)      151KB cf_shell=F real_data=T 2s
+COST: 3 req = $0.0045. Extrapolated #2-only bulk: ~500 sites × ~2 req
+= ~$1.50 one-time. Web Unlocker is the definitive crack for the CF
+managed-challenge ceiling — recommend wiring it as the fetch path for
+the #2 subset (prospectportal / Entrata-conventional). Two-layer
+infra plan: residential proxy ($4/GB, lightweight probe only ≈$2.5-5/
+run) for IP-reputation pool; Web Unlocker ($1.50/CPM) for the harder
+managed-challenge subset.
