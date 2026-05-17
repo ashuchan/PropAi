@@ -54,6 +54,7 @@ PmsName = Literal[
     "knock",
     "g5",
     "resman",
+    "apts247",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -84,6 +85,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "knock": "api_first",
     "g5": "api_first",
     "resman": "api_first",
+    "apts247": "api_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -165,6 +167,16 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
         "touchtour",
         0.85,
         "host ends in liveovation.com (Ovation parent portfolio)",
+    ),
+    # Apts247 / RentDynamics — the JS widget + media assets serve from
+    # apts247.info. The data API itself is same-origin on the property's
+    # own domain, so this host match only fires when a captured request
+    # hit the apts247 CDN; the HTML marker (below) is the primary path.
+    (
+        re.compile(r"(?:^|\.)apts247\.info$"),
+        "apts247",
+        0.95,
+        "host ends in apts247.info (Apts247/RentDynamics)",
     ),
 ]
 
@@ -503,6 +515,19 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             0.90,
             ["ResMan marker in HTML "
              "(myresman.com / Portal/Applicants/Availability)"],
+        )
+
+    # Apts247 / RentDynamics — JS leasing widget (static2.apts247.info /
+    # media.apts247.info) with a SAME-ORIGIN /api/v1/floorplans/?api_key=
+    # data API. 2026-05-17 canary Chrome-MCP no-signature deep-probe: a
+    # ≥4-site cluster invisible to static curl_cffi (inventory is fetched
+    # client-side). api_key is in the homepage HTML ⇒ deterministic Tier-1.
+    if "apts247" in h or "rentdynamics.com" in h:
+        return (
+            "apts247",
+            0.90,
+            ["Apts247/RentDynamics marker in HTML "
+             "(apts247.info widget / same-origin /api/v1/ data API)"],
         )
 
     # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong

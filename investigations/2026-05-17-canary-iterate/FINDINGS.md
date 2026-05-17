@@ -348,3 +348,69 @@ the #2 subset (prospectportal / Entrata-conventional). Two-layer
 infra plan: residential proxy ($4/GB, lightweight probe only ≈$2.5-5/
 run) for IP-reputation pool; Web Unlocker ($1.50/CPM) for the harder
 managed-challenge subset.
+
+## ★ COHORT63 RESULT — iter-14 on prod's "permanently broken" ★
+63 props = never-canary-fed AND latest prod verdict FAILED_NO_DATA(35)/
+FAILED_UNREACHABLE(28). Run on iter-14 (all adapters + residential
+proxy + cost-gated WU escalation), exec jtr9n, 4 tasks, ~$0.03 WU:
+  TRUE Tier-1 unit-level (real unit_id+rent): 44/63 = 70%
+  unit-level rent non-Tier1: 6 | floorplan/no-rent: 2 | zero(dead): 11
+  ⇒ 50/63 (79%) unit-level; 44 genuine Tier-1, recovered from TOTAL
+    prod failure. Tiers: Knock15 securecafe11(WU) API7 AppFolio-vanity6
+    Entrata4 SightMap4. WU mix: 18 transport_error + 4 cf_shell (dead
+    /unreachable cohort → proxied curl raises, WU rescues by design).
+
+## ★ QUALITY AUDIT — 1,257 never-fed prod-SUCCESS ★
+Prod "SUCCESS" verdict ≠ Tier-1 unit-level. Of 1,257 (all matched in
+prod 2026-05-17):
+  GENUINE Tier-1 unit-level (real unit_id+rent): 962 = 76.5%
+  --- 295 (23.5%) deficient despite SUCCESS verdict: ---
+  fragile-LLM(TIER_4) 114 | empty/no-extract(NONE/no_body) 86 |
+  Tier1-but-floorplan/no-rent 49 | fragile-DOM(TIER_3) 40 | other 6
+KEY: prod verdict logic counts zero-unit + floorplan-only + fragile-
+LLM as SUCCESS. 86 are flat false-positives (SUCCESS, 0 units).
+NEXT: stage 295 as prod-quality-gap cohort → iter-14 (empirical
+conversion test); optional local platform-probe first to predict.
+
+## ★ CHROME MCP PROBE — the "no-signature" long-tail is NOT random ★
+Static curl_cffi classified 16/295 deficient as no-signature + 12
+embed-only. Chrome MCP (JS-rendered, hostname fingerprint) reveals
+these cluster on JS-INJECTED leasing platforms invisible to static
+HTML — distinct PMS clusters, not custom long-tail:
+  • apts247 / RentDynamics (static2.apts247.info, /floorplans/):
+    calligraphy, thelakelofts, casapacifica, trailside.graninc
+    → ≥4-site cluster, NO adapter. HIGHEST new-adapter leverage.
+  • Hy.ly (my.hy.ly): courtyardatjefferson, compassatthegrove,
+    cityridge/Bozzuto stack → ≥3, NO adapter.
+  • RentManager (cdn.rentmanager.com + iloveleasing.com):
+    henryonthepark → NO adapter.
+  • Duda/Elfsight site-builder (static.cdn-website.com): elevate-
+    sequoia, lodgeat1550 → genuinely custom, LLM-tier is correct.
+  • RECAPTCHA-walled: bowervillage, northcreek → WU/stealth (iter-14
+    already covers via cost-gated escalation).
+  • Harbor Group self-hosted multi-prop (/floor-plans subpath):
+    hgliving, aurella → needs subpage crawl, custom API.
+  • Avalon: TIER_1_API_AVALONBAY adapter EXISTS — deficient one is a
+    data gap, not platform gap.
+STRATEGY: after iter-1..14, the next high-leverage adapters are
+(1) apts247/RentDynamics and (2) Hy.ly — JS-widget leasing platforms,
+fingerprintable only via rendered DOM. Probe method that worked:
+Chrome MCP navigate + hostname-only JS fingerprint (innerHTML dumps
+trip the privacy guard; script/iframe .hostname does not).
+
+## ★ ITER-15 — Apts247/RentDynamics adapter (NEW, built+validated) ★
+Built ma_poc/pms/adapters/apts247.py + detector wiring (PmsName,
+_STRATEGY_BY_PMS api_first, apts247.info host fp, HTML marker) +
+registry + 7 unit tests (pass) + ruff/mypy clean.
+Mechanism: api_key is in static homepage HTML ⇒ deterministic Tier-1,
+no browser. Fetch <origin>/api/v1/floorplans/?api_key=<k> →
+objects[].units[] → unit-level rows (real unit id + concrete rent +
+available_date). probe_get path = proxy/WU-aware like resman.
+LIVE end-to-end (non-GCP IP):
+  thelakeloftsapts.com  22 plans → 63 unit-level avail rows ($899)
+  casapacificaapts.com   1 plan  →  4 unit-level (unit 131 $2535)
+  trailside.graninc.com  3 plans →  0 avail (no current availability;
+                                     emits 3 plan-level — correct)
+⇒ adapter recovers a ≥4-site no-signature cluster to Tier-1 unit-
+level. Next: Hy.ly adapter (2nd cluster); apts247 test-cohort on
+iter-15 image to measure pool-wide conversion.

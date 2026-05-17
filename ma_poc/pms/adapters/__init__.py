@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from ma_poc.pms.adapters.amli import AmliAdapter
 from ma_poc.pms.adapters.appfolio import AppFolioAdapter
+from ma_poc.pms.adapters.apts247 import Apts247Adapter
 from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
 from ma_poc.pms.adapters.entrata import EntrataAdapter
@@ -45,6 +46,7 @@ def _bootstrap_registry() -> None:
     for cls in (
         RentCafeAdapter,
         ResManAdapter,
+        Apts247Adapter,
         EntrataAdapter,
         AppFolioAdapter,
         OneSiteAdapter,
