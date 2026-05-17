@@ -666,3 +666,11 @@ floorplan-only CEILING ~80-90 sites (~18%). New path patterns for #1:
 /floor-plan-cards/<p>, query-param paginated, multi-click
 /floor-plans/apartment/<id>, On-Site application-portal hop.
 Strengthens #1 case (~370+ not ~206). Still GATED on #2 baseline.
+
+## ★ POLICY (user, 2026-05-17): floorplan-level fallback accounting ★
+When unit-level data genuinely is not available, RECORD floorplan-
+level (do not drop / do not return empty) — already the adapter
+behavior (resman/apts247/entrata-WP emit plan-level fallback rows).
+But for the success/recoverable RATE, floorplan-level counts as F
+(floorplan-only), NOT a unit-level win. #7 smdproperty (style+price,
+no unit#) = firm F. Classification rule, not a behavior change.

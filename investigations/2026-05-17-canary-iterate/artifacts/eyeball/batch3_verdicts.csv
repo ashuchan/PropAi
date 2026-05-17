@@ -5,7 +5,7 @@ n,url,verdict,pattern
 4,parkvanness.com,U,multi-hop -> parkvanness.securecafe.com oleapplication (MISFP securecafe)
 5,elevatetoshorepark.com,U,js-popup-unit-table (like #1)
 6,1900pacific.com,U,engrain-sightmap-embed (MISFP)
-7,smdproperty.com/country-club-apartments,F*,style/floorplan-level price no unit# (pending user call)
+7,smdproperty.com/country-club-apartments,F,style/floorplan-level no unit# (user policy: record floorplan-level but counts as F not unit-level)
 8,ascendnonawest.com,U,popup->check-availability->unit-level
 9,liveatcivicsquare.com,U,engrain-sightmap-embed (MISFP)
 10,tvcproperties.com,U,community-detail #available listing
