@@ -19,3 +19,4 @@ n,url,verdict,pattern
 18,parkplace380.com,F,floorplan-level table avail-text no unit#
 19,residecrosbyhill.com,F,floorplan-level bed-type only
 20,liveemersonpark.com,U,click-floorplan->view-availability
+21,colonialcourtapts.com,PENDING,/apartments/<plan-type> detail pages price listed (some no-avail); user did not give explicit U/F - awaiting confirm
