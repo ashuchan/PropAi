@@ -414,3 +414,14 @@ LIVE end-to-end (non-GCP IP):
 ⇒ adapter recovers a ≥4-site no-signature cluster to Tier-1 unit-
 level. Next: Hy.ly adapter (2nd cluster); apts247 test-cohort on
 iter-15 image to measure pool-wide conversion.
+
+## ★ Hy.ly — NOT an adapter target (negative finding) ★
+Deep-probed courtyardatjefferson + compassatthegrove (the Hy.ly
+cluster). Hy.ly = marketing/lead-capture CRM OVERLAY (my.hy.ly chat/
+tour widget) on WordPress, NOT a data platform: no uniform
+availability API, courtyardatjefferson recaptcha-walled,
+compassatthegrove server-renders WP HTML w/ zero data XHR. There is
+no Hy.ly data contract to write a deterministic adapter against —
+these correctly belong to DOM/LLM tier or their underlying PMS. Do
+NOT build a Hy.ly adapter. Apts247 (iter-15) is the genuine cluster
+win; Hy.ly cluster was a false positive for adapter purposes.
