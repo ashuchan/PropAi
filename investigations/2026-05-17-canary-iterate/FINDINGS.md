@@ -552,3 +552,27 @@ miss. Honest denominator for "recoverable" is smaller than the raw
 residual; the wins are the adapter-bug + discovery-gap classes.
 Parallel run (7 execs, ~1hr) provides big-cluster no-unit rows to
 apply this taxonomy at scale.
+
+## ★ PER-CLUSTER CHROME-MCP VERIFICATION (user-requested, 2-3/cluster) ★
+Verified no-unit sites with rendered Chrome-MCP, not asserted:
+ funnel: liveattrailpoint = Duda marketing, floorplan-only, units
+   behind external "Check Availability" CTA; vitruvianwest =
+   MISFINGERPRINTED (UDR, redirects udr.com). → no public units / noise
+ spherexx: chathamsquare /floorplans/ = 12 rents but ALL floorplan
+   "from $X" (unitToks=[], perUnit=false, 115 fp els); hurston = thin
+   /no data. → floorplan-only, no public unit inventory
+ realpage: farnhampark/oakbend .aspx = 13 rents, RealPage CDN, but
+   floorplan-level only, no per-unit rows. → unit data behind RealPage
+   portal/flow, not on public site
+ (earlier) entrata ironhorseflats = WP marketing + Entrata auth-login
+   only; apts247 zurabay/3681 = genuinely 0 nested units (correct).
+CONCLUSION (honest, tempers "assume units exist"): the DOMINANT
+no-unit reality in the residual is FLOORPLAN-ONLY PUBLIC MARKETING —
+sites publish "from $X" per plan and gate real unit inventory behind
+auth portals / external leasing flows not publicly scrapeable.
+Producing unit-level there would be fabrication; empty is CORRECT.
+apts247 (clean public API, real units) was the exception → fixed.
+Recoverable = clean-API/portal clusters only (apts247 done,
+securecafe/resman portal-hop, sightmap/knock/onesite APIs). The
+floorplan-marketing long tail is a HARD CEILING, not a fix backlog.
+Tier-1 unit-level is bounded by what sites actually publish publicly.
