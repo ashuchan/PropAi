@@ -127,3 +127,83 @@ def test_retry_stamps_wedge_rescue_applied() -> None:
         "Wedge-rescue stamp missing — no way to attribute next-run "
         "successes to the rescue path vs. organic success."
     )
+
+
+# ── RC5 (2026-05-17 regression fix): retry budget enforcement ────────────────
+
+
+def test_retry_pool_invokes_budget_wrapper_not_raw_process_one() -> None:
+    """The retry pool must dispatch through ``_process_one_with_budget``,
+    not the unwrapped ``_process_one``.
+
+    Pre-RC5, the dispatch was ``_retry_pool.map(_process_one, ...)``.
+    ``_process_one`` wraps its body in
+    ``asyncio.wait_for(timeout=PER_PROPERTY_TIMEOUT_SECONDS)`` (600s) and
+    ignores ``task.budget_ms``. On 2026-05-17 shard_10 the rescue cohort
+    of 25 PIDs serialised to 30:01 minutes against a pool of ~10 — each
+    retry hit the outer 600s instead of its 90s budget. Asserting the
+    wrapper name in the dispatch line locks the contract: any future
+    change that drops back to the raw callable fails this test loudly.
+    """
+    from ma_poc.scripts.runners import jugnu
+
+    src = inspect.getsource(jugnu)
+    assert "_retry_pool.map(\n                _process_one_with_budget" in src, (
+        "Retry pool no longer dispatches through the budget wrapper. "
+        "Without it, every retry inherits the 600s per-property "
+        "timeout and a single hung task blocks the whole rescue "
+        "cohort — see shard_10 / shard_84 in the 2026-05-17 cloud run."
+    )
+
+
+def test_budget_wrapper_uses_asyncio_wait_for_with_task_budget() -> None:
+    """The budget wrapper must enforce ``task.budget_ms`` via
+    ``asyncio.wait_for``. Any other timeout mechanism (timer thread,
+    polling) would allow the inner work to keep running after the
+    "timeout" fired, defeating the cohort-protection goal."""
+    from ma_poc.scripts.runners import jugnu
+
+    src = inspect.getsource(jugnu)
+    import re
+    block = re.search(
+        r"async def _process_one_with_budget[\s\S]{0,1500}",
+        src,
+    )
+    assert block is not None, "_process_one_with_budget closure missing"
+    body = block.group(0)
+    assert "asyncio.wait_for" in body, (
+        "_process_one_with_budget not using asyncio.wait_for"
+    )
+    assert "budget_ms" in body, (
+        "_process_one_with_budget not reading task.budget_ms"
+    )
+
+
+def test_budget_exhaustion_returns_failed_record_not_exception() -> None:
+    """When a retry exceeds its budget, the wrapper must return a
+    properly-shaped failed record so the zip-with-results loop in
+    ``run_jugnu`` sees a dict (not an exception) and emits the
+    RESOLVED/RETRY_ALSO_FAILED telemetry event correctly.
+
+    Returning an exception would land in the ``isinstance(_rr,
+    Exception)`` branch and emit ``CRASHED`` instead — wrong taxonomy
+    and confuses the rescue-rate dashboard.
+    """
+    from ma_poc.scripts.runners import jugnu
+
+    src = inspect.getsource(jugnu)
+    import re
+    block = re.search(
+        r"async def _process_one_with_budget[\s\S]{0,1500}",
+        src,
+    )
+    assert block is not None
+    body = block.group(0)
+    assert "_make_failed_record" in body, (
+        "Budget wrapper not returning a failed record on timeout — "
+        "downstream telemetry will misclassify as CRASHED."
+    )
+    assert "wedge_rescue_budget_exhausted" in body, (
+        "Budget-exhaustion reason string missing; analyzer can't "
+        "distinguish RC5 timeouts from generic per-property timeouts."
+    )

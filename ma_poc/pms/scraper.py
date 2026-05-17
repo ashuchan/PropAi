@@ -76,6 +76,36 @@ _MERGE_DICT_KEYS: tuple[str, ...] = (
 )
 
 
+# Extraction-output keys copied from the hop result onto the entry result
+# when Phase 9 cross-page merge falls back to an overwrite path (either
+# because the merge produced nothing usable, or because the main page
+# extracted no units and the sub-page is the authoritative source).
+#
+# RC1 (2026-05-17 regression fix) — ``plan_summaries`` was missing from
+# this list, so plan-level rows extracted on hop pages reached the entry
+# result's units-only key list and vanished. The §8.19 playbook fix
+# applied this same correction to the exception-fallback path only;
+# the two non-exception overwrite paths (merge-empty fallback, main-empty
+# active path) kept the units-only list and lost ~336 PIDs worth of
+# plan-level data on 2026-05-17.
+_HOP_OVERWRITE_KEYS: tuple[str, ...] = (
+    "units",
+    "plan_summaries",
+    "extraction_tier_used",
+    "api_calls_intercepted",
+    "_winning_page_url",
+    "_raw_api_responses",
+    "_adapter_used",
+    "_fallback_chain",
+    "_tier_attempts",
+    "_llm_interactions",
+    "_llm_hints",
+    "_llm_analysis_results",
+    "_llm_field_mappings",
+    "_explored_links",
+)
+
+
 def _merge_post_hop_telemetry(
     result: dict[str, Any],
     hop_result: dict[str, Any],
@@ -913,7 +943,20 @@ async def scrape(
 
         try:
             fallback_result = await generic.extract(page, fallback_ctx)  # type: ignore[arg-type]
-            if fallback_result.units:
+            # RC2 (2026-05-17 regression fix) — accept plan-only fallback
+            # results as well. The precondition at lines 876-882 above
+            # invokes the generic fallback when both ``units`` AND
+            # ``plan_summaries`` are empty on the detected-PMS adapter
+            # result; the acceptance gate must mirror that symmetry, or
+            # plan-only generic recoveries are silently discarded and the
+            # original PMS adapter's empty NO_RESPONSE result stays
+            # terminal. Without this, RentCafe-misdetected marketing
+            # shells (post-detector-RC-4 widening in commit 4ac6611) lose
+            # their generic plan-level rescue.
+            _fallback_has_plan_rows = bool(
+                getattr(fallback_result, "plan_summaries", None)
+            )
+            if fallback_result.units or _fallback_has_plan_rows:
                 adapter_result = fallback_result
                 result["_adapter_used"] = generic_name
             # Always promote portal hints from the generic fallback even when
@@ -2119,15 +2162,29 @@ _URL_SHAPE_PATTERNS: tuple[tuple[re.Pattern[str], int, str], ...] = (
     ),
     # Anti-signals — explicit non-inventory paths. Negative score so the
     # additive sum can never elevate them above the base internal-link tier.
-    # Use start-anchor `^/` since these are TOP-LEVEL paths like /tour/, /gallery/
-    # — we don't want to penalize `/apartments/{slug}/photos/{n}` (which still
-    # may be a per-unit page); only penalise when the URL itself IS the page.
+    #
+    # RC4a (2026-05-17 regression fix) — the original pattern was anchored
+    # at ``^/`` to only catch top-level paths. Portfolio sites under a
+    # property-slug prefix (``/apartments/{slug}/schedule-tour``,
+    # ``/apartments/{slug}/apply``) evaded this completely and were lifted
+    # to score 5_100 by the anchor+keyword floor at line 2428 below,
+    # burning hop budget on URLs that never carry inventory. PID 78134
+    # spent 1406s of its 2045s wallclock (68.8%) chasing these.
+    #
+    # The new pattern matches the keyword as a *path segment* — preceded
+    # by ``/`` or path start, followed by ``/`` or path end — so
+    # ``/apartments/the-24/schedule-tour`` is correctly penalised while
+    # ``/apartments/the-24-tour-king-blvd/pricing`` (substring overlap in
+    # the slug, not a real anti-signal segment) is not. The path-segment
+    # boundaries are essential — without them, every URL containing
+    # ``apply`` as a substring (e.g. ``/applewood-pricing``) would be
+    # penalised.
     (
         re.compile(
-            r"^/(?:schedule[-_]?(?:a[-_]?)?tour|tour|gallery|photos?|amenities?|"
+            r"(?:^|/)(?:schedule[-_]?(?:a[-_]?)?tour|tour|gallery|photos?|amenities?|"
             r"neighborhood|reviews?|about|contact|faq|policies?|residents?|"
             r"news|blog|events?|sitemap|careers?|privacy|terms|accessibility|"
-            r"login|sign[-_]?(?:up|in)|register|application|account)/?",
+            r"login|sign[-_]?(?:up|in)|register|application|apply|applies|account)(?:/|$)",
             re.IGNORECASE,
         ),
         -2_000,
@@ -2602,6 +2659,16 @@ async def _try_link_hop(
     portal_candidates: list[tuple[str, int, str]] = []
     if embedded_portal_hints:
         from ma_poc.pms.signal_engine.filters import is_infra_url as _infra_check_portal
+        # RC4c (2026-05-17 regression fix) — dedup portal hints by URL at
+        # the construction site. The downstream merge at lines ~2688-2702
+        # does URL-dedup across the combined list, but only after sorting.
+        # When the iframe scanner returns the SAME URL multiple times
+        # (page has the iframe in two distinct positions; the scanner
+        # walks both), every duplicate races through the downstream merge
+        # and is removed there, BUT each duplicate spent a portal-blacklist
+        # check + parse. Cheap to dedup upfront, and makes the per-PID
+        # candidate-count telemetry easier to read.
+        _portal_seen_urls: set[str] = set()
         for hint in embedded_portal_hints:
             try:
                 url_s, portal_name = hint
@@ -2610,6 +2677,9 @@ async def _try_link_hop(
             url_s = str(url_s or "").strip()
             if not url_s or url_s in visited or _infra_check_portal(url_s):
                 continue
+            if url_s in _portal_seen_urls:
+                continue
+            _portal_seen_urls.add(url_s)
             portal_candidates.append(
                 (url_s, _EMBEDDED_PORTAL_SCORE, f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}")
             )
@@ -3124,11 +3194,41 @@ async def _try_link_hop(
             _has_entrata_dead_end = any(
                 p.lower() in _ENTRATA_MODULE_DEAD_ENDS for p in _hop_path_parts
             )
+            # RC4b (2026-05-17 regression fix) — when the hop base URL is
+            # itself a known non-inventory path (``/schedule-tour``,
+            # ``/apply``, ``/gallery``, ...), do NOT spawn the four
+            # ``/floorplans``, ``/floor-plans``, ``/pricing``,
+            # ``/apartments-pricing`` suffix variants off it. PID 78134
+            # burned 1406s of its 2045s wallclock on
+            # ``/apartments/the-24/schedule-tour`` plus
+            # ``/schedule-tour/floorplans|floor-plans|pricing``: the
+            # anti-signal anchor regex (RC4a) drops the BASE from
+            # admission, but this composition path runs *after* admission
+            # and re-introduces 4× junk fetches per hop. Path-segment
+            # match (not substring) so slugs like
+            # ``/apartments/applewood-pricing`` aren't false-positives.
+            _ANTI_SIGNAL_PATH_SEGMENTS = frozenset({
+                "schedule-tour", "schedule_a_tour", "schedule-a-tour",
+                "schedule_tour", "tour",
+                "gallery", "photos", "photo",
+                "amenities", "amenity", "neighborhood",
+                "reviews", "about", "contact", "faq", "policies",
+                "residents", "resident",
+                "news", "blog", "events", "event", "sitemap",
+                "careers", "career", "privacy", "terms", "accessibility",
+                "login", "sign-in", "sign_in", "signin",
+                "sign-up", "sign_up", "signup",
+                "register", "application", "account",
+            })
+            _has_anti_signal_segment = any(
+                p.lower() in _ANTI_SIGNAL_PATH_SEGMENTS for p in _hop_path_parts
+            )
             if (
                 len(_hop_path_parts) >= 3
                 and dynamic_appended < max_dynamic_appends
                 and not _in_floorplan_accumulation
                 and not _has_entrata_dead_end
+                and not _has_anti_signal_segment
             ):
                 _prop_sub_paths = ("/floorplans", "/floor-plans", "/pricing", "/apartments-pricing")
                 # Compose subpaths into the PATH component only, preserving query
@@ -4041,66 +4141,27 @@ async def scrape_jugnu(
                             # TIER_MERGED_CROSS_PAGE wins their persistence.
                             _merge_post_hop_telemetry(result, hop_result)
                         else:
-                            # Merge produced nothing usable — fall back to overwrite path.
-                            for k in (
-                                "units",
-                                "extraction_tier_used",
-                                "api_calls_intercepted",
-                                "_winning_page_url",
-                                "_raw_api_responses",
-                                "_adapter_used",
-                                "_fallback_chain",
-                                "_tier_attempts",
-                                "_llm_interactions",
-                                "_llm_hints",
-                                "_llm_analysis_results",
-                                "_llm_field_mappings",
-                                "_explored_links",
-                            ):
+                            # Merge produced nothing usable — fall back to
+                            # overwrite path. ``_HOP_OVERWRITE_KEYS`` includes
+                            # ``plan_summaries`` (RC1, 2026-05-17) so plan-level
+                            # rows extracted on hop pages reach the v2
+                            # ``floor_plans[]`` output instead of vanishing.
+                            for k in _HOP_OVERWRITE_KEYS:
                                 if k in hop_result:
                                     result[k] = hop_result[k]
                     except Exception as exc:
                         log.warning("Phase 9 merge fallback for %s: %s", property_id, exc)
-                        for k in (
-                            "units",
-                            # 2026-05-17 Bug C: also propagate plan_summaries from
-                            # hop_result so plan-level rows extracted on hop pages
-                            # reach the v2 ``floor_plans[]`` output (post Fix 1).
-                            "plan_summaries",
-                            "extraction_tier_used",
-                            "api_calls_intercepted",
-                            "_winning_page_url",
-                            "_raw_api_responses",
-                            "_adapter_used",
-                            "_fallback_chain",
-                            "_tier_attempts",
-                            "_llm_interactions",
-                            "_llm_hints",
-                            "_llm_analysis_results",
-                            "_llm_field_mappings",
-                            "_explored_links",
-                        ):
+                        for k in _HOP_OVERWRITE_KEYS:
                             if k in hop_result:
                                 result[k] = hop_result[k]
                 else:
                     # Main empty (active path today): copy sub-page extraction
                     # fields wholesale. Telemetry from main is preserved
                     # because we only copy the listed extraction keys.
-                    for k in (
-                        "units",
-                        "extraction_tier_used",
-                        "api_calls_intercepted",
-                        "_winning_page_url",
-                        "_raw_api_responses",
-                        "_adapter_used",
-                        "_fallback_chain",
-                        "_tier_attempts",
-                        "_llm_interactions",
-                        "_llm_hints",
-                        "_llm_analysis_results",
-                        "_llm_field_mappings",
-                        "_explored_links",
-                    ):
+                    # ``plan_summaries`` is in ``_HOP_OVERWRITE_KEYS`` (RC1,
+                    # 2026-05-17) — without it, ~336 PIDs whose units-empty
+                    # hop returned plan-level rows shipped as FAILED_NO_DATA.
+                    for k in _HOP_OVERWRITE_KEYS:
                         if k in hop_result:
                             result[k] = hop_result[k]
                 for k in ("_link_hop_from", "_link_hop_depth", "_link_hop_score", "_link_hop_anchor"):

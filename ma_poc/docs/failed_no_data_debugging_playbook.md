@@ -2,8 +2,8 @@
 
 **Working directory for every command:** `ma_poc/`
 **Audience:** Claude Code (or any engineer) debugging extraction failures after a cloud run.
-**Updated:** 2026-05-15 (afternoon). Last campaign reviewed: 2026-05-15 cloud run.
-**This update:** added §0 anti-patterns 11-13 (STUB-without-frames, redirect-host-anchor, fp_signal-without-structure); added Q10-Q12 to §3 diagnostic; new §8.9-§8.17 extraction gaps (redirect landed_url, listing-structure gate, JSON-LD Product+additionalProperty, generic inline-JS PMS parser, AppFolio slug synth, vendor-iframe widgets, open-by-default discovery, decider rule conflation, Wix fuzzy normalize); §11 STUB classifier updated with frame-enumeration requirement; §14 added Playwright frame-enumeration snippet; §15 file reference appended with all 2026-05-15 additions.
+**Updated:** 2026-05-17. Last campaign reviewed: 2026-05-16 cloud run + post-deploy canaries on PIDs 20959 / 53592 / 55317 / 52331.
+**This update:** new §0 anti-patterns 14-16 (verdict-vs-unit-count, cascade-overwrite misdiagnosis, internal-vs-v2-shape); new Q13 in §3 (unit-fidelity check); §5 verdict decoder gains SUCCESS_PARTIAL row + analyzer-label-leak note; new §8.18-§8.22 extraction gaps (plan_summaries dropped at v2 formatter, hop plan_summaries not propagated, AVAILABLE+rent classification, cross-host per-plan URL discovery, wedge-rescue captcha guard); §15 file reference appended with 2026-05-17 additions; glossary gains SUCCESS_PARTIAL + plan_summaries.
 
 ---
 
@@ -40,6 +40,9 @@ Be explicit with yourself when you catch yourself doing any of these. Most "obvi
 | **Declaring STUB without enumerating frames** | Called 3 Wix sites (46179 / 118965 / 292955) "STUB sites" after a Playwright probe that only checked top-level `document.body.innerText`. Reality: each had real unit data in cross-origin iframes (`wix-visual-data.appspot.com/index?pageId=...&compId=...` with the table; `yourcrossstreet.com/property/...` with availability). The static HTML and even top-level rendered text had nothing — but `page.frames` enumeration would have surfaced the data. | Before declaring STUB, enumerate `page.frames` (Playwright) AND grep the rendered HTML for iframe `src=` patterns. See §11 *STUB classifier* and §14 *Frame enumeration snippet*. |
 | **Trusting a CSV URL when the redirect host owns the inventory** | For 53592 (1701arch.com) and 119144 (windsorburnet.com), `_rank_internal_links` filtered out the actual unit-page anchors because they pointed at `livethearch.com` / `windsorcommunities.com` (the redirect target), not the CSV host. Same-host filter dropped the only correct links. | When `fetch_result.final_url` host ≠ `base_url` host, ALSO accept anchors on the landed host as "same-site". PMS-priors should be synthesised against the landed host too. See §8.9 *Redirect-aware landed_url*. |
 | **Trusting fp_signal count without listing-structure check** | PID 119144 had fp_signals=3 from `priceRange: "$1490 - $3824"` (LocalBusiness JSON-LD aggregate) + marketing copy ("Choose from our 1, 2, 3-bedroom apartments") + amenityFeature description. LLM_DOM ran and correctly returned 0 units — but $0.005 wasted and the page was misclassified as "extractable but extraction failed" rather than STUB_AGGREGATE_COPY. | When fp_signals ≥ 2 AND `has_listing_structure(html) == False` → STUB_AGGREGATE_COPY. The structural check looks for ≥2 `<tr>` rows with rent / ≥2 unit-card class markers / ≥2 Offer-array entries / ≥2 PropertyValue dimension entries. See §8.10 *fp_signal listing-structure gate*. |
+| **Trusting verdict alone, not unit-fidelity** (2026-05-17) | Reported "all 4 sentinels UNCHANGED_OK, deploy is safe" based on verdict==SUCCESS unchanged. Reality: 3 of 5 sentinels lost units (65399 8→1, 1375 12→7, 285558 18→0). The asset-hop-filter cases reported as "IMPROVED" lost a third of their units (37156 31→1, 59540 58→1). The verdict-only metric was wrong. | Always count units shipped per PID, not just verdict. Diff cloud vs canary `units` by PID; total delta < 0 means data quality regressed even when verdict went green. New Q13 in §3 codifies this — run BEFORE celebrating any "IMPROVED" cluster. |
+| **Diagnosing unit-loss as cascade overwrite when post_process classification is the real culprit** (2026-05-17) | For PID 53592 livethearch, traced `dom_scan ran_units=26` + `llm_dom_targeted ran_units=1` → emit 1 unit. First diagnosed as "cascade overwrites earlier larger result". Wrong — `_merge_into_result_units` at `generic.py:2717` ALREADY merges (26 + 1 → 27 in test harness). The real drop was `post_process.classify()` partitioning 27 rows into `units=0` + `plan_summaries=27`, then the v2 formatter dropping plan_summaries silently (§8.18). | When a unit-loss bug looks like "cascade overwrites", reproduce the post_process pipeline in isolation against the raw extractor output before blaming the cascade. `extraction/post_process.post_process(units, property_id=...)` is pure — give it the LLM/dom_scan output and inspect `r.units` vs `r.plan_summaries`. The split tells you the real drop site. |
+| **Reading the internal unit dict expecting v2-formatted fields** (2026-05-17) | Wrote a cross-host per-plan discovery helper that read `u.get("floor_plan_name")` to extract plan names. Test passed in isolation; live canary fired the function but `plan_names_for_match` was always empty. The internal unit dict at link-hop time has `floor_plan_name=""` for RentCafe / SecureCafe extractions — the human-readable name is only materialised LATER by `floorplan_snap` on the v2 output path. | Don't assume the internal in-flight unit dict matches v2 output. Either (a) match by URL SHAPE rather than name (the eventual fix), or (b) use the canonical alias resolver `get_str(u, FP_NAME_KEYS)` AND check the value against `""` (empty string is the common no-name placeholder). Best — log `sorted(unit.keys())[:25]` once when a downstream lookup returns empty so the shape surfaces. |
 
 ---
 
@@ -97,8 +100,9 @@ For EVERY FAILED_NO_DATA PID you investigate, answer all 9 in order before formi
 | **Q10** | Cross-origin iframes rendered into the DOM | Playwright `page.frames` + Playwright `page.content()` after scroll/wait | Any frame URL not on a known infra host (Google analytics, maps, parastorage CDN, social) with unit-shaped innerText (`\d+ bed`, `$NNN`, `sqft`) → §8.11/§8.15 vendor-iframe widget. Common offenders: `wix-visual-data.appspot.com`, `yourcrossstreet.com/property/`, `embed.fortresstech.io`, `my.hy.ly`. Static-HTML grep can MISS these — Wix injects the iframe post-hydration. |
 | **Q11** | Entry-page redirect host vs CSV host | `fetch_result.final_url` vs `base_url` | When hosts differ, anchors on the page point at the LANDED host (cross-domain). The CSV-host filter in `_rank_internal_links` drops them. → §8.9 redirect-aware landed_url. Diagnostic command: live-fetch the CSV URL with `urllib.request.urlopen(...)`; if `resp.geturl()` returns a different host, that host owns the inventory. |
 | **Q12** | Listing structure vs fp_signals | `has_listing_structure(html)` against entry/hop HTML | fp_signals ≥ 2 BUT `count_listing_structural_signals == 0` → marketing aggregate copy (priceRange in LocalBusiness JSON-LD, "Choose from 1, 2, 3-bedroom"), not real listings. Classify as STUB_AGGREGATE_COPY rather than chasing extraction. → §8.10. |
+| **Q13** | Unit-fidelity: extractor `units_found` vs emitted `units` | sum of `extract.tier_attempted.units_found` (only `ran_units`) vs `output.property_emitted.units` | Extractor reported N, emit shows M < N → the gap is the unit-loss bug class (§8.18-8.20). Categorize: M=0 with N≥1 → §8.18 plan_summaries dropped at v2 OR §8.19 hop plan_summaries not propagated. M < N/2 with `verdict=SUCCESS` → §8.20 AVAILABLE+rent classification (rows demoted to plan_summaries). M < N with `verdict=PARTIAL` → validation-majority-rejected, real units gate-failed (data-quality issue, not a code bug). Run THIS before declaring an "IMPROVED" delta a real fix — the verdict can go SUCCESS while losing two-thirds of the units. |
 
-When you finish Q1–Q12, the root cause is almost always one of: § ENV_MISMATCH (CF-blocked locally only), §6 profile poisoning, §8 extraction gap, §10 architectural invariant violation, §11 STUB_URL.
+When you finish Q1–Q13, the root cause is almost always one of: § ENV_MISMATCH (CF-blocked locally only), §6 profile poisoning, §8 extraction gap, §10 architectural invariant violation, §11 STUB_URL.
 
 ---
 
@@ -126,8 +130,11 @@ The terminal_tier in `failures.csv` is NOT a description of what happened. It's 
 | `TIER_1_API_RENTCAFE_SHAPE_REJECTED` | "RentCafe API captured but malformed" | At least one response was buffered in `_api_responses` AND none passed `_is_rentcafe_response`. The response might be the HTML page itself or a third-party tracker JSON. | grep events.jsonl for `rentcafeapi.com\|widgets.rentcafe.com\|securecafe.com\|yardi.com` — if no hits, NO RentCafe JSON was captured. The 2026-05-15 fix tightened this to require json content-type AND a rentcafe-family host. |
 | `TIER_1_API_ENTRATA` | "Entrata adapter captured an API" | Adapter ran (PMS detected as entrata); 0 units emerged from any tier. Most often 0 XHRs captured because the widget XHR is sub-page-only and the hop probe didn't fire (`page=None` bug — see §10). | grep for `/Apartments/module/widgets/`; if absent, the probe never fired. |
 | `TIER_1_API_SIGHTMAP_SHAPE_REJECTED` | "SightMap API returned wrong shape" | Sometimes correct. Often: the page has a SightMap iframe (`sightmap.com/embed/...`) but the L1 fetcher never navigated into it. The adapter sees zero sightmap-shape responses → SHAPE_REJECTED. | Live-fetch the entry HTML; grep for `sightmap.com/embed/`. Presence + 0 captured sightmap responses → §8 portal scan missed it. |
-| `FAILED_NO_DATA` (verdict, not tier) | "Page exists but extraction failed" | Entry-page `fetch.completed` was OK; aggregate extraction produced 0 units. Doesn't say WHERE in the cascade. | Q1-Q9 checklist. |
+| `FAILED_NO_DATA` (verdict, not tier) | "Page exists but extraction failed" | Entry-page `fetch.completed` was OK; aggregate extraction produced 0 units. Doesn't say WHERE in the cascade. | Q1-Q13 checklist. |
 | `FAILED_UNREACHABLE` (verdict) | "Site down" | Entry-page fetch_outcome ≠ OK. Locally vs cloud distinction matters: CF-blocked locally → ENV_MISMATCH; CF-blocked in cloud too → real infra problem. | Compare local canary `fetch.completed` to cloud's. |
+| `SUCCESS_PARTIAL` (verdict, 2026-05-17+) | "Partial failure" | Timeout-rescue success. Per-property wallclock fired before cascade completed BUT link-hop accumulator buffered ≥1 valid unit. Counts as success in `reporting.verdict._SUCCESS_VERDICTS`. Tracked separately under `properties_success_partial` in the analyzer so the rescue population is visible. | Look for `Property X timed out after 600s — attempting partial recovery` log line + units > 0 in the emit event. |
+| `PARTIAL` (verdict, 2026-05-17+ semantics) | "Same as SUCCESS_PARTIAL" | **Different bucket.** Validation-majority-rejected: the schema gate dropped >50% of extracted rows on validity grounds (dim-less rows, junk floor-plan names). The surviving rows ship but are suspect. **Excluded from `_SUCCESS_VERDICTS`.** Tracked under `properties_partial_validation_rejected`. | grep events.jsonl for `validate.record_rejected` count vs `validate.record_accepted` count — if rejected > accepted, you're looking at PARTIAL not SUCCESS_PARTIAL. |
+| `FAILED (no property_emitted — likely killed by per-property timeout)` (analyzer label) | "Property crashed / wallclock-killed before output" | **Misleading label that survives in older analyzer output.** Pre-2026-05-17 analyzer dumped any property whose verdict wasn't `SUCCESS`/`FAILED_NO_DATA`/`FAILED_UNREACHABLE` into `properties_failed_other` and labelled them "no property_emitted". In reality those properties DID emit — with verdict `PARTIAL` (now `SUCCESS_PARTIAL`) and units > 0. The 2026-05-17 analyzer surfaces them under `SUCCESS_PARTIAL` / `PARTIAL (validation-rejected)` distinctly. Old reports still carry the misleading label. | Count `output.property_emitted` events per shard and reconcile against `properties_failed_other`. If they're equal, the label is stale. |
 
 ---
 
@@ -376,6 +383,57 @@ The caller in [pms/adapters/generic.py:2655](ma_poc/pms/adapters/generic.py#L265
 **Cause:** `FIELD_ALIASES` had `bedroomcount` / `bedroom_count` / `numberofbedrooms` but NOT `numbedrooms` / `bedroomsnumber` / `pricetext` (Wix wix-data collection vendor spellings).
 
 **Fix:** [pms/signal_engine/floor_plan_signals.py:151-280](ma_poc/pms/signal_engine/floor_plan_signals.py#L151-L280) — added exact aliases for the observed Wix keys, AND added a `_fuzzy_normalize` helper with prefix patterns (`num<X>` / `number<X>` / `total<X>`) and suffix patterns (`<X>Count` / `<X>Number` / `<X>Total`) that maps to canonical when the stem is in `_FUZZY_STEM_CANONICAL`. Critically: `_PROTECTED_CANONICAL_KEYS` guards `min_rent` / `max_rent` etc. so the `min<X>` / `max<X>` semantic prefixes survive normalisation.
+
+### 8.18 Plan-summaries silently dropped at v2 output boundary (2026-05-17)
+
+**Signal:** Property emits SUCCESS with N units but the extractor's `extract.tier_attempted ran_units` reported a higher count (e.g. PID 20959 dovevalleyapts: LLM emitted 12 units, output shipped 6). Trace shows `B4 dedup: dropped K plan-level rows that duplicated existing unit-level rows`, then post_process partitions the rest, then the v2 formatter ships only `result.units` and ignores `result.plan_summaries`.
+
+**Cause:** `_format_v1` / `_format_v2` at [scripts/runners/jugnu.py](ma_poc/scripts/runners/jugnu.py) read only `result["units"]` from the in-process result dict. `result["plan_summaries"]` (the second partition produced by `extraction.post_process.post_process`) was never surfaced into the v2 record. Plan-level rows admitted by `post_process` (real rent + dims, just no per-apartment identity) shipped nowhere.
+
+**Fix:** v1 emits `Floor Plans: [...]` (capitalised); v2 emits `floor_plans: [...]` (snake). Both pipe through `_format_v2_unit` so the same field-name normalisation runs on both partitions. Contract test in [tests/integration/contracts/test_floor_plans_emit.py](ma_poc/tests/integration/contracts/test_floor_plans_emit.py).
+
+**Companion:** §8.20 (AVAILABLE+rent promotion) reduces how often a row lands in plan_summaries; this fix ensures the rows that genuinely belong there still reach output.
+
+### 8.19 Hop-level plan_summaries not propagated to entry result (2026-05-17)
+
+**Signal:** Hop emits `generic:llm_dom_targeted ran_units=6` but final emit shows units=0 and no floor_plans (PID 300327 flatson10th — 3 hop ran_units events totalling 13 units, final 0). The hop ran extraction; post_process partitioned all rows into plan_summaries (no per-unit signal in the SecureCafe portal extraction); the hop_result returned with `units=[]` and `plan_summaries=[6 rows]`. Entry-side `_try_link_hop` only checked `sub_result.get("units")` for `had_data` and discarded the hop entirely.
+
+**Cause:** in `_try_link_hop` ([pms/scraper.py](ma_poc/pms/scraper.py)), the `had_data = bool(sub_result.get("units"))` check gated all downstream merging. Hops with only plan_summaries were treated as empty and skipped.
+
+**Fix:** `had_data = bool(sub_result.get("units")) or bool(sub_result.get("plan_summaries"))`. Added `"plan_summaries"` to the key-copy list at the entry-side `if _hop_has_data:` branch in `scrape_jugnu` so the partition reaches the entry result alongside `units`. Renamed the local `_hop_has_data` predicate for clarity.
+
+### 8.20 AVAILABLE+rent rows misclassified as plan-level (2026-05-17)
+
+**Signal:** Extractor returns N units, post_process emits 0 in `units` and N in `plan_summaries`. Example (PID 20959 dovevalleyapts, LLM output): 12 rows with `floor_plan_name`, beds/baths/sqft, `market_rent_low`, and `availability_status="AVAILABLE"` — but `available_date=None` on half of them. `classify()` demoted every dateless row to plan-level because `_has_per_unit_signal` required `available_date` / `floor` / `building`.
+
+**Cause:** `extraction/classify.py:_has_per_unit_signal` checked `_UNIT_LEVEL_SIGNAL_KEYS = ("available_date", "availability_date", "floor", "building", …)` only. A row with explicit AVAILABLE status + rent ≠ a plan summary — it represents an available apartment at that price even when the move-in date is unknown.
+
+**Fix:** new `_is_available_with_rent` predicate in [extraction/classify.py](ma_poc/extraction/classify.py). `_has_per_unit_signal` now also returns True when status is in `{AVAILABLE, AVAIL, OPEN, TRUE, 1, YES}` (read via canonical `AVAIL_STATUS_KEYS`) AND rent_low / rent_high is present. UNAVAILABLE rows + UNKNOWN-status rows correctly stay plan-level. Test suite: [tests/extraction/test_classify_available_rent_promotion.py](ma_poc/tests/extraction/test_classify_available_rent_promotion.py) (11 cases — covers alias keys, distinct rents on the same plan, AVAIL synonym, regression guard for plan-aggregates without rent).
+
+**New canonical alias table:** `AVAIL_STATUS_KEYS` in [extraction/canonical.py](ma_poc/extraction/canonical.py). Companion to `RENT_LO_KEYS` / `AVAIL_DATE_KEYS` — covers vendor variants of the per-row status string.
+
+### 8.21 Cross-host per-plan detail discovery (2026-05-17)
+
+**Signal:** Hop produces 10 plan-shape rows from a portal host (e.g. `*.securecafe.com`) and emits SUCCESS, but the per-plan detail URLs (one per plan, each carrying actual per-apartment inventory) live on the marketing host — e.g. `alexandriacarmel.com/floorplans/the-diplomat-1-br-1-ba`. The same-host HTML fallback in `_try_link_hop` searches only the SECURECAFE page's anchors and finds nothing matching. The entry candidate queue DOES contain the per-plan URL at score 5980 with anchor "the diplomat - 1 br 1 ba", but the link-hop loop returned on the first hop with units (LEAF return) and never reached it.
+
+**Cause:** the floor-plan-accumulation `fp_hints` discovery was scoped to same-host sub-page anchors (`_rank_internal_links(sub_html, sub_url)` with a same-prefix filter). Cross-host per-plan URLs already in the entry queue weren't bridged into accumulation mode.
+
+**Fix:** `_discover_cross_host_per_plan_urls` in [pms/scraper.py](ma_poc/pms/scraper.py). Pure helper — given the candidate queue, visited set, the just-hopped URL, and current fp_hints, returns URLs whose path matches `_PER_FLOORPLAN_DETAIL_PATH_RE` (`/floor[-]?plans?/{slug}` or `/plans/{slug}` or `/units/{slug}`) AND whose slug contains a bed/bath/studio token AND whose queue score ≥ 4000. Anchored against URL SHAPE, not plan-name, because the in-flight internal unit dict's `floor_plan_name` is empty at this stage (see §0 anti-pattern 16). Test suite: [tests/pms/test_cross_host_per_plan_discovery.py](ma_poc/tests/pms/test_cross_host_per_plan_discovery.py) (15 cases — URL-shape matchers, queue filters, edge cases).
+
+**Companion ranking changes (2026-05-17):**
+- `slugged_plan_detail` URL-shape score boosted 5_000 → 6_500 in [pms/scraper.py](ma_poc/pms/scraper.py) `_URL_SHAPE_PATTERNS`. Per-plan URLs now outrank generic anchor-discovered links (~5_100) so the entry queue surfaces them earlier.
+- New anchor keywords in [pms/signal_engine/defaults.py](ma_poc/pms/signal_engine/defaults.py): `view details` (70), `apply now` (60), `only ` (75 — substring prefix for "only N left" / "only available").
+- `_PORTAL_INFRA_BLACKLIST` filter lifted from the unknown-portal scan into the known-portal pattern dispatch in [pms/scraper.py](ma_poc/pms/scraper.py). Pre-fix, `resources.yardi.com/legal/cookie-notice/` matched the bare `.yardi.com` known pattern at score 10_110 and burned a hop slot ahead of the Diplomat URL.
+
+**Status:** ships one cross-host per-plan URL per hop today. The remaining sibling per-plan URLs (Ambassador, Justice, etc.) aren't in the entry candidates and require sibling-URL synthesis from a template — deferred (see §17 Bug #5).
+
+### 8.22 Wedge-rescue captcha guard — SGCAPTCHA properties (2026-05-17)
+
+**Signal:** Property scored `FAILED_UNREACHABLE` on entry due to a captcha challenge (entry HTML was an 11 KB SGCAPTCHA wall, body_bytes=11961, captcha_detected=True). Wedge-rescue retry pass then refetched with HTTP-only GET, received a 215-byte captcha stub, the `LLM_GATE_NO_BODY` gate rejected it (<1024 bytes required), and the runner re-emitted `output.property_emitted verdict=FAILED_NO_DATA`. The later emit shadowed the correct FAILED_UNREACHABLE verdict. 37 properties on 2026-05-16: 298969 thewattapts, 300327 flatson10th, 3188 thepointeatlapts, 55317 abodes, … — all SiteGround-hosted.
+
+**Cause:** wedge-rescue's retry-candidate filter at [scripts/runners/jugnu.py](ma_poc/scripts/runners/jugnu.py) admitted any record with verdict in `{PARTIAL, FAILED_UNREACHABLE}` and `len(units)==0`. Didn't check whether the failure was a captcha-block — those properties have nothing useful that GET would surface (the captcha page is the same on RENDER and GET).
+
+**Fix:** new pure helper `wedge_rescue_decision(meta, *, has_units)` in [scripts/runners/jugnu.py](ma_poc/scripts/runners/jugnu.py) returning `"RETRY"` / `"SKIP_ENTRY_CAPTCHA"` / `"NO_RETRY"`. SKIP_ENTRY_CAPTCHA fires when `_meta.entry_captcha_detected` or `entry_bot_blocked` is truthy. The captcha info is propagated from `result["_fetch_diagnostic"]["captcha_detected"]` into `_meta` by `_process_property` after each scrape. SKIP_ENTRY_CAPTCHA emits a `WEDGE_RESCUE_RETRY_RESOLVED resolution=SKIPPED_ENTRY_CAPTCHA` event for telemetry. Test suite: [tests/scripts/test_wedge_rescue_decision.py](ma_poc/tests/scripts/test_wedge_rescue_decision.py) (20 cases — RETRY / SKIP_ENTRY_CAPTCHA / NO_RETRY branches, case-insensitive verdict, falsy-flag handling, units-outranks-captcha priority).
 
 ---
 
@@ -805,10 +863,31 @@ The deselect-list captures known pre-existing failures (`test_h5_visited_urls_de
 | AsyncPool capped to `MAX_CONCURRENT_BROWSERS` | `scripts/runners/jugnu.py:307-329` |
 | `WEDGE_RESCUE_RETRY_STARTED` / `_RESOLVED` EventKinds | `observability/events.py` (Phase 17) |
 | Alternate SightMap init patterns (Bug #4 follow-up) | `pms/scraper.py:1438+` |
+| **2026-05-17 additions** | |
+| `Verdict.SUCCESS_PARTIAL` (timeout-rescue success class) | `reporting/verdict.py` |
+| `_SUCCESS_VERDICTS` admits SUCCESS_PARTIAL; PARTIAL stays out | `reporting/verdict.py` |
+| `AVAIL_STATUS_KEYS` canonical alias table | `extraction/canonical.py` |
+| `_is_available_with_rent` predicate (AVAILABLE+rent promotion) | `extraction/classify.py` |
+| `Floor Plans` field in v1 output / `floor_plans[]` in v2 output (plan_summaries surface) | `scripts/runners/jugnu.py` |
+| Hop-side plan_summaries propagation (had_data + key-copy list) | `pms/scraper.py` |
+| `_discover_cross_host_per_plan_urls` (cross-host per-plan URL discovery) | `pms/scraper.py` |
+| `_PER_FLOORPLAN_DETAIL_PATH_RE` + `_PER_FLOORPLAN_DETAIL_SLUG_TOKEN_RE` + `_PER_FLOORPLAN_MIN_QUEUE_SCORE` | `pms/scraper.py` |
+| `slugged_plan_detail` URL-shape score boosted 5_000 → 6_500 | `pms/scraper.py` `_URL_SHAPE_PATTERNS` |
+| `_PORTAL_INFRA_BLACKLIST` extended with `resources.yardi.com` + `www.yardi.com` | `pms/adapters/_html_extract.py` |
+| Blacklist filter lifted into known-portal pattern dispatch | `pms/scraper.py` (inside `_extract_portal_iframe_hints` pass 1) |
+| Anchor keywords `view details` (70) / `apply now` (60) / `only ` (75) | `pms/signal_engine/defaults.py` `DEFAULT_ANCHOR_KEYWORDS` |
+| `wedge_rescue_decision` pure predicate + RETRY / SKIP_ENTRY_CAPTCHA / NO_RETRY decision | `scripts/runners/jugnu.py` |
+| `entry_captcha_detected` / `entry_bot_blocked` propagated from `_fetch_diagnostic` → `_meta` | `scripts/runners/jugnu.py` `_process_one` |
+| `WEDGE_RESCUE_RETRY_RESOLVED` docstring updated with `SKIPPED_ENTRY_CAPTCHA` resolution | `observability/events.py` |
+| Test: AVAILABLE+rent promotion (11 cases) | `tests/extraction/test_classify_available_rent_promotion.py` |
+| Test: v1 + v2 `floor_plans` emit contract (7 cases) | `tests/integration/contracts/test_floor_plans_emit.py` |
+| Test: cross-host per-plan URL discovery (15 cases) | `tests/pms/test_cross_host_per_plan_discovery.py` |
+| Test: wedge-rescue decision (20 cases — RETRY / SKIP_ENTRY_CAPTCHA / NO_RETRY) | `tests/scripts/test_wedge_rescue_decision.py` |
+| Test: SUCCESS_PARTIAL admitted to success set, PARTIAL stays out | `tests/reporting/test_verdict_plan_level.py` |
 
 ---
 
-## Phase 17 — Deferred follow-ups (2026-05-16)
+## Phase 17 — Deferred follow-ups
 
 ### Bug #4 — parent-marketing-site detection (PIDs 14524, 234945, similar)
 
@@ -835,6 +914,26 @@ Deferred because: requires new heuristic + telemetry + a new hop-candidate score
 **Status:** Partially fixed. The 2026-05-16 patch added 3 more inline-JS init patterns to `_INLINE_JS_INIT_PATTERNS` (`embed_id` / `mapId` / `<sightmap-*>` custom element + an Engrain-context permissive last-resort). If the chaseknolls SDK uses any of those, the iframe URL will be synthesized correctly. If not, a Playwright-rendered scan is the only fix — deferred.
 
 **To verify after next cloud deploy:** check whether 16139 appears in the new run's `TIER_1_API_SIGHTMAP` (success) or stays in `TIER_1_API_SIGHTMAP_SHAPE_REJECTED`. If still failing, dispatch a follow-up Playwright forensic with `page.evaluate("window.SightMap")` to dump the actual SDK config blob.
+
+### Bug #5 — sibling per-plan URL synthesis (PIDs 52331 alexandriacarmel, similar cross-host portal sites) (2026-05-17)
+
+**Diagnosis:** §8.21 cross-host per-plan URL discovery surfaces only the per-plan URLs already present in the entry-page candidate queue. For PID 52331, the entry page contained ONE per-plan anchor (`/floorplans/the-diplomat-1-br-1-ba` at score 5980), so accumulation only crawled that one. The other 5 sibling per-plan URLs (Justice, Independence, Ambassador, Constitution, Congressional) weren't surfaced as anchors on the entry HTML and were never crawled.
+
+Each sibling per-plan detail page contains its own per-apartment inventory (5-15+ physical units per plan per the user's ground-truth observation). Without the other 5 URLs, the property emits 14 units when the real count is likely 60-100.
+
+**Why the existing fix doesn't cover this:**
+- `_discover_cross_host_per_plan_urls` only matches URLs already in the queue.
+- The SecureCafe portal page's HTML may contain the sibling anchors but the same-host `_rank_internal_links` fallback (line 3191+) filters cross-host candidates.
+- The first per-plan detail page (`/floorplans/the-diplomat-1-br-1-ba`) may contain "Other Floor Plans" anchors but those weren't surfaced either in the canary trace.
+
+**Recommended fix path (not yet shipped):**
+1. **URL synthesis from discovered template + plan-name list**: when at least one per-plan URL is matched, derive `{scheme}://{host}{prefix}/{slug}` from it and synthesise sibling URLs by slugifying the plan names extracted from the hop's plan_summaries. Plan-name slugification: lowercase + non-alphanumeric → `-` + strip edges. Bounded by per-property plan count (typically 6–12).
+2. **Pull plan names from the SightMap recovery payload** (if the property's hop sequence includes a SightMap iframe hop, the engrain.com API response has plan names in clear form even when the SecureCafe portal extraction emits empty `floor_plan_name`).
+3. **Fallback synthesis**: when no plan names are available, derive slug variants from URL pattern observations on the same host (e.g. `/floorplans/the-{n}-br-{n}-ba` where n ∈ {0..3}).
+
+**Status:** ~50 LOC + tests. Benefits every cross-host portal property with marketing-site per-plan detail pages. Estimated impact: ~5x unit-count uplift on the affected ~40 properties per cloud run (RentCafe vanity sites with SecureCafe portals).
+
+Deferred because: requires careful slugification rules (vendor-specific edge cases in plan-name → URL transformation) and a 600s wallclock budget audit (synthesising 6 more hops per property may not fit current budget — needs prioritisation guard or per-plan parallelism).
 
 ---
 
@@ -863,3 +962,8 @@ Deferred because: requires new heuristic + telemetry + a new hop-candidate score
 - **ENV_MISMATCH** — local canary failure that the cloud run handles correctly (usually CF/bot-block with residential proxy).
 - **Self-fetch** — `profile.winning_page_url == entry_url`; symptom of homepage being mistakenly tagged as the unit-data URL.
 - **Hop_depth bug pattern** — a gate that reads `ctx.X` where `X` was never wired into the upstream `AdapterContext`; gate silently always-True or always-False.
+- **SUCCESS_PARTIAL** (2026-05-17) — verdict emitted when the per-property 600s wallclock fires and the link-hop accumulator has buffered ≥1 unit before the timeout. Counts as success in `_SUCCESS_VERDICTS`. Distinct from `PARTIAL` (validation-majority-rejected) which is NOT a success.
+- **PARTIAL** (2026-05-17 semantics) — validation-majority-rejected. The schema gate dropped >50% of extracted rows on validity grounds. Surviving rows ship but are suspect; the verdict is EXCLUDED from `_SUCCESS_VERDICTS`. Tracked under `properties_partial_validation_rejected` in the analyzer.
+- **plan_summaries partition** (2026-05-17) — the second output of `extraction.post_process.post_process`. Rows admitted by Stage-1 validity but classified as plan-level (no per-unit identity). Ships under `Floor Plans` (v1) / `floor_plans` (v2). Before §8.18 fix these were silently dropped at the v2 formatter.
+- **Cross-host per-plan URL** (2026-05-17) — per-floorplan detail page URL whose host differs from the just-finished hop's host. Discovered by `_discover_cross_host_per_plan_urls` via URL SHAPE (`/floor[-]?plans?/{slug-with-br-ba}`). Required when a portal host (`*.securecafe.com`) yields plan-summary rows while per-apartment inventory lives on a different host (`{property}.com/floorplans/{slug}`).
+- **Unit-fidelity check (Q13)** — compare emitted `units` count to the extractor's reported `units_found`. A SUCCESS verdict with units lost in transit is a §8.18-8.20 silent regression, NOT a real fix. Always run before celebrating an "IMPROVED" cluster.

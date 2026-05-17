@@ -625,8 +625,44 @@ async def run_jugnu(
                 "Wedge-rescue: pool_size=%d for %d retries",
                 _retry_pool_size, len(_retry_tasks),
             )
+
+            # RC5 (2026-05-17 regression fix) — enforce ``task.budget_ms``
+            # on each retry. ``_process_one`` wraps its body in
+            # ``asyncio.wait_for(..., timeout=PER_PROPERTY_TIMEOUT_SECONDS)``
+            # (line 365 above, 600s), which ignores the 90s budget set
+            # at the dispatch site. On 2026-05-17 shard_10 had 25 retry
+            # candidates: with a pool size of ~10 and each task allowed
+            # to hit the outer 600s timeout, the rescue phase serialised
+            # to **30:01 minutes** (all 50 started events at
+            # 08:31:44.873, all 50 resolved at 09:01:45.938). That
+            # blew shard_10's wallclock from 29 min (May 16) to 92 min
+            # and produced the +22 CANCELLED in the shard.
+            #
+            # The wrapper enforces the per-task budget and synthesises a
+            # failed record on its own timeout so the zip-with-results
+            # loop downstream sees a properly-shaped value and emits the
+            # RESOLVED/RETRY_ALSO_FAILED event for telemetry.
+            async def _process_one_with_budget(_task: Any) -> dict[str, Any]:
+                _budget_sec = max(1.0, float(getattr(_task, "budget_ms", 90_000)) / 1000.0)
+                try:
+                    return await asyncio.wait_for(
+                        _process_one(_task),
+                        timeout=_budget_sec,
+                    )
+                except TimeoutError:
+                    log.warning(
+                        "wedge-rescue retry exceeded budget for %s: %.0fs",
+                        _task.property_id, _budget_sec,
+                    )
+                    return _make_failed_record(
+                        _task.property_id,
+                        _task.url,
+                        f"wedge_rescue_budget_exhausted:{int(_task.budget_ms)}ms",
+                        schema_version,
+                    )
+
             _retry_results = await _retry_pool.map(
-                _process_one, [(t,) for t in _retry_tasks]
+                _process_one_with_budget, [(t,) for t in _retry_tasks]
             )
 
             _upgrade_count = 0
@@ -1156,10 +1192,18 @@ async def _process_property(
             )
 
     # Verdict
+    # RC3 (2026-05-17 regression fix) — pass ``plan_summaries`` so
+    # ``compute_verdict`` can return ``SUCCESS_PLAN_LEVEL`` when the
+    # extractor produced plan-level rows but no per-apartment units. The
+    # D16 unit/plan partition (commit 0a4624c) routes rows lacking a
+    # natural identity into ``result["plan_summaries"]``; without this
+    # kwarg they reached the verdict layer invisible and the property
+    # was misclassified as ``FAILED_NO_DATA`` despite shipping data.
     verdict = compute_verdict(
         fetch_outcome=outcome_val,
         extract_result=extract_result,
         carry_forward_applied=result.get("_meta", {}).get("carry_forward_used", False),
+        plan_summaries=result.get("plan_summaries"),
     )
     meta = result.setdefault("_meta", {})
     meta["canonical_id"] = task.property_id

@@ -1145,6 +1145,54 @@ _PORTAL_URL_PATTERNS: tuple[tuple[str, str], ...] = (
 )
 
 
+# RC4d (2026-05-17 regression fix) — path segments that indicate an
+# authentication wall on an otherwise-recognised portal host. Even when
+# a URL's host matches ``_PORTAL_URL_PATTERNS`` (so it gets queued at the
+# top embedded-portal score of 10_000+), if the path is a sign-in /
+# login / signout / auth-callback route, fetching it returns a 0-unit
+# auth-shell that wastes a hop slot and feeds the LLM with chrome.
+# Observed 2026-05-17 on PID 6997 — ``urbanresidential.myresman.com``
+# matched the ``resman`` host allow-list but the URL was
+# ``/Portal/Access/SignIn/WT`` (Keycloak-style auth wall).
+#
+# AppFolio's ``.appfolio.com/connect/users/sign_in`` was also a recurring
+# offender, which is why the previous fix (2026-05-15) excised the
+# ``.appfolio.com/connect`` host pattern from the allow-list entirely.
+# This filter is the general-case equivalent: keep the host in the
+# allow-list (so legitimate inventory URLs on it work), but reject any
+# URL whose path is an auth route.
+_PORTAL_AUTH_PATH_SEGMENTS: frozenset[str] = frozenset({
+    "sign-in", "sign_in", "signin",
+    "sign-up", "sign_up", "signup",
+    "sign-out", "sign_out", "signout",
+    "logout", "log-out", "log_out",
+    "login", "log-in", "log_in",
+    "auth", "authenticate", "authentication",
+    "oauth", "oauth2", "callback",
+    "register", "registration",
+    "forgot-password", "reset-password", "password-reset",
+})
+
+
+def _is_portal_auth_path(url: str) -> bool:
+    """``True`` when *url* is an auth/sign-in route on an allow-listed portal.
+
+    Path-segment match (not substring) so slugs like ``/signature-plan/``
+    or ``/north-login-blvd-apartments/`` are not false-positives. The
+    check is case-insensitive — ResMan returns ``/Portal/Access/SignIn``
+    with mixed case but consumer code lower-cases before lookup.
+    """
+    if not url:
+        return False
+    try:
+        import urllib.parse as _up
+        parsed = _up.urlparse(url)
+        path_segments = (parsed.path or "").lower().split("/")
+        return any(seg in _PORTAL_AUTH_PATH_SEGMENTS for seg in path_segments if seg)
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Generic unknown-portal discovery
 # ---------------------------------------------------------------------------
@@ -1290,6 +1338,18 @@ _PORTAL_INFRA_BLACKLIST: tuple[str, ...] = (
     "tour-virtual",  # virtual tour widgets (matterport, etc — could be promoted later)
     "matterport.com",
     "kuula.co",
+    # RC4c (2026-05-17 regression fix) — additional unknown-portal hosts
+    # that the iframe-scanner was queuing at scores 4_700-10_040 because
+    # they pass the "is iframe + not blacklisted" gate. None of these
+    # carry property inventory; together they accounted for 1100+ wasted
+    # hop fetches on PIDs 6997 / 229374 / 231970 in the May 17 cloud run.
+    "leavefeedback.app",          # feedback-survey iframe
+    "gum.criteo.com",             # ad-tech / programmatic
+    "connect.facebook.net",       # FB tracking pixel signals
+    "analytics.sitewit.com",      # marketing analytics
+    "rp-webchat-client.netlify.app",  # RealPage chat widget
+    "integrations.nestio.com",    # Nestio integration glue
+    "webchat-client",             # generic webchat iframe path
 )
 
 
@@ -1380,6 +1440,10 @@ def detect_embedded_portal_urls(
                     # too ("//sightmap.com/embed/...").
                     if candidate.startswith("//"):
                         candidate = "https:" + candidate
+                    # RC4d — reject auth-wall paths on allow-listed hosts.
+                    # See ``_is_portal_auth_path`` for the segment list.
+                    if _is_portal_auth_path(candidate):
+                        return
                     if candidate in seen_urls:
                         return
                     seen_urls.add(candidate)
@@ -1434,6 +1498,12 @@ def sweep_raw_html_for_portal_urls(html: str) -> list[tuple[str, str]]:
     for m in _RAW_URL_RE.finditer(html):
         url = m.group(0).rstrip(".,;)'\"")  # strip trailing punctuation
         if url in seen:
+            continue
+        # RC4d — reject auth-wall paths on allow-listed hosts before any
+        # pattern match runs. Symmetric with the embedded-JSON walker
+        # above so the same URL is treated identically regardless of
+        # which discovery path found it.
+        if _is_portal_auth_path(url):
             continue
         lower = url.lower()
         for needle, portal in _PORTAL_URL_PATTERNS:
