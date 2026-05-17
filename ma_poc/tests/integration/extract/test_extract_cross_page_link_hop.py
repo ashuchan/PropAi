@@ -31,12 +31,26 @@ def _stub_playwright() -> None:
             sys.modules[name] = mod
 
 
-def _ranked_links_stub(html: str, entry_url: str, limit: int = 3):
-    """Deterministic 3 candidates for testing the bounded loop."""
+def _ranked_links_stub(html: str, entry_url: str, limit: int = 3, **_kwargs):
+    """Deterministic 3 candidates for testing the bounded loop.
+
+    Accepts ``**_kwargs`` so the test stays compatible when the real
+    ``_rank_internal_links`` signature gains new keyword arguments
+    (e.g. ``landed_url`` added 2026-05-15 for redirect-aware anchor
+    admission, playbook §8.9). The other two stubs in this file
+    (``many_candidates``, ``candidates_include_entry``) already accept
+    ``**_kwargs`` — this one was missed.
+
+    Scores returned as ints in the thousands to match the real ranker's
+    contract (the scraper's URL_SHAPE patterns + PMS priors emit scores
+    in the 4_000–10_000 range; a stub returning floats < 1 would be
+    outranked by every prior). Without the high scores the dedup test
+    can't reliably observe its own candidates being fetched.
+    """
     return [
-        ("https://example.com/floor-plans", 0.9, "Floor Plans"),
-        ("https://example.com/availability", 0.85, "Availability"),
-        ("https://example.com/apply", 0.5, "Apply"),
+        ("https://example.com/floor-plans", 9_900, "Floor Plans"),
+        ("https://example.com/availability", 9_800, "Availability"),
+        ("https://example.com/apply", 9_700, "Apply"),
     ]
 
 

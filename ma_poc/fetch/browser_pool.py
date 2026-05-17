@@ -69,6 +69,23 @@ def _resolve_int_env(name: str, default_ms: int) -> int:
 DEFAULT_PAGE_TIMEOUT_MS = _resolve_int_env("PLAYWRIGHT_PAGE_TIMEOUT_MS", 60_000)
 DEFAULT_NAV_TIMEOUT_MS = _resolve_int_env("PLAYWRIGHT_NAV_TIMEOUT_MS", 45_000)
 
+# Shard_10 fix (2026-05-17): wrap every awaitable inside ``acquire()`` in a
+# host-level ``asyncio.wait_for`` so a wedged Chromium IPC cannot park the
+# caller for the full per-property 600s wallclock. The shard_84 fix from
+# 2026-05-16 hardened ``page.goto`` (fetch/fetcher.py:707) and
+# ``context.close`` (browser_pool.release, line 195), but the wedge had
+# migrated UP into ``_semaphore.acquire`` / ``browser.new_context`` /
+# ``context.new_page`` — none of which were timeout-wrapped. Shard 10 of
+# 2026-05-17 had 22/50 PIDs hit the per-property wallclock with body_bytes=0,
+# 10 of them double-wedged (entry + hop) for ~63 min wallclock each.
+#
+# 30s is a conservative cap: legitimate Chromium acquire takes <1s in
+# steady state; even under pool contention with 8 concurrent slots,
+# spinning up a new context+page rarely exceeds 5s. A 30s cap gives 30×
+# headroom over the observed legitimate ceiling while limiting wedge
+# blast radius to 5% of the per-property budget.
+ACQUIRE_TIMEOUT_MS = _resolve_int_env("BROWSER_POOL_ACQUIRE_TIMEOUT_MS", 30_000)
+
 
 class BrowserContextPool:
     """Pool of Playwright browser contexts, one per property.
@@ -114,50 +131,110 @@ class BrowserContextPool:
 
         Returns:
             A Playwright Page ready for navigation.
+
+        Raises:
+            asyncio.TimeoutError: If any step (semaphore, browser launch,
+                context creation, page creation) exceeds
+                ``ACQUIRE_TIMEOUT_MS``. The semaphore slot is released
+                on timeout so the pool does not leak slots; the caller is
+                expected to treat the timeout as a TRANSIENT fetch failure.
         """
-        await self._semaphore.acquire()
-        browser = await self._ensure_browser()
+        timeout_s = ACQUIRE_TIMEOUT_MS / 1000.0
+        # Step 1 — semaphore. Timeout-wrapped because a previous wedged
+        # acquire on a degraded Chromium child can hold a slot until the
+        # per-property wallclock fires (600s). With ``timeout_s`` we cap
+        # the wait to a fraction of that, then the caller can fail-fast
+        # the fetch as TRANSIENT and free its own slot.
+        try:
+            await asyncio.wait_for(self._semaphore.acquire(), timeout=timeout_s)
+        except TimeoutError:
+            log.warning(
+                "browser_pool.acquire: semaphore.acquire() exceeded %.1fs — "
+                "pool starved (all %d slots held). Failing fast.",
+                timeout_s, self._max_contexts,
+            )
+            raise
 
-        context_opts: dict[str, object] = {
-            "user_agent": identity.user_agent,
-            "viewport": {"width": identity.viewport[0], "height": identity.viewport[1]},
-            "locale": identity.accept_language.split(",")[0],
-            # Inject timezone matching the identity's plausible US region.
-            # Without this, Playwright contexts on a UTC host (Cloud Run, CI)
-            # expose the server timezone via JS Intl.DateTimeFormat — a
-            # detectable inconsistency against the locale/UA combination.
-            "timezone_id": identity.timezone_id,
-        }
-        if isinstance(proxy, ProxyConfig):
-            pw_proxy = proxy.to_playwright()
-            if pw_proxy is not None:
-                context_opts["proxy"] = pw_proxy
-                # Bright Data terminates TLS at the proxy; its proxy cert
-                # is not the target site's cert. Only relax verification
-                # when a non-direct proxy is in use.
+        # From here on, the semaphore is HELD. Every error path below must
+        # release it before re-raising; otherwise a downstream wedge leaks
+        # a pool slot permanently.
+        try:
+            # Step 2 — browser launch (cached after first call).
+            browser = await asyncio.wait_for(
+                self._ensure_browser(), timeout=timeout_s,
+            )
+
+            context_opts: dict[str, object] = {
+                "user_agent": identity.user_agent,
+                "viewport": {"width": identity.viewport[0], "height": identity.viewport[1]},
+                "locale": identity.accept_language.split(",")[0],
+                # Inject timezone matching the identity's plausible US region.
+                # Without this, Playwright contexts on a UTC host (Cloud Run, CI)
+                # expose the server timezone via JS Intl.DateTimeFormat — a
+                # detectable inconsistency against the locale/UA combination.
+                "timezone_id": identity.timezone_id,
+            }
+            if isinstance(proxy, ProxyConfig):
+                pw_proxy = proxy.to_playwright()
+                if pw_proxy is not None:
+                    context_opts["proxy"] = pw_proxy
+                    # Bright Data terminates TLS at the proxy; its proxy cert
+                    # is not the target site's cert. Only relax verification
+                    # when a non-direct proxy is in use.
+                    context_opts["ignore_https_errors"] = True
+            elif isinstance(proxy, str) and proxy:
+                from urllib.parse import urlparse
+
+                _parsed = urlparse(proxy)
+                _port = f":{_parsed.port}" if _parsed.port else ""
+                _server = f"{_parsed.scheme}://{_parsed.hostname}{_port}"
+                _pw_proxy: dict[str, str] = {"server": _server}
+                if _parsed.username:
+                    _pw_proxy["username"] = _parsed.username
+                if _parsed.password:
+                    _pw_proxy["password"] = _parsed.password
+                context_opts["proxy"] = _pw_proxy
+                # BrightData terminates TLS at the proxy edge; without this flag
+                # Chromium aborts HTTPS navigations with ERR_CERT_AUTHORITY_INVALID.
                 context_opts["ignore_https_errors"] = True
-        elif isinstance(proxy, str) and proxy:
-            from urllib.parse import urlparse
 
-            _parsed = urlparse(proxy)
-            _port = f":{_parsed.port}" if _parsed.port else ""
-            _server = f"{_parsed.scheme}://{_parsed.hostname}{_port}"
-            _pw_proxy: dict[str, str] = {"server": _server}
-            if _parsed.username:
-                _pw_proxy["username"] = _parsed.username
-            if _parsed.password:
-                _pw_proxy["password"] = _parsed.password
-            context_opts["proxy"] = _pw_proxy
-            # BrightData terminates TLS at the proxy edge; without this flag
-            # Chromium aborts HTTPS navigations with ERR_CERT_AUTHORITY_INVALID.
-            context_opts["ignore_https_errors"] = True
+            # Step 3 — new context. Can wedge when the browser process is
+            # alive but the IPC channel is degraded.
+            context = await asyncio.wait_for(
+                browser.new_context(**context_opts),  # type: ignore[arg-type]
+                timeout=timeout_s,
+            )
+            self._active_contexts.append(context)
 
-        context = await browser.new_context(**context_opts)  # type: ignore[arg-type]
-        self._active_contexts.append(context)
-        page = await context.new_page()
-        page.set_default_timeout(DEFAULT_PAGE_TIMEOUT_MS)
-        page.set_default_navigation_timeout(DEFAULT_NAV_TIMEOUT_MS)
-        return page
+            # Step 4 — new page. Same wedge surface as step 3. On timeout
+            # the context is registered in ``_active_contexts`` so the
+            # close-path can still reach it; abandon it from the list so
+            # we don't leak a dangling reference.
+            try:
+                page = await asyncio.wait_for(
+                    context.new_page(), timeout=timeout_s,
+                )
+            except TimeoutError:
+                log.warning(
+                    "browser_pool.acquire: context.new_page() exceeded %.1fs — "
+                    "abandoning wedged context.",
+                    timeout_s,
+                )
+                try:
+                    self._active_contexts.remove(context)
+                except ValueError:
+                    pass
+                raise
+
+            page.set_default_timeout(DEFAULT_PAGE_TIMEOUT_MS)
+            page.set_default_navigation_timeout(DEFAULT_NAV_TIMEOUT_MS)
+            return page
+        except BaseException:
+            # Any failure (TimeoutError, Playwright error, asyncio cancel)
+            # must release the semaphore so the slot count stays accurate.
+            # release() is sync and never raises.
+            self._semaphore.release()
+            raise
 
     async def release(self, page: Page) -> None:
         """Release a page and close its context.

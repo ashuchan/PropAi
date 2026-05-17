@@ -33,6 +33,7 @@ from typing import Any
 
 from data_provider.contracts import (
     DataProvider,
+    SOFT_PROPERTY_COLS,
     IExtractionResultStore,
     IProfileStore,
     IPropertyCatalogSource,
@@ -185,9 +186,19 @@ class FsPropertyStateStore(IPropertyStateStore):
         self._ensure_loaded()
         # property_index.json is still V1-shaped on disk; translate the
         # V2-named snapshot back to V1 before delegating to StateStore.
+        #
+        # Drop SOFT_PROPERTY_COLS keys whose value is None — the underlying
+        # StateStore.upsert_property does dict.update on the existing index,
+        # so an explicit None erases a previously-good value. Same NULL-
+        # ratchet behaviour the SQL store fixes via COALESCE; see
+        # SOFT_PROPERTY_COLS docstring in data_provider.contracts.
+        cleaned = {
+            k: v for k, v in snapshot.items()
+            if v is not None or k not in SOFT_PROPERTY_COLS
+        }
         is_new = self._s.upsert_property(
             canonical_id,
-            _v2_to_v1_property_keys(snapshot),
+            _v2_to_v1_property_keys(cleaned),
             run_date,
         )
         self._owner._dirty = True

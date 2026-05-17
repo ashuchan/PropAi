@@ -35,6 +35,32 @@ from data_provider.dtos import (
 )
 
 
+# Columns on the property snapshot that hold structural CSV/scrape data
+# (name, address, etc.). Implementations MUST NOT overwrite a populated
+# value on these columns with NULL — when a partial / failed scrape emits
+# None, keep the previously-good value. Without this guard the column
+# ratchets to NULL across runs because SqlPropertyCatalogSource reads
+# `properties` to feed the next run's input as csv-like rows. The 562→880
+# NULL-name regression observed 2026-05-14 → 2026-05-17 in production was
+# this leak. Used by SqlPropertyStateStore.upsert (COALESCE) and
+# FsPropertyStateStore.upsert (None-filter).
+SOFT_PROPERTY_COLS: frozenset[str] = frozenset({
+    "proj_name",
+    "address",
+    "city",
+    "state",
+    "zip_code",
+    "country",
+    "phone",
+    "email_address",
+    "website",
+    "pmc",
+    "website_design",
+    "concessions",
+    "apartment_id",
+})
+
+
 class IPropertyStateStore(ABC):
     """Current-state view of property_index.json (one row per canonical_id)."""
 

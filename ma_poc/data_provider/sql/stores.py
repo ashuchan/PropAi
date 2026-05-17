@@ -18,10 +18,11 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from data_provider.contracts import (
+    SOFT_PROPERTY_COLS,
     IExtractionResultStore,
     IProfileStore,
     IPropertyCatalogSource,
@@ -516,8 +517,19 @@ class SqlPropertyStateStore(IPropertyStateStore):
             _clip_to_column_limits(values, PropertyRow, log_prefix=f"property upsert cid={canonical_id}")
 
             stmt = dialect_insert(self._h.engine, PropertyRow).values(**values)
-            # On conflict, update every column except the PK.
-            update_cols = {k: stmt.excluded[k] for k in values if k != "canonical_id"}
+            # On conflict, update every column except the PK. Soft fields
+            # use COALESCE(EXCLUDED, existing) so a partial scrape that
+            # emits NULL doesn't erase a previously-good value — see
+            # _SOFT_PROPERTY_COLS for the rationale.
+            cols = PropertyRow.__table__.c
+            update_cols: dict[str, Any] = {}
+            for k in values:
+                if k == "canonical_id":
+                    continue
+                if k in SOFT_PROPERTY_COLS:
+                    update_cols[k] = func.coalesce(stmt.excluded[k], cols[k])
+                else:
+                    update_cols[k] = stmt.excluded[k]
             stmt = stmt.on_conflict_do_update(
                 index_elements=[PropertyRow.canonical_id],
                 set_=update_cols,

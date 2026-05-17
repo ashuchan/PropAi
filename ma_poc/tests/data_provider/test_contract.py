@@ -115,6 +115,71 @@ def test_property_state_upsert_existing_is_not_new(provider: DataProvider) -> No
 
 
 @providers
+def test_property_state_upsert_null_does_not_erase_existing(provider: DataProvider) -> None:
+    # First upsert seeds the soft fields (CSV-style payload).
+    with provider.transaction():
+        provider.property_state.upsert(
+            "P-SOFT",
+            {
+                "proj_name": "Lofts at Little Creek",
+                "address": "123 Main St",
+                "city": "Scottsdale",
+                "state": "AZ",
+                "zip_code": "85255",
+                "pmc": "Mark-Taylor",
+                "website": "https://example.com",
+                "phone": "(555) 123-4567",
+                "last_scrape_status": "SUCCESS",
+            },
+            "2026-04-18",
+        )
+    # Second upsert simulates a partial / failed scrape: every soft field
+    # arrives as None. Only the hard-overwrite status changes.
+    with provider.transaction():
+        provider.property_state.upsert(
+            "P-SOFT",
+            {
+                "proj_name": None,
+                "address": None,
+                "city": None,
+                "state": None,
+                "zip_code": None,
+                "pmc": None,
+                "website": None,
+                "phone": None,
+                "last_scrape_status": "FAILED_UNREACHABLE",
+            },
+            "2026-04-19",
+        )
+    got = provider.property_state.get("P-SOFT")
+    assert got is not None
+    # Soft fields survive the NULL-write — this is the 880-NULL regression
+    # the COALESCE upsert prevents.
+    assert got.proj_name == "Lofts at Little Creek"
+    assert got.address == "123 Main St"
+    assert got.city == "Scottsdale"
+    assert got.state == "AZ"
+    assert got.zip_code == "85255"
+    assert got.pmc == "Mark-Taylor"
+    assert got.website == "https://example.com"
+    assert got.phone == "(555) 123-4567"
+    # Hard-overwrite columns reflect the latest run.
+    assert got.last_scrape_status == "FAILED_UNREACHABLE"
+
+
+@providers
+def test_property_state_upsert_non_null_still_overrides_existing(provider: DataProvider) -> None:
+    # Sanity: COALESCE doesn't pin the column — a real new value still wins.
+    with provider.transaction():
+        provider.property_state.upsert("P-OVR", {"proj_name": "Old Name", "city": "Old City"}, "2026-04-18")
+        provider.property_state.upsert("P-OVR", {"proj_name": "New Name", "city": "New City"}, "2026-04-19")
+    got = provider.property_state.get("P-OVR")
+    assert got is not None
+    assert got.proj_name == "New Name"
+    assert got.city == "New City"
+
+
+@providers
 def test_unit_state_diff_new_updated_unchanged_disappeared(
     provider: DataProvider,
 ) -> None:

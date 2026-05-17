@@ -230,6 +230,58 @@ _RICH_HOP_MIN_BODY_BYTES = 50_000
 _RICH_HOP_JSONLD_MARKERS = ("FloorPlan", "ApartmentComplex", "Apartment\"")
 
 
+def choose_hop_render_mode(
+    *,
+    parent_render_mode: Any | None,
+    browser_page: Any | None = None,
+) -> Any:
+    """Pick the render mode for a link-hop sub-task.
+
+    Shard_10 fix (2026-05-17). Before this, ``_try_link_hop`` hard-coded
+    ``RenderMode.RENDER`` for every hop. When the parent was a wedge-rescue
+    retry running ``RenderMode.GET`` (HTTP-only, by design to bypass
+    Playwright IPC wedges), the hop reverted to Playwright and re-entered
+    the wedge-prone path. PID 19154 (conwayclub.com) shipped two
+    consecutive 600s wedges that way — entry wedge then hop wedge.
+
+    The decision is narrow: only downgrade to GET when the parent task
+    EXPLICITLY ran in GET mode (the rescue case). Default to RENDER
+    otherwise so XHR capture, JS-rendered DOM, and stealth identity
+    handling that today's hop relies on stay intact.
+
+    ``browser_page`` is accepted for signature stability with prior call
+    sites but is intentionally ignored: in production
+    ``scripts/runners/jugnu.py:1113`` passes ``page=None`` to
+    ``scrape_jugnu`` even for RENDER entries, so reading "browser_page is
+    None" as "parent was HTTP-only" is wrong and downgraded EVERY hop to
+    GET — observed locally on PID 19530 (brazosthehampton.com) where
+    every hop, including ``/floorplans``, hit BOT_BLOCKED in <1s because
+    the WAF rejects plain GET but lets Playwright through.
+
+    Args:
+        parent_render_mode: The entry task's render_mode. ``RenderMode``
+            enum, the equivalent string, or ``None`` if unknown.
+        browser_page: Reserved for signature stability; ignored.
+
+    Returns:
+        ``RenderMode.GET`` only when the parent task was explicitly GET;
+        ``RenderMode.RENDER`` in every other case.
+    """
+    del browser_page  # intentionally ignored; see docstring
+    from ma_poc.fetch.contracts import RenderMode
+
+    parent_was_get = (
+        parent_render_mode is RenderMode.GET
+        or (
+            isinstance(parent_render_mode, str)
+            and parent_render_mode.upper() == "GET"
+        )
+    )
+    if parent_was_get:
+        return RenderMode.GET
+    return RenderMode.RENDER
+
+
 def _link_hop_is_rich(fetch_result: Any) -> bool:
     """Bug 5 alignment: should this hop's body trigger a cost-cap refresh?
 
@@ -2519,6 +2571,7 @@ async def _try_link_hop(
     shared_budget: dict | None = None,
     browser_page: Any | None = None,
     landed_url: str | None = None,
+    parent_render_mode: Any | None = None,
 ) -> dict[str, Any] | None:
     """One-level BFS over home-page links when primary extraction is empty.
 
@@ -2803,6 +2856,14 @@ async def _try_link_hop(
     from ma_poc.fetch.contracts import RenderMode
     from ma_poc.observability.events import EventKind, emit
 
+    # Shard_10 fix (2026-05-17): inherit the parent task's render_mode for
+    # sub-page fetches. See ``choose_hop_render_mode`` docstring above
+    # for the full rationale (PID 19154 conwayclub.com double-wedge).
+    _hop_render_mode = choose_hop_render_mode(
+        parent_render_mode=parent_render_mode,
+        browser_page=browser_page,
+    )
+
     emit(
         EventKind.LINK_HOP_STARTED,
         property_id,
@@ -2828,8 +2889,20 @@ async def _try_link_hop(
     # we accumulate units across all sub-pages rather than returning early.
     # ``_first_successful_result`` holds the base result; ``_accumulated_units``
     # merges all unit lists.
+    #
+    # 2026-05-17 Bug #3 fix — track plan_summaries in parallel. When
+    # post_process partitions LLM_DOM rows into plan_summaries (rent + dims
+    # but no per-apartment identity signals like available_date/floor/
+    # building), sub_result["units"] is empty and the accumulator-units-only
+    # path lost those rows. PID 16139 chaseknollsapts.com: hop 1 to
+    # /photos/pricing extracted 2 rows via LLM_DOM, both landed in
+    # plan_summaries after post_process, accumulation captured 0, ran
+    # through 24 more empty hops, returned 0 units. With this fix the
+    # 2 plan-level rows propagate via _accumulated_plan_summaries → result
+    # plan_summaries → v2 floor_plans[].
     _first_successful_result: dict[str, Any] | None = None
     _accumulated_units: list[dict[str, Any]] = []
+    _accumulated_plan_summaries: list[dict[str, Any]] = []
     _in_floorplan_accumulation = False
 
     # Rule: once profile:winning_page_url delivers >1 units, skip lower-scored
@@ -2915,9 +2988,16 @@ async def _try_link_hop(
             priority=0,
             budget_ms=35000,
             reason=TaskReason.SCHEDULED,
-            render_mode=RenderMode.RENDER,
+            render_mode=_hop_render_mode,
             parent_task_id=None,
-            reuse_page=browser_page,  # Pattern A: share entry-page session
+            # Only reuse the browser page when we're staying in RENDER
+            # mode. Passing a Playwright Page into a GET-mode fetch
+            # is ignored by the HTTP path and would mask the mode
+            # selection in the LINK_HOP_FETCHED event. ``browser_page``
+            # is typically None in production today (runner doesn't
+            # thread the entry Page down — see jugnu.py:1113); when set,
+            # the L1 fetcher reuses the session cookies.
+            reuse_page=(browser_page if _hop_render_mode is RenderMode.RENDER else None),
         )
         try:
             sub_fetch = await jugnu_fetch(sub_task)
@@ -3236,14 +3316,26 @@ async def _try_link_hop(
                 # query string (e.g. `?id=X` + `/floorplans` -> `?id=X/floorplans`)
                 # which many SPAs return 200 OK for, creating an extraction spiral.
                 _hop_base_path = _hop_parsed.path.rstrip("/")
-                for _psp in _prop_sub_paths:
-                    _new_path = _hop_base_path + _psp
-                    _psp_url = urllib.parse.urlunparse(_hop_parsed._replace(path=_new_path))
-                    if _psp_url not in visited and not any(u == _psp_url for u, _, _ in queue):
-                        queue.append((_psp_url, _PMS_PRIOR_SCORE + 200, f"prop_subpath:{_psp}"))
-                        dynamic_appended += 1
-                        if dynamic_appended >= max_dynamic_appends:
-                            break
+                # Bug #3 fix (2026-05-17): skip subpath synthesis when the hop
+                # path already ends with one of the prop_sub_paths segments.
+                # Without this guard, hopping to /map-and-directions/floorplans
+                # synthesised /map-and-directions/floorplans/floorplans and
+                # /map-and-directions/pricing/pricing — nonsensical URLs that
+                # CF-blocked or returned the same SPA shell. Burned hop budget
+                # on PID 16139 chaseknollsapts (3 garbage hops) + many others.
+                _base_path_lower = _hop_base_path.lower()
+                _base_already_subpath = any(
+                    _base_path_lower.endswith(_psp) for _psp in _prop_sub_paths
+                )
+                if not _base_already_subpath:
+                    for _psp in _prop_sub_paths:
+                        _new_path = _hop_base_path + _psp
+                        _psp_url = urllib.parse.urlunparse(_hop_parsed._replace(path=_new_path))
+                        if _psp_url not in visited and not any(u == _psp_url for u, _, _ in queue):
+                            queue.append((_psp_url, _PMS_PRIOR_SCORE + 200, f"prop_subpath:{_psp}"))
+                            dynamic_appended += 1
+                            if dynamic_appended >= max_dynamic_appends:
+                                break
         except Exception:
             pass
 
@@ -3506,7 +3598,15 @@ async def _try_link_hop(
                 # unknown number of LEASE_UP properties) from accumulating
                 # sub-page units even though their index pages carried
                 # full floor-plan structure.
+                # Bug #3 fix (2026-05-17): consider plan_summaries in the
+                # fp-data signal check. When post_process partitions rows
+                # to plan_summaries, sub_result["units"] is empty but the
+                # rows still carry beds/baths/sqft/rent — entering
+                # accumulation on plan_summaries lets cross-hop dedup +
+                # propagation happen for plan-level data too.
                 _index_units = sub_result.get("units") or []
+                _index_plans = sub_result.get("plan_summaries") or []
+                _fp_signal_rows = _index_units if _index_units else _index_plans
                 _has_fp_data = any(
                     (
                         u.get("beds") is not None
@@ -3521,7 +3621,7 @@ async def _try_link_hop(
                         or u.get("rent_high")
                         or u.get("asking_rent")
                     )
-                    for u in _index_units
+                    for u in _fp_signal_rows
                 )
                 if _has_fp_data:
                     # Mark accumulation mode so recursive sub-pages are merged,
@@ -3548,6 +3648,15 @@ async def _try_link_hop(
                             property_id, _merge_err,
                         )
                         _accumulated_units.extend(sub_result.get("units") or [])
+                    # Bug #3 fix (2026-05-17): also accumulate plan_summaries.
+                    # When units is empty but plan_summaries has rows (LLM_DOM
+                    # extractions from pricing/floorplans pages that lack
+                    # per-apartment identity), preserve them so the return
+                    # path at line 3692+ can ship them via _HOP_OVERWRITE_KEYS
+                    # → result.plan_summaries → v2 floor_plans[].
+                    _accumulated_plan_summaries.extend(
+                        sub_result.get("plan_summaries") or []
+                    )
                     # Checkpoint partial results so the timeout handler can
                     # salvage accumulated units if the property wall-clock budget
                     # expires mid-hop.
@@ -3616,6 +3725,11 @@ async def _try_link_hop(
                         property_id, _merge_err,
                     )
                     _accumulated_units.extend(sub_result.get("units") or [])
+                # Bug #3 fix (2026-05-17): parallel plan_summaries accumulation
+                # so cross-hop plan-level rows reach the return path.
+                _accumulated_plan_summaries.extend(
+                    sub_result.get("plan_summaries") or []
+                )
                 _accum_pages_fetched += 1
                 if shared_budget is not None:
                     shared_budget["_partial_units"] = list(_accumulated_units)
@@ -3703,6 +3817,29 @@ async def _try_link_hop(
                 seen_ids.add(key_str)
                 deduped.append(u)
         _first_successful_result["units"] = deduped
+        # Bug #3 fix (2026-05-17): dedup + return accumulated plan_summaries
+        # so plan-level rows extracted on hop pages reach the caller's
+        # _HOP_OVERWRITE_KEYS copy path. Dedup key is plan-shape — no
+        # per-apartment identity, so (floor_plan_name, beds, baths, sqft,
+        # rent_low) is the natural natural key. Without this dedup, hop
+        # accumulation across N pages that all returned the same plan
+        # summary (e.g. cross-host per-plan detail pages all repeat the
+        # same aggregate row) would emit N duplicates of one plan.
+        if _accumulated_plan_summaries:
+            _plan_seen: set[str] = set()
+            _plan_deduped: list[dict[str, Any]] = []
+            for p in _accumulated_plan_summaries:
+                _pkey = "|".join((
+                    str(p.get("floor_plan_name") or p.get("floorplan_name") or "").lower().strip(),
+                    str(p.get("beds") if p.get("beds") is not None else p.get("bedrooms")),
+                    str(p.get("baths") if p.get("baths") is not None else p.get("bathrooms")),
+                    str(p.get("sqft") or p.get("area") or ""),
+                    str(p.get("rent_low") or p.get("market_rent_low") or ""),
+                ))
+                if _pkey not in _plan_seen:
+                    _plan_seen.add(_pkey)
+                    _plan_deduped.append(p)
+            _first_successful_result["plan_summaries"] = _plan_deduped
         existing_explored = _first_successful_result.get("_explored_links") or {}
         existing_explored.update(explored)
         _first_successful_result["_explored_links"] = existing_explored
@@ -4068,6 +4205,10 @@ async def scrape_jugnu(
                     shared_budget=_jugnu_budget,
                     browser_page=page,  # Pattern A: share entry-page session
                     landed_url=_landed_url,
+                    # Shard_10 fix: propagate the entry task's render_mode so
+                    # wedge-rescue's HTTP-only GET retries don't bounce back
+                    # into Playwright on the hop.
+                    parent_render_mode=getattr(task, "render_mode", None),
                 )
             except Exception as exc:
                 log.warning("link-hop orchestration failed for %s: %s", property_id, exc)

@@ -689,6 +689,22 @@ async def run_jugnu(
                 _rr_meta = (_rr.get("_meta") or {}) if isinstance(_rr, dict) else {}
                 _rr_v = (_rr_meta.get("verdict") or "").upper()
                 _rr_has_units = bool(_rr.get("units"))
+
+                # Shard_10 fix (2026-05-17): retroactively stamp the
+                # original record with entry_bot_blocked when the rescue's
+                # HTTP-only GET surfaced a WAF response. See
+                # ``stamp_inferred_entry_block`` docstring for the full
+                # rationale.
+                _rr_fd = _rr.get("_fetch_diagnostic") or {}
+                _orig_idx = _pid_to_index.get(_rt.property_id)
+                if _orig_idx is not None:
+                    _orig = results[_orig_idx]
+                    if isinstance(_orig, dict):
+                        stamp_inferred_entry_block(
+                            _orig.setdefault("_meta", {}),
+                            _rr_fd,
+                        )
+
                 # Upgrade ONLY if retry produced units OR a non-failure verdict.
                 # An HTTP_ONLY retry that also fails doesn't help; keep the
                 # original partial-recovery record (it might carry-forward
@@ -838,6 +854,60 @@ _WEDGE_RESCUE_RETRY_VERDICTS: frozenset[str] = frozenset({
     "SUCCESS_PARTIAL",
     "FAILED_UNREACHABLE",
 })
+
+
+def stamp_inferred_entry_block(
+    original_meta: dict[str, Any],
+    rescue_fetch_diagnostic: dict[str, Any] | None,
+) -> bool:
+    """Retroactively flag the entry as bot-blocked when wedge-rescue
+    surfaced a WAF response.
+
+    Shard_10 fix (2026-05-17). When the entry-page RENDER fetch is killed
+    by the per-property wallclock, ``fetch/fetcher.py`` builds the
+    ``CANCELLED`` FetchResult with ``body=None``. The captcha detector at
+    ``fetch/fetcher.py:329`` only runs ``if result.body``, so
+    ``entry_captcha_detected`` stays False. ``wedge_rescue_decision``
+    reads that false value and returns ``RETRY``. The rescue's HTTP-only
+    GET then immediately receives the WAF interstitial and is classified
+    BOT_BLOCKED — proof that the entry was always behind a WAF, just
+    invisible from the wedged RENDER attempt.
+
+    This helper updates the ORIGINAL record's ``_meta`` so:
+      * Telemetry counts captcha-blocked properties correctly even when
+        the first fetch never returned a body.
+      * Any subsequent rescue pass (none today, but the architecture
+        allows it) reads the corrected flag and short-circuits via
+        ``SKIP_ENTRY_CAPTCHA``.
+      * The verdict_reason can be made specific in downstream analysers
+        without re-parsing rescue diagnostics.
+
+    The function is idempotent and pure (no I/O). It mutates
+    ``original_meta`` in place and returns True when a flag was stamped.
+
+    Args:
+        original_meta: The ``_meta`` dict of the main-pass record. Updated
+            in place.
+        rescue_fetch_diagnostic: The ``_fetch_diagnostic`` dict from the
+            wedge-rescue retry's result. ``None`` is a no-op.
+
+    Returns:
+        True when ``original_meta`` was updated, False otherwise.
+    """
+    if not rescue_fetch_diagnostic:
+        return False
+    bot_blocked = bool(rescue_fetch_diagnostic.get("bot_blocked"))
+    captcha_detected = bool(rescue_fetch_diagnostic.get("captcha_detected"))
+    if not (bot_blocked or captcha_detected):
+        return False
+    original_meta["entry_bot_blocked"] = True
+    if captcha_detected:
+        original_meta["entry_captcha_detected"] = True
+    provider = rescue_fetch_diagnostic.get("captcha_provider")
+    if provider:
+        original_meta["entry_captcha_provider"] = provider
+    original_meta["entry_bot_blocked_inferred_from_rescue"] = True
+    return True
 
 
 def wedge_rescue_decision(

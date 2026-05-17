@@ -222,3 +222,131 @@ def test_env_override_rejects_non_positive(monkeypatch) -> None:
     monkeypatch.setenv("PLAYWRIGHT_NAV_TIMEOUT_MS", "0")
     from ma_poc.fetch.browser_pool import _resolve_int_env
     assert _resolve_int_env("PLAYWRIGHT_NAV_TIMEOUT_MS", 45_000) == 45_000
+
+
+# ── Acquire-timeout (shard_10 fix, 2026-05-17) ───────────────────────────────
+#
+# The host-level ``asyncio.wait_for`` cap on every awaitable inside
+# ``acquire()``. Without these guards a wedged Chromium IPC channel can
+# park the caller for the full per-property 600s wallclock — shard 10
+# of 2026-05-17 had 22 of 50 PIDs hit exactly that.
+#
+# Each test uses a microsecond-grade ACQUIRE_TIMEOUT_MS env override so
+# the suite stays fast even though we're forcing every code path to time
+# out. We force the module to re-read the env by re-importing and
+# monkey-patching the module-level constant.
+
+
+def _patched_pool_with_tiny_acquire_timeout(monkeypatch, ms: int = 50) -> BrowserContextPool:
+    """Force a tiny acquire timeout so tests can prove the guard fires
+    without parking for 30 seconds."""
+    from ma_poc.fetch import browser_pool as bp_mod
+
+    monkeypatch.setattr(bp_mod, "ACQUIRE_TIMEOUT_MS", ms)
+    return BrowserContextPool(max_contexts=1)
+
+
+def test_acquire_times_out_when_semaphore_starved(monkeypatch) -> None:
+    """When the pool semaphore is fully held, ``acquire()`` must raise
+    TimeoutError after ACQUIRE_TIMEOUT_MS rather than parking forever."""
+    pool = _patched_pool_with_tiny_acquire_timeout(monkeypatch, ms=50)
+
+    async def _go() -> None:
+        # Manually drain the single semaphore slot — simulating a wedged
+        # caller that holds the slot indefinitely.
+        await pool._semaphore.acquire()
+        # A second acquire must raise TimeoutError.
+        with __import__("pytest").raises((asyncio.TimeoutError, TimeoutError)):
+            await pool.acquire(_IDENTITY, None)
+
+    asyncio.run(_go())
+
+
+def test_acquire_times_out_when_new_context_wedges(monkeypatch) -> None:
+    """When ``browser.new_context()`` hangs, the host-level wait_for must
+    fire and the semaphore slot must be released so the pool doesn't leak."""
+    pool = _patched_pool_with_tiny_acquire_timeout(monkeypatch, ms=50)
+
+    async def _wedged_new_context(**_kwargs: object) -> AsyncMock:
+        # Park forever; the wait_for in acquire() should interrupt.
+        await asyncio.sleep(60)
+        return AsyncMock()
+
+    mock_browser = AsyncMock()
+    mock_browser.new_context = _wedged_new_context
+
+    async def _go() -> None:
+        with patch.object(pool, "_ensure_browser", return_value=mock_browser):
+            with __import__("pytest").raises((asyncio.TimeoutError, TimeoutError)):
+                await pool.acquire(_IDENTITY, None)
+        # Semaphore must be released — a follow-up acquire must succeed
+        # immediately (it'd hang otherwise on the now-leaked slot).
+        await asyncio.wait_for(pool._semaphore.acquire(), timeout=0.5)
+
+    asyncio.run(_go())
+
+
+def test_acquire_times_out_when_new_page_wedges(monkeypatch) -> None:
+    """When ``context.new_page()`` hangs, wait_for fires AND the wedged
+    context is removed from _active_contexts so close() doesn't trip."""
+    pool = _patched_pool_with_tiny_acquire_timeout(monkeypatch, ms=50)
+
+    wedged_context = AsyncMock()
+
+    async def _wedged_new_page() -> AsyncMock:
+        await asyncio.sleep(60)
+        return AsyncMock()
+
+    wedged_context.new_page = _wedged_new_page
+
+    async def _new_context(**_kwargs: object) -> AsyncMock:
+        return wedged_context
+
+    mock_browser = AsyncMock()
+    mock_browser.new_context = _new_context
+
+    async def _go() -> None:
+        with patch.object(pool, "_ensure_browser", return_value=mock_browser):
+            with __import__("pytest").raises((asyncio.TimeoutError, TimeoutError)):
+                await pool.acquire(_IDENTITY, None)
+        # Wedged context must NOT be tracked in _active_contexts (the
+        # cleanup branch removes it). Otherwise close() would try to
+        # close a wedged context that itself parks forever.
+        assert wedged_context not in pool._active_contexts
+        # Semaphore released.
+        await asyncio.wait_for(pool._semaphore.acquire(), timeout=0.5)
+
+    asyncio.run(_go())
+
+
+def test_acquire_releases_semaphore_on_ensure_browser_failure(monkeypatch) -> None:
+    """When ``_ensure_browser`` raises (e.g. Playwright launch error), the
+    semaphore must still be released so the pool slot is not leaked."""
+    pool = _patched_pool_with_tiny_acquire_timeout(monkeypatch, ms=500)
+
+    async def _failing_ensure() -> AsyncMock:
+        raise RuntimeError("playwright failed to launch")
+
+    async def _go() -> None:
+        with patch.object(pool, "_ensure_browser", side_effect=_failing_ensure):
+            with __import__("pytest").raises(RuntimeError):
+                await pool.acquire(_IDENTITY, None)
+        # The semaphore must be released — a follow-up acquire must succeed.
+        await asyncio.wait_for(pool._semaphore.acquire(), timeout=0.5)
+
+    asyncio.run(_go())
+
+
+def test_acquire_timeout_default_is_30_seconds() -> None:
+    """Lock the production default: the timeout cap is 30 seconds. Lowering
+    it without intent risks legitimate slow acquires; raising it weakens
+    the wedge containment. Either change must be deliberate."""
+    from ma_poc.fetch import browser_pool as bp_mod
+    assert bp_mod.ACQUIRE_TIMEOUT_MS == 30_000
+
+
+def test_acquire_timeout_env_override(monkeypatch) -> None:
+    """``BROWSER_POOL_ACQUIRE_TIMEOUT_MS`` overrides the default."""
+    monkeypatch.setenv("BROWSER_POOL_ACQUIRE_TIMEOUT_MS", "5000")
+    from ma_poc.fetch.browser_pool import _resolve_int_env
+    assert _resolve_int_env("BROWSER_POOL_ACQUIRE_TIMEOUT_MS", 30_000) == 5_000
