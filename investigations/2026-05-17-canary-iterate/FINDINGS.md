@@ -649,3 +649,20 @@ princetonmanagement=floorplan-only (no detail-page units; from-price
 only). apartmentsniagara=HAS units (bespoke WP). The recoverable
 fraction is therefore much larger than any "ceiling" estimate; the
 gate is the crawl+render-detail capability, not site-by-site code.
+
+## ★ EYEBALL BATCH 2 (user-validated, 209 static-unclassified sample) ★
+8 sampled: 5 HAVE unit-level (riversidevillas /floor-plan-cards/<p>;
+on-site=RealPage portal-hop; sussexmanor=AppFolio; cityridge query-
+paginated /living/floor-plans/?sort=unitrent; yardsatfieldside deep
+/floor-plans/apartment/<id> via view-apartments) | 3 floorplan-only
+ceiling (thewestmoor .html; catalinagardens /vacancy count;
+harborgroup count-not-unit). 2/8 misfingerprinted KNOWN-PMS
+(On-Site/RealPage, AppFolio) — adapters exist.
+EXTRAPOLATION 209 static-unclassified: ~60-65% recoverable (deeper
+detail path or known-portal-hop), ~35-40% genuine floorplan-only.
+=> ORIGINAL ~456 "genuine-custom" TRUE PICTURE: ~370+ recoverable
+(~80%) [206 vendor-template + 39 misfp-known + ~125 of 209], hard
+floorplan-only CEILING ~80-90 sites (~18%). New path patterns for #1:
+/floor-plan-cards/<p>, query-param paginated, multi-click
+/floor-plans/apartment/<id>, On-Site application-portal hop.
+Strengthens #1 case (~370+ not ~206). Still GATED on #2 baseline.
