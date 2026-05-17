@@ -473,6 +473,23 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
              "(inventory.g5marketingcloud / g5-cl- / g5dxm.com / dnn506yrbagrg.cloudfront.net)"],
         )
 
+    # securecafe online-leasing portal — definitive RentCafe/Yardi. A
+    # ``<sub>.securecafe.com/onlineleasing/`` reference is the resident-
+    # facing leasing portal and is never an incidental CDN asset. The
+    # detector's host regex only catches ``*.rentcafe.com`` hosts, so
+    # marketing sites that link/iframe to their securecafe portal
+    # (2026-05-17 canary: liveatcivicsquare.com and a large slice of the
+    # "other" no-fingerprint pool) were misrouted to generic/LLM. Routing
+    # to ``rentcafe`` engages the iter-4 securecafe availableunits.aspx
+    # unit-level probe.
+    if "securecafe.com/onlineleasing" in h or ".securecafe.com" in h:
+        return (
+            "rentcafe",
+            0.90,
+            ["RentCafe securecafe online-leasing portal marker in HTML "
+             "(<sub>.securecafe.com/onlineleasing)"],
+        )
+
     # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong
     # "not-a-PMS" signals when no strong PMS marker appeared in pass 1.
     if "static.parastorage.com" in h or "wix.com" in h:
