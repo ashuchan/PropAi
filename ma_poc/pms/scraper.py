@@ -876,9 +876,17 @@ async def scrape(
     # carries the real unit inventory (the Entrata floorplan module returns
     # nothing). Both fingerprints match; the router commits to Entrata, it
     # yields 0 units, and we'd otherwise drop to the generic LLM cascade.
-    # When the rendered HTML carries a SightMap embed code or inline API
-    # URL, run the SightMap adapter first — it's a deterministic Tier-1
-    # path that beats the LLM fallback on cost and accuracy.
+    #
+    # Gate on a BROAD SightMap signal — any sightmap.com reference in the
+    # rendered HTML (loader script, not just an <iframe> embed code) OR a
+    # SightMap-shaped body already in the captured network log. SightMap
+    # frequently injects its iframe/API *after* the HTML the scraper
+    # captured (e.g. tarowalk.com: sightmap.com is only a script host, no
+    # embed code in page_html), so the old find_sightmap_embed_codes()
+    # precondition silently missed every dynamically-loaded SightMap.
+    # Delegate actual discovery to SightMapAdapter — it already handles
+    # captured-response parsing + iframe + direct-API fallback and
+    # self-gates (SIGHTMAP_NO_RESPONSE) when there's genuinely nothing.
     if (
         not adapter_result.units
         and pms_name == "entrata"
@@ -887,11 +895,14 @@ async def scrape(
         try:
             from ma_poc.pms.adapters.sightmap import (
                 SightMapAdapter,
-                find_sightmap_direct_api_urls,
-                find_sightmap_embed_codes,
+                _is_sightmap_response,
             )
 
-            if find_sightmap_embed_codes(page_html) or find_sightmap_direct_api_urls(page_html):
+            captured = getattr(ctx, "_api_responses", []) or []
+            sm_signal = "sightmap.com" in page_html.lower() or any(
+                _is_sightmap_response(r.get("body")) for r in captured
+            )
+            if sm_signal:
                 sm_result = await SightMapAdapter().extract(page, ctx)  # type: ignore[arg-type]
                 if sm_result.units:
                     adapter_result = sm_result
