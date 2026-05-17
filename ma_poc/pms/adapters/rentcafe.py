@@ -617,6 +617,21 @@ def _find_securecafe_base(html: str, ctx: AdapterContext) -> str | None:
         m = _SECURECAFE_URL_RE.search(html)
         if m:
             return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
+    # 2026-05-17 iter-7: the rendered fetch_result.body frequently lacks a
+    # clean securecafe link (patchright DOM differs from raw server HTML;
+    # link injected post-render or behind a menu), but the scraper's
+    # network log almost always captured a securecafe portal request
+    # (guestlogin.aspx / userlogin.aspx / floorplans). taylorspond
+    # canary: body had no match, captured response #7 was
+    # taylorspond-ticonproperties.securecafe.com/onlineleasing/taylor-s-pond/
+    # guestlogin.aspx. Scan captured response URLs as a second source.
+    for resp in getattr(ctx, "_api_responses", []) or []:
+        u = str(resp.get("url", "") or "")
+        if "securecafe.com/onlineleasing/" not in u.lower():
+            continue
+        m = _SECURECAFE_URL_RE.search(u)
+        if m:
+            return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
     origin = _origin_from_ctx(ctx)
     if "securecafe.com" in origin:
         # Host is the portal; recover the slug from the effective URL path.
