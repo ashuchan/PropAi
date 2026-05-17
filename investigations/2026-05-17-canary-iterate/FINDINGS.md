@@ -626,3 +626,26 @@ per-floorplan DETAIL pages my shallow/static/regex checks missed:
 LESSON: never conclude "no units" from index/static/regex. The unit
 data lives on per-floorplan detail pages across EVERY platform;
 recoverable, not a ceiling. Trustworthy measure = pipeline, not hand.
+
+## ★★★ SYSTEMIC ROOT CAUSE (user-driven, definitive) ★★★
+User corrected my "no units / floorplan-only" calls 6+ times
+(apts247, chathamsquare, farnhampark, ironhorseflats, jaxon,
+livethemarion). EVERY case: the marketing INDEX is floorplan-level by
+design; real unit-level data lives one level deeper on per-floorplan
+DETAIL pages (/floorplan(s)/<bed>/<plan>), sometimes static, sometimes
+JS-rendered. jaxon/marion (shared "version2 community" template):
+JS-rendered units e.g. "Unit 202 - Starting $824 - Available Now" +
+lease-term price table on /floorplans/one-bedroom/a1.
+CONCLUSION: not 6 bugs — ONE architectural gap: the pipeline does not
+systematically crawl into + render per-floorplan detail pages. This
+single gap explains the bulk of the "no unit-level" residual.
+RIGHT FIX: one generalizable capability — discover floorplan-detail
+links from any index -> fetch/RENDER each -> parse the recurring
+(unit# | rent | avail-date | lease-terms) table. NOT N per-template
+parsers (the iter-16/17/18 per-template parsers are correct but were
+treating instances of one disease). EYEBALL verdicts: jaxonliving=HAS
+units (detail page), livethemarion=HAS units (same template),
+princetonmanagement=floorplan-only (no detail-page units; from-price
+only). apartmentsniagara=HAS units (bespoke WP). The recoverable
+fraction is therefore much larger than any "ceiling" estimate; the
+gate is the crawl+render-detail capability, not site-by-site code.
