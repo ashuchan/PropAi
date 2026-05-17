@@ -674,3 +674,14 @@ behavior (resman/apts247/entrata-WP emit plan-level fallback rows).
 But for the success/recoverable RATE, floorplan-level counts as F
 (floorplan-only), NOT a unit-level win. #7 smdproperty (style+price,
 no unit#) = firm F. Classification rule, not a behavior change.
+
+## ★ #31 lochravenapts -> CAF-v2 template hops to RealPage OneSite/Knock ★
+Chrome-MCP: lochravenapts vendor hosts = property.onesite.realpage.com
++ leasing.realpage.com + doorway.knck.io, on the /assets/css/community/
+version2/ CAF template (SAME as jaxon, The Marion). The caf_v2 cluster
+(26 sites in vendor-sizing) "Check Availability" PORTAL-HOPS to RealPage
+OneSite / Knock for units — BOTH existing adapters. So the big "popup/
+check-availability" + caf_v2 slice of genuine-custom is NOT bespoke:
+it's OneSite/Knock behind a marketing template, recoverable via
+existing adapters + a check-availability hop. Standalone module Phase C
+= follow Check-Availability -> OneSite/Knock portal -> existing parse.
