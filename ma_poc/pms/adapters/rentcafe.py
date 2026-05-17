@@ -720,6 +720,32 @@ async def _try_rentcafe_securecafe_probe(
 
     base = _find_securecafe_base(html, ctx)
     if not base:
+        # 2026-05-17 iter-9 (do-or-die root cause): the patchright-rendered
+        # fetch_result.body lacks the securecafe link in a regex-matchable
+        # form, and the link-hop-discovered securecafe URL never reaches
+        # the adapter (it's in separate link-hop fetch events, not in
+        # ctx._api_responses). But the RAW server HTML of the property's
+        # own homepage DOES contain it (link-hop extracted it from there;
+        # standalone curl_cffi of taylorspond.ticonproperties.com →
+        # taylorspond-ticonproperties.securecafe.com/onlineleasing/
+        # taylor-s-pond present). patchright also gets 403 CF-blocked on
+        # securecafe directly. So: re-fetch the property's own homepage
+        # via curl_cffi (bypasses CF + gives raw server HTML) and scan
+        # that for the securecafe base.
+        origin = _origin_from_ctx(ctx)
+        if origin:
+            try:
+                from curl_cffi import requests as _creq0
+
+                _hr = _creq0.get(origin, impersonate="chrome120", timeout=20)
+                if _hr.status_code == 200 and _hr.text:
+                    base = _find_securecafe_base(_hr.text, ctx)
+            except Exception as _hp_exc:
+                result.errors.append(
+                    f"rentcafe-securecafe-homepage-refetch-error: "
+                    f"{type(_hp_exc).__name__}: {str(_hp_exc)[:100]}"
+                )
+    if not base:
         return []
     au_url = f"{base}/availableunits.aspx"
 
