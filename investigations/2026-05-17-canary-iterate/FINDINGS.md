@@ -317,3 +317,18 @@ proxy infrastructure gap that no amount of adapter iteration can
 overcome. Recommendation to operator: wire BrightData residential
 proxy, then re-run the canary on iter-9 image — expected large
 securecafe + bot_blocked recovery.
+
+## ★ CORRECTION: 842 "other" deep-probe (per-site, user-directed) ★
+Earlier "fragmented long-tail, no high-leverage pattern" was WRONG
+(based on 8-site sample). Systematic per-site curl_cffi probe of all
+842 reveals strong clusters:
+  369 no-signature (custom/needs subpage) | 141 embed-only(JSON-LD/
+  floorplans-path, recoverable) | 88 securecafe-MISCLASSIFIED |
+  67 ResMan (no adapter) | 63 Rently (no adapter) | 96 RealPage/
+  OneSite (adapter exists, misdetected) | 33 ActiveBuilding |
+  19 Spherexx + 22 Funnel + 16 Yardi + ~60 Entrata/Knock/G5/SightMap
+  (all adapters exist, just misdetected).
+⇒ ~400+ sites are on KNOWN platforms the detector fails to recognize.
+NEXT FIXES (iter-10+): (a) detector markers for misdetected clusters
+(Spherexx/Funnel/RealPage/Yardi/ActiveBuilding — adapters exist,
+proxy-independent); (b) NEW adapters: ResMan (67), Rently (63).
