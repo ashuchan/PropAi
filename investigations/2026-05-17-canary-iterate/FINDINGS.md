@@ -595,3 +595,34 @@ conservative). 18 tests pass, ruff clean.
 HONEST: proven on 1 template variant; full spherexx coverage unknown
 until PIPELINE-measured (hand-probing unreliable — proven). realpage
 on-index unit-table parser still TODO (farnhampark 618 A1-1X1 $1146).
+
+## ★ iter-18: Entrata-WP embedded available_units (5th false-negative fixed) ★
+User screenshot+URL (ironhorseflats.com/floorplan/1br-1ba-pennsylvania/)
+proved my "entrata=auth-only, no public units" call WRONG (5th
+confirmed false negative: apts247, chathamsquare, farnhampark,
+ironhorseflats x2-class). Entrata-WP marketing sites server-render an
+HTML-entity-encoded JSON blob on /floorplan/<slug>/ detail pages:
+  "available_units":[{id,name,available_on,price,deposit,apply_url}]
+Real stable id + unit name + date + rent → deterministic Tier-1,
+STATIC (no render). Added parse_entrata_available_units +
+find_entrata_fp_detail_links + static fallback in EntrataAdapter
+(also parses captured fetch body if it is a detail page). ruff clean,
+12 entrata tests pass. LIVE: ironhorseflats detail page 0→10 unit-
+level (Pennsylvania 1/1 H0225 $1000 avail 2026-03-11).
+CAVEAT (honest): parser PROVEN; static index link-discovery returns 0
+for ironhorseflats (floorplan list is Vue-rendered, not in static
+index) — same discovery-gap class as resman. In-pipeline the
+patchright-rendered body usually carries the /floorplan/ links and/or
+IS a detail page → measurable only via pipeline, not static harness.
+
+## SCORECARD — user was right every time (deep per-floorplan check)
+5 clusters I falsely called "no units"; all had public unit data on
+per-floorplan DETAIL pages my shallow/static/regex checks missed:
+  apts247    iter-16 FIXED+proven  (cypress 0->10, lakelofts 63/63)
+  spherexx   iter-17 FIXED+proven  (chathamsquare 0->16)
+  entrata-WP iter-18 parser proven (ironhorse 0->10; discovery=pipeline)
+  realpage   pattern confirmed (farnhampark 618 A1-1X1 $1146) — TODO
+  resman     iter-17-design (JS portal link) — discovery via render
+LESSON: never conclude "no units" from index/static/regex. The unit
+data lives on per-floorplan detail pages across EVERY platform;
+recoverable, not a ceiling. Trustworthy measure = pipeline, not hand.

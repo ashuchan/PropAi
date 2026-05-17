@@ -25,6 +25,7 @@ Key findings:
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from typing import TYPE_CHECKING, Any
@@ -152,6 +153,129 @@ def parse_entrata_widget_envelope(
     return []
 
 
+_AVAIL_UNITS_RE = re.compile(r'"available_units"\s*:\s*(\[)')
+_FP_DETAIL_RE = re.compile(r"/floorplan/[a-z0-9][a-z0-9-]*/?", re.IGNORECASE)
+_SLUG_BB_RE = re.compile(r"(\d+)\s*br[\s_-]*(\d+(?:\.\d+)?)\s*ba", re.IGNORECASE)
+
+
+def _iso_date(s: str) -> str:
+    """``MM/DD/YYYY`` → ``YYYY-MM-DD``; passthrough/'' otherwise."""
+    m = re.match(r"\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*$", str(s or ""))
+    if not m:
+        return ""
+    mo, d, y = m.groups()
+    return f"{y}-{int(mo):02d}-{int(d):02d}"
+
+
+def _bracket_json(html: str, start: int) -> str | None:
+    """Return the balanced ``[...]`` JSON array starting at *start*."""
+    depth = 0
+    for j in range(start, len(html)):
+        c = html[j]
+        if c == "[":
+            depth += 1
+        elif c == "]":
+            depth -= 1
+            if depth == 0:
+                return html[start : j + 1]
+    return None
+
+
+def parse_entrata_available_units(
+    html: str, url: str
+) -> list[dict[str, str]]:
+    """Parse Entrata-WP per-floorplan-detail embedded ``available_units``.
+
+    Entrata marketing sites (WordPress + prospectportal apply links)
+    server-render an HTML-entity-encoded JSON blob on
+    ``/floorplan/<slug>/`` detail pages:
+      "available_units":[{"id","name","available_on","price",
+                          "deposit","apply_url"}, ...]
+    Each entry is a real unit (stable ``id`` + unit ``name`` + date +
+    rent) → deterministic Tier-1, no render needed. Beds/baths come from
+    the floorplan slug (``1br-1ba-pennsylvania``).
+    """
+    if not html or "available_units" not in html:
+        return []
+    import html as _htmlmod
+
+    decoded = _htmlmod.unescape(html).replace("\\/", "/")
+    beds = baths = plan = ""
+    ms = re.search(r"/floorplan/([a-z0-9][a-z0-9-]*)", url, re.IGNORECASE)
+    slug = ms.group(1) if ms else ""
+    mb = _SLUG_BB_RE.search(slug)
+    if mb:
+        beds, baths = mb.group(1), mb.group(2)
+    plan = re.sub(r"^\d+br[-_]?\d+(?:\.\d+)?ba[-_]?", "", slug, flags=re.IGNORECASE)
+    plan = plan.replace("-", " ").strip().title() or slug
+
+    units: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for m in _AVAIL_UNITS_RE.finditer(decoded):
+        arr = _bracket_json(decoded, m.start(1))
+        if not arr:
+            continue
+        try:
+            data = json.loads(arr)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(data, list):
+            continue
+        for u in data:
+            if not isinstance(u, dict):
+                continue
+            uid = str(u.get("id") or "").strip()
+            name = str(u.get("name") or "").strip()
+            key = uid or name
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            rent_i: int | None = None
+            pr = re.search(r"[\d,]+", str(u.get("price") or ""))
+            if pr:
+                try:
+                    rent_i = int(round(float(pr.group(0).replace(",", ""))))
+                except (TypeError, ValueError):
+                    rent_i = None
+            units.append(
+                make_unit_dict(
+                    floor_plan_name=plan,
+                    bedrooms=beds,
+                    bathrooms=baths,
+                    unit_number=name or f"ent-{uid}",
+                    rent_low=rent_i,
+                    rent_high=rent_i,
+                    availability_status="AVAILABLE",
+                    availability_date=_iso_date(u.get("available_on")),
+                    source_api_url=url,
+                    extraction_tier="TIER_1_DOM_ENTRATA_WP",
+                )
+            )
+    return units
+
+
+def find_entrata_fp_detail_links(index_html: str, origin: str) -> list[str]:
+    """Absolute ``/floorplan/<slug>/`` detail URLs from an index page."""
+    if not index_html:
+        return []
+    out: list[str] = []
+    for m in _FP_DETAIL_RE.finditer(index_html):
+        path = m.group(0)
+        if not path.endswith("/"):
+            path += "/"
+        u = origin.rstrip("/") + path
+        if u not in out:
+            out.append(u)
+    return out
+
+
+async def _entrata_static_fetch(url: str) -> str:
+    from ma_poc.pms.adapters._probe import probe_get
+
+    r = probe_get(url, timeout=20)
+    return (r.text or "") if r.status_code == 200 else ""
+
+
 class EntrataAdapter:
     """Entrata PMS adapter. Parses /Apartments/module/widgets/ API responses."""
 
@@ -236,6 +360,72 @@ class EntrataAdapter:
                     f"ENTRATA_PROBE_VALIDITY_REJECTED: {len(probe_units)} probed rows "
                     f"failed unit_validity (no numeric dimension)"
                 )
+
+        # Entrata-WP static fallback: marketing sites (WordPress +
+        # prospectportal apply links) embed an HTML-entity-encoded
+        # "available_units" JSON on /floorplan/<slug>/ detail pages.
+        # The captured-API and probe paths above see nothing (data is
+        # server-rendered, not an XHR), so crawl the detail pages with
+        # a static probe (no render needed).
+        origin = ""
+        fr = getattr(ctx, "fetch_result", None)
+        if fr is not None:
+            origin = str(getattr(fr, "final_url", "") or "")
+        origin = origin or getattr(ctx, "base_url", "") or ""
+        try:
+            p = urlparse(origin)
+            base = f"{p.scheme}://{p.netloc}" if p.scheme and p.netloc else ""
+        except Exception:
+            base = ""
+        if base:
+            wp_units: list[dict[str, str]] = []
+            # The captured fetch body may itself be a /floorplan/ detail
+            # page; parse it first, then crawl siblings from the index.
+            fr_body = getattr(fr, "body", None) if fr is not None else None
+            if isinstance(fr_body, bytes):
+                fr_body = fr_body.decode("utf-8", "replace")
+            if isinstance(fr_body, str) and "available_units" in fr_body:
+                wp_units.extend(
+                    parse_entrata_available_units(
+                        fr_body, str(getattr(fr, "final_url", "") or base)
+                    )
+                )
+            links: list[str] = []
+            for idx_path in ("/floorplans/", "/floor-plans/", "/"):
+                try:
+                    idx = await _entrata_static_fetch(base + idx_path)
+                except Exception:
+                    idx = ""
+                links = find_entrata_fp_detail_links(idx, base)
+                if links:
+                    break
+            for du in links[:30]:
+                try:
+                    dh = await _entrata_static_fetch(du)
+                except Exception:
+                    continue
+                wp_units.extend(parse_entrata_available_units(dh, du))
+            if wp_units:
+                from ma_poc.extraction.post_process import post_process
+
+                _ppw = post_process(
+                    wp_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _ppw.n_admitted > 0:
+                    result.units = _ppw.admitted
+                    result.plan_summaries = _ppw.plan_summaries
+                    result.winning_url = base + "/floorplans/"
+                    result.tier_used = "TIER_1_DOM_ENTRATA_WP"
+                    result.confidence = min(0.92, 0.7 + 0.04 * _ppw.n_admitted)
+                    result.api_responses.append(
+                        {
+                            "url": base + "/floorplans/",
+                            "status": 200,
+                            "body": "<entrata-wp-available-units>",
+                            "via": "entrata_wp_probe",
+                        }
+                    )
+                    return result
 
         result.confidence = 0.0
         result.errors.append("No Entrata floorplan data found in captured API responses")
