@@ -413,6 +413,21 @@ class RentCafeAdapter:
                 result.confidence = min(0.90, 0.65 + 0.05 * pp.n_admitted)
                 return result
 
+        # 2026-05-17 (canary deep-probe): securecafe online-leasing portal
+        # carries the real UNIT-LEVEL inventory one drill-down past the
+        # floorplan page. Highest-leverage RentCafe path — promotes the
+        # ~1,060-property floorplan/LLM pool to deterministic Tier-1.
+        sc_units = await _try_rentcafe_securecafe_probe(ctx, result)
+        if sc_units:
+            from ma_poc.extraction.post_process import post_process
+            pp = post_process(sc_units, property_id=getattr(ctx, "property_id", None))
+            if pp.n_admitted > 0:
+                result.units = pp.admitted
+                result.plan_summaries = pp.plan_summaries
+                result.tier_used = f"{_TIER_BASE}_SECURECAFE"
+                result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
+                return result
+
         # Failure path: re-stamp tier_used with a structured sub-code so the
         # downstream report can distinguish misrouting from genuine zero data.
         tier_code, err_msg = _classify_rentcafe_failure(api_responses)
@@ -546,4 +561,176 @@ async def _try_rentcafe_wp_probe(
             {"url": api_url, "status": 200, "body": payload, "via": "wp_probe"}
         )
         result.winning_url = api_url
+    return units
+
+
+# ── RentCafe securecafe online-leasing portal — UNIT-LEVEL ───────────────────
+# 2026-05-17 (canary deep-probe): the biggest stuck pool (~1,060 props) are
+# RentCafe sites whose marketing page only yields floorplan-level rows (LLM
+# reads "Starting at $X / N Available"). The real UNIT-LEVEL inventory lives
+# one drill-down deeper, server-rendered, at the securecafe online-leasing
+# portal:
+#   https://<sub>.securecafe.com/onlineleasing/<slug>/availableunits.aspx
+# Each ``<tr class='AvailUnitRow'>`` is one real apartment (unit #, sqft,
+# rent range), grouped under a floorplan header that carries beds/baths.
+# securecafe is Cloudflare-fronted, so the probe fetches via curl_cffi
+# (TLS impersonation passes the CF challenge; plain httpx gets the 5KB
+# challenge shell). Deterministic Tier-1 — no LLM, no hallucination.
+_SECURECAFE_URL_RE = re.compile(
+    r"""https?://
+        (?P<sub>[a-z0-9][a-z0-9-]*)\.securecafe\.com
+        /onlineleasing/
+        (?P<slug>[a-z0-9][a-z0-9-]*)
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+_WORD_NUM = {
+    "studio": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+}
+
+_SECURECAFE_FP_HDR_RE = re.compile(
+    r"Floor\s+Plan:\s*(?P<name>[^<\-]{1,80}?)\s*-\s*"
+    r"(?P<bedtxt>Studio|\d+\s*Bedroom[s]?)\s*,\s*"
+    r"(?P<bathtxt>\d+(?:\.\d+)?)\s*Bathroom",
+    re.IGNORECASE,
+)
+
+_SECURECAFE_UNIT_ROW_RE = re.compile(
+    r"<tr[^>]*class='AvailUnitRow'.*?</tr>", re.IGNORECASE | re.DOTALL
+)
+_SC_APT_RE = re.compile(r"data-label=['\"]?Apartment['\"]?[^>]*>\s*#?\s*([A-Za-z0-9-]+)", re.I)
+_SC_SQFT_RE = re.compile(r"data-label=['\"]?Sq\.?Ft\.?['\"]?[^>]*>\s*([\d,]+)", re.I)
+_SC_RENT_RE = re.compile(
+    r"data-label=['\"]?Rent['\"]?[^>]*>\s*\$?\s*([\d,]+)\s*(?:-\s*\$?\s*([\d,]+))?", re.I
+)
+
+
+def _find_securecafe_base(html: str, ctx: AdapterContext) -> str | None:
+    """Return ``https://<sub>.securecafe.com/onlineleasing/<slug>`` or None.
+
+    Looks in the rendered HTML first (marketing sites link/iframe to their
+    securecafe portal), then falls back to the property's own host when it
+    *is* a securecafe portal.
+    """
+    if html:
+        m = _SECURECAFE_URL_RE.search(html)
+        if m:
+            return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
+    origin = _origin_from_ctx(ctx)
+    if "securecafe.com" in origin:
+        # Host is the portal; recover the slug from the effective URL path.
+        fr = getattr(ctx, "fetch_result", None)
+        final = str(getattr(fr, "final_url", "") or "") if fr else ""
+        m = _SECURECAFE_URL_RE.search(final or origin)
+        if m:
+            return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
+    return None
+
+
+def _beds_from_text(bedtxt: str) -> int:
+    bedtxt = bedtxt.strip().lower()
+    if bedtxt.startswith("studio"):
+        return 0
+    m = re.match(r"(\d+)", bedtxt)
+    return int(m.group(1)) if m else 0
+
+
+def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str, Any]]:
+    """Parse a securecafe ``availableunits.aspx`` page into unit-level dicts.
+
+    The page is a sequence of floorplan sections; each section header
+    ("... Floor Plan: A1 One Bedroom / One Bath - 1 Bedroom, 1 Bathroom")
+    is followed by ``<tr class='AvailUnitRow'>`` rows, one per real
+    apartment. Returns ``[]`` on a CF-challenge shell or unparseable HTML.
+    """
+    if not html or "AvailUnitRow" not in html:
+        return []
+    units: list[dict[str, Any]] = []
+    headers = list(_SECURECAFE_FP_HDR_RE.finditer(html))
+    if not headers:
+        return []
+    for idx, hm in enumerate(headers):
+        seg_start = hm.end()
+        seg_end = headers[idx + 1].start() if idx + 1 < len(headers) else len(html)
+        segment = html[seg_start:seg_end]
+        fp_name = re.sub(r"\s+", " ", hm.group("name")).strip()
+        beds = _beds_from_text(hm.group("bedtxt"))
+        try:
+            baths = float(hm.group("bathtxt"))
+        except (TypeError, ValueError):
+            baths = 0.0
+        for row in _SECURECAFE_UNIT_ROW_RE.findall(segment):
+            apt = _SC_APT_RE.search(row)
+            if not apt:
+                continue
+            sqft_m = _SC_SQFT_RE.search(row)
+            rent_m = _SC_RENT_RE.search(row)
+            rent_low = rent_high = None
+            if rent_m:
+                rent_low = money_to_int(rent_m.group(1))
+                rent_high = money_to_int(rent_m.group(2)) if rent_m.group(2) else rent_low
+            units.append(
+                make_unit_dict(
+                    floor_plan_name=fp_name,
+                    bedrooms=str(beds),
+                    bathrooms=str(baths),
+                    sqft=(sqft_m.group(1).replace(",", "") if sqft_m else ""),
+                    unit_number=apt.group(1),
+                    rent_low=rent_low,
+                    rent_high=rent_high,
+                    availability_status="AVAILABLE",
+                    source_api_url=source_url,
+                    extraction_tier="TIER_1_API_RENTCAFE_SECURECAFE",
+                )
+            )
+    return units
+
+
+async def _try_rentcafe_securecafe_probe(
+    ctx: AdapterContext, result: AdapterResult
+) -> list[dict[str, Any]]:
+    """SHAPE_REJECTED fallback: follow the securecafe online-leasing portal
+    and parse ``availableunits.aspx`` for true unit-level inventory.
+
+    Returns parsed unit dicts on success, ``[]`` on any failure.
+    """
+    html = ""
+    fr = getattr(ctx, "fetch_result", None)
+    body = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(body, bytes):
+        html = body.decode("utf-8", errors="replace")
+    elif isinstance(body, str):
+        html = body
+
+    base = _find_securecafe_base(html, ctx)
+    if not base:
+        return []
+    au_url = f"{base}/availableunits.aspx"
+
+    try:
+        from curl_cffi import requests as _creq
+    except ImportError:
+        result.errors.append("rentcafe-securecafe: curl_cffi not installed")
+        return []
+
+    try:
+        r = _creq.get(au_url, impersonate="chrome120", timeout=25)
+    except Exception as exc:
+        result.errors.append(
+            f"rentcafe-securecafe-fetch-error: {type(exc).__name__}: {str(exc)[:120]}"
+        )
+        return []
+    if r.status_code != 200:
+        return []
+    page_html = r.text or ""
+    # CF challenge shell is tiny and carries no unit rows.
+    if "AvailUnitRow" not in page_html:
+        return []
+    units = parse_securecafe_availableunits(page_html, au_url)
+    if units:
+        result.api_responses.append(
+            {"url": au_url, "status": 200, "body": "<securecafe-html>", "via": "securecafe_probe"}
+        )
+        result.winning_url = au_url
     return units
