@@ -53,6 +53,7 @@ PmsName = Literal[
     "spherexx",
     "knock",
     "g5",
+    "resman",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -82,6 +83,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "spherexx": "api_first",
     "knock": "api_first",
     "g5": "api_first",
+    "resman": "api_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -488,6 +490,19 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             0.90,
             ["RentCafe securecafe online-leasing portal marker in HTML "
              "(<sub>.securecafe.com/onlineleasing)"],
+        )
+
+    # ResMan — public availability portal at <client>.myresman.com/Portal/
+    # Applicants/Availability?a=&p=, linked from the marketing /floorplans/
+    # page. 2026-05-17 canary 842-pool deep-probe: 67+ sites the detector
+    # missed (fell to LLM/floorplan). Portal is NOT Cloudflare-fronted, so
+    # the ResMan adapter recovers Tier-1 unit-level even proxy-less.
+    if "myresman.com" in h or "/portal/applicants/availability" in h:
+        return (
+            "resman",
+            0.90,
+            ["ResMan marker in HTML "
+             "(myresman.com / Portal/Applicants/Availability)"],
         )
 
     # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong

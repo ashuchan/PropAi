@@ -19,6 +19,7 @@ from ma_poc.pms.adapters.onesite import OneSiteAdapter
 from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
 from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
+from ma_poc.pms.adapters.resman import ResManAdapter
 from ma_poc.pms.adapters.sightmap import SightMapAdapter
 from ma_poc.pms.adapters.spherexx import SpherexxAdapter
 from ma_poc.pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
@@ -43,6 +44,7 @@ def _bootstrap_registry() -> None:
     already = _registered_names()
     for cls in (
         RentCafeAdapter,
+        ResManAdapter,
         EntrataAdapter,
         AppFolioAdapter,
         OneSiteAdapter,
