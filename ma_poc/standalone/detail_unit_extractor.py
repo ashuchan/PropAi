@@ -349,43 +349,54 @@ async def _phase_b_url(page: Any, base: str, res: PropResult) -> bool:
     return False
 
 
-async def _phase_c_interact(page: Any, res: PropResult) -> bool:
-    """Click view-detail / check-availability / expand controls, parse."""
-    try:
-        ctrls = await page.evaluate(
-            """() => {
-              const out=[];
-              const els=[...document.querySelectorAll('a,button,[role=button],[onclick]')];
-              els.forEach((e,i)=>{ const t=(e.innerText||e.textContent||'').trim();
-                if(t && /view\\s*detail|check\\s*availab|see\\s*availab|view\\s*units?|available\\s*units?|see\\s*units|view\\s*pricing/i.test(t))
-                  out.push(i); });
-              return out.slice(0,8);
-            }"""
-        )
-    except Exception:
-        ctrls = []
-    if not ctrls:
-        return False
-    for idx in ctrls[:6]:
-        try:
-            await page.evaluate(
-                """(i)=>{ const els=[...document.querySelectorAll('a,button,[role=button],[onclick]')];
-                   if(els[i]) els[i].click(); }""",
-                idx,
-            )
-            await page.wait_for_timeout(2500)
-            h = await _content(page)
-            units, sig = _proven_parsers(h, page.url)
-            if not units:
-                units = _generic_text_rows(await _text(page), page.url)
-                sig = "generic_text" if units else ""
-            if units:
-                res.units = units
-                res.signal = f"interact:{sig}"
-                res.phase = "C_interact"
-                return True
-        except Exception:
+async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
+    """Click view-detail / check-availability / expand controls, parse.
+
+    The popup/expand controls live on the floorplans index (royce: only
+    "VIEW AMENITIES" on the homepage; the per-row "View Details" popup
+    is on /floor-plans). So land on the floorplans index first, then
+    click the per-row controls and parse the modal/expanded text.
+    """
+    scan_pages = [base.rstrip("/") + p for p in ("/floor-plans/", "/floorplans/", "/floorplans", "/")]
+    _CTRL_JS = (
+        """() => {
+          const out=[];
+          const els=[...document.querySelectorAll('a,button,[role=button],[onclick],[class*=avail],[class*=detail]')];
+          els.forEach((e,i)=>{ const t=((e.innerText||e.textContent||'')+' '+(e.getAttribute&&(e.getAttribute('aria-label')||'')||'')).trim();
+            if(t && /view\\s*detail|details?\\b|check\\s*availab|see\\s*availab|view\\s*(?:unit|apartment)s?|available\\s*(?:unit|apartment)s?|see\\s*units|view\\s*pricing|\\(\\d+\\)\\s*available/i.test(t))
+              out.push(i); });
+          return out.slice(0,10);
+        }"""
+    )
+    for sp in scan_pages:
+        if not await _goto(page, sp):
             continue
+        try:
+            ctrls = await page.evaluate(_CTRL_JS)
+        except Exception:
+            ctrls = []
+        if not ctrls:
+            continue
+        for idx in ctrls[:8]:
+            try:
+                await page.evaluate(
+                    """(i)=>{ const els=[...document.querySelectorAll('a,button,[role=button],[onclick],[class*=avail],[class*=detail]')];
+                       if(els[i]) els[i].click(); }""",
+                    idx,
+                )
+                await page.wait_for_timeout(2600)
+                h = await _content(page)
+                units, sig = _proven_parsers(h, page.url)
+                if not units:
+                    units = _generic_text_rows(await _text(page), page.url)
+                    sig = "generic_text" if units else ""
+                if units:
+                    res.units = units
+                    res.signal = f"interact:{sig}"
+                    res.phase = "C_interact"
+                    return True
+            except Exception:
+                continue
     return False
 
 
@@ -435,7 +446,7 @@ async def extract_property(page: Any, url: str) -> PropResult:
             _classify(res, home)
             return res
         await _goto(page, url)
-        if await _phase_c_interact(page, res):
+        if await _phase_c_interact(page, base, res):
             _classify(res, home)
             return res
     except Exception as exc:
