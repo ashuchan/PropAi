@@ -971,6 +971,43 @@ async def scrape(
             # → sightmap.com/embed/n9w63m8jw71), and splice it into the
             # ctx fetch_result body so SightMapAdapter's own iframe/embed
             # discovery finds it.
+            # iter-19: the canary/prod render is proxy-less; CF-fronted
+            # Entrata/prospectportal sites return a CF challenge shell as
+            # page_html, so the sightmap.com signal is invisible and the
+            # /conventional/ discovery below (also keyed off page_html /
+            # captured net) finds nothing — the SightMap embed is never
+            # reached and ~250 dual-fingerprint sites misroute to a
+            # 0-unit Entrata result. Recover by proxied-probe of the
+            # homepage (the proven iter-13 securecafe pattern: probe_get
+            # clears CF and the server HTML carries the sightmap loader),
+            # then splice it so SightMapAdapter's own discovery fires.
+            if not sm_signal:
+                try:
+                    from urllib.parse import urlparse as _up19
+
+                    from ma_poc.pms.adapters._probe import probe_get as _pg19
+
+                    _fr19 = getattr(ctx, "fetch_result", None)
+                    _origin19 = str(getattr(_fr19, "final_url", "") or "") or (
+                        getattr(ctx, "base_url", "") or ""
+                    )
+                    _p19 = _up19(_origin19)
+                    if _p19.scheme and _p19.netloc:
+                        _home19 = f"{_p19.scheme}://{_p19.netloc}/"
+                        _r19 = _pg19(_home19, timeout=25)
+                        _h19 = (_r19.text or "") if _r19.status_code == 200 else ""
+                        if "sightmap.com" in _h19.lower():
+                            if _fr19 is not None:
+                                _fr19.body = _h19  # type: ignore[attr-defined]
+                            sm_signal = True
+                            fallback_chain.append("entrata:home_proxied_for_sightmap")
+                except Exception as _hp_exc:  # pragma: no cover - defensive
+                    log.warning(
+                        "Entrata homepage proxied-probe failed for %s: %s",
+                        property_id,
+                        _hp_exc,
+                    )
+
             if not sm_signal:
                 import re as _re
 
