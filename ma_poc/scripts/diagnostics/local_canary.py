@@ -60,12 +60,22 @@ _DEFAULT_OUT_ROOT = _MA_POC_ROOT / "data" / "canary" / "local_runs"
 # Mirrors DEFAULT_OUT_ROOT from analyze_cloud_run.py
 _ANALYZER_OUT_ROOT = _MA_POC_ROOT / "data" / "reports"
 
-_SUCCESS_VERDICTS = frozenset({"SUCCESS"})
+# 2026-05-16: mirror the production success classifier in
+# ``ma_poc/reporting/verdict.py``. That module's ``verdict_is_success``
+# admits SUCCESS, SUCCESS_PLAN_LEVEL, AND PARTIAL — the canary must use
+# the same set, otherwise a property that went from SUCCESS (9 units) to
+# PARTIAL (205 units, timeout-rescued) reads as REGRESSED here while
+# reporting/run_report.py correctly counts it as success in production
+# (a false REGRESSED blocks deploy). Sync these sets when adding new
+# success-class verdicts.
+from ma_poc.reporting.verdict import _SUCCESS_VERDICTS as _PROD_SUCCESS_VERDICTS
+
+_SUCCESS_VERDICTS = frozenset(_PROD_SUCCESS_VERDICTS)
 # CARRY_FORWARD counts as a "soft success" from the cloud run perspective;
 # a canary that fails on it is a regression.
-_CLOUD_OK_VERDICTS = frozenset({"SUCCESS", "CARRY_FORWARD"})
+_CLOUD_OK_VERDICTS = frozenset(_PROD_SUCCESS_VERDICTS | {"CARRY_FORWARD"})
 # Verdicts that qualify a property for the regression sentinel basket.
-_REGRESSION_SENTINEL_VERDICTS = frozenset({"SUCCESS", "CARRY_FORWARD"})
+_REGRESSION_SENTINEL_VERDICTS = frozenset(_PROD_SUCCESS_VERDICTS | {"CARRY_FORWARD"})
 
 VERDICT_IMPROVED = "IMPROVED"
 VERDICT_REGRESSED = "REGRESSED"
@@ -99,6 +109,12 @@ class _CanaryOutcome:
     property_id: str
     verdict: str          # SUCCESS / FAILED_* / TIMEOUT_IN_CANARY
     units: int = 0
+    # D16: plan-aggregate row count and cross-page dedup telemetry. These
+    # are read from properties.json (per-property ``_post_process_meta``)
+    # when available — events.jsonl does not currently carry them.
+    plan_summaries: int = 0
+    cross_page_dedup_collapses: int = 0
+    inverse_b4_rerouted: int = 0
     tier: str = ""        # populated from extract.tier_won events (L4)
     event_kinds: set[str] = field(default_factory=set)  # all event kinds seen (L4)
 
@@ -118,6 +134,10 @@ class ComparedRow:
     verdict: str         # IMPROVED / REGRESSED / UNCHANGED_OK / UNCHANGED_FAIL
     basket: str = BASKET_FAILURE   # FAILURE or REGRESSION_SENTINEL
     attributed_fix: str = ""       # L4 attribution
+    # D16: per-property partition + dedup telemetry.
+    canary_plan_summaries: int = 0
+    canary_cross_page_dedup_collapses: int = 0
+    canary_inverse_b4_rerouted: int = 0
 
 
 @dataclass
@@ -722,6 +742,43 @@ def read_canary_outcomes(out_dir: Path, run_date: str) -> dict[str, _CanaryOutco
             event_kinds=event_kinds_by_pid.get(pid, set()),
         )
 
+    # D16: enrich outcomes with plan_summaries + cross-page dedup
+    # telemetry from properties.json when present. Best-effort — a
+    # missing or malformed file just leaves the new fields at zero.
+    properties_path = events_path.parent / "properties.json"
+    if properties_path.exists():
+        try:
+            with properties_path.open(encoding="utf-8") as fh:
+                props_payload = json.load(fh)
+            props_iter = (
+                props_payload
+                if isinstance(props_payload, list)
+                else props_payload.get("properties", [])
+            )
+            for p in props_iter:
+                if not isinstance(p, dict):
+                    continue
+                pid = str(
+                    (p.get("_meta") or {}).get("canonical_id")
+                    or (p.get("_meta") or {}).get("property_id")
+                    or p.get("property_id")
+                    or ""
+                ).strip()
+                if not pid or pid not in outcomes:
+                    continue
+                plans = p.get("plan_summaries") or []
+                outcomes[pid].plan_summaries = len(plans)
+                pp_meta = p.get("_post_process_meta") or {}
+                if isinstance(pp_meta, dict):
+                    outcomes[pid].cross_page_dedup_collapses = int(
+                        pp_meta.get("cross_page_dedup_collapses") or 0
+                    )
+                    outcomes[pid].inverse_b4_rerouted = int(
+                        pp_meta.get("inverse_b4_rerouted") or 0
+                    )
+        except (OSError, json.JSONDecodeError) as exc:
+            log.debug("D16 enrichment skipped (%s): %s", properties_path, exc)
+
     log.info("Read %d canary outcomes from %s", len(outcomes), events_path)
     return outcomes
 
@@ -781,11 +838,17 @@ def compare(
             canary_units = 0
             canary_tier = ""
             event_kinds: set[str] = set()
+            canary_plan_summaries = 0
+            canary_cross_page_collapses = 0
+            canary_inverse_b4 = 0
         else:
             canary_verdict = canary.verdict
             canary_units = canary.units
             canary_tier = canary.tier
             event_kinds = canary.event_kinds
+            canary_plan_summaries = canary.plan_summaries
+            canary_cross_page_collapses = canary.cross_page_dedup_collapses
+            canary_inverse_b4 = canary.inverse_b4_rerouted
 
         canary_was_ok = canary_verdict in _SUCCESS_VERDICTS
 
@@ -826,6 +889,9 @@ def compare(
                 verdict=row_verdict,
                 basket=basket,
                 attributed_fix=attributed_fix,
+                canary_plan_summaries=canary_plan_summaries,
+                canary_cross_page_dedup_collapses=canary_cross_page_collapses,
+                canary_inverse_b4_rerouted=canary_inverse_b4,
             )
         )
 
@@ -905,19 +971,43 @@ def render_markdown(report: CanaryReport) -> str:
                 )
         lines.append("")
 
+    # D16 run-level partition + dedup totals.
+    total_plan_summaries = sum(r.canary_plan_summaries for r in report.rows)
+    total_cross_page_collapses = sum(
+        r.canary_cross_page_dedup_collapses for r in report.rows
+    )
+    total_inverse_b4 = sum(r.canary_inverse_b4_rerouted for r in report.rows)
+    properties_with_collapses = sum(
+        1 for r in report.rows if r.canary_cross_page_dedup_collapses > 0
+    )
     lines += [
+        "## D16 — Partition + cross-page dedup totals",
+        "",
+        "```",
+        f"  Plan summaries (canary): {total_plan_summaries}",
+        f"  Cross-page unit-number dedup collapses: {total_cross_page_collapses}"
+        f"  (properties: {properties_with_collapses})",
+        f"  Inverse-B4 rerouted: {total_inverse_b4}",
+        "```",
+        "",
         "## Per-property delta",
         "",
         "| property_id | cloud_outcome | cloud_tier | cloud_units"
-        " | canary_outcome | canary_tier | canary_units | verdict | attributed_fix |",
-        "|---|---|---|---|---|---|---|---|---|",
+        " | canary_outcome | canary_tier | canary_units"
+        " | canary_plans | canary_dedup | canary_inv_b4"
+        " | verdict | attributed_fix |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 
     for row in report.rows:
         lines.append(
             f"| `{row.property_id}` | {row.cloud_outcome} | {row.cloud_tier}"
             f" | {row.cloud_units} | {row.canary_outcome} | {row.canary_tier}"
-            f" | {row.canary_units} | **{row.verdict}** | {row.attributed_fix} |"
+            f" | {row.canary_units}"
+            f" | {row.canary_plan_summaries}"
+            f" | {row.canary_cross_page_dedup_collapses}"
+            f" | {row.canary_inverse_b4_rerouted}"
+            f" | **{row.verdict}** | {row.attributed_fix} |"
         )
 
     lines.append("")
@@ -953,6 +1043,11 @@ def render_json(report: CanaryReport) -> str:
                 "canary_outcome": r.canary_outcome,
                 "canary_tier": r.canary_tier,
                 "canary_units": r.canary_units,
+                "canary_plan_summaries": r.canary_plan_summaries,
+                "canary_cross_page_dedup_collapses": (
+                    r.canary_cross_page_dedup_collapses
+                ),
+                "canary_inverse_b4_rerouted": r.canary_inverse_b4_rerouted,
                 "verdict": r.verdict,
                 "basket": r.basket,
                 "attributed_fix": r.attributed_fix,

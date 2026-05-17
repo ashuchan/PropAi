@@ -77,6 +77,14 @@ class AdapterResult:
     #: routing). Additive field — adapters that don't yet populate this
     #: continue to return an empty list, matching pre-Stage-2 behaviour.
     plan_summaries: list[dict[str, Any]] = field(default_factory=list)
+    #: D16 (2026-05-16): cross-page unit-number dedup + inverse-B4 telemetry
+    #: from ``PostProcessResult.to_meta()``. Keys:
+    #: ``cross_page_dedup_collapses``, ``inverse_b4_rerouted``,
+    #: ``n_unit_level``, ``n_plan_level``. ``None`` means the adapter
+    #: didn't run ``post_process`` (rare — only on early-exit paths). The
+    #: scraper threads this into ``result["_post_process_meta"]`` for the
+    #: per-property markdown and run-level aggregations.
+    post_process_meta: dict[str, int] | None = None
     tier_used: str = ""
     winning_url: str | None = None
     api_responses: list[dict[str, Any]] = field(default_factory=list)

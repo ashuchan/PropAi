@@ -272,16 +272,28 @@ class AmliAdapter:
                 _pp = post_process(
                     result.units, property_id=getattr(ctx, "property_id", None)
                 )
-                if _pp.n_admitted > 0:
-                    result.units = _pp.admitted
-                    result.plan_summaries = _pp.plan_summaries
+                # Gate on per-UNIT rows only, not n_admitted. Inline
+                # ``__NEXT_DATA__`` frequently carries plan-level FloorPlan
+                # entries with no ``unit_number`` — those classify as
+                # ``plan_summaries`` and ``n_admitted`` is non-zero, but the
+                # authoritative submarket JSON refetch is still the only
+                # path to real per-apartment rows. Return early only when
+                # inline parse produced actual unit-level rows.
+                if _pp.n_unit_level > 0:
+                    # D16: strict unit-level / plan-level partition. ``units``
+                    # carries only unit-level rows; plan-aggregate rows live
+                    # in ``plan_summaries`` only.
+                    result.units = list(_pp.units)
+                    result.plan_summaries = list(_pp.plan_summaries)
+                    result.post_process_meta = _pp.to_meta()
                     result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
                     return result
                 result.units = []
-                result.errors.append(
-                    f"AMLI_INLINE_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
-                    f"failed unit_validity (no numeric dimension)"
-                )
+                if _pp.n_admitted == 0:
+                    result.errors.append(
+                        f"AMLI_INLINE_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
+                        f"failed unit_validity (no numeric dimension)"
+                    )
 
         # Step 2 — refetch the SUBMARKET _next/data JSON. This is the
         # authoritative source — it always has units when AMLI has them.
@@ -336,8 +348,10 @@ class AmliAdapter:
             )
             return result
 
-        result.units = _pp.admitted
-        result.plan_summaries = _pp.plan_summaries
+        # D16: strict unit-level / plan-level partition.
+        result.units = list(_pp.units)
+        result.plan_summaries = list(_pp.plan_summaries)
+        result.post_process_meta = _pp.to_meta()
         result.tier_used = _TIER_FETCHED
         result.winning_url = submarket_url
         result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)

@@ -732,8 +732,15 @@ async def scrape(
         from ma_poc.services.llm_api_rescue import SUPPORTED_ADAPTERS
 
         captcha_detected = bool(getattr(fetch_result, "captcha_detected", False))
+        # D16 post-partition guard: a plan-only site emits zero rows into
+        # ``adapter_result.units`` but populates ``plan_summaries`` with
+        # successfully-extracted plan rows. Treat that as "adapter found
+        # something" — skip rescue, otherwise we re-run the LLM on the same
+        # API bodies the adapter already classified as plan-aggregate.
+        adapter_found_plan_rows = bool(getattr(adapter_result, "plan_summaries", None))
         needs_rescue = (
             not property_passes_quality_gate(adapter_result.units)
+            and not adapter_found_plan_rows
             and bool(raw_api_responses)
             and adapter_name in SUPPORTED_ADAPTERS
             and consecutive_rescue_failures < 3
@@ -861,7 +868,18 @@ async def scrape(
         log.warning("F2 rescue orchestration failed for %s: %s", property_id, _rescue_exc)
 
     # --- Step 8: Fallback to generic if adapter returned empty ---
-    if not adapter_result.units and pms_name != "unknown" and adapter_name != "generic":
+    # D16 post-partition guard: ``plan_summaries`` carries successfully-
+    # extracted plan-aggregate rows. Treat them as "adapter found something"
+    # — skipping the generic re-extraction avoids re-running 5 tiers on the
+    # same page when the dedicated adapter already classified the available
+    # rows. Plan-only sites legitimately have no unit-level inventory.
+    _adapter_has_plan_rows = bool(getattr(adapter_result, "plan_summaries", None))
+    if (
+        not adapter_result.units
+        and not _adapter_has_plan_rows
+        and pms_name != "unknown"
+        and adapter_name != "generic"
+    ):
         generic = get_adapter("unknown")  # resolves to generic
         generic_name = getattr(generic, "pms_name", "generic")
         fallback_chain.append(generic_name)
@@ -918,6 +936,19 @@ async def scrape(
 
     # --- Step 9: Populate legacy result ---
     result["units"] = adapter_result.units
+    # D16: surface plan-aggregate rows separately from unit-level rows.
+    # Adapters populate ``plan_summaries`` from ``PostProcessResult.plan_summaries``;
+    # downstream consumers (reporting, run_report) read the count without
+    # conflating with the unit-level inventory.
+    result["plan_summaries"] = list(getattr(adapter_result, "plan_summaries", []) or [])
+    # D16: cross-page unit-number dedup + inverse-B4 telemetry. Stashed
+    # under ``_post_process_meta`` so the run report can aggregate them
+    # without scanning every property's full PostProcessResult. Sourced
+    # from the typed ``AdapterResult.post_process_meta`` field
+    # (``None`` when the adapter took an early-exit path before
+    # ``post_process``).
+    if adapter_result.post_process_meta:
+        result["_post_process_meta"] = dict(adapter_result.post_process_meta)
     result["extraction_tier_used"] = adapter_result.tier_used or None
     result["errors"].extend(adapter_result.errors)
     result["api_calls_intercepted"] = [r.get("url", "") for r in adapter_result.api_responses]
@@ -1279,6 +1310,20 @@ def _extract_portal_iframe_hints(html: str) -> list[tuple[str, str]]:
             # See data/reports/cloud_run_2026-05-15/TRIAGE.md RC #3a.
             if lower.endswith("/embed/api.js") or "/embed/api.js?" in lower:
                 continue
+            # 2026-05-17 — apply the portal-infra blacklist before matching
+            # known patterns. The bare ``.yardi.com`` needle at
+            # _html_extract.py:1112 was matching ``resources.yardi.com/
+            # legal/cookie-notice/`` and queuing it as ``portal_name=yardi``
+            # at score 10110, beating per-plan detail URLs (PID 52331).
+            # The blacklist filter was only running in the 6th-pass
+            # unknown-portal scan; lift it here so known patterns can't
+            # admit Yardi's own corporate/consent infra.
+            try:
+                from ma_poc.pms.adapters._html_extract import _is_portal_infra_blacklisted
+                if _is_portal_infra_blacklisted(src):
+                    continue
+            except Exception:
+                pass
             for needle, portal_name in _PORTAL_URL_PATTERNS:
                 if needle in lower:
                     seen.add(src)
@@ -1435,19 +1480,73 @@ def _extract_portal_iframe_hints(html: str) -> list[tuple[str, str]]:
 # different patterns can match the same key on the same page and the
 # synthesized URL dedups via the caller's ``seen`` set.
 
+# RC-6 (2026-05-16): SightMap embed IDs are base-32-ish tokens — short
+# mixed alphanumeric strings (e.g. ``n9w6mmzrv71``, ``m9pz438qvk1``,
+# ``9zw4n95zv87``). Regex patterns matching ``[\w-]{6,}`` happily admit
+# common English words like ``standard``, ``default``, ``api``, ``embed``
+# because they have ≥6 letters — synthesising ``sightmap.com/embed/standard``
+# (a 404) which then trips TIER_1_API_SIGHTMAP_SHAPE_REJECTED. 22 of 26
+# SightMap_SHAPE_REJECTED failures in the 2026-05-16 cloud run.
+# ``_is_plausible_sightmap_id`` enforces the canonical shape: at least
+# one digit AND one letter, total 6-32 chars, no common English placeholder.
+_SIGHTMAP_ID_BLACKLIST: frozenset[str] = frozenset({
+    "standard", "default", "embed", "embedded", "preview", "demo",
+    "example", "sample", "template", "config", "settings", "options",
+    "loading", "error", "unknown", "placeholder", "widget", "iframe",
+    "container", "wrapper", "anonymous", "undefined", "null",
+})
+
+
+def _is_plausible_sightmap_id(key: str) -> bool:
+    """Filter SightMap-id captures to the canonical token shape.
+
+    Real SightMap embed IDs are mixed alphanumeric (base-32-ish) tokens.
+    Common false positives from regex captures: English placeholder
+    words (``standard``, ``default``, ``api``). Reject those even when
+    they pass the ``[\\w-]{6,}`` length bar.
+    """
+    if not key:
+        return False
+    if key.lower() in _SIGHTMAP_ID_BLACKLIST:
+        return False
+    if not (6 <= len(key) <= 32):
+        return False
+    has_letter = any(c.isalpha() for c in key)
+    has_digit = any(c.isdigit() for c in key)
+    # Real embed IDs always mix letters AND digits. ``configapi`` is alpha-
+    # only, ``12345678`` is digit-only — both bogus.
+    return has_letter and has_digit
+
+
+def _synth_sightmap_url(key: str) -> str | None:
+    """URL-synth helper for SightMap inline-JS init patterns.
+
+    Returns ``None`` when the captured key isn't a plausible SightMap
+    embed ID — the caller treats ``None`` as "don't queue this hop".
+    """
+    if not _is_plausible_sightmap_id(key):
+        return None
+    return f"https://sightmap.com/embed/{key}"
+
 _INLINE_JS_INIT_PATTERNS: list[tuple[re.Pattern[str], str, "Callable[[str], str | None]"]] = [
     # SightMap (Engrain) — JS init: `SightMap.init({sightmap_id: "n9w6mmzrv71"})`
     # or `new SightMap({...})` or `Engrain.SightMap.create({"map_id": ...})`.
     # Also covers data-* placeholders: `<div data-sightmap-id="n9w6mmzrv71">`.
+    # RC-6 (2026-05-16): all SightMap synthesizers funnel through
+    # ``_synth_sightmap_url`` which rejects placeholder words (``standard``,
+    # ``default``, ``api``) and alpha-only / digit-only captures via
+    # ``_is_plausible_sightmap_id``. PIDs 26523 / 20959 / 22 other
+    # SightMap_SHAPE_REJECTED failures synthesized non-existent embed
+    # URLs like ``sightmap.com/embed/standard`` that 404'd.
     (
         re.compile(r'sightmap[_\-]?id["\']?\s*[:=]\s*["\']([\w-]{6,})["\']', re.IGNORECASE),
         "sightmap",
-        lambda k: f"https://sightmap.com/embed/{k}",
+        _synth_sightmap_url,
     ),
     (
         re.compile(r'data-sightmap[_\-]?id\s*=\s*["\']([\w-]{6,})["\']', re.IGNORECASE),
         "sightmap",
-        lambda k: f"https://sightmap.com/embed/{k}",
+        _synth_sightmap_url,
     ),
     # Bug #4 follow-up (2026-05-16): the Playwright forensic on PID 16139
     # chaseknollsapts.com found `sightmap.com/embed/api` in the rendered
@@ -1468,7 +1567,7 @@ _INLINE_JS_INIT_PATTERNS: list[tuple[re.Pattern[str], str, "Callable[[str], str 
             re.IGNORECASE,
         ),
         "sightmap",
-        lambda k: f"https://sightmap.com/embed/{k}",
+        _synth_sightmap_url,
     ),
     (
         re.compile(
@@ -1476,7 +1575,7 @@ _INLINE_JS_INIT_PATTERNS: list[tuple[re.Pattern[str], str, "Callable[[str], str 
             re.IGNORECASE,
         ),
         "sightmap",
-        lambda k: f"https://sightmap.com/embed/{k}",
+        _synth_sightmap_url,
     ),
     # Engrain CDN SDK loader leaves a global config blob. Look for any
     # quoted string within ~200 chars of `engrain.com/embed` or
@@ -1489,7 +1588,7 @@ _INLINE_JS_INIT_PATTERNS: list[tuple[re.Pattern[str], str, "Callable[[str], str 
             re.IGNORECASE,
         ),
         "sightmap",
-        lambda k: f"https://sightmap.com/embed/{k}",
+        _synth_sightmap_url,
     ),
     # D14a (2026-05-16): G5 Marketing Cloud floor-plans-plus widget config.
     # PID 161 Hickory Mill (and the entire Morgan Properties portfolio):
@@ -1506,7 +1605,7 @@ _INLINE_JS_INIT_PATTERNS: list[tuple[re.Pattern[str], str, "Callable[[str], str 
             re.IGNORECASE,
         ),
         "sightmap",
-        lambda k: f"https://sightmap.com/embed/{k}",
+        _synth_sightmap_url,
     ),
     # D19a (2026-05-16): SightMap clientKey + sightmapID → DIRECT API URL.
     # The embed URL `sightmap.com/embed/{id}` is an empty SPA shell; real
@@ -1836,6 +1935,39 @@ _LINK_SKIP_PATTERNS: tuple[str, ...] = (
     ".svg",
     ".mp4",
     ".mov",
+    # Static asset extensions — JS/CSS/font/icon bundles can never carry unit data.
+    # PID 1074 (carltonequities AppFolio) 2026-05-16: 19 hops, half of which went
+    # to `/listings/assets/listings/appfolio_touch-*.js`, `ie-shims-*.js`,
+    # `application2-*.js`, `place_holder-*.png`. Every JS/font asset costs a
+    # fetch round-trip + a tier cascade against ~1KB of JS source.
+    ".js",
+    ".css",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".ico",
+    ".map",   # source map files
+    # WordPress CMS asset / REST paths — top hop destinations on PARTIAL pids
+    # 2026-05-16 (resources.yardi.com): /wp-content 420 hits, /wp-json 267,
+    # /wp-includes 73, /xmlrpc.php 24. These are theme assets / API endpoints
+    # that NEVER carry apartment unit data.
+    "/wp-content/",
+    "/wp-json/",
+    "/wp-includes/",
+    "/wp-admin/",
+    "/xmlrpc.php",
+    # Yardi corporate marketing CDN — 489 hits to /legal alone on 2026-05-16.
+    # `resources.yardi.com` is the Yardi marketing/legal content site, not a
+    # property data host.
+    "resources.yardi.com",
+    "www.yardi.com",
+    # Ad / tracker beacons that surface as anchors on some sites. These ALWAYS
+    # 404 or return non-JSON tracker payloads.
+    "online-metrix.net",
+    "doubleclick.net/pagead",
+    "googletagmanager.com",
+    "google-analytics.com",
     "/blog/",
     "/news/",
     "/privacy",
@@ -1861,6 +1993,11 @@ _LINK_SKIP_PATTERNS: tuple[str, ...] = (
     "/log-in",
     "/auth",
     "/sso",
+    # AppFolio per-listing rental-application form — `/listings/rental_applications/new?listable_uid=*`.
+    # Pure application form, never the unit listing page. Each unique listable_uid
+    # generates a NEW skip-list miss; we keep hopping until budget exhausts.
+    # 14 of 181 PARTIAL pids on 2026-05-16 (PID 1074 hit this 4× in one run).
+    "/rental_applications",
     # Entrata CMS module dead-ends — these are auth / detail shell paths that
     # the Entrata template renders on every property page (e.g. "Apply Now"
     # CTA → `/Apartments/module/application_authentication/`). They have an
@@ -1931,13 +2068,22 @@ _URL_SHAPE_PATTERNS: tuple[tuple[re.Pattern[str], int, str], ...] = (
         5_500,
         "rentcafe_per_plan",
     ),
-    # Generic slugged plan-detail (PID 3483 Brook `/floorplans/1-bed-1-bath`).
+    # Generic slugged plan-detail (PID 3483 Brook `/floorplans/1-bed-1-bath`,
+    # PID 52331 alexandriacarmel `/floorplans/the-diplomat-1-br-1-ba`).
     # One fetch = ~5-30 units. Restricted to `/floor-plans|units|residences/
     # {slug}` — NOT `/apartments/{slug}` (ambiguous: portfolio sites use
     # `/apartments/{property-slug}/` for sibling-property links).
+    #
+    # 2026-05-17 — boosted 5_000 → 6_500 so per-plan detail pages outrank
+    # bare floor-plan-index pages (1_500) and generic anchor-discovered
+    # links (~5_100). The Diplomat URL on 52331 was at 5980 (slugged
+    # detail 5000 + anchor 88 + path keyword); under the boost it lands
+    # ~7500, ahead of every entry candidate except the SecureCafe portal
+    # itself (10120). That brings the productive per-plan crawl forward
+    # in the hop queue before the property hits the wallclock budget.
     (
         re.compile(r"/(?:floor[-_]?plans?|units?|residences?)/[a-z0-9][a-z0-9\-_]+/?$", re.IGNORECASE),
-        5_000,
+        6_500,
         "slugged_plan_detail",
     ),
     # Per-unit detail page (Cortland `/available-apartments/1n-131/pricing/`).
@@ -2003,6 +2149,100 @@ def _url_shape_score(link_path: str) -> tuple[int, str]:
         if pattern.search(link_path):
             return delta, label
     return 0, ""
+
+
+#: Path shape for a per-floorplan detail page. Matches
+#: ``/floor-plans/{slug}`` / ``/floorplans/{slug}`` / ``/plans/{slug}`` /
+#: ``/units/{slug}`` where the slug is at least 8 chars and contains at
+#: least one alphanumeric edge character. The trailing slash is optional.
+_PER_FLOORPLAN_DETAIL_PATH_RE = re.compile(
+    r"/(?:floor[-_]?plans?|plans|units)/(?P<slug>[a-z0-9][a-z0-9\-_]{6,}[a-z0-9])(?:/|$)",
+    re.IGNORECASE,
+)
+
+#: Bed/bath/studio token that must appear in the slug for a candidate to
+#: count as a per-plan detail page. ``the-diplomat-1-br-1-ba`` matches;
+#: ``community-gallery`` does not. Filters generic ``/units/{slug}`` and
+#: ``/plans/{slug}`` shapes that aren't per-floorplan inventory pages.
+_PER_FLOORPLAN_DETAIL_SLUG_TOKEN_RE = re.compile(
+    r"(?:br|bed|bedroom|ba|bath|bathroom|studio)",
+    re.IGNORECASE,
+)
+
+#: Minimum entry-ranker score for a candidate to qualify as a per-plan
+#: detail page. Anchor-discovered links score ~4_000 base + keyword
+#: bonuses; this floor lets through real anchors while filtering random
+#: site-wide nav links (contact / privacy / careers) that score lower.
+_PER_FLOORPLAN_MIN_QUEUE_SCORE = 4_000
+
+
+def _discover_cross_host_per_plan_urls(
+    queue: list[tuple[str, int, str]],
+    visited: set[str],
+    sub_url: str,
+    existing_fp_hints: list[tuple[str, str]],
+) -> list[str]:
+    """Return per-floorplan detail URLs found in *queue* but not yet hopped.
+
+    Companion to the floor-plan accumulation logic in :func:`_try_link_hop`.
+    Called when a hop produces plan-shaped rows (one row per floor plan
+    rather than per physical apartment) and the same-host ``fp_hints``
+    discovery (HTML anchor scrape on the sub-page) came up empty.
+
+    The entry-page candidate queue may already contain per-plan detail
+    URLs (anchor-discovered, ranked at 5_000+) on a different host than
+    the just-finished hop — they wouldn't be queued by the same-host
+    accumulator. This function scans the remaining queue and returns
+    any candidate matching :data:`_PER_FLOORPLAN_DETAIL_PATH_RE` plus
+    :data:`_PER_FLOORPLAN_DETAIL_SLUG_TOKEN_RE` plus the queue-score
+    floor.
+
+    Real-world case (PID 52331 alexandriacarmel, 2026-05-17): SecureCafe
+    portal at ``alexandriacarmel.securecafe.com`` returns 10 plan rows;
+    the per-plan detail pages live on ``alexandriacarmel.com/floorplans/
+    the-diplomat-1-br-1-ba`` (different host). Without this discovery
+    the link-hop loop would return on the first hop with units (LEAF
+    return) and never crawl them.
+
+    Args:
+        queue: The link-hop candidate queue, tuples of ``(url, score, anchor)``.
+        visited: URLs already fetched in this property's hop walk.
+        sub_url: The URL of the hop that just produced plan-shaped rows
+            (excluded from matches so we don't re-queue it).
+        existing_fp_hints: ``(url, kind)`` tuples already in fp_hints —
+            used to dedup the result.
+
+    Returns:
+        A list of URLs from *queue* that look like per-floorplan detail
+        pages and aren't yet in *visited* / *existing_fp_hints*. Empty
+        when no candidate matches. Order preserved from the input queue.
+    """
+    matched: list[str] = []
+    if not queue:
+        return matched
+    existing_hint_urls = {url for url, _ in existing_fp_hints}
+    for candidate_url, candidate_score, _anchor in queue:
+        if candidate_url in visited:
+            continue
+        if candidate_url == sub_url:
+            continue
+        if (candidate_score or 0) < _PER_FLOORPLAN_MIN_QUEUE_SCORE:
+            continue
+        try:
+            path = urllib.parse.urlparse(candidate_url).path or ""
+        except Exception:
+            continue
+        slug_match = _PER_FLOORPLAN_DETAIL_PATH_RE.search(path)
+        if not slug_match:
+            continue
+        slug = slug_match.group("slug")
+        if not _PER_FLOORPLAN_DETAIL_SLUG_TOKEN_RE.search(slug):
+            continue
+        if candidate_url in existing_hint_urls:
+            continue
+        matched.append(candidate_url)
+        existing_hint_urls.add(candidate_url)
+    return matched
 
 
 def _rank_internal_links(
@@ -2954,7 +3194,17 @@ async def _try_link_hop(
             explored[sub_url] = False
             continue
 
-        had_data = bool(sub_result.get("units"))
+        # 2026-05-17 Bug C fix — count plan_summaries as data too. PIDs
+        # like 300327 flatson10th had LLM_DOM extract 6+1+6=13 rows on
+        # SecureCafe portal hops; after the validity/classify gates, all
+        # were partitioned to plan_summaries (no available_date / floor /
+        # building) and ``sub_result["units"]`` was empty. With only
+        # ``units`` counted as data, every hop looked dead → ``_try_link_hop``
+        # returned ``_units_empty`` → the entry's RentCafe NO_RESPONSE
+        # verdict shipped with 0 units. Recognising plan-level rows as
+        # data here lets them propagate to the entry result and ship under
+        # ``floor_plans[]`` post Fix 1.
+        had_data = bool(sub_result.get("units")) or bool(sub_result.get("plan_summaries"))
         # B3 writer fix: only record had_data=True ("this URL gave us units,
         # prioritise it next run" → availability_links). A successful
         # 200-OK fetch that produced 0 units is NOT a dead URL — extraction
@@ -3094,6 +3344,45 @@ async def _try_link_hop(
                                 if not _path_kw_match:
                                     continue
                         fp_hints.append((lnk_url, "html_subpage"))
+
+            # Cross-host per-plan detail discovery (2026-05-17). When the
+            # same-host HTML fallback above came up empty AND the hop's
+            # rows look like plan-summaries (beds/baths/sqft + rent, no
+            # per-apartment identity), check the entry-page candidate
+            # queue for any URL whose shape matches a per-floorplan
+            # detail page. See ``_discover_cross_host_per_plan_urls`` for
+            # the matching rules. Real-world case: PID 52331
+            # alexandriacarmel — SecureCafe portal returns 10 plan rows
+            # while per-plan detail pages live cross-host on the
+            # marketing site (different host than the hop) and would
+            # otherwise never be crawled.
+            if not fp_hints and not _in_floorplan_accumulation:
+                _index_units_for_match = sub_result.get("units") or []
+                _has_plan_shape = any(
+                    isinstance(u, dict)
+                    and (u.get("bedrooms") is not None or u.get("beds") is not None)
+                    and (u.get("market_rent_low") is not None or u.get("market_rent_high") is not None)
+                    for u in _index_units_for_match
+                )
+                if _has_plan_shape:
+                    _per_plan_matched = _discover_cross_host_per_plan_urls(
+                        queue=queue,
+                        visited=visited,
+                        sub_url=sub_url,
+                        existing_fp_hints=fp_hints,
+                    )
+                    if _per_plan_matched:
+                        for _candidate_url in _per_plan_matched:
+                            fp_hints.append(
+                                (_candidate_url, "cross_host_per_plan_url")
+                            )
+                        log.info(
+                            "cross-host per-plan discovery for %s: "
+                            "matched %d entry-queue candidates by URL shape "
+                            "from plan-index hop %s",
+                            property_id, len(_per_plan_matched), sub_url[:80],
+                        )
+
             if fp_hints and not _in_floorplan_accumulation:
                 # Guard: enter accumulation when the index page has any
                 # genuine floor-plan content — at least one bed/bath/sqft/
@@ -3684,7 +3973,17 @@ async def scrape_jugnu(
                 log.warning("link-hop orchestration failed for %s: %s", property_id, exc)
                 hop_result = None
 
-            if hop_result and hop_result.get("units"):
+            # 2026-05-17 Bug C fix — accept hop_result that has plan_summaries
+            # even when units is empty. RentCafe SecureCafe hops + similar
+            # LLM-DOM extractions on portal pages often emit rows with rent
+            # + dimensions but no per-unit signal (no available_date / floor
+            # / building), so post_process classifies them as plan-level.
+            # Pre-fix this whole branch was gated on ``units`` only, so the
+            # extracted rows never reached the entry result.
+            _hop_has_data = bool(hop_result) and (
+                bool(hop_result.get("units")) or bool(hop_result.get("plan_summaries"))
+            )
+            if _hop_has_data:
                 main_units = result.get("units") or []
                 sub_units = hop_result.get("units") or []
                 # Phase 9: when both main and sub-page produced units, merge
@@ -3764,6 +4063,10 @@ async def scrape_jugnu(
                         log.warning("Phase 9 merge fallback for %s: %s", property_id, exc)
                         for k in (
                             "units",
+                            # 2026-05-17 Bug C: also propagate plan_summaries from
+                            # hop_result so plan-level rows extracted on hop pages
+                            # reach the v2 ``floor_plans[]`` output (post Fix 1).
+                            "plan_summaries",
                             "extraction_tier_used",
                             "api_calls_intercepted",
                             "_winning_page_url",

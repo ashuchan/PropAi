@@ -110,7 +110,11 @@ _JSONLD_HTML = """<!DOCTYPE html>
 
 
 def test_tier2_jsonld_used_when_api_is_empty() -> None:
-    """When API has no recognisable units, JSON-LD in HTML is the fallback."""
+    """When API has no recognisable units, JSON-LD in HTML is the fallback.
+
+    D16: synthetic ``Apartment`` JSON-LD has no per-apartment identity,
+    so post-process correctly routes to ``plan_summaries``.
+    """
     api_responses: list[dict] = []  # deliberately empty
     ctx = _make_ctx(
         api_responses=api_responses,
@@ -119,7 +123,9 @@ def test_tier2_jsonld_used_when_api_is_empty() -> None:
     result = asyncio.run(GenericAdapter().extract(page=None, ctx=ctx))
 
     assert result.tier_used == "TIER_2_JSONLD"
-    assert len(result.units) >= 1
+    # Tight: plan-level by fixture construction.
+    assert len(result.plan_summaries) >= 1
+    assert len(result.units) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +180,11 @@ _BARE_RENT_HTML = (
 
 
 def test_tier4_llm_invoked_when_structural_tiers_fail(fake_llm: Any) -> None:
-    """LLM is called when API, JSON-LD, and DOM all yield nothing."""
+    """LLM is called when API, JSON-LD, and DOM all yield nothing.
+
+    D16: fake LLM emits a row with no unit_number / no per-apartment
+    signal — that's plan-level.
+    """
     fake_llm.returns({"units": [{"bedrooms": 1, "market_rent_low": 1500, "floor_plan_name": "1BR"}]})
 
     ctx = _make_ctx(
@@ -185,8 +195,9 @@ def test_tier4_llm_invoked_when_structural_tiers_fail(fake_llm: Any) -> None:
 
     # LLM was reached because structural tiers found nothing
     assert fake_llm.call_count >= 1
-    # Result should have units from the fake LLM response
-    assert len(result.units) >= 1
+    # Tight: fake LLM row is plan-level by construction.
+    assert len(result.plan_summaries) >= 1
+    assert len(result.units) == 0
 
 
 # ---------------------------------------------------------------------------

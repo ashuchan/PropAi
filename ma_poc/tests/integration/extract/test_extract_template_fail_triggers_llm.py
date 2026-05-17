@@ -71,14 +71,19 @@ _BARE_RENT_HTML = (
 
 
 def test_llm_invoked_once_when_structural_tiers_fail(fake_llm: Any) -> None:
-    """LLM is called at least once when API + JSON-LD + DOM all find nothing."""
+    """LLM is called at least once when API + JSON-LD + DOM all find nothing.
+
+    D16: fake LLM row has no per-apartment identity → plan-level partition.
+    """
     fake_llm.returns({"units": [{"bedrooms": 0, "market_rent_low": 1400, "floor_plan_name": "Studio"}]})
 
     ctx = _make_ctx(_make_fetch_result(_BARE_RENT_HTML))
     result = asyncio.run(GenericAdapter().extract(page=None, ctx=ctx))
 
     assert fake_llm.call_count >= 1, "Expected at least one LLM call"
-    assert len(result.units) >= 1
+    # Tight: fake LLM row is plan-level by construction.
+    assert len(result.plan_summaries) >= 1
+    assert len(result.units) == 0
     assert "TIER_4" in result.tier_used or "LLM" in result.tier_used
 
 
@@ -99,7 +104,10 @@ def test_llm_receives_html_content_in_prompt(fake_llm: Any) -> None:
 
 
 def test_llm_units_used_when_llm_returns_data(fake_llm: Any) -> None:
-    """When LLM returns units, they become the result (tier_used reflects LLM tier)."""
+    """When LLM returns rows, they become the result (tier_used reflects LLM tier).
+
+    D16: fake LLM rows have no per-apartment identity → plan-level partition.
+    """
     fake_llm.returns({
         "units": [
             {"bedrooms": 0, "market_rent_low": 1400, "floor_plan_name": "Studio"},
@@ -112,7 +120,9 @@ def test_llm_units_used_when_llm_returns_data(fake_llm: Any) -> None:
     result = asyncio.run(GenericAdapter().extract(page=None, ctx=ctx))
 
     assert "TIER_4" in result.tier_used or "LLM" in result.tier_used
-    assert len(result.units) >= 1
+    # Tight: 3 fake LLM rows are plan-level by construction.
+    assert len(result.plan_summaries) >= 1
+    assert len(result.units) == 0
 
 
 def test_llm_returning_empty_leaves_empty_result(fake_llm: Any) -> None:

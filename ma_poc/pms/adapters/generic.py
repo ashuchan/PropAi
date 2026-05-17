@@ -32,6 +32,7 @@ import re as _re
 from datetime import datetime, timezone as _timezone
 from typing import TYPE_CHECKING, Any
 
+from ma_poc.extraction.canonical import FP_ID_KEYS, get_str
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_api_responses as _dr_parse_api_responses,
 )
@@ -958,18 +959,34 @@ class GenericAdapter:
                     # API output and inflate the unit count — see PID 67327
                     # Windsong Estates 2026-05-14 (18 real units + 9 phantom
                     # plan-only inferred rows = 27 emitted).
+                    #
+                    # D16 (2026-05-16) — partition fix: ``result.units`` is
+                    # strictly unit-level. Plan rows live in
+                    # ``result.plan_summaries`` only (after B4 fp_id dedup
+                    # against the unit set). Before D16, the back-compat
+                    # shim concatenated the kept plans into ``result.units``
+                    # which inflated the count by exactly the number of
+                    # plan-aggregate rows the property advertised — Olympic
+                    # by Windsor 2026-05-16 surfaced this leak (29 = 15 real
+                    # + 14 plan-aggregate).
                     if _pp.n_unit_level > 0 and _pp.n_plan_level > 0:
-                        unit_fpids: set[str] = {
-                            str(u.get("floor_plan_id"))
-                            for u in _pp.units
-                            if u.get("floor_plan_id")
-                        }
+                        # Alias-aware fp_id read via the canonical helper so
+                        # PascalCase / camelCase variants (``FloorPlanId``,
+                        # ``floorplan_id``, ``planCode``) all collapse to the
+                        # same comparison string, and ``FieldValue`` wrappers
+                        # from the cross-source merger get unwrapped instead
+                        # of stringified into ``"FieldValue(value=...)"``.
+                        unit_fpids: set[str] = set()
+                        for u in _pp.units:
+                            fid = get_str(u, FP_ID_KEYS)
+                            if fid:
+                                unit_fpids.add(fid)
                         kept_plans = [
                             p for p in _pp.plan_summaries
-                            if str(p.get("floor_plan_id") or "") not in unit_fpids
+                            if (get_str(p, FP_ID_KEYS) or "") not in unit_fpids
                         ]
                         dropped = len(_pp.plan_summaries) - len(kept_plans)
-                        result.units = list(_pp.units) + list(kept_plans)
+                        result.units = list(_pp.units)
                         result.plan_summaries = list(kept_plans)
                         if dropped:
                             log.info(
@@ -979,8 +996,11 @@ class GenericAdapter:
                                 getattr(ctx, "property_id", "?"),
                             )
                     else:
-                        result.units = _pp.admitted
-                        result.plan_summaries = _pp.plan_summaries
+                        result.units = list(_pp.units)
+                        result.plan_summaries = list(_pp.plan_summaries)
+                    # D16: surface dedup + inverse-B4 counts for the run
+                    # report and per-property markdown.
+                    result.post_process_meta = _pp.to_meta()
                     # confidence already set by the winning sub-tier; only
                     # rescale if the validity-drop changes its denominator
                     # materially. Leave alone to preserve sub-tier scoring.

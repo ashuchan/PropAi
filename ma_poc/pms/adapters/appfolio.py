@@ -336,8 +336,10 @@ class AppFolioAdapter:
             _pp_parsed = len(all_units)
             _pp = post_process(all_units, property_id=getattr(ctx, "property_id", None))
             if _pp.n_admitted > 0:
-                result.units = _pp.admitted
-                result.plan_summaries = _pp.plan_summaries
+                # D16: strict unit-level / plan-level partition.
+                result.units = list(_pp.units)
+                result.plan_summaries = list(_pp.plan_summaries)
+                result.post_process_meta = _pp.to_meta()
                 result.winning_url = (
                     result.api_responses[0].get("url") if result.api_responses else None
                 )

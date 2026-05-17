@@ -1199,6 +1199,14 @@ _PORTAL_INFRA_BLACKLIST: tuple[str, ...] = (
     "trustarc.com",
     "termly.io",
     "iubenda.com",
+    # 2026-05-17 — Yardi's own cookie-consent + corporate marketing CDN.
+    # PID 52331 alexandriacarmel had ``resources.yardi.com/legal/cookie-notice/``
+    # scored at 10110 via the portal-iframe scanner, beating the per-plan
+    # detail URLs (5980+) and burning a hop slot. ``resources.yardi.com``
+    # serves WordPress legal/marketing pages; ``www.yardi.com`` is the
+    # corporate site — neither carries property inventory.
+    "resources.yardi.com",
+    "www.yardi.com",
     # Ad-tech / programmatic — never inventory
     "doubleverify.com",
     "adnxs.com",

@@ -92,6 +92,19 @@ DEFAULT_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("browse floor plans", 88),
     ("view floorplan", 88),
     ("view floor plans", 88),
+    # 2026-05-17 — strong "go here for unit data" cues observed on
+    # per-plan detail-page anchors. PID 52331 alexandriacarmel surfaces
+    # ``Only N left`` / ``View Details`` / ``Apply Now`` next to each
+    # per-plan card; before this addition only the URL-shape boost
+    # (slugged_plan_detail) carried these anchors, so generic-anchor
+    # variants without a slug-shaped URL underscored.
+    ("view details", 70),
+    ("apply now", 60),
+    # ``only`` is a prefix marker for ``only 1 left`` / ``only 4 left`` /
+    # ``only available`` — strong availability signals. Substring match
+    # via the existing keyword loop is sufficient; the trailing space
+    # avoids matching ``only`` inside ``only-child`` / ``only one``.
+    ("only ", 75),
     ("apartment", 60),
     ("unit", 55),
     ("lease", 50),

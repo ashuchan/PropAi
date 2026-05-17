@@ -419,8 +419,13 @@ class RentCafeAdapter:
                 # runner promotes ``plan_summaries`` into the V2 record's
                 # ``floor_plans[]`` field; verdict treats a property with
                 # only plan-level data as SUCCESS_PLAN_LEVEL.
-                result.units = pp.admitted
-                result.plan_summaries = pp.plan_summaries
+                #
+                # D16: strict unit-level / plan-level partition. ``units``
+                # carries only unit-level rows; plan-aggregate rows live
+                # in ``plan_summaries`` only.
+                result.units = list(pp.units)
+                result.plan_summaries = list(pp.plan_summaries)
+                result.post_process_meta = pp.to_meta()
                 result.winning_url = (
                     result.api_responses[0].get("url") if result.api_responses else None
                 )

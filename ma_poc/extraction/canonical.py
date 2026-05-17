@@ -178,9 +178,47 @@ AVAIL_DATE_KEYS: Final[tuple[str, ...]] = (
     "readydate", "ready_date",
 )
 
+#: Availability-status field aliases — vendor variants of the per-row
+#: status string ("AVAILABLE" / "UNAVAILABLE" / "WAITLIST" / etc.). Used by
+#: :func:`classify._is_available_with_rent` (2026-05-17) to promote rent-
+#: bearing AVAILABLE rows to unit-level even when they lack an
+#: ``available_date`` move-in date. Centralised here so future producers'
+#: spellings land in one place.
+AVAIL_STATUS_KEYS: Final[tuple[str, ...]] = (
+    "availability_status",           # V2 canonical
+    "availabilitystatus",            # camelCase availabilityStatus post-lower
+    "availability",
+    "available",
+    "status",
+    "is_available", "isavailable",
+    "availability_state", "availabilitystate",
+    "availability_code", "availabilitycode",
+)
+
 RENT_RANGE_KEYS: Final[tuple[str, ...]] = (
     "rent_range",
     "rentrange",                     # post-lower of rentRange
+)
+
+#: Building name / identifier — used by the cross-page dedup pass to keep
+#: townhome complexes with re-used apartment numbers across buildings
+#: ("Bldg A #1" vs "Bldg B #1") distinct in the dedup bucket key.
+BUILDING_KEYS: Final[tuple[str, ...]] = (
+    "building",                      # V2 canonical
+    "building_name", "buildingname",
+    "bldg", "bldg_name", "bldgname",
+)
+
+#: Floor-plan identifier / code — the per-property unique key that
+#: distinguishes one plan from another. Used by the inverse-B4 guard to
+#: detect unit rows whose ``unit_number`` is actually a plan code that
+#: leaked through. Distinct from ``FP_NAME_KEYS`` (display name).
+FP_ID_KEYS: Final[tuple[str, ...]] = (
+    "floor_plan_id",                 # V2 canonical
+    "floorplan_id", "floorplanid",
+    "floor_plan_code", "floorplancode",
+    "plan_code", "plancode",
+    "plan_id", "planid",
 )
 
 

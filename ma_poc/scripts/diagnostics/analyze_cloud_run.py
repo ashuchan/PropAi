@@ -73,7 +73,7 @@ class PropertyOutcome:
     shard: str
     url: str | None = None
     final_url: str | None = None
-    verdict: str | None = None  # SUCCESS / FAILED_NO_DATA / FAILED_UNREACHABLE / CARRY_FORWARD / PARTIAL
+    verdict: str | None = None  # SUCCESS / SUCCESS_PLAN_LEVEL / SUCCESS_PARTIAL / FAILED_NO_DATA / FAILED_UNREACHABLE / CARRY_FORWARD / PARTIAL / DEAD_URL
     units: int = 0
     pms_detected: str | None = None
     adapter_selected: str | None = None
@@ -118,7 +118,13 @@ class PropertyOutcome:
 
     @property
     def succeeded(self) -> bool:
-        return self.verdict == "SUCCESS"
+        # 2026-05-17 — match the production success classifier in
+        # reporting/verdict.py:_SUCCESS_VERDICTS. SUCCESS_PARTIAL is the
+        # timeout-rescue success verdict (real units buffered before the
+        # per-property wallclock fired). The bare ``PARTIAL`` verdict
+        # (validation-majority-rejected) intentionally STAYS OUT of the
+        # success set — its units are suspect (>50% gate-rejected).
+        return self.verdict in {"SUCCESS", "SUCCESS_PLAN_LEVEL", "SUCCESS_PARTIAL"}
 
     @property
     def failed(self) -> bool:
@@ -137,6 +143,19 @@ class RunStats:
     properties_failed_no_data: int = 0
     properties_failed_unreachable: int = 0
     properties_failed_other: int = 0  # counted-failed by report.json with no output.property_emitted event
+    # 2026-05-17 — timeout-rescue successes (verdict ``SUCCESS_PARTIAL``):
+    # the per-property wallclock fired before the cascade completed but
+    # the link-hop accumulator buffered ≥1 valid unit. Tracked separately
+    # so the dashboard can show the rescue population alongside clean
+    # SUCCESS. Counted toward ``properties_succeeded``.
+    properties_success_partial: int = 0
+    properties_success_partial_units_total: int = 0
+    # Validation-majority-rejected (verdict ``PARTIAL``). NOT a success —
+    # the schema gate dropped >50% of rows so the surviving units are
+    # suspect. Tracked so the dashboard can surface this population
+    # (data-quality alert) without conflating it with timeout-rescue.
+    properties_partial_validation_rejected: int = 0
+    properties_dead_url: int = 0
     success_rate_pct: float = 0.0
     llm_cost_total: float = 0.0
     slo_breaches: list[dict[str, Any]] = field(default_factory=list)
@@ -386,19 +405,48 @@ def aggregate_run(run_dir: Path, run_date: str, expected_shards: int = 20) -> tu
             # Split failed bucket into NO_DATA vs UNREACHABLE using events later.
             del failed  # silence linter
 
-    # Recompute NO_DATA / UNREACHABLE split from event-level verdicts so the
-    # numbers reconcile with per-property categorisation. Anything counted as
-    # failed by report.json but with no output.property_emitted event lands in
-    # properties_failed_other (typically per-property timeout / crash kills).
+    # Recompute the verdict splits from event-level verdicts so the
+    # numbers reconcile with per-property categorisation.
+    #
+    # 2026-05-17: ``SUCCESS_PARTIAL`` (timeout-rescued success) is a
+    # success-class verdict and counts toward ``properties_succeeded``.
+    # The bare ``PARTIAL`` verdict (validation-majority-rejected) is
+    # tracked under ``properties_partial_validation_rejected`` and does
+    # NOT count as success — its rows are suspect (>50% gate-rejected).
+    # The runner's report.json (``totals.succeeded``) already includes
+    # SUCCESS_PARTIAL via the run_report classifier; this top-up branch
+    # handles older runs / fresh-data cases.
     verdicts = Counter(o.verdict for o in all_outcomes.values())
     stats.properties_failed_no_data = verdicts.get("FAILED_NO_DATA", 0)
     stats.properties_failed_unreachable = verdicts.get("FAILED_UNREACHABLE", 0)
+    stats.properties_success_partial = verdicts.get("SUCCESS_PARTIAL", 0)
+    stats.properties_partial_validation_rejected = verdicts.get("PARTIAL", 0)
+    stats.properties_dead_url = verdicts.get("DEAD_URL", 0)
+    # Sum units carried by SUCCESS_PARTIAL records — emitted on the
+    # ``output.property_emitted`` event payload as the ``units`` field.
+    stats.properties_success_partial_units_total = sum(
+        int(o.units or 0)
+        for o in all_outcomes.values()
+        if (o.verdict or "") == "SUCCESS_PARTIAL"
+    )
+    # Top up the succeeded count to include SUCCESS_PARTIAL when the
+    # report.json's totals.succeeded didn't (older runs / runs before the
+    # verdict.py update).
+    _succeeded_floor = (
+        verdicts.get("SUCCESS", 0)
+        + verdicts.get("SUCCESS_PLAN_LEVEL", 0)
+        + stats.properties_success_partial
+    )
+    if _succeeded_floor > stats.properties_succeeded:
+        stats.properties_succeeded = _succeeded_floor
     stats.properties_failed_other = max(
         0,
         stats.properties_total
         - stats.properties_succeeded
         - stats.properties_failed_no_data
-        - stats.properties_failed_unreachable,
+        - stats.properties_failed_unreachable
+        - stats.properties_partial_validation_rejected
+        - stats.properties_dead_url,
     )
 
     if stats.properties_total:
@@ -634,10 +682,15 @@ def render_summary_md(stats: RunStats, outcomes: dict[str, PropertyOutcome]) -> 
         "## Top-line numbers",
         "",
         f"- **Properties processed:** {stats.properties_total}",
-        f"- **SUCCESS:** {stats.properties_succeeded} ({stats.success_rate_pct}%)",
+        f"- **SUCCESS (incl. SUCCESS_PARTIAL):** {stats.properties_succeeded} ({stats.success_rate_pct}%)",
+        f"  ↳ of which SUCCESS_PARTIAL (timeout-rescued, real units shipped): "
+        f"**{stats.properties_success_partial}** ({stats.properties_success_partial_units_total} units total)",
         f"- **FAILED_NO_DATA:** {stats.properties_failed_no_data}",
         f"- **FAILED_UNREACHABLE:** {stats.properties_failed_unreachable}",
-        f"- **FAILED (no `output.property_emitted` — likely killed by per-property timeout):** {stats.properties_failed_other}",
+        f"- **PARTIAL (validation-majority-rejected — data-quality alert):** "
+        f"{stats.properties_partial_validation_rejected}",
+        f"- **DEAD_URL:** {stats.properties_dead_url}",
+        f"- **Other (no verdict match — should be 0):** {stats.properties_failed_other}",
         f"- **LLM cost:** ${stats.llm_cost_total:.2f}",
         f"- **SLO breaches:** {len(stats.slo_breaches)} across all shards",
         "",
@@ -931,10 +984,13 @@ def render_comparison_md(
         "| Metric | Today | Yesterday | Δ |",
         "|---|---|---|---|",
         f"| Properties processed | {today_stats.properties_total} | {prev_stats.properties_total} | {today_stats.properties_total - prev_stats.properties_total:+d} |",
-        f"| Succeeded | {today_stats.properties_succeeded} | {prev_stats.properties_succeeded} | {today_stats.properties_succeeded - prev_stats.properties_succeeded:+d} |",
+        f"| Succeeded (incl. SUCCESS_PARTIAL) | {today_stats.properties_succeeded} | {prev_stats.properties_succeeded} | {today_stats.properties_succeeded - prev_stats.properties_succeeded:+d} |",
+        f"|   ↳ SUCCESS_PARTIAL (timeout-rescued with units) | {today_stats.properties_success_partial} | {prev_stats.properties_success_partial} | {today_stats.properties_success_partial - prev_stats.properties_success_partial:+d} |",
         f"| Failed (no data) | {today_stats.properties_failed_no_data} | {prev_stats.properties_failed_no_data} | {today_stats.properties_failed_no_data - prev_stats.properties_failed_no_data:+d} |",
         f"| Failed (unreachable) | {today_stats.properties_failed_unreachable} | {prev_stats.properties_failed_unreachable} | {today_stats.properties_failed_unreachable - prev_stats.properties_failed_unreachable:+d} |",
-        f"| Failed (no emit — probable timeout kill) | {today_stats.properties_failed_other} | {prev_stats.properties_failed_other} | {today_stats.properties_failed_other - prev_stats.properties_failed_other:+d} |",
+        f"| PARTIAL (validation-majority-rejected) | {today_stats.properties_partial_validation_rejected} | {prev_stats.properties_partial_validation_rejected} | {today_stats.properties_partial_validation_rejected - prev_stats.properties_partial_validation_rejected:+d} |",
+        f"| Dead URL | {today_stats.properties_dead_url} | {prev_stats.properties_dead_url} | {today_stats.properties_dead_url - prev_stats.properties_dead_url:+d} |",
+        f"| Other (verdict mismatch — should be 0) | {today_stats.properties_failed_other} | {prev_stats.properties_failed_other} | {today_stats.properties_failed_other - prev_stats.properties_failed_other:+d} |",
         f"| Success rate | {today_stats.success_rate_pct}% | {prev_stats.success_rate_pct}% | {today_stats.success_rate_pct - prev_stats.success_rate_pct:+.2f} pp |",
         f"| LLM cost (run) | ${today_stats.llm_cost_total:.2f} | ${prev_stats.llm_cost_total:.2f} | ${today_stats.llm_cost_total - prev_stats.llm_cost_total:+.2f} |",
         f"| Shards seen | {len(today_stats.shards_seen)} | {len(prev_stats.shards_seen)} | {len(today_stats.shards_seen) - len(prev_stats.shards_seen):+d} |",

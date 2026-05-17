@@ -91,7 +91,14 @@ _JSONLD_LISTING_HTML = """<!DOCTYPE html>
 
 
 def test_empty_api_falls_through_to_jsonld() -> None:
-    """Empty API responses → JSON-LD tier extracts units from HTML."""
+    """Empty API responses → JSON-LD tier extracts plan summaries from HTML.
+
+    D16: the synthetic Schema.org ``Apartment`` entries carry no per-
+    apartment identity (no unit_number / no availability_date / no
+    floor), so the post-process partition correctly routes them to
+    ``plan_summaries`` — assert specifically against that partition to
+    catch regressions in either direction.
+    """
     ctx = _make_ctx(
         api_responses=[],
         fetch_result=_make_fetch_result(_JSONLD_LISTING_HTML),
@@ -101,7 +108,11 @@ def test_empty_api_falls_through_to_jsonld() -> None:
     assert result.tier_used == "TIER_2_JSONLD", (
         f"Expected TIER_2_JSONLD but got {result.tier_used!r}"
     )
-    assert len(result.units) >= 1
+    # Tight assertion — the synthetic JSON-LD fixture is plan-level by
+    # construction (no per-apartment fields), so plan_summaries must be
+    # populated and units must be empty.
+    assert len(result.plan_summaries) >= 1
+    assert len(result.units) == 0
 
 
 def test_noise_api_response_falls_through_to_jsonld() -> None:
@@ -119,7 +130,9 @@ def test_noise_api_response_falls_through_to_jsonld() -> None:
     result = asyncio.run(GenericAdapter().extract(page=None, ctx=ctx))
 
     assert result.tier_used == "TIER_2_JSONLD"
-    assert len(result.units) >= 1
+    # D16: see test_empty_api_falls_through_to_jsonld — plan-level routing.
+    assert len(result.plan_summaries) >= 1
+    assert len(result.units) == 0
 
 
 def test_empty_api_list_body_falls_through_to_jsonld() -> None:
@@ -131,11 +144,17 @@ def test_empty_api_list_body_falls_through_to_jsonld() -> None:
     result = asyncio.run(GenericAdapter().extract(page=None, ctx=ctx))
 
     assert result.tier_used == "TIER_2_JSONLD"
-    assert len(result.units) >= 1
+    # D16: see test_empty_api_falls_through_to_jsonld — plan-level routing.
+    assert len(result.plan_summaries) >= 1
+    assert len(result.units) == 0
 
 
 def test_jsonld_fallback_units_have_required_fields() -> None:
-    """Units extracted via JSON-LD have at least beds or rent_low populated."""
+    """Rows extracted via JSON-LD have at least beds or rent_low populated.
+
+    D16: walks both partitions because plan-level Apartment entries route
+    to ``plan_summaries`` while genuine unit-level rows route to ``units``.
+    """
     ctx = _make_ctx(
         api_responses=[],
         fetch_result=_make_fetch_result(_JSONLD_LISTING_HTML),
@@ -143,7 +162,7 @@ def test_jsonld_fallback_units_have_required_fields() -> None:
     result = asyncio.run(GenericAdapter().extract(page=None, ctx=ctx))
 
     assert result.tier_used == "TIER_2_JSONLD"
-    for unit in result.units:
+    for unit in list(result.units) + list(result.plan_summaries):
         assert isinstance(unit, dict)
         has_beds = unit.get("bedrooms") is not None or unit.get("beds") is not None
         has_rent = (
@@ -152,5 +171,5 @@ def test_jsonld_fallback_units_have_required_fields() -> None:
             or unit.get("rent_range") is not None
         )
         assert has_beds or has_rent, (
-            f"JSON-LD unit missing both beds and rent: {unit}"
+            f"JSON-LD row missing both beds and rent: {unit}"
         )

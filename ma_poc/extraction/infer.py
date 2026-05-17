@@ -216,6 +216,28 @@ def infer(
                 out["rent_high"] = float(hi)
 
     # Pass 4: unit_id fallback (uses post-inference physical attrs)
+    #
+    # D16 item 7: skip the inferred-id assignment when a real ``unit_number``
+    # is present on the row. The apartment number IS the natural per-unit
+    # identity; computing an ``inferred_<hash>`` from (fp_name, beds, baths)
+    # on top of it causes two distinct failures downstream:
+    #   1. Two real apartments on different plans with no unit_id (but with
+    #      different unit_numbers) collide into the same inferred hash.
+    #   2. The same apartment seen on two floor-plan pages with different
+    #      fp_name values gets two DIFFERENT inferred ids, and the merger's
+    #      Rank-1 unit_id keying can't reconcile them.
+    #
+    # Why no explicit `unit_number` short-circuit here: ``UID_KEYS`` already
+    # includes the unit_number aliases (``unit_number``, ``_unit_number``,
+    # ``unitnumber``, ``apartmentname``, ``apartment_name``,
+    # ``display_unit_number``, ``displayunitnumber``, plus ``label``). So
+    # ``get_str(out, UID_KEYS)`` returns the unit_number value when no
+    # ``unit_id`` is present — ``uid_now is None`` already implies "no
+    # unit-identity alias present at all," and the fallback is correctly
+    # skipped whenever a unit_number is set.
+    #
+    # If a future change removes unit_number aliases from ``UID_KEYS``,
+    # add an explicit ``extract_unit_number(out) is not None`` guard here.
     if property_id is not None:
         uid_now = get_str(out, UID_KEYS)
         if uid_now is None:

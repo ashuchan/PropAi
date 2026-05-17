@@ -420,6 +420,30 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # endpoints. Run after Wix/Squarespace so a ``cdngeneralcf.rentcafe.com``
     # image on a Squarespace site doesn't misroute to RentCafe — see
     # ``test_no_rentcafe_false_positive_on_squarespace_with_cdn_asset``.
+    #
+    # RC-4 (2026-05-16): ordered RentCafe portal-path checks BEFORE the
+    # bare ``entrata.com`` substring. 168 of 179 TIER_1_API_ENTRATA failures
+    # in the 2026-05-16 cloud run were RentCafe-powered vanity sites
+    # misclassified as Entrata: each had a stale ``entrata.com`` link
+    # somewhere in the page (analytics blob, old marketing CTA, vendor
+    # snippet) that beat the RentCafe identification. The portal-path
+    # markers below (``.securecafe.com``, ``rentcafe.com/onlineleasing``,
+    # ``rentcafe.com/apartments``) are structurally specific to RentCafe
+    # — they CANNOT appear on a real Entrata site, so they're a stronger
+    # positive ID for RentCafe than a bare ``entrata.com`` substring is
+    # for Entrata.
+    if (
+        ".securecafe.com" in h
+        or "rentcafe.com/onlineleasing" in h
+        or "rentcafe.com/apartments" in h
+        or "widgets.rentcafe.com" in h
+        or "rentcafeapi.com" in h
+    ):
+        return (
+            "rentcafe",
+            0.85,
+            ["RentCafe portal path/host in HTML (securecafe.com / rentcafe.com/onlineleasing|apartments / widgets.rentcafe.com / rentcafeapi.com)"],
+        )
     if "entrata.com" in h:
         return "entrata", 0.80, ["Entrata marker in HTML (entrata.com)"]
     if "rentcafe" in h or "yardi" in h:

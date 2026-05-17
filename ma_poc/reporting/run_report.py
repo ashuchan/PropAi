@@ -16,7 +16,7 @@ from typing import Any
 # ``resolve_verdict`` lives in reporting/verdict.py so both run_report
 # and slo_watcher can share the dual-source resolution semantics. See
 # Bug A v0.2 in docs/2026_05_11_regressions_fix_design.md.
-from ma_poc.reporting.verdict import resolve_verdict
+from ma_poc.reporting.verdict import resolve_verdict, verdict_is_success
 
 log = logging.getLogger(__name__)
 
@@ -123,6 +123,13 @@ def build(
     tier_counts: Counter[str] = Counter()
     failed = 0
     carry_forward = 0
+    # D16: run-level totals for the partition + cross-page dedup telemetry.
+    total_units = 0
+    total_plan_summaries = 0
+    total_cross_page_collapses = 0
+    total_inverse_b4_rerouted = 0
+    properties_with_plan_summaries = 0
+    properties_with_cross_page_dedup = 0
 
     # Read events.jsonl once up front. ``verdict_by_pid`` is the
     # authoritative secondary source consulted alongside ``_meta.verdict``
@@ -171,10 +178,35 @@ def build(
         # (e.g. ``_make_failed_record`` early returns) that bypass both
         # the verdict-writer AND the emit event — they carry tier="FAILED"
         # and no other failure signal.
-        if verdict.startswith("FAILED") or "FAIL" in str(tier).upper():
+        #
+        # 2026-05-16: route success classification through
+        # ``verdict_is_success`` so PARTIAL (timeout-rescued partial
+        # successes carrying real units) counts as success. The
+        # tier="FAILED" guard previously caught PARTIAL records because
+        # ``_make_failed_record`` stamps tier=FAILED on the timeout path
+        # — explicit verdict-precedence avoids that misclassification.
+        _is_success = verdict_is_success(verdict)
+        _looks_failed_by_tier = "FAIL" in str(tier).upper()
+        if not _is_success and (verdict.startswith("FAILED") or _looks_failed_by_tier):
             failed += 1
         if meta.get("carry_forward_used"):
             carry_forward += 1
+
+        # D16: aggregate partition + dedup telemetry across the run.
+        units_list = p.get("units") or []
+        plans_list = p.get("plan_summaries") or []
+        total_units += len(units_list)
+        total_plan_summaries += len(plans_list)
+        if len(plans_list) > 0:
+            properties_with_plan_summaries += 1
+        pp_meta = p.get("_post_process_meta") or {}
+        if isinstance(pp_meta, dict):
+            cross_n = int(pp_meta.get("cross_page_dedup_collapses") or 0)
+            inv_n = int(pp_meta.get("inverse_b4_rerouted") or 0)
+            total_cross_page_collapses += cross_n
+            total_inverse_b4_rerouted += inv_n
+            if cross_n > 0:
+                properties_with_cross_page_dedup += 1
 
     success_rate = ((total - failed) / total * 100) if total > 0 else 0
 
@@ -242,6 +274,15 @@ def build(
             "failed": failed,
             "carry_forward": carry_forward,
             "success_rate_pct": round(success_rate, 2),
+            # D16: partition-level totals so operators can see strict
+            # unit-level vs plan-level counts and confirm the cross-page
+            # dedup is firing on multi-page floor-plan crawls.
+            "units": total_units,
+            "plan_summaries": total_plan_summaries,
+            "properties_with_plan_summaries": properties_with_plan_summaries,
+            "cross_page_unit_dedup_collapses": total_cross_page_collapses,
+            "properties_with_cross_page_dedup": properties_with_cross_page_dedup,
+            "inverse_b4_rerouted": total_inverse_b4_rerouted,
         },
         # F7: no_body_short_circuit removed — moved to pre_extraction_terminations
         "tier_distribution": dict(real_tier_counts.most_common()),

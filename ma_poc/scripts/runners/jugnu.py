@@ -364,6 +364,21 @@ async def run_jugnu(
                 ),
                 timeout=PER_PROPERTY_TIMEOUT_SECONDS,
             )
+            # RC-3 (2026-05-16): propagate entry-page captcha/bot-block flags
+            # from _fetch_diagnostic into _meta so the wedge-rescue filter
+            # (line ~530) can skip retries on properties that were rejected
+            # at the WAF — a HTTP-only retry returns the same captcha stub
+            # (~200 bytes) which then trips LLM_GATE_NO_BODY and DOWNGRADES
+            # the correct FAILED_UNREACHABLE verdict to FAILED_NO_DATA.
+            # PIDs 298969 thewattapts, 300327 flatson10th, 3188 thepointeatlapts,
+            # 55317 abodes — all SiteGround SGCAPTCHA, all flipped UNREACHABLE
+            # to NO_DATA via the wedge-rescue stub.
+            _fd_for_captcha = result.get("_fetch_diagnostic") or {}
+            if _fd_for_captcha.get("captcha_detected") or _fd_for_captcha.get("bot_blocked"):
+                _result_meta = result.setdefault("_meta", {})
+                _result_meta["entry_captcha_detected"] = bool(_fd_for_captcha.get("captcha_detected"))
+                _result_meta["entry_bot_blocked"] = bool(_fd_for_captcha.get("bot_blocked"))
+                _result_meta["entry_captcha_provider"] = _fd_for_captcha.get("captcha_provider")
             # PR 2 (2026-05-10): null-field recovery now runs INSIDE
             # _process_property (before the profile-update step) so
             # recovered FieldPatch entries reach the persistence layer.
@@ -443,13 +458,23 @@ async def run_jugnu(
             if _partial_units:
                 failed["units"] = _partial_units
                 failed.setdefault("_meta", {})["partial_recovery"] = True
-            # Bug #1 fix (2026-05-16): stamp verdict + emit PROPERTY_EMITTED so
-            # the analyzer counts these in the right bucket. Before this fix
-            # 108 partial-recovery properties (~20-149 units each) on
+            # 2026-05-16: stamp verdict + emit PROPERTY_EMITTED so the
+            # analyzer counts these in the right bucket. Before this fix,
+            # 108 partial-recovery properties (~20–149 units each) on
             # 2026-05-16 were invisible to failures.csv AND successes.csv
-            # because the only emit-site sits in the SUCCESS branch at the
+            # because the only emit-site sat in the SUCCESS branch at the
             # bottom of this function — never reached on TimeoutError.
-            _v = "PARTIAL" if _partial_units else "FAILED_UNREACHABLE"
+            #
+            # 2026-05-17: distinguish from validation-majority-rejected
+            # ``PARTIAL`` by using ``SUCCESS_PARTIAL`` here. Both verdicts
+            # carry real units, but ``SUCCESS_PARTIAL`` is data-clean
+            # (timeout cut the cascade short; the units that buffered
+            # passed Stage-1 validity) while ``PARTIAL`` means the gate
+            # actively rejected the majority of rows. The success
+            # classifier (reporting/verdict.py:_SUCCESS_VERDICTS) admits
+            # only ``SUCCESS_PARTIAL``, keeping the validation-rejected
+            # case out of the headline success rate.
+            _v = "SUCCESS_PARTIAL" if _partial_units else "FAILED_UNREACHABLE"
             _meta = failed.setdefault("_meta", {})
             _meta["verdict"] = _v
             _meta["verdict_reason"] = (
@@ -523,20 +548,25 @@ async def run_jugnu(
         if not _pid_r:
             continue
         _pid_to_index[_pid_r] = _idx
-        # Retry criteria:
-        # 1) Verdict indicates timeout/cancel/unreachable AND
-        # 2) No partial units recovered (otherwise we have data; skip)
-        # 3) The original task was RENDER mode (HTTP_ONLY retry is
-        #    meaningful only when RENDER was the wedge-prone path)
-        _v = (_meta_r.get("verdict") or "").upper()
-        _is_timeout_shape = (
-            _v in ("PARTIAL", "FAILED_UNREACHABLE")
-            or _meta_r.get("partial_recovery") is True
-            or _meta_r.get("scrape_tier_used") == "FAILED"
-        )
         _has_units = bool(_r.get("units"))
-        if _is_timeout_shape and not _has_units:
+        _decision = wedge_rescue_decision(_meta_r, has_units=_has_units)
+        if _decision == "RETRY":
             _retry_candidate_pids.append(_pid_r)
+        elif _decision == "SKIP_ENTRY_CAPTCHA":
+            # Visibility: count skipped retries via a dedicated event so
+            # we can see the SGCAPTCHA-blocked population separately
+            # from rescue-attempt counts.
+            try:
+                from ma_poc.observability.events import EventKind as _EK
+                from ma_poc.observability.events import emit as _emit
+                _emit(
+                    _EK.WEDGE_RESCUE_RETRY_RESOLVED,
+                    _pid_r,
+                    resolution="SKIPPED_ENTRY_CAPTCHA",
+                    verdict=(_meta_r.get("verdict") or "UNKNOWN"),
+                )
+            except Exception:
+                pass
 
     if _retry_candidate_pids:
         log.info(
@@ -628,7 +658,7 @@ async def run_jugnu(
                 # original partial-recovery record (it might carry-forward
                 # state-store data we don't want to overwrite).
                 _upgraded = False
-                if _rr_has_units or _rr_v in ("SUCCESS", "SUCCESS_PLAN_LEVEL"):
+                if _rr_has_units or _rr_v in ("SUCCESS", "SUCCESS_PLAN_LEVEL", "SUCCESS_PARTIAL"):
                     _idx = _pid_to_index.get(_rt.property_id)
                     if _idx is not None:
                         # Stamp the retry record so the analyzer knows
@@ -760,6 +790,76 @@ async def _try_rentcafe_direct(
     )
 
     return await _impl(task, profile, csv_row)
+
+
+#: Verdict shapes that look "wedge-prone" (timed-out / cancelled / unreachable)
+#: and therefore qualify for a wedge-rescue HTTP-only retry pass. Captures
+#: the three verdict strings the runner stamps on those outcomes, plus the
+#: ``SUCCESS_PARTIAL`` verdict that the timeout-rescue path emits when at
+#: least one unit was buffered (we still retry if no units survived).
+_WEDGE_RESCUE_RETRY_VERDICTS: frozenset[str] = frozenset({
+    "PARTIAL",
+    "SUCCESS_PARTIAL",
+    "FAILED_UNREACHABLE",
+})
+
+
+def wedge_rescue_decision(
+    meta: dict[str, Any],
+    *,
+    has_units: bool,
+) -> str:
+    """Decide whether a property's main-pass result qualifies for a
+    wedge-rescue HTTP-only retry.
+
+    Pure function — no I/O, easily unit-testable. The return value
+    drives a switch in the orchestrator after the main result pool
+    completes.
+
+    Returns one of:
+
+      - ``"RETRY"`` — the property's verdict is wedge-prone (timeout /
+        cancel / unreachable) AND no units were buffered AND the entry
+        fetch was NOT captcha-blocked. A HTTP-only retry is worth
+        attempting because the wedge may have been a Chromium IPC death
+        or a slow render that GET would bypass.
+      - ``"SKIP_ENTRY_CAPTCHA"`` — the verdict is wedge-prone but the
+        entry fetch was captcha-blocked. Retrying with GET returns the
+        same captcha stub (~200 bytes, 0 text), which then trips the
+        LLM_GATE and downgrades the correct ``FAILED_UNREACHABLE``
+        verdict to ``FAILED_NO_DATA``. Skip the retry, preserve the
+        correct verdict. The caller emits a
+        ``WEDGE_RESCUE_RETRY_RESOLVED`` event with
+        ``resolution=SKIPPED_ENTRY_CAPTCHA`` so this population is
+        visible separately from rescue-attempt counts.
+      - ``"NO_RETRY"`` — neither wedge-prone nor captcha-blocked; the
+        result is final, no retry needed.
+
+    Args:
+        meta: The property record's ``_meta`` dict. Reads ``verdict``,
+            ``partial_recovery``, ``scrape_tier_used``,
+            ``entry_captcha_detected``, ``entry_bot_blocked``.
+        has_units: ``True`` when the property record has at least one
+            unit in its ``units`` list. Computed by the caller because
+            the meta dict doesn't carry the unit list.
+
+    Returns:
+        One of ``"RETRY"`` / ``"SKIP_ENTRY_CAPTCHA"`` / ``"NO_RETRY"``.
+    """
+    verdict = (meta.get("verdict") or "").upper()
+    is_wedge_prone = (
+        verdict in _WEDGE_RESCUE_RETRY_VERDICTS
+        or meta.get("partial_recovery") is True
+        or meta.get("scrape_tier_used") == "FAILED"
+    )
+    if not is_wedge_prone or has_units:
+        return "NO_RETRY"
+    entry_captcha_blocked = bool(
+        meta.get("entry_captcha_detected") or meta.get("entry_bot_blocked")
+    )
+    if entry_captcha_blocked:
+        return "SKIP_ENTRY_CAPTCHA"
+    return "RETRY"
 
 
 async def _process_property(
@@ -1258,6 +1358,16 @@ def _format_v1(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
     meta = result.setdefault("_meta", {})
     md = result.get("property_metadata") or {}
     units = result.get("units", [])
+    # 2026-05-17 Bug A fix — plan-level rows are real extracted data that
+    # previously got silently dropped here. ``post_process`` partitions
+    # the extracted rows: ``units`` carries per-apartment inventory,
+    # ``plan_summaries`` carries floor-plan-level summaries (rows that
+    # describe a plan's typical dims + rent range without a per-unit
+    # identity). Before this fix, the v1 formatter read ONLY
+    # ``result["units"]`` — every plan_summary was discarded at the
+    # output boundary. Surface them under ``Floor Plans`` so downstream
+    # consumers can see the partition the extractor already maintains.
+    plan_summaries = result.get("plan_summaries") or []
     canonical_id = meta.get("canonical_id", "")
 
     def _csv(key: str) -> Any:
@@ -1330,6 +1440,13 @@ def _format_v1(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "Lease Start Date": _csv("Lease Start Date"),
         # Units
         "units": units,
+        # 2026-05-17 Bug A fix — surface plan-level rows that ``post_process``
+        # admits separately. These describe floor-plan-level inventory the
+        # extractor saw but couldn't tie to a specific apartment (no
+        # available_date / floor / building / real unit_id). Pre-fix they
+        # vanished at this boundary; consumers can now count plan-level
+        # availability alongside unit-level.
+        "Floor Plans": plan_summaries,
         # Metadata
         "_meta": meta,
         "_extract_result": _extract_result_summary(result),
@@ -1382,6 +1499,15 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
     meta = result.setdefault("_meta", {})
     md = result.get("property_metadata") or {}
     units = result.get("units", [])
+    # 2026-05-17 Bug A fix — plan-level rows previously dropped here.
+    # ``post_process`` partitions extracted rows into ``units`` (per-
+    # apartment inventory) and ``plan_summaries`` (floor-plan-level
+    # summaries lacking per-unit identity). The pre-fix v2 formatter
+    # silently discarded plan_summaries — for PIDs 20959 (12→6 units),
+    # 55317 (8→5 units) the lost rows had valid rent + AVAILABLE status
+    # but no ``available_date``, so they were classified as plans. Now
+    # they ship under ``floor_plans`` and are visible to consumers.
+    plan_summaries = result.get("plan_summaries") or []
     scrape_ts = datetime.now(UTC)
 
     def _csv(key: str) -> Any:
@@ -1438,6 +1564,12 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "website_design": website_design,
         "concessions": concessions_text,
         "units": [_format_v2_unit(u, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)) for u in units],
+        # 2026-05-17 Bug A fix — surface plan-level rows (post_process
+        # ``plan_summaries`` partition). Pre-fix these were silently
+        # dropped at the v2 output boundary; now they ship under
+        # ``floor_plans`` so downstream consumers can render plan-level
+        # availability separately from per-unit availability.
+        "floor_plans": [_format_v2_unit(u, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)) for u in plan_summaries],
         # Keep _meta for internal tracking (stripped on final delivery)
         "_meta": meta,
         "_extract_result": _extract_result_summary(result),

@@ -128,7 +128,9 @@ def test_vision_called_when_llm_returns_empty(
     assert fake_vision.call_count == 1, (
         f"Expected vision to be called once but call_count={fake_vision.call_count}"
     )
-    assert len(result.units) >= 1
+    # D16: fake vision row has no per-apartment identity → plan-level partition.
+    assert len(result.plan_summaries) >= 1
+    assert len(result.units) == 0
 
 
 def test_vision_not_called_when_disabled(
@@ -189,4 +191,6 @@ def test_vision_result_used_when_text_llm_yields_nothing(
     result = asyncio.run(GenericAdapter().extract(page=None, ctx=ctx))
 
     assert fake_vision.call_count == 1
-    assert len(result.units) >= 1
+    # D16: fake vision rows have no per-apartment identity → plan-level partition.
+    assert len(result.plan_summaries) >= 1
+    assert len(result.units) == 0

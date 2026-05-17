@@ -172,9 +172,27 @@ def _normalise_fp_name(name: Any) -> str:
 # ── Rank signature ─────────────────────────────────────────────────────────────
 
 def merge_rank_signature(unit: dict[str, Any]) -> dict[str, Any]:
-    """Extract the comparable identity fields from a unit (H2 strict sqft)."""
+    """Extract the comparable identity fields from a unit (H2 strict sqft).
+
+    Note on ``uid``: ``inferred_*`` synthetic ids and rows flagged with
+    ``_inferred_id=True`` resolve to empty uid here. R0a (uid-equality
+    match) then never fires for synthetic ids — distinct apartments
+    without ``unit_number`` that happen to share ``(fp_name, beds,
+    baths, sqft)`` produce the SAME ``inferred_<hash>``, and treating
+    that hash as identity destructively collapses them.
+
+    The cross-page merger relies on this: inferred-only signatures fall
+    through to the stricter R1* physical-attr matches instead of
+    pretending to be apartment-level identity.
+    """
     fp_id = merge_field_present(unit, "floor_plan_id")
     uid = merge_field_present(unit, "unit_id", "unit_number", "_unit_number")
+    uid_str = merge_norm(uid)
+    # Treat inferred uids as no-identity for the rank signature.
+    # ``_inferred_id=True`` is the in-band marker; the ``inferred_``
+    # prefix on ``unit_id`` is the legacy marker before the flag landed.
+    if uid_str.startswith("inferred_") or unit.get("_inferred_id") is True:
+        uid_str = ""
     # D8 (2026-05-16): unwrap stringified-JSON fp_name before comparison.
     fp_name = _normalise_fp_name(
         merge_field_present(unit, "floor_plan_name", "_floor_plan", "floorplan_name")
@@ -184,7 +202,7 @@ def merge_rank_signature(unit: dict[str, Any]) -> dict[str, Any]:
     sqft = merge_int_or_none(merge_field_present(unit, "sqft", "area", "_sqft"))
     return {
         "fp_id": str(fp_id) if fp_id else "",
-        "uid": merge_norm(uid),
+        "uid": uid_str,
         "fp_name": fp_name,
         "beds": beds,
         "baths": baths,

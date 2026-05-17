@@ -178,8 +178,26 @@ class EventKind(StrEnum):
     #   - bytes_saved            = (600s wallclock - actual retry seconds)
     #                              × STARTED count
     # WEDGE_RESCUE_RETRY_STARTED fires when the retry CrawlTask is built;
-    # WEDGE_RESCUE_RETRY_RESOLVED fires after the retry completes carrying
-    # the resolution (UPGRADED_TO_SUCCESS | RETRY_ALSO_FAILED | CRASHED).
+    # WEDGE_RESCUE_RETRY_RESOLVED fires after the retry completes (or is
+    # pre-empted) carrying one of the following resolutions:
+    #
+    #   - ``UPGRADED_TO_SUCCESS``     — retry produced units; original record
+    #                                   was upgraded in the result list.
+    #   - ``RETRY_ALSO_FAILED``       — retry ran but yielded no units; the
+    #                                   original partial-recovery record is
+    #                                   preserved as-is.
+    #   - ``CRASHED``                 — retry raised an unhandled exception.
+    #   - ``SKIPPED_ENTRY_CAPTCHA``   — 2026-05-17: retry was not attempted
+    #                                   because the original entry-fetch was
+    #                                   captcha-blocked. A HTTP_ONLY retry of
+    #                                   a captcha-blocked URL returns the
+    #                                   same captcha stub (~200 bytes), which
+    #                                   then trips ``LLM_GATE_NO_BODY`` and
+    #                                   downgrades the correct
+    #                                   ``FAILED_UNREACHABLE`` verdict to
+    #                                   ``FAILED_NO_DATA``. Skipping the
+    #                                   retry preserves the correct verdict.
+    #
     # Until 2026-05-16 the retry started was piggybacked onto
     # PROPERTY_EMITTED with a custom verdict string — that conflated
     # retry telemetry with verdict telemetry and made the rescue rate

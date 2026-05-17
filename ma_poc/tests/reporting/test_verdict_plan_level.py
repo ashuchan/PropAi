@@ -35,9 +35,19 @@ def test_success_plan_level_distinct_from_success() -> None:
 class TestVerdictIsSuccess:
     @pytest.mark.parametrize(
         "verdict",
-        [Verdict.SUCCESS, Verdict.SUCCESS_PLAN_LEVEL, "SUCCESS", "SUCCESS_PLAN_LEVEL"],
+        [
+            Verdict.SUCCESS,
+            Verdict.SUCCESS_PLAN_LEVEL,
+            Verdict.SUCCESS_PARTIAL,
+            "SUCCESS",
+            "SUCCESS_PLAN_LEVEL",
+            "SUCCESS_PARTIAL",
+        ],
     )
-    def test_recognises_both_success_variants(self, verdict):
+    def test_recognises_all_success_variants(self, verdict):
+        """2026-05-17: ``SUCCESS_PARTIAL`` (timeout-rescued with units)
+        admitted to the success set. ``PARTIAL`` (validation-majority-
+        rejected) stays OUT — its surviving rows are suspect."""
         assert verdict_is_success(verdict) is True
 
     @pytest.mark.parametrize(
@@ -49,9 +59,13 @@ class TestVerdictIsSuccess:
             Verdict.PARTIAL,
             "FAILED_NO_DATA",
             "CARRY_FORWARD",
+            "PARTIAL",
         ],
     )
     def test_rejects_non_success_verdicts(self, verdict):
+        """``PARTIAL`` is validation-majority-rejected — gate dropped more
+        than half the rows. The surviving rows are not trustworthy enough
+        to count toward the headline success rate."""
         assert verdict_is_success(verdict) is False
 
     def test_none_is_not_success(self):

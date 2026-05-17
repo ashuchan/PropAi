@@ -42,9 +42,21 @@ class Verdict(StrEnum):
     #: not a failure. ``verdict_is_success`` recognises both ``SUCCESS`` and
     #: ``SUCCESS_PLAN_LEVEL`` so the headline metric counts both correctly.
     SUCCESS_PLAN_LEVEL = "SUCCESS_PLAN_LEVEL"
+    #: 2026-05-17 — timeout-recovery success. The per-property wallclock
+    #: budget fired before the full cascade completed, but the link-hop
+    #: accumulator had already buffered at least one valid unit. Distinct
+    #: from ``PARTIAL`` (validation-majority-rejected) so the success
+    #: classifier can admit timeout-rescued records without admitting
+    #: bulk-rejected ones.
+    SUCCESS_PARTIAL = "SUCCESS_PARTIAL"
     FAILED_UNREACHABLE = "FAILED_UNREACHABLE"
     FAILED_NO_DATA = "FAILED_NO_DATA"
     CARRY_FORWARD = "CARRY_FORWARD"
+    #: Validation-majority-rejected. ``compute()`` returns this when the
+    #: schema gate drops more than half of the extracted rows on validity
+    #: grounds (dim-less rows, junk floor-plan names, etc.). The remaining
+    #: rows are still shipped but the headline classifier treats the run
+    #: as a partial failure — the data we have is suspect.
     PARTIAL = "PARTIAL"
     #: Stage 3 (2026-05-12): the URL is dead (404 / 410 / 451 / NXDOMAIN).
     #: Terminal: re-running won't change the outcome. Excluded from the
@@ -58,8 +70,21 @@ class Verdict(StrEnum):
 #: ``verdict_is_success(v)`` rather than ``v == Verdict.SUCCESS`` so a
 #: future addition of another success-class verdict (e.g. a hypothetical
 #: ``SUCCESS_ENRICHED``) lands cleanly in one place.
+#:
+#: 2026-05-17 (revised): ``SUCCESS_PARTIAL`` is the success-class verdict
+#: for timeout-rescued records that buffered at least one real unit before
+#: the per-property wallclock fired. ``PARTIAL`` is reserved for the
+#: validation-majority-rejected path and stays OUT of the success set —
+#: a run where the schema gate dropped >50% of rows is suspect, even if
+#: a few rows survived. Pre-revision (2026-05-16) we admitted both under
+#: ``PARTIAL`` which conflated genuine timeout-rescued successes with
+#: low-quality validation-rejected runs in the headline metric.
 _SUCCESS_VERDICTS: frozenset[str] = frozenset(
-    {Verdict.SUCCESS.value, Verdict.SUCCESS_PLAN_LEVEL.value}
+    {
+        Verdict.SUCCESS.value,
+        Verdict.SUCCESS_PLAN_LEVEL.value,
+        Verdict.SUCCESS_PARTIAL.value,
+    }
 )
 
 
@@ -69,9 +94,17 @@ def verdict_is_success(verdict: Verdict | str | None) -> bool:
     Accepts a :class:`Verdict` enum value, the underlying string, or
     ``None``. Returns ``False`` for unknown / missing verdicts.
 
-    Recognises both ``SUCCESS`` (unit-level inventory extracted) and
-    ``SUCCESS_PLAN_LEVEL`` (plan-level summary extracted — Stage 2 of the
-    2026-05-11 fix).
+    Recognises:
+      - ``SUCCESS`` — unit-level inventory extracted.
+      - ``SUCCESS_PLAN_LEVEL`` — plan-level summary extracted (Stage 2,
+        2026-05-11).
+      - ``SUCCESS_PARTIAL`` — timeout-rescued record with at least one
+        real unit buffered before the per-property wallclock fired
+        (2026-05-17).
+
+    ``PARTIAL`` (validation-majority-rejected) is intentionally NOT
+    included — those runs surfaced data the gate dropped because most
+    rows failed dimensionality checks, so the surviving rows are suspect.
     """
     if verdict is None:
         return False

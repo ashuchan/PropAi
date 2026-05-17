@@ -46,11 +46,36 @@ def test_data_sightmap_id_still_matches() -> None:
 
 
 def test_embed_id_alternative_pattern_matches() -> None:
-    """New 2026-05-16 pattern: `embed_id: "..."`."""
-    html = _PAD + '<script>window.SM = {embed_id: "longidentifier"};</script>' + _END
+    """New 2026-05-16 pattern: `embed_id: "..."`.
+
+    RC-6 (2026-05-16): synthesised URLs must pass
+    ``_is_plausible_sightmap_id`` — real SightMap embed tokens always mix
+    letters AND digits (e.g. ``n9w6mmzrv71``). The previous fixture
+    ``longidentifier`` (alpha-only) was an unrealistic placeholder; it
+    would have synthesised a 404 URL in production.
+    """
+    html = _PAD + '<script>window.SM = {embed_id: "long1234ident5"};</script>' + _END
     hits = _scan_inline_js_pms_init(html)
     assert hits, "embed_id alternative pattern not matched"
-    assert any("longidentifier" in url for url, pms in hits if pms == "sightmap")
+    assert any("long1234ident5" in url for url, pms in hits if pms == "sightmap")
+
+
+def test_embed_id_placeholder_word_rejected() -> None:
+    """RC-6 (2026-05-16) regression guard: alpha-only / placeholder embed
+    IDs must NOT be synthesised into hop candidates. PIDs 26523 et al.
+    in the 2026-05-16 cloud run had ``sightmap.com/embed/standard`` 404
+    because regex matched the literal word ``standard`` somewhere on
+    the page."""
+    for placeholder in ("standard", "default", "embed", "longidentifier"):
+        html = (
+            _PAD
+            + f'<script>window.SM = {{embed_id: "{placeholder}"}};</script>'
+            + _END
+        )
+        hits = _scan_inline_js_pms_init(html)
+        assert not any(
+            placeholder in url for url, pms in hits if pms == "sightmap"
+        ), f"placeholder {placeholder!r} should not synthesise a SightMap URL"
 
 
 def test_embedId_camelcase_matches() -> None:

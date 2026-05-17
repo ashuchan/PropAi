@@ -63,8 +63,17 @@ def _render_status_table(
 ) -> str:
     """Render the Status section table."""
     units = scrape_result.get("units") or []
+    plan_summaries = scrape_result.get("plan_summaries") or []
     duration = scrape_result.get("scrape_duration_s", "n/a")
     llm_cost = scrape_result.get("llm_cost", 0.0)
+
+    # D16: cross-page dedup + inverse-B4 telemetry surfaced into the per-
+    # property markdown report so operators can confirm the new passes are
+    # firing. ``_post_process_meta`` is the dict the adapter stashes on
+    # ``result.extra`` (or equivalent) with the PostProcessResult counts.
+    pp_meta = scrape_result.get("_post_process_meta") or {}
+    cross_page_collapses = pp_meta.get("cross_page_dedup_collapses", 0)
+    inverse_b4_rerouted = pp_meta.get("inverse_b4_rerouted", 0)
 
     lines = [
         "## Status",
@@ -73,6 +82,9 @@ def _render_status_table(
         f"| **Verdict** | {verdict} |",
         f"| Canonical ID | {property_id} |",
         f"| Units extracted | {len(units)} |",
+        f"| Plan summaries | {len(plan_summaries)} |",
+        f"| Cross-page dedup collapses | {cross_page_collapses} |",
+        f"| Inverse-B4 rerouted | {inverse_b4_rerouted} |",
         f"| Scrape duration | {duration}s |",
         f"| LLM cost | ${llm_cost:.4f} |"
         if isinstance(llm_cost, (int, float))
