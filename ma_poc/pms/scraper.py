@@ -902,6 +902,56 @@ async def scrape(
             sm_signal = "sightmap.com" in page_html.lower() or any(
                 _is_sightmap_response(r.get("body")) for r in captured
             )
+
+            # iter-5: Entrata "engrain" sites embed the SightMap only on the
+            # floorplan sub-page (/<city>/<slug>/conventional/), NOT on the
+            # homepage the scraper captured. When there's no SightMap signal
+            # in page_html, discover that sub-page from the nav links,
+            # curl_cffi-fetch it (Entrata sub-pages are Cloudflare-fronted;
+            # the embed code IS in the server HTML — confirmed chaseknolls
+            # → sightmap.com/embed/n9w63m8jw71), and splice it into the
+            # ctx fetch_result body so SightMapAdapter's own iframe/embed
+            # discovery finds it.
+            if not sm_signal:
+                import re as _re
+
+                _ENTRATA_FP_SUBPATH = _re.compile(
+                    r"""["']((?:https?://[^"'/]+)?/[a-z0-9-]+/[a-z0-9-]+/"""
+                    r"""(?:conventional|student|senior|affordable)/?)["']""",
+                    _re.IGNORECASE,
+                )
+                m = _ENTRATA_FP_SUBPATH.search(page_html)
+                if m:
+                    sub = m.group(1)
+                    if sub.startswith("/"):
+                        from urllib.parse import urlparse as _up
+
+                        _fr = getattr(ctx, "fetch_result", None)
+                        _base = str(getattr(_fr, "final_url", "") or "") or (
+                            getattr(ctx, "base_url", "") or ""
+                        )
+                        _p = _up(_base)
+                        if _p.scheme and _p.netloc:
+                            sub = f"{_p.scheme}://{_p.netloc}{sub}"
+                    try:
+                        from curl_cffi import requests as _creq
+
+                        _r = _creq.get(sub, impersonate="chrome120", timeout=25)
+                        if _r.status_code == 200 and "sightmap.com" in (_r.text or "").lower():
+                            # Splice sub-page HTML in so SightMapAdapter's
+                            # _entry_html_from_ctx picks up the embed code.
+                            _fr2 = getattr(ctx, "fetch_result", None)
+                            if _fr2 is not None:
+                                _fr2.body = _r.text  # type: ignore[attr-defined]
+                            sm_signal = True
+                            fallback_chain.append("entrata:fp_subpage_fetched")
+                    except Exception as _sub_exc:  # pragma: no cover
+                        log.warning(
+                            "Entrata fp-subpage fetch failed for %s: %s",
+                            property_id,
+                            _sub_exc,
+                        )
+
             if sm_signal:
                 sm_result = await SightMapAdapter().extract(page, ctx)  # type: ignore[arg-type]
                 if sm_result.units:

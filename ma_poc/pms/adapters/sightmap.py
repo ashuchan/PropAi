@@ -62,7 +62,8 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 # the embedded-portal-hint path that the generic adapter relies on for
 # fetch-candidate surfacing. See test_portal_hint_survives_full_scrape_chain.
 _SIGHTMAP_IFRAME_RE = re.compile(
-    r"""<iframe\b[^>]*?\bsrc=["']
+    r"""<iframe\b[^>]*?\bsrc=["']?       # quote optional — Entrata engrain
+                                         # emits unquoted src=https://...
         (?:https?:)?//
         (?:[a-z0-9-]+\.)?sightmap\.com/embed/
         ([a-z0-9]{6,32})""",
