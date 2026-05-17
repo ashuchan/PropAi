@@ -921,6 +921,18 @@ async def scrape(
                     _re.IGNORECASE,
                 )
                 m = _ENTRATA_FP_SUBPATH.search(page_html)
+                if not m:
+                    # iter-8: same fix class as iter-7 securecafe — the
+                    # rendered body often lacks the /conventional/ nav link
+                    # (patchright DOM vs raw HTML / behind a menu), but the
+                    # scraper's network log captured the floorplan sub-page
+                    # request. Scan captured response URLs as a 2nd source.
+                    for _resp in getattr(ctx, "_api_responses", []) or []:
+                        _u = str(_resp.get("url", "") or "")
+                        _mm = _ENTRATA_FP_SUBPATH.search(f'"{_u}"')
+                        if _mm:
+                            m = _mm
+                            break
                 if m:
                     sub = m.group(1)
                     if sub.startswith("/"):
