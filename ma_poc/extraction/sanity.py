@@ -52,6 +52,26 @@ _BATHS_RANGE: Final[tuple[float, float]] = (0.0, 10.0)
 _SQFT_RANGE: Final[tuple[float, float]] = (150.0, 10_000.0)
 _RENT_RANGE: Final[tuple[float, float]] = (200.0, 50_000.0)
 
+# Cross-field sqft floor by bedroom count — generous lower bounds that catch
+# obvious Tier-4 LLM hallucinations (e.g. "2BR @ 310 sqft" = LLM extracted
+# the deposit amount as sqft) without rejecting micro-units. Tuned 2026-05-13
+# against the 1,156 "sqft too small for beds" rows surfaced in validation;
+# every observed case is well outside these floors.
+#
+# Margins are deliberately wide. Real-world minimums per HUD compact-living
+# data: 0BR ≥ 200, 1BR ≥ 350, 2BR ≥ 500, 3BR ≥ 700, 4+BR ≥ 900. The bad rows
+# averaged 300 sqft for 3BR (impossible) and 320 sqft for 2BR (impossible).
+_SQFT_FLOOR_BY_BEDS: Final[dict[int, int]] = {
+    0: 200,
+    1: 350,
+    2: 500,
+    3: 700,
+    4: 900,
+    5: 1_100,
+    6: 1_300,
+    7: 1_500,
+}
+
 
 # ── Provenance marker ────────────────────────────────────────────────────────
 
@@ -109,6 +129,41 @@ def _sanitize_field(
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
+def _sanitize_sqft_vs_beds(unit: dict[str, Any]) -> None:
+    """Null sqft when it's impossibly small for the (already-sanitised) beds.
+
+    Catches the 2026-05-13 validation-pass finding of 1,156 rows with
+    "sqft too small for bed count" (Tier-4 LLM_DOM dominant; LLM
+    confused the deposit/fee amount with sqft). beds is trusted; sqft
+    is the suspect field.
+
+    Side effects on *unit*:
+      * If beds is present and sqft is present and sqft < floor(beds):
+        every sqft alias set to None and ``_sanity_dropped`` annotated
+        with ``"area_implausible_for_beds"``.
+      * Otherwise no change.
+
+    Pre-condition: ``_sanitize_field`` has already run on both beds and
+    sqft, so any out-of-absolute-range values are already None.
+    """
+    beds = get_numeric(unit, BEDS_KEYS)
+    sqft = get_numeric(unit, SQFT_KEYS)
+    if beds is None or sqft is None:
+        return
+    try:
+        beds_int = int(beds)
+    except (TypeError, ValueError):
+        return
+    floor = _SQFT_FLOOR_BY_BEDS.get(beds_int)
+    if floor is None or sqft >= floor:
+        return
+    _null_all_aliases(unit, SQFT_KEYS)
+    dropped: list[str] = unit.setdefault(_SANITY_DROPPED_KEY, [])
+    label = "area_implausible_for_beds"
+    if label not in dropped:
+        dropped.append(label)
+
+
 def sanity_bound(unit: dict[str, Any]) -> dict[str, Any]:
     """Apply production sanity bounds to a unit dict. Return a new dict.
 
@@ -129,6 +184,12 @@ def sanity_bound(unit: dict[str, Any]) -> dict[str, Any]:
 
     Non-mutation: input dict is deep-copied; mutations to the result
     never propagate back.
+
+    2026-05-13: added cross-field ``area_implausible_for_beds`` null pass
+    AFTER the per-field absolute-range pass. Catches Tier-4 LLM-DOM
+    hallucinations where the LLM confused deposit/fee amounts with sqft
+    (1,156 rows in the 2026-05-13 daily output had 2BR/3BR units with
+    impossibly small sqft). Beds is trusted; sqft alone is nulled.
     """
     if not isinstance(unit, dict):
         return unit
@@ -138,4 +199,5 @@ def sanity_bound(unit: dict[str, Any]) -> dict[str, Any]:
     _sanitize_field(out, SQFT_KEYS, _SQFT_RANGE, "area")
     _sanitize_field(out, RENT_LO_KEYS, _RENT_RANGE, "rent_low")
     _sanitize_field(out, RENT_HI_KEYS, _RENT_RANGE, "rent_high")
+    _sanitize_sqft_vs_beds(out)
     return out

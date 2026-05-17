@@ -247,16 +247,33 @@ class EntrataAdapter:
 
     @staticmethod
     def _origin_from_ctx(page: Page, ctx: AdapterContext) -> str:
-        """Bug 9: build the origin (scheme://host) for direct probes.
+        """Build the origin (scheme://host) for direct probes.
 
-        Prefer ``page.url`` since redirects may have already settled there;
-        fall back to ``ctx.base_url`` when the page object isn't useful.
+        Resolution order:
+          1. ``ctx.fetch_result.final_url`` — post-redirect URL, the most
+             reliable signal of where the page actually lives.
+          2. ``page.url`` — Playwright session URL.
+          3. ``ctx.base_url`` — initial CSV URL (may be pre-redirect).
+
+        2026-05-13 (C2 Entrata teammate analysis): ~60% of TIER_1_API_ENTRATA
+        failures (~133 properties) had the probe fire against the pre-redirect
+        origin. Entry URL was e.g. ``elevatetosequoia.com``; the page actually
+        landed on ``elevatetoriveroaks.com`` after a redirect. The probe hit
+        the original host with the wrong content, returning empty. Preferring
+        ``fetch_result.final_url`` fixes this.
         """
         candidate = ""
-        try:
-            candidate = page.url or ""
-        except Exception:
-            candidate = ""
+        # 1. fetch_result.final_url — definitive post-redirect URL.
+        fr = getattr(ctx, "fetch_result", None)
+        if fr is not None:
+            candidate = str(getattr(fr, "final_url", "") or "")
+        # 2. page.url — Playwright session URL.
+        if not candidate:
+            try:
+                candidate = page.url or ""
+            except Exception:
+                candidate = ""
+        # 3. ctx.base_url — CSV entry URL (last resort, may be pre-redirect).
         if not candidate:
             candidate = getattr(ctx, "base_url", "") or ""
         try:

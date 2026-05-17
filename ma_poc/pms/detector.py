@@ -51,6 +51,8 @@ PmsName = Literal[
     "funnel",
     "touchtour",
     "spherexx",
+    "knock",
+    "g5",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -78,6 +80,8 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "funnel": "api_first",
     "touchtour": "cascade",
     "spherexx": "api_first",
+    "knock": "api_first",
+    "g5": "api_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -161,6 +165,15 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
         "host ends in liveovation.com (Ovation parent portfolio)",
     ),
 ]
+
+# Entrata's tenant login form lives at /Apartments/module/application_authentication/
+# and is linked from many vanity marketing sites that have no real Entrata
+# integration. Match any /Apartments/module/<widget>/ EXCEPT that auth path.
+# Negative lookahead lets the auth subpath fall through to other detection.
+_ENTRATA_REAL_MODULE_RE = re.compile(
+    r"/apartments/module/(?!application_authentication\b)[a-z][a-z0-9_]*/",
+    re.IGNORECASE,
+)
 
 _ONESITE_CLIENT_ID_RE = re.compile(r"^(?P<id>\d{3,9})\.onlineleasing\.realpage\.com$")
 _APPFOLIO_CLIENT_ID_RE = re.compile(r"^(?P<id>[a-z0-9-]+)\.appfolio\.com$")
@@ -366,17 +379,43 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # platform.
     if "onlineleasing.realpage.com" in h:
         return "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
-    if "/apartments/module/" in h or "entrata-widget" in h or "commoncf.entrata.com" in h:
+    # Entrata routing. ``/Apartments/module/`` alone is too broad — Entrata
+    # exposes a generic tenant login form at
+    # ``/Apartments/module/application_authentication/`` that many vanity
+    # multifamily marketing sites link to even when their actual unit data
+    # lives elsewhere (Jonah Digital / ProspectPortal / etc.). Require a
+    # widget-specific subpath OR the dedicated Entrata host markers.
+    # 2026-05-13 probe (4 of 4 false-positive sites — Foxchase, Muse ATL,
+    # Laurel Crossing, livemuseatl): only path present was
+    # application_authentication; no Entrata API ever fires.
+    has_entrata_widget_path = bool(
+        _ENTRATA_REAL_MODULE_RE.search(h)
+    )
+    if has_entrata_widget_path or "entrata-widget" in h or "commoncf.entrata.com" in h:
         return (
             "entrata",
             0.85,
-            ["Entrata widget marker in HTML (/Apartments/module/ / entrata-widget / commoncf.entrata.com)"],
+            [
+                "Entrata widget marker in HTML "
+                "(/Apartments/module/<widget>/ / entrata-widget / commoncf.entrata.com)"
+            ],
         )
-    if "nestiolistings.com" in h or "nestio_" in h or "data-nestio-" in h:
+    if (
+        "nestiolistings.com" in h
+        or "nestio_" in h
+        or "data-nestio-" in h
+        or "funnelleasing.com" in h  # catches integrations/apply/bh subdomains
+        or "funnel-gen-ai-chat" in h
+        or "integrations.nestio.com" in h  # Nestio contact-widget = Funnel
+    ):
         return (
             "funnel",
             0.90,
-            ["Funnel/Nestio marker in HTML (nestiolistings.com / NESTIO_* / data-nestio-*)"],
+            [
+                "Funnel/Nestio marker in HTML "
+                "(nestiolistings.com / NESTIO_* / data-nestio-* / "
+                "funnelleasing.com / funnel-gen-ai-chat / integrations.nestio.com)"
+            ],
         )
     if "mytouchtour.com" in h:
         return "touchtour", 0.85, ["TouchTour portal marker in HTML (mytouchtour.com)"]
@@ -394,6 +433,44 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             "spherexx",
             0.90,
             ["Spherexx marker in HTML (presentation.spherexx.app / ssploader.js / sspcfg)"],
+        )
+    # Knock / Doorway — marketing-led PMS widget. Identified by the
+    # doorway.knck.io script tag and/or knockDoorway.init() call.
+    # Public Doorway API serves full unit data: 2026-05-13 probe of
+    # liveatcalista.com returned 53 units (incl. availableOn, price).
+    if "doorway.knck.io" in h or "knockdoorway" in h:
+        return (
+            "knock",
+            0.90,
+            ["Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"],
+        )
+    # G5 Marketing Cloud — multifamily CMS used by Morgan Properties, Aimco,
+    # Bell Partners, ZRS, JMG, BH. Identified by ``inventory.g5marketingcloud``
+    # (the GraphQL endpoint) or the ``g5-cl-...`` URN slug referenced in
+    # asset CDN paths. 2026-05-13 probe of kings-manor-apartments returned
+    # 21 unit-level records (incl. availabilityDate, prices).
+    # ``g5dxm.com`` (themes.g5dxm.com, widgets.g5dxm.com) is the same
+    # vendor's theme + widget CDN — observed on 173 properties in the
+    # 2026-05-13 survey, many at Tier 3/4 today.
+    if (
+        "inventory.g5marketingcloud" in h
+        or "g5marketingcloud" in h
+        or "g5-cl-" in h
+        or "g5dxm.com" in h
+        or "dnn506yrbagrg.cloudfront.net" in h
+    ):
+        # ``dnn506yrbagrg.cloudfront.net`` is G5's primary CDN — per teammate
+        # 2026-05-13 deep-dive (C1.G5/RealPage SSR sub-class), 73 of 244 generic
+        # Tier-1-API failures had this CDN as their script source but no
+        # G5/RealPage fingerprint fired because the detector didn't recognise
+        # it. Adding it routes those sites to the G5 GraphQL adapter (which
+        # then probes ``inventory.g5marketingcloud.com`` via the locationUrn
+        # extracted from CDN paths).
+        return (
+            "g5",
+            0.90,
+            ["G5 Marketing Cloud marker in HTML "
+             "(inventory.g5marketingcloud / g5-cl- / g5dxm.com / dnn506yrbagrg.cloudfront.net)"],
         )
 
     # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong

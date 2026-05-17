@@ -67,6 +67,34 @@ _DETAIL_MAIN_RE = re.compile(
 )
 _DETAIL_TAG_RE = re.compile(r"<[^>]+>")
 
+# Vanity-domain slug discovery: every AppFolio-hosted vanity site references
+# its PMC subdomain at least once (a ``connect`` / ``request_access`` link).
+# We extract that slug and follow it to ``<slug>.appfolio.com/listings``.
+# Source: 2026-04-30 failure-recovery investigation (33/46 recoveries).
+_APPFOLIO_SLUG_RE = re.compile(
+    r"https?://([a-z0-9-]+)\.appfolio\.com", re.IGNORECASE
+)
+_APPFOLIO_SKIP_SLUGS = frozenset({
+    "www", "app", "support", "secure", "tenant", "tenants", "owner", "owners", "demo",
+})
+
+
+def find_appfolio_slug(html: str) -> str | None:
+    """Return the first AppFolio PMC slug in the HTML (or None).
+
+    Skips known non-PMC subdomains (www, app, support, etc.). Used by the
+    vanity-domain fallback path in :meth:`AppFolioAdapter.extract` when the
+    page being scraped is the property's marketing site rather than an
+    ``<slug>.appfolio.com`` subdomain.
+    """
+    if not html or "appfolio.com" not in html.lower():
+        return None
+    for m in _APPFOLIO_SLUG_RE.finditer(html):
+        slug = m.group(1).lower()
+        if slug and slug not in _APPFOLIO_SKIP_SLUGS:
+            return slug
+    return None
+
 
 def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any]]:
     """Bug 7: parse a single AppFolio /listings/detail/<uuid> page into one unit.
@@ -425,6 +453,41 @@ class AppFolioAdapter:
                     result.winning_url = current_url or None
                     result.confidence = 0.85
                     return result
+
+        # Vanity-domain fallback: the page is a marketing site that links to
+        # ``<slug>.appfolio.com``. Discover the slug, fetch the SSR listings
+        # page directly, and parse it with the existing SSR parser.
+        # Source: 2026-04-30 failure-recovery (33/46 demonstrated).
+        if page_html:
+            slug = find_appfolio_slug(page_html)
+            if slug:
+                listings_url = f"https://{slug}.appfolio.com/listings"
+                try:
+                    import httpx
+                    headers = {
+                        "User-Agent": (
+                            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/124.0.0.0 Safari/537.36"
+                        ),
+                        "Accept": "text/html,*/*;q=0.8",
+                    }
+                    async with httpx.AsyncClient(
+                        timeout=15.0, follow_redirects=True
+                    ) as c:
+                        r = await c.get(listings_url, headers=headers)
+                    if r.status_code == 200 and "data-listing-id=" in r.text:
+                        vanity_units = parse_appfolio_listings_ssr(r.text, listings_url)
+                        if vanity_units:
+                            result.units = vanity_units
+                            result.tier_used = "TIER_1_DOM_APPFOLIO_VANITY"
+                            result.winning_url = listings_url
+                            result.confidence = min(0.90, 0.65 + 0.05 * len(vanity_units))
+                            return result
+                except Exception as exc:
+                    result.errors.append(
+                        f"appfolio-vanity-fetch-error: slug={slug!r} {type(exc).__name__}"
+                    )
 
         result.confidence = 0.0
         result.errors.append("No AppFolio unit data found in captured API responses or SSR DOM")

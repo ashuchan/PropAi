@@ -33,6 +33,7 @@ Key findings:
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
@@ -392,6 +393,26 @@ class RentCafeAdapter:
                 f"failed unit_validity (no numeric dimension)"
             )
 
+        # 2026-05-13 (C3 RentCafe SHAPE_REJECTED, teammate analysis):
+        # before classifying as a failure, probe the property's own
+        # ``/wp-json/middleware/v1/getFloorplans/`` WordPress endpoint
+        # directly. Yardi/RentCafe sites mounted under WordPress (typical
+        # for management-company brand sites) expose this endpoint with a
+        # ``propertyId[]=<id>`` query. When the network-log capture missed
+        # the in-page XHR (timing or CDN-proxied via a different host), the
+        # direct probe still works. Analogous to Entrata's
+        # ``_probe_known_endpoints`` (entrata.py:270).
+        wp_units = await _try_rentcafe_wp_probe(ctx, result)
+        if wp_units:
+            from ma_poc.extraction.post_process import post_process
+            pp = post_process(wp_units, property_id=getattr(ctx, "property_id", None))
+            if pp.n_admitted > 0:
+                result.units = pp.admitted
+                result.plan_summaries = pp.plan_summaries
+                result.tier_used = f"{_TIER_BASE}_WP_PROBE"
+                result.confidence = min(0.90, 0.65 + 0.05 * pp.n_admitted)
+                return result
+
         # Failure path: re-stamp tier_used with a structured sub-code so the
         # downstream report can distinguish misrouting from genuine zero data.
         tier_code, err_msg = _classify_rentcafe_failure(api_responses)
@@ -411,3 +432,118 @@ class RentCafeAdapter:
         the router and the parser agree on what "RentCafe-shaped" means.
         """
         return _is_rentcafe_response(body)
+
+
+# 2026-05-13 (C3 SHAPE_REJECTED fallback): regex to pull a RentCafe property
+# ID from the rendered HTML. RentCafe property IDs appear in (a) anchor hrefs
+# (``propertyId=<id>`` query param), (b) the WordPress middleware embed
+# config (``data-property-id="..."``), and (c) inline script tags
+# (``propertyId: <id>``).
+_RENTCAFE_PROP_ID_HTML_RE = re.compile(
+    r"""
+    (?:
+        propertyId(?:\[\])?=(\d{3,9})           # query-string form
+      | data-property[-_]id=["'](\d{3,9})["']   # data-attribute form
+      | propertyId[\"']?\s*[:=]\s*(\d{3,9})     # JS-config form
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _find_rentcafe_property_id(html: str) -> str | None:
+    """Return the first RentCafe propertyId seen in *html*, or None."""
+    if not html:
+        return None
+    m = _RENTCAFE_PROP_ID_HTML_RE.search(html)
+    if not m:
+        return None
+    for grp in m.groups():
+        if grp:
+            return grp
+    return None
+
+
+def _origin_from_ctx(ctx: AdapterContext) -> str:
+    """scheme://netloc for the property's effective URL (post-redirect)."""
+    candidate = ""
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is not None:
+        candidate = str(getattr(fr, "final_url", "") or "")
+    if not candidate:
+        candidate = getattr(ctx, "base_url", "") or ""
+    try:
+        from urllib.parse import urlparse
+        p = urlparse(candidate)
+    except Exception:
+        return ""
+    if not p.scheme or not p.netloc:
+        return ""
+    return f"{p.scheme}://{p.netloc}"
+
+
+async def _try_rentcafe_wp_probe(
+    ctx: AdapterContext, result: AdapterResult
+) -> list[dict[str, str]]:
+    """SHAPE_REJECTED fallback: probe ``<origin>/wp-json/middleware/v1/getFloorplans/``
+    directly with the property ID extracted from the rendered HTML.
+
+    Returns parsed unit dicts on success, empty list on any failure.
+    """
+    html = ""
+    fr = getattr(ctx, "fetch_result", None)
+    body = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(body, bytes):
+        try:
+            html = body.decode("utf-8", errors="replace")
+        except Exception:
+            html = ""
+    elif isinstance(body, str):
+        html = body
+    if not html:
+        return []
+
+    prop_id = _find_rentcafe_property_id(html)
+    if not prop_id:
+        return []
+
+    origin = _origin_from_ctx(ctx)
+    if not origin:
+        return []
+
+    api_url = f"{origin}/wp-json/middleware/v1/getFloorplans/?propertyId[]={prop_id}"
+    try:
+        import httpx
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json",
+        }
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+            r = await c.get(api_url, headers=headers)
+        if r.status_code != 200:
+            return []
+        try:
+            payload = r.json()
+        except (ValueError, Exception):
+            return []
+    except Exception as exc:
+        result.errors.append(
+            f"rentcafe-wp-probe-error: prop_id={prop_id!r} "
+            f"{type(exc).__name__}: {str(exc)[:120]}"
+        )
+        return []
+
+    items = _unwrap_rentcafe_list(payload)
+    if not items:
+        return []
+    units = parse_rentcafe_floorplans(items, api_url)
+    if units:
+        result.api_responses.append(
+            {"url": api_url, "status": 200, "body": payload, "via": "wp_probe"}
+        )
+        result.winning_url = api_url
+    return units

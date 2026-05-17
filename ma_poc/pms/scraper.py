@@ -413,7 +413,20 @@ async def scrape(
     # --- Step 1: Initial offline detection from URL + CSV mgmt-prior ---
     # csv_row threads in the Management Company so MGMT_TO_PMS_PRIOR can fire
     # on vanity domains where URL alone gives no PMS signal.
-    initial_detection = detect_pms(base_url, csv_row=csv_row)
+    #
+    # 2026-05-13 (teammate analysis — cross-cutting C1/C2/C8): when the
+    # fetch redirected to a different domain (e.g.
+    # ``elevatetosequoia.com`` → ``elevatetoriveroaks.com``), running the
+    # detector against the original ``base_url`` host produces 0 fingerprint
+    # matches and ``pms=unknown``. The HTML body belongs to the redirect
+    # target, so the detector must run against ``fetch_result.final_url`` to
+    # see the same hostname as the body.
+    _effective_url = base_url
+    if fetch_result is not None:
+        _final_url = str(getattr(fetch_result, "final_url", "") or "")
+        if _final_url:
+            _effective_url = _final_url
+    initial_detection = detect_pms(_effective_url, csv_row=csv_row)
     result["_detected_pms"] = _detection_to_dict(initial_detection)
 
     # --- Step 2: Navigate page (or use provided one) ---
@@ -451,7 +464,7 @@ async def scrape(
 
     # --- Step 4: Re-detect with page HTML if available ---
     if page_html:
-        html_detection = detect_pms(base_url, csv_row=csv_row, page_html=page_html)
+        html_detection = detect_pms(_effective_url, csv_row=csv_row, page_html=page_html)
         if html_detection.confidence > initial_detection.confidence:
             initial_detection = html_detection
             result["_detected_pms"] = _detection_to_dict(initial_detection)
@@ -460,7 +473,7 @@ async def scrape(
     # Attach raw detector inputs to the result so the per-property report can
     # render them, and emit DETECTOR_SIGNALS for ledger-level analytics.
     try:
-        _signals = collect_detector_signals(base_url, csv_row, page_html)
+        _signals = collect_detector_signals(_effective_url, csv_row, page_html)
         result["_detector_signals"] = _signals
         try:
             from ma_poc.observability.events import EventKind, emit
@@ -1481,6 +1494,25 @@ async def _try_link_hop(
             url_s = str(url_s or "").strip()
             if not url_s or url_s in visited:
                 continue
+            # 2026-05-13 (C5 OneSite, teammate analysis): when the embedded
+            # portal is RealPage Online Leasing (onlineleasing.realpage.com),
+            # individual unit application URLs (``?UnitId=N`` / ``?MoveInDate=``)
+            # are application FORM shells — 59KB body, 1.5KB text, 0 unit
+            # signals — not the floor-plan grid. Hopping them burns LLM
+            # budget on dozens of empty shells (PID 264372 ellisonpreserve
+            # had 81 such hops, $0.016 wasted). Strip the query params so the
+            # candidate becomes the property-level URL ``{id}.onlineleasing.
+            # realpage.com/`` which DOES carry the floor-plan grid.
+            if "onlineleasing.realpage.com" in url_s.lower():
+                _q_pos = url_s.find("?")
+                if _q_pos > 0:
+                    _stripped = url_s[:_q_pos]
+                    if _stripped not in visited:
+                        url_s = _stripped
+                    else:
+                        # Property-level URL already queued / visited;
+                        # skip this per-unit application shell entirely.
+                        continue
             portal_candidates.append(
                 (url_s, _EMBEDDED_PORTAL_SCORE, f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}")
             )
@@ -1757,11 +1789,34 @@ async def _try_link_hop(
         # sites like amli.com where the PMS prior is appended to the base
         # domain instead of the property's own deep URL.
         try:
-            _hop_path_parts = [p for p in urllib.parse.urlparse(sub_url).path.split("/") if p]
-            if len(_hop_path_parts) >= 3 and dynamic_appended < max_dynamic_appends:
+            _parsed_sub = urllib.parse.urlparse(sub_url)
+            _hop_path_parts = [p for p in _parsed_sub.path.split("/") if p]
+            # 2026-05-13 (C6 AppFolio login bug, teammate analysis): strip
+            # the query + fragment before constructing the subpath URL.
+            # Without this strip, hop URLs like
+            #   dlandgroup.appfolio.com/oportal/users/log_in?UnitId=42
+            # become
+            #   dlandgroup.appfolio.com/oportal/users/log_in?UnitId=42/floorplans
+            # — nonsense that returns the login form for every hop.
+            # Also skip subpath construction when the path itself is clearly
+            # an auth/login endpoint (oportal/users/log_in, /sign_in, etc.).
+            _sub_path_lower = _parsed_sub.path.lower()
+            _LOGIN_PATH_SIGNATURES = (
+                "/log_in", "/login", "/sign_in", "/signin", "/auth/", "/oauth/",
+                "/users/log_in", "/users/sign_in",
+            )
+            _is_login_path = any(sig in _sub_path_lower for sig in _LOGIN_PATH_SIGNATURES)
+            _sub_url_no_query = urllib.parse.urlunparse(
+                (_parsed_sub.scheme, _parsed_sub.netloc, _parsed_sub.path, "", "", "")
+            )
+            if (
+                len(_hop_path_parts) >= 3
+                and dynamic_appended < max_dynamic_appends
+                and not _is_login_path
+            ):
                 _prop_sub_paths = ("/floorplans", "/floor-plans", "/pricing", "/apartments-pricing")
                 for _psp in _prop_sub_paths:
-                    _psp_url = sub_url.rstrip("/") + _psp
+                    _psp_url = _sub_url_no_query.rstrip("/") + _psp
                     if _psp_url not in visited and not any(u == _psp_url for u, _, _ in queue):
                         queue.append((_psp_url, _PMS_PRIOR_SCORE + 200, f"prop_subpath:{_psp}"))
                         dynamic_appended += 1
@@ -2178,6 +2233,48 @@ async def scrape_jugnu(
                 errors=[f"fetch_outcome={outcome_val}"],
             )
             return result
+
+    # 2026-05-13 (C1 SGCaptcha wall, teammate analysis): when the fetch
+    # outcome is technically OK but the page redirected to
+    # ``/.well-known/sgcaptcha/`` (the SGCaptcha interstitial), the body
+    # is a ~12KB challenge page with 0 floor-plan signals. Running the full
+    # tier cascade against it wastes ~25 seconds per property and trips the
+    # LLM tiers against 200-byte HTML shells. Estimated 85+ properties hit
+    # this daily. Emit a dedicated tier code so reports distinguish the
+    # captcha wall from a genuine extraction failure.
+    _sgcaptcha_walled = False
+    _final_url = ""
+    if fetch_result is not None:
+        _final_url = str(getattr(fetch_result, "final_url", "") or "")
+        if "/.well-known/sgcaptcha/" in _final_url.lower():
+            _sgcaptcha_walled = True
+    if _sgcaptcha_walled:
+        result = _empty_result(base_url)
+        result["_property_id"] = property_id
+        result["extraction_tier_used"] = "generic:sgcaptcha_wall"
+        result["errors"].append(
+            f"SGCAPTCHA_WALL: final_url={_final_url[:120]} "
+            "(SGCaptcha interstitial — full tier cascade skipped)"
+        )
+        try:
+            fd = fetch_result.to_dict() if hasattr(fetch_result, "to_dict") else {}
+            body = getattr(fetch_result, "body", None)
+            fd["body_bytes"] = len(body) if body else 0
+            fd["captcha_detected"] = True
+            fd["captcha_provider"] = "sgcaptcha"
+            result["_fetch_diagnostic"] = fd
+        except Exception:
+            pass
+        result["_extract_result"] = ExtractResult(
+            property_id=property_id,
+            records=[],
+            tier_used="generic:sgcaptcha_wall",
+            adapter_name="none",
+            winning_url=None,
+            confidence=0.0,
+            errors=[f"sgcaptcha_wall: final_url={_final_url[:80]}"],
+        )
+        return result
 
     # Delta 4: emit PMS detection event — forward fetch_result so adapters
     # can work from fetch_result.body when no live page is available.

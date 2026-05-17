@@ -12,7 +12,9 @@ from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
 from ma_poc.pms.adapters.entrata import EntrataAdapter
 from ma_poc.pms.adapters.funnel import FunnelAdapter
+from ma_poc.pms.adapters.g5 import G5Adapter
 from ma_poc.pms.adapters.generic import GenericAdapter
+from ma_poc.pms.adapters.knock import KnockAdapter
 from ma_poc.pms.adapters.onesite import OneSiteAdapter
 from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
@@ -51,6 +53,8 @@ def _bootstrap_registry() -> None:
         FunnelAdapter,
         TouchTourAdapter,
         SpherexxAdapter,
+        KnockAdapter,
+        G5Adapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,

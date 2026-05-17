@@ -93,6 +93,158 @@ def test_detect_squarespace_nopms_from_html() -> None:
     assert result.recommended_strategy == "syndication_only"
 
 
+def test_detect_knock_from_doorway_script() -> None:
+    """Knock widget loaded via script tag — most common case for the 570
+    Knock-fingerprinted T2/3/4 properties (e.g. liveatcalista.com, where
+    a 2026-05-13 probe pulled 53 units from the public Doorway API)."""
+    html = (
+        '<html><head>'
+        '<script src="https://doorway.knck.io/latest/doorway.min.js" defer></script>'
+        '</head><body>Welcome</body></html>'
+    )
+    result = detect_pms("https://www.liveatcalista.com/", page_html=html)
+    assert result.pms == "knock"
+    assert result.confidence >= 0.85
+    assert result.recommended_strategy == "api_first"
+
+
+def test_entrata_application_authentication_path_is_not_a_widget() -> None:
+    """Regression for 2026-05-13: many vanity multifamily marketing sites
+    (e.g. foxchaseofalexandriaapts.com, livemuseatl.com) link to
+    ``/Apartments/module/application_authentication/`` (Entrata's generic
+    tenant login form) even when their actual unit data lives on Jonah
+    Digital / ProspectPortal / etc. Detector must NOT route to Entrata
+    based on this path alone."""
+    html = (
+        '<html><body>'
+        '<a href="/Apartments/module/application_authentication/">'
+        'Sign In</a>'
+        '</body></html>'
+    )
+    result = detect_pms("https://www.foxchaseofalexandriaapts.com/", page_html=html)
+    # Either unknown (no other signals) or some non-entrata classification.
+    # The hard requirement is: NOT entrata.
+    assert result.pms != "entrata"
+
+
+def test_entrata_real_widget_path_still_routes_to_entrata() -> None:
+    """Counter-regression: a real Entrata widget embed (e.g. floor_plans,
+    availability, lease_application) must still route to Entrata."""
+    html = (
+        '<html><body>'
+        '<iframe src="/Apartments/module/floor_plans/property/12345"></iframe>'
+        '</body></html>'
+    )
+    result = detect_pms("https://www.someproperty.com/", page_html=html)
+    assert result.pms == "entrata"
+
+
+def test_entrata_commoncf_marker_still_routes_to_entrata() -> None:
+    """commoncf.entrata.com host marker remains a strong Entrata signal."""
+    html = (
+        '<html><head>'
+        '<script src="https://commoncf.entrata.com/widgets/x.js"></script>'
+        '</head></html>'
+    )
+    result = detect_pms("https://www.someproperty.com/", page_html=html)
+    assert result.pms == "entrata"
+
+
+def test_detect_funnel_from_funnelleasing_script() -> None:
+    """2026-05-13: confirmed Funnel uses ``integrations.funnelleasing.com``
+    on its newer customer base (e.g. Brook Lane, Arbor Park). Previously
+    these were misrouting to RentCafe via Pass 3 weak markers and ended
+    up in ``TIER_1_API_RENTCAFE_SHAPE_REJECTED``."""
+    html = (
+        '<html><body>'
+        '<script src="https://integrations.funnelleasing.com/gen-ai-chatbot/v1/'
+        'funnel-gen-ai-chat.js"></script>'
+        '</body></html>'
+    )
+    result = detect_pms("https://www.brooklaneapts.com/", page_html=html)
+    assert result.pms == "funnel"
+    assert result.recommended_strategy == "api_first"
+
+
+def test_detect_g5_from_dnn506_cloudfront_cdn() -> None:
+    """2026-05-13 teammate analysis (C1 sub-class): 73 of 244 generic Tier-1-API
+    failures had ``dnn506yrbagrg.cloudfront.net`` as their script source — that's
+    G5's primary CDN. Detector must route these to G5."""
+    html = (
+        '<html><body>'
+        '<script src="https://dnn506yrbagrg.cloudfront.net/themes/main.js"></script>'
+        '</body></html>'
+    )
+    result = detect_pms("https://www.bowmanstation.com/", page_html=html)
+    assert result.pms == "g5"
+    assert result.recommended_strategy == "api_first"
+
+
+def test_detect_g5_from_g5dxm_themes_host() -> None:
+    """2026-05-13 host survey: 173 properties load themes.g5dxm.com /
+    widgets.g5dxm.com (G5's theme + widget CDN). These are G5 customers
+    whose ``inventory.g5marketingcloud`` calls happen via fetch() (not
+    ``<script src>``) so the original detector missed them."""
+    html = (
+        '<html><body>'
+        '<script src="https://themes.g5dxm.com/themes/g5-cs-12345/dist/main.js"></script>'
+        '</body></html>'
+    )
+    result = detect_pms("https://www.morgan-properties.com/apartments/x/y/z/", page_html=html)
+    assert result.pms == "g5"
+    assert result.recommended_strategy == "api_first"
+
+
+def test_detect_funnel_from_nestio_contact_widget() -> None:
+    """2026-05-13: Funnel acquired Nestio. Properties still loading the
+    Nestio contact-widget script are actually on Funnel. Confirmed via
+    probe of livebh.com properties — every Nestio reference co-occurs
+    with apply.funnelleasing.com / bh.funnelleasing.com URLs."""
+    html = (
+        '<html><body>'
+        '<script src="https://integrations.nestio.com/contact-widget/v1/integration.js"></script>'
+        '</body></html>'
+    )
+    result = detect_pms("https://www.parkatcanyonridge.com/", page_html=html)
+    assert result.pms == "funnel"
+
+
+def test_detect_funnel_from_apply_subdomain() -> None:
+    """``apply.funnelleasing.com`` and ``bh.funnelleasing.com`` are
+    customer-specific Funnel subdomains observed on livebh.com properties."""
+    html = '<a href="https://apply.funnelleasing.com/1170">Apply Now</a>'
+    result = detect_pms("https://livebh.com/x/", page_html=html)
+    assert result.pms == "funnel"
+
+
+def test_detect_funnel_beats_rentcafe_when_both_in_html() -> None:
+    """Regression guard: a page with BOTH a residual ``rentcafe`` token AND
+    the Funnel script must route to Funnel — not fall through to Pass 3's
+    weak ``rentcafe`` matcher (the bug that produced 193 SHAPE_REJECTED rows)."""
+    html = (
+        '<html><body>'
+        '<img src="https://cdn-images.rentcafe.com/something.png">'
+        '<script src="https://integrations.funnelleasing.com/x.js"></script>'
+        '</body></html>'
+    )
+    result = detect_pms("https://example-funnel-property.com/", page_html=html)
+    assert result.pms == "funnel"
+
+
+def test_detect_knock_from_init_call() -> None:
+    """Some properties carry the knockDoorway.init() call directly in static
+    HTML even when the doorway.knck.io script is loaded lazily later."""
+    html = (
+        '<html><body>'
+        '<script>window.knockDoorway.init("d05b0a9af1ca11e99ba712428f0e8cf6", '
+        '"community", "0344aa08a46c311f");</script>'
+        '</body></html>'
+    )
+    result = detect_pms("https://example-knock-property.com/", page_html=html)
+    assert result.pms == "knock"
+    assert result.recommended_strategy == "api_first"
+
+
 def test_detect_wix_nopms_from_html() -> None:
     html = '<html><head><script src="https://static.parastorage.com/bundle.js"></script></head></html>'
     result = detect_pms("https://example-wixsite.com", page_html=html)

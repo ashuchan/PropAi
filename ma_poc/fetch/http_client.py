@@ -168,7 +168,25 @@ def make_http_client(tier: FetchTier, proxy: str | None) -> _HttpxAdapter | _Cur
     DIRECT → httpx (plain). DC_PROXY+ → curl_cffi with chrome impersonation.
 
     The caller is responsible for ``await client.aclose()``.
+
+    Override (2026-05-13 — opt-in): set ``CURL_CFFI_FOR_DIRECT=1`` in the
+    environment to use curl_cffi for the DIRECT tier as well. The
+    2026-04-30 failure-recovery investigation demonstrated 95.2% Cloudflare
+    bypass (258/271) with curl_cffi where plain httpx was 403-ing. Enabling
+    this at DIRECT unlocks ~378 currently-CF-walled properties (134
+    short-circuit + 244 Entrata-mis-classified, the latter mostly being
+    CF-walled per the 2026-05-13 random-sample probe). The default stays
+    on httpx so the switch is a deliberate ops decision, not a silent
+    regression risk.
     """
     if tier == FetchTier.DIRECT:
+        if _os.getenv("CURL_CFFI_FOR_DIRECT") in ("1", "true", "yes", "on"):
+            if curl_cffi_requests is None:
+                log.warning(
+                    "CURL_CFFI_FOR_DIRECT requested but curl_cffi not "
+                    "installed; falling back to httpx for DIRECT tier"
+                )
+                return _HttpxAdapter(proxy=proxy)
+            return _CurlCffiAdapter(proxy=proxy)
         return _HttpxAdapter(proxy=proxy)
     return _CurlCffiAdapter(proxy=proxy)

@@ -429,12 +429,24 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
             )
             has_name = bool(item.get("name"))
             has_size = bool(item.get("floorSize"))
-            has_rooms = bool(item.get("numberOfRooms"))
+            has_rooms = bool(item.get("numberOfRooms") or item.get("numberOfBedrooms"))
             if not (has_price or has_name):
                 # Skip items that only have physical attributes (size/rooms)
                 # but no name and no price — these are itemOffered sub-nodes
                 # nested inside Offer elements and are handled by pass 2
                 # (_extract_offers_as_units) instead.
+                continue
+            # 2026-05-13 teammate analysis (C8 JSON-LD false-positive): nodes
+            # with @type=Apartment but only a ``name`` and no quantitative
+            # data (no price, no size, no bedroom count) still slip through.
+            # Examples observed:
+            #   {"@type": "Apartment", "name": "Pet Friendly", ...}
+            #   {"@type": "ApartmentComplex", "name": "Amenities"}
+            # post_process eventually rejects them, but the planner sees
+            # ``ran_units=1`` first and escalates to LLM rescue, burning
+            # token budget. Require at least one quantitative dimension to
+            # emit a unit; name-only nodes get skipped.
+            if not (has_price or has_size or has_rooms):
                 continue
 
             name = item.get("name") or ""

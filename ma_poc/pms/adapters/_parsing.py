@@ -398,6 +398,41 @@ def parse_rent_range(rent_range: str) -> tuple[int | None, int | None]:
     return min(nums), max(nums)
 
 
+def _unwrap_name_blob(val: Any) -> str:
+    """Coerce ``val`` to a clean floor-plan-name string.
+
+    Some adapters' API parsers receive a structured floor-plan object
+    (``{"name": "B06", "provider_id": "...", ...}``) rather than the
+    name string itself. If we accept it as-is, the JSON repr of the dict
+    ends up serialised as the floor-plan name in the XLSX output (2,534
+    rows seen on 2026-05-13). Unwrap to the ``name`` field when present;
+    otherwise fall back to ``str(val)`` for already-string inputs.
+    """
+    if val is None:
+        return ""
+    if isinstance(val, dict):
+        # Prefer the most common name keys observed across PMS responses.
+        for key in ("name", "floor_plan_name", "label", "displayName"):
+            inner = val.get(key)
+            if isinstance(inner, str) and inner.strip():
+                return inner.strip()
+        # No string-valued name field — drop the blob (better than serialising
+        # the whole dict into the output).
+        return ""
+    s = str(val).strip()
+    # 2026-05-13: a small number of adapters pre-emit json.dumps(dict) into
+    # the name slot. Recognise the literal ``{"`` prefix and try one parse.
+    if s.startswith("{") and "name" in s[:100]:
+        try:
+            import json
+            parsed = json.loads(s)
+            if isinstance(parsed, dict):
+                return _unwrap_name_blob(parsed)
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return s
+
+
 def make_unit_dict(
     *,
     floor_plan_name: str = "",
@@ -440,6 +475,15 @@ def make_unit_dict(
     # but no string was passed.
     if not rent_range and (rent_low or rent_high):
         rent_range = format_rent_range(rent_low, rent_high)
+
+    # Defensive unwrap: some upstream parsers pass the raw API floor-plan
+    # dict (``{"name":"B06","provider_id":"4875687"}``) instead of the
+    # name string. 2026-05-13 validation pass found 2,534 such rows
+    # leaking JSON-blob floor-plan names across Tier-1 API (1,151), Tier-3
+    # DOM (628), Tier-1 SightMap (334), Tier-2 JSON-LD (212), and
+    # MERGED_CROSS_PAGE (118). Normalising here means every adapter benefits
+    # without changing per-adapter signatures.
+    floor_plan_name = _unwrap_name_blob(floor_plan_name)
 
     return {
         "floor_plan_name": floor_plan_name,
