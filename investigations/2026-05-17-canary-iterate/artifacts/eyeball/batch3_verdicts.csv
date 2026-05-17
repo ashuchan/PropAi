@@ -9,3 +9,13 @@ n,url,verdict,pattern
 8,ascendnonawest.com,U,popup->check-availability->unit-level
 9,liveatcivicsquare.com,U,engrain-sightmap-embed (MISFP)
 10,tvcproperties.com,U,community-detail #available listing
+11,integrapalms.com,U,engrain-sightmap (MISFP)
+12,solaire7607.com,U,js-popup-unit-table
+13,waterfordtrailsliving.com,U,popup->check-availability
+14,aspenmeadowky.com,U,in-page-expand click-available-unit
+15,livevictorprosper.com,U,engrain-sightmap (MISFP)
+16,liveastonpointe.com,U,popup->check-availability
+17,broadstoneparagon.com,U,engrain-sightmap (MISFP)
+18,parkplace380.com,F,floorplan-level table avail-text no unit#
+19,residecrosbyhill.com,F,floorplan-level bed-type only
+20,liveemersonpark.com,U,click-floorplan->view-availability
