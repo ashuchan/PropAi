@@ -486,24 +486,50 @@ async def scrape(
             if _p.scheme and _p.netloc:
                 from curl_cffi import requests as _creqd
 
-                _rr = _creqd.get(
-                    f"{_p.scheme}://{_p.netloc}/",
-                    impersonate="chrome120",
-                    timeout=20,
-                    allow_redirects=True,
-                )
-                if _rr.status_code == 200 and _rr.text:
-                    _rd = detect_pms(_effective_url, csv_row=csv_row, page_html=_rr.text)
+                _root = f"{_p.scheme}://{_p.netloc}"
+                # iter-12 (2026-05-17, 604-probe finding): the PMS marker
+                # is frequently NOT on the homepage but on the floorplan/
+                # availability sub-page (the 604 unit-level-via-LLM/DOM
+                # probe found markers on /floorplans/ etc. for ~270
+                # proxy-independent sites the homepage-only rescue missed).
+                # Try the homepage AND the common floorplan sub-paths;
+                # first one that yields a confident PMS wins.
+                for _suffix in (
+                    "/",
+                    "/floorplans/",
+                    "/floor-plans/",
+                    "/floorplans",
+                    "/floor-plans",
+                    "/availability/",
+                    "/apartments/",
+                ):
+                    try:
+                        _rr = _creqd.get(
+                            _root + _suffix,
+                            impersonate="chrome120",
+                            timeout=15,
+                            allow_redirects=True,
+                        )
+                    except Exception:
+                        continue
+                    if _rr.status_code != 200 or not _rr.text:
+                        continue
+                    _rd = detect_pms(
+                        _effective_url, csv_row=csv_row, page_html=_rr.text
+                    )
                     if (
                         _rd.pms not in ("unknown", "custom")
                         and _rd.confidence > initial_detection.confidence
                     ):
                         initial_detection = _rd
-                        result["_detected_pms"] = _detection_to_dict(initial_detection)
+                        result["_detected_pms"] = _detection_to_dict(
+                            initial_detection
+                        )
                         result["_detection_rescued"] = {
-                            "via": "curl_cffi_homepage_refetch",
+                            "via": f"curl_cffi_refetch:{_suffix}",
                             "pms": _rd.pms,
                         }
+                        break
         except Exception as _dr_exc:  # pragma: no cover - defensive
             log.warning("detection-rescue failed for %s: %s", property_id, _dr_exc)
 
