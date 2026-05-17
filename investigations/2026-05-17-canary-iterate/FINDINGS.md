@@ -425,3 +425,18 @@ no Hy.ly data contract to write a deterministic adapter against —
 these correctly belong to DOM/LLM tier or their underlying PMS. Do
 NOT build a Hy.ly adapter. Apts247 (iter-15) is the genuine cluster
 win; Hy.ly cluster was a false positive for adapter purposes.
+
+## ★ RentManager / iLoveLeasing — NOT an adapter target (negative) ★
+Deep-probed henryonthepark.com (the lone RentManager-marker site).
+Verdict = Hy.ly redux: cdn.rentmanager.com is a WebChat plugin
+(WebBasedChatWizard.js); iloveleasing.com is a lead-capture/tracking
+widget (pub/widget/js/main.js + tracking iframe). NEITHER is a data
+API. The site is WordPress (/wp-content/uploads/*Plan*.png) — floor-
+plan content server-rendered, no data XHR (only google/analytics).
+RentManager's real data = per-company auth-gated Integration API,
+never exposed client-side on marketing sites. Structural (not just
+n=1) reason the markers are non-data. Low leverage anyway (1 site in
+Chrome-probe, absent from 295 curl-probe top platforms). These sites
+correctly belong to DOM/Tier-3/LLM, usually floorplan-level. Do NOT
+build a RentManager adapter. apts247 remains the only genuine
+no-signature cluster win.
