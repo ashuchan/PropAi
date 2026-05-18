@@ -598,6 +598,26 @@ class Fetcher:
             except Exception:
                 pass
 
+            # Interaction-driven CTA-hop (2026-05-18, env-gated, default OFF).
+            # Some clusters only expose their real unit-data source AFTER a
+            # click: funnel/UDR -> RealPage OLL wizard, resman -> myresman
+            # availability portal, entrata -> the real widget. Static/
+            # passive render never reaches it (validated: the source is not
+            # in static HTML). When INTERACTION_CTA_HOP is truthy, click the
+            # Apply/Check-Availability/Floor-Plans CTA(s); the response
+            # handler registered above keeps capturing XHR into
+            # ``network_log`` -> flows to ctx._api_responses -> existing
+            # OLL/resman/entrata adapters. Strictly bounded + never raises,
+            # so off it is a no-op and on it adds <=~8s with no SLO risk on
+            # passive sites (gate is opt-in, prod default unset).
+            if os.getenv("INTERACTION_CTA_HOP", "").strip().lower() in (
+                "1", "true", "yes", "on"
+            ):
+                try:
+                    await _drive_cta_hop(page)
+                except Exception:
+                    pass
+
             # Always-salvage: even when page.goto() timed out, page.content()
             # typically returns a usable DOM (probe: charterclubapts.com timed
             # out on networkidle but had 144KB of rendered HTML with rent data
@@ -1009,6 +1029,59 @@ class Fetcher:
             )
         finally:
             await self._browsers.release(page)
+
+
+_CTA_CLICK_JS = r"""
+(maxClicks) => {
+  // Strict CTA matcher: the controls that hop to the real unit-data
+  // source. NOT contact/tour/login/resident (those trigger CAPTCHA or
+  // dead-end at a sign-in form — the exact false-positive trap).
+  const GOOD = /(check\s*availab|view\s*pricing|see\s*availab|view\s*availab|all[-\s]?in\s*price|floor\s*plans?\s*(&|and)\s*pricing|see\s*floor\s*plans?|view\s*floor\s*plans?|apply\s*now|get\s*pricing|shop\s*(now|units?))/i;
+  const BAD  = /(contact|schedule|tour|sign\s*in|log\s*in|login|resident|application_authentication|careers|privacy|terms)/i;
+  const els = [...document.querySelectorAll('a,button,[role=button],[onclick]')];
+  const picked = [];
+  const seen = new Set();
+  for (const e of els) {
+    const t = ((e.innerText || e.textContent || '') + ' ' +
+               (e.getAttribute && (e.getAttribute('aria-label') || '') || '')).trim();
+    const href = (e.getAttribute && e.getAttribute('href')) || '';
+    if (!t && !href) continue;
+    if (BAD.test(t) || BAD.test(href)) continue;
+    if (!(GOOD.test(t) || GOOD.test(href))) continue;
+    const key = t.slice(0, 40) + '|' + href.slice(0, 60);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(e);
+    if (picked.length >= maxClicks) break;
+  }
+  picked.forEach((e) => { try { e.scrollIntoView(); e.click(); } catch (x) {} });
+  return picked.length;
+}
+"""
+
+
+async def _drive_cta_hop(page: Any) -> None:
+    """Click the unit-data CTA(s) so post-interaction XHR is captured.
+
+    Env-gated by the caller (``INTERACTION_CTA_HOP``). The page's
+    ``response`` handler is already registered, so any XHR the click
+    triggers (RealPage OLL appstate, myresman availability, the entrata
+    widget…) lands in ``network_log`` -> ``ctx._api_responses`` -> the
+    existing adapters. Strictly time-bounded; every step is best-effort
+    and swallowed so this can never fail a render.
+    """
+    try:
+        n = await asyncio.wait_for(page.evaluate(_CTA_CLICK_JS, 2), timeout=6.0)
+    except Exception:
+        return
+    if not n:
+        return
+    # Bounded settle for the post-click navigation/XHR to fire and be
+    # captured. Cap total added time so the 95%-success SLO is unaffected.
+    try:
+        await asyncio.sleep(5.0)
+    except Exception:
+        pass
 
 
 def _now_ms() -> int:
