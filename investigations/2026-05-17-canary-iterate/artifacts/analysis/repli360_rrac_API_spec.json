@@ -47,5 +47,6 @@
   "response": "{selected_units:[unitnum,...], str:<big HTML>}; parse str with bs4: tr.unitlisting -> unit_number=b.unitNumber, building=1st td text, deposit=$ td, rent=span.unit_price_value, availability=avail td text, availability_date=tr[data-available_date] (ISO). MRI link has BuildingID/ApartmentID (repli360 fronts MRI ProspectConnect).",
   "verified": "royce site_id=1619 fp A1AL -> 7 units (4114,6203,4302,6311,6222,6221,6213); 4114=Bldg4 $2,335 Available Now data-available_date=2026-05-17",
   "render_required": "YES \u2014 onclick/site_id/floorPlanID are JS-injected, absent from static curl. Pipeline already renders JS sites; adapter reads rendered HTML then replays API deterministically (no popup interaction needed)."
- }
+ },
+ "BUILD_STATUS": "SHIPPED \u2014 repli360.py (find_repli360_floorplans + parse_repli360_str + Repli360Adapter) + probe_post + detector marker + DEFAULT_PMS_PRIORS + 8 tests. Verified live on royce (site_id 1619, fp A1AL -> 7 units). Commit 0cb58c8. Deterministic Tier-1, no auth, no browser interaction (render -> read onclick IDs -> replay POST)."
 }
