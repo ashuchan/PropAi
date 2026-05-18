@@ -28,6 +28,13 @@
    "build_recipe": "enumerate property[id]+floorplan ids from ProspectPortal floorplans page (id in slug e.g. a1-712595), then per-fp check_availability GET via probe_get(+WU) -> parse HTML unit-spaces fragment (repli360 str / entrata-WP parser pattern).",
    "verified": "springriver: property[id]=1209258 fp 712595 -> 3 units $1,291"
   },
-  "resman/covington": "AWAITING capture (covingtonplace.com/floorplan)"
- }
+  "resman/covington": {
+   "real_source": "<client>.myresman.com/Portal/Applicants/Availability?a=<acct>&p=<guid>&moveInDate=&refreshPricing=true (SSR HTML page; embeds var unitTypes=[...]). verified: stewart.myresman.com a=1041 p=68f5dd84-230b-4dad-9a2e-9d18dfaccdc2",
+   "protection": "NONE \u2014 not Cloudflare-fronted, no auth (per resman.py iter-13 note). Clean server-side GET.",
+   "adapter": "ResManAdapter ALREADY EXISTS and parses exactly this (var unitTypes).",
+   "gap": "a/p params are interaction-gated \u2014 marketing site (covingtonplace.com) static HTML only has stewart.myresman.com/Portal/Access/SignIn/CVGTNPLC (resident login). The Applicants/Availability?a=&p= URL is produced by clicking Check Availability. Detector/resolver never sees it statically.",
+   "fix": "CTA-hop -> surfaces the Portal/Applicants/Availability?a=&p= URL -> existing ResManAdapter parses server-side. EASIEST of the 3 (no bot wall, adapter exists)."
+  }
+ },
+ "UNIFYING_ROOT_CAUSE": "All 3 sub-clusters (and OLL canary 10%): the real unit-data source URL is behind an interaction/redirect (Check Availability) the STATIC detector/resolver never sees \u2014 marketing site exposes only a login link. CTA-hop (commit 4194257) is the common enabler. Tractability after CTA-hop: resman=easiest (adapter exists, no wall); funnel/UDR=OLL browser-intercept (DataDome 2nd wall->residential render); entrata=NEW ProspectPortal adapter (server-side GET+WU for CF)."
 }
