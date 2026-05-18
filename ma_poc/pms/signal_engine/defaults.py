@@ -200,6 +200,11 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     # Resolver-only fallback paths — when host detection picks "spherexx"
     # without a same-page widget, prefer these vanity sub-paths first.
     "spherexx": ("/interactive-site-map", "/floor-plans", "/availability"),
+    # 2026-05-17 — Repli360/rrac popup family. The JS-rendered
+    # getUnitListByFloor "View Details" anchors live on the floor-plans
+    # page; prefer those sub-paths when host/HTML detection picks
+    # "repli360" without the widget on the entry page.
+    "repli360": ("/floor-plans", "/floorplans", "/availability"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (

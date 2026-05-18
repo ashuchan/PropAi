@@ -55,6 +55,7 @@ PmsName = Literal[
     "g5",
     "resman",
     "apts247",
+    "repli360",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -86,6 +87,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "g5": "api_first",
     "resman": "api_first",
     "apts247": "api_first",
+    "repli360": "api_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -528,6 +530,24 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             0.90,
             ["Apts247/RentDynamics marker in HTML "
              "(apts247.info widget / same-origin /api/v1/ data API)"],
+        )
+
+    # Repli360 / rrac popup family (royce-like caf_v2 cluster — 158 sites
+    # across the 5K, ~0 real units in prod, falls to TIER_4_LLM floorplan-
+    # level). The JS-rendered "View Details" anchors call
+    # ``getUnitListByFloor(this,'<fp>',<tt>,<site_id>)`` against the
+    # no-auth POST app.repli360.com/admin/getUnitListByFloor data API.
+    # Markers appear post-render (the detector re-runs with page_html).
+    if (
+        "app.repli360.com" in h
+        or "getunitlistbyfloor(" in h
+        or "rrac_listavailableunit" in h
+    ):
+        return (
+            "repli360",
+            0.90,
+            ["Repli360/rrac marker in HTML "
+             "(app.repli360.com / getUnitListByFloor / rrac_listAvailableUnit)"],
         )
 
     # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong

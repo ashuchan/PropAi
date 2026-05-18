@@ -26,5 +26,26 @@
  "verified_on": [
   "royceattrumbull.com (site_id 1619, fp A1AL \u2014 curl returned rrac table JSON)"
  ],
- "open": "confirm site_id/floorPlanID extraction generalizes across cluster (only royce verified); finalize required param defaults; wire as jugnu Tier-1 adapter (reuse rrac parser)."
+ "open": "confirm site_id/floorPlanID extraction generalizes across cluster (only royce verified); finalize required param defaults; wire as jugnu Tier-1 adapter (reuse rrac parser).",
+ "COMPLETE_RECIPE": {
+  "detect": "rendered HTML contains getUnitListByFloor( / repli360 / rrac_listAvailableUnit",
+  "id_extraction": "regex on rendered HTML: getUnitListByFloor\\(\\s*this\\s*,\\s*['\"]([^'\"]+)['\"]\\s*,\\s*(\\d+)\\s*,\\s*(\\d+) -> (floorPlanID, template_type, site_id) per View-Details anchor; site_id constant per property",
+  "api": "POST https://app.repli360.com/admin/getUnitListByFloor (no auth; Referer+Origin=property domain)",
+  "params_CONFIRMED": {
+   "floorPlanID": "<per-fp>",
+   "moveinDate": "today as \"%-d %b %Y\" e.g. 17 May 2026",
+   "site_id": "<from onclick>",
+   "template_type": "2 (from onclick arg)",
+   "mode": "apt",
+   "type": "2d",
+   "currentanuualterm": "",
+   "AcademicTerm": "",
+   "RentalLevel": "",
+   "special": "no",
+   "zpopUp": ""
+  },
+  "response": "{selected_units:[unitnum,...], str:<big HTML>}; parse str with bs4: tr.unitlisting -> unit_number=b.unitNumber, building=1st td text, deposit=$ td, rent=span.unit_price_value, availability=avail td text, availability_date=tr[data-available_date] (ISO). MRI link has BuildingID/ApartmentID (repli360 fronts MRI ProspectConnect).",
+  "verified": "royce site_id=1619 fp A1AL -> 7 units (4114,6203,4302,6311,6222,6221,6213); 4114=Bldg4 $2,335 Available Now data-available_date=2026-05-17",
+  "render_required": "YES \u2014 onclick/site_id/floorPlanID are JS-injected, absent from static curl. Pipeline already renders JS sites; adapter reads rendered HTML then replays API deterministically (no popup interaction needed)."
+ }
 }

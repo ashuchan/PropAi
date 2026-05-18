@@ -157,3 +157,25 @@ def probe_get(url: str, **kw: Any) -> Any:
             log.info("web_unlocker.rescue url=%s via=cf_shell_or_block", url)
             return wu
     return resp
+
+
+def probe_post(url: str, data: Any = None, **kw: Any) -> Any:
+    """curl_cffi POST with chrome impersonation + optional probe proxy.
+
+    Mirrors :func:`probe_get` (same proxy / TLS-relax behaviour when
+    ``PROBE_PROXY_URL`` is set) for endpoints that require POST — e.g.
+    the repli360 ``/admin/getUnitListByFloor`` data API. ``data`` is
+    passed straight to curl_cffi (dict ⇒ form-encoded). No Web-Unlocker
+    escalation: the repli360 endpoint is not bot-walled, and WU's GET-
+    only semantics don't fit a POST body.
+
+    Raises ImportError if curl_cffi is unavailable (callers guard).
+    """
+    from curl_cffi import requests as _creq
+
+    opts: dict[str, Any] = {**_DEFAULTS, **kw}
+    px = probe_proxies()
+    if px:
+        opts.setdefault("proxies", px)
+        opts.setdefault("verify", False)  # BrightData edge TLS termination
+    return _creq.post(url, data=data, **opts)
