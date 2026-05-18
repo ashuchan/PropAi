@@ -67,6 +67,22 @@ g5 94/124=76% NO-REGRESSION ✓ | appfolio 74/107=69% NO-REGRESSION ✓
   maxRetries 0. No VPC connector.
 - Output: gs://jugnu-canary/runs/2026-05-17-standalone456/shard_*/results.jsonl
 - Aggregate: artifacts/scripts/agg_standalone456.py 2026-05-17-standalone456
+- EXEC: jugnu-standalone456-47cfn (region us-central1), watcher bg
+  bly5und4a notifies on completion.
+
+## Phase-D / lochraven — Chrome-MCP finding (durable)
+lochraven = **RentVision** site (NOT royce-rrac). Floorplans at
+/floorplans (no hyphen); per-FP detail /floorplans/<bed>/<slug> are
+**floorplan-level only** ("Prices Starting At $1,240", "Available on
+May 21, 2026", "Sign Waitlist" — NO unit#/bldg). Unit-level (user
+eyeball=U) is behind "Check Availability" → /content/apply#k=57256
+which loads **Knock doorway** (scripts doorway.knck.io/v3/static/js/
+main.min.js + /latest/doorway.min.js; ~10 [*knock/doorway*] DOM els;
+NO OneSite iframe, NO unit rows in static DOM). Knock doorway is a
+scheduling/lead overlay — extracting unit rows needs a distinct
+interaction flow (open doorway → unit-select), a substantial Phase-D
+sub-project separate from rrac. Defer unless 456 agg shows the
+Knock/#k= class is large.
 
 [superseded] 8th smoke DONE: 4/5 UNIT (solano/chatham/ironhorse/jaxon), royce=
 FLOORPLAN (timeout FIXED — no regression). royce rrac still 0 because
