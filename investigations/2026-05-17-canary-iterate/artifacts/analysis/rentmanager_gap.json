@@ -1,8 +1,9 @@
 {
- "cohort": "rentmanager-tagged",
- "size_ledger": 22,
+ "cluster": "rentmanager / iLoveLeasing",
  "prod_true_tier1": "0/22 (0%)",
- "finding": "All samples statically reference iloveleasing.com (RentManager prospect/leasing product) + cdn.rentmanager.com. Unit data is in the iLoveLeasing widget (JS/iframe-gated) \u2014 NOT a static API. Same interaction-gated root cause as the rest of the session.",
- "scope": "NET-NEW adapter = iLoveLeasing widget. Needs ONE DevTools capture of the iLoveLeasing availability flow (URL/method/auth/response) to build \u2014 not writing blind (validate-first discipline held all session).",
- "status": "characterized + scoped; build pending one iLoveLeasing capture"
+ "API": "GET https://<eid>.ua.rentmanager.com/Search_Result?command=Search_Result&template=<tmpl>&locations=<loc>&maxperpage=<n> \u2014 NO auth, server-side curl 200 (repli360/securecafe-class, NOT the JS iLoveLeasing widget). Often the FULL URL is in the property static HTML; else derive <eid> from <eid>.twa/.ua/.owa.rentmanager.com or cdn.rentmanager.com EID.",
+ "response": "series of document.write(\"{ ... }\") chunks; each a backtick-pseudo-JSON record. Keys: ppropertyname,pid,unitid,unit,location,street1/2,city,state,zip,availabilitydateresult(M/D/YYYY),marketrent($4,971.00),Description,unitVirtualTour,websiteCategory,pproptype. NO beds/baths/sqft in this template. 99/page, Page X of N pagination.",
+ "parse": "split records on } ; per record regex \\s*:\\s*; unit_number=unit, rent=marketrent->int, availability_date=availabilitydateresult->ISO, unit id=unitid. tier TIER_1_API_RENTMANAGER.",
+ "verified": "high.ua.rentmanager.com template=highlandUnit -> 99 records pg1 of 11; rec unit 2600 marketrent $4,971.00.",
+ "status": "SHIPPED 2026-05-18 — ma_poc/pms/adapters/rentmanager.py (RentManagerAdapter); registry+detector+priors wired; 11 tests vs verified payload; full PMS suite 940 passed, 0 regressions."
 }

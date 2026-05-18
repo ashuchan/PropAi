@@ -216,6 +216,11 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     # 2026-05-17 — Essex Property Trust. Per-unit /api availability
     # calls fire from the floor-plans-and-pricing page.
     "essex": ("/floor-plans-and-pricing", "/floor-plans", "/floorplans"),
+    # 2026-05-18 — RentManager/iLoveLeasing. The Search_Result URL is
+    # usually verbatim in the static shell; when detection picks
+    # "rentmanager" without it, the floor-plans / availability / sitemap
+    # sub-paths are the most likely carriers of the embedded endpoint.
+    "rentmanager": ("/floorplans", "/floor-plans", "/availability", "/interactive-site-map"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (

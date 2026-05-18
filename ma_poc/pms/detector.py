@@ -57,6 +57,7 @@ PmsName = Literal[
     "apts247",
     "repli360",
     "essex",
+    "rentmanager",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -90,6 +91,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "apts247": "api_first",
     "repli360": "api_first",
     "essex": "api_first",
+    "rentmanager": "api_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -594,6 +596,29 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
              "(app.repli360.com / getUnitListByFloor / rrac_listAvailableUnit)"],
         )
 
+    # RentManager / iLoveLeasing — the marketing shell embeds the JS-only
+    # iLoveLeasing widget (www.iloveleasing.com/pub/widget/js/luv.js) but
+    # the real unit feed is the no-auth, no-bot-wall server-side
+    # ``<eid>.ua.rentmanager.com/Search_Result`` endpoint (the full URL is
+    # usually present verbatim in the static HTML). ``<eid>.twa/owa
+    # .rentmanager.com`` and ``cdn.rentmanager.com`` are the same vendor's
+    # tenant-web-access / CDN hosts. 2026-05-18 server-side curl verified
+    # (high.ua.rentmanager.com → unit 2600 @ $4,971). Routed to
+    # RentManagerAdapter whose extract() probes Search_Result.
+    if (
+        ".ua.rentmanager.com" in h
+        or ".twa.rentmanager.com" in h
+        or "cdn.rentmanager.com" in h
+        or "iloveleasing.com" in h
+    ):
+        return (
+            "rentmanager",
+            0.90,
+            ["RentManager/iLoveLeasing marker in HTML "
+             "(.ua.rentmanager.com / .twa.rentmanager.com / "
+             "cdn.rentmanager.com / iloveleasing.com)"],
+        )
+
     # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong
     # "not-a-PMS" signals when no strong PMS marker appeared in pass 1.
     if "static.parastorage.com" in h or "wix.com" in h:
@@ -662,6 +687,12 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
     "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
+    "rentmanager": (
+        ".ua.rentmanager.com",
+        ".twa.rentmanager.com",
+        "cdn.rentmanager.com",
+        "iloveleasing.com",
+    ),
     # Marketing / lead-capture stacks — observed in 10-property roll-up
     # (doorway.knck.io, cdn-media.hy.ly, chat.hyly.ai, marketapts.com).
     "marketing_knock": ("doorway.knck.io", "knockrentals.com"),
