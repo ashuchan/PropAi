@@ -95,6 +95,21 @@ frame innerText → parse via _generic_text_rows. ~26-site class
 (jaxon/marion/lochraven). Cross-origin frame + multi-step = real
 work; do AFTER 456 agg quantifies class size.
 
+**EXACT FLOW + SCHEMA (user screenshots, lochraven #k=26888):**
+Step1 "Select Floor Plan": FP cards, each a button labelled
+"(N) Available" (N=live unit count); also filters Desired Move-In
+Date / Bedrooms / Sort. CLICK "(N) Available" → Step2 "Select
+Apartment": table cols **Apartment | Price per month | Available
+Move-in Date**, rows e.g. `#1709C AB | $1,155 - $1,415* |
+Available Now`, `#1705C AB | $1,170 - $1,430* | June 8, 2026`.
+Left panel = FP name/Bedrooms/Bathrooms/Square Feet/Occupancy.
+"Back" btn → Step1. PARSE: unit_number = the `#<bldg><unit><suffix>`
+token (e.g. "#1709C AB","#8213AT LO"); rent range "$lo - $hi*" →
+market_rent_low/high; avail = "Available Now" | "<Mon D, YYYY>".
+Loop all FP cards. Phase-D is now FULLY SPEC'D — no more probing
+needed, ready to implement _phase_d_portal_hop against
+iframe#rp-leasing-widget.
+
 [superseded] 8th smoke DONE: 4/5 UNIT (solano/chatham/ironhorse/jaxon), royce=
 FLOORPLAN (timeout FIXED — no regression). royce rrac still 0 because
 the module scans for "View Details" BEFORE the async rrac widget
