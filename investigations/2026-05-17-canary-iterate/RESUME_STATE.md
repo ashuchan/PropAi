@@ -24,7 +24,9 @@ royce (rrac popup) — mechanism CRACKED via Chrome-MCP: trigger =
 `a` text "View Details" → async-populates `.rrac_apartment_details_
 content` (Bldg#/Unit#/$/avail table). Was timing out (14×10s polls
 > 120s cap) → FIXED: capped to 3 View Details + 6s poll.
-8th smoke DONE: 4/5 UNIT (solano/chatham/ironhorse/jaxon), royce=
+ROYCE SOLVED (commit ~latest): rrac break was the PARSER not interaction — modal text has tabs+newlines INSIDE rows; fixed _generic_text_rows to normalize whitespace then split on row-terminators. 6-site smoke 5/6 UNIT (royce/ironhorse/jaxon/chatham/solano UNIT; lochraven Phase-D #k= still 0). 18-site rrac-cluster validation running bf47w5239.
+
+[superseded] 8th smoke DONE: 4/5 UNIT (solano/chatham/ironhorse/jaxon), royce=
 FLOORPLAN (timeout FIXED — no regression). royce rrac still 0 because
 the module scans for "View Details" BEFORE the async rrac widget
 renders. **EXACT NEXT FIX (do this first on resume):** in
