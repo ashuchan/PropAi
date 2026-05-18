@@ -12,6 +12,7 @@ from ma_poc.pms.adapters.apts247 import Apts247Adapter
 from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
 from ma_poc.pms.adapters.entrata import EntrataAdapter
+from ma_poc.pms.adapters.essex import EssexAdapter
 from ma_poc.pms.adapters.funnel import FunnelAdapter
 from ma_poc.pms.adapters.g5 import G5Adapter
 from ma_poc.pms.adapters.generic import GenericAdapter
@@ -54,6 +55,7 @@ def _bootstrap_registry() -> None:
         SightMapAdapter,
         RealPageOllAdapter,
         Repli360Adapter,
+        EssexAdapter,
         AvalonBayAdapter,
         AmliAdapter,
         FunnelAdapter,

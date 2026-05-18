@@ -213,6 +213,9 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     # linked from the property's ``/floorplans/`` page.
     "apts247": ("/floorplans", "/floor-plans", "/availability"),
     "resman": ("/floorplans", "/availability", "/apartments"),
+    # 2026-05-17 — Essex Property Trust. Per-unit /api availability
+    # calls fire from the floor-plans-and-pricing page.
+    "essex": ("/floor-plans-and-pricing", "/floor-plans", "/floorplans"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (

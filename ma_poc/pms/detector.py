@@ -56,6 +56,7 @@ PmsName = Literal[
     "resman",
     "apts247",
     "repli360",
+    "essex",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -88,6 +89,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "resman": "api_first",
     "apts247": "api_first",
     "repli360": "api_first",
+    "essex": "api_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -133,6 +135,18 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
         "amli",
         0.95,
         "host ends in amli.com (AMLI Residential)",
+    ),
+    # Essex Property Trust — single REIT, single host. Next.js/Vercel
+    # marketing app; per-unit data via the same-origin
+    # /api/properties/{id}/units/{id}/availability JSON (browser-
+    # intercept, Vercel-bot-gated). Detector-tagged "rentcafe" before
+    # this, but the public securecafe portal is login-only so it fell to
+    # LLM/no_body_short_circuit in prod (0 Tier-1).
+    (
+        re.compile(r"(?:^|\.)essexapartmenthomes\.com$"),
+        "essex",
+        0.95,
+        "host ends in essexapartmenthomes.com (Essex Property Trust)",
     ),
     (re.compile(r"(?:^|\.)entrata\.com$"), "entrata", 0.95, "host ends in entrata.com"),
     (re.compile(r"(?:^|\.)appfolio\.com$"), "appfolio", 0.95, "host ends in appfolio.com"),
