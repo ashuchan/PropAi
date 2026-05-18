@@ -769,9 +769,9 @@ def _proxy_ctx_opts() -> dict[str, Any]:
 
 async def run(urls: list[str], concurrency: int = 6) -> list[PropResult]:
     """Standalone harness: own patchright browser, no pipeline coupling."""
-    from patchright.async_api import async_playwright
-
     import os
+
+    from patchright.async_api import async_playwright
 
     results: list[PropResult] = []
     sem = asyncio.Semaphore(concurrency)
