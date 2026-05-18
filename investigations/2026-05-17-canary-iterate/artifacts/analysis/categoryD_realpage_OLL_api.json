@@ -1,0 +1,11 @@
+{
+ "category_d": "RealPage Online Leasing (OLL) API",
+ "endpoint": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/appstate/v1/",
+ "auth_model": "NOT header/Bearer auth-gated. STATEFUL appstate/BPM session flow: OLL.HomeDetails(BpmSeq0, sets SiteId/PmcId from #k= key) -> OLL.Menu -> OLL.SearchFloorPlan(BpmSeq1) -> unit detail, all threaded by ClientSessionID + incrementing BpmSequence/LogSequence.",
+ "cold_call_test": "GET SearchFloorPlan in isolation -> HTTP 404 (no appstate for non-bootstrapped session; session also expired).",
+ "response": "JSON (UnitId detail call shows {Id,Name,UnitDescription,ResponseStatus,...}).",
+ "identifiers": "SiteId=4000138, PmcId=2104447 (lochraven) \u2014 resolved from #k= key via HomeDetails bootstrap.",
+ "size_5k": 187,
+ "verdict": "API-addressable & replicable (session-state, which we control \u2014 not auth-walled) BUT requires replaying the full OLL BPM bootstrap sequence per property; materially harder + more brittle than repli360 single stateless POST. Strong follow-on, not a quick win.",
+ "vs_repli360": "repli360=158 props, 1 stateless no-auth POST (clean win, build first). CategoryD=187 props, stateful multi-step OLL flow (real reverse-eng project)."
+}
