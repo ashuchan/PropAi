@@ -40,6 +40,12 @@ from ma_poc.pms.adapters._daily_runner_parsers import (
     _money_to_int,
     _walk_jsonld,
 )
+from ma_poc.pms.signal_engine.floor_plan_signals import (
+    SIGNAL_THRESHOLD_STRUCTURAL as _FP_STRUCTURAL,
+)
+from ma_poc.pms.signal_engine.floor_plan_signals import (
+    has_floor_plan_signals as _has_fp_signals,
+)
 
 # Mirrors scripts/entrata.py::_EMBEDDED_JS_GLOBALS so both pipelines search
 # the same set of SSR framework globals.
@@ -73,9 +79,13 @@ _PROPERTY_VARS: tuple[str, ...] = (
     "buildingData",
 )
 
-# Signal keywords that make an inline script worth JSON-extracting.
+# Structural floor-plan keywords that make an inline script worth JSON-extracting.
+# Only structural unit-dimension terms — "rent"/"avail"/"pricing"/"units" are
+# too broad and match chatbot configs, analytics, and amenity feeds that have
+# zero floor-plan data.  Blobs are screened again by has_floor_plan_signals
+# after extraction so false positives from this gate are cheap.
 _UNIT_KEYWORD_RE = re.compile(
-    r"floor.?plan|floorPlan|units|avail|rent|bedroom|sqft|pricing",
+    r"floor.?plan|floorPlan|bedroom|sqft|studio|unitType|floorplanName",
     re.IGNORECASE,
 )
 
@@ -112,6 +122,68 @@ def _money_int_or_none(v: Any) -> int | None:
     if v is None or v == "":
         return None
     return _money_to_int(str(v))
+
+
+def _read_additional_property(item: dict[str, Any]) -> dict[str, Any]:
+    """Schema.org Product ``additionalProperty: [PropertyValue]`` reader.
+
+    Squarespace, Shopify, and several other e-commerce CMSes serialise
+    apartment dimensions as a list of PropertyValue ``{name, value}`` pairs
+    rather than as direct Schema.org keys. The Squarespace "Apartment
+    Floor Plan" template produces:
+
+        {"@type": "Product",
+         "additionalProperty": [
+           {"@type": "PropertyValue", "name": "Bedrooms",      "value": 1},
+           {"@type": "PropertyValue", "name": "Bathrooms",     "value": 1},
+           {"@type": "PropertyValue", "name": "Square Footage","value": 830}
+         ]}
+
+    Returns a dict keyed by canonical field names (``bedrooms``, ``bathrooms``,
+    ``sqft``) — empty when no recognisable PropertyValue is present.
+    Caller MERGEs this into the unit dict alongside Offer fields. Never raises.
+
+    See data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md
+    PID 61950 (250high.com) for the canonical case.
+    """
+    out: dict[str, Any] = {}
+    aps = item.get("additionalProperty") or item.get("additionalproperty") or []
+    if not isinstance(aps, list):
+        return out
+    # Mapping from PropertyValue.name (lowercased) → canonical key.
+    _NAME_TO_CANON: dict[str, str] = {
+        "bedrooms":         "bedrooms",
+        "bedroom":          "bedrooms",
+        "beds":             "bedrooms",
+        "bed":              "bedrooms",
+        "number of bedrooms": "bedrooms",
+        "bathrooms":        "bathrooms",
+        "bathroom":         "bathrooms",
+        "baths":            "bathrooms",
+        "bath":             "bathrooms",
+        "number of bathrooms": "bathrooms",
+        "square footage":   "sqft",
+        "square feet":      "sqft",
+        "square foot":      "sqft",
+        "sqft":             "sqft",
+        "sq ft":            "sqft",
+        "size":             "sqft",
+        "area":             "sqft",
+        "floor size":       "sqft",
+        "floor area":       "sqft",
+    }
+    for ap in aps:
+        if not isinstance(ap, dict):
+            continue
+        name = str(ap.get("name", "")).strip().lower()
+        val = ap.get("value")
+        canon = _NAME_TO_CANON.get(name)
+        if canon and val not in (None, ""):
+            # Don't overwrite a value already present (e.g. earlier
+            # PropertyValue with the same canonical name).
+            if canon not in out:
+                out[canon] = val
+    return out
 
 
 def _build_unit_from_offer(
@@ -167,6 +239,38 @@ def _build_unit_from_offer(
         num_rooms = num_rooms.get("value", "")
     if num_rooms not in (None, ""):
         bedrooms = str(num_rooms)
+    # numberOfBedrooms — populated by Pass-1 path but also surfaces on some
+    # Product/Offer containers (Squarespace e-commerce uses both).
+    if not bedrooms:
+        for src in (item, offer):
+            if isinstance(src, dict):
+                nb = src.get("numberOfBedrooms")
+                if nb not in (None, ""):
+                    bedrooms = str(nb)
+                    break
+
+    bathrooms = ""
+    for src in (item, offer):
+        if isinstance(src, dict):
+            nb = src.get("numberOfBathroomsTotal") or src.get("numberOfBathrooms")
+            if nb not in (None, ""):
+                bathrooms = str(nb)
+                break
+
+    # additionalProperty: [PropertyValue] — Schema.org list-shaped dimension
+    # carrier used by Squarespace's "Apartment Floor Plan" Product template
+    # and Shopify/other e-commerce CMSes. Only fills slots still empty so
+    # direct Schema.org keys remain authoritative.
+    for src in (offer, item):
+        if not isinstance(src, dict):
+            continue
+        ap = _read_additional_property(src)
+        if not bedrooms and ap.get("bedrooms") not in (None, ""):
+            bedrooms = str(ap["bedrooms"])
+        if not bathrooms and ap.get("bathrooms") not in (None, ""):
+            bathrooms = str(ap["bathrooms"])
+        if not sqft and ap.get("sqft") not in (None, ""):
+            sqft = str(ap["sqft"])
 
     avail = ""
     if isinstance(item, dict):
@@ -183,7 +287,7 @@ def _build_unit_from_offer(
         "floor_plan_name": name,
         "bed_label": "",
         "bedrooms": bedrooms,
-        "bathrooms": "",
+        "bathrooms": bathrooms,
         "sqft": sqft,
         "unit_number": "",
         "floor": "",
@@ -340,6 +444,89 @@ def _extract_standalone_offers(data: Any, source_url: str) -> list[dict[str, Any
     return units
 
 
+def _extract_product_floorplans_as_units(
+    data: Any, source_url: str
+) -> list[dict[str, Any]]:
+    """Pass 4: emit units from Schema.org ``Product`` siblings that each
+    represent a single floor-plan.
+
+    The Squarespace e-commerce extension for property listings emits a graph
+    of multiple ``Product`` nodes (one per floor plan) where:
+      * ``@type`` is ``Product``
+      * ``category`` is ``"Apartment Floor Plan"`` (or contains "Apartment"
+        or "Floor Plan")
+      * ``offers`` is a SINGLE dict (with ``price`` / ``lowPrice`` /
+        ``highPrice``), NOT a list — so the existing ``_extract_offers_as_units``
+        skip at ``len(arr) < 2`` rejects each Product individually
+      * ``additionalProperty: [PropertyValue]`` carries the dimensions
+
+    Pass 2 misses this pattern because each Product has only one offer.
+    Pass 3 misses it because the Offers are nested (not bare). This pass
+    closes the gap: collects every Product whose ``category`` smells like
+    apartment-floor-plan, and emits each as a unit via ``_build_unit_from_offer``
+    on its single offer dict.
+
+    Distinguishing-fields guard: require ≥2 distinct Products to qualify
+    (each is a separate floor plan; a single Product is property metadata).
+
+    See data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md
+    PID 61950 (250high.com) — 5 Product siblings with single offers each.
+    """
+    products: list[dict[str, Any]] = []
+    _APARTMENT_CATEGORY_HINTS = (
+        "apartment",
+        "floor plan",
+        "floorplan",
+        "rental",
+        "residence",
+        "unit",
+    )
+
+    def _walk(node: Any) -> None:
+        if isinstance(node, dict):
+            t = node.get("@type")
+            t_list: list[str] = []
+            if isinstance(t, str):
+                t_list = [t]
+            elif isinstance(t, list):
+                t_list = [x for x in t if isinstance(x, str)]
+            if "Product" in t_list:
+                cat = node.get("category", "")
+                if isinstance(cat, str):
+                    cat_lower = cat.lower()
+                    if any(h in cat_lower for h in _APARTMENT_CATEGORY_HINTS):
+                        products.append(node)
+                        # Don't recurse into a matched Product's children;
+                        # additionalProperty / offers are leaf data.
+                        return
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                _walk(v)
+
+    _walk(data)
+    if len(products) < 2:
+        return []
+
+    units: list[dict[str, Any]] = []
+    for p in products:
+        offer = p.get("offers")
+        # Wrap a singular offer dict in a synthetic "offer-shape" view so
+        # _build_unit_from_offer can read price + the Product's
+        # additionalProperty in one pass.
+        synthetic_offer: dict[str, Any] = {}
+        if isinstance(offer, dict):
+            synthetic_offer.update(offer)
+        synthetic_offer["itemOffered"] = p
+        synthetic_offer.setdefault("name", p.get("name", ""))
+        parent_name = p.get("name", "") if isinstance(p.get("name"), str) else ""
+        u = _build_unit_from_offer(synthetic_offer, parent_name, source_url)
+        if u:
+            units.append(u)
+    return units
+
+
 def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]:
     """Extract unit records from ``<script type="application/ld+json">`` blocks.
 
@@ -428,25 +615,11 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
                 isinstance(offers_raw, list) and bool(offers_raw)
             )
             has_name = bool(item.get("name"))
-            has_size = bool(item.get("floorSize"))
-            has_rooms = bool(item.get("numberOfRooms") or item.get("numberOfBedrooms"))
             if not (has_price or has_name):
                 # Skip items that only have physical attributes (size/rooms)
                 # but no name and no price — these are itemOffered sub-nodes
                 # nested inside Offer elements and are handled by pass 2
                 # (_extract_offers_as_units) instead.
-                continue
-            # 2026-05-13 teammate analysis (C8 JSON-LD false-positive): nodes
-            # with @type=Apartment but only a ``name`` and no quantitative
-            # data (no price, no size, no bedroom count) still slip through.
-            # Examples observed:
-            #   {"@type": "Apartment", "name": "Pet Friendly", ...}
-            #   {"@type": "ApartmentComplex", "name": "Amenities"}
-            # post_process eventually rejects them, but the planner sees
-            # ``ran_units=1`` first and escalates to LLM rescue, burning
-            # token budget. Require at least one quantitative dimension to
-            # emit a unit; name-only nodes get skipped.
-            if not (has_price or has_size or has_rooms):
                 continue
 
             name = item.get("name") or ""
@@ -540,7 +713,21 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
         for data in parsed_blocks:
             units.extend(_extract_offers_as_units(data, source_url))
 
-    # Pass 3 (Bug 4, 2026-05-09): standalone Offer arrays — bare ``Offer``
+    # Pass 3 (2026-05-15): Product siblings each representing a single
+    # floor-plan. Squarespace e-commerce property listings use this pattern:
+    # multiple Product nodes at @graph level, each with a single Offer +
+    # additionalProperty: [PropertyValue] carrying bedrooms/bathrooms/sqft.
+    # MUST run BEFORE the bare-Offer pass — Squarespace nests its individual
+    # offers inside an AggregateOffer dict on each Product, and the bare-Offer
+    # walker picks those up with no parent context, dropping the
+    # additionalProperty dimensions.
+    # See PID 61950 (250high.com) in
+    # data/canary/local_runs/fix-validation-2026-05-15/UNCHANGED_FAIL_ANALYSIS.md.
+    if not units:
+        for data in parsed_blocks:
+            units.extend(_extract_product_floorplans_as_units(data, source_url))
+
+    # Pass 4 (Bug 4, 2026-05-09): standalone Offer arrays — bare ``Offer``
     # nodes that are siblings of ``Brand``/``PostalAddress``/etc., or nested
     # inside non-listed containers like ``Brand``. Closes the gscapts.com /
     # Jonah Systems / Knock CMS gap where Offers are present but neither
@@ -714,9 +901,16 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
     found: list[dict[str, Any]] = []
 
     # ── Strategy A: <script type="application/json"> (incl. __NEXT_DATA__) ──
+    # Upper cap raised from 1 MB → 4 MB. The Razz / MyRazz CMS platform
+    # serialises ENTIRE inventory state inline (PID 246710 8181medcenter
+    # ships 678 units + 5 plan models in a ~1.02 MB blob — just over the
+    # old cap). 4 MB still bounds the per-page memory budget but covers
+    # every observed inline-inventory CMS so far. Pages above that limit
+    # are almost certainly mis-rendered (the rendered HTML wraps real
+    # data plus minified component code).
     for script in soup.find_all("script", attrs={"type": "application/json"}):
         text = script.string or script.get_text()
-        if not text or len(text) < 200 or len(text) > 1_000_000:
+        if not text or len(text) < 200 or len(text) > 4_000_000:
             continue
         try:
             data = json.loads(text)
@@ -894,7 +1088,295 @@ _PORTAL_URL_PATTERNS: tuple[tuple[str, str], ...] = (
     ("funnelleasing.com/embed", "funnel"),
     ("apartments.appfolio.com", "appfolio"),
     ("widgets.appfolio.com", "appfolio"),
+    # AppFolio per-property widget — the actual listings live at
+    # ``{property-slug}.appfolio.com/listings`` (e.g. ``franklin.appfolio.com``,
+    # ``postroadmgmt.appfolio.com``). Observed 2026-05-14 on PIDs 219388 +
+    # 46582 where this iframe carries the inventory but pattern-matching
+    # only knew about the legacy ``apartments.appfolio.com`` host.
+    (".appfolio.com/listings", "appfolio"),
+    # NOTE: `.appfolio.com/connect` removed 2026-05-15. AppFolio's `/connect/*`
+    # paths are Keycloak auth shells (`/connect/users/sign_in`,
+    # `/connect/users/oauth/callback`, `/connect/signout`, literal
+    # `/connect/*`) — 29 KB login pages with zero unit data. Marketing sites
+    # embed "Pay Rent" / "Tenant Portal" iframes pointing at these and the
+    # per-hop quoted-URL re-scan keeps re-queueing more auth URLs from the
+    # login page body, burning the entire hop budget. The `.appfolio.com/listings`
+    # pattern above already covers the canonical inventory iframe.
+    # See data/reports/cloud_run_2026-05-15/TRIAGE.md RC #3b.
+    # ResMan property-management portal
+    ("myresman.com/portal/applicants", "resman"),
+    ("myresman.com/portal/prospects", "resman"),
+    ("resman.com/portal/", "resman"),
+    # Yardi RentCafe variants
+    (".yardi.com", "yardi"),
+    # FortressTech: leasing-portal vendor. Observed on Squarespace marketing
+    # sites embedding ``embed.fortresstech.io`` + ``portal.fortresstech.io``
+    # iframes (e.g. PID 1713 brooklaneapts.com — 2026-05-15).
+    # See data/reports/cloud_run_2026-05-15/TRIAGE.md RC #10.
+    ("fortresstech.io", "fortresstech"),
+    # Wix Visual Data widget: AngularJS SPA that renders a tabular Wix
+    # Collection inside an iframe. Wix sites with the "Visual Data" Wix-App
+    # embed inventory here — the marketing page's main DOM has no inventory
+    # text, just a placeholder iframe. URL shape:
+    #   wix-visual-data.appspot.com/index?pageId={page}&compId={comp}&siteRevision={n}...
+    # Observed 2026-05-15 on PIDs 46179 hayloft east-hampton-estates (5 floor
+    # plans) and 118965 16bennett (30+ unit-level table rows with rent).
+    ("wix-visual-data.appspot.com", "wix_visual_data"),
+    # Cross Street Leasing — third-party leasing widget embedded as an iframe
+    # by some Wix / Squarespace marketing sites. URL shape:
+    #   yourcrossstreet.com/property/{slug}/?floorplan={id}&...
+    # Observed 2026-05-15 on PID 292955 3140clybourn.com /floor-plans
+    # (6 floor plans with availability counts, rent, sqft).
+    ("yourcrossstreet.com/property", "yourcrossstreet"),
+    # D17a (2026-05-16): hy.ly Marketing Cloud API endpoints.
+    # The chat widget at `my.hy.ly/chat` is BLACKLISTED below (line 1221)
+    # to prevent the 6th-pass discovery from queueing chatbot configs as
+    # inventory portals. But `my.hy.ly/api/` IS inventory data — explicitly
+    # allowed here so synthesised hy.ly API URLs (from `_INLINE_JS_INIT_PATTERNS`
+    # at scraper.py) get routed correctly. PID 1085 Sound at Peninsula +
+    # the ZRS Management portfolio (~30+ properties).
+    ("my.hy.ly/api/", "hyly"),
+    # SightMap direct API endpoint (D19a, 2026-05-16). Distinct from the
+    # `sightmap.com/embed/` allow-list entry above — `/app/api/v1/`
+    # returns the unit JSON directly. Routed through the existing SightMap
+    # adapter which is body-shape-aware.
+    ("sightmap.com/app/api", "sightmap"),
 )
+
+
+# RC4d (2026-05-17 regression fix) — path segments that indicate an
+# authentication wall on an otherwise-recognised portal host. Even when
+# a URL's host matches ``_PORTAL_URL_PATTERNS`` (so it gets queued at the
+# top embedded-portal score of 10_000+), if the path is a sign-in /
+# login / signout / auth-callback route, fetching it returns a 0-unit
+# auth-shell that wastes a hop slot and feeds the LLM with chrome.
+# Observed 2026-05-17 on PID 6997 — ``urbanresidential.myresman.com``
+# matched the ``resman`` host allow-list but the URL was
+# ``/Portal/Access/SignIn/WT`` (Keycloak-style auth wall).
+#
+# AppFolio's ``.appfolio.com/connect/users/sign_in`` was also a recurring
+# offender, which is why the previous fix (2026-05-15) excised the
+# ``.appfolio.com/connect`` host pattern from the allow-list entirely.
+# This filter is the general-case equivalent: keep the host in the
+# allow-list (so legitimate inventory URLs on it work), but reject any
+# URL whose path is an auth route.
+_PORTAL_AUTH_PATH_SEGMENTS: frozenset[str] = frozenset({
+    "sign-in", "sign_in", "signin",
+    "sign-up", "sign_up", "signup",
+    "sign-out", "sign_out", "signout",
+    "logout", "log-out", "log_out",
+    "login", "log-in", "log_in",
+    "auth", "authenticate", "authentication",
+    "oauth", "oauth2", "callback",
+    "register", "registration",
+    "forgot-password", "reset-password", "password-reset",
+})
+
+
+def _is_portal_auth_path(url: str) -> bool:
+    """``True`` when *url* is an auth/sign-in route on an allow-listed portal.
+
+    Path-segment match (not substring) so slugs like ``/signature-plan/``
+    or ``/north-login-blvd-apartments/`` are not false-positives. The
+    check is case-insensitive — ResMan returns ``/Portal/Access/SignIn``
+    with mixed case but consumer code lower-cases before lookup.
+    """
+    if not url:
+        return False
+    try:
+        import urllib.parse as _up
+        parsed = _up.urlparse(url)
+        path_segments = (parsed.path or "").lower().split("/")
+        return any(seg in _PORTAL_AUTH_PATH_SEGMENTS for seg in path_segments if seg)
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Generic unknown-portal discovery
+# ---------------------------------------------------------------------------
+# The hardcoded ``_PORTAL_URL_PATTERNS`` above is a high-precision allow-list:
+# we know these hosts are leasing portals and queue them at a top score.
+# But when a property site embeds inventory in a NEW vendor's iframe we
+# haven't catalogued, the scraper has no way to learn — every property using
+# that vendor fails until someone notices and ships a new pattern.
+#
+# The blacklist below is the COMPLEMENT: hosts we're confident are NOT
+# leasing portals — analytics, maps, chat, captcha, social, third-party
+# trackers, and Wix/Squarespace internal CDNs. Any cross-origin iframe with
+# a host NOT on this blacklist is a CANDIDATE unknown portal: queue it at
+# a medium score (below known-portal 10_000 but above PMS_PRIOR 5_000),
+# emit a telemetry event so cross-run aggregation can identify trending
+# unknown vendors, and let the existing fetch/extract path try it.
+#
+# Goal: open-by-default discovery so an unknown vendor either yields data
+# (recovery without a code change) or is added to the blacklist with one
+# line if it proves to be noise.
+
+_PORTAL_INFRA_BLACKLIST: tuple[str, ...] = (
+    # Analytics + tag managers
+    "google-analytics.com",
+    "googletagmanager.com",
+    "doubleclick.net",
+    "googleadservices.com",
+    "bat.bing.com",
+    "facebook.com/tr",
+    "hotjar.com",
+    "fullstory.com",
+    "sentry.io",
+    "mixpanel.com",
+    "segment.com",
+    "omappapi.com",
+    "theconversioncloud.com",
+    "visitor-analytics.io",
+    "walkme.com",
+    "userway.org",
+    "callrail.com",
+    "osano.com",
+    # A/B-testing + consent management — emit user-keyed config iframes that
+    # look like portals (cdn.optimizely.com/client_storage/<key>.html) but
+    # carry no inventory. PID 2982 Cortland on Pike 2026-05-16 wasted hop 1
+    # on a19749172433.cdn.optimizely.com — the same Optimizely iframe will
+    # appear on any A/B-tested property site.
+    "optimizely.com",
+    "cdn.optimizely.com",
+    "cookiebot.com",
+    "consensu.org",
+    "onetrust.com",
+    "trustarc.com",
+    "termly.io",
+    "iubenda.com",
+    # 2026-05-17 — Yardi's own cookie-consent + corporate marketing CDN.
+    # PID 52331 alexandriacarmel had ``resources.yardi.com/legal/cookie-notice/``
+    # scored at 10110 via the portal-iframe scanner, beating the per-plan
+    # detail URLs (5980+) and burning a hop slot. ``resources.yardi.com``
+    # serves WordPress legal/marketing pages; ``www.yardi.com`` is the
+    # corporate site — neither carries property inventory.
+    "resources.yardi.com",
+    "www.yardi.com",
+    # Ad-tech / programmatic — never inventory
+    "doubleverify.com",
+    "adnxs.com",
+    "pubmatic.com",
+    "rubiconproject.com",
+    "adsystem.com",
+    "scorecardresearch.com",
+    "quantserve.com",
+    # Maps / geo
+    "maps.google",
+    "googleapis.com/maps",
+    "mapbox.com",
+    "openstreetmap.org",
+    # Chat / lead-capture / accessibility
+    "drift.com",
+    "intercom.io",
+    "zendesk.com",
+    "livechatinc.com",
+    "tawk.to",
+    "crisp.chat",
+    "meetelise.com",
+    "sierra.chat",
+    "nestiolistings.com",
+    "rentgrata.com",
+    "g5marketingcloud.com",
+    "g5-c-",  # g5 marketing widget CDN
+    # Hyly / EliseAI chat widgets — `my.hy.ly/chat/ssid?page_url=...`
+    # is the per-property chatbot iframe, NOT a leasing portal. The
+    # 6th-pass unknown-portal scan was picking it up at score 9000
+    # and burning hops on chat endpoints that return chat-config JSON.
+    # PIDs 69188 (727westmadison), 16139 (chaseknollsapts), 20959
+    # (dovevalleyapts) — 2026-05-15 cloud run.
+    "my.hy.ly/chat",
+    "chat.hy.ly",
+    "hy.ly/chat",
+    # Canva design embeds — sites use Canva to render marketing graphics
+    # (e.g. floor-plan diagrams as Canva designs). The /design/{id}/view
+    # iframe is a graphic, not a data widget. When the hop walker queues
+    # the Canva URL, the subpath-prior helper appends /floorplans, /pricing
+    # etc. and Canva 403s every variant. Wasted hop budget.
+    # PIDs 37719 (1611onlakeunion), 20959 (dovevalleyapts) — 2026-05-15.
+    "canva.com/design",
+    # CAPTCHA / bot protection
+    "recaptcha.net",
+    "google.com/recaptcha",
+    "hcaptcha.com",
+    "perimeterx.net",
+    "geetest.com",
+    "friendlycaptcha.com",
+    "cloudflare.com/cdn-cgi",
+    # Social / sharing
+    "facebook.com/plugins",
+    "twitter.com/widgets",
+    "instagram.com/embed",
+    "linkedin.com/embed",
+    "youtube.com/embed",
+    "vimeo.com",
+    "pinterest.com/widget",
+    # Wix / Squarespace / parastorage internal infrastructure
+    # (parastorage hosts UI components, not inventory — but
+    # wix-visual-data.appspot.com IS inventory and is NOT in this blacklist)
+    "parastorage.com",
+    "wixstatic.com",
+    "static1.squarespace.com",
+    "images.squarespace-cdn.com",
+    "wix-instantsearchplus",
+    "filesusr.com",
+    # CDN-only assets
+    "cloudfront.net/assets",
+    "cdnjs.cloudflare.com",
+    "jsdelivr.net",
+    "unpkg.com",
+    # Email / contact form services
+    "mailchimp.com",
+    "constantcontact.com",
+    "typeform.com",
+    "jotform.com",
+    "wufoo.com",
+    "google.com/forms",
+    # Misc
+    "tour-virtual",  # virtual tour widgets (matterport, etc — could be promoted later)
+    "matterport.com",
+    "kuula.co",
+    # RC4c (2026-05-17 regression fix) — additional unknown-portal hosts
+    # that the iframe-scanner was queuing at scores 4_700-10_040 because
+    # they pass the "is iframe + not blacklisted" gate. None of these
+    # carry property inventory; together they accounted for 1100+ wasted
+    # hop fetches on PIDs 6997 / 229374 / 231970 in the May 17 cloud run.
+    "leavefeedback.app",          # feedback-survey iframe
+    "gum.criteo.com",             # ad-tech / programmatic
+    "connect.facebook.net",       # FB tracking pixel signals
+    "analytics.sitewit.com",      # marketing analytics
+    "rp-webchat-client.netlify.app",  # RealPage chat widget
+    "integrations.nestio.com",    # Nestio integration glue
+    "webchat-client",             # generic webchat iframe path
+)
+
+
+def _is_portal_infra_blacklisted(url: str) -> bool:
+    """True when *url*'s host/path is on the no-portal blacklist.
+
+    Cheap substring check — runs on every iframe src during unknown-portal
+    discovery. Order doesn't matter; first hit wins.
+    """
+    if not url:
+        return True
+    lower = url.lower()
+    return any(needle in lower for needle in _PORTAL_INFRA_BLACKLIST)
+
+
+def _iframe_host(url: str) -> str:
+    """Extract the host (registered domain + subdomain) from a URL.
+
+    Returns lowercased host or "" on parse failure. Used for telemetry
+    deduplication so the same vendor's URL with different query params
+    aggregates as one entry.
+    """
+    try:
+        import urllib.parse as _up
+        parsed = _up.urlparse(url)
+        return (parsed.hostname or "").lower()
+    except Exception:
+        return ""
 
 # Cap the recursion depth so a self-referential JSON blob can't blow
 # the stack. 12 is deep enough for every realistic portal-config shape
@@ -957,6 +1439,10 @@ def detect_embedded_portal_urls(
                     # too ("//sightmap.com/embed/...").
                     if candidate.startswith("//"):
                         candidate = "https:" + candidate
+                    # RC4d — reject auth-wall paths on allow-listed hosts.
+                    # See ``_is_portal_auth_path`` for the segment list.
+                    if _is_portal_auth_path(candidate):
+                        return
                     if candidate in seen_urls:
                         return
                     seen_urls.add(candidate)
@@ -976,6 +1462,54 @@ def detect_embedded_portal_urls(
             continue
         _walk(body, 0)
 
+    return out
+
+
+# Regex that finds all https:// URLs appearing as plain text anywhere in raw
+# HTML — covers JSON.parse('...') blobs, obfuscated JS assignments, and any
+# other encoding where the URL is present as a string literal but not in a
+# parseable structure.
+_RAW_URL_RE = re.compile(
+    r'https://[\w\-\.]+(?::\d+)?(?:/[^\s"\'<>\\\x00-\x1f]*)?',
+    re.ASCII,
+)
+
+
+def sweep_raw_html_for_portal_urls(html: str) -> list[tuple[str, str]]:
+    """Scan raw HTML text for portal URLs using a broad URL regex.
+
+    Complements ``detect_embedded_portal_urls`` for sites (e.g. Canva SPAs,
+    obfuscated marketing builders) where portal URLs are present as plain
+    text inside ``JSON.parse('...')`` or other non-parseable JS patterns —
+    structures that ``extract_embedded_blobs_from_html`` cannot decode.
+
+    Args:
+        html: Raw HTML string from the fetcher (before any parsing).
+
+    Returns:
+        Deduplicated ``(url, portal_name)`` list, same shape as
+        ``detect_embedded_portal_urls``.
+    """
+    if not html:
+        return []
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for m in _RAW_URL_RE.finditer(html):
+        url = m.group(0).rstrip(".,;)'\"")  # strip trailing punctuation
+        if url in seen:
+            continue
+        # RC4d — reject auth-wall paths on allow-listed hosts before any
+        # pattern match runs. Symmetric with the embedded-JSON walker
+        # above so the same URL is treated identically regardless of
+        # which discovery path found it.
+        if _is_portal_auth_path(url):
+            continue
+        lower = url.lower()
+        for needle, portal in _PORTAL_URL_PATTERNS:
+            if needle in lower:
+                seen.add(url)
+                out.append((url, portal))
+                break
     return out
 
 
@@ -1006,29 +1540,61 @@ _TLD_RE = re.compile(
     r'\.(com|net|org|apartments|info|biz|co|us|homes|live|apts)$',
     re.IGNORECASE,
 )
+# D5 (2026-05-16): direct SecureCafe href detection. Multi-property portfolios
+# (Morgan Properties, Greystar, etc.) use per-property securecafe subdomains
+# like ``hickorymilloh.securecafe.com`` — synthesising from the portfolio's
+# base hostname (``morgan-properties.securecafe.com``) produces a 404.
+# When the page already contains an explicit ``<a href="https://{slug}.
+# securecafe.com/onlineleasing/{path}/...">``, USE THAT URL VERBATIM and skip
+# the synthesiser.  PID 161 Hickory Mill 2026-05-16: line 558 has the right
+# host but our synthesiser built the wrong one.
+_DIRECT_SECURECAFE_RE = re.compile(
+    r'href=["\'](https?://[a-z0-9][a-z0-9-]+\.securecafe\.com/onlineleasing/[a-z0-9][a-z0-9-]+(?:/[^"\'\s]*)?)',
+    re.IGNORECASE,
+)
 
 
 def detect_securecafe_portal_url(html: str, base_url: str) -> str | None:
-    """Construct a SecureCafe floor-plans URL from /onlineleasing/ href + domain.
+    """Construct a SecureCafe floor-plans URL.
 
-    Matches Shape-B SecureCafe sites where the property domain has a JS-only
-    route ``/onlineleasing/{slug}`` that client-side-redirects to the securecafe
-    subdomain.  Because the JS redirect is never followed in HTTP-fetch mode,
-    we synthesise the canonical URL instead:
+    Two-phase detection (D5 redesign, 2026-05-16):
 
-        https://{domain_slug}.securecafe.com/onlineleasing/{path_slug}/floorplans.aspx
+      Phase 1 — direct href. When the page already carries an explicit
+        ``<a href="https://{slug}.securecafe.com/onlineleasing/{path}/...">``,
+        use that URL verbatim. Preferred for multi-property portfolios
+        where each property has its own securecafe subdomain (PID 161
+        Hickory Mill → ``hickorymilloh.securecafe.com``).
 
-    The domain slug is the property hostname with ``www.`` and TLD stripped.
-    The path slug comes directly from the ``/onlineleasing/`` href — it always
-    matches the SecureCafe path because the property developer sets both.
-
-    Args:
-        html: Full Playwright-rendered page HTML.
-        base_url: The property entry URL (used to derive the subdomain).
+      Phase 2 — slug synthesis. When no direct href exists but the page
+        has a local ``/onlineleasing/{slug}`` route (JS SPA redirect),
+        synthesise:
+            https://{domain_slug}.securecafe.com/onlineleasing/{path_slug}/floorplans.aspx
+        ``domain_slug`` = base hostname minus ``www.`` and TLD.
 
     Returns:
-        Absolute floorplans.aspx URL, or None when the pattern is absent.
+        Absolute SecureCafe URL, or None when no pattern matched.
     """
+    # Phase 1: direct securecafe href present? Use it verbatim.
+    direct_m = _DIRECT_SECURECAFE_RE.search(html)
+    if direct_m:
+        direct_url = direct_m.group(1)
+        # Heuristic — strip ``/userlogin.aspx`` etc. and prefer the floorplans
+        # endpoint when the matched path is a sign-in / application form
+        # rather than the listing page.
+        if any(noise in direct_url.lower() for noise in (
+            "userlogin", "oleapplication", "guestlogin", "residentservices",
+        )):
+            # Trim back to the property root and append floorplans.aspx
+            stem = re.sub(
+                r"(/onlineleasing/[a-z0-9][a-z0-9-]+)/.*$",
+                r"\1/floorplans.aspx",
+                direct_url,
+                flags=re.IGNORECASE,
+            )
+            return stem
+        return direct_url
+
+    # Phase 2: synthesise from /onlineleasing/{slug} JS route + base hostname.
     path_m = _ONLINELEASING_RE.search(html)
     if not path_m:
         return None
@@ -1061,6 +1627,21 @@ def detect_securecafe_portal_url(html: str, base_url: str) -> str | None:
 # adapter-shape unit dict.
 
 _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
+    # D4 (2026-05-16): RentCafe per-plan availability rows. Each row holds
+    # one unit with Unit#, rent, sqft, deposit, availability date. 58-59
+    # rows per page on PID 5822 The Izzy. Must come BEFORE the generic
+    # ".unit-card" so the more specific selector wins for RentCafe sites.
+    "div.option-row",
+    ".option-row",
+    # Cortland-style apartment grid (PID 2982): 79 anchors with
+    # data-js-hook="apartment" + data-unit-id / data-apartment-id attrs.
+    "a[data-js-hook='apartment']",
+    ".apartments__card",
+    # Brook-style apartment card (PID 3483): `<div class="card">` wrapping
+    # `<h3>Apartment: <span># NNNNNN</span></h3>` blocks. Scoped to the
+    # availability container `#availApts` so we don't pick up unrelated
+    # marketing cards on the same site.
+    "#availApts .card",
     # Common PMS / CMS container patterns. Specific-first, generic-last so a
     # site with both `.unit-card` and `.card` prefers the specific one.
     ".unit-card",
@@ -1101,6 +1682,17 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
 _RENT_PATTERN = re.compile(
     r"\$\s*(\d{1,3}(?:,\d{3})*|\d{3,5})(?:\.\d{2})?",
 )
+# Captures bare numbers following price-range / pricing labels.
+# Handles "Price Range: 1,200 - 1,500 /mo", "From 1,350/month", etc.
+# Group 1: lower bound (always present).  Group 2: upper bound (optional).
+# Only used as a fallback when _RENT_PATTERN produces no dollar matches.
+_PRICE_RANGE_PATTERN = re.compile(
+    r"(?:price\s+range|starting\s+(?:from|at)|from|rent\s+(?:from|starting))"
+    r"\s*:?\s*"
+    r"(\d{1,3}(?:,\d{3})*|\d{3,5})"
+    r"(?:[^0-9]{0,15}(\d{1,3}(?:,\d{3})*|\d{3,5}))?",
+    re.IGNORECASE,
+)
 _SQFT_PATTERN = re.compile(
     r"(\d{2,5})\s*(?:sq\.?\s*ft\.?|sqft|square\s*feet)",
     re.IGNORECASE,
@@ -1118,6 +1710,39 @@ _UNIT_NUM_PATTERN = re.compile(
     r"(?:unit|apt|apartment|#)\s*#?\s*([A-Za-z0-9][A-Za-z0-9\-]{0,10})",
     re.IGNORECASE,
 )
+# Stop-words that appear directly after the regex anchors ("apartment Details",
+# "apartment with", "apartment for", "apartment Bed") in marketing prose. The
+# regex captures the next 1–11-char token regardless of meaning, so without
+# this filter we emit a phantom unit with unit_number="Details" / "with" /
+# "for" / "Bed", whose existence makes the planner stop at pct_complete=1.0
+# and the link-hop never fires (see PID 2982 Cortland on Pike 2026-05-14).
+# Tokens that contain a digit are always accepted — those look like real
+# unit numbers ("A-301", "203B"). Tokens that are pure-alphabetic AND in the
+# stop-word list are rejected.
+_UNIT_NUM_STOPWORDS: frozenset[str] = frozenset({
+    "details", "with", "for", "and", "the", "near", "info", "tour", "now",
+    "today", "view", "more", "see", "from", "starting", "rent", "lease",
+    "bed", "bath", "beds", "baths", "bedroom", "bathroom", "sqft", "studio",
+    "available", "homes", "home", "house", "loft", "lofts",
+    "this", "that", "your", "our", "is", "are",
+})
+
+
+def _is_valid_unit_number(token: str) -> bool:
+    """Reject English stop-words masquerading as unit numbers.
+
+    Production-emitted bogus ids on 2026-05-14: "Details", "with", "for",
+    "Bed". Each came from a regex that anchors on "apartment"|"apt"|
+    "unit"|"#" and captures the next word — which in marketing prose is
+    typically an English preposition or label. Real unit numbers almost
+    always contain at least one digit ("203", "A-12", "3B", "Loft-5").
+    Accept tokens containing a digit; reject pure-alphabetic stop-words.
+    """
+    if not token:
+        return False
+    if any(ch.isdigit() for ch in token):
+        return True
+    return token.strip().lower() not in _UNIT_NUM_STOPWORDS
 _FP_NAME_PATTERN = re.compile(
     r"(?:the\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)",
 )
@@ -1171,27 +1796,22 @@ def _sqft_match_is_valid(text: str, m: re.Match) -> bool:
 
 
 def _container_yields_unit(text: str) -> dict[str, Any] | None:
-    """Return a unit dict if ``text`` has at least rent + (sqft or beds).
+    """Return a unit dict when ``text`` has floor-plan structural signals.
 
-    2026-05-12 sqft fix: the regex matches any 2-5 digit number + sqft suffix,
-    including "100 sq ft storage" or "50 sq ft balcony". These values are
-    below 150 sqft (the realistic apartment floor), so _format_area previously
-    stored them as the -1 absent sentinel even though beds/baths were present.
-    _sqft_match_is_valid now rejects sub-150 matches and context-contaminated
-    matches (where a noise word like "balcony" or "storage" precedes the number).
+    Gate: requires ≥2 distinct floor-plan signal types (SIGNAL_THRESHOLD_STRUCTURAL)
+    so the canonical qualifiers are:
+      • floor_plan_name + beds + baths  (e.g. "1BR/1BA" or "Studio")
+      • beds + baths + area             (e.g. "1 bed / 1 bath  750 sqft")
+
+    Rent is NEVER a gate criterion — a floor-plan record with no price is still
+    valid data.  Rent is extracted as enrichment when present.
     """
-    rents = _RENT_PATTERN.findall(text)
-    if not rents:
+    # Gate: use the canonical floor-plan signal detector as the single check.
+    # This covers bed/bath/sqft/studio/floor-plan-type in all their variants.
+    if not _has_fp_signals(text, _FP_STRUCTURAL):
         return None
-    rent_ints = [r for r in (_rent_to_int(x) for x in rents) if r is not None]
-    if not rent_ints:
-        return None
-    rent_lo = min(rent_ints)
-    rent_hi = max(rent_ints)
 
-    # Find the best (largest) valid sqft match in the container text.
-    # Using the largest value avoids picking up sub-unit amenity areas that
-    # appear in the same container as the real unit sqft.
+    # Value extraction — run the specific patterns to pull out numeric values.
     valid_sqft_matches = [
         m for m in _SQFT_PATTERN.finditer(text) if _sqft_match_is_valid(text, m)
     ]
@@ -1202,17 +1822,34 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
     m_unit = _UNIT_NUM_PATTERN.search(text)
     is_studio = bool(_STUDIO_RE.search(text))
 
-    # Require at least one structural signal beyond rent so we don't pick up
-    # "hero price" banners or aggregate summaries.
-    if not (m_sqft or m_beds or is_studio):
-        return None
+    # --- rent (optional) ---
+    rent_ints: list[int] = []
+    dollar_rents = _RENT_PATTERN.findall(text)
+    if dollar_rents:
+        rent_ints = [r for r in (_rent_to_int(x) for x in dollar_rents) if r is not None]
+
+    if not rent_ints:
+        # Fallback: price-range labels without explicit $ prefix.
+        # Each match has up to two capture groups (lower, optional upper).
+        for m in _PRICE_RANGE_PATTERN.finditer(text):
+            for grp in (m.group(1), m.group(2)):
+                if grp:
+                    v = _rent_to_int(grp)
+                    if v is not None:
+                        rent_ints.append(v)
+
+    rent_lo: int | None = min(rent_ints) if rent_ints else None
+    rent_hi: int | None = max(rent_ints) if rent_ints else None
+    if rent_lo is not None and rent_hi is not None:
+        rent_range: str | None = f"{rent_lo}-{rent_hi}" if rent_hi > rent_lo else str(rent_lo)
+    else:
+        rent_range = None
 
     beds_val = m_beds.group(1) if m_beds else ("0" if is_studio else "")
     baths_val = m_baths.group(1) if m_baths else ""
     sqft_val = m_sqft.group(1) if m_sqft else ""
-    unit_num = m_unit.group(1) if m_unit else ""
-
-    rent_range = f"{rent_lo}-{rent_hi}" if rent_hi > rent_lo else str(rent_lo)
+    unit_num_raw = m_unit.group(1) if m_unit else ""
+    unit_num = unit_num_raw if _is_valid_unit_number(unit_num_raw) else ""
 
     return {
         "floor_plan_name": "",
@@ -1233,6 +1870,347 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
         "availability_date": "",
         "extraction_tier": "TIER_3_DOM",
     }
+
+
+# D6 (2026-05-16): attributes that carry per-unit identity when present.
+# Order matters — most specific first. ``data-unit-id`` is the truly-unique
+# database PK on most PMS embeds (Cortland 2604014, RentCafe 5704854). The
+# ``data-unit-number`` is human-readable (Cortland "4", "#C-113") and is a
+# weaker uniqueness signal but more useful for output. ``data-apartment-id``
+# is the apartment-level PK (one apartment can have multiple unit records
+# over time as availability changes).
+_DATA_UID_ATTRS: tuple[str, ...] = (
+    "data-unit-id",
+    "data-unit",
+    "data-unitid",
+    "data-unit_id",
+)
+_DATA_APT_ATTRS: tuple[str, ...] = (
+    "data-apartment-id",
+    "data-apartmentid",
+    "data-apartment_id",
+)
+_DATA_UNUM_ATTRS: tuple[str, ...] = (
+    "data-unit-number",
+    "data-unitnumber",
+    "data-unit_number",
+)
+
+
+def _extract_data_uid_from_node(node: Any) -> tuple[str, str, str]:
+    """Pull per-unit identifiers from data-* attributes on the node OR its descendants.
+
+    Returns ``(unit_id, apartmentid, unit_number)`` — any field may be empty.
+
+    Walks node first, then descendants. Returns the first non-empty
+    attribute value for each kind; doesn't try to reconcile competing
+    values (rare in practice — a single container usually has one set).
+    """
+    uid = apt = unum = ""
+    try:
+        descendants = [node] + list(node.find_all(True))
+    except Exception:
+        descendants = [node]
+    for el in descendants:
+        if not hasattr(el, "get"):
+            continue
+        if not uid:
+            for a in _DATA_UID_ATTRS:
+                v = el.get(a) or ""
+                if isinstance(v, str) and v.strip():
+                    uid = v.strip()
+                    break
+        if not apt:
+            for a in _DATA_APT_ATTRS:
+                v = el.get(a) or ""
+                if isinstance(v, str) and v.strip():
+                    apt = v.strip()
+                    break
+        if not unum:
+            for a in _DATA_UNUM_ATTRS:
+                v = el.get(a) or ""
+                if isinstance(v, str) and v.strip():
+                    unum = v.strip()
+                    break
+        if uid and apt and unum:
+            break
+    return uid, apt, unum
+
+
+# D13 (2026-05-16): page-level plan attributes used by compact-row extractors.
+# Per-plan availability pages render each unit as a short row carrying only
+# unit-level data (unit#, rent, sqft, availability). The plan-level data
+# (beds/baths/plan_name) lives in the page header. To assemble a complete
+# unit record, the compact-row extractors read page-level attrs ONCE and
+# apply to every row.
+_PAGE_CTX_BEDS_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:bedroom|bed\b|br\b)",
+    re.IGNORECASE,
+)
+_PAGE_CTX_BATHS_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:bathroom|bath\b|ba\b)",
+    re.IGNORECASE,
+)
+_PAGE_CTX_STUDIO_RE = re.compile(r"\bstudio\b", re.IGNORECASE)
+# Plan-name patterns commonly seen in <h1>/<title>/<meta property="og:title">.
+# "Floor Plan: 1x1 Reno" / "1 Bed / 1 Bath - A1B" / "Baywood Floor Plan"
+_PAGE_CTX_FP_NAME_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"floor\s*plan[:\s]+([^|<]{2,80})", re.IGNORECASE),
+    re.compile(r"([A-Za-z0-9][A-Za-z0-9 /+\-_.]{1,50})\s+floor\s*plan", re.IGNORECASE),
+)
+
+
+def _extract_page_ctx(soup: Any) -> dict[str, Any]:
+    """Extract page-level plan attributes (beds/baths/fp_name) once per page.
+
+    Read order: <h1> → <h2> → <title> → og:title meta.  First non-empty
+    plan-name pattern wins.  Beds/baths/studio are coalesced across all
+    these sources so a value present in ANY of them lifts the row.
+    """
+    ctx: dict[str, Any] = {
+        "beds": "",
+        "baths": "",
+        "fp_name": "",
+        "is_studio": False,
+    }
+    chunks: list[str] = []
+    try:
+        for tag in ("h1", "h2", "title"):
+            for el in soup.find_all(tag):
+                t = (el.get_text(" ", strip=True) or "")[:300]
+                if t:
+                    chunks.append(t)
+        meta = soup.find("meta", attrs={"property": "og:title"})
+        if meta and isinstance(meta.get("content"), str):
+            chunks.append(meta["content"][:300])
+    except Exception:
+        return ctx
+
+    combined = " | ".join(chunks)
+    if not combined:
+        return ctx
+
+    if _PAGE_CTX_STUDIO_RE.search(combined):
+        ctx["is_studio"] = True
+        ctx["beds"] = "0"
+    m_beds = _PAGE_CTX_BEDS_RE.search(combined)
+    if m_beds and not ctx["beds"]:
+        ctx["beds"] = m_beds.group(1)
+    m_baths = _PAGE_CTX_BATHS_RE.search(combined)
+    if m_baths:
+        ctx["baths"] = m_baths.group(1)
+    for pat in _PAGE_CTX_FP_NAME_PATTERNS:
+        m = pat.search(combined)
+        if m:
+            ctx["fp_name"] = m.group(1).strip()
+            break
+    if not ctx["fp_name"] and chunks:
+        # Fallback: shortest <h1>/<h2>/<title> chunk that looks plan-name-ish.
+        # Reject ones that are too generic ("Available Floor Plans", "Apply Now").
+        for c in chunks:
+            cl = c.lower()
+            if 3 <= len(c) <= 60 and not any(
+                kw in cl for kw in ("apply", "schedule", "available floor", "all floor", "our community")
+            ):
+                ctx["fp_name"] = c
+                break
+    return ctx
+
+
+def _empty_unit_with_ctx(page_ctx: dict[str, Any], source: str, source_url: str) -> dict[str, Any]:
+    """Build a unit dict pre-populated with page-level plan attributes."""
+    return {
+        "floor_plan_name": page_ctx.get("fp_name", ""),
+        "bed_label": (
+            "Studio" if page_ctx.get("is_studio")
+            else (f"{page_ctx['beds']}BR" if page_ctx.get("beds") and page_ctx["beds"] != "0" else "")
+        ),
+        "bedrooms": page_ctx.get("beds", ""),
+        "bathrooms": page_ctx.get("baths", ""),
+        "sqft": "",
+        "unit_number": "",
+        "floor": "",
+        "building": "",
+        "rent_range": None,
+        "market_rent_low": None,
+        "market_rent_high": None,
+        "deposit": "",
+        "concession": "",
+        "availability_status": "AVAILABLE",
+        "available_units": "",
+        "availability_date": "",
+        "extraction_tier": "TIER_3_DOM",
+        "source_api_url": source,
+        "_source_url": source_url,
+    }
+
+
+# Compact-row extractors. Each takes (node, page_ctx, source_url) and returns a
+# unit dict OR None when the row doesn't carry per-unit data.
+_RENTCAFE_DETAIL_FIRST_RE = re.compile(r"unit\s*[#:]?\s*(\S+)", re.IGNORECASE)
+_RENTCAFE_RENT_RE = re.compile(r"\$\s?(\d{1,3}(?:,\d{3})*|\d{3,5})", re.IGNORECASE)
+_RENTCAFE_SQFT_NUM_RE = re.compile(r"sq\.?\s*ft\.?\s*[:\s]*(\d{1,3}(?:,\d{3})*|\d{3,5})", re.IGNORECASE)
+
+
+def _extract_rentcafe_option_row(
+    node: Any, page_ctx: dict[str, Any], source_url: str
+) -> dict[str, Any] | None:
+    """RentCafe per-plan availability row (Yardi).
+
+    Row text is short ("Unit 138 Rent $1,115 Sq.ft. 1,025 Available Now"); the
+    generic `_container_yields_unit` rejects it because the row alone lacks the
+    ≥2 structural signals it requires. The plan-level beds/baths/plan_name
+    come from `page_ctx`; per-unit fields come from specific child selectors.
+    """
+    try:
+        text = node.get_text(" ", strip=True)
+    except Exception:
+        return None
+    if not text or len(text) < 5:
+        return None
+
+    unit = _empty_unit_with_ctx(page_ctx, source="dom:option-row", source_url=source_url)
+
+    # unit_number: ".detail.first" child OR the row's leading "Unit NNN" text.
+    unit_num = ""
+    try:
+        first = node.select_one(".detail.first")
+        if first:
+            ft = first.get_text(" ", strip=True)
+            m = _RENTCAFE_DETAIL_FIRST_RE.search(ft) or re.match(r".*?(\b[A-Z0-9][A-Z0-9\-]{0,10}\b)$", ft, re.IGNORECASE)
+            if m:
+                unit_num = m.group(1).strip()
+    except Exception:
+        pass
+    if not unit_num:
+        m = _RENTCAFE_DETAIL_FIRST_RE.search(text)
+        if m:
+            unit_num = m.group(1).strip()
+    if unit_num and _is_valid_unit_number(unit_num):
+        unit["unit_number"] = unit_num
+
+    # rent: "$1,115" → first $NNN match
+    m_rent = _RENTCAFE_RENT_RE.search(text)
+    if m_rent:
+        try:
+            rent = int(m_rent.group(1).replace(",", ""))
+            if _RENT_LO_BOUND <= rent <= _RENT_HI_BOUND:
+                unit["market_rent_low"] = rent
+                unit["market_rent_high"] = rent
+                unit["rent_range"] = str(rent)
+        except (ValueError, TypeError):
+            pass
+
+    # sqft: try "Sq.ft. NNN" (number AFTER keyword — RentCafe shape) FIRST,
+    # because the row also contains "$1,115" which can fool _SQFT_PATTERN into
+    # extracting "115" as the sqft. The more specific pattern wins.
+    m_sqft = _RENTCAFE_SQFT_NUM_RE.search(text) or _SQFT_PATTERN.search(text)
+    if m_sqft:
+        try:
+            sqft = int(m_sqft.group(1).replace(",", ""))
+            if _SQFT_MIN <= sqft <= 10_000:
+                unit["sqft"] = str(sqft)
+        except (ValueError, TypeError):
+            pass
+
+    # availability: look for "Available Now" or a date
+    if re.search(r"available\s+now|^\s*now\b", text, re.IGNORECASE):
+        unit["availability_date"] = "Now"
+        unit["availability_status"] = "AVAILABLE"
+
+    # button[data-unit] holds the RentCafe internal unit ID
+    d_uid, d_apt, d_unum = _extract_data_uid_from_node(node)
+    if d_uid:
+        unit["unit_id"] = d_uid
+    if d_apt:
+        unit["apartmentid"] = d_apt
+
+    # Only emit if the row has at least a unit number OR rent + sqft.
+    # Rejects "See Details" / "Apply Now" buttons that match the selector
+    # accidentally.
+    has_identity = bool(unit.get("unit_id") or unit["unit_number"])
+    has_unit_data = bool(unit["market_rent_low"]) or bool(unit["sqft"])
+    if not (has_identity or has_unit_data):
+        return None
+    return unit
+
+
+_BROOK_APT_NUM_RE = re.compile(r"Apartment\s*[:\s]*#?\s*([A-Za-z0-9][A-Za-z0-9\-]{1,20})", re.IGNORECASE)
+
+
+def _extract_brook_availapts_card(
+    node: Any, page_ctx: dict[str, Any], source_url: str
+) -> dict[str, Any] | None:
+    """Brook-at-Columbia `<div class="card">` row inside `#availApts`.
+
+    Row text shape: "Apartment: # 517001 Available Now Starting at: $1,745.00".
+    Unit number is in the <h3 class="card-title"> span; rent in a
+    `.card-subtitle` with "Starting at:" prefix.
+    """
+    try:
+        text = node.get_text(" ", strip=True)
+    except Exception:
+        return None
+    if not text or len(text) < 5:
+        return None
+
+    unit = _empty_unit_with_ctx(page_ctx, source="dom:availApts-card", source_url=source_url)
+
+    # unit_number from "Apartment: # NNNNNN"
+    m_unum = _BROOK_APT_NUM_RE.search(text)
+    if m_unum and _is_valid_unit_number(m_unum.group(1)):
+        unit["unit_number"] = m_unum.group(1).strip()
+
+    # rent from "Starting at: $1,745.00" or any $NNN
+    m_rent = re.search(r"\$\s?(\d{1,3}(?:,\d{3})*|\d{3,5})", text)
+    if m_rent:
+        try:
+            rent = int(m_rent.group(1).replace(",", ""))
+            if _RENT_LO_BOUND <= rent <= _RENT_HI_BOUND:
+                unit["market_rent_low"] = rent
+                unit["market_rent_high"] = rent
+                unit["rent_range"] = str(rent)
+        except (ValueError, TypeError):
+            pass
+
+    # availability "Available Now" or move-in date
+    if re.search(r"available\s+now", text, re.IGNORECASE):
+        unit["availability_date"] = "Now"
+
+    # Try data-* attributes on Apply Now link (it embeds UnitID=N as href param)
+    try:
+        apply_link = node.select_one("a[href*='UnitID']")
+        if apply_link:
+            href = apply_link.get("href", "")
+            m_uid = re.search(r"UnitID=(\d+)", href, re.IGNORECASE)
+            if m_uid:
+                unit["unit_id"] = m_uid.group(1)
+            m_fp = re.search(r"FloorPlanID=(\d+)", href, re.IGNORECASE)
+            if m_fp:
+                # FloorPlanID becomes a stable cross-page id but isn't
+                # the floor_plan_id we hash later — leave it as telemetry.
+                unit["_rentcafe_floor_plan_id"] = m_fp.group(1)
+    except Exception:
+        pass
+
+    if not unit.get("unit_number") and not unit.get("unit_id"):
+        return None
+    return unit
+
+
+# Selectors mapped to specialised extractors. When the DOM container loop
+# matches one of these selectors, the matching extractor is used INSTEAD of
+# `_container_yields_unit`. This bypasses the ≥2 structural-signal gate that
+# rejects compact per-unit rows where bed/bath/sqft live in the page header.
+_COMPACT_ROW_EXTRACTORS: tuple[tuple[str, Any], ...] = (
+    # RentCafe per-plan availability — both `.option-row` and `div.option-row`
+    # patterns map to the same extractor.
+    ("div.option-row", _extract_rentcafe_option_row),
+    (".option-row", _extract_rentcafe_option_row),
+    # Brook-at-Columbia (RentCafe variant where the card structure differs).
+    ("#availApts .card", _extract_brook_availapts_card),
+)
+_COMPACT_ROW_SELECTOR_SET = frozenset(sel for sel, _ in _COMPACT_ROW_EXTRACTORS)
 
 
 def extract_units_from_dom(
@@ -1276,6 +2254,12 @@ def extract_units_from_dom(
 
     units: list[dict[str, Any]] = []
     seen: set[str] = set()
+    # D13 (2026-05-16): page-level plan attributes shared by every compact row.
+    # Computed once per page (cheap header-only read). Used by the compact-row
+    # extractors when a selector hit maps into _COMPACT_ROW_EXTRACTORS.
+    _page_ctx = _extract_page_ctx(soup)
+    # Lookup map for compact-row selectors → extractor function.
+    _compact_extractor_map = dict(_COMPACT_ROW_EXTRACTORS)
     for selector in _DOM_CONTAINER_SELECTORS:
         try:
             nodes = soup.select(selector)
@@ -1283,20 +2267,68 @@ def extract_units_from_dom(
             continue
         if not nodes:
             continue
-        # If we found >80 of the same selector, it probably matched
+        # If we found >200 of the same selector, it probably matched
         # something too generic (like every `.apartment` article on a blog).
-        if len(nodes) > 80:
+        # D6 (2026-05-16): raised from 80 → 200. Large multifamily
+        # properties legitimately have 80-200 per-unit cards on their
+        # availability page (Cortland on Pike has 79 active units;
+        # bigger lease-up properties can easily exceed 100).
+        if len(nodes) > 200:
             continue
+        # D13 (2026-05-16): when the selector matches a compact-row pattern
+        # (RentCafe option-row, Brook availApts-card), use the specialised
+        # extractor that bypasses the generic ≥2-structural-signal gate.
+        # The row text alone is too short to pass that gate (unit-level
+        # data only: unit#/rent/sqft/avail — bed/bath live in the page
+        # header). Page-level beds/baths/plan_name come from `_page_ctx`.
+        compact_extractor = _compact_extractor_map.get(selector)
         for node in nodes:
-            text = node.get_text(" ", strip=True)
-            if len(text) < 10 or len(text) > 3000:
-                continue
-            unit = _container_yields_unit(text)
-            if unit is None:
-                continue
-            unit["source_api_url"] = f"dom:{selector}"
-            unit["_source_url"] = source_url
-            dedup = unit["unit_number"] or f"{unit['rent_range']}|{unit['sqft']}|{unit['bedrooms']}"
+            if compact_extractor is not None:
+                unit = compact_extractor(node, _page_ctx, source_url)
+                if unit is None:
+                    continue
+            else:
+                text = node.get_text(" ", strip=True)
+                if len(text) < 10 or len(text) > 3000:
+                    continue
+                unit = _container_yields_unit(text)
+                if unit is None:
+                    continue
+            # D6 (2026-05-16): Read per-unit identity from data-* attributes
+            # when present on the container or any descendant. Real database
+            # PKs from data-unit-id beat the inferred-id hash collision that
+            # happens when many units share the same plan dimensions.
+            # PID 2982 Cortland on Pike: 79 anchors carry
+            # data-unit-id="2604014" / data-unit-number="4" — without this
+            # the 25 cards for plan "1 Bed/1 Bath - A1B" all hash to the
+            # same inferred_* id.
+            #
+            # D13 (2026-05-16): compact-row extractors already read data-*
+            # internally and may pull a unit_id from a child link's UnitID
+            # query param. Don't overwrite a richer unit_id with the
+            # generic helper's value.
+            if compact_extractor is None:
+                d_uid, d_apt, d_unum = _extract_data_uid_from_node(node)
+                if d_uid:
+                    unit["unit_id"] = d_uid
+                if d_apt:
+                    unit["apartmentid"] = d_apt
+                if d_unum and not unit.get("unit_number"):
+                    # Only set unit_number from data-* when the text-regex didn't
+                    # already extract one — preserves backward-compatible behaviour
+                    # for sites that have BOTH a visible unit number AND a
+                    # data-unit-number attribute (rare but possible).
+                    unit["unit_number"] = d_unum
+                unit["source_api_url"] = f"dom:{selector}"
+                unit["_source_url"] = source_url
+
+            # Dedup priority: real unit_id (truly unique) > unit_number >
+            # composite fingerprint.
+            dedup = (
+                unit.get("unit_id")
+                or unit.get("unit_number")
+                or f"{unit.get('rent_range') or ''}|{unit.get('sqft') or ''}|{unit.get('bedrooms') or ''}"
+            )
             if dedup in seen:
                 continue
             seen.add(dedup)
@@ -1471,9 +2503,23 @@ def extract_with_hints(
             unit["concession_text"] = conc_text
             unit["concession_source"] = "strikethrough_dom"
 
+        # D6 (2026-05-16): also harvest data-* identifiers under the
+        # hint-driven path. Same rationale as the default-cascade branch.
+        d_uid, d_apt, d_unum = _extract_data_uid_from_node(node)
+        if d_uid:
+            unit["unit_id"] = d_uid
+        if d_apt:
+            unit["apartmentid"] = d_apt
+        if d_unum and not unit.get("unit_number"):
+            unit["unit_number"] = d_unum
+
         unit["source_api_url"] = f"dom_hints:{container_sel}"
         unit["_source_url"] = source_url
-        dedup = unit["unit_number"] or f"{unit['rent_range']}|{unit['sqft']}|{unit['bedrooms']}"
+        dedup = (
+            d_uid
+            or unit["unit_number"]
+            or f"{unit['rent_range']}|{unit['sqft']}|{unit['bedrooms']}"
+        )
         if dedup in seen:
             continue
         seen.add(dedup)

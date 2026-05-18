@@ -27,6 +27,7 @@ SIGNAL_THRESHOLD_STRUCTURAL = 2   — two or more distinct structural types
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass as _dc
 from typing import Any
 
 __all__ = [
@@ -602,8 +603,6 @@ def has_listing_structure(html: str, threshold: int = 1) -> bool:
 #   - property_value_bed_bath   — JSON-LD PropertyValue dimension entries
 #   - matched_signal_bytes      — total bytes of matched signal substrings
 
-from dataclasses import dataclass as _dc
-
 _RE_DOLLAR = re.compile(r"\$\s?(\d{2,5}(?:,\d{3})?(?:\.\d+)?)")
 _RE_BED_BATH_PAIR = re.compile(
     r"(\d)\s*(?:br|bed|bedroom)s?\b[^\n.;]{0,40}?(\d(?:\.5)?)\s*(?:ba|bath)s?\b",
@@ -718,7 +717,7 @@ def has_floor_plan_signals(
     across the codebase.  Use the named threshold constants instead of bare
     integers so the threshold decision is visible at the definition site:
 
-        from ma_poc.pms._vendor_main_dom.floor_plan_signals import (
+        from ma_poc.pms.signal_engine.floor_plan_signals import (
             has_floor_plan_signals,
             SIGNAL_THRESHOLD_ANY,
             SIGNAL_THRESHOLD_STRUCTURAL,
