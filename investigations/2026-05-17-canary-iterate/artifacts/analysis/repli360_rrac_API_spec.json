@@ -1,0 +1,30 @@
+{
+ "discovery": "2026-05-17 Chrome-MCP probe of royceattrumbull.com \u2014 rrac/caf_v2 popup is backed by a server-callable JSON API (repli360, the rrac vendor).",
+ "endpoint": "POST https://app.repli360.com/admin/getUnitListByFloor",
+ "auth": "NONE \u2014 works server-side with just Referer/Origin = property domain (verified via curl, no cookies). Full param set required (bare call -> HTTP 500).",
+ "request_params": [
+  "floorPlanID",
+  "moveinDate",
+  "site_id",
+  "template_type",
+  "mode",
+  "type",
+  "currentanuualterm",
+  "AcademicTerm",
+  "RentalLevel",
+  "special",
+  "zpopUp"
+ ],
+ "response": "JSON envelope {single_cta_str, str:<HTML unit table>, ...}; str contains Building Number/Unit Number/Deposits/Total Monthly Leasing Price/Availability rows \u2014 parse with existing rrac whitespace-normalize row parser.",
+ "discoverable_in_static_html": {
+  "site_id": "royce=1619",
+  "floorPlanID": "one per floorplan e.g. A1AL"
+ },
+ "bootstrap_call": "POST app.repli360.com/admin/template-render (params site_id,property_id,...) renders widget HTML; getUnitListByFloor is the DATA call.",
+ "recipe": "1) fetch property HTML 2) extract site_id + all floorPlanIDs 3) POST getUnitListByFloor per floorPlanID with Referer=property 4) parse JSON .str HTML rows",
+ "impact": "Converts ENTIRE royce-like / rrac / caf_v2 / repli360 cluster from slow fragile DOM-popup (standalone module, not in prod, ~21%) into a deterministic Tier-1 API adapter that IS productionizable in jugnu. No browser/proxy/headless.",
+ "verified_on": [
+  "royceattrumbull.com (site_id 1619, fp A1AL \u2014 curl returned rrac table JSON)"
+ ],
+ "open": "confirm site_id/floorPlanID extraction generalizes across cluster (only royce verified); finalize required param defaults; wire as jugnu Tier-1 adapter (reuse rrac parser)."
+}
