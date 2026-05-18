@@ -30,19 +30,22 @@ rrac-timing. Commits 3abad9c (dash+timing), ea9247d (Cloud Run shard
 wrapper ma_poc/scripts/runners/standalone_shard.py). 18-site cluster:
 9/18 → **10/18** after dash-date.
 
-**LATEST FIX (uncommitted, re-validating bg b036oxs0l on
-/tmp/royce_cluster.txt → /tmp/royce_cluster3.out):** Chrome-MCP cracked
-the independence/westwood miss — those 8 non-UNIT cluster sites are ALL
-user-validated U (eyeball batch3), NOT floorplan-only. Root cause: the
-RealPage rrac embed is injected ASYNC and on slow sites takes ~4-5s to
-create its `[class*=rrac]` container; the pre-poll early-exit
-`if n==-1 and _>=6: break` bailed at 3s before it existed. FIX in
-_phase_c_interact: added `await page.wait_for_timeout(2500)` initial
-settle + raised no-rrac early-exit `_>=6` → `_>=22`. Also removed
-F841 unused `sig`. ruff clean. Verified live via Chrome-MCP:
-independence /floor-plans (HYPHEN; /floorplans no-hyphen has rrac=0)
-→ View Details → modal "50/102 $2,215 05-23-2026, 40/102 $2,215
-Available Now".
+**CLUSTER FINAL: 10/18 (cluster2, restored & committed f025b9e).**
+cluster3 (pre-poll settle+22) REGRESSED to 9/4/4/1DEAD — reverted.
+The 8 non-UNIT are ALL user-validated U (eyeball batch3), NOT
+floorplan-only. **ROOT CAUSE (Chrome-MCP proven, durable):** the
+module's EXACT rrac-detection JS works on live independence — returns
+6 "VIEW DETAILS" anchors by 500ms, rrac=60, stays 6 for 12s. Logic +
+timing are CORRECT in a foreground browser. The module miss is NOT
+parser/timing — it is that the RealPage rrac embed never loads under
+**concurrency-6 headless + no-proxy** (datacenter/headless-trust
+starvation). MCP tab = foreground/single/residential-IP → loads <1s.
+⇒ The independence-class fix is **residential proxy + stealth**, which
+the GCP run provides (PROXY_POOL_URLS support added f025b9e). The
+all-456 GCP-with-proxy run is the real test of this class, not a
+parser tweak. independence rrac lives at /floor-plans (HYPHEN;
+/floorplans no-hyphen → rrac=0); modal text "50/102 $2,215
+05-23-2026, 40/102 $2,215 Available Now" parses fine already.
 
 ## #2 RE-BASELINE — LOCKED (durable: artifacts/analysis/rebaseline2_results.jsonl)
 securecafe 1097/1400=78% (986 RentCafe-SC+53 Knock+28 SightMap) |
@@ -50,15 +53,20 @@ g5 94/124=76% NO-REGRESSION ✓ | appfolio 74/107=69% NO-REGRESSION ✓
 | apts247 99/223=44% | sightmap 29/421=7% (224 NONE+33 SHAPE_REJECTED
 — unrealized gain, standalone Phase-A target, NOT a regression).
 
-## 456 GCP RUN — STAGED, GATED on cluster3 passing
-- Image: us-central1-docker.pkg.dev/jugnu-494013/jugnu-images/jugnu:canary-fixtest-ea9247d (built, has shard wrapper + dash-date; does NOT yet have the pre-poll settle fix — REBUILD with new sha before triggering 456)
+## 456 GCP RUN — user OK'd "run 456 AND iterate in parallel"
+- Image: canary-fixtest-f025b9e (REBUILDING bg bdieevfaa — has proxy
+  support + cluster2 logic + shard wrapper). MUST use f025b9e (NOT
+  ea9247d — that lacks proxy → datacenter IP bot-blocked → garbage).
 - URLs: gs://jugnu-canary/property-list/all456_urls.txt (456)
 - Wrapper: ma_poc/scripts/runners/standalone_shard.py — env URLS_GCS_URI,
-  BUCKET_NAME=jugnu-canary, CONCURRENCY=6, RESULT_PREFIX. Cloud Run job
-  with --tasks N (≈24 for <30min), command python
-  ma_poc/scripts/runners/standalone_shard.py. Output:
-  gs://jugnu-canary/runs/<date>-standalone456/shard_*/results.jsonl
-- Aggregate: artifacts/scripts/agg_standalone456.py <run-dir> (vs eyeball)
+  BUCKET_NAME=jugnu-canary, CONCURRENCY=6, RESULT_PREFIX=standalone456,
+  RUN_DATE=2026-05-17. Cloud Run job ≈24 tasks for <30min.
+- PROXY secret: proxy-credentials-production (key=latest) →
+  PROXY_POOL_URLS. SA jugnu-worker-production@jugnu-494013.iam.
+  gserviceaccount.com. region us-central1, cpu2/4Gi, timeout 3600,
+  maxRetries 0. No VPC connector.
+- Output: gs://jugnu-canary/runs/2026-05-17-standalone456/shard_*/results.jsonl
+- Aggregate: artifacts/scripts/agg_standalone456.py 2026-05-17-standalone456
 
 [superseded] 8th smoke DONE: 4/5 UNIT (solano/chatham/ironhorse/jaxon), royce=
 FLOORPLAN (timeout FIXED — no regression). royce rrac still 0 because
