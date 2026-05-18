@@ -10,5 +10,12 @@
  "finding": "Adapters exist in codebase but for the residual-ledger-tagged set they almost never deliver Tier-1 in prod (mostly TIER_3_DOM/TIER_4_LLM fallback). Gap = detection/routing not sending these to the adapters OR adapters fire but fail. entrata: 6 got TIER_1_API_ENTRATA yet true-tier1 only 4 (fires but 0-real-units sometimes).",
  "next": "measurement canary on current stack (image 9954f0f, existing funnel/entrata/resman adapters + latest detector). If converts -> prod-vs-canary detection win to promote. If not -> concrete 239-prop adapter-fix target w/ per-platform breakdown.",
  "cohort_csv": "gs://jugnu-canary/property-list/cohort_fer.csv",
- "status": "QUEUED behind repli-oll canary l5w5t (single shared job)"
+ "status": "QUEUED behind repli-oll canary l5w5t (single shared job)",
+ "VALIDATED_2026-05-18": {
+  "funnel/UDR": "NOT a new cluster \u2014 RealPage OLL via vanity host oll-leasing.loftliving.com/RP.Leasing.AppService.WebHost (DataDome+xyz-token, same as Category-D). Shipped OLL adapter ALREADY parses this shape (host-agnostic: Workflow/ActivityGroups body + rp.leasing.appservice marker). Gap = detection routes udr.com->funnel (HTML has funnelleasing); the OLL hop is JS-post-interaction, invisible to static detection. udr.com/api/internal/data = CMS/amenities red herring, NOT pricing.",
+  "entrata/springriver": "False-positive: /Apartments/module/application_authentication/ is a tenant LOGIN link; real unit data elsewhere. Detection mis-tag, adapter correctly finds no widget.",
+  "resman/covington": "myresman.com signature present but portal URL/format not found by adapter \u2014 detection/extraction gap.",
+  "reframe": "These need DETECTION-ROUTING fixes, not 3 new adapters. funnel/UDR is the existing OLL cluster in disguise. Blind measurement canary would show failure without revealing cause \u2014 validate-first was correct.",
+  "status": "User: do not proceed, wait for next instruction. No routing fix / no canary started."
+ }
 }
