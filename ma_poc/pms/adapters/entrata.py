@@ -254,6 +254,115 @@ def parse_entrata_available_units(
     return units
 
 
+# --- Entrata ProspectPortal `check_availability` surface (2026-05-18) ---
+# Validated via DevTools on springriver.prospectportal.com. The
+# marketing shell links to <sub>.prospectportal.com; the real unit
+# list is GET ?module=check_availability&action=view_unit_spaces&
+# property[id]=<pid>&property_floorplan[id]=<fpid>&move_in_date=...&
+# occupancy_type=conventional → an HTML fragment whose unit rows are
+# <a class="unit-button" data-unit data-rent data-bedroom data-bathroom
+# data-unitavailabilitydate ...>. Cloudflare-fronted (cf_clearance) →
+# probe_get's cost-gated Web-Unlocker escalation clears it. Stateless
+# GET, repli360/securecafe-class (no browser, no OLL stateful wall).
+_PP_HOST_RE = re.compile(
+    r"https?://([a-z0-9][a-z0-9-]*)\.prospectportal\.com", re.IGNORECASE
+)
+_PP_PROPID_RE = re.compile(r"property\[id\][^0-9]{0,6}(\d{3,9})", re.IGNORECASE)
+_PP_FPID_RE = re.compile(
+    r"""(?:property_floorplan\[id\]|data-floorplan)["'\]=\s/]{1,4}(\d{4,9})""",
+    re.IGNORECASE,
+)
+
+
+def _pp_iso(s: str) -> str:
+    """``2026/05/17`` | ``2026-05-17`` → ``2026-05-17``; else ''."""
+    m = re.search(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", str(s or ""))
+    if not m:
+        return ""
+    return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+
+
+def parse_prospectportal_unit_spaces(
+    html: str, url: str
+) -> list[dict[str, str]]:
+    """Parse a ProspectPortal ``view_unit_spaces`` HTML fragment.
+
+    One row per ``<a class="unit-button" data-*>``. The ``data-*`` attrs
+    are authoritative (data-unit = unit_space id, data-rent numeric,
+    data-bedroom/-bathroom, data-unitavailabilitydate); the visible unit
+    number is the sibling ``.unit-col.unit .unit-col-text``. Floorplan
+    name/sqft from the fragment header. Verified: springriver A1 fp
+    712595 → units 1306/1406/1410 @ $1,291, 642 sqft, avail 2026-05-17.
+    """
+    if not html or "unit-button" not in html:
+        return []
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "lxml")
+    fp_name = ""
+    h = soup.select_one("h6.availability-fp-name")
+    if h:
+        fp_name = h.get_text(strip=True)
+    fp_sqft = ""
+    for li in soup.select("li.fp-stats-item.modal-sq-feet .stat-value"):
+        fp_sqft = li.get_text(strip=True)
+        break
+
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for a in soup.select("a.unit-button"):
+        uid = str(a.get("data-unit") or a.get("rel") or "").strip()
+        row = a.find_parent(class_="unit-row-wrapper") or a.find_parent(
+            class_="unit-row"
+        )
+        unum = ""
+        if row is not None:
+            uc = row.select_one(".unit-col.unit .unit-col-text")
+            if uc:
+                unum = uc.get_text(strip=True)
+        unum = unum or uid
+        if not unum or unum in seen:
+            continue
+        seen.add(unum)
+        rent_i: int | None = None
+        rraw = str(
+            a.get("data-rent")
+            or a.get("data-min-advertised-base-rent")
+            or ""
+        )
+        rm = re.search(r"[\d,]+", rraw)
+        if rm:
+            try:
+                rent_i = int(round(float(rm.group(0).replace(",", ""))))
+            except (TypeError, ValueError):
+                rent_i = None
+        sqft = ""
+        if row is not None:
+            sc = row.select_one(".unit-col.sqft .unit-col-text") or row.select_one(
+                ".unit-col.sq-ft .unit-col-text"
+            )
+            if sc:
+                sqft = sc.get_text(strip=True)
+        out.append(
+            make_unit_dict(
+                floor_plan_name=fp_name,
+                bedrooms=str(a.get("data-bedroom") or ""),
+                bathrooms=str(a.get("data-bathroom") or ""),
+                sqft=sqft or fp_sqft,
+                unit_number=unum,
+                rent_low=rent_i,
+                rent_high=rent_i,
+                availability_status="AVAILABLE",
+                availability_date=_pp_iso(
+                    str(a.get("data-unitavailabilitydate") or "")
+                ),
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+            )
+        )
+    return out
+
+
 def find_entrata_fp_detail_links(index_html: str, origin: str) -> list[str]:
     """Absolute ``/floorplan/<slug>/`` detail URLs from an index page."""
     if not index_html:
@@ -427,10 +536,97 @@ class EntrataAdapter:
                     )
                     return result
 
+        # ProspectPortal `check_availability` fallback (2026-05-18).
+        # Marketing shell links to <sub>.prospectportal.com; the real
+        # unit list is the CF-fronted view_unit_spaces GET. Stateless,
+        # server-side via probe_get (cost-gated Web-Unlocker clears the
+        # CF challenge). Guarded/additive — only runs after every other
+        # path produced nothing; returns silently if not a PP site.
+        try:
+            pp_units = await self._probe_prospectportal(ctx)
+        except Exception as exc:  # noqa: BLE001 — never raise from an adapter
+            pp_units = []
+            result.errors.append(
+                f"prospectportal-probe-error: {type(exc).__name__}: {str(exc)[:90]}"
+            )
+        if pp_units:
+            from ma_poc.extraction.post_process import post_process
+
+            _ppp = post_process(
+                pp_units, property_id=getattr(ctx, "property_id", None)
+            )
+            if _ppp.n_admitted > 0:
+                result.units = _ppp.admitted
+                result.plan_summaries = _ppp.plan_summaries
+                result.tier_used = "TIER_1_DOM_ENTRATA_PROSPECTPORTAL"
+                result.confidence = min(0.92, 0.7 + 0.04 * _ppp.n_admitted)
+                return result
+
         result.confidence = 0.0
         result.errors.append("No Entrata floorplan data found in captured API responses")
 
         return result
+
+    async def _probe_prospectportal(
+        self, ctx: AdapterContext
+    ) -> list[dict[str, str]]:
+        """Discover <sub>.prospectportal.com + property/floorplan ids,
+        then per-floorplan ``view_unit_spaces`` via probe_get (+WU for
+        the Cloudflare challenge). Never raises; [] when not a PP site.
+        """
+        fr = getattr(ctx, "fetch_result", None)
+        body = getattr(fr, "body", None) if fr is not None else None
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", "replace")
+        seed = body if isinstance(body, str) else ""
+        seed = (seed or "") + " " + (getattr(ctx, "base_url", "") or "")
+        mh = _PP_HOST_RE.search(seed)
+        if not mh:
+            return []
+        portal = f"https://{mh.group(1)}.prospectportal.com"
+
+        # The PP check_availability landing lists every floorplan
+        # (data-floorplan / property_floorplan[id]) and carries
+        # property[id]. probe_get auto-escalates to Web-Unlocker on the
+        # CF challenge shell.
+        landing = ""
+        try:
+            r = await _entrata_static_fetch(
+                portal + "/?module=check_availability&is_secure=1"
+            )
+            landing = r or ""
+        except Exception:
+            landing = ""
+        hay = landing or seed
+        mp = _PP_PROPID_RE.search(hay)
+        if not mp:
+            return []
+        prop_id = mp.group(1)
+        fp_ids: list[str] = []
+        for m in _PP_FPID_RE.finditer(hay):
+            fid = m.group(1)
+            if fid and fid not in fp_ids:
+                fp_ids.append(fid)
+        if not fp_ids:
+            return []
+
+        from datetime import date
+
+        movein = date.today().isoformat()
+        out: list[dict[str, str]] = []
+        for fid in fp_ids[:30]:
+            u = (
+                f"{portal}/?module=check_availability&is_secure=1"
+                f"&property[id]={prop_id}&action=view_unit_spaces"
+                f"&property_floorplan[id]={fid}"
+                f"&move_in_date={movein}&occupancy_type=conventional"
+            )
+            try:
+                h = await _entrata_static_fetch(u)
+            except Exception:
+                continue
+            out.extend(parse_prospectportal_unit_spaces(h, u))
+        return out
 
     def static_fingerprints(self) -> list[str]:
         return list(self._fingerprints)

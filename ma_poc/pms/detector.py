@@ -441,13 +441,23 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     has_entrata_widget_path = bool(
         _ENTRATA_REAL_MODULE_RE.search(h)
     )
-    if has_entrata_widget_path or "entrata-widget" in h or "commoncf.entrata.com" in h:
+    # ``.prospectportal.com`` is Entrata's ProspectPortal product host
+    # (definitive Entrata, not an incidental CDN asset). Marketing
+    # shells that hop to <sub>.prospectportal.com route to EntrataAdapter
+    # whose _probe_prospectportal handles the check_availability surface.
+    if (
+        has_entrata_widget_path
+        or "entrata-widget" in h
+        or "commoncf.entrata.com" in h
+        or ".prospectportal.com" in h
+    ):
         return (
             "entrata",
             0.85,
             [
-                "Entrata widget marker in HTML "
-                "(/Apartments/module/<widget>/ / entrata-widget / commoncf.entrata.com)"
+                "Entrata widget marker in HTML (/Apartments/module/"
+                "<widget>/ / entrata-widget / commoncf.entrata.com / "
+                ".prospectportal.com)"
             ],
         )
     if (
