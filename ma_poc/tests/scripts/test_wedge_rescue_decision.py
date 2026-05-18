@@ -169,3 +169,72 @@ class TestEdgeCases:
             "entry_captcha_detected": True,
         }
         assert wedge_rescue_decision(meta, has_units=True) == "NO_RETRY"
+
+
+class TestSkipDomainQuarantined:
+    """High-density Phase 2 (2026-05-18): domain-quarantine / rate-limit guard.
+
+    A property whose entry-fetch hit DOMAIN_QUARANTINED_IN_RUN (or any
+    RATE_LIMITED outcome) should not be retried — the GET retry would
+    immediately return the same quarantine result (elapsed_ms=0) and emit a
+    duplicate FAILED_UNREACHABLE, inflating the failure count without any
+    hope of recovery.
+    """
+
+    def test_domain_quarantined_in_run_skips(self):
+        """Canonical Essex 2026-05-18 trace: domain quarantined, wedge-prone
+        verdict → SKIP, not RETRY."""
+        meta = {
+            "verdict": "FAILED_UNREACHABLE",
+            "domain_quarantined_in_run": True,
+        }
+        assert wedge_rescue_decision(meta, has_units=False) == "SKIP_DOMAIN_QUARANTINED"
+
+    def test_entry_rate_limited_skips(self):
+        """Entry fetch returned RATE_LIMITED but domain not yet fully quarantined.
+        Retrying with GET will also be rate-limited — skip."""
+        meta = {
+            "verdict": "FAILED_UNREACHABLE",
+            "entry_rate_limited": True,
+        }
+        assert wedge_rescue_decision(meta, has_units=False) == "SKIP_DOMAIN_QUARANTINED"
+
+    def test_quarantined_with_units_is_no_retry(self):
+        """If units were already buffered, has_units=True gates to NO_RETRY
+        regardless of quarantine flag — we have data, no rescue needed."""
+        meta = {
+            "verdict": "FAILED_UNREACHABLE",
+            "domain_quarantined_in_run": True,
+        }
+        assert wedge_rescue_decision(meta, has_units=True) == "NO_RETRY"
+
+    def test_captcha_takes_precedence_over_quarantine(self):
+        """When both captcha and quarantine flags are set, SKIP_ENTRY_CAPTCHA
+        fires first (captcha check comes before quarantine check in the function).
+        Both are skip paths so the order doesn't matter for correctness, but
+        it must be deterministic."""
+        meta = {
+            "verdict": "FAILED_UNREACHABLE",
+            "entry_captcha_detected": True,
+            "domain_quarantined_in_run": True,
+        }
+        assert wedge_rescue_decision(meta, has_units=False) == "SKIP_ENTRY_CAPTCHA"
+
+    def test_falsy_quarantine_flag_does_not_skip(self):
+        """``domain_quarantined_in_run=False`` (explicitly set but falsy)
+        must NOT trigger the skip — only truthy values qualify."""
+        meta = {
+            "verdict": "FAILED_UNREACHABLE",
+            "domain_quarantined_in_run": False,
+            "entry_rate_limited": False,
+        }
+        assert wedge_rescue_decision(meta, has_units=False) == "RETRY"
+
+    def test_partial_verdict_quarantined_skips(self):
+        """Quarantine flag applies to any wedge-prone verdict, not just
+        FAILED_UNREACHABLE."""
+        meta = {
+            "verdict": "PARTIAL",
+            "domain_quarantined_in_run": True,
+        }
+        assert wedge_rescue_decision(meta, has_units=False) == "SKIP_DOMAIN_QUARANTINED"

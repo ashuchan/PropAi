@@ -197,6 +197,16 @@ class EventKind(StrEnum):
     #                                   ``FAILED_UNREACHABLE`` verdict to
     #                                   ``FAILED_NO_DATA``. Skipping the
     #                                   retry preserves the correct verdict.
+    #   - ``SKIPPED_DOMAIN_QUARANTINED`` — 2026-05-18: retry was not attempted
+    #                                   because the entry-fetch was
+    #                                   rate-limited or the domain was
+    #                                   quarantined for the entire run
+    #                                   (error_signature=DOMAIN_QUARANTINED_IN_RUN).
+    #                                   A GET retry hits the same quarantine
+    #                                   instantly (elapsed_ms=0) and emits a
+    #                                   duplicate FAILED_UNREACHABLE. Skipping
+    #                                   halves the failure-metric inflation for
+    #                                   high-density hosts (e.g. Essex 27 PIDs).
     #
     # Until 2026-05-16 the retry started was piggybacked onto
     # PROPERTY_EMITTED with a custom verdict string — that conflated
