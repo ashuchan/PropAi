@@ -87,6 +87,54 @@ DEFAULT_NAV_TIMEOUT_MS = _resolve_int_env("PLAYWRIGHT_NAV_TIMEOUT_MS", 45_000)
 ACQUIRE_TIMEOUT_MS = _resolve_int_env("BROWSER_POOL_ACQUIRE_TIMEOUT_MS", 30_000)
 
 
+# Shards 84 / 64 / 10 (2026-05-18): patchright's Node sidecar can die mid-run
+# when Chromium rejects a CDP call with `Internal server error, session
+# closed`. The Node process triggers an uncaught Promise rejection
+# (crConnection.js:111 -> triggerUncaughtException) and exits; the Python
+# read loop then raises a literal `Exception("Connection closed while
+# reading from the driver")` for every subsequent IPC call
+# (patchright/_impl/_transport.py:136).
+#
+# The pre-2026-05-19 release() path only set ``force_restart`` on
+# asyncio.TimeoutError; the IPC-closed exception raises *fast*, landed in
+# the generic ``except Exception`` arm, and left ``self._browser``
+# pointing at a dead Node driver. ``_ensure_browser()``'s
+# ``is_connected()`` check returns True on the stale Python-side proxy
+# (it doesn't know the sidecar is dead) so every following ``acquire()``
+# re-hit the same wedge until the per-property wallclock killed the task.
+# Shard 84 cascaded 225 fetch.completed events across 33 PIDs over 39
+# seconds via exactly this chain.
+#
+# The match list is conservative — we treat any of these as a signal that
+# the Browser reference is unrecoverable and a full restart is required.
+_DRIVER_DEAD_ERROR_FRAGMENTS = (
+    # Shortened to ``"connection closed"`` because patchright phrasing
+    # has drifted in the past (``"Connection closed while reading from
+    # the driver"`` is the 1.59.1 wording but earlier versions used
+    # ``"Connection closed before message was sent"`` etc.). In a
+    # browser-pool context the substring is unambiguous.
+    "connection closed",
+    "target page, context or browser has been closed",
+    "browser has been closed",
+    "target closed",
+    "browser closed",
+    "browser.disconnected",
+)
+
+
+def _is_driver_dead_error(exc: BaseException) -> bool:
+    """True when the exception message matches a known driver-death signature.
+
+    Used by both ``acquire()`` and ``release()`` to decide whether to
+    invalidate the cached Browser reference. Match is case-insensitive;
+    we look for fragments rather than full strings because the exact
+    error text varies between patchright versions and between Python /
+    Node sources of the same underlying condition.
+    """
+    msg = str(exc).lower()
+    return any(frag in msg for frag in _DRIVER_DEAD_ERROR_FRAGMENTS)
+
+
 class BrowserContextPool:
     """Pool of Playwright browser contexts, one per property.
 
@@ -229,10 +277,27 @@ class BrowserContextPool:
             page.set_default_timeout(DEFAULT_PAGE_TIMEOUT_MS)
             page.set_default_navigation_timeout(DEFAULT_NAV_TIMEOUT_MS)
             return page
-        except BaseException:
+        except BaseException as exc:
             # Any failure (TimeoutError, Playwright error, asyncio cancel)
             # must release the semaphore so the slot count stays accurate.
             # release() is sync and never raises.
+            #
+            # Shard_84 follow-up (2026-05-19): if the failure is a known
+            # driver-death signature, invalidate the cached Browser
+            # reference BEFORE re-raising. ``_ensure_browser()``'s
+            # ``is_connected()`` check doesn't detect a dead Node
+            # sidecar; without this hook the same cascade chains across
+            # every remaining property on the shard (observed: shards
+            # 84 / 64 / 10 on 2026-05-18, 462 cascade events combined).
+            if isinstance(exc, Exception) and _is_driver_dead_error(exc):
+                self._browser = None
+                self._active_contexts.clear()
+                log.warning(
+                    "browser_pool.acquire: driver-death signature detected "
+                    "(%s); cleared cached browser ref so the next acquire "
+                    "launches a fresh Chromium child.",
+                    type(exc).__name__,
+                )
             self._semaphore.release()
             raise
 
@@ -279,6 +344,14 @@ class BrowserContextPool:
                 force_restart = True
             except Exception as exc:
                 log.warning("Error releasing browser context: %s", exc)
+                # Shard_84 follow-up (2026-05-19): driver-death raises
+                # fast through context.close(), not as a timeout. Trip
+                # the same force_restart path so the next acquire
+                # launches a fresh Chromium child instead of re-using
+                # the dead Browser reference. See
+                # _DRIVER_DEAD_ERROR_FRAGMENTS above for the match set.
+                if _is_driver_dead_error(exc):
+                    force_restart = True
             if context in self._active_contexts:
                 try:
                     self._active_contexts.remove(context)

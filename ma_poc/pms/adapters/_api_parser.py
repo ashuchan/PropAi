@@ -175,6 +175,208 @@ def _item_has_unit_signals(item: Any, min_signals: int = 2) -> bool:
     return False
 
 
+#: Foreign-key field names on a UNIT row that reference a sibling PLAN
+#: row's primary key. When a candidate list's items carry one of these
+#: fields AND there's another sibling list whose ``id`` values match,
+#: the FK-bearing list is the authoritative unit list and the referenced
+#: list provides plan-level enrichment. Origin: Knock RentManager API
+#: (PID 253774 on 2026-05-18) returns ``{layouts: [60 plans], units: [30
+#: instances]}`` where only ``units`` carry ``displayPrice`` and
+#: ``availableOn`` but our pre-fix walker picked ``layouts`` (longer
+#: list) and shipped 60 plan-level rows with null rent / null
+#: availability. Adding a new vendor's FK key here extends the pair
+#: detector automatically.
+_PLAN_FK_KEYS: tuple[str, ...] = (
+    "layoutId", "layout_id", "layoutid",
+    "floorPlanId", "floor_plan_id", "floorplanid", "floorplanId",
+    "planId", "plan_id",
+    "fpId", "fp_id",
+    "unitTypeId", "unit_type_id", "unittypeid",
+    "modelId", "model_id",
+    "templateId", "template_id",
+)
+
+#: Per-unit signal keys that mark a list as the AUTHORITATIVE unit list
+#: (rather than a plan-summary list). A list whose items carry any of
+#: these keys has per-apartment data the plan-list doesn't have. Match
+#: is on raw key name — vendor variants are common but case-sensitive
+#: comparison is enough because the same vendor uses one spelling
+#: throughout one response.
+_PER_UNIT_SIGNAL_KEYS: tuple[str, ...] = (
+    # availability date / status
+    "available_date", "availableOn", "available_on", "availableDate",
+    "moveInDate", "move_in_date", "readyDate", "ready_date",
+    "available", "leased", "occupied", "reserved", "noticeGiven",
+    # per-unit rent (vs plan-level rent range)
+    "displayPrice", "display_price", "price", "monthlyRent",
+    "monthly_rent", "askingRent", "asking_rent",
+    # per-unit identity
+    "unitNumber", "unit_number", "unitId", "unit_id",
+)
+
+
+def _list_item_keys(items: list, sample: int = 5) -> set[str]:
+    """Union of dict-keys across the first ``sample`` items of ``items``.
+
+    Used by the FK-pair detector to decide which list is plan-shaped vs
+    unit-shaped without scanning the entire list. 5 items is enough to
+    surface vendor key patterns; vendor APIs are uniform within a
+    response.
+    """
+    keys: set[str] = set()
+    for item in items[:sample]:
+        if isinstance(item, dict):
+            keys.update(k for k in item.keys() if isinstance(k, str))
+    return keys
+
+
+def _detect_plan_unit_pair(
+    walker_lists: list[list[dict]],
+) -> tuple[list[dict], list[dict], str] | None:
+    """Detect a plan-list / unit-list pair joined by foreign key.
+
+    A unit-list is identified by:
+        - items carry one of :data:`_PLAN_FK_KEYS` (foreign-key reference)
+        - items carry at least one :data:`_PER_UNIT_SIGNAL_KEYS` field
+          (per-unit data the plan-list can't have)
+
+    A plan-list is identified by:
+        - items have an ``id`` field whose values match the unit-list's
+          FK values for >=2 distinct references (avoids accidental match
+          on unrelated lists that happen to have ``id``)
+
+    Returns ``(plan_list, unit_list, fk_key)`` on detection, ``None``
+    otherwise. When multiple unit-list / plan-list candidates exist,
+    picks the pair with the highest match-count.
+
+    Generic by design: any vendor that ships the
+    ``{plans: [...], units-with-planId: [...]}`` shape benefits without
+    a per-vendor parser. Tested vendors:
+        - Knock RentManager (``layoutId``, PID 253774, 2026-05-18)
+        - (extension point — add coverage as new vendors surface)
+    """
+    if len(walker_lists) < 2:
+        return None
+
+    # Categorise each candidate list as plan-shaped / unit-shaped /
+    # neither. A list can be BOTH if items carry both an ``id`` and an
+    # FK to another list — pick the side that produces more matches.
+    candidates_as_unit: list[tuple[list[dict], str]] = []
+    candidates_as_plan: list[tuple[list[dict], set]] = []
+
+    for lst in walker_lists:
+        if not lst:
+            continue
+        keys = _list_item_keys(lst)
+        # Unit-shape: has an FK key AND a per-unit signal.
+        fk_key = next((k for k in _PLAN_FK_KEYS if k in keys), None)
+        if fk_key and any(k in keys for k in _PER_UNIT_SIGNAL_KEYS):
+            candidates_as_unit.append((lst, fk_key))
+        # Plan-shape: items have an ``id`` field. We're permissive here —
+        # the cross-reference count filters false positives below.
+        if "id" in keys:
+            ids = {
+                it.get("id") for it in lst
+                if isinstance(it, dict) and it.get("id") is not None
+            }
+            if ids:
+                candidates_as_plan.append((lst, ids))
+
+    if not candidates_as_unit or not candidates_as_plan:
+        return None
+
+    # For each (unit, plan) combination, count how many unit FKs resolve
+    # to a plan id. The best-scoring pair wins. Require >=2 matches so
+    # we don't false-positive on a single-row coincidence.
+    best: tuple[int, list[dict], list[dict], str] | None = None
+    for unit_list, fk_key in candidates_as_unit:
+        for plan_list, plan_ids in candidates_as_plan:
+            if plan_list is unit_list:
+                continue
+            match_count = 0
+            for u in unit_list:
+                if not isinstance(u, dict):
+                    continue
+                fk_val = u.get(fk_key)
+                if fk_val is not None and fk_val in plan_ids:
+                    match_count += 1
+            if match_count >= 2 and (best is None or match_count > best[0]):
+                best = (match_count, plan_list, unit_list, fk_key)
+
+    if best is None:
+        return None
+    _, plan_list, unit_list, fk_key = best
+    return plan_list, unit_list, fk_key
+
+
+def _merge_units_with_plans(
+    unit_list: list[dict],
+    plan_list: list[dict],
+    fk_key: str,
+) -> list[dict]:
+    """Enrich each unit dict with fields from its referenced plan.
+
+    Unit-side fields ALWAYS win (per-unit data is authoritative; the
+    plan's ``area`` may be wrong for a specific unit on plans with
+    slight size variations across buildings). The plan supplies values
+    only for keys missing or empty on the unit. Returns a new list — the
+    input dicts are not mutated.
+    """
+    plan_index: dict[Any, dict] = {
+        p["id"]: p for p in plan_list
+        if isinstance(p, dict) and p.get("id") is not None
+    }
+    out: list[dict] = []
+    for u in unit_list:
+        if not isinstance(u, dict):
+            continue
+        fk_val = u.get(fk_key)
+        plan = plan_index.get(fk_val) if fk_val is not None else None
+        if not plan:
+            out.append(dict(u))
+            continue
+        # plan first, unit second so the unit's value overrides on
+        # overlapping keys. Skip the plan's ``id`` (it's the FK from
+        # the unit's perspective, not the unit's own id) and skip the
+        # plan's bookkeeping fields that would just be noise.
+        merged = dict(plan)
+        merged.pop("id", None)
+        for skip in ("createdAt", "modifiedAt", "deletedAt", "deletedByVendor",
+                     "integrationId", "images", "description"):
+            merged.pop(skip, None)
+        # Promote the plan's ``name`` into ``planName`` (if the plan
+        # doesn't already supply one) BEFORE the unit overlay runs.
+        # Knock's unit row carries its own ``name`` field (the unit
+        # number, e.g. "4103") which would otherwise clobber the
+        # plan's ``name`` (e.g. "1x1A6 Greater HeightsC") and the
+        # downstream picker would silently end up with the unit
+        # number in ``floor_plan_name``. ``planName`` is the second
+        # alias the picker tries (after ``layoutName``) so the plan
+        # identity survives the overlay.
+        plan_name_seed = plan.get("name") if isinstance(plan, dict) else None
+        if plan_name_seed and "planName" not in merged:
+            merged["planName"] = plan_name_seed
+        # Now overlay the unit. ``v not in (None, "")`` keeps the plan
+        # value when the unit has a blank.
+        for k, v in u.items():
+            if v not in (None, ""):
+                merged[k] = v
+        # Knock-shape canonicalisation: when a unit row has a foreign
+        # key + a ``name`` field, ``name`` is the per-apartment unit
+        # number (e.g. "4103"), NOT the floor-plan name. The merged
+        # plan-row already carries the floor-plan name in ``layoutName``
+        # / ``planName``. Promote the unit's ``name`` to the canonical
+        # ``unit_number`` key so the downstream picker doesn't have to
+        # know about Knock's specific conventions. ``unit_number`` is
+        # the first key the picker checks, so this beats any other
+        # vendor-key fallback that might pick up ``id`` etc.
+        unit_name = u.get("name") if isinstance(u, dict) else None
+        if unit_name not in (None, "") and "unit_number" not in u:
+            merged["unit_number"] = unit_name
+        out.append(merged)
+    return out
+
+
 def find_unit_arrays(blob: Any, min_signals: int = 2) -> list[list[dict]]:
     """Recursively walk ``blob`` and return every list whose first dict-typed
     item satisfies :func:`_item_has_unit_signals`.
@@ -803,11 +1005,31 @@ def parse_api_responses(
             except Exception:
                 walker_lists = []
             if walker_lists:
-                # Prefer the LARGEST list — it's almost always the per-unit
-                # inventory rather than a 5-row floor-plan summary that
-                # would also pass the signal gate.
-                walker_lists.sort(key=len, reverse=True)
-                candidates = walker_lists[0]
+                # Knock-shape detector (2026-05-19): when the response
+                # holds BOTH a plan list and a unit list joined by a
+                # foreign key (``layoutId`` / ``floorPlanId`` / etc.),
+                # the unit list is authoritative — it's the one with
+                # ``displayPrice`` / ``availableOn`` while the plan list
+                # only has area / beds / baths. Pre-fix the "largest
+                # wins" rule below picked the plan list (60 plans vs 30
+                # units on Knock PID 253774) and shipped 60 plan-level
+                # rows with null rent / null availability.
+                try:
+                    pair = _detect_plan_unit_pair(walker_lists)
+                except Exception:
+                    pair = None
+                if pair is not None:
+                    plan_list, unit_list, fk_key = pair
+                    candidates = _merge_units_with_plans(
+                        unit_list, plan_list, fk_key
+                    )
+                else:
+                    # Generic fallback: largest list wins. It's almost
+                    # always the per-unit inventory rather than a 5-row
+                    # floor-plan summary that would also pass the signal
+                    # gate.
+                    walker_lists.sort(key=len, reverse=True)
+                    candidates = walker_lists[0]
 
         # RC-TRACE (2026-05-15 PM): sampled trace event for offline alias
         # analysis. Emits keys_observed + keys_matched + keys_unmatched_unit_shape
@@ -831,9 +1053,20 @@ def parse_api_responses(
                 continue
 
             name = _get(item,
-                "floorPlanName", "floor_plan_name", "name", "planName",
-                "unitType", "unit_type", "title", "FloorPlanName",
-                "floorplan_name", "floorplan-name",
+                # Knock RentManager denormalises the plan name onto each
+                # unit dict as ``layoutName`` — picked before the generic
+                # ``name`` alias because on Knock the unit's own ``name``
+                # field carries the UNIT number ("4103"), not the plan.
+                "layoutName", "layout_name",
+                "planName", "plan_name",
+                "floorPlanName", "floor_plan_name",
+                "FloorPlanName", "floorplan_name", "floorplan-name",
+                "unitType", "unit_type",
+                # Generic last-resort: many vendors put the plan name in
+                # ``name``. Only safe because the unit_number picker
+                # below also accepts ``name`` and beats us to it for
+                # vendors where ``name`` is the unit identifier.
+                "name", "title",
             )
             rent_lo = _get(item,
                 "minRent", "rent_min", "min_rent", "startingFrom",

@@ -350,3 +350,182 @@ def test_acquire_timeout_env_override(monkeypatch) -> None:
     monkeypatch.setenv("BROWSER_POOL_ACQUIRE_TIMEOUT_MS", "5000")
     from ma_poc.fetch.browser_pool import _resolve_int_env
     assert _resolve_int_env("BROWSER_POOL_ACQUIRE_TIMEOUT_MS", 30_000) == 5_000
+
+
+# ── Driver-death recovery (shards 84/64/10, 2026-05-18) ──────────────────────
+#
+# When patchright's Node sidecar dies (uncaught Promise rejection inside
+# crConnection.js — observed when Chromium answers a Page.enable CDP call
+# with "Internal server error, session closed"), the Python read loop
+# raises a literal ``Exception("Connection closed while reading from the
+# driver")`` for every subsequent IPC call. Without these tests, a
+# regression in the driver-death detection would re-introduce the
+# cascade: 225 fetch.completed events across 33 PIDs on shard 84,
+# 174 across 10 on shard 64, 63 across 1 on shard 10 — all FAILED_UNREACHABLE
+# because the dead Browser ref kept being re-used.
+
+
+def test_is_driver_dead_error_matches_patchright_signature() -> None:
+    """The exact text patchright/_impl/_transport.py:136 raises must match."""
+    from ma_poc.fetch.browser_pool import _is_driver_dead_error
+    assert _is_driver_dead_error(
+        Exception("Connection closed while reading from the driver")
+    )
+
+
+def test_is_driver_dead_error_matches_target_closed_variants() -> None:
+    """Cover the family of related messages that surface when a Browser
+    reference has gone stale through routes other than the read-loop."""
+    from ma_poc.fetch.browser_pool import _is_driver_dead_error
+    assert _is_driver_dead_error(
+        Exception("Target page, context or browser has been closed")
+    )
+    assert _is_driver_dead_error(Exception("Browser has been closed"))
+    assert _is_driver_dead_error(Exception("Target closed"))
+
+
+def test_is_driver_dead_error_is_case_insensitive() -> None:
+    from ma_poc.fetch.browser_pool import _is_driver_dead_error
+    assert _is_driver_dead_error(Exception("CONNECTION CLOSED WHILE READING"))
+
+
+def test_is_driver_dead_error_ignores_unrelated_exceptions() -> None:
+    """Don't accidentally invalidate the browser on every random error."""
+    from ma_poc.fetch.browser_pool import _is_driver_dead_error
+    assert not _is_driver_dead_error(RuntimeError("network error"))
+    assert not _is_driver_dead_error(TimeoutError("nav timeout"))
+    assert not _is_driver_dead_error(Exception("response status 500"))
+
+
+def test_acquire_resets_browser_ref_when_new_context_raises_driver_death(monkeypatch) -> None:
+    """When ``browser.new_context()`` raises the patchright IPC-closed
+    signature, acquire() must clear ``self._browser`` so the NEXT
+    ``_ensure_browser()`` call relaunches a fresh Chromium child instead
+    of returning the dead reference."""
+    pool = _patched_pool_with_tiny_acquire_timeout(monkeypatch, ms=500)
+
+    async def _dying_new_context(**_kwargs: object) -> AsyncMock:
+        raise Exception("Connection closed while reading from the driver")
+
+    dead_browser = AsyncMock()
+    dead_browser.new_context = _dying_new_context
+
+    async def _go() -> None:
+        # Seed the cache as if a prior acquire had populated it.
+        pool._browser = dead_browser  # type: ignore[assignment]
+        with patch.object(pool, "_ensure_browser", return_value=dead_browser):
+            with __import__("pytest").raises(Exception):
+                await pool.acquire(_IDENTITY, None)
+        # The cached reference must be cleared so the next acquire
+        # cycle launches fresh.
+        assert pool._browser is None
+        # Active contexts list must be cleared so a follow-up close()
+        # doesn't try to close a dangling stale ref.
+        assert pool._active_contexts == []
+        # Semaphore must be released.
+        await asyncio.wait_for(pool._semaphore.acquire(), timeout=0.5)
+
+    asyncio.run(_go())
+
+
+def test_acquire_does_not_reset_browser_ref_on_unrelated_error(monkeypatch) -> None:
+    """A run-of-the-mill error (RuntimeError, TimeoutError) must NOT
+    invalidate the cached browser — only the driver-death signature
+    should trigger that escalation. Otherwise every transient error
+    forces a full Chromium relaunch on the next acquire."""
+    pool = _patched_pool_with_tiny_acquire_timeout(monkeypatch, ms=500)
+
+    async def _failing_new_context(**_kwargs: object) -> AsyncMock:
+        raise RuntimeError("transient network blip")
+
+    sentinel_browser = AsyncMock()
+    sentinel_browser.new_context = _failing_new_context
+
+    async def _go() -> None:
+        pool._browser = sentinel_browser  # type: ignore[assignment]
+        with patch.object(pool, "_ensure_browser", return_value=sentinel_browser):
+            with __import__("pytest").raises(RuntimeError):
+                await pool.acquire(_IDENTITY, None)
+        # The browser reference must survive — RuntimeError is not a
+        # driver-death signature.
+        assert pool._browser is sentinel_browser
+
+    asyncio.run(_go())
+
+
+def test_release_triggers_force_restart_on_driver_death_signature() -> None:
+    """Release path: when context.close() raises a fast (non-timeout)
+    Connection-closed exception, force_restart must fire so the dead
+    Browser is closed and ``self._browser`` is reset. Before this fix
+    the generic ``except Exception`` arm just logged a warning and left
+    the dead ref in place."""
+    pool = BrowserContextPool(max_contexts=1)
+
+    async def _dying_close() -> None:
+        raise Exception("Connection closed while reading from the driver")
+
+    context = AsyncMock()
+    context.close = _dying_close
+
+    page = MagicMock()
+    page.context = context
+
+    # Seed pool state as if acquire() had handed out this page.
+    browser_close_called: list[bool] = []
+
+    async def _browser_close() -> None:
+        browser_close_called.append(True)
+
+    dead_browser = AsyncMock()
+    dead_browser.close = _browser_close
+    pool._browser = dead_browser  # type: ignore[assignment]
+    pool._active_contexts.append(context)
+
+    # release() acquires a semaphore slot it didn't take; pre-seed one
+    # so the .release() inside release() balances the count.
+    async def _go() -> None:
+        await pool._semaphore.acquire()
+        await pool.release(page)
+
+    asyncio.run(_go())
+
+    # The force_restart path must have closed the dead Browser and
+    # cleared the cache.
+    assert pool._browser is None
+    assert browser_close_called == [True]
+    assert pool._active_contexts == []
+
+
+def test_release_does_not_force_restart_on_unrelated_exception() -> None:
+    """A garden-variety release error (e.g. selector mid-teardown) must
+    NOT close the Browser — only driver-death signatures should escalate."""
+    pool = BrowserContextPool(max_contexts=1)
+
+    async def _failing_close() -> None:
+        raise RuntimeError("teardown selector failed")
+
+    context = AsyncMock()
+    context.close = _failing_close
+
+    page = MagicMock()
+    page.context = context
+
+    browser_close_called: list[bool] = []
+
+    async def _browser_close() -> None:
+        browser_close_called.append(True)
+
+    healthy_browser = AsyncMock()
+    healthy_browser.close = _browser_close
+    pool._browser = healthy_browser  # type: ignore[assignment]
+    pool._active_contexts.append(context)
+
+    async def _go() -> None:
+        await pool._semaphore.acquire()
+        await pool.release(page)
+
+    asyncio.run(_go())
+
+    # Browser must survive — RuntimeError isn't a driver-death signature.
+    assert pool._browser is healthy_browser
+    assert browser_close_called == []

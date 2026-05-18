@@ -520,20 +520,76 @@ _RE_LISTING_REPEAT_TABLE = re.compile(
     r"<tr[\s>][\s\S]{1,1500}?\$\s?\d{2,5}",
     re.IGNORECASE,
 )
-_RE_LISTING_REPEAT_CARDS = re.compile(
-    r"""
-    (?:class|id)\s*=\s*["'][^"']*?
-    (?:
-        unit[-_]card | unit[-_]row | unit[-_]item | unit[-_]list
-        | floorplan[-_]card | floorplan[-_]row | floorplan[-_]item
-        | fp[-_]card | fp[-_]row | fp[-_]item
-        | listing[-_]card | listing[-_]row
-        | availability[-_](?:card|row|item|list)
-    )
-    [^"']*["']
-    """,
-    re.IGNORECASE | re.VERBOSE,
+#: PMS-listing nouns — what producers call a per-apartment row.
+#:
+#: Expansion path: when a new vendor surfaces with a different noun (e.g.
+#: ``"home_card"`` / ``"residence-row"`` / ``"model-item"``), append the
+#: noun stem here rather than adding a fully-specified pattern. The regex
+#: below builds the cross-product noun × separator × suffix.
+_LISTING_NOUNS: tuple[str, ...] = (
+    "unit",
+    "floorplan",
+    "floor",           # Wordpress/Elementor producers: floor_title / floor_details
+    "fp",
+    "listing",
+    "availability",
+    "apartment",
+    "plan",
+    "home",
+    "residence",
+    "model",
+    "rental",
+    "vacancy",
 )
+
+#: Suffixes that, paired with a listing noun, indicate a per-listing DOM
+#: container or a per-listing detail node. Split into two groups for
+#: readability — both contribute to the same regex.
+_LISTING_CONTAINER_SUFFIXES: tuple[str, ...] = (
+    # repeating containers
+    "card", "row", "item", "list", "tile", "block",
+    "wrapper", "container", "section", "panel",
+)
+_LISTING_DETAIL_SUFFIXES: tuple[str, ...] = (
+    # per-listing detail nodes (the princetonmanagement.com case:
+    # ``class="floor_title"``, ``class="floor_details"``,
+    # ``class="floor_price_details"``). When 2+ of these repeat in the
+    # markup the page IS listing real units even when no $NNN appears in
+    # the static HTML (prices rendered client-side).
+    "title", "name", "details", "info", "price", "pricing",
+    "description", "features", "status", "header", "summary",
+)
+
+
+def _build_listing_card_regex() -> re.Pattern[str]:
+    """Cross-product of listing nouns × separator × suffixes.
+
+    Generic so that adding a new vendor noun in :data:`_LISTING_NOUNS`
+    automatically extends the regex. Match shape::
+
+        class="…floor_title…"
+        id   ='unit-row-12'
+        class="apartment_card primary"
+
+    Anchored on ``class=`` / ``id=`` attribute openings so we don't
+    accidentally match noun/suffix combinations that happen to appear
+    inside text content.
+    """
+    nouns = "|".join(re.escape(n) for n in _LISTING_NOUNS)
+    suffixes = "|".join(
+        re.escape(s) for s in (_LISTING_CONTAINER_SUFFIXES + _LISTING_DETAIL_SUFFIXES)
+    )
+    pattern = (
+        r"(?:class|id)\s*=\s*[\"'][^\"']*?"
+        r"(?:" + nouns + r")"
+        r"[-_]"
+        r"(?:" + suffixes + r")"
+        r"[^\"']*[\"']"
+    )
+    return re.compile(pattern, re.IGNORECASE)
+
+
+_RE_LISTING_REPEAT_CARDS = _build_listing_card_regex()
 _RE_LISTING_REPEAT_OFFER_ARRAY = re.compile(
     r'"@type"\s*:\s*"(?:Apartment|FloorPlan|Offer|Product)"',
     re.IGNORECASE,

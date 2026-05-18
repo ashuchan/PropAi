@@ -897,15 +897,27 @@ def render_failures_csv(outcomes: dict[str, PropertyOutcome], out_path: Path) ->
 
 
 def render_successes_csv(outcomes: dict[str, PropertyOutcome], out_path: Path) -> None:
-    """Write one row per SUCCESS/CARRY_FORWARD property for the canary regression basket.
+    """Write one row per successful property for the canary regression basket.
 
     Schema mirrors failures.csv with the addition of a ``units`` column so the
     canary report can show cloud_units for regression-sentinel properties.
+
+    The success predicate is delegated to ``PropertyOutcome.succeeded``
+    so new verdict classes (``SUCCESS_PLAN_LEVEL``, ``SUCCESS_PARTIAL``)
+    flow through automatically. ``CARRY_FORWARD`` is admitted separately
+    — it isn't a fresh-scrape success (so production's
+    ``reporting.verdict._SUCCESS_VERDICTS`` excludes it from the success
+    rate) but downstream canary sentinels need CARRY_FORWARD rows in
+    successes.csv to detect regressions in the carry-forward path
+    itself. The previous local literal ``{"SUCCESS", "CARRY_FORWARD"}``
+    silently dropped SUCCESS_PLAN_LEVEL / SUCCESS_PARTIAL — verified on
+    2026-05-18 when PID 17102 (irvinecompanyapartments.com,
+    SUCCESS_PLAN_LEVEL) was absent from both successes.csv and
+    failures.csv.
     """
-    _SUCCESS_VERDICTS = {"SUCCESS", "CARRY_FORWARD"}
     rows = []
     for o in outcomes.values():
-        if o.verdict not in _SUCCESS_VERDICTS:
+        if not (o.succeeded or o.verdict == "CARRY_FORWARD"):
             continue
         rows.append({
             "property_id": o.property_id,

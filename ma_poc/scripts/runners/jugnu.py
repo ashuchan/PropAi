@@ -1820,6 +1820,33 @@ def _format_v2_unit(
     except Exception:
         floor_plan_id = None
 
+    # availability_status was previously dropped at the v2 boundary —
+    # the per-property report MD ships "AVAILABLE | Available 7/4/26"
+    # but the v2 unit dict only carried the date column. Pull from the
+    # canonical alias set so producer spellings (`status`, `available`,
+    # `is_available`, etc.) all collapse to one v2 field. PID 67736 on
+    # 2026-05-18 (live210main.com, 308 units) was the trigger — every
+    # unit had availability_status="AVAILABLE" but the v2 row didn't
+    # carry it forward to downstream consumers.
+    try:
+        from ma_poc.extraction.canonical import AVAIL_STATUS_KEYS
+        from ma_poc.extraction.canonical import get_str as _get_str_canon
+
+        avail_status_raw = _get_str_canon(unit, AVAIL_STATUS_KEYS) or ""
+    except Exception:
+        avail_status_raw = ""
+
+    # If the date normaliser resolved to today via the "Available Now"
+    # token AND status is still empty, we have a strong AVAILABLE signal
+    # — emit it so downstream gates see availability cleanly.
+    avail_date_norm = _format_date_str(unit.get("available_date"))
+    avail_status = _normalize_availability_status(
+        avail_status_raw,
+        raw_available_date=unit.get("available_date"),
+        normalized_available_date=avail_date_norm,
+        scrape_ts=scrape_ts,
+    )
+
     out: dict[str, Any] = {
         "beds": norm_beds,
         "baths": norm_baths,
@@ -1830,7 +1857,8 @@ def _format_v2_unit(
         "rent_low": _format_rent(rent_lo_raw),
         "rent_high": _format_rent(rent_hi_raw),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
-        "available_date": _format_date_str(unit.get("available_date")),
+        "available_date": avail_date_norm,
+        "availability_status": avail_status,
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date_str(unit.get("move_in_date") or unit.get("_move_in_date")),
     }
@@ -2309,18 +2337,188 @@ def _format_zip(val: Any) -> str | None:
     return digits.zfill(5)[:5] if digits else None
 
 
+#: Producer wrappings around rent values — "From $1,450", "Starting at",
+#: "As low as 1450/mo". Stripped greedily from the start; case-insensitive.
+_RENT_PREFIX_RE = _re.compile(
+    r"^(?:from|starting[\s\-]?(?:at|from)?|as[\s\-]?low[\s\-]?as|"
+    r"only|just|priced[\s\-]?at|rent[\s\-]?from)[\s:\-]+",
+    _re.IGNORECASE,
+)
+
+#: Producer suffixes that don't change the rent amount — "/month",
+#: "per mo", "USD". Stripped after prefix removal.
+_RENT_SUFFIX_RE = _re.compile(
+    r"[\s\-]*(?:/?(?:month|mo|monthly)|per[\s\-]?(?:month|mo)|usd|cad|\+)\b.*$",
+    _re.IGNORECASE,
+)
+
+#: Placeholders that explicitly mean "no rent available". Distinct from a
+#: format mismatch — both map to None but the producer's intent is
+#: preserved by the explicit match.
+_RENT_ABSENT_TOKENS: frozenset[str] = frozenset({
+    "call", "contact", "inquire", "call for price", "call for pricing",
+    "tbd", "tba", "n/a", "na", "varies", "market", "market rent",
+    "see leasing office", "-", "--", "0", "$0",
+})
+
+
+#: Canonical map of producer status strings to the v2 enumeration.
+#: Producers emit a wide variety of words ("AVAILABLE", "Available now",
+#: "Open", "Vacant", "Leased", "Reserved") — collapse them here so
+#: downstream gates see a stable vocabulary. Unknown values pass through
+#: uppercased so we don't lose unforeseen producer signals.
+_AVAILABILITY_STATUS_MAP: dict[str, str] = {
+    "available": "AVAILABLE",
+    "avail": "AVAILABLE",
+    "vacant": "AVAILABLE",
+    "open": "AVAILABLE",
+    "ready": "AVAILABLE",
+    "now": "AVAILABLE",
+    "true": "AVAILABLE",
+    "yes": "AVAILABLE",
+    "y": "AVAILABLE",
+    "1": "AVAILABLE",
+    "unavailable": "UNAVAILABLE",
+    "unavail": "UNAVAILABLE",
+    "leased": "UNAVAILABLE",
+    "rented": "UNAVAILABLE",
+    "occupied": "UNAVAILABLE",
+    "taken": "UNAVAILABLE",
+    "reserved": "UNAVAILABLE",
+    "pending": "UNAVAILABLE",
+    "applied": "UNAVAILABLE",
+    "false": "UNAVAILABLE",
+    "no": "UNAVAILABLE",
+    "n": "UNAVAILABLE",
+    "0": "UNAVAILABLE",
+    "waitlist": "WAITLIST",
+    "wait list": "WAITLIST",
+    "wait-list": "WAITLIST",
+    "coming soon": "COMING_SOON",
+    "future": "COMING_SOON",
+    "tba": "UNKNOWN",
+    "tbd": "UNKNOWN",
+    "n/a": "UNKNOWN",
+    "na": "UNKNOWN",
+}
+
+
+def _normalize_availability_status(
+    raw: str,
+    *,
+    raw_available_date: Any = None,
+    normalized_available_date: str | None = None,
+    scrape_ts: datetime | None = None,
+) -> str | None:
+    """Canonicalise a producer status string into AVAILABLE/UNAVAILABLE/etc.
+
+    Order of precedence:
+        1. Explicit producer string via the alias map — fast path.
+        2. Implicit "available now" signal: ``raw_available_date`` is a
+           known "now" token AND we normalised it to today's date. This
+           covers AppFolio's pattern of emitting ``"Available Now"`` in
+           the date field WITHOUT a separate status field; without this
+           fallback the v2 row would lose the AVAILABLE signal.
+        3. Implicit availability from a future date: when an
+           ``available_date`` resolved to today or later but no explicit
+           status was set, treat as AVAILABLE.
+        4. None when there's no signal at all (rather than guessing).
+
+    Unknown explicit values pass through uppercased so we don't drop
+    producer signals we haven't seen yet.
+    """
+    raw_s = (raw or "").strip().lower()
+    if raw_s:
+        mapped = _AVAILABILITY_STATUS_MAP.get(raw_s)
+        if mapped is not None:
+            return mapped
+        # Unknown producer string — keep it, but normalise casing so
+        # downstream string comparisons are stable.
+        return raw_s.upper()
+
+    # No explicit status — try to infer from the date field.
+    raw_date = str(raw_available_date or "").strip().lower()
+    raw_date = _DATE_PREFIX_RE.sub("", raw_date).strip()
+    if raw_date in _DATE_NOW_TOKENS:
+        return "AVAILABLE"
+    if normalized_available_date and scrape_ts is not None:
+        try:
+            avail = datetime.strptime(normalized_available_date, "%Y-%m-%d").date()
+            if avail >= scrape_ts.date():
+                return "AVAILABLE"
+        except (ValueError, TypeError):
+            pass
+
+    return None
+
+
 def _format_rent(val: Any) -> float | None:
-    """Clean rent value. Must be > 1 or None."""
-    if val is None:
+    """Clean a rent value to a float dollar amount. None if unparseable.
+
+    Accepts:
+        - int / float scalars (passed through if > 1)
+        - "$1,450", "1450.00", "1,450 USD" — currency symbols and grouping
+          stripped via _money_to_int-style cleanup
+        - Producer prefixes: "From $1,450", "Starting at 1450", "As low
+          as $1,200"
+        - Producer suffixes: "$1,450/month", "1450/mo", "1450 per month"
+        - Range strings: "$1,200 - $1,500" -> 1200.0 (low end). This
+          mirrors how unit-level callers want the LOW value when only a
+          range is available; the v2 ``rent_high`` field receives the
+          high end via a separate code path that picks up
+          ``market_rent_high``.
+    Returns None for empty / placeholder ("Call", "TBD", "Inquire") /
+    format mismatch.
+
+    Origin: same incident chain as :func:`_format_date_str` — adapter
+    output is permissive but the v2 normaliser was strict, dropping
+    legitimate values. Hardened 2026-05-19 in tandem with the date
+    normaliser; same regex-prefix-stripping approach.
+    """
+    if val is None or val == "":
+        return None
+    if isinstance(val, bool):
+        # bool is an int subclass; True / False are not rents.
         return None
     if isinstance(val, (int, float)):
         return float(val) if val > 1 else None
-    s = str(val).strip().replace("$", "").replace(",", "")
+
+    s = str(val).strip()
+    if not s:
+        return None
+    if s.lower() in _RENT_ABSENT_TOKENS:
+        return None
+
+    s = _RENT_PREFIX_RE.sub("", s).strip()
+    s = _RENT_SUFFIX_RE.sub("", s).strip()
+
+    # Range "$1,200 - $1,500" / "1200-1500" — take the low end. We split
+    # on a hyphen with optional surrounding whitespace; a bare hyphen
+    # inside a number ("12-34") won't appear in rents because real
+    # values are >= 200.
+    range_match = _re.match(r"^(.+?)[\s]*[-–—][\s]*(.+)$", s)
+    if range_match:
+        s = range_match.group(1).strip()
+
+    cleaned = _re.sub(r"[^\d.]", "", s)
+    if not cleaned or cleaned == ".":
+        return None
     try:
-        n = float(s)
+        n = float(cleaned)
         return n if n > 1 else None
     except (ValueError, TypeError):
         return None
+
+
+#: Producer suffixes attached to sqft values — "sqft", "sq ft", "square
+#: feet", "SF". Stripped (case-insensitive) before numeric coercion so
+#: ``"850 sqft"`` parses cleanly. Greedy match to consume trailing
+#: punctuation / unit-marker characters.
+_AREA_SUFFIX_RE = _re.compile(
+    r"[\s\-]*(?:square[\s\-]?(?:feet|foot|ft)|sq\.?[\s\-]?ft\.?|"
+    r"sqft|sf|s\.?f\.?|ft²|ft2)\b.*$",
+    _re.IGNORECASE,
+)
 
 
 def _format_area(val: Any) -> int:
@@ -2331,11 +2529,31 @@ def _format_area(val: Any) -> int:
     truncated values like "070") and gets coerced to -1. Previously any
     positive integer was accepted, which is why the 2026-04-19 run had area
     values of 9, 12, 50, 70, 100, etc. passed through as "successful".
+
+    Beyond integer/float coercion, accepts:
+        - ``"850 sqft"``, ``"850 sq ft"``, ``"850 square feet"``,
+          ``"850 SF"``, ``"850 ft²"`` — suffix stripped via
+          :data:`_AREA_SUFFIX_RE` before numeric coercion.
+        - Range strings ``"850 - 950 sqft"`` — takes the LOW end, mirroring
+          the rent-range handling so unit-level analytics get a
+          consistent "smallest claimable" value.
     """
     if val is None or val == -1:
         return -1
+    s = str(val).strip()
+    if not s or s == "-1":
+        return -1
+
+    s = _AREA_SUFFIX_RE.sub("", s).strip()
+    range_match = _re.match(r"^(.+?)[\s]*[-–—][\s]*(.+)$", s)
+    if range_match:
+        s = range_match.group(1).strip()
+
+    cleaned = _re.sub(r"[^\d.]", "", s)
+    if not cleaned or cleaned == ".":
+        return -1
     try:
-        n = int(float(str(val)))
+        n = int(float(cleaned))
     except (ValueError, TypeError):
         return -1
     if 150 <= n <= 10_000:
@@ -2343,20 +2561,108 @@ def _format_area(val: Any) -> int:
     return -1
 
 
-def _format_date_str(val: Any) -> str | None:
-    """Normalize date to YYYY-MM-DD. None if unparseable."""
+#: Words that producers prepend to availability dates without changing the
+#: underlying date semantics. Stripped before format-matching so AppFolio's
+#: ``"Available 7/4/26"`` and Entrata's ``"Move-in 8/21/26"`` both reduce to
+#: a plain date string. The leading word is consumed greedily;
+#: case-insensitive. Add new producers' phrasings here.
+_DATE_PREFIX_RE = _re.compile(
+    r"^(?:available|avail|move[\s\-_]?in|moveinday|moveindate|ready|"
+    r"availability|estimated|est\.?|approx\.?|approximate|opens?|open)"
+    r"[\s:\-]+",
+    _re.IGNORECASE,
+)
+
+#: Placeholder strings meaning "available immediately" — the producer is
+#: signalling that the unit is rentable today rather than dating a future
+#: move-in. These resolve to the scrape date (close-enough for analytics;
+#: the alternative is None which loses the AVAILABLE-now signal entirely).
+_DATE_NOW_TOKENS: frozenset[str] = frozenset({
+    "now", "today", "immediate", "immediately", "imm",
+    "asap", "ready now", "ready", "current", "currently",
+    "open now", "available now",
+})
+
+#: Placeholder strings that explicitly mean "no date available" — kept
+#: distinct from format-mismatch so the producer's intent isn't lost in
+#: logs. Both map to None (the v2 contract uses None for absent dates).
+_DATE_ABSENT_TOKENS: frozenset[str] = frozenset({
+    "n/a", "na", "tbd", "tba", "call", "contact", "inquire",
+    "unavailable", "unavail", "leased", "rented", "not available",
+    "coming soon", "wait list", "waitlist", "-", "--",
+})
+
+
+def _format_date_str(val: Any, *, today: date | None = None) -> str | None:
+    """Normalize a producer date string to YYYY-MM-DD. None if unparseable.
+
+    Beyond the strict ISO / numeric ``m/d/Y`` shapes the previous
+    implementation handled, this accepts producer wrappings like
+    ``"Available 7/4/26"`` (AppFolio), ``"Move-in 8/21/2026"`` (Entrata),
+    ``"Available Now"`` / ``"Ready"`` / ``"Immediate"`` (resolved to
+    *today*'s date so the AVAILABLE-now signal isn't dropped), and 2-digit
+    years (``"7/4/26"`` -> 2026-07-04).
+
+    Args:
+        val: The raw value from the adapter. Any type; non-strings are
+            coerced via ``str(val)``.
+        today: Override for the "now" placeholder anchor — defaults to
+            ``datetime.now().date()``. Exposed for testing so the unit
+            tests can pin a deterministic anchor instead of asserting
+            against the wall clock.
+
+    Returns:
+        ISO YYYY-MM-DD string, or None if the value is empty / a known
+        "absent" placeholder / doesn't match any supported format.
+
+    Origin: PID 67736 (live210main.com, AppFolio, 308 units) on
+    2026-05-18 emitted ``"Available 7/4/26"`` for every available unit;
+    the pre-fix function returned None for all of them so the v2 output
+    shipped ``available_date=null`` despite the source having the data.
+    """
     if val is None or val == "":
         return None
     s = str(val).strip()
+    if not s:
+        return None
+
+    # Strip producer prefix word (e.g. "Available ", "Move-in ").
+    s = _DATE_PREFIX_RE.sub("", s).strip()
+    if not s:
+        return None
+
+    s_lower = s.lower()
+    if s_lower in _DATE_ABSENT_TOKENS:
+        return None
+    if s_lower in _DATE_NOW_TOKENS:
+        anchor = today if today is not None else datetime.now().date()
+        return anchor.strftime("%Y-%m-%d")
+
+    # Strict ISO YYYY-MM-DD (already-normalised input — fast path).
     if _re.match(r"^\d{4}-\d{2}-\d{2}$", s):
         return s
     if len(s) >= 10 and _re.match(r"^\d{4}-\d{2}-\d{2}", s):
         return s[:10]
-    for fmt in ("%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d"):
+
+    # Numeric m/d/Y and friends. Try 4-digit-year first (unambiguous),
+    # then 2-digit. ``%y`` interprets 00-68 as 2000-2068 and 69-99 as
+    # 1969-1999 per Python's strptime contract — good enough for
+    # property listings whose dates are always near-future.
+    for fmt in ("%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d", "%m-%d-%Y", "%Y-%m-%d",
+                "%m/%d/%y", "%d/%m/%y", "%m-%d-%y"):
         try:
             return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
         except ValueError:
             continue
+
+    # Long-form ("July 4, 2026", "Jul 4 2026", "4 July 2026").
+    for fmt in ("%B %d, %Y", "%B %d %Y", "%b %d, %Y", "%b %d %Y",
+                "%d %B %Y", "%d %b %Y"):
+        try:
+            return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
     return None
 
 
