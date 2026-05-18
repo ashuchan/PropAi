@@ -498,6 +498,80 @@ _PORTAL_LINK = re.compile(
 )
 
 
+_ONESITE_ROW = re.compile(
+    r"#\s*([0-9][0-9A-Za-z]{1,8}(?:\s+[A-Z]{1,3})?)\s+"      # unit id "#1709C AB"
+    r"\$\s?([\d,]+)(?:\s*-\s*\$\s?([\d,]+))?\*?\s+"           # $lo[ - $hi]*
+    r"(Available\s+Now|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+    r"[a-z]*\.?\s+\d{1,2},?\s+\d{4})",                         # avail
+    re.I,
+)
+
+
+def _parse_onesite_rows(text: str, src: str) -> list[dict[str, Any]]:
+    """Parse a RealPage OneSite step-2 'Select Apartment' table.
+
+    Rows render as: ``#1709C AB  $1,155 - $1,415*  Available Now``.
+    Whitespace is normalized first (the frame innerText has tabs/
+    newlines inside a logical row, same hazard as the rrac modal).
+    """
+    flat = re.sub(r"\s+", " ", text or "").strip()
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for m in _ONESITE_ROW.finditer(flat):
+        uid = m.group(1).strip()
+        if not uid or uid.lower() in seen:
+            continue
+        seen.add(uid.lower())
+        try:
+            lo = int(m.group(2).replace(",", ""))
+        except (TypeError, ValueError):
+            lo = None
+        try:
+            hi = int(m.group(3).replace(",", "")) if m.group(3) else lo
+        except (TypeError, ValueError):
+            hi = lo
+        out.append(
+            {
+                "unit_number": uid,
+                "market_rent_low": lo,
+                "market_rent_high": hi,
+                "availability_status": "AVAILABLE",
+                "source_api_url": src,
+                "extraction_tier": "STANDALONE_ONESITE",
+            }
+        )
+    return out
+
+
+async def _realpage_frame(page: Any) -> Any:
+    """Pick the cross-origin RealPage OneSite wizard frame.
+
+    iframe#rp-leasing-widget's src is set via JS to a
+    *.onesite.realpage.com URL, but it can be blank/srcdoc early, so
+    URL detection alone is brittle. Try URL/name first, then fall back
+    to content-sniffing for the wizard's step labels / "(N) Available".
+    """
+    frames = list(getattr(page, "frames", []) or [])
+    for f in frames:
+        try:
+            u = (f.url or "").lower()
+        except Exception:
+            u = ""
+        if "onesite.realpage" in u or "leasing.realpage" in u:
+            return f
+    for f in frames:
+        try:
+            t = await f.evaluate("()=>document.body?document.body.innerText:''")
+        except Exception:
+            t = ""
+        if t and re.search(
+            r"select\s+floor\s+plan|select\s+apartment|\(\s*\d+\s*\)\s*available",
+            t, re.I,
+        ):
+            return f
+    return None
+
+
 async def _phase_d_portal_hop(page: Any, base: str, res: PropResult) -> bool:
     """OneSite / Knock #k=-hop (6th path).
 
@@ -527,49 +601,74 @@ async def _phase_d_portal_hop(page: Any, base: str, res: PropResult) -> bool:
             continue
         if not await _goto(page, href):
             continue
-        await page.wait_for_timeout(3000)
-        cur = ""
-        try:
-            cur = page.url
-        except Exception:
-            cur = ""
-        portal = bool(
-            re.search(r"onesite\.realpage|leasing\.realpage|knck\.io|#k=", cur, re.I)
-        )
-        # parse portal directly
-        h = await _content(page)
-        units, sig = _proven_parsers(h, cur or href)
-        if not units:
-            units = _generic_text_rows(await _text(page), cur or href)
-            sig = "generic_text"
-        if not units:
-            # OneSite OLL: click "(N) Available"/"Select"/"View" then parse
+        # The RealPage OneSite leasing wizard renders in a cross-origin
+        # iframe#rp-leasing-widget; it's heavy — wait, then poll frames.
+        fr = None
+        for _ in range(20):  # up to ~10s for the widget frame to attach
+            await page.wait_for_timeout(500)
             try:
-                idxs = await page.evaluate(
-                    """() => { const o=[]; const els=[...document.querySelectorAll('a,button,[role=button],[onclick]')];
-                      els.forEach((e,i)=>{ const t=(e.innerText||'').trim();
-                        if(/\\(\\s*\\d+\\s*\\)\\s*available|select|view\\s*(?:unit|apartment)s?|see\\s*units|check\\s*availab/i.test(t)) o.push(i); });
-                      return o.slice(0,8); }"""
+                fr = await _realpage_frame(page)
+            except Exception:
+                fr = None
+            if fr is not None:
+                break
+        if fr is None:
+            # No OneSite frame — fall back to the old top-document scan
+            # (Knock/other portals that DON'T use the rp iframe).
+            try:
+                u_top = _generic_text_rows(await _text(page), page.url)
+            except Exception:
+                u_top = []
+            if u_top:
+                res.units = u_top
+                res.signal = "portal_hop:top_text"
+                res.phase = "D_portal_hop"
+                return True
+            continue
+        # Step 1 "Select Floor Plan": each FP card has a "(N) Available"
+        # button. Click each → step 2 "Select Apartment" table
+        # (#unit | $lo - $hi* | avail). Parse, go Back, repeat.
+        acc: list[dict[str, Any]] = []
+        seen_o: set[str] = set()
+        for ci in range(12):
+            try:
+                clicked = await fr.evaluate(
+                    """(ci)=>{ const b=[...document.querySelectorAll('a,button,[role=button]')]
+                        .filter(e=>/\\(\\s*\\d+\\s*\\)\\s*available/i.test((e.innerText||'').trim()));
+                      if(!b[ci]) return -1; b[ci].scrollIntoView(); b[ci].click(); return b.length; }""",
+                    ci,
                 )
             except Exception:
-                idxs = []
-            for ix in (idxs or [])[:6]:
+                clicked = -1
+            if clicked == -1:
+                break
+            txt = ""
+            for _ in range(16):  # poll up to ~8s for step-2 table
+                await page.wait_for_timeout(500)
                 try:
-                    await page.evaluate(
-                        """(i)=>{ const els=[...document.querySelectorAll('a,button,[role=button],[onclick]')]; if(els[i]) els[i].click(); }""",
-                        ix,
-                    )
-                    await page.wait_for_timeout(2500)
-                    u2 = _generic_text_rows(await _text(page), page.url)
-                    if u2:
-                        units = u2
-                        sig = "onesite_knock_text"
-                        break
+                    txt = await fr.evaluate("()=>document.body.innerText||''")
                 except Exception:
-                    continue
-        if units:
-            res.units = units
-            res.signal = f"portal_hop:{sig}" + ("" if portal else ":nonportal")
+                    txt = ""
+                if _ONESITE_ROW.search(re.sub(r"\s+", " ", txt or "")):
+                    break
+            for u in _parse_onesite_rows(txt, page.url):
+                k = str(u.get("unit_number") or "")
+                if k and k not in seen_o:
+                    seen_o.add(k)
+                    acc.append(u)
+            # Back to step 1 for the next floorplan card.
+            try:
+                await fr.evaluate(
+                    """()=>{ const bk=[...document.querySelectorAll('a,button,[role=button]')]
+                        .find(e=>/^back$/i.test((e.innerText||'').trim()));
+                      if(bk) bk.click(); }"""
+                )
+                await page.wait_for_timeout(1500)
+            except Exception:
+                pass
+        if acc:
+            res.units = acc
+            res.signal = "portal_hop:onesite_wizard"
             res.phase = "D_portal_hop"
             return True
     return False
@@ -672,9 +771,14 @@ async def run(urls: list[str], concurrency: int = 6) -> list[PropResult]:
     """Standalone harness: own patchright browser, no pipeline coupling."""
     from patchright.async_api import async_playwright
 
+    import os
+
     results: list[PropResult] = []
     sem = asyncio.Semaphore(concurrency)
     ctx_opts = _proxy_ctx_opts()
+    # Per-URL wall-clock cap. Env-driven so a slower no-proxy multi-phase
+    # run can be given more budget without an image rebuild.
+    _per_url_timeout = float(os.getenv("PER_URL_TIMEOUT", "200"))
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
 
@@ -700,7 +804,7 @@ async def run(urls: list[str], concurrency: int = 6) -> list[PropResult]:
                 page.on("response", lambda r: asyncio.create_task(_on_resp(r)))
                 try:
                     r = await asyncio.wait_for(
-                        extract_property(page, u), timeout=200
+                        extract_property(page, u), timeout=_per_url_timeout
                     )
                 except Exception as exc:
                     r = PropResult(url=u, klass="DEAD", error=f"timeout/{exc}")
