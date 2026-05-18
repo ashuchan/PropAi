@@ -6,6 +6,9 @@
  "response": "JSON (UnitId detail call shows {Id,Name,UnitDescription,ResponseStatus,...}).",
  "identifiers": "SiteId=4000138, PmcId=2104447 (lochraven) \u2014 resolved from #k= key via HomeDetails bootstrap.",
  "size_5k": 187,
- "verdict": "API-addressable & replicable (session-state, which we control \u2014 not auth-walled) BUT requires replaying the full OLL BPM bootstrap sequence per property; materially harder + more brittle than repli360 single stateless POST. Strong follow-on, not a quick win.",
- "vs_repli360": "repli360=158 props, 1 stateless no-auth POST (clean win, build first). CategoryD=187 props, stateful multi-step OLL flow (real reverse-eng project)."
+ "verdict": "CONFIRMED HARD: not a clean server-side API. Off-browser replay requires defeating DataDome+Akamai + token/session bootstrap (brittle, against no-bypass policy). Right path = real browser session OR existing jugnu onesite.py/realpage_oll.py + Web-Unlocker proxy stack. NOT a lightweight adapter. ~187 props.",
+ "vs_repli360": "repli360=158 props, 1 stateless no-auth POST (clean win, build first). CategoryD=187 props, stateful multi-step OLL flow (real reverse-eng project).",
+ "method": "PUT (JSON body ~280B), not GET",
+ "BOT_PROTECTION": "DataDome + Akamai Bot Manager \u2014 set-cookie datadome=, x-datadome: protected, bm_ss/bm_s/bm_so cookies. CORS locked to property origin. Custom headers xyz=<base64 token>, x-authtoken, ClientSessionID.",
+ "final_recommendation": "Build repli360 (158, clean no-auth stateless POST, no bot wall) FIRST. Category-D = route to existing OneSite/Web-Unlocker infra, separate harder track."
 }
