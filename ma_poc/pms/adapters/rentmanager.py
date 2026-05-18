@@ -34,6 +34,7 @@ import re
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+from ma_poc.pms.adapters._iloveleasing_table import parse_iloveleasing_table
 from ma_poc.pms.adapters._parsing import make_unit_dict
 from ma_poc.pms.adapters._probe import probe_get
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
@@ -166,6 +167,9 @@ class RentManagerAdapter:
             result.errors.append("RENTMANAGER: no page html")
             return result
 
+        from ma_poc.extraction.post_process import post_process
+
+        # ── Path A: server-side ua.rentmanager.com/Search_Result API ──────────
         search_url = find_rentmanager_search_url(html)
         if not search_url:
             # No verbatim Search_Result URL — try to synthesise from eid
@@ -178,45 +182,71 @@ class RentManagerAdapter:
                     f"command=Search_Result&template={eid}Unit"
                     f"&locations=default&maxperpage=9999"
                 )
-        if not search_url:
-            result.tier_used = f"{_TIER}_NO_ENDPOINT"
-            result.errors.append("RENTMANAGER: no ua.rentmanager.com Search_Result")
-            return result
+        if search_url:
+            try:
+                r = probe_get(search_url, timeout=30)
+            except Exception as exc:  # noqa: BLE001 — never raise from an adapter
+                result.errors.append(
+                    f"rentmanager-fetch-error: {type(exc).__name__}: {str(exc)[:100]}"
+                )
+                r = None
+            if r is not None and getattr(r, "status_code", 0) == 200:
+                units = parse_rentmanager_search(r.text or "", search_url)
+                if units:
+                    _pp = post_process(
+                        units, property_id=getattr(ctx, "property_id", None)
+                    )
+                    if _pp.n_admitted > 0:
+                        result.units = _pp.admitted
+                        result.plan_summaries = _pp.plan_summaries
+                        result.winning_url = search_url
+                        result.confidence = min(0.92, 0.7 + 0.04 * _pp.n_admitted)
+                        result.api_responses.append(
+                            {"url": search_url, "status": 200,
+                             "via": "rentmanager_ua_probe"}
+                        )
+                        return result
+                    result.errors.append(
+                        f"RENTMANAGER_VALIDITY_REJECTED: {len(units)} rows "
+                        "failed unit_validity"
+                    )
+                else:
+                    result.errors.append(
+                        "RENTMANAGER: no units parsed from Search_Result"
+                    )
+            elif r is not None:
+                result.errors.append(
+                    f"RENTMANAGER: Search_Result HTTP "
+                    f"{getattr(r, 'status_code', 0)}"
+                )
 
-        try:
-            r = probe_get(search_url, timeout=30)
-        except Exception as exc:  # noqa: BLE001 — never raise from an adapter
-            result.tier_used = f"{_TIER}_FETCH_ERROR"
+        # ── Path B fallback: JS-injected iLoveLeasing availability table ──────
+        # (krcapartments-class — render-only; server-side API absent.)
+        page_url = str(getattr(ctx, "base_url", "") or "")
+        il_units = parse_iloveleasing_table(html, page_url)
+        if il_units:
+            _pp = post_process(
+                il_units, property_id=getattr(ctx, "property_id", None)
+            )
+            if _pp.n_admitted > 0:
+                result.units = _pp.admitted
+                result.plan_summaries = _pp.plan_summaries
+                result.winning_url = page_url or None
+                result.tier_used = "TIER_1_DOM_RENTMANAGER_ILOVELEASING"
+                result.confidence = min(0.90, 0.7 + 0.04 * _pp.n_admitted)
+                return result
             result.errors.append(
-                f"rentmanager-fetch-error: {type(exc).__name__}: {str(exc)[:100]}"
+                f"RENTMANAGER_ILOVELEASING_VALIDITY_REJECTED: "
+                f"{len(il_units)} rows failed unit_validity"
             )
-            return result
-        if getattr(r, "status_code", 0) != 200:
-            result.tier_used = f"{_TIER}_HTTP_{getattr(r, 'status_code', 0)}"
-            return result
 
-        units = parse_rentmanager_search(r.text or "", search_url)
-        if not units:
-            result.confidence = 0.0
-            result.errors.append("RENTMANAGER: no units parsed from Search_Result")
-            return result
-
-        from ma_poc.extraction.post_process import post_process
-
-        _pp = post_process(units, property_id=getattr(ctx, "property_id", None))
-        if _pp.n_admitted > 0:
-            result.units = _pp.admitted
-            result.plan_summaries = _pp.plan_summaries
-            result.winning_url = search_url
-            result.confidence = min(0.92, 0.7 + 0.04 * _pp.n_admitted)
-            result.api_responses.append(
-                {"url": search_url, "status": 200, "via": "rentmanager_ua_probe"}
+        if not result.errors:
+            result.tier_used = f"{_TIER}_NO_ENDPOINT"
+            result.errors.append(
+                "RENTMANAGER: no ua.rentmanager.com Search_Result and "
+                "no iLoveLeasing table"
             )
-            return result
         result.confidence = 0.0
-        result.errors.append(
-            f"RENTMANAGER_VALIDITY_REJECTED: {len(units)} rows failed unit_validity"
-        )
         return result
 
     def _origin(self, url: str) -> str:
