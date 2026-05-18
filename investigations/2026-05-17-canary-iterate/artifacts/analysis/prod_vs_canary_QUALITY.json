@@ -1,0 +1,1656 @@
+{
+ "summary": {
+  "intersection": 2275,
+  "OLD_count_based": {
+   "canary_better": 1384,
+   "canary_worse": 205,
+   "equal": 686
+  },
+  "QUALITY_based": {
+   "canary_win_or_equal": 2070,
+   "GENUINE_canary_regressions": 76,
+   "prod_inflation_discarded": 129
+  },
+  "units_raw": {
+   "prod": 7805,
+   "canary": 35165,
+   "ratio": 4.51
+  },
+  "units_trusted_only": {
+   "prod": 3147,
+   "canary": 24685,
+   "ratio": 7.84
+  },
+  "prod_inflation_tier_breakdown": [
+   [
+    "TIER_4_LLM_DOM",
+    93
+   ],
+   [
+    "TIER_4_LLM",
+    22
+   ],
+   [
+    "TIER_MERGED_CROSS_PAGE",
+    9
+   ],
+   [
+    "TIER_1_DOM_APPFOLIO_SSR",
+    5
+   ]
+  ],
+  "genuine_regression_tier_breakdown": [
+   [
+    "TIER_3_DOM",
+    31
+   ],
+   [
+    "TIER_1_API",
+    24
+   ],
+   [
+    "NONE",
+    11
+   ],
+   [
+    "TIER_1_API_APPFOLIO",
+    6
+   ],
+   [
+    "TIER_1_API_SIGHTMAP",
+    4
+   ]
+  ]
+ },
+ "genuine_regressions": [
+  {
+   "aid": "14939",
+   "prod_u": 180,
+   "can_u": 1,
+   "gap": 179,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_3_DOM",
+   "url": "https://www.livethemaya.com/"
+  },
+  {
+   "aid": "35695",
+   "prod_u": 101,
+   "can_u": 0,
+   "gap": 101,
+   "prod_tier": "TIER_1_API_SIGHTMAP",
+   "can_tier": "TIER_2_JSONLD",
+   "url": "https://www.shorehamtides.com/"
+  },
+  {
+   "aid": "3307",
+   "prod_u": 69,
+   "can_u": 0,
+   "gap": 69,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_2_JSONLD",
+   "url": "https://www.lakehouseatmartinslanding.com/"
+  },
+  {
+   "aid": "277277",
+   "prod_u": 41,
+   "can_u": 0,
+   "gap": 41,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_KNOCK_API",
+   "url": "https://theproximitynewbern.com/"
+  },
+  {
+   "aid": "255637",
+   "prod_u": 32,
+   "can_u": 1,
+   "gap": 31,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_3_DOM",
+   "url": "https://www.rentanapt.com/apartments/az/gilbert/e-warner-rd/"
+  },
+  {
+   "aid": "37685",
+   "prod_u": 31,
+   "can_u": 0,
+   "gap": 31,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_KNOCK_API",
+   "url": "www.liveatsweetwaterfl.com"
+  },
+  {
+   "aid": "268169",
+   "prod_u": 29,
+   "can_u": 0,
+   "gap": 29,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_KNOCK_API",
+   "url": "https://millyardliving.com/"
+  },
+  {
+   "aid": "8667",
+   "prod_u": 30,
+   "can_u": 1,
+   "gap": 29,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_3_DOM",
+   "url": "http://chesapeakeapartments.net/"
+  },
+  {
+   "aid": "1085",
+   "prod_u": 25,
+   "can_u": 0,
+   "gap": 25,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "NONE",
+   "url": "https://www.livesoundatpeninsulajax.com/"
+  },
+  {
+   "aid": "235778",
+   "prod_u": 22,
+   "can_u": 0,
+   "gap": 22,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_API_ONESITE",
+   "url": "http://www.foxrundothan.com/"
+  },
+  {
+   "aid": "284175",
+   "prod_u": 22,
+   "can_u": 0,
+   "gap": 22,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.livescs.com/property/scs-athens"
+  },
+  {
+   "aid": "64181",
+   "prod_u": 22,
+   "can_u": 0,
+   "gap": 22,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_KNOCK_API",
+   "url": "https://www.liveatparkerhouse.com/"
+  },
+  {
+   "aid": "239952",
+   "prod_u": 21,
+   "can_u": 0,
+   "gap": 21,
+   "prod_tier": "NONE",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/southeast-florida/fort-lauderdale-apartments/amli-toscana-place"
+  },
+  {
+   "aid": "62354",
+   "prod_u": 22,
+   "can_u": 1,
+   "gap": 21,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_3_DOM",
+   "url": "http://www.ariarollingbrook.com/"
+  },
+  {
+   "aid": "219660",
+   "prod_u": 20,
+   "can_u": 0,
+   "gap": 20,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_KNOCK_API",
+   "url": "www.lifeatlakehouse.com"
+  },
+  {
+   "aid": "61159",
+   "prod_u": 29,
+   "can_u": 10,
+   "gap": 19,
+   "prod_tier": "TIER_1_API_SIGHTMAP",
+   "can_tier": "TIER_1_API_G5",
+   "url": "https://www.centuryaftonridge.com/?rcstdid=Mg%3D%3D-YRjTEizZPgM%3D&utm_source=google+biz&utm_medium=organic"
+  },
+  {
+   "aid": "245398",
+   "prod_u": 21,
+   "can_u": 4,
+   "gap": 17,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.sspropertiesinvestment.com/vacancies/"
+  },
+  {
+   "aid": "265566",
+   "prod_u": 17,
+   "can_u": 0,
+   "gap": 17,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_RENTCAFE_SHAPE_REJECTED",
+   "url": "https://www.liveatpiper.com/"
+  },
+  {
+   "aid": "40193",
+   "prod_u": 17,
+   "can_u": 0,
+   "gap": 17,
+   "prod_tier": "NONE",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/austin/downtown-austin-apartments/amli-south-shore"
+  },
+  {
+   "aid": "234350",
+   "prod_u": 16,
+   "can_u": 1,
+   "gap": 15,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_3_DOM",
+   "url": "www.newportatclearlake.com"
+  },
+  {
+   "aid": "271374",
+   "prod_u": 15,
+   "can_u": 0,
+   "gap": 15,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_RENTCAFE_SHAPE_REJECTED",
+   "url": "https://www.joineryclt.com/"
+  },
+  {
+   "aid": "285331",
+   "prod_u": 14,
+   "can_u": 0,
+   "gap": 14,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "NONE",
+   "url": "https://www.silosharvestgreen.com/"
+  },
+  {
+   "aid": "237704",
+   "prod_u": 13,
+   "can_u": 0,
+   "gap": 13,
+   "prod_tier": "NONE",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/austin/mueller-apartments/amli-on-aldrich"
+  },
+  {
+   "aid": "305776",
+   "prod_u": 39,
+   "can_u": 26,
+   "gap": 13,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+   "url": "https://westgatetownes.com/"
+  },
+  {
+   "aid": "40171",
+   "prod_u": 23,
+   "can_u": 10,
+   "gap": 13,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_2_JSONLD",
+   "url": "https://www.trailsatcitypark.com/"
+  },
+  {
+   "aid": "217930",
+   "prod_u": 20,
+   "can_u": 8,
+   "gap": 12,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_3_DOM",
+   "url": "https://www.reserveatcityplace.com"
+  },
+  {
+   "aid": "33172",
+   "prod_u": 36,
+   "can_u": 24,
+   "gap": 12,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_2_JSONLD",
+   "url": "https://www.livestonebridgecitypark.com/"
+  },
+  {
+   "aid": "66940",
+   "prod_u": 11,
+   "can_u": 0,
+   "gap": 11,
+   "prod_tier": "NONE",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/denver/lodo-apartments/amli-riverfront-green"
+  },
+  {
+   "aid": "266951",
+   "prod_u": 10,
+   "can_u": 0,
+   "gap": 10,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "generic:no_body_short_circuit",
+   "url": "https://www.livesevenoaks.com/"
+  },
+  {
+   "aid": "278521",
+   "prod_u": 10,
+   "can_u": 1,
+   "gap": 9,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+   "url": "https://parkeastla.com/"
+  },
+  {
+   "aid": "13966",
+   "prod_u": 8,
+   "can_u": 0,
+   "gap": 8,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_KNOCK_API",
+   "url": "http://www.parkviewapartmenthomes.com/"
+  },
+  {
+   "aid": "290592",
+   "prod_u": 30,
+   "can_u": 22,
+   "gap": 8,
+   "prod_tier": "TIER_1_API_SIGHTMAP",
+   "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+   "url": "https://colinaranchhill.com/"
+  },
+  {
+   "aid": "37386",
+   "prod_u": 8,
+   "can_u": 0,
+   "gap": 8,
+   "prod_tier": "NONE",
+   "can_tier": "NONE",
+   "url": "https://www.amli.com/apartments/dallas/downtown-dallas-apartments/amli-quadrangle"
+  },
+  {
+   "aid": "1971",
+   "prod_u": 7,
+   "can_u": 0,
+   "gap": 7,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_KNOCK_API",
+   "url": "https://www.parkwestend.com/"
+  },
+  {
+   "aid": "261770",
+   "prod_u": 7,
+   "can_u": 0,
+   "gap": 7,
+   "prod_tier": "NONE",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/denver/broadway-park-apartments/amli-broadway-park"
+  },
+  {
+   "aid": "4734",
+   "prod_u": 8,
+   "can_u": 1,
+   "gap": 7,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_4_LLM_DOM",
+   "url": "https://avantiresidential.com/property/heights-on-huron/"
+  },
+  {
+   "aid": "54553",
+   "prod_u": 7,
+   "can_u": 0,
+   "gap": 7,
+   "prod_tier": "NONE",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/chicago/near-north-suburbs-apartments/amli-evanston"
+  },
+  {
+   "aid": "68148",
+   "prod_u": 7,
+   "can_u": 0,
+   "gap": 7,
+   "prod_tier": "NONE",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/southeast-florida/miami-apartments/amli-midtown-29"
+  },
+  {
+   "aid": "8389",
+   "prod_u": 7,
+   "can_u": 0,
+   "gap": 7,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "generic:no_body_short_circuit",
+   "url": "https://www.imtresidential.com/imtstevensonranch/"
+  },
+  {
+   "aid": "220156",
+   "prod_u": 6,
+   "can_u": 0,
+   "gap": 6,
+   "prod_tier": "NONE",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/dallas/las-colinas-apartments/amli-at-escena/"
+  },
+  {
+   "aid": "27793",
+   "prod_u": 17,
+   "can_u": 11,
+   "gap": 6,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "http://www.brigadoonapartments.com/"
+  },
+  {
+   "aid": "291509",
+   "prod_u": 5,
+   "can_u": 0,
+   "gap": 5,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "NONE",
+   "url": "https://livebeckon.com/"
+  },
+  {
+   "aid": "4756",
+   "prod_u": 5,
+   "can_u": 0,
+   "gap": 5,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API",
+   "url": "https://www.clearrunaptswilmington.com/"
+  },
+  {
+   "aid": "13376",
+   "prod_u": 4,
+   "can_u": 0,
+   "gap": 4,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "generic:no_body_short_circuit",
+   "url": "http://coachman.stuartco.com/"
+  },
+  {
+   "aid": "14611",
+   "prod_u": 4,
+   "can_u": 0,
+   "gap": 4,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "generic:no_body_short_circuit",
+   "url": "http://www.barringtonliving.com/"
+  },
+  {
+   "aid": "17186",
+   "prod_u": 4,
+   "can_u": 0,
+   "gap": 4,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_2_JSONLD",
+   "url": "https://www.theparkattivoli.com/"
+  },
+  {
+   "aid": "242191",
+   "prod_u": 4,
+   "can_u": 0,
+   "gap": 4,
+   "prod_tier": "NONE",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/chicago/west-loop-apartments/amli-west-loop"
+  },
+  {
+   "aid": "3338",
+   "prod_u": 8,
+   "can_u": 4,
+   "gap": 4,
+   "prod_tier": "TIER_1_API_APPFOLIO",
+   "can_tier": "TIER_1_API_APTS247",
+   "url": "http://www.theboardwalkapartments.info/"
+  },
+  {
+   "aid": "3342",
+   "prod_u": 5,
+   "can_u": 1,
+   "gap": 4,
+   "prod_tier": "TIER_1_API_APPFOLIO",
+   "can_tier": "TIER_1_API_APTS247",
+   "url": "https://www.saharaandplayapalmsapts.com/"
+  },
+  {
+   "aid": "60359",
+   "prod_u": 4,
+   "can_u": 0,
+   "gap": 4,
+   "prod_tier": "TIER_1_API_APPFOLIO",
+   "can_tier": "TIER_1_API_APTS247",
+   "url": "http://www.watermillpark.com/"
+  },
+  {
+   "aid": "62778",
+   "prod_u": 4,
+   "can_u": 0,
+   "gap": 4,
+   "prod_tier": "NONE",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/denver/englewood-centennial-apartments/amli-dry-creek"
+  },
+  {
+   "aid": "72121",
+   "prod_u": 5,
+   "can_u": 1,
+   "gap": 4,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_3_DOM",
+   "url": "https://www.mangotreeapt.com/"
+  },
+  {
+   "aid": "284346",
+   "prod_u": 6,
+   "can_u": 3,
+   "gap": 3,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.empireapts.com/"
+  },
+  {
+   "aid": "60316",
+   "prod_u": 3,
+   "can_u": 0,
+   "gap": 3,
+   "prod_tier": "TIER_1_API_APPFOLIO",
+   "can_tier": "TIER_1_API_APTS247",
+   "url": "https://www.highlandparkapartmenthomes.com/"
+  },
+  {
+   "aid": "6533",
+   "prod_u": 3,
+   "can_u": 0,
+   "gap": 3,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "NONE",
+   "url": "https://www.avanacumberland.com/switch_cls[id]/64264/"
+  },
+  {
+   "aid": "251989",
+   "prod_u": 21,
+   "can_u": 19,
+   "gap": 2,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_API",
+   "url": "https://broadstonearchive.com/"
+  },
+  {
+   "aid": "25494",
+   "prod_u": 5,
+   "can_u": 3,
+   "gap": 2,
+   "prod_tier": "TIER_1_API_APPFOLIO",
+   "can_tier": "TIER_1_API_APTS247",
+   "url": "http://www.mylacasita.com/"
+  },
+  {
+   "aid": "257171",
+   "prod_u": 6,
+   "can_u": 4,
+   "gap": 2,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_3_DOM",
+   "url": "https://livetanagerecho.com/"
+  },
+  {
+   "aid": "258366",
+   "prod_u": 2,
+   "can_u": 0,
+   "gap": 2,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_RENTCAFE_SHAPE_REJECTED",
+   "url": "https://www.gildchicago.com/"
+  },
+  {
+   "aid": "35488",
+   "prod_u": 2,
+   "can_u": 0,
+   "gap": 2,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.threelakeskc.com/"
+  },
+  {
+   "aid": "78759",
+   "prod_u": 2,
+   "can_u": 0,
+   "gap": 2,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_FUNNEL_LIST_EMPTY",
+   "url": "https://reflectionapartments.com/"
+  },
+  {
+   "aid": "8995",
+   "prod_u": 16,
+   "can_u": 14,
+   "gap": 2,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_3_DOM",
+   "url": "https://www.blakelyliving.com/"
+  },
+  {
+   "aid": "1310",
+   "prod_u": 5,
+   "can_u": 4,
+   "gap": 1,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_KNOCK_API",
+   "url": "https://www.colinasatmedical.com/"
+  },
+  {
+   "aid": "16579",
+   "prod_u": 1,
+   "can_u": 0,
+   "gap": 1,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_APTS247",
+   "url": "https://www.zurabay.com/"
+  },
+  {
+   "aid": "20386",
+   "prod_u": 6,
+   "can_u": 5,
+   "gap": 1,
+   "prod_tier": "TIER_1_API_APPFOLIO",
+   "can_tier": "TIER_1_API_APTS247",
+   "url": "https://www.escondido-apts.com/"
+  },
+  {
+   "aid": "24577",
+   "prod_u": 4,
+   "can_u": 3,
+   "gap": 1,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_KNOCK_API",
+   "url": "https://www.liveatmagnoliacrossingapts.com/"
+  },
+  {
+   "aid": "246491",
+   "prod_u": 3,
+   "can_u": 2,
+   "gap": 1,
+   "prod_tier": "TIER_1_API",
+   "can_tier": "TIER_1_KNOCK_API",
+   "url": "https://www.rentthecedarsapts.com/"
+  },
+  {
+   "aid": "262557",
+   "prod_u": 2,
+   "can_u": 1,
+   "gap": 1,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.larkenassociates.com/residential-rentals/the-oaks-at-copper-chase"
+  },
+  {
+   "aid": "274661",
+   "prod_u": 1,
+   "can_u": 0,
+   "gap": 1,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_FUNNEL_SHAPE_REJECTED",
+   "url": "https://cornerstoneapartments.com/our-buildings/1600-s-albion/"
+  },
+  {
+   "aid": "278371",
+   "prod_u": 1,
+   "can_u": 0,
+   "gap": 1,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "NONE",
+   "url": "https://www.nichetampa.com/"
+  },
+  {
+   "aid": "27986",
+   "prod_u": 1,
+   "can_u": 0,
+   "gap": 1,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_APTS247",
+   "url": "www.centerparkapartments.com"
+  },
+  {
+   "aid": "29486",
+   "prod_u": 12,
+   "can_u": 11,
+   "gap": 1,
+   "prod_tier": "TIER_1_API_SIGHTMAP",
+   "can_tier": "TIER_1_API",
+   "url": "https://www.averyatmoorpark.com/"
+  },
+  {
+   "aid": "3169",
+   "prod_u": 1,
+   "can_u": 0,
+   "gap": 1,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "NONE",
+   "url": "https://www.avanacourt.com/"
+  },
+  {
+   "aid": "40710",
+   "prod_u": 1,
+   "can_u": 0,
+   "gap": 1,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_SIGHTMAP_SHAPE_REJECTED",
+   "url": "https://www.equityapartments.com/seattle/pike-pine/chloe-apartments"
+  },
+  {
+   "aid": "61143",
+   "prod_u": 1,
+   "can_u": 0,
+   "gap": 1,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_ONESITE",
+   "url": "https://www.mapleatmedcenter.com/"
+  },
+  {
+   "aid": "65134",
+   "prod_u": 2,
+   "can_u": 1,
+   "gap": 1,
+   "prod_tier": "TIER_3_DOM",
+   "can_tier": "TIER_1_API_G5",
+   "url": "http://www.garnetcreekapts.com/"
+  }
+ ],
+ "prod_inflation": [
+  {
+   "aid": "11327",
+   "prod_u": 14,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.planoparktownhomes.com/"
+  },
+  {
+   "aid": "11398",
+   "prod_u": 10,
+   "can_u": 1,
+   "prod_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.eclipsedallas.com/"
+  },
+  {
+   "aid": "11495",
+   "prod_u": 8,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.palisadesbearcreek.com/"
+  },
+  {
+   "aid": "11777",
+   "prod_u": 2,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.waterridgeapartments.com/"
+  },
+  {
+   "aid": "12393",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.thekirbyonmain.com/"
+  },
+  {
+   "aid": "12573",
+   "prod_u": 19,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.qtowneoaks.com/"
+  },
+  {
+   "aid": "12594",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.elanatmallardcreek.com/"
+  },
+  {
+   "aid": "12739",
+   "prod_u": 4,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.woodlandestatesapartmenthomes.com/?utm_source=google_my_business&utm_medium=organic"
+  },
+  {
+   "aid": "12758",
+   "prod_u": 3,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.wynfieldpark.com/"
+  },
+  {
+   "aid": "15710",
+   "prod_u": 4,
+   "can_u": 1,
+   "prod_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.lifeatthecobb.com/"
+  },
+  {
+   "aid": "16078",
+   "prod_u": 5,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.mark-taylor.com/apartments/az/chandler/san-cervantes/"
+  },
+  {
+   "aid": "16169",
+   "prod_u": 7,
+   "can_u": 5,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.rentthecape.com/"
+  },
+  {
+   "aid": "16499",
+   "prod_u": 300,
+   "can_u": 12,
+   "prod_tier": "TIER_1_DOM_APPFOLIO_SSR",
+   "url": "https://www.palmflats.com/"
+  },
+  {
+   "aid": "16634",
+   "prod_u": 22,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.residenceatbarrington.com/"
+  },
+  {
+   "aid": "16765",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.spinnakerlandingapts.com/"
+  },
+  {
+   "aid": "17728",
+   "prod_u": 4,
+   "can_u": 3,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.esring.com/apartments/ca/los-angeles/west-park-village/"
+  },
+  {
+   "aid": "19777",
+   "prod_u": 2,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.glenatnorthcreek.com/?utm_source=GMB&utm_medium=organic"
+  },
+  {
+   "aid": "19955",
+   "prod_u": 36,
+   "can_u": 0,
+   "prod_tier": "TIER_1_DOM_APPFOLIO_SSR",
+   "url": "https://www.brooksidejohnsoncreek.com/"
+  },
+  {
+   "aid": "20507",
+   "prod_u": 99,
+   "can_u": 97,
+   "prod_tier": "TIER_1_DOM_APPFOLIO_SSR",
+   "url": "http://www.hendersonmill.com/"
+  },
+  {
+   "aid": "21303",
+   "prod_u": 7,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "http://www.rosemeadema.com/"
+  },
+  {
+   "aid": "21570",
+   "prod_u": 21,
+   "can_u": 20,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.kensingtonapartments.net/"
+  },
+  {
+   "aid": "21577",
+   "prod_u": 19,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.springvalleyaparts.com/"
+  },
+  {
+   "aid": "217564",
+   "prod_u": 9,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.altitudeglenwoodsprings.com/"
+  },
+  {
+   "aid": "219793",
+   "prod_u": 5,
+   "can_u": 3,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.mywinchestercommons.com/"
+  },
+  {
+   "aid": "220287",
+   "prod_u": 16,
+   "can_u": 14,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.lansingwestapts.com/"
+  },
+  {
+   "aid": "221081",
+   "prod_u": 4,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.cityviewapartmentsspokane.com/"
+  },
+  {
+   "aid": "221973",
+   "prod_u": 8,
+   "can_u": 5,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.thepark4690.com/"
+  },
+  {
+   "aid": "22347",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.mainstreetapts.com/"
+  },
+  {
+   "aid": "224617",
+   "prod_u": 4,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.lakewoodsumter.com/"
+  },
+  {
+   "aid": "225398",
+   "prod_u": 3,
+   "can_u": 0,
+   "prod_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "http://www.remingtoncoveapts.com/"
+  },
+  {
+   "aid": "225610",
+   "prod_u": 16,
+   "can_u": 14,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://610west.com/"
+  },
+  {
+   "aid": "22611",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.mercuryonmillapts.com/"
+  },
+  {
+   "aid": "22767",
+   "prod_u": 2,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.sunsetpointeapts.net/"
+  },
+  {
+   "aid": "227817",
+   "prod_u": 5,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.alloyla.com/"
+  },
+  {
+   "aid": "22934",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://westwoodvillagegalleria.bhprop.com/"
+  },
+  {
+   "aid": "231522",
+   "prod_u": 6,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.oakwoodestatessiouxfalls.com/"
+  },
+  {
+   "aid": "233496",
+   "prod_u": 3,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.riverstoneapartmentsatlongshoals.com/"
+  },
+  {
+   "aid": "234133",
+   "prod_u": 2,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "http://www.grandviewluxuryapts.com/"
+  },
+  {
+   "aid": "234783",
+   "prod_u": 5,
+   "can_u": 3,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.highlandsathilltop.com/"
+  },
+  {
+   "aid": "235996",
+   "prod_u": 156,
+   "can_u": 2,
+   "prod_tier": "TIER_1_DOM_APPFOLIO_SSR",
+   "url": "http://stratfordchase.com/"
+  },
+  {
+   "aid": "237148",
+   "prod_u": 2,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.thehavenlamesa.com/"
+  },
+  {
+   "aid": "239699",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.huntersruncharles.com/"
+  },
+  {
+   "aid": "243245",
+   "prod_u": 3,
+   "can_u": 2,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://longfellowlofts.com/"
+  },
+  {
+   "aid": "24561",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "www.thefountainsdeerwood.com"
+  },
+  {
+   "aid": "246751",
+   "prod_u": 3,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.parkplacewaxahachie.com/"
+  },
+  {
+   "aid": "246773",
+   "prod_u": 7,
+   "can_u": 4,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.pointat180.com/"
+  },
+  {
+   "aid": "250342",
+   "prod_u": 4,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.stationhouseredmond.com/"
+  },
+  {
+   "aid": "252560",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_1_DOM_APPFOLIO_SSR",
+   "url": "https://www.boardwalklux.com/"
+  },
+  {
+   "aid": "254144",
+   "prod_u": 6,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.legacyatfitz.com/"
+  },
+  {
+   "aid": "257140",
+   "prod_u": 9,
+   "can_u": 7,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.livethedepot.com/?fbclid=IwAR2ZBb-O9yqiGpgNbUNsfFsQAGcDU0YDwPuVWbmMM3tZ3P1tLAOfFZ934DE"
+  },
+  {
+   "aid": "257372",
+   "prod_u": 3,
+   "can_u": 2,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://liveinspirepensacola.com/"
+  },
+  {
+   "aid": "258309",
+   "prod_u": 20,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.liveatleesquare.com/"
+  },
+  {
+   "aid": "26132",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "www.thebelmontbyreside.com"
+  },
+  {
+   "aid": "261358",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.edgebayonne.com/avenueg/"
+  },
+  {
+   "aid": "263127",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.hickorygrovega.com/"
+  },
+  {
+   "aid": "263368",
+   "prod_u": 7,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.marinavillaapartments.com/"
+  },
+  {
+   "aid": "264329",
+   "prod_u": 3,
+   "can_u": 2,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.axisatptc.com/"
+  },
+  {
+   "aid": "267147",
+   "prod_u": 2,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.crldublinflats.com/"
+  },
+  {
+   "aid": "269304",
+   "prod_u": 6,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://livemadisonashleypark.com/"
+  },
+  {
+   "aid": "269983",
+   "prod_u": 15,
+   "can_u": 3,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.gmholdingsmanagement.com/residential-propertiesv"
+  },
+  {
+   "aid": "271975",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.edgeapartmentstarga.com/"
+  },
+  {
+   "aid": "273930",
+   "prod_u": 5,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.westshireocala.com/"
+  },
+  {
+   "aid": "274585",
+   "prod_u": 7,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://edenatsunterra.com/?utm_source=greystar&utm_medium=ils"
+  },
+  {
+   "aid": "27583",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.brookmoreapts.com/"
+  },
+  {
+   "aid": "280718",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.livethemarqapts.com/"
+  },
+  {
+   "aid": "281837",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.railyardapts.com/"
+  },
+  {
+   "aid": "282648",
+   "prod_u": 3,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.apolloridgeapts.com/"
+  },
+  {
+   "aid": "282768",
+   "prod_u": 3,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.convergenw.com/"
+  },
+  {
+   "aid": "283333",
+   "prod_u": 3,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.casaprincetonfl.com/"
+  },
+  {
+   "aid": "283391",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.thevalleyatmillcreek.com/"
+  },
+  {
+   "aid": "2871",
+   "prod_u": 12,
+   "can_u": 6,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.liveatthejaxtn.com/"
+  },
+  {
+   "aid": "28728",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.arthauscentral.mov/"
+  },
+  {
+   "aid": "290391",
+   "prod_u": 7,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.theenclaveatdeermosscreek.com/"
+  },
+  {
+   "aid": "3092",
+   "prod_u": 4,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.chimneyhillapartments.com/"
+  },
+  {
+   "aid": "34187",
+   "prod_u": 12,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.enclavewaco.com/?utm_knock=g"
+  },
+  {
+   "aid": "36572",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.villasatgreenview.com/"
+  },
+  {
+   "aid": "37148",
+   "prod_u": 2,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.washingtonplaceapts.com"
+  },
+  {
+   "aid": "37478",
+   "prod_u": 8,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.livebreckenridge.com/"
+  },
+  {
+   "aid": "3787",
+   "prod_u": 5,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.enclaveatbreckenridge.com/"
+  },
+  {
+   "aid": "39387",
+   "prod_u": 2,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.highrock5300.com"
+  },
+  {
+   "aid": "41134",
+   "prod_u": 4,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "www.waterfordvillagetn.com"
+  },
+  {
+   "aid": "42332",
+   "prod_u": 9,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.gravity255apartments.com/"
+  },
+  {
+   "aid": "42361",
+   "prod_u": 5,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.liveatwinston.com/"
+  },
+  {
+   "aid": "42576",
+   "prod_u": 21,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://fenwaytriangle.com/"
+  },
+  {
+   "aid": "42586",
+   "prod_u": 14,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.birchstonenorthlake.com/"
+  },
+  {
+   "aid": "43947",
+   "prod_u": 8,
+   "can_u": 6,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.stoneoakapt.com/"
+  },
+  {
+   "aid": "44765",
+   "prod_u": 2,
+   "can_u": 0,
+   "prod_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.aeroplaceliving.com/"
+  },
+  {
+   "aid": "49454",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "www.romainecourt.com"
+  },
+  {
+   "aid": "49521",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.redbankreserve.com/"
+  },
+  {
+   "aid": "49691",
+   "prod_u": 13,
+   "can_u": 10,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "www.monticellovillageapts.com"
+  },
+  {
+   "aid": "49743",
+   "prod_u": 5,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.westchestersquareapartments.com/"
+  },
+  {
+   "aid": "50114",
+   "prod_u": 3,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://rookwoodproperties.com/details/?propID=1&rmwebsvc_id=1&rmwebsvc_command=PropertyDetail.aspx&rmwebsvc_corpid=rookwood&rmwebsvc_location=1&rmwebsvc_mode=javascript&rmwebsvc_AvailabilityDate=8/21/2019&rmwebsvc_template=proplist"
+  },
+  {
+   "aid": "50339",
+   "prod_u": 5,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.parcatdenhamsprings.com/"
+  },
+  {
+   "aid": "50912",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.indigobremerton.com/"
+  },
+  {
+   "aid": "5113",
+   "prod_u": 3,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.pepperwoodknoll.com/"
+  },
+  {
+   "aid": "51982",
+   "prod_u": 13,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM",
+   "url": "www.liveportside.com"
+  },
+  {
+   "aid": "52198",
+   "prod_u": 2,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.comptonlake.com/"
+  },
+  {
+   "aid": "53511",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.riveroaksrochesterhills.com"
+  },
+  {
+   "aid": "57545",
+   "prod_u": 13,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.baytreeoceandrive.com/"
+  },
+  {
+   "aid": "57761",
+   "prod_u": 8,
+   "can_u": 6,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.bellknoxdistrict.com/?utm_source=google+local&utm_medium=organic&utm_campaign=website+link"
+  },
+  {
+   "aid": "5854",
+   "prod_u": 7,
+   "can_u": 1,
+   "prod_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.terraatpineypoint.com"
+  },
+  {
+   "aid": "6147",
+   "prod_u": 14,
+   "can_u": 11,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://besparkliving.com/spark-pax-river/"
+  },
+  {
+   "aid": "61548",
+   "prod_u": 11,
+   "can_u": 0,
+   "prod_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/southeast-florida/dadeland-apartments/amli-dadeland"
+  },
+  {
+   "aid": "61552",
+   "prod_u": 11,
+   "can_u": 0,
+   "prod_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.amli.com/apartments/southeast-florida/dadeland-apartments/amli-joya"
+  },
+  {
+   "aid": "62178",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://thebungalowsatskyvista.com/"
+  },
+  {
+   "aid": "64088",
+   "prod_u": 6,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "www.thealdynnyc.com"
+  },
+  {
+   "aid": "64171",
+   "prod_u": 5,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.liveatwestlink.com/"
+  },
+  {
+   "aid": "6454",
+   "prod_u": 12,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.staywelleby.com/"
+  },
+  {
+   "aid": "64973",
+   "prod_u": 5,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://cortland.com/apartments/cortland-onion-creek/"
+  },
+  {
+   "aid": "6550",
+   "prod_u": 3,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.scottsdalevintageapts.com/"
+  },
+  {
+   "aid": "65659",
+   "prod_u": 16,
+   "can_u": 14,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "http://www.pointatwaterfordapartments.com/"
+  },
+  {
+   "aid": "6701",
+   "prod_u": 2,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.theparkonriley.com/"
+  },
+  {
+   "aid": "67124",
+   "prod_u": 12,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "http://thegarfield.com/"
+  },
+  {
+   "aid": "67689",
+   "prod_u": 7,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.adaraoverlandpark.com/"
+  },
+  {
+   "aid": "68395",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.parksideatdg.com/"
+  },
+  {
+   "aid": "69571",
+   "prod_u": 19,
+   "can_u": 18,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.riverhouseat11miami.com/"
+  },
+  {
+   "aid": "69760",
+   "prod_u": 9,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://lakesidevillagemarysville.com/"
+  },
+  {
+   "aid": "71534",
+   "prod_u": 5,
+   "can_u": 3,
+   "prod_tier": "TIER_MERGED_CROSS_PAGE",
+   "url": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/"
+  },
+  {
+   "aid": "7176",
+   "prod_u": 4,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.bellavidalv.com/"
+  },
+  {
+   "aid": "73079",
+   "prod_u": 6,
+   "can_u": 1,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.thepalazzoapts.com/"
+  },
+  {
+   "aid": "74547",
+   "prod_u": 8,
+   "can_u": 7,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.verticaleastapts.com/"
+  },
+  {
+   "aid": "7596",
+   "prod_u": 7,
+   "can_u": 6,
+   "prod_tier": "TIER_4_LLM",
+   "url": "http://www.palmcourtapts.com/"
+  },
+  {
+   "aid": "77168",
+   "prod_u": 10,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "www.crosskeysapts.com"
+  },
+  {
+   "aid": "7770",
+   "prod_u": 1,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.twelve100.com/"
+  },
+  {
+   "aid": "77994",
+   "prod_u": 2,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.byredwood.com/apartments/oh/sugarcreek-township/redwood-sugarcreek-township/"
+  },
+  {
+   "aid": "78079",
+   "prod_u": 5,
+   "can_u": 2,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.voramissionvalley.com/"
+  },
+  {
+   "aid": "78134",
+   "prod_u": 22,
+   "can_u": 0,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://uncommondevelopers.com/apartments/the-24/"
+  },
+  {
+   "aid": "7951",
+   "prod_u": 6,
+   "can_u": 5,
+   "prod_tier": "TIER_4_LLM_DOM",
+   "url": "https://www.summerridgeapartments.com/"
+  },
+  {
+   "aid": "93977",
+   "prod_u": 18,
+   "can_u": 2,
+   "prod_tier": "TIER_4_LLM",
+   "url": "https://www.eonflaglervillage.com/"
+  }
+ ]
+}
