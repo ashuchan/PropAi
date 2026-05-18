@@ -56,7 +56,7 @@ _UNIT_TOK = re.compile(
 )
 _RENT = re.compile(r"\$\s?[1-9]\d{0,2}(?:,\d{3})?\d{0,3}(?:\.\d{2})?")
 _AVAIL = re.compile(
-    r"avail\w*|\bnow\b|\d{1,2}/\d{1,2}/\d{2,4}|move[- ]?in", re.I
+    r"avail\w*|\bnow\b|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|move[- ]?in", re.I
 )
 _DETAIL_LINK = re.compile(
     r"/(?:floor-?plans?(?:-and-pricing)?|floorplan|floor-plan-cards|"
@@ -164,8 +164,8 @@ async def _text(page: Any) -> str:
 # 'unit' keyword): "202", "4114", "05-101", "6203", "H0225", "A-204".
 _ID_TOK = re.compile(r"^[A-Za-z]{0,2}\d{1,4}(?:[-\s]\d{1,4})?$")
 _AVAIL_LINE = re.compile(
-    r"available\s*(?:now|soon|\w+\.?\s?\d{0,2}|\d{1,2}/\d{1,2})|"
-    r"\d{1,2}/\d{1,2}/\d{2,4}|move[- ]?in", re.I
+    r"available\s*(?:now|soon|\w+\.?\s?\d{0,2}|\d{1,2}[/-]\d{1,2})|"
+    r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|move[- ]?in", re.I
 )
 _BAD_TOK = re.compile(r"^(?:19|20)\d{2}$")  # years
 _FLOOR_WORDS = re.compile(
@@ -399,7 +399,7 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
         # why the Chrome-MCP probe succeeded where blind scans failed).
         has_rrac = False
         n = 0
-        for _ in range(16):  # up to ~8s
+        for _ in range(28):  # up to ~14s (concurrency slows render)
             try:
                 n = await page.evaluate(
                     """() => {
@@ -421,7 +421,7 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
             seen_r: set[str] = set()
             # Cap to a few floorplans: we need to CLASSIFY (units exist?),
             # not exhaust all popups. 14×10s polls blew the 120s cap.
-            for vi in range(min(int(n or 0), 2)):
+            for vi in range(min(int(n or 0), 4)):
                 try:
                     await page.evaluate(
                         """(vi)=>{ const vd=[...document.querySelectorAll('a,button')]
@@ -431,7 +431,7 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
                         vi,
                     )
                     txt = ""
-                    for _ in range(10):  # poll up to ~5s for async modal
+                    for _ in range(16):  # poll up to ~8s for async modal
                         await page.wait_for_timeout(500)
                         txt = await page.evaluate(
                             """()=>{ const m=document.querySelector(
