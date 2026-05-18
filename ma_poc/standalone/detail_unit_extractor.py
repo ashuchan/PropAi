@@ -380,6 +380,61 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
     for sp in scan_pages:
         if not await _goto(page, sp):
             continue
+        # caf_v2 / rrac widget: trigger = <a class="btn btn-primary">
+        # "View Details" (one per floorplan); click -> async-populates
+        # .rrac_apartment_details_content with the Bldg#/Unit#/$/avail
+        # table. Poll the container (rrac loads slowly), parse ITS text.
+        try:
+            has_rrac = await page.evaluate(
+                "() => { for (let i=0;i<1;i++){} "
+                "return !!document.querySelector('[class*=rrac]'); }"
+            )
+        except Exception:
+            has_rrac = False
+        if has_rrac:
+            try:
+                n = await page.evaluate(
+                    """() => [...document.querySelectorAll('a,button')]
+                        .filter(e=>/view\\s*detail/i.test((e.innerText||'').trim())
+                        && (e.innerText||'').trim().length<25).length"""
+                )
+            except Exception:
+                n = 0
+            acc_r: list[dict[str, Any]] = []
+            seen_r: set[str] = set()
+            for vi in range(min(int(n or 0), 14)):
+                try:
+                    await page.evaluate(
+                        """(vi)=>{ const vd=[...document.querySelectorAll('a,button')]
+                            .filter(e=>/view\\s*detail/i.test((e.innerText||'').trim())
+                            && (e.innerText||'').trim().length<25);
+                          if(vd[vi]){ vd[vi].scrollIntoView(); vd[vi].click(); } }""",
+                        vi,
+                    )
+                    txt = ""
+                    for _ in range(20):  # poll up to ~10s for async modal
+                        await page.wait_for_timeout(500)
+                        txt = await page.evaluate(
+                            """()=>{ const m=document.querySelector(
+                              '.rrac_apartment_details_content,.rrac_modal_container,[class*=rrac-popup]');
+                              return m ? (m.innerText||'').trim() : ''; }"""
+                        )
+                        if len(txt) > 60:
+                            break
+                    for u in _generic_text_rows(txt, page.url):
+                        k = str(u.get("unit_number") or "") + str(
+                            u.get("market_rent_low") or ""
+                        )
+                        if k and k not in seen_r:
+                            seen_r.add(k)
+                            acc_r.append(u)
+                except Exception:
+                    continue
+            if acc_r:
+                res.units = acc_r
+                res.signal = "interact:rrac_popup"
+                res.phase = "C_interact"
+                return True
         try:
             ctrls = await page.evaluate(_CTRL_JS)
         except Exception:
