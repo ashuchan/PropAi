@@ -24,7 +24,41 @@ royce (rrac popup) — mechanism CRACKED via Chrome-MCP: trigger =
 `a` text "View Details" → async-populates `.rrac_apartment_details_
 content` (Bldg#/Unit#/$/avail table). Was timing out (14×10s polls
 > 120s cap) → FIXED: capped to 3 View Details + 6s poll.
-ROYCE SOLVED (commit ~latest): rrac break was the PARSER not interaction — modal text has tabs+newlines INSIDE rows; fixed _generic_text_rows to normalize whitespace then split on row-terminators. 6-site smoke 5/6 UNIT (royce/ironhorse/jaxon/chatham/solano UNIT; lochraven Phase-D #k= still 0). 18-site rrac-cluster validation running bf47w5239.
+ROYCE SOLVED: rrac PARSER fix (normalize whitespace, split on row-
+terminators) + dash-date fix (MM-DD-YYYY in _AVAIL/_AVAIL_LINE) +
+rrac-timing. Commits 3abad9c (dash+timing), ea9247d (Cloud Run shard
+wrapper ma_poc/scripts/runners/standalone_shard.py). 18-site cluster:
+9/18 → **10/18** after dash-date.
+
+**LATEST FIX (uncommitted, re-validating bg b036oxs0l on
+/tmp/royce_cluster.txt → /tmp/royce_cluster3.out):** Chrome-MCP cracked
+the independence/westwood miss — those 8 non-UNIT cluster sites are ALL
+user-validated U (eyeball batch3), NOT floorplan-only. Root cause: the
+RealPage rrac embed is injected ASYNC and on slow sites takes ~4-5s to
+create its `[class*=rrac]` container; the pre-poll early-exit
+`if n==-1 and _>=6: break` bailed at 3s before it existed. FIX in
+_phase_c_interact: added `await page.wait_for_timeout(2500)` initial
+settle + raised no-rrac early-exit `_>=6` → `_>=22`. Also removed
+F841 unused `sig`. ruff clean. Verified live via Chrome-MCP:
+independence /floor-plans (HYPHEN; /floorplans no-hyphen has rrac=0)
+→ View Details → modal "50/102 $2,215 05-23-2026, 40/102 $2,215
+Available Now".
+
+## #2 RE-BASELINE — LOCKED (durable: artifacts/analysis/rebaseline2_results.jsonl)
+securecafe 1097/1400=78% (986 RentCafe-SC+53 Knock+28 SightMap) |
+g5 94/124=76% NO-REGRESSION ✓ | appfolio 74/107=69% NO-REGRESSION ✓
+| apts247 99/223=44% | sightmap 29/421=7% (224 NONE+33 SHAPE_REJECTED
+— unrealized gain, standalone Phase-A target, NOT a regression).
+
+## 456 GCP RUN — STAGED, GATED on cluster3 passing
+- Image: us-central1-docker.pkg.dev/jugnu-494013/jugnu-images/jugnu:canary-fixtest-ea9247d (built, has shard wrapper + dash-date; does NOT yet have the pre-poll settle fix — REBUILD with new sha before triggering 456)
+- URLs: gs://jugnu-canary/property-list/all456_urls.txt (456)
+- Wrapper: ma_poc/scripts/runners/standalone_shard.py — env URLS_GCS_URI,
+  BUCKET_NAME=jugnu-canary, CONCURRENCY=6, RESULT_PREFIX. Cloud Run job
+  with --tasks N (≈24 for <30min), command python
+  ma_poc/scripts/runners/standalone_shard.py. Output:
+  gs://jugnu-canary/runs/<date>-standalone456/shard_*/results.jsonl
+- Aggregate: artifacts/scripts/agg_standalone456.py <run-dir> (vs eyeball)
 
 [superseded] 8th smoke DONE: 4/5 UNIT (solano/chatham/ironhorse/jaxon), royce=
 FLOORPLAN (timeout FIXED — no regression). royce rrac still 0 because
