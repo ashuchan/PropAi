@@ -42,6 +42,7 @@ from ma_poc.pms.adapters._parsing import (
     make_unit_dict,
     money_to_int,
 )
+from ma_poc.pms.adapters._rentcafe_hosted_table import parse_rentcafe_hosted_table
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 # Note: ``ma_poc.extraction.post_process`` is imported lazily inside ``extract``
@@ -63,6 +64,8 @@ try:
     from ma_poc.pms.signal_engine.defaults import create_rentcafe_qualifier as _create_rq
     from ma_poc.pms.signal_engine.models import (
         SourceKind as _RCSourceKind,
+    )
+    from ma_poc.pms.signal_engine.models import (
         SourceSignal as _RCSourceSignal,
     )
     _rentcafe_qualifier = _create_rq()
@@ -427,6 +430,33 @@ class RentCafeAdapter:
                 result.tier_used = f"{_TIER_BASE}_SECURECAFE"
                 result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
                 return result
+
+        # 2026-05-18: RentCafe-HOSTED SSR unit table fallback. The
+        # rentcafe.com/.../default.aspx portal (and the same RC widget on
+        # rendered vanity pages) SSRs every unit as
+        # ``<tr class="fp-unit" data-unit-*>`` — server-200, no bot-wall,
+        # no login. main's generic extractor misses this markup. Render-
+        # dependent, so parse the already-rendered page HTML.
+        try:
+            from ma_poc.pms.adapters.generic import _get_page_html
+            _rc_html = await _get_page_html(page, ctx)
+        except Exception:
+            _rc_html = ""
+        if _rc_html and "fp-unit" in _rc_html:
+            hosted = parse_rentcafe_hosted_table(
+                _rc_html, str(getattr(ctx, "base_url", "") or "")
+            )
+            if hosted:
+                from ma_poc.extraction.post_process import post_process
+                pp = post_process(
+                    hosted, property_id=getattr(ctx, "property_id", None)
+                )
+                if pp.n_admitted > 0:
+                    result.units = pp.admitted
+                    result.plan_summaries = pp.plan_summaries
+                    result.tier_used = "TIER_1_DOM_RENTCAFE_HOSTED"
+                    result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
+                    return result
 
         # Failure path: re-stamp tier_used with a structured sub-code so the
         # downstream report can distinguish misrouting from genuine zero data.
