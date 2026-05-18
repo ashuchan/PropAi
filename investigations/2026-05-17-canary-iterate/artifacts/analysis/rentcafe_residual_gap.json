@@ -1,0 +1,13 @@
+{
+ "cohort": "rentcafe-tagged residual (domllm_ledger platform=rentcafe)",
+ "size_in_ledger": 195,
+ "true_5k": "likely larger (ledger undercounts)",
+ "prod_outcome": "ZERO reached TIER_1. PROD tiers: TIER_4_LLM_DOM 131 (67%), generic:no_body_short_circuit 28 (14%), TIER_4_LLM 12, NONE 10. The RentCafe Tier-1 path (our strongest, 78%) NEVER fires for these.",
+ "heterogeneous": true,
+ "sub_clusters": {
+  "Essex Property Trust (essexapartmenthomes.com/*)": "large single-operator chunk. Next.js bespoke app over Yardi/RentCafe (essexrentcafe.securecafe.com / essexrentcafenet). Public availability via Essex OWN same-origin /api/* (parent-template, locations/communities), NOT the standard securecafe availableunits.aspx our adapter probes. securecafe only exposed behind RESIDENT LOGIN. Page is bot/JS-gated \u2014 does NOT render to automated browser (==> prod no_body_short_circuit). Needs DevTools capture of the /api unit call (proven pattern, like OLL).",
+  "independent RentCafe marketing tail": "cascadewoodsprinceton/stazione25/chatwellclub/etc \u2014 varied RentCafe sites that fell to TIER_4_LLM; need per-site probing; not one API."
+ },
+ "root_cause": "detector tags rentcafe but the securecafe iter-4 availableunits.aspx probe is keyed on securecafe.com/onlineleasing portal links these sites do not publicly expose; Essex wraps RentCafe in a custom React/Next app with same-origin /api.",
+ "next": "Essex: user DevTools capture of the floor-plans-and-pricing unit API (host+method+payload+auth) \u2014 same as OLL. Non-Essex tail: separate."
+}
