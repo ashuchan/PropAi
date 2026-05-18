@@ -259,15 +259,23 @@ def _build_query(
         params["cids"] = list(cid_filter)
 
     where_sql = " AND ".join(where_clauses)
-    limit_sql = f"\n    LIMIT {int(limit)}" if limit else ""
+    # Python 3.11 forbids backslashes inside f-string `{...}` expressions
+    # (PEP 701 lifted this only in 3.12). Pre-bind every join that
+    # contains a newline / tab so the f-string template stays scalar.
+    # The production Cloud Run image is on 3.11 — see incident
+    # 2026-05-18T16:41 (SyntaxError in jugnu-adhoc-production-9t4ls).
+    ctes_sql = ",".join(ctes)
+    select_cols_sql = (",\n            ").join(select_cols)
+    joins_sql = "\n".join(joins)
+    limit_sql = ("\n    LIMIT " + str(int(limit))) if limit else ""
 
     sql = f"""
-    WITH {",".join(ctes)}
+    WITH {ctes_sql}
     SELECT
         p.canonical_id,
-        {",\n            ".join(select_cols)}
+        {select_cols_sql}
     FROM properties p
-    {chr(10).join(joins)}
+    {joins_sql}
     WHERE {where_sql}{limit_sql}
     """
     return sql, params

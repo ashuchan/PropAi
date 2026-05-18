@@ -103,6 +103,57 @@ Idempotent: never overwrites non-NULL values.
 
 Optional: `--batch-size 500`, `--database-url <override>`, `--dry-run`, `-v`.
 
+#### `diagnostics.backfill_property_soft_fields` — fix NULL property name / address / phone / pmc
+Lives under `scripts/diagnostics/` because it was authored to remediate a specific incident, but functionally it IS a backfill. Repairs `properties` rows whose soft fields were NULL'd out by either (a) the pre-COALESCE upsert ratchet or (b) the pre-fix `_make_failed_record` path that wrote `proj_name=None` for every failure-path emit (2026-05-18). Strictly NULL-guarded — every UPDATE has `AND ({col} IS NULL OR TRIM({col}) = '')` so re-runs touch nothing and concurrent writers can't be clobbered.
+
+Per-field source order (first hit wins): `property_snapshots.payload` (V2 key or V1 Title-Case alias, optionally filtered to success-class snapshots) → `properties.extra` JSON (CSV-passthrough bucket from `ingest_properties_csv`) → optional `--csv` file (last-resort recovery for rows whose snapshots aged out of the 3-day retention window).
+
+| Field | Value |
+|---|---|
+| `SCRIPT_NAME` | `diagnostics.backfill_property_soft_fields` |
+| `SCRIPT_ARGS` | *(empty for dry-run scan; default behaviour reports planned writes without applying)* |
+
+Variations:
+```
+# Dry-run scan — see what would change, write nothing
+SCRIPT_ARGS=
+
+# Apply for real (commits writes)
+SCRIPT_ARGS=--apply
+
+# Restrict to specific fields only
+SCRIPT_ARGS=--fields proj_name,address,city,state --apply
+
+# Stage rollout — verify on 5 PIDs first, then specific PIDs, then full
+SCRIPT_ARGS=--limit 5 --apply
+SCRIPT_ARGS=--cid 12586,12963 --apply
+SCRIPT_ARGS=--apply
+
+# Include CSV catalog as a last-resort source (recovers rows whose snapshots
+# have aged out of the 3-day retention window — required for the long-tail
+# of properties that have been failing every day for >3 days)
+SCRIPT_ARGS=--csv ma_poc/config/properties.csv --apply
+
+# Only accept values from SUCCESS-class snapshots (safer when pre-fix FAILED
+# snapshots may have written stale identity data)
+SCRIPT_ARGS=--require-success-verdict --apply
+
+# Write a per-cell audit log (recommended for any --apply run)
+SCRIPT_ARGS=--apply --audit /tmp/audit.jsonl
+
+# Combined: the recommended production-grade invocation
+SCRIPT_ARGS=--csv ma_poc/config/properties.csv --require-success-verdict --apply --audit /tmp/audit.jsonl
+```
+
+Other flags:
+- `--batch-size N` (default 500) — commit cadence. Bounds rollback radius if the connection drops mid-run.
+- `-v` — log every per-row update.
+
+Notes:
+- Default is dry-run; `--apply` is required to commit.
+- Idempotent — the SQL guard `AND ({col} IS NULL OR TRIM({col}) = '')` ensures re-running touches nothing.
+- The audit JSONL written by `--audit PATH` is a per-cell record `{ts, cid, field, value, source}` — keep this for post-hoc auditability of what changed and from which source.
+
 ---
 
 ### Floor-plan comparison & disagreement export
@@ -490,6 +541,36 @@ Builds a per-property bundle for every cid whose `run_ledger` status is not `SUC
 2. After it finishes, browse `data/runs/{date}/failure_debug/index.md` in the run dir (uploaded back to `gs://{BUCKET_NAME}/runs/{date}/shard_<idx>/failure_debug/` by the next sync).
 3. For ad-hoc inspection of specific cids: `SCRIPT_ARGS=--canonical-ids 12345,67890 --include-gcs`.
 4. For runs older than 3 days (past SQL retention): `SCRIPT_ARGS=--run-date 2026-05-01 --use-gcs`.
+
+### "Frontend shows blank property cards — N properties have NULL name / address"
+
+Backstory: the FAILED-record stub used to write `proj_name=None` / `address=None` (fixed 2026-05-18), and the pre-COALESCE upsert ratchet preserved those NULLs forever. The frontend reads `properties.proj_name` directly, so affected rows render with empty headers.
+
+Two-pass rollout:
+
+1. **Dry-run, see the scale + source breakdown:**
+   ```
+   SCRIPT_NAME=diagnostics.backfill_property_soft_fields
+   SCRIPT_ARGS=--csv ma_poc/config/properties.csv --require-success-verdict
+   ```
+   Logs will print per-field tallies and per-source totals (`snapshot` / `properties_extra` / `csv`).
+
+2. **Verify on 5 PIDs first:**
+   ```
+   SCRIPT_NAME=diagnostics.backfill_property_soft_fields
+   SCRIPT_ARGS=--csv ma_poc/config/properties.csv --require-success-verdict --limit 5 --apply --audit /tmp/audit.jsonl
+   ```
+   Cross-check those 5 in the frontend.
+
+3. **Full apply:**
+   ```
+   SCRIPT_NAME=diagnostics.backfill_property_soft_fields
+   SCRIPT_ARGS=--csv ma_poc/config/properties.csv --require-success-verdict --apply --audit /tmp/audit.jsonl
+   ```
+
+4. **Audit:** the `--audit` JSONL is per-cell — sort or group it to see exactly which (cid, field) pairs were written and from which source.
+
+> Without `--csv`, the script only recovers rows whose snapshot is still within the 3-day Postgres retention window. Properties failing every day for >3 days have only NULL snapshots and need the CSV fallback to recover. The CSV is bundled in the image at `/app/ma_poc/config/properties.csv`.
 
 ### "Verify the live image is healthy after a deploy"
 
