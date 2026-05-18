@@ -76,13 +76,24 @@ lochraven = **RentVision** site (NOT royce-rrac). Floorplans at
 **floorplan-level only** ("Prices Starting At $1,240", "Available on
 May 21, 2026", "Sign Waitlist" — NO unit#/bldg). Unit-level (user
 eyeball=U) is behind "Check Availability" → /content/apply#k=57256
-which loads **Knock doorway** (scripts doorway.knck.io/v3/static/js/
-main.min.js + /latest/doorway.min.js; ~10 [*knock/doorway*] DOM els;
-NO OneSite iframe, NO unit rows in static DOM). Knock doorway is a
-scheduling/lead overlay — extracting unit rows needs a distinct
-interaction flow (open doorway → unit-select), a substantial Phase-D
-sub-project separate from rrac. Defer unless 456 agg shows the
-Knock/#k= class is large.
+which **auto-loads a RealPage OneSite leasing wizard** in a
+cross-origin iframe **id=rp-leasing-widget** (the Knock doorway chat
+bubble is a SEPARATE element, not the unit source). USER-CONFIRMED U.
+
+**PHASE-D MECHANISM FULLY CRACKED (Chrome-MCP screenshot):** wizard
+steps 1.Floor Plans → 2.Apartment → 3.Lease Terms → 4.Quote. Step 1
+renders floorplan cards each with an **"(N) Available"** button (live
+available-unit count); clicking it advances to step 2 "Apartment"
+which lists the individual units (unit#/rent/avail). #k= hash rotates
+(26888→38186…) but the widget loads ALL floorplans regardless.
+propertyId=2021993, Pusher ws, Knockbot GA. BUILD PLAN for
+_phase_d_portal_hop: nav /content/apply (or follow Check-Availability)
+→ wait for iframe#rp-leasing-widget → patchright
+frame_locator('#rp-leasing-widget') / iterate page.frames() for the
+RealPage onesite frame → click each "(N) Available" → read step-2
+frame innerText → parse via _generic_text_rows. ~26-site class
+(jaxon/marion/lochraven). Cross-origin frame + multi-step = real
+work; do AFTER 456 agg quantifies class size.
 
 [superseded] 8th smoke DONE: 4/5 UNIT (solano/chatham/ironhorse/jaxon), royce=
 FLOORPLAN (timeout FIXED — no regression). royce rrac still 0 because
