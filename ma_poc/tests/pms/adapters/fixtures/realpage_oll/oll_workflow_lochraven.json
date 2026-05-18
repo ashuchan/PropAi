@@ -1,0 +1,104 @@
+[
+  {
+    "url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/appstate/v1/?BpmId=OLL.SearchFloorPlan&BpmSequence=1&LogSequence=7&ClientSessionID=lochraven-sid",
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "SiteId": "4000138",
+      "PmcId": "2104447",
+      "PmsId": 1,
+      "Workflow": {
+        "ActivityGroups": [
+          {
+            "GroupActivities": [
+              {
+                "__type": "SomeOther.NavigationActivity, RP.Leasing",
+                "Id": "nav-1"
+              },
+              {
+                "__type": "RP.Leasing.ApartmentSelectionLeaseMgmtActivity, RP.Leasing.AppService",
+                "Id": "apt-activity-fp-206",
+                "Floorplan": {
+                  "Id": "206",
+                  "Name": "The Oak (1x1)",
+                  "Bedrooms": 1,
+                  "Bathrooms": "1",
+                  "MinSquareFeet": 700,
+                  "MinPriceRange": 1255,
+                  "MaxPriceRange": 1515,
+                  "AvailableUnits": 2
+                },
+                "Units": [
+                  {
+                    "UnitNumber": "1805C AB",
+                    "Id": 206,
+                    "MinPriceRange": 1255,
+                    "MaxPriceRange": 1515,
+                    "AvailableDateString": "May 21",
+                    "AvailableDate": "/Date(1779339600000-0500)/",
+                    "Deposit": 350,
+                    "Squarefeet": 700,
+                    "TwelveMonthsRent": 1290,
+                    "SiteId": "4000138"
+                  },
+                  {
+                    "UnitNumber": "1719F AB",
+                    "Id": 207,
+                    "MinPriceRange": 1290,
+                    "MaxPriceRange": 1290,
+                    "AvailableDateString": "Jun 1",
+                    "AvailableDate": "/Date(1780290000000-0500)/",
+                    "Deposit": 350,
+                    "Squarefeet": 700,
+                    "TwelveMonthsRent": 1290,
+                    "SiteId": "4000138"
+                  }
+                ]
+              },
+              {
+                "__type": "RP.Leasing.ApartmentSelectionLeaseMgmtActivity, RP.Leasing.AppService",
+                "Id": "apt-activity-fp-310",
+                "Floorplan": {
+                  "Id": "310",
+                  "Name": "The Maple (2x2)",
+                  "Bedrooms": 2,
+                  "Bathrooms": "2",
+                  "MinSquareFeet": 1050,
+                  "MinPriceRange": 1715,
+                  "MaxPriceRange": 1815,
+                  "AvailableUnits": 2
+                },
+                "Units": [
+                  {
+                    "UnitNumber": "8309AT LO",
+                    "Id": 310,
+                    "MinPriceRange": 1715,
+                    "MaxPriceRange": 1815,
+                    "AvailableDateString": "May 25",
+                    "AvailableDate": "/Date(1779685200000-0500)/",
+                    "Deposit": 500,
+                    "Squarefeet": 1050,
+                    "TwelveMonthsRent": 1765,
+                    "SiteId": "4000138"
+                  },
+                  {
+                    "UnitNumber": "1715A AB",
+                    "Id": 311,
+                    "MinPriceRange": 1815,
+                    "MaxPriceRange": 1815,
+                    "AvailableDateString": "Jun 15",
+                    "AvailableDate": "/Date(1781499600000-0500)/",
+                    "Deposit": 500,
+                    "Squarefeet": 1050,
+                    "TwelveMonthsRent": 1815,
+                    "SiteId": "4000138"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+]

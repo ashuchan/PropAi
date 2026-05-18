@@ -395,6 +395,26 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # platform.
     if "onlineleasing.realpage.com" in h:
         return "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
+    # RealPage OLL (Online Leasing) wizard — the "Category-D" cluster
+    # (~187 props). Vanity marketing sites hop to ``leasing.realpage.com``
+    # / embed an ``rp-leasing-widget`` / link ``<property>/content/apply#k=``
+    # whose ``#k=`` key bootstraps the stateful ``RP.Leasing.AppService``
+    # appstate session. None of these markers can appear on a real OneSite
+    # numeric-subdomain site, so this is checked AFTER the OneSite marker
+    # above and does not regress it. Routed to ``realpage_oll`` whose
+    # adapter intercepts the OLL.SearchFloorPlan PUT response.
+    if (
+        "leasing.realpage.com" in h
+        or "rp-leasing-widget" in h
+        or "rp.leasing.appservice" in h
+        or "/content/apply#k=" in h
+    ):
+        return (
+            "realpage_oll",
+            0.85,
+            ["RealPage OLL wizard marker in HTML (leasing.realpage.com / "
+             "rp-leasing-widget / RP.Leasing.AppService / /content/apply#k=)"],
+        )
     # Entrata routing. ``/Apartments/module/`` alone is too broad — Entrata
     # exposes a generic tenant login form at
     # ``/Apartments/module/application_authentication/`` that many vanity
@@ -607,6 +627,12 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "wix": ("static.parastorage.com", "wix.com"),
     "squarespace": ("squarespace.com",),
     "realpage": ("api.ws.realpage.com", "realpage.com"),
+    "realpage_oll": (
+        "leasing.realpage.com",
+        "rp-leasing-widget",
+        "rp.leasing.appservice",
+        "/content/apply#k=",
+    ),
     "avalonbay": ("avaloncommunities.com",),
     "amli": ("amli.com",),
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
