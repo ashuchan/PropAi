@@ -1,0 +1,14 @@
+{
+ "cohort": "funnel+entrata+resman residual (adapters EXIST, never measured)",
+ "size": 239,
+ "prod_true_tier1": {
+  "funnel": "5/89 (5%)",
+  "entrata": "4/76 (5%)",
+  "resman": "1/74 (1%)",
+  "combined": "~3%"
+ },
+ "finding": "Adapters exist in codebase but for the residual-ledger-tagged set they almost never deliver Tier-1 in prod (mostly TIER_3_DOM/TIER_4_LLM fallback). Gap = detection/routing not sending these to the adapters OR adapters fire but fail. entrata: 6 got TIER_1_API_ENTRATA yet true-tier1 only 4 (fires but 0-real-units sometimes).",
+ "next": "measurement canary on current stack (image 9954f0f, existing funnel/entrata/resman adapters + latest detector). If converts -> prod-vs-canary detection win to promote. If not -> concrete 239-prop adapter-fix target w/ per-platform breakdown.",
+ "cohort_csv": "gs://jugnu-canary/property-list/cohort_fer.csv",
+ "status": "QUEUED behind repli-oll canary l5w5t (single shared job)"
+}
