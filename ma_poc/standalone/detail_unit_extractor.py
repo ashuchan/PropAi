@@ -601,10 +601,13 @@ async def _phase_d_portal_hop(page: Any, base: str, res: PropResult) -> bool:
             continue
         if not await _goto(page, href):
             continue
-        # The RealPage OneSite leasing wizard renders in a cross-origin
-        # iframe#rp-leasing-widget; it's heavy — wait, then poll frames.
+        # The RealPage OneSite wizard is an SPA in iframe#rp-leasing-widget
+        # (same-origin, hash-routed #!/loading → #!/floorplans). Headless
+        # it is VERY slow: >23s to leave "Loading...", longer to reach
+        # "Select Floor Plan". _realpage_frame content-sniffs for the
+        # real wizard text (NOT "Loading..."), so poll long (~50s).
         fr = None
-        for _ in range(20):  # up to ~10s for the widget frame to attach
+        for _ in range(100):  # up to ~50s for the wizard to populate
             await page.wait_for_timeout(500)
             try:
                 fr = await _realpage_frame(page)

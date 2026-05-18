@@ -106,9 +106,29 @@ Left panel = FP name/Bedrooms/Bathrooms/Square Feet/Occupancy.
 "Back" btn → Step1. PARSE: unit_number = the `#<bldg><unit><suffix>`
 token (e.g. "#1709C AB","#8213AT LO"); rent range "$lo - $hi*" →
 market_rent_low/high; avail = "Available Now" | "<Mon D, YYYY>".
-Loop all FP cards. Phase-D is now FULLY SPEC'D — no more probing
-needed, ready to implement _phase_d_portal_hop against
-iframe#rp-leasing-widget.
+Loop all FP cards. Phase-D IMPLEMENTED (commit c3a7c2f + poll-50s
+fix uncommitted): _parse_onesite_rows (unit-tested 5/5),
+_realpage_frame content-sniff, click "(N) Available" loop.
+
+**PHASE-D STILL BLOCKED — 2 compounding issues (durable):**
+(1) Headless probe (bcz3r0jfq): RealPage wizard is a same-origin SPA
+in iframe (frame URLs about:blank / .../content/apply#!/loading,
+NEVER onesite.realpage — URL detection is dead, content-sniff only).
+Headless it is VERY slow: >23s to leave "Loading...", longer to
+reach "Select Floor Plan". Poll bumped 10s→50s.
+(2) ROUTING CONTENTION: lochraven homepage matches is_cafv2 (caf_v2
+token present) so order=[C,D,B,A] — phase C (rrac) runs FIRST and
+burns ~100s+ scanning lochraven's non-rrac /floor-plans(404)//
+/floorplans/ with the 28-iter poll + _CTRL_JS clicks, THEN slow
+phase D blows even a 320s budget → lochraven=DEAD timeout.
+FIX (deferred, regression-risky): when a STRONG portal signal
+(doorway.knck.io | onesite.realpage | #k= | /content/apply) is in
+home, route _phase_d_portal_hop FIRST even if is_cafv2 — but must
+prove it does NOT regress the validated 10/18 rrac cluster (royce
+et al. are caf_v2 + need phase C first; they lack the strong portal
+signal, so the carve should be safe but UNVALIDATED). ~26-site
+class (jaxon/marion/lochraven). Additive/non-regressing as-is
+(returns False). DEFER until after no-proxy 456 agg.
 
 [superseded] 8th smoke DONE: 4/5 UNIT (solano/chatham/ironhorse/jaxon), royce=
 FLOORPLAN (timeout FIXED — no regression). royce rrac still 0 because
