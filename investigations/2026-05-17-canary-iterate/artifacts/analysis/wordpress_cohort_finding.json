@@ -1,0 +1,14 @@
+{
+ "cohort": "wordpress-tagged residual",
+ "size": 135,
+ "prod_true_tier1": "1/135 (0%)",
+ "static_embed_scan": "0/135 known PMS in static HTML",
+ "rendered_sample_18": {
+  "still_none": 14,
+  "securecafe/rentcafe(+knock)": 3,
+  "rentmanager": 1
+ },
+ "verdict": "NOT a distinct cluster. Decomposes: ~20% known-PMS-under-JS (securecafe/rentcafe/rentmanager -> detection-post-render + existing adapters); ~80% interaction-gated (CTA-hop, same as funnel/entrata/resman/Essex) OR hard genuine-custom tail. No clean WordPress adapter exists or is needed.",
+ "net_new_surfaced": "rentmanager \u2014 NO adapter, user-flagged earlier (cdn.rentmanager.com/iloveleasing.com), appears in this cohort. Clean net-new build candidate.",
+ "session_meta_conclusion": "~8 cohorts characterized; ALL reduce to (1) interaction-gated source -> CTA-hop (built, unmeasured) (2) irreducible custom tail. Further cohort-slicing re-proves this. Highest leverage = MEASURE CTA-hop + finish in-flight builds (ProspectPortal, repli360 rewrite), not new cohorts."
+}
