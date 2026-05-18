@@ -384,22 +384,29 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
         # "View Details" (one per floorplan); click -> async-populates
         # .rrac_apartment_details_content with the Bldg#/Unit#/$/avail
         # table. Poll the container (rrac loads slowly), parse ITS text.
-        try:
-            has_rrac = await page.evaluate(
-                "() => { for (let i=0;i<1;i++){} "
-                "return !!document.querySelector('[class*=rrac]'); }"
-            )
-        except Exception:
-            has_rrac = False
-        if has_rrac:
+        # rrac loads ASYNC — must poll for the widget + the View-Details
+        # anchors to render BEFORE scanning (this pre-poll is exactly
+        # why the Chrome-MCP probe succeeded where blind scans failed).
+        has_rrac = False
+        n = 0
+        for _ in range(24):  # up to ~12s
             try:
                 n = await page.evaluate(
-                    """() => [...document.querySelectorAll('a,button')]
+                    """() => {
+                      if(!document.querySelector('[class*=rrac]')) return -1;
+                      return [...document.querySelectorAll('a,button')]
                         .filter(e=>/view\\s*detail/i.test((e.innerText||'').trim())
-                        && (e.innerText||'').trim().length<25).length"""
+                        && (e.innerText||'').trim().length<25).length; }"""
                 )
             except Exception:
-                n = 0
+                n = -1
+            if n and n > 0:
+                has_rrac = True
+                break
+            if n == -1 and _ >= 6:
+                break  # no rrac widget at all — bail early
+            await page.wait_for_timeout(500)
+        if has_rrac:
             acc_r: list[dict[str, Any]] = []
             seen_r: set[str] = set()
             # Cap to a few floorplans: we need to CLASSIFY (units exist?),
@@ -475,6 +482,90 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
     return False
 
 
+_PORTAL_LINK = re.compile(
+    r"online-leasing|/content/apply|check.?availab|apply\s*now|"
+    r"onesite\.realpage\.com|leasing\.realpage\.com|doorway\.knck\.io|#k=",
+    re.I,
+)
+
+
+async def _phase_d_portal_hop(page: Any, base: str, res: PropResult) -> bool:
+    """OneSite / Knock #k=-hop (6th path).
+
+    caf_v2 sites expose a "Check Availability"/"Apply"/online-leasing
+    link or a /content/apply#k= / /online-leasing#k= URL that hops to
+    RealPage OneSite (*.onesite.realpage.com / leasing.realpage.com) or
+    Knock (doorway.knck.io). Those portals render "(N) Available -> units"
+    cards (OneSite OLL) or a unit list (Knock). Follow the link, then
+    reuse the interaction + generic-text + proven-parser machinery on
+    the portal page.
+    """
+    for sp in (base.rstrip("/") + "/floor-plans", base.rstrip("/") + "/", base.rstrip("/") + "/floorplans/"):
+        if not await _goto(page, sp):
+            continue
+        try:
+            href = await page.evaluate(
+                """() => {
+                  const els=[...document.querySelectorAll('a[href]')];
+                  for (const e of els){ const h=e.href||''; const t=(e.innerText||'').trim();
+                    if(/online-leasing|\\/content\\/apply|onesite\\.realpage|leasing\\.realpage|doorway\\.knck|#k=/i.test(h)
+                       || /check\\s*availab|apply\\s*now|online\\s*leasing/i.test(t)) return h; }
+                  return ''; }"""
+            )
+        except Exception:
+            href = ""
+        if not href:
+            continue
+        if not await _goto(page, href):
+            continue
+        await page.wait_for_timeout(3000)
+        cur = ""
+        try:
+            cur = page.url
+        except Exception:
+            cur = ""
+        portal = bool(
+            re.search(r"onesite\.realpage|leasing\.realpage|knck\.io|#k=", cur, re.I)
+        )
+        # parse portal directly
+        h = await _content(page)
+        units, sig = _proven_parsers(h, cur or href)
+        if not units:
+            units = _generic_text_rows(await _text(page), cur or href)
+            sig = "generic_text"
+        if not units:
+            # OneSite OLL: click "(N) Available"/"Select"/"View" then parse
+            try:
+                idxs = await page.evaluate(
+                    """() => { const o=[]; const els=[...document.querySelectorAll('a,button,[role=button],[onclick]')];
+                      els.forEach((e,i)=>{ const t=(e.innerText||'').trim();
+                        if(/\\(\\s*\\d+\\s*\\)\\s*available|select|view\\s*(?:unit|apartment)s?|see\\s*units|check\\s*availab/i.test(t)) o.push(i); });
+                      return o.slice(0,8); }"""
+                )
+            except Exception:
+                idxs = []
+            for ix in (idxs or [])[:6]:
+                try:
+                    await page.evaluate(
+                        """(i)=>{ const els=[...document.querySelectorAll('a,button,[role=button],[onclick]')]; if(els[i]) els[i].click(); }""",
+                        ix,
+                    )
+                    await page.wait_for_timeout(2500)
+                    u2 = _generic_text_rows(await _text(page), page.url)
+                    if u2:
+                        units = u2
+                        sig = "onesite_knock_text"
+                        break
+                except Exception:
+                    continue
+        if units:
+            res.units = units
+            res.signal = f"portal_hop:{sig}" + ("" if portal else ":nonportal")
+            res.phase = "D_portal_hop"
+            return True
+    return False
+
+
 def _has_rent(u: dict[str, Any]) -> bool:
     # make_unit_dict (used by every proven parser) emits market_rent_*,
     # NOT rent_*. Accept both so parsed units aren't silently discarded.
@@ -522,6 +613,10 @@ async def extract_property(page: Any, url: str) -> PropResult:
             return res
         await _goto(page, url)
         if await _phase_c_interact(page, base, res):
+            _classify(res, home)
+            return res
+        await _goto(page, url)
+        if await _phase_d_portal_hop(page, base, res):
             _classify(res, home)
             return res
     except Exception as exc:
