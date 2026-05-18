@@ -1,0 +1,8 @@
+{
+ "cohort": "rentmanager-tagged",
+ "size_ledger": 22,
+ "prod_true_tier1": "0/22 (0%)",
+ "finding": "All samples statically reference iloveleasing.com (RentManager prospect/leasing product) + cdn.rentmanager.com. Unit data is in the iLoveLeasing widget (JS/iframe-gated) \u2014 NOT a static API. Same interaction-gated root cause as the rest of the session.",
+ "scope": "NET-NEW adapter = iLoveLeasing widget. Needs ONE DevTools capture of the iLoveLeasing availability flow (URL/method/auth/response) to build \u2014 not writing blind (validate-first discipline held all session).",
+ "status": "characterized + scoped; build pending one iLoveLeasing capture"
+}
