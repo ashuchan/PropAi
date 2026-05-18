@@ -357,15 +357,24 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
     is on /floor-plans). So land on the floorplans index first, then
     click the per-row controls and parse the modal/expanded text.
     """
-    scan_pages = [base.rstrip("/") + p for p in ("/floor-plans/", "/floorplans/", "/floorplans", "/")]
+    scan_pages = [
+        base.rstrip("/") + p
+        for p in ("/floor-plans", "/floor-plans/", "/floorplans/", "/floorplans", "/")
+    ]
+    # Strict CTA matcher: the popup TRIGGER ("View Details", "Check
+    # Availability", "(N) Available", "See Units"), NOT bare status
+    # labels like "Available Now" (which clicked nothing useful and was
+    # the royce bug). The selector list is broad; the regex is strict.
     _CTRL_JS = (
         """() => {
           const out=[];
-          const els=[...document.querySelectorAll('a,button,[role=button],[onclick],[class*=avail],[class*=detail]')];
-          els.forEach((e,i)=>{ const t=((e.innerText||e.textContent||'')+' '+(e.getAttribute&&(e.getAttribute('aria-label')||'')||'')).trim();
-            if(t && /view\\s*detail|details?\\b|check\\s*availab|see\\s*availab|view\\s*(?:unit|apartment)s?|available\\s*(?:unit|apartment)s?|see\\s*units|view\\s*pricing|\\(\\d+\\)\\s*available/i.test(t))
+          const els=[...document.querySelectorAll('a,button,[role=button],[onclick],[class*=detail],[class*=availab]')];
+          els.forEach((e,i)=>{ let t=((e.innerText||e.textContent||'')+' '+((e.getAttribute&&e.getAttribute('aria-label'))||'')).replace(/\\s+/g,' ').trim();
+            if(!t) return;
+            if(/view\\s*detail|^details?\\b|check\\s*availab|see\\s*(?:unit|apartment)s?|view\\s*(?:unit|apartment)s?|\\(\\s*\\d+\\s*\\)\\s*available|select\\s*(?:floor\\s*)?plan/i.test(t)
+               && !/^available(\\s*now)?$/i.test(t))
               out.push(i); });
-          return out.slice(0,10);
+          return out.slice(0,14);
         }"""
     )
     for sp in scan_pages:
@@ -377,26 +386,35 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
             ctrls = []
         if not ctrls:
             continue
-        for idx in ctrls[:8]:
+        acc: list[dict[str, Any]] = []
+        seen_u: set[str] = set()
+        for idx in ctrls[:12]:
             try:
                 await page.evaluate(
-                    """(i)=>{ const els=[...document.querySelectorAll('a,button,[role=button],[onclick],[class*=avail],[class*=detail]')];
+                    """(i)=>{ const els=[...document.querySelectorAll('a,button,[role=button],[onclick],[class*=detail],[class*=availab]')];
                        if(els[i]) els[i].click(); }""",
                     idx,
                 )
-                await page.wait_for_timeout(2600)
+                await page.wait_for_timeout(2400)
                 h = await _content(page)
                 units, sig = _proven_parsers(h, page.url)
                 if not units:
                     units = _generic_text_rows(await _text(page), page.url)
-                    sig = "generic_text" if units else ""
-                if units:
-                    res.units = units
-                    res.signal = f"interact:{sig}"
-                    res.phase = "C_interact"
-                    return True
+                    sig = "generic_text"
+                for u in units:
+                    k = str(u.get("unit_number") or "") + str(
+                        u.get("market_rent_low") or u.get("rent_low") or ""
+                    )
+                    if k and k not in seen_u:
+                        seen_u.add(k)
+                        acc.append(u)
             except Exception:
                 continue
+        if acc:
+            res.units = acc
+            res.signal = "interact:popup_accumulated"
+            res.phase = "C_interact"
+            return True
     return False
 
 
