@@ -205,6 +205,14 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     # page; prefer those sub-paths when host/HTML detection picks
     # "repli360" without the widget on the entry page.
     "repli360": ("/floor-plans", "/floorplans", "/availability"),
+    # 2026-05-17 — pre-existing gap closed: both have a
+    # ``matches_response_body`` checker but lacked a link-hop prior.
+    # apts247: the same-origin ``/api/v1/floorplans/?api_key=`` widget +
+    # api_key render on the floor-plans page. resman: the public
+    # ``<client>.myresman.com/Portal/Applicants/Availability`` portal is
+    # linked from the property's ``/floorplans/`` page.
+    "apts247": ("/floorplans", "/floor-plans", "/availability"),
+    "resman": ("/floorplans", "/availability", "/apartments"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (
