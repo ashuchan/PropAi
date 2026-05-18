@@ -471,10 +471,9 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
                 )
                 await page.wait_for_timeout(2400)
                 h = await _content(page)
-                units, sig = _proven_parsers(h, page.url)
+                units, _ = _proven_parsers(h, page.url)
                 if not units:
                     units = _generic_text_rows(await _text(page), page.url)
-                    sig = "generic_text"
                 for u in units:
                     k = str(u.get("unit_number") or "") + str(
                         u.get("market_rent_low") or u.get("rent_low") or ""
@@ -642,18 +641,46 @@ async def extract_property(page: Any, url: str) -> PropResult:
     return res
 
 
+def _proxy_ctx_opts() -> dict[str, Any]:
+    """Parse PROXY_POOL_URLS (first entry) into patchright context opts.
+
+    Empty/unset → {} so local runs are unchanged (no proxy, no regression).
+    On Cloud Run the datacenter egress IP is bot-blocked by caf_v2/RealPage;
+    BrightData residential proxy is required for a representative measurement.
+    Mirrors browser_pool.py's str-proxy branch.
+    """
+    import os
+    from urllib.parse import urlparse
+
+    raw = os.getenv("PROXY_POOL_URLS", "").split(",")
+    raw = [u.strip() for u in raw if u.strip()]
+    if not raw:
+        return {}
+    p = urlparse(raw[0])
+    port = f":{p.port}" if p.port else ""
+    pw_proxy: dict[str, str] = {"server": f"{p.scheme}://{p.hostname}{port}"}
+    if p.username:
+        pw_proxy["username"] = p.username
+    if p.password:
+        pw_proxy["password"] = p.password
+    # BrightData terminates TLS at the proxy edge — without this Chromium
+    # aborts HTTPS navigations with ERR_CERT_AUTHORITY_INVALID.
+    return {"proxy": pw_proxy, "ignore_https_errors": True}
+
+
 async def run(urls: list[str], concurrency: int = 6) -> list[PropResult]:
     """Standalone harness: own patchright browser, no pipeline coupling."""
     from patchright.async_api import async_playwright
 
     results: list[PropResult] = []
     sem = asyncio.Semaphore(concurrency)
+    ctx_opts = _proxy_ctx_opts()
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True)
 
         async def one(u: str) -> None:
             async with sem:
-                ctx = await browser.new_context()
+                ctx = await browser.new_context(**ctx_opts)
                 page = await ctx.new_page()
                 cap: list[dict[str, Any]] = []
                 page._cap = cap  # type: ignore[attr-defined]
