@@ -48,5 +48,15 @@
   "verified": "royce site_id=1619 fp A1AL -> 7 units (4114,6203,4302,6311,6222,6221,6213); 4114=Bldg4 $2,335 Available Now data-available_date=2026-05-17",
   "render_required": "YES \u2014 onclick/site_id/floorPlanID are JS-injected, absent from static curl. Pipeline already renders JS sites; adapter reads rendered HTML then replays API deterministically (no popup interaction needed)."
  },
- "BUILD_STATUS": "SHIPPED \u2014 repli360.py (find_repli360_floorplans + parse_repli360_str + Repli360Adapter) + probe_post + detector marker + DEFAULT_PMS_PRIORS + 8 tests. Verified live on royce (site_id 1619, fp A1AL -> 7 units). Commit 0cb58c8. Deterministic Tier-1, no auth, no browser interaction (render -> read onclick IDs -> replay POST)."
+ "BUILD_STATUS": "SHIPPED \u2014 repli360.py (find_repli360_floorplans + parse_repli360_str + Repli360Adapter) + probe_post + detector marker + DEFAULT_PMS_PRIORS + 8 tests. Verified live on royce (site_id 1619, fp A1AL -> 7 units). Commit 0cb58c8. Deterministic Tier-1, no auth, no browser interaction (render -> read onclick IDs -> replay POST).",
+ "FLOORPLAN_LIST_API_FOUND_2026-05-18": {
+  "chain_zero_render_no_auth_no_botwall": [
+   "1. static curl property home -> regex script src: https://app.repli360.com/admin/rrac-website-script/<token> (token = per-property encrypted blob, present in STATIC HTML)",
+   "2. GET that rrac-website-script URL -> regex: var site_id = '<id>' (also desiredMoveinDate). royce -> site_id 1619",
+   "3. POST https://app.repli360.com/admin/template-render  body site_id=<id> (template_type=2)  -> 559KB widget HTML containing ALL getUnitListByFloor(this,'<fp>',<tt>,<sid>) onclick attrs = THE FLOORPLAN LIST API (royce -> 9 floorplans: A1AL A1BLL A1CL A1DLL B2AL B2BL B2CLL B2DLL C2AL...)",
+   "4. POST https://app.repli360.com/admin/getUnitListByFloor per floorPlanID (existing proven call) -> units"
+  ],
+  "impact": "REMOVES the render dependency that capped repli360 at 36% in the l5w5t canary. Adapter can run purely from the static embed-script token -> deterministic, render-independent. template-render with no site_id (Referer only) returns 0 -> site_id is required and comes from step 2.",
+  "next": "rewrite Repli360Adapter: find_repli360_script_token(html) -> fetch script -> site_id -> template-render -> parse floorplan list (reuse _ONCLICK_RE) -> getUnitListByFloor loop. No _get_page_html rendered-DOM dependency."
+ }
 }
