@@ -546,6 +546,19 @@ class CsvPropertyCatalogSource(IPropertyCatalogSource):
     ) -> list[PropertyToScrape]:
         pairs = self._read_rows()
         pairs = self._apply_filters(pairs, filters)
+        # Bug #5 Layer 3 (2026-05-18): deterministic shuffle BEFORE shard
+        # partitioning. Spreads domain clusters (27 contiguous Essex rows
+        # in the CSV -> 12 shards × 2-3 each) into a much flatter
+        # distribution where each shard sees at most 1-2 properties from
+        # any single domain. Shuffle is deterministic per ``shuffle_seed``
+        # so re-runs of the same date land the same property in the same
+        # shard (debug reproducibility), but day-to-day the distribution
+        # rotates so no single shard is always the "Essex shard".
+        if filters is not None and filters.shuffle_seed:
+            import random
+            rng = random.Random(filters.shuffle_seed)
+            pairs = list(pairs)
+            rng.shuffle(pairs)
         pairs = self._apply_shard(pairs, filters)
         if filters is not None and filters.start_index:
             pairs = pairs[filters.start_index :]

@@ -44,6 +44,49 @@ class HostRateLimiter:
         bucket.refill_interval = 1.0 / rps
         log.info("Set crawl delay for %s: %.1fs (%.2f rps)", host, delay_sec, rps)
 
+    def on_rate_limited(self, host: str) -> float:
+        """Halve the effective rate for *host* on every 429 / RATE_LIMITED.
+
+        Bug #5 Layer 1 (2026-05-18): the bucket is purely proactive — it
+        enforces a fixed default rps regardless of server feedback. When the
+        CDN starts returning 429s, the bucket keeps firing at the same rate
+        and the shard's quota burns instantly. With 12 shards collectively
+        hitting one domain (Essex 2026-05-18 case), per-shard 2 rps × 12 ≈
+        24 rps trips the CDN's global limit.
+
+        This method halves the per-host rate on every observed 429. After
+        2-3 calls a shard drops from 2 rps -> 0.5 rps -> 0.125 rps. Each
+        shard learns independently — no shared state required. Floored at
+        0.1 rps so we never deadlock.
+
+        Returns the new rps so callers can log / observe the decay.
+        """
+        bucket = self._get_bucket(host)
+        current_rps = 1.0 / bucket.refill_interval if bucket.refill_interval > 0 else self._default_rps
+        new_rps = max(0.1, current_rps / 2.0)
+        bucket.refill_interval = 1.0 / new_rps
+        # Bucket capacity also shrinks so burst-allowance can't undo the
+        # decay on the next acquire (capacity controls how many tokens
+        # accumulate during a quiet period). Floor at 1.0 token so the
+        # very-first request after a quiet window can still go through.
+        bucket.capacity = max(1.0, new_rps)
+        # Drain any accumulated tokens so the next acquire respects the
+        # new rate immediately. Otherwise a host that was idle for 30s
+        # would still have a full burst sitting in the bucket.
+        bucket.tokens = min(bucket.tokens, bucket.capacity)
+        log.warning(
+            "Host %s rate-limited (429): decayed %.3f -> %.3f rps",
+            host, current_rps, new_rps,
+        )
+        return new_rps
+
+    def current_rps(self, host: str) -> float:
+        """Return the host's current effective rate (rps). For telemetry."""
+        if host not in self._buckets:
+            return self._default_rps
+        bucket = self._buckets[host]
+        return 1.0 / bucket.refill_interval if bucket.refill_interval > 0 else self._default_rps
+
     async def acquire(self, host: str) -> None:
         """Block until the host's bucket has a token.
 

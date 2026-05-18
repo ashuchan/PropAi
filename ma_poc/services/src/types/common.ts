@@ -6,8 +6,39 @@
 /** Extraction tier indicating how data was obtained */
 export type ExtractionTier = 'TIER_1_API' | 'TIER_2_JSONLD' | 'TIER_3_DOM' | 'TIER_4_LLM' | 'TIER_5_VISION' | 'FAILED';
 
-/** Scrape outcome status */
-export type ScrapeStatus = 'SUCCESS' | 'FAILED' | 'CARRIED_FORWARD' | 'SKIPPED' | 'SUCCESS_WITH_ERRORS';
+/** Scrape outcome status.
+ *  Must stay in lock-step with ``Verdict`` (Python: ``ma_poc/reporting/verdict.py``).
+ *  ``contract_test.success_verdicts`` enforces parity. */
+export type ScrapeStatus =
+  | 'SUCCESS'
+  | 'SUCCESS_PLAN_LEVEL'
+  | 'SUCCESS_PARTIAL'
+  | 'SUCCESS_WITH_ERRORS'
+  | 'FAILED'
+  | 'FAILED_UNREACHABLE'
+  | 'FAILED_NO_DATA'
+  | 'CARRY_FORWARD'
+  | 'CARRIED_FORWARD'
+  | 'SKIPPED'
+  | 'PARTIAL'
+  | 'DEAD_URL';
+
+/** Verdicts counted toward the success-rate numerator. Mirrors
+ *  ``_SUCCESS_VERDICTS`` in ``ma_poc/reporting/verdict.py``. ``SUCCESS_WITH_ERRORS``
+ *  is a legacy status that older snapshots may still carry; we include it to
+ *  preserve current behaviour. ``PARTIAL`` (validation-majority-rejected)
+ *  stays OUT — those rows are gate-suspect. */
+export const SUCCESS_VERDICTS: ReadonlySet<ScrapeStatus> = new Set<ScrapeStatus>([
+  'SUCCESS',
+  'SUCCESS_PLAN_LEVEL',
+  'SUCCESS_PARTIAL',
+  'SUCCESS_WITH_ERRORS',
+]);
+
+/** True iff the given status counts as a success. Tolerates unknown strings. */
+export function isSuccessVerdict(status: string | null | undefined): boolean {
+  return status != null && SUCCESS_VERDICTS.has(status as ScrapeStatus);
+}
 
 /** Property lifecycle status */
 export type PropertyStatus = 'ACTIVE' | 'LEASE_UP' | 'STABILISED' | 'OFFLINE';

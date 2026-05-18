@@ -103,6 +103,11 @@ _HOP_OVERWRITE_KEYS: tuple[str, ...] = (
     "_llm_analysis_results",
     "_llm_field_mappings",
     "_explored_links",
+    # 2026-05-18 (Bug #1): per-hop outcome telemetry — copies the
+    # ``_hop_summary`` dict (hop_count_total / hop_count_bot_blocked)
+    # stashed by _try_link_hop. Read by the verdict layer to promote
+    # FAILED_NO_DATA -> FAILED_UNREACHABLE when every hop was bot-blocked.
+    "_hop_summary",
 )
 
 
@@ -1981,6 +1986,21 @@ def _pms_priors_for(
     # hayloftapartmenthomes.com/east-hampton-estates 2026-05-15). Also generate
     # priors RELATIVE to the entry path so we try /east-hampton-estates/floor-plans
     # as well as /floor-plans. See data/reports/cloud_run_2026-05-15/TRIAGE.md RC #12.
+    #
+    # 2026-05-18 (Bug #2 stronger fix): when entry_url lands on a deep
+    # path (`/apartments/<city>/<property>/`, `/property-detail/<slug>/`,
+    # `/homes/<state>/<city>/<slug>/`), the host-root variant is essentially
+    # guaranteed to 404 on management-company hosts (venterraliving,
+    # krcapartments, eaglerockproperties, scullycompany, liveatmagnolia).
+    # SUPPRESS the host-root variant entirely for these cases — each host-root
+    # hop burns a hop slot AND queues a DEAD_URL into explored_links, which
+    # then poisons the next run's link-hop heuristics. The path-prefix variant
+    # is the only one that has a chance of returning real data.
+    #
+    # The CSV-host case (entry_url == base_url, no redirect) is unchanged:
+    # when entry_url is the CSV's plain `https://example.com/`, _entry_path is
+    # empty so _has_property_subpath is False and the host-root path is
+    # the only synthesis emitted — same behaviour as before.
     try:
         _entry_parsed = urllib.parse.urlparse(entry_url)
         _entry_path = _entry_parsed.path.rstrip("/")
@@ -1990,25 +2010,30 @@ def _pms_priors_for(
         _has_property_subpath = False
 
     for path in template_paths:
-        prior_url = urllib.parse.urljoin(entry_url, path)
-        if prior_url and prior_url != entry_url and prior_url not in seen:
-            out.append((prior_url, _PMS_PRIOR_SCORE, anchor))
-            seen.add(prior_url)
-        # Property-subpath variant for multi-property hosts. Only emit when
-        # entry_url has a real sub-path AND the universal prior is absolute
-        # (starts with /); skip already-rooted priors.
+        # Property-subpath variant is emitted whenever the entry lands on a
+        # non-trivial path. When that fires we SKIP the host-root variant
+        # (stronger fix) — every cloud-run trace we have shows the host-root
+        # synthesis 404ing on multi-property hosts, and the path-prefix variant
+        # is strictly more likely to exist.
         if _has_property_subpath and path.startswith("/"):
             try:
                 _subpath_prior = urllib.parse.urlunparse(
                     _entry_parsed._replace(path=_entry_path + path)
                 )
                 if _subpath_prior and _subpath_prior != entry_url and _subpath_prior not in seen:
-                    # Slight boost so the sub-path variant outranks the host-root
-                    # variant for multi-property hosts where the host root often 404s.
-                    out.append((_subpath_prior, _PMS_PRIOR_SCORE + 10, f"{anchor}:prop_subpath"))
+                    out.append((_subpath_prior, _PMS_PRIOR_SCORE, f"{anchor}:prop_subpath"))
                     seen.add(_subpath_prior)
+                # Deliberately do NOT also emit the host-root variant here —
+                # see comment above.
+                continue
             except Exception:
+                # Fall through to host-root synthesis below if the urlunparse
+                # round-trip threw for some reason.
                 pass
+        prior_url = urllib.parse.urljoin(entry_url, path)
+        if prior_url and prior_url != entry_url and prior_url not in seen:
+            out.append((prior_url, _PMS_PRIOR_SCORE, anchor))
+            seen.add(prior_url)
     return out
 
 
@@ -2947,6 +2972,16 @@ async def _try_link_hop(
     _HOP_CUMULATIVE_BUDGET_MS = 240_000
     _hop_elapsed_total_ms = 0
 
+    # 2026-05-18 (Bug #1): per-hop outcome telemetry. When every hop attempt
+    # comes back BOT_BLOCKED (Cloudflare challenge, SGCAPTCHA wall, etc.)
+    # but the entry fetched OK, the property is functionally unreachable for
+    # extraction — not a "we got the page but couldn't find data" case. The
+    # verdict layer (reporting/verdict.py:compute) uses these counters to
+    # promote FAILED_NO_DATA -> FAILED_UNREACHABLE in that pattern so the
+    # right bucket gets surfaced in failures.csv and triage isn't misled.
+    _hop_count_total = 0
+    _hop_count_bot_blocked = 0
+
     while queue_idx < len(queue):
         sub_url, score, anchor = queue[queue_idx]
         idx = queue_idx + 1
@@ -3049,6 +3084,14 @@ async def _try_link_hop(
             score=score,
             anchor=anchor[:60],
         )
+
+        # Bug #1 (2026-05-18): track per-hop outcomes for verdict promotion.
+        # When every hop is BOT_BLOCKED, the verdict layer reclassifies
+        # FAILED_NO_DATA -> FAILED_UNREACHABLE (see _hop_summary stash below
+        # + reporting/verdict.py).
+        _hop_count_total += 1
+        if outcome_val == "BOT_BLOCKED":
+            _hop_count_bot_blocked += 1
 
         # Shard_84 fix (2026-05-16): accumulate hop-fetch elapsed_ms into
         # the cumulative budget tracker. Counted regardless of outcome —
@@ -3353,6 +3396,56 @@ async def _try_link_hop(
                 sub_url=sub_url,
                 hop_index=idx,
             )
+
+        # Skip the recursive extraction when the hop page has ZERO floor-plan
+        # signals AND no other recovery path could surface data. Running 6+
+        # tiers on a body with no inventory markers burns ~5-10s/property and
+        # never produces units. But we must NOT skip when the body carries
+        # portal hints (SightMap / RentCafe embed config in a JSON script
+        # block) or sub-resource iframes (cross-origin widget) — those let
+        # the cascade dynamically discover a different URL where data lives.
+        # The Skyline-at-Kessler case is canonical: /floorplans/ page has
+        # zero rent text but contains a sightmap.com embed URL in
+        # application/json config.
+        #
+        # Skip preconditions (ALL must hold):
+        #   - browser_page is None (HTTP-only hop; a live Playwright session
+        #     might capture XHRs that aren't visible in the static body).
+        #   - has_floor_plan_signals(body, ANY) is False (no inventory hints).
+        #   - body contains no <iframe> tags (no cross-origin widget).
+        #   - body contains no <script type="application/json"> (no SSR
+        #     portal config blob).
+        if browser_page is None and sub_fetch.body:
+            try:
+                from ma_poc.pms.signal_engine.floor_plan_signals import (
+                    has_floor_plan_signals as _has_fp_sig,
+                    SIGNAL_THRESHOLD_ANY as _SIG_ANY,
+                )
+                _hop_body_text = (
+                    sub_fetch.body.decode("utf-8", "ignore")
+                    if isinstance(sub_fetch.body, bytes)
+                    else str(sub_fetch.body)
+                )
+                _has_iframe = "<iframe" in _hop_body_text.lower()
+                _has_json_script = 'type="application/json"' in _hop_body_text.lower() \
+                    or "type='application/json'" in _hop_body_text.lower()
+                if (
+                    not _has_fp_sig(_hop_body_text, _SIG_ANY)
+                    and not _has_iframe
+                    and not _has_json_script
+                ):
+                    log.debug(
+                        "link-hop %s: skipping cascade — body has 0 fp_signals, "
+                        "no iframes, no JSON script blocks (zero-signal hop guard)",
+                        sub_url,
+                    )
+                    explored[sub_url] = False
+                    continue
+            except Exception as _fp_sig_exc:
+                # Gate is best-effort; fall through to the normal cascade on
+                # any unexpected error so we never block extraction on a
+                # signal-engine import / decode failure.
+                log.debug("zero-signal hop guard skipped: %s", _fp_sig_exc)
 
         # Re-run extraction on the sub-page via ``scrape()`` (not
         # ``scrape_jugnu``) so link-hop doesn't recurse — scrape_jugnu is
@@ -3774,6 +3867,14 @@ async def _try_link_hop(
             )
             sub_result["_best_units_page"] = _best_units_page[0] or sub_url
             sub_result["_best_units_count"] = _best_units_page[1]
+            # Bug #1 (2026-05-18): stash hop-outcome counters so the verdict
+            # layer can see them. Harmless on the success path (all_hops_bot_blocked
+            # is False here because this hop OK'd) but kept consistent so every
+            # exit point of _try_link_hop carries the same telemetry shape.
+            sub_result["_hop_summary"] = {
+                "hop_count_total": _hop_count_total,
+                "hop_count_bot_blocked": _hop_count_bot_blocked,
+            }
             return sub_result
 
         # Dynamic discovery: a sub-fetch may itself have surfaced
@@ -3848,6 +3949,12 @@ async def _try_link_hop(
         if _best_units_page[0]:
             _first_successful_result["_best_units_page"] = _best_units_page[0]
             _first_successful_result["_best_units_count"] = _best_units_page[1]
+        # Bug #1 (2026-05-18) — hop-outcome telemetry; see comment at top
+        # of _try_link_hop and at the `return sub_result` branch above.
+        _first_successful_result["_hop_summary"] = {
+            "hop_count_total": _hop_count_total,
+            "hop_count_bot_blocked": _hop_count_bot_blocked,
+        }
         return _first_successful_result
 
     # No hop recovered — return None but stash the explored map on the
@@ -3855,7 +3962,18 @@ async def _try_link_hop(
     # can drop it onto the final empty result so learning still happens on
     # failure too.
     if explored:
-        return {"_units_empty": True, "_explored_links": explored}
+        return {
+            "_units_empty": True,
+            "_explored_links": explored,
+            # Bug #1 (2026-05-18) — hop-outcome telemetry; on the all-empty
+            # path this is the critical signal: if hop_count_total > 0 AND
+            # every hop was BOT_BLOCKED, the verdict layer reclassifies the
+            # property as FAILED_UNREACHABLE instead of FAILED_NO_DATA.
+            "_hop_summary": {
+                "hop_count_total": _hop_count_total,
+                "hop_count_bot_blocked": _hop_count_bot_blocked,
+            },
+        }
     return None
 
 
@@ -4314,6 +4432,13 @@ async def scrape_jugnu(
                 # learned which sub-URLs had nothing. Feed that into the
                 # profile so subsequent runs skip them.
                 result["_explored_links"] = hop_result.get("_explored_links") or {}
+                # Bug #1 (2026-05-18): also propagate _hop_summary so the
+                # verdict layer can promote FAILED_NO_DATA -> FAILED_UNREACHABLE
+                # when every hop was BOT_BLOCKED. Without this, the bot-block
+                # signal collected by _try_link_hop is dropped on the floor
+                # for properties where extraction returned empty.
+                if "_hop_summary" in hop_result:
+                    result["_hop_summary"] = hop_result["_hop_summary"]
                 # Update adapter_name so downstream events see the real winner.
                 adapter_name = result.get("_adapter_used", adapter_name)
 

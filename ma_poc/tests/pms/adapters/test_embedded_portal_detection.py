@@ -354,8 +354,20 @@ async def test_try_link_hop_queues_portal_hint_from_sub_fetch() -> None:
     # Each URL returns distinct body content so the body-hash dedup in
     # _try_link_hop does not mistake the SightMap embed page for the
     # /floorplans/ shell (both would be tiny if we used the same stub body).
+    #
+    # /floorplans/ includes a <script type="application/json"> block to
+    # mirror real-world Razz / Wix / SSR pages where the SightMap embed
+    # URL lives inside such a config blob. Without this marker the zero-
+    # fp-signal hop guard in _try_link_hop would short-circuit before the
+    # mocked scrape() ever runs — defeating the dynamic-discovery contract
+    # this test is checking.
     _FAKE_BODIES: dict[str, bytes] = {
-        floorplans_url: b"<html><body><section id='floor-plans'>loading...</section></body></html>",
+        floorplans_url: (
+            b"<html><body><section id='floor-plans'>loading...</section>"
+            b'<script type="application/json">{"sightmap":"'
+            b'https://sightmap.com/embed/abc123"}</script>'
+            b"</body></html>"
+        ),
         sightmap_url: b"<html><body><div class='sm-embed'>1BR 750sqft sightmap unit data</div></body></html>",
     }
 

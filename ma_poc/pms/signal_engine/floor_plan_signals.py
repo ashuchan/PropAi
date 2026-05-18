@@ -41,6 +41,7 @@ __all__ = [
     "FIELD_ALIASES",
     "SIGNAL_THRESHOLD_ANY",
     "SIGNAL_THRESHOLD_STRUCTURAL",
+    "SIGNAL_THRESHOLD_HIGH",
 ]
 
 # ---------------------------------------------------------------------------
@@ -72,6 +73,22 @@ Call sites:
 - ``page_has_content_signals`` in generic.py    (suppress RC3 deferral)
 - ``_link_hop_is_rich`` in scraper.py           (grant LLM budget refresh)
 - DOM section selection in ``_extract_rent_dom_section`` (generic.py)
+"""
+
+SIGNAL_THRESHOLD_HIGH: int = 4
+"""Four or more distinct structural signal types — a saturated unit page.
+
+Four signal types out of the five-ish we recognise (bedrooms, bathrooms,
+area, studio/efficiency, rent token) means the page is essentially
+guaranteed to be a real listing page rather than marketing copy. Used to
+grant ONE free LLM call per property when extraction lands on such a page
+(see Bug #3, 2026-05-18): the page is so signal-rich that the LLM cost is
+worth absorbing even when the per-property budget is otherwise exhausted.
+The free-call grant is one-shot per property to bound worst-case cost.
+
+Call sites:
+- Free LLM-monolithic call gate in ``generic.py`` (Bug #3 fix)
+- Free LLM-DOM-targeted call gate in ``generic.py`` (Bug #3 fix)
 """
 
 # ---------------------------------------------------------------------------

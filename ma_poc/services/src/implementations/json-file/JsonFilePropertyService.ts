@@ -7,6 +7,7 @@
 import { join } from 'node:path';
 import type { IPropertyService, PropertyReport, PropertyProfile } from '../../interfaces/IPropertyService.js';
 import type { PaginatedResult, PropertyFilters, SortOptions, ExtractionTier, ScrapeStatus } from '../../types/common.js';
+import { isSuccessVerdict } from '../../types/common.js';
 import type { PropertySummary, Property, PropertyAggregates, Unit, FloorPlan, MarketMetrics, PropertyMedia, FloorPlanImage, SchemaVersion } from '../../types/property.js';
 import { readJsonFile, readJsonlFile, readTextFile, getLatestRunDate, getRunDates, runPath, statePath } from './dataLoader.js';
 
@@ -444,7 +445,7 @@ export class JsonFilePropertyService implements IPropertyService {
     const medianRent = sortedRents.length > 0 ? sortedRents[Math.floor(sortedRents.length / 2)] : 0;
     const availableTotal = items.reduce((sum, p) => sum + p.availableUnits, 0);
     const availabilityRate = totalUnits > 0 ? availableTotal / totalUnits : 0;
-    const successCount = items.filter(p => p.scrapeStatus === 'SUCCESS' || p.scrapeStatus === 'SUCCESS_WITH_ERRORS').length;
+    const successCount = items.filter(p => isSuccessVerdict(p.scrapeStatus)).length;
     const successRate = totalProperties > 0 ? successCount / totalProperties : 0;
 
     const tierDistribution = {} as Record<ExtractionTier, number>;

@@ -65,6 +65,17 @@ __all__ = [
 # is per-shard (process-local); each shard learns its own slice.
 _LATE_RENDER_HOSTS: set[str] = set()
 
+
+# Bug #5 Layer 2 (2026-05-18) — after this many consecutive RATE_LIMITED
+# responses from one host, quarantine the host for the rest of the shard
+# run. Single conservative threshold: 3 attempts gives the rate-limiter
+# (Layer 1) time to decay the rps and gives proxy rotation a fair shot
+# before we give up on the host. Tunable via FETCH_DOMAIN_QUARANTINE_429
+# env var for staging experiments.
+_DOMAIN_QUARANTINE_THRESHOLD: int = int(
+    os.environ.get("FETCH_DOMAIN_QUARANTINE_429", "3") or "3"
+)
+
 # C1 — in-flight XHR quiescence: URLs matching these patterns carry no
 # apartment unit data and must not block the quiescence counter.
 _C1_STATIC_SUFFIXES: frozenset[str] = frozenset({
@@ -157,6 +168,18 @@ class Fetcher:
         self._identities = identities
         self._browsers = browsers
         self._retry = retry
+        # Bug #5 Layer 2 (2026-05-18): per-shard in-job domain quarantine.
+        # When a host returns N consecutive RATE_LIMITED responses, the
+        # host is parked for the REST of this shard's run. Any subsequent
+        # fetch to a quarantined host returns RATE_LIMITED immediately
+        # (no actual request fires), letting downstream property emit
+        # FAILED_UNREACHABLE with the correct verdict without burning
+        # proxy/rate-limit budget on a hopeless retry. Cheaper than DLQ
+        # parking (which assumes hourly retry — useless inside a 20-min
+        # job). Reset implicit at next run-startup (the fetcher is
+        # constructed fresh per shard process).
+        self._domain_429_consecutive: dict[str, int] = {}
+        self._domain_quarantined: set[str] = set()
 
     async def fetch(self, task: CrawlTask, profile: "ScrapeProfile | None" = None) -> FetchResult:
         """Top-level entry. Never raises on transient errors.
@@ -188,6 +211,40 @@ class Fetcher:
             return await fetch_with_escalation(task, profile)
         start_ms = _now_ms()
         host = urlparse(task.url).netloc
+
+        # Bug #5 Layer 2 (2026-05-18): in-job domain quarantine. If this
+        # host has already racked up DOMAIN_QUARANTINE_THRESHOLD consecutive
+        # RATE_LIMITED responses earlier in the same shard run, short-circuit
+        # to RATE_LIMITED without issuing the actual request. Saves proxy
+        # budget + shard wallclock on hopeless retries; Essex's 27 PIDs on
+        # one shard previously each took ~3 attempts × ~5s = 15s+ before
+        # giving up.
+        if host in self._domain_quarantined:
+            emit(
+                EventKind.FETCH_COMPLETED,
+                task.property_id,
+                url=task.url,
+                outcome=FetchOutcome.RATE_LIMITED.value,
+                elapsed_ms=0,
+                body_bytes=0,
+                error_signature="DOMAIN_QUARANTINED_IN_RUN",
+            )
+            return FetchResult(
+                url=task.url,
+                outcome=FetchOutcome.RATE_LIMITED,
+                status_code=429,
+                headers={},
+                body=None,
+                final_url=task.url,
+                elapsed_ms=0,
+                render_mode=task.render_mode,
+                identity_key=None,
+                proxy_label=None,
+                error_signature="DOMAIN_QUARANTINED_IN_RUN",
+                etag=None,
+                last_modified=None,
+            )
+
         identity = self._identities.pick(sticky_key=task.property_id)
         proxy = self._proxy_pool.pick(sticky_key=task.property_id)
 
@@ -416,6 +473,48 @@ class Fetcher:
 
             if not decision.should_retry:
                 break
+
+            # Bug #5 Layer 1 (2026-05-18): on every observed RATE_LIMITED,
+            # halve the host's effective rps. Each shard learns
+            # independently — no shared state. Compounds across the
+            # retry loop: 2 -> 1 -> 0.5 -> 0.25 rps after 3 retries.
+            # Floored at 0.1 rps by the rate limiter itself.
+            if result.outcome == FetchOutcome.RATE_LIMITED:
+                try:
+                    self._rate_limiter.on_rate_limited(host)
+                except Exception as _rl_exc:
+                    log.debug("rate-limiter decay failed for %s: %s", host, _rl_exc)
+                # Bug #5 Layer 2 (2026-05-18): increment the consecutive-429
+                # counter for this host. At threshold, mark the host as
+                # quarantined; subsequent fetches in this shard short-circuit
+                # at the top of fetch().
+                self._domain_429_consecutive[host] = (
+                    self._domain_429_consecutive.get(host, 0) + 1
+                )
+                if (
+                    self._domain_429_consecutive[host] >= _DOMAIN_QUARANTINE_THRESHOLD
+                    and host not in self._domain_quarantined
+                ):
+                    self._domain_quarantined.add(host)
+                    log.warning(
+                        "Domain %s quarantined for rest of shard run: "
+                        "%d consecutive 429s",
+                        host, self._domain_429_consecutive[host],
+                    )
+                    emit(
+                        EventKind.FETCH_RETRY,
+                        task.property_id,
+                        wait_ms=0,
+                        reason="DOMAIN_QUARANTINE_TRIGGERED",
+                        host=host,
+                        consecutive_429s=self._domain_429_consecutive[host],
+                    )
+            elif result.outcome == FetchOutcome.OK:
+                # Reset the consecutive-429 counter on any OK response so
+                # transient rate-limits don't accumulate to quarantine
+                # over the lifetime of the shard.
+                if host in self._domain_429_consecutive:
+                    self._domain_429_consecutive[host] = 0
 
             emit(
                 EventKind.FETCH_RETRY, task.property_id, wait_ms=decision.wait_ms, reason=result.outcome.value

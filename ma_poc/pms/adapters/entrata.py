@@ -248,6 +248,17 @@ class EntrataAdapter:
         result.confidence = 0.0
         result.errors.append("No Entrata floorplan data found in captured API responses")
 
+        # 2026-05-18 (bonus / tier-label leak): when no Entrata-shaped API
+        # response was actually captured, downgrade the tier label so the
+        # failures.csv bucket doesn't mislead triage. Yardi-served properties
+        # that load Entrata widgets via rcommoncf.entrata.com CDN previously
+        # showed up as TIER_1_API_ENTRATA despite zero Entrata API capture
+        # (~80% of the TIER_1_API_ENTRATA + FAILED_NO_DATA bucket on 2026-05-18).
+        # result.api_responses is the filtered list of Entrata-shaped captures;
+        # empty means the adapter never saw a real Entrata payload.
+        if not result.api_responses:
+            result.tier_used = "TIER_1_API"
+
         return result
 
     def static_fingerprints(self) -> list[str]:

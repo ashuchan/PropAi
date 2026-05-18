@@ -211,10 +211,19 @@ async def run_jugnu(
         catalog_source = get_data_provider().property_catalog
         catalog_label = type(catalog_source).__name__
 
+    # Bug #5 Layer 3 (2026-05-18): pass run_date as the shuffle seed.
+    # The catalog source shuffles deterministically by this key BEFORE
+    # partitioning into shards, breaking up domain clusters (essex's
+    # 27 contiguous rows in the CSV previously landed across only 12
+    # shards). Same-day re-runs land the same property in the same
+    # shard (debug reproducibility); day-over-day the distribution
+    # rotates so no shard is always the "Essex shard".
+    _shuffle_seed = today  # already YYYY-MM-DD string used downstream
     catalog_filters = CatalogFilters(
         start_index=start_index or None,
         shard_index=shard_index,
         shard_count=shard_count,
+        shuffle_seed=_shuffle_seed,
     )
     catalog_rows = catalog_source.list_active(limit=limit, filters=catalog_filters)
     # Downstream consumers (scheduler.build_tasks, csv_lookup, _format_v1/v2)
@@ -342,8 +351,12 @@ async def run_jugnu(
         # timeout handler can salvage partial results without any I/O inside
         # the cancelled coroutine (which would deadlock on the event loop).
         _partial_state: dict[str, Any] = {}
+        # Lookup csv_row BEFORE the try so the timeout/crash except branches
+        # below can pass it to _make_failed_record — without this the failed
+        # record emits NULL name/address and overwrites the properties row
+        # for any property that has never had a successful scrape.
+        csv_row = csv_lookup.get(task.property_id, {})
         try:
-            csv_row = csv_lookup.get(task.property_id, {})
             # Per-property wall-clock guard. Without this, a single property
             # that gets caught in the LLM-retry/link-hop tail can monopolise
             # the AsyncPool until Cloud Run's 4h task timeout kills the whole
@@ -452,6 +465,7 @@ async def run_jugnu(
                 f"per_property_timeout:{int(PER_PROPERTY_TIMEOUT_SECONDS)}s ({type(exc).__name__})"
                 + (f" — {len(_partial_units)} partial units persisted" if _partial_units else ""),
                 schema_version,
+                csv_row=csv_row,
             )
             # Surface partial units in the failed record so the run report can
             # show partial data rather than a zero-unit timeout row.
@@ -500,6 +514,7 @@ async def run_jugnu(
                 task.url,
                 str(exc),
                 schema_version,
+                csv_row=csv_row,
             )
             # Bug #1 fix (2026-05-16): same verdict-stamp + emit for the crash
             # path. Without this, any uncaught exception inside
@@ -659,6 +674,7 @@ async def run_jugnu(
                         _task.url,
                         f"wedge_rescue_budget_exhausted:{int(_task.budget_ms)}ms",
                         schema_version,
+                        csv_row=csv_lookup.get(_task.property_id, {}),
                     )
 
             _retry_results = await _retry_pool.map(
@@ -1274,6 +1290,19 @@ async def _process_property(
         extract_result=extract_result,
         carry_forward_applied=result.get("_meta", {}).get("carry_forward_used", False),
         plan_summaries=result.get("plan_summaries"),
+        # 2026-05-18 (Bug #6): pass entry body + final_url so the verdict
+        # layer can short-circuit to DEAD_URL when the fetch landed on a
+        # vendor-lockout / parked-domain stub (cityclubapartments.com ->
+        # nonpayment.spherexx.com etc.). Pre-fix these routed through
+        # LLM_GATE_NO_BODY -> FAILED_NO_DATA which is the wrong verdict
+        # for a permanently-shut-down property.
+        fetch_body=getattr(fetch_result, "body", None) if fetch_result else None,
+        fetch_final_url=getattr(fetch_result, "final_url", None) if fetch_result else None,
+        # 2026-05-18 (Bug #1): pass the per-hop outcome counters so the
+        # verdict layer can promote FAILED_NO_DATA -> FAILED_UNREACHABLE when
+        # entry fetched OK but every hop was BOT_BLOCKED (Yardi
+        # /conventional/ Cloudflare cluster — ~193 PIDs on 2026-05-18).
+        hop_summary=result.get("_hop_summary"),
     )
     meta = result.setdefault("_meta", {})
     meta["canonical_id"] = task.property_id
@@ -2159,6 +2188,7 @@ def _make_failed_record(
     url: str,
     error: str,
     schema_version: str,
+    csv_row: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create a failed property record in the appropriate schema.
 
@@ -2167,6 +2197,12 @@ def _make_failed_record(
         url: Property URL.
         error: Error message.
         schema_version: "v1" or "v2".
+        csv_row: Optional CSV row dict (output of ``CatalogRow.as_csv_row()``).
+            When provided, CSV identity fields (name, address, city, state,
+            zip, phone, pmc) are carried into the failed record so the
+            downstream upsert into the ``properties`` table doesn't clobber
+            previously-good data with NULL (and so first-time-failing
+            properties still get a real name+address in the DB).
 
     Returns:
         Failed property dict.
@@ -2177,6 +2213,15 @@ def _make_failed_record(
         "scrape_errors": [error],
         "carry_forward_used": False,
     }
+    csv_row = csv_row or {}
+    # Helper: pick the first non-empty value across V2 + Title-Case CSV aliases.
+    def _from_csv(*keys: str) -> Any:
+        for k in keys:
+            v = csv_row.get(k)
+            if v not in (None, ""):
+                return v
+        return None
+
     if schema_version == "v2":
         try:
             apartment_id = int(property_id)
@@ -2184,16 +2229,16 @@ def _make_failed_record(
             apartment_id = None
         return {
             "apartment_id": apartment_id,
-            "proj_name": None,
-            "address": None,
-            "city": None,
-            "state": None,
-            "zip_code": None,
-            "country": None,
-            "phone": None,
-            "email_address": None,
+            "proj_name": _from_csv("proj_name", "Property Name", "name", "Name"),
+            "address": _from_csv("address", "Property Address", "Address"),
+            "city": _from_csv("city", "City"),
+            "state": _from_csv("state", "State"),
+            "zip_code": _from_csv("zip_code", "ZIP Code", "zip", "Zip"),
+            "country": _from_csv("country", "Country"),
+            "phone": _from_csv("phone", "Phone"),
+            "email_address": _from_csv("email_address", "Email"),
             "website": url,
-            "pmc": None,
+            "pmc": _from_csv("pmc", "Management Company"),
             "website_design": None,
             "concessions": None,
             "units": [],
@@ -2202,6 +2247,13 @@ def _make_failed_record(
     return {
         "_meta": meta,
         "units": [],
+        "Property Name": _from_csv("Property Name", "proj_name", "name", "Name"),
+        "Property Address": _from_csv("Property Address", "address", "Address"),
+        "City": _from_csv("City", "city"),
+        "State": _from_csv("State", "state"),
+        "ZIP Code": _from_csv("ZIP Code", "zip_code", "zip", "Zip"),
+        "Phone": _from_csv("Phone", "phone"),
+        "Management Company": _from_csv("Management Company", "pmc"),
         "Website": url,
     }
 

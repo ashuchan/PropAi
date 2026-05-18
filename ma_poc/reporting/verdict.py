@@ -143,6 +143,29 @@ class VerdictResult:
     source: str  # "fetch", "extract", "validate", "carry_forward"
 
 
+def _all_hops_bot_blocked(hop_summary: dict[str, Any] | None) -> bool:
+    """True iff at least one hop was attempted AND every hop was BOT_BLOCKED.
+
+    ``hop_summary`` is populated by ``pms/scraper.py::_try_link_hop`` and
+    threaded onto the result dict via ``_HOP_OVERWRITE_KEYS``. Shape::
+
+        {"hop_count_total": int, "hop_count_bot_blocked": int}
+
+    Returns False when ``hop_summary`` is missing/empty (the scrape never
+    needed to hop, so the entry was the only thing tried). Returns False
+    on malformed shapes (non-int values, missing keys) — defensive against
+    upstream serialization drift, never raises.
+    """
+    if not isinstance(hop_summary, dict):
+        return False
+    try:
+        total = int(hop_summary.get("hop_count_total") or 0)
+        blocked = int(hop_summary.get("hop_count_bot_blocked") or 0)
+    except (TypeError, ValueError):
+        return False
+    return total > 0 and blocked == total
+
+
 def compute(
     fetch_outcome: str | None = None,
     extract_result: Any = None,
@@ -150,6 +173,9 @@ def compute(
     carry_forward_applied: bool = False,
     units_hollow: bool = False,
     plan_summaries: list[Any] | None = None,
+    fetch_body: bytes | str | None = None,
+    fetch_final_url: str | None = None,
+    hop_summary: dict[str, Any] | None = None,
 ) -> VerdictResult:
     """Compute the verdict for a property scrape.
 
@@ -163,6 +189,16 @@ def compute(
             non-empty AND no unit-level records survive, the verdict is
             ``SUCCESS_PLAN_LEVEL`` rather than ``FAILED_NO_DATA``. Pass
             ``None`` (or omit) to keep pre-Stage-2 behaviour.
+        fetch_body: Raw entry-fetch body. When supplied AND the body matches
+            a known vendor-lockout / parked-domain pattern (see
+            ``reporting.vendor_lockout``), the verdict short-circuits to
+            ``DEAD_URL`` regardless of extract outcome — these properties
+            have been administratively shut down (non-payment, expired
+            domain, parked) and rerunning will never recover them. Pass
+            ``None`` to skip the check (e.g. unit tests that don't care).
+        fetch_final_url: Post-redirect URL. Some vendor-lockout cases are
+            recognisable from the URL alone (cf. ``nonpayment.spherexx.com``)
+            even before the body is decoded.
 
     Returns:
         VerdictResult with verdict, reason, and source.
@@ -187,6 +223,29 @@ def compute(
             "fetch",
         )
 
+    # 2026-05-18 (Bug #6): vendor-lockout / parked-domain detection.
+    # Fetch was OK on paper but the body is a hosting-vendor takedown stub
+    # (cityclubapartments.com -> nonpayment.spherexx.com 962 bytes was the
+    # canonical case on the 2026-05-18 cloud run). These properties pre-fix
+    # routed through LLM_GATE_NO_BODY -> FAILED_NO_DATA, which is wrong:
+    # the URL is terminally dead at the application level, no amount of
+    # re-extraction will recover it. Reclassify as DEAD_URL so it's
+    # excluded from the success-rate denominator and routed to re-discovery.
+    if fetch_body is not None or fetch_final_url is not None:
+        try:
+            from ma_poc.reporting.vendor_lockout import detect_vendor_lockout
+            is_lockout, label = detect_vendor_lockout(
+                fetch_body, final_url=fetch_final_url,
+            )
+            if is_lockout:
+                return VerdictResult(
+                    Verdict.DEAD_URL,
+                    label or "vendor_lockout",
+                    "fetch",
+                )
+        except Exception as exc:  # noqa: BLE001 — never let verdict raise
+            log.debug("vendor_lockout check failed: %s", exc)
+
     # Check extract result
     if extract_result is not None:
         records = getattr(extract_result, "records", None)
@@ -202,6 +261,19 @@ def compute(
                     f"plan-level data only ({len(plan_summaries)} plans)",
                     "extract",
                 )
+            # Bug #1 (2026-05-18): when entry fetched OK but every link-hop
+            # came back BOT_BLOCKED (Cloudflare challenge, SGCAPTCHA, etc.),
+            # the property is functionally unreachable for extraction. The
+            # downstream `/conventional/` Yardi captcha cluster (~193 PIDs on
+            # 2026-05-18) was misclassified as FAILED_NO_DATA pre-fix; that
+            # bucket is for "page loaded but no inventory found", which
+            # implies the page is reachable. Reclassify.
+            if _all_hops_bot_blocked(hop_summary):
+                return VerdictResult(
+                    Verdict.FAILED_UNREACHABLE,
+                    f"all_hops_bot_blocked ({hop_summary.get('hop_count_total', 0)})",  # type: ignore[union-attr]
+                    "fetch",
+                )
             return VerdictResult(Verdict.FAILED_NO_DATA, "no records extracted", "extract")
     else:
         if plan_summaries:
@@ -209,6 +281,12 @@ def compute(
                 Verdict.SUCCESS_PLAN_LEVEL,
                 f"plan-level data only ({len(plan_summaries)} plans)",
                 "extract",
+            )
+        if _all_hops_bot_blocked(hop_summary):
+            return VerdictResult(
+                Verdict.FAILED_UNREACHABLE,
+                f"all_hops_bot_blocked ({hop_summary.get('hop_count_total', 0)})",  # type: ignore[union-attr]
+                "fetch",
             )
         return VerdictResult(Verdict.FAILED_NO_DATA, "no extract result", "extract")
 

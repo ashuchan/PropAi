@@ -2592,15 +2592,33 @@ class GenericAdapter:
                     _llm_dom_gate_ok = False
             except Exception:
                 pass
+        # 2026-05-18 (Bug #3): pre-compute the high-signal flag once.
+        # Used by both the DOM-targeted LLM call below AND the monolithic
+        # LLM call later. SIGNAL_THRESHOLD_HIGH = 4 — a page with that
+        # many distinct structural signals is essentially guaranteed to
+        # be a real listing page, so the LLM call earns a "free" pass
+        # (bypasses the per-property call budget; cost cap still applies).
+        from ma_poc.pms.signal_engine.floor_plan_signals import (
+            SIGNAL_THRESHOLD_HIGH as _SIGNAL_THRESHOLD_HIGH,
+        )
+        _high_signal_page_dom = (
+            int(getattr(ctx, "floor_plan_signal_count", 0) or 0) >= _SIGNAL_THRESHOLD_HIGH
+        )
         if (
             not dom_units
             and dom_section_html
             and _llm_dom_gate_ok
-            and int(_budget.get("llm_dom_calls", 0)) > 0
+            # 2026-05-18 (Bug #3): high-signal pages (fp_signals ≥
+            # SIGNAL_THRESHOLD_HIGH) bypass the dom-calls budget gate AND
+            # don't decrement it. See companion comment at the monolithic
+            # call site below. _high_signal_page is computed once per
+            # property earlier in this function.
+            and (int(_budget.get("llm_dom_calls", 0)) > 0 or _high_signal_page_dom)
             and not _llm_cost_exceeded()
         ):
             t0 = _time.monotonic()
-            _budget["llm_dom_calls"] = int(_budget.get("llm_dom_calls", 0)) - 1
+            if not _high_signal_page_dom:
+                _budget["llm_dom_calls"] = int(_budget.get("llm_dom_calls", 0)) - 1
             try:
                 dom_units, dom_hints, interaction = await analyze_dom_with_llm(
                     dom_section_html,
@@ -2905,8 +2923,33 @@ class GenericAdapter:
                         )
                 except Exception as _rc3_exc:
                     log.debug("rc3-decider-error: %s", _rc3_exc)
-        if not _rc3_deferred and int(_budget.get("llm_monolithic", 0)) > 0 and not _llm_cost_exceeded():
-            _budget["llm_monolithic"] = int(_budget.get("llm_monolithic", 0)) - 1
+        # 2026-05-18 (Bug #4): also skip the monolithic LLM when
+        # _stub_aggregate_copy fired upstream. That gate already proved the
+        # body has no listing structure (no <tr>+rent, no unit-card class,
+        # no Apartment/Offer JSON-LD, no PropertyValue dim entries). Running
+        # a more expensive LLM on the same body produces nothing 247/247
+        # times in the 2026-05-18 cloud run AND burns the per-property
+        # budget that hop pages need (Bug #3 compound).
+        #
+        # 2026-05-18 (Bug #3): when the current page has SIGNAL_THRESHOLD_HIGH
+        # (≥4 distinct structural floor-plan signals), bypass the budget
+        # check AND skip the decrement — call this a "free" LLM call. The
+        # threshold means the page is essentially saturated with listing
+        # signals; the LLM call has a near-100% recovery rate and is worth
+        # absorbing the cost. The hard `_llm_cost_exceeded()` cap stays as
+        # the ultimate brake so a pathological case can't blow the budget.
+        # _high_signal_page_dom was computed alongside _stub_aggregate_copy
+        # above; reuse it here so both call sites apply the same threshold.
+        if (
+            not _rc3_deferred
+            and not _stub_aggregate_copy
+            and (int(_budget.get("llm_monolithic", 0)) > 0 or _high_signal_page_dom)
+            and not _llm_cost_exceeded()
+        ):
+            # High-signal pages get a free pass — don't decrement the budget.
+            # Everything else pays the usual slot.
+            if not _high_signal_page_dom:
+                _budget["llm_monolithic"] = int(_budget.get("llm_monolithic", 0)) - 1
             t0 = _time.monotonic()
             try:
                 llm_input = prepare_llm_input(html, api_responses, property_context)
@@ -2964,10 +3007,18 @@ class GenericAdapter:
                 )
                 result.errors.append(f"llm-tier-error: {exc}")
         elif not _rc3_deferred:
+            # Distinct skip reason for the stub-aggregate-copy case so the
+            # analyzer can tell budget-pressure skips from "no point trying"
+            # skips. Bug #4 (2026-05-18).
+            _skip_reason = (
+                "stub_aggregate_copy - fp_signals present but no listing structure"
+                if _stub_aggregate_copy
+                else "llm_monolithic budget exhausted or cost cap reached"
+            )
             _log_attempt(
                 "generic:llm",
                 "skipped",
-                reason="llm_monolithic budget exhausted or cost cap reached",
+                reason=_skip_reason,
             )
 
         # Fix 6 — Vision LLM as Tier 5 last-resort fallback.

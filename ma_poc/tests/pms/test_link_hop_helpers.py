@@ -364,10 +364,15 @@ def test_pms_priors_universal_unblocks_skyline_at_kessler_regression() -> None:
 
 
 def test_pms_priors_filter_entry_url_collisions() -> None:
-    """When a template path resolves to the entry URL itself (e.g.,
-    entry_url already includes the path), filter that prior out — we
-    only want strictly-distinct sub-pages because re-fetching the same
-    URL is wasted budget."""
+    """When a template path resolves to the entry URL itself, filter that
+    prior out — re-fetching the same URL is wasted budget.
+
+    2026-05-18 (Bug #2 stronger fix): when entry has a non-trivial path,
+    the synthesiser ONLY emits path-prefix variants (host-root variants
+    are suppressed because empirical evidence shows they 404 on multi-
+    property hosts). The entry-URL collision filter still applies — it just
+    operates on the path-prefix variant now.
+    """
     from ma_poc.pms.detector import DetectedPMS
     from ma_poc.pms.scraper import _pms_priors_for
 
@@ -377,13 +382,40 @@ def test_pms_priors_filter_entry_url_collisions() -> None:
         evidence=["fp:rentcafe"],
         recommended_strategy="jsonld_first",
     )
-    # entry_url IS /floorplans. urljoin("...../floorplans", "/floorplans")
-    # returns the same URL — filter it.
+    # entry_url IS /floorplans — non-trivial path triggers the path-prefix
+    # branch (Bug #2 stronger fix). Priors emitted as /floorplans/{keyword}.
     priors = _pms_priors_for(detected, "https://x.com/floorplans")
     urls = [u for u, _, _ in priors]
+    # Same-URL collision filter still works (entry == prior_url): the
+    # appended /floorplans/floorplans is distinct from entry, so the filter
+    # doesn't drop anything here. The original assertion that
+    # "https://x.com/floorplans" doesn't appear still holds because the
+    # path-prefix variant is "https://x.com/floorplans/floorplans".
     assert "https://x.com/floorplans" not in urls
-    # But the other priors for rentcafe (/availability, /apartments) still
-    # produce — the entry-URL filter is per-path, not all-or-nothing.
+    # Path-prefix variants present:
+    assert "https://x.com/floorplans/availability" in urls
+    assert "https://x.com/floorplans/apartments" in urls
+    # Host-root variants suppressed (Bug #2 stronger fix):
+    assert "https://x.com/availability" not in urls
+    assert "https://x.com/apartments" not in urls
+
+
+def test_pms_priors_emit_host_root_when_entry_is_host_root() -> None:
+    """The plain CSV-URL case: entry IS the host root, so host-root priors
+    are the right thing to try. No path-prefix variants here because there's
+    no prefix to use. Companion test to the 2026-05-18 stronger-fix change."""
+    from ma_poc.pms.detector import DetectedPMS
+    from ma_poc.pms.scraper import _pms_priors_for
+
+    detected = DetectedPMS(
+        pms="rentcafe",
+        confidence=0.9,
+        evidence=["fp:rentcafe"],
+        recommended_strategy="jsonld_first",
+    )
+    priors = _pms_priors_for(detected, "https://x.com/")
+    urls = [u for u, _, _ in priors]
+    assert "https://x.com/floorplans" in urls
     assert "https://x.com/availability" in urls
     assert "https://x.com/apartments" in urls
 

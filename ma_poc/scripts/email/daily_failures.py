@@ -16,8 +16,10 @@ Two attachments, both ``.xlsx`` (Gmail previews them as Sheets natively):
        persisted for the day.
 
     2. ``failed_properties_{run_date}.xlsx``
-       One row per failed canonical_id (``run_ledger.status != 'SUCCESS'``)
-       with: error/warning counts, every issue code from ``run_issues``
+       One row per failed canonical_id (``run_ledger.status`` not in
+       ``reporting.verdict._SUCCESS_VERDICTS`` — i.e. excluding SUCCESS /
+       SUCCESS_PARTIAL / SUCCESS_PLAN_LEVEL) with: error/warning counts,
+       every issue code from ``run_issues``
        concatenated, and the latest ``scrape_events`` row's
        ``scrape_outcome`` + ``failure_reason``. Designed so a person
        sorting by error_code or by failure_reason text can immediately
@@ -142,6 +144,7 @@ from data_provider.sql.models import (  # noqa: E402
     ScrapeEventRow,
 )
 from data_provider.sql.provider import SqlDataProvider  # noqa: E402
+from reporting.verdict import _SUCCESS_VERDICTS, verdict_is_success  # noqa: E402
 from scripts.email.daily import (  # noqa: E402
     _open_provider,
     _parse_recipients,
@@ -406,7 +409,10 @@ def _fetch_failed_properties_from_sql(
         if not cid:
             continue
         status = (r.status or "").upper()
-        if status and status != "SUCCESS":
+        # Use the canonical success classifier so SUCCESS_PARTIAL,
+        # SUCCESS_PLAN_LEVEL etc. don't count as failures here (they're
+        # genuine success-class verdicts per reporting.verdict._SUCCESS_VERDICTS).
+        if status and not verdict_is_success(status):
             failed_cids.append(cid)
             ledger_by_cid[cid] = r
     if not failed_cids:
@@ -516,7 +522,7 @@ def _fetch_run_from_gcs(
             for ledger in _read_jsonl(ledger_file):
                 cid = ledger.get("canonical_id") or ""
                 status = (ledger.get("status") or "").upper()
-                if cid and status and status != "SUCCESS":
+                if cid and status and not verdict_is_success(status):
                     failed_by_cid[cid] = {
                         "canonical_id": cid,
                         "property_name": "",

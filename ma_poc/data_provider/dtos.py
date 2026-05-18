@@ -228,6 +228,19 @@ class CatalogFilters(BaseModel):
     shard_count: int | None = None  # total number of shards
     start_index: int | None = None  # zero-based row offset (post-filter)
 
+    # Bug #5 Layer 3 (2026-05-18): when set, the catalog source shuffles
+    # the (post-filter, pre-shard) row list using this key as the
+    # ``random.Random(seed)`` argument. Deterministic per-key so re-runs
+    # land the same property in the same shard, BUT scrambles the natural
+    # CSV order so domain clustering (e.g. 27 essexapartmenthomes.com
+    # properties contiguously in the CSV) gets spread evenly across
+    # shards. Pre-fix: 12 shards each hammered Essex with ~3 rps; with
+    # the shuffle, each property goes to a roughly-different shard so
+    # the per-shard rate per domain drops to ~0.2 rps. Typically the
+    # caller passes ``run_date`` (e.g. "2026-05-18") so the shuffle is
+    # stable within a day and varies day-to-day.
+    shuffle_seed: str | None = None
+
 
 class PropertyToScrape(BaseModel):
     """One row in the input catalog — a property the runner should scrape.

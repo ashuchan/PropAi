@@ -11,6 +11,7 @@ import type { IPropertyService, PropertyReport, PropertyProfile } from '../inter
 import type {
   PaginatedResult, PropertyFilters, SortOptions, ExtractionTier, ScrapeStatus, DataScope,
 } from '../types/common.js';
+import { isSuccessVerdict } from '../types/common.js';
 import type {
   PropertySummary, Property, PropertyAggregates, Unit, FloorPlan,
   MarketMetrics, PropertyMedia, FloorPlanImage, SchemaVersion,
@@ -258,7 +259,7 @@ export class PropertyService implements IPropertyService {
     const ledgerStatus = (r.ledgerStatus ?? '').toUpperCase();
     const stateStatus = (r.lastScrapeStatus ?? '').toUpperCase();
     const status = ledgerStatus || stateStatus || 'UNKNOWN';
-    const isSuccess = status === 'SUCCESS' || status === 'SUCCESS_WITH_ERRORS';
+    const isSuccess = isSuccessVerdict(status);
 
     let tier: ExtractionTier;
     const tierStr = (r.extractionTier ?? '').toUpperCase();
@@ -709,9 +710,7 @@ export class PropertyService implements IPropertyService {
     const medianRent = sortedRents.length > 0 ? sortedRents[Math.floor(sortedRents.length / 2)] : 0;
     const availableTotal = items.reduce((sum, p) => sum + p.availableUnits, 0);
     const availabilityRate = totalUnits > 0 ? availableTotal / totalUnits : 0;
-    const successCount = items.filter(
-      (p) => p.scrapeStatus === 'SUCCESS' || p.scrapeStatus === 'SUCCESS_WITH_ERRORS',
-    ).length;
+    const successCount = items.filter((p) => isSuccessVerdict(p.scrapeStatus)).length;
     const successRate = totalProperties > 0 ? successCount / totalProperties : 0;
 
     const tierDistribution = {} as Record<ExtractionTier, number>;
