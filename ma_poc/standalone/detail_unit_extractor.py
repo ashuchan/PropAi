@@ -188,9 +188,19 @@ def _generic_text_rows(text: str, src: str) -> list[dict[str, Any]]:
         return []
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for raw in re.split(r"[\n\r]+|(?<=Lease Now)|(?<=Apply Now)", text):
+    # Modal/table text has tabs + newlines INSIDE one logical row
+    # (rrac: "4\t4114\t\t$1,000\t\n$2,335\n\tAvailable Now\tLease Now").
+    # Normalize ALL whitespace to single spaces FIRST, then split on the
+    # row terminators ("Lease Now"/"Apply Now") — not raw \n which
+    # fragments a unit across pieces. Fall back to raw-newline split for
+    # pages that have neither terminator.
+    flat = re.sub(r"\s+", " ", text).strip()
+    segs = re.split(r"(?<=Lease Now)|(?<=Apply Now)|(?<=Lease now)", flat)
+    if len(segs) < 2:
+        segs = re.split(r"[\n\r]+", text)
+    for raw in segs:
         line = re.sub(r"\s+", " ", raw).strip()
-        if not (10 <= len(line) <= 240):
+        if not (8 <= len(line) <= 240):
             continue
         rent = _RENT.search(line)
         if not rent or not _AVAIL_LINE.search(line):
