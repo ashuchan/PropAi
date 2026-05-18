@@ -39,3 +39,13 @@ n,url,verdict,pattern
 38,woodviewatrandolph.com,U,image: caf_v2 popup = Bldg#/Unit#/$2515/Available unit-table
 39,grandpalms.com,U,caf_v2 dropdown -> /floorplans/<bed>/<layout> detail units
 40,springsapartments.com,U,engrain-sightmap (MISFP)
+41,theinfieldloftsapartments.com,U,engrain-sightmap (MISFP)
+42,mqsonoranpreserve.com,U,caf_v2 popup
+43,socoapartments.com,U,caf_v2 popup
+44,villamilano.us,U,view-details/date-entry (bot-protected)
+45,thekentcarmel.com,U,engrain-sightmap (MISFP)
+46,karademas.org/windpoint,F,image: rent-range floorplan-level "No current availability" (policy F)
+47,emersonparkapartmenthomes.com,U,/unit/<slug> per-unit page
+48,waynewoodapts.com,U,caf_v2 /floorplans/<layout> + avail-click same-page
+49,irvinecompanyapartments.com/pacific-view,U,availability.html in-page expand (like #22)
+50,spearheadproperties.com/elm,U,table listed on page

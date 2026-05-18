@@ -685,3 +685,21 @@ check-availability" + caf_v2 slice of genuine-custom is NOT bespoke:
 it's OneSite/Knock behind a marketing template, recoverable via
 existing adapters + a check-availability hop. Standalone module Phase C
 = follow Check-Availability -> OneSite/Knock portal -> existing parse.
+
+## ★★★ EYEBALL 50-SAMPLE COMPLETE — defensible all-456 number ★★★
+50/385 JS-rendered "no static signal" sites, user-validated:
+  FINAL TALLY: 42 U / 8 F  ->  84% recoverable, 16% true ceiling.
+Extrapolated all-456 genuine-custom:
+  69 HAS_UNITS (probe456 static-confirmed) + 385 NEEDS_EYEBALL@84%
+  (~323) + 2 dead  =>  ~392/456 ≈ 86% RECOVERABLE, ~14% genuine
+  floorplan-only ceiling (record floorplan-level per policy).
+Recoverable patterns (all handled by the standalone A+B+C module):
+  Engrain/SightMap (existing adapter, JS-injected) | caf_v2 family
+  (popup unit-table / detail-page / #k= OneSite-Knock portal) |
+  per-unit pages /unit/<slug> | availability.html in-page expand |
+  apts247/spherexx-ZRS/entrata-WP (proven parsers) | securecafe hop.
+Net: the "~460 genuine-custom" is ~86% recoverable; combined with the
+2,861 known-adapter residual this lifts the achievable Tier-1 well
+above the measured ~60% once the standalone module + detection fixes
+ship. The 50-site eyeball ledger is durable in
+artifacts/eyeball/batch3_verdicts.csv (user-validated, not guessed).
