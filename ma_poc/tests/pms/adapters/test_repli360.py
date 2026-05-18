@@ -18,9 +18,43 @@ from ma_poc.pms.adapters.repli360 import (
     Repli360Adapter,
     _movein_today,
     find_repli360_floorplans,
+    find_repli360_script_url,
     parse_repli360_str,
 )
 from ma_poc.pms.detector import _detect_html_markers
+
+
+def test_find_script_url_from_static_html() -> None:
+    # The embed-script URL is in STATIC HTML (render-independent entry).
+    tok = "eyJpdiI6Inp2M25HZlJLTVduVHE4a1cxQjFVYXc9PSJ9"
+    html = (
+        '<html><body><a href="https://repli360.com">logo</a>'
+        f'<script src="https://app.repli360.com/admin/rrac-website-script/{tok}">'
+        "</script></body></html>"
+    )
+    url = find_repli360_script_url(html)
+    assert url == f"https://app.repli360.com/admin/rrac-website-script/{tok}"
+
+
+def test_find_script_url_absent() -> None:
+    assert find_repli360_script_url("<html>no repli embed here</html>") == ""
+    # A bare logo link is NOT the embed script (the false-positive trap).
+    assert find_repli360_script_url('<a href="https://repli360.com">x</a>') == ""
+
+
+def test_template_render_html_parses_via_onclick_reuse() -> None:
+    # fetch_repli360_floorplans feeds the template-render HTML through
+    # find_repli360_floorplans; verify that reuse parses the bootstrap
+    # widget's onclick attrs (same shape the live API returns).
+    tpl = (
+        "<div>"
+        "<a onclick=\"getUnitListByFloor(this,'A1AL' , 2 , 1619,``);\">x</a>"
+        "<a onclick=\"getUnitListByFloor(this,'B2CL', 2, 1619, '');\">y</a>"
+        "</div>"
+    )
+    sid, fps = find_repli360_floorplans(tpl)
+    assert sid == "1619"
+    assert fps == [("A1AL", "2"), ("B2CL", "2")]
 
 # Exact markup captured live from royceattrumbull.com getUnitListByFloor.
 _STR_HTML = """

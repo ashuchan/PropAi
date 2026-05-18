@@ -44,7 +44,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from ma_poc.pms.adapters._parsing import make_unit_dict
-from ma_poc.pms.adapters._probe import probe_post
+from ma_poc.pms.adapters._probe import probe_get, probe_post
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.adapters.generic import _get_page_html
 
@@ -53,6 +53,18 @@ if TYPE_CHECKING:
 
 _TIER = "TIER_1_API_REPLI360"
 _API = "https://app.repli360.com/admin/getUnitListByFloor"
+_TPL_RENDER = "https://app.repli360.com/admin/template-render"
+
+# The per-property repli360 embed script — present in the property's
+# STATIC HTML (no render needed): src=".../admin/rrac-website-script/
+# <encrypted-token>". Fetching it yields ``var site_id = '<id>'``.
+_SCRIPT_RE = re.compile(
+    r"https?://app\.repli360\.com/admin/rrac-website-script/[A-Za-z0-9=_./+-]+",
+    re.IGNORECASE,
+)
+_SITEID_RE = re.compile(
+    r"""var\s+site_id\s*=\s*['"](\d{2,9})['"]""", re.IGNORECASE
+)
 
 # onclick="getUnitListByFloor(this,'A1AL' , 2 , 1619,``);"
 _ONCLICK_RE = re.compile(
@@ -102,6 +114,72 @@ def find_repli360_floorplans(html: str) -> tuple[str, list[tuple[str, str]]]:
             seen.add(fpid)
             fps.append((fpid, ttype))
     return site_id, fps
+
+
+def find_repli360_script_url(html: str) -> str:
+    """Return the ``rrac-website-script/<token>`` embed URL, or ''.
+
+    This is in the property's STATIC HTML — it does NOT require the page
+    to be rendered (unlike the JS-injected onclick attrs). It is the
+    render-independent entry point.
+    """
+    m = _SCRIPT_RE.search(html or "")
+    return m.group(0) if m else ""
+
+
+def fetch_repli360_site_id(script_url: str, referer: str = "") -> str:
+    """GET the embed script, return its ``var site_id = '<id>'``, or ''.
+
+    No auth, no bot wall (verified). Best-effort: any failure → ''.
+    """
+    if not script_url:
+        return ""
+    try:
+        hdrs = {"Referer": referer} if referer else {}
+        r = probe_get(script_url, headers=hdrs, timeout=20)
+    except Exception:
+        return ""
+    if getattr(r, "status_code", 0) != 200:
+        return ""
+    m = _SITEID_RE.search(r.text or "")
+    return m.group(1) if m else ""
+
+
+def fetch_repli360_floorplans(
+    site_id: str, referer: str = ""
+) -> list[tuple[str, str]]:
+    """POST ``/admin/template-render`` → the floorplan list.
+
+    The bootstrap widget HTML it returns embeds every
+    ``getUnitListByFloor(this,'<fp>',<tt>,<sid>)`` onclick — i.e. the
+    full floorplan list — render-free. Reuses :func:`find_repli360_
+    floorplans` to parse those attrs. No auth / no bot wall (verified).
+    """
+    if not site_id:
+        return []
+    try:
+        origin = _origin_of(referer)
+        hdrs = {"Referer": referer or "", "Origin": origin}
+        r = probe_post(
+            _TPL_RENDER,
+            data={
+                "site_id": site_id,
+                "template_type": "2",
+                "action": "",
+                "ready_script": "",
+                "source": "",
+                "property_id": "",
+                "zpopUp": "",
+            },
+            headers=hdrs,
+            timeout=25,
+        )
+    except Exception:
+        return []
+    if getattr(r, "status_code", 0) != 200:
+        return []
+    _sid, fps = find_repli360_floorplans(r.text or "")
+    return fps
 
 
 def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
@@ -185,19 +263,38 @@ class Repli360Adapter:
             result.errors.append("REPLI360: no page html")
             return result
 
-        site_id, fps = find_repli360_floorplans(html)
-        if not site_id or not fps:
-            # onclick attrs are JS-injected; absent ⇒ page not rendered
-            # or not actually a repli360 site. Degrade to fallback.
-            result.tier_used = f"{_TIER}_NO_FLOORPLANS"
-            result.errors.append(
-                "REPLI360: site_id/floorPlanID not found in rendered HTML"
-            )
-            return result
-
         origin = _origin_of(
             str(getattr(getattr(ctx, "fetch_result", None), "final_url", "") or "")
         ) or _origin_of(getattr(ctx, "base_url", "") or "")
+        referer = origin + "/" if origin else ""
+
+        # PRIMARY (render-independent): the embed-script URL is in the
+        # STATIC HTML → fetch it → site_id → /admin/template-render →
+        # floorplan list. All server-side, no auth, no bot wall, no
+        # browser. This is what lifts repli360 past the render cap.
+        site_id = ""
+        fps: list[tuple[str, str]] = []
+        script_url = find_repli360_script_url(html)
+        if script_url:
+            site_id = fetch_repli360_site_id(script_url, referer)
+            if site_id:
+                fps = fetch_repli360_floorplans(site_id, referer)
+
+        # FALLBACK: if the static chain didn't resolve (no script tag, or
+        # template-render empty), use JS-rendered onclick attrs if the
+        # page happened to be rendered. Keeps the prior behaviour.
+        if not site_id or not fps:
+            r_sid, r_fps = find_repli360_floorplans(html)
+            site_id = site_id or r_sid
+            fps = fps or r_fps
+
+        if not site_id or not fps:
+            result.tier_used = f"{_TIER}_NO_FLOORPLANS"
+            result.errors.append(
+                "REPLI360: site_id/floorPlanID not resolvable "
+                "(static script chain + rendered onclick both empty)"
+            )
+            return result
         movein = _movein_today()
         all_units: list[dict[str, Any]] = []
         seen_units: set[str] = set()
