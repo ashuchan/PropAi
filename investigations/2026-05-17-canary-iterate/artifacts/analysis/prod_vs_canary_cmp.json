@@ -1,0 +1,16 @@
+{
+  "intersection_props": 2275,
+  "prod_unitlevel_props": 1044,
+  "canary_unitlevel_props": 1587,
+  "prod_unitlevel_pct": 46,
+  "canary_unitlevel_pct": 70,
+  "prod_total_real_units": 7805,
+  "canary_total_real_units": 35165,
+  "canary_better_props": 1384,
+  "canary_worse_props": 205,
+  "equal_props": 686,
+  "both_have_units": 918,
+  "prod_only_has_units": 126,
+  "canary_only_has_units": 669,
+  "neither": 562
+}
