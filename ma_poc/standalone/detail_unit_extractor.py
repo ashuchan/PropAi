@@ -389,7 +389,7 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
         # why the Chrome-MCP probe succeeded where blind scans failed).
         has_rrac = False
         n = 0
-        for _ in range(24):  # up to ~12s
+        for _ in range(16):  # up to ~8s
             try:
                 n = await page.evaluate(
                     """() => {
@@ -411,7 +411,7 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
             seen_r: set[str] = set()
             # Cap to a few floorplans: we need to CLASSIFY (units exist?),
             # not exhaust all popups. 14×10s polls blew the 120s cap.
-            for vi in range(min(int(n or 0), 3)):
+            for vi in range(min(int(n or 0), 2)):
                 try:
                     await page.evaluate(
                         """(vi)=>{ const vd=[...document.querySelectorAll('a,button')]
@@ -421,7 +421,7 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
                         vi,
                     )
                     txt = ""
-                    for _ in range(12):  # poll up to ~6s for async modal
+                    for _ in range(10):  # poll up to ~5s for async modal
                         await page.wait_for_timeout(500)
                         txt = await page.evaluate(
                             """()=>{ const m=document.querySelector(
@@ -603,22 +603,29 @@ async def extract_property(page: Any, url: str) -> PropResult:
         res.error = "home-nav-failed"
         return res
     home = await _content(page)
+    low = home.lower()
+    # EARLY SIGNATURE ROUTING — jump straight to the right phase so the
+    # time budget isn't wasted running irrelevant phases (royce/lochraven
+    # timed out doing A+B before reaching the rrac/portal path).
+    is_sightmap = "sightmap.com" in low or "engrain" in low
+    is_cafv2 = ("/community/version2" in low or "rrac" in low
+                or "visitdata-" in low)
+    is_portal = bool(_PORTAL_LINK.search(home))
     try:
-        if await _phase_a_sightmap(page, base, res):
-            _classify(res, home)
-            return res
-        await _goto(page, url)  # restore home (Phase A may have navigated)
-        if await _phase_b_url(page, base, res):
-            _classify(res, home)
-            return res
-        await _goto(page, url)
-        if await _phase_c_interact(page, base, res):
-            _classify(res, home)
-            return res
-        await _goto(page, url)
-        if await _phase_d_portal_hop(page, base, res):
-            _classify(res, home)
-            return res
+        order = []
+        if is_sightmap:
+            order = [_phase_a_sightmap, _phase_c_interact, _phase_b_url, _phase_d_portal_hop]
+        elif is_cafv2:
+            order = [_phase_c_interact, _phase_d_portal_hop, _phase_b_url, _phase_a_sightmap]
+        elif is_portal:
+            order = [_phase_d_portal_hop, _phase_c_interact, _phase_b_url, _phase_a_sightmap]
+        else:
+            order = [_phase_b_url, _phase_a_sightmap, _phase_c_interact, _phase_d_portal_hop]
+        for ph in order:
+            await _goto(page, url)  # restore home between phases
+            if await ph(page, base, res):
+                _classify(res, home)
+                return res
     except Exception as exc:
         res.error = f"{type(exc).__name__}:{str(exc)[:120]}"
     _classify(res, home)
@@ -656,7 +663,7 @@ async def run(urls: list[str], concurrency: int = 6) -> list[PropResult]:
                 page.on("response", lambda r: asyncio.create_task(_on_resp(r)))
                 try:
                     r = await asyncio.wait_for(
-                        extract_property(page, u), timeout=120
+                        extract_property(page, u), timeout=200
                     )
                 except Exception as exc:
                     r = PropResult(url=u, klass="DEAD", error=f"timeout/{exc}")
