@@ -1,0 +1,22 @@
+{
+ "run": "2026-05-18-repli-oll canary (exec l5w5t, image canary-fixtest-9954f0f)",
+ "cohort": 342,
+ "prod_baseline": "~0 real units (both clusters)",
+ "repli360": {
+  "props": 158,
+  "true_tier1": 58,
+  "pct": 36,
+  "adapter_fired_TIER_1_API_REPLI360": 30,
+  "remaining_gap": "NONE 26 + REPLI360_NO_FLOORPLANS 13 (JS-render dependency: onclick attrs absent when page not rendered) + LLM 10",
+  "verdict": "real solid lift 0->36%; cap is render-gating not parser"
+ },
+ "oll": {
+  "props": 187,
+  "true_tier1": 19,
+  "pct": 10,
+  "note": "TIER_1_API_ONESITE fired 45 but mostly 0-real-units; new appstate browser-intercept largely did NOT trigger (passive render doesnt drive the #k= wizard)",
+  "verdict": "weak 0->10%; adapter correct but interaction-gated"
+ },
+ "synthesis": "repli360 = genuine productionizable win (render-gated, raisable). OLL = shipped+correct but needs pipeline to DRIVE the wizard during render, not passive load. Both > prod ~0; neither done.",
+ "count_vs_quality": "repli360 any-real==true-tier1 (58/58, clean). OLL any-real 56 vs true-tier1 19 (TIER_3/LLM inflation) \u2014 honest number is true-tier1=19."
+}
