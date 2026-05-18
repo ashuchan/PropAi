@@ -17,5 +17,17 @@
   "resman/covington": "myresman.com signature present but portal URL/format not found by adapter \u2014 detection/extraction gap.",
   "reframe": "These need DETECTION-ROUTING fixes, not 3 new adapters. funnel/UDR is the existing OLL cluster in disguise. Blind measurement canary would show failure without revealing cause \u2014 validate-first was correct.",
   "status": "User: do not proceed, wait for next instruction. No routing fix / no canary started."
+ },
+ "DEVTOOLS_VALIDATED": {
+  "entrata/springriver": {
+   "real_api": "GET https://<sub>.prospectportal.com/?module=check_availability&is_secure=1&property[id]=<pid>&action=view_unit_spaces&property_floorplan[id]=<fpid>&move_in_date=YYYY-MM-DD&occupancy_type=conventional&unit_count=N",
+   "returns": "text/html fragment of unit spaces per floorplan; min_rent/max_rent/unit_count echoed in query",
+   "platform": "Entrata ProspectPortal (prospectportal.com) \u2014 IS Entrata but a DIFFERENT surface than shipped EntrataAdapter (/Apartments/module/widgets/). The /application_authentication/ link was the false-positive distractor.",
+   "protection": "Cloudflare (cf_clearance + __cf_bm) \u2014 NOT DataDome, NOT stateful. GET w/ URL params.",
+   "tractability": "SERVER-SIDE: probe_get already has cost-gated Web-Unlocker escalation that auto-solves CF managed challenge (same as securecafe/#2 subset). repli360/securecafe-class, NOT OLL-class.",
+   "build_recipe": "enumerate property[id]+floorplan ids from ProspectPortal floorplans page (id in slug e.g. a1-712595), then per-fp check_availability GET via probe_get(+WU) -> parse HTML unit-spaces fragment (repli360 str / entrata-WP parser pattern).",
+   "verified": "springriver: property[id]=1209258 fp 712595 -> 3 units $1,291"
+  },
+  "resman/covington": "AWAITING capture (covingtonplace.com/floorplan)"
  }
 }
