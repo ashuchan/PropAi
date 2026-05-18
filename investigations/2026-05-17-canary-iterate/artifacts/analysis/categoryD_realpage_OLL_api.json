@@ -10,5 +10,25 @@
  "vs_repli360": "repli360=158 props, 1 stateless no-auth POST (clean win, build first). CategoryD=187 props, stateful multi-step OLL flow (real reverse-eng project).",
  "method": "PUT (JSON body ~280B), not GET",
  "BOT_PROTECTION": "DataDome + Akamai Bot Manager \u2014 set-cookie datadome=, x-datadome: protected, bm_ss/bm_s/bm_so cookies. CORS locked to property origin. Custom headers xyz=<base64 token>, x-authtoken, ClientSessionID.",
- "final_recommendation": "Build repli360 (158, clean no-auth stateless POST, no bot wall) FIRST. Category-D = route to existing OneSite/Web-Unlocker infra, separate harder track."
+ "final_recommendation": "Build repli360 (158, clean no-auth stateless POST, no bot wall) FIRST. Category-D = route to existing OneSite/Web-Unlocker infra, separate harder track.",
+ "response_schema": {
+  "root": "Workflow.ActivityGroups[].GroupActivities[]",
+  "unit_activity": "__type endswith ApartmentSelectionLeaseMgmtActivity -> .Units[]",
+  "unit_fields": {
+   "UnitNumber": "e.g. \"1805C AB\"",
+   "Id": "206",
+   "MinPriceRange": 1255,
+   "MaxPriceRange": 1515,
+   "AvailableDateString": "\"May 21\"",
+   "AvailableDate": "/Date(ms)/",
+   "Deposit": 350,
+   "Squarefeet": 700,
+   "TwelveMonthsRent": 1290,
+   "SiteId": "4000138"
+  },
+  "floorplan": ".Floorplan {Id,Name,Bedrooms,Bathrooms,MinSquareFeet,MinPriceRange,MaxPriceRange,AvailableUnits}",
+  "ids": "top-level SiteId 4000138, PmcId 2104447, PmsId 1; AppStateParams.FloorplanId per-call",
+  "verified_units": "lochraven: 1805C AB / 1719F AB / 8309AT LO / 1715A AB \u2014 real unit-level, clean structured JSON"
+ },
+ "refined_path": "DATA IS EXCELLENT (clean structured Units[] JSON, unit-level). Only barrier = DataDome+Akamai+stateful-PUT+xyz-token. Right adapter = BROWSER-based Tier-1 API INTERCEPTION: existing jugnu patchright+WebUnlocker loads the OLL wizard (real browser passes DataDome), intercept the OLL.SearchFloorPlan PUT response per floorplan, parse Workflow->...->Units[]. Reuse onesite.py/realpage_oll.py + Tier-1 interception architecture. Tractable follow-on; NOT a clean curl adapter but data-shape now fully known."
 }
