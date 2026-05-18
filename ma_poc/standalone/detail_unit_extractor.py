@@ -402,7 +402,9 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
                 n = 0
             acc_r: list[dict[str, Any]] = []
             seen_r: set[str] = set()
-            for vi in range(min(int(n or 0), 14)):
+            # Cap to a few floorplans: we need to CLASSIFY (units exist?),
+            # not exhaust all popups. 14×10s polls blew the 120s cap.
+            for vi in range(min(int(n or 0), 3)):
                 try:
                     await page.evaluate(
                         """(vi)=>{ const vd=[...document.querySelectorAll('a,button')]
@@ -412,7 +414,7 @@ async def _phase_c_interact(page: Any, base: str, res: PropResult) -> bool:
                         vi,
                     )
                     txt = ""
-                    for _ in range(20):  # poll up to ~10s for async modal
+                    for _ in range(12):  # poll up to ~6s for async modal
                         await page.wait_for_timeout(500)
                         txt = await page.evaluate(
                             """()=>{ const m=document.querySelector(
