@@ -2770,6 +2770,59 @@ class GenericAdapter:
         if aggregated_property_amenities:
             result._property_amenities = list(aggregated_property_amenities)  # type: ignore[attr-defined]
         result._decision_log = decision_log  # type: ignore[attr-defined]
+
+        # Last-resort SightMap iframe-fallback (2026-05-18 generalisation).
+        # The JS-injected-embed Engrain/SightMap class (HubSpot/Wix —
+        # springsapartments.com etc.) has no sightmap marker on the
+        # property page, so the detector tags it ``unknown`` and this
+        # generic adapter runs. But its per-property ``/floor-plans``
+        # sub-page (which the link-hop fetches) DOES embed
+        # ``<iframe src="sightmap.com/embed/{code}">`` on load. The
+        # capture-based generic:sightmap path (line ~1490) is timing-
+        # fragile because the SightMap data XHR fires only after the
+        # embed SPA boots (often >12s). The iframe FALLBACK resolves it
+        # deterministically from HTML alone — fetch the embed page, read
+        # ``__APP_CONFIG__``, GET the API — exactly the path that already
+        # makes IRT succeed (TIER_1_API_SIGHTMAP_IFRAME). Works on the
+        # fetch_result snapshot (no live page), so it fits jugnu. Reuses
+        # the proven sightmap.py helper unchanged. Cost-gated to the
+        # genuine 0-unit tail; never raises.
+        if not result.units:
+            try:
+                from ma_poc.pms.adapters.sightmap import (
+                    _try_sightmap_iframe_fallback,
+                )
+
+                _sm_units = await _try_sightmap_iframe_fallback(ctx, result)
+                if _sm_units:
+                    from ma_poc.extraction.post_process import post_process
+
+                    _pp = post_process(
+                        _sm_units,
+                        property_id=getattr(ctx, "property_id", None),
+                    )
+                    if _pp.n_admitted > 0:
+                        result.units = _pp.admitted
+                        result.plan_summaries = _pp.plan_summaries
+                        result.tier_used = "TIER_1_API_SIGHTMAP_IFRAME"
+                        result.confidence = min(
+                            0.90, 0.7 + 0.05 * _pp.n_admitted
+                        )
+                        _log_attempt(
+                            "generic:sightmap_iframe", "ran_units",
+                            units_found=len(_pp.admitted),
+                        )
+                        return result
+                _log_attempt(
+                    "generic:sightmap_iframe", "ran_empty",
+                    reason="no sightmap embed in HTML or fallback empty",
+                )
+            except Exception as _sm_exc:  # never crash the adapter
+                _log_attempt(
+                    "generic:sightmap_iframe", "errored",
+                    reason=str(_sm_exc)[:120],
+                )
+
         result.confidence = 0.0
         result.errors.append("Generic parser found no units in captured API responses")
         return result

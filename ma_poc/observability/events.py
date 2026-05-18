@@ -29,6 +29,7 @@ class EventKind(StrEnum):
     FETCH_ROTATED_IDENTITY = "fetch.rotated_identity"
     FETCH_BOT_BLOCKED = "fetch.bot_blocked"
     FETCH_CAPTCHA_DETECTED = "fetch.captcha_detected"
+    FETCH_BYTE_CAP_EXCEEDED = "fetch.byte_cap_exceeded"
 
     # Discovery (L2)
     TASK_ENQUEUED = "discovery.task_enqueued"

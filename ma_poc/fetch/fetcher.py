@@ -90,6 +90,17 @@ def _classify_fetch_outcome(
 _MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
 _DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
 
+# Safety: hard per-fetch transfer cap. Independent of the (default)
+# image/font/media resource-blocking — this is a runaway-bandwidth
+# circuit-breaker that matters most on a proxied fleet run ($/GB
+# residential egress). Once cumulative response bytes for a single
+# render exceed the cap, all further requests are aborted (the page
+# keeps whatever it already loaded, so extraction still proceeds on the
+# captured DOM/network_log). Generous default (16 MB) so it only trips
+# on pathological sites, never normal ones. ``MAX_FETCH_BYTES=0``
+# disables the cap.
+_MAX_FETCH_BYTES = int(os.getenv("MAX_FETCH_BYTES", str(16_000_000)))
+
 log = logging.getLogger(__name__)
 
 
@@ -516,11 +527,58 @@ class Fetcher:
         """
         page = await self._browsers.acquire(identity, proxy)
         network_log: list[dict[str, Any]] = []
+        # Per-fetch transfer-byte circuit breaker (see _MAX_FETCH_BYTES).
+        _xfer = {"bytes": 0, "tripped": False}
+
+        async def _abort_all(route: Any) -> None:
+            try:
+                await route.abort()
+            except Exception:
+                ...
 
         try:
             # Intercept network requests
             async def _on_response(response: Any) -> None:
                 try:
+                    # Bandwidth circuit breaker — count every response's
+                    # transfer size (content-length is free; no .body()
+                    # needed and it covers JS/CSS/binary too). Once over
+                    # the cap, abort all further requests so a runaway /
+                    # proxied site can't burn $/GB. Best-effort; the
+                    # already-captured DOM + network_log still extract.
+                    if _MAX_FETCH_BYTES and not _xfer["tripped"]:
+                        try:
+                            _cl = response.headers.get("content-length")
+                            _xfer["bytes"] += int(_cl) if _cl and _cl.isdigit() else 0
+                        except Exception:
+                            ...
+                        if _xfer["bytes"] >= _MAX_FETCH_BYTES:
+                            _xfer["tripped"] = True
+                            try:
+                                await page.route("**/*", _abort_all)
+                            except Exception:
+                                ...
+                            log.warning(
+                                "fetch.byte_cap_exceeded url=%s bytes=%d cap=%d "
+                                "proxy=%s — aborting further requests",
+                                task.url, _xfer["bytes"], _MAX_FETCH_BYTES,
+                                bool(proxy),
+                            )
+                            # Structured event so a (proxied) fleet run can
+                            # quantify cap hits + $/GB impact from
+                            # events.jsonl, not just grep logs.
+                            try:
+                                emit(
+                                    EventKind.FETCH_BYTE_CAP_EXCEEDED,
+                                    task.property_id,
+                                    url=task.url,
+                                    bytes=_xfer["bytes"],
+                                    cap=_MAX_FETCH_BYTES,
+                                    proxied=bool(proxy),
+                                    attempt=attempt,
+                                )
+                            except Exception:
+                                ...
                     url = response.url
                     content_type = response.headers.get("content-type", "")
                     if any(t in content_type for t in ["json", "xml", "html", "text"]):

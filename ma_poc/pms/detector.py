@@ -57,6 +57,10 @@ PmsName = Literal[
     "apts247",
     "repli360",
     "essex",
+    "maac",
+    "irvine",
+    "cortland",
+    "equity",
     "rentmanager",
     "squarespace_nopms",
     "wix_nopms",
@@ -91,6 +95,10 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "apts247": "api_first",
     "repli360": "api_first",
     "essex": "api_first",
+    "maac": "api_first",
+    "irvine": "api_first",
+    "cortland": "api_first",
+    "equity": "api_first",
     "rentmanager": "api_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
@@ -149,6 +157,35 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
         "essex",
         0.95,
         "host ends in essexapartmenthomes.com (Essex Property Trust)",
+    ),
+    # MAAC (Mid-America Apartment Communities) — single REIT, single
+    # host. Next.js app; per-unit rent via public same-origin
+    # /api/properties/{ULID}/units/available/ (ULID = propertyIntegrationID
+    # in community HTML). Detector-tagged generic before this -> floorplan
+    # rows with rent=null in prod (0 genuine Tier-1).
+    (
+        re.compile(r"(?:^|\.)maac\.com$"),
+        "maac",
+        0.95,
+        "host ends in maac.com (Mid-America Apartment Communities)",
+    ),
+    (
+        re.compile(r"(?:^|\.)irvinecompanyapartments\.com$"),
+        "irvine",
+        0.95,
+        "host ends in irvinecompanyapartments.com (Irvine Company)",
+    ),
+    (
+        re.compile(r"(?:^|\.)cortland\.com$"),
+        "cortland",
+        0.95,
+        "host ends in cortland.com (Cortland)",
+    ),
+    (
+        re.compile(r"(?:^|\.)equityapartments\.com$"),
+        "equity",
+        0.95,
+        "host ends in equityapartments.com (Equity Residential)",
     ),
     (re.compile(r"(?:^|\.)entrata\.com$"), "entrata", 0.95, "host ends in entrata.com"),
     (re.compile(r"(?:^|\.)appfolio\.com$"), "appfolio", 0.95, "host ends in appfolio.com"),

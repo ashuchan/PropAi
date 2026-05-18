@@ -46,15 +46,180 @@ Verified: city-view (property 492967, unit 6302379, floorplan
 from __future__ import annotations
 
 import re
+from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any
 
-from ma_poc.pms.adapters._parsing import make_unit_dict
+from ma_poc.pms.adapters._parsing import (
+    bed_label_from,
+    format_rent_range,
+    make_unit_dict,
+    money_to_int,
+)
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
 
 _TIER = "TIER_1_API_ESSEX"
+
+# 2026-05-18 (user HAR): the BULK endpoint
+#   GET /api/properties/{propertyId}/availability?start_date&end_date&format=spa
+# returns ALL units in one call and — unlike the per-unit route — clears
+# the Vercel bot check under curl_cffi chrome impersonation (verified
+# 200, 8 floorplans / 25 units, property 492967). Shape:
+#   {"result":{"floorplans":[{...,"units":[{unit_id,name,floorplan_name,
+#     beds,baths,sqft,minimum_rent,maximum_rent,availability_date,
+#     specials,amenities,floorplate:{floor,building_name}}]}]}}
+_PROP_ID_RE = re.compile(
+    r'(?:data-property-id="|/api/properties/|"propertyId"\s*[:=]\s*"?)(\d{5,7})',
+    re.IGNORECASE,
+)
+
+
+def _is_essex_bulk(body: Any) -> bool:
+    if not isinstance(body, dict):
+        return False
+    r = body.get("result")
+    return isinstance(r, dict) and isinstance(r.get("floorplans"), list)
+
+
+def parse_essex_bulk(body: dict[str, Any], source_url: str) -> list[dict[str, Any]]:
+    """Bulk ``/availability?format=spa`` -> all unit-level dicts."""
+    r = body.get("result")
+    if not isinstance(r, dict):
+        return []
+    out: list[dict[str, Any]] = []
+    for fp in r.get("floorplans") or []:
+        if not isinstance(fp, dict):
+            continue
+        for u in fp.get("units") or []:
+            if not isinstance(u, dict):
+                continue
+            unit_no = str(u.get("name") or u.get("unit_id") or "").strip()
+            if not unit_no:
+                continue
+            fp_name = str(
+                u.get("floorplan_name") or fp.get("name") or ""
+            ).strip()
+            beds_raw = u.get("beds")
+            baths_raw = u.get("baths")
+            try:
+                beds = int(float(beds_raw)) if beds_raw not in (None, "") else None
+            except (TypeError, ValueError):
+                beds = None
+            try:
+                baths = float(baths_raw) if baths_raw not in (None, "") else None
+            except (TypeError, ValueError):
+                baths = None
+            sqft_raw = u.get("sqft")
+            sqft = str(sqft_raw) if sqft_raw not in (None, "", 0) else ""
+            rent_lo = money_to_int(str(u.get("minimum_rent") or "")) or None
+            rent_hi = money_to_int(str(u.get("maximum_rent") or "")) or None
+            if rent_lo is None and rent_hi is not None:
+                rent_lo = rent_hi
+            if rent_hi is None and rent_lo is not None:
+                rent_hi = rent_lo
+            avail = str(u.get("availability_date") or "")
+            avail = avail[:10] if "T" in avail else avail
+            concession = ""
+            sp = u.get("specials")
+            if isinstance(sp, list) and sp:
+                first = sp[0]
+                concession = str(
+                    first.get("title") or first.get("description") or ""
+                ).strip() if isinstance(first, dict) else str(first).strip()
+            fpl = u.get("floorplate") if isinstance(u.get("floorplate"), dict) else {}
+            floor = fpl.get("floor")
+            building = fpl.get("building_name")
+            out.append(
+                make_unit_dict(
+                    floor_plan_name=fp_name,
+                    bed_label=bed_label_from(beds, fp_name),
+                    bedrooms=str(beds) if beds is not None else "",
+                    bathrooms=(
+                        str(int(baths)) if baths is not None and baths == int(baths)
+                        else (str(baths) if baths is not None else "")
+                    ),
+                    sqft=sqft,
+                    unit_number=unit_no,
+                    floor=str(floor) if floor not in (None, "") else "",
+                    building=str(building) if building not in (None, "") else "",
+                    rent_range=format_rent_range(rent_lo, rent_hi),
+                    rent_low=rent_lo,
+                    rent_high=rent_hi,
+                    concession=concession,
+                    availability_status="AVAILABLE",
+                    availability_date=avail,
+                    source_api_url=source_url,
+                    extraction_tier=_TIER,
+                )
+            )
+    return out
+
+
+async def _active_fetch_essex_bulk(
+    page: Page | None, ctx: AdapterContext
+) -> list[dict[str, Any]]:
+    """Resolve propertyId from community HTML and GET the bulk API.
+
+    curl_cffi (via probe_get) clears the Vercel bot check for the bulk
+    route. Never raises.
+    """
+    # raw community HTML (raw > hydrated for the embedded propertyId)
+    html = ""
+    fr = getattr(ctx, "fetch_result", None)
+    body = getattr(fr, "body", None)
+    if isinstance(body, bytes):
+        try:
+            body = body.decode("utf-8", errors="replace")
+        except Exception:
+            body = None
+    if isinstance(body, str) and _PROP_ID_RE.search(body):
+        html = body
+    if not html:
+        base = getattr(ctx, "base_url", "") or ""
+        if base:
+            try:
+                from ma_poc.pms.adapters._probe import probe_get
+
+                rr = probe_get(base, timeout=20)
+                if getattr(rr, "status_code", 0) == 200 and rr.text:
+                    html = str(rr.text)
+            except Exception:
+                pass
+    if not html and page is not None:
+        try:
+            html = await page.content()
+        except Exception:
+            html = ""
+    m = _PROP_ID_RE.search(html or "")
+    if not m:
+        return []
+    pid = m.group(1)
+    d0 = date.today()
+    d1 = d0 + timedelta(days=60)
+    url = (
+        f"https://www.essexapartmenthomes.com/api/properties/{pid}"
+        f"/availability?start_date={d0}&end_date={d1}&format=spa"
+    )
+    try:
+        from ma_poc.pms.adapters._probe import probe_get
+
+        r = probe_get(
+            url,
+            timeout=20,
+            headers={
+                "accept": "application/json, text/plain, */*",
+                "referer": "https://www.essexapartmenthomes.com/",
+            },
+        )
+        if getattr(r, "status_code", 0) == 200:
+            b = r.json()
+            if _is_essex_bulk(b):
+                return [{"url": url, "body": b}]
+    except Exception:
+        return []
+    return []
 
 # /api/properties/<pid>/units/<uid>/availability
 _AVAIL_URL_RE = re.compile(
@@ -166,11 +331,36 @@ class EssexAdapter:
         return list(self._fingerprints)
 
     def matches_response_body(self, body: Any) -> bool:
-        return _is_essex_availability(body, "")
+        return _is_essex_availability(body, "") or _is_essex_bulk(body)
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used=_TIER)
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
+
+        # Primary: bulk /availability?format=spa (passively captured or
+        # actively fetched). One call returns every unit.
+        bulk_sources: list[dict[str, Any]] = [
+            {"url": str(rsp.get("url", "")), "body": rsp.get("body")}
+            for rsp in api_responses
+            if _is_essex_bulk(rsp.get("body"))
+        ]
+        if not bulk_sources:
+            bulk_sources = await _active_fetch_essex_bulk(page, ctx)
+        if bulk_sources:
+            bulk_units: list[dict[str, Any]] = []
+            for src in bulk_sources:
+                try:
+                    bulk_units.extend(parse_essex_bulk(src["body"], src.get("url", "")))
+                except Exception as exc:  # noqa: BLE001 — adapters never raise
+                    result.errors.append(
+                        f"essex-bulk-parse-error: {type(exc).__name__}: {exc}"
+                    )
+            if bulk_units:
+                result.units = bulk_units
+                result.winning_url = bulk_sources[0].get("url") or None
+                result.confidence = min(0.90, 0.7 + 0.05 * len(bulk_units))
+                return result
+
         all_units: list[dict[str, Any]] = []
         seen: set[str] = set()
         for resp in api_responses:
