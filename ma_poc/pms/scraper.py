@@ -210,18 +210,37 @@ _RICH_HOP_MIN_RENT_TOKENS = 5
 # Deterministic, capture-first (raw matched phrase). Real patterns
 # observed on RC /floorplans (probe 2026-05-19): "1 Month FREE",
 # "8 Weeks Free", "Move-in Special", "Look & Lease", "$X off".
+# Broadened 2026-05-19 to the empirically-closed family set (grind:
+# cohort 22 + random 20/20). DETECTION trigger only — it fires capture
+# of the enclosing clause window; the deterministic concession_normalize
+# parser decides structure downstream. Every alternative is anchored on
+# offer context (weeks/months/rent/$+off/lease/move-in/special/bonus)
+# so bare-amenity "free" (wifi/parking/fitness) and rent-financing
+# (FLEX) do NOT trigger.
+_CW_NUM = (
+    r"(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve)"
+)
 _PROPERTY_CONCESSION_RE = re.compile(
-    r"\b\d+\s*(?:weeks?|months?)\s*(?:of\s*)?free(?:\s*rent)?\b"
-    r"|\b(?:one|two|three|first)\s+months?\s+free\b"
-    r"|\blook\s*&?\s*lease\b"
-    r"|\bmove[- ]?in\s+special\b"
-    r"|\$\s?\d{2,4}\s*(?:off|gift\s*card|credit|cash|savings)\b"
+    rf"\b{_CW_NUM}[\s-]*(?:full[\s-]+)?(?:weeks?|months?)['’]?s?[\s-]*"
+    r"(?:of[\s-]+)?(?:rent[\s-]+)?(?:free|complimentary|on\s+us)\b"
+    rf"|\b(?:rent[\s-]?)?free\s+(?:for\s+)?(?:{_CW_NUM}\s+)?(?:full\s+)?"
+    r"(?:weeks?|months?)\b"
+    rf"|\b(?:first|1st)\s+(?:{_CW_NUM}\s+)?(?:full\s+)?months?\b"
+    r"[^.!?]{0,40}\bfree\b"
+    r"|\bfree\s+rent\b|\bmonths?\s+on\s+us\b"
+    r"|\$\s?\d{1,3}(?:,\d{3})*\s*(?:off|gift\s*card|credit|cash|savings|"
+    r"welcome\s+bonus)\b"
+    r"|\bsave\s+(?:up\s+to\s+)?\$\s?\d"
+    r"|\$\s?\d{2,5}\s+(?:welcome\s+)?bonus\b"
+    r"|\breduced\s+rents?\b|\brent\s+as\s+low\s+as\s+\$"
+    r"|\blook[\s-]*(?:and|&|\+|n)?[\s-]*lease\b"
+    r"|\b(?:move[- ]?in|mi)\s+special\b"
+    r"|\b(?:rent|lease|deposit|move[- ]?in)\s+special\b"
+    r"|\blimited[- ]time\s+(?:offer|special|savings|deal)\b"
+    r"|\breduced\s+deposit\b"
     r"|\bwaived\s+(?:application|admin(?:istration)?|amenity|"
-    r"move[- ]?in|deposit)\s*fee\b"
-    r"|\breduced\s+deposit\b|\bdeposit\s+special\b"
-    r"|\brent\s+special\b|\blease\s+special\b"
-    r"|\blimited[- ]time\s+(?:offer|special|savings)\b"
-    r"|\bfree\s+rent\b",
+    r"move[- ]?in|deposit)\s*fees?\b",
     re.IGNORECASE,
 )
 
@@ -485,23 +504,31 @@ async def scrape(
         elif isinstance(body, str):
             page_html = body
 
-    # --- Property-level concession capture (2026-05-19) ---
-    # The designed banner capture (vision_banner.py) is dormant/unwired
-    # and `result["concessions_text"]` was never produced by ANY path.
-    # Probe+eyeball proved RC/marketing /floorplans pages we ALREADY
-    # fetch carry the concession as plain HTML text (~5/8 sample;
-    # "One MONTH FREE!" etc.). Deterministic non-LLM phrase scrape over
-    # page_html — $0, no extra fetch, capture-first (store raw match).
-    # Property-level (concessions are property-wide). This is the
-    # missing producer feeding the existing v2 `concessions` field.
+    # --- Property-level concession capture (2026-05-19; window 2026-05-19b) ---
+    # Deterministic non-LLM phrase scrape over page_html — $0, no extra
+    # fetch, capture-first. The detector only TRIGGERS capture; we then
+    # store the enclosing CLAUSE WINDOW (not the bare regex fragment) so
+    # the downstream concession_normalize parser sees the full offer
+    # ("...REDUCED RENT + 6 Weeks FREE..." not just "6 Weeks FREE").
+    # concessions_text stays raw (capture-first); schema_v2 derives the
+    # structured concessions_json from it.
     if page_html and not result.get("concessions_text"):
         try:
-            _ctxt = re.sub(r"<[^>]+>", " ", page_html)
-            _cm = _PROPERTY_CONCESSION_RE.search(_ctxt)
+            _flat = re.sub(
+                r"\s+", " ", re.sub(r"<[^>]+>", " ", page_html)
+            )
+            _cm = _PROPERTY_CONCESSION_RE.search(_flat)
             if _cm:
-                result["concessions_text"] = re.sub(
-                    r"\s+", " ", _cm.group(0)
-                ).strip()[:200]
+                _s, _e = _cm.span()
+                _win = _flat[max(0, _s - 200):_e + 200]
+                _off = _s - max(0, _s - 200)
+                _seg, _acc = _win, 0
+                for _p in re.split(r"(?<=[.!?|•·])\s+", _win):
+                    if _acc <= _off < _acc + len(_p) + 1:
+                        _seg = _p
+                        break
+                    _acc += len(_p) + 1
+                result["concessions_text"] = _seg.strip()[:300]
         except Exception:
             pass
 
@@ -1183,6 +1210,45 @@ async def scrape(
                 )
         except Exception as exc:
             adapter_result.errors.append(f"generic-fallback-error: {exc}")
+
+    # --- Step 8b: Universal embed-recovery as the cross-vendor misroute net ---
+    # Closes the "detector picked the wrong primary, generic also returned 0,
+    # but the site really has an AppFolio iframe / LeaseLeads embed / ResMan
+    # portal / generic SSR plan grid one nav-hop deep" gap. The four
+    # recoveries are the same chain wired into wix/squarespace_nopms; here we
+    # also fire them when ANY non-syndication primary mis-routed.
+    # Idempotent: ``recover_universal_embed`` sets
+    # ``ctx._embed_recovery_attempted`` so the syndication adapters' inline
+    # run (when this is a wix/squarespace property) isn't repeated.
+    if not adapter_result.units and page is not None:
+        try:
+            from ma_poc.pms.adapters._universal_recovery import (
+                already_attempted as _ur_attempted,
+            )
+            from ma_poc.pms.adapters._universal_recovery import (
+                recover_universal_embed as _ur_recover,
+            )
+
+            if not _ur_attempted(ctx):
+                _ur_units, _ur_tier, _ur_winner = await _ur_recover(page, ctx)
+                if _ur_units:
+                    from ma_poc.extraction.post_process import (
+                        post_process as _ur_pp,
+                    )
+
+                    _ur_post = _ur_pp(
+                        _ur_units, property_id=getattr(ctx, "property_id", None)
+                    )
+                    if _ur_post.n_admitted > 0:
+                        adapter_result.units = _ur_post.admitted
+                        adapter_result.plan_summaries = _ur_post.plan_summaries
+                        adapter_result.tier_used = _ur_tier
+                        adapter_result.confidence = min(
+                            0.92, 0.65 + 0.04 * _ur_post.n_admitted
+                        )
+                        fallback_chain.append(f"universal_recovery:{_ur_winner}")
+        except Exception as exc:
+            adapter_result.errors.append(f"universal-recovery-error: {exc}")
 
     # --- Step 9: Populate legacy result ---
     result["units"] = adapter_result.units
