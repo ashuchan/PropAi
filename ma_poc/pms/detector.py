@@ -65,6 +65,7 @@ PmsName = Literal[
     "rentvision",
     "residentservices365",
     "encoreskyline_template",
+    "aspensquare",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -106,6 +107,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "rentvision": "dom_first",
     "residentservices365": "dom_first",
     "encoreskyline_template": "dom_first",
+    "aspensquare": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -228,6 +230,16 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
         "touchtour",
         0.85,
         "host ends in liveovation.com (Ovation parent portfolio)",
+    ),
+    # Aspen Square Management — multi-property operator on its own
+    # Strapi CMS at aspensquare.com. Community pages at
+    # /apartments/{st}/{city}/{community}/; unit roster at
+    # /floor-plans/{plan-slug}/ on the same domain.
+    (
+        re.compile(r"(?:^|\.)aspensquare\.com$"),
+        "aspensquare",
+        0.95,
+        "host ends in aspensquare.com (Aspen Square Management operator)",
     ),
     # Apts247 / RentDynamics — the JS widget + media assets serve from
     # apts247.info. The data API itself is same-origin on the property's
@@ -798,6 +810,7 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "rentvision": ("created by rentvision", "powered by rentvision", "rentvision.com"),
     "residentservices365": ("365residentservices.com",),
     "encoreskyline_template": ("jonahwidget", "jonahdigital", "meetelise"),
+    "aspensquare": ("aspensquare.com", "static.aspensquare.com"),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
     "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
     "rentmanager": (
