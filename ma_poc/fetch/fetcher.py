@@ -30,9 +30,10 @@ from .captcha_detect import looks_like_captcha
 from .clearance_jar import (
     CLEARANCE_COOKIE_NAMES,
     ClearanceJar,
-    _PROVIDER_DEFAULT_TTL,
-    _FALLBACK_TTL,
-    _extract_clearance_from_set_cookie,
+    FALLBACK_TTL,
+    PROVIDER_DEFAULT_TTL,
+    extract_clearance_from_set_cookie,
+    provider_from_cookie_name,
     ua_hash as _ua_hash,
 )
 from .conditional import ConditionalCache
@@ -586,20 +587,24 @@ class Fetcher:
             if self._clearance_jar is not None:
                 try:
                     _sc_header = (last_result.headers or {}).get("set-cookie", "")
-                    _clearance_found = _extract_clearance_from_set_cookie(
+                    _clearance_found = extract_clearance_from_set_cookie(
                         _sc_header, last_result.headers or {}
                     )
                     if _clearance_found:
                         _c_host = urlparse(task.url).netloc
                         _c_proxy_ip = _extract_proxy_ip(proxy)
                         _c_ua_hash = _ua_hash(identity.user_agent, identity.accept_language)
-                        # Determine provider from the last captcha_provider we saw.
-                        _c_provider = captcha_provider or "unknown"
-                        _c_ttl = _PROVIDER_DEFAULT_TTL.get(_c_provider, _FALLBACK_TTL)
-                        self._clearance_jar.store(
-                            _c_host, _c_proxy_ip, _c_ua_hash,
-                            _c_provider, _clearance_found, _c_ttl,
-                        )
+                        for _ck_name, _ck_value in _clearance_found.items():
+                            # Infer provider from the cookie name for accurate TTL.
+                            # captcha_provider is None on successful (non-challenge)
+                            # responses, so the name-based lookup is the only reliable
+                            # source here.
+                            _c_provider = provider_from_cookie_name(_ck_name)
+                            _c_ttl = PROVIDER_DEFAULT_TTL.get(_c_provider, FALLBACK_TTL)
+                            self._clearance_jar.store(
+                                _c_host, _c_proxy_ip, _c_ua_hash,
+                                _c_provider, {_ck_name: _ck_value}, _c_ttl,
+                            )
                 except Exception as _cj_exc:
                     log.debug("clearance_jar opportunistic store failed: %s", _cj_exc)
 

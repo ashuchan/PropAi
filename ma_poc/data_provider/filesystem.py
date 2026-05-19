@@ -640,8 +640,8 @@ class CsvPropertyCatalogSource(IPropertyCatalogSource):
             (i, p) for i, p in enumerate(normal)
         ]
         for host, rows in hd_by_host.items():
-            base_offset = _h(host + str(shard_index)) % max(1, n // 2)
-            spread = max(1, _h(host) % 30)
+            base_offset = _h(host + str(shard_index)) % max(1, n)
+            spread = max(3, _h(host) % 30)
             for pos_within_host, pair in enumerate(rows):
                 target = (base_offset + pos_within_host * spread) % n
                 positioned.append((target, pair))

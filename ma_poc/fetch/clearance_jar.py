@@ -47,20 +47,41 @@ CLEARANCE_COOKIE_NAMES: frozenset[str] = frozenset({
     "sg-cookies",       # SiteGround alternative name
     "_pxhd",            # PerimeterX
     "_pxde",            # PerimeterX device token
-    "__hssc",           # HubSpot bot guard (session)
-    "__hstc",           # HubSpot bot guard (persistent)
 })
 
 # Provider → default TTL in seconds when the cookie doesn't carry its own
 # ``Expires`` or ``Max-Age`` attribute.
-_PROVIDER_DEFAULT_TTL: dict[str, int] = {
+PROVIDER_DEFAULT_TTL: dict[str, int] = {
     "cloudflare": 1800,     # 30 min
     "sgcaptcha":  43200,    # 12 hours
     "perimeterx": 3600,     # 1 hour
     "hcaptcha":   3600,
     "recaptcha":  3600,
 }
-_FALLBACK_TTL: int = 1800  # 30 min when provider unknown
+FALLBACK_TTL: int = 1800  # 30 min when provider unknown
+
+# Cookie name → WAF provider — used to infer TTL when the captcha detector
+# hasn't fired (opportunistic Set-Cookie capture on successful responses).
+_COOKIE_NAME_TO_PROVIDER: dict[str, str] = {
+    "cf_clearance":  "cloudflare",
+    "__cf_bm":       "cloudflare",
+    "srcfh-cookie":  "sgcaptcha",
+    "sg-cookies":    "sgcaptcha",
+    "_pxhd":         "perimeterx",
+    "_pxde":         "perimeterx",
+}
+
+
+def provider_from_cookie_name(cookie_name: str) -> str:
+    """Infer the WAF provider from a clearance cookie name.
+
+    Returns the provider string (e.g. ``"cloudflare"``) when the name is
+    recognised, or ``"unknown"`` otherwise.  Used by the fetcher to
+    select the correct default TTL when the captcha detector hasn't run
+    (e.g. on a successful 200 response that opportunistically carries a
+    clearance cookie in its Set-Cookie header).
+    """
+    return _COOKIE_NAME_TO_PROVIDER.get(cookie_name, "unknown")
 
 _DDL = """
 CREATE TABLE IF NOT EXISTS clearance_cookies (
@@ -299,7 +320,7 @@ class ClearanceJar:
 # ── Utility: parse clearance cookies from HTTP Set-Cookie headers ─────────────
 
 
-def _extract_clearance_from_set_cookie(
+def extract_clearance_from_set_cookie(
     set_cookie_header: str,
     all_headers: dict[str, str],
 ) -> dict[str, str]:

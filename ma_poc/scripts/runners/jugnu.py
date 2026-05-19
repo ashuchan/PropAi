@@ -610,7 +610,7 @@ async def run_jugnu(
                     _pid_r,
                     resolution="SKIPPED_DOMAIN_QUARANTINED",
                     verdict=(_meta_r.get("verdict") or "UNKNOWN"),
-                    domain_quarantined=bool(_meta_r.get("domain_quarantined_in_run")),
+                    domain_quarantined_in_run=bool(_meta_r.get("domain_quarantined_in_run")),
                 )
             except Exception:
                 pass

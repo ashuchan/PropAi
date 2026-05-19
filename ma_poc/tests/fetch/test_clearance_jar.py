@@ -6,7 +6,7 @@ Verifies:
   - Concurrent-write safety (SQLite WAL mode; two jars on the same DB)
   - Upsert semantics (store updates value + expiry for existing key)
   - ua_hash() stability — same input produces the same output
-  - _extract_clearance_from_set_cookie() parses the known cookie names
+  - extract_clearance_from_set_cookie() parses the known cookie names
   - close() / context-manager behaviour
 """
 
@@ -22,7 +22,7 @@ import pytest
 from ma_poc.fetch.clearance_jar import (
     CLEARANCE_COOKIE_NAMES,
     ClearanceJar,
-    _extract_clearance_from_set_cookie,
+    extract_clearance_from_set_cookie,
     ua_hash,
 )
 
@@ -204,24 +204,24 @@ def test_concurrent_writes_are_safe(tmp_path: Path):
     assert not errors, f"concurrent write errors: {errors}"
 
 
-# ── _extract_clearance_from_set_cookie ───────────────────────────────────────
+# ── extract_clearance_from_set_cookie ───────────────────────────────────────
 
 
 def test_extract_cf_clearance():
     hdr = "cf_clearance=TOK123; Path=/; Secure; HttpOnly; SameSite=None; Max-Age=1800"
-    result = _extract_clearance_from_set_cookie(hdr, {})
+    result = extract_clearance_from_set_cookie(hdr, {})
     assert result == {"cf_clearance": "TOK123"}
 
 
 def test_extract_cf_bm():
     hdr = "__cf_bm=BMBM; Path=/; Secure; SameSite=None"
-    result = _extract_clearance_from_set_cookie(hdr, {})
+    result = extract_clearance_from_set_cookie(hdr, {})
     assert result == {"__cf_bm": "BMBM"}
 
 
 def test_extract_ignores_non_clearance_cookies():
     hdr = "sessionid=abc123; Path=/; HttpOnly"
-    result = _extract_clearance_from_set_cookie(hdr, {})
+    result = extract_clearance_from_set_cookie(hdr, {})
     assert result == {}
 
 
@@ -230,12 +230,12 @@ def test_extract_from_headers_dict():
         "set-cookie": "cf_clearance=DICT_TOK; Path=/; Secure",
         "content-type": "text/html",
     }
-    result = _extract_clearance_from_set_cookie("", headers)
+    result = extract_clearance_from_set_cookie("", headers)
     assert result.get("cf_clearance") == "DICT_TOK"
 
 
 def test_extract_empty_inputs():
-    assert _extract_clearance_from_set_cookie("", {}) == {}
+    assert extract_clearance_from_set_cookie("", {}) == {}
 
 
 def test_clearance_cookie_names_set_includes_known_names():
