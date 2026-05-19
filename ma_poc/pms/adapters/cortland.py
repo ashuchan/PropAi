@@ -113,6 +113,19 @@ def parse_cortland_units(floorplans: dict[str, Any], url: str) -> list[dict[str,
         sqft_raw = fp.get("square_feet")
         sqft = str(sqft_raw) if sqft_raw not in (None, "", 0) else ""
 
+        # 2026-05-19 capture-first: Cortland preload carries a specials/
+        # concession flag/text at floorplan level (probe saw
+        # `specials_flag` + concession phrases). Alias-tolerant; raw
+        # passthrough; empty when no active special (correct, not a bug).
+        _conc = ""
+        for _ck in ("specials", "special", "concession", "concessions",
+                    "specials_description", "specials_text", "promotion",
+                    "offer", "incentive"):
+            _cv = fp.get(_ck)
+            if isinstance(_cv, str) and _cv.strip():
+                _conc = _cv.strip()
+                break
+
         availprice = fp.get("availprice")
         if not isinstance(availprice, dict):
             continue
@@ -138,6 +151,7 @@ def parse_cortland_units(floorplans: dict[str, Any], url: str) -> list[dict[str,
                     rent_high=rent,
                     availability_status="AVAILABLE",
                     availability_date=avail_date,
+                    concession=_conc,
                     source_api_url=url,
                     extraction_tier=OLL_TIER,
                 )

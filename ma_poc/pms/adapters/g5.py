@@ -46,9 +46,19 @@ _G5_URN_RE = re.compile(r"g5-cl-[a-z0-9]+(?:-[a-z0-9]+)*", re.IGNORECASE)
 # GraphQL query — returns the unit + floor-plan join in one round trip.
 # perPage:200 covers any normal property; pagination would need the API's
 # total-count hint (not currently used).
+# 2026-05-19: concession fields added — HAR-confirmed valid on
+# ``apartmentComplex`` (morgan-properties browser query returned 200
+# with these exact fields). G5 specials are property/floorplan-level:
+# ``hasApartmentSpecials``/``hasFloorplanSpecials`` (bool) +
+# ``floorplans[].floorplanSpecials`` (array, joined by floorplan id).
+# No auth token (scalable). NOTE: value-shape of floorplanSpecials is
+# INFERRED (the captured HAR property had no active special, [] /
+# false) — parsed defensively; revalidate when a populated G5 special
+# is observed.
 _G5_UNITS_QUERY = (
     "query($urn:String!){apartmentComplex(locationUrn:$urn){"
-    "id name "
+    "id name hasApartmentSpecials hasFloorplanSpecials "
+    "floorplans{id name floorplanSpecials} "
     "apartments(perPage:200){"
     "id name displayName building availabilityDate sqftDisplay "
     "prices{value formattedPrice priceType} "
@@ -122,10 +132,40 @@ def _sqft_to_int(val: Any) -> int | None:
     return None
 
 
+def _g5_specials_to_str(val: Any) -> str:
+    """Defensive: G5 floorplanSpecials value-shape is inferred (no
+    populated HAR example). Coerce list[str] / list[dict] / str / dict
+    → a single raw string, capture-first. '' when absent."""
+    if not val:
+        return ""
+    if isinstance(val, str):
+        return val.strip()
+    if isinstance(val, dict):
+        for k in ("description", "title", "text", "name", "value"):
+            if isinstance(val.get(k), str) and val[k].strip():
+                return val[k].strip()
+        return ""
+    if isinstance(val, list):
+        parts: list[str] = []
+        for it in val:
+            s = _g5_specials_to_str(it)
+            if s:
+                parts.append(s)
+        return " | ".join(parts)
+    return ""
+
+
 def parse_g5_apartments(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Convert G5's ``apartmentComplex.apartments`` list into unit dicts."""
     ac = (payload.get("data") or {}).get("apartmentComplex") or {}
     apts = ac.get("apartments") or []
+    # Map floorplanId -> concession text (HAR-confirmed schema path).
+    _fp_spec: dict[Any, str] = {}
+    for _fp in ac.get("floorplans") or []:
+        if isinstance(_fp, dict):
+            _s = _g5_specials_to_str(_fp.get("floorplanSpecials"))
+            if _s:
+                _fp_spec[_fp.get("id")] = _s
     out: list[dict[str, Any]] = []
     for a in apts:
         if not isinstance(a, dict):
@@ -152,6 +192,7 @@ def parse_g5_apartments(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "availability_status": "AVAILABLE",
                 "availability_date": str(avail)[:30],
                 "building": str(a.get("building") or ""),
+                "concession": _fp_spec.get(fp.get("id"), ""),
                 "extraction_tier": _TIER_BASE,
             }
         )

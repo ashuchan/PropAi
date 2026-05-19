@@ -26,6 +26,7 @@ unset ⇒ no escalation (safe default, no functional change off-canary).
 """
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import os
@@ -35,6 +36,54 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 _DEFAULTS = {"impersonate": "chrome120", "timeout": 25, "allow_redirects": True}
+
+# Cookie-mint reuse (option b, 2026-05-18). The fetcher's patchright
+# render solves the CF/DataDome challenge and harvests the clearance
+# cookies onto FetchResult.clearance_cookies; scraper.scrape() installs
+# them here for the duration of one property's adapter dispatch. The
+# probes below auto-attach them so the cheap curl_cffi active-fetch
+# (MAAC/Irvine/Cortland/Essex/Equity/SightMap-iframe) reuses the solved
+# clearance instead of hitting the wall again. ContextVar ⇒ per-asyncio-
+# task isolation: concurrent property scrapes never share clearance.
+# Empty by default ⇒ no behaviour change off the cookie-mint path.
+_clearance_cookies: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar(
+    "probe_clearance_cookies", default=None
+)
+
+
+def set_clearance_cookies(
+    cookies: dict[str, str] | None,
+) -> contextvars.Token[dict[str, str] | None]:
+    """Install clearance cookies for the current task; returns a reset token.
+
+    Caller MUST ``reset_clearance_cookies(token)`` in a ``finally`` so the
+    cookies don't bleed into the next property scraped on this task.
+    """
+    return _clearance_cookies.set(dict(cookies) if cookies else {})
+
+
+def reset_clearance_cookies(token: contextvars.Token[dict[str, str] | None]) -> None:
+    """Restore the clearance-cookie contextvar to its prior value."""
+    try:
+        _clearance_cookies.reset(token)
+    except (ValueError, LookupError):
+        pass
+
+
+def _with_clearance(opts: dict[str, Any]) -> dict[str, Any]:
+    """Merge task-scoped clearance cookies under any explicit ``cookies=``.
+
+    Explicit per-call cookies win on key collision (the adapter knows its
+    own endpoint better than a generic CF cookie). No-op when no clearance
+    has been minted for this task.
+    """
+    minted = _clearance_cookies.get() or {}
+    if not minted:
+        return opts
+    explicit = opts.get("cookies") or {}
+    if isinstance(explicit, dict):
+        opts["cookies"] = {**minted, **explicit}
+    return opts
 _WU_API = "https://api.brightdata.com/request"
 _WU_BLOCK_STATUS = {403, 429, 503}
 
@@ -136,7 +185,7 @@ def probe_get(url: str, **kw: Any) -> Any:
     """
     from curl_cffi import requests as _creq
 
-    opts: dict[str, Any] = {**_DEFAULTS, **kw}
+    opts: dict[str, Any] = _with_clearance({**_DEFAULTS, **kw})
     px = probe_proxies()
     if px:
         opts.setdefault("proxies", px)
@@ -173,7 +222,7 @@ def probe_post(url: str, data: Any = None, **kw: Any) -> Any:
     """
     from curl_cffi import requests as _creq
 
-    opts: dict[str, Any] = {**_DEFAULTS, **kw}
+    opts: dict[str, Any] = _with_clearance({**_DEFAULTS, **kw})
     px = probe_proxies()
     if px:
         opts.setdefault("proxies", px)

@@ -26,6 +26,7 @@ from ..config.feature_flags import ENABLE_TIER_ESCALATION
 from ..discovery.contracts import CrawlTask
 from ..observability.events import EventKind, emit
 from .browser_pool import BrowserContextPool
+from .camoufox_pool import get_browser_pool
 from .captcha_detect import looks_like_captcha
 from .conditional import ConditionalCache
 from .contracts import FetchOutcome, FetchResult, FetchTier, RenderMode
@@ -102,6 +103,37 @@ _DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
 _MAX_FETCH_BYTES = int(os.getenv("MAX_FETCH_BYTES", str(16_000_000)))
 
 log = logging.getLogger(__name__)
+
+# Cookie-mint reuse (option b): exact names + prefixes of the bot-wall
+# clearance cookies worth reusing. cf_clearance/__cf_bm = Cloudflare,
+# datadome/__ddg* = DataDome, incap_ses*/visid_incap* = Imperva/Incapsula.
+# Anything else from the context is session noise we deliberately drop
+# (smaller jar, no cross-property identity bleed).
+_CLEARANCE_EXACT = {"cf_clearance", "__cf_bm", "datadome"}
+_CLEARANCE_PREFIX = ("__ddg", "incap_ses", "visid_incap", "nlbi_")
+
+
+async def _harvest_clearance_cookies(page: Any) -> dict[str, str]:
+    """Return ``{name: value}`` of bot-wall clearance cookies from *page*.
+
+    Reads the live Playwright browser context (post-challenge). Returns
+    only the CF/DataDome/Incapsula clearance cookies — never the full
+    cookie set — so reuse can't leak a session/identity cookie into the
+    cheap curl_cffi probe. Best-effort: any error yields ``{}`` (callers
+    then behave exactly as before option b).
+    """
+    try:
+        cookies = await page.context.cookies()
+    except Exception:
+        return {}
+    out: dict[str, str] = {}
+    for c in cookies or []:
+        name = c.get("name") or ""
+        if name in _CLEARANCE_EXACT or name.startswith(_CLEARANCE_PREFIX):
+            val = c.get("value")
+            if val:
+                out[name] = val
+    return out
 
 
 class Fetcher:
@@ -1027,6 +1059,19 @@ class Fetcher:
             resp_headers = {k.lower(): v for k, v in (resp.headers if resp else {}).items()}
             body_head = body[:4096]
 
+            # Cookie-mint reuse (option b): harvest the clearance cookies the
+            # patchright context just earned by passing the CF/DataDome
+            # challenge, so the cheap curl_cffi active-fetch in the API
+            # adapters can reuse the solved clearance instead of hitting the
+            # wall again. Best-effort; failure just yields the pre-(b)
+            # blocked-probe behaviour.
+            clearance_cookies = await _harvest_clearance_cookies(page)
+            if clearance_cookies:
+                log.info(
+                    "fetch.clearance_cookies_minted url=%s names=%s",
+                    task.url, ",".join(sorted(clearance_cookies)),
+                )
+
             if nav_exc is not None:
                 # Timeout/abort but body salvaged. If the salvaged page looks
                 # like a Cloudflare/reCAPTCHA interstitial, mark BOT_BLOCKED so
@@ -1068,6 +1113,7 @@ class Fetcher:
                 last_modified=resp_headers.get("last-modified"),
                 error_signature=sig,
                 proxy_used=_redact_proxy(proxy),
+                clearance_cookies=clearance_cookies,
             )
         except Exception as exc:
             outcome, sig = classify(None, {}, None, exception=exc)
@@ -1206,7 +1252,15 @@ def get_default_fetcher() -> Fetcher:
             robots=RobotsConsumer(),
             cond_cache=ConditionalCache(cache_dir / "conditional.sqlite"),
             identities=IdentityPool(),
-            browsers=BrowserContextPool(max_contexts=int(os.getenv("MAX_CONCURRENT_BROWSERS", "5"))),
+            # Camoufox escalation rung: get_browser_pool() returns the
+            # patchright BrowserContextPool unless ENABLE_CAMOUFOX=true AND
+            # camoufox is importable, in which case it returns the
+            # structurally-identical CamoufoxPool (Firefox/Gecko — passes
+            # some CF JS challenges patchright fails). Flag-off ⇒ byte-
+            # identical to the prior direct construction (zero blast
+            # radius). Composes with cookie-mint (b): camoufox passes the
+            # wall, (b) harvests its clearance cookie for cheap reuse.
+            browsers=get_browser_pool(max_contexts=int(os.getenv("MAX_CONCURRENT_BROWSERS", "5"))),
             retry=RetryPolicy(),
         )
     return _default

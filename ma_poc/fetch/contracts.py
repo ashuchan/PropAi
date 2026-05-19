@@ -86,6 +86,16 @@ class FetchResult:
     # pms/scraper.py can short-circuit instead of feeding interstitial HTML
     # into the LLM. Default False so all pre-F1.2 callers stay valid.
     captcha_detected: bool = False
+    # Cookie-mint reuse (option b, 2026-05-18): clearance cookies
+    # (cf_clearance / __cf_bm / datadome / __ddg* / incap*) harvested from
+    # the patchright context AFTER it passed the JS/managed challenge, as
+    # a flat ``{name: value}`` map. scraper.py threads these into a
+    # contextvar so the cheap curl_cffi active-fetch in MAAC/Irvine/
+    # Cortland/Essex/Equity/SightMap-iframe adapters reuses the solved
+    # clearance instead of hitting the wall again. Same-run, same-egress-IP
+    # only (cf_clearance is IP+UA bound); empty when render didn't solve a
+    # challenge. Default empty so all pre-(b) callers stay valid.
+    clearance_cookies: dict[str, str] = field(default_factory=dict)
 
     def ok(self) -> bool:
         """True when fetch succeeded with a 2xx response."""

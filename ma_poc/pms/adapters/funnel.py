@@ -46,6 +46,7 @@ Key findings:
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
@@ -64,6 +65,116 @@ _TIER_BASE = "TIER_1_API_FUNNEL"
 _TIER_NO_RESPONSE = f"{_TIER_BASE}_NO_RESPONSE"
 _TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
 _TIER_LIST_EMPTY = f"{_TIER_BASE}_LIST_EMPTY"
+# Funnel "Spaces" frontend widget SSR fallback. Funnel customers on the
+# WordPress "Spaces" theme (Windsor et al.) render every unit server-side
+# as <article class="spaces-unit" data-spaces-*> and call nestiolistings
+# server-side — so no nestio XHR is ever captured and the API path above
+# yields LIST_EMPTY/SHAPE_REJECTED even though full unit-level data is in
+# the page HTML. 2026-05-18 (HAR www.windsorcommunities.com): proven
+# 46/46 units on windsor-addison, all with unit#+price+bed/bath+area+
+# plan+avail-date. Deterministic — pure data-attribute extraction.
+_TIER_SPACES_SSR = "TIER_1_DOM_FUNNEL_SPACES"
+
+_SPACES_ARTICLE_RE = re.compile(
+    r'<article[^>]*\bclass="[^"]*\bspaces-unit\b[^"]*"[^>]*>', re.IGNORECASE
+)
+
+
+def _spaces_attr(tag: str, name: str) -> str:
+    """Return the value of HTML attribute *name* in *tag*, or ''."""
+    m = re.search(r'\b' + re.escape(name) + r'="([^"]*)"', tag, re.IGNORECASE)
+    return m.group(1).strip() if m else ""
+
+
+def parse_funnel_spaces_ssr(html: str, source_url: str) -> list[dict[str, str]]:
+    """Parse Funnel "Spaces" SSR markup into unit-level dicts.
+
+    Each available unit is one ``<article class="spaces-unit"
+    data-spaces-obj="unit" ...>`` carrying a complete data-attribute set:
+    ``data-spaces-unit`` (unit number), ``data-spaces-sort-price``,
+    ``data-spaces-sort-bed/bath/area``, ``data-spaces-sort-plan-name``,
+    ``data-spaces-soonest`` (avail date), ``data-spaces-available``.
+    Returns ``[]`` when the markup is absent (caller falls through).
+    """
+    if not html or "spaces-unit" not in html:
+        return []
+    units: list[dict[str, str]] = []
+    for m in _SPACES_ARTICLE_RE.finditer(html):
+        tag = m.group(0)
+        if _spaces_attr(tag, "data-spaces-obj") != "unit":
+            continue
+        unit_no = _spaces_attr(tag, "data-spaces-unit")
+        if not unit_no:
+            continue
+        price = _spaces_attr(tag, "data-spaces-sort-price")
+        rent = money_to_int(price) if price else None
+        beds = _spaces_attr(tag, "data-spaces-sort-bed")
+        baths = _spaces_attr(tag, "data-spaces-sort-bath")
+        plan = _spaces_attr(tag, "data-spaces-sort-plan-name")
+        try:
+            beds_int = int(beds) if beds not in ("", None) else None
+        except ValueError:
+            beds_int = None
+        avail = _spaces_attr(tag, "data-spaces-available") == "true"
+        units.append(
+            make_unit_dict(
+                floor_plan_name=plan,
+                bed_label=bed_label_from(beds_int, plan),
+                bedrooms=beds,
+                bathrooms=baths,
+                sqft=_spaces_attr(tag, "data-spaces-sort-area"),
+                unit_number=unit_no,
+                rent_low=rent,
+                rent_high=rent,
+                availability_status="AVAILABLE" if avail else "UNAVAILABLE",
+                availability_date=_spaces_attr(tag, "data-spaces-soonest"),
+                source_api_url=source_url,
+                extraction_tier=_TIER_SPACES_SSR,
+            )
+        )
+    return units
+
+
+# Funnel "Spaces" sites (Windsor et al.) put the unit list on the
+# ``…/properties/<slug>/floorplans/`` sub-page, NOT the landing page the
+# pipeline fetches (vanity domains 301 → windsorcommunities.com/
+# properties/<slug>/). The landing page is gated by the WordPress
+# "wincommunities"/Spaces theme and links to floorplans/ — so when the
+# current HTML is a Spaces landing page WITHOUT spaces-unit markup,
+# resolve the one floorplans/ link and probe it. Deterministic, single
+# extra GET, gated tightly so it never fires on non-Spaces Funnel sites.
+_SPACES_SITE_MARKERS = ("wincommunities", "data-spaces", "spaces_get_",
+                        "spaces_tab=")
+_SPACES_FP_HREF_RE = re.compile(
+    r'href="([^"]*?/?floorplans/?(?:\?[^"]*)?)"', re.IGNORECASE
+)
+
+
+def _spaces_floorplans_url(html: str, base_url: str) -> str | None:
+    """Return the absolute Spaces ``…/floorplans/`` URL, or None.
+
+    Gated on a Spaces/wincommunities marker so it only fires for the
+    Funnel-Spaces SSR cluster. Resolves the floorplans href against
+    *base_url* (the post-redirect landing URL).
+    """
+    if not html or not base_url:
+        return None
+    if not any(m in html for m in _SPACES_SITE_MARKERS):
+        return None
+    from urllib.parse import urljoin
+
+    best: str | None = None
+    for m in _SPACES_FP_HREF_RE.finditer(html):
+        href = m.group(1)
+        absu = href if href.startswith("http") else urljoin(base_url, href)
+        # Prefer the bare floorplans/ page over filtered (?spaces_tab=…)
+        # variants so we get the full unit list.
+        if "?" not in absu:
+            return absu
+        best = best or absu
+    return best
+
+
 _TIER_PARSE_ZERO = f"{_TIER_BASE}_PARSE_ZERO"
 
 
@@ -248,6 +359,16 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
 
         avail_date = str(_pick(row, "availabilityDate", "availabilitydate", "available_on") or "")
         floor = str(_pick(row, "floor", "floorNumber") or "")
+        # 2026-05-19 capture-first: Funnel/Nestio carries concession in
+        # the schema (incentives_marketing_description / special_offers /
+        # incentives). Often empty (no active special — correct, not a
+        # bug) but capture raw when present; v2's widened concession
+        # alias chain maps it.
+        concession = str(_pick(
+            row, "incentives_marketing_description", "special_offers",
+            "incentives", "concession", "concessions", "specials",
+            "specials_description",
+        ) or "")
 
         units.append(
             make_unit_dict(
@@ -265,6 +386,7 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
                 availability_status="AVAILABLE" if avail_date else "AVAILABLE",
                 available_units="1",
                 availability_date=avail_date,
+                concession=concession,
                 source_api_url=url,
                 extraction_tier=_TIER_BASE,
             )
@@ -356,6 +478,54 @@ class FunnelAdapter:
                 f"FUNNEL_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
                 f"failed unit_validity (no numeric dimension)"
             )
+
+        # Funnel "Spaces" SSR fallback: customers on the WordPress Spaces
+        # theme call nestiolistings server-side and render units into the
+        # page, so no nestio XHR is ever captured (the API path above
+        # always LIST_EMPTY/SHAPE_REJECTED). The full unit-level data is
+        # in the rendered page HTML as data-spaces-* article markup.
+        try:
+            from ma_poc.pms.adapters.generic import _get_page_html
+
+            _sp_html = await _get_page_html(page, ctx)
+        except Exception:
+            _sp_html = ""
+        _fr = getattr(ctx, "fetch_result", None)
+        _final = str(getattr(_fr, "final_url", "") or "") if _fr else ""
+        _src = _final or str(getattr(ctx, "base_url", "") or "")
+        # Spaces landing page (no spaces-unit) → hop to the floorplans/
+        # sub-page where the SSR unit list lives.
+        if _sp_html and "spaces-unit" not in _sp_html:
+            _fp_url = _spaces_floorplans_url(_sp_html, _src)
+            if _fp_url:
+                try:
+                    from ma_poc.pms.adapters._probe import probe_get
+
+                    _fpr = probe_get(_fp_url, timeout=20)
+                    if _fpr.status_code == 200 and _fpr.text and (
+                        "spaces-unit" in _fpr.text
+                    ):
+                        _sp_html = _fpr.text
+                        _src = _fp_url
+                except Exception as _fp_exc:
+                    result.errors.append(
+                        f"funnel-spaces-floorplans-hop-error: "
+                        f"{type(_fp_exc).__name__}: {str(_fp_exc)[:100]}"
+                    )
+        if _sp_html and "spaces-unit" in _sp_html:
+            _sp_units = parse_funnel_spaces_ssr(_sp_html, _src)
+            if _sp_units:
+                from ma_poc.extraction.post_process import post_process
+
+                _sp_pp = post_process(
+                    _sp_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _sp_pp.n_admitted > 0:
+                    result.units = _sp_pp.admitted
+                    result.plan_summaries = _sp_pp.plan_summaries
+                    result.tier_used = _TIER_SPACES_SSR
+                    result.confidence = min(0.92, 0.7 + 0.04 * _sp_pp.n_admitted)
+                    return result
 
         tier_code, err_msg = _classify_funnel_failure(api_responses)
         result.tier_used = tier_code

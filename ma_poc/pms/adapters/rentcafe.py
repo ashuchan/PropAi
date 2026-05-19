@@ -375,6 +375,37 @@ class RentCafeAdapter:
 
             pp = post_process(all_units, property_id=getattr(ctx, "property_id", None))
             if pp.n_admitted > 0:
+                # 2026-05-18 (canary deep-probe): the network getFloorplans
+                # XHR returns FLOORPLAN aggregates only ("4 available, from
+                # $1,465"), not unit-level. Returning here stamps
+                # SUCCESS_PLAN_LEVEL and never drills to the securecafe
+                # online-leasing portal — yet that portal carries the real
+                # unit-level inventory and is curl_cffi-reachable for 84%
+                # of brochure + 67% of has-inventory RC residual (sc_gap
+                # probe, 112 sites, CF-walled=0). So when the admitted set
+                # is plan-level ONLY (no unit_number), attempt the
+                # securecafe drill-down BEFORE returning; prefer unit-level,
+                # fall back to this plan-level result if it fails.
+                _has_unit_level = any(
+                    str(u.get("unit_number") or "").strip() for u in pp.admitted
+                )
+                if not _has_unit_level:
+                    sc_units = await _try_rentcafe_securecafe_probe(ctx, result)
+                    if sc_units:
+                        sc_pp = post_process(
+                            sc_units,
+                            property_id=getattr(ctx, "property_id", None),
+                        )
+                        if sc_pp.n_admitted > 0:
+                            result.units = sc_pp.admitted
+                            result.plan_summaries = sc_pp.plan_summaries
+                            result.tier_used = f"{_TIER_BASE}_SECURECAFE"
+                            result.confidence = min(
+                                0.92, 0.7 + 0.04 * sc_pp.n_admitted
+                            )
+                            return result
+                # Unit-level already present, or securecafe drill-down
+                # unavailable: return the network getFloorplans result.
                 # Stage 2: surface unit-level AND plan-level lists. The
                 # runner promotes ``plan_summaries`` into the V2 record's
                 # ``floor_plans[]`` field; verdict treats a property with
@@ -634,6 +665,15 @@ _SC_SQFT_RE = re.compile(r"data-label=['\"]?Sq\.?Ft\.?['\"]?[^>]*>\s*([\d,]+)", 
 _SC_RENT_RE = re.compile(
     r"data-label=['\"]?Rent['\"]?[^>]*>\s*\$?\s*([\d,]+)\s*(?:-\s*\$?\s*([\d,]+))?", re.I
 )
+# 2026-05-18: securecafe AvailUnitRow has a ``data-label='Date Available'``
+# cell (inner text e.g. "Available" or a "6/25/26" date). The parser
+# previously ignored it ⇒ TIER_1_API_RENTCAFE_SECURECAFE (21.6k units)
+# had 0% available_date. Cell may wrap the value in a <span>; capture
+# the inner HTML and strip tags. schema_v2._format_date normalizes
+# "Available"/"M/D/YY" forms.
+_SC_DATE_RE = re.compile(
+    r"data-label=['\"]?Date Available['\"]?[^>]*>(.*?)</td>", re.I | re.S
+)
 
 
 def _find_securecafe_base(html: str, ctx: AdapterContext) -> str | None:
@@ -715,6 +755,11 @@ def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str
             if rent_m:
                 rent_low = money_to_int(rent_m.group(1))
                 rent_high = money_to_int(rent_m.group(2)) if rent_m.group(2) else rent_low
+            date_m = _SC_DATE_RE.search(row)
+            avail_date = ""
+            if date_m:
+                avail_date = re.sub(r"<[^>]+>", " ", date_m.group(1))
+                avail_date = re.sub(r"\s+", " ", avail_date).strip()
             units.append(
                 make_unit_dict(
                     floor_plan_name=fp_name,
@@ -725,6 +770,7 @@ def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str
                     rent_low=rent_low,
                     rent_high=rent_high,
                     availability_status="AVAILABLE",
+                    availability_date=avail_date,
                     source_api_url=source_url,
                     extraction_tier="TIER_1_API_RENTCAFE_SECURECAFE",
                 )

@@ -20,6 +20,10 @@ import urllib.parse
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from ma_poc.pms.adapters._probe import (
+    reset_clearance_cookies,
+    set_clearance_cookies,
+)
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.adapters.registry import get_adapter
 from ma_poc.pms.detector import (
@@ -201,6 +205,25 @@ _RICH_HOP_JSONLD_MARKERS = ("FloorPlan", "ApartmentComplex", "Apartment\"")
 # the body. Five distinct hits is uncommon outside an actual pricing page.
 _RICH_HOP_RENT_TOKEN_RE = re.compile(r"\$\d{3,4}")
 _RICH_HOP_MIN_RENT_TOKENS = 5
+
+# Property-level concession/special phrasing on marketing/RC pages.
+# Deterministic, capture-first (raw matched phrase). Real patterns
+# observed on RC /floorplans (probe 2026-05-19): "1 Month FREE",
+# "8 Weeks Free", "Move-in Special", "Look & Lease", "$X off".
+_PROPERTY_CONCESSION_RE = re.compile(
+    r"\b\d+\s*(?:weeks?|months?)\s*(?:of\s*)?free(?:\s*rent)?\b"
+    r"|\b(?:one|two|three|first)\s+months?\s+free\b"
+    r"|\blook\s*&?\s*lease\b"
+    r"|\bmove[- ]?in\s+special\b"
+    r"|\$\s?\d{2,4}\s*(?:off|gift\s*card|credit|cash|savings)\b"
+    r"|\bwaived\s+(?:application|admin(?:istration)?|amenity|"
+    r"move[- ]?in|deposit)\s*fee\b"
+    r"|\breduced\s+deposit\b|\bdeposit\s+special\b"
+    r"|\brent\s+special\b|\blease\s+special\b"
+    r"|\blimited[- ]time\s+(?:offer|special|savings)\b"
+    r"|\bfree\s+rent\b",
+    re.IGNORECASE,
+)
 
 
 def _link_hop_is_rich(fetch_result: Any) -> bool:
@@ -462,6 +485,26 @@ async def scrape(
         elif isinstance(body, str):
             page_html = body
 
+    # --- Property-level concession capture (2026-05-19) ---
+    # The designed banner capture (vision_banner.py) is dormant/unwired
+    # and `result["concessions_text"]` was never produced by ANY path.
+    # Probe+eyeball proved RC/marketing /floorplans pages we ALREADY
+    # fetch carry the concession as plain HTML text (~5/8 sample;
+    # "One MONTH FREE!" etc.). Deterministic non-LLM phrase scrape over
+    # page_html — $0, no extra fetch, capture-first (store raw match).
+    # Property-level (concessions are property-wide). This is the
+    # missing producer feeding the existing v2 `concessions` field.
+    if page_html and not result.get("concessions_text"):
+        try:
+            _ctxt = re.sub(r"<[^>]+>", " ", page_html)
+            _cm = _PROPERTY_CONCESSION_RE.search(_ctxt)
+            if _cm:
+                result["concessions_text"] = re.sub(
+                    r"\s+", " ", _cm.group(0)
+                ).strip()[:200]
+        except Exception:
+            pass
+
     # --- Step 4: Re-detect with page HTML if available ---
     if page_html:
         html_detection = detect_pms(_effective_url, csv_row=csv_row, page_html=page_html)
@@ -651,6 +694,18 @@ async def scrape(
             except Exception:
                 pass
 
+    # Cookie-mint reuse (option b): install the clearance cookies the
+    # fetcher's patchright render earned by passing the CF/DataDome
+    # challenge, scoped to this property's adapter dispatch. The cheap
+    # curl_cffi active-fetch in MAAC/Irvine/Cortland/Essex/Equity/
+    # SightMap-iframe then reuses the solved clearance instead of hitting
+    # the wall again. Unconditional set (empty when no challenge solved)
+    # so a recursive link-hop scrape can't leave stale clearance behind;
+    # reset before every return below.
+    _clr_token = set_clearance_cookies(
+        getattr(fetch_result, "clearance_cookies", None)
+    )
+
     ctx = AdapterContext(
         base_url=resolved.resolved_url,
         detected=detection,
@@ -773,6 +828,7 @@ async def scrape(
         if _is_unreachable_error(exc):
             result["errors"].append(f"FAILED_UNREACHABLE: {exc}")
             result["_fallback_chain"] = fallback_chain
+            reset_clearance_cookies(_clr_token)
             return result
         adapter_result = AdapterResult(errors=[str(exc)])
 
@@ -1198,6 +1254,7 @@ async def scrape(
     if prop_amen:
         result["property_amenities"] = list(prop_amen)
 
+    reset_clearance_cookies(_clr_token)
     return result
 
 

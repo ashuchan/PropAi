@@ -140,6 +140,23 @@ def parse_knock_units(units_payload: dict[str, Any]) -> list[dict[str, Any]]:
         )
         status = "AVAILABLE" if (u.get("available") and not u.get("occupied")) else "UNAVAILABLE"
 
+        # 2026-05-19 capture-first: Knock payload carries concession as
+        # `SpecialsDescription`/specials on the unit or layout. Was
+        # unmapped (Knock = 9k genuine units, 0% concession). Alias-
+        # tolerant; raw; empty when no active special (correct).
+        concession = ""
+        for _src in (u, layout):
+            for _ck in ("SpecialsDescription", "specialsDescription",
+                        "specials_description", "specials", "special",
+                        "concession", "concessions", "leasingSpecial",
+                        "incentive", "promotion", "offer"):
+                _cv = _src.get(_ck) if isinstance(_src, dict) else None
+                if isinstance(_cv, str) and _cv.strip():
+                    concession = _cv.strip()
+                    break
+            if concession:
+                break
+
         units.append(
             {
                 "unit_number": str(unit_number),
@@ -153,6 +170,7 @@ def parse_knock_units(units_payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "availability_status": status,
                 "availability_date": str(avail)[:30],
                 "building": str(u.get("buildingName") or ""),
+                "concession": concession,
                 "extraction_tier": "TIER_1_KNOCK_API",
             }
         )
