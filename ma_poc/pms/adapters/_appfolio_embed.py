@@ -43,6 +43,28 @@ _APPFOLIO_IFRAME_RE = re.compile(
     r"""https?://[a-z0-9][a-z0-9-]*\.appfolio\.com/listings[^\s"'<>]*""",
     re.IGNORECASE,
 )
+# Real-world variants captured by the regex above include:
+#   {tenant}.appfolio.com/listings                 ← listings SSR index (what we want)
+#   {tenant}.appfolio.com/listings?orderable=true  ← listings SSR with filters
+#   {tenant}.appfolio.com/listings/detail/{uuid}   ← single-listing detail
+#   {tenant}.appfolio.com/listings/showings/new?listable_uid=...  ← "schedule a
+#       showing" form — 200 OK but no listings markup, must NOT be fetched
+# Canonicalize: strip path after ``/listings`` so we always hit the SSR index.
+# 2026-05-19 v2: 100-sample validation surfaced 3 sites with showings/new
+# anchor links (no real iframe), where the parser correctly returned 0 units
+# but the fetch wasted a round-trip. Canonical URL = ``{scheme}://{host}/listings``.
+_APPFOLIO_LISTINGS_HOST_RE = re.compile(
+    r"https?://[a-z0-9][a-z0-9-]*\.appfolio\.com/listings",
+    re.IGNORECASE,
+)
+
+
+def _to_appfolio_listings_root(url: str) -> str:
+    """Strip any path after ``/listings`` (e.g. ``/showings/new``) so we
+    fetch the listings SSR index, not a request-a-tour form.
+    """
+    m = _APPFOLIO_LISTINGS_HOST_RE.match(url)
+    return m.group(0) if m else url
 
 # Sub-paths a marketing shell uses for the page that embeds the AppFolio
 # widget. Ordered by observed frequency in the 2026-05-19 probe. Kept tight
@@ -149,6 +171,7 @@ async def recover_appfolio_embed(
     # 3. Fetch the AppFolio listings page itself and run the existing SSR
     #    parser. First non-empty wins.
     for src in iframe_urls:
+        src = _to_appfolio_listings_root(src)
         html = await _fetch(page, src)
         if not html:
             continue

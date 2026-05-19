@@ -38,6 +38,11 @@ _APPFOLIO_SSR = """
 """
 
 _IFRAME_SRC = "https://illumepm.appfolio.com/listings?1234567890"
+# After 2026-05-19 canonicalization (``_to_appfolio_listings_root``), any
+# captured AppFolio URL — including showings/new anchor links — is stripped
+# to the listings SSR root. Tests respond to BOTH variants so the
+# canonicalization doesn't break the existing assertions.
+_IFRAME_CANON = "https://illumepm.appfolio.com/listings"
 _SUBPAGE_HTML = (
     '<html><body><div class="sqs-block">'
     f'<iframe src="{_IFRAME_SRC}" width="100%"></iframe>'
@@ -76,7 +81,7 @@ async def test_recover_via_live_iframe_on_page() -> None:
     page = _FakePage(
         url="https://www.brooksidejohnsoncreek.com/listings",
         live=[_IFRAME_SRC],
-        responses={_IFRAME_SRC: _APPFOLIO_SSR},
+        responses={_IFRAME_SRC: _APPFOLIO_SSR, _IFRAME_CANON: _APPFOLIO_SSR},
     )
     units = await recover_appfolio_embed(page, _ctx("https://www.brooksidejohnsoncreek.com/"))  # type: ignore[arg-type]
     assert len(units) == 2
@@ -94,6 +99,7 @@ async def test_recover_via_subpath_probe() -> None:
         responses={
             "https://www.brooksidejohnsoncreek.com/listings": _SUBPAGE_HTML,
             _IFRAME_SRC: _APPFOLIO_SSR,
+            _IFRAME_CANON: _APPFOLIO_SSR,
         },
     )
     units = await recover_appfolio_embed(page, _ctx("https://www.brooksidejohnsoncreek.com/"))  # type: ignore[arg-type]
@@ -129,7 +135,7 @@ async def test_squarespace_adapter_recovers_appfolio_embed() -> None:
     page = _FakePage(
         url="https://www.brooksidejohnsoncreek.com/listings",
         live=[_IFRAME_SRC],
-        responses={_IFRAME_SRC: _APPFOLIO_SSR},
+        responses={_IFRAME_SRC: _APPFOLIO_SSR, _IFRAME_CANON: _APPFOLIO_SSR},
     )
     result = await SquarespaceNoPmsAdapter().extract(page, _ctx("https://www.brooksidejohnsoncreek.com/"))  # type: ignore[arg-type]
     assert result.tier_used == "TIER_1_DOM_APPFOLIO_SSR"
@@ -153,6 +159,7 @@ async def test_wix_adapter_recovers_appfolio_embed() -> None:
         responses={
             "https://www.villasonrock.com/availability": _SUBPAGE_HTML,
             _IFRAME_SRC: _APPFOLIO_SSR,
+            _IFRAME_CANON: _APPFOLIO_SSR,
         },
     )
     result = await WixNoPmsAdapter().extract(page, _ctx("https://www.villasonrock.com/"))  # type: ignore[arg-type]
@@ -176,3 +183,27 @@ def test_detector_plain_squarespace_still_nopms() -> None:
     html = '<html><head><script src="https://static1.squarespace.com/x.js"></script></head><body></body></html>'
     det = detect_pms("https://www.plain.com/", page_html=html)
     assert det.pms == "squarespace_nopms"
+
+
+# ── 2026-05-19 regression: "schedule a showing" anchor → don't waste a fetch ──
+
+
+@pytest.mark.asyncio
+async def test_recover_canonicalizes_showings_new_anchor_to_listings_root() -> None:
+    """The 100-sample validation surfaced 3 sites with anchor links of the form
+    ``{tenant}.appfolio.com/listings/showings/new?listable_uid=...`` (a
+    "request a tour" form, NOT the listings SSR index). The greedy
+    ``/listings[^\\s"'<>]*`` regex captures the whole URL — the recovery
+    must canonicalize to ``{tenant}.appfolio.com/listings`` before fetching
+    so we hit the data-bearing index, not the form.
+    """
+    showings = "https://yourmetropolitan.appfolio.com/listings/showings/new?listable_uid=abc123&source=Website"
+    canonical = "https://yourmetropolitan.appfolio.com/listings"
+    page = _FakePage(
+        url="https://www.yourmetropolitan.com/properties/bala/",
+        live=[showings],            # the regex matched this URL
+        responses={canonical: _APPFOLIO_SSR},  # fetch must canonicalize to here
+    )
+    units = await recover_appfolio_embed(page, _ctx("https://www.yourmetropolitan.com/"))  # type: ignore[arg-type]
+    assert len(units) == 2
+    assert units[0]["floor_plan_name"] == "10 Creek Rd"
