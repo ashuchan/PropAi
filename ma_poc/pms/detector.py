@@ -62,6 +62,7 @@ PmsName = Literal[
     "cortland",
     "equity",
     "rentmanager",
+    "rentvision",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -100,6 +101,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "cortland": "api_first",
     "equity": "api_first",
     "rentmanager": "api_first",
+    "rentvision": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -499,6 +501,43 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
                 ".prospectportal.com)"
             ],
         )
+    # AppFolio embedded as an iframe to the tenant subdomain
+    # (``{tenant}.appfolio.com/listings``) is a definitive leasing path —
+    # commonly embedded one nav-hop deep on a Wix/Squarespace marketing
+    # shell. Strong marker so it beats the Wix/Squarespace pass-2 demotion
+    # (same rationale as onlineleasing.realpage.com / commoncf.entrata.com
+    # above). Bare ``appfolio.com`` stays a pass-3 weak marker.
+    if ".appfolio.com/listings" in h:
+        return (
+            "appfolio",
+            0.85,
+            ["AppFolio listings-iframe marker in HTML (.appfolio.com/listings)"],
+        )
+    # G5 (g5marketingcloud) Vue-SPA marketing sites. The g5dxm.com CDN /
+    # g5marketingcloud asset hosts and the ``g5-c-{client}`` URN appear
+    # site-wide incl. landing, so detection fires before the floor-plans
+    # hop. Unit data is in the SPA's Apollo cache (see G5Adapter); these
+    # sites carry no other PMS.
+    if "g5marketingcloud" in h or "g5dxm.com" in h or "g5-c-" in h:
+        return (
+            "g5",
+            0.85,
+            ["G5 marketing-cloud marker in HTML (g5marketingcloud / g5dxm.com / g5-c- URN)"],
+        )
+    # RentVision is a multifamily marketing-site CMS whose ``/floorplans``
+    # page is full plan-level SSR DOM. The platform credit appears
+    # site-wide including the landing page, so detection fires before any
+    # hop. These sites carry no other PMS.
+    if (
+        "created by rentvision" in h
+        or "powered by rentvision" in h
+        or "rentvision.com" in h
+    ):
+        return (
+            "rentvision",
+            0.85,
+            ["RentVision CMS marker in HTML (created/powered by RentVision / rentvision.com)"],
+        )
     if (
         "nestiolistings.com" in h
         or "nestio_" in h
@@ -722,6 +761,8 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "avalonbay": ("avaloncommunities.com",),
     "amli": ("amli.com",),
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
+    "g5": ("g5marketingcloud", "g5dxm.com", "g5-c-"),
+    "rentvision": ("created by rentvision", "powered by rentvision", "rentvision.com"),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
     "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
     "rentmanager": (

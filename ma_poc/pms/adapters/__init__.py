@@ -26,6 +26,7 @@ from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
 from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
 from ma_poc.pms.adapters.rentmanager import RentManagerAdapter
+from ma_poc.pms.adapters.rentvision import RentVisionAdapter
 from ma_poc.pms.adapters.repli360 import Repli360Adapter
 from ma_poc.pms.adapters.resman import ResManAdapter
 from ma_poc.pms.adapters.sightmap import SightMapAdapter
@@ -61,6 +62,7 @@ def _bootstrap_registry() -> None:
         RealPageOllAdapter,
         Repli360Adapter,
         RentManagerAdapter,
+        RentVisionAdapter,
         EssexAdapter,
         AvalonBayAdapter,
         AmliAdapter,

@@ -35,11 +35,25 @@ class SquarespaceNoPmsAdapter:
     _fingerprints: list[str] = ["squarespace.com", "static1.squarespace.com"]
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
-        """Squarespace sites have no structured unit data to extract.
-
-        Returns empty result with informative error. The orchestrator should
-        not fall through to generic/LLM for known non-PMS platforms.
+        """Squarespace shells are usually no-PMS — but a sizable minority
+        embed an AppFolio listings widget one labelled-nav hop deep. Try
+        that recovery before declaring syndication_only.
         """
+        from ma_poc.pms.adapters._appfolio_embed import recover_appfolio_embed
+
+        units = await recover_appfolio_embed(page, ctx)
+        if units:
+            from ma_poc.extraction.post_process import post_process
+
+            pp = post_process(units, property_id=getattr(ctx, "property_id", None))
+            if pp.n_admitted > 0:
+                return AdapterResult(
+                    units=pp.admitted,
+                    plan_summaries=pp.plan_summaries,
+                    tier_used="TIER_1_DOM_APPFOLIO_SSR",
+                    confidence=min(0.95, 0.7 + 0.05 * pp.n_admitted),
+                )
+
         return AdapterResult(
             tier_used="SYNDICATION_ONLY_SQUARESPACE",
             confidence=0.0,
