@@ -670,3 +670,94 @@ def test_confirm_detection_preserves_when_only_initial_adapter_has_checker(
         f"alternative to cross-match against. P3 says preserve when no "
         f"negative evidence is found — got {result.pms!r}"
     )
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Ported from main commit 78516c3 ("Added fixes for jsonld and few pms"):
+# SightMap-embed iframe is a STRONG marker that should beat an Entrata-widget
+# marker on the same page. Two real-world cases motivate this:
+#   - chaseknollsapts.com (PID 16139, 2026-05-14): Entrata STRONG won pre-fix,
+#     SightMap iframe with 9 units never got read.
+#   - Morgan Properties cluster (28 props observed 2026-05-19): canary fell
+#     to TIER_3_DOM on every one, prod caught SightMap.
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def test_detect_sightmap_embed_iframe_routes_to_sightmap_strong() -> None:
+    """A page with ``sightmap.com/embed/<code>`` in an iframe is SightMap.
+
+    The bare ``sightmap.com`` substring was already detected at a weaker
+    pass-3 confidence (0.80) — but the embed-iframe form is iframe-specific
+    and unambiguous, so it deserves STRONG (0.90).
+    """
+    html = (
+        "<html><body>"
+        '<iframe src="https://sightmap.com/embed/abc123def" '
+        'width="100%" height="700"></iframe>'
+        "</body></html>"
+    )
+    result = detect_pms("https://www.morgan-properties.com/apartments/x/", page_html=html)
+    assert result.pms == "sightmap"
+    assert result.confidence >= 0.90
+
+
+def test_detect_sightmap_embed_beats_entrata_widget_when_both_present() -> None:
+    """Real chaseknollsapts.com shape — Entrata widget + SightMap embed.
+
+    The Entrata widget on the same page is typically a contact/amenities/
+    photo module that doesn't carry units; the unit data lives in the
+    SightMap iframe. Detector must route to SightMap or its units will
+    never be read.
+    """
+    html = (
+        "<html><body>"
+        '<div class="entrata-widget"></div>'
+        '<script src="https://commoncf.entrata.com/widgets/x.js"></script>'
+        '<iframe src="https://sightmap.com/embed/xy7890ab" '
+        'width="100%" height="700"></iframe>'
+        "</body></html>"
+    )
+    result = detect_pms(
+        "https://chaseknollsapts.com/", page_html=html
+    )
+    assert result.pms == "sightmap"
+    assert result.confidence >= 0.90
+
+
+def test_entrata_widget_without_sightmap_embed_still_routes_to_entrata() -> None:
+    """The Entrata-widget path is unchanged when no SightMap embed exists.
+
+    Guards against the regression where the new SightMap-embed branch
+    accidentally swallows all Entrata-widget pages.
+    """
+    html = (
+        "<html><body>"
+        '<script src="https://commoncf.entrata.com/widgets/x.js"></script>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "entrata"
+    assert result.confidence >= 0.85
+
+
+def test_bare_sightmap_com_without_embed_path_is_NOT_strong() -> None:
+    """Bare ``sightmap.com`` substring (no ``/embed/``) must not promote.
+
+    Could be a CDN asset, analytics referrer, or favicon link. Only the
+    iframe-specific ``sightmap.com/embed/`` is a definitive routing signal.
+    Stays in the weaker pass-3 fingerprint path.
+    """
+    html = (
+        "<html><head>"
+        '<link rel="preconnect" href="https://sightmap.com">'
+        "</head><body><p>marketing copy</p></body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    # Either routed to sightmap at the weaker 0.80 pass-3, OR not routed
+    # at all — the hard requirement is: confidence cannot be ≥ 0.90, and
+    # we must NOT see the strong-routing evidence string.
+    if result.pms == "sightmap":
+        assert result.confidence < 0.90
+    assert not any(
+        "embed iframe in HTML" in e for e in result.evidence
+    )
