@@ -22,7 +22,10 @@ import pytest
 from ma_poc.fetch.clearance_jar import (
     CLEARANCE_COOKIE_NAMES,
     ClearanceJar,
+    ParsedSetCookie,
+    candidate_lookup_hosts,
     extract_clearance_from_set_cookie,
+    parse_set_cookie_clearance,
     ua_hash,
 )
 
@@ -261,3 +264,209 @@ def test_context_manager_closes_on_exit(tmp_path: Path):
     j2 = ClearanceJar(tmp_path / "jar.sqlite")
     assert j2.lookup("ctx.com", "", "uh") == {"cf_clearance": "CTX"}
     j2.close()
+
+
+# ── candidate_lookup_hosts: parent-domain walk ──────────────────────────────
+
+
+def test_candidate_lookup_hosts_single_host_returns_self():
+    assert candidate_lookup_hosts("example.com") == ["example.com"]
+
+
+def test_candidate_lookup_hosts_walks_subdomains():
+    """``app.example.com`` lookup must also check ``example.com`` so a
+    cookie set with ``Domain=.example.com`` is found."""
+    out = candidate_lookup_hosts("app.example.com")
+    assert out == ["app.example.com", "example.com"]
+
+
+def test_candidate_lookup_hosts_walks_multiple_levels():
+    out = candidate_lookup_hosts("app.www.example.com")
+    assert out == ["app.www.example.com", "www.example.com", "example.com"]
+
+
+def test_candidate_lookup_hosts_stops_before_bare_tld():
+    """We never reduce to a single-label host — ``com``/``uk`` would
+    match every cookie in the jar."""
+    out = candidate_lookup_hosts("example.com")
+    assert "com" not in out
+    out = candidate_lookup_hosts("foo.bar.co.uk")
+    assert "uk" not in out
+    assert "co.uk" in out  # crude eTLD shortcoming, documented
+
+
+def test_candidate_lookup_hosts_empty_input():
+    assert candidate_lookup_hosts("") == [""]
+
+
+# ── Parent-domain lookup against the live jar ───────────────────────────────
+
+
+def test_lookup_finds_cookie_via_parent_domain(tmp_path: Path):
+    """Cookie stored under bare domain must be found for subdomain lookup.
+
+    This is the canonical Cloudflare pattern: ``Set-Cookie: cf_clearance=...
+    ; Domain=.example.com`` on a response to ``app.example.com`` means
+    the cookie applies to every ``*.example.com`` subdomain.
+    """
+    jar = ClearanceJar(tmp_path / "jar.sqlite")
+    jar.store("example.com", "", "uh", "cloudflare", {"cf_clearance": "PARENT"}, 3600)
+    # Lookup from subdomain — must find the parent's cookie.
+    assert jar.lookup("app.example.com", "", "uh") == {"cf_clearance": "PARENT"}
+    assert jar.lookup("api.www.example.com", "", "uh") == {"cf_clearance": "PARENT"}
+    jar.close()
+
+
+def test_lookup_does_not_leak_across_unrelated_domains(tmp_path: Path):
+    """A cookie under ``example.com`` must NOT be returned for
+    ``other.com`` even though both have the same number of labels."""
+    jar = ClearanceJar(tmp_path / "jar.sqlite")
+    jar.store("example.com", "", "uh", "cloudflare", {"cf_clearance": "X"}, 3600)
+    assert jar.lookup("other.com", "", "uh") == {}
+    assert jar.lookup("notexample.com", "", "uh") == {}
+    jar.close()
+
+
+def test_lookup_specific_host_wins_over_parent(tmp_path: Path):
+    """When both ``app.example.com`` and ``example.com`` have a cookie
+    of the same name, the more-specific host wins (RFC 6265 precedence)."""
+    jar = ClearanceJar(tmp_path / "jar.sqlite")
+    jar.store("example.com", "", "uh", "cloudflare", {"cf_clearance": "PARENT"}, 3600)
+    jar.store("app.example.com", "", "uh", "cloudflare", {"cf_clearance": "CHILD"}, 3600)
+    assert jar.lookup("app.example.com", "", "uh") == {"cf_clearance": "CHILD"}
+    # And a sibling subdomain still picks up the parent.
+    assert jar.lookup("api.example.com", "", "uh") == {"cf_clearance": "PARENT"}
+    jar.close()
+
+
+# ── parse_set_cookie_clearance: rich parse with Domain + Max-Age ─────────────
+
+
+def test_parse_set_cookie_basic():
+    headers = {"set-cookie": "cf_clearance=TOK1; Path=/; Secure; HttpOnly"}
+    out = parse_set_cookie_clearance(headers)
+    assert len(out) == 1
+    assert out[0] == ParsedSetCookie(
+        name="cf_clearance", value="TOK1", domain=None, max_age_seconds=None,
+    )
+
+
+def test_parse_set_cookie_domain_directive_strips_leading_dot():
+    headers = {
+        "set-cookie": "cf_clearance=T; Domain=.example.com; Path=/; Secure",
+    }
+    out = parse_set_cookie_clearance(headers)
+    assert out[0].domain == "example.com"
+
+
+def test_parse_set_cookie_domain_directive_lowercased():
+    headers = {"set-cookie": "cf_clearance=T; Domain=Example.COM; Path=/"}
+    out = parse_set_cookie_clearance(headers)
+    assert out[0].domain == "example.com"
+
+
+def test_parse_set_cookie_max_age_overrides_provider_default():
+    headers = {"set-cookie": "cf_clearance=T; Max-Age=43200; Path=/"}
+    out = parse_set_cookie_clearance(headers)
+    assert out[0].max_age_seconds == 43200
+
+
+def test_parse_set_cookie_max_age_takes_precedence_over_expires():
+    """RFC 6265 §5.3 — Max-Age wins when both directives present."""
+    headers = {
+        "set-cookie": (
+            "cf_clearance=T; Expires=Wed, 21 Oct 2099 07:28:00 GMT; "
+            "Max-Age=600; Path=/"
+        ),
+    }
+    out = parse_set_cookie_clearance(headers)
+    assert out[0].max_age_seconds == 600
+
+
+def test_parse_set_cookie_expires_fallback_when_no_max_age():
+    """When only ``Expires=`` is present, parse it as a relative TTL."""
+    future = datetime.now(UTC) + timedelta(hours=2)
+    expires_str = future.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    headers = {"set-cookie": f"cf_clearance=T; Expires={expires_str}; Path=/"}
+    out = parse_set_cookie_clearance(headers)
+    # Should be ~7200 seconds, allow ±5 for clock drift in the test.
+    assert out[0].max_age_seconds is not None
+    assert 7195 <= out[0].max_age_seconds <= 7200
+
+
+def test_parse_set_cookie_expires_in_past_returns_none():
+    """An already-expired ``Expires=`` directive doesn't yield a positive
+    TTL — caller falls back to provider default."""
+    past = datetime.now(UTC) - timedelta(days=1)
+    expires_str = past.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    headers = {"set-cookie": f"cf_clearance=T; Expires={expires_str}"}
+    out = parse_set_cookie_clearance(headers)
+    assert out[0].max_age_seconds is None
+
+
+def test_parse_set_cookie_malformed_max_age_ignored():
+    headers = {"set-cookie": "cf_clearance=T; Max-Age=not-a-number"}
+    out = parse_set_cookie_clearance(headers)
+    assert out[0].max_age_seconds is None
+
+
+def test_parse_set_cookie_case_insensitive_header_key():
+    """Different HTTP clients capitalise Set-Cookie differently —
+    must match all of ``Set-Cookie`` / ``set-cookie`` / ``SET-COOKIE``."""
+    for key in ("Set-Cookie", "set-cookie", "SET-COOKIE", "Set-cookie"):
+        headers = {key: "cf_clearance=T; Path=/"}
+        out = parse_set_cookie_clearance(headers)
+        assert len(out) == 1, f"header key {key!r} failed to match"
+        assert out[0].name == "cf_clearance"
+
+
+def test_parse_set_cookie_multiple_lines_via_newline():
+    """Some clients merge multiple Set-Cookie lines on a single value
+    separated by newlines. Comma-separation is NOT safe (commas appear
+    inside ``Expires=Wed, 21 Oct ...``)."""
+    headers = {
+        "set-cookie": (
+            "cf_clearance=T1; Path=/\n"
+            "__cf_bm=T2; Path=/"
+        ),
+    }
+    out = parse_set_cookie_clearance(headers)
+    names = sorted(c.name for c in out)
+    assert names == ["__cf_bm", "cf_clearance"]
+
+
+def test_parse_set_cookie_ignores_non_clearance_names():
+    headers = {
+        "set-cookie": "sessionid=abc; Path=/\ncf_clearance=T; Path=/",
+    }
+    out = parse_set_cookie_clearance(headers)
+    assert len(out) == 1
+    assert out[0].name == "cf_clearance"
+
+
+def test_parse_set_cookie_empty_input():
+    assert parse_set_cookie_clearance({}) == []
+    assert parse_set_cookie_clearance({"content-type": "text/html"}) == []
+
+
+# ── Back-compat shim sanity ─────────────────────────────────────────────────
+
+
+def test_extract_clearance_shim_returns_bare_map():
+    """The legacy dict-returning API still works for callers that haven't
+    migrated to :func:`parse_set_cookie_clearance`."""
+    out = extract_clearance_from_set_cookie(
+        "cf_clearance=SHIM; Path=/; Secure", {}
+    )
+    assert out == {"cf_clearance": "SHIM"}
+
+
+def test_extract_clearance_shim_handles_mixed_case_header_key():
+    """The shim's case-insensitive contract — both ``Set-Cookie`` and
+    ``set-cookie`` must yield the cookie regardless of which the client
+    emits."""
+    for key in ("Set-Cookie", "set-cookie", "SET-COOKIE"):
+        out = extract_clearance_from_set_cookie(
+            "", {key: "cf_clearance=CASE; Path=/"}
+        )
+        assert out == {"cf_clearance": "CASE"}, f"failed for key {key!r}"

@@ -28,11 +28,10 @@ from ..observability.events import EventKind, emit
 from .browser_pool import BrowserContextPool
 from .captcha_detect import looks_like_captcha
 from .clearance_jar import (
-    CLEARANCE_COOKIE_NAMES,
     ClearanceJar,
     FALLBACK_TTL,
     PROVIDER_DEFAULT_TTL,
-    extract_clearance_from_set_cookie,
+    parse_set_cookie_clearance,
     provider_from_cookie_name,
     ua_hash as _ua_hash,
 )
@@ -584,26 +583,40 @@ class Fetcher:
             # cookies from Set-Cookie headers on successful responses.  Only
             # cookies whose names appear in CLEARANCE_COOKIE_NAMES are stored;
             # general session cookies are ignored.
+            #
+            # Per-cookie storage decisions (post-2026-05-19 hardening):
+            #   * If the cookie carried a ``Domain=`` directive, store
+            #     under the bare domain (leading dot stripped) so a
+            #     cookie issued for ``Domain=.example.com`` is found on
+            #     later requests to ``app.example.com``. Lookup walks
+            #     parent domains via :func:`candidate_lookup_hosts`.
+            #   * If the cookie carried ``Max-Age`` (or ``Expires``),
+            #     honour that TTL — producers like Cloudflare sometimes
+            #     issue a 12-hour ``__cf_bm`` when the default would be
+            #     30 minutes. Fall back to ``PROVIDER_DEFAULT_TTL`` when
+            #     neither directive is present.
             if self._clearance_jar is not None:
                 try:
-                    _sc_header = (last_result.headers or {}).get("set-cookie", "")
-                    _clearance_found = extract_clearance_from_set_cookie(
-                        _sc_header, last_result.headers or {}
+                    _parsed_cookies = parse_set_cookie_clearance(
+                        last_result.headers or {}
                     )
-                    if _clearance_found:
-                        _c_host = urlparse(task.url).netloc
+                    if _parsed_cookies:
+                        _req_host = urlparse(task.url).netloc
                         _c_proxy_ip = _extract_proxy_ip(proxy)
                         _c_ua_hash = _ua_hash(identity.user_agent, identity.accept_language)
-                        for _ck_name, _ck_value in _clearance_found.items():
-                            # Infer provider from the cookie name for accurate TTL.
+                        for _cookie in _parsed_cookies:
                             # captcha_provider is None on successful (non-challenge)
-                            # responses, so the name-based lookup is the only reliable
-                            # source here.
-                            _c_provider = provider_from_cookie_name(_ck_name)
-                            _c_ttl = PROVIDER_DEFAULT_TTL.get(_c_provider, FALLBACK_TTL)
+                            # responses, so the name-based lookup is the only
+                            # reliable provider signal here.
+                            _c_provider = provider_from_cookie_name(_cookie.name)
+                            _c_default_ttl = PROVIDER_DEFAULT_TTL.get(
+                                _c_provider, FALLBACK_TTL
+                            )
+                            _c_ttl = _cookie.max_age_seconds or _c_default_ttl
+                            _c_host = _cookie.domain or _req_host
                             self._clearance_jar.store(
                                 _c_host, _c_proxy_ip, _c_ua_hash,
-                                _c_provider, {_ck_name: _ck_value}, _c_ttl,
+                                _c_provider, {_cookie.name: _cookie.value}, _c_ttl,
                             )
                 except Exception as _cj_exc:
                     log.debug("clearance_jar opportunistic store failed: %s", _cj_exc)
