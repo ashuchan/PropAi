@@ -64,6 +64,67 @@ def test_natural_unit_id_passes_through(provider: DataProvider) -> None:
     assert diff.new == ["101"]
 
 
+# ── 2026-05-19 (R1) — available_date_raw round-trips through upsert ─────────
+
+
+def test_available_date_raw_round_trips(provider: DataProvider) -> None:
+    """The producer-literal availability string must survive the
+    upsert + read round-trip alongside the typed ISO column.
+    """
+    provider.unit_state.upsert_units(
+        "P1",
+        [_u(
+            unit_id="200",
+            floor_plan_name="B2",
+            beds=1, baths=1.0, area=700, rent_low=1800.0,
+            available_date="2026-07-04",
+            available_date_raw="Available 7/4/26",
+        )],
+        "2026-05-19",
+    )
+    units = provider.unit_state.get_units("P1")
+    row = units["200"]
+    assert row.available_date == "2026-07-04"
+    assert row.available_date_raw == "Available 7/4/26"
+
+
+def test_available_date_raw_falls_back_to_date_placeholder(provider: DataProvider) -> None:
+    """When the caller only carries ``_date_placeholder`` (the gate-stashed
+    slot), the upsert reads it as ``available_date_raw``."""
+    provider.unit_state.upsert_units(
+        "P1",
+        [_u(
+            unit_id="201",
+            floor_plan_name="B2",
+            beds=1, baths=1.0, area=700, rent_low=1800.0,
+            available_date=None,
+            _date_placeholder="Available 7/24",  # year missing — parser couldn't infer
+        )],
+        "2026-05-19",
+    )
+    units = provider.unit_state.get_units("P1")
+    row = units["201"]
+    assert row.available_date is None
+    assert row.available_date_raw == "Available 7/24"
+
+
+def test_available_date_raw_null_when_absent(provider: DataProvider) -> None:
+    """No producer date in any slot → both columns null."""
+    provider.unit_state.upsert_units(
+        "P1",
+        [_u(
+            unit_id="202",
+            floor_plan_name="B2",
+            beds=1, baths=1.0, area=700, rent_low=1800.0,
+        )],
+        "2026-05-19",
+    )
+    units = provider.unit_state.get_units("P1")
+    row = units["202"]
+    assert row.available_date is None
+    assert row.available_date_raw is None
+
+
 def test_missing_unit_id_gets_sha256_fallback(provider: DataProvider) -> None:
     diff = provider.unit_state.upsert_units(
         "P1",

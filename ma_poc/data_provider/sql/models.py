@@ -114,6 +114,13 @@ class UnitRow(Base):
     rent_high: Mapped[float | None] = mapped_column(Float)
     date_captured: Mapped[str | None] = mapped_column(String(32))
     available_date: Mapped[str | None] = mapped_column(String(32))
+    # Producer's literal availability string (whitespace-collapsed).
+    # Populated alongside ``available_date`` so analytics can recover
+    # the as-seen value when the typed column had to be null
+    # (e.g. ``"Available 7/24"`` — year missing, can't normalise to ISO).
+    # Added 2026-05-19 by alembic 0014_units_avail_date_raw to close the
+    # 94 %-null placeholder leak diagnosed in the 2026-05-18 cloud run.
+    available_date_raw: Mapped[str | None] = mapped_column(String(64))
     lease_term: Mapped[int | None] = mapped_column(Integer)
     move_in_date: Mapped[str | None] = mapped_column(String(32))
 

@@ -229,6 +229,12 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
     except Exception:
         floor_plan_id = None
 
+    raw_available_date = (
+        unit.get("available_date")
+        or unit.get("available_date_raw")
+        or unit.get("_date_placeholder")
+    )
+
     return {
         "beds": norm_beds,
         "baths": norm_baths,
@@ -239,7 +245,16 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         "rent_low": _format_rent(rent_lo),
         "rent_high": _format_rent(rent_hi),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
-        "available_date": _format_date(unit.get("available_date")),
+        "available_date": _format_date(raw_available_date),
+        # Producer's literal availability string, whitespace-collapsed.
+        # Persisted to ``units.available_date_raw``. Priority order
+        # preserves whatever upstream already captured (see the v2
+        # formatter in ``scripts/runners/jugnu.py`` for the rationale).
+        "available_date_raw": _normalize_raw_date(
+            unit.get("available_date_raw"),
+            unit.get("_date_placeholder"),
+            unit.get("available_date"),
+        ),
         "lease_term": _safe_lease_term(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
         # F10 additions — always present (None when unset).
@@ -251,6 +266,23 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         "_inferred_id": bool(unit.get("_inferred_id")) if "_inferred_id" in unit else None,
         "_date_placeholder": unit.get("_date_placeholder") or None,
     }
+
+
+def _normalize_raw_date(*candidates: Any) -> str | None:
+    """Return the first non-empty candidate as a whitespace-collapsed string.
+
+    Companion to :func:`_format_date` — preserves the producer's
+    literal availability string for the V2 ``available_date_raw``
+    field. Returns None when no candidate yields content.
+    """
+    for c in candidates:
+        if c is None:
+            continue
+        s = str(c).strip()
+        if not s:
+            continue
+        return re.sub(r"\s+", " ", s)
+    return None
 
 
 def _safe_float(val: Any) -> float | None:
@@ -380,23 +412,15 @@ def _format_area(val: Any) -> int:
 
 
 def _format_date(val: Any) -> str | None:
-    """Normalize date to YYYY-MM-DD. Returns None if unparseable."""
-    if val is None or val == "":
-        return None
-    s = str(val).strip()
-    # Already ISO format
-    if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
-        return s
-    # Try common formats
-    for fmt in ("%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d", "%m-%d-%Y", "%d-%m-%Y"):
-        try:
-            return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-    # If it's a datetime string, take just the date part
-    if len(s) >= 10 and re.match(r"^\d{4}-\d{2}-\d{2}", s):
-        return s[:10]
-    return None
+    """Normalize date to YYYY-MM-DD. Returns None if unparseable.
+
+    Delegates to :func:`ma_poc.extraction.dates.format_loose_date` — the
+    same parser the L4 schema gate and the jugnu v2 formatter use, so
+    all three call sites accept the same producer surface.
+    """
+    from ma_poc.extraction.dates import format_loose_date
+
+    return format_loose_date(val)
 
 
 def _safe_lease_term(val: Any) -> int | None:

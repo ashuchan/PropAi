@@ -143,6 +143,7 @@ _UNIT_COLS = {
     "rent_high",
     "date_captured",
     "available_date",
+    "available_date_raw",
     "lease_term",
     "move_in_date",
     # State-tracking
@@ -431,6 +432,7 @@ def _hydrate_unit(row: UnitRow) -> UnitIndexEntry:
         "rent_high": row.rent_high,
         "date_captured": row.date_captured,
         "available_date": row.available_date,
+        "available_date_raw": row.available_date_raw,
         "lease_term": row.lease_term,
         "move_in_date": row.move_in_date,
         # State-tracking
@@ -690,6 +692,7 @@ class SqlUnitStateStore(IUnitStateStore):
         "rent_high": ("rent_high", "market_rent_high"),
         "date_captured": ("date_captured",),
         "available_date": ("available_date",),
+        "available_date_raw": ("available_date_raw", "_date_placeholder"),
         "lease_term": ("lease_term", "_lease_term"),
         "move_in_date": ("move_in_date", "_move_in_date"),
         "concessions": ("concessions",),
@@ -839,6 +842,7 @@ class SqlUnitStateStore(IUnitStateStore):
                         "rent_high": r.rent_high,
                         "date_captured": r.date_captured,
                         "available_date": r.available_date,
+                        "available_date_raw": r.available_date_raw,
                         "lease_term": r.lease_term,
                         "move_in_date": r.move_in_date,
                         "concessions": r.concessions,
