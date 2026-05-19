@@ -197,16 +197,6 @@ class EventKind(StrEnum):
     #                                   ``FAILED_UNREACHABLE`` verdict to
     #                                   ``FAILED_NO_DATA``. Skipping the
     #                                   retry preserves the correct verdict.
-    #   - ``SKIPPED_DOMAIN_QUARANTINED`` — 2026-05-18: retry was not attempted
-    #                                   because the entry-fetch was
-    #                                   rate-limited or the domain was
-    #                                   quarantined for the entire run
-    #                                   (error_signature=DOMAIN_QUARANTINED_IN_RUN).
-    #                                   A GET retry hits the same quarantine
-    #                                   instantly (elapsed_ms=0) and emits a
-    #                                   duplicate FAILED_UNREACHABLE. Skipping
-    #                                   halves the failure-metric inflation for
-    #                                   high-density hosts (e.g. Essex 27 PIDs).
     #
     # Until 2026-05-16 the retry started was piggybacked onto
     # PROPERTY_EMITTED with a custom verdict string — that conflated
@@ -214,16 +204,6 @@ class EventKind(StrEnum):
     # invisible to the analyzer. These distinct kinds fix that.
     WEDGE_RESCUE_RETRY_STARTED = "extract.wedge_rescue_retry_started"
     WEDGE_RESCUE_RETRY_RESOLVED = "extract.wedge_rescue_retry_resolved"
-
-    # Stealth plan Phase 2 (2026-05-18): WAF clearance cookie cache events.
-    # CLEARANCE_CACHE_HIT fires when a clearance cookie from the jar is
-    # injected into an outgoing request, skipping the challenge re-solve.
-    # STEALTH_INVOCATION / _SOLVED / _FAILED are reserved for Phase 3 when
-    # the stealth browser pool is wired up.
-    CLEARANCE_CACHE_HIT = "fetch.clearance_cache_hit"
-    STEALTH_INVOCATION = "fetch.stealth_invocation"
-    STEALTH_SOLVED = "fetch.stealth_solved"
-    STEALTH_FAILED = "fetch.stealth_failed"
 
 
 @dataclass(slots=True, frozen=True)

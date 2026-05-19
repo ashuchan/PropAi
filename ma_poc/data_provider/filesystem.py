@@ -22,7 +22,6 @@ Layout (paths below are rooted at `base_dir` / `config_dir`):
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 import logging
 import os
@@ -31,7 +30,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 from data_provider.contracts import (
     DataProvider,
@@ -540,116 +538,6 @@ class CsvPropertyCatalogSource(IPropertyCatalogSource):
         end = min(start + per_shard, len(pairs))
         return pairs[start:end]
 
-    @staticmethod
-    def _extract_host_from_row(row: dict[str, Any]) -> str:
-        """Extract a normalized hostname from a catalog row's URL column.
-
-        Strips the ``www.`` prefix so ``www.essexapartmenthomes.com`` and
-        ``essexapartmenthomes.com`` collapse to the same density bucket.
-
-        Returns an empty string when no URL is present or parsing fails.
-        """
-        url = row.get("url") or row.get("Website") or row.get("website") or ""
-        if not url:
-            return ""
-        try:
-            host = urlparse(str(url)).netloc.lower()
-            if host.startswith("www."):
-                host = host[4:]
-            return host
-        except Exception:
-            return ""
-
-    @staticmethod
-    def _compute_global_host_density(
-        pairs: list[tuple[str, dict[str, Any]]],
-    ) -> dict[str, int]:
-        """Count how many times each host appears in the GLOBAL (pre-shard) catalog.
-
-        O(N) single pass.  The resulting map is passed to
-        ``_temporally_stagger_high_density_hosts`` so each shard knows
-        which hosts qualify as high-density relative to the full fleet,
-        not just its own slice.
-        """
-        counts: dict[str, int] = {}
-        for _, row in pairs:
-            host = CsvPropertyCatalogSource._extract_host_from_row(row)
-            if host:
-                counts[host] = counts.get(host, 0) + 1
-        return counts
-
-    @staticmethod
-    def _temporally_stagger_high_density_hosts(
-        pairs: list[tuple[str, dict[str, Any]]],
-        shard_index: int,
-        host_density_map: dict[str, int],
-        host_density_threshold: int = 5,
-    ) -> list[tuple[str, dict[str, Any]]]:
-        """Re-order this shard's rows so high-density-host PIDs land at
-        staggered positions driven by ``hash(host, shard_index)``.
-
-        **Why this works:** All 100 shards process rows sequentially, so
-        earlier rows execute sooner.  Without staggering, the few Essex PIDs
-        that land in each shard all sit in the shard's first few rows
-        (because the global shuffle is uniform but doesn't push high-density
-        PIDs away from position 0 within the shard).  Post-stagger, shard 0
-        puts its Essex PID at position 17, shard 1 at position 89, etc. —
-        spreading Essex hits across rows 0-2500 of the 100-shard run, which
-        at ~3-5 s/property maps to a uniformly-distributed rate curve at the
-        origin instead of a 100× spike at t=0.
-
-        **Pure function** — no I/O, no shared state.  O(N) per shard.
-
-        Args:
-            pairs: This shard's rows (post ``_apply_shard``).
-            shard_index: Zero-based shard number; drives the per-shard offset.
-            host_density_map: Global ``{host: count}`` from
-                ``_compute_global_host_density``.
-            host_density_threshold: Hosts appearing at least this many times
-                globally qualify as high-density and are staggered.
-
-        Returns:
-            The re-ordered pairs list.  May return the input list unchanged
-            when no high-density hosts are present in this shard.
-        """
-        n = len(pairs)
-        if n < 2:
-            return pairs
-
-        def _h(s: str) -> int:
-            return int(hashlib.sha256(s.encode("utf-8", "ignore")).hexdigest()[:8], 16)
-
-        # Partition rows into normal vs high-density-host buckets.
-        hd_by_host: dict[str, list[tuple[str, dict[str, Any]]]] = {}
-        normal: list[tuple[str, dict[str, Any]]] = []
-        for cid, row in pairs:
-            host = CsvPropertyCatalogSource._extract_host_from_row(row)
-            if host and host_density_map.get(host, 0) >= host_density_threshold:
-                hd_by_host.setdefault(host, []).append((cid, row))
-            else:
-                normal.append((cid, row))
-
-        if not hd_by_host:
-            return pairs  # fast path: nothing to stagger
-
-        # Assign staggered target positions to each high-density row.
-        # base_offset differs per (host, shard) so 100 shards collectively
-        # cover the full position range for a given host.
-        # spread keeps consecutive PIDs of the same host at distance ≥ 1.
-        positioned: list[tuple[int, tuple[str, dict[str, Any]]]] = [
-            (i, p) for i, p in enumerate(normal)
-        ]
-        for host, rows in hd_by_host.items():
-            base_offset = _h(host + str(shard_index)) % max(1, n)
-            spread = max(3, _h(host) % 30)
-            for pos_within_host, pair in enumerate(rows):
-                target = (base_offset + pos_within_host * spread) % n
-                positioned.append((target, pair))
-
-        # Stable sort by (target_position, canonical_id) for determinism.
-        positioned.sort(key=lambda x: (x[0], x[1][0]))
-        return [pair for _, pair in positioned]
-
     def list_active(
         self,
         *,
@@ -666,34 +554,12 @@ class CsvPropertyCatalogSource(IPropertyCatalogSource):
         # so re-runs of the same date land the same property in the same
         # shard (debug reproducibility), but day-to-day the distribution
         # rotates so no single shard is always the "Essex shard".
-        #
-        # High-density Phase 1 (2026-05-18): compute the global host density
-        # map BEFORE sharding so the stagger pass below knows how many times
-        # each host appears fleet-wide (not just in this shard).  Only
-        # computed when shuffle+shard mode is active.
-        _shard_idx = filters.shard_index if filters is not None else None
-        _global_density: dict[str, int] = {}
-        if filters is not None and filters.shuffle_seed and _shard_idx is not None:
-            _global_density = self._compute_global_host_density(pairs)
-
         if filters is not None and filters.shuffle_seed:
             import random
             rng = random.Random(filters.shuffle_seed)
             pairs = list(pairs)
             rng.shuffle(pairs)
         pairs = self._apply_shard(pairs, filters)
-
-        # High-density Phase 1 (2026-05-18): after sharding, reorder
-        # high-density-host PIDs within this shard so all 100 shards
-        # collectively hit essex at uniformly-distributed wall-clock offsets
-        # across the first ~5 minutes of the run instead of all at t=0.
-        # Threshold default: 5 global appearances.
-        if _global_density and _shard_idx is not None:
-            _threshold = getattr(filters, "host_density_threshold", 5) if filters else 5
-            pairs = self._temporally_stagger_high_density_hosts(
-                pairs, _shard_idx, _global_density, host_density_threshold=_threshold,
-            )
-
         if filters is not None and filters.start_index:
             pairs = pairs[filters.start_index :]
         if limit is not None:

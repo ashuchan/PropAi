@@ -245,15 +245,6 @@ class CatalogFilters(BaseModel):
     # stable within a day and varies day-to-day.
     shuffle_seed: str | None = None
 
-    # High-density Phase 1 (2026-05-18): minimum number of global appearances
-    # for a host to qualify for temporal staggering inside each shard.
-    # Hosts at or above this count get their rows moved to hash-derived
-    # positions so all 100 shards hit the host at distributed wall-clock
-    # offsets instead of all at t=0.  Default 5 covers essexapartmenthomes
-    # (27), equityapartments, gscapts, krcapartments, etc., while excluding
-    # single-host or tiny-cluster backends.
-    host_density_threshold: int = 5
-
 
 class PropertyToScrape(BaseModel):
     """One row in the input catalog — a property the runner should scrape.

@@ -402,20 +402,6 @@ async def run_jugnu(
                 _result_meta["entry_captcha_detected"] = bool(_fd_for_captcha.get("captcha_detected"))
                 _result_meta["entry_bot_blocked"] = bool(_fd_for_captcha.get("bot_blocked"))
                 _result_meta["entry_captcha_provider"] = _fd_for_captcha.get("captcha_provider")
-            # High-density Phase 2 (2026-05-18): propagate domain-quarantine and
-            # rate-limited signals so wedge_rescue_decision can skip the pointless
-            # HTTP-only retry that would immediately hit the same quarantine and
-            # emit a duplicate FAILED_UNREACHABLE.  Essex trace 2026-05-18:
-            # fetch.completed outcome=RATE_LIMITED sig=DOMAIN_QUARANTINED_IN_RUN
-            # followed immediately by wedge-rescue re-fail — 2× FAILED_UNREACHABLE
-            # per quarantined PID.
-            _fd_sig = _fd_for_captcha.get("error_signature") or ""
-            _fd_outcome = _fd_for_captcha.get("outcome") or ""
-            if _fd_sig == "DOMAIN_QUARANTINED_IN_RUN" or _fd_outcome == "RATE_LIMITED":
-                _result_meta = result.setdefault("_meta", {})
-                if _fd_sig == "DOMAIN_QUARANTINED_IN_RUN":
-                    _result_meta["domain_quarantined_in_run"] = True
-                _result_meta["entry_rate_limited"] = True
             # PR 2 (2026-05-10): null-field recovery now runs INSIDE
             # _process_property (before the profile-update step) so
             # recovered FieldPatch entries reach the persistence layer.
@@ -603,24 +589,6 @@ async def run_jugnu(
                     _pid_r,
                     resolution="SKIPPED_ENTRY_CAPTCHA",
                     verdict=(_meta_r.get("verdict") or "UNKNOWN"),
-                )
-            except Exception:
-                pass
-        elif _decision == "SKIP_DOMAIN_QUARANTINED":
-            # Domain was quarantined for the run (or entry fetch was rate-limited).
-            # Retrying with GET returns the same quarantine result (elapsed_ms=0,
-            # outcome=RATE_LIMITED) and emits a duplicate FAILED_UNREACHABLE —
-            # skip it and emit a clean telemetry event so the quarantined
-            # population is visible in dashboards without inflating failure counts.
-            try:
-                from ma_poc.observability.events import EventKind as _EK
-                from ma_poc.observability.events import emit as _emit
-                _emit(
-                    _EK.WEDGE_RESCUE_RETRY_RESOLVED,
-                    _pid_r,
-                    resolution="SKIPPED_DOMAIN_QUARANTINED",
-                    verdict=(_meta_r.get("verdict") or "UNKNOWN"),
-                    domain_quarantined_in_run=bool(_meta_r.get("domain_quarantined_in_run")),
                 )
             except Exception:
                 pass
@@ -996,29 +964,19 @@ def wedge_rescue_decision(
         ``WEDGE_RESCUE_RETRY_RESOLVED`` event with
         ``resolution=SKIPPED_ENTRY_CAPTCHA`` so this population is
         visible separately from rescue-attempt counts.
-      - ``"SKIP_DOMAIN_QUARANTINED"`` — the verdict is wedge-prone but
-        the entry fetch was rate-limited or the domain was quarantined
-        for the entire run (``error_signature=DOMAIN_QUARANTINED_IN_RUN``).
-        A HTTP-only retry will hit the same quarantine (elapsed_ms=0,
-        outcome=RATE_LIMITED) and emit a duplicate FAILED_UNREACHABLE.
-        Skip to avoid the double-emit. The caller emits
-        ``WEDGE_RESCUE_RETRY_RESOLVED`` with
-        ``resolution=SKIPPED_DOMAIN_QUARANTINED``.
-      - ``"NO_RETRY"`` — neither wedge-prone nor captcha/rate-blocked;
-        the result is final, no retry needed.
+      - ``"NO_RETRY"`` — neither wedge-prone nor captcha-blocked; the
+        result is final, no retry needed.
 
     Args:
         meta: The property record's ``_meta`` dict. Reads ``verdict``,
             ``partial_recovery``, ``scrape_tier_used``,
-            ``entry_captcha_detected``, ``entry_bot_blocked``,
-            ``entry_rate_limited``, ``domain_quarantined_in_run``.
+            ``entry_captcha_detected``, ``entry_bot_blocked``.
         has_units: ``True`` when the property record has at least one
             unit in its ``units`` list. Computed by the caller because
             the meta dict doesn't carry the unit list.
 
     Returns:
-        One of ``"RETRY"`` / ``"SKIP_ENTRY_CAPTCHA"`` /
-        ``"SKIP_DOMAIN_QUARANTINED"`` / ``"NO_RETRY"``.
+        One of ``"RETRY"`` / ``"SKIP_ENTRY_CAPTCHA"`` / ``"NO_RETRY"``.
     """
     verdict = (meta.get("verdict") or "").upper()
     is_wedge_prone = (
@@ -1033,8 +991,6 @@ def wedge_rescue_decision(
     )
     if entry_captcha_blocked:
         return "SKIP_ENTRY_CAPTCHA"
-    if meta.get("entry_rate_limited") or meta.get("domain_quarantined_in_run"):
-        return "SKIP_DOMAIN_QUARANTINED"
     return "RETRY"
 
 
