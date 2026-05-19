@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ma_poc.core import issue_log as V
+from ma_poc.core.concession_normalize import normalize_concession
 
 # ── V2 CSV column mapping ────────────────────────────────────────────────────
 #
@@ -118,8 +119,11 @@ def build_v2_property(
     platform = scrape_result.get("platform_detected") or (md.get("api_provider") if md else None) or ""
     website_design = _PLATFORM_LABELS.get(platform.lower(), platform or None)
 
-    # Concessions — prefer scraped banner text
+    # Concessions — prefer scraped banner text. Raw text is ALWAYS retained
+    # (capture-first); concessions_json is the deterministic RealPage-shaped
+    # normalization (None when unparseable — not data loss, raw stays).
     concessions_text = scrape_result.get("concessions_text") or md.get("concessions") or None
+    concessions_json = normalize_concession(concessions_text)
 
     prop: dict[str, Any] = {
         # ── Property-level fields ────────────────────────────────────────
@@ -160,6 +164,7 @@ def build_v2_property(
         or None,
         "website_design": website_design if website_design else None,
         "concessions": concessions_text,
+        "concessions_json": concessions_json,
         # ── Units ────────────────────────────────────────────────────────
         "units": [
             _format_v2_unit(u, scrape_ts, str(_safe_int(csv_id) or ""))
