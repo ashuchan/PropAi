@@ -18,6 +18,10 @@ interface Row {
   rent_high: number | null;
   date_captured: string | null;
   available_date: string | null;
+  // 2026-05-20: producer-literal availability string (alembic 0014). The
+  // Python pipeline writes this even when the typed ``available_date``
+  // column had to be null (e.g. ``"Available 7/24"`` — year missing).
+  available_date_raw: string | null;
   lease_term: number | null;
   move_in_date: string | null;
   first_seen_date: string | null;
@@ -28,12 +32,17 @@ interface Row {
   concessions: unknown;
   amenities: unknown;
   changed_fields: string[] | null;
+  // 2026-05-20: the v2 transform writes ``availability_status`` into
+  // ``extra`` JSON on adapter paths where the column isn't declared on
+  // the row (legacy v1-shape units). Falling back to ``extra`` keeps the
+  // status visible without forcing a second migration.
   extra: Record<string, unknown> | null;
 }
 
 const COLS = `
   canonical_id, unit_id, beds, baths, floor_plan_name, area,
-  rent_low, rent_high, date_captured, available_date, lease_term, move_in_date,
+  rent_low, rent_high, date_captured, available_date, available_date_raw,
+  lease_term, move_in_date,
   first_seen_date, last_seen_at,
   carryforward_days, disappeared_since, last_absent_date,
   concessions, amenities, changed_fields, extra
@@ -75,6 +84,15 @@ export class PgUnitStore implements IUnitStore {
   }
 
   private toRecord(row: Row): UnitStateRecord {
+    const extra = row.extra ?? {};
+    // 2026-05-20: ``availability_status`` lives only inside the ``extra``
+    // JSON catch-all today — the column isn't on the strict v2 schema.
+    // Read with a defensive cast so a missing key is treated as null,
+    // not a TS error.
+    const statusFromExtra =
+      typeof extra['availability_status'] === 'string'
+        ? (extra['availability_status'] as string)
+        : null;
     return {
       canonicalId: row.canonical_id,
       unitId: row.unit_id,
@@ -95,6 +113,11 @@ export class PgUnitStore implements IUnitStore {
       marketRentHigh: row.rent_high,
       // Shared
       availableDate: row.available_date,
+      // 2026-05-20: producer literal + explicit status — required for
+      // the UI to render "Available 7/24" and "AVAILABLE" correctly when
+      // the typed column is null.
+      availableDateRaw: row.available_date_raw,
+      availabilityStatus: statusFromExtra,
       concessions: row.concessions,
       amenities: row.amenities,
       floorPlanName: row.floor_plan_name,
@@ -104,7 +127,7 @@ export class PgUnitStore implements IUnitStore {
       disappearedSince: row.disappeared_since,
       lastAbsentDate: row.last_absent_date,
       changedFields: row.changed_fields ?? [],
-      extra: row.extra ?? {},
+      extra,
     };
   }
 }

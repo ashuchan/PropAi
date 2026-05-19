@@ -1883,31 +1883,37 @@ def _format_v2_unit(
     # unit had availability_status="AVAILABLE" but the v2 row didn't
     # carry it forward to downstream consumers.
     try:
-        from ma_poc.extraction.canonical import AVAIL_STATUS_KEYS
+        from ma_poc.extraction.canonical import (
+            AVAIL_DATE_KEYS,
+            AVAIL_STATUS_KEYS,
+        )
         from ma_poc.extraction.canonical import get_str as _get_str_canon
 
         avail_status_raw = _get_str_canon(unit, AVAIL_STATUS_KEYS) or ""
+        producer_avail_date = _get_str_canon(unit, AVAIL_DATE_KEYS)
     except Exception:
         avail_status_raw = ""
+        producer_avail_date = None
 
-    # If the date normaliser resolved to today via the "Available Now"
-    # token AND status is still empty, we have a strong AVAILABLE signal
-    # — emit it so downstream gates see availability cleanly.
+    # The 2026-05-20 PID 67736 regression: extractors (AppFolio
+    # SSR adapter, Entrata, several others) emit the producer's date
+    # string under the legacy v1 key ``availability_date`` (with the
+    # "y"). Pre-fix we only read ``available_date`` (no "y") so the
+    # 94% of units carrying their date under the legacy spelling
+    # silently shipped ``available_date=null``. The schema gate's
+    # ``record.get("availability_date") or record.get("available_date")``
+    # path read both, but the gate mutates a copy that the v2
+    # formatter never sees.
     #
-    # The schema gate may have already normalised ``available_date`` to
-    # ISO and stashed the producer's literal in ``_date_placeholder`` /
-    # ``available_date_raw``. Fall back to whichever slot carries the
-    # original string when ``available_date`` itself is already None
-    # (e.g. unparseable producer values like "Available 7/24" where the
-    # year is missing).
+    # Fix: use the canonical alias resolver so every producer
+    # spelling (``available_date``, ``availability_date``,
+    # ``availabledate``, ``available_on``, ``readydate``, …) lands
+    # in one slot, then re-run the lenient parser.
     raw_available_date = (
-        unit.get("available_date")
-        or unit.get("available_date_raw")
-        or unit.get("_date_placeholder")
+        unit.get("available_date_raw")     # already-raw, if upstream set it
+        or unit.get("_date_placeholder")   # gate-stashed unparseable literal
+        or producer_avail_date             # any producer alias (the common case)
     )
-    # Re-run the lenient parser. If the gate already normalised, this
-    # passes the ISO value through; if the slot is still raw producer
-    # text, it gets one more chance to resolve before shipping null.
     avail_date_norm = _format_date_str(raw_available_date)
     avail_status = _normalize_availability_status(
         avail_status_raw,
@@ -1945,11 +1951,18 @@ def _format_v2_unit(
         "available_date_raw": _normalize_raw_date(
             unit.get("available_date_raw"),
             unit.get("_date_placeholder"),
-            unit.get("available_date"),
+            # ``raw_available_date`` above already collapsed every
+            # producer alias (``availability_date`` v1, ``available_date``
+            # v2, ``availabledate``, ``available_on``, …) — reuse it so
+            # the raw column captures the producer's literal even when
+            # the alias chain landed on the legacy key.
+            raw_available_date,
         ),
         "availability_status": avail_status,
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
-        "move_in_date": _format_date_str(unit.get("move_in_date") or unit.get("_move_in_date")),
+        "move_in_date": _format_date_str(
+            unit.get("move_in_date") or unit.get("_move_in_date")
+        ),
     }
 
     # Merge-rescue: if no natural id survived, derive a stable inferred id
@@ -2456,6 +2469,12 @@ _RENT_ABSENT_TOKENS: frozenset[str] = frozenset({
 #: "Open", "Vacant", "Leased", "Reserved") — collapse them here so
 #: downstream gates see a stable vocabulary. Unknown values pass through
 #: uppercased so we don't lose unforeseen producer signals.
+#:
+#: 2026-05-20: added the long-tail forms observed in the cloud run telemetry
+#: (``available_ready`` from RealPage feeds, ``schema.org/InStock`` style
+#: URLs from JSON-LD extractors). The ``_STATUS_NORMALIZE_RE`` helper
+#: handles Schema.org URLs by stripping to the local-name suffix before
+#: lookup.
 _AVAILABILITY_STATUS_MAP: dict[str, str] = {
     "available": "AVAILABLE",
     "avail": "AVAILABLE",
@@ -2467,6 +2486,14 @@ _AVAILABILITY_STATUS_MAP: dict[str, str] = {
     "yes": "AVAILABLE",
     "y": "AVAILABLE",
     "1": "AVAILABLE",
+    "available_ready": "AVAILABLE",
+    "availableready": "AVAILABLE",
+    "ready_now": "AVAILABLE",
+    "readynow": "AVAILABLE",
+    "in_stock": "AVAILABLE",
+    "instock": "AVAILABLE",
+    "preorder": "COMING_SOON",
+    "pre_order": "COMING_SOON",
     "unavailable": "UNAVAILABLE",
     "unavail": "UNAVAILABLE",
     "leased": "UNAVAILABLE",
@@ -2480,16 +2507,33 @@ _AVAILABILITY_STATUS_MAP: dict[str, str] = {
     "no": "UNAVAILABLE",
     "n": "UNAVAILABLE",
     "0": "UNAVAILABLE",
+    "out_of_stock": "UNAVAILABLE",
+    "outofstock": "UNAVAILABLE",
+    "soldout": "UNAVAILABLE",
+    "sold_out": "UNAVAILABLE",
+    "discontinued": "UNAVAILABLE",
     "waitlist": "WAITLIST",
     "wait list": "WAITLIST",
     "wait-list": "WAITLIST",
+    "limitedavailability": "WAITLIST",
+    "limited_availability": "WAITLIST",
     "coming soon": "COMING_SOON",
+    "comingsoon": "COMING_SOON",
+    "coming_soon": "COMING_SOON",
     "future": "COMING_SOON",
     "tba": "UNKNOWN",
     "tbd": "UNKNOWN",
     "n/a": "UNKNOWN",
     "na": "UNKNOWN",
 }
+
+#: Schema.org availability URIs land in the status slot when a JSON-LD
+#: extractor copies the value through verbatim. Strip everything up to
+#: the local name (``https://schema.org/InStock`` → ``instock``) so the
+#: lowercase lookup in ``_AVAILABILITY_STATUS_MAP`` resolves correctly.
+_SCHEMA_ORG_AVAILABILITY_RE = _re.compile(
+    r"^https?://schema\.org/(.+?)/?$", _re.IGNORECASE
+)
 
 
 def _normalize_availability_status(
@@ -2518,6 +2562,13 @@ def _normalize_availability_status(
     """
     raw_s = (raw or "").strip().lower()
     if raw_s:
+        # Schema.org URI passthrough: JSON-LD extractors sometimes copy
+        # ``offers[].availability: "https://schema.org/InStock"`` verbatim
+        # into the status slot. Strip to the local name before lookup so
+        # the alias map resolves cleanly instead of shipping the URL.
+        schema_match = _SCHEMA_ORG_AVAILABILITY_RE.match(raw_s)
+        if schema_match:
+            raw_s = schema_match.group(1).lower()
         mapped = _AVAILABILITY_STATUS_MAP.get(raw_s)
         if mapped is not None:
             return mapped

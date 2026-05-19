@@ -86,6 +86,12 @@ export interface UnitStateRecord {
   moveInDate?: string | null;
   // Shared
   availableDate?: string | null;
+  // 2026-05-20: producer-literal availability string (the raw text that
+  // appeared on the website, e.g. "Available 7/24", "Late August").
+  // Populated even when the typed ``availableDate`` had to be null
+  // because the producer's value couldn't normalise to ISO. Mapped from
+  // ``units.available_date_raw`` column (alembic 0014).
+  availableDateRaw?: string | null;
   concessions?: unknown;
   amenities?: unknown;
   floorPlanName?: string | null;

@@ -61,6 +61,23 @@ export interface Property extends PropertySummary {
   schemaVersion: SchemaVersion;
 }
 
+/** Canonical availability statuses surfaced by the API contract.
+ *
+ * 2026-05-20: widened from the previous 3-value enum
+ * (``AVAILABLE | UNAVAILABLE | UNKNOWN``) to include the WAITLIST and
+ * COMING_SOON values the Python normaliser emits. Pre-widening, the
+ * service layer derived the value from ``available_date`` truthiness
+ * and shipped ``UNKNOWN`` whenever the typed date was null — even when
+ * the producer explicitly told us the unit was AVAILABLE. The wider
+ * enum lets us pass the real signal through to the UI.
+ */
+export type AvailabilityStatus =
+  | 'AVAILABLE'
+  | 'UNAVAILABLE'
+  | 'WAITLIST'
+  | 'COMING_SOON'
+  | 'UNKNOWN';
+
 /** Individual rental unit */
 export interface Unit {
   unitId: string;
@@ -71,8 +88,16 @@ export interface Unit {
   askingRent: number;
   effectiveRent: number | null;
   sqft: number | null;
-  availabilityStatus: 'AVAILABLE' | 'UNAVAILABLE' | 'UNKNOWN';
+  availabilityStatus: AvailabilityStatus;
   availableDate: string | null;
+  /** Producer-literal availability string. Populated even when
+   *  ``availableDate`` is null because the producer's value couldn't
+   *  normalise to ISO (e.g. ``"Available 7/24"`` — year missing,
+   *  ``"Late August"``, ``"Available Now"``). UI surfaces this when
+   *  the typed column is empty so users see the website's actual text.
+   *  Added 2026-05-20; nullable to keep the field optional for V1
+   *  schema-version payloads. */
+  availableDateRaw?: string | null;
   leaseLink: string;
   concessions: string | null;
   amenities: string | null;

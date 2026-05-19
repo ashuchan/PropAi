@@ -6,6 +6,7 @@
 import type { IUnitService } from '../../interfaces/IUnitService.js';
 import type { Unit } from '../../types/property.js';
 import type { FloorPlanGroup, UnitHistoryEntry } from '../../types/unit.js';
+import { resolveAvailabilityStatus } from '../../utils/availability.js';
 import { readJsonFile, getLatestRunDate, runPath } from './dataLoader.js';
 
 interface RawProperty {
@@ -75,7 +76,8 @@ export class JsonFileUnitService implements IUnitService {
         unitId: u.unit_id, propertyId, floorPlanType: null,
         marketRentLow: u.market_rent_low, marketRentHigh: u.market_rent_high,
         askingRent: Math.round(askingRent), effectiveRent: null, sqft: null,
-        availabilityStatus: u.available_date ? 'AVAILABLE' as const : 'UNKNOWN' as const,
+        // V1 has no explicit status field; fall back to date inference.
+        availabilityStatus: resolveAvailabilityStatus(null, u.available_date),
         availableDate: u.available_date || null, leaseLink: u.lease_link || '',
         concessions: u.concessions, amenities: u.amenities,
         daysOnMarket: null, rentPerSqft: null,

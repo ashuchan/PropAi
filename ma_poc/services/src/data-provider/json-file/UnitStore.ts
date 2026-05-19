@@ -12,6 +12,9 @@ interface RawUnit {
   market_rent_low?: number | null;
   market_rent_high?: number | null;
   available_date?: string | null;
+  // 2026-05-20: producer-literal availability string. Optional because
+  // pre-2026-05-20 state files don't carry it.
+  available_date_raw?: string | null;
   concessions?: unknown;
   bedrooms?: number | null;
   bathrooms?: number | null;
@@ -49,7 +52,7 @@ export class JsonFileUnitStore implements IUnitStore {
   private toRecord(canonicalId: string, unitId: string, raw: RawUnit): UnitStateRecord {
     const {
       unit_id: _uid,
-      market_rent_low, market_rent_high, available_date, concessions,
+      market_rent_low, market_rent_high, available_date, available_date_raw, concessions,
       bedrooms, bathrooms, sqft, floor_plan_name, availability_status,
       first_seen_date, last_seen_at,
       // Legacy field — no longer on the DTO / DB schema.
@@ -63,6 +66,7 @@ export class JsonFileUnitStore implements IUnitStore {
       marketRentLow: market_rent_low ?? null,
       marketRentHigh: market_rent_high ?? null,
       availableDate: available_date ?? null,
+      availableDateRaw: available_date_raw ?? null,
       concessions: concessions ?? null,
       bedrooms: bedrooms ?? null,
       bathrooms: bathrooms ?? null,

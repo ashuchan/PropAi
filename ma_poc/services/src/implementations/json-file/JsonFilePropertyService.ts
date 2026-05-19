@@ -9,6 +9,7 @@ import type { IPropertyService, PropertyReport, PropertyProfile } from '../../in
 import type { PaginatedResult, PropertyFilters, SortOptions, ExtractionTier, ScrapeStatus } from '../../types/common.js';
 import { isSuccessVerdict } from '../../types/common.js';
 import type { PropertySummary, Property, PropertyAggregates, Unit, FloorPlan, MarketMetrics, PropertyMedia, FloorPlanImage, SchemaVersion } from '../../types/property.js';
+import { resolveAvailabilityStatus } from '../../utils/availability.js';
 import { readJsonFile, readJsonlFile, readTextFile, getLatestRunDate, getRunDates, runPath, statePath } from './dataLoader.js';
 
 /** Raw property format from backend properties.json */
@@ -85,6 +86,9 @@ interface RawV2Unit {
   rent_high: number | null;
   date_captured: string;
   available_date: string | null;
+  // 2026-05-20: producer-literal availability string + explicit status.
+  available_date_raw?: string | null;
+  availability_status?: string | null;
   lease_term: number | null;
   move_in_date: string | null;
 }
@@ -505,7 +509,8 @@ export class JsonFilePropertyService implements IPropertyService {
         unitId: u.unit_id, propertyId, floorPlanType: null,
         marketRentLow: u.market_rent_low, marketRentHigh: u.market_rent_high,
         askingRent: Math.round(askingRent), effectiveRent: null, sqft: null,
-        availabilityStatus: u.available_date ? 'AVAILABLE' as const : 'UNKNOWN' as const,
+        // V1 has no explicit status; fall back to date inference.
+        availabilityStatus: resolveAvailabilityStatus(null, u.available_date),
         availableDate: u.available_date || null, leaseLink: u.lease_link || '',
         concessions: u.concessions, amenities: u.amenities,
         daysOnMarket: null, rentPerSqft: null,
@@ -525,8 +530,10 @@ export class JsonFilePropertyService implements IPropertyService {
         marketRentLow: lo, marketRentHigh: hi,
         askingRent: Math.round(askingRent), effectiveRent: null,
         sqft,
-        availabilityStatus: u.available_date ? 'AVAILABLE' as const : 'UNKNOWN' as const,
-        availableDate: u.available_date || null, leaseLink: '',
+        availabilityStatus: resolveAvailabilityStatus(u.availability_status, u.available_date),
+        availableDate: u.available_date || null,
+        availableDateRaw: u.available_date_raw ?? null,
+        leaseLink: '',
         concessions: null, amenities: null,
         daysOnMarket: null,
         rentPerSqft: sqft && sqft > 0 && askingRent > 0 ? Math.round((askingRent / sqft) * 100) / 100 : null,

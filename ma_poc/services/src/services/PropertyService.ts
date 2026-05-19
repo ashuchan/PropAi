@@ -13,9 +13,10 @@ import type {
 } from '../types/common.js';
 import { isSuccessVerdict } from '../types/common.js';
 import type {
-  PropertySummary, Property, PropertyAggregates, Unit, FloorPlan,
+  AvailabilityStatus, PropertySummary, Property, PropertyAggregates, Unit, FloorPlan,
   MarketMetrics, PropertyMedia, FloorPlanImage, SchemaVersion,
 } from '../types/property.js';
+import { resolveAvailabilityStatus } from '../utils/availability.js';
 
 // ── Raw row shapes — v1 and v2 ───────────────────────────────────────────────
 
@@ -91,6 +92,11 @@ interface RawV2Unit {
   rent_high: number | null;
   date_captured: string;
   available_date: string | null;
+  // 2026-05-20: producer-literal availability string + explicit status.
+  // Both are optional to preserve forward-compat with pre-2026-05-20
+  // payloads — the resolver helpers treat ``undefined`` as ``null``.
+  available_date_raw?: string | null;
+  availability_status?: string | null;
   lease_term: number | null;
   move_in_date: string | null;
 }
@@ -137,8 +143,12 @@ export function recordToUnit(
     askingRent: Math.round(askingRent),
     effectiveRent: null,
     sqft,
-    availabilityStatus: r.availableDate ? 'AVAILABLE' : 'UNKNOWN',
+    // 2026-05-20: read the explicit status field (populated by the Python
+    // normaliser); fall back to date-based inference only when no
+    // producer status was captured.
+    availabilityStatus: resolveAvailabilityStatus(r.availabilityStatus, r.availableDate),
     availableDate: r.availableDate ?? null,
+    availableDateRaw: r.availableDateRaw ?? null,
     leaseLink: '',
     concessions,
     amenities: null,
@@ -780,7 +790,10 @@ export class PropertyService implements IPropertyService {
         askingRent: Math.round(askingRent),
         effectiveRent: null,
         sqft: null,
-        availabilityStatus: u.available_date ? ('AVAILABLE' as const) : ('UNKNOWN' as const),
+        // V1 payloads predate the explicit status field; fall back to
+        // date-based inference (the historical behaviour). The helper
+        // keeps this branch consistent with V2 / postgres readers.
+        availabilityStatus: resolveAvailabilityStatus(null, u.available_date),
         availableDate: u.available_date || null,
         leaseLink: u.lease_link || '',
         concessions: u.concessions,
@@ -807,8 +820,14 @@ export class PropertyService implements IPropertyService {
         askingRent: Math.round(askingRent),
         effectiveRent: null,
         sqft,
-        availabilityStatus: u.available_date ? ('AVAILABLE' as const) : ('UNKNOWN' as const),
+        // 2026-05-20: prefer the explicit producer status — the Python
+        // pipeline emits AVAILABLE / WAITLIST / COMING_SOON / UNAVAILABLE
+        // long before the typed date column is set. Pre-fix the API
+        // shipped UNKNOWN for 77 % of the units that had an explicit
+        // ``AVAILABLE`` status because the typed date was null.
+        availabilityStatus: resolveAvailabilityStatus(u.availability_status, u.available_date),
         availableDate: u.available_date || null,
+        availableDateRaw: u.available_date_raw ?? null,
         leaseLink: '',
         concessions: null,
         amenities: null,

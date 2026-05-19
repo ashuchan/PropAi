@@ -426,3 +426,124 @@ def test_v2_unit_prefers_available_date_over_placeholder() -> None:
     out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
     assert out["available_date"] == "2026-06-15"
     assert out["available_date_raw"] == "Available 6/15/26"
+
+
+# ── 2026-05-20 — alias key regression (PID 67736 / AppFolio SSR) ─────────────
+
+
+def test_v2_unit_reads_legacy_availability_date_key() -> None:
+    """The AppFolio SSR adapter emits the producer's date string under the
+    legacy v1 key ``availability_date`` (with the "y"). Pre-2026-05-20
+    ``_format_v2_unit`` only read ``available_date`` (no "y") — 94 % of units
+    in the 2026-05-19 cloud run shipped ``available_date=null`` and
+    ``available_date_raw=null`` because the formatter never found the data.
+    """
+    unit = {
+        "unit_id": "2216",
+        "bedrooms": 1, "bathrooms": 1.0, "sqft": 665,
+        "market_rent_low": 2295,
+        # Date lands on the legacy alias — this is what the AppFolio
+        # adapter actually emits per the cloud-run artifacts.
+        "availability_date": "Available 7/10/26",
+        "availability_status": "AVAILABLE",
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
+    assert out["available_date"] == "2026-07-10"
+    assert out["available_date_raw"] == "Available 7/10/26"
+    assert out["availability_status"] == "AVAILABLE"
+
+
+def test_v2_unit_reads_camelcase_availabledate_alias() -> None:
+    """MAA emits ``availableDate`` (camelCase); after the adapter lowers
+    field keys it lands as ``availabledate``. AVAIL_DATE_KEYS resolves it."""
+    unit = {
+        "unit_id": "303",
+        "beds": 1, "baths": 1.0, "area": 720,
+        "rent_low": 1850,
+        "availabledate": "2026-08-01",
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="MAA")
+    assert out["available_date"] == "2026-08-01"
+    assert out["available_date_raw"] == "2026-08-01"
+
+
+def test_v2_unit_v2_canonical_key_still_wins_over_alias() -> None:
+    """Priority order: ``available_date`` (v2 canonical) beats
+    ``availability_date`` (v1 alias) when both are set. Otherwise a stale
+    schema-gate-normalised value would be overridden by a raw legacy alias."""
+    unit = {
+        "unit_id": "X",
+        "beds": 1, "baths": 1.0, "area": 700,
+        "rent_low": 1500,
+        "available_date": "2026-06-15",            # already normalised
+        "availability_date": "Available 6/15/26",  # the raw producer string
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="X")
+    # Both keys point at the same logical date — should ship the ISO form
+    # regardless of which slot the producer used.
+    assert out["available_date"] == "2026-06-15"
+
+
+def test_v2_unit_no_date_anywhere_yields_null() -> None:
+    """When no producer alias is populated, both typed and raw columns are
+    null — distinguishes "no data" from "data we couldn't parse"."""
+    unit = {
+        "unit_id": "no_date",
+        "beds": 1, "baths": 1.0, "area": 700,
+        "rent_low": 1500,
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="X")
+    assert out["available_date"] is None
+    assert out["available_date_raw"] is None
+
+
+# ── 2026-05-20 — status normalisation long-tail (cloud run telemetry) ────────
+
+
+def test_status_available_ready_normalised() -> None:
+    """RealPage and several other adapters emit ``AVAILABLE_READY`` to
+    indicate "available now, no preparation needed". Pre-2026-05-20 it
+    fell through to the unknown-pass-through branch and shipped as-is."""
+    assert _normalize_availability_status("AVAILABLE_READY") == "AVAILABLE"
+    assert _normalize_availability_status("available_ready") == "AVAILABLE"
+    assert _normalize_availability_status("AvailableReady") == "AVAILABLE"
+
+
+def test_status_schema_org_instock_normalised() -> None:
+    """JSON-LD extractors sometimes copy ``offers[].availability:
+    "https://schema.org/InStock"`` verbatim into the status slot.
+    Strip the URL prefix down to the local name before lookup."""
+    assert _normalize_availability_status("https://schema.org/InStock") == "AVAILABLE"
+    assert _normalize_availability_status("http://schema.org/InStock") == "AVAILABLE"
+    assert _normalize_availability_status(
+        "https://schema.org/OutOfStock"
+    ) == "UNAVAILABLE"
+    assert _normalize_availability_status(
+        "https://schema.org/LimitedAvailability"
+    ) == "WAITLIST"
+    assert _normalize_availability_status(
+        "https://schema.org/PreOrder"
+    ) == "COMING_SOON"
+    assert _normalize_availability_status(
+        "https://schema.org/Discontinued"
+    ) == "UNAVAILABLE"
+
+
+def test_status_schema_org_trailing_slash_tolerated() -> None:
+    """Some emitters include a trailing slash on the Schema.org URI."""
+    assert _normalize_availability_status(
+        "https://schema.org/InStock/"
+    ) == "AVAILABLE"
+
+
+def test_status_schema_org_unknown_term_falls_through() -> None:
+    """Unrecognised Schema.org names pass through uppercased (after URL
+    strip) so we don't drop signals we haven't classified yet."""
+    out = _normalize_availability_status("https://schema.org/SoldOut")
+    assert out == "UNAVAILABLE"  # mapped via 'soldout' alias
+
+
+def test_status_in_stock_underscore_variant() -> None:
+    """``in_stock`` / ``instock`` (Schema.org local name) → AVAILABLE."""
+    assert _normalize_availability_status("in_stock") == "AVAILABLE"
+    assert _normalize_availability_status("instock") == "AVAILABLE"

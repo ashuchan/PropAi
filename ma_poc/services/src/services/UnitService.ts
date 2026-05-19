@@ -10,6 +10,7 @@ import type { IUnitService } from '../interfaces/IUnitService.js';
 import type { Unit } from '../types/property.js';
 import type { DataScope } from '../types/common.js';
 import type { FloorPlanGroup, UnitHistoryEntry } from '../types/unit.js';
+import { resolveAvailabilityStatus } from '../utils/availability.js';
 import { recordToUnit } from './PropertyService.js';
 
 interface RawV1Unit {
@@ -33,6 +34,9 @@ interface RawV2Unit {
   rent_high: number | null;
   date_captured: string;
   available_date: string | null;
+  // 2026-05-20: producer-literal availability string + explicit status.
+  available_date_raw?: string | null;
+  availability_status?: string | null;
   lease_term: number | null;
   move_in_date: string | null;
 }
@@ -105,7 +109,9 @@ export class UnitService implements IUnitService {
         askingRent: Math.round(askingRent),
         effectiveRent: null,
         sqft: null,
-        availabilityStatus: u.available_date ? ('AVAILABLE' as const) : ('UNKNOWN' as const),
+        // V1 payloads predate the explicit status field — date-based
+        // inference is the historical behaviour.
+        availabilityStatus: resolveAvailabilityStatus(null, u.available_date),
         availableDate: u.available_date || null,
         leaseLink: u.lease_link || '',
         concessions: u.concessions,
@@ -132,8 +138,12 @@ export class UnitService implements IUnitService {
         askingRent: Math.round(askingRent),
         effectiveRent: null,
         sqft,
-        availabilityStatus: u.available_date ? ('AVAILABLE' as const) : ('UNKNOWN' as const),
+        // 2026-05-20: explicit producer status wins; date-inference is
+        // the fallback. See PropertyService.transformUnitsV2 for the
+        // canonical comment.
+        availabilityStatus: resolveAvailabilityStatus(u.availability_status, u.available_date),
         availableDate: u.available_date || null,
+        availableDateRaw: u.available_date_raw ?? null,
         leaseLink: '',
         concessions: null,
         amenities: null,
