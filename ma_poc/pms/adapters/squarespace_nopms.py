@@ -43,6 +43,7 @@ class SquarespaceNoPmsAdapter:
         """
         from ma_poc.extraction.post_process import post_process
         from ma_poc.pms.adapters._appfolio_embed import recover_appfolio_embed
+        from ma_poc.pms.adapters._leaseleads_embed import recover_leaseleads_embed
         from ma_poc.pms.adapters._pms_portal_hop import recover_pms_portal
 
         units = await recover_appfolio_embed(page, ctx)
@@ -56,7 +57,21 @@ class SquarespaceNoPmsAdapter:
                     confidence=min(0.95, 0.7 + 0.05 * pp.n_admitted),
                 )
 
-        # Second-chance: PMS portal one nav-hop deep (Resman/RentCafe SecureCafe).
+        # Second-chance: LeaseLeads embedded iframe one nav-hop deep.
+        # 2026-05-19 deep-probe finding (5 confirmed cases) — see
+        # _leaseleads_embed.py. Public JSON API at api.leaseleads.co.
+        ll_units = await recover_leaseleads_embed(page, ctx)
+        if ll_units:
+            pp = post_process(ll_units, property_id=getattr(ctx, "property_id", None))
+            if pp.n_admitted > 0:
+                return AdapterResult(
+                    units=pp.admitted,
+                    plan_summaries=pp.plan_summaries,
+                    tier_used="TIER_1_API_LEASELEADS",
+                    confidence=min(0.95, 0.7 + 0.04 * pp.n_admitted),
+                )
+
+        # Third-chance: PMS portal one nav-hop deep (Resman/RentCafe SecureCafe).
         # 2026-05-19 deep-probe finding — see _pms_portal_hop.py docstring.
         portal_units = await recover_pms_portal(page, ctx)
         if portal_units:
