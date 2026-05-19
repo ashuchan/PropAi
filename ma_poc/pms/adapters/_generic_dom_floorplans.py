@@ -113,39 +113,58 @@ async () => {
     return CLASS_WORDS.some((w) => c.includes(w));
   };
 
+  const scoreCard = (t) => {
+    if (!t || t.length > 800) return 0;
+    const hasBed = /\b(?:studio|\d+\s*(?:bed|bd|br))\b/i.test(t);
+    const hasBath = /\b\d+(?:\.\d+)?\s*(?:bath|ba)\b/i.test(t);
+    const hasSqft = /\b\d[\d,]*\s*(?:sq|sqft|square)/i.test(t);
+    const hasDollar = /\$\d{3,}/.test(t);
+    return (hasBed?1:0) + (hasBath?1:0) + (hasSqft?1:0) + (hasDollar?1:0);
+  };
+
   const findCardsIn = (doc) => {
-    // group sibling-of-same-class containers, count >=2 and <=50
+    // 1) collect every plan-class-like className that appears in [2, 50] instances
     const freq = new Map();
     doc.querySelectorAll('div,li,article,section').forEach((el) => {
       const cn = typeof el.className === 'string' ? el.className.trim() : '';
       if (!cn || !classMatches(cn)) return;
       freq.set(cn, (freq.get(cn) || 0) + 1);
     });
-    // pick the class with the most matches in the [2,50] sweet spot
-    let bestClass = null, bestCount = 0;
-    freq.forEach((n, c) => { if (n >= 2 && n <= 50 && n > bestCount) { bestClass = c; bestCount = n; } });
-    if (!bestClass) return [];
-    const containers = Array.from(doc.querySelectorAll('[class]'))
-      .filter((el) => typeof el.className === 'string' && el.className === bestClass);
+    const candidates = [...freq.entries()].filter(([, n]) => n >= 2 && n <= 50);
+    if (candidates.length === 0) return [];
 
-    const cards = [];
-    for (const c of containers) {
-      const t = TXT(c);
-      if (!t || t.length > 800) continue;
-      const hasBed = /\b(?:studio|\d+\s*(?:bed|bd|br))\b/i.test(t);
-      const hasBath = /\b\d+(?:\.\d+)?\s*(?:bath|ba)\b/i.test(t);
-      const hasSqft = /\b\d[\d,]*\s*(?:sq|sqft|square)/i.test(t);
-      const hasDollar = /\$\d{3,}/.test(t);
-      const score = (hasBed?1:0) + (hasBath?1:0) + (hasSqft?1:0) + (hasDollar?1:0);
-      if (score < 2) continue;
-      // grab "name" candidate: first heading or .name/.title under container
-      let name = '';
-      const head = c.querySelector('h1, h2, h3, h4, [class*="name"], [class*="title"], [class*="heading"]');
-      if (head) name = TXT(head);
-      if (!name) name = t.split(/[|•\n]/)[0].slice(0, 60).trim();
-      cards.push({name, text: t, klass: bestClass});
+    // 2) score each candidate by ADMITTED-card count (not raw frequency).
+    //    A class with 5 cards that admit beats a class with 48 cards that
+    //    all fail the score gate (e.g. Webflow's nested detail containers).
+    //    Tiebreaker: admission rate; then raw count (least bad fallback).
+    let best = null;
+    for (const [cn] of candidates) {
+      const containers = Array.from(doc.querySelectorAll('[class]'))
+        .filter((el) => typeof el.className === 'string' && el.className === cn);
+      const admitted = [];
+      for (const c of containers) {
+        const t = TXT(c);
+        if (scoreCard(t) >= 2) admitted.push({el: c, text: t});
+      }
+      if (admitted.length === 0) continue;
+      const rate = admitted.length / containers.length;
+      if (
+        !best
+        || admitted.length > best.admitted.length
+        || (admitted.length === best.admitted.length && rate > best.rate)
+      ) {
+        best = {cn, admitted, rate};
+      }
     }
-    return cards;
+    if (!best) return [];
+
+    return best.admitted.map(({el, text}) => {
+      let name = '';
+      const head = el.querySelector('h1, h2, h3, h4, [class*="name"], [class*="title"], [class*="heading"]');
+      if (head) name = TXT(head);
+      if (!name) name = text.split(/[|•\n]/)[0].slice(0, 60).trim();
+      return {name, text, klass: best.cn};
+    });
   };
 
   // 1) try the live document (we may already be on the right page)
