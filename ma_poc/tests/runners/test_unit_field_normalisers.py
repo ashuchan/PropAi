@@ -370,18 +370,60 @@ def test_v2_unit_emits_available_date_raw_for_parseable_string() -> None:
 def test_v2_unit_falls_back_to_date_placeholder_for_raw() -> None:
     """When the schema gate has already nulled ``available_date`` and
     stashed the literal in ``_date_placeholder``, the v2 formatter
-    surfaces the placeholder as ``available_date_raw``.
+    surfaces the placeholder.
+
+    2026-05-21 contract change: when the producer string can't be
+    normalised to ISO, ``available_date`` falls back to the raw producer
+    literal (clipped to 32 chars for the VARCHAR(32) column) rather than
+    shipping null. The UI now always shows what the website actually
+    said. The strict ISO column lives at ``available_date_raw`` — wait,
+    no — ``available_date_raw`` IS the raw column; ``available_date`` is
+    "best effort": ISO when parseable, raw otherwise.
     """
     unit = {
         "unit_id": "9821",
         "bedrooms": 1, "bathrooms": 1.0, "sqft": 650,
         "market_rent_low": 1800,
         "available_date": None,
-        "_date_placeholder": "Available 7/24",  # year ambiguous — gate nulled it
+        "_date_placeholder": "Available 7/24",  # year ambiguous — parser returns None
     }
     out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
-    assert out["available_date"] is None  # parser still can't infer a year
+    # Parser still can't infer a year, so the typed column falls back
+    # to the producer literal rather than null.
+    assert out["available_date"] == "Available 7/24"
     assert out["available_date_raw"] == "Available 7/24"
+
+
+def test_v2_unit_truly_no_data_yields_null_date() -> None:
+    """When the producer emitted nothing at all (no value in any alias),
+    both the typed and raw date columns are null. Distinguishes
+    "no data" from "data we couldn't parse"."""
+    unit = {
+        "unit_id": "0001",
+        "bedrooms": 1, "bathrooms": 1.0, "sqft": 700,
+        "market_rent_low": 1500,
+        # No date in any alias.
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="X")
+    assert out["available_date"] is None
+    assert out["available_date_raw"] is None
+
+
+def test_v2_unit_raw_fallback_clipped_to_column_width() -> None:
+    """Long producer strings (e.g. "Unit 0304 Available on June 3,
+    2026 1 bedroom...") are clipped to 32 chars so the storage layer's
+    truncation warning path doesn't fire."""
+    unit = {
+        "unit_id": "X",
+        "bedrooms": 1, "bathrooms": 1.0, "sqft": 700,
+        "market_rent_low": 1500,
+        "availability_date": "Unit 0304 Available on June 3, 2026 1 bedroom",
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="X")
+    assert out["available_date"] is not None
+    assert len(out["available_date"]) <= 32
+    # available_date_raw column is VARCHAR(64) so it keeps the full string.
+    assert out["available_date_raw"].startswith("Unit 0304 Available on June")
 
 
 def test_v2_unit_collapses_internal_whitespace_in_raw() -> None:
@@ -547,3 +589,169 @@ def test_status_in_stock_underscore_variant() -> None:
     """``in_stock`` / ``instock`` (Schema.org local name) → AVAILABLE."""
     assert _normalize_availability_status("in_stock") == "AVAILABLE"
     assert _normalize_availability_status("instock") == "AVAILABLE"
+
+
+# ── 2026-05-21 — rent-presence implicit AVAILABLE defaulting ────────────────
+
+
+def test_status_defaults_to_available_when_rent_present() -> None:
+    """A unit with rent set + no explicit status defaults to AVAILABLE.
+
+    Diagnostic from the 2026-05-19 cloud run: 12,346 of 14,084 TIER_1_API
+    null-status units (87.7 %) had rent set. Properties don't list rent
+    for occupied units — the missing status is a producer-side gap.
+    """
+    assert _normalize_availability_status("", rent_low=1500.0) == "AVAILABLE"
+    assert _normalize_availability_status(None, rent_high=2200.0) == "AVAILABLE"
+    assert _normalize_availability_status(
+        "", rent_low=None, rent_high=1800.0,
+    ) == "AVAILABLE"
+
+
+def test_status_no_rent_no_date_returns_none() -> None:
+    """When no signal at all (no status, no date, no rent), stay null —
+    don't fabricate availability."""
+    assert _normalize_availability_status("", rent_low=None, rent_high=None) is None
+    assert _normalize_availability_status("") is None
+
+
+def test_status_zero_or_negative_rent_does_not_default() -> None:
+    """The rent sanity floor (> 1) gates the inference — 0 and negative
+    rents are noise from broken extractors, not real listings."""
+    assert _normalize_availability_status("", rent_low=0) is None
+    assert _normalize_availability_status("", rent_low=1) is None
+    assert _normalize_availability_status("", rent_high=-50) is None
+
+
+def test_status_bool_rent_does_not_default() -> None:
+    """``True`` is technically ``> 1`` in Python (bool is an int subclass).
+    Explicit guard prevents bool from triggering AVAILABLE."""
+    assert _normalize_availability_status("", rent_low=True) is None
+    assert _normalize_availability_status("", rent_high=False) is None
+
+
+def test_status_explicit_producer_value_beats_rent_default() -> None:
+    """The rent-default is the lowest-priority inference. An explicit
+    producer value (even UNAVAILABLE) still wins."""
+    assert _normalize_availability_status(
+        "UNAVAILABLE", rent_low=1500.0,
+    ) == "UNAVAILABLE"
+    assert _normalize_availability_status(
+        "WAITLIST", rent_low=1500.0,
+    ) == "WAITLIST"
+
+
+def test_v2_unit_rent_present_no_status_now_resolves_available() -> None:
+    """End-to-end: PID 1156 (Northview Southview)-style unit from the
+    2026-05-19 TIER_1_API null-status cohort. Pre-fix v2 output had
+    availability_status=null on 12,346 units with rent set."""
+    unit = {
+        "unit_id": "324H",
+        "beds": 1, "baths": 1.0, "area": 687,
+        "rent_low": 1890,
+        "rent_high": 1890,
+        # No availability_status, no availability_date — extractor missed both.
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="1156")
+    assert out["availability_status"] == "AVAILABLE"
+    assert out["rent_low"] == 1890.0
+
+
+# ── 2026-05-21 — floor-plan rent join post-pass ─────────────────────────────
+
+
+def test_fp_join_fills_rent_from_sibling() -> None:
+    """A unit with no rent shares a floor_plan_id with one that does —
+    the post-pass copies rent_low (min) and rent_high (max)."""
+    from ma_poc.scripts.runners.jugnu import _fill_rent_from_floor_plan_siblings
+    units = [
+        {"unit_id": "A1", "floor_plan_id": "fp_a", "rent_low": 1500.0, "rent_high": 1500.0},
+        {"unit_id": "A2", "floor_plan_id": "fp_a", "rent_low": None, "rent_high": None},
+        {"unit_id": "A3", "floor_plan_id": "fp_a", "rent_low": 1600.0, "rent_high": 1700.0},
+    ]
+    out = _fill_rent_from_floor_plan_siblings(units)
+    # A1 unchanged
+    assert out[0]["rent_low"] == 1500.0
+    # A2 filled from siblings: min of (1500, 1600) and max of (1500, 1700)
+    assert out[1]["rent_low"] == 1500.0
+    assert out[1]["rent_high"] == 1700.0
+    assert out[1]["_rent_filled_from_sibling"] is True
+    # A3 unchanged
+    assert out[2]["rent_low"] == 1600.0
+
+
+def test_fp_join_no_op_when_no_floor_plan_id() -> None:
+    """Units without a floor_plan_id can't be joined — leave them alone."""
+    from ma_poc.scripts.runners.jugnu import _fill_rent_from_floor_plan_siblings
+    units = [
+        {"unit_id": "X", "rent_low": None, "rent_high": None},
+        {"unit_id": "Y", "rent_low": 1500.0, "rent_high": 1500.0},
+    ]
+    out = _fill_rent_from_floor_plan_siblings(units)
+    assert out[0]["rent_low"] is None
+    assert "_rent_filled_from_sibling" not in out[0]
+
+
+def test_fp_join_no_op_when_no_sibling_has_rent() -> None:
+    """When every unit in a floor plan has no rent, the join can't help —
+    everyone stays null."""
+    from ma_poc.scripts.runners.jugnu import _fill_rent_from_floor_plan_siblings
+    units = [
+        {"unit_id": "A1", "floor_plan_id": "fp_a", "rent_low": None, "rent_high": None},
+        {"unit_id": "A2", "floor_plan_id": "fp_a", "rent_low": None, "rent_high": None},
+    ]
+    out = _fill_rent_from_floor_plan_siblings(units)
+    assert out[0]["rent_low"] is None
+    assert out[1]["rent_low"] is None
+
+
+def test_fp_join_also_recovers_status_when_rent_filled() -> None:
+    """A unit that gets rent via the FP join also picks up
+    ``availability_status=AVAILABLE`` (mirrors the rent-presence
+    inference at the per-unit level)."""
+    from ma_poc.scripts.runners.jugnu import _fill_rent_from_floor_plan_siblings
+    units = [
+        {
+            "unit_id": "A1", "floor_plan_id": "fp_a",
+            "rent_low": 1500.0, "rent_high": 1500.0,
+            "availability_status": "AVAILABLE",
+        },
+        {
+            "unit_id": "A2", "floor_plan_id": "fp_a",
+            "rent_low": None, "rent_high": None,
+            "availability_status": None,
+        },
+    ]
+    out = _fill_rent_from_floor_plan_siblings(units)
+    assert out[1]["rent_low"] == 1500.0
+    assert out[1]["availability_status"] == "AVAILABLE"
+
+
+def test_fp_join_does_not_override_explicit_status() -> None:
+    """A unit with an explicit UNAVAILABLE status doesn't get bumped to
+    AVAILABLE just because the FP join filled its rent."""
+    from ma_poc.scripts.runners.jugnu import _fill_rent_from_floor_plan_siblings
+    units = [
+        {"unit_id": "A1", "floor_plan_id": "fp_a", "rent_low": 1500.0, "rent_high": 1500.0},
+        {
+            "unit_id": "A2", "floor_plan_id": "fp_a",
+            "rent_low": None, "rent_high": None,
+            "availability_status": "UNAVAILABLE",
+        },
+    ]
+    out = _fill_rent_from_floor_plan_siblings(units)
+    assert out[1]["rent_low"] == 1500.0
+    assert out[1]["availability_status"] == "UNAVAILABLE"  # preserved
+
+
+def test_fp_join_is_idempotent() -> None:
+    """Running the post-pass twice produces the same output the second
+    time. Pure function contract."""
+    from ma_poc.scripts.runners.jugnu import _fill_rent_from_floor_plan_siblings
+    units = [
+        {"unit_id": "A1", "floor_plan_id": "fp_a", "rent_low": 1500.0, "rent_high": 1500.0},
+        {"unit_id": "A2", "floor_plan_id": "fp_a", "rent_low": None, "rent_high": None},
+    ]
+    first = _fill_rent_from_floor_plan_siblings(units)
+    second = _fill_rent_from_floor_plan_siblings(first)
+    assert first == second

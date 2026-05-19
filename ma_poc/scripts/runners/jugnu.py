@@ -1760,7 +1760,16 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "pmc": _pick(_csv("Management Company") or _csv("pmc"), md.get("management_company")),
         "website_design": website_design,
         "concessions": concessions_text,
-        "units": [_format_v2_unit(u, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)) for u in units],
+        # 2026-05-21: after per-unit format, run the floor-plan rent
+        # join post-pass so units that share a ``floor_plan_id`` with
+        # a rent-bearing sibling pick up the sibling's rent_low/high.
+        # Adds ~763 unit recoveries / day (10.5 % of TIER_1_API and
+        # TIER_1_5_EMBEDDED null-rent units in the 2026-05-19 run) at
+        # the cost of one O(N) pre-pass + O(N) post-pass over the unit
+        # list — negligible per-property.
+        "units": _fill_rent_from_floor_plan_siblings(
+            [_format_v2_unit(u, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)) for u in units]
+        ),
         # 2026-05-17 Bug A fix — surface plan-level rows (post_process
         # ``plan_summaries`` partition). Pre-fix these were silently
         # dropped at the v2 output boundary; now they ship under
@@ -1783,6 +1792,86 @@ def _v2_property_id_for_unit(meta: dict[str, Any], apartment_id: int | None) -> 
     unit in the same property still hashes consistently.
     """
     return str(meta.get("canonical_id") or apartment_id or "").strip()
+
+
+def _fill_rent_from_floor_plan_siblings(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Fill missing rent on units that share a ``floor_plan_id`` with a sibling.
+
+    When the extractor captures some units in a floor plan with rent but
+    misses others (commonly happens with TIER_1_API and TIER_1_5_EMBEDDED
+    paths where rent lives on a per-unit row but a few rows have it null),
+    the empty rent slot can be inferred from the floor plan's other units.
+
+    Strategy:
+      * First pass — collect ``{floor_plan_id: [rents]}`` from units
+        with rent set.
+      * Second pass — for each unit with ``rent_low=None`` AND a known
+        ``floor_plan_id``, fill from the sibling distribution: take the
+        MIN of sibling rent_lows for rent_low, the MAX of sibling
+        rent_highs for rent_high. Conservative on the low end; honest
+        about the high end.
+      * Stamp ``_rent_filled_from_sibling=True`` (private flag) so
+        downstream gates can distinguish inferred rent from extracted.
+
+    Pure function — never raises, returns a new list with mutated copies.
+    Idempotent: calling twice on the same list produces the same result.
+
+    Diagnostic: ``2026-05-19`` cloud-run scan found 763 / 7,263 null-rent
+    units (10.5 %) whose floor plan had rent on a sibling — the recovery
+    target for this helper.
+    """
+    if not units:
+        return units
+
+    # Index: floor_plan_id -> (set of rent_lows, set of rent_highs)
+    fp_rents: dict[str, tuple[set[float], set[float]]] = {}
+    for u in units:
+        fp_id = u.get("floor_plan_id")
+        if not fp_id:
+            continue
+        rl = u.get("rent_low")
+        rh = u.get("rent_high")
+        if (rl is not None and isinstance(rl, (int, float)) and rl > 1) or (
+            rh is not None and isinstance(rh, (int, float)) and rh > 1
+        ):
+            slot = fp_rents.setdefault(fp_id, (set(), set()))
+            if isinstance(rl, (int, float)) and rl > 1:
+                slot[0].add(float(rl))
+            if isinstance(rh, (int, float)) and rh > 1:
+                slot[1].add(float(rh))
+
+    if not fp_rents:
+        return units
+
+    out: list[dict[str, Any]] = []
+    for u in units:
+        fp_id = u.get("floor_plan_id")
+        rl = u.get("rent_low")
+        rh = u.get("rent_high")
+        need_low = rl is None or (isinstance(rl, (int, float)) and rl <= 1)
+        need_high = rh is None or (isinstance(rh, (int, float)) and rh <= 1)
+        if not (need_low or need_high) or fp_id not in fp_rents:
+            out.append(u)
+            continue
+        lows, highs = fp_rents[fp_id]
+        if not (lows or highs):
+            out.append(u)
+            continue
+        new_u = dict(u)
+        if need_low and lows:
+            new_u["rent_low"] = min(lows)
+            new_u["_rent_filled_from_sibling"] = True
+        if need_high and highs:
+            new_u["rent_high"] = max(highs)
+            new_u["_rent_filled_from_sibling"] = True
+        # If status was missing too, the rent-presence inference at the
+        # formatter ran on the per-unit `rent_low_fmt` which was None;
+        # now that we've filled rent, re-run the status inference so the
+        # sibling-recovered rent also rescues the status.
+        if not new_u.get("availability_status") and (new_u.get("rent_low") or new_u.get("rent_high")):
+            new_u["availability_status"] = "AVAILABLE"
+        out.append(new_u)
+    return out
 
 
 def _format_v2_unit(
@@ -1844,9 +1933,24 @@ def _format_v2_unit(
         except Exception:
             pass
 
-    # rent: numeric first, parse rent_range string if needed.
-    rent_lo_raw = unit.get("market_rent_low") or unit.get("asking_rent")
-    rent_hi_raw = unit.get("market_rent_high") or unit.get("asking_rent")
+    # rent: use the canonical alias resolver so every producer spelling
+    # (``rent_low`` v2 canonical, ``market_rent_low`` v1, ``min_rent``
+    # MAA, ``minimumrent`` Windsor, ``base_rent``, ``starting_price``, …)
+    # lands in one slot. Pre-2026-05-21 the formatter only read
+    # ``market_rent_low`` + ``asking_rent``, so adapter paths that emit
+    # under any other alias shipped ``rent_low=null`` — the same alias-
+    # blind bug class as the date issue fixed 2026-05-20.
+    try:
+        from ma_poc.extraction.canonical import RENT_HI_KEYS, RENT_LO_KEYS
+        from ma_poc.extraction.canonical import get_numeric as _get_num_canon
+
+        rent_lo_raw = _get_num_canon(unit, RENT_LO_KEYS)
+        rent_hi_raw = _get_num_canon(unit, RENT_HI_KEYS)
+    except Exception:
+        # Defensive fallback to the legacy lookup if the canonical
+        # module is unavailable for any reason (import error, test stub).
+        rent_lo_raw = unit.get("market_rent_low") or unit.get("asking_rent")
+        rent_hi_raw = unit.get("market_rent_high") or unit.get("asking_rent")
     if rent_lo_raw is None and rent_hi_raw is None:
         rent_range = unit.get("rent_range")
         if rent_range:
@@ -1915,11 +2019,34 @@ def _format_v2_unit(
         or producer_avail_date             # any producer alias (the common case)
     )
     avail_date_norm = _format_date_str(raw_available_date)
+    # 2026-05-21 product call: when the producer emitted a date string we
+    # can't normalise to ISO ("Date: Available", "Late August", "Spring
+    # 2026", …), fall back to the producer literal in the typed column
+    # rather than shipping null. Downstream UI now always shows what the
+    # website actually said, and analytics that want strict ISO can
+    # still filter on the ``available_date_raw`` column (which is
+    # always the verbatim producer string) or pattern-match ISO via
+    # regex. The DB column is VARCHAR(32); strings longer than that are
+    # clipped by ``_clip_to_column_limits`` at the storage boundary.
+    if avail_date_norm is None and raw_available_date:
+        fallback = _normalize_raw_date(raw_available_date)
+        if fallback:
+            # Clip to the typed column width so the storage clipper
+            # doesn't have to truncate mid-word in the warning path.
+            avail_date_norm = fallback[:32]
+    # Pre-compute the rent values so the status inference can read them
+    # without recomputing — formatted values are the source of truth for
+    # the "is rent present?" decision, not the raw input keys (which
+    # might be 0 or sentinel strings the rent normaliser rejects).
+    _rent_low_fmt = _format_rent(rent_lo_raw)
+    _rent_high_fmt = _format_rent(rent_hi_raw)
     avail_status = _normalize_availability_status(
         avail_status_raw,
         raw_available_date=raw_available_date,
         normalized_available_date=avail_date_norm,
         scrape_ts=scrape_ts,
+        rent_low=_rent_low_fmt,
+        rent_high=_rent_high_fmt,
     )
 
     out: dict[str, Any] = {
@@ -1929,8 +2056,8 @@ def _format_v2_unit(
         "floor_plan_id": floor_plan_id,
         "area": _format_area(sqft),
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
-        "rent_low": _format_rent(rent_lo_raw),
-        "rent_high": _format_rent(rent_hi_raw),
+        "rent_low": _rent_low_fmt,
+        "rent_high": _rent_high_fmt,
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         "available_date": avail_date_norm,
         # Producer's literal availability string, preserved verbatim
@@ -2542,6 +2669,8 @@ def _normalize_availability_status(
     raw_available_date: Any = None,
     normalized_available_date: str | None = None,
     scrape_ts: datetime | None = None,
+    rent_low: Any = None,
+    rent_high: Any = None,
 ) -> str | None:
     """Canonicalise a producer status string into AVAILABLE/UNAVAILABLE/etc.
 
@@ -2555,7 +2684,19 @@ def _normalize_availability_status(
         3. Implicit availability from a future date: when an
            ``available_date`` resolved to today or later but no explicit
            status was set, treat as AVAILABLE.
-        4. None when there's no signal at all (rather than guessing).
+        4. **Implicit availability from rent presence** (2026-05-21): when
+           the unit has rent but no explicit status and no date signal,
+           default to AVAILABLE. The reasoning: the unit reached the v2
+           output because the extractor pulled it from a property
+           website's availability feed (``/availability``,
+           ``/units``, embedded SSR inventory, …) with a rent value
+           attached. Producers don't list rent for occupied units they
+           aren't trying to lease. In the 2026-05-19 cloud run, 12,346
+           of 14,084 TIER_1_API null-status units (87.7 %) had rent set;
+           99.6 % of TIER_1_API null-status units overall had rent —
+           the missing status is a producer-side gap, not a "we don't
+           know" signal.
+        5. None when there's no signal at all (rather than guessing).
 
     Unknown explicit values pass through uppercased so we don't drop
     producer signals we haven't seen yet.
@@ -2588,6 +2729,20 @@ def _normalize_availability_status(
                 return "AVAILABLE"
         except (ValueError, TypeError):
             pass
+
+    # 2026-05-21: rent-presence inference. A unit that reached the v2
+    # output with a non-trivial rent value was, by definition, pulled
+    # from an availability feed — producer just didn't stamp the
+    # status column. ``> 1`` mirrors ``_format_rent``'s sanity floor;
+    # bools are excluded because ``True > 1`` evaluates True in Python.
+    for rv in (rent_low, rent_high):
+        if rv is None or isinstance(rv, bool):
+            continue
+        try:
+            if float(rv) > 1:
+                return "AVAILABLE"
+        except (TypeError, ValueError):
+            continue
 
     return None
 
