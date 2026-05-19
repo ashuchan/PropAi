@@ -57,6 +57,124 @@ _ENTRATA_PROBES: tuple[str, ...] = (
     "/api/availability",
 )
 
+# 2026-05-19: Entrata "Prospect Portal" *website* recovery. These are
+# Entrata-hosted marketing sites (host ``*.prospectportal.com`` or a vanity
+# domain that loads ``commoncf.entrata.com/.../prospect_portal/*`` scripts).
+# Their floor-plan grid is server-side rendered into the DOM at
+# ``/{city}/{slug}/conventional/`` — no unit XHR fires, so the captured-API
+# and probe paths above both come back empty and the adapter used to dead-end
+# at ``no_units``. This was the single largest recoverable failure cluster in
+# the 2026-05-19 deep probe (~43% of failed cases, 100% recoverable). The
+# selectors below were verified against live Prospect Portal pages on both a
+# canonical ``*.prospectportal.com`` subdomain and a vanity domain.
+_PROSPECT_PORTAL_DOM_JS = r"""
+() => {
+  const T = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : '');
+  const cards = Array.from(document.querySelectorAll('.fp-card'));
+  return cards.map((c) => {
+    const liDeposit = Array.from(c.querySelectorAll('.fp-details li'))
+      .map((e) => T(e))
+      .find((t) => /deposit/i.test(t)) || '';
+    const special =
+      T(c.querySelector('.fp-special-main-text')) ||
+      T(c.querySelector('.fp-special-text')) ||
+      '';
+    return {
+      name: T(c.querySelector('.fp-title')),
+      bedbath: T(c.querySelector('.dynamic-text-before')),
+      sqft: T(c.querySelector('.dynamic-text-after')),
+      fee: T(c.querySelector('.fee-transparency-text')),
+      lease: T(c.querySelector('.lease-term-name')),
+      deposit: liDeposit,
+      availability: T(c.querySelector('.availability')),
+      special: special,
+    };
+  });
+}
+"""
+
+# "1 Bed / 1 Bath", "Studio / 1 Bath", "2 Bed / 2.5 Bath"
+_BED_RE = re.compile(r"(\d+(?:\.\d+)?)\s*bed", re.IGNORECASE)
+_BATH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*bath", re.IGNORECASE)
+_SQFT_RE = re.compile(r"([\d,]+)\+?\s*sq", re.IGNORECASE)
+_MONEY_RE = re.compile(r"\$[\s]?[\d,]+(?:\.\d{2})?")
+# "2 Units Available", "Only 1 Unit Available!", "1 Unit Available"
+_UNIT_COUNT_RE = re.compile(r"(\d+)\s*units?\s*available", re.IGNORECASE)
+
+
+def parse_prospect_portal_cards(
+    cards: list[dict[str, str]], url: str
+) -> list[dict[str, str]]:
+    """Parse SSR Prospect Portal ``.fp-card`` rows into standard unit dicts.
+
+    Plan-level (one row per floor plan, no per-apartment unit number) — these
+    pages render a plan grid, not a unit roster. ``available_units`` carries
+    the per-plan count when the page states one ("N Units Available").
+    """
+    units: list[dict[str, str]] = []
+    for card in cards:
+        if not isinstance(card, dict):
+            continue
+        name = (card.get("name") or "").strip()
+        bedbath = card.get("bedbath") or ""
+        if not name and not bedbath:
+            continue
+
+        bed_m = _BED_RE.search(bedbath)
+        bath_m = _BATH_RE.search(bedbath)
+        if bed_m:
+            beds: int | None = int(float(bed_m.group(1)))
+        elif re.search(r"studio", bedbath, re.IGNORECASE):
+            beds = 0
+        else:
+            beds = None
+        baths = bath_m.group(1) if bath_m else ""
+
+        sqft_m = _SQFT_RE.search(card.get("sqft") or "")
+        sqft = sqft_m.group(1).replace(",", "") if sqft_m else ""
+
+        fee = card.get("fee") or ""
+        money = _MONEY_RE.findall(fee)
+        rent_lo = money_to_int(money[0]) if money else None
+        rent_hi = money_to_int(money[-1]) if money else None
+        rent_range = format_rent_range(rent_lo, rent_hi)
+
+        avail = card.get("availability") or ""
+        count_m = _UNIT_COUNT_RE.search(avail)
+        available_units = count_m.group(1) if count_m else ""
+        availability_date = ""
+        status = "AVAILABLE"
+        if re.search(r"waitlist", avail, re.IGNORECASE):
+            status = "UNAVAILABLE"
+            available_units = available_units or "0"
+        else:
+            date_m = re.search(r"available\s+(.+)$", avail, re.IGNORECASE)
+            if date_m and not count_m:
+                availability_date = date_m.group(1).strip()
+
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths),
+                sqft=sqft,
+                unit_number="",
+                rent_range=rent_range,
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                deposit=(card.get("deposit") or "").strip(),
+                concession=(card.get("special") or "").strip(),
+                availability_status=status,
+                available_units=available_units,
+                availability_date=availability_date,
+                lease_term=(card.get("lease") or "").strip(),
+                source_api_url=url,
+                extraction_tier="TIER_3_DOM_ENTRATA_PP",
+            )
+        )
+    return units
+
 # Entrata widget types that contain real floor plan / availability data.
 _PROPERTY_WIDGET_TYPES = {"floor_plans", "availability"}
 
@@ -156,7 +274,13 @@ class EntrataAdapter:
     """Entrata PMS adapter. Parses /Apartments/module/widgets/ API responses."""
 
     pms_name: str = "entrata"
-    _fingerprints: list[str] = ["entrata.com", "/Apartments/module/"]
+    _fingerprints: list[str] = [
+        "entrata.com",
+        "/Apartments/module/",
+        "prospectportal.com",
+        "prospect_portal",
+        "floorplan_overview",
+    ]
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units from Entrata widget API responses captured during page load.
@@ -237,10 +361,64 @@ class EntrataAdapter:
                     f"failed unit_validity (no numeric dimension)"
                 )
 
+        # 2026-05-19: Prospect Portal *website* SSR-DOM fallback. When both
+        # the captured-API and direct-probe paths produced nothing, the page
+        # itself may be an Entrata-hosted marketing site whose floor-plan grid
+        # is server-side rendered into the DOM (no unit XHR). Parse it
+        # directly. Runs last so a genuine API/probe hit always wins.
+        if page is not None:
+            ssr_units = await self._extract_ssr_prospect_portal(page)
+            if ssr_units:
+                from ma_poc.extraction.post_process import post_process
+
+                _pp_ssr = post_process(
+                    ssr_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _pp_ssr.n_admitted > 0:
+                    result.units = _pp_ssr.admitted
+                    result.plan_summaries = _pp_ssr.plan_summaries
+                    result.tier_used = "TIER_3_DOM_ENTRATA_PP"
+                    try:
+                        result.winning_url = page.url or None
+                    except Exception:
+                        result.winning_url = None
+                    result.confidence = min(0.9, 0.65 + 0.05 * _pp_ssr.n_admitted)
+                    return result
+                result.errors.append(
+                    f"ENTRATA_PP_DOM_VALIDITY_REJECTED: {len(ssr_units)} SSR rows "
+                    f"failed unit_validity (no numeric dimension)"
+                )
+
         result.confidence = 0.0
         result.errors.append("No Entrata floorplan data found in captured API responses")
 
         return result
+
+    async def _extract_ssr_prospect_portal(
+        self,
+        page: Page,
+    ) -> list[dict[str, str]]:
+        """Parse the server-side-rendered Prospect Portal floor-plan grid.
+
+        Returns plan-level unit dicts from the ``.fp-card`` DOM, or ``[]`` if
+        the page has no Prospect Portal grid (so non-PP Entrata pages are
+        unaffected). Never raises — evaluate failures yield ``[]``.
+        """
+        evaluate = getattr(page, "evaluate", None)
+        if not callable(evaluate):
+            return []
+        try:
+            cards = await evaluate(_PROSPECT_PORTAL_DOM_JS)
+        except Exception as exc:
+            log.debug("Prospect Portal DOM evaluate failed err=%s", exc)
+            return []
+        if not isinstance(cards, list) or not cards:
+            return []
+        try:
+            page_url = page.url or ""
+        except Exception:
+            page_url = ""
+        return parse_prospect_portal_cards(cards, page_url)
 
     def static_fingerprints(self) -> list[str]:
         return list(self._fingerprints)

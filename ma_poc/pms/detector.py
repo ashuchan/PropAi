@@ -50,6 +50,9 @@ PmsName = Literal[
     "amli",
     "funnel",
     "touchtour",
+    "rentvision",
+    "resman",
+    "g5",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -76,6 +79,9 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "amli": "api_first",
     "funnel": "api_first",
     "touchtour": "cascade",
+    "rentvision": "dom_first",
+    "resman": "dom_first",
+    "g5": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -123,6 +129,16 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
         "host ends in amli.com (AMLI Residential)",
     ),
     (re.compile(r"(?:^|\.)entrata\.com$"), "entrata", 0.95, "host ends in entrata.com"),
+    # Entrata "Prospect Portal" websites are served from
+    # ``*.prospectportal.com`` (canonical) — and vanity domains 302 into
+    # this host. The floor-plan grid is SSR DOM; the EntrataAdapter has a
+    # Prospect Portal DOM fallback for exactly these.
+    (
+        re.compile(r"(?:^|\.)prospectportal\.com$"),
+        "entrata",
+        0.9,
+        "host ends in prospectportal.com (Entrata Prospect Portal website)",
+    ),
     (re.compile(r"(?:^|\.)appfolio\.com$"), "appfolio", 0.95, "host ends in appfolio.com"),
     # RealPage portals that are NOT the OneSite OLL subdomain shape — e.g.
     # portal.realpage.com, api.ws.realpage.com. Lower confidence because the
@@ -364,11 +380,72 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # platform.
     if "onlineleasing.realpage.com" in h:
         return "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
-    if "/apartments/module/" in h or "entrata-widget" in h or "commoncf.entrata.com" in h:
+    if (
+        "/apartments/module/" in h
+        or "entrata-widget" in h
+        or "commoncf.entrata.com" in h
+        or "prospectportal.com" in h
+        or "prospect_portal" in h
+        or "floorplan_overview" in h
+    ):
         return (
             "entrata",
             0.85,
-            ["Entrata widget marker in HTML (/Apartments/module/ / entrata-widget / commoncf.entrata.com)"],
+            [
+                "Entrata widget/Prospect-Portal marker in HTML "
+                "(/Apartments/module/ / entrata-widget / commoncf.entrata.com / "
+                "prospectportal.com / prospect_portal / floorplan_overview)"
+            ],
+        )
+    # AppFolio embedded as an iframe to the tenant subdomain
+    # (``{tenant}.appfolio.com/listings``) is a definitive leasing path —
+    # commonly embedded one nav-hop deep on a Wix/Squarespace marketing
+    # shell. Strong marker so it beats the Wix/Squarespace pass-2 demotion
+    # (same rationale as onlineleasing.realpage.com / commoncf.entrata.com
+    # above). Bare ``appfolio.com`` stays a pass-3 weak marker.
+    if ".appfolio.com/listings" in h:
+        return (
+            "appfolio",
+            0.85,
+            ["AppFolio listings-iframe marker in HTML (.appfolio.com/listings)"],
+        )
+    # RentVision is a multifamily marketing-site CMS whose ``/floorplans``
+    # page is full plan-level SSR DOM (name/bd/ba/sqft/price/availability).
+    # The platform credit ("Website created by RentVision" / "Powered by
+    # RentVision" / a rentvision.com asset) appears site-wide including the
+    # landing page, so detection fires before any hop. Strong marker: the
+    # data is definitively present in RentVision's own DOM, and these sites
+    # carry no other PMS.
+    if (
+        "created by rentvision" in h
+        or "powered by rentvision" in h
+        or "rentvision.com" in h
+    ):
+        return (
+            "rentvision",
+            0.85,
+            ["RentVision CMS marker in HTML (created/powered by RentVision / rentvision.com)"],
+        )
+    # ResMan "Implicity" prospect portal embedded as an iframe on the
+    # marketing shell — a definitive leasing path (the availability roster
+    # is move-in-date-gated SSR behind it). Strong marker, same rationale
+    # as the AppFolio listings-iframe above.
+    if "implicity.myresman.com" in h or "myresman.com" in h:
+        return (
+            "resman",
+            0.85,
+            ["ResMan Implicity iframe marker in HTML (implicity.myresman.com)"],
+        )
+    # G5 (g5marketingcloud) Vue-SPA marketing sites. The g5dxm.com CDN /
+    # g5marketingcloud asset hosts and the ``g5-c-{client}`` URN appear
+    # site-wide (incl. landing), so detection fires before the floor-plans
+    # hop. Unit data is in the SPA's Apollo cache (see G5Adapter); these
+    # sites carry no other PMS.
+    if "g5marketingcloud" in h or "g5dxm.com" in h or "g5-c-" in h:
+        return (
+            "g5",
+            0.85,
+            ["G5 marketing-cloud marker in HTML (g5marketingcloud / g5dxm.com / g5-c- URN)"],
         )
     if "nestiolistings.com" in h or "nestio_" in h or "data-nestio-" in h:
         return (
@@ -428,10 +505,20 @@ _META_APP_RE = re.compile(
 # GenericAdapter HTML/LLM cascade — but knowing the stack is present means
 # future work can add dedicated portal resolvers for these vendors.
 _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
-    "entrata": ("entrata.com", "/apartments/module/", "entrata-widget"),
+    "entrata": (
+        "entrata.com",
+        "/apartments/module/",
+        "entrata-widget",
+        "prospectportal.com",
+        "prospect_portal",
+        "floorplan_overview",
+    ),
     "rentcafe": ("rentcafe", "yardi"),
     "sightmap": ("sightmap.com",),
     "appfolio": (".appfolio.com",),
+    "rentvision": ("created by rentvision", "powered by rentvision", "rentvision.com"),
+    "resman": ("implicity.myresman.com", "myresman.com"),
+    "g5": ("g5marketingcloud", "g5dxm.com", "g5-c-"),
     "onesite": ("onlineleasing.realpage.com",),
     "wix": ("static.parastorage.com", "wix.com"),
     "squarespace": ("squarespace.com",),

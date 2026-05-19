@@ -38,6 +38,11 @@ from ma_poc.pms.adapters._daily_runner_parsers import (
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_sightmap_payload as _dr_parse_sightmap,
 )
+from ma_poc.pms.adapters.g5 import (
+    is_g5_graphql_body as _is_g5_graphql_body,
+    is_g5_graphql_url as _is_g5_graphql_url,
+    parse_g5_response as _parse_g5_response,
+)
 from ma_poc.models.scrape_profile import FieldSelectorMap as _FieldSelectorMap
 from ma_poc.pms.adapters._html_extract import (
     extract_embedded_blobs_from_html,
@@ -1492,6 +1497,14 @@ class GenericAdapter:
                         host_units = _dr_parse_sightmap(body, url) or []
                     except Exception as exc:  # defensive — never break the run
                         result.errors.append(f"sightmap-parse-error: {exc}")
+                # Patch #11 — G5 Marketing Cloud GraphQL. Parse a captured
+                # inventory.g5marketingcloud.com/graphql body even when
+                # detection didn't route to G5Adapter (defense in depth).
+                elif body is not None and _is_g5_graphql_url(url) and _is_g5_graphql_body(body):
+                    try:
+                        host_units = _parse_g5_response(body, url) or []
+                    except Exception as exc:  # defensive — never break the run
+                        result.errors.append(f"g5-graphql-parse-error: {exc}")
                 if host_units:
                     all_units.extend(host_units)
                     result.api_responses.append(resp)

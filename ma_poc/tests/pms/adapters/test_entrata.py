@@ -345,3 +345,153 @@ async def test_bug9_probe_skipped_when_captured_api_already_has_units() -> None:
     assert result.units[0]["floor_plan_name"] == "From Capture"
     assert page.calls == []
     assert result.tier_used == "TIER_1_API_ENTRATA"
+
+
+# ── Prospect Portal SSR-DOM recovery (2026-05-19) ────────────────────────
+# Card data captured live from Arrive Oak Brook Heights
+# (arriveoakbrookheights.prospectportal.com/.../conventional/) and a vanity
+# Prospect Portal domain — the shape the SSR ``.fp-card`` grid emits.
+from ma_poc.pms.adapters.entrata import parse_prospect_portal_cards  # noqa: E402
+
+_PP_CARDS = [
+    {
+        "name": "Adams",
+        "bedbath": "1 Bed / 1 Bath",
+        "sqft": "760 sq. ft",
+        "fee": "Starting from $1,939/month",
+        "lease": "12mo lease",
+        "deposit": "$500 deposit",
+        "availability": "Available May 30, 2026",
+        "special": "",
+    },
+    {
+        "name": "Baldwin Townhome",
+        "bedbath": "2 Bed / 2.5 Bath",
+        "sqft": "1,225 sq. ft",
+        "fee": "Starting from $2,269/month",
+        "lease": "10mo lease",
+        "deposit": "$500 deposit",
+        "availability": "Available May 27, 2026",
+        "special": "",
+    },
+    {
+        "name": "Butterfield Townhome",
+        "bedbath": "2 Bed / 1.5 Bath",
+        "sqft": "1,072 sq. ft",
+        "fee": "Starting from $2,469/month",
+        "lease": "12mo lease",
+        "deposit": "$500 deposit",
+        "availability": "2 Units Available",
+        "special": "$1000 off first month",
+    },
+]
+
+
+class _PPPage:
+    """Page stub whose evaluate() returns SSR Prospect Portal cards."""
+
+    def __init__(self, cards: list[dict], url: str = "https://x.prospectportal.com/c/s/conventional/") -> None:
+        self._cards = cards
+        self.url = url
+
+    async def evaluate(self, _js: str, *_a: object) -> list[dict]:
+        return self._cards
+
+
+def test_parse_prospect_portal_cards_fields() -> None:
+    units = parse_prospect_portal_cards(_PP_CARDS, "https://x.prospectportal.com/c/s/conventional/")
+    assert len(units) == 3
+    adams = units[0]
+    assert adams["floor_plan_name"] == "Adams"
+    assert adams["bedrooms"] == "1"
+    assert adams["bathrooms"] == "1"
+    assert adams["sqft"] == "760"
+    assert adams["market_rent_low"] == 1939
+    assert adams["lease_term"] == "12mo lease"
+    assert adams["deposit"] == "$500 deposit"
+    assert adams["availability_date"] == "May 30, 2026"
+    assert adams["availability_status"] == "AVAILABLE"
+    assert adams["extraction_tier"] == "TIER_3_DOM_ENTRATA_PP"
+    # Baldwin: 2.5 bath, comma sqft
+    baldwin = units[1]
+    assert baldwin["bathrooms"] == "2.5"
+    assert baldwin["sqft"] == "1225"
+    # Butterfield: per-plan unit count + concession
+    butter = units[2]
+    assert butter["available_units"] == "2"
+    assert butter["availability_date"] == ""
+    assert butter["concession"] == "$1000 off first month"
+
+
+def test_parse_prospect_portal_studio_and_waitlist() -> None:
+    cards = [
+        {"name": "S1", "bedbath": "Studio / 1 Bath", "sqft": "500 sq. ft",
+         "fee": "$1,200 – $1,400/month", "lease": "", "deposit": "",
+         "availability": "Waitlist Available", "special": ""},
+    ]
+    units = parse_prospect_portal_cards(cards, "u")
+    assert units[0]["bedrooms"] == "0"
+    assert units[0]["bed_label"]
+    assert units[0]["market_rent_low"] == 1200
+    assert units[0]["market_rent_high"] == 1400
+    assert units[0]["availability_status"] == "UNAVAILABLE"
+
+
+@pytest.mark.asyncio
+async def test_entrata_ssr_fallback_when_api_empty() -> None:
+    """No API responses → SSR Prospect Portal DOM fallback fires."""
+    adapter = EntrataAdapter()
+    ctx = _make_ctx([])
+    result = await adapter.extract(_PPPage(_PP_CARDS), ctx)  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_3_DOM_ENTRATA_PP"
+    assert len(result.units) == 3
+    assert result.confidence > 0.0
+    assert result.units[0]["floor_plan_name"] == "Adams"
+
+
+@pytest.mark.asyncio
+async def test_entrata_ssr_not_used_when_api_succeeds() -> None:
+    """A genuine API hit wins; SSR DOM fallback is never consulted."""
+    responses = _load_fixture("257356.json")
+    adapter = EntrataAdapter()
+    ctx = _make_ctx(responses)
+    result = await adapter.extract(_PPPage(_PP_CARDS), ctx)  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_API_ENTRATA"
+    assert all(u["floor_plan_name"] != "Adams" for u in result.units)
+
+
+def test_detector_routes_prospectportal_host_to_entrata() -> None:
+    det = detect_pms("https://ariaatella.prospectportal.com/spring/aria-at-ella/conventional/")
+    assert det.pms == "entrata"
+
+
+def test_detector_routes_prospect_portal_html_to_entrata() -> None:
+    html = (
+        '<html><head><script src="https://commoncf.entrata.com/website_templates/'
+        '_assets/prospect_portal/module/floorplan_overview.min.js"></script>'
+        "</head><body></body></html>"
+    )
+    det = detect_pms("https://www.somevanitydomain.com/city/slug/conventional/", page_html=html)
+    assert det.pms == "entrata"
+
+
+def test_parse_prospect_portal_live_vanity_variants() -> None:
+    """Live rivertonterrace.com (vanity domain) card-text variants:
+    'NNN+ sq. ft', 'From $X/month', bare '$X/month', 'Only 1 Unit Available!'.
+    """
+    cards = [
+        {"name": "1 x 1", "bedbath": "1 Bed / 1 Bath", "sqft": "630+ sq. ft",
+         "fee": "From $1,054/month", "lease": "12mo lease", "deposit": "$500 deposit",
+         "availability": "Only 1 Unit Available!", "special": ""},
+        {"name": "3 x 1", "bedbath": "3 Bed / 1 Bath", "sqft": "900+ sq. ft",
+         "fee": "$1,471/month", "lease": "12mo lease", "deposit": "$500 deposit",
+         "availability": "Available Jul 07, 2026", "special": ""},
+    ]
+    units = parse_prospect_portal_cards(cards, "https://www.rivertonterrace.com/x/y/conventional/")
+    assert units[0]["sqft"] == "630"
+    assert units[0]["market_rent_low"] == 1054
+    assert units[0]["available_units"] == "1"
+    assert units[1]["sqft"] == "900"
+    assert units[1]["market_rent_low"] == 1471
+    assert units[1]["available_units"] == ""
+    assert units[1]["availability_date"] == "Jul 07, 2026"
