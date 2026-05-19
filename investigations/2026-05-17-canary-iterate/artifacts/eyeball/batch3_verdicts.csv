@@ -1,0 +1,51 @@
+n,url,verdict,pattern
+1,royceattrumbull.com,U,js-popup-unit-table (view-detail modal no urlchange)
+2,solanobelleair.com,U,engrain-sightmap-embed (MISFP existing adapter)
+3,summitonthehudson.com,U,engrain-sightmap-embed (MISFP)
+4,parkvanness.com,U,multi-hop -> parkvanness.securecafe.com oleapplication (MISFP securecafe)
+5,elevatetoshorepark.com,U,js-popup-unit-table (like #1)
+6,1900pacific.com,U,engrain-sightmap-embed (MISFP)
+7,smdproperty.com/country-club-apartments,F,style/floorplan-level no unit# (user policy: record floorplan-level but counts as F not unit-level)
+8,ascendnonawest.com,U,popup->check-availability->unit-level
+9,liveatcivicsquare.com,U,engrain-sightmap-embed (MISFP)
+10,tvcproperties.com,U,community-detail #available listing
+11,integrapalms.com,U,engrain-sightmap (MISFP)
+12,solaire7607.com,U,js-popup-unit-table
+13,waterfordtrailsliving.com,U,popup->check-availability
+14,aspenmeadowky.com,U,in-page-expand click-available-unit
+15,livevictorprosper.com,U,engrain-sightmap (MISFP)
+16,liveastonpointe.com,U,popup->check-availability
+17,broadstoneparagon.com,U,engrain-sightmap (MISFP)
+18,parkplace380.com,F,floorplan-level table avail-text no unit#
+19,residecrosbyhill.com,F,floorplan-level bed-type only
+20,liveemersonpark.com,U,click-floorplan->view-availability
+21,colonialcourtapts.com,F,layout/model-level only no unit (user-confirmed)
+22,irvinecompanyapartments.com/oak-glen,U,availability.html in-page-expand no-urlchange
+23,westwoodterraceliving.com,U,popup (like #8)
+24,independenceplaceapts.com,U,popup (like #8)
+25,marqonburnet.com,U,popup (like #8)
+26,theridgehagerstown.com,U,engrain-sightmap (MISFP)
+27,stewartlangleyproperties.com/kendall-square,F,image-confirmed From-$X per bed-type no unit# (policy F)
+28,liveatechopointe.com,U,per-unit page /unit/<slug>
+29,liveatbrookstoneapartments.com,U,/apartments/1-bedroom unit-level (user-confirmed)
+30,syncatharmony.com,U,image-confirmed unit table (Unit#+rent+avail+term+floor)
+31,lochravenapts.com,U,CAF-version2 template -> Check-Availability hops to RealPage OneSite (property.onesite.realpage.com)+Knock (doorway.knck.io) = EXISTING adapters; cluster=caf_v2 (jaxon/marion/lochraven 26 sites)
+32,thecoloniesapartments.com,U,caf_v2/jaxon-template - dropdown then units on /floorplans/<bed>/<plan> detail page same-page (Phase B detail)
+33,edgemerecrossing.com,U,popup (caf_v2 family)
+34,ishranchestates.com,F,homepage no-availability msg -> no units (policy F record floorplan)
+35,aspirethunderbird.com,U,/unit/<slug> per-unit detail page
+36,lewisapartments.com,U,/online-leasing#k= portal-hop (caf-style -> OneSite/Knock)
+37,6151winthrop.com,F,image: $995-$1140 per bed-type no unit# (policy F)
+38,woodviewatrandolph.com,U,image: caf_v2 popup = Bldg#/Unit#/$2515/Available unit-table
+39,grandpalms.com,U,caf_v2 dropdown -> /floorplans/<bed>/<layout> detail units
+40,springsapartments.com,U,engrain-sightmap (MISFP)
+41,theinfieldloftsapartments.com,U,engrain-sightmap (MISFP)
+42,mqsonoranpreserve.com,U,caf_v2 popup
+43,socoapartments.com,U,caf_v2 popup
+44,villamilano.us,U,view-details/date-entry (bot-protected)
+45,thekentcarmel.com,U,engrain-sightmap (MISFP)
+46,karademas.org/windpoint,F,image: rent-range floorplan-level "No current availability" (policy F)
+47,emersonparkapartmenthomes.com,U,/unit/<slug> per-unit page
+48,waynewoodapts.com,U,caf_v2 /floorplans/<layout> + avail-click same-page
+49,irvinecompanyapartments.com/pacific-view,U,availability.html in-page expand (like #22)
+50,spearheadproperties.com/elm,U,table listed on page

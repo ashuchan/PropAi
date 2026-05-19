@@ -26,6 +26,7 @@ from ..config.feature_flags import ENABLE_TIER_ESCALATION
 from ..discovery.contracts import CrawlTask
 from ..observability.events import EventKind, emit
 from .browser_pool import BrowserContextPool
+from .camoufox_pool import get_browser_pool
 from .captcha_detect import looks_like_captcha
 from .conditional import ConditionalCache
 from .contracts import FetchOutcome, FetchResult, FetchTier, RenderMode
@@ -90,7 +91,49 @@ def _classify_fetch_outcome(
 _MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
 _DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
 
+# Safety: hard per-fetch transfer cap. Independent of the (default)
+# image/font/media resource-blocking — this is a runaway-bandwidth
+# circuit-breaker that matters most on a proxied fleet run ($/GB
+# residential egress). Once cumulative response bytes for a single
+# render exceed the cap, all further requests are aborted (the page
+# keeps whatever it already loaded, so extraction still proceeds on the
+# captured DOM/network_log). Generous default (16 MB) so it only trips
+# on pathological sites, never normal ones. ``MAX_FETCH_BYTES=0``
+# disables the cap.
+_MAX_FETCH_BYTES = int(os.getenv("MAX_FETCH_BYTES", str(16_000_000)))
+
 log = logging.getLogger(__name__)
+
+# Cookie-mint reuse (option b): exact names + prefixes of the bot-wall
+# clearance cookies worth reusing. cf_clearance/__cf_bm = Cloudflare,
+# datadome/__ddg* = DataDome, incap_ses*/visid_incap* = Imperva/Incapsula.
+# Anything else from the context is session noise we deliberately drop
+# (smaller jar, no cross-property identity bleed).
+_CLEARANCE_EXACT = {"cf_clearance", "__cf_bm", "datadome"}
+_CLEARANCE_PREFIX = ("__ddg", "incap_ses", "visid_incap", "nlbi_")
+
+
+async def _harvest_clearance_cookies(page: Any) -> dict[str, str]:
+    """Return ``{name: value}`` of bot-wall clearance cookies from *page*.
+
+    Reads the live Playwright browser context (post-challenge). Returns
+    only the CF/DataDome/Incapsula clearance cookies — never the full
+    cookie set — so reuse can't leak a session/identity cookie into the
+    cheap curl_cffi probe. Best-effort: any error yields ``{}`` (callers
+    then behave exactly as before option b).
+    """
+    try:
+        cookies = await page.context.cookies()
+    except Exception:
+        return {}
+    out: dict[str, str] = {}
+    for c in cookies or []:
+        name = c.get("name") or ""
+        if name in _CLEARANCE_EXACT or name.startswith(_CLEARANCE_PREFIX):
+            val = c.get("value")
+            if val:
+                out[name] = val
+    return out
 
 
 class Fetcher:
@@ -516,11 +559,58 @@ class Fetcher:
         """
         page = await self._browsers.acquire(identity, proxy)
         network_log: list[dict[str, Any]] = []
+        # Per-fetch transfer-byte circuit breaker (see _MAX_FETCH_BYTES).
+        _xfer = {"bytes": 0, "tripped": False}
+
+        async def _abort_all(route: Any) -> None:
+            try:
+                await route.abort()
+            except Exception:
+                ...
 
         try:
             # Intercept network requests
             async def _on_response(response: Any) -> None:
                 try:
+                    # Bandwidth circuit breaker — count every response's
+                    # transfer size (content-length is free; no .body()
+                    # needed and it covers JS/CSS/binary too). Once over
+                    # the cap, abort all further requests so a runaway /
+                    # proxied site can't burn $/GB. Best-effort; the
+                    # already-captured DOM + network_log still extract.
+                    if _MAX_FETCH_BYTES and not _xfer["tripped"]:
+                        try:
+                            _cl = response.headers.get("content-length")
+                            _xfer["bytes"] += int(_cl) if _cl and _cl.isdigit() else 0
+                        except Exception:
+                            ...
+                        if _xfer["bytes"] >= _MAX_FETCH_BYTES:
+                            _xfer["tripped"] = True
+                            try:
+                                await page.route("**/*", _abort_all)
+                            except Exception:
+                                ...
+                            log.warning(
+                                "fetch.byte_cap_exceeded url=%s bytes=%d cap=%d "
+                                "proxy=%s — aborting further requests",
+                                task.url, _xfer["bytes"], _MAX_FETCH_BYTES,
+                                bool(proxy),
+                            )
+                            # Structured event so a (proxied) fleet run can
+                            # quantify cap hits + $/GB impact from
+                            # events.jsonl, not just grep logs.
+                            try:
+                                emit(
+                                    EventKind.FETCH_BYTE_CAP_EXCEEDED,
+                                    task.property_id,
+                                    url=task.url,
+                                    bytes=_xfer["bytes"],
+                                    cap=_MAX_FETCH_BYTES,
+                                    proxied=bool(proxy),
+                                    attempt=attempt,
+                                )
+                            except Exception:
+                                ...
                     url = response.url
                     content_type = response.headers.get("content-type", "")
                     if any(t in content_type for t in ["json", "xml", "html", "text"]):
@@ -597,6 +687,26 @@ class Fetcher:
                 await asyncio.sleep(2.0)
             except Exception:
                 pass
+
+            # Interaction-driven CTA-hop (2026-05-18, env-gated, default OFF).
+            # Some clusters only expose their real unit-data source AFTER a
+            # click: funnel/UDR -> RealPage OLL wizard, resman -> myresman
+            # availability portal, entrata -> the real widget. Static/
+            # passive render never reaches it (validated: the source is not
+            # in static HTML). When INTERACTION_CTA_HOP is truthy, click the
+            # Apply/Check-Availability/Floor-Plans CTA(s); the response
+            # handler registered above keeps capturing XHR into
+            # ``network_log`` -> flows to ctx._api_responses -> existing
+            # OLL/resman/entrata adapters. Strictly bounded + never raises,
+            # so off it is a no-op and on it adds <=~8s with no SLO risk on
+            # passive sites (gate is opt-in, prod default unset).
+            if os.getenv("INTERACTION_CTA_HOP", "").strip().lower() in (
+                "1", "true", "yes", "on"
+            ):
+                try:
+                    await _drive_cta_hop(page)
+                except Exception:
+                    pass
 
             # Always-salvage: even when page.goto() timed out, page.content()
             # typically returns a usable DOM (probe: charterclubapts.com timed
@@ -949,6 +1059,19 @@ class Fetcher:
             resp_headers = {k.lower(): v for k, v in (resp.headers if resp else {}).items()}
             body_head = body[:4096]
 
+            # Cookie-mint reuse (option b): harvest the clearance cookies the
+            # patchright context just earned by passing the CF/DataDome
+            # challenge, so the cheap curl_cffi active-fetch in the API
+            # adapters can reuse the solved clearance instead of hitting the
+            # wall again. Best-effort; failure just yields the pre-(b)
+            # blocked-probe behaviour.
+            clearance_cookies = await _harvest_clearance_cookies(page)
+            if clearance_cookies:
+                log.info(
+                    "fetch.clearance_cookies_minted url=%s names=%s",
+                    task.url, ",".join(sorted(clearance_cookies)),
+                )
+
             if nav_exc is not None:
                 # Timeout/abort but body salvaged. If the salvaged page looks
                 # like a Cloudflare/reCAPTCHA interstitial, mark BOT_BLOCKED so
@@ -990,6 +1113,7 @@ class Fetcher:
                 last_modified=resp_headers.get("last-modified"),
                 error_signature=sig,
                 proxy_used=_redact_proxy(proxy),
+                clearance_cookies=clearance_cookies,
             )
         except Exception as exc:
             outcome, sig = classify(None, {}, None, exception=exc)
@@ -1009,6 +1133,59 @@ class Fetcher:
             )
         finally:
             await self._browsers.release(page)
+
+
+_CTA_CLICK_JS = r"""
+(maxClicks) => {
+  // Strict CTA matcher: the controls that hop to the real unit-data
+  // source. NOT contact/tour/login/resident (those trigger CAPTCHA or
+  // dead-end at a sign-in form — the exact false-positive trap).
+  const GOOD = /(check\s*availab|view\s*pricing|see\s*availab|view\s*availab|all[-\s]?in\s*price|floor\s*plans?\s*(&|and)\s*pricing|see\s*floor\s*plans?|view\s*floor\s*plans?|apply\s*now|get\s*pricing|shop\s*(now|units?))/i;
+  const BAD  = /(contact|schedule|tour|sign\s*in|log\s*in|login|resident|application_authentication|careers|privacy|terms)/i;
+  const els = [...document.querySelectorAll('a,button,[role=button],[onclick]')];
+  const picked = [];
+  const seen = new Set();
+  for (const e of els) {
+    const t = ((e.innerText || e.textContent || '') + ' ' +
+               (e.getAttribute && (e.getAttribute('aria-label') || '') || '')).trim();
+    const href = (e.getAttribute && e.getAttribute('href')) || '';
+    if (!t && !href) continue;
+    if (BAD.test(t) || BAD.test(href)) continue;
+    if (!(GOOD.test(t) || GOOD.test(href))) continue;
+    const key = t.slice(0, 40) + '|' + href.slice(0, 60);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(e);
+    if (picked.length >= maxClicks) break;
+  }
+  picked.forEach((e) => { try { e.scrollIntoView(); e.click(); } catch (x) {} });
+  return picked.length;
+}
+"""
+
+
+async def _drive_cta_hop(page: Any) -> None:
+    """Click the unit-data CTA(s) so post-interaction XHR is captured.
+
+    Env-gated by the caller (``INTERACTION_CTA_HOP``). The page's
+    ``response`` handler is already registered, so any XHR the click
+    triggers (RealPage OLL appstate, myresman availability, the entrata
+    widget…) lands in ``network_log`` -> ``ctx._api_responses`` -> the
+    existing adapters. Strictly time-bounded; every step is best-effort
+    and swallowed so this can never fail a render.
+    """
+    try:
+        n = await asyncio.wait_for(page.evaluate(_CTA_CLICK_JS, 2), timeout=6.0)
+    except Exception:
+        return
+    if not n:
+        return
+    # Bounded settle for the post-click navigation/XHR to fire and be
+    # captured. Cap total added time so the 95%-success SLO is unaffected.
+    try:
+        await asyncio.sleep(5.0)
+    except Exception:
+        pass
 
 
 def _now_ms() -> int:
@@ -1075,7 +1252,15 @@ def get_default_fetcher() -> Fetcher:
             robots=RobotsConsumer(),
             cond_cache=ConditionalCache(cache_dir / "conditional.sqlite"),
             identities=IdentityPool(),
-            browsers=BrowserContextPool(max_contexts=int(os.getenv("MAX_CONCURRENT_BROWSERS", "5"))),
+            # Camoufox escalation rung: get_browser_pool() returns the
+            # patchright BrowserContextPool unless ENABLE_CAMOUFOX=true AND
+            # camoufox is importable, in which case it returns the
+            # structurally-identical CamoufoxPool (Firefox/Gecko — passes
+            # some CF JS challenges patchright fails). Flag-off ⇒ byte-
+            # identical to the prior direct construction (zero blast
+            # radius). Composes with cookie-mint (b): camoufox passes the
+            # wall, (b) harvests its clearance cookie for cheap reuse.
+            browsers=get_browser_pool(max_contexts=int(os.getenv("MAX_CONCURRENT_BROWSERS", "5"))),
             retry=RetryPolicy(),
         )
     return _default

@@ -242,3 +242,96 @@ class TestRealDataSanity:
         assert result.get("beds") == 2
         assert result.get("baths") == 1.5
         assert result.get("rent_low") == 1125
+
+
+class TestCrossFieldSqftVsBeds:
+    """2026-05-13 addition: catch sqft values that pass the absolute [150,
+    10000] range but are impossibly small for the bed count. Tier-4 LLM
+    hallucinations (LLM confused deposit/fee with sqft) accounted for 1,156
+    such rows in the daily output.
+    """
+
+    def test_2br_at_310_sqft_nulls_sqft(self):
+        """The Mansions at Sunset Ridge case: 2BR/2BA reported at 310 sqft.
+        That's physically impossible — sqft is the LLM hallucination.
+        Beds trusted; sqft nulled."""
+        unit = {"floor_plan_name": "London", "beds": 2, "baths": 2, "area": 310, "rent_low": 2460}
+        result = sanity_bound(unit)
+        assert result.get("area") is None
+        assert "area_implausible_for_beds" in result.get("_sanity_dropped", [])
+        assert result.get("beds") == 2  # beds untouched
+        assert result.get("baths") == 2
+
+    def test_3br_at_173_sqft_nulls_sqft(self):
+        """Cypress Grove case: '3 Bed 2 Bath Garden' reported at 173 sqft."""
+        unit = {"floor_plan_name": "Three Bed, Two Bath Garden", "beds": 3, "baths": 2, "area": 173}
+        result = sanity_bound(unit)
+        assert result.get("area") is None
+        assert "area_implausible_for_beds" in result.get("_sanity_dropped", [])
+
+    def test_studio_at_200_sqft_passes(self):
+        """A studio at 200 sqft is small but real (micro-units exist).
+        Floor for 0BR is exactly 200 — must pass."""
+        unit = {"beds": 0, "area": 200}
+        result = sanity_bound(unit)
+        assert result.get("area") == 200
+        assert "_sanity_dropped" not in result
+
+    def test_1br_at_400_sqft_passes(self):
+        """Compact 1BR at 400 sqft is real (micro-units in dense cities).
+        Floor for 1BR is 350 — 400 must pass."""
+        unit = {"beds": 1, "area": 400}
+        result = sanity_bound(unit)
+        assert result.get("area") == 400
+
+    def test_2br_at_700_sqft_passes(self):
+        """Tight but real 2BR at 700 sqft passes (floor for 2BR is 500)."""
+        unit = {"beds": 2, "area": 700}
+        result = sanity_bound(unit)
+        assert result.get("area") == 700
+
+    def test_real_2br_at_950_sqft_passes(self):
+        """Production Morgan Properties King's Manor case — 2BR/2BA @ 950 sqft.
+        Must pass cleanly."""
+        unit = {"beds": 2, "baths": 2, "area": 950, "rent_low": 1365}
+        result = sanity_bound(unit)
+        assert result == unit
+
+    def test_no_beds_means_no_cross_field_check(self):
+        """When beds is absent (None or missing), the cross-field check
+        cannot fire — we don't know the floor to apply."""
+        unit = {"area": 200}  # 200 is in the absolute [150, 10000] range
+        result = sanity_bound(unit)
+        assert result.get("area") == 200
+
+    def test_no_sqft_means_no_cross_field_check(self):
+        """When sqft is absent, nothing to null."""
+        unit = {"beds": 2}
+        result = sanity_bound(unit)
+        assert "_sanity_dropped" not in result
+        assert result.get("beds") == 2
+
+    def test_sqft_already_nulled_by_absolute_range_is_idempotent(self):
+        """If sqft was already nulled by the per-field range check
+        (e.g. sqft=50 < 150 floor), the cross-field pass is a no-op."""
+        unit = {"beds": 2, "area": 50}  # Below absolute 150 floor
+        result = sanity_bound(unit)
+        assert result.get("area") is None
+        assert "area" in result.get("_sanity_dropped", [])
+        # area_implausible_for_beds should NOT be added — area was already
+        # nulled by the absolute-range pass, so the cross-field check sees None.
+        assert "area_implausible_for_beds" not in result.get("_sanity_dropped", [])
+
+    def test_5br_floor(self):
+        """5BR @ 800 sqft is impossible (floor for 5BR is 1100)."""
+        unit = {"beds": 5, "area": 800}
+        result = sanity_bound(unit)
+        assert result.get("area") is None
+        assert "area_implausible_for_beds" in result.get("_sanity_dropped", [])
+
+    def test_sanity_bound_remains_idempotent(self):
+        """After cross-field nulling, a second call is a no-op."""
+        unit = {"beds": 2, "area": 310}
+        once = sanity_bound(unit)
+        twice = sanity_bound(once)
+        assert once == twice

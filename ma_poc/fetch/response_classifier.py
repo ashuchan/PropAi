@@ -15,7 +15,7 @@ import ssl
 from collections.abc import Mapping
 from socket import gaierror
 
-from .block_signatures import match_block_signature
+from .block_signatures import looks_like_200_block
 from .captcha_detect import looks_like_captcha
 from .contracts import FetchOutcome
 
@@ -213,6 +213,26 @@ def classify(
         # the success-rate denominator and route them to re-discovery.
         if body_head and _is_parked_domain(body_head):
             return FetchOutcome.DEAD_URL, "PARKED_DOMAIN"
+        # 2026-05-19: bot-block/challenge served WITH a 2xx status.
+        # Previously this branch returned OK unconditionally — a
+        # DataDome/Akamai 200 interstitial was counted as a successful
+        # fetch, flowed into extraction as junk, became the
+        # ``unit_count>1`` "success" that self-reinforced a misroute,
+        # and the profile never learned it was blocked. High-precision
+        # checks only (block-page-only literals) so a legit 200 page is
+        # never flipped to BOT_BLOCKED.
+        if body_head:
+            _cap, _prov = looks_like_captcha(body_head)
+            if _cap:
+                _sig = (
+                    "CF_CHALLENGE"
+                    if _prov == "cloudflare"
+                    else f"CAPTCHA_{(_prov or 'unknown').upper()}"
+                )
+                return FetchOutcome.BOT_BLOCKED, _sig
+        _b200 = looks_like_200_block(body_head, headers)
+        if _b200:
+            return FetchOutcome.BOT_BLOCKED, f"{_b200.upper()}_200"
         return FetchOutcome.OK, None
 
     # Stage 3 (2026-05-12): explicit "this resource is gone" statuses are

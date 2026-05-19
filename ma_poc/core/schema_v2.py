@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ma_poc.core import issue_log as V
+from ma_poc.core.concession_normalize import normalize_concession
 
 # ── V2 CSV column mapping ────────────────────────────────────────────────────
 #
@@ -118,8 +119,11 @@ def build_v2_property(
     platform = scrape_result.get("platform_detected") or (md.get("api_provider") if md else None) or ""
     website_design = _PLATFORM_LABELS.get(platform.lower(), platform or None)
 
-    # Concessions — prefer scraped banner text
+    # Concessions — prefer scraped banner text. Raw text is ALWAYS retained
+    # (capture-first); concessions_json is the deterministic RealPage-shaped
+    # normalization (None when unparseable — not data loss, raw stays).
     concessions_text = scrape_result.get("concessions_text") or md.get("concessions") or None
+    concessions_json = normalize_concession(concessions_text)
 
     prop: dict[str, Any] = {
         # ── Property-level fields ────────────────────────────────────────
@@ -136,7 +140,23 @@ def build_v2_property(
         )
         or None,
         "email_address": md.get("email") or md.get("email_address") or None,
+        # CANONICAL property URL — ALWAYS the input CSV/property URL
+        # (scheme-normalized base_url fallback). NEVER overwritten by a
+        # winning/resolved/final URL. Provenance URLs are SEPARATE
+        # columns below (added 2026-05-19 per "keep property url + add
+        # any url column separately"). apartment_id likewise = CSV id.
         "website": csv_website or scrape_result.get("base_url") or None,
+        # Separate, additive URL provenance (capture-first; do not feed
+        # identity/dedup off these — they vary run-to-run).
+        "winning_url": _raw_str(
+            scrape_result.get("_winning_page_url")
+            or scrape_result.get("_winning_url")
+        ),
+        "resolved_url": _raw_str(
+            (scrape_result.get("_resolved_target") or {}).get("resolved_url")
+            if isinstance(scrape_result.get("_resolved_target"), dict)
+            else None
+        ),
         "pmc": _pick(
             csv_get(row, "Management Company", "pmc"),
             md.get("management_company"),
@@ -144,6 +164,7 @@ def build_v2_property(
         or None,
         "website_design": website_design if website_design else None,
         "concessions": concessions_text,
+        "concessions_json": concessions_json,
         # ── Units ────────────────────────────────────────────────────────
         "units": [
             _format_v2_unit(u, scrape_ts, str(_safe_int(csv_id) or ""))
@@ -164,13 +185,25 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
     ``property_id`` seeds the deterministic ``floor_plan_id`` so two
     properties with identically-named plans don't collide.
     """
-    beds_raw = unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds")
-    baths_raw = unit.get("_bathrooms") or unit.get("bathrooms") or unit.get("baths")
-    fp_name = unit.get("_floor_plan") or unit.get("floor_plan_name") or unit.get("floorplan_name")
-    sqft = unit.get("_sqft") or unit.get("sqft") or unit.get("area")
+    # 2026-05-19 capture-first alias hardening. Static audit of every
+    # adapter showed the DOM (_html_extract), generic LLM/DOM, funnel,
+    # repli360 and _api_parser paths emit camelCase / alt names the prior
+    # ``or``-chains missed → silent loss of beds/baths/sqft/unit_id/
+    # floor-plan for those FORMATS even though the value was surfaced.
+    # _first() = alias-tolerant, additive, zero-risk when absent.
+    beds_raw = _first(unit, "_bedrooms", "bedrooms", "beds",
+                      "numberOfBeds", "bedroom", "bed", "num_beds")
+    baths_raw = _first(unit, "_bathrooms", "bathrooms", "baths",
+                       "numberOfBaths", "bathroom", "bath", "num_baths")
+    fp_name = _first(unit, "_floor_plan", "floor_plan_name",
+                     "floorplan_name", "floorPlanName", "floorplanName",
+                     "fp_name", "floorplan", "plan_name")
+    sqft = _first(unit, "_sqft", "sqft", "area", "squareFeet",
+                  "square_feet", "size", "sq_ft")
 
-    # unit_id alias (adapters emit unit_number)
-    uid = unit.get("unit_id") or unit.get("unit_number") or unit.get("_unit_number")
+    # unit_id alias (adapters emit unit_number / camelCase / uid)
+    uid = _first(unit, "unit_id", "unit_number", "_unit_number",
+                 "unitNumber", "unitId", "uid", "apartment_number")
 
     # Bed/bath fallback inference from the floor-plan name. Mirrors the
     # Jugnu transform so both pipelines fill the same gaps.
@@ -186,11 +219,15 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         except Exception:
             pass
 
-    # rent: try numeric fields first, then parse rent_range string
-    rent_lo = unit.get("market_rent_low") or unit.get("asking_rent")
-    rent_hi = unit.get("market_rent_high") or unit.get("asking_rent")
+    # rent: numeric fields first (alias-tolerant — generic/_merge emit
+    # rent/minRent/totalRent/price camelCase), then parse rent_range.
+    rent_lo = _first(unit, "market_rent_low", "rent_low", "asking_rent",
+                     "minRent", "min_rent", "rent", "totalRent", "price")
+    rent_hi = _first(unit, "market_rent_high", "rent_high", "asking_rent",
+                     "maxRent", "max_rent", "rent", "totalRent", "price")
     if rent_lo is None and rent_hi is None:
-        rent_range = unit.get("rent_range")
+        rent_range = _first(unit, "rent_range", "_rent_range", "rentRange",
+                            "priceRange", "price_range")
         if rent_range:
             try:
                 from ma_poc.pms.adapters._parsing import parse_rent_range
@@ -212,7 +249,17 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
     if not isinstance(concession_text, str) or not concession_text:
         concession_text = None
     if not concession_text:
-        legacy = unit.get("concession") or unit.get("specials_description")
+        # 2026-05-19 capture-first: concessions arrive under many names
+        # across parsers (concession/concessions/special/specials/promo/
+        # offer/incentive/deal/savings/free_rent/look_and_lease). Accept
+        # any string variant into the canonical field; dicts/lists fall
+        # through to _extra (capture-everything net) so nothing is lost.
+        legacy = _first(
+            unit, "concession", "concessions", "specials_description",
+            "special", "specials", "promotion", "promo", "offer",
+            "offers", "incentive", "incentives", "deal", "savings",
+            "discount", "free_rent", "look_and_lease", "move_in_special",
+        )
         if isinstance(legacy, str) and legacy.strip():
             concession_text = legacy
     raw_amenities = unit.get("amenities")
@@ -239,7 +286,53 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         "rent_low": _format_rent(rent_lo),
         "rent_high": _format_rent(rent_hi),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
-        "available_date": _format_date(unit.get("available_date")),
+        # Bug 2026-05-13: most adapters emit the long-form key
+        # ``availability_date`` (via ``make_unit_dict`` in
+        # ``adapters/_parsing.py``). Three direct-write paths in
+        # ``adapters/_api_parser.py`` (SightMap line 305, RealPage line
+        # 450, generic line 611) also emit the long form. Accept either
+        # — ``available_date`` wins when both are populated.
+        "available_date": _format_date(_first(
+            unit, "available_date", "availability_date", "internalAvailableDate",
+            "availableDate", "date_available", "dateAvailable")),
+        # 2026-05-18 (capture-first): preserve the RAW availability string
+        # even when _format_date can't normalize it (text/word/odd format).
+        # Data has value; cleaning can be done later off the raw. Clean
+        # consumers keep using ``available_date`` (ISO-or-None) unchanged;
+        # this never drops a value. Underscore = private passthrough
+        # (same convention as _inferred_id / _date_placeholder).
+        "_available_date_raw": _raw_str(_first(
+            unit, "available_date", "availability_date", "internalAvailableDate",
+            "availableDate", "date_available", "dateAvailable")),
+        # 2026-05-18: availability_status is emitted by many parsers
+        # ("AVAILABLE"/"UNAVAILABLE") via make_unit_dict but the v2
+        # transform never mapped it -> 99.7% missing in output. Capture
+        # it (same class as available_date). Raw-preserving: light
+        # upper-normalize known tokens, else passthrough; None when unset.
+        "availability_status": _norm_status(
+            unit.get("availability_status") or unit.get("_availability_status")
+        ),
+        # 2026-05-18: deposit is emitted by securecafe/onesite/others and
+        # was dropped. Raw passthrough (clean later) — value has worth.
+        "deposit": _raw_str(unit.get("deposit") or unit.get("_deposit")),
+        # 2026-05-19 capture-first sweep: floor / building / available_units
+        # / rent_range are emitted by make_unit_dict AND direct-write
+        # parsers but the v2 transform never mapped them -> silently
+        # dropped (same class as available_date). Alias-tolerant (parsers
+        # name them differently); raw passthrough, clean later. Additive,
+        # None when unset (F10/underscore precedent; validation is
+        # required-field-based, no unknown-key rejection).
+        "floor": _raw_str(_first(unit, "floor", "_floor", "floor_number",
+                                 "floorNumber", "floor_no")),
+        "building": _raw_str(_first(unit, "building", "_building",
+                                    "building_name", "buildingName",
+                                    "building_id", "bldg")),
+        "available_units": _raw_str(_first(
+            unit, "available_units", "_available_units", "availableUnits",
+            "units_available", "available_unit_count", "numberOfUnits",
+            "availableUnitsCount", "availableunitscount")),
+        "_rent_range_raw": _raw_str(_first(unit, "rent_range",
+                                           "_rent_range", "rentRange")),
         "lease_term": _safe_lease_term(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
         # F10 additions — always present (None when unset).
@@ -250,6 +343,10 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         # Validation provenance flags (surfaced from schema_gate).
         "_inferred_id": bool(unit.get("_inferred_id")) if "_inferred_id" in unit else None,
         "_date_placeholder": unit.get("_date_placeholder") or None,
+        # Capture-everything net: any surfaced attribute-looking key not
+        # already mapped (future/unknown column-name variant) preserved
+        # raw so nothing is silently lost. None when nothing extra.
+        "_extra": _extra_attrs(unit),
     }
 
 
@@ -380,23 +477,172 @@ def _format_area(val: Any) -> int:
 
 
 def _format_date(val: Any) -> str | None:
-    """Normalize date to YYYY-MM-DD. Returns None if unparseable."""
+    """Normalize date to YYYY-MM-DD. Returns None if unparseable.
+
+    2026-05-18: widened. The prior version accepted only ISO and
+    4-digit-year ``m/d/Y`` forms and silently dropped the very common
+    AppFolio ``"Available 6/25/26"`` form and securecafe ``"Available"``
+    / ``"Available Now"`` text — the root cause of fleet-wide ~0%
+    available_date on AppFolio-vanity (parser fills it 100%; transform
+    dropped it) and other tiers. Now also handles: a leading
+    ``Available|Avail|Move-in|Ready`` prefix; 2-digit years; month-name
+    forms; and relative "now/today/immediate/available" → scrape date.
+    ISO and 4-digit ``m/d/Y`` behave EXACTLY as before (additive only).
+    """
     if val is None or val == "":
         return None
     s = str(val).strip()
-    # Already ISO format
+    # Already ISO format (unchanged)
     if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
         return s
-    # Try common formats
-    for fmt in ("%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d", "%m-%d-%Y", "%d-%m-%Y"):
+    # Strip a leading availability label, e.g. "Available 6/25/26",
+    # "Avail. 6/25/26", "Move-in 6/25/26", "Ready 6/25/26".
+    s = re.sub(
+        r"^\s*(available|avail\.?|move[- ]?in|ready|date available)\s*[:\-]?\s*",
+        "",
+        s,
+        flags=re.IGNORECASE,
+    ).strip()
+    if not s:
+        # Pure text like "Available" with no date ⇒ available now.
+        return datetime.now(UTC).strftime("%Y-%m-%d")
+    low = s.lower()
+    if low in ("now", "today", "immediate", "immediately", "available",
+               "available now", "now available", "ready now"):
+        return datetime.now(UTC).strftime("%Y-%m-%d")
+    # Try common formats — 4-digit-year set unchanged; 2-digit-year and
+    # month-name forms added.
+    for fmt in (
+        "%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d", "%m-%d-%Y", "%d-%m-%Y",
+        "%m/%d/%y", "%m-%d-%y",
+        "%b %d, %Y", "%B %d, %Y", "%b %d %Y", "%B %d %Y",
+        "%b %d, %y", "%b %d %y",
+    ):
         try:
             return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
         except ValueError:
             continue
-    # If it's a datetime string, take just the date part
+    # If it's a datetime string, take just the date part (unchanged)
     if len(s) >= 10 and re.match(r"^\d{4}-\d{2}-\d{2}", s):
         return s[:10]
+    # 2026-05-19: no-year month-name forms ("May 19", "Jun. 7", "Jul. 18")
+    # — Razz/Spherexx embedded portals omit the year. Product rule: assume
+    # the current (run) year. Strip a trailing '.' on an abbreviated month
+    # ("Jun." -> "Jun"). Additive: only reached after all year-bearing
+    # formats fail, so no existing input changes behavior.
+    s_no_year = re.sub(r"^([A-Za-z]{3,9})\.", r"\1", s)
+    for fmt in ("%b %d", "%B %d"):
+        try:
+            return (
+                datetime.strptime(s_no_year, fmt)
+                .replace(year=datetime.now(UTC).year)
+                .strftime("%Y-%m-%d")
+            )
+        except ValueError:
+            continue
     return None
+
+
+def _raw_str(val: Any) -> str | None:
+    """Capture-first: return the raw value as a trimmed string, or None
+    if empty. Never normalizes — preserves text/words/odd formats so
+    cleaning can be done later. Data has value."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    return s or None
+
+
+# Fuzzy "this looks like a unit attribute" / "this is noise" token sets.
+# `_extra` is the capture-everything safety net: any surfaced key that
+# *looks* like an attribute (token match) but isn't a known mapped name
+# is preserved raw so a future column-name variant is never silently
+# lost. Noise (urls/provenance/telemetry/request bodies) is excluded so
+# `_extra` doesn't bloat with non-data.
+_ATTR_TOKEN_RE = re.compile(
+    r"bed|bath|sq_?ft|square|\barea\b|rent|price|avail|date|floor|unit|"
+    r"deposit|concession|special|lease|term|move[_-]?in|building|bldg|"
+    r"balcon|parking|\bpet\b|amenit|level|wing|exposure|view|sqfeet|"
+    r"sqfootage|occup|ready|waitlist|fee\b",
+    re.IGNORECASE,
+)
+_NOISE_TOKEN_RE = re.compile(
+    r"url|source|_tier|extraction|outcome|reason|duration|http|status_code|"
+    r"\bbody\b|\bvia\b|\bpmc\b|property_id|property_name|website|"
+    r"\bcity\b|\bstate\b|\bzip\b|\bmode\b|site_id|template|\benv\b|"
+    r"community_?id|request|response|header|placeholder|inferred|"
+    r"date_captured|canonical|provider_id|image|link\b|api\b",
+    re.IGNORECASE,
+)
+# Primary names already pulled by the transform — don't duplicate them.
+_MAPPED_SRC = {
+    "_bedrooms", "bedrooms", "beds", "numberofbeds", "bedroom", "bed",
+    "num_beds", "_bathrooms", "bathrooms", "baths", "numberofbaths",
+    "bathroom", "bath", "num_baths", "_floor_plan", "floor_plan_name",
+    "floorplan_name", "floorplanname", "fp_name", "floorplan",
+    "plan_name", "_sqft", "sqft", "area", "squarefeet", "square_feet",
+    "size", "sq_ft", "unit_id", "unit_number", "_unit_number",
+    "unitnumber", "unitid", "uid", "apartment_number",
+    "market_rent_low", "market_rent_high", "rent_low", "rent_high",
+    "asking_rent", "minrent", "min_rent", "rent", "totalrent", "price",
+    "maxrent", "max_rent", "rent_range", "_rent_range", "rentrange",
+    "pricerange", "price_range", "available_date", "availability_date",
+    "internalavailabledate", "availabledate", "date_available",
+    "dateavailable", "lease_term", "_lease_term", "move_in_date",
+    "_move_in_date", "availability_status", "_availability_status",
+    "deposit", "_deposit", "floor", "_floor", "floor_number",
+    "floornumber", "floor_no", "building", "_building", "building_name",
+    "buildingname", "building_id", "bldg", "available_units",
+    "_available_units", "availableunits", "units_available",
+    "available_unit_count", "numberofunits", "availableunitscount",
+    "concession", "concession_text", "concession_value",
+    "concession_source", "specials_description", "amenities",
+    "bed_label", "floor_plan_id", "source_api_url", "extraction_tier",
+}
+
+
+def _extra_attrs(unit: dict) -> dict | None:
+    """Capture-everything net: surfaced keys that look like a unit
+    attribute but aren't a known mapped name, preserved raw. Excludes
+    noise/provenance. None when nothing extra."""
+    out: dict[str, str] = {}
+    for k, v in unit.items():
+        kl = str(k).lower()
+        if kl in _MAPPED_SRC or kl.startswith("_") and kl in _MAPPED_SRC:
+            continue
+        if _NOISE_TOKEN_RE.search(kl) or not _ATTR_TOKEN_RE.search(kl):
+            continue
+        rv = _raw_str(v)
+        if rv is not None:
+            out[str(k)] = rv
+    return out or None
+
+
+def _first(unit: dict, *keys: str) -> Any:
+    """Return the first non-empty value among *keys* (alias-tolerant —
+    parsers name the same field differently). Capture-first: no
+    normalization, just locate the surfaced value."""
+    for k in keys:
+        v = unit.get(k)
+        if v not in (None, "") and not (isinstance(v, (int, float)) and v == 0):
+            return v
+    return None
+
+
+def _norm_status(val: Any) -> str | None:
+    """Light availability-status normalization. Uppercases the common
+    AVAILABLE/UNAVAILABLE/WAITLIST tokens; otherwise passes the raw
+    string through (capture-first). None when unset."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    u = s.upper()
+    if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED",
+             "LEASED", "PENDING", "UNKNOWN"):
+        return u
+    return s
 
 
 def _safe_lease_term(val: Any) -> int | None:

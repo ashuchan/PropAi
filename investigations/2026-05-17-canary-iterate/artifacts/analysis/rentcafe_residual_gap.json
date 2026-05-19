@@ -1,0 +1,30 @@
+{
+ "cohort": "rentcafe-tagged residual (domllm_ledger platform=rentcafe)",
+ "size_in_ledger": 195,
+ "true_5k": "likely larger (ledger undercounts)",
+ "prod_outcome": "ZERO reached TIER_1. PROD tiers: TIER_4_LLM_DOM 131 (67%), generic:no_body_short_circuit 28 (14%), TIER_4_LLM 12, NONE 10. The RentCafe Tier-1 path (our strongest, 78%) NEVER fires for these.",
+ "heterogeneous": true,
+ "sub_clusters": {
+  "Essex Property Trust (essexapartmenthomes.com/*)": "large single-operator chunk. Next.js bespoke app over Yardi/RentCafe (essexrentcafe.securecafe.com / essexrentcafenet). Public availability via Essex OWN same-origin /api/* (parent-template, locations/communities), NOT the standard securecafe availableunits.aspx our adapter probes. securecafe only exposed behind RESIDENT LOGIN. Page is bot/JS-gated \u2014 does NOT render to automated browser (==> prod no_body_short_circuit). Needs DevTools capture of the /api unit call (proven pattern, like OLL).",
+  "independent RentCafe marketing tail": "cascadewoodsprinceton/stazione25/chatwellclub/etc \u2014 varied RentCafe sites that fell to TIER_4_LLM; need per-site probing; not one API."
+ },
+ "root_cause": "detector tags rentcafe but the securecafe iter-4 availableunits.aspx probe is keyed on securecafe.com/onlineleasing portal links these sites do not publicly expose; Essex wraps RentCafe in a custom React/Next app with same-origin /api.",
+ "next": "Essex: user DevTools capture of the floor-plans-and-pricing unit API (host+method+payload+auth) \u2014 same as OLL. Non-Essex tail: separate.",
+ "essex_api": {
+  "endpoint": "GET https://www.essexapartmenthomes.com/api/properties/{propertyId}/units/{unitId}/availability?date=YYYY-MM-DD",
+  "next_route": "/api/properties/[propertyId]/units/[unitId]/availability (Next.js/Vercel, content-type application/json)",
+  "auth": "NO Authorization/Bearer. Cookies present are analytics/consent only (GA, tiktok, hubspot, OptanonConsent, sc_site/sc_cid Sitecore personalization) \u2014 not auth.",
+  "server_side": "BLOCKED \u2014 plain curl returns HTTP 429 \"Vercel Security Check\" (Vercel Firewall bot challenge). Same class as OLL DataDome wall, NOT curl-able like repli360.",
+  "shape": "per-UNIT (needs propertyId + unitId). Page renders full per-date pricing + lease-term base rents (e.g. city-view 492967: 12mo $2,487 ... 4mo $3,727). Needs upstream property->units listing (likely the floor-plans-and-pricing Next __NEXT_DATA__/RSC or an /api/properties/{id} units list).",
+  "build_path": "BROWSER-INTERCEPT (reuse OLL pattern: pipeline patchright renders floor-plans-and-pricing -> browser makes the /api/.../availability calls -> adapter parses ctx._api_responses). NOT a server-side curl adapter.",
+  "still_needed": "the availability JSON response shape (keys / where rents+dates+leaseTerms live) to write the parser; + propertyId/unitId discovery from the marketing slug.",
+  "response_schema": {
+   "root": "{success, result}",
+   "result": "{property_id, floorplan_id, unit_id, start_date, end_date, pricing_by_date[]}",
+   "pricing_by_date": "[{date:ISO, terms_by_month:[{term_months,rent:\"2487.00\",deposit:\"600.00\",apply_url}]}]",
+   "parse_rule": "unit_id/floorplan_id/property_id from result. availability_date = first pricing_by_date[].date whose terms_by_month is NON-empty (empty => not available that day). asking rent = the term_months==12 rent on that earliest-available date (page headlines 12mo as Best Value; short terms 1-3mo are inflated premiums, NOT the asking rent). deposit from same term.",
+   "backend_revealed": "apply_url -> nestiolistings.com/api/v2/onlineleasing-link?companyID=18855&myOlePropertyId=492967&FloorPlanID=&UnitID=&sLeaseTerm= => Essex RentCafe-tagged sites are actually NESTIO/FUNNEL online-leasing. Existing FunnelAdapter + nestio detection may be relevant.",
+   "verified": "city-view unit 6302379 fp 2101784 prop 492967: 12mo $2,487 (earliest avail 2026-05-17), rises to $2,567 by 5/31"
+  }
+ }
+}

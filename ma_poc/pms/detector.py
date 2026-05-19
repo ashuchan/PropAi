@@ -50,9 +50,22 @@ PmsName = Literal[
     "amli",
     "funnel",
     "touchtour",
-    "rentvision",
-    "resman",
+    "spherexx",
+    "knock",
     "g5",
+    "resman",
+    "apts247",
+    "repli360",
+    "essex",
+    "maac",
+    "irvine",
+    "cortland",
+    "equity",
+    "rentmanager",
+    "rentvision",
+    "residentservices365",
+    "encoreskyline_template",
+    "aspensquare",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -79,9 +92,22 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "amli": "api_first",
     "funnel": "api_first",
     "touchtour": "cascade",
+    "spherexx": "api_first",
+    "knock": "api_first",
+    "g5": "api_first",
+    "resman": "api_first",
+    "apts247": "api_first",
+    "repli360": "api_first",
+    "essex": "api_first",
+    "maac": "api_first",
+    "irvine": "api_first",
+    "cortland": "api_first",
+    "equity": "api_first",
+    "rentmanager": "api_first",
     "rentvision": "dom_first",
-    "resman": "dom_first",
-    "g5": "dom_first",
+    "residentservices365": "dom_first",
+    "encoreskyline_template": "dom_first",
+    "aspensquare": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -127,6 +153,47 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
         "amli",
         0.95,
         "host ends in amli.com (AMLI Residential)",
+    ),
+    # Essex Property Trust — single REIT, single host. Next.js/Vercel
+    # marketing app; per-unit data via the same-origin
+    # /api/properties/{id}/units/{id}/availability JSON (browser-
+    # intercept, Vercel-bot-gated). Detector-tagged "rentcafe" before
+    # this, but the public securecafe portal is login-only so it fell to
+    # LLM/no_body_short_circuit in prod (0 Tier-1).
+    (
+        re.compile(r"(?:^|\.)essexapartmenthomes\.com$"),
+        "essex",
+        0.95,
+        "host ends in essexapartmenthomes.com (Essex Property Trust)",
+    ),
+    # MAAC (Mid-America Apartment Communities) — single REIT, single
+    # host. Next.js app; per-unit rent via public same-origin
+    # /api/properties/{ULID}/units/available/ (ULID = propertyIntegrationID
+    # in community HTML). Detector-tagged generic before this -> floorplan
+    # rows with rent=null in prod (0 genuine Tier-1).
+    (
+        re.compile(r"(?:^|\.)maac\.com$"),
+        "maac",
+        0.95,
+        "host ends in maac.com (Mid-America Apartment Communities)",
+    ),
+    (
+        re.compile(r"(?:^|\.)irvinecompanyapartments\.com$"),
+        "irvine",
+        0.95,
+        "host ends in irvinecompanyapartments.com (Irvine Company)",
+    ),
+    (
+        re.compile(r"(?:^|\.)cortland\.com$"),
+        "cortland",
+        0.95,
+        "host ends in cortland.com (Cortland)",
+    ),
+    (
+        re.compile(r"(?:^|\.)equityapartments\.com$"),
+        "equity",
+        0.95,
+        "host ends in equityapartments.com (Equity Residential)",
     ),
     (re.compile(r"(?:^|\.)entrata\.com$"), "entrata", 0.95, "host ends in entrata.com"),
     # Entrata "Prospect Portal" websites are served from
@@ -174,7 +241,36 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
         0.85,
         "host ends in liveovation.com (Ovation parent portfolio)",
     ),
+    # Aspen Square Management — multi-property operator on its own
+    # Strapi CMS at aspensquare.com. Community pages at
+    # /apartments/{st}/{city}/{community}/; unit roster at
+    # /floor-plans/{plan-slug}/ on the same domain.
+    (
+        re.compile(r"(?:^|\.)aspensquare\.com$"),
+        "aspensquare",
+        0.95,
+        "host ends in aspensquare.com (Aspen Square Management operator)",
+    ),
+    # Apts247 / RentDynamics — the JS widget + media assets serve from
+    # apts247.info. The data API itself is same-origin on the property's
+    # own domain, so this host match only fires when a captured request
+    # hit the apts247 CDN; the HTML marker (below) is the primary path.
+    (
+        re.compile(r"(?:^|\.)apts247\.info$"),
+        "apts247",
+        0.95,
+        "host ends in apts247.info (Apts247/RentDynamics)",
+    ),
 ]
+
+# Entrata's tenant login form lives at /Apartments/module/application_authentication/
+# and is linked from many vanity marketing sites that have no real Entrata
+# integration. Match any /Apartments/module/<widget>/ EXCEPT that auth path.
+# Negative lookahead lets the auth subpath fall through to other detection.
+_ENTRATA_REAL_MODULE_RE = re.compile(
+    r"/apartments/module/(?!application_authentication\b)[a-z][a-z0-9_]*/",
+    re.IGNORECASE,
+)
 
 _ONESITE_CLIENT_ID_RE = re.compile(r"^(?P<id>\d{3,9})\.onlineleasing\.realpage\.com$")
 _APPFOLIO_CLIENT_ID_RE = re.compile(r"^(?P<id>[a-z0-9-]+)\.appfolio\.com$")
@@ -380,21 +476,85 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # platform.
     if "onlineleasing.realpage.com" in h:
         return "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
+    # RealPage OLL (Online Leasing) wizard — the "Category-D" cluster
+    # (~187 props). Vanity marketing sites hop to ``leasing.realpage.com``
+    # / embed an ``rp-leasing-widget`` / link ``<property>/content/apply#k=``
+    # whose ``#k=`` key bootstraps the stateful ``RP.Leasing.AppService``
+    # appstate session. None of these markers can appear on a real OneSite
+    # numeric-subdomain site, so this is checked AFTER the OneSite marker
+    # above and does not regress it. Routed to ``realpage_oll`` whose
+    # adapter intercepts the OLL.SearchFloorPlan PUT response.
     if (
-        "/apartments/module/" in h
+        "leasing.realpage.com" in h
+        or "rp-leasing-widget" in h
+        or "rp.leasing.appservice" in h
+        or "/content/apply#k=" in h
+    ):
+        return (
+            "realpage_oll",
+            0.85,
+            ["RealPage OLL wizard marker in HTML (leasing.realpage.com / "
+             "rp-leasing-widget / RP.Leasing.AppService / /content/apply#k=)"],
+        )
+    # Entrata routing. ``/Apartments/module/`` alone is too broad — Entrata
+    # exposes a generic tenant login form at
+    # ``/Apartments/module/application_authentication/`` that many vanity
+    # multifamily marketing sites link to even when their actual unit data
+    # lives elsewhere (Jonah Digital / ProspectPortal / etc.). Require a
+    # widget-specific subpath OR the dedicated Entrata host markers.
+    # 2026-05-13 probe (4 of 4 false-positive sites — Foxchase, Muse ATL,
+    # Laurel Crossing, livemuseatl): only path present was
+    # application_authentication; no Entrata API ever fires.
+    has_entrata_widget_path = bool(
+        _ENTRATA_REAL_MODULE_RE.search(h)
+    )
+    _has_entrata_widget = (
+        has_entrata_widget_path
         or "entrata-widget" in h
         or "commoncf.entrata.com" in h
-        or "prospectportal.com" in h
-        or "prospect_portal" in h
-        or "floorplan_overview" in h
-    ):
+        or ".prospectportal.com" in h
+    )
+    # Ported from main 78516c3 (2026-05-15 — "Added fixes for jsonld and few
+    # pms"). Multi-PMS routing: when a page contains BOTH an Entrata-widget
+    # marker AND a SightMap embed iframe (sightmap.com/embed/), the unit data
+    # lives in the SightMap iframe — the Entrata widget on the same page is
+    # typically a contact/amenities/photo module that doesn't carry units.
+    # Promote SightMap to STRONG so it beats the Entrata-widget path that
+    # would otherwise lock the SightMap adapter out.
+    # Real cases: PID 16139 chaseknollsapts.com observed 2026-05-14 (Entrata
+    # STRONG won, SightMap iframe with 9 units never got read); Morgan
+    # Properties cluster (28 props observed 2026-05-19 — canary fell to
+    # TIER_3_DOM on every one, prod caught SightMap).
+    # Note: bare ``sightmap.com`` substring is NOT enough — could be a CDN
+    # asset or analytics link. ``sightmap.com/embed/`` is iframe-specific.
+    _has_sightmap_embed = "sightmap.com/embed/" in h
+    if _has_sightmap_embed and _has_entrata_widget:
+        return (
+            "sightmap",
+            0.90,
+            [
+                "SightMap embed iframe + Entrata widget both present — "
+                "SightMap carries unit data, routed there"
+            ],
+        )
+    if _has_sightmap_embed:
+        return (
+            "sightmap",
+            0.90,
+            ["SightMap embed iframe in HTML (sightmap.com/embed/)"],
+        )
+    # ``.prospectportal.com`` is Entrata's ProspectPortal product host
+    # (definitive Entrata, not an incidental CDN asset). Marketing
+    # shells that hop to <sub>.prospectportal.com route to EntrataAdapter
+    # whose _probe_prospectportal handles the check_availability surface.
+    if _has_entrata_widget:
         return (
             "entrata",
             0.85,
             [
-                "Entrata widget/Prospect-Portal marker in HTML "
-                "(/Apartments/module/ / entrata-widget / commoncf.entrata.com / "
-                "prospectportal.com / prospect_portal / floorplan_overview)"
+                "Entrata widget marker in HTML (/Apartments/module/"
+                "<widget>/ / entrata-widget / commoncf.entrata.com / "
+                ".prospectportal.com)"
             ],
         )
     # AppFolio embedded as an iframe to the tenant subdomain
@@ -409,13 +569,32 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             0.85,
             ["AppFolio listings-iframe marker in HTML (.appfolio.com/listings)"],
         )
+    # G5 (g5marketingcloud) Vue-SPA marketing sites. The g5dxm.com CDN /
+    # g5marketingcloud asset hosts and the ``g5-c-{client}`` URN appear
+    # site-wide incl. landing, so detection fires before the floor-plans
+    # hop. Unit data is in the SPA's Apollo cache (see G5Adapter); these
+    # sites carry no other PMS.
+    if "g5marketingcloud" in h or "g5dxm.com" in h or "g5-c-" in h:
+        return (
+            "g5",
+            0.85,
+            ["G5 marketing-cloud marker in HTML (g5marketingcloud / g5dxm.com / g5-c- URN)"],
+        )
+    # 365 ResidentServices (Apollo / collapsar theme) — a self-hosted CMS
+    # used by a small operator cluster. Asset host fingerprint is stable
+    # site-wide (used for plan-card images and theme css), so detection
+    # fires on landing before any hop. SSR plan grid at
+    # /Marketing/FloorPlans (see Residentservices365Adapter).
+    if "365residentservices.com" in h:
+        return (
+            "residentservices365",
+            0.85,
+            ["365 ResidentServices marker in HTML (365residentservices.com)"],
+        )
     # RentVision is a multifamily marketing-site CMS whose ``/floorplans``
-    # page is full plan-level SSR DOM (name/bd/ba/sqft/price/availability).
-    # The platform credit ("Website created by RentVision" / "Powered by
-    # RentVision" / a rentvision.com asset) appears site-wide including the
-    # landing page, so detection fires before any hop. Strong marker: the
-    # data is definitively present in RentVision's own DOM, and these sites
-    # carry no other PMS.
+    # page is full plan-level SSR DOM. The platform credit appears
+    # site-wide including the landing page, so detection fires before any
+    # hop. These sites carry no other PMS.
     if (
         "created by rentvision" in h
         or "powered by rentvision" in h
@@ -426,35 +605,180 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             0.85,
             ["RentVision CMS marker in HTML (created/powered by RentVision / rentvision.com)"],
         )
-    # ResMan "Implicity" prospect portal embedded as an iframe on the
-    # marketing shell — a definitive leasing path (the availability roster
-    # is move-in-date-gated SSR behind it). Strong marker, same rationale
-    # as the AppFolio listings-iframe above.
-    if "implicity.myresman.com" in h or "myresman.com" in h:
+    # Encoreskyline-template marketing family driven by the Jonah Digital /
+    # MeetElise widget. Per-plan /floorplans/{slug}/ pages render real
+    # apartment-level rows only after a Check-Availability JS click;
+    # adapter handles the per-plan interaction. 2026-05-19 deep probe —
+    # encoreskyline.com / geneseepointe.com / highlineaustin.com verified.
+    if (
+        "jonahwidget" in h
+        or "jonahdigital" in h
+        or "meetelise" in h
+    ):
         return (
-            "resman",
+            "encoreskyline_template",
             0.85,
-            ["ResMan Implicity iframe marker in HTML (implicity.myresman.com)"],
+            [
+                "Jonah Digital / MeetElise widget marker in HTML "
+                "(JonahWidget / jonahdigital / meetelise)"
+            ],
         )
-    # G5 (g5marketingcloud) Vue-SPA marketing sites. The g5dxm.com CDN /
-    # g5marketingcloud asset hosts and the ``g5-c-{client}`` URN appear
-    # site-wide (incl. landing), so detection fires before the floor-plans
-    # hop. Unit data is in the SPA's Apollo cache (see G5Adapter); these
-    # sites carry no other PMS.
-    if "g5marketingcloud" in h or "g5dxm.com" in h or "g5-c-" in h:
-        return (
-            "g5",
-            0.85,
-            ["G5 marketing-cloud marker in HTML (g5marketingcloud / g5dxm.com / g5-c- URN)"],
-        )
-    if "nestiolistings.com" in h or "nestio_" in h or "data-nestio-" in h:
+    if (
+        "nestiolistings.com" in h
+        or "nestio_" in h
+        or "data-nestio-" in h
+        or "funnelleasing.com" in h  # catches integrations/apply/bh subdomains
+        or "funnel-gen-ai-chat" in h
+        or "integrations.nestio.com" in h  # Nestio contact-widget = Funnel
+    ):
         return (
             "funnel",
             0.90,
-            ["Funnel/Nestio marker in HTML (nestiolistings.com / NESTIO_* / data-nestio-*)"],
+            [
+                "Funnel/Nestio marker in HTML "
+                "(nestiolistings.com / NESTIO_* / data-nestio-* / "
+                "funnelleasing.com / funnel-gen-ai-chat / integrations.nestio.com)"
+            ],
         )
     if "mytouchtour.com" in h:
         return "touchtour", 0.85, ["TouchTour portal marker in HTML (mytouchtour.com)"]
+    # Spherexx Presentation Software ("Convert") — Leaflet-based interactive
+    # building site-map widget. Identified by the ssploader.js script tag
+    # and/or window.sspcfg config. Confirmed via 2026-05-13 deep probe of
+    # henryonthepark.com — /api/unit returns a 176KB array of structured
+    # unit data (ID/Name/Sqft/Bed/Bath/Price/FloorplanID/FloorplanName).
+    if (
+        "presentation.spherexx.app" in h
+        or "ssploader.js" in h
+        or "sspcfg" in h
+    ):
+        return (
+            "spherexx",
+            0.90,
+            ["Spherexx marker in HTML (presentation.spherexx.app / ssploader.js / sspcfg)"],
+        )
+    # Knock / Doorway — marketing-led PMS widget. Identified by the
+    # doorway.knck.io script tag and/or knockDoorway.init() call.
+    # Public Doorway API serves full unit data: 2026-05-13 probe of
+    # liveatcalista.com returned 53 units (incl. availableOn, price).
+    if "doorway.knck.io" in h or "knockdoorway" in h:
+        return (
+            "knock",
+            0.90,
+            ["Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"],
+        )
+    # G5 Marketing Cloud — multifamily CMS used by Morgan Properties, Aimco,
+    # Bell Partners, ZRS, JMG, BH. Identified by ``inventory.g5marketingcloud``
+    # (the GraphQL endpoint) or the ``g5-cl-...`` URN slug referenced in
+    # asset CDN paths. 2026-05-13 probe of kings-manor-apartments returned
+    # 21 unit-level records (incl. availabilityDate, prices).
+    # ``g5dxm.com`` (themes.g5dxm.com, widgets.g5dxm.com) is the same
+    # vendor's theme + widget CDN — observed on 173 properties in the
+    # 2026-05-13 survey, many at Tier 3/4 today.
+    if (
+        "inventory.g5marketingcloud" in h
+        or "g5marketingcloud" in h
+        or "g5-cl-" in h
+        or "g5dxm.com" in h
+        or "dnn506yrbagrg.cloudfront.net" in h
+    ):
+        # ``dnn506yrbagrg.cloudfront.net`` is G5's primary CDN — per teammate
+        # 2026-05-13 deep-dive (C1.G5/RealPage SSR sub-class), 73 of 244 generic
+        # Tier-1-API failures had this CDN as their script source but no
+        # G5/RealPage fingerprint fired because the detector didn't recognise
+        # it. Adding it routes those sites to the G5 GraphQL adapter (which
+        # then probes ``inventory.g5marketingcloud.com`` via the locationUrn
+        # extracted from CDN paths).
+        return (
+            "g5",
+            0.90,
+            ["G5 Marketing Cloud marker in HTML "
+             "(inventory.g5marketingcloud / g5-cl- / g5dxm.com / dnn506yrbagrg.cloudfront.net)"],
+        )
+
+    # securecafe online-leasing portal — definitive RentCafe/Yardi. A
+    # ``<sub>.securecafe.com/onlineleasing/`` reference is the resident-
+    # facing leasing portal and is never an incidental CDN asset. The
+    # detector's host regex only catches ``*.rentcafe.com`` hosts, so
+    # marketing sites that link/iframe to their securecafe portal
+    # (2026-05-17 canary: liveatcivicsquare.com and a large slice of the
+    # "other" no-fingerprint pool) were misrouted to generic/LLM. Routing
+    # to ``rentcafe`` engages the iter-4 securecafe availableunits.aspx
+    # unit-level probe.
+    if "securecafe.com/onlineleasing" in h or ".securecafe.com" in h:
+        return (
+            "rentcafe",
+            0.90,
+            ["RentCafe securecafe online-leasing portal marker in HTML "
+             "(<sub>.securecafe.com/onlineleasing)"],
+        )
+
+    # ResMan — public availability portal at <client>.myresman.com/Portal/
+    # Applicants/Availability?a=&p=, linked from the marketing /floorplans/
+    # page. 2026-05-17 canary 842-pool deep-probe: 67+ sites the detector
+    # missed (fell to LLM/floorplan). Portal is NOT Cloudflare-fronted, so
+    # the ResMan adapter recovers Tier-1 unit-level even proxy-less.
+    if "myresman.com" in h or "/portal/applicants/availability" in h:
+        return (
+            "resman",
+            0.90,
+            ["ResMan marker in HTML "
+             "(myresman.com / Portal/Applicants/Availability)"],
+        )
+
+    # Apts247 / RentDynamics — JS leasing widget (static2.apts247.info /
+    # media.apts247.info) with a SAME-ORIGIN /api/v1/floorplans/?api_key=
+    # data API. 2026-05-17 canary Chrome-MCP no-signature deep-probe: a
+    # ≥4-site cluster invisible to static curl_cffi (inventory is fetched
+    # client-side). api_key is in the homepage HTML ⇒ deterministic Tier-1.
+    if "apts247" in h or "rentdynamics.com" in h:
+        return (
+            "apts247",
+            0.90,
+            ["Apts247/RentDynamics marker in HTML "
+             "(apts247.info widget / same-origin /api/v1/ data API)"],
+        )
+
+    # Repli360 / rrac popup family (royce-like caf_v2 cluster — 158 sites
+    # across the 5K, ~0 real units in prod, falls to TIER_4_LLM floorplan-
+    # level). The JS-rendered "View Details" anchors call
+    # ``getUnitListByFloor(this,'<fp>',<tt>,<site_id>)`` against the
+    # no-auth POST app.repli360.com/admin/getUnitListByFloor data API.
+    # Markers appear post-render (the detector re-runs with page_html).
+    if (
+        "app.repli360.com" in h
+        or "getunitlistbyfloor(" in h
+        or "rrac_listavailableunit" in h
+    ):
+        return (
+            "repli360",
+            0.90,
+            ["Repli360/rrac marker in HTML "
+             "(app.repli360.com / getUnitListByFloor / rrac_listAvailableUnit)"],
+        )
+
+    # RentManager / iLoveLeasing — the marketing shell embeds the JS-only
+    # iLoveLeasing widget (www.iloveleasing.com/pub/widget/js/luv.js) but
+    # the real unit feed is the no-auth, no-bot-wall server-side
+    # ``<eid>.ua.rentmanager.com/Search_Result`` endpoint (the full URL is
+    # usually present verbatim in the static HTML). ``<eid>.twa/owa
+    # .rentmanager.com`` and ``cdn.rentmanager.com`` are the same vendor's
+    # tenant-web-access / CDN hosts. 2026-05-18 server-side curl verified
+    # (high.ua.rentmanager.com → unit 2600 @ $4,971). Routed to
+    # RentManagerAdapter whose extract() probes Search_Result.
+    if (
+        ".ua.rentmanager.com" in h
+        or ".twa.rentmanager.com" in h
+        or "cdn.rentmanager.com" in h
+        or "iloveleasing.com" in h
+    ):
+        return (
+            "rentmanager",
+            0.90,
+            ["RentManager/iLoveLeasing marker in HTML "
+             "(.ua.rentmanager.com / .twa.rentmanager.com / "
+             "cdn.rentmanager.com / iloveleasing.com)"],
+        )
 
     # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong
     # "not-a-PMS" signals when no strong PMS marker appeared in pass 1.
@@ -523,10 +847,28 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "wix": ("static.parastorage.com", "wix.com"),
     "squarespace": ("squarespace.com",),
     "realpage": ("api.ws.realpage.com", "realpage.com"),
+    "realpage_oll": (
+        "leasing.realpage.com",
+        "rp-leasing-widget",
+        "rp.leasing.appservice",
+        "/content/apply#k=",
+    ),
     "avalonbay": ("avaloncommunities.com",),
     "amli": ("amli.com",),
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
+    "g5": ("g5marketingcloud", "g5dxm.com", "g5-c-"),
+    "rentvision": ("created by rentvision", "powered by rentvision", "rentvision.com"),
+    "residentservices365": ("365residentservices.com",),
+    "encoreskyline_template": ("jonahwidget", "jonahdigital", "meetelise"),
+    "aspensquare": ("aspensquare.com", "static.aspensquare.com"),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
+    "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
+    "rentmanager": (
+        ".ua.rentmanager.com",
+        ".twa.rentmanager.com",
+        "cdn.rentmanager.com",
+        "iloveleasing.com",
+    ),
     # Marketing / lead-capture stacks — observed in 10-property roll-up
     # (doorway.knck.io, cdn-media.hy.ly, chat.hyly.ai, marketapts.com).
     "marketing_knock": ("doorway.knck.io", "knockrentals.com"),

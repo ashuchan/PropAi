@@ -56,6 +56,64 @@ def test_s2_no_cross_tier_client_leak() -> None:
     assert "httpx.AsyncClient" not in curl_src
 
 
+def test_direct_uses_httpx_by_default(monkeypatch) -> None:
+    """2026-05-13: regression guard. Without the CURL_CFFI_FOR_DIRECT
+    opt-in, DIRECT must continue using httpx as it has always done."""
+    monkeypatch.delenv("CURL_CFFI_FOR_DIRECT", raising=False)
+    pytest.importorskip("curl_cffi")
+    client = make_http_client(FetchTier.DIRECT, proxy=None)
+    assert isinstance(client, _HttpxAdapter)
+
+
+@pytest.mark.parametrize("flag_value", ["1", "true", "yes", "on"])
+def test_direct_switches_to_curlcffi_when_flag_set(
+    monkeypatch, flag_value: str
+) -> None:
+    """2026-05-13: opt-in switch — CURL_CFFI_FOR_DIRECT=1 enables curl_cffi
+    on the DIRECT tier to bypass Cloudflare on the ~378 currently-CF-walled
+    properties. The flag must accept the common truthy spellings."""
+    pytest.importorskip("curl_cffi")
+    monkeypatch.setenv("CURL_CFFI_FOR_DIRECT", flag_value)
+    client = make_http_client(FetchTier.DIRECT, proxy=None)
+    assert isinstance(client, _CurlCffiAdapter)
+
+
+@pytest.mark.parametrize("flag_value", ["0", "false", "no", "off", ""])
+def test_direct_flag_falsy_values_stay_on_httpx(
+    monkeypatch, flag_value: str
+) -> None:
+    """Falsy / empty values must not flip the switch."""
+    pytest.importorskip("curl_cffi")
+    monkeypatch.setenv("CURL_CFFI_FOR_DIRECT", flag_value)
+    client = make_http_client(FetchTier.DIRECT, proxy=None)
+    assert isinstance(client, _HttpxAdapter)
+
+
+def test_direct_flag_falls_back_to_httpx_when_curl_cffi_missing(
+    monkeypatch,
+) -> None:
+    """If the operator enables the flag but curl_cffi isn't installed,
+    we must NOT crash — log a warning and continue with httpx."""
+    monkeypatch.setenv("CURL_CFFI_FOR_DIRECT", "1")
+    monkeypatch.setattr(
+        "ma_poc.fetch.http_client.curl_cffi_requests", None
+    )
+    client = make_http_client(FetchTier.DIRECT, proxy=None)
+    assert isinstance(client, _HttpxAdapter)
+
+
+def test_proxy_tiers_unaffected_by_curl_cffi_for_direct_flag(
+    monkeypatch,
+) -> None:
+    """The flag must only touch DIRECT. DC_PROXY+ stays on curl_cffi
+    regardless."""
+    pytest.importorskip("curl_cffi")
+    for val in ("1", ""):
+        monkeypatch.setenv("CURL_CFFI_FOR_DIRECT", val)
+        client = make_http_client(FetchTier.DC_PROXY, proxy="http://x:8080")
+        assert isinstance(client, _CurlCffiAdapter)
+
+
 @pytest.mark.parametrize(
     "impersonate,description",
     [

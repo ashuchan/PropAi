@@ -1,0 +1,21 @@
+url,plat,class,evidence
+https://uptowngainesville.com/,?,MISFP_RESMAN,/Portal/Applicants/Availability JS-rendered + Duda
+https://conklintowns.com/,wordpress,FLOORPLAN_ONLY_LIKELY,wp floorplan-gif + $2050 from-price
+https://www.riverbankapartments.com/,none,TEMPLATE_MARKETAPTS,marketapts.com vendor
+http://www.villasatwylie.com/,none,TEMPLATE_JONAHDIGITAL,cdn.jonahdigital.com
+https://integrapalms.com/,?,TEMPLATE_JONAHDIGITAL,cdn.jonahdigital.com
+https://www.spearheadproperties.com/property/oak-i/,wordpress,BESPOKE_WP_CANDIDATE,/for-rent listings $1400+
+http://www.themeydenbellevue.com/,none,TEMPLATE_REPLI360,app.repli360.com+multihub
+https://www.liveatvaya.com/,none,TEMPLATE_JONAHDIGITAL,cdn.jonahdigital.com+milestone
+https://www.30sixtyapts.com/,squarespace,TEMPLATE_SQSP_DYNASTY,squarespace+rent.dynasty.com
+https://jcmliving.com/apartment-rentals/nj/tuckerton/village-on-the-green/,wordpress,BESPOKE_PM_CANDIDATE,from-prices no unit tok
+http://www.greenarchtulsa.com/,none,TEMPLATE_365RS_DIGILEASE,cdn.365residentservices.com+digi.lease
+https://enbygardens.com/,elfsight,BESPOKE_MINIMAL,no vendor host /floor-plans/
+liveatriversidevillas.com,bespoke,HAS_UNITS_DETAIL,/floor-plan-cards/<plan> (user-confirmed)
+thewestmoor.com,bespoke,FLOORPLAN_ONLY_CEILING,/floor-plans--pricing.html (user-confirmed)
+on-site.com,bespoke,MISFP_REALPAGE_ONSITE,online_app3/step/unit portal-hop (user-confirmed)
+catalinagardenslv.com,bespoke,FLOORPLAN_COUNT,/vacancy/ floorplan+count (user)
+sussexmanorapts.com,bespoke,MISFP_APPFOLIO,appfolio+sightmap has unit-level (user)
+cityridgedc.com,bespoke,HAS_UNITS_DIRECT,/living/floor-plans/?sort=unitrent paginated (user)
+yardsatfieldside.com,bespoke,HAS_UNITS_DEEP,/floor-plans/apartment/<id> via view-apartments (user)
+harborgroupmanagement.com,bespoke,FLOORPLAN_COUNT_CEILING,signal-pointe count-only not unit (user)

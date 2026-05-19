@@ -1,0 +1,12 @@
+{
+ "date": "2026-05-18",
+ "q": "Do we need more RentCafe probes? Is RentCafe unit-level reachable without login?",
+ "property": "Tall Oaks Kalamazoo (both surfaces probed)",
+ "vanity": "talloaks-apartments.com \u2014 curl_cffi 403 bot-wall; unit-level rows only render to a real browser (residential/render-gated).",
+ "hosted": "rentcafe.com/apartments/mi/kalamazoo/tall-oaks-apartment-homes/default.aspx \u2014 server-side 200, NO bot-wall, propertyId=455753, FloorplanList = SSR floorplan-level only; unit-level/apply links all go to /onlineleasing/apartmentsforrent/guestlogin.aspx | register.aspx | oleapplication.aspx (LOGIN WALL).",
+ "verdict": "RentCafe unit-level is NOT cheaply reachable: floorplan-level is free (hosted portal, not Tier-1 per success def); unit-level is residential-gated (vanity render) OR login-walled (rentcafe.com onlineleasing). Matches documented FINAL_5K_SUMMARY ~1,060 RentCafe-securecafe pool = 0/2000 without residential proxy.",
+ "conclusion": "924 rentcafe_w = the KNOWN RentCafe residential-proxy infra ceiling. Not missing-adapter, not routing, not a cheap win. Adapter code already exists (getFloorplans + _try_rentcafe_securecafe_probe). Recoverable only via residential canary; floorplan-level free fallback != Tier-1. No more probing (more samples only re-confirm same 2-surface pattern). No code.",
+ "status": "REOPENED \u2014 awaiting real unit-row markup from user (inspect-element) to build validated RentCafe-hosted parser",
+ "CORRECTION_2026_05_18_v2": "RETRACT \"floorplan-level only / login-walled\" for the hosted portal. User eyeball + headless render (586KB, server-200, NO bot-wall, ZERO data-XHRs, tokens unit/available/select present) confirm UNIT-LEVEL data IS SSR-public on rentcafe.com hosted portal WITHOUT login. My earlier regex-sniff of curl HTML was a false negative (the no-units-from-regex trap; user eyeball overrides).",
+ "revised_conclusion": "rentcafe.com-HOSTED portal = server-fetchable (200, no bot-wall) AND public unit-level data, no login. main extract_units_from_dom returns 0 on its markup (extractor gap, same class as iLoveLeasing) +/- needs floorplan-expand interaction. This is a RECOVERABLE surface (extraction/interaction gap), NOT a residential ceiling. Potentially large cheap (no-residential) Tier-1 recovery for the hosted-portal subset of the 924. Vanity-domain (403) still residential-gated; hosted portal is the cheap path."
+}

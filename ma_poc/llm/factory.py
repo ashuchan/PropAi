@@ -25,6 +25,10 @@ def _build_provider(name: str) -> LLMProvider:
         from llm.openrouter import OpenRouterLLMProvider
 
         return OpenRouterLLMProvider()
+    if name == "gemini":
+        from llm.gemini import GeminiLLMProvider
+
+        return GeminiLLMProvider()
     from llm.azure import AzureLLMProvider
 
     return AzureLLMProvider()

@@ -1,0 +1,57 @@
+{
+ "category_d": "RealPage Online Leasing (OLL) API",
+ "endpoint": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/appstate/v1/",
+ "auth_model": "NOT header/Bearer auth-gated. STATEFUL appstate/BPM session flow: OLL.HomeDetails(BpmSeq0, sets SiteId/PmcId from #k= key) -> OLL.Menu -> OLL.SearchFloorPlan(BpmSeq1) -> unit detail, all threaded by ClientSessionID + incrementing BpmSequence/LogSequence.",
+ "cold_call_test": "GET SearchFloorPlan in isolation -> HTTP 404 (no appstate for non-bootstrapped session; session also expired).",
+ "response": "JSON (UnitId detail call shows {Id,Name,UnitDescription,ResponseStatus,...}).",
+ "identifiers": "SiteId=4000138, PmcId=2104447 (lochraven) \u2014 resolved from #k= key via HomeDetails bootstrap.",
+ "size_5k": 187,
+ "verdict": "CONFIRMED HARD: not a clean server-side API. Off-browser replay requires defeating DataDome+Akamai + token/session bootstrap (brittle, against no-bypass policy). Right path = real browser session OR existing jugnu onesite.py/realpage_oll.py + Web-Unlocker proxy stack. NOT a lightweight adapter. ~187 props.",
+ "vs_repli360": "repli360=158 props, 1 stateless no-auth POST (clean win, build first). CategoryD=187 props, stateful multi-step OLL flow (real reverse-eng project).",
+ "method": "PUT (JSON body ~280B), not GET",
+ "BOT_PROTECTION": "DataDome + Akamai Bot Manager \u2014 set-cookie datadome=, x-datadome: protected, bm_ss/bm_s/bm_so cookies. CORS locked to property origin. Custom headers xyz=<base64 token>, x-authtoken, ClientSessionID.",
+ "final_recommendation": "Build repli360 (158, clean no-auth stateless POST, no bot wall) FIRST. Category-D = route to existing OneSite/Web-Unlocker infra, separate harder track.",
+ "response_schema": {
+  "root": "Workflow.ActivityGroups[].GroupActivities[]",
+  "unit_activity": "__type endswith ApartmentSelectionLeaseMgmtActivity -> .Units[]",
+  "unit_fields": {
+   "UnitNumber": "e.g. \"1805C AB\"",
+   "Id": "206",
+   "MinPriceRange": 1255,
+   "MaxPriceRange": 1515,
+   "AvailableDateString": "\"May 21\"",
+   "AvailableDate": "/Date(ms)/",
+   "Deposit": 350,
+   "Squarefeet": 700,
+   "TwelveMonthsRent": 1290,
+   "SiteId": "4000138"
+  },
+  "floorplan": ".Floorplan {Id,Name,Bedrooms,Bathrooms,MinSquareFeet,MinPriceRange,MaxPriceRange,AvailableUnits}",
+  "ids": "top-level SiteId 4000138, PmcId 2104447, PmsId 1; AppStateParams.FloorplanId per-call",
+  "verified_units": "lochraven: 1805C AB / 1719F AB / 8309AT LO / 1715A AB \u2014 real unit-level, clean structured JSON"
+ },
+ "refined_path": "DATA IS EXCELLENT (clean structured Units[] JSON, unit-level). Only barrier = DataDome+Akamai+stateful-PUT+xyz-token. Right adapter = BROWSER-based Tier-1 API INTERCEPTION: existing jugnu patchright+WebUnlocker loads the OLL wizard (real browser passes DataDome), intercept the OLL.SearchFloorPlan PUT response per floorplan, parse Workflow->...->Units[]. Reuse onesite.py/realpage_oll.py + Tier-1 interception architecture. Tractable follow-on; NOT a clean curl adapter but data-shape now fully known.",
+ "request_contract": {
+  "url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/appstate/v1/?BpmId=OLL.SearchFloorPlan&BpmSequence=1&LogSequence=<N>&ClientSessionID=<sid>",
+  "method": "PUT",
+  "content_type": "application/json;charset=UTF-8",
+  "body": {
+   "NavigationMode": 2,
+   "ActivityID": "<apartment-activity-guid from bootstrap>",
+   "IsSkipStep": false,
+   "PmcId": "2104447",
+   "SiteId": "4000138",
+   "LeasingIntent": "SearchUnit",
+   "AppStateParams": {
+    "FloorplanId": "<per-floorplan>",
+    "MoveInDate": "MM/DD/YYYY",
+    "switchToWaitlist": false
+   },
+   "SelectedLanguage": "English"
+  },
+  "headers_needed": "xyz:<base64 token>, x-authtoken (empty observed), Origin/Referer=property domain; DataDome+Akamai cookies (bm_*, datadome)",
+  "session_inputs_from_bootstrap": "ClientSessionID, ActivityID (apartment activity), SiteId 4000138, PmcId 2104447 \u2014 all from OLL.HomeDetails(#k=key) -> OLL.Menu sequence; FloorplanId per card from SearchFloorPlan/floorplan list"
+ },
+ "CONTRACT_STATUS": "FULLY reverse-engineered end-to-end (request URL+method+body+headers+session inputs AND response schema). Buildable as BROWSER-INTERCEPT Tier-1 adapter: patchright+WebUnlocker loads OLL wizard (passes DataDome as real browser, browser mints xyz token + bootstraps session), intercept the OLL.SearchFloorPlan PUT JSON per floorplan, parse Workflow->...->Units[]. Forging server-side curl is blocked by DataDome+Akamai; browser-intercept sidesteps all 3 barriers (bot wall, xyz token, session).",
+ "BUILD_STATUS": "SHIPPED \u2014 realpage_oll.py parse_realpage_oll_workflow + browser-intercept extract + detector marker + 28 tests. Parser VALIDATED against the REAL lochraven payload (4 units exact: 1805C AB $1255-1515 2026-05-21, 1719F AB, 8309AT LO, 1715A AB). Commit 983f35f. Browser-intercept (ctx._api_responses) \u2014 never forges DataDome/Akamai PUT."
+}

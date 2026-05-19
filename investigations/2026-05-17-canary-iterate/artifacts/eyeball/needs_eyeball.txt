@@ -1,0 +1,30 @@
+NEEDS-EYEBALL BATCH 1 (automated probe inconclusive — confirm units visible or not)
+Protocol: per-site, you confirm "units visible y/n" → decides recoverable vs ceiling
+
+1. https://www.jaxonliving.com/floorplans
+   cluster: genuine-custom (no PMS host) | got: homepage clean, /floorplans not deep-probed
+   look for: per-unit rows (unit/suite # + $ + avail date) vs only floorplan "from $X"
+
+2. https://princetonmanagement.com/communities/century-square-townhomes/
+   cluster: custom CMS (princetonmanagement multi-property) | got: community page no units
+   look for: a deeper "availability"/"apply" page with unit rows; is there one?
+
+3. https://www.livethemarion.com/  (none-cluster sample, not yet probed)
+   look for: unit-level table or an embedded availability widget/XHR
+
+CONFIRMED recoverable in this probe (no eyeball needed):
+  apartmentsniagara.com/property-detail/?ID=46 -> Suite 117 $1,200 (bespoke WP, LLM/DOM under-extracts)
+
+
+NEEDS-EYEBALL BATCH 2 (from 209 static-unclassified 'genuine-custom')
+For each: open it, then go to its floorplan/availability detail page.
+Tell me: HAS per-unit data (unit#/suite + $ + avail) | FLOORPLAN-ONLY (from $X) | DEAD
+
+1. http://www.liveatriversidevillas.com
+2. www.thewestmoor.com
+3. https://www.meripalmbay.com/
+4. http://www.catalinagardenslv.com
+5. https://www.sussexmanorapts.com/
+6. http://cityridgedc.com/
+7. https://www.yardsatfieldside.com
+8. http://www.signalpointe.com/

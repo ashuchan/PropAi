@@ -1,0 +1,10 @@
+{
+ "correction": "USER-VERIFIED 2026-05-17: palmflats has only 12 units. Canary apts247=12 CORRECT; prod TIER_1_DOM_APPFOLIO_SSR=300 is INFLATED (likely whole dowwoodproperty.appfolio.com mgmt-account / occupied units, not this property).",
+ "implications": [
+  "palmflats is NOT a regression; prod over-counted ~288 phantom units.",
+  "The naive appfolio-precedence fix would have made data WORSE (routing correct apts247-12 to inflated AppFolio-300). Not-shipping was doubly correct.",
+  "The 205 canary-worse set is computed on RAW real-unit count -> biased toward over-counters. Genuine canary regressions << 205. Many prod-wins (115 LLM-based + AppFolio_SSR like palmflats 300 / stratfordchase 156) are likely prod inflation, not canary loss.",
+  "Headline canary 4.5x units vs prod: direction still positive but raw count is NOT a quality proxy; needs distinct-available-unit validation."
+ ],
+ "methodology_lesson": "Raw unit count != quality. User manual eyeball overrides my count-based inference (consistent: solo calls 0/7). Re-score prod-vs-canary on quality not count before any 205 fix."
+}

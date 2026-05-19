@@ -1,0 +1,41 @@
+TIER_3_DOM + TIER_4_LLM* population: 2650 props (1360 with 0 true unit-level)
+
+by static-fingerprint platform (the cluster map for Chrome-probe):
+  securecafe             1179
+  none                    199
+  sightmap                172
+  apts247                 150
+  rentcafe                148
+  onesite                 117
+  wordpress               117
+  g5                       93
+  funnel                   79
+  appfolio                 66
+  resman                   63
+  entrata                  60
+  ?                        56
+  duda                     46
+  wix                      20
+  spherexx                 19
+  rentmanager              16
+  realpage                 15
+  elfsight                 10
+  squarespace               9
+
+by winning tier:
+  TIER_4_LLM_DOM             1686
+  TIER_3_DOM                  524
+  TIER_4_LLM                  439
+  TIER_4_LLM_API                1
+
+sample no-unit URLs per top cluster:
+  [securecafe] https://www.doveparkapts.com/ | https://www.theblackhawkapartments.com/ | https://livebh.com/apartments/the-oakley-apartment-homes/ | www.hpluxuryapts.com
+  [none] https://www.livethemarion.com/#hero | https://www.jaxonliving.com/ | http://www.signalpointe.com/ | https://www.primeelectriccity.com/
+  [sightmap] https://www.risewestarlington.com/ | http://www.leasewestwindapartments.com/ | https://www.risebedfordlake.com/ | https://www.equityapartments.com/san-diego/pacific-beach/mara-pacific-beach-apartments
+  [apts247] https://www.reservelh.com/ | www.prestonvalleyapartments.com | www.countrywoodsapts.com | https://www.trailside.graninc.com/
+  [rentcafe] https://livebh.com/apartments/ashford/?utm_source=vanity&utm_medium=redirect&utm_campaign=liveatashford&original_referrer=liveatashford.com | https://livebh.com/apartments/old-farm/?utm_source=realpage&utm_medium=referral&utm_campaign=cta | https://livebh.com/apartments/marisol-vista-apartment-homes/?utm_source=realpage&utm_medium=referral&utm_campaign=cta | http://hampshirevillage.com/
+  [onesite] https://www.courtneyparkapthomes.com/ | https://www.robbinspropertyllc.com/apartments/fl/boynton-beach/boynton-place-apartments/ | https://www.millbridgeapartments.com/ | https://www.lajoyabyazali.com/floorplans/
+  [wordpress] https://apartmentsniagara.com/property-detail/?ID=46 | https://princetonmanagement.com/communities/century-square-townhomes/ | https://liveatfairlaneapartments.com/ | https://princetonmanagement.com/communities/lincoln-meadows-apartments/
+  [g5] https://www.bellafioreliving.com/ | https://www.caymanluxuryliving.com/ | www.sherwoodacresapts.com | https://portraitathancepark.com/
+  [funnel] https://www.udr.com/baltimore-apartments/towson/1274-at-towson/ | www.vitruvianwest.com | http://www.liveattrailpoint.com/ | http://www.oxfordlakeview.com/
+  [appfolio] https://www.liveatthebiltmore.com/?utm_knock=g#section-1 | https://www.ptbproperties.com/prairie-oaks | https://www.countryapts.com/ | https://www.iconre.org/arborwoods

@@ -1,0 +1,8 @@
+{
+ "bug": "apts247_vs_appfolio_misroute",
+ "verified": "palmflats prod 300 distinct real units (correct) vs canary apts247 12 \u2014 real regression",
+ "naive_fix": "appfolio-subdomain-precedence over apts247",
+ "naive_fix_REJECTED_reason": "3/20 (~15%) correctly-apts247 sites share chamberlin.appfolio.com PM-portal signal \u2014 guard would regress more working sites than it fixes",
+ "correct_fix": "try-both-on-ambiguity: when apts247 AND real appfolio account co-present, run both adapters keep max real units; needs design+full-cohort regression run",
+ "status": "NOT SHIPPED \u2014 test gated unsafe change"
+}

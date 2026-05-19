@@ -1,0 +1,10 @@
+ALL 456 genuine-custom — per-site automated unit check
+
+  NEEDS_EYEBALL   385
+  HAS_UNITS        69
+  DEAD              2
+
+HAS_UNITS by signal:
+  multi_unit_table          66
+  unit_price_attr            2
+  generic_unit_row           1

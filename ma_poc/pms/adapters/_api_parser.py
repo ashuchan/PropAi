@@ -49,6 +49,11 @@ def _get(d: dict, *keys: str) -> str:
     """Try multiple key names, return first non-empty string found.
 
     Unwraps nested rent/sqft objects like ``{rent: {min: 1351, max: 1351}}``.
+    Also unwraps name-shaped dicts ``{name: "...", provider_id: "..."}`` —
+    some upstream APIs (Morgan Properties / RentCafe family) return the
+    floor-plan-name field as a dict; without unwrap we serialise the whole
+    dict and emit ``floor_plan_name='{"name":"One Bedroom","provider_id":...}'``
+    See PID 161 Hickory Mill 2026-05-14.
     """
     for k in keys:
         v = d.get(k)
@@ -57,6 +62,11 @@ def _get(d: dict, *keys: str) -> str:
         if isinstance(v, list):
             continue
         if isinstance(v, dict):
+            # Try name-shaped subkeys first (B3 fix), then rent/sqft subkeys.
+            for sub_k in ("name", "label", "title", "display_name", "displayName"):
+                sv = v.get(sub_k)
+                if isinstance(sv, str) and sv:
+                    return sv
             for sub_k in ("min", "low", "amount", "value", "effectiveRent", "max", "high"):
                 sv = v.get(sub_k)
                 if sv is not None and sv != "":
@@ -64,6 +74,26 @@ def _get(d: dict, *keys: str) -> str:
             continue
         return str(v)
     return ""
+
+
+def _unwrap_name(v: Any) -> str:
+    """Coerce a possibly-dict-shaped name field to a plain string.
+
+    Some PMS APIs (RealPage via Morgan Properties is a confirmed case) emit
+    ``floor_plan`` / ``floorPlanName`` as a dict ``{"name": "...", "provider_id":
+    "..."}``. A naive ``str(v)`` then serialises the whole dict and the row
+    surfaces with ``floor_plan_name`` set to a stringified JSON object.
+    This helper extracts the human-readable name when present.
+    """
+    if v is None:
+        return ""
+    if isinstance(v, dict):
+        for k in ("name", "label", "title", "display_name", "displayName"):
+            sv = v.get(k)
+            if isinstance(sv, str) and sv:
+                return sv
+        return ""
+    return str(v) if v != "" else ""
 
 
 def _money_to_int(s: Any) -> int | None:
@@ -88,6 +118,103 @@ def _find_list(obj: Any, keys: tuple[str, ...]) -> list:
         if isinstance(v, list) and v:
             return v
     return []
+
+
+# Canonical unit-signal keys for the recursive walker. After
+# normalize_field_key() collapses vendor variants (camelCase / PascalCase /
+# snake_case / vendor abbreviations) these are the field-names that count.
+# An item with >= 2 canonical signals is treated as unit-shaped.
+_CANON_UNIT_SIGNAL_KEYS: frozenset[str] = frozenset({
+    "rent", "min_rent", "max_rent",
+    "sqft",
+    "bedrooms", "bathrooms",
+    "floor_plan_name",
+    "unit_number", "unit_id",
+    "available_date",
+})
+
+# Defensive cap on the recursive walker. The Razz blob is ~1 MB but well-
+# structured; pathological pages (mis-rendered SPAs, infinitely nested
+# logger payloads) can dwarf that. Capping nodes visited keeps the worst
+# case bounded.
+_WALK_MAX_NODES = 50_000
+
+
+def _item_has_unit_signals(item: Any, min_signals: int = 2) -> bool:
+    """True iff ``item`` is a dict whose keys (normalised) include at least
+    ``min_signals`` distinct canonical unit signal keys.
+
+    Skips keys starting with '@' (Schema.org reserved). Uses
+    normalize_field_key from floor_plan_signals to collapse vendor variants
+    so ``monthlyRent``/``minRent``/``rentTerms``/``floorPlanName``/
+    ``bedroomCount``/``squareFootage``/``SquareFeet`` all map to canonical
+    keys without per-call regex work.
+    """
+    if not isinstance(item, dict):
+        return False
+    try:
+        from ma_poc.pms.signal_engine.floor_plan_signals import (
+            normalize_field_key as _norm,
+        )
+    except Exception:
+        return False
+    found: set[str] = set()
+    for k, v in item.items():
+        if not isinstance(k, str) or k.startswith("@"):
+            continue
+        # Treat dict/list values as "present" if they are non-empty —
+        # nested ``rent: {min, max}`` and ``rentTerms: [...]`` count as
+        # the rent signal even though the value isn't a scalar.
+        if v in (None, "", [], {}):
+            continue
+        canon = _norm(k)
+        if canon in _CANON_UNIT_SIGNAL_KEYS:
+            found.add(canon)
+            if len(found) >= min_signals:
+                return True
+    return False
+
+
+def find_unit_arrays(blob: Any, min_signals: int = 2) -> list[list[dict]]:
+    """Recursively walk ``blob`` and return every list whose first dict-typed
+    item satisfies :func:`_item_has_unit_signals`.
+
+    Designed for SSR JSON blobs that bury inventory under vendor-specific
+    paths (Razz: ``initialStoreState.$inventory.units`` 4 levels deep; some
+    Wix / custom CMSes go even deeper). Returns each candidate list in
+    discovery order. Caller is responsible for deduplicating units between
+    lists if multiple matches are returned.
+
+    Node-visit cap (``_WALK_MAX_NODES``) bounds the worst case on
+    pathological / mis-rendered payloads.
+    """
+    if blob is None:
+        return []
+    results: list[list[dict]] = []
+    visited = 0
+    stack: list[Any] = [blob]
+    while stack:
+        node = stack.pop()
+        visited += 1
+        if visited > _WALK_MAX_NODES:
+            break
+        if isinstance(node, list):
+            # If this list itself is unit-shaped, capture it; do NOT recurse
+            # into its items (each item would just yield itself again).
+            if node and any(
+                _item_has_unit_signals(it, min_signals) for it in node[:5]
+            ):
+                results.append([it for it in node if isinstance(it, dict)])
+                continue
+            # Otherwise, look inside for nested unit arrays.
+            for child in node:
+                if isinstance(child, (dict, list)):
+                    stack.append(child)
+        elif isinstance(node, dict):
+            for v in node.values():
+                if isinstance(v, (dict, list)):
+                    stack.append(v)
+    return results
 
 
 def _extract_rent(u: dict) -> tuple[int | None, int | None]:
@@ -178,7 +305,17 @@ def _walk_jsonld(node: Any, out: list[dict]) -> None:
 
 
 def _jsonld_item_has_unit_signal(item: dict) -> bool:
-    """True if a JSON-LD node has offers/pricing/rooms data — i.e. unit-level."""
+    """True if a JSON-LD node has offers/pricing/rooms data — i.e. unit-level.
+
+    Two signal-detection passes. The first uses Schema.org canonical keys
+    (``offers``, ``numberOfRooms``, ``floorSize``); the second runs the
+    item's keys through ``normalize_field_key`` so PMS-vendor variants
+    (``floorPlanName``, ``numberOfBedrooms``, ``monthlyRent``,
+    ``bedroomCount``, ``squareFootage`` …) also count as signals. Without
+    the second pass, ApartmentComplex blocks that ship vendor-specific
+    keys are rejected as "no unit signal" even when the data is plainly
+    present (PID 290347 29washington.com observed 2026-05-14).
+    """
     offers = item.get("offers")
     if isinstance(offers, dict) and (
         offers.get("price") or offers.get("lowPrice") or offers.get("highPrice")
@@ -198,11 +335,38 @@ def _jsonld_item_has_unit_signal(item: dict) -> bool:
         return True
     t = item.get("@type")
     t_list = t if isinstance(t, list) else [t]
-    return any(
+    if any(
         x in ("Apartment", "FloorPlan", "Residence", "Offer", "SingleFamilyResidence")
         for x in t_list
         if isinstance(x, str)
-    )
+    ):
+        return True
+    # Second pass: any key that normalises to a canonical unit signal counts.
+    # Picks up Schema.org camelCase + PMS-vendor variants without modifying
+    # the item or breaking downstream extractors that read Schema.org keys
+    # directly.
+    try:
+        from ma_poc.pms.signal_engine.floor_plan_signals import (
+            normalize_field_key as _norm_key,
+        )
+    except Exception:
+        return False
+    _unit_signal_canon = {
+        "rent", "min_rent", "max_rent",
+        "sqft",
+        "bedrooms", "bathrooms",
+        "floor_plan_name",
+        "unit_number", "unit_id",
+        "available_date",
+    }
+    for k, v in item.items():
+        if not isinstance(k, str) or k.startswith("@"):
+            continue
+        if v in (None, ""):
+            continue
+        if _norm_key(k) in _unit_signal_canon:
+            return True
+    return False
 
 
 # ── Quality checks ─────────────────────────────────────────────────────────────
@@ -279,7 +443,8 @@ def parse_sightmap_payload(body: Any, url: str) -> list[dict]:
 
         beds = fp.get("bedroom_count")
         baths = fp.get("bathroom_count")
-        name = fp.get("name") or fp.get("filter_label") or ""
+        # B3 (2026-05-16): unwrap dict-shaped names — see PID 161 Hickory Mill.
+        name = _unwrap_name(fp.get("name")) or _unwrap_name(fp.get("filter_label")) or ""
 
         if beds == 0 or (isinstance(name, str) and "studio" in name.lower()):
             bed_label = "Studio"
@@ -358,7 +523,9 @@ def realpage_units_from_body(body: Any, source_url: str) -> list[dict]:
         for fp in resp.get("floorplans") or []:
             if not isinstance(fp, dict):
                 continue
-            fp_id = str(fp.get("id") or fp.get("name") or "")
+            # B3 (2026-05-16): unwrap dict-shaped name fields.
+            fp_name = _unwrap_name(fp.get("name"))
+            fp_id = str(fp.get("id") or fp_name or "")
             beds = fp.get("bedRooms") or fp.get("bedrooms")
             sqft = fp.get("sqft") or fp.get("squareFeet")
             sqft_v = int(sqft) if isinstance(sqft, (int, float)) and sqft > 0 else None
@@ -374,7 +541,7 @@ def realpage_units_from_body(body: Any, source_url: str) -> list[dict]:
                 "amenities": None,
                 "floorplan_image_url": fp.get("imageUrl") or fp.get("image") or None,
                 "_sqft": sqft_v,
-                "_floor_plan": fp.get("name") or fp_id,
+                "_floor_plan": fp_name or fp_id,
                 "_bedrooms": beds,
             })
         return out
@@ -403,7 +570,8 @@ def realpage_units_from_body(body: Any, source_url: str) -> list[dict]:
                     u.get("floorPlanImage") or u.get("floorplanImage") or u.get("imageUrl") or None
                 ),
                 "_sqft": int(sqft_v) if isinstance(sqft_v, (int, float)) and sqft_v > 0 else None,
-                "_floor_plan": u.get("floorPlanName") or u.get("floorplanName") or "",
+                # B3 (2026-05-16): unwrap dict-shaped floorPlanName.
+                "_floor_plan": _unwrap_name(u.get("floorPlanName")) or _unwrap_name(u.get("floorplanName")) or "",
                 "_bedrooms": u.get("bedrooms") or u.get("bedRooms"),
             })
         return out
@@ -463,12 +631,127 @@ _LIST_KEYS = (
 )
 
 
-def parse_api_responses(api_responses: list[dict]) -> list[dict]:
+def _emit_signal_inspection(
+    resp: dict,
+    data: Any,
+    candidates: list,
+    qualifier_admitted: bool,
+    qualifier_reason: str,
+    property_id: str | None = None,
+) -> None:
+    """Emit a per-response key-classification trace for offline alias-table tuning.
+
+    Captures the response URL + observed keys + which keys normalize_field_key
+    matched into canonical signal keys + which keys LOOK unit-shaped but
+    didn't normalize (alias-table miss candidates). Weekly aggregation over
+    `keys_unmatched_unit_shape` produces the canonical "missing aliases" report.
+
+    Sampled by SIGNAL_INSPECTION_SAMPLE_RATE env (default 10%) — sample key is
+    ``property_id + scrape_date`` so the same property is always or never
+    sampled on a given day. Always-on for properties on the FAILED_NO_DATA
+    allowlist (when present in env).
+
+    Bug #10 fix (2026-05-16): the original implementation read
+    ``resp.get("property_id")`` but API-response dicts carry only ``url`` /
+    ``body`` (per the L1 fetcher's network_log shape) — never property_id.
+    The fallback ``"unknown"`` collapsed every response into one SHA bucket,
+    so the sample either fired for everything or nothing on a given day. On
+    the 2026-05-16 cloud run, 0 of an expected ~500 SIGNAL_INSPECTION events
+    were emitted across 4982 properties. The new ``property_id`` parameter
+    lets the caller plumb the canonical_id from AdapterContext so the sample
+    is genuinely per-property.
+
+    Best-effort — telemetry must never break extraction.
+    """
+    try:
+        import datetime as _dt
+        import hashlib
+        import os
+
+        # Deterministic sample. Default 10% by SHA-256(property_id + date).
+        sample_rate = float(os.getenv("SIGNAL_INSPECTION_SAMPLE_RATE", "0.10"))
+        # Bug #10 fix: prefer explicit caller-supplied property_id; fall back
+        # to the (always-missing) resp key for back-compat with older callers
+        # before finally defaulting to "unknown".
+        pid = str(property_id or resp.get("property_id") or "unknown")
+        today = _dt.datetime.utcnow().strftime("%Y-%m-%d")
+        h = int(hashlib.sha256(f"{pid}|{today}".encode()).hexdigest()[:8], 16)
+        if (h % 1000) >= int(sample_rate * 1000):
+            return
+
+        # Collect a sample of dict-items from the candidate list (max 3),
+        # falling back to data if no candidates were resolved.
+        sample_items: list[dict] = []
+        if candidates:
+            for c in candidates[:3]:
+                if isinstance(c, dict):
+                    sample_items.append(c)
+        elif isinstance(data, dict):
+            sample_items.append(data)
+
+        # Unit-shaped key heuristic: a key NAME that contains any of these
+        # tokens almost certainly represents per-unit data even if the alias
+        # table missed it.
+        _UNIT_SHAPE_TOKENS = (
+            "bed", "bath", "rent", "price", "sqft", "sq_ft", "sqf", "size",
+            "area", "unit", "floor", "plan", "available", "vacant",
+        )
+
+        from ma_poc.pms.signal_engine.floor_plan_signals import (
+            normalize_field_key as _norm,
+        )
+
+        observed: list[str] = []
+        matched: dict[str, str] = {}
+        unmatched_unit_shape: list[str] = []
+        for item in sample_items:
+            for k in item.keys():
+                if not isinstance(k, str) or k.startswith("@"):
+                    continue
+                if k not in observed:
+                    observed.append(k)
+                canon = _norm(k)
+                if canon in _CANON_UNIT_SIGNAL_KEYS:
+                    matched.setdefault(k, canon)
+                else:
+                    kl = k.lower()
+                    if any(tok in kl for tok in _UNIT_SHAPE_TOKENS):
+                        if k not in unmatched_unit_shape:
+                            unmatched_unit_shape.append(k)
+
+        from ma_poc.observability.events import EventKind, emit
+        emit(
+            EventKind.SIGNAL_INSPECTION,
+            pid,
+            url=str(resp.get("url") or "")[:300],
+            source_kind="api",
+            item_count=len(candidates) if isinstance(candidates, list) else 0,
+            keys_observed=observed[:20],
+            keys_matched=matched,
+            keys_unmatched_unit_shape=unmatched_unit_shape[:20],
+            qualifier_admitted=bool(qualifier_admitted),
+            qualifier_reason=str(qualifier_reason)[:80],
+        )
+    except Exception:
+        pass  # never let telemetry mask extraction
+
+
+def parse_api_responses(
+    api_responses: list[dict],
+    *,
+    property_id: str | None = None,
+) -> list[dict]:
     """Parse captured API JSON into normalised unit/floor-plan records.
 
     Handles SightMap (dedicated parser), generic REST, and GraphQL-style
     responses with 50+ key-name variants. Output is adapter-compatible
     (``floor_plan_name``, ``bed_label``, ``rent_range``, etc.).
+
+    Bug #10 fix (2026-05-16): accepts ``property_id`` for
+    ``_emit_signal_inspection`` deterministic per-PID sampling. Callers
+    should pass ``ctx.property_id`` when available; legacy callers that
+    omit it still work (signal-inspection bucket falls back to "unknown",
+    matching pre-fix behaviour rather than breaking the parser).
     """
     units: list[dict] = []
     seen: set[str] = set()
@@ -506,6 +789,42 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
                                 candidates = _find_list(v, _LIST_KEYS)
                                 if candidates:
                                     break
+
+        # Fallback: recursive search for ANY array whose items have >= 2
+        # canonical unit-signal keys (after vendor-variant normalisation).
+        # Picks up CMS inventory blobs that bury units under non-standard
+        # paths (Razz / MyRazz: ``initialStoreState.$inventory.units`` 4
+        # levels deep; observed 678 units on PID 246710 8181medcenter).
+        # Only runs when the keyed walker found nothing — the keyed walker
+        # is cheaper and produces cleaner matches when its key names hit.
+        if not candidates and isinstance(data, (dict, list)):
+            try:
+                walker_lists = find_unit_arrays(data, min_signals=2)
+            except Exception:
+                walker_lists = []
+            if walker_lists:
+                # Prefer the LARGEST list — it's almost always the per-unit
+                # inventory rather than a 5-row floor-plan summary that
+                # would also pass the signal gate.
+                walker_lists.sort(key=len, reverse=True)
+                candidates = walker_lists[0]
+
+        # RC-TRACE (2026-05-15 PM): sampled trace event for offline alias
+        # analysis. Emits keys_observed + keys_matched + keys_unmatched_unit_shape
+        # for ~10% of properties (deterministic by SHA-256(pid|date)). The
+        # `keys_unmatched_unit_shape` field is the gold output: vendor key
+        # names that look unit-shaped (contain "bed"/"bath"/"rent"/"sqft"/etc.)
+        # but didn't normalize to a canonical alias. Weekly aggregation
+        # surfaces the top N misses as alias-table candidates. Never raises.
+        _emit_signal_inspection(
+            resp,
+            data,
+            candidates if isinstance(candidates, list) else [],
+            qualifier_admitted=bool(candidates),
+            qualifier_reason=("admitted_via_keyed_walker_or_fallback"
+                              if candidates else "no_candidates_resolved"),
+            property_id=property_id,  # Bug #10 fix: per-PID sampling
+        )
 
         for item in candidates:
             if not isinstance(item, dict):
@@ -552,9 +871,15 @@ def parse_api_responses(api_responses: list[dict]) -> list[dict]:
                 "available_on", "availableOn", "display_available_on", "readyDate",
             )
             status = _get(item, "status", "availability_status", "leaseStatus", "Status", "unit_status")
+            # ``id`` is intentionally last so it only fires when no specific
+            # unit_number key matched — guards against picking a row's
+            # database PK on JSON shapes where ``id`` is non-unit semantics.
+            # Razz/MyRazz uses ``id`` directly as the unit identifier (e.g.
+            # ``{id: '21110', rent: {...}, sqft: {...}}``).
             unit_num = _get(item,
                 "unitNumber", "unit_number", "unitId", "unit_id", "UnitNumber",
                 "label", "display_unit_number", "unitCode", "unit_code",
+                "id",
             )
             floor_num = _get(item, "floor", "floorNumber", "FloorNumber", "floor_id", "floorId")
             building = _get(item, "building", "buildingName", "BuildingName", "building_name")

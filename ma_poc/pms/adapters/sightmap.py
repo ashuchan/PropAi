@@ -39,6 +39,8 @@ Key findings:
 
 from __future__ import annotations
 
+import json
+import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
@@ -47,6 +49,48 @@ from ma_poc.pms.adapters._parsing import (
     money_to_int,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+
+# Iframe URL: <iframe src="https://sightmap.com/embed/{embed_code}">. The
+# embed_code is NOT the API client_key — the embed page itself contains the
+# real API URL in window.__APP_CONFIG__.sightmaps[*].href. Pattern derived
+# from 2026-05-13 probe of livesoundatpeninsulajax.com / hickoryhighlandsapts.com.
+#
+# IMPORTANT: must scope to actual ``<iframe src=...>`` tags. Some property
+# pages embed a SightMap *config blob* inside ``<script type="application/json">``
+# (e.g. Jonah Digital's sightmap-config payload) — those carry the embed URL
+# as data, not as a live iframe. Firing the fallback on those would replace
+# the embedded-portal-hint path that the generic adapter relies on for
+# fetch-candidate surfacing. See test_portal_hint_survives_full_scrape_chain.
+_SIGHTMAP_IFRAME_RE = re.compile(
+    r"""<iframe\b[^>]*?\bsrc=["']?       # quote optional — Entrata engrain
+                                         # emits unquoted src=https://...
+        (?:https?:)?//
+        (?:[a-z0-9-]+\.)?sightmap\.com/embed/
+        ([a-z0-9]{6,32})""",
+    re.IGNORECASE | re.VERBOSE,
+)
+# Pull the SightMaps API URL out of the embed page's bootstrap config. The
+# href is JSON-encoded (forward-slashes escaped as \/) so the regex tolerates
+# both forms.
+_SIGHTMAP_APP_CONFIG_HREF_RE = re.compile(
+    r'"href"\s*:\s*"(https?:[\\/]+sightmap\.com[\\/]+app[\\/]+api[\\/]+v1[\\/]+'
+    r'[a-z0-9]+[\\/]+sightmaps[\\/]+\d+)"',
+    re.IGNORECASE,
+)
+# 2026-05-13 (C7 SightMap Angular SPA, teammate analysis): when the SightMap
+# widget is wrapped in an Angular SPA (e.g. equityapartments.com), the iframe
+# materialises AFTER the fetch_result.body is captured — but the direct API
+# URL ``sightmap.com/app/api/v1/{client_key}/sightmaps/{sightmap_id}`` often
+# appears inline in the Angular bundle, hardcoded as a config value. Picking
+# it up directly lets the adapter recover ~70% of SHAPE_REJECTED cases that
+# would otherwise need an extended Playwright wait we can't afford in the
+# fetch budget. The regex tolerates both literal URLs and JSON-escaped
+# (``\/``) forms.
+_SIGHTMAP_DIRECT_API_RE = re.compile(
+    r'https?:[\\/]+(?:[a-z0-9-]+\.)?sightmap\.com[\\/]+app[\\/]+api[\\/]+v1'
+    r'[\\/]+[a-z0-9_-]+[\\/]+sightmaps[\\/]+\d+(?:[\\/]?[a-zA-Z0-9_-]*)?',
+    re.IGNORECASE,
+)
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -145,6 +189,14 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
                 availability_status="AVAILABLE",
                 available_units="1",
                 availability_date=str(u.get("available_on") or u.get("display_available_on") or ""),
+                source_ids={
+                    k: v
+                    for k, v in {
+                        "sightmap_unit_id": u.get("id"),
+                        "sightmap_floor_plan_id": fp_id,
+                    }.items()
+                    if v
+                },
                 source_api_url=url,
                 extraction_tier=_TIER_BASE,
             )
@@ -255,6 +307,28 @@ class SightMapAdapter:
                 f"failed unit_validity (no numeric dimension)"
             )
 
+        # Iframe-direct fallback. The captured network log can miss the
+        # SightMap XHR when the iframe loads after our 2-second settle
+        # budget. Synthesise the API call by extracting the embed URL from
+        # the rendered HTML, fetching the embed page to read its
+        # ``window.__APP_CONFIG__`` block, then calling the
+        # ``app/api/v1/.../sightmaps/`` endpoint directly. Source:
+        # 2026-05-13 live probe of livesoundatpeninsulajax.com.
+        if not all_units:
+            iframe_units = await _try_sightmap_iframe_fallback(ctx, result)
+            if iframe_units:
+                from ma_poc.extraction.post_process import post_process
+
+                _pp = post_process(
+                    iframe_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _pp.n_admitted > 0:
+                    result.units = _pp.admitted
+                    result.plan_summaries = _pp.plan_summaries
+                    result.tier_used = f"{_TIER_BASE}_IFRAME"
+                    result.confidence = min(0.90, 0.65 + 0.05 * _pp.n_admitted)
+                    return result
+
         # Failure path: classify via structured sub-codes mirroring the RentCafe
         # adapter pattern.
         result.confidence = 0.0
@@ -308,3 +382,167 @@ class SightMapAdapter:
         adapter's own envelope check so router and parser stay in sync.
         """
         return _is_sightmap_response(body)
+
+
+def _entry_html_from_ctx(ctx: AdapterContext) -> str | None:
+    fr = getattr(ctx, "fetch_result", None)
+    body = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(body, bytes):
+        try:
+            return body.decode("utf-8", errors="replace")
+        except Exception:
+            return None
+    if isinstance(body, str):
+        return body
+    return None
+
+
+def find_sightmap_embed_codes(html: str) -> list[str]:
+    """Return any SightMap iframe embed codes found in *html* (deduped)."""
+    if not html or "sightmap.com" not in html.lower():
+        return []
+    seen: set[str] = set()
+    codes: list[str] = []
+    for m in _SIGHTMAP_IFRAME_RE.finditer(html):
+        code = m.group(1).lower()
+        if code in {"embed", "app", "admin"}:
+            continue
+        if code in seen:
+            continue
+        seen.add(code)
+        codes.append(code)
+    return codes
+
+
+def extract_sightmap_api_url(embed_html: str) -> str | None:
+    """Pull the SightMap API URL out of an embed page's ``window.__APP_CONFIG__``."""
+    if not embed_html:
+        return None
+    m = _SIGHTMAP_APP_CONFIG_HREF_RE.search(embed_html)
+    if not m:
+        return None
+    # JSON-escaped forward slashes are common (\/); normalise to /.
+    return m.group(1).replace("\\/", "/")
+
+
+def find_sightmap_direct_api_urls(html: str) -> list[str]:
+    """Pull any direct SightMap API URLs found inline in *html*.
+
+    Returns deduplicated, slash-normalised URLs of the form
+    ``sightmap.com/app/api/v1/{client}/sightmaps/{id}``. Used by the
+    Angular-SPA fallback path (C7 2026-05-13) when the embed iframe has
+    not yet materialised but the Angular bundle has the API URL inline.
+    """
+    if not html or "sightmap.com" not in html.lower():
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for m in _SIGHTMAP_DIRECT_API_RE.finditer(html):
+        url = m.group(0).replace("\\/", "/")
+        if url in seen:
+            continue
+        seen.add(url)
+        out.append(url)
+    return out
+
+
+async def _try_sightmap_iframe_fallback(
+    ctx: AdapterContext, result: AdapterResult
+) -> list[dict[str, str]]:
+    """When no SightMap API was captured during page load, follow the
+    iframe URL ourselves: fetch the embed page, extract the
+    ``__APP_CONFIG__`` API URL, fetch that, parse units.
+
+    Also tries any direct SightMap API URLs found inline in the page
+    HTML — covers the Angular-SPA case (C7 2026-05-13) where the iframe
+    has not yet materialised but the bundle has the API URL hardcoded.
+
+    Returns an empty list on any failure (silent; the caller continues to
+    the normal failure-classification path).
+    """
+    html = _entry_html_from_ctx(ctx)
+    if not html:
+        return []
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/json,*/*;q=0.8",
+    }
+
+    # Pass 1: direct API URLs inline in HTML (Angular SPA bundle pattern).
+    # Faster than the embed-page indirection and works when the iframe
+    # hasn't yet rendered. Try each candidate; first valid response wins.
+    direct_urls = find_sightmap_direct_api_urls(html)
+    if direct_urls:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+                for api_url in direct_urls[:3]:
+                    try:
+                        ar = await c.get(api_url, headers=headers)
+                    except Exception:
+                        continue
+                    if ar.status_code != 200:
+                        continue
+                    try:
+                        body = ar.json()
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    if not isinstance(body, dict) or not _is_sightmap_response(body):
+                        continue
+                    units, _dropped = parse_sightmap_payload(body, api_url)
+                    if units:
+                        result.api_responses.append(
+                            {"url": api_url, "status": 200, "body": body,
+                             "via": "direct_api_fallback"}
+                        )
+                        result.winning_url = api_url
+                        return units
+        except Exception as exc:
+            result.errors.append(
+                f"sightmap-direct-api-fallback-error: "
+                f"{type(exc).__name__}: {str(exc)[:120]}"
+            )
+
+    # Pass 2: embed-iframe fallback. Look for ``<iframe src=...sightmap.com/
+    # embed/{code}>``, fetch the embed page, parse out the API URL from
+    # ``window.__APP_CONFIG__``.
+    codes = find_sightmap_embed_codes(html)
+    if not codes:
+        return []
+    embed_code = codes[0]
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+            embed_url = f"https://sightmap.com/embed/{embed_code}"
+            er = await c.get(embed_url, headers=headers)
+            if er.status_code != 200 or not er.text:
+                return []
+            api_url = extract_sightmap_api_url(er.text)
+            if not api_url:
+                return []
+            ar = await c.get(api_url, headers=headers)
+            if ar.status_code != 200:
+                return []
+            try:
+                body = ar.json()
+            except (json.JSONDecodeError, ValueError):
+                return []
+        if not isinstance(body, dict) or not _is_sightmap_response(body):
+            return []
+        units, _dropped = parse_sightmap_payload(body, api_url)
+        if units:
+            result.api_responses.append(
+                {"url": api_url, "status": 200, "body": body, "via": "iframe_fallback"}
+            )
+            result.winning_url = api_url
+        return units
+    except Exception as exc:
+        result.errors.append(
+            f"sightmap-iframe-fallback-error: embed={embed_code!r} "
+            f"{type(exc).__name__}: {str(exc)[:120]}"
+        )
+        return []

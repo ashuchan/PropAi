@@ -23,7 +23,6 @@ from ma_poc.pms.signal_engine.qualifier import (
 )
 from ma_poc.pms.signal_engine.ranker import ScoringTables, SourceRanker
 
-
 # ── Scoring constants (single source of truth) ────────────────────────────────
 # These replace the scattered constants in scraper.py.
 # scraper.py imports these during Phase 2; the definitions there are removed
@@ -120,6 +119,40 @@ DEFAULT_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("/models", 85),
     ("/find-your-home", 88),
     ("/search", 50),
+    # 2026-05-13 (May-13 manual QC): patterns added based on 400-property
+    # ground-truth tagging. Sync with resolver._CTA_PATH_RE.
+    ("/floor-plans-and-pricing", 95),  # verbose variant
+    ("/floor-plans.aspx", 90),
+    ("/floorplans.aspx", 90),
+    ("/plans.html", 85),
+    ("/plans.asp", 85),
+    ("/units-available", 88),
+    ("/townhome-floorplans", 90),
+    ("/vacancies", 85),
+    ("/check-availability", 90),
+    ("/floorplan-availability", 90),
+    ("/interactive-site-map", 85),     # RentManager sitemap with embedded units
+    ("/oleapplication", 70),           # Entrata Online Leasing Application
+    # Pattern A: per-floor-plan detail-page navigation. Floor-plan card
+    # sites like liveatsurf.com link from /floor-plans/ to /apartment/<slug>/
+    # for each plan. The detail page has the actual rent. Singular
+    # `/apartment/` (NOT `/apartments`) is the differentiator.
+    #
+    # Weight 88 (not lower) so it passes the ≥88 gate in scraper.py's
+    # floor-plan-accumulation mode. _try_link_hop accumulates units across
+    # per-card sub-pages only when the link scores ≥ 88 (lower-scored
+    # candidates are speculative).
+    ("/apartment/", 88),
+    ("/home/", 65),                    # /home/<slug> per-property detail
+    # Portfolio PMC site patterns — Princeton Mgmt, Beacon Mgmt etc.
+    # Weight 88 to enable accumulation through portfolio site nav.
+    ("/communities/", 88),
+    ("/community/", 85),
+    ("/property/", 85),
+    ("/properties/", 85),
+    ("/apartment-communities/", 88),
+    ("/our-properties/", 85),
+    ("/our-communities/", 85),
 )
 
 DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
@@ -135,6 +168,20 @@ DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("knockrentals.com", 115),      # Knock CRM leasing portal
     ("leasehawk.com", 115),         # LeasHawk leasing CRM
     ("rentgrata.com", 80),          # Referral, lower priority
+    # 2026-05-13 (May-13 manual QC + live-probe): cross-domain portals
+    # observed on 98 rebrand cases + 30-property untagged sample.
+    # Sync with resolver._LEASING_PORTAL_DOMAINS.
+    (".securecafenet.com", 115),     # SecureCafe alt domain
+    ("yottareal.com", 115),          # adaraportal.yottareal.com (Yardi product)
+    ("mriprospectconnect.com", 115), # MRI Software portal
+    ("showmojo.com", 110),           # ShowMojo unit-tour platform
+    ("apartmentsearch.com", 105),    # CORT aggregator
+    ("selftournow.com", 110),        # TouchTour / Engrain self-tour
+    ("ovationco.com", 110),          # Ovation Property Management
+    ("doorway.knck.io", 115),        # Knock subdomain
+    ("myresman.com", 115),           # ResMan PMS portal
+    ("reslisting.com", 110),         # marquette-management.reslisting.com
+    ("rentcafewebsite.com", 115),    # legacy *.rentcafewebsite.com
 )
 
 DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
@@ -147,6 +194,33 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     "avalonbay": ("/floor-plans-pricing", "/apartments"),
     "amli": ("/floor-plans", "/availability"),
     "funnel": ("/floorplans", "/availability"),
+    # 2026-05-13 — Spherexx Presentation Software ("Convert"). Properties
+    # using Spherexx commonly land at /interactive-site-map/ on the vanity
+    # host; the actual data API lives on presentation.spherexx.app/api/unit.
+    # Resolver-only fallback paths — when host detection picks "spherexx"
+    # without a same-page widget, prefer these vanity sub-paths first.
+    "spherexx": ("/interactive-site-map", "/floor-plans", "/availability"),
+    # 2026-05-17 — Repli360/rrac popup family. The JS-rendered
+    # getUnitListByFloor "View Details" anchors live on the floor-plans
+    # page; prefer those sub-paths when host/HTML detection picks
+    # "repli360" without the widget on the entry page.
+    "repli360": ("/floor-plans", "/floorplans", "/availability"),
+    # 2026-05-17 — pre-existing gap closed: both have a
+    # ``matches_response_body`` checker but lacked a link-hop prior.
+    # apts247: the same-origin ``/api/v1/floorplans/?api_key=`` widget +
+    # api_key render on the floor-plans page. resman: the public
+    # ``<client>.myresman.com/Portal/Applicants/Availability`` portal is
+    # linked from the property's ``/floorplans/`` page.
+    "apts247": ("/floorplans", "/floor-plans", "/availability"),
+    "resman": ("/floorplans", "/availability", "/apartments"),
+    # 2026-05-17 — Essex Property Trust. Per-unit /api availability
+    # calls fire from the floor-plans-and-pricing page.
+    "essex": ("/floor-plans-and-pricing", "/floor-plans", "/floorplans"),
+    # 2026-05-18 — RentManager/iLoveLeasing. The Search_Result URL is
+    # usually verbatim in the static shell; when detection picks
+    # "rentmanager" without it, the floor-plans / availability / sitemap
+    # sub-paths are the most likely carriers of the embedded endpoint.
+    "rentmanager": ("/floorplans", "/floor-plans", "/availability", "/interactive-site-map"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (

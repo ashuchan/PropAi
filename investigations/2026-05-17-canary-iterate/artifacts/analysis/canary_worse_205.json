@@ -1,0 +1,2052 @@
+[
+ {
+  "aid": "16499",
+  "prod_u": 300,
+  "can_u": 12,
+  "gap": 288,
+  "prod_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "https://www.palmflats.com/"
+ },
+ {
+  "aid": "14939",
+  "prod_u": 180,
+  "can_u": 1,
+  "gap": 179,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.livethemaya.com/"
+ },
+ {
+  "aid": "235996",
+  "prod_u": 156,
+  "can_u": 2,
+  "gap": 154,
+  "prod_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "http://stratfordchase.com/"
+ },
+ {
+  "aid": "35695",
+  "prod_u": 101,
+  "can_u": 0,
+  "gap": 101,
+  "prod_tier": "TIER_1_API_SIGHTMAP",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "securecafe",
+  "url": "https://www.shorehamtides.com/"
+ },
+ {
+  "aid": "3307",
+  "prod_u": 69,
+  "can_u": 0,
+  "gap": 69,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "apts247",
+  "url": "https://www.lakehouseatmartinslanding.com/"
+ },
+ {
+  "aid": "277277",
+  "prod_u": 41,
+  "can_u": 0,
+  "gap": 41,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "securecafe",
+  "url": "https://theproximitynewbern.com/"
+ },
+ {
+  "aid": "19955",
+  "prod_u": 36,
+  "can_u": 0,
+  "gap": 36,
+  "prod_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "can_tier": "SYNDICATION_ONLY_SQUARESPACE",
+  "cohort": "appfolio",
+  "url": "https://www.brooksidejohnsoncreek.com/"
+ },
+ {
+  "aid": "255637",
+  "prod_u": 32,
+  "can_u": 1,
+  "gap": 31,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "g5",
+  "url": "https://www.rentanapt.com/apartments/az/gilbert/e-warner-rd/"
+ },
+ {
+  "aid": "37685",
+  "prod_u": 31,
+  "can_u": 0,
+  "gap": 31,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "apts247",
+  "url": "www.liveatsweetwaterfl.com"
+ },
+ {
+  "aid": "8667",
+  "prod_u": 30,
+  "can_u": 1,
+  "gap": 29,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "http://chesapeakeapartments.net/"
+ },
+ {
+  "aid": "268169",
+  "prod_u": 29,
+  "can_u": 0,
+  "gap": 29,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "apts247",
+  "url": "https://millyardliving.com/"
+ },
+ {
+  "aid": "1085",
+  "prod_u": 25,
+  "can_u": 0,
+  "gap": 25,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "NONE",
+  "cohort": "sightmap",
+  "url": "https://www.livesoundatpeninsulajax.com/"
+ },
+ {
+  "aid": "78134",
+  "prod_u": 22,
+  "can_u": 0,
+  "gap": 22,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://uncommondevelopers.com/apartments/the-24/"
+ },
+ {
+  "aid": "284175",
+  "prod_u": 22,
+  "can_u": 0,
+  "gap": 22,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "appfolio",
+  "url": "https://www.livescs.com/property/scs-athens"
+ },
+ {
+  "aid": "64181",
+  "prod_u": 22,
+  "can_u": 0,
+  "gap": 22,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "apts247",
+  "url": "https://www.liveatparkerhouse.com/"
+ },
+ {
+  "aid": "235778",
+  "prod_u": 22,
+  "can_u": 0,
+  "gap": 22,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_API_ONESITE",
+  "cohort": "apts247",
+  "url": "http://www.foxrundothan.com/"
+ },
+ {
+  "aid": "16634",
+  "prod_u": 22,
+  "can_u": 1,
+  "gap": 21,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.residenceatbarrington.com/"
+ },
+ {
+  "aid": "239952",
+  "prod_u": 21,
+  "can_u": 0,
+  "gap": 21,
+  "prod_tier": "NONE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/southeast-florida/fort-lauderdale-apartments/amli-toscana-place"
+ },
+ {
+  "aid": "42576",
+  "prod_u": 21,
+  "can_u": 0,
+  "gap": 21,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_4_LLM",
+  "cohort": "securecafe",
+  "url": "https://fenwaytriangle.com/"
+ },
+ {
+  "aid": "62354",
+  "prod_u": 22,
+  "can_u": 1,
+  "gap": 21,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "http://www.ariarollingbrook.com/"
+ },
+ {
+  "aid": "219660",
+  "prod_u": 20,
+  "can_u": 0,
+  "gap": 20,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "apts247",
+  "url": "www.lifeatlakehouse.com"
+ },
+ {
+  "aid": "258309",
+  "prod_u": 20,
+  "can_u": 0,
+  "gap": 20,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SHAPE_REJECTED",
+  "cohort": "sightmap",
+  "url": "https://www.liveatleesquare.com/"
+ },
+ {
+  "aid": "61159",
+  "prod_u": 29,
+  "can_u": 10,
+  "gap": 19,
+  "prod_tier": "TIER_1_API_SIGHTMAP",
+  "can_tier": "TIER_1_API_G5",
+  "cohort": "securecafe",
+  "url": "https://www.centuryaftonridge.com/?rcstdid=Mg%3D%3D-YRjTEizZPgM%3D&utm_source=google+biz&utm_medium=organic"
+ },
+ {
+  "aid": "12573",
+  "prod_u": 19,
+  "can_u": 0,
+  "gap": 19,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "https://www.qtowneoaks.com/"
+ },
+ {
+  "aid": "21577",
+  "prod_u": 19,
+  "can_u": 1,
+  "gap": 18,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.springvalleyaparts.com/"
+ },
+ {
+  "aid": "245398",
+  "prod_u": 21,
+  "can_u": 4,
+  "gap": 17,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "appfolio",
+  "url": "https://www.sspropertiesinvestment.com/vacancies/"
+ },
+ {
+  "aid": "40193",
+  "prod_u": 17,
+  "can_u": 0,
+  "gap": 17,
+  "prod_tier": "NONE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/austin/downtown-austin-apartments/amli-south-shore"
+ },
+ {
+  "aid": "265566",
+  "prod_u": 17,
+  "can_u": 0,
+  "gap": 17,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SHAPE_REJECTED",
+  "cohort": "securecafe",
+  "url": "https://www.liveatpiper.com/"
+ },
+ {
+  "aid": "93977",
+  "prod_u": 18,
+  "can_u": 2,
+  "gap": 16,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.eonflaglervillage.com/"
+ },
+ {
+  "aid": "234350",
+  "prod_u": 16,
+  "can_u": 1,
+  "gap": 15,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "www.newportatclearlake.com"
+ },
+ {
+  "aid": "271374",
+  "prod_u": 15,
+  "can_u": 0,
+  "gap": 15,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SHAPE_REJECTED",
+  "cohort": "securecafe",
+  "url": "https://www.joineryclt.com/"
+ },
+ {
+  "aid": "285331",
+  "prod_u": 14,
+  "can_u": 0,
+  "gap": 14,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "NONE",
+  "cohort": "sightmap",
+  "url": "https://www.silosharvestgreen.com/"
+ },
+ {
+  "aid": "42586",
+  "prod_u": 14,
+  "can_u": 0,
+  "gap": 14,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "NONE",
+  "cohort": "sightmap",
+  "url": "https://www.birchstonenorthlake.com/"
+ },
+ {
+  "aid": "40171",
+  "prod_u": 23,
+  "can_u": 10,
+  "gap": 13,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "apts247",
+  "url": "https://www.trailsatcitypark.com/"
+ },
+ {
+  "aid": "57545",
+  "prod_u": 13,
+  "can_u": 0,
+  "gap": 13,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "apts247",
+  "url": "https://www.baytreeoceandrive.com/"
+ },
+ {
+  "aid": "237704",
+  "prod_u": 13,
+  "can_u": 0,
+  "gap": 13,
+  "prod_tier": "NONE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/austin/mueller-apartments/amli-on-aldrich"
+ },
+ {
+  "aid": "305776",
+  "prod_u": 39,
+  "can_u": 26,
+  "gap": 13,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://westgatetownes.com/"
+ },
+ {
+  "aid": "11327",
+  "prod_u": 14,
+  "can_u": 1,
+  "gap": 13,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.planoparktownhomes.com/"
+ },
+ {
+  "aid": "67124",
+  "prod_u": 12,
+  "can_u": 0,
+  "gap": 12,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_1_API_G5_NO_URN",
+  "cohort": "sightmap",
+  "url": "http://thegarfield.com/"
+ },
+ {
+  "aid": "269983",
+  "prod_u": 15,
+  "can_u": 3,
+  "gap": 12,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "appfolio",
+  "url": "https://www.gmholdingsmanagement.com/residential-propertiesv"
+ },
+ {
+  "aid": "217930",
+  "prod_u": 20,
+  "can_u": 8,
+  "gap": 12,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.reserveatcityplace.com"
+ },
+ {
+  "aid": "33172",
+  "prod_u": 36,
+  "can_u": 24,
+  "gap": 12,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "apts247",
+  "url": "https://www.livestonebridgecitypark.com/"
+ },
+ {
+  "aid": "6454",
+  "prod_u": 12,
+  "can_u": 0,
+  "gap": 12,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_1_API_G5_NO_URN",
+  "cohort": "sightmap",
+  "url": "https://www.staywelleby.com/"
+ },
+ {
+  "aid": "51982",
+  "prod_u": 13,
+  "can_u": 1,
+  "gap": 12,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "www.liveportside.com"
+ },
+ {
+  "aid": "66940",
+  "prod_u": 11,
+  "can_u": 0,
+  "gap": 11,
+  "prod_tier": "NONE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/denver/lodo-apartments/amli-riverfront-green"
+ },
+ {
+  "aid": "61552",
+  "prod_u": 11,
+  "can_u": 0,
+  "gap": 11,
+  "prod_tier": "TIER_MERGED_CROSS_PAGE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/southeast-florida/dadeland-apartments/amli-joya"
+ },
+ {
+  "aid": "34187",
+  "prod_u": 12,
+  "can_u": 1,
+  "gap": 11,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.enclavewaco.com/?utm_knock=g"
+ },
+ {
+  "aid": "61548",
+  "prod_u": 11,
+  "can_u": 0,
+  "gap": 11,
+  "prod_tier": "TIER_MERGED_CROSS_PAGE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/southeast-florida/dadeland-apartments/amli-dadeland"
+ },
+ {
+  "aid": "77168",
+  "prod_u": 10,
+  "can_u": 0,
+  "gap": 10,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "apts247",
+  "url": "www.crosskeysapts.com"
+ },
+ {
+  "aid": "266951",
+  "prod_u": 10,
+  "can_u": 0,
+  "gap": 10,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "https://www.livesevenoaks.com/"
+ },
+ {
+  "aid": "217564",
+  "prod_u": 9,
+  "can_u": 0,
+  "gap": 9,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "NONE",
+  "cohort": "apts247",
+  "url": "https://www.altitudeglenwoodsprings.com/"
+ },
+ {
+  "aid": "42332",
+  "prod_u": 9,
+  "can_u": 0,
+  "gap": 9,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "apts247",
+  "url": "https://www.gravity255apartments.com/"
+ },
+ {
+  "aid": "69760",
+  "prod_u": 9,
+  "can_u": 0,
+  "gap": 9,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "sightmap",
+  "url": "https://lakesidevillagemarysville.com/"
+ },
+ {
+  "aid": "11398",
+  "prod_u": 10,
+  "can_u": 1,
+  "gap": 9,
+  "prod_tier": "TIER_MERGED_CROSS_PAGE",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.eclipsedallas.com/"
+ },
+ {
+  "aid": "278521",
+  "prod_u": 10,
+  "can_u": 1,
+  "gap": 9,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://parkeastla.com/"
+ },
+ {
+  "aid": "290592",
+  "prod_u": 30,
+  "can_u": 22,
+  "gap": 8,
+  "prod_tier": "TIER_1_API_SIGHTMAP",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://colinaranchhill.com/"
+ },
+ {
+  "aid": "13966",
+  "prod_u": 8,
+  "can_u": 0,
+  "gap": 8,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "apts247",
+  "url": "http://www.parkviewapartmenthomes.com/"
+ },
+ {
+  "aid": "37386",
+  "prod_u": 8,
+  "can_u": 0,
+  "gap": 8,
+  "prod_tier": "NONE",
+  "can_tier": "NONE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/dallas/downtown-dallas-apartments/amli-quadrangle"
+ },
+ {
+  "aid": "8389",
+  "prod_u": 7,
+  "can_u": 0,
+  "gap": 7,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "apts247",
+  "url": "https://www.imtresidential.com/imtstevensonranch/"
+ },
+ {
+  "aid": "37478",
+  "prod_u": 8,
+  "can_u": 1,
+  "gap": 7,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "http://www.livebreckenridge.com/"
+ },
+ {
+  "aid": "290391",
+  "prod_u": 7,
+  "can_u": 0,
+  "gap": 7,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.theenclaveatdeermosscreek.com/"
+ },
+ {
+  "aid": "54553",
+  "prod_u": 7,
+  "can_u": 0,
+  "gap": 7,
+  "prod_tier": "NONE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/chicago/near-north-suburbs-apartments/amli-evanston"
+ },
+ {
+  "aid": "1971",
+  "prod_u": 7,
+  "can_u": 0,
+  "gap": 7,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "g5",
+  "url": "https://www.parkwestend.com/"
+ },
+ {
+  "aid": "274585",
+  "prod_u": 7,
+  "can_u": 0,
+  "gap": 7,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "securecafe",
+  "url": "https://edenatsunterra.com/?utm_source=greystar&utm_medium=ils"
+ },
+ {
+  "aid": "261770",
+  "prod_u": 7,
+  "can_u": 0,
+  "gap": 7,
+  "prod_tier": "NONE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/denver/broadway-park-apartments/amli-broadway-park"
+ },
+ {
+  "aid": "11495",
+  "prod_u": 8,
+  "can_u": 1,
+  "gap": 7,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.palisadesbearcreek.com/"
+ },
+ {
+  "aid": "4734",
+  "prod_u": 8,
+  "can_u": 1,
+  "gap": 7,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "sightmap",
+  "url": "https://avantiresidential.com/property/heights-on-huron/"
+ },
+ {
+  "aid": "67689",
+  "prod_u": 7,
+  "can_u": 0,
+  "gap": 7,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "NONE",
+  "cohort": "securecafe",
+  "url": "https://www.adaraoverlandpark.com/"
+ },
+ {
+  "aid": "263368",
+  "prod_u": 7,
+  "can_u": 0,
+  "gap": 7,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "g5",
+  "url": "https://www.marinavillaapartments.com/"
+ },
+ {
+  "aid": "21303",
+  "prod_u": 7,
+  "can_u": 0,
+  "gap": 7,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "sightmap",
+  "url": "http://www.rosemeadema.com/"
+ },
+ {
+  "aid": "68148",
+  "prod_u": 7,
+  "can_u": 0,
+  "gap": 7,
+  "prod_tier": "NONE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/southeast-florida/miami-apartments/amli-midtown-29"
+ },
+ {
+  "aid": "254144",
+  "prod_u": 6,
+  "can_u": 0,
+  "gap": 6,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "securecafe",
+  "url": "https://www.legacyatfitz.com/"
+ },
+ {
+  "aid": "231522",
+  "prod_u": 6,
+  "can_u": 0,
+  "gap": 6,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "https://www.oakwoodestatessiouxfalls.com/"
+ },
+ {
+  "aid": "27793",
+  "prod_u": 17,
+  "can_u": 11,
+  "gap": 6,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "apts247",
+  "url": "http://www.brigadoonapartments.com/"
+ },
+ {
+  "aid": "269304",
+  "prod_u": 6,
+  "can_u": 0,
+  "gap": 6,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "securecafe",
+  "url": "https://livemadisonashleypark.com/"
+ },
+ {
+  "aid": "2871",
+  "prod_u": 12,
+  "can_u": 6,
+  "gap": 6,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.liveatthejaxtn.com/"
+ },
+ {
+  "aid": "64088",
+  "prod_u": 6,
+  "can_u": 0,
+  "gap": 6,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "www.thealdynnyc.com"
+ },
+ {
+  "aid": "5854",
+  "prod_u": 7,
+  "can_u": 1,
+  "gap": 6,
+  "prod_tier": "TIER_MERGED_CROSS_PAGE",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.terraatpineypoint.com"
+ },
+ {
+  "aid": "220156",
+  "prod_u": 6,
+  "can_u": 0,
+  "gap": 6,
+  "prod_tier": "NONE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/dallas/las-colinas-apartments/amli-at-escena/"
+ },
+ {
+  "aid": "4756",
+  "prod_u": 5,
+  "can_u": 0,
+  "gap": 5,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API",
+  "cohort": "sightmap",
+  "url": "https://www.clearrunaptswilmington.com/"
+ },
+ {
+  "aid": "3787",
+  "prod_u": 5,
+  "can_u": 0,
+  "gap": 5,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "NONE",
+  "cohort": "securecafe",
+  "url": "https://www.enclaveatbreckenridge.com/"
+ },
+ {
+  "aid": "227817",
+  "prod_u": 5,
+  "can_u": 0,
+  "gap": 5,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_FUNNEL_LIST_EMPTY",
+  "cohort": "securecafe",
+  "url": "https://www.alloyla.com/"
+ },
+ {
+  "aid": "50339",
+  "prod_u": 5,
+  "can_u": 0,
+  "gap": 5,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_1_API_G5_NO_URN",
+  "cohort": "sightmap",
+  "url": "https://www.parcatdenhamsprings.com/"
+ },
+ {
+  "aid": "42361",
+  "prod_u": 5,
+  "can_u": 0,
+  "gap": 5,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "NONE",
+  "cohort": "securecafe",
+  "url": "https://www.liveatwinston.com/"
+ },
+ {
+  "aid": "73079",
+  "prod_u": 6,
+  "can_u": 1,
+  "gap": 5,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.thepalazzoapts.com/"
+ },
+ {
+  "aid": "64171",
+  "prod_u": 5,
+  "can_u": 0,
+  "gap": 5,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "http://www.liveatwestlink.com/"
+ },
+ {
+  "aid": "16078",
+  "prod_u": 5,
+  "can_u": 0,
+  "gap": 5,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "securecafe",
+  "url": "https://www.mark-taylor.com/apartments/az/chandler/san-cervantes/"
+ },
+ {
+  "aid": "291509",
+  "prod_u": 5,
+  "can_u": 0,
+  "gap": 5,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "NONE",
+  "cohort": "sightmap",
+  "url": "https://livebeckon.com/"
+ },
+ {
+  "aid": "64973",
+  "prod_u": 5,
+  "can_u": 0,
+  "gap": 5,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "https://cortland.com/apartments/cortland-onion-creek/"
+ },
+ {
+  "aid": "14611",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "http://www.barringtonliving.com/"
+ },
+ {
+  "aid": "13376",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "http://coachman.stuartco.com/"
+ },
+ {
+  "aid": "72121",
+  "prod_u": 5,
+  "can_u": 1,
+  "gap": 4,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "g5",
+  "url": "https://www.mangotreeapt.com/"
+ },
+ {
+  "aid": "3092",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API",
+  "cohort": "apts247",
+  "url": "http://www.chimneyhillapartments.com/"
+ },
+ {
+  "aid": "60359",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "TIER_1_API_APPFOLIO",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "http://www.watermillpark.com/"
+ },
+ {
+  "aid": "17186",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "securecafe",
+  "url": "https://www.theparkattivoli.com/"
+ },
+ {
+  "aid": "62778",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "NONE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/denver/englewood-centennial-apartments/amli-dry-creek"
+ },
+ {
+  "aid": "3338",
+  "prod_u": 8,
+  "can_u": 4,
+  "gap": 4,
+  "prod_tier": "TIER_1_API_APPFOLIO",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "http://www.theboardwalkapartments.info/"
+ },
+ {
+  "aid": "221081",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://www.cityviewapartmentsspokane.com/"
+ },
+ {
+  "aid": "250342",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "g5",
+  "url": "https://www.stationhouseredmond.com/"
+ },
+ {
+  "aid": "273930",
+  "prod_u": 5,
+  "can_u": 1,
+  "gap": 4,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.westshireocala.com/"
+ },
+ {
+  "aid": "242191",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "NONE",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.amli.com/apartments/chicago/west-loop-apartments/amli-west-loop"
+ },
+ {
+  "aid": "3342",
+  "prod_u": 5,
+  "can_u": 1,
+  "gap": 4,
+  "prod_tier": "TIER_1_API_APPFOLIO",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "https://www.saharaandplayapalmsapts.com/"
+ },
+ {
+  "aid": "49743",
+  "prod_u": 5,
+  "can_u": 1,
+  "gap": 4,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM",
+  "cohort": "securecafe",
+  "url": "https://www.westchestersquareapartments.com/"
+ },
+ {
+  "aid": "12739",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "https://www.woodlandestatesapartmenthomes.com/?utm_source=google_my_business&utm_medium=organic"
+ },
+ {
+  "aid": "7176",
+  "prod_u": 4,
+  "can_u": 0,
+  "gap": 4,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "apts247",
+  "url": "https://www.bellavidalv.com/"
+ },
+ {
+  "aid": "78079",
+  "prod_u": 5,
+  "can_u": 2,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.voramissionvalley.com/"
+ },
+ {
+  "aid": "221973",
+  "prod_u": 8,
+  "can_u": 5,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "https://www.thepark4690.com/"
+ },
+ {
+  "aid": "225398",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_MERGED_CROSS_PAGE",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "g5",
+  "url": "http://www.remingtoncoveapts.com/"
+ },
+ {
+  "aid": "6533",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "NONE",
+  "cohort": "sightmap",
+  "url": "https://www.avanacumberland.com/switch_cls[id]/64264/"
+ },
+ {
+  "aid": "6550",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "https://www.scottsdalevintageapts.com/"
+ },
+ {
+  "aid": "41134",
+  "prod_u": 4,
+  "can_u": 1,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "www.waterfordvillagetn.com"
+ },
+ {
+  "aid": "50114",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API",
+  "cohort": "appfolio",
+  "url": "https://rookwoodproperties.com/details/?propID=1&rmwebsvc_id=1&rmwebsvc_command=PropertyDetail.aspx&rmwebsvc_corpid=rookwood&rmwebsvc_location=1&rmwebsvc_mode=javascript&rmwebsvc_AvailabilityDate=8/21/2019&rmwebsvc_template=proplist"
+ },
+ {
+  "aid": "12758",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "http://www.wynfieldpark.com/"
+ },
+ {
+  "aid": "5113",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_1_API_G5_NO_URN",
+  "cohort": "sightmap",
+  "url": "https://www.pepperwoodknoll.com/"
+ },
+ {
+  "aid": "15710",
+  "prod_u": 4,
+  "can_u": 1,
+  "gap": 3,
+  "prod_tier": "TIER_MERGED_CROSS_PAGE",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.lifeatthecobb.com/"
+ },
+ {
+  "aid": "6147",
+  "prod_u": 14,
+  "can_u": 11,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://besparkliving.com/spark-pax-river/"
+ },
+ {
+  "aid": "282768",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "NONE",
+  "cohort": "securecafe",
+  "url": "https://www.convergenw.com/"
+ },
+ {
+  "aid": "60316",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_1_API_APPFOLIO",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "https://www.highlandparkapartmenthomes.com/"
+ },
+ {
+  "aid": "224617",
+  "prod_u": 4,
+  "can_u": 1,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "apts247",
+  "url": "https://www.lakewoodsumter.com/"
+ },
+ {
+  "aid": "246773",
+  "prod_u": 7,
+  "can_u": 4,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_5_EMBEDDED",
+  "cohort": "securecafe",
+  "url": "https://www.pointat180.com/"
+ },
+ {
+  "aid": "283333",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "sightmap",
+  "url": "https://www.casaprincetonfl.com/"
+ },
+ {
+  "aid": "49691",
+  "prod_u": 13,
+  "can_u": 10,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "www.monticellovillageapts.com"
+ },
+ {
+  "aid": "233496",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "apts247",
+  "url": "https://www.riverstoneapartmentsatlongshoals.com/"
+ },
+ {
+  "aid": "284346",
+  "prod_u": 6,
+  "can_u": 3,
+  "gap": 3,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "appfolio",
+  "url": "https://www.empireapts.com/"
+ },
+ {
+  "aid": "246751",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.parkplacewaxahachie.com/"
+ },
+ {
+  "aid": "282648",
+  "prod_u": 3,
+  "can_u": 0,
+  "gap": 3,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "apts247",
+  "url": "https://www.apolloridgeapts.com/"
+ },
+ {
+  "aid": "257171",
+  "prod_u": 6,
+  "can_u": 4,
+  "gap": 2,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "securecafe",
+  "url": "https://livetanagerecho.com/"
+ },
+ {
+  "aid": "78759",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_FUNNEL_LIST_EMPTY",
+  "cohort": "sightmap",
+  "url": "https://reflectionapartments.com/"
+ },
+ {
+  "aid": "65659",
+  "prod_u": 16,
+  "can_u": 14,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "http://www.pointatwaterfordapartments.com/"
+ },
+ {
+  "aid": "20507",
+  "prod_u": 99,
+  "can_u": 97,
+  "gap": 2,
+  "prod_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "can_tier": "TIER_1_DOM_APPFOLIO_VANITY",
+  "cohort": "appfolio",
+  "url": "http://www.hendersonmill.com/"
+ },
+ {
+  "aid": "219793",
+  "prod_u": 5,
+  "can_u": 3,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://www.mywinchestercommons.com/"
+ },
+ {
+  "aid": "35488",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.threelakeskc.com/"
+ },
+ {
+  "aid": "52198",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.comptonlake.com/"
+ },
+ {
+  "aid": "43947",
+  "prod_u": 8,
+  "can_u": 6,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "https://www.stoneoakapt.com/"
+ },
+ {
+  "aid": "225610",
+  "prod_u": 16,
+  "can_u": 14,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "securecafe",
+  "url": "http://610west.com/"
+ },
+ {
+  "aid": "71534",
+  "prod_u": 5,
+  "can_u": 3,
+  "gap": 2,
+  "prod_tier": "TIER_MERGED_CROSS_PAGE",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "securecafe",
+  "url": "https://www.wimmercommunities.com/apartments/menomonee-falls/riverwalk-on-the-falls/"
+ },
+ {
+  "aid": "258366",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SHAPE_REJECTED",
+  "cohort": "securecafe",
+  "url": "https://www.gildchicago.com/"
+ },
+ {
+  "aid": "251989",
+  "prod_u": 21,
+  "can_u": 19,
+  "gap": 2,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_API",
+  "cohort": "sightmap",
+  "url": "https://broadstonearchive.com/"
+ },
+ {
+  "aid": "234133",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "http://www.grandviewluxuryapts.com/"
+ },
+ {
+  "aid": "37148",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "http://www.washingtonplaceapts.com"
+ },
+ {
+  "aid": "8995",
+  "prod_u": 16,
+  "can_u": 14,
+  "gap": 2,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.blakelyliving.com/"
+ },
+ {
+  "aid": "11777",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "NONE",
+  "cohort": "securecafe",
+  "url": "https://www.waterridgeapartments.com/"
+ },
+ {
+  "aid": "257140",
+  "prod_u": 9,
+  "can_u": 7,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "https://www.livethedepot.com/?fbclid=IwAR2ZBb-O9yqiGpgNbUNsfFsQAGcDU0YDwPuVWbmMM3tZ3P1tLAOfFZ934DE"
+ },
+ {
+  "aid": "16169",
+  "prod_u": 7,
+  "can_u": 5,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://www.rentthecape.com/"
+ },
+ {
+  "aid": "44765",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_MERGED_CROSS_PAGE",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "g5",
+  "url": "https://www.aeroplaceliving.com/"
+ },
+ {
+  "aid": "77994",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_FUNNEL_LIST_EMPTY",
+  "cohort": "securecafe",
+  "url": "https://www.byredwood.com/apartments/oh/sugarcreek-township/redwood-sugarcreek-township/"
+ },
+ {
+  "aid": "234783",
+  "prod_u": 5,
+  "can_u": 3,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "securecafe",
+  "url": "http://www.highlandsathilltop.com/"
+ },
+ {
+  "aid": "220287",
+  "prod_u": 16,
+  "can_u": 14,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "apts247",
+  "url": "http://www.lansingwestapts.com/"
+ },
+ {
+  "aid": "57761",
+  "prod_u": 8,
+  "can_u": 6,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://www.bellknoxdistrict.com/?utm_source=google+local&utm_medium=organic&utm_campaign=website+link"
+ },
+ {
+  "aid": "25494",
+  "prod_u": 5,
+  "can_u": 3,
+  "gap": 2,
+  "prod_tier": "TIER_1_API_APPFOLIO",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "http://www.mylacasita.com/"
+ },
+ {
+  "aid": "22767",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API",
+  "cohort": "apts247",
+  "url": "https://www.sunsetpointeapts.net/"
+ },
+ {
+  "aid": "267147",
+  "prod_u": 2,
+  "can_u": 0,
+  "gap": 2,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.crldublinflats.com/"
+ },
+ {
+  "aid": "12594",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "http://www.elanatmallardcreek.com/"
+ },
+ {
+  "aid": "239699",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.huntersruncharles.com/"
+ },
+ {
+  "aid": "1310",
+  "prod_u": 5,
+  "can_u": 4,
+  "gap": 1,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "apts247",
+  "url": "https://www.colinasatmedical.com/"
+ },
+ {
+  "aid": "65134",
+  "prod_u": 2,
+  "can_u": 1,
+  "gap": 1,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_G5",
+  "cohort": "g5",
+  "url": "http://www.garnetcreekapts.com/"
+ },
+ {
+  "aid": "274661",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_FUNNEL_SHAPE_REJECTED",
+  "cohort": "securecafe",
+  "url": "https://cornerstoneapartments.com/our-buildings/1600-s-albion/"
+ },
+ {
+  "aid": "24561",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "www.thefountainsdeerwood.com"
+ },
+ {
+  "aid": "27583",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "http://www.brookmoreapts.com/"
+ },
+ {
+  "aid": "7951",
+  "prod_u": 6,
+  "can_u": 5,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "https://www.summerridgeapartments.com/"
+ },
+ {
+  "aid": "17728",
+  "prod_u": 4,
+  "can_u": 3,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.esring.com/apartments/ca/los-angeles/west-park-village/"
+ },
+ {
+  "aid": "22347",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://www.mainstreetapts.com/"
+ },
+ {
+  "aid": "61143",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_ONESITE",
+  "cohort": "sightmap",
+  "url": "https://www.mapleatmedcenter.com/"
+ },
+ {
+  "aid": "36572",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "http://www.villasatgreenview.com/"
+ },
+ {
+  "aid": "257372",
+  "prod_u": 3,
+  "can_u": 2,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "securecafe",
+  "url": "https://liveinspirepensacola.com/"
+ },
+ {
+  "aid": "22611",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM",
+  "cohort": "securecafe",
+  "url": "https://www.mercuryonmillapts.com/"
+ },
+ {
+  "aid": "21570",
+  "prod_u": 21,
+  "can_u": 20,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "apts247",
+  "url": "http://www.kensingtonapartments.net/"
+ },
+ {
+  "aid": "29486",
+  "prod_u": 12,
+  "can_u": 11,
+  "gap": 1,
+  "prod_tier": "TIER_1_API_SIGHTMAP",
+  "can_tier": "TIER_1_API",
+  "cohort": "g5",
+  "url": "https://www.averyatmoorpark.com/"
+ },
+ {
+  "aid": "69571",
+  "prod_u": 19,
+  "can_u": 18,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://www.riverhouseat11miami.com/"
+ },
+ {
+  "aid": "7596",
+  "prod_u": 7,
+  "can_u": 6,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "http://www.palmcourtapts.com/"
+ },
+ {
+  "aid": "26132",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SHAPE_REJECTED",
+  "cohort": "securecafe",
+  "url": "www.thebelmontbyreside.com"
+ },
+ {
+  "aid": "278371",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "NONE",
+  "cohort": "sightmap",
+  "url": "https://www.nichetampa.com/"
+ },
+ {
+  "aid": "12393",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "https://www.thekirbyonmain.com/"
+ },
+ {
+  "aid": "261358",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.edgebayonne.com/avenueg/"
+ },
+ {
+  "aid": "271975",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "sightmap",
+  "url": "https://www.edgeapartmentstarga.com/"
+ },
+ {
+  "aid": "262557",
+  "prod_u": 2,
+  "can_u": 1,
+  "gap": 1,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.larkenassociates.com/residential-rentals/the-oaks-at-copper-chase"
+ },
+ {
+  "aid": "24577",
+  "prod_u": 4,
+  "can_u": 3,
+  "gap": 1,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "g5",
+  "url": "https://www.liveatmagnoliacrossingapts.com/"
+ },
+ {
+  "aid": "263127",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "securecafe",
+  "url": "https://www.hickorygrovega.com/"
+ },
+ {
+  "aid": "243245",
+  "prod_u": 3,
+  "can_u": 2,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "http://longfellowlofts.com/"
+ },
+ {
+  "aid": "53511",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_2_JSONLD",
+  "cohort": "securecafe",
+  "url": "https://www.riveroaksrochesterhills.com"
+ },
+ {
+  "aid": "283391",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM",
+  "cohort": "apts247",
+  "url": "https://www.thevalleyatmillcreek.com/"
+ },
+ {
+  "aid": "40710",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_SIGHTMAP_SHAPE_REJECTED",
+  "cohort": "sightmap",
+  "url": "https://www.equityapartments.com/seattle/pike-pine/chloe-apartments"
+ },
+ {
+  "aid": "281837",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "sightmap",
+  "url": "https://www.railyardapts.com/"
+ },
+ {
+  "aid": "16765",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.spinnakerlandingapts.com/"
+ },
+ {
+  "aid": "7770",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "NONE",
+  "cohort": "sightmap",
+  "url": "https://www.twelve100.com/"
+ },
+ {
+  "aid": "246491",
+  "prod_u": 3,
+  "can_u": 2,
+  "gap": 1,
+  "prod_tier": "TIER_1_API",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "g5",
+  "url": "https://www.rentthecedarsapts.com/"
+ },
+ {
+  "aid": "3169",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "NONE",
+  "cohort": "sightmap",
+  "url": "https://www.avanacourt.com/"
+ },
+ {
+  "aid": "280718",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.livethemarqapts.com/"
+ },
+ {
+  "aid": "28728",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM",
+  "cohort": "g5",
+  "url": "https://www.arthauscentral.mov/"
+ },
+ {
+  "aid": "252560",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "https://www.boardwalklux.com/"
+ },
+ {
+  "aid": "6701",
+  "prod_u": 2,
+  "can_u": 1,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://www.theparkonriley.com/"
+ },
+ {
+  "aid": "62178",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_MERGED_CROSS_PAGE",
+  "can_tier": "TIER_1_KNOCK_API",
+  "cohort": "g5",
+  "url": "https://thebungalowsatskyvista.com/"
+ },
+ {
+  "aid": "27986",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "www.centerparkapartments.com"
+ },
+ {
+  "aid": "22934",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "https://westwoodvillagegalleria.bhprop.com/"
+ },
+ {
+  "aid": "50912",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "generic:no_body_short_circuit",
+  "cohort": "securecafe",
+  "url": "https://www.indigobremerton.com/"
+ },
+ {
+  "aid": "237148",
+  "prod_u": 2,
+  "can_u": 1,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.thehavenlamesa.com/"
+ },
+ {
+  "aid": "68395",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_MERGED_CROSS_PAGE",
+  "cohort": "sightmap",
+  "url": "https://www.parksideatdg.com/"
+ },
+ {
+  "aid": "49454",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "www.romainecourt.com"
+ },
+ {
+  "aid": "49521",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.redbankreserve.com/"
+ },
+ {
+  "aid": "20386",
+  "prod_u": 6,
+  "can_u": 5,
+  "gap": 1,
+  "prod_tier": "TIER_1_API_APPFOLIO",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "https://www.escondido-apts.com/"
+ },
+ {
+  "aid": "19777",
+  "prod_u": 2,
+  "can_u": 1,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.glenatnorthcreek.com/?utm_source=GMB&utm_medium=organic"
+ },
+ {
+  "aid": "74547",
+  "prod_u": 8,
+  "can_u": 7,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_1_API_RENTCAFE_SECURECAFE",
+  "cohort": "securecafe",
+  "url": "https://www.verticaleastapts.com/"
+ },
+ {
+  "aid": "264329",
+  "prod_u": 3,
+  "can_u": 2,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_4_LLM_DOM",
+  "cohort": "securecafe",
+  "url": "https://www.axisatptc.com/"
+ },
+ {
+  "aid": "16579",
+  "prod_u": 1,
+  "can_u": 0,
+  "gap": 1,
+  "prod_tier": "TIER_3_DOM",
+  "can_tier": "TIER_1_API_APTS247",
+  "cohort": "apts247",
+  "url": "https://www.zurabay.com/"
+ },
+ {
+  "aid": "39387",
+  "prod_u": 2,
+  "can_u": 1,
+  "gap": 1,
+  "prod_tier": "TIER_4_LLM_DOM",
+  "can_tier": "TIER_3_DOM",
+  "cohort": "g5",
+  "url": "https://www.highrock5300.com"
+ }
+]

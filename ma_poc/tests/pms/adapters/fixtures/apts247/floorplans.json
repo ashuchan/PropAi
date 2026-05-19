@@ -1,0 +1,29 @@
+{
+  "meta": {"limit": 1000, "next": null, "offset": 0, "previous": null, "total_count": 3},
+  "objects": [
+    {
+      "apartment_type": "Studio", "display_bed": "Studio", "bath": 1,
+      "id": 56703, "name": "S1", "rent": "$899", "sq_ft": "500",
+      "deposit": "$300", "slug": "s1-98",
+      "units": [
+        {"id": 1622720, "number": "", "rent": "$899", "available_date": "2025-12-02",
+         "floor": "", "building": "", "sq_ft": "500", "display_bed": "Studio"}
+      ]
+    },
+    {
+      "apartment_type": "1 Bed", "display_bed": "1 Bed", "bath": 1,
+      "id": 56704, "name": "A1", "rent": "$1,199", "sq_ft": "720",
+      "units": [
+        {"id": 1622800, "number": "204", "rent": "$1,225", "available_date": "2026-01-15",
+         "floor": "2", "building": "A", "sq_ft": "720", "display_bed": "1 Bed"},
+        {"id": 1622801, "number": "311", "rent": "Call for details.", "available_date": "",
+         "floor": "3", "building": "A", "sq_ft": "720", "display_bed": "1 Bed"}
+      ]
+    },
+    {
+      "apartment_type": "2 Bed", "display_bed": "2 Bed", "bath": 2,
+      "id": 56705, "name": "B2", "rent": "$1,650", "sq_ft": "1010",
+      "units": []
+    }
+  ]
+}

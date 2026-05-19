@@ -15,9 +15,17 @@ def money_to_int(s: str) -> int | None:
     """Parse '$1,450', '1450.00', '1,450 USD' -> 1450. Returns None on failure."""
     if not s:
         return None
-    cleaned = re.sub(r"[^\d.]", "", s)
-    if not cleaned or cleaned == ".":
+    # 2026-05-19: the prior ``re.sub(r"[^\d.]", "", s)`` CONCATENATED every
+    # digit in the string, so a range like ``"$1,200 - $1,400"`` became
+    # ``12001400`` — a plausible-looking but fabricated rent that then
+    # passed every downstream guard (>1, quality gate). Take the FIRST
+    # monetary token instead: single values ("$1,450", "1450.00",
+    # "1,450 USD", "$1450/mo") are unchanged; a range resolves to its low
+    # bound (correct for rent_low; far better than a poisoned value).
+    m = re.search(r"\d[\d,]*(?:\.\d{1,2})?", s)
+    if not m:
         return None
+    cleaned = m.group(0).replace(",", "")
     try:
         return int(float(cleaned))
     except ValueError:
@@ -398,6 +406,41 @@ def parse_rent_range(rent_range: str) -> tuple[int | None, int | None]:
     return min(nums), max(nums)
 
 
+def _unwrap_name_blob(val: Any) -> str:
+    """Coerce ``val`` to a clean floor-plan-name string.
+
+    Some adapters' API parsers receive a structured floor-plan object
+    (``{"name": "B06", "provider_id": "...", ...}``) rather than the
+    name string itself. If we accept it as-is, the JSON repr of the dict
+    ends up serialised as the floor-plan name in the XLSX output (2,534
+    rows seen on 2026-05-13). Unwrap to the ``name`` field when present;
+    otherwise fall back to ``str(val)`` for already-string inputs.
+    """
+    if val is None:
+        return ""
+    if isinstance(val, dict):
+        # Prefer the most common name keys observed across PMS responses.
+        for key in ("name", "floor_plan_name", "label", "displayName"):
+            inner = val.get(key)
+            if isinstance(inner, str) and inner.strip():
+                return inner.strip()
+        # No string-valued name field — drop the blob (better than serialising
+        # the whole dict into the output).
+        return ""
+    s = str(val).strip()
+    # 2026-05-13: a small number of adapters pre-emit json.dumps(dict) into
+    # the name slot. Recognise the literal ``{"`` prefix and try one parse.
+    if s.startswith("{") and "name" in s[:100]:
+        try:
+            import json
+            parsed = json.loads(s)
+            if isinstance(parsed, dict):
+                return _unwrap_name_blob(parsed)
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return s
+
+
 def make_unit_dict(
     *,
     floor_plan_name: str = "",
@@ -420,6 +463,7 @@ def make_unit_dict(
     move_in_date: str = "",
     source_api_url: str = "",
     extraction_tier: str = "",
+    source_ids: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a standard unit dict in the format expected by the pipeline.
 
@@ -441,6 +485,15 @@ def make_unit_dict(
     if not rent_range and (rent_low or rent_high):
         rent_range = format_rent_range(rent_low, rent_high)
 
+    # Defensive unwrap: some upstream parsers pass the raw API floor-plan
+    # dict (``{"name":"B06","provider_id":"4875687"}``) instead of the
+    # name string. 2026-05-13 validation pass found 2,534 such rows
+    # leaking JSON-blob floor-plan names across Tier-1 API (1,151), Tier-3
+    # DOM (628), Tier-1 SightMap (334), Tier-2 JSON-LD (212), and
+    # MERGED_CROSS_PAGE (118). Normalising here means every adapter benefits
+    # without changing per-adapter signatures.
+    floor_plan_name = _unwrap_name_blob(floor_plan_name)
+
     return {
         "floor_plan_name": floor_plan_name,
         "bed_label": bed_label,
@@ -457,9 +510,28 @@ def make_unit_dict(
         "concession": concession,
         "availability_status": availability_status,
         "available_units": available_units,
+        # Bug 2026-05-13: the v2 schema reader (core/schema_v2.py:242) looks
+        # for ``available_date`` (short form), but every adapter has been
+        # writing ``availability_date`` (long form) since the helper was
+        # introduced. The reader silently returned None for ~6,900 Tier-1
+        # API rows/day across RentCafe, Entrata, AvalonBay, AppFolio,
+        # OneSite, and SightMap. Emit BOTH keys so a reader on either
+        # convention sees the date. The reader-side fallback in
+        # schema_v2.py covers the few direct-write paths in
+        # ``_api_parser.py`` that bypass this helper.
         "availability_date": availability_date,
+        "available_date": availability_date,
         "lease_term": lease_term,
         "move_in_date": move_in_date,
         "source_api_url": source_api_url,
         "extraction_tier": extraction_tier,
+        # 2026-05-19: stable PMS-native identifiers (model_id, building_id,
+        # floor_id, listing_id, etc.) for cross-run daily merge. Until now
+        # the fixed kwarg set dropped them at the adapter boundary, so only
+        # DERIVED ids (our hashed unit_id/floor_plan_id) survived — which
+        # churn run-to-run and make day-over-day matching brittle.
+        # Additive: empty {} when an adapter doesn't (yet) pass it, so no
+        # behavior change; adapters populate per-PMS incrementally with
+        # grounded field names (no signature churn thereafter).
+        "source_ids": dict(source_ids) if source_ids else {},
     }

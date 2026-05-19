@@ -20,6 +20,10 @@ import urllib.parse
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from ma_poc.pms.adapters._probe import (
+    reset_clearance_cookies,
+    set_clearance_cookies,
+)
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 from ma_poc.pms.adapters.registry import get_adapter
 from ma_poc.pms.detector import (
@@ -201,6 +205,25 @@ _RICH_HOP_JSONLD_MARKERS = ("FloorPlan", "ApartmentComplex", "Apartment\"")
 # the body. Five distinct hits is uncommon outside an actual pricing page.
 _RICH_HOP_RENT_TOKEN_RE = re.compile(r"\$\d{3,4}")
 _RICH_HOP_MIN_RENT_TOKENS = 5
+
+# Property-level concession/special phrasing on marketing/RC pages.
+# Deterministic, capture-first (raw matched phrase). Real patterns
+# observed on RC /floorplans (probe 2026-05-19): "1 Month FREE",
+# "8 Weeks Free", "Move-in Special", "Look & Lease", "$X off".
+_PROPERTY_CONCESSION_RE = re.compile(
+    r"\b\d+\s*(?:weeks?|months?)\s*(?:of\s*)?free(?:\s*rent)?\b"
+    r"|\b(?:one|two|three|first)\s+months?\s+free\b"
+    r"|\blook\s*&?\s*lease\b"
+    r"|\bmove[- ]?in\s+special\b"
+    r"|\$\s?\d{2,4}\s*(?:off|gift\s*card|credit|cash|savings)\b"
+    r"|\bwaived\s+(?:application|admin(?:istration)?|amenity|"
+    r"move[- ]?in|deposit)\s*fee\b"
+    r"|\breduced\s+deposit\b|\bdeposit\s+special\b"
+    r"|\brent\s+special\b|\blease\s+special\b"
+    r"|\blimited[- ]time\s+(?:offer|special|savings)\b"
+    r"|\bfree\s+rent\b",
+    re.IGNORECASE,
+)
 
 
 def _link_hop_is_rich(fetch_result: Any) -> bool:
@@ -413,7 +436,20 @@ async def scrape(
     # --- Step 1: Initial offline detection from URL + CSV mgmt-prior ---
     # csv_row threads in the Management Company so MGMT_TO_PMS_PRIOR can fire
     # on vanity domains where URL alone gives no PMS signal.
-    initial_detection = detect_pms(base_url, csv_row=csv_row)
+    #
+    # 2026-05-13 (teammate analysis — cross-cutting C1/C2/C8): when the
+    # fetch redirected to a different domain (e.g.
+    # ``elevatetosequoia.com`` → ``elevatetoriveroaks.com``), running the
+    # detector against the original ``base_url`` host produces 0 fingerprint
+    # matches and ``pms=unknown``. The HTML body belongs to the redirect
+    # target, so the detector must run against ``fetch_result.final_url`` to
+    # see the same hostname as the body.
+    _effective_url = base_url
+    if fetch_result is not None:
+        _final_url = str(getattr(fetch_result, "final_url", "") or "")
+        if _final_url:
+            _effective_url = _final_url
+    initial_detection = detect_pms(_effective_url, csv_row=csv_row)
     result["_detected_pms"] = _detection_to_dict(initial_detection)
 
     # --- Step 2: Navigate page (or use provided one) ---
@@ -449,18 +485,97 @@ async def scrape(
         elif isinstance(body, str):
             page_html = body
 
+    # --- Property-level concession capture (2026-05-19) ---
+    # The designed banner capture (vision_banner.py) is dormant/unwired
+    # and `result["concessions_text"]` was never produced by ANY path.
+    # Probe+eyeball proved RC/marketing /floorplans pages we ALREADY
+    # fetch carry the concession as plain HTML text (~5/8 sample;
+    # "One MONTH FREE!" etc.). Deterministic non-LLM phrase scrape over
+    # page_html — $0, no extra fetch, capture-first (store raw match).
+    # Property-level (concessions are property-wide). This is the
+    # missing producer feeding the existing v2 `concessions` field.
+    if page_html and not result.get("concessions_text"):
+        try:
+            _ctxt = re.sub(r"<[^>]+>", " ", page_html)
+            _cm = _PROPERTY_CONCESSION_RE.search(_ctxt)
+            if _cm:
+                result["concessions_text"] = re.sub(
+                    r"\s+", " ", _cm.group(0)
+                ).strip()[:200]
+        except Exception:
+            pass
+
     # --- Step 4: Re-detect with page HTML if available ---
     if page_html:
-        html_detection = detect_pms(base_url, csv_row=csv_row, page_html=page_html)
+        html_detection = detect_pms(_effective_url, csv_row=csv_row, page_html=page_html)
         if html_detection.confidence > initial_detection.confidence:
             initial_detection = html_detection
             result["_detected_pms"] = _detection_to_dict(initial_detection)
+
+    # --- Step 4b: detection rescue via curl_cffi homepage refetch -----------
+    # 2026-05-17 iter-11 (canary 842-pool deep-probe): the patchright-
+    # rendered page_html frequently hides PMS markers that ARE present in
+    # the raw server HTML (post-render mutation / behind menus / CF shell).
+    # Same root-cause class as the securecafe iter-9 fix. When detection is
+    # still unknown/custom, curl_cffi-refetch the homepage (CF-bypass,
+    # proxy-independent) and re-detect on that. Recovers the misclassified-
+    # but-adapter-exists clusters (RealPage/OneSite, Funnel, Spherexx,
+    # ResMan, Entrata, securecafe, …) the 842 probe surfaced.
+    if initial_detection.pms in ("unknown", "custom"):
+        try:
+            from urllib.parse import urlparse as _up
+
+            _p = _up(_effective_url)
+            if _p.scheme and _p.netloc:
+                from ma_poc.pms.adapters._probe import probe_get as _creqd_get
+
+                _root = f"{_p.scheme}://{_p.netloc}"
+                # iter-12 (2026-05-17, 604-probe finding): the PMS marker
+                # is frequently NOT on the homepage but on the floorplan/
+                # availability sub-page (the 604 unit-level-via-LLM/DOM
+                # probe found markers on /floorplans/ etc. for ~270
+                # proxy-independent sites the homepage-only rescue missed).
+                # Try the homepage AND the common floorplan sub-paths;
+                # first one that yields a confident PMS wins.
+                for _suffix in (
+                    "/",
+                    "/floorplans/",
+                    "/floor-plans/",
+                    "/floorplans",
+                    "/floor-plans",
+                    "/availability/",
+                    "/apartments/",
+                ):
+                    try:
+                        _rr = _creqd_get(_root + _suffix, timeout=15)
+                    except Exception:
+                        continue
+                    if _rr.status_code != 200 or not _rr.text:
+                        continue
+                    _rd = detect_pms(
+                        _effective_url, csv_row=csv_row, page_html=_rr.text
+                    )
+                    if (
+                        _rd.pms not in ("unknown", "custom")
+                        and _rd.confidence > initial_detection.confidence
+                    ):
+                        initial_detection = _rd
+                        result["_detected_pms"] = _detection_to_dict(
+                            initial_detection
+                        )
+                        result["_detection_rescued"] = {
+                            "via": f"curl_cffi_refetch:{_suffix}",
+                            "pms": _rd.pms,
+                        }
+                        break
+        except Exception as _dr_exc:  # pragma: no cover - defensive
+            log.warning("detection-rescue failed for %s: %s", property_id, _dr_exc)
 
     # --- Telemetry A: detector signals ----------------------------------------
     # Attach raw detector inputs to the result so the per-property report can
     # render them, and emit DETECTOR_SIGNALS for ledger-level analytics.
     try:
-        _signals = collect_detector_signals(base_url, csv_row, page_html)
+        _signals = collect_detector_signals(_effective_url, csv_row, page_html)
         result["_detector_signals"] = _signals
         try:
             from ma_poc.observability.events import EventKind, emit
@@ -579,6 +694,18 @@ async def scrape(
             except Exception:
                 pass
 
+    # Cookie-mint reuse (option b): install the clearance cookies the
+    # fetcher's patchright render earned by passing the CF/DataDome
+    # challenge, scoped to this property's adapter dispatch. The cheap
+    # curl_cffi active-fetch in MAAC/Irvine/Cortland/Essex/Equity/
+    # SightMap-iframe then reuses the solved clearance instead of hitting
+    # the wall again. Unconditional set (empty when no challenge solved)
+    # so a recursive link-hop scrape can't leave stale clearance behind;
+    # reset before every return below.
+    _clr_token = set_clearance_cookies(
+        getattr(fetch_result, "clearance_cookies", None)
+    )
+
     ctx = AdapterContext(
         base_url=resolved.resolved_url,
         detected=detection,
@@ -675,6 +802,25 @@ async def scrape(
         fallback_chain.append(adapter_name)
         result["_detected_pms"] = _detection_to_dict(detection)
 
+    # --- Pattern B reveal: click "View Availability" / "Show Units" cards ----
+    # Some marketing sites render plan cards collapsed and only reveal
+    # rents on click (no XHR). When the rendered HTML has < 3 dollar
+    # amounts AND has reveal-shaped button text, click them and let the
+    # adapter see the post-click DOM via page.content(). No-ops when
+    # ``page is None`` (Jugnu fetch-only path) or when the page already
+    # has rent content. See ``ma_poc.pms.interactive_reveal`` for the
+    # full design rationale and gating heuristics.
+    try:
+        from ma_poc.pms.interactive_reveal import maybe_reveal as _maybe_reveal
+
+        reveal_telemetry = await _maybe_reveal(page, page_html=page_html)
+        result["_interactive_reveal"] = reveal_telemetry
+    except Exception as exc:  # pragma: no cover - defensive
+        result["_interactive_reveal"] = {
+            "triggered": False,
+            "reason": f"exception: {exc}",
+        }
+
     adapter_result: AdapterResult
     try:
         adapter_result = await adapter.extract(page, ctx)  # type: ignore[arg-type]
@@ -682,6 +828,7 @@ async def scrape(
         if _is_unreachable_error(exc):
             result["errors"].append(f"FAILED_UNREACHABLE: {exc}")
             result["_fallback_chain"] = fallback_chain
+            reset_clearance_cookies(_clr_token)
             return result
         adapter_result = AdapterResult(errors=[str(exc)])
 
@@ -839,6 +986,150 @@ async def scrape(
     except Exception as _rescue_exc:
         log.warning("F2 rescue orchestration failed for %s: %s", property_id, _rescue_exc)
 
+    # --- Step 7b: Entrata→SightMap secondary adapter -----------------------
+    # Many Entrata-hosted communities embed a SightMap interactive map that
+    # carries the real unit inventory (the Entrata floorplan module returns
+    # nothing). Both fingerprints match; the router commits to Entrata, it
+    # yields 0 units, and we'd otherwise drop to the generic LLM cascade.
+    #
+    # Gate on a BROAD SightMap signal — any sightmap.com reference in the
+    # rendered HTML (loader script, not just an <iframe> embed code) OR a
+    # SightMap-shaped body already in the captured network log. SightMap
+    # frequently injects its iframe/API *after* the HTML the scraper
+    # captured (e.g. tarowalk.com: sightmap.com is only a script host, no
+    # embed code in page_html), so the old find_sightmap_embed_codes()
+    # precondition silently missed every dynamically-loaded SightMap.
+    # Delegate actual discovery to SightMapAdapter — it already handles
+    # captured-response parsing + iframe + direct-API fallback and
+    # self-gates (SIGHTMAP_NO_RESPONSE) when there's genuinely nothing.
+    if (
+        not adapter_result.units
+        and pms_name == "entrata"
+        and page_html
+    ):
+        try:
+            from ma_poc.pms.adapters.sightmap import (
+                SightMapAdapter,
+                _is_sightmap_response,
+            )
+
+            captured = getattr(ctx, "_api_responses", []) or []
+            sm_signal = "sightmap.com" in page_html.lower() or any(
+                _is_sightmap_response(r.get("body")) for r in captured
+            )
+
+            # iter-5: Entrata "engrain" sites embed the SightMap only on the
+            # floorplan sub-page (/<city>/<slug>/conventional/), NOT on the
+            # homepage the scraper captured. When there's no SightMap signal
+            # in page_html, discover that sub-page from the nav links,
+            # curl_cffi-fetch it (Entrata sub-pages are Cloudflare-fronted;
+            # the embed code IS in the server HTML — confirmed chaseknolls
+            # → sightmap.com/embed/n9w63m8jw71), and splice it into the
+            # ctx fetch_result body so SightMapAdapter's own iframe/embed
+            # discovery finds it.
+            # iter-19: the canary/prod render is proxy-less; CF-fronted
+            # Entrata/prospectportal sites return a CF challenge shell as
+            # page_html, so the sightmap.com signal is invisible and the
+            # /conventional/ discovery below (also keyed off page_html /
+            # captured net) finds nothing — the SightMap embed is never
+            # reached and ~250 dual-fingerprint sites misroute to a
+            # 0-unit Entrata result. Recover by proxied-probe of the
+            # homepage (the proven iter-13 securecafe pattern: probe_get
+            # clears CF and the server HTML carries the sightmap loader),
+            # then splice it so SightMapAdapter's own discovery fires.
+            if not sm_signal:
+                try:
+                    from urllib.parse import urlparse as _up19
+
+                    from ma_poc.pms.adapters._probe import probe_get as _pg19
+
+                    _fr19 = getattr(ctx, "fetch_result", None)
+                    _origin19 = str(getattr(_fr19, "final_url", "") or "") or (
+                        getattr(ctx, "base_url", "") or ""
+                    )
+                    _p19 = _up19(_origin19)
+                    if _p19.scheme and _p19.netloc:
+                        _home19 = f"{_p19.scheme}://{_p19.netloc}/"
+                        _r19 = _pg19(_home19, timeout=25)
+                        _h19 = (_r19.text or "") if _r19.status_code == 200 else ""
+                        if "sightmap.com" in _h19.lower():
+                            if _fr19 is not None:
+                                _fr19.body = _h19  # type: ignore[attr-defined]
+                            sm_signal = True
+                            fallback_chain.append("entrata:home_proxied_for_sightmap")
+                except Exception as _hp_exc:  # pragma: no cover - defensive
+                    log.warning(
+                        "Entrata homepage proxied-probe failed for %s: %s",
+                        property_id,
+                        _hp_exc,
+                    )
+
+            if not sm_signal:
+                import re as _re
+
+                _ENTRATA_FP_SUBPATH = _re.compile(
+                    r"""["']((?:https?://[^"'/]+)?/[a-z0-9-]+/[a-z0-9-]+/"""
+                    r"""(?:conventional|student|senior|affordable)/?)["']""",
+                    _re.IGNORECASE,
+                )
+                m = _ENTRATA_FP_SUBPATH.search(page_html)
+                if not m:
+                    # iter-8: same fix class as iter-7 securecafe — the
+                    # rendered body often lacks the /conventional/ nav link
+                    # (patchright DOM vs raw HTML / behind a menu), but the
+                    # scraper's network log captured the floorplan sub-page
+                    # request. Scan captured response URLs as a 2nd source.
+                    for _resp in getattr(ctx, "_api_responses", []) or []:
+                        _u = str(_resp.get("url", "") or "")
+                        _mm = _ENTRATA_FP_SUBPATH.search(f'"{_u}"')
+                        if _mm:
+                            m = _mm
+                            break
+                if m:
+                    sub = m.group(1)
+                    if sub.startswith("/"):
+                        from urllib.parse import urlparse as _up
+
+                        _fr = getattr(ctx, "fetch_result", None)
+                        _base = str(getattr(_fr, "final_url", "") or "") or (
+                            getattr(ctx, "base_url", "") or ""
+                        )
+                        _p = _up(_base)
+                        if _p.scheme and _p.netloc:
+                            sub = f"{_p.scheme}://{_p.netloc}{sub}"
+                    try:
+                        from ma_poc.pms.adapters._probe import probe_get as _pg
+
+                        _r = _pg(sub, timeout=25)
+                        if _r.status_code == 200 and "sightmap.com" in (_r.text or "").lower():
+                            # Splice sub-page HTML in so SightMapAdapter's
+                            # _entry_html_from_ctx picks up the embed code.
+                            _fr2 = getattr(ctx, "fetch_result", None)
+                            if _fr2 is not None:
+                                _fr2.body = _r.text  # type: ignore[attr-defined]
+                            sm_signal = True
+                            fallback_chain.append("entrata:fp_subpage_fetched")
+                    except Exception as _sub_exc:  # pragma: no cover
+                        log.warning(
+                            "Entrata fp-subpage fetch failed for %s: %s",
+                            property_id,
+                            _sub_exc,
+                        )
+
+            if sm_signal:
+                sm_result = await SightMapAdapter().extract(page, ctx)  # type: ignore[arg-type]
+                if sm_result.units:
+                    adapter_result = sm_result
+                    adapter_name = "sightmap"
+                    result["_adapter_used"] = "sightmap"
+                    fallback_chain.append("sightmap:entrata_secondary")
+        except Exception as _sm_exc:  # pragma: no cover - defensive
+            log.warning(
+                "Entrata→SightMap secondary failed for %s: %s",
+                property_id,
+                _sm_exc,
+            )
+
     # --- Step 8: Fallback to generic if adapter returned empty ---
     if not adapter_result.units and pms_name != "unknown" and adapter_name != "generic":
         generic = get_adapter("unknown")  # resolves to generic
@@ -963,6 +1254,7 @@ async def scrape(
     if prop_amen:
         result["property_amenities"] = list(prop_amen)
 
+    reset_clearance_cookies(_clr_token)
     return result
 
 
@@ -1462,6 +1754,25 @@ async def _try_link_hop(
             url_s = str(url_s or "").strip()
             if not url_s or url_s in visited:
                 continue
+            # 2026-05-13 (C5 OneSite, teammate analysis): when the embedded
+            # portal is RealPage Online Leasing (onlineleasing.realpage.com),
+            # individual unit application URLs (``?UnitId=N`` / ``?MoveInDate=``)
+            # are application FORM shells — 59KB body, 1.5KB text, 0 unit
+            # signals — not the floor-plan grid. Hopping them burns LLM
+            # budget on dozens of empty shells (PID 264372 ellisonpreserve
+            # had 81 such hops, $0.016 wasted). Strip the query params so the
+            # candidate becomes the property-level URL ``{id}.onlineleasing.
+            # realpage.com/`` which DOES carry the floor-plan grid.
+            if "onlineleasing.realpage.com" in url_s.lower():
+                _q_pos = url_s.find("?")
+                if _q_pos > 0:
+                    _stripped = url_s[:_q_pos]
+                    if _stripped not in visited:
+                        url_s = _stripped
+                    else:
+                        # Property-level URL already queued / visited;
+                        # skip this per-unit application shell entirely.
+                        continue
             portal_candidates.append(
                 (url_s, _EMBEDDED_PORTAL_SCORE, f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}")
             )
@@ -1738,11 +2049,34 @@ async def _try_link_hop(
         # sites like amli.com where the PMS prior is appended to the base
         # domain instead of the property's own deep URL.
         try:
-            _hop_path_parts = [p for p in urllib.parse.urlparse(sub_url).path.split("/") if p]
-            if len(_hop_path_parts) >= 3 and dynamic_appended < max_dynamic_appends:
+            _parsed_sub = urllib.parse.urlparse(sub_url)
+            _hop_path_parts = [p for p in _parsed_sub.path.split("/") if p]
+            # 2026-05-13 (C6 AppFolio login bug, teammate analysis): strip
+            # the query + fragment before constructing the subpath URL.
+            # Without this strip, hop URLs like
+            #   dlandgroup.appfolio.com/oportal/users/log_in?UnitId=42
+            # become
+            #   dlandgroup.appfolio.com/oportal/users/log_in?UnitId=42/floorplans
+            # — nonsense that returns the login form for every hop.
+            # Also skip subpath construction when the path itself is clearly
+            # an auth/login endpoint (oportal/users/log_in, /sign_in, etc.).
+            _sub_path_lower = _parsed_sub.path.lower()
+            _LOGIN_PATH_SIGNATURES = (
+                "/log_in", "/login", "/sign_in", "/signin", "/auth/", "/oauth/",
+                "/users/log_in", "/users/sign_in",
+            )
+            _is_login_path = any(sig in _sub_path_lower for sig in _LOGIN_PATH_SIGNATURES)
+            _sub_url_no_query = urllib.parse.urlunparse(
+                (_parsed_sub.scheme, _parsed_sub.netloc, _parsed_sub.path, "", "", "")
+            )
+            if (
+                len(_hop_path_parts) >= 3
+                and dynamic_appended < max_dynamic_appends
+                and not _is_login_path
+            ):
                 _prop_sub_paths = ("/floorplans", "/floor-plans", "/pricing", "/apartments-pricing")
                 for _psp in _prop_sub_paths:
-                    _psp_url = sub_url.rstrip("/") + _psp
+                    _psp_url = _sub_url_no_query.rstrip("/") + _psp
                     if _psp_url not in visited and not any(u == _psp_url for u, _, _ in queue):
                         queue.append((_psp_url, _PMS_PRIOR_SCORE + 200, f"prop_subpath:{_psp}"))
                         dynamic_appended += 1
@@ -1881,12 +2215,25 @@ async def _try_link_hop(
                             if not sub_path_l.startswith(base_path_l.rstrip("/")):
                                 # Allow if the link scores on a floor-plan
                                 # path keyword specifically.
+                                # 2026-05-13: also accept the per-plan detail
+                                # URL conventions that show up on card-based
+                                # marketing sites:
+                                #   /apartment/<slug>   (liveatsurf pattern)
+                                #   /home/<slug>        (some Greystar sites)
+                                #   /property/<slug>    (PMC portfolio detail
+                                #                       pages — princeton mgmt)
+                                # These were excluded by the previous
+                                # short-list, so floor-plan accumulation never
+                                # walked into per-card detail pages even when
+                                # the resolver landed on the index page.
                                 _path_kw_match = any(
                                     kw in sub_path_l
                                     for kw, _ in _LINK_PATH_KEYWORDS
                                     if kw in ("/floorplan", "/floor-plan",
                                               "/availability", "/units",
-                                              "/conventional", "/apartments")
+                                              "/conventional", "/apartments",
+                                              "/apartment/", "/home/",
+                                              "/property/", "/communities/")
                                 )
                                 if not _path_kw_match:
                                     continue
@@ -2146,6 +2493,48 @@ async def scrape_jugnu(
                 errors=[f"fetch_outcome={outcome_val}"],
             )
             return result
+
+    # 2026-05-13 (C1 SGCaptcha wall, teammate analysis): when the fetch
+    # outcome is technically OK but the page redirected to
+    # ``/.well-known/sgcaptcha/`` (the SGCaptcha interstitial), the body
+    # is a ~12KB challenge page with 0 floor-plan signals. Running the full
+    # tier cascade against it wastes ~25 seconds per property and trips the
+    # LLM tiers against 200-byte HTML shells. Estimated 85+ properties hit
+    # this daily. Emit a dedicated tier code so reports distinguish the
+    # captcha wall from a genuine extraction failure.
+    _sgcaptcha_walled = False
+    _final_url = ""
+    if fetch_result is not None:
+        _final_url = str(getattr(fetch_result, "final_url", "") or "")
+        if "/.well-known/sgcaptcha/" in _final_url.lower():
+            _sgcaptcha_walled = True
+    if _sgcaptcha_walled:
+        result = _empty_result(base_url)
+        result["_property_id"] = property_id
+        result["extraction_tier_used"] = "generic:sgcaptcha_wall"
+        result["errors"].append(
+            f"SGCAPTCHA_WALL: final_url={_final_url[:120]} "
+            "(SGCaptcha interstitial — full tier cascade skipped)"
+        )
+        try:
+            fd = fetch_result.to_dict() if hasattr(fetch_result, "to_dict") else {}
+            body = getattr(fetch_result, "body", None)
+            fd["body_bytes"] = len(body) if body else 0
+            fd["captcha_detected"] = True
+            fd["captcha_provider"] = "sgcaptcha"
+            result["_fetch_diagnostic"] = fd
+        except Exception:
+            pass
+        result["_extract_result"] = ExtractResult(
+            property_id=property_id,
+            records=[],
+            tier_used="generic:sgcaptcha_wall",
+            adapter_name="none",
+            winning_url=None,
+            confidence=0.0,
+            errors=[f"sgcaptcha_wall: final_url={_final_url[:80]}"],
+        )
+        return result
 
     # Delta 4: emit PMS detection event — forward fetch_result so adapters
     # can work from fetch_result.body when no live page is available.

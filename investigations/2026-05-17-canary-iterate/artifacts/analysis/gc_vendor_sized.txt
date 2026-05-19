@@ -1,0 +1,22 @@
+genuine-custom population sized: 456 sites
+
+  truly_bespoke           209
+  jonahdigital             60
+  repli360                 46
+  marketapts               32
+  caf_v2                   26
+  wix                      21
+  rentmanager_w            13
+  rentcafe_w               12
+  squarespace              10
+  365rs_digilease           9
+  sightmap_w                8
+  resman_w                  3
+  realpage_w                3
+  ERR                       2
+  duda                      1
+  dynasty                   1
+
+  => MISFP known-PMS (existing adapters): 39
+  => vendor-TEMPLATE clusters (generic detail-crawl target): 206
+  => truly bespoke: 209  | ERR/dead: 2

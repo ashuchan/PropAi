@@ -1,0 +1,4 @@
+SUMMARY {'UNIT': 4, 'DEAD': 1}
+Future exception was never retrieved
+future: <Future finished exception=TargetClosedError('Target page, context or browser has been closed')>
+patchright._impl._errors.TargetClosedError: Target page, context or browser has been closed
