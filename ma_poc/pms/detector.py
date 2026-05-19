@@ -63,6 +63,7 @@ PmsName = Literal[
     "equity",
     "rentmanager",
     "rentvision",
+    "residentservices365",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -102,6 +103,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "equity": "api_first",
     "rentmanager": "api_first",
     "rentvision": "dom_first",
+    "residentservices365": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -524,6 +526,17 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             0.85,
             ["G5 marketing-cloud marker in HTML (g5marketingcloud / g5dxm.com / g5-c- URN)"],
         )
+    # 365 ResidentServices (Apollo / collapsar theme) — a self-hosted CMS
+    # used by a small operator cluster. Asset host fingerprint is stable
+    # site-wide (used for plan-card images and theme css), so detection
+    # fires on landing before any hop. SSR plan grid at
+    # /Marketing/FloorPlans (see Residentservices365Adapter).
+    if "365residentservices.com" in h:
+        return (
+            "residentservices365",
+            0.85,
+            ["365 ResidentServices marker in HTML (365residentservices.com)"],
+        )
     # RentVision is a multifamily marketing-site CMS whose ``/floorplans``
     # page is full plan-level SSR DOM. The platform credit appears
     # site-wide including the landing page, so detection fires before any
@@ -763,6 +776,7 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
     "g5": ("g5marketingcloud", "g5dxm.com", "g5-c-"),
     "rentvision": ("created by rentvision", "powered by rentvision", "rentvision.com"),
+    "residentservices365": ("365residentservices.com",),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
     "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
     "rentmanager": (

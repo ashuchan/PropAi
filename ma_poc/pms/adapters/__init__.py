@@ -28,6 +28,7 @@ from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
 from ma_poc.pms.adapters.rentmanager import RentManagerAdapter
 from ma_poc.pms.adapters.rentvision import RentVisionAdapter
 from ma_poc.pms.adapters.repli360 import Repli360Adapter
+from ma_poc.pms.adapters.residentservices365 import Residentservices365Adapter
 from ma_poc.pms.adapters.resman import ResManAdapter
 from ma_poc.pms.adapters.sightmap import SightMapAdapter
 from ma_poc.pms.adapters.spherexx import SpherexxAdapter
@@ -63,6 +64,7 @@ def _bootstrap_registry() -> None:
         Repli360Adapter,
         RentManagerAdapter,
         RentVisionAdapter,
+        Residentservices365Adapter,
         EssexAdapter,
         AvalonBayAdapter,
         AmliAdapter,
