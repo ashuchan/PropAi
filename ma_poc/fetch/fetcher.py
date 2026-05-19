@@ -27,6 +27,14 @@ from ..discovery.contracts import CrawlTask
 from ..observability.events import EventKind, emit
 from .browser_pool import BrowserContextPool
 from .captcha_detect import looks_like_captcha
+from .clearance_jar import (
+    ClearanceJar,
+    FALLBACK_TTL,
+    PROVIDER_DEFAULT_TTL,
+    parse_set_cookie_clearance,
+    provider_from_cookie_name,
+    ua_hash as _ua_hash,
+)
 from .conditional import ConditionalCache
 from .contracts import FetchOutcome, FetchResult, FetchTier, RenderMode
 from .cookie_jar import PropertyCookieJar
@@ -160,6 +168,7 @@ class Fetcher:
         identities: IdentityPool,
         browsers: BrowserContextPool,
         retry: RetryPolicy,
+        clearance_jar: ClearanceJar | None = None,
     ) -> None:
         self._proxy_pool = proxy_pool
         self._rate_limiter = rate_limiter
@@ -168,6 +177,10 @@ class Fetcher:
         self._identities = identities
         self._browsers = browsers
         self._retry = retry
+        # Phase 2 (stealth plan): optional WAF clearance cookie store.
+        # When set, clearance cookies are injected before requests and
+        # captured opportunistically from Set-Cookie headers after 200s.
+        self._clearance_jar = clearance_jar
         # Bug #5 Layer 2 (2026-05-18): per-shard in-job domain quarantine.
         # When a host returns N consecutive RATE_LIMITED responses, the
         # host is parked for the REST of this shard's run. Any subsequent
@@ -566,6 +579,48 @@ class Fetcher:
             if last_result.render_mode == RenderMode.RENDER and last_result.body:
                 _persist_raw_html(task.property_id, last_result.body)
 
+            # Phase 2 (stealth plan): opportunistically capture WAF clearance
+            # cookies from Set-Cookie headers on successful responses.  Only
+            # cookies whose names appear in CLEARANCE_COOKIE_NAMES are stored;
+            # general session cookies are ignored.
+            #
+            # Per-cookie storage decisions (post-2026-05-19 hardening):
+            #   * If the cookie carried a ``Domain=`` directive, store
+            #     under the bare domain (leading dot stripped) so a
+            #     cookie issued for ``Domain=.example.com`` is found on
+            #     later requests to ``app.example.com``. Lookup walks
+            #     parent domains via :func:`candidate_lookup_hosts`.
+            #   * If the cookie carried ``Max-Age`` (or ``Expires``),
+            #     honour that TTL — producers like Cloudflare sometimes
+            #     issue a 12-hour ``__cf_bm`` when the default would be
+            #     30 minutes. Fall back to ``PROVIDER_DEFAULT_TTL`` when
+            #     neither directive is present.
+            if self._clearance_jar is not None:
+                try:
+                    _parsed_cookies = parse_set_cookie_clearance(
+                        last_result.headers or {}
+                    )
+                    if _parsed_cookies:
+                        _req_host = urlparse(task.url).netloc
+                        _c_proxy_ip = _extract_proxy_ip(proxy)
+                        _c_ua_hash = _ua_hash(identity.user_agent, identity.accept_language)
+                        for _cookie in _parsed_cookies:
+                            # captcha_provider is None on successful (non-challenge)
+                            # responses, so the name-based lookup is the only
+                            # reliable provider signal here.
+                            _c_provider = provider_from_cookie_name(_cookie.name)
+                            _c_default_ttl = PROVIDER_DEFAULT_TTL.get(
+                                _c_provider, FALLBACK_TTL
+                            )
+                            _c_ttl = _cookie.max_age_seconds or _c_default_ttl
+                            _c_host = _cookie.domain or _req_host
+                            self._clearance_jar.store(
+                                _c_host, _c_proxy_ip, _c_ua_hash,
+                                _c_provider, {_cookie.name: _cookie.value}, _c_ttl,
+                            )
+                except Exception as _cj_exc:
+                    log.debug("clearance_jar opportunistic store failed: %s", _cj_exc)
+
         return last_result
 
     async def _do_request(
@@ -613,6 +668,26 @@ class Fetcher:
         identity_slot = self._identities.current_slot(task.property_id)
         jar = PropertyCookieJar(task.property_id, identity_slot)
         cookies = jar.cookies_for_host(host)
+
+        # Phase 2 (stealth plan): inject WAF clearance cookies when available.
+        # Clearance cookies are keyed by (host, proxy_ip, ua_hash); they win
+        # on collision with property-session cookies because the WAF checks the
+        # clearance token first.
+        if self._clearance_jar is not None:
+            try:
+                _proxy_ip = _extract_proxy_ip(proxy)
+                _ua_hash_val = _ua_hash(identity.user_agent, identity.accept_language)
+                _clearance = self._clearance_jar.lookup(host, _proxy_ip, _ua_hash_val)
+                if _clearance:
+                    cookies = {**cookies, **_clearance}
+                    emit(
+                        EventKind.CLEARANCE_CACHE_HIT,
+                        task.property_id,
+                        host=host,
+                        cookies=list(_clearance.keys()),
+                    )
+            except Exception as _cj_exc:
+                log.debug("clearance_jar.lookup failed: %s", _cj_exc)
 
         timeout_sec = min(task.budget_ms / 1000.0, 30.0)
         method = "HEAD" if task.render_mode == RenderMode.HEAD else "GET"
@@ -704,6 +779,31 @@ class Fetcher:
         else:
             page = await self._browsers.acquire(identity, proxy)
         network_log: list[dict[str, Any]] = []
+
+        # Phase 2 (stealth plan): inject WAF clearance cookies into the
+        # Playwright context before navigation so the WAF skips re-challenging.
+        if self._clearance_jar is not None:
+            try:
+                _render_host = urlparse(task.url).netloc
+                _render_proxy_ip = _extract_proxy_ip(proxy)
+                _render_ua_hash = _ua_hash(identity.user_agent, identity.accept_language)
+                _render_clearance = self._clearance_jar.lookup(
+                    _render_host, _render_proxy_ip, _render_ua_hash
+                )
+                if _render_clearance:
+                    await page.context.add_cookies([
+                        {"name": name, "value": value, "domain": _render_host, "path": "/"}
+                        for name, value in _render_clearance.items()
+                    ])
+                    emit(
+                        EventKind.CLEARANCE_CACHE_HIT,
+                        task.property_id,
+                        host=_render_host,
+                        cookies=list(_render_clearance.keys()),
+                        render_mode="RENDER",
+                    )
+            except Exception as _cj_exc:
+                log.debug("clearance_jar inject (render) failed: %s", _cj_exc)
 
         try:
             # Intercept network requests
@@ -1392,6 +1492,21 @@ def _short_hash(value: str | None) -> str | None:
     return hashlib.sha256(value.encode("utf-8", errors="ignore")).hexdigest()[:10]
 
 
+def _extract_proxy_ip(proxy: str | None) -> str:
+    """Extract the host/IP portion of a proxy URL for use as a jar key.
+
+    Returns an empty string for direct (non-proxy) connections so the jar
+    key remains stable and distinct from any real IP.
+    """
+    if not proxy:
+        return ""
+    try:
+        parsed = urlparse(proxy)
+        return parsed.hostname or ""
+    except Exception:
+        return ""
+
+
 def _persist_raw_html(property_id: str, body: bytes) -> None:
     """Write raw HTML to disk for replay. Fails silently.
 
@@ -1427,6 +1542,8 @@ def get_default_fetcher() -> Fetcher:
         cache_dir = Path(os.getenv("DATA_DIR", _DEFAULT_DATA_DIR)) / "cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
+        state_dir = Path(os.getenv("DATA_DIR", _DEFAULT_DATA_DIR)) / "state"
+        state_dir.mkdir(parents=True, exist_ok=True)
         _default = Fetcher(
             proxy_pool=ProxyPool(proxy_urls),
             rate_limiter=HostRateLimiter(),
@@ -1435,5 +1552,6 @@ def get_default_fetcher() -> Fetcher:
             identities=IdentityPool(),
             browsers=BrowserContextPool(max_contexts=int(os.getenv("MAX_CONCURRENT_BROWSERS", "5"))),
             retry=RetryPolicy(),
+            clearance_jar=ClearanceJar(state_dir / "clearance_jar.sqlite"),
         )
     return _default
