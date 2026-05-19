@@ -132,3 +132,73 @@ class TestPortalAllowlistEntries:
         urls_to_portals = dict(_PORTAL_URL_PATTERNS)
         assert "sightmap.com/app/api" in urls_to_portals
         assert urls_to_portals["sightmap.com/app/api"] == "sightmap"
+
+
+# ── D22 (2026-05-19): RealPage OneSite iframe → api.ws REST URL synthesis ──
+
+class TestRealPageOneSiteApiSynthesis:
+    """When a marketing page references `{propid}.onlineleasing.realpage.com`,
+    the synth must emit BOTH the iframe host (existing capability) AND the
+    canonical ``api.ws.realpage.com/v2/property/{propid}/floorplans`` REST URL.
+
+    Canonical PIDs: 245526 thebridgewaterapartments.com (propid 1834846),
+    18736 centralparkmontgomery.com (propid 8786943).
+    """
+
+    def test_iframe_url_yields_iframe_plus_api(self) -> None:
+        """Both the iframe host AND the REST API URL are synthesised."""
+        from ma_poc.pms.scraper import _scan_inline_js_pms_init
+        html = (
+            '<iframe src="https://1834846.onlineleasing.realpage.com/#k=57427"></iframe>'
+            + "x" * 200
+        )
+        hits = _scan_inline_js_pms_init(html)
+        urls = [u for u, p in hits if p == "realpage_oll"]
+        assert "https://1834846.onlineleasing.realpage.com/" in urls
+        assert "https://api.ws.realpage.com/v2/property/1834846/floorplans" in urls
+
+    def test_quoted_url_in_inline_js_also_fires(self) -> None:
+        """The pattern matches the bare host:port mention inside inline JS, not
+        just attribute values — site authors often embed the iframe URL in a
+        JS variable that the SPA reads to bootstrap.
+        """
+        from ma_poc.pms.scraper import _scan_inline_js_pms_init
+        html = (
+            '<script>var oneSiteUrl = "https://8786943.onlineleasing.realpage.com/#k=abc";</script>'
+            + "x" * 200
+        )
+        hits = _scan_inline_js_pms_init(html)
+        urls = [u for u, p in hits if p == "realpage_oll"]
+        assert "https://api.ws.realpage.com/v2/property/8786943/floorplans" in urls
+
+    def test_short_subdomain_does_not_match(self) -> None:
+        """Subdomains under 6 digits aren't valid OneSite propids."""
+        from ma_poc.pms.scraper import _scan_inline_js_pms_init
+        html = '<iframe src="https://12345.onlineleasing.realpage.com/"></iframe>' + "x" * 200
+        hits = _scan_inline_js_pms_init(html)
+        urls = [u for u, p in hits if p == "realpage_oll"]
+        # Neither the iframe nor the API URL should be emitted from the
+        # D22 pattern — caught by the `(\d{6,})` group.
+        assert not any("/12345/" in u or "12345.onlineleasing" in u for u in urls)
+
+    def test_api_ws_in_portal_allowlist(self) -> None:
+        """``api.ws.realpage.com/v2/property`` maps to ``realpage_oll``."""
+        from ma_poc.pms.adapters._html_extract import _PORTAL_URL_PATTERNS
+        urls_to_portals = dict(_PORTAL_URL_PATTERNS)
+        assert "api.ws.realpage.com/v2/property" in urls_to_portals
+        assert urls_to_portals["api.ws.realpage.com/v2/property"] == "realpage_oll"
+
+    def test_existing_data_client_id_pattern_unchanged(self) -> None:
+        """The pre-existing ``data-client-id`` pattern still fires for sites
+        that publish the propid as an HTML attribute (no iframe URL present).
+        Regression guard so the new D22 doesn't shadow the old behaviour.
+        """
+        from ma_poc.pms.scraper import _scan_inline_js_pms_init
+        html = (
+            '<div data-realpage-client-id="7654321"></div>'
+            + "x" * 200
+        )
+        hits = _scan_inline_js_pms_init(html)
+        urls = [u for u, p in hits if p == "realpage_oll"]
+        # Legacy synthesiser emits only the iframe host
+        assert "https://7654321.onlineleasing.realpage.com/" in urls

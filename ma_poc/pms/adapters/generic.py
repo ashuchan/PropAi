@@ -871,6 +871,151 @@ async def _probe_realpage_cws(html: str) -> list[dict[str, Any]]:
     return units
 
 
+# ── D25 (2026-05-19): Beacon Management WordPress admin-ajax probe ─────────
+# Beacon Management property sites (theshoresoflakestclair.com, similar) serve
+# an apartment table behind a WordPress admin-ajax endpoint:
+#   POST {host}/wp-admin/admin-ajax.php
+#   body: action=beacon_property_aptmt_search
+# Response: HTML fragment containing
+#   <table class="beacon-aptsearch-rslt-table">
+#     <tr data-singleUnit-id="475199">
+#       <td>#01112</td>           <!-- unit_number -->
+#       <td>{beds}</td><td>{baths}</td><td>{sqft}</td>
+#       <td>{rent}</td><td>{date}</td><td>Action</td>
+#     </tr>
+#   ...
+# The endpoint has no CSRF nonce (verified 2026-05-19 live-fetch) and infers
+# the property identity from the request Host header. POSTing without a body
+# returns the populated table; GET returns "Invalid request" — so the probe
+# MUST POST to retrieve data.
+#
+# Cohort: Beacon Management portfolio (likely 5-20 properties) + any other
+# WordPress site using the same plugin family. The marker class
+# ``beacon_property_aptmt_search_form`` in HTML is the gate signal.
+_BEACON_AJAX_MARKER = _re.compile(
+    r'beacon_property_aptmt_search(?:_form)?', _re.IGNORECASE,
+)
+_BEACON_TABLE_RE = _re.compile(
+    r'<table[^>]*beacon-aptsearch-rslt-table[^>]*>([\s\S]*?)</table>',
+    _re.IGNORECASE,
+)
+# Per-row <tr> capture inside the response table. ``data-singleUnit-id`` (case
+# insensitive — site source mixes capitalisation) is a strong per-unit identity
+# signal; rows without it (the thead row, alert banners) are skipped.
+_BEACON_ROW_RE = _re.compile(
+    r'<tr[^>]*data-single[Uu]nit-?[Ii]d=["\'](\d+)["\'][^>]*>([\s\S]*?)</tr>',
+    _re.IGNORECASE,
+)
+_BEACON_TD_RE = _re.compile(r'<td[^>]*>([\s\S]*?)</td>', _re.IGNORECASE)
+_BEACON_TAG_STRIP_RE = _re.compile(r'<[^>]+>')
+
+
+def _beacon_clean_cell(raw: str) -> str:
+    """Strip HTML tags and collapse whitespace inside a ``<td>`` cell."""
+    txt = _BEACON_TAG_STRIP_RE.sub(" ", raw or "")
+    return _re.sub(r"\s+", " ", txt).strip()
+
+
+def _parse_beacon_response_table(html: str) -> list[dict[str, Any]]:
+    """Parse the HTML fragment returned by the Beacon AJAX endpoint into
+    unit dicts. Cells are positional — column order is fixed by the plugin:
+    [apartment#, beds, baths, sqft, rent, date_available, action].
+
+    Returns an empty list when the fragment has no table or no data rows.
+    Pure function — no network I/O.
+    """
+    table_match = _BEACON_TABLE_RE.search(html or "")
+    if not table_match:
+        return []
+    table_body = table_match.group(1)
+    units: list[dict[str, Any]] = []
+    for row_match in _BEACON_ROW_RE.finditer(table_body):
+        single_unit_id = row_match.group(1)
+        row_body = row_match.group(2)
+        cells = [_beacon_clean_cell(m.group(1)) for m in _BEACON_TD_RE.finditer(row_body)]
+        if len(cells) < 5:
+            continue
+        apt = cells[0].lstrip("#").strip()
+        beds_raw = cells[1]
+        baths_raw = cells[2]
+        sqft_raw = cells[3]
+        rent_raw = cells[4]
+        date_raw = cells[5] if len(cells) > 5 else ""
+
+        # Numeric coercions — tolerant of "1.5", "$1,200", "1,250 sq ft".
+        def _num(s: str) -> int | None:
+            m = _re.search(r"\d{1,7}(?:[.,]\d{1,3})?", s.replace(",", ""))
+            if not m:
+                return None
+            try:
+                return int(float(m.group(0)))
+            except (ValueError, TypeError):
+                return None
+
+        rent_int = _num(rent_raw)
+        record: dict[str, Any] = {
+            "unit_id": f"beacon_{single_unit_id}",
+            "unit_number": apt,
+            "bedrooms": _num(beds_raw),
+            "bathrooms": _num(baths_raw),
+            "sqft": _num(sqft_raw),
+            "market_rent_low": rent_int,
+            "market_rent_high": rent_int,
+            "rent_range": str(rent_int) if rent_int is not None else None,
+            "available_date": date_raw,
+            "availability_status": "AVAILABLE",
+            "extraction_tier": "TIER_1_API",
+        }
+        if apt:
+            units.append(record)
+    return units
+
+
+async def _probe_beacon_ajax(html: str, base_url: str) -> list[dict[str, Any]]:
+    """Probe the Beacon Management WordPress admin-ajax endpoint for units.
+
+    Gate: ``html`` must contain the ``beacon_property_aptmt_search`` marker.
+
+    Args:
+        html:     Entry-page HTML (used only for the gate check).
+        base_url: The property's base URL — used to derive
+                  ``{scheme}://{host}/wp-admin/admin-ajax.php``.
+
+    Returns parsed unit dicts; empty list on any failure (no marker, network
+    error, non-200, or empty table).
+    """
+    if not html or not _BEACON_AJAX_MARKER.search(html):
+        return []
+    try:
+        import urllib.parse as _up
+        parsed = _up.urlparse(base_url)
+        if not parsed.scheme or not parsed.netloc:
+            return []
+        ajax_url = f"{parsed.scheme}://{parsed.netloc}/wp-admin/admin-ajax.php"
+    except Exception:
+        return []
+    try:
+        import httpx as _httpx
+        async with _httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.post(
+                ajax_url,
+                data={"action": "beacon_property_aptmt_search"},
+                headers={
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    # Many Beacon sites validate Origin/Referer against the
+                    # request host — fail closed when unset on cloud proxies.
+                    "Referer": base_url,
+                    "Origin": f"{parsed.scheme}://{parsed.netloc}",
+                },
+            )
+        if resp.status_code != 200:
+            return []
+        return _parse_beacon_response_table(resp.text or "")
+    except Exception:
+        return []
+
+
 class GenericAdapter:
     """Generic fallback adapter.
 
@@ -1940,6 +2085,52 @@ class GenericAdapter:
                         "ran_empty",
                         units=0,
                         reason=f"probe error: {_cws_exc}",
+                    )
+
+            # Sub-tier 4c: Beacon Management WordPress admin-ajax probe ─────
+            # D25 (2026-05-19). Beacon Management property sites embed a
+            # ``beacon_property_aptmt_search_form`` widget whose data lives
+            # behind a POST to ``{host}/wp-admin/admin-ajax.php``. The
+            # marker class is the gate; the probe POSTs and parses the
+            # returned HTML fragment into unit dicts. Pre-fix PID 244123
+            # theshoresoflakestclair.com shipped 0 units + 1 plan; the
+            # endpoint returns ≥5 real per-apartment rows (verified
+            # 2026-05-19 live).
+            if not result.units and html and _BEACON_AJAX_MARKER.search(html):
+                try:
+                    _beacon_units = await _probe_beacon_ajax(html, ctx.base_url)
+                    if _beacon_units:
+                        result.units = _merge_into_result_units(
+                            result.units, _beacon_units, property_id=ctx.property_id
+                        )
+                        result.tier_used = "TIER_1_API"
+                        result.winning_url = ctx.base_url
+                        result.confidence = min(0.90, 0.65 + 0.04 * len(result.units))
+                        _log_attempt(
+                            "generic:beacon_ajax",
+                            "ran_units",
+                            units=len(_beacon_units),
+                            reason="beacon admin-ajax endpoint returned table rows",
+                        )
+                        from ma_poc.models.source import SourceId as _SI4c
+                        sources_already_run.add(_SI4c.API_GENERIC_NARROW)
+                        _bc_d = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
+                        if _bc_d is None or _bc_d.action == "STOP":
+                            result._decision_log = decision_log  # type: ignore[attr-defined]
+                            return result
+                    else:
+                        _log_attempt(
+                            "generic:beacon_ajax",
+                            "ran_empty",
+                            units=0,
+                            reason="beacon marker found but AJAX returned no units",
+                        )
+                except Exception as _beacon_exc:
+                    _log_attempt(
+                        "generic:beacon_ajax",
+                        "ran_empty",
+                        units=0,
+                        reason=f"probe error: {_beacon_exc}",
                     )
 
             # Sub-tier 5: DOM selector cascade ------------------------------

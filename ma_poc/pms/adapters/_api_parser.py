@@ -309,6 +309,28 @@ def _detect_plan_unit_pair(
     return plan_list, unit_list, fk_key
 
 
+#: Fields the row-picker (``parse_api_responses`` body around line 1112)
+#: walks when filling ``unit_number``. When we append an unmatched plan
+#: as a plan-summary row, the picker would otherwise read the plan's
+#: database PK (``id``) or a vendor label as a unit-number, lifting the
+#: row to ``unit`` instead of ``plan`` at the classify boundary. The
+#: stripper below clears every alias the picker reads so the resulting
+#: row has ``unit_number=None`` and partitions to plan-summary correctly.
+_UNIT_NUMBER_PICKER_KEYS: tuple[str, ...] = (
+    "unitNumber", "unit_number", "unitId", "unit_id", "UnitNumber",
+    "label", "display_unit_number", "unitCode", "unit_code",
+    "id",
+)
+
+#: Plan-side bookkeeping fields that would only add noise downstream and
+#: never feed the v2 unit schema. Stripped from both merged units and
+#: unmatched plan-summary rows.
+_PLAN_BOOKKEEPING_DROP: tuple[str, ...] = (
+    "createdAt", "modifiedAt", "deletedAt", "deletedByVendor",
+    "integrationId", "images", "description",
+)
+
+
 def _merge_units_with_plans(
     unit_list: list[dict],
     plan_list: list[dict],
@@ -321,17 +343,37 @@ def _merge_units_with_plans(
     slight size variations across buildings). The plan supplies values
     only for keys missing or empty on the unit. Returns a new list — the
     input dicts are not mutated.
+
+    **Unmatched-plan preservation (Gap 1, 2026-05-19):** plans whose
+    ``id`` is NOT referenced by any unit's foreign key are appended to
+    the returned list as plan-shape rows (no per-apartment identity).
+    The downstream classifier in :mod:`ma_poc.extraction.classify`
+    partitions them into ``plan_summaries`` and the v2 formatter ships
+    them under ``floor_plans[]`` (cf. playbook §8.18). This prevents
+    silent loss of plans without current available units (PID 268552:
+    7 plans / 2 had units → pre-Gap-1 shipped 2, post-Gap-1 ships 8 = 2
+    units + 6 plan summaries; PID 253774: 60 plans / 30 had units →
+    ships 30 units + 30 plan summaries instead of silently dropping
+    the 30 plan rows).
+
+    The fix preserves the original bfeda6c intent — the 30 plans
+    without rent on PID 253774 still don't ship as ``units`` (no rent,
+    no availability, no natural identity → classifier returns "plan");
+    they just stop being silently dropped.
     """
     plan_index: dict[Any, dict] = {
         p["id"]: p for p in plan_list
         if isinstance(p, dict) and p.get("id") is not None
     }
+    referenced_plan_ids: set[Any] = set()
     out: list[dict] = []
     for u in unit_list:
         if not isinstance(u, dict):
             continue
         fk_val = u.get(fk_key)
         plan = plan_index.get(fk_val) if fk_val is not None else None
+        if plan is not None:
+            referenced_plan_ids.add(fk_val)
         if not plan:
             out.append(dict(u))
             continue
@@ -341,8 +383,7 @@ def _merge_units_with_plans(
         # plan's bookkeeping fields that would just be noise.
         merged = dict(plan)
         merged.pop("id", None)
-        for skip in ("createdAt", "modifiedAt", "deletedAt", "deletedByVendor",
-                     "integrationId", "images", "description"):
+        for skip in _PLAN_BOOKKEEPING_DROP:
             merged.pop(skip, None)
         # Promote the plan's ``name`` into ``planName`` (if the plan
         # doesn't already supply one) BEFORE the unit overlay runs.
@@ -374,6 +415,33 @@ def _merge_units_with_plans(
         if unit_name not in (None, "") and "unit_number" not in u:
             merged["unit_number"] = unit_name
         out.append(merged)
+
+    # Gap 1 (2026-05-19): append unmatched plans as plan-shape rows so
+    # plans without current available units still surface downstream as
+    # plan_summaries. See class docstring for rationale.
+    for plan in plan_list:
+        if not isinstance(plan, dict):
+            continue
+        plan_id = plan.get("id")
+        if plan_id is None or plan_id in referenced_plan_ids:
+            continue
+        plan_row = dict(plan)
+        # Strip every alias the row-picker would walk for ``unit_number``
+        # so the resulting v2 row has no natural identity and the
+        # classifier in extraction/classify.py routes it to plan_summaries.
+        for k in _UNIT_NUMBER_PICKER_KEYS:
+            plan_row.pop(k, None)
+        for skip in _PLAN_BOOKKEEPING_DROP:
+            plan_row.pop(skip, None)
+        # Promote ``name`` -> ``planName`` so the picker's floor-plan-name
+        # cascade reads it; without this the plan's name would fall
+        # through to the generic ``name`` alias and could be misread
+        # downstream as a unit number on some vendors.
+        plan_name_seed = plan.get("name")
+        if plan_name_seed and "planName" not in plan_row:
+            plan_row["planName"] = plan_name_seed
+            plan_row.pop("name", None)
+        out.append(plan_row)
     return out
 
 
@@ -1171,11 +1239,32 @@ def parse_api_responses(
                 "extraction_tier": "TIER_1_API",
             })
 
-    has_real = any(u.get("unit_number") or u.get("rent_range") for u in units)
+    # Stub filter: when at least one row carries real per-apartment
+    # data (unit_number OR rent_range), drop rows that have NEITHER. The
+    # filter exists to suppress phantom-empty noise (parser quirks that
+    # emit zero-information rows alongside real units).
+    #
+    # Gap 1 (2026-05-19): plan-summary rows emitted by
+    # ``_merge_units_with_plans`` for unmatched plans intentionally lack
+    # ``unit_number`` (so the downstream classifier routes them to
+    # ``plan_summaries``). When the source plan also has null rent, the
+    # row lacks ``rent_range`` too — but it still carries useful
+    # plan-level structure (``floor_plan_name`` + ``bedrooms`` / ``sqft``).
+    # Keep such rows so they reach ``extraction.classify`` and ship as
+    # ``floor_plans[]`` per playbook §8.18, instead of being silently
+    # dropped on the way out.
+    def _is_real_unit_or_plan(u: dict) -> bool:
+        if u.get("unit_number") or u.get("rent_range"):
+            return True
+        fp_name = u.get("floor_plan_name") or ""
+        has_dim = bool(u.get("bedrooms")) or bool(u.get("sqft"))
+        return bool(fp_name) and has_dim
+
+    has_real = any(_is_real_unit_or_plan(u) for u in units)
     stub_count = 0
     if has_real:
         before = len(units)
-        units = [u for u in units if u.get("unit_number") or u.get("rent_range")]
+        units = [u for u in units if _is_real_unit_or_plan(u)]
         stub_count = before - len(units)
 
     log.debug(

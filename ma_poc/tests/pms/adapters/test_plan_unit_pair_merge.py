@@ -20,10 +20,16 @@ merge the plan fields into each unit. Adding a new vendor's FK key to
 
 from __future__ import annotations
 
+import pytest
+
 from ma_poc.pms.adapters._api_parser import (
     _detect_plan_unit_pair,
     _merge_units_with_plans,
     parse_api_responses,
+)
+from ma_poc.services.source_planner import (
+    evaluate_completeness,
+    plan_next_action,
 )
 
 
@@ -329,3 +335,331 @@ def test_parse_api_responses_layouts_only_still_works() -> None:
     # 2 plans -> 2 plan-level rows (no rent, no per-unit identity).
     plan_names = sorted(row.get("floor_plan_name") or "" for row in out)
     assert plan_names == ["1x1", "2x2"]
+
+
+# ── Gap 1 (2026-05-19): unmatched plans appended as plan-summary rows ────────
+
+
+def test_merge_appends_unmatched_plans_as_plan_rows() -> None:
+    """PID 268552 shape: 7 plans, both currently-available units sit on
+    the SAME plan (p2). Matched ids = {p2}; unmatched = {p1, p3..p7} = 6.
+
+    Pre-Gap-1 those 6 plans were silently dropped — the property emitted
+    2 units (vs ground-truth 7 floor plans on site). Post-fix the merged
+    result is 2 unit-shape rows + 6 plan-shape rows = 8 total. The
+    downstream classifier in ``extraction.classify`` partitions the plan
+    rows to ``plan_summaries`` and the v2 formatter ships them under
+    ``floor_plans[]`` (playbook §8.18).
+    """
+    plans = [
+        {"id": "p1", "name": "Studio S1", "bedrooms": 0, "bathrooms": 1,
+         "area": 530, "minRent": 1450, "maxRent": 1550},
+        {"id": "p2", "name": "1Bed A1",   "bedrooms": 1, "bathrooms": 1,
+         "area": 720, "minRent": 1700, "maxRent": 1900},
+        {"id": "p3", "name": "1Bed A2",   "bedrooms": 1, "bathrooms": 1,
+         "area": 760, "minRent": 1750, "maxRent": 1950},
+        {"id": "p4", "name": "1Bed A3",   "bedrooms": 1, "bathrooms": 1.5,
+         "area": 810, "minRent": 1850, "maxRent": 2100},
+        {"id": "p5", "name": "2Bed B1",   "bedrooms": 2, "bathrooms": 2,
+         "area": 1050, "minRent": 2400, "maxRent": 2700},
+        {"id": "p6", "name": "2Bed B2",   "bedrooms": 2, "bathrooms": 2,
+         "area": 1120, "minRent": 2500, "maxRent": 2800},
+        {"id": "p7", "name": "3Bed C1",   "bedrooms": 3, "bathrooms": 2,
+         "area": 1320, "minRent": 3100, "maxRent": 3400},
+    ]
+    units = [
+        # Two currently-available apartments, both on the 1Bed A1 plan.
+        {"name": "101", "layoutId": "p2", "displayPrice": "1800",
+         "availableOn": "2026-06-01", "available": True},
+        {"name": "203", "layoutId": "p2", "displayPrice": "1850",
+         "availableOn": "2026-06-15", "available": True},
+    ]
+    merged = _merge_units_with_plans(units, plans, "layoutId")
+    # 2 unit + 6 unmatched plans = 8 (only plan p2 was referenced by
+    # units and is folded into them; p1, p3..p7 ship as plan rows).
+    assert len(merged) == 8
+
+    unit_rows = [r for r in merged if r.get("unit_number") is not None]
+    assert len(unit_rows) == 2
+    assert sorted(r["unit_number"] for r in unit_rows) == ["101", "203"]
+
+    plan_rows = [r for r in merged if r.get("unit_number") is None]
+    assert len(plan_rows) == 6
+    plan_names = sorted(
+        r.get("planName") or r.get("name") or "" for r in plan_rows
+    )
+    assert plan_names == [
+        "1Bed A2", "1Bed A3", "2Bed B1", "2Bed B2", "3Bed C1", "Studio S1",
+    ]
+    # Defensive: none of the plan-shape rows carry a key the row-picker
+    # would walk for ``unit_number`` — otherwise the plan PK would leak
+    # as a unit number downstream.
+    for p in plan_rows:
+        for k in ("id", "unitNumber", "unit_number", "unitId", "unit_id",
+                  "label", "unitCode"):
+            assert k not in p, (
+                f"plan row carries picker key {k!r} = {p[k]!r}"
+            )
+
+
+def test_merge_unmatched_plans_strip_database_pk_fields() -> None:
+    """A plan dict's ``id`` is the plan's database PK. The
+    ``parse_api_responses`` row-picker uses ``id`` as the LAST fallback
+    for ``unit_number``. If we let it through, the resulting v2 row would
+    have a meaningless unit_number (the plan PK) and ``classify`` would
+    misroute it to ``units`` instead of ``plan_summaries``.
+
+    Strip every alias the picker walks: ``id`` / ``unitNumber`` /
+    ``unitId`` / ``label`` / ``unitCode`` / etc.
+    """
+    plans = [
+        {"id": "PLAN-DB-PK-42", "name": "1Bed A", "bedrooms": 1, "area": 800,
+         "minRent": 1700},
+        {"id": "PLAN-OTHER", "name": "Other", "bedrooms": 1, "area": 700},
+    ]
+    units = [
+        {"name": "U-01", "layoutId": "PLAN-OTHER", "displayPrice": "1800",
+         "availableOn": "2026-06-01"},
+        {"name": "U-02", "layoutId": "PLAN-OTHER", "displayPrice": "1850",
+         "availableOn": "2026-06-15"},
+    ]
+    merged = _merge_units_with_plans(units, plans, "layoutId")
+    unmatched = [r for r in merged
+                 if r.get("planName") == "1Bed A"
+                 or r.get("name") == "1Bed A"]
+    assert len(unmatched) == 1
+    p = unmatched[0]
+    for k in ("id", "unitNumber", "unit_number", "unitId", "unit_id",
+              "UnitNumber", "label", "display_unit_number",
+              "unitCode", "unit_code"):
+        assert k not in p, (
+            f"unmatched plan still carries picker key {k!r} = {p[k]!r}"
+        )
+
+
+def test_parse_api_responses_ships_unmatched_plans_as_plan_summary_rows() -> None:
+    """End-to-end: a Knock-shape response with more plans than units
+    must surface every plan downstream. Verifies (1) every plan ships
+    as a row in ``parse_api_responses`` output, and (2) the rows for
+    plans without a current FK-matched unit have no ``unit_number`` so
+    the classifier routes them to ``plan_summaries``.
+    """
+    response = {
+        "url": "https://doorway-api.knockrentals.com/v1/property/268552/units",
+        "content_type": "application/json",
+        # Wrap in ``units_data`` so the walker fallback runs (matches the
+        # real Knock response shape — keyed walker doesn't know
+        # ``units_data`` so falls through to ``find_unit_arrays``).
+        "body": {
+            "units_data": {
+                "layouts": [
+                    {"id": "p1", "name": "Studio S1", "bedrooms": 0,
+                     "bathrooms": 1, "area": 530, "minRent": 1450,
+                     "maxRent": 1550},
+                    {"id": "p2", "name": "1Bed A1", "bedrooms": 1,
+                     "bathrooms": 1, "area": 720, "minRent": 1700,
+                     "maxRent": 1900},
+                    {"id": "p3", "name": "2Bed B1", "bedrooms": 2,
+                     "bathrooms": 2, "area": 1050, "minRent": 2400,
+                     "maxRent": 2700},
+                ],
+                "units": [
+                    {"name": "101", "layoutId": "p2", "displayPrice": "1800",
+                     "availableOn": "2026-06-01", "available": True,
+                     "bedrooms": 1, "bathrooms": 1, "area": 720},
+                    {"name": "203", "layoutId": "p2", "displayPrice": "1850",
+                     "availableOn": "2026-06-15", "available": True,
+                     "bedrooms": 1, "bathrooms": 1, "area": 720},
+                ],
+            },
+        },
+    }
+    out = parse_api_responses([response])
+    # 2 units (Knock-merged) + 2 unmatched plans (Studio S1, 2Bed B1) = 4.
+    assert len(out) == 4
+
+    unit_rows = [r for r in out if r.get("unit_number")]
+    assert sorted(r["unit_number"] for r in unit_rows) == ["101", "203"]
+
+    plan_rows = [r for r in out if not r.get("unit_number")]
+    assert len(plan_rows) == 2
+    plan_names = sorted(r.get("floor_plan_name") or "" for r in plan_rows)
+    assert plan_names == ["2Bed B1", "Studio S1"]
+    for r in plan_rows:
+        assert r.get("rent_range"), (
+            f"plan row {r.get('floor_plan_name')!r} lost its rent range"
+        )
+
+
+def test_parse_api_responses_emits_plan_rows_even_when_rent_null() -> None:
+    """PID 253774 shape: layouts with ``minRent: null`` (the original
+    bfeda6c bug case — these were the rows that shipped as units with
+    null rent pre-bfeda6c). Post-Gap-1 they still ship as plan rows in
+    ``parse_api_responses``; the classifier downstream routes them to
+    ``plan_summaries`` because they lack unit_number + per-unit
+    signals — they don't re-enter ``units[]``.
+    """
+    response = {
+        "url": "https://doorway-api.knockrentals.com/v1/property/253774/units",
+        "content_type": "application/json",
+        "body": {
+            "units_data": {
+                "layouts": [
+                    {"id": "p1", "name": "A1", "bedrooms": 1, "bathrooms": 1,
+                     "area": 821, "minRent": None, "maxRent": None},
+                    {"id": "p2", "name": "B1", "bedrooms": 2, "bathrooms": 2,
+                     "area": 1100, "minRent": None, "maxRent": None},
+                    # p3 has live units; serves as the FK target so the
+                    # pair detector fires.
+                    {"id": "p3", "name": "C1", "bedrooms": 1, "bathrooms": 1,
+                     "area": 700, "minRent": 1700, "maxRent": 1900},
+                ],
+                "units": [
+                    {"name": "U-01", "layoutId": "p3", "displayPrice": "1800",
+                     "availableOn": "2026-06-01",
+                     "bedrooms": 1, "bathrooms": 1, "area": 700},
+                    {"name": "U-02", "layoutId": "p3", "displayPrice": "1850",
+                     "availableOn": "2026-06-15",
+                     "bedrooms": 1, "bathrooms": 1, "area": 700},
+                ],
+            },
+        },
+    }
+    out = parse_api_responses([response])
+    # 2 unit rows + 2 unmatched plans with null rent = 4.
+    assert len(out) == 4
+    plan_rows = [r for r in out if not r.get("unit_number")]
+    assert len(plan_rows) == 2
+    for r in plan_rows:
+        # No unit_number (would route to ``units``). Picker emits empty
+        # string when no key resolved; check truthiness.
+        assert not r.get("unit_number"), (
+            f"plan row leaked unit_number={r.get('unit_number')!r}"
+        )
+        assert not r.get("availability_date")
+        assert (r.get("availability_status") or "") == ""
+
+
+def test_merge_no_unmatched_plans_when_every_plan_referenced() -> None:
+    """Backwards-compat: when every plan is FK-referenced by at least
+    one unit, the unmatched-plan appender is a no-op. Pre-Gap-1
+    behaviour is preserved exactly."""
+    plans = [
+        {"id": "p1", "name": "1Bed A", "bedrooms": 1, "area": 800,
+         "minRent": 1700},
+        {"id": "p2", "name": "2Bed B", "bedrooms": 2, "area": 1100,
+         "minRent": 2400},
+    ]
+    units = [
+        {"name": "101", "layoutId": "p1", "displayPrice": "1800",
+         "availableOn": "2026-06-01"},
+        {"name": "201", "layoutId": "p2", "displayPrice": "2500",
+         "availableOn": "2026-06-05"},
+    ]
+    merged = _merge_units_with_plans(units, plans, "layoutId")
+    assert len(merged) == 2
+    assert all(r.get("unit_number") for r in merged)
+
+
+def test_merge_plan_with_only_id_field_not_emitted() -> None:
+    """Defensive: a plan stub with NO meaningful attributes beyond its
+    PK (deleted-but-not-purged) is appended to the merge output, but
+    the picker drops it via the existing ``skipped_no_fields`` gate at
+    ``_api_parser.py`` line 1193. Round-trip is safe — only real rows
+    survive ``parse_api_responses``."""
+    plans = [
+        {"id": "p1", "name": "1Bed A", "bedrooms": 1, "area": 800,
+         "minRent": 1700},
+        {"id": "p2"},  # empty stub
+    ]
+    units = [
+        {"name": "101", "layoutId": "p1", "displayPrice": "1800",
+         "availableOn": "2026-06-01", "bedrooms": 1, "area": 800},
+        {"name": "102", "layoutId": "p1", "displayPrice": "1850",
+         "availableOn": "2026-06-15", "bedrooms": 1, "area": 800},
+    ]
+    response = {
+        "url": "https://example.com/api/inventory",
+        "content_type": "application/json",
+        "body": {"units_data": {"layouts": plans, "units": units}},
+    }
+    out = parse_api_responses([response])
+    # 2 unit rows; the empty plan stub is dropped by the picker's
+    # skipped_no_fields gate.
+    assert len(out) == 2
+    assert sorted(r["unit_number"] for r in out) == ["101", "102"]
+
+
+def test_merge_pct_complete_falls_below_stop_floor() -> None:
+    """The planner-completeness side-effect (Gap 2 fallout): when
+    unmatched plans are appended, the resulting row mix has split
+    identity coverage. Plan rows lack ``unit_number`` → ``pct_with_identity``
+    drops → ``pct_complete`` drops below the 0.90 STOP floor in
+    ``source_planner.plan_next_action``.
+
+    Pre-Gap-1 the 2 merged units had pct_complete=1.0 → STOP; post-Gap-1
+    the 8 rows have pct_complete ≈ 2/8 = 0.25 → planner escalates.
+    """
+    plans = [
+        {"id": f"p{i}", "name": f"Plan {i}", "bedrooms": 1, "bathrooms": 1,
+         "area": 700 + i * 50, "minRent": 1500 + i * 100,
+         "maxRent": 1700 + i * 100}
+        for i in range(1, 8)  # 7 plans, p1..p7
+    ]
+    units = [
+        {"name": "101", "layoutId": "p2", "displayPrice": "1800",
+         "availableOn": "2026-06-01", "availability_status": "AVAILABLE",
+         "bedrooms": 1, "bathrooms": 1, "area": 750},
+        {"name": "203", "layoutId": "p2", "displayPrice": "1850",
+         "availableOn": "2026-06-15", "availability_status": "AVAILABLE",
+         "bedrooms": 1, "bathrooms": 1, "area": 750},
+    ]
+    response = {
+        "url": "https://doorway-api.knockrentals.com/v1/property/268552/units",
+        "content_type": "application/json",
+        "body": {"units_data": {"layouts": plans, "units": units}},
+    }
+    out = parse_api_responses([response])
+
+    def _to_planner_row(r: dict) -> dict:
+        rent_range = r.get("rent_range") or ""
+        rent_low: int | None = None
+        rent_high: int | None = None
+        if rent_range:
+            digits = "".join(c if c.isdigit() else " "
+                             for c in rent_range).split()
+            if digits:
+                rent_low = int(digits[0])
+                rent_high = int(digits[-1])
+        return {
+            "unit_id": r.get("unit_number"),
+            "unit_number": r.get("unit_number"),
+            "floor_plan_name": r.get("floor_plan_name"),
+            "beds": r.get("bedrooms"),
+            "baths": r.get("bathrooms"),
+            "area": r.get("sqft"),
+            "rent_low": rent_low,
+            "rent_high": rent_high,
+            "available_date": r.get("availability_date"),
+            "availability_status": r.get("availability_status"),
+        }
+
+    rows = [_to_planner_row(r) for r in out]
+    report = evaluate_completeness(rows)
+
+    # 8 rows (2 units on p2 + 6 unmatched plans). 2 carry identity.
+    assert report.n_units == 8
+    assert report.pct_with_identity == pytest.approx(2 / 8, abs=0.01)
+    assert report.pct_complete <= report.pct_with_identity + 1e-9
+    decision = plan_next_action(
+        report,
+        sources_already_run=set(),
+        budget_remaining={"link_hop": 1, "llm_monolithic": 1,
+                          "llm_api_calls": 1, "llm_dom_calls": 1},
+        pms_name="unknown",
+    )
+    assert decision.action != "STOP", (
+        f"planner STOPPED prematurely on FK-merged result "
+        f"({report.n_units} rows, pct_complete={report.pct_complete:.2f}); "
+        f"Gap 2 regression — got Decision({decision})"
+    )

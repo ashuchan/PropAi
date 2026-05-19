@@ -1142,6 +1142,24 @@ _PORTAL_URL_PATTERNS: tuple[tuple[str, str], ...] = (
     # returns the unit JSON directly. Routed through the existing SightMap
     # adapter which is body-shape-aware.
     ("sightmap.com/app/api", "sightmap"),
+    # D22 (2026-05-19): RealPage WebServices v2 REST endpoint. Synthesised
+    # from the OneSite iframe URL — see ``_INLINE_JS_INIT_PATTERNS`` D22
+    # in scraper.py. Distinct from the ``onlineleasing.realpage.com`` host
+    # which is the SPA shell; ``api.ws.realpage.com/v2/property/{id}/...``
+    # returns unit JSON. Routed through OneSiteAdapter / RealPageOllAdapter
+    # which are body-shape-aware.
+    ("api.ws.realpage.com/v2/property", "realpage_oll"),
+    # D24 (2026-05-19): G5 Marketing Cloud inventory REST endpoint.
+    # Synthesised from the ``floor-plans-plus-config`` widget JSON — see
+    # ``_INLINE_JS_INIT_PATTERNS`` D24 in scraper.py. The bare host
+    # ``g5marketingcloud.com`` is on the infra blacklist below (line ~1289)
+    # to prevent the 6th-pass unknown-portal scan from queueing G5 marketing
+    # widget assets; explicitly allow-listing the ``inventory.`` subdomain
+    # here means the synthesised URL still routes via the known-portal pass
+    # (which takes precedence over the blacklist for specific subdomain
+    # matches). PID 75340 liveatvcu.com canonical + the Landmark Properties /
+    # Cardinal Group portfolios.
+    ("inventory.g5marketingcloud.com", "g5_marketing_cloud"),
 )
 
 
@@ -1638,6 +1656,20 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
     # data-js-hook="apartment" + data-unit-id / data-apartment-id attrs.
     "a[data-js-hook='apartment']",
     ".apartments__card",
+    # D23 (2026-05-19): Equity Apartments per-unit availability tiles.
+    # PID 55910 1111-belle-pre canonical — 29 tiles each carrying unit#,
+    # rent ($1,980), sqft (607), beds/baths, and "Available {date}" text.
+    # Tile DOM shape: `<div class="unit-availability-tile" data-availability=...>`
+    # under the `#unit-availability-tile` anchor on the property page.
+    # Pre-fix, dom_scan fell through to ``.apartment``/``.listing`` and
+    # captured 49 marketing-card noise dicts (no rent), all of which got
+    # demoted to plan_summaries by classify(). Adding these selectors at
+    # high specificity steers dom_scan to the real per-unit data first.
+    # Cohort: every Equity Apartments property template (hundreds in CSV).
+    ".unit-availability-tile",
+    "[data-availability]",
+    "div[class*='availability-tile']",
+    "div[class*='unit-tile']",
     # Brook-style apartment card (PID 3483): `<div class="card">` wrapping
     # `<h3>Apartment: <span># NNNNNN</span></h3>` blocks. Scoped to the
     # availability container `#availApts` so we don't pick up unrelated
@@ -1711,6 +1743,58 @@ _UNIT_NUM_PATTERN = re.compile(
     r"(?:unit|apt|apartment|#)\s*#?\s*([A-Za-z0-9][A-Za-z0-9\-]{0,10})",
     re.IGNORECASE,
 )
+# D23b (2026-05-19): availability-status detection from container text.
+# Pre-fix, ``_container_yields_unit`` hard-coded ``availability_status: "AVAILABLE"``
+# on every match — a false attribution when the regex only saw bed/bath/sqft.
+# The agent's 2026-05-19 forensic on PID 55910 (equityapartments) confirmed
+# this masks the real reason a row got demoted (missing rent), making future
+# rent-path regressions harder to diagnose. The replacement keeps backward
+# compatibility for the common case (card present with rent ⇒ AVAILABLE)
+# while admitting two new derived states:
+#   • UNAVAILABLE when the card text explicitly says so
+#   • UNKNOWN when the text is silent AND rent is absent (covers marketing
+#     aggregate cards that lack both unit identity and price)
+_UNAVAILABLE_TEXT_RE = re.compile(
+    r"\b(?:un(?:available|leased)|waitlist(?:ed)?|leased(?:\s+up)?|sold[\s\-]?out"
+    r"|not\s+available|coming\s+soon|on\s+request|join\s+(?:the\s+)?wait[\s\-]?list)"
+    r"\b",
+    re.IGNORECASE,
+)
+_AVAILABLE_TEXT_RE = re.compile(
+    r"\b(?:available(?:\s+now|\s+immediately)?|now\s+leasing|now\s+available"
+    r"|ready\s+now|move[\s\-]?in[\s\-]?ready|currently\s+available"
+    r"|available\s+(?:on|starting|from|after))\b",
+    re.IGNORECASE,
+)
+
+
+def _detect_availability_status(text: str, has_rent: bool) -> str:
+    """Infer ``availability_status`` from container text.
+
+    Three-state output: ``AVAILABLE`` / ``UNAVAILABLE`` / ``UNKNOWN``. Pure
+    function — no side-effects, no DOM access.
+
+    Decision order (specific-first):
+      1. Explicit UNAVAILABLE phrase wins, even when rent is also present
+         (an UNAVAILABLE unit with a rent quote should not be admitted as
+         available inventory).
+      2. Explicit AVAILABLE phrase ⇒ AVAILABLE.
+      3. No explicit phrase BUT rent is present ⇒ AVAILABLE. Most PMS
+         templates only render rent on cards for available units; absent
+         this fallback the §8.20 AVAILABLE+rent promotion would never
+         fire for sites whose card text doesn't include the word
+         "available" (which is most of them — see RentCafe option-row).
+      4. Otherwise ⇒ UNKNOWN. The row will reach ``classify()`` and get
+         routed to ``plan_summaries`` unless it carries a per-unit
+         identity signal.
+    """
+    if not text:
+        return "UNKNOWN" if not has_rent else "AVAILABLE"
+    if _UNAVAILABLE_TEXT_RE.search(text):
+        return "UNAVAILABLE"
+    if _AVAILABLE_TEXT_RE.search(text):
+        return "AVAILABLE"
+    return "AVAILABLE" if has_rent else "UNKNOWN"
 # Stop-words that appear directly after the regex anchors ("apartment Details",
 # "apartment with", "apartment for", "apartment Bed") in marketing prose. The
 # regex captures the next 1–11-char token regardless of meaning, so without
@@ -1852,6 +1936,8 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
     unit_num_raw = m_unit.group(1) if m_unit else ""
     unit_num = unit_num_raw if _is_valid_unit_number(unit_num_raw) else ""
 
+    # D23b (2026-05-19): infer status from text instead of hard-coding AVAILABLE.
+    avail_status = _detect_availability_status(text, has_rent=rent_lo is not None)
     return {
         "floor_plan_name": "",
         "bed_label": f"{beds_val}BR" if beds_val and beds_val != "0" else ("Studio" if is_studio else ""),
@@ -1866,7 +1952,7 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
         "market_rent_high": rent_hi,
         "deposit": "",
         "concession": "",
-        "availability_status": "AVAILABLE",
+        "availability_status": avail_status,
         "available_units": "",
         "availability_date": "",
         "extraction_tier": "TIER_3_DOM",

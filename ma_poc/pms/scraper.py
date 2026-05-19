@@ -1784,6 +1784,92 @@ _INLINE_JS_INIT_PATTERNS: list[tuple[re.Pattern[str], str, "Callable[[str], str 
         "realpage_oll",
         lambda k: f"https://{k}.onlineleasing.realpage.com/",
     ),
+    # D24 (2026-05-19): G5 Marketing Cloud floor-plans-plus widget config.
+    # PID 75340 liveatvcu.com canonical (also: Landmark Properties, Cardinal
+    # Group, the wider G5 SaaS platform). The G5 widget ships as:
+    #   <script id="floor-plans-plus-config" type="application/json">
+    #   {"widgetId": "...",
+    #    "locationUrn": "g5-cl-1nmaxwdhcg-landmark-property-services-inc-richmond-va",
+    #    "inventoryHost": "https://inventory.g5marketingcloud.com", ...}
+    #   </script>
+    # Real per-unit data lives at the inventory API endpoint:
+    #   {inventoryHost}/api/v1/apartment_complexes/{locationUrn}/floorplans
+    # This shape is documented by 2026-05-09 ``config/profiles/61377.json``
+    # which a prior Tier-4 LLM extraction discovered and persisted as a
+    # ``known_endpoints`` entry — confirming the URL pattern empirically.
+    #
+    # Pre-fix, cold-run G5 properties (no profile) had no path to the
+    # inventory host. ``g5marketingcloud.com`` is even on the
+    # ``_PORTAL_INFRA_BLACKLIST`` (line 1289 of _html_extract.py) so the
+    # 6th-pass unknown-portal discovery filtered it out. The companion
+    # ``inventory.g5marketingcloud.com`` ``_PORTAL_URL_PATTERNS`` entry
+    # whitelists the explicit inventory subdomain so the synthesised URL
+    # routes via the known-portal allow-list (which takes precedence over
+    # the blacklist for hosts that match it specifically).
+    #
+    # Two patterns — keys can appear in either order in the JSON. The host
+    # capture uses ``[^"\']+`` so a trailing slash (common in JSON URL values)
+    # doesn't break the match; the lambda normalises with ``rstrip('/')``.
+    (
+        re.compile(
+            r'["\']locationurn["\']\s*[:=]\s*["\'](g5-cl-[\w-]{8,})["\']'
+            r'[\s\S]{0,1200}?'
+            r'["\']inventoryhost["\']\s*[:=]\s*["\'](https?://[^"\']+)["\']',
+            re.IGNORECASE,
+        ),
+        "g5_marketing_cloud",
+        lambda urn, host: (
+            f"{host.rstrip('/')}/api/v1/apartment_complexes/{urn}/floorplans"
+        ),
+    ),
+    (
+        # Reverse order — inventoryHost before locationUrn in source.
+        re.compile(
+            r'["\']inventoryhost["\']\s*[:=]\s*["\'](https?://[^"\']+)["\']'
+            r'[\s\S]{0,1200}?'
+            r'["\']locationurn["\']\s*[:=]\s*["\'](g5-cl-[\w-]{8,})["\']',
+            re.IGNORECASE,
+        ),
+        "g5_marketing_cloud",
+        lambda host, urn: (
+            f"{host.rstrip('/')}/api/v1/apartment_complexes/{urn}/floorplans"
+        ),
+    ),
+    # D22 (2026-05-19): RealPage OneSite iframe URL → direct REST API URL.
+    # PIDs 245526 thebridgewaterapartments.com and 18736 centralparkmontgomery.com
+    # both ship `{propid}.onlineleasing.realpage.com/#k=...` iframes. The hash
+    # fragment routes the SPA client-side so a static Playwright fetch of the
+    # iframe returns only the 58-64 KB SPA shell — the per-unit XHR to
+    # `api.ws.realpage.com/v2/property/{propid}/floorplans` never fires.
+    # The numeric propid IS visible 3-10x in the marketing-site HTML
+    # (subdomain of the iframe URL). Synthesizing the REST endpoint and queueing
+    # it alongside the iframe gives the OneSite + RealPageOLL adapters a
+    # body-shape-aware response to parse. When the API is publicly reachable
+    # the cascade ships unit data; when 401, the adapter falls back gracefully
+    # to the iframe hop (existing behaviour, no regression).
+    #
+    # Synthesises BOTH the iframe host (existing capability) and the v2
+    # floorplans REST URL — fan-out is supported by the dispatch loop at
+    # ``_scan_inline_js_pms_init`` (returns ``list[str]`` for one regex hit).
+    #
+    # NOTE: the agent's 2026-05-19 forensic verified live-fetch of
+    # `api.ws.realpage.com/v2/property/1834846/floorplans` returns 401 without
+    # an auth header. The OneSite SPA learns its per-tenant ``x-ws-authkey``
+    # from its bundle at runtime. Residential-proxy + shared-context capture
+    # is the production path. This synth gets the URL into the queue so the
+    # adapter's passive XHR listener has the canonical endpoint to match
+    # against, regardless of whether the auth-flow succeeds today.
+    (
+        re.compile(
+            r'\b(\d{6,})\.onlineleasing\.realpage\.com',
+            re.IGNORECASE,
+        ),
+        "realpage_oll",
+        lambda k: [
+            f"https://{k}.onlineleasing.realpage.com/",
+            f"https://api.ws.realpage.com/v2/property/{k}/floorplans",
+        ],
+    ),
     # Funnel / FortressTech — UUID-style portal IDs embedded in JS state.
     # The UUID is the property-specific portal address.
     (
@@ -2476,7 +2562,17 @@ def _rank_internal_links(
             continue
         lower = href.lower()
         if any(skip in lower for skip in _LINK_SKIP_PATTERNS):
-            continue
+            # D25 (2026-05-19): WordPress admin-ajax carve-out. The
+            # ``/wp-admin/`` skip pattern was added 2026-05-16 to drop
+            # Yardi marketing-shell asset paths (/wp-content, /wp-json,
+            # /wp-admin/edit.php etc.), but it also blanket-rejects the
+            # ``wp-admin/admin-ajax.php?action=<X>`` pattern that several
+            # WordPress-CMS-backed property sites (Beacon Management,
+            # similar) use to serve apartment availability JSON / HTML.
+            # Anchor URLs with explicit ``action=`` query params are real
+            # AJAX endpoints, not theme-asset noise — let them through.
+            if not ("wp-admin/admin-ajax.php" in lower and "action=" in lower):
+                continue
 
         # Resolve relative → absolute. Use landed_url as the base when the
         # entry page redirected to a different host so relative anchors
