@@ -64,6 +64,7 @@ PmsName = Literal[
     "rentmanager",
     "rentvision",
     "residentservices365",
+    "encoreskyline_template",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -104,6 +105,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "rentmanager": "api_first",
     "rentvision": "dom_first",
     "residentservices365": "dom_first",
+    "encoreskyline_template": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -551,6 +553,24 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             0.85,
             ["RentVision CMS marker in HTML (created/powered by RentVision / rentvision.com)"],
         )
+    # Encoreskyline-template marketing family driven by the Jonah Digital /
+    # MeetElise widget. Per-plan /floorplans/{slug}/ pages render real
+    # apartment-level rows only after a Check-Availability JS click;
+    # adapter handles the per-plan interaction. 2026-05-19 deep probe —
+    # encoreskyline.com / geneseepointe.com / highlineaustin.com verified.
+    if (
+        "jonahwidget" in h
+        or "jonahdigital" in h
+        or "meetelise" in h
+    ):
+        return (
+            "encoreskyline_template",
+            0.85,
+            [
+                "Jonah Digital / MeetElise widget marker in HTML "
+                "(JonahWidget / jonahdigital / meetelise)"
+            ],
+        )
     if (
         "nestiolistings.com" in h
         or "nestio_" in h
@@ -777,6 +797,7 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "g5": ("g5marketingcloud", "g5dxm.com", "g5-c-"),
     "rentvision": ("created by rentvision", "powered by rentvision", "rentvision.com"),
     "residentservices365": ("365residentservices.com",),
+    "encoreskyline_template": ("jonahwidget", "jonahdigital", "meetelise"),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
     "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
     "rentmanager": (

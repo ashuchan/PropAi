@@ -12,6 +12,9 @@ from ma_poc.pms.adapters.apts247 import Apts247Adapter
 from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
 from ma_poc.pms.adapters.cortland import CortlandAdapter
+from ma_poc.pms.adapters.encoreskyline_template import (
+    EncoreSkylineTemplateAdapter,
+)
 from ma_poc.pms.adapters.entrata import EntrataAdapter
 from ma_poc.pms.adapters.equity import EquityAdapter
 from ma_poc.pms.adapters.essex import EssexAdapter
@@ -77,6 +80,7 @@ def _bootstrap_registry() -> None:
         SpherexxAdapter,
         KnockAdapter,
         G5Adapter,
+        EncoreSkylineTemplateAdapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,

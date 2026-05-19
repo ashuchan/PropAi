@@ -37,20 +37,42 @@ class SquarespaceNoPmsAdapter:
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Squarespace shells are usually no-PMS — but a sizable minority
         embed an AppFolio listings widget one labelled-nav hop deep. Try
-        that recovery before declaring syndication_only.
+        that recovery first, then a PMS-portal-hop (ResMan / RentCafe
+        SecureCafe) as a second-chance recovery, before declaring
+        syndication_only.
         """
+        from ma_poc.extraction.post_process import post_process
         from ma_poc.pms.adapters._appfolio_embed import recover_appfolio_embed
+        from ma_poc.pms.adapters._pms_portal_hop import recover_pms_portal
 
         units = await recover_appfolio_embed(page, ctx)
         if units:
-            from ma_poc.extraction.post_process import post_process
-
             pp = post_process(units, property_id=getattr(ctx, "property_id", None))
             if pp.n_admitted > 0:
                 return AdapterResult(
                     units=pp.admitted,
                     plan_summaries=pp.plan_summaries,
                     tier_used="TIER_1_DOM_APPFOLIO_SSR",
+                    confidence=min(0.95, 0.7 + 0.05 * pp.n_admitted),
+                )
+
+        # Second-chance: PMS portal one nav-hop deep (Resman/RentCafe SecureCafe).
+        # 2026-05-19 deep-probe finding — see _pms_portal_hop.py docstring.
+        portal_units = await recover_pms_portal(page, ctx)
+        if portal_units:
+            pp = post_process(
+                portal_units, property_id=getattr(ctx, "property_id", None)
+            )
+            if pp.n_admitted > 0:
+                tier = (
+                    str(portal_units[0].get("extraction_tier"))
+                    if portal_units[0].get("extraction_tier")
+                    else "TIER_1_PMS_PORTAL_HOP"
+                )
+                return AdapterResult(
+                    units=pp.admitted,
+                    plan_summaries=pp.plan_summaries,
+                    tier_used=tier,
                     confidence=min(0.95, 0.7 + 0.05 * pp.n_admitted),
                 )
 
