@@ -185,6 +185,76 @@ def test_detector_plain_squarespace_still_nopms() -> None:
     assert det.pms == "squarespace_nopms"
 
 
+# ── 2026-05-19 bot-block telemetry: 403 on the AppFolio fetch ─────────────
+
+
+class _StatusFakePage:
+    """Like ``_FakePage`` but the responses dict maps URL → ``{status, body}``
+    so the recovery's ``fetch_with_status`` JS-shim gets the new dict wire
+    format and can record bot-blocks.
+    """
+
+    def __init__(
+        self,
+        url: str,
+        live: list[str],
+        responses: dict[str, dict[str, object]],
+    ) -> None:
+        self.url = url
+        self._live = live
+        self._responses = responses
+
+    async def evaluate(self, _js: str, *args: object) -> object:
+        if not args:
+            return list(self._live)
+        u = str(args[0])
+        return self._responses.get(u, {"status": 0, "body": ""})
+
+
+@pytest.mark.asyncio
+async def test_recover_records_bot_block_when_appfolio_returns_403() -> None:
+    """If the AppFolio listings fetch is 403'd (DataDome / etc.), the
+    recovery returns ``[]`` BUT stamps a bot-block record on the ctx so
+    triage can distinguish 'routing-correct, bot-walled' from 'no signal'.
+    """
+    from ma_poc.pms.adapters._universal_recovery import get_blocks
+
+    page = _StatusFakePage(
+        url="https://www.brooksidejohnsoncreek.com/listings",
+        live=[_IFRAME_SRC],
+        responses={
+            _IFRAME_SRC: {"status": 403, "body": ""},
+            _IFRAME_CANON: {"status": 403, "body": ""},
+        },
+    )
+    ctx = _ctx("https://www.brooksidejohnsoncreek.com/")
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+    assert units == []
+    blocks = get_blocks(ctx)
+    assert len(blocks) >= 1
+    assert blocks[0]["recovery"] == "appfolio_embed"
+    assert blocks[0]["status"] == 403
+
+
+@pytest.mark.asyncio
+async def test_recover_no_bot_block_recorded_on_success() -> None:
+    """200 with parseable SSR markup must not stamp a bot-block."""
+    from ma_poc.pms.adapters._universal_recovery import get_blocks
+
+    page = _StatusFakePage(
+        url="https://www.brooksidejohnsoncreek.com/listings",
+        live=[_IFRAME_SRC],
+        responses={
+            _IFRAME_SRC: {"status": 200, "body": _APPFOLIO_SSR},
+            _IFRAME_CANON: {"status": 200, "body": _APPFOLIO_SSR},
+        },
+    )
+    ctx = _ctx("https://www.brooksidejohnsoncreek.com/")
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+    assert len(units) == 2
+    assert get_blocks(ctx) == []
+
+
 # ── 2026-05-19 regression: "schedule a showing" anchor → don't waste a fetch ──
 
 

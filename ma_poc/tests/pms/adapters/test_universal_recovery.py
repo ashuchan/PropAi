@@ -21,7 +21,10 @@ import pytest
 
 from ma_poc.pms.adapters._universal_recovery import (
     already_attempted,
+    get_blocks,
+    is_bot_block,
     mark_attempted,
+    mark_blocked,
     recover_universal_embed,
 )
 from ma_poc.pms.adapters.base import AdapterContext
@@ -220,6 +223,51 @@ async def test_flag_set_on_total_miss() -> None:
     # On a total miss there's no winner to record. The _embed_recovery_winner
     # attribute is intentionally left unset (None / missing).
     assert not getattr(ctx, "_embed_recovery_winner", None)
+
+
+# ── Bot-block telemetry ───────────────────────────────────────────────────
+
+
+def test_is_bot_block_classifier() -> None:
+    """Only 401/403/429/503 register as bot-walls. Real-world 502/504 are
+    transient upstream errors, not bot-walls, and aren't recorded so they
+    don't pollute the triage signal."""
+    for s in (401, 403, 429, 503):
+        assert is_bot_block(s) is True, f"expected {s} bot-block"
+    for s in (200, 301, 302, 400, 404, 500, 502, 504, 0):
+        assert is_bot_block(s) is False, f"unexpected {s} bot-block"
+
+
+def test_mark_blocked_records_observations() -> None:
+    """Records get accumulated and surfaced via ``get_blocks``."""
+    ctx = _ctx()
+    assert get_blocks(ctx) == []
+    mark_blocked(ctx, "appfolio_embed", "https://x.appfolio.com/listings", 403)
+    mark_blocked(ctx, "pms_portal_hop:rentcafe", "https://y.securecafe.com/...", 403)
+    blocks = get_blocks(ctx)
+    assert len(blocks) == 2
+    assert blocks[0]["recovery"] == "appfolio_embed"
+    assert blocks[0]["status"] == 403
+    assert blocks[1]["recovery"] == "pms_portal_hop:rentcafe"
+
+
+def test_mark_blocked_ignores_non_bot_block_statuses() -> None:
+    """A 200/404/500 isn't a bot-wall and must not pollute the block list."""
+    ctx = _ctx()
+    mark_blocked(ctx, "appfolio_embed", "https://x/y", 200)
+    mark_blocked(ctx, "appfolio_embed", "https://x/y", 404)
+    mark_blocked(ctx, "appfolio_embed", "https://x/y", 500)
+    assert get_blocks(ctx) == []
+
+
+def test_get_blocks_returns_copy() -> None:
+    """Caller mutations must not corrupt the on-ctx block list."""
+    ctx = _ctx()
+    mark_blocked(ctx, "leaseleads_embed", "https://api.leaseleads.co/", 429)
+    blocks = get_blocks(ctx)
+    blocks.clear()
+    # Internal state untouched
+    assert len(get_blocks(ctx)) == 1
 
 
 # ── Resilience: an exception in one recovery doesn't crash the chain ─────

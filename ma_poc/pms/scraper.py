@@ -1226,6 +1226,9 @@ async def scrape(
                 already_attempted as _ur_attempted,
             )
             from ma_poc.pms.adapters._universal_recovery import (
+                get_blocks as _ur_get_blocks,
+            )
+            from ma_poc.pms.adapters._universal_recovery import (
                 recover_universal_embed as _ur_recover,
             )
 
@@ -1247,6 +1250,28 @@ async def scrape(
                             0.92, 0.65 + 0.04 * _ur_post.n_admitted
                         )
                         fallback_chain.append(f"universal_recovery:{_ur_winner}")
+
+            # Bot-block telemetry: when a recovery sub-fetch hit a wall
+            # (401/403/429/503), record it on the fallback chain so DLQ/
+            # triage can distinguish "routing-correct but bot-walled,
+            # worth a proxy/Camoufox retry" from "no signal anywhere".
+            # Emitted regardless of whether the chain ultimately recovered
+            # units (an AppFolio block on a property that later resolved
+            # via generic_dom is still useful signal).
+            _ur_blocks = _ur_get_blocks(ctx)
+            if _ur_blocks:
+                # Deduplicate by (recovery, status) — one entry per
+                # unique block kind is enough for triage.
+                _seen: set[tuple[str, int]] = set()
+                for _b in _ur_blocks:
+                    _rec = str(_b.get("recovery") or "")
+                    _st = int(_b.get("status") or 0)
+                    if not _rec or not _st or (_rec, _st) in _seen:
+                        continue
+                    _seen.add((_rec, _st))
+                    fallback_chain.append(
+                        f"universal_recovery_blocked:{_rec}:{_st}"
+                    )
         except Exception as exc:
             adapter_result.errors.append(f"universal-recovery-error: {exc}")
 

@@ -48,6 +48,20 @@ log = logging.getLogger(__name__)
 
 
 _RECOVERY_FLAG_ATTR = "_embed_recovery_attempted"
+_RECOVERY_BLOCKS_ATTR = "_embed_recovery_blocks"
+
+# HTTP status codes that indicate the response was intercepted by a bot-wall
+# (DataDome, Akamai, Cloudflare, IIS bot-protection) rather than a genuine
+# "no resource" / "no data" outcome. Recording these separately from "empty
+# body" lets downstream telemetry distinguish a misroute (no embed anywhere)
+# from a routing-correct-but-blocked recovery (residential proxy + Camoufox
+# may flip the same probe to a HIT in production).
+_BOT_BLOCK_STATUSES: frozenset[int] = frozenset({401, 403, 429, 503})
+
+
+def is_bot_block(status: int) -> bool:
+    """True when *status* indicates a bot-wall intercept (not a genuine empty)."""
+    return status in _BOT_BLOCK_STATUSES
 
 
 def already_attempted(ctx: AdapterContext) -> bool:
@@ -66,6 +80,38 @@ def mark_attempted(ctx: AdapterContext, winning_recovery: str = "") -> None:
             ctx._embed_recovery_winner = winning_recovery  # type: ignore[attr-defined]
     except Exception:  # pragma: no cover — defensive
         pass
+
+
+def mark_blocked(
+    ctx: AdapterContext, recovery: str, url: str, status: int
+) -> None:
+    """Record that a recovery sub-fetch hit a bot-wall (HTTP 401/403/429/503).
+    The scraper reads ``ctx._embed_recovery_blocks`` after the chain runs and
+    appends ``universal_recovery_blocked:<recovery>:<status>`` entries to
+    ``fallback_chain`` so DLQ/triage can distinguish bot-walled-but-routing-
+    correct cases (worth retrying with proxy/Camoufox) from genuine no-signal
+    misses.
+    """
+    if not is_bot_block(status):
+        return
+    try:
+        existing = getattr(ctx, _RECOVERY_BLOCKS_ATTR, None)
+        if not isinstance(existing, list):
+            existing = []
+            setattr(ctx, _RECOVERY_BLOCKS_ATTR, existing)
+        existing.append({"recovery": recovery, "url": url, "status": int(status)})
+    except Exception:  # pragma: no cover — defensive
+        pass
+
+
+def get_blocks(ctx: AdapterContext) -> list[dict[str, object]]:
+    """Return the list of bot-block observations recorded on *ctx* during
+    the recovery chain. Empty list when nothing was blocked.
+    """
+    blocks = getattr(ctx, _RECOVERY_BLOCKS_ATTR, None)
+    if not isinstance(blocks, list):
+        return []
+    return list(blocks)
 
 
 async def recover_universal_embed(
