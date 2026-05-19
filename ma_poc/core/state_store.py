@@ -211,6 +211,12 @@ class StateStore:
                 "market_rent_low": u.get("market_rent_low"),
                 "market_rent_high": u.get("market_rent_high"),
                 "available_date": u.get("available_date"),
+                # Producer's literal availability string. Falls back to
+                # the gate-stashed ``_date_placeholder`` so unparseable
+                # producer values (``"Available 7/24"``, ``"Late August"``)
+                # survive the state-store hop.
+                "available_date_raw": u.get("available_date_raw")
+                    or u.get("_date_placeholder"),
                 "concessions": u.get("concessions"),
                 # Extended fields — read both canonical and _-prefixed names.
                 "bedrooms": _first_not_none(u, "bedrooms", "_bedrooms"),

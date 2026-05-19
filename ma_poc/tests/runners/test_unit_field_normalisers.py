@@ -348,3 +348,81 @@ def test_v2_unit_explicit_status_overrides_inference() -> None:
     out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
     assert out["available_date"] == "2026-08-01"
     assert out["availability_status"] == "UNAVAILABLE"  # mapped from "Reserved"
+
+
+# ── 2026-05-19 (R1) — available_date_raw surfacing ────────────────────────────
+
+
+def test_v2_unit_emits_available_date_raw_for_parseable_string() -> None:
+    """Parseable producer string: ``available_date`` is ISO,
+    ``available_date_raw`` preserves the literal (whitespace-collapsed)."""
+    unit = {
+        "unit_id": "4425",
+        "bedrooms": 2, "bathrooms": 1.0, "sqft": 987,
+        "market_rent_low": 2460,
+        "available_date": "Available 7/4/26",
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
+    assert out["available_date"] == "2026-07-04"
+    assert out["available_date_raw"] == "Available 7/4/26"
+
+
+def test_v2_unit_falls_back_to_date_placeholder_for_raw() -> None:
+    """When the schema gate has already nulled ``available_date`` and
+    stashed the literal in ``_date_placeholder``, the v2 formatter
+    surfaces the placeholder as ``available_date_raw``.
+    """
+    unit = {
+        "unit_id": "9821",
+        "bedrooms": 1, "bathrooms": 1.0, "sqft": 650,
+        "market_rent_low": 1800,
+        "available_date": None,
+        "_date_placeholder": "Available 7/24",  # year ambiguous — gate nulled it
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
+    assert out["available_date"] is None  # parser still can't infer a year
+    assert out["available_date_raw"] == "Available 7/24"
+
+
+def test_v2_unit_collapses_internal_whitespace_in_raw() -> None:
+    """DOM-injected ``\\n\\t`` runs are collapsed to single spaces so
+    Postgres' VARCHAR(64) limit isn't burned on whitespace."""
+    unit = {
+        "unit_id": "1137",
+        "bedrooms": 1, "bathrooms": 1.0, "sqft": 726,
+        "market_rent_low": 2025,
+        "available_date": "Avail.\n\t\t\tNow",
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
+    assert out["available_date_raw"] == "Avail. Now"
+
+
+def test_v2_unit_raw_none_when_no_signal() -> None:
+    """No producer date in any slot → ``available_date_raw`` is None,
+    not empty string. Distinguishes "not extracted" from "explicitly
+    empty"."""
+    unit = {
+        "unit_id": "0001",
+        "bedrooms": 1, "bathrooms": 1.0, "sqft": 700,
+        "market_rent_low": 1500,
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
+    assert out["available_date"] is None
+    assert out["available_date_raw"] is None
+
+
+def test_v2_unit_prefers_available_date_over_placeholder() -> None:
+    """When the gate already normalised, the typed column is the
+    canonical source — ``available_date_raw`` reflects the original
+    pre-normalisation string.
+    """
+    unit = {
+        "unit_id": "5400",
+        "bedrooms": 2, "bathrooms": 2.0, "sqft": 1100,
+        "market_rent_low": 2800,
+        "available_date": "2026-06-15",  # already normalised by upstream
+        "available_date_raw": "Available 6/15/26",  # the original
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
+    assert out["available_date"] == "2026-06-15"
+    assert out["available_date_raw"] == "Available 6/15/26"

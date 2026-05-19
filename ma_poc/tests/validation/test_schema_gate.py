@@ -105,8 +105,112 @@ def test_schema_routes_unparseable_string_date_to_placeholder() -> None:
     result = check(_valid_record(availability_date="not-a-date"), property_id="P1")
     assert result.accepted is not None
     assert result.accepted.get("_date_placeholder") == "not-a-date"
+    assert result.accepted.get("available_date_raw") == "not-a-date"
     assert result.accepted.get("availability_date") is None
     assert "INVALID_DATE_FORMAT" not in (result.rejection_reasons or [])
+
+
+# ── 2026-05-19 (R2) — gate calls the lenient parser ─────────────────────────
+
+
+def test_schema_gate_normalises_appfolio_available_prefix() -> None:
+    """``"Available 7/4/26"`` reaches the gate from AppFolio raw extract.
+    Pre-R2 the gate nulled it (strict ISO check). Post-R2 it normalises
+    in place to ``"2026-07-04"`` AND preserves the producer literal in
+    ``available_date_raw``.
+    """
+    result = check(
+        _valid_record(availability_date="Available 7/4/26"),
+        property_id="P1",
+    )
+    assert result.accepted is not None
+    assert result.accepted.get("availability_date") == "2026-07-04"
+    assert result.accepted.get("available_date") == "2026-07-04"
+    assert result.accepted.get("available_date_raw") == "Available 7/4/26"
+    # No placeholder stash needed — parser succeeded.
+    assert result.accepted.get("_date_placeholder") is None
+
+
+def test_schema_gate_normalises_date_colon_prefix() -> None:
+    """Funnel emits ``"Date: 5/22/2026"``; gate normalises and keeps raw."""
+    result = check(
+        _valid_record(availability_date="Date: 5/22/2026"),
+        property_id="P1",
+    )
+    assert result.accepted is not None
+    assert result.accepted.get("available_date") == "2026-05-22"
+    assert result.accepted.get("available_date_raw") == "Date: 5/22/2026"
+
+
+def test_schema_gate_normalises_weekday_prefix() -> None:
+    """RealPage emits ``"Tuesday June 23 2026"``."""
+    result = check(
+        _valid_record(availability_date="Tuesday June 23 2026"),
+        property_id="P1",
+    )
+    assert result.accepted is not None
+    assert result.accepted.get("available_date") == "2026-06-23"
+    assert result.accepted.get("available_date_raw") == "Tuesday June 23 2026"
+
+
+def test_schema_gate_writes_back_to_both_aliases() -> None:
+    """The gate keeps ``available_date`` and ``availability_date`` in
+    sync after normalisation so downstream readers that pick either alias
+    see the same value.
+    """
+    result = check(
+        _valid_record(available_date="Available 6/10/26"),
+        property_id="P1",
+    )
+    assert result.accepted is not None
+    assert result.accepted.get("available_date") == "2026-06-10"
+    assert result.accepted.get("availability_date") == "2026-06-10"
+
+
+def test_schema_gate_iso_passes_through_unchanged() -> None:
+    """Already-ISO input is a fixed point — the typed column reads back
+    the same value and ``available_date_raw`` captures the ISO string
+    as the producer's literal."""
+    result = check(
+        _valid_record(availability_date="2026-07-04"),
+        property_id="P1",
+    )
+    assert result.accepted is not None
+    assert result.accepted.get("available_date") == "2026-07-04"
+    assert result.accepted.get("available_date_raw") == "2026-07-04"
+
+
+def test_schema_gate_absent_token_nulls_typed_columns_keeps_raw() -> None:
+    """``"TBD"`` / ``"Call"`` carry intent "no date available". The
+    lenient parser returns None for them, which routes through the
+    placeholder code path — typed columns null, raw preserved, telemetry
+    fires. The placeholder telemetry doubles as "we saw an absent
+    token" signal; not worth a separate code path until we need it.
+    """
+    result = check(
+        _valid_record(availability_date="TBD"),
+        property_id="P1",
+    )
+    assert result.accepted is not None
+    assert result.accepted.get("available_date") is None
+    assert result.accepted.get("availability_date") is None
+    # Raw preserved for BI / analytics.
+    assert result.accepted.get("available_date_raw") == "TBD"
+    # ABSENT tokens flow through the placeholder path today — the gate
+    # doesn't distinguish them from format-mismatch. The stash is
+    # informational only (downstream consumers read ``available_date_raw``).
+    assert result.accepted.get("_date_placeholder") == "TBD"
+
+
+def test_schema_gate_empty_string_unchanged() -> None:
+    """Whitespace-only string is "absent" — leave the record alone."""
+    result = check(
+        _valid_record(availability_date="   "),
+        property_id="P1",
+    )
+    assert result.accepted is not None
+    # No mutation — the record's empty string passes through.
+    assert result.accepted.get("_date_placeholder") is None
 
 
 def test_schema_inferred_id_flagged_on_accept() -> None:

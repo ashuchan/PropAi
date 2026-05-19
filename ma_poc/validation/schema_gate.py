@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
 from typing import Any
 
 from ma_poc.core.identity import compute_fallback_unit_id
+from ma_poc.extraction.dates import format_loose_date
 from ma_poc.validation.unit_validity import is_valid_unit
 
 log = logging.getLogger(__name__)
@@ -204,29 +204,52 @@ def check(record: dict[str, Any], property_id: str) -> SchemaGateResult:
         except (ValueError, TypeError):
             pass
 
-    # F4: Date validation. Unparseable strings re-route as placeholder
-    # pass-through (null both aliases, stash original in _date_placeholder,
-    # emit telemetry). Non-string corrupted types still reject.
-    avail_date = record.get("availability_date") or record.get("available_date")
-    if avail_date is not None and isinstance(avail_date, str):
-        stripped = avail_date.strip()
-        if not stripped:
-            # Empty / whitespace-only string is "absent", not a placeholder.
-            # Pre-F4 behavior was the same; treat it like None.
-            pass
-        else:
-            parsed = False
-            try:
-                datetime.fromisoformat(stripped.replace("Z", "+00:00"))
-                parsed = True
-            except ValueError:
-                try:
-                    date.fromisoformat(stripped)
-                    parsed = True
-                except ValueError:
-                    parsed = False
-            if not parsed:
-                record = dict(record)
+    # F4: Date validation. Run the lenient shared parser
+    # (:func:`ma_poc.extraction.dates.format_loose_date`) — it accepts every
+    # producer shape observed in cloud-run telemetry (``"Available 7/4/26"``,
+    # ``"Date: 5/22/2026"``, ``"Available Now"``, weekday prefixes, ordinal
+    # suffixes, month-day without year, ...).
+    #
+    # Three outcomes:
+    #   * ISO-normalisable        → write back the canonical YYYY-MM-DD
+    #     into both ``available_date`` and ``availability_date`` so
+    #     downstream consumers see one shape regardless of which key the
+    #     producer used. Original is preserved in ``available_date_raw``
+    #     so analytics can still see the as-seen string.
+    #   * Recognised "absent" token (TBD/N-A/Call/...) → both keys null;
+    #     no placeholder telemetry because the producer's intent is
+    #     "no date", not "format mismatch".
+    #   * Unparseable               → both keys null AND
+    #     ``_date_placeholder`` stashed AND
+    #     ``DATE_PLACEHOLDER_OBSERVED`` emitted. The placeholder also
+    #     surfaces as ``available_date_raw`` on the way to the units
+    #     table so producers' literal strings are never lost.
+    #
+    # Pre-2026-05-19 the gate used a bare ``datetime.fromisoformat``
+    # check that nulled out 21K+ rows per day with parseable producer
+    # strings. The 2026-05-18 lenient parser shipped in the v2
+    # formatter *downstream* of this gate and so was inert in production.
+    avail_date_raw = record.get("availability_date") or record.get("available_date")
+    if avail_date_raw is not None and isinstance(avail_date_raw, str):
+        stripped = avail_date_raw.strip()
+        if stripped:
+            parsed = format_loose_date(stripped)
+            record = dict(record)
+            # Always carry the raw producer string forward. The v2
+            # formatter / state-store upsert reads this slot so a single
+                # column in Postgres preserves "what the website actually
+            # said" alongside the typed normalised form.
+            record["available_date_raw"] = stripped
+            if parsed is not None:
+                # Normalised in place — downstream sees one canonical
+                # shape regardless of producer.
+                record["available_date"] = parsed
+                record["availability_date"] = parsed
+            else:
+                # Producer string didn't match any supported format —
+                # placeholder pass-through. Keep the typed columns null
+                # so analytics that filter on ``available_date IS NOT NULL``
+                # don't trip on un-normalised garbage.
                 record["_date_placeholder"] = stripped
                 record["available_date"] = None
                 record["availability_date"] = None
@@ -241,7 +264,9 @@ def check(record: dict[str, Any], property_id: str) -> SchemaGateResult:
                     # Event module not yet upgraded with new EventKind.
                     # Anything else (TypeError, OSError) must surface.
                     pass
-    elif avail_date is not None and not isinstance(avail_date, str):
+        # else: empty / whitespace-only string is "absent", not a
+        # placeholder. Leave the record alone.
+    elif avail_date_raw is not None and not isinstance(avail_date_raw, str):
         # H7: non-string date values (corrupted types, ints) still reject.
         reasons.append("INVALID_DATE_FORMAT")
 

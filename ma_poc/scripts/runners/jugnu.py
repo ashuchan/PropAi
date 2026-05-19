@@ -52,6 +52,16 @@ except ImportError:
 # free, but module-level keeps the hot loop clean.
 from ma_poc.core.identity import assign_fallback_unit_id
 
+# Date parser + producer-token tables — single source of truth in
+# :mod:`ma_poc.extraction.dates`. Imported under the legacy underscore
+# names so the availability-status inference (~50K calls/run) reads
+# them as module-level locals without a re-lookup hop.
+from ma_poc.extraction.dates import (
+    DATE_NOW_TOKENS as _DATE_NOW_TOKENS,
+    DATE_PREFIX_RE as _DATE_PREFIX_RE,
+    format_loose_date as _format_loose_date_impl,
+)
+
 log = logging.getLogger("jugnu_runner")
 
 
@@ -1883,10 +1893,25 @@ def _format_v2_unit(
     # If the date normaliser resolved to today via the "Available Now"
     # token AND status is still empty, we have a strong AVAILABLE signal
     # — emit it so downstream gates see availability cleanly.
-    avail_date_norm = _format_date_str(unit.get("available_date"))
+    #
+    # The schema gate may have already normalised ``available_date`` to
+    # ISO and stashed the producer's literal in ``_date_placeholder`` /
+    # ``available_date_raw``. Fall back to whichever slot carries the
+    # original string when ``available_date`` itself is already None
+    # (e.g. unparseable producer values like "Available 7/24" where the
+    # year is missing).
+    raw_available_date = (
+        unit.get("available_date")
+        or unit.get("available_date_raw")
+        or unit.get("_date_placeholder")
+    )
+    # Re-run the lenient parser. If the gate already normalised, this
+    # passes the ISO value through; if the slot is still raw producer
+    # text, it gets one more chance to resolve before shipping null.
+    avail_date_norm = _format_date_str(raw_available_date)
     avail_status = _normalize_availability_status(
         avail_status_raw,
-        raw_available_date=unit.get("available_date"),
+        raw_available_date=raw_available_date,
         normalized_available_date=avail_date_norm,
         scrape_ts=scrape_ts,
     )
@@ -1902,6 +1927,26 @@ def _format_v2_unit(
         "rent_high": _format_rent(rent_hi_raw),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         "available_date": avail_date_norm,
+        # Producer's literal availability string, preserved verbatim
+        # (whitespace-stripped) regardless of whether ``available_date``
+        # resolved to ISO. Lets analytics / BI see "Available 7/24" or
+        # "Late August" even when the typed column had to be null.
+        # Clipped to the units.available_date_raw VARCHAR(64) limit at
+        # the storage layer; this layer keeps the full string.
+        #
+        # Priority order is "preserve what the upstream gave us":
+        #   1. An upstream-set ``available_date_raw`` — the schema gate or
+        #      an earlier formatter already captured the producer's literal.
+        #   2. The gate-stashed ``_date_placeholder`` — gate ran, parser
+        #      failed, placeholder is the only surviving original.
+        #   3. The ``available_date`` slot — typically already-normalised
+        #      ISO from the gate, but on adapter paths that bypass the
+        #      gate it may still be the raw producer string.
+        "available_date_raw": _normalize_raw_date(
+            unit.get("available_date_raw"),
+            unit.get("_date_placeholder"),
+            unit.get("available_date"),
+        ),
         "availability_status": avail_status,
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date_str(unit.get("move_in_date") or unit.get("_move_in_date")),
@@ -2605,108 +2650,40 @@ def _format_area(val: Any) -> int:
     return -1
 
 
-#: Words that producers prepend to availability dates without changing the
-#: underlying date semantics. Stripped before format-matching so AppFolio's
-#: ``"Available 7/4/26"`` and Entrata's ``"Move-in 8/21/26"`` both reduce to
-#: a plain date string. The leading word is consumed greedily;
-#: case-insensitive. Add new producers' phrasings here.
-_DATE_PREFIX_RE = _re.compile(
-    r"^(?:available|avail|move[\s\-_]?in|moveinday|moveindate|ready|"
-    r"availability|estimated|est\.?|approx\.?|approximate|opens?|open)"
-    r"[\s:\-]+",
-    _re.IGNORECASE,
-)
-
-#: Placeholder strings meaning "available immediately" — the producer is
-#: signalling that the unit is rentable today rather than dating a future
-#: move-in. These resolve to the scrape date (close-enough for analytics;
-#: the alternative is None which loses the AVAILABLE-now signal entirely).
-_DATE_NOW_TOKENS: frozenset[str] = frozenset({
-    "now", "today", "immediate", "immediately", "imm",
-    "asap", "ready now", "ready", "current", "currently",
-    "open now", "available now",
-})
-
-#: Placeholder strings that explicitly mean "no date available" — kept
-#: distinct from format-mismatch so the producer's intent isn't lost in
-#: logs. Both map to None (the v2 contract uses None for absent dates).
-_DATE_ABSENT_TOKENS: frozenset[str] = frozenset({
-    "n/a", "na", "tbd", "tba", "call", "contact", "inquire",
-    "unavailable", "unavail", "leased", "rented", "not available",
-    "coming soon", "wait list", "waitlist", "-", "--",
-})
-
-
 def _format_date_str(val: Any, *, today: date | None = None) -> str | None:
-    """Normalize a producer date string to YYYY-MM-DD. None if unparseable.
+    """Thin back-compat wrapper over :func:`ma_poc.extraction.dates.format_loose_date`.
 
-    Beyond the strict ISO / numeric ``m/d/Y`` shapes the previous
-    implementation handled, this accepts producer wrappings like
-    ``"Available 7/4/26"`` (AppFolio), ``"Move-in 8/21/2026"`` (Entrata),
-    ``"Available Now"`` / ``"Ready"`` / ``"Immediate"`` (resolved to
-    *today*'s date so the AVAILABLE-now signal isn't dropped), and 2-digit
-    years (``"7/4/26"`` -> 2026-07-04).
-
-    Args:
-        val: The raw value from the adapter. Any type; non-strings are
-            coerced via ``str(val)``.
-        today: Override for the "now" placeholder anchor — defaults to
-            ``datetime.now().date()``. Exposed for testing so the unit
-            tests can pin a deterministic anchor instead of asserting
-            against the wall clock.
-
-    Returns:
-        ISO YYYY-MM-DD string, or None if the value is empty / a known
-        "absent" placeholder / doesn't match any supported format.
+    Kept under the underscore-prefixed name because existing tests import
+    this symbol directly off the jugnu module. The implementation moved
+    to ``ma_poc.extraction.dates`` so the L4 schema gate can share it
+    without an upstream ``scripts``-import circularity.
 
     Origin: PID 67736 (live210main.com, AppFolio, 308 units) on
     2026-05-18 emitted ``"Available 7/4/26"`` for every available unit;
     the pre-fix function returned None for all of them so the v2 output
     shipped ``available_date=null`` despite the source having the data.
     """
-    if val is None or val == "":
-        return None
-    s = str(val).strip()
-    if not s:
-        return None
+    return _format_loose_date_impl(val, today=today)
 
-    # Strip producer prefix word (e.g. "Available ", "Move-in ").
-    s = _DATE_PREFIX_RE.sub("", s).strip()
-    if not s:
-        return None
 
-    s_lower = s.lower()
-    if s_lower in _DATE_ABSENT_TOKENS:
-        return None
-    if s_lower in _DATE_NOW_TOKENS:
-        anchor = today if today is not None else datetime.now().date()
-        return anchor.strftime("%Y-%m-%d")
+def _normalize_raw_date(*candidates: Any) -> str | None:
+    """Return the first candidate as a clean (whitespace-collapsed) string, or None.
 
-    # Strict ISO YYYY-MM-DD (already-normalised input — fast path).
-    if _re.match(r"^\d{4}-\d{2}-\d{2}$", s):
-        return s
-    if len(s) >= 10 and _re.match(r"^\d{4}-\d{2}-\d{2}", s):
-        return s[:10]
-
-    # Numeric m/d/Y and friends. Try 4-digit-year first (unambiguous),
-    # then 2-digit. ``%y`` interprets 00-68 as 2000-2068 and 69-99 as
-    # 1969-1999 per Python's strptime contract — good enough for
-    # property listings whose dates are always near-future.
-    for fmt in ("%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d", "%m-%d-%Y", "%Y-%m-%d",
-                "%m/%d/%y", "%d/%m/%y", "%m-%d-%y"):
-        try:
-            return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
-        except ValueError:
+    Used to populate ``available_date_raw`` on the V2 unit — preserves
+    the producer's literal availability string verbatim (apart from
+    whitespace normalisation) so analytics can see "Available 7/24",
+    "Late August", etc. even when the typed ``available_date`` had to
+    be null. Returns None when no candidate yields a non-empty string.
+    """
+    for c in candidates:
+        if c is None:
             continue
-
-    # Long-form ("July 4, 2026", "Jul 4 2026", "4 July 2026").
-    for fmt in ("%B %d, %Y", "%B %d %Y", "%b %d, %Y", "%b %d %Y",
-                "%d %B %Y", "%d %b %Y"):
-        try:
-            return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
-        except ValueError:
+        s = str(c).strip()
+        if not s:
             continue
-
+        # Collapse internal whitespace so DOM-injected ``\n\t`` runs
+        # don't bloat the column. Storage layer clips to 64 chars.
+        return _re.sub(r"\s+", " ", s)
     return None
 
 

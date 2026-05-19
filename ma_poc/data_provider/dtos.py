@@ -110,6 +110,10 @@ class UnitIndexEntry(BaseModel):
     rent_high: float | int | None = None
     date_captured: str | None = None
     available_date: str | None = None
+    # Producer's literal availability string (e.g. "Available 7/24",
+    # "Late August") — preserved verbatim when the typed
+    # ``available_date`` had to be null. Added 2026-05-19.
+    available_date_raw: str | None = None
     lease_term: int | None = None
     move_in_date: str | None = None
     concessions: Any = None
