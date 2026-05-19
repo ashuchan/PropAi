@@ -43,6 +43,9 @@ class SquarespaceNoPmsAdapter:
         """
         from ma_poc.extraction.post_process import post_process
         from ma_poc.pms.adapters._appfolio_embed import recover_appfolio_embed
+        from ma_poc.pms.adapters._generic_dom_floorplans import (
+            recover_generic_floorplans,
+        )
         from ma_poc.pms.adapters._leaseleads_embed import recover_leaseleads_embed
         from ma_poc.pms.adapters._pms_portal_hop import recover_pms_portal
 
@@ -89,6 +92,23 @@ class SquarespaceNoPmsAdapter:
                     plan_summaries=pp.plan_summaries,
                     tier_used=tier,
                     confidence=min(0.95, 0.7 + 0.05 * pp.n_admitted),
+                )
+
+        # Last-chance: generic SSR-DOM floor-plan fallback. Catches the
+        # custom-CMS long tail (one labelled nav-hop deep, repeated plan
+        # cards w/ bd/ba/sqft/$). Plan-level only; conservative thresholds
+        # against false positives.
+        generic_units, _ = await recover_generic_floorplans(page, ctx)
+        if generic_units:
+            pp = post_process(
+                generic_units, property_id=getattr(ctx, "property_id", None)
+            )
+            if pp.n_admitted > 0:
+                return AdapterResult(
+                    units=pp.admitted,
+                    plan_summaries=pp.plan_summaries,
+                    tier_used="TIER_3_DOM_GENERIC",
+                    confidence=min(0.85, 0.6 + 0.03 * pp.n_admitted),
                 )
 
         return AdapterResult(
