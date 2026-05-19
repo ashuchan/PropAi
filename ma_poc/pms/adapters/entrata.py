@@ -119,6 +119,28 @@ def parse_entrata_floorplans(items: list[dict[str, Any]], url: str) -> list[dict
         rent_lo = money_to_int(str(item.get("min_rent") or ""))
         rent_hi = money_to_int(str(item.get("max_rent") or ""))
         rent_range = format_rent_range(rent_lo, rent_hi)
+        # 2026-05-19: Entrata floorplan/availability items carry a move-in
+        # date the adapter previously dropped (fleet-wide 0% available_date
+        # on TIER_1_API_ENTRATA). Alias-tolerant + additive: empty when
+        # absent, so no existing output changes. schema_v2._format_date
+        # normalizes the value downstream.
+        avail_dt = next(
+            (
+                str(item[k])
+                for k in (
+                    "available_date",
+                    "availableDate",
+                    "availability_date",
+                    "move_in_date",
+                    "min_move_in_date",
+                    "date_available",
+                    "available_on",
+                    "first_available_date",
+                )
+                if item.get(k)
+            ),
+            "",
+        )
 
         units.append(
             make_unit_dict(
@@ -130,6 +152,7 @@ def parse_entrata_floorplans(items: list[dict[str, Any]], url: str) -> list[dict
                 unit_number=str(item.get("id") or ""),
                 rent_range=rent_range,
                 availability_status="AVAILABLE",
+                availability_date=avail_dt,
                 available_units="1",
                 source_api_url=url,
                 extraction_tier="TIER_1_API_ENTRATA",

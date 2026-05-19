@@ -72,6 +72,27 @@ def parse_realpage_floorplans(body: dict[str, Any], url: str) -> list[dict[str, 
 
         deposit = str(fp.get("depositAmount") or "")
         num_units = str(fp.get("numberOfUnitsDisplay") or "")
+        # 2026-05-19: OneSite floorplan objects sometimes carry a first-
+        # available date the adapter previously dropped (fleet-wide 0%
+        # available_date on TIER_1_API_ONESITE). Alias-tolerant + additive:
+        # empty when absent, so no existing output changes. schema_v2.
+        # _format_date handles "NOW"/relative/2-digit forms downstream.
+        avail_dt = next(
+            (
+                str(fp[k])
+                for k in (
+                    "availableDate",
+                    "firstAvailableDate",
+                    "dateAvailable",
+                    "minimumAvailableDate",
+                    "availabilityDate",
+                    "available_date",
+                    "minAvailableDate",
+                )
+                if fp.get(k)
+            ),
+            "",
+        )
 
         units.append(
             make_unit_dict(
@@ -84,6 +105,7 @@ def parse_realpage_floorplans(body: dict[str, Any], url: str) -> list[dict[str, 
                 rent_range=format_rent_range(rent_lo, rent_hi),
                 deposit=deposit,
                 availability_status="AVAILABLE",
+                availability_date=avail_dt,
                 available_units=num_units,
                 source_api_url=url,
                 extraction_tier="TIER_1_API_ONESITE",

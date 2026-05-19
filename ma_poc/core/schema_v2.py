@@ -520,6 +520,21 @@ def _format_date(val: Any) -> str | None:
     # If it's a datetime string, take just the date part (unchanged)
     if len(s) >= 10 and re.match(r"^\d{4}-\d{2}-\d{2}", s):
         return s[:10]
+    # 2026-05-19: no-year month-name forms ("May 19", "Jun. 7", "Jul. 18")
+    # — Razz/Spherexx embedded portals omit the year. Product rule: assume
+    # the current (run) year. Strip a trailing '.' on an abbreviated month
+    # ("Jun." -> "Jun"). Additive: only reached after all year-bearing
+    # formats fail, so no existing input changes behavior.
+    s_no_year = re.sub(r"^([A-Za-z]{3,9})\.", r"\1", s)
+    for fmt in ("%b %d", "%B %d"):
+        try:
+            return (
+                datetime.strptime(s_no_year, fmt)
+                .replace(year=datetime.now(UTC).year)
+                .strftime("%Y-%m-%d")
+            )
+        except ValueError:
+            continue
     return None
 
 

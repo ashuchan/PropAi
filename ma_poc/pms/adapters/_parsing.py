@@ -15,9 +15,17 @@ def money_to_int(s: str) -> int | None:
     """Parse '$1,450', '1450.00', '1,450 USD' -> 1450. Returns None on failure."""
     if not s:
         return None
-    cleaned = re.sub(r"[^\d.]", "", s)
-    if not cleaned or cleaned == ".":
+    # 2026-05-19: the prior ``re.sub(r"[^\d.]", "", s)`` CONCATENATED every
+    # digit in the string, so a range like ``"$1,200 - $1,400"`` became
+    # ``12001400`` — a plausible-looking but fabricated rent that then
+    # passed every downstream guard (>1, quality gate). Take the FIRST
+    # monetary token instead: single values ("$1,450", "1450.00",
+    # "1,450 USD", "$1450/mo") are unchanged; a range resolves to its low
+    # bound (correct for rent_low; far better than a poisoned value).
+    m = re.search(r"\d[\d,]*(?:\.\d{1,2})?", s)
+    if not m:
         return None
+    cleaned = m.group(0).replace(",", "")
     try:
         return int(float(cleaned))
     except ValueError:
@@ -455,6 +463,7 @@ def make_unit_dict(
     move_in_date: str = "",
     source_api_url: str = "",
     extraction_tier: str = "",
+    source_ids: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a standard unit dict in the format expected by the pipeline.
 
@@ -516,4 +525,13 @@ def make_unit_dict(
         "move_in_date": move_in_date,
         "source_api_url": source_api_url,
         "extraction_tier": extraction_tier,
+        # 2026-05-19: stable PMS-native identifiers (model_id, building_id,
+        # floor_id, listing_id, etc.) for cross-run daily merge. Until now
+        # the fixed kwarg set dropped them at the adapter boundary, so only
+        # DERIVED ids (our hashed unit_id/floor_plan_id) survived — which
+        # churn run-to-run and make day-over-day matching brittle.
+        # Additive: empty {} when an adapter doesn't (yet) pass it, so no
+        # behavior change; adapters populate per-PMS incrementally with
+        # grounded field names (no signature churn thereafter).
+        "source_ids": dict(source_ids) if source_ids else {},
     }

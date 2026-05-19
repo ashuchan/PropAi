@@ -2589,7 +2589,25 @@ def extract_available_date_from_card(card_html: str) -> str | None:
                 return None
             return str(d.isoformat())
         except Exception:
-            return None
+            # 2026-05-19: dateutil rejects label-prefixed / relative forms
+            # ("Available 7/10/26", "Available Now", "Available May 19")
+            # that DOM cards commonly use, so Tier-3 dropped them. Fall
+            # back to the canonical widened parser — same single-source-of
+            # -truth fix applied to jugnu/onesite/entrata. Additive: only
+            # reached when dateutil already failed; the past-date guard is
+            # preserved so previously-parseable inputs are unchanged.
+            try:
+                from ma_poc.core.schema_v2 import _format_date as _canon
+
+                iso = _canon(raw)
+                if not iso:
+                    return None
+                d2 = date.fromisoformat(iso)
+                if d2 < _today_date() and not available_now:
+                    return None
+                return iso
+            except Exception:
+                return None
 
     # 1. data-available-date / data-move-in attribute
     for attr in ("data-available-date", "data-move-in"):

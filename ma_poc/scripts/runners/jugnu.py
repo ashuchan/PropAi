@@ -50,9 +50,66 @@ except ImportError:
 # Hoisted from inside _format_v2_unit; the merge-rescue path runs once per
 # unit (~50K calls per run) and import caching makes the repeated lookup
 # free, but module-level keeps the hot loop clean.
-from ma_poc.core.identity import assign_fallback_unit_id
+from ma_poc.core.identity import (  # noqa: E402, I001  (intentional: must follow the sys.path bootstrap above)
+    assign_fallback_unit_id,
+)
 
 log = logging.getLogger("jugnu_runner")
+
+# 2026-05-19 capture-first grounding aid. The Entrata/OneSite/RentCafe/Knock
+# per-unit API JSON is never browser-exposed (server-rendered / 3rd-party
+# widgets), so source_ids field names for those PMS can't be grounded from
+# live probing — only from a real intercepted body. Archive a small capped
+# SAMPLE of winning raw API responses for those tiers so the NEXT run yields
+# groundable JSON. Capped per shard-process per adapter (grounding needs a
+# handful, not the fleet); idempotent; non-fatal. Mirrors the existing
+# llm_diagnostics dump precedent.
+_API_SAMPLE_CAP_PER_ADAPTER = 15
+_API_SAMPLE_COUNTS: dict[str, int] = {}
+_API_SAMPLE_TIER_MARKERS = ("ENTRATA", "ONESITE", "RENTCAFE", "KNOCK")
+
+
+# 2026-05-19 JSON-on-GCS profile persistence (interim, no database).
+# config/profiles/ is .dockerignored AND Cloud Run task FS is ephemeral, so
+# the FS ProfileStore otherwise bootstraps COLD every run (documented bug).
+# Syncing the per-property {canonical_id}.json files to/from a stable GCS
+# prefix makes the self-learning loop durable across runs with zero DB —
+# per-property objects mean parallel shards never contend. Env-gated
+# (PROFILE_GCS_PREFIX, e.g. gs://jugnu-canary/profiles/) and fully
+# non-fatal: a sync failure must never break or fail the run.
+_PROFILE_GCS_PREFIX = os.getenv("PROFILE_GCS_PREFIX", "").strip()
+
+
+def _pull_profiles_from_gcs(profiles_dir: Path) -> None:
+    """Warm-start: pull persisted profile JSONs from GCS before processing."""
+    if not _PROFILE_GCS_PREFIX:
+        return
+    try:
+        from ma_poc.storage import gcs
+
+        n = gcs.download_prefix(_PROFILE_GCS_PREFIX, profiles_dir)
+        log.info(
+            "profile warm-start: pulled %d profiles from %s",
+            n, _PROFILE_GCS_PREFIX,
+        )
+    except Exception as exc:  # never block the runner on a sync blip
+        log.warning("profile GCS pull failed (cold start this run): %s", exc)
+
+
+def _push_profiles_to_gcs(profiles_dir: Path) -> None:
+    """Persist this run's learned/updated profile JSONs back to GCS."""
+    if not _PROFILE_GCS_PREFIX:
+        return
+    try:
+        from ma_poc.storage import gcs
+
+        n = gcs.upload_prefix(profiles_dir, _PROFILE_GCS_PREFIX)
+        log.info(
+            "profile persistence: pushed %d profiles to %s",
+            n, _PROFILE_GCS_PREFIX,
+        )
+    except Exception as exc:
+        log.warning("profile GCS push failed (learning not persisted): %s", exc)
 
 
 def _resolve_per_property_timeout() -> float:
@@ -272,7 +329,11 @@ async def run_jugnu(
     # critical for the self-learning loop (saved llm_field_mappings &
     # dom_hints replay on the next run instead of re-paying LLM tax). Local
     # dev with DATA_PROVIDER unset still gets the FS store, same as before.
-    profile_store = _build_profile_store(_MA_POC_ROOT / "config" / "profiles")
+    _profiles_dir = _MA_POC_ROOT / "config" / "profiles"
+    # Warm-start BEFORE the store is built so get_profile() sees the
+    # pulled JSONs. No-op unless PROFILE_GCS_PREFIX is set; non-fatal.
+    _pull_profiles_from_gcs(_profiles_dir)
+    profile_store = _build_profile_store(_profiles_dir)
 
     # PR 1 (2026-05-10): Persistence sentinel probe. Verifies that every
     # writeable channel of the self-learning loop round-trips through the
@@ -380,7 +441,7 @@ async def run_jugnu(
                 all_llm_interactions.extend(interactions)
 
             return formatted
-        except (TimeoutError, asyncio.TimeoutError) as exc:
+        except TimeoutError as exc:
             log.error(
                 "Property %s timed out after %.0fs — attempting partial recovery",
                 task.property_id, PER_PROPERTY_TIMEOUT_SECONDS,
@@ -405,13 +466,27 @@ async def run_jugnu(
                         )
                 except Exception as _su_exc:
                     log.warning("partial state_store.upsert_units failed: %s", _su_exc)
-                # Persist the scrape profile so LLM-learned CSS selectors and
-                # field mappings from this run survive for next-day replay.
-                try:
-                    if _partial_profile is not None and hasattr(profile_store, "save"):
-                        profile_store.save(_partial_profile)
-                except Exception as _ps_exc:
-                    log.warning("partial profile_store.save failed: %s", _ps_exc)
+            # 2026-05-19: persist the discovered route/profile EVEN WHEN zero
+            # units were extracted. Previously this save was gated behind
+            # ``if _partial_units`` — so a property that timed out *before*
+            # finishing extraction (but *after* discovering the right
+            # floorplans URL / selectors) learned nothing, started cold next
+            # run, slow-crawled, and timed out again forever (the ~79
+            # per-property-timeout dead-zone cohort). Saving the profile
+            # unconditionally breaks that vicious cycle: discovery from a
+            # timed-out run accelerates the next run even if this one yielded
+            # no units. Units are still only persisted when present (no blank
+            # rows) — this is route/selector knowledge, not fabricated data.
+            try:
+                if _partial_profile is not None and hasattr(profile_store, "save"):
+                    profile_store.save(_partial_profile)
+                    log.info(
+                        "Property %s: persisted discovered profile from "
+                        "timed-out run (units=%d) — next run starts warm",
+                        task.property_id, len(_partial_units),
+                    )
+            except Exception as _ps_exc:
+                log.warning("partial profile_store.save failed: %s", _ps_exc)
             failed = _make_failed_record(
                 task.property_id,
                 task.url,
@@ -460,6 +535,11 @@ async def run_jugnu(
     properties_path = run_dir / "properties.json"
     merged_properties = _merge_with_existing_properties(properties_path, properties)
     _write_properties_incremental(properties_path, merged_properties)
+
+    # Persist this run's profile learnings (winning_page_url, llm field
+    # mappings, dom hints) durably so the NEXT run starts warm. No-op
+    # unless PROFILE_GCS_PREFIX is set; non-fatal by construction.
+    _push_profiles_to_gcs(_profiles_dir)
 
     # Run-wide LLM aggregate — writes {run_dir}/llm_report.json with the
     # per-property cost breakdown the frontend reads. No-op when no LLM
@@ -933,6 +1013,52 @@ async def _process_property(
         except Exception as _exc:
             log.debug("F1 adapter_debugger hook failed for %s: %s", task.property_id, _exc)
 
+    # Capture-first: archive a capped sample of winning raw API bodies for
+    # the PMS whose source_ids can't be grounded from live probing. Success
+    # path only (we want groundable real bodies; failures are already dumped
+    # to llm_diagnostics). Capped/idempotent/non-fatal by construction.
+    if (
+        run_dir is not None
+        and _tier_used.startswith("TIER_1")
+        and any(mk in _tier_used.upper() for mk in _API_SAMPLE_TIER_MARKERS)
+    ):
+        try:
+            _adapter = next(
+                mk.lower()
+                for mk in _API_SAMPLE_TIER_MARKERS
+                if mk in _tier_used.upper()
+            )
+            if _API_SAMPLE_COUNTS.get(_adapter, 0) < _API_SAMPLE_CAP_PER_ADAPTER:
+                _apis = result.get("_raw_api_responses") or []
+                if _apis:
+                    _dir = run_dir / "api_samples" / _adapter
+                    _dir.mkdir(parents=True, exist_ok=True)
+                    _path = _dir / f"{task.property_id}.json"
+                    if not _path.exists():
+                        _sample = [
+                            {
+                                "url": _r.get("url"),
+                                "status": _r.get("status"),
+                                "tier": _tier_used,
+                                # truncate huge bodies — grounding only
+                                # needs the field shape, not every unit
+                                "body": str(_r.get("body"))[:250_000],
+                            }
+                            for _r in _apis[:3]
+                            if isinstance(_r, dict)
+                        ]
+                        _path.write_text(
+                            json.dumps(_sample, ensure_ascii=False),
+                            encoding="utf-8",
+                        )
+                        _API_SAMPLE_COUNTS[_adapter] = (
+                            _API_SAMPLE_COUNTS.get(_adapter, 0) + 1
+                        )
+        except Exception as _exc:
+            log.debug(
+                "api_sample capture failed for %s: %s", task.property_id, _exc
+            )
+
     return result
 
 
@@ -1208,6 +1334,57 @@ def _format_v2_unit(
     Jugnu unit on its way out, so JSON-LD / Tier-4-LLM / cross-page-merger
     records that previously dropped at upsert time now keep an anchor.
     """
+    # 2026-05-19 capture-first: snapshot the ORIGINAL source value for
+    # every emitted field BEFORE any inference / junk-scrub / lossy
+    # formatting. Emitted as first-class ``<field>_raw`` columns at the
+    # bottom so downstream QA can cross-check a normalized value against
+    # what was actually extracted and recover formatter mistakes without
+    # re-scraping (every bug fixed this session would have been a 1-line
+    # post-process instead of a re-run). Derived/generated fields
+    # (floor_plan_id, date_captured) have no source → raw is None (honest,
+    # not fabricated).
+    _raw_src: dict[str, Any] = {
+        "beds": unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds"),
+        "baths": unit.get("_bathrooms") or unit.get("bathrooms") or unit.get("baths"),
+        "floor_plan_name": (
+            unit.get("_floor_plan")
+            or unit.get("floor_plan_name")
+            or unit.get("floorplan_name")
+        ),
+        "floor_plan_id": unit.get("floor_plan_id"),
+        "area": unit.get("_sqft") or unit.get("sqft") or unit.get("area"),
+        "unit_id": (
+            unit.get("unit_id")
+            or unit.get("unit_number")
+            or unit.get("_unit_number")
+        ),
+        "rent_low": (
+            unit.get("market_rent_low")
+            or unit.get("asking_rent")
+            or unit.get("rent_range")
+        ),
+        "rent_high": (
+            unit.get("market_rent_high")
+            or unit.get("asking_rent")
+            or unit.get("rent_range")
+        ),
+        "floor": (
+            unit.get("floor")
+            or unit.get("_floor")
+            or unit.get("floor_number")
+            or unit.get("floorNumber")
+            or unit.get("floor_no")
+        ),
+        "building": unit.get("building") or unit.get("_building"),
+        "available_units": unit.get("available_units"),
+        "date_captured": None,
+        "available_date": unit.get("available_date"),
+        "lease_term": unit.get("lease_term") or unit.get("_lease_term"),
+        "move_in_date": (
+            unit.get("move_in_date") or unit.get("_move_in_date")
+        ),
+    }
+
     beds_raw = unit.get("_bedrooms") or unit.get("bedrooms") or unit.get("beds")
     baths_raw = unit.get("_bathrooms") or unit.get("bathrooms") or unit.get("baths")
     fp_name = unit.get("_floor_plan") or unit.get("floor_plan_name") or unit.get("floorplan_name")
@@ -1286,6 +1463,19 @@ def _format_v2_unit(
         "unit_id": str(uid) if uid not in (None, "", "null") else None,
         "rent_low": _format_rent(rent_lo_raw),
         "rent_high": _format_rent(rent_hi_raw),
+        "floor": _format_floor(_raw_src["floor"]),
+        "building": (
+            None
+            if not _raw_src["building"]
+            or str(_raw_src["building"]).strip() == ""
+            else str(_raw_src["building"]).strip()
+        ),
+        "available_units": (
+            int(_m.group(0))
+            if (_m := _re.search(r"\d+", str(_raw_src["available_units"] or "")))
+            and 1 <= int(_m.group(0)) <= 10_000
+            else None
+        ),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         "available_date": _format_date_str(unit.get("available_date")),
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
@@ -1299,6 +1489,22 @@ def _format_v2_unit(
     # unit_id" rate drops by ~17K units/run for JSON-LD + LLM tiers).
     if not out["unit_id"]:
         assign_fallback_unit_id(out, property_id)
+
+    # First-class raw companions for every emitted field. Uncoerced
+    # (trimmed string or None) so the exact extracted value is preserved
+    # for later cross-processing. Additive — never overwrites a processed
+    # column; consumers that don't know these keys simply ignore them.
+    for _k in list(out.keys()):
+        _v = _raw_src.get(_k)
+        out[f"{_k}_raw"] = (
+            None if _v is None or str(_v).strip() == "" else str(_v).strip()
+        )
+
+    # Stable PMS-native ids for daily merge — carried through as-is (a
+    # dict; already raw, so no string _raw companion). Empty {} when the
+    # adapter hasn't been wired to populate it yet (additive, non-breaking).
+    _sids = unit.get("source_ids")
+    out["source_ids"] = dict(_sids) if isinstance(_sids, dict) else {}
     return out
 
 
@@ -1754,6 +1960,23 @@ def _format_rent(val: Any) -> float | None:
         n = float(s)
         return n if n > 1 else None
     except (ValueError, TypeError):
+        # 2026-05-19: the bare float() above silently discarded valid but
+        # noisy single-value rents the adapters emit ("$1450/mo",
+        # "From $1,450", "Starting at $1450", "$1,450+", "1200-1400").
+        # Delegate to the canonical money parser (single source of truth —
+        # same pattern as the _format_date_str delegate fix). Additive:
+        # only reached after float() already failed, so clean numerics are
+        # byte-identical. Returns the LOW bound (the dominant discard case
+        # is a single price with noise where lo == hi; a true embedded
+        # range in one field is rare and lo is still correct for rent_low).
+        try:
+            from ma_poc.pms.adapters._parsing import parse_rent_range
+
+            lo, _hi = parse_rent_range(str(val))
+            if lo is not None and lo > 1:
+                return float(lo)
+        except Exception:
+            pass
         return None
 
 
@@ -1768,8 +1991,18 @@ def _format_area(val: Any) -> int:
     """
     if val is None or val == -1:
         return -1
+    # 2026-05-19: ``int(float(str(val)))`` silently discarded the very
+    # common comma / unit-suffixed / range sqft forms ("1,200",
+    # "1,200 sq ft", "1200 sqft", "1,200-1,400") → area=-1. Pull the first
+    # numeric token first (range → low bound). The 150–10,000 sanity
+    # bound below is UNCHANGED — it still rejects bed counts / floor
+    # numbers / truncated "070" garbage (additive: clean ints identical).
+    s = str(val).replace(",", "")
+    m = _re.search(r"\d+(?:\.\d+)?", s)
+    if not m:
+        return -1
     try:
-        n = int(float(str(val)))
+        n = int(float(m.group(0)))
     except (ValueError, TypeError):
         return -1
     if 150 <= n <= 10_000:
@@ -1778,28 +2011,61 @@ def _format_area(val: Any) -> int:
 
 
 def _format_date_str(val: Any) -> str | None:
-    """Normalize date to YYYY-MM-DD. None if unparseable."""
-    if val is None or val == "":
+    """Normalize date to YYYY-MM-DD. None if unparseable.
+
+    2026-05-19: delegate to ``schema_v2._format_date``. This runner had a
+    DUPLICATE, narrower date parser that only accepted ISO and 4-digit-year
+    ``m/d/Y`` — it silently dropped the ``"Available 7/10/26"`` /
+    ``"Available Now"`` / 2-digit-year forms that AppFolio, RentCafe, Knock
+    and the embedded-portal parsers actually emit. The capture-first
+    widening shipped in 15b7aab only touched ``schema_v2._format_date``,
+    so it never took effect on the production jugnu path and fleet-wide
+    ``available_date`` stayed ~0% for those tiers. Delegating keeps a
+    single source of truth; ISO and 4-digit ``m/d/Y`` behave exactly as
+    before (the delegate is a strict superset).
+    """
+    from ma_poc.core.schema_v2 import _format_date
+
+    return _format_date(val)
+
+
+def _format_floor(val: Any) -> int | None:
+    """Unit floor number, or None.
+
+    2026-05-19: probe found the only ``floor`` values reaching output were
+    5–6-digit unit/internal IDs mis-mapped into the field (a real apartment
+    floor is 1–~100). Extract the leading int ("2nd", "Floor 3" → 2, 3)
+    and apply a sanity bound — anything outside 1–100 is an ID/garbage and
+    is rejected (same defensive shape as ``_format_area``). The raw source
+    is still preserved via the ``floor_raw`` companion.
+    """
+    if val is None:
         return None
-    s = str(val).strip()
-    if _re.match(r"^\d{4}-\d{2}-\d{2}$", s):
-        return s
-    if len(s) >= 10 and _re.match(r"^\d{4}-\d{2}-\d{2}", s):
-        return s[:10]
-    for fmt in ("%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d"):
-        try:
-            return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-    return None
+    m = _re.search(r"\d+", str(val))
+    if not m:
+        return None
+    try:
+        n = int(m.group(0))
+    except (ValueError, TypeError):
+        return None
+    return n if 1 <= n <= 100 else None
 
 
 def _safe_int_gt1(val: Any) -> int | None:
-    """Integer > 1 or None."""
+    """Integer > 1 or None.
+
+    2026-05-19: extract the leading integer first — adapters commonly
+    emit lease_term as "12 Months" / "12 mo" / "13-month", which the bare
+    ``int(float(str(val)))`` silently dropped to None. Additive: bare
+    ints/floats behave exactly as before; the ``> 1`` guard is preserved.
+    """
     if val is None:
         return None
+    m = _re.search(r"\d+", str(val))
+    if not m:
+        return None
     try:
-        n = int(float(str(val)))
+        n = int(m.group(0))
         return n if n > 1 else None
     except (ValueError, TypeError):
         return None

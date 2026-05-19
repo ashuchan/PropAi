@@ -189,6 +189,14 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
                 availability_status="AVAILABLE",
                 available_units="1",
                 availability_date=str(u.get("available_on") or u.get("display_available_on") or ""),
+                source_ids={
+                    k: v
+                    for k, v in {
+                        "sightmap_unit_id": u.get("id"),
+                        "sightmap_floor_plan_id": fp_id,
+                    }.items()
+                    if v
+                },
                 source_api_url=url,
                 extraction_tier=_TIER_BASE,
             )

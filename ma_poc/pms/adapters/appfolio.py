@@ -241,6 +241,7 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
                 rent_range=format_rent_range(rent_val, rent_val),
                 availability_status="AVAILABLE",
                 availability_date=avail_raw or "",
+                source_ids={"appfolio_listing_id": listing_id} if listing_id else {},
                 source_api_url=url,
                 extraction_tier="TIER_1_DOM_APPFOLIO_SSR",
             )
@@ -285,6 +286,14 @@ def parse_appfolio_listings(items: list[dict[str, Any]], url: str) -> list[dict[
                 if not status or "avail" in status.lower()
                 else status.upper(),
                 availability_date=avail_date,
+                source_ids={
+                    k: v
+                    for k, v in {
+                        "appfolio_id": item.get("id"),
+                        "appfolio_unit_id": item.get("unit_id"),
+                    }.items()
+                    if v
+                },
                 source_api_url=url,
                 extraction_tier="TIER_1_API_APPFOLIO",
             )

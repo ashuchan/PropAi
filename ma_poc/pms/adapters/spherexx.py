@@ -58,6 +58,29 @@ _TIER_PARSE_FAILED = f"{_TIER_BASE}_PARSE_FAILED"
 # table on /floorplans/<bed>/<plan>/ detail pages, NOT via the
 # presentation.spherexx.app /api/unit iframe. Deterministic Tier-1.
 _TIER_ZRS = "TIER_1_DOM_SPHEREXX_ZRS"
+# Razz/myrazz embedded portal: "Happily Made by Razz" Vue SPA renders a
+# per-unit list at /models with a labeled "Available <date>" column.
+# Distinct from the presentation.spherexx.app /api iframe — no API XHR
+# fires; units live only in the post-hydration DOM. Anchor on the stable
+# ``wrap-model-item model-list`` container + label TEXT (the date leaf is
+# an unclassed <div>, so class selectors are unsafe — same lesson as the
+# AppFolio js-listing-* scare). Raw "May 19"/"Now" is passed through;
+# schema_v2._format_date normalizes it (no-year→run year, Now→run date).
+_TIER_RAZZ = "TIER_1_DOM_SPHEREXX_RAZZ"
+
+_RAZZ_ITEM_RE = re.compile(r"wrap-model-item[\s\"']*model-list", re.IGNORECASE)
+_RAZZ_UNIT_RE = re.compile(
+    r"Unit\s+([A-Za-z0-9.\-]+)\s*-\s*(Studio|\d+)\s*Bed\s*\|\s*"
+    r"([\d.]+)\s*Bath",
+    re.IGNORECASE,
+)
+_RAZZ_RENT_RE = re.compile(r"Base\s*Rent\s*\$?\s*([\d,]+)", re.IGNORECASE)
+_RAZZ_SQFT_RE = re.compile(r"Sq\.?\s*Ft\.?\s*([\d,]+)", re.IGNORECASE)
+_RAZZ_AVAIL_RE = re.compile(
+    r"Available\s+(Now|Today|[A-Za-z]{3,9}\.?\s+\d{1,2}"
+    r"|\d{1,2}/\d{1,2}/\d{2,4})",
+    re.IGNORECASE,
+)
 
 
 
@@ -282,9 +305,89 @@ def _parse_spherexx_unit(u: dict[str, Any], url: str) -> dict[str, str] | None:
         availability_status="AVAILABLE",
         available_units="1",
         availability_date=avail,
+        source_ids={
+            k: v
+            for k, v in {
+                "spherexx_unit_id": u.get("ID"),
+                "spherexx_floorplan_id": u.get("FloorplanID"),
+            }.items()
+            if v
+        },
         source_api_url=url,
         extraction_tier=_TIER_BASE,
     )
+
+
+def parse_razz_models_dom(html: str, url: str) -> list[dict[str, str]]:
+    """Parse a Razz/myrazz ``/models`` rendered DOM → standard unit dicts.
+
+    The Razz Vue SPA renders each unit inside a ``wrap-model-item
+    model-list`` block whose visible text follows a stable labeled
+    layout, e.g.::
+
+        1X1  Unit 627 - 1 Bed | 1 Bath  Base Rent $925
+        Sq. Ft. 700  Available May 19  Term 12 Months  Deposit -
+
+    We anchor on that label text (not the generated Vue ``data-v-*`` /
+    unclassed date <div>) so markup churn doesn't silently break it.
+    ``available`` ("May 19" / "Now") is emitted RAW — schema_v2.
+    _format_date does the canonical normalization downstream.
+    """
+    try:
+        from bs4 import BeautifulSoup  # lazy: avoid import cost off-path
+    except ImportError:
+        return []
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+        except Exception:
+            return []
+
+    items = soup.find_all(class_=re.compile(r"wrap-model-item", re.IGNORECASE))
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for it in items:
+        txt = re.sub(r"\s+", " ", it.get_text(" ", strip=True))
+        m = _RAZZ_UNIT_RE.search(txt)
+        if not m:
+            continue
+        unit_no = m.group(1).strip()
+        if unit_no in seen:
+            continue
+        seen.add(unit_no)
+        beds = 0 if m.group(2).lower() == "studio" else int(m.group(2))
+        bath_f = float(m.group(3))
+        baths_str = f"{bath_f:.1f}".rstrip("0").rstrip(".")
+
+        rm = _RAZZ_RENT_RE.search(txt)
+        rent = int(rm.group(1).replace(",", "")) if rm else None
+        sm = _RAZZ_SQFT_RE.search(txt)
+        sqft = sm.group(1).replace(",", "") if sm else ""
+        am = _RAZZ_AVAIL_RE.search(txt)
+        avail = am.group(1).strip() if am else ""
+
+        rent_range = f"${rent:,}" if rent else ""
+        out.append(
+            make_unit_dict(
+                floor_plan_name="",
+                bed_label=bed_label_from(beds, ""),
+                bedrooms=str(beds),
+                bathrooms=baths_str,
+                sqft=sqft,
+                unit_number=unit_no,
+                rent_range=rent_range,
+                rent_low=rent,
+                rent_high=rent,
+                availability_status="AVAILABLE",
+                available_units="1",
+                availability_date=avail,
+                source_api_url=url,
+                extraction_tier=_TIER_RAZZ,
+            )
+        )
+    return out
 
 
 def parse_spherexx_units(body: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
@@ -314,6 +417,9 @@ class SpherexxAdapter:
         "spherexx.com",
         "sspcfg",
         "ssploader.js",
+        "myrazz.com",
+        "images.myrazz.com",
+        "wrap-models-list",
     ]
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
@@ -356,6 +462,55 @@ class SpherexxAdapter:
             result.confidence = min(0.95, 0.7 + 0.04 * len(all_units))
             result.tier_used = _TIER_BASE
             return result
+
+        # Razz/myrazz /models DOM fallback. The "Happily Made by Razz" Vue
+        # SPA fires no spherexx API XHR — units exist only in the post-
+        # hydration DOM. Pull rendered HTML the same way appfolio's SSR
+        # path does (fetch_result.body first to avoid a re-fetch, then
+        # live page.content()). Guarded by Razz markers so spherexx-API /
+        # ZRS sites are never touched (cannot regress them).
+        page_html: str | None = None
+        _fr = getattr(ctx, "fetch_result", None)
+        if _fr is not None:
+            _body = getattr(_fr, "body", None)
+            if isinstance(_body, bytes):
+                try:
+                    page_html = _body.decode("utf-8", errors="replace")
+                except Exception:
+                    page_html = None
+            elif isinstance(_body, str):
+                page_html = _body
+        if page_html is None and page is not None:
+            try:
+                page_html = await page.content()
+            except Exception:
+                page_html = None
+        if page_html and (
+            "wrap-model-item" in page_html
+            or "myrazz" in page_html.lower()
+            or "happily made by razz" in page_html.lower()
+        ):
+            try:
+                razz_units = parse_razz_models_dom(
+                    page_html, getattr(ctx, "base_url", "") or ""
+                )
+            except Exception as exc:
+                razz_units = []
+                result.errors.append(f"razz-parse-error: {exc}")
+            if razz_units:
+                result.units = razz_units
+                result.winning_url = getattr(ctx, "base_url", "") or None
+                result.confidence = min(0.92, 0.7 + 0.04 * len(razz_units))
+                result.tier_used = _TIER_RAZZ
+                result.api_responses.append(
+                    {
+                        "url": (getattr(ctx, "base_url", "") or "") + "#/models",
+                        "status": 200,
+                        "body": "<razz-models-dom>",
+                        "via": "razz_models_dom",
+                    }
+                )
+                return result
 
         # ZRS server-rendered fallback: chathamsquare/mirabella-class
         # spherexx sites render units in an HTML table on
