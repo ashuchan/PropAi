@@ -489,6 +489,49 @@ class RentCafeAdapter:
                     result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
                     return result
 
+        # 2026-05-20: Nestin per-plan DOM recovery. The 35-prop JSON-LD
+        # probe (project_jsonld_recovery_2026-05-20.md) found that ~89% of
+        # the 298-prop JSON-LD ALL_fail bucket are RentCafe-Nestin marketing
+        # sites where the unit + rent + date data lives one nav-hop deeper
+        # at /floorplans/{plan-slug}. Previous tiers (XHR / WP / SecureCafe /
+        # hosted-table) handle the API-shape cohort; this branch picks up
+        # the Nestin DOM-template cohort. Detection: resource.rentcafe.com
+        # image CDN signal in rendered HTML. Probes each /floorplans/{slug}
+        # detail page via curl_cffi for the table (Layout A1) or card
+        # (Layout A2) layout.
+        if _rc_html:
+            try:
+                from ma_poc.pms.adapters._rentcafe_nestin import (
+                    is_nestin_template,
+                    recover_rentcafe_nestin_per_plan,
+                )
+
+                if is_nestin_template(_rc_html):
+                    nestin_units, nestin_source = await recover_rentcafe_nestin_per_plan(
+                        _rc_html,
+                        str(getattr(ctx, "base_url", "") or ""),
+                    )
+                    if nestin_units:
+                        from ma_poc.extraction.post_process import post_process
+                        pp = post_process(
+                            nestin_units, property_id=getattr(ctx, "property_id", None)
+                        )
+                        if pp.n_admitted > 0:
+                            result.units = pp.admitted
+                            result.plan_summaries = pp.plan_summaries
+                            result.tier_used = "TIER_1_DOM_RENTCAFE_NESTIN"
+                            if nestin_source:
+                                result.winning_url = nestin_source
+                            result.confidence = min(0.90, 0.65 + 0.04 * pp.n_admitted)
+                            return result
+            except Exception as nestin_exc:
+                # Recovery must never block scrape — log + fall through to
+                # failure classification.
+                result.errors.append(
+                    f"rentcafe-nestin-error: {type(nestin_exc).__name__}: "
+                    f"{str(nestin_exc)[:120]}"
+                )
+
         # Failure path: re-stamp tier_used with a structured sub-code so the
         # downstream report can distinguish misrouting from genuine zero data.
         tier_code, err_msg = _classify_rentcafe_failure(api_responses)
