@@ -91,3 +91,120 @@ def test_f1_2_fetchresult_replace_sets_captcha_detected() -> None:
     assert fr2.url == fr.url
     assert fr2.body == fr.body
     assert fr2.attempts == fr.attempts
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 cluster #4 shea-style false-positive fix.
+#
+# The reCAPTCHA / hCaptcha fingerprints are dual-use — they appear both
+# on captcha CHALLENGE pages AND on legitimate pages that embed the
+# captcha as a widget in contact forms. Without a body-size guard, a
+# real apartment page with an embedded reCAPTCHA contact form gets
+# misclassified as BOT_BLOCKED → no_body_short_circuit → property
+# dropped from the canary.
+#
+# Live-verified false positive: sheaapartments.com/citylights returns
+# 200 OK with 150 KB of real apartment content; the first 4KB contains
+# ``g-recaptcha`` inside a WCAG-accessibility-fix JS function for the
+# contact-form widget. Pre-fix: classifier returned (True, "recaptcha").
+# Post-fix: returns (False, None) because body_size (150_194) exceeds
+# the 30_000-byte challenge-interstitial threshold.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_recaptcha_widget_on_large_real_page_is_not_captcha() -> None:
+    """The shea-style false positive — g-recaptcha widget embedded
+    in a 150 KB real apartment page must NOT be flagged as captcha
+    when the body size is passed."""
+    # Body matches the shea pattern: short captcha widget reference
+    # embedded in a much larger page.
+    body = (
+        b'<html><head><title>Apartments | Real Property</title></head>'
+        b'<body><h1>Available units</h1>'
+        b'<script>const captchaResponseId = "g-recaptcha-response-100000";</script>'
+        b'<div class="content">' + b"x" * 200_000 + b"</div></body></html>"
+    )
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is False, (
+        f"large real page with embedded g-recaptcha widget must NOT be "
+        f"flagged as captcha; got is_captcha={is_captcha!r} provider={provider!r}"
+    )
+
+
+def test_recaptcha_widget_on_small_body_still_flagged() -> None:
+    """A genuine reCAPTCHA challenge interstitial is small (<30 KB).
+    The same g-recaptcha marker on a small body must still be flagged
+    so real challenges don't slip past."""
+    # Small body — mimics a typical challenge interstitial.
+    body = (
+        b'<html><head><title>Verify</title></head><body>'
+        b'<div class="g-recaptcha" data-sitekey="abc"></div>'
+        b'</body></html>'
+    )
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is True
+    assert provider == "recaptcha"
+
+
+def test_hcaptcha_widget_on_large_real_page_is_not_captcha() -> None:
+    """Same false-positive shape for hCaptcha widget on a real page."""
+    body = (
+        b'<html><body>'
+        b'<script src="https://hcaptcha.com/1/api.js"></script>'
+        + b"x" * 100_000
+        + b"</body></html>"
+    )
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is False
+
+
+def test_cloudflare_challenge_always_flagged_regardless_of_size() -> None:
+    """CHALLENGE-only fingerprints (cloudflare/perimeterx) are ALWAYS
+    trusted — they don't appear on real content pages. Body size guard
+    does not apply."""
+    # Pad to a large size to verify the size guard doesn't skip
+    # challenge-only fingerprints.
+    body = (
+        b'<html><script>challenge-platform</script>' + b"x" * 200_000 + b"</html>"
+    )
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is True
+    assert provider == "cloudflare"
+
+
+def test_perimeterx_always_flagged_regardless_of_size() -> None:
+    """Same for PerimeterX — challenge-only marker, always trusted."""
+    body = b'<html><script>_pxhd = "x";</script>' + b"x" * 100_000 + b"</html>"
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is True
+    assert provider == "perimeterx"
+
+
+def test_body_size_none_preserves_backcompat_behavior() -> None:
+    """When body_size is not passed (legacy callers), the function
+    falls back to ``len(body)`` so the existing widget-detection tests
+    keep their meaning. A small recaptcha-widget body still flags."""
+    body = b'<div class="g-recaptcha" data-sitekey="abc"></div>'  # 50 bytes
+    is_captcha, provider = looks_like_captcha(body)  # body_size omitted
+    assert is_captcha is True
+    assert provider == "recaptcha"
+
+
+def test_real_shea_first_4kb_with_full_size_is_not_captcha() -> None:
+    """Synthesized from the actual 2026-05-20 live-probe bytes —
+    sheaapartments.com/citylights first 4KB has g-recaptcha inside
+    a wcagFix() JS function; full body is 150 KB."""
+    head = (
+        b'<!DOCTYPE html>\n<html class="no-js" lang="en"><head>'
+        b'<link rel="preload" href="/assets/fonts/38D01F_0_0.woff" as="font">'
+        b'<script>function wcagFix(){'
+        b'const captchaResponseId="g-recaptcha-response-100000";'
+        b'}</script></head><body>...real content...'
+    )
+    # Pad to match the real shea body size (~150 KB).
+    full_body = head + (b"x" * (150_000 - len(head)))
+    is_captcha, provider = looks_like_captcha(full_body, body_size=len(full_body))
+    assert is_captcha is False, (
+        f"shea-style real page (150KB body, g-recaptcha in head) must NOT "
+        f"flag as captcha; got is_captcha={is_captcha!r} provider={provider!r}"
+    )

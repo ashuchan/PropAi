@@ -129,6 +129,7 @@ def classify(
     headers: dict[str, str],
     body_head: bytes | None,
     exception: Exception | None = None,
+    body_size: int | None = None,
 ) -> tuple[FetchOutcome, str | None]:
     """Classify an HTTP response into a FetchOutcome.
 
@@ -137,6 +138,12 @@ def classify(
         headers: Response headers with lowercased keys.
         body_head: First ~4KB of the response body.
         exception: Exception raised during the request, if any.
+        body_size: Total body size in bytes (NOT just the head slice).
+            Forwarded to ``looks_like_captcha`` so widget-dual-use
+            captcha fingerprints (``g-recaptcha`` / ``hcaptcha.com``)
+            are skipped on large real pages. Without this, embedded
+            captcha widgets in contact forms cause false-positive
+            BOT_BLOCKED classifications. See ``looks_like_captcha``.
 
     Returns:
         Tuple of (FetchOutcome, error_signature_or_none).
@@ -186,7 +193,7 @@ def classify(
         return FetchOutcome.RATE_LIMITED, "HTTP_429"
 
     if status == 403:
-        is_captcha, provider = looks_like_captcha(body_head or b"")
+        is_captcha, provider = looks_like_captcha(body_head or b"", body_size=body_size)
         if is_captcha:
             sig = "CF_CHALLENGE" if provider == "cloudflare" else f"CAPTCHA_{(provider or 'unknown').upper()}"
             return FetchOutcome.BOT_BLOCKED, sig
@@ -222,7 +229,7 @@ def classify(
         # checks only (block-page-only literals) so a legit 200 page is
         # never flipped to BOT_BLOCKED.
         if body_head:
-            _cap, _prov = looks_like_captcha(body_head)
+            _cap, _prov = looks_like_captcha(body_head, body_size=body_size)
             if _cap:
                 _sig = (
                     "CF_CHALLENGE"

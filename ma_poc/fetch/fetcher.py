@@ -80,13 +80,19 @@ def _classify_fetch_outcome(
     bytes) — the underlying classifier only inspects the head.
     """
     head: bytes | None
+    body_size: int | None
     if isinstance(body, bytes):
         head = body[:4096]
+        body_size = len(body)
     elif isinstance(body, str):
         head = body[:4096].encode("utf-8", errors="replace")
+        body_size = len(body)
     else:
         head = None
-    return classify(status_code, headers or {}, head, exception=error)
+        body_size = None
+    return classify(
+        status_code, headers or {}, head, exception=error, body_size=body_size
+    )
 
 _MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
 _DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
@@ -489,8 +495,11 @@ class Fetcher:
             resp_headers = resp.headers
             body = resp.content if method == "GET" else None
             body_head = body[:4096] if body else None
+            body_size = len(body) if body else None
 
-            outcome, sig = classify(resp.status_code, resp_headers, body_head)
+            outcome, sig = classify(
+                resp.status_code, resp_headers, body_head, body_size=body_size
+            )
 
             # RC5: HTTP GET 200 with an empty or trivially-small body (< 16 bytes).
             # classify() returns OK for 200, but a body this small cannot contain
