@@ -2756,33 +2756,82 @@ async def scrape_jugnu(
             else str(fetch_result.outcome)
         )
         if outcome_val != "OK":
-            result = _empty_result(base_url)
-            result["_property_id"] = property_id
-            result["extraction_tier_used"] = "generic:no_body_short_circuit"
-            _verdict_prefix = _OUTCOME_VERDICT_PREFIX.get(outcome_val, "FAILED_UNREACHABLE")
-            result["errors"].append(
-                f"{_verdict_prefix}: fetch_outcome={outcome_val} "
-                f"sig={getattr(fetch_result, 'error_signature', None)}"
-            )
-            # Attach the diagnostic so the report can render *why* it failed.
-            try:
-                fd = fetch_result.to_dict() if hasattr(fetch_result, "to_dict") else {}
-                fd["body_bytes"] = 0
-                fd["captcha_detected"] = False
-                fd["captcha_provider"] = None
-                result["_fetch_diagnostic"] = fd
-            except Exception:
-                pass
-            result["_extract_result"] = ExtractResult(
-                property_id=property_id,
-                records=[],
-                tier_used="generic:no_body_short_circuit",
-                adapter_name="none",
-                winning_url=None,
-                confidence=0.0,
-                errors=[f"fetch_outcome={outcome_val}"],
-            )
-            return result
+            # 2026-05-20 cluster #4 soft-404 recovery: some marketing
+            # sites return HTTP 404 for valid property URLs (e.g.
+            # liveatcrossroadsranch.com/home: 404 with 59 KB of real
+            # content + nav-link to /apartments/.../floor-plans where
+            # the SightMap embed lives). Main's prod extracts these
+            # via TIER_1_API_SIGHTMAP after link-hop. Short-circuiting
+            # on DEAD_URL drops the property entirely.
+            # Conservative recovery: when outcome=DEAD_URL AND the body
+            # has substantive apartment-shaped content (>=10 KB AND
+            # >=1 inventory nav link), skip the short-circuit and let
+            # the rest of the pipeline (link-hop, generic adapter, F2
+            # LLM rescue) try. Genuine 404s have empty/minimal bodies
+            # and don't trip this gate.
+            _soft_404_recovery = False
+            if outcome_val == "DEAD_URL":
+                _fr_body = getattr(fetch_result, "body", None) or b""
+                _body_size = len(_fr_body) if isinstance(_fr_body, (bytes, str)) else 0
+                if _body_size >= 10_000:
+                    try:
+                        _body_str = (
+                            _fr_body.decode("utf-8", errors="replace")
+                            if isinstance(_fr_body, bytes)
+                            else _fr_body
+                        ).lower()
+                        # Nav-link markers — any one is enough.
+                        _SOFT_404_MARKERS = (
+                            "/floor-plans",
+                            "/floorplans",
+                            "/availability",
+                            "/available-units",
+                            "/availableunits",
+                            "/apartments/",
+                            "sightmap.com/embed/",
+                            "rentcafe.com",
+                            "knockdoorway",
+                        )
+                        if any(m in _body_str for m in _SOFT_404_MARKERS):
+                            _soft_404_recovery = True
+                    except Exception:  # pragma: no cover — defensive
+                        pass
+
+            if _soft_404_recovery:
+                # Fall through to extraction. Record the recovery on the
+                # result dict so reports can distinguish "soft-404 recovered"
+                # from "genuine 200 OK".
+                result["_soft_404_recovery"] = True
+                result["_soft_404_status"] = getattr(fetch_result, "status_code", None)
+                # Don't short-circuit; continue past this block.
+            else:
+                result = _empty_result(base_url)
+                result["_property_id"] = property_id
+                result["extraction_tier_used"] = "generic:no_body_short_circuit"
+                _verdict_prefix = _OUTCOME_VERDICT_PREFIX.get(outcome_val, "FAILED_UNREACHABLE")
+                result["errors"].append(
+                    f"{_verdict_prefix}: fetch_outcome={outcome_val} "
+                    f"sig={getattr(fetch_result, 'error_signature', None)}"
+                )
+                # Attach the diagnostic so the report can render *why* it failed.
+                try:
+                    fd = fetch_result.to_dict() if hasattr(fetch_result, "to_dict") else {}
+                    fd["body_bytes"] = 0
+                    fd["captcha_detected"] = False
+                    fd["captcha_provider"] = None
+                    result["_fetch_diagnostic"] = fd
+                except Exception:
+                    pass
+                result["_extract_result"] = ExtractResult(
+                    property_id=property_id,
+                    records=[],
+                    tier_used="generic:no_body_short_circuit",
+                    adapter_name="none",
+                    winning_url=None,
+                    confidence=0.0,
+                    errors=[f"fetch_outcome={outcome_val}"],
+                )
+                return result
 
     # 2026-05-13 (C1 SGCaptcha wall, teammate analysis): when the fetch
     # outcome is technically OK but the page redirected to
