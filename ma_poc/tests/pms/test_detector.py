@@ -9,8 +9,10 @@ from ma_poc.pms.detector import (
     _STRATEGY_BY_PMS,
     MGMT_TO_PMS_PRIOR,
     DetectedPMS,
+    _iter_html_markers,
     confirm_detection,
     detect_pms,
+    detect_pms_candidates,
 )
 
 # Hand-collected from ma_poc/data/runs/2026-04-15/property_reports/. A third
@@ -966,3 +968,183 @@ def test_knock_doorway_beats_g5_marker_when_both_present() -> None:
         f"expected knock (Doorway widget beats G5 page-marker), "
         f"got {result.pms!r}"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Path B Piece 2 (2026-05-20) — _iter_html_markers + detect_pms_candidates.
+#
+# The HTML-marker scan is now a generator yielding ALL matching PMSs in
+# detector priority order. The orchestrator uses detect_pms_candidates
+# to find the NEXT PMS to try when the first adapter returns an empty
+# exit. These tests pin the contract: candidates[0] == detect_pms()'s
+# winner (back-compat); exclude={prev_pms} surfaces the runner-up.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_iter_html_markers_yields_first_match_equal_to_detect_html_markers() -> None:
+    """The legacy first-match contract is preserved. Picking the first
+    yield must equal what the old single-result function returned."""
+    from ma_poc.pms.detector import _detect_html_markers
+    samples = [
+        '<script src="https://commoncf.entrata.com/widgets/x.js"></script>',
+        '<script>knockDoorway.init("a"*32,"community","abc123def");</script>',
+        '<iframe src="https://sightmap.com/embed/m9pzd4ezvk1"></iframe>',
+        '<a href="https://propmgr.securecafe.com/onlineleasing/x/availableunits.aspx">x</a>',
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>',
+    ]
+    for html in samples:
+        first_yielded = next(_iter_html_markers(html), None)
+        legacy = _detect_html_markers(html)
+        assert first_yielded == legacy, (
+            f"first yield differs from legacy first-match for html={html[:60]!r}: "
+            f"yield={first_yielded!r} legacy={legacy!r}"
+        )
+
+
+def test_iter_html_markers_yields_multiple_on_co_resident_pms() -> None:
+    """Page with G5 + Knock + SecureCafe markers — generator yields all
+    three that pass the existing detector gates. (G5 is gated out by
+    cluster #3 fix when securecafe/knock is present; Knock and RentCafe
+    both yield.)"""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+        '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+        '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+        '"community","69e936e6567a11ef");</script>'
+        '<a href="https://lpc.securecafe.com/onlineleasing/x/availableunits.aspx">x</a>'
+        "</body></html>"
+    )
+    yielded = [m[0] for m in _iter_html_markers(html)]
+    # First yield is the highest-priority survivor of the gates.
+    assert yielded[0] == "knock", f"first should be knock, got {yielded[0]!r}"
+    # RentCafe (via securecafe) is yielded later as a retry candidate.
+    assert "rentcafe" in yielded, (
+        f"rentcafe (via securecafe) should appear as a later candidate; got {yielded!r}"
+    )
+
+
+def test_detect_pms_candidates_first_equals_detect_pms() -> None:
+    """Back-compat: candidates[0] must equal detect_pms() result so any
+    existing call site can be swapped to take ``candidates[0]`` without
+    behavior change."""
+    samples = [
+        # (url, html or None, csv_row or None)
+        ("https://www.example.com/", '<iframe src="https://sightmap.com/embed/abc123xyz"></iframe>', None),
+        ("https://lakeline.example.com/", '<script src="//doorway.knck.io/latest/doorway.min.js"></script>', None),
+        ("https://example.com/", '<script src="https://commoncf.entrata.com/widgets/x.js"></script>', None),
+        ("https://example.com/", None, None),  # no signals → no candidates
+    ]
+    for url, html, csv_row in samples:
+        main = detect_pms(url, csv_row=csv_row, page_html=html)
+        cands = detect_pms_candidates(url, csv_row=csv_row, page_html=html)
+        if main.pms == "unknown":
+            # detect_pms returns "unknown" when no signal; candidates is empty.
+            assert cands == [], f"expected [] for no-signal input, got {cands!r}"
+        else:
+            assert cands, f"expected at least 1 candidate for {url!r}, got []"
+            assert cands[0].pms == main.pms, (
+                f"candidates[0] {cands[0].pms!r} differs from detect_pms {main.pms!r} "
+                f"for url={url!r}"
+            )
+
+
+def test_detect_pms_candidates_exclude_removes_first_winner() -> None:
+    """Calling with exclude={first_winner} returns the runner-up — the
+    primary Path B retry use case."""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+        '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+        '"community","69e936e6567a11ef");</script>'
+        '<a href="https://lpc.securecafe.com/onlineleasing/x/availableunits.aspx">x</a>'
+        "</body></html>"
+    )
+    full = detect_pms_candidates("https://example.com/", page_html=html)
+    assert len(full) >= 2, (
+        f"expected ≥2 candidates on multi-PMS page, got {len(full)}: {[c.pms for c in full]}"
+    )
+    winner = full[0].pms
+    runner_up = full[1].pms
+    second_call = detect_pms_candidates(
+        "https://example.com/", page_html=html, exclude={winner}
+    )
+    assert second_call, "expected non-empty list after excluding the winner"
+    assert second_call[0].pms == runner_up, (
+        f"excluding {winner!r} should surface {runner_up!r}; got {second_call[0].pms!r}"
+    )
+    assert all(c.pms != winner for c in second_call), (
+        f"excluded PMS appeared in candidates: {[c.pms for c in second_call]}"
+    )
+
+
+def test_detect_pms_candidates_caps_at_max_candidates() -> None:
+    """max_candidates default is 4; larger pools must be truncated."""
+    # Construct a page with many distinct PMS markers (more than 4).
+    html = (
+        "<html><body>"
+        '<iframe src="https://sightmap.com/embed/abc12345"></iframe>'
+        '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+        '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+        '"community","69e936e6567a11ef");</script>'
+        '<a href="https://lpc.securecafe.com/onlineleasing/x/availableunits.aspx">x</a>'
+        '<script src="https://commoncf.entrata.com/x.js"></script>'
+        '<a href="https://x.appfolio.com/listings">listings</a>'
+        "</body></html>"
+    )
+    capped = detect_pms_candidates(
+        "https://example.com/", page_html=html, max_candidates=2
+    )
+    assert len(capped) <= 2, f"expected ≤2, got {len(capped)}"
+    expanded = detect_pms_candidates(
+        "https://example.com/", page_html=html, max_candidates=10
+    )
+    assert len(expanded) >= len(capped)
+
+
+def test_detect_pms_candidates_excludes_unknown() -> None:
+    """``unknown`` is never offered as a retry candidate — it has no
+    adapter to dispatch to."""
+    cands = detect_pms_candidates("https://no-signal.example.com/")
+    for c in cands:
+        assert c.pms != "unknown", (
+            f"`unknown` must never appear in candidates list, got {[x.pms for x in cands]}"
+        )
+
+
+def test_detect_pms_candidates_no_signal_returns_empty() -> None:
+    """Bare URL, no HTML, no CSV → no candidates (not [DetectedPMS('unknown')])."""
+    assert detect_pms_candidates("https://nowhere.example.com/") == []
+
+
+def test_detect_pms_candidates_never_raises_on_bad_input() -> None:
+    """Defensive: every detector helper is wrapped; bad inputs return []
+    or partial list, never raise."""
+    assert detect_pms_candidates("") == []
+    # Garbled HTML / wrong types — must not raise.
+    out = detect_pms_candidates("https://x.com/", page_html=b"not str" * 100)  # type: ignore[arg-type]
+    assert isinstance(out, list)
+
+
+def test_detect_pms_candidates_host_fingerprint_wins_first_slot() -> None:
+    """Host-based fingerprint (e.g. ``*.rentcafe.com``) is high-trust
+    and should take the first slot even when the HTML carries other
+    markers."""
+    html = (
+        "<html><body>"
+        '<iframe src="https://sightmap.com/embed/abc12345"></iframe>'
+        "</body></html>"
+    )
+    cands = detect_pms_candidates(
+        "https://prop.rentcafe.com/apartments/", page_html=html
+    )
+    assert cands, "expected candidates"
+    assert cands[0].pms == "rentcafe", (
+        f"host fingerprint should win first slot, got {cands[0].pms!r}"
+    )
+    # SightMap from the HTML still appears later — orchestrator can
+    # retry to it if rentcafe returns empty.
+    assert any(c.pms == "sightmap" for c in cands), (
+        f"sightmap should still appear as a later candidate; got {[c.pms for c in cands]}"
+    )
+
