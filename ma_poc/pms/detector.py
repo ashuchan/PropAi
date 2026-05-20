@@ -457,23 +457,39 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     h = page_html.lower()
     # 2026-05-20 fix (feature_fail_1429 cluster #3): G5 marketing-cloud
     # markers (g5marketingcloud / g5dxm.com / g5-c- / g5-cl- /
-    # dnn506yrbagrg.cloudfront.net) are sometimes co-resident with a
-    # real PMS portal (RentCafe SecureCafe or ResMan). In that case
-    # G5's page-level URN is a company-level URN (e.g.
-    # ``g5-cl-...-lincoln-property-company-...``) and the G5 adapter
-    # bails empty (``TIER_1_API_G5_EMPTY`` / ``_NO_URN``) because the
-    # property-specific URN isn't on the page. Gate both G5 branches
-    # below on the absence of these competing-PMS markers so the real
-    # PMS detection wins.
-    # Live-verified: pid 13477 flatirondistrictataustinranch.com — G5
-    # markers + hasRentCafe=true + LPC company URNs; main reached
-    # TIER_1_API for 69 strict units.
+    # dnn506yrbagrg.cloudfront.net) are often co-resident with a real
+    # PMS widget — usually Knock/Doorway, sometimes RentCafe SecureCafe
+    # or ResMan. In that case G5's page-level URN is a company-level
+    # URN (e.g. ``g5-cl-...-lincoln-property-company-...``) and the
+    # G5 adapter bails empty (``TIER_1_API_G5_EMPTY`` / ``_NO_URN``)
+    # because the property-specific URN isn't on the page. Gate both
+    # G5 branches below on the absence of these competing-PMS markers
+    # so the real PMS detection wins.
+    #
+    # Live-verified 2026-05-20 against 6 Bucket-A worklist properties
+    # (cluster G5+TIER_1_API): altaaptstarga / avonleatributary /
+    # beechmeadowaptsin / unionthompson / 6thandalderapartments /
+    # liveatone55lofts — every one had G5 markers AND Knock/Doorway
+    # markers; none had securecafe/resman/rentcafe. The dominant
+    # co-resident pattern is Knock, not RentCafe. The 2026-05-19
+    # session memory of "hasRentCafe: true on Flatiron" was a recall
+    # error — not present in the real fetched HTML.
+    #
+    # Order note: Knock at line ~676 already fires before the G5
+    # *strong* branch at ~690 but AFTER the G5 *weak* branch at ~567.
+    # Without this gate the weak branch wins. With it, Knock and the
+    # later PMS-portal branches get a chance.
     _has_competing_pms_for_g5 = (
-        ".securecafe.com" in h
+        # Knock / Doorway widget — the dominant co-resident PMS in
+        # this cluster (≥6 of 6 Bucket-A props sampled 2026-05-20).
+        "doorway.knck.io" in h
+        or "knockdoorway" in h
+        # RentCafe SecureCafe portal anchors (Flatiron pattern).
+        or ".securecafe.com" in h
         or "securecafe.com/onlineleasing" in h
+        # ResMan portal anchors.
         or "myresman.com" in h
         or "/portal/applicants/availability" in h
-        or "hasrentcafe" in h
     )
     # F0.3 (2026-05-09): three-pass priority order so a real PMS portal
     # reachable from a Squarespace/Wix marketing shell (e.g. 123taylor.com →

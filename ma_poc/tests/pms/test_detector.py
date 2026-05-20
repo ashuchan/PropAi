@@ -945,18 +945,24 @@ def test_g5_alone_still_routes_to_g5_strong_marker() -> None:
     assert result.confidence >= 0.85
 
 
-def test_hasrentcafe_config_beats_g5_marker() -> None:
-    """flatirondistrictataustinranch.com observed config: page has G5
-    markers AND a JS config flag ``hasRentCafe: true`` indicating the
-    building has a RentCafe integration even when no securecafe
-    anchor is rendered in the DOM. Detector must route to rentcafe."""
+def test_knock_doorway_beats_g5_marker_when_both_present() -> None:
+    """Dominant cluster-3 pattern (2026-05-20 live probe of 6 Bucket-A
+    worklist props — altaaptstarga, avonleatributary, beechmeadowaptsin,
+    unionthompson, 6thandalderapartments, liveatone55lofts): G5 markers
+    co-resident with the Knock/Doorway widget. Without the gate the
+    pass-2 G5 weak marker at line 567 wins and the page-level URN is
+    company-level → empty. Detector must route to knock so the
+    KnockAdapter (api_first) hits the Doorway public API."""
     html = (
         "<html><body>"
         '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
-        '<script>window.bldgCfg = {hasRentCafe: true, name: "Flatiron"};</script>'
+        '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+        '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+        '"community","69e936e6567a11ef");</script>'
         "</body></html>"
     )
     result = detect_pms("https://example.com/", page_html=html)
-    assert result.pms == "rentcafe", (
-        f"expected rentcafe (hasRentCafe config flag), got {result.pms!r}"
+    assert result.pms == "knock", (
+        f"expected knock (Doorway widget beats G5 page-marker), "
+        f"got {result.pms!r}"
     )
