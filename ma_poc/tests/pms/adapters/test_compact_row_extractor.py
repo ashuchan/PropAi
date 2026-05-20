@@ -155,6 +155,172 @@ class TestCompactRowFieldExtractor:
         assert all(u["bedrooms"] == "2" for u in units)
 
 
+# ── F2 + F3 (2026-05-20): RentCafe vanity `.fp-container` data-attr cards ─
+
+class TestRentCafeFpContainerDataAttrs:
+    """RentCafe vanity-site plan cards (1105townbrookhaven, wymberlycrossing,
+    sussexwestlife, …) carry the canonical name/beds/sqft/price values as
+    `data-floorplan-*` attributes on descendant Apply / Guided-Tour buttons.
+
+    Verified live against 1105townbrookhaven-apts.com/floorplans 2026-05-20:
+    19 `.fp-container` cards, 38 `data-floorplan-price` attrs total (each
+    plan in two buttons), all four `data-floorplan-*` attrs present.
+    """
+
+    def test_extracts_price_range_lo_hi(self) -> None:
+        """Standard live shape: data-floorplan-price="1660-2199"."""
+        from bs4 import BeautifulSoup
+        from ma_poc.pms.adapters._html_extract import _extract_rentcafe_data_attrs
+        html = """
+        <div class="fp-container" id="fp-container-6114511">
+          <h3 class="card-title">A1</h3>
+          <a class="btn btn-primary track-apply"
+             data-floorplan-name="A1"
+             data-floorplan-size="1"
+             data-floorplan-sqft="682"
+             data-floorplan-price="1660-2199">Availability</a>
+        </div>
+        """
+        node = BeautifulSoup(html, "lxml").select_one(".fp-container")
+        ctx = {"beds": "", "baths": "", "fp_name": "", "is_studio": False}
+        unit = _extract_rentcafe_data_attrs(node, ctx, "https://example.com/floorplans")
+        assert unit is not None
+        assert unit["floor_plan_name"] == "A1"
+        assert unit["bedrooms"] == "1"
+        assert unit["sqft"] == "682"
+        assert unit["market_rent_low"] == 1660
+        assert unit["market_rent_high"] == 2199
+        assert unit["rent_range"] == "$1,660 - $2,199"
+
+    def test_extracts_price_with_space_before_dash(self) -> None:
+        """Live RentCafe sometimes emits "1660 -2199" with a leading space
+        on HI — observed in PID 60578 forensic. Regex must accept this."""
+        from bs4 import BeautifulSoup
+        from ma_poc.pms.adapters._html_extract import _extract_rentcafe_data_attrs
+        html = """
+        <div class="fp-container">
+          <a data-floorplan-name="B1" data-floorplan-size="2"
+             data-floorplan-sqft="1276" data-floorplan-price="2207 -3046">Apply</a>
+        </div>
+        """
+        node = BeautifulSoup(html, "lxml").select_one(".fp-container")
+        unit = _extract_rentcafe_data_attrs(
+            node, {"beds": "", "baths": "", "fp_name": "", "is_studio": False},
+            "https://example.com/floorplans",
+        )
+        assert unit is not None
+        assert unit["market_rent_low"] == 2207
+        assert unit["market_rent_high"] == 3046
+
+    def test_extracts_single_price_lo_only(self) -> None:
+        """When data-floorplan-price is a single number ('1660'), use it
+        for both rent_low and rent_high."""
+        from bs4 import BeautifulSoup
+        from ma_poc.pms.adapters._html_extract import _extract_rentcafe_data_attrs
+        html = """
+        <div class="fp-container">
+          <a data-floorplan-name="A2" data-floorplan-size="1"
+             data-floorplan-sqft="693" data-floorplan-price="1566">Apply</a>
+        </div>
+        """
+        node = BeautifulSoup(html, "lxml").select_one(".fp-container")
+        unit = _extract_rentcafe_data_attrs(
+            node, {"beds": "", "baths": "", "fp_name": "", "is_studio": False},
+            "https://example.com/floorplans",
+        )
+        assert unit is not None
+        assert unit["market_rent_low"] == 1566
+        assert unit["market_rent_high"] == 1566
+
+    def test_price_zero_sentinel_yields_unit_without_rent(self) -> None:
+        """RentCafe uses "0" as a placeholder for "Contact Us" / no public
+        rent. Don't ship 0 as a rent number — fall back to sqft-only row."""
+        from bs4 import BeautifulSoup
+        from ma_poc.pms.adapters._html_extract import _extract_rentcafe_data_attrs
+        html = """
+        <div class="fp-container">
+          <a data-floorplan-name="A3" data-floorplan-size="1"
+             data-floorplan-sqft="800" data-floorplan-price="0">Apply</a>
+        </div>
+        """
+        node = BeautifulSoup(html, "lxml").select_one(".fp-container")
+        unit = _extract_rentcafe_data_attrs(
+            node, {"beds": "", "baths": "", "fp_name": "", "is_studio": False},
+            "https://example.com/floorplans",
+        )
+        # Sqft present → row still emits, but with no rent set.
+        assert unit is not None
+        assert unit["floor_plan_name"] == "A3"
+        assert unit.get("market_rent_low") is None
+        assert unit["sqft"] == "800"
+
+    def test_missing_floorplan_name_returns_none(self) -> None:
+        """No data-floorplan-name = not a RentCafe plan card."""
+        from bs4 import BeautifulSoup
+        from ma_poc.pms.adapters._html_extract import _extract_rentcafe_data_attrs
+        html = '<div class="fp-container"><a>just some content</a></div>'
+        node = BeautifulSoup(html, "lxml").select_one(".fp-container")
+        unit = _extract_rentcafe_data_attrs(
+            node, {"beds": "", "baths": "", "fp_name": "", "is_studio": False},
+            "https://example.com/floorplans",
+        )
+        assert unit is None
+
+    def test_studio_size_zero_renders_studio_bed_label(self) -> None:
+        from bs4 import BeautifulSoup
+        from ma_poc.pms.adapters._html_extract import _extract_rentcafe_data_attrs
+        html = """
+        <div class="fp-container">
+          <a data-floorplan-name="Studio-A" data-floorplan-size="0"
+             data-floorplan-sqft="540" data-floorplan-price="1450-1550">Apply</a>
+        </div>
+        """
+        node = BeautifulSoup(html, "lxml").select_one(".fp-container")
+        unit = _extract_rentcafe_data_attrs(
+            node, {"beds": "", "baths": "", "fp_name": "", "is_studio": False},
+            "https://example.com/floorplans",
+        )
+        assert unit is not None
+        assert unit["bedrooms"] == "0"
+        assert unit["bed_label"] == "Studio"
+
+    def test_end_to_end_extract_units_from_dom_picks_fp_container(self) -> None:
+        """Full cascade: extract_units_from_dom should route .fp-container
+        cards through _extract_rentcafe_data_attrs and emit one row per
+        card with rent / beds / sqft populated."""
+        from ma_poc.pms.adapters._html_extract import extract_units_from_dom
+        # Synthetic 3-plan page modelling the live 1105townbrookhaven shape
+        # — each card has both an Availability and a Guided Tour button
+        # carrying the same data-floorplan-* attrs (mirrors live).
+        cards = []
+        for i, (name, beds, sqft, lo, hi) in enumerate([
+            ("A1", "1", "682", 1660, 2199),
+            ("A2", "1", "693", 1566, 2095),
+            ("B1", "2", "1276", 2207, 3046),
+        ]):
+            cards.append(f"""
+            <div class="fp-container" id="fp-container-{i+1}">
+              <h3 class="card-title">{name}</h3>
+              <a class="btn btn-primary track-apply"
+                 data-floorplan-name="{name}" data-floorplan-size="{beds}"
+                 data-floorplan-sqft="{sqft}" data-floorplan-price="{lo}-{hi}">Availability</a>
+              <a class="btn btn-outline-dark"
+                 data-floorplan-name="{name}" data-floorplan-size="{beds}"
+                 data-floorplan-sqft="{sqft}" data-floorplan-price="{lo}-{hi}">Guided Tour</a>
+            </div>
+            """)
+        html = f"<html><body><h1>Floor Plans</h1>{''.join(cards)}</body></html>"
+        units, mode = extract_units_from_dom(html, "https://example.com/floorplans")
+        assert mode == "default"
+        assert len(units) == 3, f"expected 3 cards, got {len(units)}: {[u['floor_plan_name'] for u in units]}"
+        # Verify A1 specifically
+        a1 = next(u for u in units if u["floor_plan_name"] == "A1")
+        assert a1["bedrooms"] == "1"
+        assert a1["sqft"] == "682"
+        assert a1["market_rent_low"] == 1660
+        assert a1["market_rent_high"] == 2199
+
+
 # ── G5 Marketing Cloud widget config sightmapID extraction ────────────────
 
 class TestG5WidgetSightmapHint:

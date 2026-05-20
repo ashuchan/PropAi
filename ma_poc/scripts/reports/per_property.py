@@ -189,10 +189,16 @@ def _summary_box(sr: dict, unit_diff: dict) -> str:
     updated = unit_diff.get("updated", [])
     unchanged = unit_diff.get("unchanged", [])
     disappeared = unit_diff.get("disappeared", [])
-    lines.append(
-        f"| State Diff | new={len(new)}, updated={len(updated)}, "
-        f"unchanged={len(unchanged)}, disappeared={len(disappeared)} |"
-    )
+    # F4 (2026-05-20): skip the State Diff row when all four lists are empty.
+    # Jugnu passes an empty diff because the real diff lives in a different
+    # scope; rendering "new=0, updated=0, ..." made every report look like
+    # the StateStore had upserted nothing. See _phase7_section for the same
+    # guard on the full section.
+    if new or updated or unchanged or disappeared:
+        lines.append(
+            f"| State Diff | new={len(new)}, updated={len(updated)}, "
+            f"unchanged={len(unchanged)}, disappeared={len(disappeared)} |"
+        )
     lines.append("")
     return "\n".join(lines)
 
@@ -711,7 +717,16 @@ def _phase6_section(sr: dict, tier_used: str) -> str:
 
 
 def _phase7_section(sr: dict, unit_diff: dict) -> str:
-    """Phase 7: Finalization + state diff."""
+    """Phase 7: Finalization + state diff.
+
+    State Diff is rendered only when the caller passed a real diff (any of
+    new/updated/unchanged/disappeared non-empty). The Jugnu runner does NOT
+    compute the diff at report-build time — it lives behind the per-run
+    StateStore inside ``_process_property`` — so passing an all-empty diff
+    suppresses the section. (Pre-fix the section always rendered with zeros,
+    misleading every debugging session: "State Diff: new=0" looks like
+    nothing was upserted when in fact the upsert happened elsewhere.)
+    """
     units = sr.get("units") or []
     if not units:
         return ""
@@ -725,6 +740,14 @@ def _phase7_section(sr: dict, unit_diff: dict) -> str:
     updated = unit_diff.get("updated", [])
     unchanged = unit_diff.get("unchanged", [])
     disappeared = unit_diff.get("disappeared", [])
+
+    # F4 (2026-05-20): suppress the entire State Diff block when no real
+    # data was passed in (all four lists empty). The Jugnu runner currently
+    # hard-codes an empty diff dict because the real diff is computed in a
+    # different scope. Rendering "new=0, updated=0, unchanged=0, disappeared=0"
+    # in every report cost real debugging time (PID 67736 / 2026-05-20).
+    if not (new or updated or unchanged or disappeared):
+        return "\n".join(lines)
 
     lines.append("### State Diff")
     lines.append("")

@@ -481,6 +481,68 @@ _PRIORITY_LISTING_SELECTORS: tuple[str, ...] = (
 )
 
 
+# F7c (2026-05-20): section-widening helpers. The LLM_DOM tier picks a
+# "tightest container" containing rent + bed/bath, but on some templates
+# the availability_date column lives in a sibling/parent block that the
+# tight selection excludes. The widener walks up the ancestor chain
+# looking for the smallest ancestor that contains a date-shaped token,
+# capped at max_bytes so we don't accidentally hand the LLM the whole
+# page. Covers ~50-100 RentCafe avail-date-only-gap properties.
+_DATE_SHAPE_FOR_WIDENING_RE = _re.compile(
+    r"\b\d{4}-\d{2}-\d{2}\b"
+    r"|\b\d{1,2}/\d{1,2}/\d{2,4}\b"
+    r"|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z.]*\s+\d{1,2}\b"
+    r"|data-(?:availability|available[-_]date|move[-_]in[-_]date|ready[-_]date)"
+    r"|available\s+(?:now|on)|\bmove[- ]?in\s+date",
+    _re.IGNORECASE,
+)
+_MAX_WIDEN_ANCESTOR_HOPS = 6
+
+
+def _has_date_signal(html: str) -> bool:
+    """Quick check whether `html` carries any date-shaped marker."""
+    if not html:
+        return False
+    return bool(_DATE_SHAPE_FOR_WIDENING_RE.search(html))
+
+
+def _widen_to_include_date_column(element: Any, max_bytes: int) -> Any:
+    """Walk up the ancestor chain until we find one containing a date.
+
+    Returns the same `element` unchanged when:
+      * the element already contains a date signal, OR
+      * no ancestor within `_MAX_WIDEN_ANCESTOR_HOPS` adds a date AND
+        stays under `max_bytes`, OR
+      * a BeautifulSoup attribute access raises (defensive).
+
+    The walk gives up at the first ancestor that would exceed max_bytes,
+    so we never blow the LLM token budget.
+    """
+    if element is None:
+        return element
+    try:
+        s = str(element)
+    except Exception:
+        return element
+    if _has_date_signal(s):
+        return element
+    parent = getattr(element, "parent", None)
+    for _ in range(_MAX_WIDEN_ANCESTOR_HOPS):
+        if parent is None:
+            break
+        try:
+            parent_html = str(parent)
+        except Exception:
+            break
+        if len(parent_html) > max_bytes:
+            # Would overflow — stop walking, return the original tight element.
+            break
+        if _has_date_signal(parent_html):
+            return parent
+        parent = getattr(parent, "parent", None)
+    return element
+
+
 def _extract_rent_dom_section(html: str, max_bytes: int = 60_000) -> str | None:
     """Return the HTML chunk most likely to contain a multi-unit table.
 
@@ -535,7 +597,12 @@ def _extract_rent_dom_section(html: str, max_bytes: int = 60_000) -> str | None:
         if not matches:
             continue
         if len(matches) == 1:
-            block = str(matches[0])
+            # F7c (2026-05-20): if the matched container doesn't itself
+            # contain a date-shaped token but an ancestor does, widen to
+            # the smallest date-bearing ancestor. Avoids handing the LLM
+            # a section that excludes the availability column.
+            element = _widen_to_include_date_column(matches[0], max_bytes)
+            block = str(element)
         else:
             # Cap at 80 matches so a degenerate selector (e.g. matches every
             # element on the page) can't blow the byte budget. The byte cap
@@ -569,6 +636,8 @@ def _extract_rent_dom_section(html: str, max_bytes: int = 60_000) -> str | None:
             best, best_len, best_combined = el, len(s), _fp_score
 
     if best is not None:
+        # F7c (2026-05-20): widen to include the date column if missing.
+        best = _widen_to_include_date_column(best, max_bytes)
         return str(best)
 
     # Phase 3: fallback to <main>, then <body>, truncated.

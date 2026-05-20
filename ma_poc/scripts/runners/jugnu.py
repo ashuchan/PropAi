@@ -1326,6 +1326,17 @@ async def _process_property(
         units=len(result.get("units", [])),
     )
 
+    # T2 + T4 (2026-05-20): per-property date-presence summary + Sub-cause B
+    # issue emission. Aggregates the date-shape signals from every
+    # extract.html_characterized event captured for this property
+    # (entry-page + every hop), plus the emitted-side date-fill counts.
+    # Used by analyze_cloud_run.py §"Date-completeness sub-cause split"
+    # to classify avail-date-only-gap properties as A/B/C/D/E.
+    try:
+        _emit_date_presence_summary(result, task.property_id, run_dir)
+    except Exception as _dps_exc:
+        log.debug("date_presence_summary emit failed for %s: %s", task.property_id, _dps_exc)
+
     # ── State-store upsert + UNITS_KEYLESS_HIGH gate ──────────────────────
     # On every successful scrape: (a) persist units into the FS state-store
     # so carry_forward_units() has data on the next failure run, and (b) fire
@@ -2029,6 +2040,54 @@ def _format_v2_unit(
             # Clip to the typed column width so the storage clipper
             # doesn't have to truncate mid-word in the warning path.
             avail_date_norm = fallback[:32]
+
+    # T5 (2026-05-20): emit DATE_EXTRACTION_DROP when the AVAIL_DATE_KEYS
+    # alias chain resolved to None BUT the unit dict carries a string value
+    # under some OTHER key that LOOKS date-shaped. Indicates either alias
+    # drift (the producer uses a new key name we don't recognise) or
+    # producer-side regression. Sampled — one event per unit, capped at
+    # first hit so a 300-unit property doesn't flood the ledger.
+    # Mirrors the existing extract.signal_inspection event for rent keys.
+    if (
+        producer_avail_date is None
+        and avail_date_norm is None
+        and isinstance(unit, dict)
+    ):
+        try:
+            import re as _re
+            from ma_poc.extraction.canonical import AVAIL_DATE_KEYS as _AVAIL_KEYS
+            _known = {str(k).lower() for k in _AVAIL_KEYS}
+            _date_shape = _re.compile(
+                r"\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}"
+                r"|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z.]*\s+\d{1,2}",
+                _re.IGNORECASE,
+            )
+            for _k, _v in unit.items():
+                if not isinstance(_v, str) or not _v:
+                    continue
+                _k_low = str(_k).lower()
+                if _k_low in _known:
+                    continue
+                # Only consider keys that LOOK availability-related — avoids
+                # false alarms on every string field on every unit.
+                if not _re.search(r"date|avail|move|ready|on\b", _k_low, _re.IGNORECASE):
+                    continue
+                if _date_shape.search(_v):
+                    try:
+                        from ma_poc.observability.events import EventKind as _EK_DROP
+                        from ma_poc.observability.events import emit as _emit_drop
+                        _emit_drop(
+                            _EK_DROP.DATE_EXTRACTION_DROP,
+                            str(_v2_property_id_for_unit(meta, apartment_id) or ""),
+                            unknown_key=str(_k)[:60],
+                            sample_value=str(_v)[:80],
+                            unit_id_hint=str(unit.get("unit_id") or unit.get("unit_number") or "")[:40],
+                        )
+                    except Exception:
+                        pass
+                    break  # one per unit
+        except Exception:
+            pass  # T5 is observability-only; never fail the formatter
     # Pre-compute the rent values so the status inference can read them
     # without recomputing — formatted values are the source of truth for
     # the "is rent present?" decision, not the raw input keys (which
@@ -2433,6 +2492,188 @@ def _append_issue_to_run(run_dir: Path, issue: Any) -> None:
             _f.write(line + "\n")
     except Exception as exc:
         log.debug("_append_issue_to_run failed: %s", exc)
+
+
+def _emit_date_presence_summary(
+    result: dict[str, Any],
+    property_id: str,
+    run_dir: Path | None,
+) -> None:
+    """T2 + T4 (2026-05-20): emit per-property date-presence summary.
+
+    Aggregates the `date_*_count` fields from every captured HTML body
+    (entry-page + every hop) recorded under ``result["_html_characterizations"]``
+    plus the latest entry-level snapshot at ``result["_html_characterization"]``.
+    Adds emitted-side date-fill counts from ``result["units"]``.
+
+    When the property emits SUCCESS with units > 0 but the date-fill rate
+    is < 50% AND ALL date signals across every captured HTML are zero,
+    also emits a ``DATE_GAP_PAGE_NO_DATES`` issue (severity=INFO) to
+    ``issues.jsonl`` so the daily issues stream can surface the Sub-cause
+    B cohort filterably. See ma_poc/docs/failed_no_data_debugging_playbook.md
+    §19 for the diagnostic decision tree.
+
+    Never raises — observability is best-effort.
+    """
+    try:
+        from ma_poc.observability.events import EventKind as _EK
+        from ma_poc.observability.events import emit as _emit
+    except Exception:
+        return
+
+    # Collect every html_characterization recorded for this property.
+    # Entry-page lives at result["_html_characterization"]; hop characterizations
+    # live at result["_html_characterizations"] (list). Either may be absent.
+    chars: list[dict[str, Any]] = []
+    entry_char = result.get("_html_characterization")
+    if isinstance(entry_char, dict):
+        chars.append(entry_char)
+    hop_chars = result.get("_html_characterizations")
+    if isinstance(hop_chars, list):
+        chars.extend(c for c in hop_chars if isinstance(c, dict))
+
+    def _max(field: str) -> int:
+        vals = [int(c.get(field, 0) or 0) for c in chars]
+        return max(vals) if vals else 0
+
+    max_date_iso = _max("date_iso_count")
+    max_date_us = _max("date_us_count")
+    max_date_named = _max("date_named_count")
+    max_avail_now = _max("available_now_count")
+    max_move_in_kw = _max("move_in_keyword_count")
+    max_data_avail_attrs = _max("data_avail_attr_count")
+
+    units = result.get("units") or []
+    n_units = len(units)
+    n_with_date = sum(
+        1 for u in units
+        if isinstance(u, dict)
+        and (u.get("available_date") not in (None, "") or u.get("availability_date") not in (None, ""))
+    )
+    n_status_avail = sum(
+        1 for u in units
+        if isinstance(u, dict)
+        and str(u.get("availability_status") or "").upper() == "AVAILABLE"
+    )
+
+    meta = result.get("_meta") or {}
+    verdict_val = str(meta.get("verdict") or "")
+    tier_used = ""
+    extract_result = result.get("_extract_result")
+    if extract_result is not None:
+        tier_used = str(getattr(extract_result, "tier_used", "") or "")
+
+    _emit(
+        _EK.DATE_PRESENCE_SUMMARY,
+        property_id,
+        verdict=verdict_val,
+        tier_used=tier_used,
+        n_units=n_units,
+        n_units_with_date=n_with_date,
+        n_units_status_available=n_status_avail,
+        max_date_iso_seen=max_date_iso,
+        max_date_us_seen=max_date_us,
+        max_date_named_seen=max_date_named,
+        max_available_now_seen=max_avail_now,
+        max_move_in_keyword_seen=max_move_in_kw,
+        max_data_avail_attrs_seen=max_data_avail_attrs,
+        n_html_chars_seen=len(chars),
+    )
+
+    # T4 (2026-05-20): emit Sub-cause B issue when SUCCESS + units > 0 + date
+    # fill < 50% AND every captured HTML showed zero date signals. Severity
+    # INFO so it stays out of ERROR dashboards but is filterable via
+    # `jq 'select(.code=="DATE_GAP_PAGE_NO_DATES")' issues.jsonl`.
+    SUCCESS_VERDICTS = {"SUCCESS", "SUCCESS_PARTIAL", "SUCCESS_PLAN_LEVEL"}
+    if (
+        verdict_val in SUCCESS_VERDICTS
+        and n_units > 0
+        and n_with_date / n_units < 0.5
+        and max_date_iso == 0
+        and max_date_us == 0
+        and max_date_named == 0
+        and max_data_avail_attrs == 0
+        # max_avail_now > 0 is OK — that means "Available Now" text is
+        # present which the v2 formatter would have turned into today's
+        # date if the producer had set available_date_raw. So if avail_now
+        # is present but date_iso/us/named are zero AND date fill < 50%,
+        # this is Sub-cause E (formatter-side fallback miss) — NOT B.
+        and max_avail_now == 0
+        and run_dir is not None
+    ):
+        try:
+            from ma_poc.data_provider.dtos import IssueEntry as _IssueEntry
+            _append_issue_to_run(
+                run_dir,
+                _IssueEntry(
+                    severity="INFO",
+                    code="DATE_GAP_PAGE_NO_DATES",
+                    message=(
+                        f"{n_units} units emitted with status but no per-unit "
+                        f"date; no date signals in any captured HTML "
+                        f"({len(chars)} bodies scanned)"
+                    ),
+                    canonical_id=property_id,
+                    details={
+                        "n_units": n_units,
+                        "n_units_with_date": n_with_date,
+                        "n_status_avail": n_status_avail,
+                        "tier_used": tier_used,
+                        "verdict": verdict_val,
+                        "subcause": "B_PAGE_NO_DATES",
+                    },
+                ),
+            )
+        except Exception as exc:
+            log.debug("DATE_GAP_PAGE_NO_DATES issue emit failed for %s: %s", property_id, exc)
+
+    # F8b (2026-05-20): emit RENT_GATED_BY_PORTAL when marketing-site rent
+    # extraction yielded null AND a SecureCafe hop got CF_CHALLENGE. Lets
+    # analytics distinguish "rent hidden behind CF" (this signal) from
+    # "rent never extracted" (Sub-cause B equivalent for rent). Pre-fix,
+    # both bucket as null-rent SUCCESS in dashboards.
+    try:
+        if verdict_val in SUCCESS_VERDICTS and n_units > 0:
+            n_with_rent = sum(
+                1 for u in units
+                if isinstance(u, dict)
+                and (u.get("rent_low") not in (None, "") or u.get("rent_high") not in (None, ""))
+            )
+            rent_fill = n_with_rent / n_units if n_units else 0
+            # Trigger only when rent is mostly missing — single-unit edge
+            # cases stay quiet.
+            if rent_fill < 0.2:
+                # Look for a SecureCafe hop that hit CF_CHALLENGE in the
+                # property's _hop_outcomes or _fetch_diagnostic blob. The
+                # concession merge added these accumulators; we read them
+                # defensively.
+                hop_outcomes = result.get("_hop_outcomes") or []
+                portal_blocked = False
+                portal_url = ""
+                if isinstance(hop_outcomes, list):
+                    for h in hop_outcomes:
+                        if not isinstance(h, dict):
+                            continue
+                        h_url = str(h.get("url") or "").lower()
+                        h_outcome = str(h.get("outcome") or "").upper()
+                        h_sig = str(h.get("error_signature") or "")
+                        if "securecafe.com" in h_url and (
+                            h_outcome == "BOT_BLOCKED" or "CF_CHALLENGE" in h_sig
+                        ):
+                            portal_blocked = True
+                            portal_url = h.get("url") or ""
+                            break
+                if portal_blocked:
+                    _emit(
+                        _EK.RENT_GATED_BY_PORTAL,
+                        property_id,
+                        portal_url=portal_url,
+                        n_units=n_units,
+                        n_with_rent=n_with_rent,
+                        tier_used=tier_used,
+                    )
+    except Exception as exc:
+        log.debug("RENT_GATED_BY_PORTAL emit failed for %s: %s", property_id, exc)
 
 
 def _make_failed_record(

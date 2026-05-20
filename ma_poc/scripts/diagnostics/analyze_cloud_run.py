@@ -101,6 +101,19 @@ class PropertyOutcome:
     link_hops_recovered: int = 0
     issue_codes: list[str] = field(default_factory=list)
 
+    # T2 (2026-05-20): date-gap sub-cause classification inputs. Populated
+    # from extract.date_presence_summary OR (when that's absent — pre-T2
+    # cloud runs) from per-property max across all extract.html_characterized
+    # events for the property.
+    max_date_iso_seen: int = 0
+    max_date_us_seen: int = 0
+    max_date_named_seen: int = 0
+    max_available_now_seen: int = 0
+    max_move_in_kw_seen: int = 0
+    max_data_avail_attrs_seen: int = 0
+    n_units_with_date: int = 0
+    n_units_status_available: int = 0
+
     @property
     def domain(self) -> str | None:
         if not self.url:
@@ -355,6 +368,44 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
         elif kind == "output.property_emitted":
             o.verdict = ev.get("verdict")
             o.units = int(ev.get("units") or 0)
+        elif kind == "extract.html_characterized":
+            # T1 (2026-05-20): track the max date-signal count seen across
+            # every captured HTML body for this property. Used by the
+            # date-gap sub-cause classifier (Sub-cause B = all zero).
+            def _max_int(field: str, current: int) -> int:
+                v = ev.get(field)
+                if v is None:
+                    return current
+                try:
+                    return max(current, int(v))
+                except (TypeError, ValueError):
+                    return current
+
+            o.max_date_iso_seen = _max_int("date_iso_count", o.max_date_iso_seen)
+            o.max_date_us_seen = _max_int("date_us_count", o.max_date_us_seen)
+            o.max_date_named_seen = _max_int("date_named_count", o.max_date_named_seen)
+            o.max_available_now_seen = _max_int("available_now_count", o.max_available_now_seen)
+            o.max_move_in_kw_seen = _max_int("move_in_keyword_count", o.max_move_in_kw_seen)
+            o.max_data_avail_attrs_seen = _max_int("data_avail_attr_count", o.max_data_avail_attrs_seen)
+        elif kind == "extract.date_presence_summary":
+            # T2 (2026-05-20): authoritative per-property roll-up. When
+            # present, override the html_characterized-derived maxes.
+            for src, dst_attr in (
+                ("max_date_iso_seen", "max_date_iso_seen"),
+                ("max_date_us_seen", "max_date_us_seen"),
+                ("max_date_named_seen", "max_date_named_seen"),
+                ("max_available_now_seen", "max_available_now_seen"),
+                ("max_move_in_keyword_seen", "max_move_in_kw_seen"),
+                ("max_data_avail_attrs_seen", "max_data_avail_attrs_seen"),
+                ("n_units_with_date", "n_units_with_date"),
+                ("n_units_status_available", "n_units_status_available"),
+            ):
+                v = ev.get(src)
+                if v is not None:
+                    try:
+                        setattr(o, dst_attr, int(v))
+                    except (TypeError, ValueError):
+                        pass
 
     for issue in issues:
         pid = str(issue.get("canonical_id") or "")
@@ -464,6 +515,189 @@ def aggregate_run(run_dir: Path, run_date: str, expected_shards: int = 20) -> tu
             stats.failure_terminal_tiers["__no_extraction__"] += 1
 
     return stats, all_outcomes
+
+
+# ---------------------------------------------------------------------------
+# Date-gap sub-cause classifier (T3, 2026-05-20)
+# ---------------------------------------------------------------------------
+
+
+_SUCCESS_VERDICTS_FOR_DATE_GAP: tuple[str, ...] = (
+    "SUCCESS",
+    "SUCCESS_PARTIAL",
+    "SUCCESS_PLAN_LEVEL",
+)
+
+
+def classify_date_gap(o: PropertyOutcome) -> str | None:
+    """Classify a property into A/B/C/D/E for the avail-date sub-cause split.
+
+    Returns None when the property doesn't have an avail-date gap (date
+    fill ≥ 50%, or didn't ship units, or failed). See playbook §19 for
+    the decision tree.
+
+    A_API_FLOORPLANS_ONLY — TIER_1_API_* tier won; producer side returned
+        plan-level only (no per-unit dates). Fix: F7a per-unit endpoint probe.
+
+    B_PAGE_NO_DATES — zero date signals in any captured HTML for this
+        property. Page genuinely doesn't display per-unit dates. Fix:
+        F7b accept + document; per-unit info is gated behind portal.
+
+    C_LLM_SECTION_MISSED — TIER_4_LLM_DOM tier won AND date signals were
+        present in captured HTML. The LLM section picker handed an
+        adjacent-but-narrower DOM region that excluded the date column.
+        Fix: F7c LLM_DOM section widening.
+
+    D_DOM_ATTRS_IGNORED — TIER_1_API_* tier won AND data-availability
+        attrs exist in captured HTML. The DOM has dates the API path
+        didn't read. Fix: F7d (already shipped for OneSite) +
+        analogous for other PMS.
+
+    E_AVAILABLE_NOW_NO_FALLBACK — "Available Now" text seen but no ISO
+        date and date fill < 50%. The formatter's today's-date fallback
+        for "Available Now" / "now" should have fired but didn't —
+        likely because available_date_raw was never set. Investigation
+        needed (alias drift? producer-side regression?).
+    """
+    if o.verdict not in _SUCCESS_VERDICTS_FOR_DATE_GAP:
+        return None
+    if o.units <= 0:
+        return None
+    # The T2 `extract.date_presence_summary` event populates
+    # `n_units_with_date` directly. For pre-T2 runs (cloud data emitted
+    # before this telemetry shipped) the field stays 0; we can't tell
+    # those apart from a real "all units missing dates" case using
+    # `n_with_date` alone. The distinguishing signal is whether ANY
+    # T1/T2 evidence was recorded — when `max_*_seen` and `issue_codes`
+    # are both blank we skip (return None) so old runs don't fill the
+    # bucket with false positives.
+    n_with_date = o.n_units_with_date
+    fill_ratio = n_with_date / o.units if o.units else 0
+    if fill_ratio >= 0.5:
+        return None
+    has_t1_telemetry = (
+        o.max_date_iso_seen > 0
+        or o.max_date_us_seen > 0
+        or o.max_date_named_seen > 0
+        or o.max_data_avail_attrs_seen > 0
+        or o.max_available_now_seen > 0
+        or o.max_move_in_kw_seen > 0
+    )
+    has_t2_or_t4 = (
+        n_with_date > 0
+        or "DATE_GAP_PAGE_NO_DATES" in o.issue_codes
+    )
+    if not has_t1_telemetry and not has_t2_or_t4:
+        # Pre-T1/T2 cloud run — no evidence either way. Don't fabricate
+        # a classification.
+        return None
+
+    # Has date signals anywhere in captured HTML?
+    has_iso_or_us_or_named = (
+        o.max_date_iso_seen > 0
+        or o.max_date_us_seen > 0
+        or o.max_date_named_seen > 0
+    )
+    has_any_date_signal = (
+        has_iso_or_us_or_named or o.max_data_avail_attrs_seen > 0
+    )
+    has_only_avail_now = o.max_available_now_seen > 0 and not has_any_date_signal
+
+    tier = o.terminal_tier or ""
+
+    # D — TIER_1_API_* with data-availability attrs in DOM.
+    if tier.startswith("TIER_1_API") and o.max_data_avail_attrs_seen > 0:
+        return "D_DOM_ATTRS_IGNORED"
+
+    # B — zero date signals AND no available-now text.
+    if not has_any_date_signal and not has_only_avail_now:
+        return "B_PAGE_NO_DATES"
+
+    # E — available-now text but no date shape AND fill < 50%.
+    if has_only_avail_now:
+        return "E_AVAILABLE_NOW_NO_FALLBACK"
+
+    # C — TIER_4_LLM_DOM AND dates exist in HTML (LLM missed the section).
+    if tier == "TIER_4_LLM_DOM" and has_iso_or_us_or_named:
+        return "C_LLM_SECTION_MISSED"
+
+    # A — TIER_1_API_* (any) AND no data-availability attrs (DOM clean,
+    # API only returned plan-level).
+    if tier.startswith("TIER_1_API") or tier == "TIER_1_API":
+        return "A_API_FLOORPLANS_ONLY"
+
+    # Unclassified — could be TIER_3_DOM with a wider gap, TIER_1_5_EMBEDDED
+    # with no date keys in the embedded blob, etc. Surface as OTHER so the
+    # next investigation knows where to look.
+    return "OTHER"
+
+
+def _render_date_gap_subcause_section(outcomes: dict[str, PropertyOutcome]) -> list[str]:
+    """Render the date-gap sub-cause split as markdown lines.
+
+    Returns an empty list when no avail-date-gap properties are found
+    (e.g. an old run without T1/T2 telemetry).
+    """
+    classified: list[tuple[str, PropertyOutcome]] = []
+    for o in outcomes.values():
+        c = classify_date_gap(o)
+        if c is not None:
+            classified.append((c, o))
+
+    if not classified:
+        return []
+
+    by_cause: dict[str, list[PropertyOutcome]] = {}
+    for cause, o in classified:
+        by_cause.setdefault(cause, []).append(o)
+
+    ordered_causes = [
+        ("A_API_FLOORPLANS_ONLY", "F7a per-unit endpoint probe"),
+        ("B_PAGE_NO_DATES", "F7b — accept; per-unit data not exposed"),
+        ("C_LLM_SECTION_MISSED", "F7c LLM_DOM section widening"),
+        ("D_DOM_ATTRS_IGNORED", "F7d (shipped for OneSite 2026-05-20)"),
+        ("E_AVAILABLE_NOW_NO_FALLBACK", "Investigate — formatter fallback miss"),
+        ("OTHER", "Investigate — unclassified gap"),
+    ]
+    lines = [
+        "",
+        "## Date-completeness sub-cause split (avail-date-only-gap properties)",
+        "",
+        f"**Total avail-date-only-gap properties: {len(classified)}**.",
+        "Classification uses the T1 (`extract.html_characterized.date_*_count`) and ",
+        "T2 (`extract.date_presence_summary`) telemetry shipped 2026-05-20. See ",
+        "[playbook §19](failed_no_data_debugging_playbook.md) for the decision tree.",
+        "",
+        "| Sub-cause | Count | % | Coverage |",
+        "|---|---:|---:|---|",
+    ]
+    total = len(classified)
+    for cause, coverage in ordered_causes:
+        bucket = by_cause.get(cause, [])
+        n = len(bucket)
+        pct = (n / total * 100) if total else 0
+        lines.append(f"| {cause} | {n} | {pct:.1f}% | {coverage} |")
+    lines.append("")
+
+    # Sample PIDs per bucket — 5 each.
+    for cause, _ in ordered_causes:
+        bucket = by_cause.get(cause, [])
+        if not bucket:
+            continue
+        sample = bucket[:5]
+        lines.append(f"**Sample {cause} PIDs:**")
+        lines.append("")
+        for o in sample:
+            url = o.url or o.final_url or ""
+            tier = o.terminal_tier or "-"
+            fill = (o.n_units_with_date / o.units * 100) if o.units else 0
+            lines.append(
+                f"- `{o.property_id}` ({tier}) — {o.units} units, "
+                f"{fill:.0f}% date-fill — {url[:80]}"
+            )
+        lines.append("")
+
+    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -783,6 +1017,12 @@ def render_summary_md(stats: RunStats, outcomes: dict[str, PropertyOutcome]) -> 
         f"| Pother | {pattern_counts.get('Pother', 0)} | Anything else |",
         "",
     ]
+
+    # T3 (2026-05-20): Date-completeness sub-cause split. Reads the per-
+    # property date-shape signals collected from extract.html_characterized
+    # + extract.date_presence_summary events. Classifies each SUCCESS
+    # property with date-fill < 50% as A/B/C/D/E (see playbook §19).
+    lines += _render_date_gap_subcause_section(outcomes)
 
     if stats.slo_breaches:
         lines += [

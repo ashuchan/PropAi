@@ -26,6 +26,7 @@ Key findings:
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._daily_runner_parsers import (
@@ -130,6 +131,15 @@ class OneSiteAdapter:
         all_units: list[dict[str, str]] = []
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
+        # F7a (2026-05-20): track the property_id we saw in /floorplans so
+        # we can probe the matching /units endpoint when /units wasn't
+        # captured during page load. RealPage emits /floorplans nearly
+        # always (Apply Now button auto-fetches it) but /units only fires
+        # when the user clicks into a specific plan — link-hop crawlers
+        # often miss it. 9 properties on 2026-05-20 had /floorplans but
+        # not /units; all 9 shipped null availability_date.
+        realpage_property_id: str | None = None
+        units_captured = False
         for resp in api_responses:
             body = resp.get("body")
             url = resp.get("url", "")
@@ -138,7 +148,15 @@ class OneSiteAdapter:
                 if units:
                     all_units.extend(units)
                     result.api_responses.append(resp)
+                # Extract the numeric property_id from the /floorplans URL
+                # for the F7a /units probe. Pattern:
+                # `api.ws.realpage.com/v2/property/{NUMERIC}/floorplans`.
+                if realpage_property_id is None:
+                    m = re.search(r"/property/(\d+)/floorplans", url, re.IGNORECASE)
+                    if m:
+                        realpage_property_id = m.group(1)
             elif _is_realpage_units_response(body, url):
+                units_captured = True
                 # RealPage /units endpoint — body may be null/[]/{response:[...]}
                 try:
                     units = _dr_realpage_units(body, url) or []
@@ -149,7 +167,46 @@ class OneSiteAdapter:
                     all_units.extend(units)
                     result.api_responses.append(resp)
 
+        # F7a (2026-05-20): when /floorplans was captured but /units wasn't,
+        # probe /units explicitly. The URL pattern is deterministic; if it
+        # returns a non-null body we merge the per-unit rows (which include
+        # availability_date) over the plan-level rows we already have.
+        # Routes via stealth_probe so we inherit the property's sticky
+        # Chrome identity + captcha-detect logic.
+        if realpage_property_id and not units_captured and all_units:
+            try:
+                _u = await _probe_realpage_units_endpoint(
+                    realpage_property_id,
+                    canonical_id=getattr(ctx, "property_id", None),
+                )
+                if _u:
+                    all_units.extend(_u)
+                    # Synthesise a pseudo-response entry so the api_responses
+                    # bookkeeping reflects the probe.
+                    result.api_responses.append({
+                        "url": _realpage_units_url(realpage_property_id),
+                        "probed": True,
+                        "unit_count": len(_u),
+                    })
+            except Exception as exc:
+                result.errors.append(f"realpage-units-probe-error: {exc}")
+
         if all_units:
+            # F7d (2026-05-20 PID 11317): OneSite /floorplans-only payloads
+            # carry plan-level rows with no per-unit availability date. The
+            # marketing page often renders the same availability info as
+            # `data-availability` / `data-available-date` attributes on
+            # apartment cards (verified live against dixonatstonegate.com:
+            # 11 data-availability attrs alongside the 11 plan rows). Merge
+            # those dates onto the units by unit_id before the validity
+            # gate runs.
+            try:
+                page_html = _read_page_html_from_ctx(ctx)
+                if page_html:
+                    _augment_units_with_dom_availability(all_units, page_html)
+            except Exception as exc:
+                result.errors.append(f"onesite-dom-aug-error: {exc}")
+
             # Stage 1 validity gate.
             from ma_poc.extraction.post_process import post_process
 
@@ -178,3 +235,186 @@ class OneSiteAdapter:
 
     def static_fingerprints(self) -> list[str]:
         return list(self._fingerprints)
+
+
+# F7d (2026-05-20): OneSite DOM data-availability augmentation
+# ─────────────────────────────────────────────────────────────────────
+# OneSite's API exposes /floorplans (plan-level) and /units (per-unit).
+# When only /floorplans is captured — which is the common case for
+# RealPage tenants whose page doesn't trigger the /units XHR — the
+# adapter ships plan rows with `availability_date=""` by design (the
+# /floorplans endpoint has no date field). The MARKETING site, however,
+# typically renders per-unit availability as `data-availability` or
+# `data-available-date` attributes on the apartment-card DOM elements.
+# Verified live against dixonatstonegate.com 2026-05-20: 11
+# data-availability attributes matching the 11 emitted units 1:1.
+#
+# This DOM augmentation pass extracts (unit_id, date) pairs from the
+# page HTML and merges them into the API-extracted units. Non-destructive
+# — only fills `availability_date` when the unit lacks one.
+
+# RealPage card data-attr shape — observed live on dixonatstonegate.com:
+#   <article data-unit-id="2604014" data-availability="2026-06-15" ...>
+# Attribute names vary slightly by tenant; we accept several aliases.
+_REALPAGE_DOM_AVAIL_RE = re.compile(
+    r'data-(?:availability|available[-_]date|move[-_]in[-_]date|ready[-_]date)'
+    r'\s*=\s*"([^"]+)"',
+    re.IGNORECASE,
+)
+_REALPAGE_DOM_UNIT_ID_RE = re.compile(
+    r'data-(?:unit[-_]id|unit[-_]number|apartment[-_]id|listing[-_]id)'
+    r'\s*=\s*"([^"]+)"',
+    re.IGNORECASE,
+)
+
+
+def _read_page_html_from_ctx(ctx: "AdapterContext") -> str:
+    """Pull rendered HTML off the AdapterContext fetch_result body."""
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is None:
+        return ""
+    body = getattr(fr, "body", None)
+    if isinstance(body, bytes):
+        try:
+            return body.decode("utf-8", errors="replace")
+        except Exception:
+            return ""
+    if isinstance(body, str):
+        return body
+    return ""
+
+
+def _extract_dom_avail_pairs(html: str) -> dict[str, str]:
+    """Scan `html` for `data-availability`-shaped attribute pairs.
+
+    Returns a dict mapping `unit_id` (or `unit_number`) → date string.
+    Best-effort: walks tag-by-tag using BeautifulSoup so we only pair
+    an availability attr with the unit_id from the SAME element (not
+    one elsewhere in the document — that would cross-pollute IDs).
+    """
+    out: dict[str, str] = {}
+    if not html or len(html) > 5_000_000:
+        # Bound the scan — runaway HTML inputs shouldn't burn parser time.
+        return out
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, "html.parser")
+        except Exception:
+            return out
+
+    # Find every element that has at least one of the date attributes.
+    date_attrs = ("data-availability", "data-available-date",
+                  "data-move-in-date", "data-ready-date")
+    id_attrs = ("data-unit-id", "data-unit-number", "data-apartment-id",
+                "data-listing-id")
+    try:
+        for el in soup.find_all(True):
+            attrs = getattr(el, "attrs", None) or {}
+            # Lowercase-key view to handle camelCase / PascalCase attrs.
+            attrs_lower = {k.lower(): v for k, v in attrs.items() if isinstance(k, str)}
+            date_val = None
+            for a in date_attrs:
+                v = attrs_lower.get(a)
+                if v:
+                    date_val = str(v).strip()
+                    break
+            if not date_val:
+                continue
+            uid_val = None
+            for a in id_attrs:
+                v = attrs_lower.get(a)
+                if v:
+                    uid_val = str(v).strip()
+                    break
+            if uid_val and date_val:
+                # First seen wins — RealPage repeats the apartment card
+                # in mobile + desktop renders sometimes.
+                out.setdefault(uid_val, date_val)
+    except Exception:
+        return out
+    return out
+
+
+def _augment_units_with_dom_availability(
+    units: list[dict[str, Any]], page_html: str
+) -> None:
+    """Merge DOM-sourced availability dates onto API-extracted units.
+
+    Non-destructive: only fills `availability_date` when the unit lacks
+    one. Matches by `unit_id` first, then `unit_number`. Does not modify
+    the list structure — only mutates dicts in place.
+    """
+    pairs = _extract_dom_avail_pairs(page_html)
+    if not pairs:
+        return
+    for u in units:
+        if u.get("availability_date"):
+            continue  # already set by API path — don't overwrite
+        # Try unit_id then unit_number as the join key.
+        uid = str(u.get("unit_id") or u.get("unit_number") or "").strip()
+        if not uid:
+            continue
+        date_val = pairs.get(uid)
+        if date_val:
+            u["availability_date"] = date_val
+
+
+# F7a (2026-05-20): explicit /units endpoint probe
+# ─────────────────────────────────────────────────────────────────────
+# When /floorplans is captured but /units isn't, this probe fetches the
+# matching /units endpoint via the stealth-probe path (sticky Chrome
+# identity + captcha-detect). Same posture as `_probe_realpage_cws` in
+# pms/adapters/generic.py.
+#
+# Coverage: ~9 properties / day on 2026-05-20 — all OneSite tenants whose
+# marketing page didn't trigger the /units XHR during the entry-page load.
+
+
+def _realpage_units_url(property_id: str) -> str:
+    """Canonical /units endpoint URL for a numeric RealPage property_id."""
+    return f"https://api.ws.realpage.com/v2/property/{property_id}/units"
+
+
+async def _probe_realpage_units_endpoint(
+    property_id: str,
+    canonical_id: str | None = None,
+) -> list[dict[str, str]]:
+    """Fetch + parse the RealPage /units endpoint.
+
+    Returns adapter-shape unit dicts (list-of-dict with floor_plan_name,
+    bedrooms, bathrooms, sqft, unit_number, rent_range, availability_date)
+    matching `realpage_units_to_adapter_shape`. Empty list on any failure
+    (probe captcha-blocked, body null/empty, parse error).
+
+    Routes via `stealth_probe` for identity stickiness — RealPage's WAF
+    profiles UA + TLS fingerprint per source IP so a coherent identity
+    across the entry-page fetch and this probe avoids the
+    "Frankenstein session" detection signal.
+    """
+    if not property_id or not property_id.isdigit():
+        return []
+    url = _realpage_units_url(property_id)
+    try:
+        from ma_poc.fetch.probe import stealth_probe
+
+        body, status, captcha_provider = await stealth_probe(
+            url,
+            method="GET",
+            property_id=canonical_id or property_id,
+            timeout_seconds=15.0,
+            telemetry_context="realpage_units_probe",
+        )
+        if status != 200 or captcha_provider or not body:
+            return []
+        import json as _json
+        try:
+            data = _json.loads(body)
+        except (ValueError, TypeError):
+            return []
+        return _dr_realpage_units(data, url) or []
+    except Exception:
+        return []

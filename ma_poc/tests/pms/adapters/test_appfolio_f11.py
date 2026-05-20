@@ -62,6 +62,32 @@ _OFFBOARDED_PAGE_TITLE_VARIANT = """
 <body><h1>Page Not Found</h1></body></html>
 """
 
+# F1 (2026-05-20 PID 67736 regression): live meridiapm.appfolio.com shape.
+# Address text is a DIRECT child of the span, no nested wrapping tag — the
+# old `>\s*<TAG>([^<]+)<` pattern matched 0 / 300 addresses on the live page.
+# This fixture pins the corrected regex against the actual production shape.
+_MERIDIAPM_LISTING_FRAGMENT = """
+<html><body>
+<article class="listing-item result js-listing-item" data-listing-id="6401">
+  <div class="js-listing-blurb-rent">$2,095</div>
+  <div class="js-listing-blurb-bed-bath">Studio / 1 ba</div>
+  <div class="js-listing-square-feet">Square Feet: 1,056</div>
+  <div class="js-listing-available">Available Now</div>
+  <p class="u-space-an">
+    <span class="u-pad-rm js-listing-address">3749 Arbor Green Way, Indianapolis, IN 46220</span>
+    <a href="#" class="hand-hidden js-listing-map-view-link">Map</a>
+  </p>
+</article>
+<article class="listing-item result js-listing-item" data-listing-id="6459">
+  <div class="js-listing-blurb-rent">$2,890</div>
+  <div class="js-listing-blurb-bed-bath">2 bd / 1 ba</div>
+  <div class="js-listing-square-feet">Square Feet: 501</div>
+  <div class="js-listing-available">6/15/26</div>
+  <span class="u-pad-rm js-listing-address">26 University Pl Blvd, Unit 349, Jersey City, NJ 07305</span>
+</article>
+</body></html>
+"""
+
 
 # ---- normalize_appfolio_url unit tests -----------------------------------
 
@@ -115,6 +141,33 @@ def test_h18_ssr_parser_extracts_richelson_shape() -> None:
     assert u2["unit_number"] == "265"
     # Studio is parsed as bedrooms=0
     assert u2["bedrooms"] == "0"
+
+
+def test_f1_ssr_parser_extracts_meridiapm_direct_text_address() -> None:
+    """F1 regression (PID 67736 / 2026-05-20): the meridiapm.appfolio.com
+    template places address text DIRECTLY inside the js-listing-address
+    span, no nested <a> wrapper. The pre-fix regex required a nested tag
+    and matched 0 / 300 addresses on the live page, sending every unit
+    through the `AppFolio listing {id}` fallback. This test pins the
+    corrected regex against the actual production shape."""
+    units = parse_appfolio_listings_ssr(
+        _MERIDIAPM_LISTING_FRAGMENT,
+        "https://meridiapm.appfolio.com/listings",
+    )
+    assert len(units) == 2
+    # First card: address-with-following-anchor shape (a Map link follows).
+    u1 = units[0]
+    assert u1["unit_number"] == "6401"
+    assert u1["floor_plan_name"] == "3749 Arbor Green Way, Indianapolis, IN 46220", \
+        f"expected real address, got junk fallback: {u1['floor_plan_name']!r}"
+    assert "$2,095" in u1["rent_range"]
+    # Second card: plain span with no following anchor.
+    u2 = units[1]
+    assert u2["unit_number"] == "6459"
+    assert u2["floor_plan_name"] == "26 University Pl Blvd, Unit 349, Jersey City, NJ 07305", \
+        f"expected real address, got junk fallback: {u2['floor_plan_name']!r}"
+    # Existing nested-tag shape (richelson) must still parse — backward compat.
+    # (Covered by test_h18_ssr_parser_extracts_richelson_shape above.)
 
 
 def test_ssr_parser_returns_empty_when_no_listing_cards() -> None:

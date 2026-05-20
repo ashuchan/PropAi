@@ -234,6 +234,26 @@ FIELD_ALIASES: dict[str, str] = {
     "pricepermonth":      "rent",        # Wix monthly rent
     "rentpermonth":       "rent",        # Wix variant
     "priceamount":        "rent",        # Wix Studio numeric
+    # F6 (2026-05-20 PID 218985 cohort): MAA / Cortland / Bell embedded
+    # JSON payloads observed in the avail-gap audit. The walker found the
+    # unit lists but skipped the rent because these key spellings weren't
+    # in the alias table. Best-effort — needs canary validation against
+    # a live MAA tenant page since the maac.com host CF-blocks ad-hoc
+    # requests. If a key here doesn't match the live payload it costs
+    # nothing (the alias table is read-only); if a key matches it
+    # recovers rent on ~23 properties / day.
+    "loweffectiverent":   "min_rent",    # MAA
+    "lowestrent":         "min_rent",    # MAA / Cortland fallback name
+    "lowmarketrent":      "min_rent",    # MAA variant
+    "highestrent":        "max_rent",    # MAA / Cortland
+    "highmarketrent":     "max_rent",    # MAA variant
+    "higheffectiverent":  "max_rent",    # MAA
+    "starting_rent":      "min_rent",    # marketing-CMS shape
+    "startingat":         "min_rent",    # display variant
+    "starting_at":        "min_rent",
+    "effectiverent":      "rent",        # MAA per-unit
+    "netrent":            "rent",        # Bell / Equity variant
+    "marketrent":         "rent",        # also covers MAA per-unit lower-case
     # ── Unit / availability ───────────────────────────────────────────────
     "unitnumber":         "unit_number",
     "unitid":             "unit_id",

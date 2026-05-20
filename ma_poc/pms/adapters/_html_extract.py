@@ -1652,6 +1652,19 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
     # ".unit-card" so the more specific selector wins for RentCafe sites.
     "div.option-row",
     ".option-row",
+    # F2 (2026-05-20 PID 60578): RentCafe vanity-site plan card. Each card
+    # carries `data-floorplan-name`, `-size`, `-sqft`, `-price` attributes on
+    # descendant Apply buttons. Routed to `_extract_rentcafe_data_attrs` via
+    # the `_COMPACT_ROW_EXTRACTORS` table. Verified live against
+    # 1105townbrookhaven-apts.com 2026-05-20 (19 cards). Must come BEFORE
+    # `.floorplan` so the data-attr extractor wins over the inner-text
+    # cascade that lacks rent.
+    ".fp-container",
+    "[id^='fp-container-']",
+    # F5 (2026-05-20 PIDs 1973 / 231711): RentCafe Interactive Property Map
+    # plan card. Routed to `_extract_rentcafe_ipm_card`. Conservative
+    # extractor — requires a parseable rent value to admit the row.
+    ".nu-floor-plan",
     # Cortland-style apartment grid (PID 2982): 79 anchors with
     # data-js-hook="apartment" + data-unit-id / data-apartment-id attrs.
     "a[data-js-hook='apartment']",
@@ -2285,6 +2298,242 @@ def _extract_brook_availapts_card(
     return unit
 
 
+# F3 (2026-05-20 PID 60578 regression): RentCafe vanity-site plan card.
+# Every RentCafe vanity site (1105townbrookhaven, wymberlycrossing,
+# sussexwestlife, …) emits one `<div class="fp-container" id="fp-container-NNN">`
+# per floor plan. The card carries the canonical RentCafe data carriers
+# as attributes on the descendant Apply / Guided-Tour buttons:
+#
+#   data-floorplan-name  = "A1"
+#   data-floorplan-size  = "1"      (beds — RentCafe's idiosyncratic naming)
+#   data-floorplan-sqft  = "682"    (sqft as int string)
+#   data-floorplan-price = "1660-2199" or "1660 -2199"  (low-high range; "0" = no rent)
+#
+# Pre-fix the DOM scanner had no selector for `.fp-container` and no reader
+# for these data attrs anywhere in the codebase (`grep -nrE "data-floorplan-"
+# ma_poc/` returned 0). The cascade fell through to `.floorplan` (40 inner
+# elements with no rent attrs), shipped 19 plan rows without rent, and
+# `availability_status` was inferred AVAILABLE from button text but no
+# `available_date` could be set because the card doesn't carry one.
+#
+# Verified live against 1105townbrookhaven-apts.com/floorplans 2026-05-20:
+# 19 fp-container cards, 38 data-floorplan-price attrs (each plan in two
+# buttons), all four data-floorplan-* attrs present.
+_DATA_FLOORPLAN_PRICE_RE = re.compile(
+    r"^\s*(\d+)\s*-?\s*(\d+)?\s*$"
+)
+
+
+def _extract_rentcafe_data_attrs(
+    node: Any, page_ctx: dict[str, Any], source_url: str
+) -> dict[str, Any] | None:
+    """RentCafe vanity-site `.fp-container` card with `data-floorplan-*` attrs.
+
+    Reads name / size (beds) / sqft / price from any descendant element
+    carrying the canonical RentCafe data attributes. Multiple descendants
+    typically carry the same attrs (Apply button + Guided-Tour button); we
+    take the first non-empty value per attribute.
+
+    Price is shape `"LO-HI"` or `"LO -HI"` (note RentCafe sometimes emits
+    `"1660 -2199"` with a leading space on HI — see live evidence in
+    the PID 60578 forensic). `"0"` is the RentCafe placeholder for
+    "Contact Us" / no public rent — skip the row entirely so we don't
+    ship 0 as a rent number.
+
+    Returns None when no `data-floorplan-name` is found OR when the
+    price field is the "0" sentinel — both signals that this card
+    isn't a real per-plan inventory row.
+    """
+    try:
+        # Walk the node + descendants for the FIRST element carrying the
+        # name attribute. BeautifulSoup's `find` short-circuits.
+        named = node if node.has_attr("data-floorplan-name") else node.find(
+            attrs={"data-floorplan-name": True}
+        )
+        if named is None:
+            return None
+        name = (named.get("data-floorplan-name") or "").strip()
+        if not name:
+            return None
+    except Exception:
+        return None
+
+    def _first_attr(attr: str) -> str:
+        # Prefer the same node that carries `name` so all four attrs come
+        # from one consistent button. Fall back to any descendant carrying
+        # the attr — defensive against templates that split attrs across
+        # siblings.
+        try:
+            v = named.get(attr)
+            if v:
+                return str(v).strip()
+        except Exception:
+            pass
+        try:
+            other = node.find(attrs={attr: True})
+            if other is not None:
+                return str(other.get(attr) or "").strip()
+        except Exception:
+            pass
+        return ""
+
+    size_s = _first_attr("data-floorplan-size")   # beds
+    sqft_s = _first_attr("data-floorplan-sqft")
+    price_s = _first_attr("data-floorplan-price")
+
+    # Parse price first — "0" / empty short-circuit means no rent published.
+    rent_lo: int | None = None
+    rent_hi: int | None = None
+    if price_s and price_s != "0":
+        m = _DATA_FLOORPLAN_PRICE_RE.match(price_s)
+        if m:
+            try:
+                lo = int(m.group(1))
+                hi = int(m.group(2)) if m.group(2) else lo
+                if _RENT_LO_BOUND <= lo <= _RENT_HI_BOUND:
+                    rent_lo = lo
+                if _RENT_LO_BOUND <= hi <= _RENT_HI_BOUND:
+                    rent_hi = hi
+            except (ValueError, TypeError):
+                pass
+
+    unit = _empty_unit_with_ctx(
+        page_ctx, source="dom:fp-container[data-floorplan-*]", source_url=source_url
+    )
+    unit["floor_plan_name"] = name
+    # F3: per-plan attrs override page_ctx (page_ctx is from the page
+    # header which doesn't have per-plan dimensions on RentCafe vanity).
+    if size_s and size_s.isdigit():
+        beds_i = int(size_s)
+        unit["bedrooms"] = str(beds_i) if beds_i > 0 else "0"
+        unit["bed_label"] = "Studio" if beds_i == 0 else f"{beds_i}BR"
+    if sqft_s:
+        try:
+            sq = int(sqft_s)
+            if _SQFT_MIN <= sq <= 10_000:
+                unit["sqft"] = str(sq)
+        except (ValueError, TypeError):
+            pass
+    if rent_lo is not None:
+        unit["market_rent_low"] = rent_lo
+        unit["market_rent_high"] = rent_hi if rent_hi is not None else rent_lo
+        if rent_hi is not None and rent_hi != rent_lo:
+            unit["rent_range"] = f"${rent_lo:,} - ${rent_hi:,}"
+        else:
+            unit["rent_range"] = f"${rent_lo:,}"
+
+    # Require at minimum a name + (rent OR sqft) to count as a real row.
+    # Cards with only a name (and price="0") look like placeholders.
+    if not (unit.get("market_rent_low") or unit.get("sqft")):
+        return None
+    return unit
+
+
+# F5 (2026-05-20 PID 1973 / 231711): RentCafe Interactive Property Map.
+# Distinct template from the `.fp-container` vanity site — the URL path is
+# `/interactivepropertymap` (vs `/interactivecommunitymap` which is SightMap).
+# DOM uses `.nu-floor-plan` as the per-plan container with `.min-rent` /
+# `.max-rent` / `.unit_price` / `.popover-price` for rent values.
+# Verified via class-name presence on rosslynheights.com and
+# williamsburgmishawaka.com — full structural confirmation should run via
+# canary before broad rollout (live-fetch a sample of the affected cohort).
+_IPM_RENT_PATTERN = re.compile(r"\$?\s*(\d{1,3}(?:,\d{3})*|\d{3,5})")
+
+
+def _extract_rentcafe_ipm_card(
+    node: Any, page_ctx: dict[str, Any], source_url: str
+) -> dict[str, Any] | None:
+    """RentCafe Interactive Property Map per-plan card.
+
+    Each `.nu-floor-plan` block summarises one floor plan with a min/max
+    rent range. The unit_price popover often carries the same value.
+    Returns plan-level rows (no per-unit unit_id — the IPM template
+    aggregates units into plan summaries).
+
+    Status note: classification is based on the spot-check agent's
+    class-name grep — selectors should be confirmed live against a
+    sample before broad rollout. The extractor is conservative: it
+    requires both a min rent and a name-shape signal so accidental
+    matches on incidental `.nu-floor-plan` class usage don't ship.
+    """
+    try:
+        text = node.get_text(" ", strip=True)
+    except Exception:
+        return None
+    if not text or len(text) < 5:
+        return None
+
+    def _read_text(sel: str) -> str:
+        try:
+            el = node.select_one(sel)
+            if el is None:
+                return ""
+            return el.get_text(" ", strip=True)
+        except Exception:
+            return ""
+
+    min_rent_s = _read_text(".min-rent") or _read_text(".unit_price") or _read_text(".popover-price")
+    max_rent_s = _read_text(".max-rent")
+    fp_name = (
+        _read_text(".nu-floor-plan-name")
+        or _read_text(".floor-plan-name")
+        or _read_text(".fp-name")
+        or page_ctx.get("fp_name", "")
+    )
+    sqft_s = _read_text(".nu-floor-plan-sqft") or _read_text(".sqft")
+
+    def _parse_rent(s: str) -> int | None:
+        if not s:
+            return None
+        m = _IPM_RENT_PATTERN.search(s)
+        if not m:
+            return None
+        try:
+            v = int(m.group(1).replace(",", ""))
+            return v if _RENT_LO_BOUND <= v <= _RENT_HI_BOUND else None
+        except (ValueError, TypeError):
+            return None
+
+    rent_lo = _parse_rent(min_rent_s)
+    rent_hi = _parse_rent(max_rent_s) or rent_lo
+
+    # Require at least a min-rent value — IPM cards without rent are
+    # navigation widgets, not plan summaries.
+    if rent_lo is None and rent_hi is None:
+        return None
+
+    unit = _empty_unit_with_ctx(
+        page_ctx, source="dom:nu-floor-plan[ipm]", source_url=source_url
+    )
+    if fp_name:
+        unit["floor_plan_name"] = fp_name
+    if sqft_s:
+        m_sq = re.search(r"(\d{2,5})", sqft_s)
+        if m_sq:
+            try:
+                sq = int(m_sq.group(1))
+                if _SQFT_MIN <= sq <= 10_000:
+                    unit["sqft"] = str(sq)
+            except (ValueError, TypeError):
+                pass
+    if rent_lo is not None:
+        unit["market_rent_low"] = rent_lo
+        unit["market_rent_high"] = rent_hi if rent_hi is not None else rent_lo
+        if rent_hi is not None and rent_hi != rent_lo:
+            unit["rent_range"] = f"${rent_lo:,} - ${rent_hi:,}"
+        else:
+            unit["rent_range"] = f"${rent_lo:,}"
+    elif rent_hi is not None:
+        unit["market_rent_high"] = rent_hi
+        unit["rent_range"] = f"${rent_hi:,}"
+
+    # IPM is plan-level by design — post_process will classify into
+    # plan_summaries unless per-unit dims attach upstream. That's correct
+    # for the IPM template; users navigate from the map to a per-unit
+    # detail page for individual apartments.
+    return unit
+
+
 # Selectors mapped to specialised extractors. When the DOM container loop
 # matches one of these selectors, the matching extractor is used INSTEAD of
 # `_container_yields_unit`. This bypasses the ≥2 structural-signal gate that
@@ -2296,6 +2545,19 @@ _COMPACT_ROW_EXTRACTORS: tuple[tuple[str, Any], ...] = (
     (".option-row", _extract_rentcafe_option_row),
     # Brook-at-Columbia (RentCafe variant where the card structure differs).
     ("#availApts .card", _extract_brook_availapts_card),
+    # F2+F3 (2026-05-20): RentCafe vanity `.fp-container` plan card.
+    # Reads bed/sqft/rent from `data-floorplan-*` attributes on descendant
+    # Apply / Guided-Tour buttons. Verified live against 1105townbrookhaven-apts.com.
+    (".fp-container", _extract_rentcafe_data_attrs),
+    ("[id^='fp-container-']", _extract_rentcafe_data_attrs),
+    # F5 (2026-05-20): RentCafe Interactive Property Map. Distinct template
+    # from `.fp-container` — uses `.nu-floor-plan` containers with
+    # `.min-rent` / `.max-rent` / `.unit_price` / `.popover-price` inside.
+    # Status: selector set is from class-name grep; needs live structural
+    # confirmation before declaring complete. The conservative gate
+    # (requires a parseable rent value) prevents false positives if the
+    # class names appear incidentally.
+    (".nu-floor-plan", _extract_rentcafe_ipm_card),
 )
 _COMPACT_ROW_SELECTOR_SET = frozenset(sel for sel, _ in _COMPACT_ROW_EXTRACTORS)
 

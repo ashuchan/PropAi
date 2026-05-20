@@ -2,8 +2,9 @@
 
 **Working directory for every command:** `ma_poc/`
 **Audience:** Claude Code (or any engineer) debugging extraction failures after a cloud run.
-**Updated:** 2026-05-21. Last campaign reviewed: 2026-05-16 cloud run + post-deploy canaries on PIDs 20959 / 53592 / 55317 / 52331; concession capture pipeline shipped 2026-05-20/21.
-**This update (2026-05-21):** new §18 Concession data debugging (full debugging instructions, symptom decoder, Q14-Q17 checklist, 7 fixes implemented, telemetry SQL queries, known-good tradeoffs, file reference, decision tree); §15 file reference appended with 2026-05-21 concession additions block; §16 closing checklist gains item #10 concession-pipeline audit; glossary gains Preserve-and-flag invariant + `_concession_quality` + `concessions_structured` + `stealth_probe` + `HOP_CAPTCHA_DETECTED` + `CONCESSION_PROBE_RESULT`.
+**Updated:** 2026-05-20. Last campaign reviewed: 2026-05-20 cloud run (4,982 properties, RentCafe + AppFolio data-quality audit); concession capture pipeline shipped 2026-05-20/21.
+**This update (2026-05-20):** new §19 RentCafe / AppFolio data-quality gaps with 11 sub-sections — §19.1 avail-date-only-gap sub-cause split (5 sub-causes A-E with fix paths F7a-d), §19.2 RentCafe `fp-container` data-attr extractor (F2 + F3), §19.3 RentCafe Interactive Property Map (F5, best-effort), §19.4 AppFolio SSR `_ADDRESS_RE` regex break (F1), §19.5 SecureCafe portal demote (F8a), §19.6 OneSite DOM `data-availability` augmentation (F7d), §19.7 MAA embedded-JSON price aliases (F6, best-effort), §19.8 telemetry shipped (T1/T2/T3/T4/T5/F8b), §19.9 State Diff fix (F4), §19.10 new anti-pattern #17 (urllib lies on JS-hydrated PMS), §19.11 next-week priorities (10 items, M/should/nice-to-have).
+**Prior update (2026-05-21):** new §18 Concession data debugging (full debugging instructions, symptom decoder, Q14-Q17 checklist, 7 fixes implemented, telemetry SQL queries, known-good tradeoffs, file reference, decision tree); §15 file reference appended with 2026-05-21 concession additions block; §16 closing checklist gains item #10 concession-pipeline audit; glossary gains Preserve-and-flag invariant + `_concession_quality` + `concessions_structured` + `stealth_probe` + `HOP_CAPTCHA_DETECTED` + `CONCESSION_PROBE_RESULT`.
 **Prior update (2026-05-17):** new §0 anti-patterns 14-16 (verdict-vs-unit-count, cascade-overwrite misdiagnosis, internal-vs-v2-shape); new Q13 in §3 (unit-fidelity check); §5 verdict decoder gains SUCCESS_PARTIAL row + analyzer-label-leak note; new §8.18-§8.22 extraction gaps (plan_summaries dropped at v2 formatter, hop plan_summaries not propagated, AVAILABLE+rent classification, cross-host per-plan URL discovery, wedge-rescue captcha guard); §15 file reference appended with 2026-05-17 additions; glossary gains SUCCESS_PARTIAL + plan_summaries.
 
 ---
@@ -44,6 +45,7 @@ Be explicit with yourself when you catch yourself doing any of these. Most "obvi
 | **Trusting verdict alone, not unit-fidelity** (2026-05-17) | Reported "all 4 sentinels UNCHANGED_OK, deploy is safe" based on verdict==SUCCESS unchanged. Reality: 3 of 5 sentinels lost units (65399 8→1, 1375 12→7, 285558 18→0). The asset-hop-filter cases reported as "IMPROVED" lost a third of their units (37156 31→1, 59540 58→1). The verdict-only metric was wrong. | Always count units shipped per PID, not just verdict. Diff cloud vs canary `units` by PID; total delta < 0 means data quality regressed even when verdict went green. New Q13 in §3 codifies this — run BEFORE celebrating any "IMPROVED" cluster. |
 | **Diagnosing unit-loss as cascade overwrite when post_process classification is the real culprit** (2026-05-17) | For PID 53592 livethearch, traced `dom_scan ran_units=26` + `llm_dom_targeted ran_units=1` → emit 1 unit. First diagnosed as "cascade overwrites earlier larger result". Wrong — `_merge_into_result_units` at `generic.py:2717` ALREADY merges (26 + 1 → 27 in test harness). The real drop was `post_process.classify()` partitioning 27 rows into `units=0` + `plan_summaries=27`, then the v2 formatter dropping plan_summaries silently (§8.18). | When a unit-loss bug looks like "cascade overwrites", reproduce the post_process pipeline in isolation against the raw extractor output before blaming the cascade. `extraction/post_process.post_process(units, property_id=...)` is pure — give it the LLM/dom_scan output and inspect `r.units` vs `r.plan_summaries`. The split tells you the real drop site. |
 | **Reading the internal unit dict expecting v2-formatted fields** (2026-05-17) | Wrote a cross-host per-plan discovery helper that read `u.get("floor_plan_name")` to extract plan names. Test passed in isolation; live canary fired the function but `plan_names_for_match` was always empty. The internal unit dict at link-hop time has `floor_plan_name=""` for RentCafe / SecureCafe extractions — the human-readable name is only materialised LATER by `floorplan_snap` on the v2 output path. | Don't assume the internal in-flight unit dict matches v2 output. Either (a) match by URL SHAPE rather than name (the eventual fix), or (b) use the canonical alias resolver `get_str(u, FP_NAME_KEYS)` AND check the value against `""` (empty string is the common no-name placeholder). Best — log `sorted(unit.keys())[:25]` once when a downstream lookup returns empty so the shape surfaces. |
+| **`urllib` lies about JS-hydrated PMS sites** (2026-05-20) | Concluded "no rent on this page" from a `urllib.request.urlopen` of `1105townbrookhaven-apts.com/floorplans` and reported the property as SecureCafe-CF-gated. User pushed back; Playwright render showed 19 `.fp-container` cards with `data-floorplan-price="1660-2199"` plain attrs. The page IS public — our extractor missed the data attrs. | Any "page has no X" claim that drives a fix MUST use Playwright (`networkidle` + scroll), not urllib. RentCafe / G5 / modern PMS sites are JS-hydrated; urllib gets the shell only. AND grep for `data-*` attributes alongside visible text — modern PMS templates push canonical values into data attributes for analytics tracking. See §19.10 + §19.2. |
 
 ---
 
@@ -1199,6 +1201,202 @@ Property X shows blank concessions in the daily xlsx
    └─ No env vars set → vision is opt-in, this is expected. Land env vars
         in production to enable image-only banner capture.
 ```
+
+---
+
+## Phase 19 — RentCafe / AppFolio data-quality gaps (2026-05-20 cloud run)
+
+The 2026-05-20 cloud run audit surfaced a class of SUCCESS-with-junk-data
+failures that the existing verdict layer treats as wins. The audit walked
+2,367 RentCafe properties (47.5% of the run) plus 42 AppFolio properties;
+the findings + fixes are below. Telemetry shipped 2026-05-20 lets the
+analyzer track these going forward — pre-2026-05-20 cloud data has zero
+date-shape signals and won't classify under §19.1's sub-cause split.
+
+### 19.1 The avail-date-only-gap (406 RentCafe SUCCESS properties, 18.8%)
+
+Properties that ship SUCCESS with bed/bath/area/rent/floor_plan_name all
+populated AND `available_date` null on >50% of units. Pre-fix, every gap
+property looked identical in dashboards; T1+T2+T3 split the cohort into
+five sub-causes with distinct fix paths:
+
+| Sub-cause | Definition | Fix |
+|---|---|---|
+| A — `API_FLOORPLANS_ONLY` | `TIER_1_API_*` won; per-unit endpoint never captured | **F7a** OneSite `/units` probe (shipped 2026-05-20) — `pms/adapters/onesite.py::_probe_realpage_units_endpoint`. Mark-Taylor + Entrata analogues deferred |
+| B — `PAGE_NO_DATES` | Zero date signals in any captured HTML | **F7b** accept; per-unit info gated behind portal (CF-blocked SecureCafe). Surfaced as `DATE_GAP_PAGE_NO_DATES` issue (INFO severity) |
+| C — `LLM_SECTION_MISSED` | `TIER_4_LLM_DOM` won; dates exist in HTML | **F7c** LLM section widening (shipped 2026-05-20) — `_widen_to_include_date_column` in `pms/adapters/generic.py` |
+| D — `DOM_ATTRS_IGNORED` | `TIER_1_API_*` won; `data-availability` attrs exist | **F7d** OneSite DOM augmentation (shipped 2026-05-20) — `pms/adapters/onesite.py::_augment_units_with_dom_availability`. Mark-Taylor analogue deferred |
+| E — `AVAILABLE_NOW_NO_FALLBACK` | "Available Now" text seen, no ISO date, fill < 50% | Investigate — likely alias drift or producer-side regression |
+
+### 19.2 RentCafe `fp-container` data-attr extractor (~40 props, F2 + F3)
+
+**Live evidence:** PID 60578 (1105townbrookhaven-apts.com), PID 10141
+(wymberlycrossing), PID 73715 (sussexwestlife). The `/floorplans` page
+renders 19 `<div class="fp-container" id="fp-container-NNN">` plan
+cards, each carrying `data-floorplan-name` / `-size` (beds) / `-sqft` /
+`-price` (LO-HI range, or "0" placeholder) attributes on descendant
+Apply / Guided-Tour buttons.
+
+**Why pre-fix missed it:** `_DOM_CONTAINER_SELECTORS` had `.fp-card` /
+`.floorplan-card` / `.floorplanItem` but NOT `.fp-container`; the cascade
+fell through to `.floorplan` (40 inner elements without rent attrs).
+And `grep -nrE "data-floorplan-(price|name|size|sqft)" ma_poc/` returned
+zero hits — no adapter read these canonical RentCafe carriers.
+
+**Fixes shipped 2026-05-20:**
+- `.fp-container` + `[id^='fp-container-']` selectors added to
+  `_DOM_CONTAINER_SELECTORS` in `pms/adapters/_html_extract.py:1648`
+- `_extract_rentcafe_data_attrs` extractor parses the four data attrs,
+  rejects price="0" sentinel, wired into `_COMPACT_ROW_EXTRACTORS`.
+- Test suite: `tests/pms/adapters/test_compact_row_extractor.py::TestRentCafeFpContainerDataAttrs`.
+
+### 19.3 RentCafe Interactive Property Map (F5, best-effort)
+
+**Live evidence:** PID 1973 (rosslynheights.com), PID 231711
+(williamsburgmishawaka.com). URL path is `/interactivepropertymap`
+(NOT `/interactivecommunitymap` which is the SightMap embed). DOM
+uses `.nu-floor-plan` containers with `.min-rent` / `.max-rent` /
+`.unit_price` / `.popover-price`.
+
+**Status:** Class-name presence confirmed via spot-check agent grep,
+NOT via live structural confirmation. `_extract_rentcafe_ipm_card` in
+`pms/adapters/_html_extract.py` requires a parseable rent value before
+admitting the row — conservative gate prevents false positives if
+class names appear incidentally. **Must run a 5-property canary
+against `/interactivepropertymap` URLs before broad rollout.**
+
+### 19.4 AppFolio SSR `_ADDRESS_RE` regex break (F1, 42 props / 3,037 units)
+
+**Live evidence:** PID 67736 (live210main.com → meridiapm.appfolio.com),
+0/300 addresses parsed on the live page.
+
+**Why pre-fix missed it:** The regex required a nested wrapping tag
+(`>\s*<TAG>([^<]+)<`). Real AppFolio templates put the address text
+directly inside the span: `<span class="u-pad-rm js-listing-address">3749 Arbor Green Way</span>`.
+Pre-fix `parse_appfolio_listings_ssr` fell back to
+`floor_plan_name=f"AppFolio listing {listing_id}"` — a unique-per-unit
+junk string. bed/bath/sqft/rent/availability ARE extracted correctly;
+only address + plan_name are lost.
+
+**Fix shipped 2026-05-20:** optional middle-tag group
+`(?:<[^>]+>)?` accepts both shapes. Test pin:
+`tests/pms/adapters/test_appfolio_f11.py::test_f1_ssr_parser_extracts_meridiapm_direct_text_address`.
+**Sibling regex audit:** `_RENT_RE` / `_BED_BATH_RE` / `_SQFT_RE` /
+`_AVAIL_RE` at `appfolio.py:128-131` all use direct-text `>([^<]+)<`
+already — no nested-tag assumption to fix.
+
+### 19.5 SecureCafe portal demote (F8a, ~1,461 props recover or speed up)
+
+**Live evidence:** RentCafe vanity sites synthesise `*.securecafe.com`
+URLs as embedded-portal candidates at score 10120 (10_000 base + 120
+host-keyword bonus). The hop hits Cloudflare ~80%+ of the time. F2+F3
+showed that the marketing `/floorplans` page typically has the same
+data SecureCafe gates — but link-hop spent the first slot on
+SecureCafe before discovering the marketing path.
+
+**Fix shipped 2026-05-20:** SecureCafe URLs cap at score 9_000 in
+`pms/scraper.py::_extract_portal_iframe_hints` synthesis, below
+`profile:winning_page_url` (10_001) AND `profile:availability_links`
+(10_000). The portal still gets crawled if no other candidate
+succeeds — just not first.
+
+### 19.6 OneSite DOM `data-availability` augmentation (F7d, ~9 props)
+
+**Live evidence:** PID 11317 (dixonatstonegate.com). 11 plan-level units
+emitted from `/floorplans` API; 11 `data-availability` attrs in the
+rendered DOM matching them 1:1; zero dates merged pre-fix.
+
+**Fix shipped 2026-05-20:** `_augment_units_with_dom_availability` in
+`pms/adapters/onesite.py` scans the captured page HTML for
+`data-availability` / `data-available-date` / `data-move-in-date` /
+`data-ready-date` attrs, pairs them with the same-element
+`data-unit-id` / `data-unit-number` / `data-apartment-id` /
+`data-listing-id`, and fills `availability_date` on matching units
+**non-destructively** (API-set dates are authoritative — DOM only
+fills empties). Tested in
+`tests/pms/adapters/test_onesite_dom_augmentation.py` (10 cases).
+
+### 19.7 MAA embedded-JSON price aliases (F6, best-effort, ~23 props)
+
+**Live evidence:** PID 218985 (maac.com/.../maa-trinity) + 22 sibling
+MAA tenants. The `TIER_1_5_EMBEDDED` walker found unit lists (44 rows
+on 218985) but `rent_low=null` for every row.
+
+**Status:** maac.com Cloudflare-blocks ad-hoc IPs so I couldn't live
+forensic the exact key path. Added a batch of probable MAA / Cortland /
+Bell aliases to `FIELD_ALIASES` at
+`pms/signal_engine/floor_plan_signals.py`: `loweffectiverent`,
+`lowestrent`, `lowmarketrent`, `highesteffectiverent`, `highmarketrent`,
+`effectiverent`, `netrent`, `marketrent`, etc. **Must run a 5-property
+canary against a known MAA tenant before broad rollout.** If a key
+doesn't match the live payload the alias is a no-op; if it matches it
+recovers rent.
+
+### 19.8 Telemetry shipped 2026-05-20 (T1 / T2 / T4 / T5 / F8b)
+
+Six observability changes to make the next round of triage faster:
+
+| Telemetry | Source site | Consumer |
+|---|---|---|
+| **T1** — `date_iso_count` / `date_us_count` / `date_named_count` / `available_now_count` / `move_in_keyword_count` / `data_avail_attr_count` on `extract.html_characterized` | `pms/scraper.py::_characterize_html` | T3 analyzer + cross-event aggregation |
+| **T2** — `extract.date_presence_summary` per-property roll-up | `scripts/runners/jugnu.py::_emit_date_presence_summary` | T3 analyzer |
+| **T3** — `Date-completeness sub-cause split` section in `summary.md` | `scripts/diagnostics/analyze_cloud_run.py::classify_date_gap` | manual triage |
+| **T4** — `DATE_GAP_PAGE_NO_DATES` issue (INFO severity) | `scripts/runners/jugnu.py` (inside `_emit_date_presence_summary`) | `jq 'select(.code=="DATE_GAP_PAGE_NO_DATES")' issues.jsonl` |
+| **T5** — `extract.date_extraction_drop` when v2 formatter sees a date-shaped value under an unknown key | `scripts/runners/jugnu.py::_format_v2_unit` | weekly alias-drift report |
+| **F8b** — `extract.rent_gated_by_portal` when null-rent SUCCESS coincides with SecureCafe CF block | `scripts/runners/jugnu.py::_emit_date_presence_summary` | dashboard split |
+
+### 19.9 State Diff is no longer hard-coded zero (F4)
+
+`scripts/reports/per_property.py::_phase7_section` now suppresses the
+State Diff section entirely when the caller passes an all-empty
+`unit_diff` dict (which is the current Jugnu reality — the real diff
+lives in a different scope). Pre-fix every property report rendered
+"State Diff: new=0, updated=0, unchanged=0, disappeared=0" which
+misled every debugging session that read it (the per-property report
+on PID 67736 / 2026-05-20 cost real triage time before the misdirection
+was caught). Companion guard in `_summary_box` skips the State Diff
+table row too.
+
+### 19.10 Anti-pattern #17 — `urllib` lies about JS-hydrated PMS sites
+
+**What I did wrong on 2026-05-20:** Concluded "no rent on this page"
+from a `urllib.request.urlopen` fetch of
+`1105townbrookhaven-apts.com/floorplans` and reported the property as
+SecureCafe-CF-gated. The user pushed back; a Playwright render showed
+19 fp-container cards with `data-floorplan-price="1660-2199"` in plain
+attributes. The page IS public, our extractor missed the carriers.
+
+**What to do instead:** Any "page has no X" claim that drives a fix
+decision must use Playwright (`networkidle` + scroll). RentCafe / G5 /
+modern PMS sites are JS-hydrated; urllib gets the shell only. AND grep
+for `data-*` attributes alongside visible text — modern PMS templates
+push canonical values into data attributes for analytics tracking.
+
+The Playwright snippet in §14 "Frame enumeration snippet" is the right
+starting template; for data-attr verification add:
+```python
+import re
+attrs = sorted(set(re.findall(r'data-([\w-]+)=', html)))
+print('data-* attrs:', attrs[:30])
+```
+
+### 19.11 Next-week priorities (queued after the 2026-05-21 deploy)
+
+The fixes above ship together; queue these for the next post-deploy
+canary cycle (in priority order):
+
+| # | Priority | Investigation / fix |
+|---|---|---|
+| 1 | **MUST** | Validate F5 (Interactive Property Map) against 5 live `/interactivepropertymap` properties — confirm `.nu-floor-plan` is the right container class on rosslynheights + 4 siblings. Without this, F5 is a no-op or worse. |
+| 2 | **MUST** | Validate F6 (MAA aliases) against a known MAA tenant page. If maac.com still CF-blocks the canary box, route the live fetch via the residential proxy that the cloud worker uses. Expected outcome: rent_low/rent_high populated on PID 218985 + ≥20 sibling MAA properties. |
+| 3 | **MUST** | Re-run `analyze_cloud_run.py --date <next-run>` and verify the new `## Date-completeness sub-cause split` section populates. If B is the dominant bucket (≥50% of the avail-gap cohort), accept and document; F7b. If C is dominant, F7c shipped — the canary should show the cohort shrinking. |
+| 4 | should | Implement F7a analogues for **Mark-Taylor** (3 props, `mark-taylor.com` API pattern needs forensic) and **Entrata** (1 prop, widget endpoint URL synthesis). The OneSite probe shipped 2026-05-20 covers ~9 properties; the analogues cover ~4 more. |
+| 5 | should | Investigate the **143 RentCafe `SUCCESS_PLAN_LEVEL` properties** — these ship zero per-unit rows by design. Check whether `extraction.post_process.classify` is over-aggressively demoting per-unit rows to `plan_summaries`. The playbook §8.20 (AVAILABLE+rent promotion) was the last major fix; a 143-property cohort suggests more rows are demoted than should be. |
+| 6 | should | Investigate the **275 multi-field-gap RentCafe properties** — not surfaced in any of §19.1's buckets because they have ≥2 fields below threshold. 67 are TIER_3_DOM, 68 have no recorded tier. Likely a mix of cascade-pickup failures. |
+| 7 | should | Implement **F8c residential proxy for SecureCafe** if post-F8a metrics show SecureCafe still dominates the avail-gap cohort. Don't ship preemptively — F8a's demote + F2/F3's marketing-site extraction may eliminate the need. |
+| 8 | nice-to-have | Investigate the **578 minor-gap RentCafe properties** (single non-rent / non-avail field <95%). Long tail; probably each has its own small story. |
+| 9 | nice-to-have | Aggregate `extract.date_extraction_drop` events weekly to drive the alias table additions (T5 — analogous to the existing rent-key alias-drift report at `extract.signal_inspection`). |
+| 10 | nice-to-have | Audit AppFolio sibling regexes (`_RENT_RE`/`_BED_BATH_RE`/`_SQFT_RE`/`_AVAIL_RE` at `appfolio.py:128-131`) against the meridiapm fixture — they LOOK fine (direct-text form already) but a deliberate live grep against 5 AppFolio tenants would close out the regex-shape risk for the cohort. |
 
 ---
 

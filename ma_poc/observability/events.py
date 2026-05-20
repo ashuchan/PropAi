@@ -67,6 +67,25 @@ class EventKind(StrEnum):
     # ``paths_attempted`` is the count of paths actually fetched
     # (caps out at ``max_paths`` — useful for cap-tuning analysis).
     CONCESSION_PROBE_RESULT = "extract.concession_probe.result"
+    # T2 (2026-05-20): per-property roll-up of date-shape signals seen
+    # across every captured HTML body (entry + every hop) AND emitted-side
+    # date-fill counts. Pair with extract.html_characterized.date_*_count
+    # fields and aggregate in analyze_cloud_run.py to classify each
+    # avail-date-only-gap property as Sub-cause A/B/C/D/E. Cheap — one
+    # event per property; emitted right before output.property_emitted.
+    DATE_PRESENCE_SUMMARY = "extract.date_presence_summary"
+    # T5 (2026-05-20): emitted by the v2 formatter when a unit dict carries
+    # a date-shaped value under a key the canonical AVAIL_DATE_KEYS alias
+    # table doesn't know. Mirrors the existing extract.signal_inspection
+    # event for rent keys — weekly aggregation surfaces "missing date
+    # aliases" the way signal_inspection surfaces missing rent aliases.
+    DATE_EXTRACTION_DROP = "extract.date_extraction_drop"
+    # F8b (2026-05-20): emitted when a marketing-site rent extraction
+    # yielded null AND the SecureCafe hop got CF_CHALLENGE. Lets
+    # analytics distinguish "rent not in DB because hidden behind CF"
+    # from "rent not in DB because extractor missed it." Without this
+    # split, all null-rent SUCCESS properties look the same in dashboards.
+    RENT_GATED_BY_PORTAL = "extract.rent_gated_by_portal"
 
     # Validation (L4)
     RECORD_ACCEPTED = "validate.record_accepted"

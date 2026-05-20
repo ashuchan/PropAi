@@ -129,7 +129,19 @@ _RENT_RE = re.compile(r'js-listing-blurb-rent[^>]*>([^<]+)<', re.IGNORECASE)
 _BED_BATH_RE = re.compile(r'js-listing-blurb-bed-bath[^>]*>([^<]+)<', re.IGNORECASE)
 _SQFT_RE = re.compile(r'js-listing-square-feet[^>]*>([^<]+)<', re.IGNORECASE)
 _AVAIL_RE = re.compile(r'js-listing-available[^>]*>([^<]+)<', re.IGNORECASE)
-_ADDRESS_RE = re.compile(r'js-listing-address[^>]*>\s*<[^>]+>([^<]+)<', re.IGNORECASE)
+# F1 (2026-05-20 PID 67736 regression): the address text on the live AppFolio
+# template is a direct child of the span (`<span class="u-pad-rm js-listing-address">3749 Arbor</span>`),
+# not wrapped in a nested link/inner tag. Verified live against
+# meridiapm.appfolio.com/listings 2026-05-20 — 0/300 addresses parsed under
+# the old `>\s*<TAG>([^<]+)<` pattern, falling back to junk
+# `floor_plan_name="AppFolio listing {id}"` for every unit. The optional
+# `(?:<[^>]+>)?` middle group accepts both shapes (richelsonmanagement has
+# the nested-tag style, meridiapm has direct text) so the existing
+# fixture-based test plus the live-verified meridiapm shape both pass.
+_ADDRESS_RE = re.compile(
+    r'js-listing-address[^>]*>\s*(?:<[^>]+>)?\s*([^<]+?)\s*<',
+    re.IGNORECASE,
+)
 # Verified against pablogroup.appfolio.com on 2026-05-05: the redirect lands
 # on https://www.appfolio.com/page-not-found-sub which renders a page whose
 # <title> includes "AppFolio - Page Not Found" alongside the canonical URL.

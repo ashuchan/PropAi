@@ -1541,11 +1541,37 @@ _FRAMEWORK_HINTS: tuple[tuple[str, str], ...] = (
 )
 
 
+_DATE_ISO_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+_DATE_US_RE = re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")
+_DATE_NAMED_RE = re.compile(
+    r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z.]*\s+\d{1,2}\b",
+    re.IGNORECASE,
+)
+_AVAIL_NOW_RE = re.compile(r"\b(?:available\s+now|now\s+available|move[- ]?in\s+ready)\b", re.IGNORECASE)
+_MOVEIN_KEYWORD_RE = re.compile(r"\bmove[- ]?in\b", re.IGNORECASE)
+# T1 (2026-05-20): data-attribute carriers for per-unit availability.
+# Verified live on dixonatstonegate.com — 11 `data-availability` attrs
+# matching 11 plan-level units. Used by the analyzer to distinguish
+# Sub-cause D (DOM attrs ignored) from Sub-cause B (no dates exist).
+_DATA_AVAIL_ATTR_RE = re.compile(
+    r'data-(?:availability|available[-_]date|move[-_]in[-_]date|ready[-_]date|available[-_]on)',
+    re.IGNORECASE,
+)
+
+
 def _characterize_html(page_html: str) -> dict[str, Any]:
     """Compute coarse shape metrics on the fetched HTML.
 
     Never raises — all regex work is bounded by input size. Intended to be
     small (<200 bytes serialized) so it's cheap to ship with every event.
+
+    T1 (2026-05-20): emits a date_signals sub-block so the analyzer can
+    distinguish "page genuinely has no dates" (Sub-cause B) from "page has
+    dates we missed" (Sub-cause C/D). The sub-block counts six classes of
+    date-shaped text/attributes; the analyzer aggregates per-property and
+    a property whose entry + every hop all show zero signals is classified
+    as Sub-cause B. See ma_poc/docs/failed_no_data_debugging_playbook.md
+    §19 for the diagnostic decision tree.
     """
     body_bytes = len(page_html.encode("utf-8", errors="ignore"))
     # Strip scripts/styles/comments to estimate "real" rendered text size.
@@ -1601,6 +1627,19 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
         spa_score += 0.3
     spa_score = round(min(1.0, spa_score), 2)
 
+    # T1 (2026-05-20): date-signal counts. Used by the analyzer to
+    # split the avail-date-only-gap cohort into Sub-cause B (page truly
+    # has no dates) vs C/D (page has dates we missed). Cheap — all six
+    # regexes are pre-compiled and bounded by clean_text length. The
+    # `data_avail_attrs` count walks the raw `page_html` because data
+    # attributes survive the script/style strip but not the tag strip.
+    date_iso = len(_DATE_ISO_RE.findall(clean_text))
+    date_us = len(_DATE_US_RE.findall(clean_text))
+    date_named = len(_DATE_NAMED_RE.findall(clean_text))
+    avail_now = len(_AVAIL_NOW_RE.findall(clean_text))
+    move_in_kw = len(_MOVEIN_KEYWORD_RE.findall(clean_text))
+    data_avail_attrs = len(_DATA_AVAIL_ATTR_RE.findall(page_html))
+
     return {
         "body_bytes": body_bytes,
         "text_bytes": text_bytes,
@@ -1619,6 +1658,13 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
         "fp_jsonld_apartment_count": fp_card.jsonld_apartment_count,
         "fp_property_value_bed_bath": fp_card.property_value_bed_bath,
         "fp_matched_signal_bytes": fp_card.matched_signal_bytes,
+        # T1 (2026-05-20): date-shape signals for avail-date sub-cause split.
+        "date_iso_count": date_iso,
+        "date_us_count": date_us,
+        "date_named_count": date_named,
+        "available_now_count": avail_now,
+        "move_in_keyword_count": move_in_kw,
+        "data_avail_attr_count": data_avail_attrs,
     }
 
 
@@ -3219,8 +3265,19 @@ async def _try_link_hop(
             if url_s in _portal_seen_urls:
                 continue
             _portal_seen_urls.add(url_s)
+            # F8a (2026-05-20): SecureCafe portal hops are Cloudflare-blocked
+            # ~80%+ of the time and almost always carry the same rent/avail
+            # data as the marketing-site /floorplans page (verified across
+            # 1,461 RentCafe vanity properties on 2026-05-20). Demoting
+            # SecureCafe to 9_000 lets `profile.winning_page_url` (10_001),
+            # `profile.availability_links` (10_000), AND the keyword-ranked
+            # marketing-site /floorplans (which the F2+F3 .fp-container
+            # extractor now handles correctly) all outrank it. The portal
+            # still gets crawled if no other candidate works — just not first.
+            _is_securecafe = "securecafe.com" in url_s.lower()
+            _score = 9_000 if _is_securecafe else _EMBEDDED_PORTAL_SCORE
             portal_candidates.append(
-                (url_s, _EMBEDDED_PORTAL_SCORE, f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}")
+                (url_s, _score, f"{_EMBEDDED_PORTAL_ANCHOR_PREFIX}{portal_name}")
             )
 
     # Merge all candidate sources and rank by SCORE, not source-list order.
