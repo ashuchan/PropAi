@@ -2410,7 +2410,31 @@ async def _try_link_hop(
                 and dynamic_appended < max_dynamic_appends
                 and not _is_login_path
             ):
-                _prop_sub_paths = ("/floorplans", "/floor-plans", "/pricing", "/apartments-pricing")
+                # 2026-05-20: extended set of property-level sub-paths the
+                # dynamic appender queues when link-hop is already at a
+                # 3+-segment URL (i.e. a brand-CMS property page like
+                # ``/apartments/ca/san-jose/villas-willow-glen``). The
+                # original 4-path list missed ``/availability`` and its
+                # variants, which is where the actual unit roster lives
+                # on many sites that show only a price-range slider or
+                # filter UI on the floor-plans page (IMT, TGM, others
+                # observed in the 2026-05-20 random-30 sample). The
+                # universal-priors list already includes /availability
+                # for level-1 hops; this completes the cascade so when
+                # we're already on /floor-plans, we discover deeper
+                # /availability + /our-apartments paths too.
+                _prop_sub_paths = (
+                    "/floorplans",
+                    "/floor-plans",
+                    "/pricing",
+                    "/apartments-pricing",
+                    "/availability",
+                    "/view-availability",
+                    "/our-apartments",
+                    "/apartments",
+                    "/units",
+                    "/leasing",
+                )
                 for _psp in _prop_sub_paths:
                     _psp_url = _sub_url_no_query.rstrip("/") + _psp
                     if _psp_url not in visited and not any(u == _psp_url for u, _, _ in queue):
