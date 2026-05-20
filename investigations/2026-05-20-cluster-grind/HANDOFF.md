@@ -607,16 +607,19 @@ pattern + 20% dead URLs). Test suite delta: 1206 → **1509 passed**
 |---|---|---|---|
 | 1 | `c01d4af` | Verdict-honesty downgrade: SUCCESS → SUCCESS_PLAN_LEVEL | ~1,031 props honest-labelled (clears the inflated-SUCCESS audit) |
 | 2 | `4961e2e` | RentCafe-Nestin per-plan DOM recovery | ~225 props / ~4,400 strict units (JSON-LD + TIER_3_DOM + TIER_MERGED overlap) |
-| 3 | `e69c208` | Knock-by-domain resolver: `/v1/profile?domain=` fallback | ~21 props / ~315 strict units (Aspen Square cluster + non-RentCafe Knock primaries) |
+| 3 | `e69c208` | Knock-by-domain resolver: `/v1/profile?domain=` fallback | ~~~21 props / ~315 strict units~~ — **0/4 in live probe** (Aspen Square pages have no static Knock signals; community hash is JS-rendered; resolver fails gracefully, no canary regression). See "Pre-canary probe — Knock-by-domain limitation" below. |
+| 6 | `bd3c606` | RentCafe-Nestin: 3 pre-canary probe bug fixes (table prefix-leak, card regex, Stonewater applyGA layout) | Hardens the +225 props from row 2 — without these, Chatwell/Hayden ship polluted unit numbers, Altair ships bogus units, Stonewater extracts 0. |
 | 4 | `df569b5` | Detector: Engrain widget signal → sightmap | ~56 props / ~1,400 strict units (RealPage+SightMap misroutes in TIER_3_DOM) |
 | 5 | `d58d624` | Generic-DOM: brand-CMS URL discovery | ~46 props / ~920 strict units (Lincoln, McKinley, HG Living, MG Properties brand sites) |
 
-**Combined expected canary impact: ~348 properties recovered, ~7,000+
-strict-quality unit rows** across the three ALL_fail buckets
-(JSON-LD 298 + TIER_3_DOM 200 + TIER_MERGED_CROSS_PAGE 79). The bulk
-of overlap recovers via a single new adapter (RentCafe-Nestin per-plan)
-plus existing-adapter detector enhancements (Engrain signal,
-brand-CMS URL discovery).
+**Combined expected canary impact** (revised after the 2026-05-20 pre-
+canary probe): **~327 properties / ~6,685+ strict-quality unit rows**
+(was ~348 / ~7,000+ before the Knock-by-domain limitation was
+discovered). The Aspen Square cluster (~21 props / ~315 strict units)
+slips to a later session pending a Playwright-based fix or HAR-replay.
+The bulk still recovers via the RentCafe-Nestin per-plan adapter (now
+hardened by the `bd3c606` post-probe bug fixes) plus existing-adapter
+detector enhancements (Engrain signal, brand-CMS URL discovery).
 
 ## Per-commit detail (follow-on)
 
@@ -765,6 +768,63 @@ Glen, Renaissance at Northpark, Roundtree, Golfside Lake (McKinley),
 Alcove at Seahurst (HG Living), Bristol at Sunset (MG Properties). 4
 tests including JS structure pin + regex matches 8 real URLs + regex
 rejects 7 non-brand URLs + e2e recovery.
+
+### `bd3c606` RentCafe-Nestin: 3 pre-canary probe bug fixes
+
+Files: `ma_poc/pms/adapters/_rentcafe_nestin.py`,
+`ma_poc/tests/pms/adapters/test_rentcafe_nestin.py`.
+
+Live curl_cffi probe against the 4 verified Nestin targets surfaced
+three real-world shape gaps the synthetic fixtures didn't cover:
+
+1. **Chatwell / Hayden table** — real HTML omits `data-label` attrs AND
+   ships a `<span class="sr-only">Apartment</span>` accessibility label
+   that `get_text()` concatenates with the value. Unit numbers were
+   emitting as `"Apartment: #1120"`. Fix: `_normalize_unit_number()`
+   strips the "Apartment[: #]" prefix via a dedicated regex.
+2. **Altair card** — `\bApartment\b[:\s#]+` matched chrome text like
+   "Altair Apartment Homes" / "Apartment Available", emitting bogus
+   units like "Homes" / "Available". Fix: `_CARD_APT_RE` now requires
+   the `#` after "Apartment" (chrome text never has it).
+3. **Stonewater (NEW Layout A3)** — static HTML uses
+   `<a id="4112-3" onclick="applyGAClick('A1', '1 Bed(s)', '900',
+   '1099.00', ...)">Apply Now</a>` — neither table nor card. Fix:
+   new `_parse_applyga_button_layout()` extracts unit + rent + sqft
+   from the button id + onclick args; inserted in the cascade between
+   table (A1) and card (A2) layouts.
+
+Post-fix verification: 4/4 Nestin targets emit clean unit numbers with
+real rents. 6 new regression tests pinning each fix.
+
+## Pre-canary probe (2026-05-20) — Knock-by-domain limitation
+
+The same live probe also tested the Knock-by-domain resolver
+(`e69c208`) against the 4 verified Aspen Square targets. **0/4
+succeeded.** Root cause:
+
+- The static-HTML Aspen Square pages carry **zero Knock signals** —
+  no `knockDoorway`, no `doorway-api.knockrentals.com`, no
+  `knockrentals.com/widget`, no `utm_knock=` param, no
+  `community_id`. The Knock widget is loaded dynamically via JS
+  post-render.
+- `/v1/profile?code=w&domain={url}` returns `"PropertyId is not set"`
+  because the public Knock API requires a prior
+  `/v1/property/community/{hash}` bootstrap call, and that hash only
+  exists in the post-JS DOM.
+
+The by-domain resolver fails gracefully (try/except → falls through
+to Path B/C retry → next adapter), so the canary won't regress — but
+the Aspen Square cluster (~21 props, ~315 strict units in the
+follow-on impact estimate) needs a different recovery strategy.
+
+**Options for the next session** (NOT blocking canary):
+- Playwright integration (renders the JS, harvests the community
+  hash, then calls the API) — most reliable, highest infra cost.
+- HAR-replay: the user's HAR file captures one verified
+  community_id; check whether Knock community IDs are stable per-
+  property over time. If yes, build a one-time harvest map.
+- Operator-route (Aspen Square may have a separate guest-card API
+  not behind Knock); needs a fresh probe.
 
 ## Open items from this follow-on (for the next session)
 
