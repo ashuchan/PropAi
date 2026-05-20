@@ -141,3 +141,95 @@ def test_rent_within_sanity_range() -> None:
                     for n in nums:
                         val = int(n.replace(",", ""))
                         assert 200 <= val <= 50000
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 feature_fail_1429 cluster #6 — OneSite empty-exit labels.
+#
+# 30 props tagged TIER_1_API_ONESITE with 0 strict units in the canary
+# feature run. Live-probe of top 3 (toapts.com, riverpointeliving,
+# acadiabysdk) on the OneSite numeric-subdomain hosts (e.g.
+# 9141461.onlineleasing.realpage.com) showed page bodyLen ≈ 386 — the
+# page is an empty OLL-widget shell. The RealPage floorplans/units API
+# was never hit on the canary, so the OneSite adapter saw zero
+# RealPage-shaped responses and emitted the bare success label —
+# which blocked both Path B/C retry AND Step 8 generic fallback.
+#
+# Fix: emit ``_NO_RESPONSE`` when nothing RealPage-shaped came back,
+# and ``_EMPTY`` when responses came back but everything failed the
+# validity gate. Both labels are in the empty-exit registry so the
+# retry mechanism + Step 8 fallback can now do their job.
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_onesite_emits_no_response_when_no_realpage_responses() -> None:
+    """No RealPage-shaped response captured (OLL widget shell pattern) —
+    emit ``TIER_1_API_ONESITE_NO_RESPONSE`` so Path B/C and Step 8
+    fallback can engage."""
+    # All non-RealPage responses (analytics, static assets, etc.)
+    responses = [
+        {
+            "url": "https://www.google-analytics.com/g/collect?v=2",
+            "body": {"event": "page_view"},
+        },
+        {
+            "url": "https://cs-cdn.realpage.com/CWS/9999/CMSScripts/main.js",
+            "body": "console.log('ok');",
+        },
+    ]
+    adapter = OneSiteAdapter()
+    ctx = _make_ctx(responses)
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.units == []
+    assert result.tier_used == "TIER_1_API_ONESITE_NO_RESPONSE", (
+        f"expected NO_RESPONSE label so retry/fallback fires; "
+        f"got {result.tier_used!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_onesite_emits_empty_when_floorplans_list_is_empty() -> None:
+    """RealPage response shape matched but the floorplans list was
+    empty — emit ``TIER_1_API_ONESITE_EMPTY``."""
+    responses = [
+        {
+            "url": "https://api.ws.realpage.com/v2/property/999/floorplans",
+            "body": {"status": 200, "response": {"floorplans": []}},
+        }
+    ]
+    adapter = OneSiteAdapter()
+    ctx = _make_ctx(responses)
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert result.units == []
+    assert result.tier_used == "TIER_1_API_ONESITE_EMPTY", (
+        f"expected EMPTY label (responses captured but no rows); "
+        f"got {result.tier_used!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_onesite_real_data_keeps_bare_success_label() -> None:
+    """Regression guard — real /floorplans data (the 293707 fixture
+    shape) still produces the bare ``TIER_1_API_ONESITE`` label so
+    Path B/C does NOT retry on a successful extraction."""
+    responses = _load_fixture("293707.json")
+    adapter = OneSiteAdapter()
+    ctx = _make_ctx(responses)
+    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+    assert len(result.units) >= 1
+    assert result.tier_used == "TIER_1_API_ONESITE", (
+        f"real data must keep the bare success label; got {result.tier_used!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_onesite_empty_label_in_empty_exit_registry() -> None:
+    """The two new empty-exit labels must both be recognized by
+    ``is_empty_exit`` so the Path B/C retry hook in scraper.py
+    actually fires on them."""
+    from ma_poc.pms.empty_exit import is_empty_exit
+    assert is_empty_exit("TIER_1_API_ONESITE_NO_RESPONSE") is True
+    assert is_empty_exit("TIER_1_API_ONESITE_EMPTY") is True
+    # Bare success label must NOT trigger retry.
+    assert is_empty_exit("TIER_1_API_ONESITE") is False
