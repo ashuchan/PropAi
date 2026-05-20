@@ -407,11 +407,18 @@ def _entry_html_from_ctx(ctx: AdapterContext) -> str | None:
 def find_sightmap_embed_codes(html: str) -> list[str]:
     """Return any SightMap embed codes found anywhere in *html* (deduped).
 
-    Accepts the embed URL in any DOM context — ``<iframe src=>``,
-    ``<a data-src=>`` (Fancybox lightbox lazy-loading), ``<a href=>``,
-    ``var EngrainedUrl = '...'`` JS assignments, etc. — because the
-    embed-code-bearing URL is distinctive enough on its own that the
-    surrounding element type isn't a useful filter.
+    Accepts the embed URL in any *loading-shaped* DOM context —
+    ``<iframe src=>``, ``<a data-src=>`` (Fancybox lightbox lazy-loading),
+    ``<a href=>``, ``var EngrainedUrl = '...'`` JS assignments, etc. —
+    because the embed-code-bearing URL is distinctive enough on its own
+    that the surrounding element type isn't a useful filter.
+
+    Skips matches that appear in JSON-value position (preceded by ``":``
+    or ``": "``). Those are config blobs the SightMap adapter can't act
+    on directly without first being routed there by a different signal
+    — and the embedded-portal-hint propagation path in the generic
+    adapter (``detect_embedded_portal_urls``) already handles them. See
+    ``test_portal_hint_survives_full_scrape_chain``.
 
     Reserved infra path segments (``embed/api``, ``embed/app``,
     ``embed/admin``) are filtered out — these are SightMap's own
@@ -422,6 +429,24 @@ def find_sightmap_embed_codes(html: str) -> list[str]:
     seen: set[str] = set()
     codes: list[str] = []
     for m in _SIGHTMAP_EMBED_URL_RE.finditer(html):
+        # Skip JSON-value position. Real cluster #5 forms preceding the URL:
+        #   data-src="...   → preceded by `="`
+        #   var EngrainedUrl = '...'  → preceded by `= '`
+        #   src=...         → preceded by `=`
+        # JSON-value form preceding the URL:
+        #   "embed_url":"...  → preceded by `":"`  (also `": "` with whitespace)
+        # Walk back over an optional whitespace + quote, then check for a
+        # colon. That distinguishes ``":"https://...`` (skip) from
+        # ``="https://...`` (keep) without false-positives.
+        start = m.start()
+        i = start - 1
+        if i >= 0 and html[i] in "'\"":
+            i -= 1
+        while i >= 0 and html[i] in " \t":
+            i -= 1
+        if i >= 0 and html[i] == ":":
+            continue
+
         code = m.group(1)
         # Reserved infra segments — never customer codes.
         if code.lower() in {"embed", "app", "admin", "api"}:

@@ -471,6 +471,59 @@ def test_find_sightmap_embed_codes_dedups_multiple_refs() -> None:
     assert codes == ["dup123abc"]
 
 
+def test_find_sightmap_embed_codes_skips_json_value_position() -> None:
+    """2026-05-20 follow-up fix to the cluster-5 broadening: when a
+    SightMap URL appears as a JSON-string *value* (preceded by ``":``
+    or ``": "``), it's a config blob, not a loading reference. The
+    generic adapter's ``detect_embedded_portal_urls`` already handles
+    those — surfacing them here would dispatch SightMapAdapter on a
+    page where the iframe-fallback can't recover (no loading-shaped
+    context), wasting the dispatch.
+
+    Regression of ``test_portal_hint_survives_full_scrape_chain``
+    (test_embedded_portal_detection.py). Before this filter, the
+    broadened regex caught the URL inside a JSON config blob and
+    routed to SightMap, breaking the generic-adapter portal-hint path."""
+    from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+    # JSON value form — exactly the shape in the portal-hint test
+    html_json = (
+        '<html><body>'
+        '<script type="application/json">'
+        '{"id":"3","embed_url":"https://sightmap.com/embed/8epm6rn0v6d?'
+        'enable_api=1","integration":"engrain"}'
+        '</script>'
+        '</body></html>'
+    )
+    assert find_sightmap_embed_codes(html_json) == [], (
+        f"JSON-value position must be filtered; got "
+        f"{find_sightmap_embed_codes(html_json)!r}"
+    )
+    # Same code, this time in a loading-shaped context — must still
+    # be discoverable.
+    html_loading = (
+        '<html><body>'
+        '<a data-src="https://sightmap.com/embed/8epm6rn0v6d">tour</a>'
+        '</body></html>'
+    )
+    assert find_sightmap_embed_codes(html_loading) == ["8epm6rn0v6d"]
+
+
+def test_find_sightmap_embed_codes_handles_json_with_whitespace_between_colon_and_quote() -> None:
+    """Defensive — JSON pretty-printers sometimes insert whitespace
+    between the colon and the opening quote: ``"embed_url" : "...``."""
+    from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+    html = (
+        '<html><body>'
+        '<script type="application/json">'
+        '{"embed_url" : "https://sightmap.com/embed/xyz123abc"}'
+        '</script></body></html>'
+    )
+    assert find_sightmap_embed_codes(html) == [], (
+        f"whitespace-padded JSON value must also be filtered; "
+        f"got {find_sightmap_embed_codes(html)!r}"
+    )
+
+
 def test_sightmap_matches_response_body_negative() -> None:
     """``matches_response_body`` returns False on non-SightMap bodies."""
     adapter = SightMapAdapter()
