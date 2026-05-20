@@ -178,7 +178,23 @@ def _html_for(ctx: AdapterContext, page: Page | None) -> tuple[str, str]:
 
 
 class EquityAdapter:
-    """Equity Residential (equityapartments.com) PMS adapter."""
+    """Equity Residential (equityapartments.com) PMS adapter.
+
+    Tier labels (post-2026-05-20 cluster #7 fix):
+
+      ``TIER_1_API_EQUITY``                — real unit-level data parsed
+      ``TIER_1_API_EQUITY_EMPTY``          — ea5-unit blocks parsed but
+                                             post_process rejected all rows
+      ``TIER_1_API_EQUITY_NO_RESPONSE``    — no ea5-unit blocks in the
+                                             fetched HTML (page may be a
+                                             redirect/legacy URL, or the
+                                             Cloudflare check returned a
+                                             challenge body the parser
+                                             can't handle)
+
+    Empty-exit labels trigger the scraper's Path B/C retry + Step 8
+    generic fallback. Previously the bare success label was kept on
+    every failure path, blocking both recovery paths."""
 
     pms_name: str = "equity"
     _fingerprints: list[str] = ["equityapartments.com", "ea5-unit"]
@@ -199,12 +215,21 @@ class EquityAdapter:
                 result.winning_url = url or None
                 result.confidence = min(0.90, 0.7 + 0.05 * _pp.n_admitted)
             else:
+                # ea5-unit blocks parsed but validity gate rejected all rows.
+                # Surface as empty-exit so Path B/C + Step 8 can engage.
+                result.tier_used = f"{OLL_TIER}_EMPTY"
                 result.confidence = 0.0
                 result.errors.append(
                     f"EQUITY_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
                     f"failed unit_validity"
                 )
         else:
+            # No ea5-unit blocks at all. The cluster #7 pattern:
+            # equityapartments.com URLs that returned a non-Angular body
+            # (legacy .aspx redirect, Cloudflare challenge, or genuine
+            # no-availability). Empty-exit label lets the retry/fallback
+            # paths run.
+            result.tier_used = f"{OLL_TIER}_NO_RESPONSE"
             result.confidence = 0.0
             result.errors.append(
                 "No Equity unit data (ea5-unit blocks not found in HTML)"
