@@ -423,3 +423,78 @@ def test_bug4_pass3_handles_offers_nested_in_brand() -> None:
     # Pass 3 walks dict.values() so the "makesOffer" array is reached and the
     # bare Offers inside are emitted.
     assert len(units) >= 2
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 random-30 probe finding: ~17% of "no_units" cohort had real
+# unit data on the homepage in custom-CMS table-row layouts. The DOM
+# scanner had ~30 ``div.*`` / ``article.*`` container selectors but ZERO
+# ``tr.*`` patterns — sites like Corsa Management's Greenwood Village
+# (``<tr class="prisma-units-row">``) fell through to LLM rescue or 0
+# extraction. Adding TR-based selectors is low-risk because the existing
+# >200-node and rent + structural-signal gates filter false positives.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_extract_units_from_dom_handles_prisma_units_row() -> None:
+    """Verified live 2026-05-20 against Greenwood Village (Corsa
+    Management). The ``tr.prisma-units-row`` contains rent + sqft +
+    beds in cells; the row's combined text passes the existing
+    structural-signal gate."""
+    from ma_poc.pms.adapters._html_extract import extract_units_from_dom
+    html = """<html><body>
+    <table class="prisma-units-table">
+      <tbody class="prisma-units-body">
+        <tr class="prisma-units-row first_tr_units">
+          <td>plan image</td>
+          <td class="prisma-units-row-autoi">1BR -3RM</td>
+          <td class="prisma-units-row-autoi">1BA</td>
+          <td><div class="unit_space">560 sqft</div></td>
+          <td class="prisma-units-data">$1,450 - 1,500</td>
+        </tr>
+        <tr class="prisma-units-row">
+          <td>plan image</td>
+          <td class="prisma-units-row-autoi">2BR -5RM</td>
+          <td class="prisma-units-row-autoi">2BA</td>
+          <td><div class="unit_space">880 sqft</div></td>
+          <td class="prisma-units-data">$2,100 - 2,250</td>
+        </tr>
+      </tbody>
+    </table>
+    </body></html>"""
+    units, hit_mode = extract_units_from_dom(html, "https://example.com/")
+    assert len(units) == 2, f"expected 2 units, got {len(units)}"
+    rents = sorted(u["market_rent_low"] for u in units if u.get("market_rent_low"))
+    assert rents == [1450, 2100], f"unexpected rents: {rents}"
+
+
+def test_extract_units_from_dom_handles_unit_row_class_suffix() -> None:
+    """Generic ``tr[class*='unit-row']`` catches custom-CMS variants
+    that name their rows ``greenwood-unit-row``, ``my-unit-row``, etc.
+    Without the wildcard suffix selector, every new theme needs its
+    own explicit entry."""
+    from ma_poc.pms.adapters._html_extract import extract_units_from_dom
+    html = """<html><body>
+    <table>
+      <tr class="custom-cms-unit-row">
+        <td>1 Bed</td>
+        <td>1 Bath</td>
+        <td>700 sqft</td>
+        <td>$1,895</td>
+      </tr>
+    </table>
+    </body></html>"""
+    units, hit_mode = extract_units_from_dom(html, "https://example.com/")
+    assert len(units) == 1
+    assert units[0]["market_rent_low"] == 1895
+
+
+def test_dom_container_selectors_includes_tr_patterns() -> None:
+    """Source-grep guard: the DOM cascade MUST include TR-row selectors.
+    A future refactor that drops them silently would regress Greenwood-
+    shape sites without firing any test failure on synthetic fixtures."""
+    from ma_poc.pms.adapters._html_extract import _DOM_CONTAINER_SELECTORS
+    assert any(
+        s.startswith("tr.") or s.startswith("tr[")
+        for s in _DOM_CONTAINER_SELECTORS
+    ), "DOM cascade must include TR-row selectors for custom-CMS unit tables"
