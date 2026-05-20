@@ -352,4 +352,126 @@ def test_sightmap_matches_response_body_protocol() -> None:
         )
         is True
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 feature_fail_1429 grind — cluster #5 (SightMap embed
+# discovered in non-iframe DOM forms). 3 of 4 Bucket-A SHAPE_REJECTED
+# props sampled (griffisresidential, cambridgeondevonshire,
+# soltrafirewheel) carry the SightMap embed URL in formats the legacy
+# ``<iframe src=...>`` regex doesn't match:
+#  * Fancybox anchor: <a data-src="https://sightmap.com/embed/{code}">
+#  * JS assignment:   var EngrainedUrl = 'https://sightmap.com/embed/{code}'
+# Result: ``find_sightmap_embed_codes`` returns [], the iframe-fallback
+# never fires, the adapter reports SHAPE_REJECTED even though main
+# extracted 10-126 strict units on the same properties.
+#
+# These tests document the broadened discovery contract: any
+# sightmap.com/embed/{code} URL in the page HTML, regardless of the
+# surrounding element, should be discoverable.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_find_sightmap_embed_codes_in_fancybox_anchor_data_src() -> None:
+    """griffisresidential / soltrafirewheel pattern — embed URL in
+    ``<a data-src="...">`` for Fancybox lightbox lazy-loading.
+    Real-bytes anchor template observed on griffisresidential 2026-05-20."""
+    from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+    html = (
+        '<html><body>'
+        '<a href="javascript:;" data-fancybox="sightmap" data-type="iframe" '
+        'data-src="https://sightmap.com/embed/m9pzd4ezvk1" '
+        'data-ecs-components-control="something">View map</a>'
+        '</body></html>'
+    )
+    codes = find_sightmap_embed_codes(html)
+    assert codes == ["m9pzd4ezvk1"], (
+        f"expected [m9pzd4ezvk1] from Fancybox data-src anchor, got {codes!r}"
+    )
+
+
+def test_find_sightmap_embed_codes_in_js_variable_assignment() -> None:
+    """cambridgeondevonshireapartments pattern — embed URL assigned to a
+    JS variable inside a <script> tag (no iframe element at parse time;
+    Engrain SDK creates the iframe dynamically). Real-bytes pattern
+    observed 2026-05-20."""
+    from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+    html = (
+        '<html><body>'
+        '<script type="text/javascript">'
+        "var EngrainedUrl = 'https://sightmap.com/embed/zlpoyde8wg4';"
+        '</script>'
+        '</body></html>'
+    )
+    codes = find_sightmap_embed_codes(html)
+    assert codes == ["zlpoyde8wg4"], (
+        f"expected [zlpoyde8wg4] from JS variable assignment, got {codes!r}"
+    )
+
+
+def test_find_sightmap_embed_codes_plain_anchor_href() -> None:
+    """Bare anchor with href — covers marketing sites that link to the
+    SightMap embed directly without Fancybox/Engrain wrappers."""
+    from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+    html = (
+        '<html><body>'
+        '<a href="https://sightmap.com/embed/abc123xyz">Tour</a>'
+        '</body></html>'
+    )
+    codes = find_sightmap_embed_codes(html)
+    assert codes == ["abc123xyz"], (
+        f"expected [abc123xyz] from plain anchor href, got {codes!r}"
+    )
+
+
+def test_find_sightmap_embed_codes_still_works_with_iframe() -> None:
+    """Regression guard — the classic ``<iframe src=>`` form must still
+    be discoverable. Was the only supported form before 2026-05-20."""
+    from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+    html = (
+        '<html><body>'
+        '<iframe src="https://sightmap.com/embed/rxwjjkedw1e" '
+        'width="100%" height="600"></iframe>'
+        '</body></html>'
+    )
+    codes = find_sightmap_embed_codes(html)
+    assert codes == ["rxwjjkedw1e"]
+
+
+def test_find_sightmap_embed_codes_skips_reserved_path_segments() -> None:
+    """``/embed/api`` / ``/embed/app`` / ``/embed/admin`` are SightMap's
+    own infra paths, not customer embed codes — already filtered today,
+    must stay filtered when the regex broadens."""
+    from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+    html = (
+        '<html><body>'
+        '<script>var x = "https://sightmap.com/embed/api";</script>'
+        '<a href="https://sightmap.com/embed/app">app</a>'
+        '<a data-src="https://sightmap.com/embed/m9pzd4ezvk1">real one</a>'
+        '</body></html>'
+    )
+    codes = find_sightmap_embed_codes(html)
+    assert codes == ["m9pzd4ezvk1"], (
+        f"reserved 'api' / 'app' segments must not be returned; got {codes!r}"
+    )
+
+
+def test_find_sightmap_embed_codes_dedups_multiple_refs() -> None:
+    """Some pages reference the same embed code multiple times (mobile
+    + desktop anchor, multiple lazy-load targets). Dedup is preserved."""
+    from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+    html = (
+        '<html><body>'
+        '<a data-src="https://sightmap.com/embed/dup123abc">A</a>'
+        '<iframe src="https://sightmap.com/embed/dup123abc"></iframe>'
+        '<script>var u = "https://sightmap.com/embed/dup123abc";</script>'
+        '</body></html>'
+    )
+    codes = find_sightmap_embed_codes(html)
+    assert codes == ["dup123abc"]
+
+
+def test_sightmap_matches_response_body_negative() -> None:
+    """``matches_response_body`` returns False on non-SightMap bodies."""
+    adapter = SightMapAdapter()
     assert adapter.matches_response_body({"random": "not-sightmap"}) is False
