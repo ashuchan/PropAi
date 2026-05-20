@@ -859,44 +859,117 @@ async def scrape(
             return result
         adapter_result = AdapterResult(errors=[str(exc)])
 
-    # --- Path B Piece 3a: empty-exit retry telemetry ---------------------------
-    # When the first adapter dispatch returns an empty-exit label (see
-    # ``ma_poc.pms.empty_exit``) AND produces no units, emit a
-    # ``RETRY_WOULD_DISPATCH`` event with the would-be next candidate from
-    # ``detect_pms_candidates``. Telemetry-only — does NOT actually retry.
-    # Lets us measure on canary how many properties would benefit from
-    # the retry mechanism vs how many the existing LLM rescue catches.
-    # Piece 3b will graduate this from telemetry to actual re-dispatch.
+    # --- Path B Piece 3: empty-exit retry with next-best PMS -------------------
+    # When an adapter dispatch returns an empty-exit label (see
+    # ``ma_poc.pms.empty_exit``) AND produces no units, find the next PMS
+    # candidate from ``detect_pms_candidates`` and re-dispatch on the same
+    # page (no re-fetch — the captured network state is shared via
+    # ``ctx._api_responses``). Max ``PATH_B_MAX_RETRIES`` attempts.
+    #
+    # Feature flag: set ``PATH_B_RETRY_ENABLED=0`` to fall back to Piece 3a
+    # telemetry-only behavior (emit ``RETRY_WOULD_DISPATCH`` without
+    # actually re-dispatching). Default is enabled.
+    #
+    # Designed at investigations/2026-05-20-path-b-design/DESIGN.md.
     try:
+        import os as _retry_os
+
         from ma_poc.observability.events import EventKind as _RetryEventKind
         from ma_poc.observability.events import emit as _retry_emit
         from ma_poc.pms.detector import detect_pms_candidates
         from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
+        from ma_poc.pms.adapters.registry import get_adapter as _retry_get_adapter
 
-        _empty_exit_label = adapter_result.tier_used
-        if (
-            is_empty_exit(_empty_exit_label)
+        _PATH_B_RETRY_ENABLED = (
+            _retry_os.environ.get("PATH_B_RETRY_ENABLED", "1").lower()
+            not in {"0", "false", "no", ""}
+        )
+        _PATH_B_MAX_RETRIES = int(
+            _retry_os.environ.get("PATH_B_MAX_RETRIES", "2")
+        )
+
+        _retry_tried_pms: set[str] = {adapter_name}
+        _retry_attempt = 0
+        while (
+            is_empty_exit(adapter_result.tier_used)
             and not adapter_result.units
+            and _retry_attempt < _PATH_B_MAX_RETRIES
         ):
             _next_candidates = detect_pms_candidates(
                 url=getattr(ctx, "base_url", "") or "",
                 csv_row=None,
                 page_html=page_html,
-                exclude={adapter_name},
-                max_candidates=2,
+                exclude=_retry_tried_pms,
+                max_candidates=_PATH_B_MAX_RETRIES,
             )
-            if _next_candidates:
+            if not _next_candidates:
+                break
+            _next_cand = _next_candidates[0]
+            _previous_tier = adapter_result.tier_used or ""
+            _previous_pms = adapter_name
+
+            # Telemetry-only mode — emit and stop (no re-dispatch).
+            if not _PATH_B_RETRY_ENABLED:
                 _retry_emit(
                     _RetryEventKind.RETRY_WOULD_DISPATCH,
                     property_id=getattr(ctx, "property_id", "") or "",
-                    previous_pms=adapter_name,
-                    previous_tier=_empty_exit_label or "",
-                    empty_exit_reason=empty_exit_reason(_empty_exit_label) or "",
-                    next_pms=_next_candidates[0].pms,
-                    next_confidence=_next_candidates[0].confidence,
+                    previous_pms=_previous_pms,
+                    previous_tier=_previous_tier,
+                    empty_exit_reason=empty_exit_reason(_previous_tier) or "",
+                    next_pms=_next_cand.pms,
+                    next_confidence=_next_cand.confidence,
                     remaining_candidates=len(_next_candidates),
                 )
-    except Exception:  # pragma: no cover — telemetry must never block scrape
+                break
+
+            _retry_attempt += 1
+            _retry_emit(
+                _RetryEventKind.RETRY_DISPATCHED,
+                property_id=getattr(ctx, "property_id", "") or "",
+                attempt=_retry_attempt,
+                previous_pms=_previous_pms,
+                previous_tier=_previous_tier,
+                empty_exit_reason=empty_exit_reason(_previous_tier) or "",
+                next_pms=_next_cand.pms,
+                next_confidence=_next_cand.confidence,
+            )
+
+            _retry_tried_pms.add(_next_cand.pms)
+            _new_adapter = _retry_get_adapter(_next_cand.pms)
+            _new_adapter_name = getattr(_new_adapter, "pms_name", _next_cand.pms)
+            # Update ctx so the new adapter sees the right detection.
+            ctx.detected = _next_cand
+            try:
+                _new_result = await _new_adapter.extract(page, ctx)  # type: ignore[arg-type]
+            except Exception as _retry_exc:
+                # The retry attempt itself crashed — record on chain, stop.
+                fallback_chain.append(
+                    f"retry_failed:{_new_adapter_name}:{type(_retry_exc).__name__}"
+                )
+                break
+
+            fallback_chain.append(f"retry:{_new_adapter_name}")
+            if _new_result.units:
+                # Winner — promote it.
+                _retry_emit(
+                    _RetryEventKind.RETRY_SUCCESS,
+                    property_id=getattr(ctx, "property_id", "") or "",
+                    attempt=_retry_attempt,
+                    previous_pms=_previous_pms,
+                    previous_tier=_previous_tier,
+                    won_pms=_new_adapter_name,
+                    won_tier=_new_result.tier_used or "",
+                    unit_count=len(_new_result.units),
+                )
+                adapter_result = _new_result
+                adapter = _new_adapter
+                adapter_name = _new_adapter_name
+                result["_adapter_used"] = _new_adapter_name
+                result["_detected_pms"] = _detection_to_dict(_next_cand)
+                break
+            # Retry produced no units either — loop and try the next.
+            adapter_result = _new_result
+    except Exception:  # pragma: no cover — Path B must never block scrape
         pass
 
     # --- F2: LLM rescue for Tier-1 API adapters --------------------------------

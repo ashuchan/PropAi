@@ -1,19 +1,27 @@
-"""Path B Piece 3a — empty-exit retry telemetry.
+"""Path B Pieces 3a + 3b — empty-exit retry telemetry and re-dispatch.
 
-The hook lives in ``ma_poc.pms.scraper.scrape_jugnu`` right after the
-first adapter dispatch. When the adapter returns an empty-exit label
-AND produces no units, the hook emits a ``RETRY_WOULD_DISPATCH`` event
-with the would-be next PMS candidate from ``detect_pms_candidates``.
+The hook lives in ``ma_poc.pms.scraper`` right after the first adapter
+dispatch. Two modes:
 
-These tests verify the *event-emission contract* in isolation by
-exercising the same code path the scraper uses (``is_empty_exit`` +
-``detect_pms_candidates`` + ``emit``) without spinning up a Playwright
-session or the rest of ``scrape_jugnu``. The scrape-time integration
-gets a smaller end-to-end pass via the existing test_scraper suite.
+  - Piece 3a (telemetry-only, ``PATH_B_RETRY_ENABLED=0``): emits a
+    single ``RETRY_WOULD_DISPATCH`` event when the adapter returns an
+    empty-exit label AND produces no units; does NOT actually retry.
+  - Piece 3b (default): emits ``RETRY_DISPATCHED`` per attempt and
+    ``RETRY_SUCCESS`` when an attempt recovers units; re-dispatches
+    on the same page using the next PMS from ``detect_pms_candidates``.
+    Bounded by ``PATH_B_MAX_RETRIES`` (default 2).
+
+These tests verify the contract in isolation by exercising the same
+primitives the scraper uses (``is_empty_exit`` + ``detect_pms_candidates``
++ ``emit`` + ``get_adapter``) plus a re-implementation of the retry
+loop logic against mocked adapters. The scraper hook itself is checked
+for drift via the source-grep contract test.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from dataclasses import field as _dc_field
 from typing import Any
 
 import pytest
@@ -305,10 +313,460 @@ def test_scraper_hook_kept_in_sync_with_test_helper() -> None:
         "is_empty_exit",
         "detect_pms_candidates",
         "RETRY_WOULD_DISPATCH",
+        "RETRY_DISPATCHED",
+        "RETRY_SUCCESS",
+        "PATH_B_RETRY_ENABLED",
+        "PATH_B_MAX_RETRIES",
         "empty_exit_reason",
     ):
         assert symbol in scraper_src, (
-            f"Path B telemetry hook in scraper.py no longer references "
+            f"Path B retry hook in scraper.py no longer references "
             f"{symbol!r} — test helper and hook are now out of sync; "
             f"update one or the other."
         )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Section 6 — Piece 3b retry-loop logic (mocked adapters, no scraper).
+#
+# Re-implements the production retry loop in a testable shape so we can
+# exercise: max-retries cap, win-on-first-retry, win-on-second-retry,
+# all-retries-fail, no-candidate, telemetry-only mode (3a). Mocks the
+# adapter dispatch via a per-PMS preset map; the loop calls
+# ``get_adapter(pms)`` via a dependency-injected callable so tests can
+# substitute a stub.
+# ─────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class _StubAdapterResult:
+    """Minimal stand-in for ``ma_poc.pms.adapters.base.AdapterResult``.
+
+    The retry loop only reads ``tier_used`` and ``units`` so the stub
+    only carries those two fields."""
+    tier_used: str | None = None
+    units: list = _dc_field(default_factory=list)
+
+
+@dataclass
+class _StubAdapter:
+    """Stub adapter whose ``extract()`` returns a preset result."""
+    pms_name: str
+    preset: _StubAdapterResult
+
+    async def extract(self, page, ctx):  # noqa: ARG002 — page/ctx unused
+        return self.preset
+
+
+@dataclass
+class _Ctx:
+    """Minimal stand-in for ``AdapterContext`` covering the retry path."""
+    base_url: str
+    property_id: str
+    detected: object = None
+
+
+async def _run_retry_loop_under_test(
+    *,
+    initial_adapter_name: str,
+    initial_result: _StubAdapterResult,
+    page_html: str | None,
+    ctx: _Ctx,
+    adapter_table: dict[str, _StubAdapter],
+    enabled: bool = True,
+    max_retries: int = 2,
+) -> tuple[str, _StubAdapterResult, list[str]]:
+    """Mirror of the production retry loop body in
+    ``ma_poc.pms.scraper`` (Path B Piece 3). Returns the final
+    (adapter_name, adapter_result, fallback_chain). Kept in sync with
+    the production hook via ``test_scraper_hook_kept_in_sync...``."""
+    from ma_poc.observability import events as _events_mod
+    from ma_poc.observability.events import EventKind
+    from ma_poc.pms.detector import detect_pms_candidates
+    from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
+
+    adapter_result = initial_result
+    adapter_name = initial_adapter_name
+    tried: set[str] = {adapter_name}
+    fallback_chain: list[str] = []
+    attempt = 0
+
+    while (
+        is_empty_exit(adapter_result.tier_used)
+        and not adapter_result.units
+        and attempt < max_retries
+    ):
+        candidates = detect_pms_candidates(
+            url=ctx.base_url,
+            csv_row=None,
+            page_html=page_html,
+            exclude=tried,
+            max_candidates=max_retries,
+        )
+        if not candidates:
+            break
+        nc = candidates[0]
+        previous_tier = adapter_result.tier_used or ""
+        previous_pms = adapter_name
+
+        if not enabled:
+            _events_mod.emit(
+                EventKind.RETRY_WOULD_DISPATCH,
+                property_id=ctx.property_id,
+                previous_pms=previous_pms,
+                previous_tier=previous_tier,
+                empty_exit_reason=empty_exit_reason(previous_tier) or "",
+                next_pms=nc.pms,
+                next_confidence=nc.confidence,
+                remaining_candidates=len(candidates),
+            )
+            break
+
+        attempt += 1
+        _events_mod.emit(
+            EventKind.RETRY_DISPATCHED,
+            property_id=ctx.property_id,
+            attempt=attempt,
+            previous_pms=previous_pms,
+            previous_tier=previous_tier,
+            empty_exit_reason=empty_exit_reason(previous_tier) or "",
+            next_pms=nc.pms,
+            next_confidence=nc.confidence,
+        )
+
+        tried.add(nc.pms)
+        new_adapter = adapter_table.get(nc.pms)
+        if new_adapter is None:
+            fallback_chain.append(f"retry_failed:{nc.pms}:NoAdapter")
+            break
+        new_result = await new_adapter.extract(None, ctx)
+        fallback_chain.append(f"retry:{nc.pms}")
+        if new_result.units:
+            _events_mod.emit(
+                EventKind.RETRY_SUCCESS,
+                property_id=ctx.property_id,
+                attempt=attempt,
+                previous_pms=previous_pms,
+                previous_tier=previous_tier,
+                won_pms=nc.pms,
+                won_tier=new_result.tier_used or "",
+                unit_count=len(new_result.units),
+            )
+            adapter_result = new_result
+            adapter_name = nc.pms
+            break
+        adapter_result = new_result
+
+    return adapter_name, adapter_result, fallback_chain
+
+
+# A page where G5 wins detection but Knock is also present — the
+# Flatiron pattern. detect_pms_candidates returns ['knock', 'rentcafe']
+# (G5 is gated out by the cluster-3 detector fix).
+_HTML_KNOCK_THEN_RENTCAFE = (
+    "<html><body>"
+    '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+    '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+    '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+    '"community","69e936e6567a11ef");</script>'
+    '<a href="https://lpc.securecafe.com/onlineleasing/x/availableunits.aspx">x</a>'
+    "</body></html>"
+)
+
+
+@pytest.mark.asyncio
+async def test_retry_succeeds_on_first_attempt(captured: _CapturedEvents) -> None:
+    """G5 returns _EMPTY, retry picks Knock, Knock recovers units —
+    emits RETRY_DISPATCHED + RETRY_SUCCESS, adapter_name becomes knock."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    knock_result = _StubAdapterResult(
+        tier_used="TIER_1_API_KNOCK",
+        units=[{"unit_id": "K1", "asking_rent": 1500}],
+    )
+    table = {
+        "knock": _StubAdapter("knock", knock_result),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_SHAPE_REJECTED"),
+        ),
+    }
+    name, result, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-001"),
+        adapter_table=table,
+    )
+
+    assert name == "knock"
+    assert result.units == knock_result.units
+    assert chain == ["retry:knock"]
+    dispatched = captured.of_kind(EventKind.RETRY_DISPATCHED)
+    success = captured.of_kind(EventKind.RETRY_SUCCESS)
+    assert len(dispatched) == 1 and dispatched[0].data["attempt"] == 1
+    assert dispatched[0].data["next_pms"] == "knock"
+    assert len(success) == 1
+    assert success[0].data["won_pms"] == "knock"
+    assert success[0].data["unit_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_retry_succeeds_on_second_attempt(captured: _CapturedEvents) -> None:
+    """Knock also returns empty, retry escalates to rentcafe — emits
+    2x RETRY_DISPATCHED and 1x RETRY_SUCCESS."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY")
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_RENTCAFE",
+                units=[{"unit_id": "RC1"}, {"unit_id": "RC2"}],
+            ),
+        ),
+    }
+    name, result, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-002"),
+        adapter_table=table,
+    )
+
+    assert name == "rentcafe"
+    assert len(result.units) == 2
+    assert chain == ["retry:knock", "retry:rentcafe"]
+    assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) == 2
+    assert len(captured.of_kind(EventKind.RETRY_SUCCESS)) == 1
+    assert captured.of_kind(EventKind.RETRY_SUCCESS)[0].data["won_pms"] == "rentcafe"
+
+
+@pytest.mark.asyncio
+async def test_retry_exhausts_all_candidates_without_recovery(
+    captured: _CapturedEvents,
+) -> None:
+    """All retry attempts return empty — no RETRY_SUCCESS event,
+    adapter_name stays at the LAST tried PMS."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY")
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_SHAPE_REJECTED"),
+        ),
+    }
+    name, result, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-003"),
+        adapter_table=table,
+    )
+
+    assert not result.units
+    assert "retry:knock" in chain and "retry:rentcafe" in chain
+    assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) == 2
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+
+
+@pytest.mark.asyncio
+async def test_retry_caps_at_max_retries(captured: _CapturedEvents) -> None:
+    """``max_retries=1`` means at most ONE retry attempt, even with
+    multiple candidates available."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY")
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_EMPTY"),
+        ),
+    }
+    await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-004"),
+        adapter_table=table,
+        max_retries=1,
+    )
+    # Exactly 1 dispatch attempt because max_retries=1
+    assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) == 1
+
+
+@pytest.mark.asyncio
+async def test_retry_no_candidate_emits_nothing(captured: _CapturedEvents) -> None:
+    """Page has only G5 markers — no co-resident PMS, no candidates.
+    detect_pms_candidates(exclude={'g5'}) returns []. Retry loop exits
+    without emitting any event."""
+    html_g5_only = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+        "</body></html>"
+    )
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY")
+    name, _, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=html_g5_only,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-005"),
+        adapter_table={},
+    )
+    assert name == "g5"  # no change
+    assert chain == []
+    assert captured.of_kind(EventKind.RETRY_DISPATCHED) == []
+    assert captured.of_kind(EventKind.RETRY_WOULD_DISPATCH) == []
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+
+
+@pytest.mark.asyncio
+async def test_retry_disabled_flag_falls_back_to_telemetry_only(
+    captured: _CapturedEvents,
+) -> None:
+    """When ``enabled=False`` (env ``PATH_B_RETRY_ENABLED=0``), behavior
+    matches Piece 3a: emit RETRY_WOULD_DISPATCH and stop. No actual
+    retry happens even with candidates available."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY")
+    knock_result = _StubAdapterResult(
+        tier_used="TIER_1_API_KNOCK",
+        units=[{"unit_id": "K1"}],
+    )
+    table = {"knock": _StubAdapter("knock", knock_result)}
+
+    name, result, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-006"),
+        adapter_table=table,
+        enabled=False,
+    )
+    assert name == "g5"  # no actual dispatch happened
+    assert not result.units
+    assert chain == []
+    assert captured.of_kind(EventKind.RETRY_WOULD_DISPATCH)
+    assert captured.of_kind(EventKind.RETRY_DISPATCHED) == []
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+
+
+@pytest.mark.asyncio
+async def test_retry_does_not_fire_when_initial_succeeds(
+    captured: _CapturedEvents,
+) -> None:
+    """First adapter returned units — retry never enters the loop."""
+    initial = _StubAdapterResult(
+        tier_used="TIER_1_API_KNOCK",
+        units=[{"unit_id": "K1"}],
+    )
+    name, result, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="knock",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-007"),
+        adapter_table={},
+    )
+    assert name == "knock"
+    assert result.units
+    assert chain == []
+    assert captured.events == []
+
+
+@pytest.mark.asyncio
+async def test_retry_does_not_fire_on_success_label_with_no_units(
+    captured: _CapturedEvents,
+) -> None:
+    """Bare success label (TIER_1_API_KNOCK) with empty units — could be
+    a genuine no-availability property, not adapter failure. Retry must
+    NOT fire."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_KNOCK", units=[])
+    name, result, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="knock",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-008"),
+        adapter_table={},
+    )
+    assert name == "knock"
+    assert chain == []
+    assert captured.events == []
+
+
+@pytest.mark.asyncio
+async def test_retry_handles_adapter_exception_gracefully(
+    captured: _CapturedEvents,
+) -> None:
+    """When the retry adapter's extract() raises, record on the fallback
+    chain and stop — no RETRY_SUCCESS, but RETRY_DISPATCHED was already
+    emitted before the call."""
+
+    class _RaisingAdapter:
+        pms_name = "knock"
+
+        async def extract(self, page, ctx):  # noqa: ARG002
+            raise RuntimeError("simulated knock crash")
+
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY")
+    table: dict[str, Any] = {"knock": _RaisingAdapter()}
+
+    # The reimplemented loop catches the exception around the
+    # extract() call and records it on the fallback chain.
+    async def _loop_with_exception_handling():
+        from ma_poc.observability import events as _events_mod
+        from ma_poc.observability.events import EventKind
+        from ma_poc.pms.detector import detect_pms_candidates
+        from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
+
+        adapter_result = initial
+        adapter_name = "g5"
+        tried = {adapter_name}
+        fallback_chain: list[str] = []
+        attempt = 0
+        ctx = _Ctx(base_url="https://example.com/", property_id="P-009")
+        while (
+            is_empty_exit(adapter_result.tier_used)
+            and not adapter_result.units
+            and attempt < 2
+        ):
+            cands = detect_pms_candidates(
+                url=ctx.base_url,
+                csv_row=None,
+                page_html=_HTML_KNOCK_THEN_RENTCAFE,
+                exclude=tried,
+                max_candidates=2,
+            )
+            if not cands:
+                break
+            nc = cands[0]
+            attempt += 1
+            _events_mod.emit(
+                EventKind.RETRY_DISPATCHED,
+                property_id=ctx.property_id,
+                attempt=attempt,
+                previous_pms=adapter_name,
+                previous_tier=adapter_result.tier_used or "",
+                empty_exit_reason=empty_exit_reason(adapter_result.tier_used)
+                or "",
+                next_pms=nc.pms,
+                next_confidence=nc.confidence,
+            )
+            tried.add(nc.pms)
+            try:
+                _new_result = await table[nc.pms].extract(None, ctx)
+            except Exception as e:
+                fallback_chain.append(
+                    f"retry_failed:{nc.pms}:{type(e).__name__}"
+                )
+                break
+        return fallback_chain
+
+    chain = await _loop_with_exception_handling()
+    assert "retry_failed:knock:RuntimeError" in chain
+    # RETRY_DISPATCHED was emitted before the crash
+    assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) == 1
+    # No success was emitted
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []

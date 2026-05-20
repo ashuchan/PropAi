@@ -74,13 +74,15 @@ class EventKind(StrEnum):
     LLM_RESCUE_FAILED = "extract.llm_rescue_failed"
 
     # Path B (2026-05-20): adapter empty-exit retry events.
-    # ``RETRY_WOULD_DISPATCH`` is the telemetry-only Piece 3a signal —
-    # emitted when an adapter returns an empty-exit label AND
-    # ``detect_pms_candidates`` has a next candidate. Does NOT trigger
-    # a real retry; lets us measure recovery potential on canary before
-    # enabling re-dispatch in Piece 3b.
-    # ``RETRY_DISPATCHED`` will be added in Piece 3b when retry is wired.
+    # When env ``PATH_B_RETRY_ENABLED`` is unset/false, the orchestrator
+    # emits ``RETRY_WOULD_DISPATCH`` (telemetry-only — Piece 3a).
+    # When enabled, the orchestrator emits ``RETRY_DISPATCHED`` before
+    # each retry attempt and ``RETRY_SUCCESS`` when an attempt recovers
+    # units. The pair lets reporting split "retry tried & failed" from
+    # "retry tried & won".
     RETRY_WOULD_DISPATCH = "extract.retry_would_dispatch"
+    RETRY_DISPATCHED = "extract.retry_dispatched"
+    RETRY_SUCCESS = "extract.retry_success"
     # F1.2 (2026-05-09): rescue gate fired but rescue was skipped — e.g.
     # captcha_detected on the fetch_result. Distinct from FAILED so the
     # run report can separate "tried and got nothing" from "didn't try
