@@ -570,6 +570,35 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             0.90,
             ["SightMap embed iframe in HTML (sightmap.com/embed/)"],
         )
+    # 2026-05-20: Engrain widget signal. RealPage's interactive-map vendor
+    # (Engrain) loads the SightMap iframe dynamically post-JS, so static
+    # HTML often lacks ``sightmap.com/embed/``. But the server-rendered HTML
+    # carries paired ``data-unit``/``data-floorplan`` attributes (the
+    # Engrain hydration placeholders) AND a ``realpage.com`` script load.
+    # When BOTH appear in static HTML, route to sightmap so its iframe-
+    # fallback discovery (cluster #5 broadening) fires; if it can't reach
+    # the embed code, empty-exit retry routes to the next candidate.
+    #
+    # Verified live (2026-05-20 TIER_3_DOM ALL_fail probe, 7 of 25 props):
+    # Sawmill Station, Headwaters Autumn Hall, Stadia Med Main, Delwyn,
+    # Broadstone SoBro, Millennium River Oaks, Soleste Seaside. All
+    # currently misroute to TIER_3_DOM_GENERIC and emit synthetic UIDs.
+    # See project_tier3_dom_recovery_2026-05-20.md for the bucket analysis.
+    _has_engrain_widget = (
+        "data-unit" in h
+        and "data-floorplan" in h
+        and "realpage.com" in h
+    )
+    if _has_engrain_widget and not _has_sightmap_embed:
+        yield (
+            "sightmap",
+            0.88,
+            [
+                "Engrain widget signal in HTML (data-unit + data-floorplan "
+                "paired attrs + realpage.com script — SightMap iframe loads "
+                "dynamically post-JS)"
+            ],
+        )
     # ``.prospectportal.com`` is Entrata's ProspectPortal product host
     # (definitive Entrata, not an incidental CDN asset). Marketing
     # shells that hop to <sub>.prospectportal.com route to EntrataAdapter

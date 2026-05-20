@@ -1148,3 +1148,113 @@ def test_detect_pms_candidates_host_fingerprint_wins_first_slot() -> None:
         f"sightmap should still appear as a later candidate; got {[c.pms for c in cands]}"
     )
 
+    # retry to it if rentcafe returns empty.
+    assert any(c.pms == "sightmap" for c in cands), (
+        f"sightmap should still appear as a later candidate; got {[c.pms for c in cands]}"
+    )
+
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 Engrain widget signal — TIER_3_DOM ALL_fail recovery
+# (see project_tier3_dom_recovery_2026-05-20.md):
+# Properties on RealPage's Engrain interactive map (SightMap) load the
+# iframe dynamically post-JS, so static HTML lacks ``sightmap.com/embed/``.
+# But the server-rendered HTML carries paired ``data-unit``/``data-floorplan``
+# attributes (Engrain hydration placeholders) AND a ``realpage.com``
+# script load. Detector must route to sightmap on this combined signal
+# so SightMap's iframe-fallback discovery (cluster #5 broadening) can
+# fire. Verified live against 7 of 25 TIER_3_DOM ALL_fail props:
+# Sawmill Station, Headwaters Autumn Hall, Stadia Med Main, Delwyn,
+# Broadstone SoBro, Millennium River Oaks, Soleste Seaside.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_engrain_widget_routes_to_sightmap() -> None:
+    """Paired ``data-unit`` + ``data-floorplan`` attrs + ``realpage.com``
+    script → route to sightmap (Engrain hydration signal)."""
+    html = (
+        "<html><body>"
+        '<script src="https://www.realpage.com/widget/engrain.js"></script>'
+        '<div data-floorplan="3x2" data-unit="A101">Plan A1</div>'
+        "</body></html>"
+    )
+    result = detect_pms(
+        "https://www.residencesatsawmillstation.com/", page_html=html
+    )
+    assert result.pms == "sightmap"
+    assert result.confidence >= 0.85
+    assert any("Engrain widget" in e for e in result.evidence)
+
+
+def test_engrain_widget_missing_realpage_does_not_fire() -> None:
+    """``data-unit`` + ``data-floorplan`` WITHOUT ``realpage.com`` is too
+    generic — many marketing-template CMSes use these attribute names.
+    Must NOT promote sightmap without the RealPage script load."""
+    html = (
+        "<html><body>"
+        '<div data-floorplan="3x2" data-unit="A101">Plan A1</div>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    # Should be unknown / weaker fingerprint, not strong-routed to sightmap
+    assert not (
+        result.pms == "sightmap"
+        and any("Engrain widget" in e for e in result.evidence)
+    )
+
+
+def test_engrain_widget_missing_data_floorplan_does_not_fire() -> None:
+    """``data-unit`` alone (no ``data-floorplan``) doesn't qualify —
+    ``data-unit`` appears in unrelated CMS templates (Yardi Nestin uses
+    ``data-unit-*`` for amenities) and isn't a definitive Engrain signal
+    without the floorplan-pair."""
+    html = (
+        "<html><body>"
+        '<script src="https://realpage.com/x.js"></script>'
+        '<div data-unit="A101">Just a unit attr, no floorplan</div>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert not (
+        result.pms == "sightmap"
+        and any("Engrain widget" in e for e in result.evidence)
+    )
+
+
+def test_strict_sightmap_embed_still_wins_when_both_signals_present() -> None:
+    """If ``sightmap.com/embed/`` IS in static HTML, the strict iframe
+    path (confidence 0.90) outranks the Engrain widget signal (0.88).
+    Validates we don't lose info to the weaker branch."""
+    html = (
+        "<html><body>"
+        '<script src="https://realpage.com/x.js"></script>'
+        '<div data-floorplan="X" data-unit="Y"></div>'
+        '<iframe src="https://sightmap.com/embed/abc123"></iframe>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "sightmap"
+    assert result.confidence >= 0.90
+    # The strict evidence wins, not the Engrain branch
+    assert any("embed iframe in HTML" in e for e in result.evidence)
+
+
+def test_engrain_widget_beats_entrata_when_both_present() -> None:
+    """Real chaseknollsapts-style co-resident pattern — Entrata widget
+    on the page (as photo/amenities module) PLUS Engrain hydration attrs.
+    The unit data lives in the SightMap-via-Engrain stack, not Entrata."""
+    html = (
+        "<html><body>"
+        '<script src="https://commoncf.entrata.com/widgets/x.js"></script>'
+        '<script src="https://www.realpage.com/widget/engrain.js"></script>'
+        '<div data-floorplan="3x2" data-unit="B202">Plan</div>'
+        "</body></html>"
+    )
+    result = detect_pms(
+        "https://www.broadstonesobro.com/", page_html=html
+    )
+    assert result.pms == "sightmap", (
+        f"expected sightmap (engrain widget wins over entrata-decoration), "
+        f"got {result.pms!r}"
+    )
