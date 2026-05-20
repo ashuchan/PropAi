@@ -860,37 +860,46 @@ async def scrape(
         adapter_result = AdapterResult(errors=[str(exc)])
 
     # --- Path B/C: empty-exit + quality-gate retry with next-best PMS ---------
-    # Two retry triggers, same mechanism:
-    #   * Path B (empty-exit): adapter self-reports an empty-exit label
+    # Three retry triggers, same mechanism:
+    #   * Path B (``empty_exit``): adapter self-reports an empty-exit label
     #     (see ``ma_poc.pms.empty_exit``) AND produces no units.
-    #   * Path C (quality-gate): adapter produced units, but they all
-    #     fail ``property_passes_quality_gate`` — hollow rows with no
-    #     rent/dims, which would otherwise be reported as SUCCESS while
-    #     silently delivering no usable data.
+    #   * Path C (``quality_gate``): adapter produced units but they fail
+    #     the dimension gate — name-only stubs with no beds/baths/sqft.
+    #   * Path C (``no_rent``): adapter produced units with dimensions but
+    #     no rent across the board — the JSON-LD inflated-SUCCESS shape
+    #     (`inferred_*` UIDs synthesized from name+beds+baths+sqft, no
+    #     `offers.price`). Covers the 1,031-prop inflated-SUCCESS bucket
+    #     identified in project_jsonld_recovery_2026-05-20.
+    #   * Path C (``no_area``): adapter produced units with rent but no
+    #     sqft/area across the board — partial extraction shape.
     #
-    # On trigger: find the next PMS candidate from ``detect_pms_candidates``
-    # and re-dispatch on the same page (no re-fetch — captured network
-    # state is shared via ``ctx._api_responses``). Bounded by
-    # ``PATH_B_MAX_RETRIES`` (default 2).
+    # On trigger: find the next PMS candidate and re-dispatch on the
+    # same page. Bounded by ``PATH_B_MAX_RETRIES`` (default 2).
     #
-    # Win condition is "real units" — the retry result must have units
-    # AND pass the quality gate. A retry that yields more hollow units
-    # is treated as a failed attempt; the loop continues to the next
-    # candidate until either a clean win or retries exhaust.
+    # Win condition: retry result must have units AND pass the dimension
+    # gate AND have a rent signal. Retries with same-or-worse quality
+    # are not promoted.
     #
-    # Feature flag: ``PATH_B_RETRY_ENABLED=0`` falls back to Piece 3a
-    # telemetry-only behavior. Default enabled.
+    # **Plan-level fallback**: when the BASELINE adapter returned
+    # plan-level rows (units with dims but no rent) and all retries
+    # failed, the baseline is restored and the result is marked with a
+    # ``_PLAN_LEVEL`` tier suffix + ``_verdict_quality=SUCCESS_PLAN_LEVEL``
+    # so the data isn't lost — just honestly flagged. Per the
+    # project_jsonld_recovery memo: "getting floor plan level data is
+    # okay but just should be flagged".
     #
-    # Designed at investigations/2026-05-20-path-b-design/DESIGN.md.
+    # Feature flag: ``PATH_B_RETRY_ENABLED=0`` falls back to telemetry-only.
     try:
         import os as _retry_os
 
         from ma_poc.observability.events import EventKind as _RetryEventKind
         from ma_poc.observability.events import emit as _retry_emit
+        from ma_poc.pms.adapters.registry import get_adapter as _retry_get_adapter
         from ma_poc.pms.detector import detect_pms_candidates
         from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
-        from ma_poc.pms.adapters.registry import get_adapter as _retry_get_adapter
         from ma_poc.validation.schema_gate import (
+            property_has_area_signal as _retry_area_signal,
+            property_has_rent_signal as _retry_rent_signal,
             property_passes_quality_gate as _retry_quality_gate,
         )
 
@@ -903,18 +912,45 @@ async def scrape(
         )
 
         def _retry_trigger_reason(res: "AdapterResult") -> str | None:
-            """Return ``"empty_exit"`` / ``"quality_gate"`` / None.
-
-            None means the adapter is fine — no retry needed."""
+            """Return ``"empty_exit"`` / ``"quality_gate"`` / ``"no_rent"``
+            / ``"no_area"`` / None. None means the adapter is fine."""
             if is_empty_exit(res.tier_used) and not res.units:
                 return "empty_exit"
-            if res.units and not _retry_quality_gate(res.units):
-                return "quality_gate"
+            if res.units:
+                if not _retry_quality_gate(res.units):
+                    return "quality_gate"
+                if not _retry_rent_signal(res.units):
+                    return "no_rent"
+                if not _retry_area_signal(res.units):
+                    return "no_area"
             return None
 
+        def _retry_win_condition(res: "AdapterResult") -> bool:
+            """A retry winner must have units AND pass dimension gate AND
+            have a rent signal. Same-or-worse quality is not promoted."""
+            return bool(
+                res.units
+                and _retry_quality_gate(res.units)
+                and _retry_rent_signal(res.units)
+            )
+
+        # Preserve the baseline (initial-adapter) result so plan-level
+        # data isn't lost if all retries fail. Only relevant when the
+        # baseline HAS units — for empty_exit triggers there's nothing
+        # to preserve.
+        _baseline_result: "AdapterResult | None" = (
+            adapter_result if adapter_result.units else None
+        )
+        _baseline_adapter_name = adapter_name
         _retry_tried_pms: set[str] = {adapter_name}
         _retry_attempt = 0
+        _retry_won = False
         _trigger_reason = _retry_trigger_reason(adapter_result)
+        _initial_trigger_reason = _trigger_reason
+        # The "current" result we evaluate triggers against. Starts as
+        # the baseline; rolls forward to the latest attempt. Does NOT
+        # mutate the public ``adapter_result`` until a win is confirmed.
+        _current_result = adapter_result
         while (
             _trigger_reason is not None
             and _retry_attempt < _PATH_B_MAX_RETRIES
@@ -929,8 +965,10 @@ async def scrape(
             if not _next_candidates:
                 break
             _next_cand = _next_candidates[0]
-            _previous_tier = adapter_result.tier_used or ""
-            _previous_pms = adapter_name
+            _previous_tier = _current_result.tier_used or ""
+            _previous_pms = (
+                adapter_name if _retry_attempt == 0 else _baseline_adapter_name
+            )
 
             # Telemetry-only mode — emit and stop (no re-dispatch).
             if not _PATH_B_RETRY_ENABLED:
@@ -968,18 +1006,14 @@ async def scrape(
             try:
                 _new_result = await _new_adapter.extract(page, ctx)  # type: ignore[arg-type]
             except Exception as _retry_exc:
-                # The retry attempt itself crashed — record on chain, stop.
                 fallback_chain.append(
                     f"retry_failed:{_new_adapter_name}:{type(_retry_exc).__name__}"
                 )
                 break
 
             fallback_chain.append(f"retry:{_new_adapter_name}")
-            # Win condition: units AND pass quality gate. A retry that
-            # produces more hollow units is treated as a failed attempt
-            # so Path C doesn't silently promote a slightly-better hollow
-            # result over an empty one.
-            if _new_result.units and _retry_quality_gate(_new_result.units):
+            if _retry_win_condition(_new_result):
+                # WIN — promote
                 _retry_emit(
                     _RetryEventKind.RETRY_SUCCESS,
                     property_id=getattr(ctx, "property_id", "") or "",
@@ -996,10 +1030,31 @@ async def scrape(
                 adapter_name = _new_adapter_name
                 result["_adapter_used"] = _new_adapter_name
                 result["_detected_pms"] = _detection_to_dict(_next_cand)
+                _retry_won = True
                 break
-            # Retry didn't recover real units — loop and try the next.
-            adapter_result = _new_result
-            _trigger_reason = _retry_trigger_reason(adapter_result)
+            # Retry didn't recover real units — roll forward and try next.
+            _current_result = _new_result
+            _trigger_reason = _retry_trigger_reason(_current_result)
+
+        # Plan-level fallback: all retries failed AND we had baseline
+        # plan-level rows. Per the project_jsonld_recovery memo:
+        # "getting floor plan level data is okay but just should be
+        # flagged and one another path should be retried ... if unit
+        # then pick that ... else floor plan".
+        if (
+            not _retry_won
+            and _baseline_result is not None
+            and _baseline_result.units
+            and _initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
+        ):
+            adapter_result = _baseline_result
+            # Stamp the tier with a _PLAN_LEVEL suffix and surface the
+            # honest verdict on the property result dict.
+            _baseline_tier = _baseline_result.tier_used or ""
+            if _baseline_tier and "_PLAN_LEVEL" not in _baseline_tier:
+                adapter_result.tier_used = f"{_baseline_tier}_PLAN_LEVEL"
+            result["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
+            result["_plan_level_reason"] = _initial_trigger_reason
     except Exception:  # pragma: no cover — Path B/C must never block scrape
         pass
 

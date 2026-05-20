@@ -377,6 +377,15 @@ def test_scraper_hook_kept_in_sync_with_test_helper() -> None:
         "trigger_reason",
         '"quality_gate"',
         '"empty_exit"',
+        # Path C extension (2026-05-20): rent + area signal predicates,
+        # the no_rent / no_area triggers, and the plan-level fallback.
+        "property_has_rent_signal",
+        "property_has_area_signal",
+        '"no_rent"',
+        '"no_area"',
+        "_PLAN_LEVEL",
+        "SUCCESS_PLAN_LEVEL",
+        "_plan_level_reason",
     ):
         assert symbol in scraper_src, (
             f"Path B retry hook in scraper.py no longer references "
@@ -434,30 +443,58 @@ async def _run_retry_loop_under_test(
     adapter_table: dict[str, _StubAdapter],
     enabled: bool = True,
     max_retries: int = 2,
-) -> tuple[str, _StubAdapterResult, list[str]]:
+) -> tuple[str, _StubAdapterResult, list[str], dict[str, Any]]:
     """Mirror of the production retry loop body in
-    ``ma_poc.pms.scraper`` (Path B Piece 3). Returns the final
-    (adapter_name, adapter_result, fallback_chain). Kept in sync with
-    the production hook via ``test_scraper_hook_kept_in_sync...``."""
+    ``ma_poc.pms.scraper`` (Path B/C). Returns
+    (adapter_name, adapter_result, fallback_chain, result_dict).
+    Kept in sync with the production hook via
+    ``test_scraper_hook_kept_in_sync_with_test_helper``.
+
+    The 4th return slot ``result_dict`` mirrors the scraper's ``result``
+    dict — exposes ``_verdict_quality`` / ``_plan_level_reason`` keys
+    so tests can assert the SUCCESS_PLAN_LEVEL fallback fires correctly.
+    """
     from ma_poc.observability import events as _events_mod
     from ma_poc.observability.events import EventKind
     from ma_poc.pms.detector import detect_pms_candidates
     from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
-    from ma_poc.validation.schema_gate import property_passes_quality_gate
+    from ma_poc.validation.schema_gate import (
+        property_has_area_signal,
+        property_has_rent_signal,
+        property_passes_quality_gate,
+    )
 
     def _trigger(res: _StubAdapterResult) -> str | None:
         if is_empty_exit(res.tier_used) and not res.units:
             return "empty_exit"
-        if res.units and not property_passes_quality_gate(res.units):
-            return "quality_gate"
+        if res.units:
+            if not property_passes_quality_gate(res.units):
+                return "quality_gate"
+            if not property_has_rent_signal(res.units):
+                return "no_rent"
+            if not property_has_area_signal(res.units):
+                return "no_area"
         return None
 
+    def _win(res: _StubAdapterResult) -> bool:
+        return bool(
+            res.units
+            and property_passes_quality_gate(res.units)
+            and property_has_rent_signal(res.units)
+        )
+
+    result_dict: dict[str, Any] = {}
     adapter_result = initial_result
     adapter_name = initial_adapter_name
+    baseline_result = initial_result if initial_result.units else None
+    baseline_adapter_name = initial_adapter_name
     tried: set[str] = {adapter_name}
     fallback_chain: list[str] = []
     attempt = 0
+    retry_won = False
     trigger_reason = _trigger(adapter_result)
+    initial_trigger_reason = trigger_reason
+    current_result = adapter_result
 
     while trigger_reason is not None and attempt < max_retries:
         candidates = detect_pms_candidates(
@@ -470,8 +507,10 @@ async def _run_retry_loop_under_test(
         if not candidates:
             break
         nc = candidates[0]
-        previous_tier = adapter_result.tier_used or ""
-        previous_pms = adapter_name
+        previous_tier = current_result.tier_used or ""
+        previous_pms = (
+            adapter_name if attempt == 0 else baseline_adapter_name
+        )
 
         if not enabled:
             _events_mod.emit(
@@ -507,8 +546,7 @@ async def _run_retry_loop_under_test(
             break
         new_result = await new_adapter.extract(None, ctx)
         fallback_chain.append(f"retry:{nc.pms}")
-        # Win condition: units AND pass quality gate.
-        if new_result.units and property_passes_quality_gate(new_result.units):
+        if _win(new_result):
             _events_mod.emit(
                 EventKind.RETRY_SUCCESS,
                 property_id=ctx.property_id,
@@ -522,11 +560,27 @@ async def _run_retry_loop_under_test(
             )
             adapter_result = new_result
             adapter_name = nc.pms
+            retry_won = True
             break
-        adapter_result = new_result
-        trigger_reason = _trigger(adapter_result)
+        current_result = new_result
+        trigger_reason = _trigger(current_result)
 
-    return adapter_name, adapter_result, fallback_chain
+    # Plan-level fallback: all retries failed AND baseline had units AND
+    # the initial trigger was a quality concern (not empty-exit).
+    if (
+        not retry_won
+        and baseline_result is not None
+        and baseline_result.units
+        and initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
+    ):
+        adapter_result = baseline_result
+        baseline_tier = baseline_result.tier_used or ""
+        if baseline_tier and "_PLAN_LEVEL" not in baseline_tier:
+            adapter_result.tier_used = f"{baseline_tier}_PLAN_LEVEL"
+        result_dict["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
+        result_dict["_plan_level_reason"] = initial_trigger_reason
+
+    return adapter_name, adapter_result, fallback_chain, result_dict
 
 
 # A page where G5 wins detection but Knock is also present — the
@@ -561,7 +615,7 @@ async def test_retry_succeeds_on_first_attempt(captured: _CapturedEvents) -> Non
             _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_SHAPE_REJECTED"),
         ),
     }
-    name, result, chain = await _run_retry_loop_under_test(
+    name, result, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="g5",
         initial_result=initial,
         page_html=_HTML_KNOCK_THEN_RENTCAFE,
@@ -602,7 +656,7 @@ async def test_retry_succeeds_on_second_attempt(captured: _CapturedEvents) -> No
             ),
         ),
     }
-    name, result, chain = await _run_retry_loop_under_test(
+    name, result, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="g5",
         initial_result=initial,
         page_html=_HTML_KNOCK_THEN_RENTCAFE,
@@ -634,7 +688,7 @@ async def test_retry_exhausts_all_candidates_without_recovery(
             _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_SHAPE_REJECTED"),
         ),
     }
-    name, result, chain = await _run_retry_loop_under_test(
+    name, result, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="g5",
         initial_result=initial,
         page_html=_HTML_KNOCK_THEN_RENTCAFE,
@@ -685,7 +739,7 @@ async def test_retry_no_candidate_emits_nothing(captured: _CapturedEvents) -> No
         "</body></html>"
     )
     initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY")
-    name, _, chain = await _run_retry_loop_under_test(
+    name, _, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="g5",
         initial_result=initial,
         page_html=html_g5_only,
@@ -713,7 +767,7 @@ async def test_retry_disabled_flag_falls_back_to_telemetry_only(
     )
     table = {"knock": _StubAdapter("knock", knock_result)}
 
-    name, result, chain = await _run_retry_loop_under_test(
+    name, result, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="g5",
         initial_result=initial,
         page_html=_HTML_KNOCK_THEN_RENTCAFE,
@@ -734,13 +788,13 @@ async def test_retry_does_not_fire_when_initial_succeeds(
     captured: _CapturedEvents,
 ) -> None:
     """First adapter returned substantive units — retry never enters the
-    loop. Unit needs a physical dimension to satisfy the post-Path-C
-    quality gate; rent alone isn't enough."""
+    loop. Unit needs rent + a physical dimension + area to satisfy the
+    full Path C predicate chain (quality_gate + no_rent + no_area)."""
     initial = _StubAdapterResult(
         tier_used="TIER_1_API_KNOCK",
-        units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1}],
+        units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1, "sqft": 750}],
     )
-    name, result, chain = await _run_retry_loop_under_test(
+    name, result, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="knock",
         initial_result=initial,
         page_html=_HTML_KNOCK_THEN_RENTCAFE,
@@ -761,7 +815,7 @@ async def test_retry_does_not_fire_on_success_label_with_no_units(
     a genuine no-availability property, not adapter failure. Retry must
     NOT fire."""
     initial = _StubAdapterResult(tier_used="TIER_1_API_KNOCK", units=[])
-    name, result, chain = await _run_retry_loop_under_test(
+    name, result, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="knock",
         initial_result=initial,
         page_html=_HTML_KNOCK_THEN_RENTCAFE,
@@ -882,7 +936,7 @@ async def test_path_c_retry_fires_on_hollow_units(
     )
     table = {"knock": _StubAdapter("knock", knock_result)}
 
-    name, result, chain = await _run_retry_loop_under_test(
+    name, result, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="g5",
         initial_result=initial,
         page_html=_HTML_KNOCK_THEN_RENTCAFE,
@@ -936,7 +990,7 @@ async def test_path_c_retry_does_not_promote_more_hollow_units(
             ),
         ),
     }
-    name, result, chain = await _run_retry_loop_under_test(
+    name, result, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="g5",
         initial_result=initial,
         page_html=_HTML_KNOCK_THEN_RENTCAFE,
@@ -971,8 +1025,9 @@ async def test_path_c_no_retry_when_initial_passes_quality_gate(
     initial = _StubAdapterResult(
         tier_used="TIER_1_API_G5",
         units=[
-            {"unit_id": "g5-1", "asking_rent": 1500, "beds": 1},
-            {"unit_id": "g5-2", "asking_rent": 1800, "beds": 2},
+            # Full unit data: rent + beds + sqft → passes all Path C predicates.
+            {"unit_id": "g5-1", "asking_rent": 1500, "beds": 1, "sqft": 750},
+            {"unit_id": "g5-2", "asking_rent": 1800, "beds": 2, "sqft": 1100},
         ],
     )
     # Co-resident PMS available, but no retry should fire.
@@ -981,11 +1036,11 @@ async def test_path_c_no_retry_when_initial_passes_quality_gate(
             "knock",
             _StubAdapterResult(
                 tier_used="TIER_1_API_KNOCK",
-                units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1}],
+                units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1, "sqft": 750}],
             ),
         ),
     }
-    name, result, chain = await _run_retry_loop_under_test(
+    name, result, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="g5",
         initial_result=initial,
         page_html=_HTML_KNOCK_THEN_RENTCAFE,
@@ -1019,7 +1074,7 @@ async def test_path_c_telemetry_only_mode_emits_quality_gate_reason(
     )
     table = {"knock": _StubAdapter("knock", knock_result)}
 
-    name, result, chain = await _run_retry_loop_under_test(
+    name, result, chain, _result_dict = await _run_retry_loop_under_test(
         initial_adapter_name="g5",
         initial_result=initial,
         page_html=_HTML_KNOCK_THEN_RENTCAFE,
@@ -1033,3 +1088,241 @@ async def test_path_c_telemetry_only_mode_emits_quality_gate_reason(
     assert len(would) == 1
     assert would[0].data["trigger_reason"] == "quality_gate"
     assert captured.of_kind(EventKind.RETRY_DISPATCHED) == []
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Section 8 — Path C extensions (no_rent / no_area triggers + plan-level
+# fallback).
+#
+# Covers the JSON-LD inflated-SUCCESS bucket (project_jsonld_recovery_
+# 2026-05-20 memo): adapters emit beds+baths+sqft rows with no rent
+# and label SUCCESS. The dimension gate passes; the rent-signal gate
+# fails; Path C retries; if the retry returns real unit-level data
+# with rent we promote, otherwise we keep the baseline plan-level
+# rows flagged as SUCCESS_PLAN_LEVEL.
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_path_c_no_rent_trigger_fires_on_jsonld_shape(
+    captured: _CapturedEvents,
+) -> None:
+    """The 1,031-prop inflated-SUCCESS JSON-LD pattern: all units have
+    beds+baths+sqft, no row has rent. Path C must trigger with
+    ``trigger_reason='no_rent'`` and retry."""
+    # Initial: JSON-LD-shape rows that pass quality_gate (dims present)
+    # but fail rent-signal.
+    initial = _StubAdapterResult(
+        tier_used="TIER_2_JSONLD",
+        units=[
+            {"unit_id": "inferred_1", "beds": 1, "baths": 1, "sqft": 750},
+            {"unit_id": "inferred_2", "beds": 2, "baths": 2, "sqft": 1100},
+        ],
+    )
+    knock_result = _StubAdapterResult(
+        tier_used="TIER_1_API_KNOCK",
+        units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1, "sqft": 750}],
+    )
+    table = {"knock": _StubAdapter("knock", knock_result)}
+
+    name, result, chain, result_dict = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-pc-no-rent"),
+        adapter_table=table,
+    )
+
+    assert name == "knock"
+    assert result.units == knock_result.units
+    dispatched = captured.of_kind(EventKind.RETRY_DISPATCHED)
+    assert len(dispatched) == 1
+    assert dispatched[0].data["trigger_reason"] == "no_rent"
+    assert dispatched[0].data["previous_tier"] == "TIER_2_JSONLD"
+    success = captured.of_kind(EventKind.RETRY_SUCCESS)
+    assert len(success) == 1 and success[0].data["trigger_reason"] == "no_rent"
+    # On WIN, no plan-level fallback applied.
+    assert result_dict.get("_verdict_quality") != "SUCCESS_PLAN_LEVEL"
+
+
+@pytest.mark.asyncio
+async def test_path_c_no_area_trigger_fires_on_rent_only_units(
+    captured: _CapturedEvents,
+) -> None:
+    """Rare-but-real shape: units have rent + beds but no sqft (some
+    SightMap responses). Path C triggers with ``no_area``."""
+    initial = _StubAdapterResult(
+        tier_used="TIER_1_API_SIGHTMAP",
+        units=[
+            {"unit_id": "S1", "beds": 1, "asking_rent": 1500},
+            {"unit_id": "S2", "beds": 2, "asking_rent": 2200},
+        ],
+    )
+    knock_result = _StubAdapterResult(
+        tier_used="TIER_1_API_KNOCK",
+        units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1, "sqft": 750}],
+    )
+    table = {"knock": _StubAdapter("knock", knock_result)}
+
+    name, result, chain, _rd = await _run_retry_loop_under_test(
+        initial_adapter_name="sightmap",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-pc-no-area"),
+        adapter_table=table,
+    )
+
+    assert name == "knock"
+    dispatched = captured.of_kind(EventKind.RETRY_DISPATCHED)
+    assert dispatched[0].data["trigger_reason"] == "no_area"
+
+
+@pytest.mark.asyncio
+async def test_path_c_plan_level_fallback_when_all_retries_fail(
+    captured: _CapturedEvents,
+) -> None:
+    """Per the project_jsonld_recovery memo: 'getting floor plan level
+    data is okay but just should be flagged'. When the baseline had
+    plan-level rows (no rent) and all retries fail, restore the
+    baseline AND mark the property dict with
+    ``_verdict_quality=SUCCESS_PLAN_LEVEL``."""
+    # Baseline: JSON-LD plan-level rows (dims, no rent).
+    baseline_units = [
+        {"unit_id": "inferred_1", "beds": 1, "baths": 1, "sqft": 750},
+        {"unit_id": "inferred_2", "beds": 2, "baths": 2, "sqft": 1100},
+    ]
+    initial = _StubAdapterResult(
+        tier_used="TIER_2_JSONLD",
+        units=baseline_units,
+    )
+    # Both retry candidates fail (return empty).
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_SHAPE_REJECTED"),
+        ),
+    }
+    name, result, chain, result_dict = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-pc-fallback"),
+        adapter_table=table,
+    )
+
+    # Baseline plan-level rows preserved.
+    assert result.units == baseline_units, (
+        "all retries failed → baseline plan-level data must be preserved, "
+        f"not the empty last-attempt result; got {result.units!r}"
+    )
+    # Tier stamped with _PLAN_LEVEL suffix.
+    assert result.tier_used == "TIER_2_JSONLD_PLAN_LEVEL", (
+        f"baseline tier must be flagged with _PLAN_LEVEL; got {result.tier_used!r}"
+    )
+    # Verdict quality marker on the result dict.
+    assert result_dict.get("_verdict_quality") == "SUCCESS_PLAN_LEVEL"
+    assert result_dict.get("_plan_level_reason") == "no_rent"
+    # Retries did fire (and emit telemetry).
+    assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) >= 1
+    assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+
+
+@pytest.mark.asyncio
+async def test_path_c_retry_promotes_over_plan_level_baseline(
+    captured: _CapturedEvents,
+) -> None:
+    """Win case: baseline has plan-level rows (no rent); retry returns
+    real unit-level rows with rent → promote retry, do NOT apply
+    plan-level fallback."""
+    baseline_units = [
+        {"unit_id": "inferred_1", "beds": 1, "baths": 1, "sqft": 750},
+    ]
+    initial = _StubAdapterResult(
+        tier_used="TIER_2_JSONLD",
+        units=baseline_units,
+    )
+    knock_units = [
+        {"unit_id": "K1", "asking_rent": 1500, "beds": 1, "sqft": 750},
+        {"unit_id": "K2", "asking_rent": 1800, "beds": 2, "sqft": 1100},
+    ]
+    table = {
+        "knock": _StubAdapter(
+            "knock",
+            _StubAdapterResult(tier_used="TIER_1_API_KNOCK", units=knock_units),
+        ),
+    }
+    name, result, chain, result_dict = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-pc-promote"),
+        adapter_table=table,
+    )
+
+    # Retry winner promoted.
+    assert name == "knock"
+    assert result.units == knock_units
+    # _PLAN_LEVEL fallback NOT applied (the retry succeeded).
+    assert "_PLAN_LEVEL" not in (result.tier_used or "")
+    assert result_dict.get("_verdict_quality") != "SUCCESS_PLAN_LEVEL"
+
+
+@pytest.mark.asyncio
+async def test_path_c_no_fallback_when_initial_was_empty_exit(
+    captured: _CapturedEvents,
+) -> None:
+    """Plan-level fallback only applies when the BASELINE had units.
+    For empty-exit triggers (no baseline units), no fallback restoration
+    happens — the final result stays empty."""
+    initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
+    # All retries also fail.
+    table = {
+        "knock": _StubAdapter(
+            "knock", _StubAdapterResult(tier_used="TIER_1_API_KNOCK_EMPTY")
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(tier_used="TIER_1_API_RENTCAFE_EMPTY"),
+        ),
+    }
+    name, result, chain, result_dict = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-pc-no-baseline"),
+        adapter_table=table,
+    )
+
+    # No baseline-units → no plan-level fallback marker.
+    assert "_PLAN_LEVEL" not in (result.tier_used or "")
+    assert result_dict.get("_verdict_quality") != "SUCCESS_PLAN_LEVEL"
+
+
+@pytest.mark.asyncio
+async def test_path_c_partial_rent_signal_does_not_trigger(
+    captured: _CapturedEvents,
+) -> None:
+    """Threshold = 0.5. If at least half the units have rent, no
+    Path-C-no-rent trigger. The data is good enough."""
+    initial = _StubAdapterResult(
+        tier_used="TIER_1_API_RENTCAFE",
+        units=[
+            {"unit_id": "1", "asking_rent": 1500, "beds": 1, "sqft": 750},
+            {"unit_id": "2", "asking_rent": None, "beds": 2, "sqft": 1100},
+            # 2/3 have rent → above 0.5 → passes rent-signal
+            {"unit_id": "3", "asking_rent": 2200, "beds": 3, "sqft": 1400},
+        ],
+    )
+    name, result, chain, _rd = await _run_retry_loop_under_test(
+        initial_adapter_name="rentcafe",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-pc-partial"),
+        adapter_table={},
+    )
+    assert name == "rentcafe"
+    assert chain == []
+    assert captured.events == []

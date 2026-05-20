@@ -14,7 +14,11 @@ from pathlib import Path
 from typing import Any
 
 from ma_poc.validation.schema_gate import (
+    _has_area,
+    _has_rent,
     is_substantive,
+    property_has_area_signal,
+    property_has_rent_signal,
     property_passes_quality_gate,
 )
 
@@ -175,3 +179,135 @@ def test_regression_northside_place_fixture_now_fails_no_data() -> None:
     assert not property_passes_quality_gate(units), (
         "Northside Place fixture should fail quality gate — all 14 units are hollow"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 Path C extensions — rent-signal + area-signal predicates.
+#
+# The default ``property_passes_quality_gate`` admits the
+# beds+baths+sqft-but-no-rent shape (the 1,031 JSON-LD inflated-SUCCESS
+# bucket). These two predicates are the secondary signals the Path C
+# retry hook uses to detect the rent-deficient / area-deficient shapes.
+# ─────────────────────────────────────────────────────────────────────
+
+
+
+
+def test_has_rent_accepts_numeric_rent_fields() -> None:
+    """Direct numeric rent in any of the canonical rent fields counts."""
+    assert _has_rent({"asking_rent": 1500}) is True
+    assert _has_rent({"market_rent_low": 1500, "market_rent_high": 1800}) is True
+    assert _has_rent({"rent_low": 1500.0}) is True
+    assert _has_rent({"rent": 2000}) is True
+
+
+def test_has_rent_accepts_string_currency_rent() -> None:
+    """``$1,500`` and ``1500.00`` string forms parse to positive numerics."""
+    assert _has_rent({"asking_rent": "$1,500"}) is True
+    assert _has_rent({"market_rent_low": "1500.00"}) is True
+    assert _has_rent({"rent": "  $2,499.99  "}) is True
+
+
+def test_has_rent_rejects_missing_or_zero() -> None:
+    """No rent fields at all, or all set to 0/None/empty, is no signal."""
+    assert _has_rent({}) is False
+    assert _has_rent({"unit_id": "1", "beds": 1, "sqft": 750}) is False
+    assert _has_rent({"asking_rent": None}) is False
+    assert _has_rent({"asking_rent": 0}) is False
+    assert _has_rent({"asking_rent": ""}) is False
+    assert _has_rent({"market_rent_low": "call for pricing"}) is False
+
+
+def test_has_rent_rejects_boolean_false_positive() -> None:
+    """``bool`` is a subclass of ``int`` in Python. Make sure ``True`` in
+    a rent field isn't accepted as a numeric rent (defensive)."""
+    assert _has_rent({"asking_rent": True}) is False
+    assert _has_rent({"asking_rent": False}) is False
+
+
+def test_has_area_accepts_numeric_and_string_area() -> None:
+    assert _has_area({"sqft": 750}) is True
+    assert _has_area({"area": 1200.5}) is True
+    assert _has_area({"sqft": "750"}) is True
+    assert _has_area({"square_feet": "1,200"}) is True
+
+
+def test_has_area_rejects_sentinel_and_missing() -> None:
+    assert _has_area({}) is False
+    assert _has_area({"sqft": None}) is False
+    assert _has_area({"sqft": 0}) is False
+    assert _has_area({"sqft": ""}) is False
+    # The -1 sentinel sometimes used for "absent" — _is_positive_numeric
+    # rejects (>0 only).
+    assert _has_area({"sqft": -1}) is False
+
+
+# property_has_rent_signal ----------------------------------------------------
+
+
+def test_property_has_rent_signal_empty_returns_false() -> None:
+    assert property_has_rent_signal([]) is False
+
+
+def test_property_has_rent_signal_all_with_rent_passes() -> None:
+    units = [
+        {"unit_id": "1", "beds": 1, "asking_rent": 1500},
+        {"unit_id": "2", "beds": 2, "asking_rent": 2200},
+    ]
+    assert property_has_rent_signal(units) is True
+
+
+def test_property_has_rent_signal_all_missing_rent_fails() -> None:
+    """The 1,031 JSON-LD inflated-SUCCESS shape: every row has dims but no rent."""
+    units = [
+        {"unit_id": "inferred_1", "beds": 1, "baths": 1, "sqft": 750},
+        {"unit_id": "inferred_2", "beds": 2, "baths": 2, "sqft": 1100},
+        {"unit_id": "inferred_3", "beds": 3, "baths": 2, "sqft": 1400},
+    ]
+    assert property_has_rent_signal(units) is False, (
+        "all-rows-no-rent shape must fail rent-signal — this is exactly "
+        "the JSON-LD inflated-SUCCESS bucket Path C needs to catch"
+    )
+
+
+def test_property_has_rent_signal_half_with_rent_passes_at_default() -> None:
+    """Default 0.5 threshold: 1/2 with rent → exactly meets, passes."""
+    units = [
+        {"unit_id": "1", "asking_rent": 1500},
+        {"unit_id": "2", "asking_rent": None},
+    ]
+    assert property_has_rent_signal(units) is True
+
+
+def test_property_has_rent_signal_below_threshold_fails() -> None:
+    """1/3 = 0.33 < 0.5 threshold → fails."""
+    units = [
+        {"unit_id": "1", "asking_rent": 1500},
+        {"unit_id": "2", "asking_rent": None},
+        {"unit_id": "3", "asking_rent": None},
+    ]
+    assert property_has_rent_signal(units) is False
+
+
+# property_has_area_signal ----------------------------------------------------
+
+
+def test_property_has_area_signal_empty_returns_false() -> None:
+    assert property_has_area_signal([]) is False
+
+
+def test_property_has_area_signal_all_with_area_passes() -> None:
+    units = [
+        {"unit_id": "1", "sqft": 750, "asking_rent": 1500},
+        {"unit_id": "2", "sqft": 1100, "asking_rent": 2200},
+    ]
+    assert property_has_area_signal(units) is True
+
+
+def test_property_has_area_signal_all_missing_area_fails() -> None:
+    """SightMap responses sometimes ship rent+beds+baths but no area."""
+    units = [
+        {"unit_id": "1", "beds": 1, "asking_rent": 1500},
+        {"unit_id": "2", "beds": 2, "asking_rent": 2200},
+    ]
+    assert property_has_area_signal(units) is False
