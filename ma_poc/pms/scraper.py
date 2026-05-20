@@ -859,6 +859,46 @@ async def scrape(
             return result
         adapter_result = AdapterResult(errors=[str(exc)])
 
+    # --- Path B Piece 3a: empty-exit retry telemetry ---------------------------
+    # When the first adapter dispatch returns an empty-exit label (see
+    # ``ma_poc.pms.empty_exit``) AND produces no units, emit a
+    # ``RETRY_WOULD_DISPATCH`` event with the would-be next candidate from
+    # ``detect_pms_candidates``. Telemetry-only — does NOT actually retry.
+    # Lets us measure on canary how many properties would benefit from
+    # the retry mechanism vs how many the existing LLM rescue catches.
+    # Piece 3b will graduate this from telemetry to actual re-dispatch.
+    try:
+        from ma_poc.observability.events import EventKind as _RetryEventKind
+        from ma_poc.observability.events import emit as _retry_emit
+        from ma_poc.pms.detector import detect_pms_candidates
+        from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
+
+        _empty_exit_label = adapter_result.tier_used
+        if (
+            is_empty_exit(_empty_exit_label)
+            and not adapter_result.units
+        ):
+            _next_candidates = detect_pms_candidates(
+                url=getattr(ctx, "base_url", "") or "",
+                csv_row=None,
+                page_html=page_html,
+                exclude={adapter_name},
+                max_candidates=2,
+            )
+            if _next_candidates:
+                _retry_emit(
+                    _RetryEventKind.RETRY_WOULD_DISPATCH,
+                    property_id=getattr(ctx, "property_id", "") or "",
+                    previous_pms=adapter_name,
+                    previous_tier=_empty_exit_label or "",
+                    empty_exit_reason=empty_exit_reason(_empty_exit_label) or "",
+                    next_pms=_next_candidates[0].pms,
+                    next_confidence=_next_candidates[0].confidence,
+                    remaining_candidates=len(_next_candidates),
+                )
+    except Exception:  # pragma: no cover — telemetry must never block scrape
+        pass
+
     # --- F2: LLM rescue for Tier-1 API adapters --------------------------------
     # When the adapter captures API responses but produces no substantive units,
     # hand the bodies to the LLM rescue service. Adapters never import this module.
