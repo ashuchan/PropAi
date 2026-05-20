@@ -512,11 +512,54 @@ def _section_heading_for_plan(detail_html: str) -> str:
     return ""
 
 
+class _PageFetchResp:
+    """Minimal response shim returned by the in-browser page fetcher."""
+
+    __slots__ = ("status_code", "text")
+
+    def __init__(self, status_code: int, text: str) -> None:
+        self.status_code = status_code
+        self.text = text
+
+
+# In-browser fetch via ``page.evaluate(fetch(...))``. Inherits the live
+# Playwright session's cookies — including freshly-rotated Cloudflare
+# ``cf_clearance`` and ``__cf_bm`` cookies that ``probe_get`` cannot
+# obtain because CF challenges new cookies per-path. This is the
+# difference between 4/4 success in the 2026-05-20 e2e probe and
+# 13/13 detail-page 403s when ``probe_get`` was used.
+_PAGE_FETCH_JS = """async (url) => {
+    try {
+        const r = await fetch(url, {
+            credentials: 'include',
+            headers: { 'Accept': 'text/html,application/xhtml+xml' },
+        });
+        return { status: r.status, text: await r.text() };
+    } catch (e) {
+        return { status: 0, text: '', error: String(e) };
+    }
+}"""
+
+
+async def _fetch_via_page(page: Any, url: str) -> _PageFetchResp:
+    """Fetch *url* using the browser's fetch API. Returns a response shim."""
+    try:
+        result = await page.evaluate(_PAGE_FETCH_JS, url)
+    except Exception as exc:
+        log.debug("nestin page.evaluate fetch failed url=%s err=%s", url, exc)
+        return _PageFetchResp(0, "")
+    if not isinstance(result, dict):
+        return _PageFetchResp(0, "")
+    return _PageFetchResp(int(result.get("status", 0) or 0), str(result.get("text", "") or ""))
+
+
 async def recover_rentcafe_nestin_per_plan(
     landing_html: str,
     base_url: str,
     *,
     fetcher: Any = None,  # callable(url) -> object with .status_code + .text
+    page: Any = None,     # Playwright Page; when provided, used in preference
+                          # to fetcher for ALL fetches so CF clearance carries
 ) -> tuple[list[dict[str, Any]], str]:
     """Run the Nestin per-plan recovery against the property's marketing site.
 
@@ -527,11 +570,16 @@ async def recover_rentcafe_nestin_per_plan(
             ``is_nestin_template`` to skip work on non-Nestin properties.
         base_url: the property's ``scheme://host`` (used to resolve relative
             href links to absolute URLs for fetching).
-        fetcher: callable taking a URL, returning an object with
-            ``.status_code`` and ``.text`` attributes. Default uses
-            ``ma_poc.pms.adapters._probe.probe_get`` (curl_cffi + optional
-            residential proxy + Web-Unlocker escalation). Injected for
-            unit testing.
+        fetcher: callable taking a URL, returning an object (or coroutine
+            yielding an object) with ``.status_code`` and ``.text`` attrs.
+            Default uses ``ma_poc.pms.adapters._probe.probe_get`` (curl_cffi
+            + optional residential proxy + Web-Unlocker escalation).
+            Injected for unit testing.
+        page: optional Playwright Page from the live adapter dispatch.
+            When provided, detail-page fetches go through ``page.evaluate(
+            fetch(...))`` so they inherit the browser's Cloudflare
+            clearance cookies. ``probe_get``'s static cf_clearance is
+            insufficient for many Nestin sites (CF rotates per-path).
 
     Returns:
         ``(units, source_url)`` where ``units`` is the list of unit dicts
@@ -548,20 +596,51 @@ async def recover_rentcafe_nestin_per_plan(
     if not origin:
         return [], ""
 
+    import asyncio as _asyncio
+
+    async def _do_fetch(url: str) -> Any:
+        """Unified fetcher: page.evaluate(fetch) when page available,
+        else user-injected fetcher, else probe_get default.
+
+        2026-05-20 e2e finding: the property-scoped ContextVar carries
+        the HOMEPAGE's ``cf_clearance`` cookie (minted during the L1
+        fetch). When that cookie is sent on a DETAIL-page fetch (the
+        same host but a different path), Cloudflare returns 403
+        because the clearance is path-scoped. Detail-page fetches
+        WITHOUT any clearance cookies trigger a fresh CF challenge
+        that curl_cffi's chrome120 impersonation passes (200 OK).
+        Solution: temporarily clear the cookies for detail-page
+        probe_get calls. Other adapters' homepage-cookie behavior
+        is unaffected (token scoped to this call only)."""
+        if page is not None:
+            return await _fetch_via_page(page, url)
+        if fetcher is not None:
+            r = fetcher(url)
+            if _asyncio.iscoroutine(r):
+                r = await r
+            return r
+        try:
+            from ma_poc.pms.adapters._probe import (
+                probe_get,
+                reset_clearance_cookies,
+                set_clearance_cookies,
+            )
+        except ImportError:
+            return _PageFetchResp(0, "")
+        _clr_tok = set_clearance_cookies(None)
+        try:
+            return probe_get(url, timeout=20)
+        finally:
+            reset_clearance_cookies(_clr_tok)
+
     # The detail-page links may be on the landing page already, or on a
     # dedicated ``/floorplans`` index. Try both: scan landing_html first,
     # then fetch /floorplans if no detail links found.
     detail_urls = _find_floorplan_detail_urls(landing_html, origin)
     floorplans_url = f"{origin}/floorplans"
     if not detail_urls:
-        if fetcher is None:
-            try:
-                from ma_poc.pms.adapters._probe import probe_get
-                fetcher = lambda u: probe_get(u, timeout=20)  # noqa: E731
-            except ImportError:
-                return [], ""
         try:
-            resp = fetcher(floorplans_url)
+            resp = await _do_fetch(floorplans_url)
         except Exception as exc:
             log.debug("nestin /floorplans fetch failed: %s", exc)
             return [], ""
@@ -573,22 +652,37 @@ async def recover_rentcafe_nestin_per_plan(
     if not detail_urls:
         return [], ""
 
-    # Resolve the fetcher now (used for every detail-page fetch).
-    if fetcher is None:
-        try:
-            from ma_poc.pms.adapters._probe import probe_get
-            fetcher = lambda u: probe_get(u, timeout=20)  # noqa: E731
-        except ImportError:
-            return [], ""
-
+    # Fail-fast on CF-protected sites: when the first detail fetch returns
+    # a CF block status (403/429/503) AND we have no live browser page,
+    # subsequent fetches will all fail the same way — abort to avoid
+    # wasting ~30s × N-plans of pipeline time. The recovery is best
+    # exercised in RENDER mode (page != None); the static-cookie probe_get
+    # path can only clear CF for the homepage, not detail URLs.
+    _CF_BLOCK_STATUSES = (403, 429, 503)
     all_units: list[dict[str, Any]] = []
+    consecutive_block_count = 0
     for detail_url in detail_urls:
         try:
-            resp = fetcher(detail_url)
+            resp = await _do_fetch(detail_url)
         except Exception as exc:
             log.debug("nestin detail-page fetch failed url=%s err=%s", detail_url, exc)
             continue
-        if getattr(resp, "status_code", 0) != 200:
+        status = getattr(resp, "status_code", 0) or 0
+        if status in _CF_BLOCK_STATUSES:
+            consecutive_block_count += 1
+            # After 3 consecutive CF blocks with no successes yet, the site
+            # is CF-walled on detail URLs — bail out. Saves ~25-60s on a
+            # 13-plan property like Stonewater.
+            if consecutive_block_count >= 3 and not all_units:
+                log.info(
+                    "nestin recovery aborting after %d consecutive CF blocks "
+                    "(origin=%s) — site requires live browser session",
+                    consecutive_block_count, origin,
+                )
+                break
+            continue
+        consecutive_block_count = 0
+        if status != 200:
             continue
         detail_html = getattr(resp, "text", "") or ""
         if not detail_html:

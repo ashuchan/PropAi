@@ -622,3 +622,119 @@ def test_find_floorplan_detail_urls_dedup_across_relative_and_absolute() -> None
     )
     out = _find_floorplan_detail_urls(dup_html, "https://www.stonewaterpark.com")
     assert out == ["https://www.stonewaterpark.com/floorplans/a"]
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 e2e finding — Cloudflare path-scoped clearance cookies.
+# The homepage's ``cf_clearance`` cookie (minted by the L1 fetcher and
+# threaded through the ContextVar) caused 13/13 detail-page 403s. The
+# nestin code now clears the ContextVar around its probe_get calls so
+# the detail fetch triggers a fresh CF challenge (which chrome120
+# passes cleanly with 200). Other adapters keep the cookies intact.
+# ─────────────────────────────────────────────────────────────────────
+
+
+async def test_recovery_clears_clearance_cookies_before_probe_get() -> None:
+    """The Nestin recovery's default-path fetcher must reset the
+    ``_clearance_cookies`` ContextVar before each probe_get so the
+    homepage's stale cf_clearance doesn't poison detail-page fetches."""
+    from typing import Any as _Any
+    from unittest.mock import MagicMock, patch
+
+    from ma_poc.pms.adapters import _probe
+    from ma_poc.pms.adapters import _rentcafe_nestin as nest
+
+    # Install fake "homepage clearance" cookies before the recovery runs
+    sentinel = {"cf_clearance": "STALE_HOMEPAGE", "__cf_bm": "STALE_HOMEPAGE"}
+    tok = _probe.set_clearance_cookies(sentinel)
+    try:
+        captured_cookies: list[dict[str, str] | None] = []
+
+        def _spy_probe_get(url: str, **kw: _Any) -> _Any:
+            # Snapshot the ContextVar's value when probe_get sees it
+            captured_cookies.append(_probe._clearance_cookies.get())
+            mock = MagicMock()
+            mock.status_code = 200
+            mock.text = (
+                "<html><body>"
+                '<table><thead><tr><th>Apartment</th><th>Rent</th>'
+                "<th>Date Available</th></tr></thead>"
+                "<tbody><tr><td>#1120</td><td>$1,200</td>"
+                "<td>05/01/26</td></tr></tbody></table></body></html>"
+            )
+            return mock
+
+        # Provide landing HTML with one detail URL so we exercise the
+        # detail-fetch path (default fetcher = probe_get).
+        landing = (
+            "<html><body>"
+            '<link rel="preconnect" href="https://resource.rentcafe.com">'
+            '<a href="/floorplans/a">A</a>'
+            "</body></html>"
+        )
+
+        with patch.object(_probe, "probe_get", _spy_probe_get):
+            units, _src = await nest.recover_rentcafe_nestin_per_plan(
+                landing,
+                "https://www.example.com",
+            )
+
+        # The recovery saw at least one probe_get call …
+        assert len(captured_cookies) >= 1, "probe_get was never called"
+        # … and the ContextVar was cleared (empty dict or None) — not
+        # the stale homepage sentinel. ``set_clearance_cookies(None)``
+        # stores an empty dict; reading it back gives ``{}``.
+        assert all(not c for c in captured_cookies), (
+            f"probe_get saw stale homepage cookies: {captured_cookies}"
+        )
+        assert all(
+            c is None or "cf_clearance" not in c for c in captured_cookies
+        ), f"stale cf_clearance leaked into probe_get: {captured_cookies}"
+        # End-to-end: the unit was extracted (proves the cookie-clear
+        # didn't break the happy path).
+        assert len(units) == 1
+        assert units[0]["unit_number"] == "1120"
+    finally:
+        _probe.reset_clearance_cookies(tok)
+
+
+async def test_recovery_restores_clearance_cookies_after_fetches() -> None:
+    """After Nestin recovery returns, the ContextVar must be back to
+    its pre-call state so other adapters keep their homepage clearance."""
+    from typing import Any as _Any
+    from unittest.mock import MagicMock
+
+    from ma_poc.pms.adapters import _probe
+    from ma_poc.pms.adapters import _rentcafe_nestin as nest
+
+    original = {"cf_clearance": "ORIGINAL_HOMEPAGE_CLEARANCE"}
+    tok = _probe.set_clearance_cookies(original)
+    try:
+        landing = (
+            "<html><body>"
+            '<link rel="preconnect" href="https://resource.rentcafe.com">'
+            "</body></html>"
+        )
+
+        # Stub fetcher (NOT probe_get) — we just want to verify the
+        # ContextVar is restored. With no detail urls discovered, the
+        # recovery falls back to fetching /floorplans index via our
+        # explicit fetcher (which doesn't touch the ContextVar).
+        def _stub(url: str) -> _Any:
+            mock = MagicMock()
+            mock.status_code = 404
+            mock.text = ""
+            return mock
+
+        await nest.recover_rentcafe_nestin_per_plan(
+            landing, "https://www.example.com", fetcher=_stub,
+        )
+
+        # After recovery, the cookies should be back to the original
+        # value — not None, not modified.
+        current = _probe._clearance_cookies.get()
+        assert current == original, (
+            f"ContextVar was not restored: got {current}, expected {original}"
+        )
+    finally:
+        _probe.reset_clearance_cookies(tok)

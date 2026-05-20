@@ -507,9 +507,15 @@ class RentCafeAdapter:
                 )
 
                 if is_nestin_template(_rc_html):
+                    # Pass the live Playwright page so detail-page fetches
+                    # use the browser's CF-cleared session (probe_get hits
+                    # CF-403 even with static cf_clearance cookies; verified
+                    # 2026-05-20 e2e probe — 13/13 detail-page 403 via
+                    # probe_get, 4/4 OK via page.evaluate(fetch)).
                     nestin_units, nestin_source = await recover_rentcafe_nestin_per_plan(
                         _rc_html,
                         str(getattr(ctx, "base_url", "") or ""),
+                        page=page,
                     )
                     if nestin_units:
                         from ma_poc.extraction.post_process import post_process
