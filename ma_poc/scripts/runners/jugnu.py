@@ -706,8 +706,30 @@ async def _process_property(
     # direct path didn't produce a usable result (any failure tier or
     # routing skip).
     if fetch_result is None:
-        # L1: Fetch
-        fetch_result = await jugnu_fetch(task)
+        # Cluster #4 fix (2026-05-20, feature_fail_1429 grind): the
+        # tier escalator in fetcher.fetch is gated on `profile is not
+        # None`. First-run properties used to have profile_for_dispatch
+        # = None at this point (bootstrap happened only after the
+        # fetch, at L3 below), so the fetcher took the single-tier
+        # DIRECT path with no escalation. Cloudflare-walled properties
+        # (tidesateastchase, liveatpalmhaven, etc.) returned 403 →
+        # BOT_BLOCKED → no_body_short_circuit. Bootstrap a COLD profile
+        # here so the escalator gets a chance to fire RESIDENTIAL on
+        # the first bot-block. The same profile instance is reused at
+        # L3 (no extra bootstrap call there).
+        if profile_for_dispatch is None and hasattr(profile_store, "bootstrap"):
+            try:
+                profile_for_dispatch = profile_store.bootstrap(
+                    task.property_id, {}, task.url
+                )
+            except Exception as _bs_exc:  # defensive — never block fetch
+                log.warning(
+                    "profile bootstrap failed for %s: %s — fetching without profile",
+                    task.property_id,
+                    _bs_exc,
+                )
+        # L1: Fetch with escalation when profile is available.
+        fetch_result = await jugnu_fetch(task, profile=profile_for_dispatch)
     frontier.mark_attempt(task.url, fetch_result.outcome)
 
     # Check carry-forward need
