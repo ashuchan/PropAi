@@ -609,6 +609,8 @@ pattern + 20% dead URLs). Test suite delta: 1206 → **1509 passed**
 | 2 | `4961e2e` | RentCafe-Nestin per-plan DOM recovery | ~225 props / ~4,400 strict units (JSON-LD + TIER_3_DOM + TIER_MERGED overlap) |
 | 3 | `e69c208` | Knock-by-domain resolver: `/v1/profile?domain=` fallback | ~~~21 props / ~315 strict units~~ — **0/4 in live probe** (Aspen Square pages have no static Knock signals; community hash is JS-rendered; resolver fails gracefully, no canary regression). See "Pre-canary probe — Knock-by-domain limitation" below. |
 | 6 | `bd3c606` | RentCafe-Nestin: 3 pre-canary probe bug fixes (table prefix-leak, card regex, Stonewater applyGA layout) | Hardens the +225 props from row 2 — without these, Chatwell/Hayden ship polluted unit numbers, Altair ships bogus units, Stonewater extracts 0. |
+| 7 | `de8632e` | RentCafe-Nestin: accept absolute hrefs from Playwright-rendered HTML | Without this, the recovery emits 0 units when running through ``jugnu`` (only worked in standalone unit tests). Unblocks the entire +225 props from row 2 in canary. |
+| 8 | `9355711` | RentCafe-Nestin: clear stale homepage CF cookies before detail probes | Without this, CF-protected Nestin sites (Stonewater, Chatwell, etc.) return 13/13 403 on detail-page fetches because the homepage's path-scoped ``cf_clearance`` cookie poisons subsequent requests. With it, e2e local probe goes from 0→24 units (Stonewater) and 0→7 units (Chatwell). |
 | 4 | `df569b5` | Detector: Engrain widget signal → sightmap | ~56 props / ~1,400 strict units (RealPage+SightMap misroutes in TIER_3_DOM) |
 | 5 | `d58d624` | Generic-DOM: brand-CMS URL discovery | ~46 props / ~920 strict units (Lincoln, McKinley, HG Living, MG Properties brand sites) |
 
@@ -768,6 +770,59 @@ Glen, Renaissance at Northpark, Roundtree, Golfside Lake (McKinley),
 Alcove at Seahurst (HG Living), Bristol at Sunset (MG Properties). 4
 tests including JS structure pin + regex matches 8 real URLs + regex
 rejects 7 non-brand URLs + e2e recovery.
+
+### `de8632e` + `9355711` RentCafe-Nestin: e2e pipeline wiring fixes
+
+Files: `ma_poc/pms/adapters/_rentcafe_nestin.py`,
+`ma_poc/pms/adapters/rentcafe.py`,
+`ma_poc/tests/pms/adapters/test_rentcafe_nestin.py`.
+
+Pre-canary local e2e (running the full ``jugnu`` pipeline against the
+4 verified Nestin URLs — Stonewater, Chatwell, Hayden, Altair) caught
+TWO production-wiring bugs that the synthetic unit tests + standalone
+probes both missed. Without these, the ~225-property Nestin recovery
+would have emitted 0 in canary for CF-protected sites:
+
+1. **`de8632e` Absolute-href detection.** ``_find_floorplan_detail_urls``
+   only matched relative ``<a href="/floorplans/{slug}">`` anchors.
+   Playwright's ``page.content()`` rewrites those to absolute URLs
+   (``https://www.stonewaterpark.com/floorplans/{slug}``). The raw
+   curl_cffi HTML keeps them relative, so standalone probes worked
+   but the pipeline saw 0 detail URLs. Fix: accept both shapes;
+   cross-domain absolutes still rejected. 4 regression tests.
+
+2. **`9355711` Stale homepage CF cookies poisoning detail probes.**
+   The L1 fetcher installs the homepage's ``cf_clearance`` cookie via
+   the ``_clearance_cookies`` ContextVar. ``probe_get`` auto-attaches
+   it to every request. But ``cf_clearance`` is PATH-scoped — sending
+   it on a different-path URL triggers a fresh CF challenge that
+   FAILS (because the cookie is now "wrong" instead of just "missing").
+   Verified: standalone ``probe_get`` with no cookies → 200 + 210 KB
+   unit HTML; in-pipeline ``probe_get`` with stale cookies → 403.
+   Fix: the Nestin fetcher wraps each ``probe_get`` call with
+   ``set_clearance_cookies(None)`` + restores via the token in
+   ``finally``. Scoped to Nestin only — SecureCafe / WP / hosted-table
+   adapters keep their homepage clearance. 2 regression tests.
+
+   Also added ``page=`` parameter to ``recover_rentcafe_nestin_per_plan``
+   that uses ``page.evaluate(fetch(...))`` for detail fetches when a
+   live Playwright page is available. Canary currently passes
+   ``page=None`` (L1-only mode), so the cookie-clear path is the
+   active fix; the page.evaluate path is preserved for future
+   RENDER-mode enablement.
+
+**E2E verification after both fixes** (all 4 verified targets):
+- Stonewater Park: 24 real units, 24 rents, TIER_1_DOM_RENTCAFE_NESTIN
+  (was 18 inferred_*, 0 rents, TIER_2_JSONLD)
+- Chatwell Club: 7 real units, 7 rents, TIER_1_DOM_RENTCAFE_NESTIN
+  (was 11 inferred_*, 0 rents, TIER_2_JSONLD)
+- Altair Escondido: 8 real units (SecureCafe — unchanged)
+- Hayden Place: 9 real units (SecureCafe — unchanged)
+
+**Lesson**: unit tests + standalone probes are unit-of-intent only.
+The pipeline path is the only thing that exercises real cookie state,
+Playwright DOM rewrites, and other production-only side-effects. Run
+the full ``jugnu`` runner pre-canary — every time.
 
 ### `bd3c606` RentCafe-Nestin: 3 pre-canary probe bug fixes
 
