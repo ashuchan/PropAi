@@ -80,6 +80,50 @@ _DMAPI_RE = re.compile(r"Functions\[[\"'][a-f0-9]+~\d+[\"']\]\s*=\s*function", r
 # Used to detect "starts with orphan punctuation" (truncated mid-statement).
 _LEADING_ORPHAN_RE = re.compile(r"^\s*[)}\];,=+<>/]")
 
+# 2026-05-20 (header-only): phrases that signal a concession exists but
+# carry no actionable terms on their own — banners typically render
+# above the actual offer body. "Limited Time Offer!" + "Special!" alone
+# don't tell you the dollar amount, weeks/months free, or move-in
+# deadline. Source-side window-extension (pms/scraper.py) usually pulls
+# the body in alongside, but for rows captured BEFORE the
+# 2026-05-20 scraper fix the body was sentence-dropped — we surface a
+# distinct quality flag so reporting can count header-only orphans.
+_BANNER_HEADER_RE = re.compile(
+    r"^\s*(?:"
+    r"limited[\s\-]+time[\s\-]+(?:offer|special|savings|deal)s?"
+    r"|move[\s\-]?in\s+special"
+    r"|special\s+offer"
+    r"|don['’]?t\s+miss\s+out"
+    r"|act\s+(?:now|fast)"
+    r"|hurry"
+    r"|exclusive\s+(?:offer|deal)"
+    r"|new\s+resident\s+(?:offer|special)"
+    r")[\s!.\-—–]*$",
+    re.IGNORECASE,
+)
+
+# Specific-offer tokens — the things that, if present, mean the row
+# carries actionable terms (dollar amount / duration / move-in date /
+# percentage). The classifier uses ABSENCE of these alongside a banner-
+# phrase match to identify header-only rows.
+_SPECIFIC_OFFER_RE = re.compile(
+    r"\$\s*\d"  # dollar amount
+    r"|\d+\s*%"  # percentage off
+    r"|\d+\s+(?:weeks?|months?|days?)\s+(?:free|of\s+free|on\s+us|complimentary)"
+    r"|free\s+rent"
+    r"|free\s+\w+\s+for"
+    r"|months?\s+free"
+    r"|weeks?\s+free"
+    r"|reduced\s+(?:rent|deposit|fees?)"
+    r"|waived\s+(?:application|admin|deposit|fee)"
+    r"|move[\s\-]?in\s+by\s+\d"
+    r"|lease\s+by\s+\d"
+    r"|move[\s\-]?in\s+(?:bonus|credit)"
+    r"|save\s+\$?\d"
+    r"|look[\s\-]+(?:and|&|n)[\s\-]+lease",
+    re.IGNORECASE,
+)
+
 
 def classify_concession_quality(text: str | None) -> str:
     """Return a short quality label for *text*.
@@ -90,6 +134,13 @@ def classify_concession_quality(text: str | None) -> str:
       * ``"unclean_style_leak"``    — CSS rules / selectors present.
       * ``"unclean_dmapi"``         — Duda CMS function definition leaked.
       * ``"unclean_orphan_prefix"`` — starts with orphan ``}``, ``);``, etc.
+      * ``"unclean_header_only"``   — banner header phrase only ("Limited
+                                       Time Offer!") with no specific
+                                       terms — dollar amount, weeks/
+                                       months free, move-in deadline.
+                                       Indicates the body was dropped
+                                       by upstream sentence-split (pre-
+                                       2026-05-20 scraper).
       * ``"empty"``                 — None / empty / whitespace-only input.
     """
     if not text or not isinstance(text, str) or not text.strip():
@@ -114,6 +165,15 @@ def classify_concession_quality(text: str | None) -> str:
         return "unclean_style_leak"
     if _LEADING_ORPHAN_RE.match(text):
         return "unclean_orphan_prefix"
+    # Header-only check runs LAST so it doesn't shadow the leak
+    # categories. "Limited Time Offer!" alone, with no $X / weeks /
+    # months / move-in deadline anywhere in the string, is a banner
+    # without an offer body. We flag it so reporting can count the
+    # 2026-05-19-canary residual (~46 rows for Woodland Creek; many
+    # more across the 49,677 non-blank sample where the body
+    # sentence-split orphaned it).
+    if _BANNER_HEADER_RE.match(text.strip()) and not _SPECIFIC_OFFER_RE.search(text):
+        return "unclean_header_only"
     return "clean"
 
 
@@ -183,6 +243,12 @@ def clean_concession_text(text: str | None) -> str:
     quality = classify_concession_quality(text)
     if quality in ("clean", "empty"):
         return text.strip()
+    if quality == "unclean_header_only":
+        # Nothing to extract — the text IS the banner header, there
+        # is no body to mine. Return whitespace-normalized so it's
+        # safe in xlsx cells; quality flag tells reporting to display
+        # with caution.
+        return re.sub(r"\s+", " ", text).strip()
 
     # Pass 1 — offer-phrase extraction. Most reliable.
     m = _OFFER_RE.search(text)

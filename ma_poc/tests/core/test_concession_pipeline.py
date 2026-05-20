@@ -392,3 +392,166 @@ def test_scraped_columns_canonical_order() -> None:
         f"Source IDs must be the last column (join keys at right edge); "
         f"got {keys[-1]!r}"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Fix E — banner-header capture: "Limited Time Offer!" alone is a
+# header, not an offer. Two halves of the fix:
+#
+#   1. Scraper (pms/scraper.py): after picking the sentence containing
+#      the regex match, walk forward into the next 1-2 sentences while
+#      total length < 300 chars. Recovers the body that follows the
+#      banner ("Move in by 6/15 and get 1 month free rent.").
+#
+#   2. Classifier (core/concession_clean.py): the new
+#      ``unclean_header_only`` quality flag fires when the captured
+#      text is a banner phrase only (no $X / weeks / months / move-in
+#      date / percentage). Reports the pre-2026-05-20-fix residual
+#      where the body was sentence-dropped at the source.
+#
+# Real-world signal: feature canary 2026-05-19 cid 74567 (Woodland
+# Creek) — 46/46 rows just say "Limited Time Offer!" because the
+# upstream sentence-splitter dropped the actionable body.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_classify_header_only_limited_time_offer() -> None:
+    """Banner header with no body → ``unclean_header_only``."""
+    from ma_poc.core.concession_clean import classify_concession_quality
+    assert classify_concession_quality("Limited Time Offer!") == (
+        "unclean_header_only"
+    )
+    assert classify_concession_quality("  Limited Time Offer!  ") == (
+        "unclean_header_only"
+    )
+    # Variant phrasings
+    assert classify_concession_quality("Move-in Special!") == "unclean_header_only"
+    assert classify_concession_quality("Special Offer") == "unclean_header_only"
+    assert classify_concession_quality("Don't Miss Out!") == "unclean_header_only"
+
+
+def test_classify_header_plus_specific_terms_is_clean() -> None:
+    """Banner + body → clean. The body terms ($X / weeks / months /
+    move-in date) make it actionable."""
+    from ma_poc.core.concession_clean import classify_concession_quality
+    # The post-2026-05-20-scraper-fix shape
+    assert classify_concession_quality(
+        "Limited Time Offer! Move in by 6/15 and get 1 month free rent."
+    ) == "clean"
+    assert classify_concession_quality(
+        "Limited Time Offer! Save $250 on select 1-bedroom units."
+    ) == "clean"
+    assert classify_concession_quality(
+        "Move-in Special! 6 weeks free on any new lease."
+    ) == "clean"
+
+
+def test_classify_header_only_does_not_shadow_leak_categories() -> None:
+    """The header-only check must run AFTER the leak classifiers — a
+    row that's both a banner AND has JS leak should classify as
+    ``unclean_script_leak`` (more actionable for upstream debugging)."""
+    from ma_poc.core.concession_clean import classify_concession_quality
+    assert classify_concession_quality(
+        "function() {} Limited Time Offer!"
+    ) == "unclean_script_leak"
+
+
+def test_clean_header_only_returns_normalized_text() -> None:
+    """``clean_concession_text`` on a header-only input returns the
+    whitespace-normalized banner (nothing to extract; quality flag
+    tells reporting to display with caution)."""
+    from ma_poc.core.concession_clean import clean_concession_text
+    assert clean_concession_text("Limited Time Offer!") == "Limited Time Offer!"
+    # Multiple whitespace collapsed
+    assert clean_concession_text("  Limited   Time  Offer!  ") == (
+        "Limited Time Offer!"
+    )
+
+
+def test_scraper_extends_sentence_to_recover_banner_body() -> None:
+    """Real-world: the regex anchors on the banner ("Limited Time
+    Offer!"), the body lives in the next sentence ("Move in by 6/15
+    and get 1 month free rent."), and the pre-fix code returned ONLY
+    the header. The post-fix sentence-extension recovers the body
+    while staying under the 300-char cap."""
+    # Mirror the post-fix scraper logic in-line so this test pins the
+    # actual algorithm — not a coincidental side-effect of the regex.
+    flat = (
+        "Welcome to Woodland Creek apartments. "
+        "Limited Time Offer! "
+        "Move in by 6/15 and get 1 month free rent on select 1-bedroom "
+        "units. Some terms apply."
+    )
+    PROPERTY_CONCESSION_RE = re.compile(
+        r"\blimited[\s-]time\s+(?:offer|special|savings|deal)\b",
+        re.I,
+    )
+    m = PROPERTY_CONCESSION_RE.search(flat)
+    assert m is not None
+    s, e = m.span()
+    win = flat[max(0, s - 200):e + 200]
+    off = s - max(0, s - 200)
+
+    parts = re.split(r"(?<=[.!?|•·])\s+", win)
+    idx, acc = -1, 0
+    for i, p in enumerate(parts):
+        if acc <= off < acc + len(p) + 1:
+            idx = i
+            break
+        acc += len(p) + 1
+    assert idx >= 0, "match must fall inside one of the split sentences"
+
+    seg = parts[idx]
+    # Pre-fix behavior would stop here at "Limited Time Offer!"
+    assert "month free" not in seg.lower(), (
+        "control: matched sentence alone should NOT contain the body — "
+        "if it does, the regex anchored on the body not the banner and "
+        "this test is misconfigured"
+    )
+
+    # Post-fix extension
+    for nxt in parts[idx + 1:idx + 3]:
+        candidate = (seg + " " + nxt).strip()
+        if len(candidate) > 300:
+            break
+        seg = candidate
+
+    assert "Limited Time Offer" in seg
+    assert "month free" in seg.lower(), (
+        f"banner body must be recovered by sentence-extension; got {seg!r}"
+    )
+    assert "6/15" in seg
+    assert len(seg) <= 300
+
+
+def test_scraper_source_contains_sentence_extension_logic() -> None:
+    """Pin the source contract: scraper.py must walk forward into
+    subsequent sentences after picking the matched one. Searches for
+    the ``_parts[_idx + 1:`` slice pattern unique to the extension
+    loop — if a refactor drops it, this test fails loudly."""
+    src = _SCRAPER_PATH.read_text(encoding="utf-8")
+    assert "_parts[_idx + 1:" in src, (
+        "scraper.py no longer extends the matched sentence forward — "
+        "banner headers like 'Limited Time Offer!' will lose their "
+        "body again."
+    )
+
+
+def test_dirty_input_with_header_only_yields_non_empty_clean_output() -> None:
+    """The preserve-and-flag invariant must hold for header-only too:
+    a row that's just 'Limited Time Offer!' returns non-empty
+    ``concession_text_clean`` (the banner itself), with quality flag
+    ``unclean_header_only``. Never silently discarded."""
+    from datetime import datetime
+
+    from ma_poc.core.schema_v2 import _format_v2_unit
+    unit = {
+        "unit_number": "301",
+        "bedrooms": "1", "bathrooms": "1", "sqft": "800",
+        "market_rent_low": 1600,
+        "concession": "Limited Time Offer!",
+    }
+    out = _format_v2_unit(unit, datetime(2026, 5, 20, 12, 0, 0), "test")
+    assert out["concession_text"] == "Limited Time Offer!"
+    assert out["concession_text_clean"] == "Limited Time Offer!"
+    assert out["_concession_quality"] == "unclean_header_only"

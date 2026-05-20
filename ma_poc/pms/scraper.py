@@ -539,12 +539,41 @@ async def scrape(
                 _s, _e = _cm.span()
                 _win = _flat[max(0, _s - 200):_e + 200]
                 _off = _s - max(0, _s - 200)
-                _seg, _acc = _win, 0
-                for _p in re.split(r"(?<=[.!?|•·])\s+", _win):
+                # 2026-05-20 (header-only fix): the matched sentence is
+                # often a banner header — "Limited Time Offer!",
+                # "Move-in Special!", "Don't Miss Out!" — terminated by
+                # ``!`` while the actionable body ("Move in by 6/15 and
+                # get 1 month free rent.") lives in the NEXT sentence.
+                # Single-sentence pick dropped the body entirely. Real
+                # bytes from feature canary 2026-05-19 cid 74567
+                # (Woodland Creek): all 46 rows captured just "Limited
+                # Time Offer!" — the regex's ``limited time offer``
+                # alternative anchored on the header, then sentence-
+                # split discarded the body two sentences over. Fix:
+                # start at the matched sentence and walk FORWARD while
+                # the running total stays under 300 chars. Up to 2
+                # extra sentences — bounded to keep the field
+                # representative and avoid greedy capture of unrelated
+                # marketing copy that follows.
+                _parts = re.split(r"(?<=[.!?|•·])\s+", _win)
+                _idx, _acc = -1, 0
+                for _i, _p in enumerate(_parts):
                     if _acc <= _off < _acc + len(_p) + 1:
-                        _seg = _p
+                        _idx = _i
                         break
                     _acc += len(_p) + 1
+                if _idx >= 0:
+                    _seg = _parts[_idx]
+                    # Extend forward; cap at 300 chars total so the
+                    # downstream truncation doesn't lop off the body
+                    # we just rescued.
+                    for _nxt in _parts[_idx + 1:_idx + 3]:
+                        _candidate = (_seg + " " + _nxt).strip()
+                        if len(_candidate) > 300:
+                            break
+                        _seg = _candidate
+                else:
+                    _seg = _win
                 result["concessions_text"] = _seg.strip()[:300]
         except Exception:
             pass
