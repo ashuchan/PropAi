@@ -262,3 +262,133 @@ def test_stringify_concessions_handles_v2_clean_field() -> None:
     )
     assert _stringify_concessions(None) == ""
     assert _stringify_concessions("") == ""
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Fix D — source_ids surfacing + expanded xlsx columns
+#
+# Adapters populate ``source_ids={pms_specific_id: value, ...}`` via
+# make_unit_dict (SightMap/AppFolio/Spherexx do this today). These are
+# the JOIN keys for cross-source diffing (canary vs main vs RealPage).
+# Pre-2026-05-20: the v2 schema dropped source_ids entirely, and the
+# xlsx export had only 19 columns missing many other v2 fields too.
+# Post-fix: source_ids carries through + xlsx surfaces the union.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_schema_v2_preserves_source_ids_dict() -> None:
+    """v2 schema must carry through ``source_ids`` as a dict (empty
+    when adapter didn't populate it)."""
+    from datetime import datetime
+
+    from ma_poc.core.schema_v2 import _format_v2_unit
+
+    unit_with_ids = {
+        "unit_number": "201",
+        "bedrooms": "1", "bathrooms": "1", "sqft": "750",
+        "market_rent_low": 1500,
+        "source_ids": {
+            "sightmap_unit_id": "12345",
+            "sightmap_floor_plan_id": "67890",
+        },
+    }
+    out = _format_v2_unit(unit_with_ids, datetime(2026, 5, 20, 12, 0, 0), "test")
+    assert out["source_ids"] == {
+        "sightmap_unit_id": "12345",
+        "sightmap_floor_plan_id": "67890",
+    }
+
+
+def test_schema_v2_source_ids_empty_when_unset() -> None:
+    """Adapters that haven't been wired to populate source_ids → {}.
+    Never None (additive, non-breaking for downstream join code that
+    iterates ``.items()``)."""
+    from datetime import datetime
+
+    from ma_poc.core.schema_v2 import _format_v2_unit
+    unit = {
+        "unit_number": "202",
+        "bedrooms": "2", "bathrooms": "2", "sqft": "1100",
+        "market_rent_low": 2200,
+    }
+    out = _format_v2_unit(unit, datetime(2026, 5, 20, 12, 0, 0), "test")
+    assert out["source_ids"] == {}
+
+
+def test_stringify_source_ids_dict_renders_sorted_kv() -> None:
+    """``{k1: v1, k2: v2}`` → ``"k1=v1; k2=v2"`` (keys sorted for
+    deterministic diff/join behavior)."""
+    from ma_poc.scripts.email.daily_failures import _stringify_source_ids
+    out = _stringify_source_ids({
+        "sightmap_unit_id": "12345",
+        "sightmap_floor_plan_id": "67890",
+    })
+    assert out == "sightmap_floor_plan_id=67890; sightmap_unit_id=12345", (
+        f"expected sorted-key cell form; got {out!r}"
+    )
+
+
+def test_stringify_source_ids_empty_cases() -> None:
+    """Empty / None / non-dict edge cases return empty string."""
+    from ma_poc.scripts.email.daily_failures import _stringify_source_ids
+    assert _stringify_source_ids(None) == ""
+    assert _stringify_source_ids({}) == ""
+    assert _stringify_source_ids("") == ""
+
+
+def test_stringify_source_ids_single_key() -> None:
+    """Single-key dict renders cleanly."""
+    from ma_poc.scripts.email.daily_failures import _stringify_source_ids
+    assert _stringify_source_ids({"appfolio_listing_id": "165"}) == (
+        "appfolio_listing_id=165"
+    )
+
+
+def test_scraped_columns_include_source_ids_and_new_columns() -> None:
+    """The xlsx column list must surface the new fields. If a future
+    refactor drops one, this test fails loudly so the canary output
+    doesn't silently lose the join keys again."""
+    from ma_poc.scripts.email.daily_failures import _SCRAPED_COLUMNS
+    cols = dict(_SCRAPED_COLUMNS)
+    # Critical for cross-source joining
+    assert cols.get("source_ids") == "Source IDs"
+    # Data-quality provenance
+    assert cols.get("concession_clean") == "Concession (Cleaned)"
+    assert cols.get("concession_quality") == "Concession Quality"
+    assert cols.get("inferred_id") == "Inferred ID"
+    # v2 fields previously dropped
+    assert cols.get("floor_plan_id") == "Floor Plan ID"
+    assert cols.get("availability_status") == "Availability Status"
+    assert cols.get("move_in_date") == "Move-In Date"
+    assert cols.get("rent_range_raw") == "Rent Range (raw)"
+    assert cols.get("available_date_raw") == "Available Date (raw)"
+    assert cols.get("building") == "Building"
+    assert cols.get("deposit") == "Deposit"
+
+
+def test_scraped_columns_no_duplicates() -> None:
+    """Each key/label pair appears once — catches accidental duplicates
+    from a future refactor that adds the same column twice."""
+    from ma_poc.scripts.email.daily_failures import _SCRAPED_COLUMNS
+    keys = [k for k, _ in _SCRAPED_COLUMNS]
+    labels = [v for _, v in _SCRAPED_COLUMNS]
+    assert len(keys) == len(set(keys)), (
+        f"duplicate keys in _SCRAPED_COLUMNS: {[k for k in keys if keys.count(k) > 1]}"
+    )
+    assert len(labels) == len(set(labels)), (
+        f"duplicate labels: {[v for v in labels if labels.count(v) > 1]}"
+    )
+
+
+def test_scraped_columns_canonical_order() -> None:
+    """Canonical ID stays first; Source IDs is the LAST column (last in
+    the row layout, easy to find on the right edge of the xlsx)."""
+    from ma_poc.scripts.email.daily_failures import _SCRAPED_COLUMNS
+    keys = [k for k, _ in _SCRAPED_COLUMNS]
+    assert keys[0] == "canonical_id", (
+        f"Canonical ID must be the first column; got {keys[0]!r}"
+    )
+    assert keys[-1] == "source_ids", (
+        f"Source IDs must be the last column (join keys at right edge); "
+        f"got {keys[-1]!r}"
+    )

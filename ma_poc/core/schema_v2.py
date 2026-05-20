@@ -357,6 +357,18 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         ),
         "concession_value": _safe_float(unit.get("concession_value")),
         "concession_source": unit.get("concession_source") or None,
+        # 2026-05-20 (canary-output surfacing): PMS-native identifiers
+        # the adapters populate via ``source_ids={...}`` in make_unit_dict
+        # — used as JOIN keys against external sources (RealPage, SurgeX,
+        # cross-canary diffs). Was silently dropped by the v2 transform
+        # despite being captured upstream. Examples:
+        #   SightMap   → {sightmap_unit_id, sightmap_floor_plan_id}
+        #   AppFolio   → {appfolio_listing_id}
+        #   Spherexx   → {spherexx_unit_id, spherexx_floorplan_id}
+        # Carry through as a dict; xlsx export stringifies for the cell.
+        # Empty {} when the adapter hasn't wired it yet (additive,
+        # non-breaking).
+        "source_ids": dict(unit.get("source_ids") or {}),
         "amenities": norm_amenities,
         # Validation provenance flags (surfaced from schema_gate).
         "_inferred_id": bool(unit.get("_inferred_id")) if "_inferred_id" in unit else None,
