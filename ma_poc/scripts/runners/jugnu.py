@@ -890,10 +890,18 @@ async def _process_property(
             )
 
     # Verdict
+    # 2026-05-20: pass the Path C plan-level fallback marker
+    # (``_verdict_quality``) and the final unit list so the verdict labeler
+    # honors both signals:
+    #   - explicit marker → SUCCESS_PLAN_LEVEL
+    #   - all-inferred_* UIDs OR no-rent-signal → SUCCESS_PLAN_LEVEL
+    # See ma_poc/reporting/verdict.py:compute() for the downgrade rules.
     verdict = compute_verdict(
         fetch_outcome=outcome_val,
         extract_result=extract_result,
         carry_forward_applied=result.get("_meta", {}).get("carry_forward_used", False),
+        verdict_quality_override=result.get("_verdict_quality"),
+        units=result.get("units"),
     )
     meta = result.setdefault("_meta", {})
     meta["canonical_id"] = task.property_id
