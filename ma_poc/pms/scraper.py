@@ -514,8 +514,25 @@ async def scrape(
     # structured concessions_json from it.
     if page_html and not result.get("concessions_text"):
         try:
+            # 2026-05-20 (concession-leak fix): the previous flat-text
+            # build stripped ``<tag>`` markers but kept ``<script>`` and
+            # ``<style>`` BODIES — adjacent JS code (e.g. Woodland Creek's
+            # PropLeadSource ``href.indexOf("?") == -1`` block) and CSS
+            # rules leaked into the ±200-char window around the
+            # concession-pattern match. Of 49,677 captured concessions
+            # in the 2026-05-19 feature canary, 49.9% were polluted this
+            # way and 10,102 (~20%) hit the 300-char cap with junk-only
+            # content — truncating the real offer entirely.
+            # Strip script/style BLOCKS before tag-stripping so the
+            # match window sees only visible text.
+            _no_code = re.sub(
+                r"<(script|style|noscript)\b[^>]*>.*?</\1>",
+                " ",
+                page_html,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
             _flat = re.sub(
-                r"\s+", " ", re.sub(r"<[^>]+>", " ", page_html)
+                r"\s+", " ", re.sub(r"<[^>]+>", " ", _no_code)
             )
             _cm = _PROPERTY_CONCESSION_RE.search(_flat)
             if _cm:

@@ -21,6 +21,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ma_poc.core import issue_log as V
+from ma_poc.core.concession_clean import (
+    classify_concession_quality as _concession_quality,
+)
+from ma_poc.core.concession_clean import (
+    clean_concession_text as _concession_clean,
+)
 from ma_poc.core.concession_normalize import normalize_concession
 
 # ── V2 CSV column mapping ────────────────────────────────────────────────────
@@ -337,6 +343,18 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         "move_in_date": _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
         # F10 additions — always present (None when unset).
         "concession_text": concession_text or None,
+        # 2026-05-20 preserve-and-flag (per user "error on side of unclean
+        # rather than discard"): emit a best-effort cleaned variant and a
+        # quality label alongside the raw text. The raw is ALWAYS the
+        # ``concession_text`` field above; consumers that prefer a
+        # display-ready version can read ``concession_text_clean``.
+        # See ma_poc/core/concession_clean.py for the classifier.
+        "concession_text_clean": (
+            _concession_clean(concession_text) if concession_text else None
+        ),
+        "_concession_quality": (
+            _concession_quality(concession_text) if concession_text else None
+        ),
         "concession_value": _safe_float(unit.get("concession_value")),
         "concession_source": unit.get("concession_source") or None,
         "amenities": norm_amenities,

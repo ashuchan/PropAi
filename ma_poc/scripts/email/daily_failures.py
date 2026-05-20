@@ -120,7 +120,7 @@ import os
 import sys
 import tempfile
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -142,11 +142,11 @@ from data_provider.sql.models import (  # noqa: E402
     ScrapeEventRow,
 )
 from data_provider.sql.provider import SqlDataProvider  # noqa: E402
+from scripts.email._client import send_html_email  # noqa: E402
 from scripts.email.daily import (  # noqa: E402
     _open_provider,
     _parse_recipients,
 )
-from scripts.email._client import send_html_email  # noqa: E402
 
 log = logging.getLogger("email_daily_failures_report")
 
@@ -178,7 +178,7 @@ def _resolve_run_date(
     except Exception as exc:  # noqa: BLE001 — never block on SQL errors
         log.warning("runs.list_runs() failed (%s); falling back to GCS", exc)
 
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = datetime.now(UTC).date().isoformat()
 
     chosen: str | None = None
     if requested:
@@ -357,7 +357,19 @@ def _fetch_scraped_units_from_sql(
                 "rent_high": u.get("rent_high"),
                 "available_date": u.get("available_date") or "",
                 "lease_term": u.get("lease_term"),
-                "concessions": _stringify_concessions(u.get("concessions")),
+                # 2026-05-20 export-wiring fix: the v2 schema emits the
+                # unit-level concession under ``concession_text``, not
+                # ``concessions``. Reading the wrong key silently produced
+                # a 100% empty Concessions column in main 2026-05-20 xlsx
+                # (0 / 69,992 rows populated). Prefer the cleaned variant
+                # when present (display-ready, JS/CSS-stripped); fall back
+                # to the raw text; legacy ``concessions`` key as final
+                # fallback for any non-v2 input shape.
+                "concessions": _stringify_concessions(
+                    u.get("concession_text_clean")
+                    or u.get("concession_text")
+                    or u.get("concessions")
+                ),
             })
     return out
 
@@ -623,7 +635,13 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
                 "rent_high": u.get("rent_high"),
                 "available_date": u.get("available_date") or "",
                 "lease_term": u.get("lease_term"),
-                "concessions": _stringify_concessions(u.get("concessions")),
+                # 2026-05-20 export-wiring fix: v2 schema emits
+                # ``concession_text``; prefer the cleaned variant.
+                "concessions": _stringify_concessions(
+                    u.get("concession_text_clean")
+                    or u.get("concession_text")
+                    or u.get("concessions")
+                ),
             })
             out.append(row)
     return out
