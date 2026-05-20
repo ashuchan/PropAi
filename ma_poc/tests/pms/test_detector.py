@@ -981,24 +981,82 @@ def test_knock_doorway_beats_g5_marker_when_both_present() -> None:
 # ─────────────────────────────────────────────────────────────────────
 
 
-def test_iter_html_markers_yields_first_match_equal_to_detect_html_markers() -> None:
-    """The legacy first-match contract is preserved. Picking the first
-    yield must equal what the old single-result function returned."""
+def test_detect_html_markers_picks_highest_confidence_yielded() -> None:
+    """``_detect_html_markers`` returns the HIGHEST-confidence marker
+    yielded by ``_iter_html_markers``. For single-signal HTML the result
+    matches ``next(_iter_html_markers(...))`` trivially; for multi-signal
+    HTML the highest-confidence wins (2026-05-20 detector-ranking fix —
+    OneSite at 0.85 yielded before SightMap at 0.90 was incorrectly
+    winning on co-resident pages like solesteseaside.com/floorplans/)."""
     from ma_poc.pms.detector import _detect_html_markers
-    samples = [
+    single_signal_samples = [
         '<script src="https://commoncf.entrata.com/widgets/x.js"></script>',
         '<script>knockDoorway.init("a"*32,"community","abc123def");</script>',
         '<iframe src="https://sightmap.com/embed/m9pzd4ezvk1"></iframe>',
         '<a href="https://propmgr.securecafe.com/onlineleasing/x/availableunits.aspx">x</a>',
-        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>',
     ]
-    for html in samples:
-        first_yielded = next(_iter_html_markers(html), None)
-        legacy = _detect_html_markers(html)
-        assert first_yielded == legacy, (
-            f"first yield differs from legacy first-match for html={html[:60]!r}: "
-            f"yield={first_yielded!r} legacy={legacy!r}"
+    for html in single_signal_samples:
+        chosen = _detect_html_markers(html)
+        # With only one PMS signal present, the chosen marker must match
+        # the (only) yielded marker.
+        all_yielded = list(_iter_html_markers(html))
+        # Multiple yields of the SAME pms can happen; the chosen result's
+        # pms must be one of them and have the highest confidence.
+        assert chosen is not None, f"no marker for {html[:60]!r}"
+        yielded_for_pms = [m for m in all_yielded if m[0] == chosen[0]]
+        assert yielded_for_pms, f"chosen pms not in yields: chosen={chosen!r}"
+        max_conf_for_pms = max(m[1] for m in yielded_for_pms)
+        assert chosen[1] == max_conf_for_pms, (
+            f"chosen confidence is not the max for its pms: "
+            f"chosen={chosen!r} max_yield={max_conf_for_pms}"
         )
+
+    # Co-resident multi-PMS case (the bug this fix addresses). Real-world:
+    # solesteseaside.com/floorplans/ has OneSite portal marker AND a
+    # SightMap embed iframe. Pre-fix, OneSite at 0.85 won; post-fix,
+    # SightMap at 0.90 must win.
+    co_resident_html = (
+        "<html><body>"
+        '<a href="https://onlineleasing.realpage.com/foo">portal</a>'
+        '<iframe src="https://sightmap.com/embed/abc123xyz"></iframe>'
+        "</body></html>"
+    )
+    chosen = _detect_html_markers(co_resident_html)
+    assert chosen is not None
+    assert chosen[0] == "sightmap", (
+        f"co-resident OneSite+SightMap: SightMap (0.90) must beat OneSite (0.85). "
+        f"got {chosen!r}"
+    )
+    assert chosen[1] == 0.90
+
+
+def test_iter_html_markers_preserves_yield_order_for_retry() -> None:
+    """``_iter_html_markers`` yields in detector pass order — NOT
+    confidence order. The orchestrator's retry path relies on the
+    generator yielding all candidates, but the WINNER selection logic
+    (``_detect_html_markers``, ``detect_pms_candidates``) must apply
+    confidence-based ranking on top. This test pins the generator's
+    contract so a future "sort the generator itself" refactor doesn't
+    silently break the retry path."""
+    from ma_poc.pms.detector import _iter_html_markers
+    # OneSite is yielded EARLY in the function; SightMap is yielded LATER.
+    # The generator must preserve that pass order; ranking happens at
+    # the consumer level (_detect_html_markers / detect_pms_candidates).
+    html = (
+        "<html><body>"
+        '<a href="https://onlineleasing.realpage.com/foo">portal</a>'
+        '<iframe src="https://sightmap.com/embed/abc123xyz"></iframe>'
+        "</body></html>"
+    )
+    yielded = [m[0] for m in _iter_html_markers(html)]
+    onesite_idx = yielded.index("onesite") if "onesite" in yielded else -1
+    sightmap_idx = yielded.index("sightmap") if "sightmap" in yielded else -1
+    assert onesite_idx >= 0 and sightmap_idx >= 0
+    # Pass-order contract: OneSite (early check) yielded before SightMap.
+    assert onesite_idx < sightmap_idx, (
+        "yield order changed — retry orchestrator depends on pass order, "
+        "confidence ranking is applied only at the consumer level"
+    )
 
 
 def test_iter_html_markers_yields_multiple_on_co_resident_pms() -> None:

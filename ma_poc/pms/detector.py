@@ -956,16 +956,34 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
 def _detect_html_markers(
     page_html: str,
 ) -> tuple[PmsName, float, list[str]] | None:
-    """First-match wrapper around :func:`_iter_html_markers`.
+    """Pick the highest-confidence marker yielded by :func:`_iter_html_markers`.
 
     Path B Piece 2 (2026-05-20): the HTML-marker scan is now a generator
-    that yields ALL matching PMS candidates in detector priority order,
-    so the orchestrator can retry with the next candidate when the first
-    adapter returns an empty exit. This wrapper preserves the legacy
-    "first match wins" contract for callers (incl. ``_detect_pms_impl``)
-    that only need the top-priority signal.
+    that yields ALL matching PMS candidates in detector pass order.
+    The orchestrator uses ``detect_pms_candidates`` to find the NEXT
+    PMS to try when the first adapter returns an empty exit.
+
+    Selection rule (2026-05-20 detector-ranking fix): yields are NOT
+    confidence-ordered — OneSite/RealPage at 0.85 are checked early in
+    the function while SightMap at 0.90 is checked later. Returning the
+    first yield made OneSite "win" over a higher-confidence SightMap
+    embed on the same page (e.g. ``solesteseaside.com/floorplans/`` —
+    OneSite portal marker + SightMap iframe both present; SightMap is
+    the actual unit-data source). Fix: materialize all yields, return
+    the one with the highest confidence. Ties broken by detector pass
+    order (first-yielded wins) so the legacy single-signal contract is
+    preserved.
     """
-    return next(_iter_html_markers(page_html), None)
+    matches = list(_iter_html_markers(page_html))
+    if not matches:
+        return None
+    best_idx = 0
+    best_conf = matches[0][1]
+    for i in range(1, len(matches)):
+        if matches[i][1] > best_conf:
+            best_conf = matches[i][1]
+            best_idx = i
+    return matches[best_idx]
 
 def _unique_hosts(urls: list[str], limit: int = 10) -> list[str]:
     """Return up to ``limit`` unique hosts (deduped, in order)."""
@@ -1382,10 +1400,17 @@ def detect_pms_candidates(
                 pms, conf, ev = ext_hit
                 _emit(pms, conf, ev)
 
-        # 3. HTML markers — iterate ALL matches in detector priority order.
+        # 3. HTML markers — collect ALL matches, then sort by confidence
+        # (descending) so the highest-confidence signal wins. Pass order
+        # is preserved as the tie-break (stable sort). 2026-05-20 fix:
+        # yield order alone made OneSite (0.85, yielded early) beat
+        # SightMap (0.90, yielded later) on co-resident pages.
         if isinstance(page_html, str) and page_html:
             client_id_url = url if isinstance(url, str) else ""
-            for pms, conf, ev in _iter_html_markers(page_html):
+            html_matches = list(_iter_html_markers(page_html))
+            # Stable sort by -confidence preserves yield order on ties.
+            html_matches.sort(key=lambda m: -m[1])
+            for pms, conf, ev in html_matches:
                 client_id = (
                     _client_account_id_from_url(client_id_url, pms)
                     if client_id_url
