@@ -555,3 +555,154 @@ def test_dirty_input_with_header_only_yields_non_empty_clean_output() -> None:
     assert out["concession_text"] == "Limited Time Offer!"
     assert out["concession_text_clean"] == "Limited Time Offer!"
     assert out["_concession_quality"] == "unclean_header_only"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Fix F — sanity-sweep follow-ups: 2 leak patterns the cleaner missed.
+#
+# The 49,677-row canary sweep (2026-05-20) surfaced two residual
+# categories the cleaner couldn't recover from cleanly:
+#
+#   1. **Template-literal trail** — offer-phrase matched, then the
+#      120-char extension pulled in ``…Open Banner const now = new
+#      Date(); const…``. Real shape from canary "shopify-style" leak.
+#
+#   2. **JSON-blob orphan** — Spherexx/McKinley CMS payload where the
+#      cell contains ``,"promotionTitle":"Save up to $260/mo on…"``
+#      — the offer IS recoverable but the cleaner kept the JSON keys.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_classify_json_blob_spherexx_pattern() -> None:
+    """Spherexx CMS payload leak — classifies as ``unclean_json_blob``
+    (distinct from orphan_prefix which had been catching it)."""
+    from ma_poc.core.concession_clean import classify_concession_quality
+    text = (
+        ',"promotionId":"192630","promotionTitle":"Save up to $260/mo on '
+        'select apartments!","promotionDescription":"Lease one of our '
+        'select Studio and"'
+    )
+    assert classify_concession_quality(text) == "unclean_json_blob"
+
+
+def test_classify_json_blob_does_not_shadow_script_leak() -> None:
+    """A row with both JSON payload AND JS function bodies stays as
+    ``unclean_script_leak`` — the JS is the more upstream debugging
+    target."""
+    from ma_poc.core.concession_clean import classify_concession_quality
+    text = (
+        'function() { return {"promotionTitle":"X"}; } '
+        '"announcementBarSettings":{"text":"Get $200 off"}'
+    )
+    assert classify_concession_quality(text) == "unclean_script_leak"
+
+
+def test_clean_strips_template_literal_trailing_js() -> None:
+    """Real canary residual: offer phrase + 120-char extension consumed
+    ``const now = new Date()`` from the following template literal.
+    Post-fix the cleaner truncates AT the script-marker boundary."""
+    from ma_poc.core.concession_clean import clean_concession_text
+    text = (
+        "'off' : 'on'}); stickyHeader(); }); × Move in Special! Apply "
+        "today and receive 1/2 OFF Application Fees! Open Banner "
+        "const now = new Date(); const todayDate = now.getFullYear()"
+    )
+    out = clean_concession_text(text)
+    assert "Move in Special" in out
+    assert "1/2 OFF" in out
+    # The script tail must be gone
+    assert "const now" not in out
+    assert "getFullYear" not in out
+    assert "new Date" not in out
+
+
+def test_clean_strips_trailing_json_key_fragment() -> None:
+    """Spherexx-style: offer phrase trails into the next JSON key.
+    Cleaner must strip ``","promotionDescription":...`` from the tail."""
+    from ma_poc.core.concession_clean import clean_concession_text
+    text = (
+        '"promotionTitle":"Save up to $260/mo on select apartments!",'
+        '"promotionDescription":"Lease one of our select Studio and"'
+    )
+    out = clean_concession_text(text)
+    assert "Save up to $260/mo on select apartments" in out
+    assert "promotionDescription" not in out
+    assert '","' not in out
+
+
+def test_clean_template_literal_with_backtick_stops_at_backtick() -> None:
+    """The ``_OFFER_RE`` regex now excludes backtick from the 120-char
+    trail — the capture stops BEFORE the template literal opens.
+    Synthetic case: ``…Move in Special!`backtick-template-literal``."""
+    from ma_poc.core.concession_clean import clean_concession_text
+    text = "Move in Special! Free rent for 1 month`onclick=`badcode"
+    out = clean_concession_text(text)
+    assert "Move in Special" in out
+    assert "onclick" not in out
+    assert "badcode" not in out
+
+
+def test_clean_preserves_real_offer_after_truncation() -> None:
+    """Regression: don't over-truncate. Ensure that when a clean offer
+    has no script trail, the cleaner returns it intact."""
+    from ma_poc.core.concession_clean import clean_concession_text
+    text = "Limited Time Offer! Move in by 6/15 and get 1 month free rent."
+    out = clean_concession_text(text)
+    assert "Limited Time Offer" in out
+    assert "1 month free rent" in out
+    assert "6/15" in out
+
+
+def test_clean_recovers_rent_infix_variants() -> None:
+    """Canary residual: ``rent`` infix between weeks/months and free.
+    Real examples from feature canary 2026-05-19:
+      * ``Up to 2 weeks rent free on select floorplans``
+      * ``Up to 1 month rent free``
+      * ``1 Month of Rent Free``
+    Original regex required ``weeks free``/``months free`` adjacency
+    and missed these. Post-fix the offer-phrase regex tolerates an
+    optional ``(of) rent`` infix."""
+    from ma_poc.core.concession_clean import clean_concession_text
+    out1 = clean_concession_text(
+        "'off' : 'on'}); stickyHeader(); }); × Up to 2 weeks rent free on select"
+    )
+    assert "2 weeks rent free" in out1, f"got {out1!r}"
+    assert "stickyHeader" not in out1
+
+    out2 = clean_concession_text(
+        "Hillside - Cornelius Floor Plan - 1 Month of Rent Free Open Banner const"
+    )
+    assert "1 Month of Rent Free" in out2 or "Month of Rent Free" in out2
+    assert "const" not in out2
+
+
+def test_classify_known_canary_residual_examples() -> None:
+    """Pin the canary residual: 5 real-shape examples from the
+    2026-05-20 sanity sweep, each must classify to a leak category
+    (not silently "clean") so reporting flags them with caution."""
+    from ma_poc.core.concession_clean import classify_concession_quality
+
+    # Template-literal "shopify-style" leak (4,400-row pattern)
+    assert classify_concession_quality(
+        "'off' : 'on'}); stickyHeader(); }); × Move in Special!"
+    ) == "unclean_script_leak"
+
+    # JSON-blob CMS payload (Spherexx/McKinley)
+    assert classify_concession_quality(
+        ',"promotionTitle":"Save up to $260/mo on select apartments!"'
+    ) == "unclean_json_blob"
+
+    # SightMap init leak (real canary row)
+    assert classify_concession_quality(
+        "initSightMapListeners(); initSpacesListeners(); }); 1 MONTH FREE!"
+    ) == "unclean_script_leak"
+
+    # Open Banner const date pattern
+    assert classify_concession_quality(
+        "Open Banner const now = new Date(); 1 month free"
+    ) == "unclean_script_leak"
+
+    # Pure mobileInfoBar settings blob
+    assert classify_concession_quality(
+        '"mobileInfoBarSettings":{"isContactEmailEnabled":false}'
+    ) == "unclean_json_blob"

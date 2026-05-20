@@ -57,6 +57,42 @@ _SCRIPT_LEAK_MARKERS: tuple[str, ...] = (
     "innerhtml",
     "console.",
     "propleadsource",
+    # 2026-05-20 sanity-sweep additions: surfaced from the 4,407 dirty
+    # canary rows where the offer-phrase extension consumed JS that
+    # followed the offer. Most common shape:
+    #   "...Move in Special! ... Open Banner const now = new Date();..."
+    # These markers serve double duty — they classify a row as
+    # script-leak AND act as truncation boundaries for the cleaner's
+    # offer-phrase extension (stop before this token).
+    "stickyheader",
+    "const now ",
+    "new date(",
+    " = new date",
+    "initmap(",
+    "initsightmap",
+    "open banner",
+    # Template-literal start: backtick-paren pattern from the "shopify-
+    # style" leak (``'off' : 'on'}`); stickyHeader(); });``).
+    "`);",
+)
+
+# Markers for JSON-blob leaks. Distinct from script leaks because the
+# upstream is a CMS payload (Spherexx/Duda/McKinley) rather than JS
+# code. Real shape: ``,"promotionTitle":"Save up to $260/mo on..."``.
+# Single quote-key signature is enough to identify — too specific to
+# appear in legitimate marketing copy.
+_JSON_BLOB_MARKERS: tuple[str, ...] = (
+    '","',                           # adjacent string fields
+    '":"',                           # key/value separator
+    '":{',                           # nested object
+    '":[',                           # nested array
+    '":false',
+    '":true',
+    '":null',
+    'promotiontitle',
+    'promotiondescription',
+    'mobileinfobarsettings',
+    'announcementbarsettings',
 )
 
 _STYLE_LEAK_MARKERS: tuple[str, ...] = (
@@ -133,6 +169,9 @@ def classify_concession_quality(text: str | None) -> str:
       * ``"unclean_script_leak"``   — JS function bodies / DOM calls present.
       * ``"unclean_style_leak"``    — CSS rules / selectors present.
       * ``"unclean_dmapi"``         — Duda CMS function definition leaked.
+      * ``"unclean_json_blob"``     — CMS JSON payload leaked
+                                       (``"promotionTitle":...``, Spherexx /
+                                       McKinley pattern).
       * ``"unclean_orphan_prefix"`` — starts with orphan ``}``, ``);``, etc.
       * ``"unclean_header_only"``   — banner header phrase only ("Limited
                                        Time Offer!") with no specific
@@ -150,6 +189,13 @@ def classify_concession_quality(text: str | None) -> str:
         return "unclean_dmapi"
     script_hit = any(m in sl for m in _SCRIPT_LEAK_MARKERS)
     style_hit = any(m in sl for m in _STYLE_LEAK_MARKERS)
+    json_hit = any(m in sl for m in _JSON_BLOB_MARKERS)
+    # JSON-blob is more specific than orphan-prefix (a leading ``,"``
+    # would otherwise satisfy both); runs before the orphan check.
+    # But after script/style — a row with both JS function bodies AND
+    # JSON payload signals JS misclassification, prefer script_leak.
+    if json_hit and not script_hit and not style_hit:
+        return "unclean_json_blob"
     if script_hit and style_hit:
         # Disambiguate by which appears first.
         first_script = min(
@@ -186,12 +232,18 @@ def classify_concession_quality(text: str | None) -> str:
 # 2026-05-20 sample.
 _OFFER_PHRASES: tuple[str, ...] = (
     r"limited[\s\-]+time[\s\-]+(?:offer|special)",
-    r"\d{1,3}\s+weeks?\s+free",
-    r"\d{1,3}\s+months?\s+free",
-    r"\d{1,3}\s+days?\s+free",
+    # 2026-05-20 sanity-sweep: the ``rent`` infix variants surfaced in
+    # canary residuals — ``1 month rent free``, ``2 weeks rent free``,
+    # ``1 Month of Rent Free``. Original regex required ``weeks free`` /
+    # ``months free`` adjacency and missed these. Optional non-capturing
+    # group preserves the simple form.
+    r"\d{1,3}\s+weeks?\s+(?:(?:of\s+)?rent\s+)?free",
+    r"\d{1,3}\s+months?\s+(?:(?:of\s+)?rent\s+)?free",
+    r"\d{1,3}\s+days?\s+(?:(?:of\s+)?rent\s+)?free",
     r"free\s+rent\b",
-    r"month\s+free\b",
-    r"week\s+free\b",
+    r"month\s+(?:of\s+)?(?:rent\s+)?free\b",
+    r"week\s+(?:of\s+)?(?:rent\s+)?free\b",
+    r"up\s+to\s+\d{1,3}\s+(?:weeks?|months?)\s+(?:(?:of\s+)?rent\s+)?free",
     r"\$\d{1,4}\s+off",
     r"\d{1,3}%\s+off",
     r"save\s+up\s+to\s+\$?\d{1,4}",
@@ -206,9 +258,39 @@ _OFFER_PHRASES: tuple[str, ...] = (
     r"receive\s+(?:up\s+to\s+)?\$\d{1,4}",
     r"\d{1,3}\s+months?\s+(?:of\s+)?free\s+\w+",
 )
+# 2026-05-20 sanity-sweep refinement: the trailing 120-char window
+# excludes ``<>{}`` AND backtick — the canary surfaced ``…Move in
+# Special! … Open Banner const now = new Date()…`` shapes where a
+# template literal trailed the offer, and the 120-char extension
+# pulled it in. Backtick stops the capture before the template
+# literal opens.
 _OFFER_RE = re.compile(
-    "(?:" + "|".join(_OFFER_PHRASES) + r")[^<>{}]{0,120}",
+    "(?:" + "|".join(_OFFER_PHRASES) + r")[^<>{}`]{0,120}",
     re.IGNORECASE,
+)
+
+# 2026-05-20 sanity-sweep: after offer-phrase extraction, trim the
+# snippet at the first script-leak token. Real residual after Fix A:
+# offer phrase matches, 120-char extension stays under the
+# ``[^<>{}\\`]`` constraints, then ``const now = new Date()`` or
+# ``initSightMap`` appears at the boundary. We truncate AT those
+# tokens (case-insensitive) so the cleaner doesn't carry the JS
+# downstream.
+_CLEANER_BOUNDARY_TOKENS_RE = re.compile(
+    r"(?i)\b(?:"
+    r"const\s+\w+\s*=|"
+    r"var\s+\w+\s*=|"
+    r"let\s+\w+\s*=|"
+    r"function\s*\(|"
+    r"new\s+date\s*\(|"
+    r"stickyheader|"
+    r"initmap|"
+    r"initsightmap|"
+    r"addeventlistener|"
+    r"document\.|"
+    r"window\.|"
+    r"open\s+banner"
+    r")"
 )
 
 # Generic "end-of-code → start-of-visible-text" boundary.
@@ -275,7 +357,46 @@ def clean_concession_text(text: str | None) -> str:
         # Strip ALL leading orphan-punctuation groups (handles multiple
         # ``}); });`` sequences with intervening whitespace).
         snippet = re.sub(r"^(?:[)}\];,=+<>/]+\s*)+", "", snippet)
-        return snippet
+        # Strip leading JSON-key fragments that precede the offer —
+        # ``"promotionTitle":"Save up to $158…"`` → ``Save up to $158…``.
+        # Anchor: a quoted-key followed by ``":"``. Re-running the
+        # offer-phrase regex tells us where the offer starts inside
+        # the snippet; everything before it that looks like JSON keys
+        # is junk.
+        offer_in_snippet = _OFFER_RE.search(snippet)
+        if offer_in_snippet:
+            head = snippet[:offer_in_snippet.start()]
+            # Match a key-value head like ``…"<key>":"`` and strip it
+            # (but only if it covers most of the head — avoids
+            # stripping a legitimate prefix that happens to end with
+            # ``":"``).
+            if re.search(r'"\s*:\s*"\s*$', head):
+                snippet = snippet[offer_in_snippet.start():]
+                offer_in_snippet = _OFFER_RE.search(snippet)
+        # 2026-05-20 sanity-sweep: truncate at the first script/template
+        # token in the snippet. Canary residual showed offer phrases
+        # trailing ``Open Banner const now = new Date()`` and similar
+        # — the 120-char window stops at backtick now, but a
+        # no-backtick template (``const x = ...``) still leaks through
+        # unless we explicitly trim. The leading-head strip above has
+        # already removed any JSON-key prefix that precedes the offer,
+        # so the boundary tokens found here are guaranteed to come
+        # AFTER the offer text (the offer phrases themselves don't
+        # contain ``const``/``function``/``new Date``/etc.).
+        boundary_match = _CLEANER_BOUNDARY_TOKENS_RE.search(snippet)
+        if boundary_match:
+            snippet = snippet[:boundary_match.start()]
+        # Strip a TRAILING CMS JSON-key fragment like ``…select units
+        # ","promotionDescription":…``. After the leading-head strip,
+        # the FIRST ``","`` in the remainder is the trailing JSON
+        # boundary — truncate there. (The offer-phrase regex's
+        # 120-char extension consumes past the trail, so we can't
+        # use offer_match.end() as a fence — must scan from snippet
+        # start.)
+        tail_match = re.search(r'"\s*,\s*"', snippet)
+        if tail_match:
+            snippet = snippet[:tail_match.start()]
+        return snippet.rstrip(' ,;:.-—–"').strip()
 
     # Pass 2 — code/text boundary split.
     boundary = _END_OF_CODE_BOUNDARY_RE.match(text)
