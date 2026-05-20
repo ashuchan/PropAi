@@ -637,10 +637,24 @@ async def _try_rentcafe_wp_probe(
 # securecafe is Cloudflare-fronted, so the probe fetches via curl_cffi
 # (TLS impersonation passes the CF challenge; plain httpx gets the 5KB
 # challenge shell). Deterministic Tier-1 — no LLM, no hallucination.
+#
+# 2026-05-20 cluster #5 RentCafe sub-cluster fix: the regex now also
+# captures slugs from ``/residentservices/<slug>`` paths. Many RentCafe
+# marketing sites (cityridgedc, thedylanchicago, ...) only link to the
+# *resident-services* portal (current-resident login) — the
+# *online-leasing* portal isn't anchored anywhere in the marketing DOM,
+# but the same slug is mounted under both paths on the SecureCafe tenant.
+# Live-probed 2026-05-20:
+#   cityridgedc residentservices/city-ridge-clo → onlineleasing/city-ridge-clo
+#     /availableunits.aspx returns 59 AvailUnitRow rows.
+#   thedylanchicago residentservices/160-n-morgan → onlineleasing/160-n-morgan
+#     /availableunits.aspx returns 2 AvailUnitRow rows.
+# Both URLs CF-403 plain httpx but 200 with curl_cffi chrome120 impersonation
+# (the adapter's ``probe_get`` already uses chrome120).
 _SECURECAFE_URL_RE = re.compile(
     r"""https?://
         (?P<sub>[a-z0-9][a-z0-9-]*)\.securecafe\.com
-        /onlineleasing/
+        /(?:onlineleasing|residentservices)/
         (?P<slug>[a-z0-9][a-z0-9-]*)
     """,
     re.IGNORECASE | re.VERBOSE,

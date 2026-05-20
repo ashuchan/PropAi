@@ -654,3 +654,103 @@ class TestMAAWorthingtonFieldMap:
         assert len(units) == 3
         unit_numbers = {u["unit_number"] for u in units}
         assert unit_numbers == {"217", "318", "419"}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 cluster #5 RentCafe sub-cluster — broaden _SECURECAFE_URL_RE
+# to also match /residentservices/<slug> paths.
+#
+# Many RentCafe marketing sites only link to the resident-services portal
+# (current-resident login). The same slug is mounted under both
+# /onlineleasing/<slug> and /residentservices/<slug> on the SecureCafe
+# tenant. The adapter's _find_securecafe_base always synthesizes the
+# /onlineleasing/<slug> URL from the captured slug, so capturing it from
+# either path works.
+#
+# Live-verified 2026-05-20 on cityridgedc.com + thedylanchicago.com:
+#   Marketing page exposes only /residentservices/<slug>/userlogin.aspx
+#   /onlineleasing/<slug>/availableunits.aspx returns 59 + 2 AvailUnitRow
+#   rows respectively via curl_cffi chrome120 impersonation.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_securecafe_regex_matches_onlineleasing_url() -> None:
+    """Regression — the legacy /onlineleasing/<slug> form must keep matching."""
+    from ma_poc.pms.adapters.rentcafe import _SECURECAFE_URL_RE
+    m = _SECURECAFE_URL_RE.search(
+        "https://the24.securecafe.com/onlineleasing/the24/guestlogin.aspx"
+    )
+    assert m is not None
+    assert m.group("sub") == "the24"
+    assert m.group("slug") == "the24"
+
+
+def test_securecafe_regex_matches_residentservices_url() -> None:
+    """2026-05-20 cluster #5 fix — /residentservices/<slug> must now match
+    with the same group names. The slug from the residentservices path
+    is identical to the slug under /onlineleasing/ on the same tenant."""
+    from ma_poc.pms.adapters.rentcafe import _SECURECAFE_URL_RE
+    m = _SECURECAFE_URL_RE.search(
+        "https://cityridgedc.securecafe.com/residentservices/city-ridge-clo/userlogin.aspx"
+    )
+    assert m is not None
+    assert m.group("sub") == "cityridgedc"
+    assert m.group("slug") == "city-ridge-clo"
+
+
+def test_securecafe_regex_residentservices_dylan_pattern() -> None:
+    """Real-bytes URL from thedylanchicago.com 2026-05-20 live probe."""
+    from ma_poc.pms.adapters.rentcafe import _SECURECAFE_URL_RE
+    m = _SECURECAFE_URL_RE.search(
+        "https://thedylanchicago.securecafe.com/residentservices/160-n-morgan/userlogin.aspx"
+    )
+    assert m is not None
+    assert m.group("sub") == "thedylanchicago"
+    assert m.group("slug") == "160-n-morgan"
+
+
+def test_securecafe_find_base_returns_onlineleasing_url_from_residentservices() -> None:
+    """The end-to-end contract — _find_securecafe_base reads a
+    /residentservices/<slug> URL from the page HTML and returns the
+    canonical /onlineleasing/<slug> base for downstream availableunits
+    probing. This is the cluster #5 routing fix in action."""
+    from ma_poc.pms.adapters.base import AdapterContext
+    from ma_poc.pms.adapters.rentcafe import _find_securecafe_base
+    html = (
+        '<html><body>'
+        '<a href="https://cityridgedc.securecafe.com/residentservices/'
+        'city-ridge-clo/userlogin.aspx">Resident Login</a>'
+        '</body></html>'
+    )
+    # Minimal context — _find_securecafe_base only reads ctx._api_responses
+    # + fetch_result.final_url + base_url as fallback sources.
+    ctx = AdapterContext(
+        base_url="https://cityridgedc.com/",
+        detected=None,  # type: ignore[arg-type]
+        profile=None,
+        expected_total_units=None,
+        property_id="P-test",
+    )
+    base = _find_securecafe_base(html, ctx)
+    assert base == (
+        "https://cityridgedc.securecafe.com/onlineleasing/city-ridge-clo"
+    ), (
+        f"adapter must synthesize the canonical /onlineleasing/<slug> URL "
+        f"from a /residentservices/<slug> source; got {base!r}"
+    )
+
+
+def test_securecafe_regex_does_not_match_unrelated_paths() -> None:
+    """Sanity — /onlineleasing/ and /residentservices/ are the ONLY two
+    accepted path segments. Other paths under securecafe.com should NOT
+    match (avoid synthesizing bogus /onlineleasing/<slug> URLs)."""
+    from ma_poc.pms.adapters.rentcafe import _SECURECAFE_URL_RE
+    for url in (
+        "https://foo.securecafe.com/login",
+        "https://foo.securecafe.com/payments/auth",
+        "https://foo.securecafe.com/marketing/slug",
+    ):
+        assert _SECURECAFE_URL_RE.search(url) is None, (
+            f"path-form not in {{onlineleasing, residentservices}} must NOT match; "
+            f"url={url!r}"
+        )
