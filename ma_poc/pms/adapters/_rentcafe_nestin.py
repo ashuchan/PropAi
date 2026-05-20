@@ -72,12 +72,32 @@ _FLOORPLAN_DETAIL_HREF_RE = re.compile(
 _TABLE_HEADER_LABELS = ("apartment", "rent", "date available")
 
 # Card-layout unit identifier: ``APARTMENT: # <value>`` or ``Apartment # <value>``.
-# Captures ``4112-3``, ``1120``, ``0200``, ``B306``, ``C201`` — strip any
-# leading ``#`` and trim. The non-greedy ``[A-Z0-9-]+?`` accepts real
-# Nestin unit numbers without picking up surrounding text.
+# The ``#`` is REQUIRED (per the 2026-05-20 pre-canary probe) — without it
+# the regex matched "Apartment Homes" / "Apartment Available" / "Apartment
+# with" chrome text, extracting bogus unit numbers like "Homes" / "with".
+# Captures ``4112-3``, ``1120``, ``0200``, ``B306``, ``C201``.
 _CARD_APT_RE = re.compile(
-    r"\bApartment\b[:\s#]+(?P<unit>[A-Z0-9][A-Z0-9-]{0,15})\b",
+    r"\bApartment\b\s*(?::\s*)?#\s*(?P<unit>[A-Z0-9][A-Z0-9-]{0,15})\b",
     re.IGNORECASE,
+)
+
+# Stonewater-shape (Layout A3): applyGAClick button.
+# Static HTML carries unit + rent + sqft as arguments to a JS click
+# handler — neither table nor card text:
+#   <button id="4112-3" onclick="applyGAClick('A1', '1 Bed(s)', '900',
+#                                              '1099.00', ...)">Apply Now</button>
+# The button ``id`` is the real unit_number; ``onclick`` args 1-4 are
+# plan_name, beds-label, sqft, rent. Discovered during 2026-05-20
+# pre-canary probe against stonewaterpark.com/floorplans/a1.
+_APPLYGA_BUTTON_RE = re.compile(
+    r"""id\s*=\s*["'](?P<unit>[A-Z0-9][A-Z0-9-]{1,15})["']"""
+    r"""[^>]*onclick\s*=\s*["']applyGAClick\("""
+    r"""\s*['"]([^'"]*)['"]"""           # arg1: plan_name
+    r"""\s*,\s*['"]([^'"]*)['"]"""       # arg2: beds-label
+    r"""\s*,\s*['"]([^'"]*)['"]"""       # arg3: sqft
+    r"""\s*,\s*['"]([^'"]*)['"]"""       # arg4: rent
+    r""".*?["']\s*>""",
+    re.IGNORECASE | re.DOTALL,
 )
 
 # Card-layout rent: ``Starting at: $X.XX``, ``$X,XXX.XX``, or bare ``$X``.
@@ -121,9 +141,42 @@ def _money_to_int(text: str) -> int | None:
         return None
 
 
+# Extract the apartment-number value from a text cell that may include
+# the "Apartment" label prefix (real Nestin tables sometimes ship an
+# inline ``<span class="sr-only">Apartment</span>`` accessibility label
+# that get_text() concatenates with the value), an optional ``#``, and
+# trailing whitespace. Captures the alphanumeric/hyphenated value.
+_UNIT_NUM_EXTRACT_RE = re.compile(
+    r"(?:Apartment\b[:\s]*)?#?\s*([A-Z0-9][A-Z0-9-]*)\b",
+    re.IGNORECASE,
+)
+
+
 def _normalize_unit_number(raw: str) -> str:
-    """Strip leading ``#`` and whitespace; return the canonical unit identifier."""
-    return (raw or "").strip().lstrip("#").strip()
+    """Extract canonical unit identifier from text that may include the
+    ``Apartment`` label prefix or leading ``#``.
+
+    Examples:
+      ``"#1120"`` → ``"1120"``
+      ``"Apartment: #1120"`` → ``"1120"``       (sr-only label leak)
+      ``"Apartment 4112-3"`` → ``"4112-3"``      (no ``#`` separator)
+      ``"  #B306  "`` → ``"B306"``
+      ``""`` → ``""``
+
+    2026-05-20: handles the pre-canary probe finding — real Chatwell /
+    Hayden Place tables omit ``data-label`` attrs AND the positional-
+    fallback ``<td>`` text includes the "Apartment" sr-only span. Without
+    this prefix-strip, the unit_number is polluted with the label text.
+    """
+    if not raw:
+        return ""
+    text = raw.strip()
+    if not text:
+        return ""
+    m = _UNIT_NUM_EXTRACT_RE.search(text)
+    if m:
+        return m.group(1).strip()
+    return text.lstrip("#").strip()
 
 
 def _origin_of(url: str) -> str:
@@ -332,17 +385,94 @@ def _parse_card_layout(
     return units
 
 
+def _parse_applyga_button_layout(
+    detail_html: str, source_url: str, floor_plan_name: str = ""
+) -> list[dict[str, Any]]:
+    """Parse Layout A3 — Stonewater-shape applyGAClick button.
+
+    Real-world (verified 2026-05-20 against stonewaterpark.com/floorplans/a1):
+
+      <button id="4112-3" onclick="applyGAClick('A1', '1 Bed(s)', '900',
+                                                 '1099.00', ...)">Apply Now</button>
+
+    The button ``id`` is the unit_number; ``onclick`` args carry the plan
+    name, beds-label, sqft, and rent.
+
+    Returns ``[]`` if no apply-button matches.
+    """
+    if not detail_html or "applyGAClick" not in detail_html:
+        return []
+
+    units: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for m in _APPLYGA_BUTTON_RE.finditer(detail_html):
+        unit_number = _normalize_unit_number(m.group("unit"))
+        if not unit_number or unit_number in seen:
+            continue
+        plan_name = (m.group(2) or "").strip() or floor_plan_name
+        beds_label = (m.group(3) or "").strip()  # e.g. "1 Bed(s)" / "Studio"
+        sqft_raw = (m.group(4) or "").strip()
+        rent_raw = (m.group(5) or "").strip()
+        sqft = "".join(c for c in sqft_raw if c.isdigit())
+        # onclick args carry the bare rent number ("1099.00") without a
+        # ``$`` prefix — ``_money_to_int`` requires ``$``, so parse via
+        # ``float()`` directly.
+        try:
+            rent_int = int(round(float(rent_raw.replace(",", "")))) if rent_raw else None
+        except (ValueError, TypeError):
+            rent_int = None
+        if rent_int is None or rent_int <= 0:
+            continue
+
+        # beds-label → numeric extraction (Studio → 0, "1 Bed(s)" → 1)
+        beds = ""
+        if "studio" in beds_label.lower():
+            beds = "0"
+        else:
+            bm = re.search(r"(\d+)", beds_label)
+            if bm:
+                beds = bm.group(1)
+
+        seen.add(unit_number)
+        units.append(
+            make_unit_dict(
+                floor_plan_name=plan_name,
+                bed_label=beds_label or bed_label_from(None, plan_name),
+                bedrooms=beds,
+                bathrooms="",
+                sqft=sqft,
+                unit_number=unit_number,
+                rent_range=format_rent_range(rent_int, rent_int),
+                rent_low=rent_int,
+                rent_high=rent_int,
+                availability_status="AVAILABLE",
+                availability_date="",
+                source_api_url=source_url,
+                extraction_tier="TIER_1_DOM_RENTCAFE_NESTIN",
+            )
+        )
+    return units
+
+
 def parse_nestin_detail_page(
     detail_html: str, source_url: str, floor_plan_name: str = ""
 ) -> list[dict[str, Any]]:
     """Parse a single ``/floorplans/{slug}`` detail page for unit rows.
 
-    Tries Layout A1 (table) first — it's the more reliable shape when
-    present. Falls through to Layout A2 (card text) when no table matches.
+    Tries Layout A1 (table) first — most reliable when present.
+    Falls through to Layout A3 (applyGAClick button — Stonewater-shape;
+    discovered 2026-05-20 pre-canary probe) which is more structured than
+    Layout A2 because the data is in well-known ``onclick`` args.
+    Finally falls through to Layout A2 (free-form card text) for the
+    Altair / Hampton / Meridian / LINQ shape.
+
     Returns ``[]`` on any extraction failure (caller decides whether to
     fall back to plan-level emission).
     """
     units = _parse_table_layout(detail_html, source_url, floor_plan_name)
+    if units:
+        return units
+    units = _parse_applyga_button_layout(detail_html, source_url, floor_plan_name)
     if units:
         return units
     return _parse_card_layout(detail_html, source_url, floor_plan_name)
