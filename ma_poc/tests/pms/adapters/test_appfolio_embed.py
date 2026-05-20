@@ -38,6 +38,11 @@ _APPFOLIO_SSR = """
 """
 
 _IFRAME_SRC = "https://illumepm.appfolio.com/listings?1234567890"
+# After 2026-05-19 canonicalization (``_to_appfolio_listings_root``), any
+# captured AppFolio URL — including showings/new anchor links — is stripped
+# to the listings SSR root. Tests respond to BOTH variants so the
+# canonicalization doesn't break the existing assertions.
+_IFRAME_CANON = "https://illumepm.appfolio.com/listings"
 _SUBPAGE_HTML = (
     '<html><body><div class="sqs-block">'
     f'<iframe src="{_IFRAME_SRC}" width="100%"></iframe>'
@@ -46,16 +51,27 @@ _SUBPAGE_HTML = (
 
 
 class _FakePage:
-    """evaluate() dispatches: no-arg call = live AppFolio-src scan;
-    1-arg call = in-session fetch(url) → body string."""
+    """evaluate() dispatches by JS body + arg shape:
+        - no-args + JS containing 'tenant-scan' → live tenant scan (anchors/scripts)
+        - no-args + any other JS              → live /listings iframe scan (legacy)
+        - 1-arg                               → in-session fetch(url) → body string"""
 
-    def __init__(self, url: str, live: list[str], responses: dict[str, str]) -> None:
+    def __init__(
+        self,
+        url: str,
+        live: list[str],
+        responses: dict[str, str],
+        tenants: list[str] | None = None,
+    ) -> None:
         self.url = url
         self._live = live
+        self._tenants = tenants or []
         self._responses = responses
 
     async def evaluate(self, _js: str, *args: object) -> object:
         if not args:
+            if 'tenant-scan' in (_js or ''):
+                return list(self._tenants)
             return list(self._live)
         url = str(args[0])
         return self._responses.get(url, "")
@@ -76,7 +92,7 @@ async def test_recover_via_live_iframe_on_page() -> None:
     page = _FakePage(
         url="https://www.brooksidejohnsoncreek.com/listings",
         live=[_IFRAME_SRC],
-        responses={_IFRAME_SRC: _APPFOLIO_SSR},
+        responses={_IFRAME_SRC: _APPFOLIO_SSR, _IFRAME_CANON: _APPFOLIO_SSR},
     )
     units = await recover_appfolio_embed(page, _ctx("https://www.brooksidejohnsoncreek.com/"))  # type: ignore[arg-type]
     assert len(units) == 2
@@ -94,6 +110,7 @@ async def test_recover_via_subpath_probe() -> None:
         responses={
             "https://www.brooksidejohnsoncreek.com/listings": _SUBPAGE_HTML,
             _IFRAME_SRC: _APPFOLIO_SSR,
+            _IFRAME_CANON: _APPFOLIO_SSR,
         },
     )
     units = await recover_appfolio_embed(page, _ctx("https://www.brooksidejohnsoncreek.com/"))  # type: ignore[arg-type]
@@ -129,7 +146,7 @@ async def test_squarespace_adapter_recovers_appfolio_embed() -> None:
     page = _FakePage(
         url="https://www.brooksidejohnsoncreek.com/listings",
         live=[_IFRAME_SRC],
-        responses={_IFRAME_SRC: _APPFOLIO_SSR},
+        responses={_IFRAME_SRC: _APPFOLIO_SSR, _IFRAME_CANON: _APPFOLIO_SSR},
     )
     result = await SquarespaceNoPmsAdapter().extract(page, _ctx("https://www.brooksidejohnsoncreek.com/"))  # type: ignore[arg-type]
     assert result.tier_used == "TIER_1_DOM_APPFOLIO_SSR"
@@ -153,6 +170,7 @@ async def test_wix_adapter_recovers_appfolio_embed() -> None:
         responses={
             "https://www.villasonrock.com/availability": _SUBPAGE_HTML,
             _IFRAME_SRC: _APPFOLIO_SSR,
+            _IFRAME_CANON: _APPFOLIO_SSR,
         },
     )
     result = await WixNoPmsAdapter().extract(page, _ctx("https://www.villasonrock.com/"))  # type: ignore[arg-type]
@@ -176,3 +194,164 @@ def test_detector_plain_squarespace_still_nopms() -> None:
     html = '<html><head><script src="https://static1.squarespace.com/x.js"></script></head><body></body></html>'
     det = detect_pms("https://www.plain.com/", page_html=html)
     assert det.pms == "squarespace_nopms"
+
+
+# ── 2026-05-19 bot-block telemetry: 403 on the AppFolio fetch ─────────────
+
+
+class _StatusFakePage:
+    """Like ``_FakePage`` but the responses dict maps URL → ``{status, body}``
+    so the recovery's ``fetch_with_status`` JS-shim gets the new dict wire
+    format and can record bot-blocks.
+    """
+
+    def __init__(
+        self,
+        url: str,
+        live: list[str],
+        responses: dict[str, dict[str, object]],
+    ) -> None:
+        self.url = url
+        self._live = live
+        self._responses = responses
+
+    async def evaluate(self, _js: str, *args: object) -> object:
+        if not args:
+            return list(self._live)
+        u = str(args[0])
+        return self._responses.get(u, {"status": 0, "body": ""})
+
+
+@pytest.mark.asyncio
+async def test_recover_records_bot_block_when_appfolio_returns_403() -> None:
+    """If the AppFolio listings fetch is 403'd (DataDome / etc.), the
+    recovery returns ``[]`` BUT stamps a bot-block record on the ctx so
+    triage can distinguish 'routing-correct, bot-walled' from 'no signal'.
+    """
+    from ma_poc.pms.adapters._universal_recovery import get_blocks
+
+    page = _StatusFakePage(
+        url="https://www.brooksidejohnsoncreek.com/listings",
+        live=[_IFRAME_SRC],
+        responses={
+            _IFRAME_SRC: {"status": 403, "body": ""},
+            _IFRAME_CANON: {"status": 403, "body": ""},
+        },
+    )
+    ctx = _ctx("https://www.brooksidejohnsoncreek.com/")
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+    assert units == []
+    blocks = get_blocks(ctx)
+    assert len(blocks) >= 1
+    assert blocks[0]["recovery"] == "appfolio_embed"
+    assert blocks[0]["status"] == 403
+
+
+@pytest.mark.asyncio
+async def test_recover_no_bot_block_recorded_on_success() -> None:
+    """200 with parseable SSR markup must not stamp a bot-block."""
+    from ma_poc.pms.adapters._universal_recovery import get_blocks
+
+    page = _StatusFakePage(
+        url="https://www.brooksidejohnsoncreek.com/listings",
+        live=[_IFRAME_SRC],
+        responses={
+            _IFRAME_SRC: {"status": 200, "body": _APPFOLIO_SSR},
+            _IFRAME_CANON: {"status": 200, "body": _APPFOLIO_SSR},
+        },
+    )
+    ctx = _ctx("https://www.brooksidejohnsoncreek.com/")
+    units = await recover_appfolio_embed(page, ctx)  # type: ignore[arg-type]
+    assert len(units) == 2
+    assert get_blocks(ctx) == []
+
+
+# ── 2026-05-19 regression: "schedule a showing" anchor → don't waste a fetch ──
+
+
+@pytest.mark.asyncio
+async def test_recover_canonicalizes_showings_new_anchor_to_listings_root() -> None:
+    """The 100-sample validation surfaced 3 sites with anchor links of the form
+    ``{tenant}.appfolio.com/listings/showings/new?listable_uid=...`` (a
+    "request a tour" form, NOT the listings SSR index). The greedy
+    ``/listings[^\\s"'<>]*`` regex captures the whole URL — the recovery
+    must canonicalize to ``{tenant}.appfolio.com/listings`` before fetching
+    so we hit the data-bearing index, not the form.
+    """
+    showings = "https://yourmetropolitan.appfolio.com/listings/showings/new?listable_uid=abc123&source=Website"
+    canonical = "https://yourmetropolitan.appfolio.com/listings"
+    page = _FakePage(
+        url="https://www.yourmetropolitan.com/properties/bala/",
+        live=[showings],            # the regex matched this URL
+        responses={canonical: _APPFOLIO_SSR},  # fetch must canonicalize to here
+    )
+    units = await recover_appfolio_embed(page, _ctx("https://www.yourmetropolitan.com/"))  # type: ignore[arg-type]
+    assert len(units) == 2
+    assert units[0]["floor_plan_name"] == "10 Creek Rd"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Tenant-only fallback (2026-05-20 — feature-fail-1429 probe finding):
+# Wix shells often have a *.appfolio.com/connect/users/sign_in (or
+# /request_access) link in the footer — the tenant subdomain is the
+# canonical one, but the path is auth not /listings. Pre-fix recovery
+# missed it. New behavior: extract tenant from ANY appfolio.com URL
+# and construct https://{tenant}.appfolio.com/listings.
+# Verified-live on aptsedenprairie (pid 30796, 298 strict),
+# aptslindenpark (32502, 297 strict), rentdwp (26772, 117 strict).
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_recover_via_tenant_only_login_url() -> None:
+    """Wix shell footer has *.appfolio.com/connect/users/sign_in link
+    (tenant subdomain, auth path). Pre-fix recovery missed it because
+    no /listings URL was present anywhere. The tenant fallback should
+    extract 'bendermanagement' from the auth URL and fetch the canonical
+    https://bendermanagement.appfolio.com/listings."""
+    login_url = "https://bendermanagement.appfolio.com/connect/users/sign_in"
+    canonical = "https://bendermanagement.appfolio.com/listings"
+    page = _FakePage(
+        url="https://www.aptsedenprairie.com/",
+        live=[],                        # no /listings URL on page
+        tenants=[login_url],            # but tenant URL is there
+        responses={canonical: _APPFOLIO_SSR},
+    )
+    units = await recover_appfolio_embed(
+        page, _ctx("https://www.aptsedenprairie.com/")  # type: ignore[arg-type]
+    )
+    assert len(units) == 2, "expected 2 units parsed from the canonical /listings page"
+    assert units[0]["extraction_tier"] == "TIER_1_DOM_APPFOLIO_SSR"
+
+
+@pytest.mark.asyncio
+async def test_recover_via_tenant_only_request_access_url() -> None:
+    """Same fallback fires on /connect/users/request_access (rentdwp pattern)."""
+    req_url = "https://dougwettonproperties.appfolio.com/connect/users/request_access"
+    canonical = "https://dougwettonproperties.appfolio.com/listings"
+    page = _FakePage(
+        url="https://www.rentdwp.com/parkviewpalms",
+        live=[],
+        tenants=[req_url],
+        responses={canonical: _APPFOLIO_SSR},
+    )
+    units = await recover_appfolio_embed(
+        page, _ctx("https://www.rentdwp.com/")  # type: ignore[arg-type]
+    )
+    assert len(units) == 2
+
+
+@pytest.mark.asyncio
+async def test_tenant_fallback_does_not_fire_when_no_appfolio_on_page() -> None:
+    """Genuine no-PMS shell: no /listings, no tenant URL → still []
+    (regression guard — the fallback must not invent tenants)."""
+    page = _FakePage(
+        url="https://www.plainshell.com/",
+        live=[],
+        tenants=[],
+        responses={},
+    )
+    units = await recover_appfolio_embed(
+        page, _ctx("https://www.plainshell.com/")  # type: ignore[arg-type]
+    )
+    assert units == []

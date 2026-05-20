@@ -61,13 +61,20 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 # as data, not as a live iframe. Firing the fallback on those would replace
 # the embedded-portal-hint path that the generic adapter relies on for
 # fetch-candidate surfacing. See test_portal_hint_survives_full_scrape_chain.
-_SIGHTMAP_IFRAME_RE = re.compile(
-    r"""<iframe\b[^>]*?\bsrc=["']?       # quote optional — Entrata engrain
-                                         # emits unquoted src=https://...
-        (?:https?:)?//
-        (?:[a-z0-9-]+\.)?sightmap\.com/embed/
-        ([a-z0-9]{6,32})""",
-    re.IGNORECASE | re.VERBOSE,
+#
+# 2026-05-20 broadening (feature_fail_1429 cluster #5): the legacy
+# ``<iframe src=...>`` requirement missed the dominant real-world embed
+# forms — Fancybox lazy-load anchors (``<a data-src="...">``), Engrain
+# SDK JS assignments (``var EngrainedUrl = '...'``), plain anchors, and
+# anywhere else the URL appears in the page text before the iframe is
+# instantiated. Live-verified 2026-05-20 on griffisresidential,
+# cambridgeondevonshireapartments, soltrafirewheel — iframe regex
+# returned [] on all three; broadened URL regex returns the right code.
+# Reserved infra segments (``embed/api``, ``embed/app``, ``embed/admin``)
+# are still filtered downstream in ``find_sightmap_embed_codes``.
+_SIGHTMAP_EMBED_URL_RE = re.compile(
+    r"(?:https?:)?//(?:[a-z0-9-]+\.)?sightmap\.com/embed/([a-zA-Z0-9_-]{4,32})",
+    re.IGNORECASE,
 )
 # Pull the SightMaps API URL out of the embed page's bootstrap config. The
 # href is JSON-encoded (forward-slashes escaped as \/) so the regex tolerates
@@ -398,14 +405,51 @@ def _entry_html_from_ctx(ctx: AdapterContext) -> str | None:
 
 
 def find_sightmap_embed_codes(html: str) -> list[str]:
-    """Return any SightMap iframe embed codes found in *html* (deduped)."""
+    """Return any SightMap embed codes found anywhere in *html* (deduped).
+
+    Accepts the embed URL in any *loading-shaped* DOM context —
+    ``<iframe src=>``, ``<a data-src=>`` (Fancybox lightbox lazy-loading),
+    ``<a href=>``, ``var EngrainedUrl = '...'`` JS assignments, etc. —
+    because the embed-code-bearing URL is distinctive enough on its own
+    that the surrounding element type isn't a useful filter.
+
+    Skips matches that appear in JSON-value position (preceded by ``":``
+    or ``": "``). Those are config blobs the SightMap adapter can't act
+    on directly without first being routed there by a different signal
+    — and the embedded-portal-hint propagation path in the generic
+    adapter (``detect_embedded_portal_urls``) already handles them. See
+    ``test_portal_hint_survives_full_scrape_chain``.
+
+    Reserved infra path segments (``embed/api``, ``embed/app``,
+    ``embed/admin``) are filtered out — these are SightMap's own
+    internal routes, never customer embed codes.
+    """
     if not html or "sightmap.com" not in html.lower():
         return []
     seen: set[str] = set()
     codes: list[str] = []
-    for m in _SIGHTMAP_IFRAME_RE.finditer(html):
-        code = m.group(1).lower()
-        if code in {"embed", "app", "admin"}:
+    for m in _SIGHTMAP_EMBED_URL_RE.finditer(html):
+        # Skip JSON-value position. Real cluster #5 forms preceding the URL:
+        #   data-src="...   → preceded by `="`
+        #   var EngrainedUrl = '...'  → preceded by `= '`
+        #   src=...         → preceded by `=`
+        # JSON-value form preceding the URL:
+        #   "embed_url":"...  → preceded by `":"`  (also `": "` with whitespace)
+        # Walk back over an optional whitespace + quote, then check for a
+        # colon. That distinguishes ``":"https://...`` (skip) from
+        # ``="https://...`` (keep) without false-positives.
+        start = m.start()
+        i = start - 1
+        if i >= 0 and html[i] in "'\"":
+            i -= 1
+        while i >= 0 and html[i] in " \t":
+            i -= 1
+        if i >= 0 and html[i] == ":":
+            continue
+
+        code = m.group(1)
+        # Reserved infra segments — never customer codes.
+        if code.lower() in {"embed", "app", "admin", "api"}:
             continue
         if code in seen:
             continue

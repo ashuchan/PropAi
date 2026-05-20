@@ -210,18 +210,37 @@ _RICH_HOP_MIN_RENT_TOKENS = 5
 # Deterministic, capture-first (raw matched phrase). Real patterns
 # observed on RC /floorplans (probe 2026-05-19): "1 Month FREE",
 # "8 Weeks Free", "Move-in Special", "Look & Lease", "$X off".
+# Broadened 2026-05-19 to the empirically-closed family set (grind:
+# cohort 22 + random 20/20). DETECTION trigger only — it fires capture
+# of the enclosing clause window; the deterministic concession_normalize
+# parser decides structure downstream. Every alternative is anchored on
+# offer context (weeks/months/rent/$+off/lease/move-in/special/bonus)
+# so bare-amenity "free" (wifi/parking/fitness) and rent-financing
+# (FLEX) do NOT trigger.
+_CW_NUM = (
+    r"(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve)"
+)
 _PROPERTY_CONCESSION_RE = re.compile(
-    r"\b\d+\s*(?:weeks?|months?)\s*(?:of\s*)?free(?:\s*rent)?\b"
-    r"|\b(?:one|two|three|first)\s+months?\s+free\b"
-    r"|\blook\s*&?\s*lease\b"
-    r"|\bmove[- ]?in\s+special\b"
-    r"|\$\s?\d{2,4}\s*(?:off|gift\s*card|credit|cash|savings)\b"
+    rf"\b{_CW_NUM}[\s-]*(?:full[\s-]+)?(?:weeks?|months?)['’]?s?[\s-]*"
+    r"(?:of[\s-]+)?(?:rent[\s-]+)?(?:free|complimentary|on\s+us)\b"
+    rf"|\b(?:rent[\s-]?)?free\s+(?:for\s+)?(?:{_CW_NUM}\s+)?(?:full\s+)?"
+    r"(?:weeks?|months?)\b"
+    rf"|\b(?:first|1st)\s+(?:{_CW_NUM}\s+)?(?:full\s+)?months?\b"
+    r"[^.!?]{0,40}\bfree\b"
+    r"|\bfree\s+rent\b|\bmonths?\s+on\s+us\b"
+    r"|\$\s?\d{1,3}(?:,\d{3})*\s*(?:off|gift\s*card|credit|cash|savings|"
+    r"welcome\s+bonus)\b"
+    r"|\bsave\s+(?:up\s+to\s+)?\$\s?\d"
+    r"|\$\s?\d{2,5}\s+(?:welcome\s+)?bonus\b"
+    r"|\breduced\s+rents?\b|\brent\s+as\s+low\s+as\s+\$"
+    r"|\blook[\s-]*(?:and|&|\+|n)?[\s-]*lease\b"
+    r"|\b(?:move[- ]?in|mi)\s+special\b"
+    r"|\b(?:rent|lease|deposit|move[- ]?in)\s+special\b"
+    r"|\blimited[- ]time\s+(?:offer|special|savings|deal)\b"
+    r"|\breduced\s+deposit\b"
     r"|\bwaived\s+(?:application|admin(?:istration)?|amenity|"
-    r"move[- ]?in|deposit)\s*fee\b"
-    r"|\breduced\s+deposit\b|\bdeposit\s+special\b"
-    r"|\brent\s+special\b|\blease\s+special\b"
-    r"|\blimited[- ]time\s+(?:offer|special|savings)\b"
-    r"|\bfree\s+rent\b",
+    r"move[- ]?in|deposit)\s*fees?\b",
     re.IGNORECASE,
 )
 
@@ -485,23 +504,31 @@ async def scrape(
         elif isinstance(body, str):
             page_html = body
 
-    # --- Property-level concession capture (2026-05-19) ---
-    # The designed banner capture (vision_banner.py) is dormant/unwired
-    # and `result["concessions_text"]` was never produced by ANY path.
-    # Probe+eyeball proved RC/marketing /floorplans pages we ALREADY
-    # fetch carry the concession as plain HTML text (~5/8 sample;
-    # "One MONTH FREE!" etc.). Deterministic non-LLM phrase scrape over
-    # page_html — $0, no extra fetch, capture-first (store raw match).
-    # Property-level (concessions are property-wide). This is the
-    # missing producer feeding the existing v2 `concessions` field.
+    # --- Property-level concession capture (2026-05-19; window 2026-05-19b) ---
+    # Deterministic non-LLM phrase scrape over page_html — $0, no extra
+    # fetch, capture-first. The detector only TRIGGERS capture; we then
+    # store the enclosing CLAUSE WINDOW (not the bare regex fragment) so
+    # the downstream concession_normalize parser sees the full offer
+    # ("...REDUCED RENT + 6 Weeks FREE..." not just "6 Weeks FREE").
+    # concessions_text stays raw (capture-first); schema_v2 derives the
+    # structured concessions_json from it.
     if page_html and not result.get("concessions_text"):
         try:
-            _ctxt = re.sub(r"<[^>]+>", " ", page_html)
-            _cm = _PROPERTY_CONCESSION_RE.search(_ctxt)
+            _flat = re.sub(
+                r"\s+", " ", re.sub(r"<[^>]+>", " ", page_html)
+            )
+            _cm = _PROPERTY_CONCESSION_RE.search(_flat)
             if _cm:
-                result["concessions_text"] = re.sub(
-                    r"\s+", " ", _cm.group(0)
-                ).strip()[:200]
+                _s, _e = _cm.span()
+                _win = _flat[max(0, _s - 200):_e + 200]
+                _off = _s - max(0, _s - 200)
+                _seg, _acc = _win, 0
+                for _p in re.split(r"(?<=[.!?|•·])\s+", _win):
+                    if _acc <= _off < _acc + len(_p) + 1:
+                        _seg = _p
+                        break
+                    _acc += len(_p) + 1
+                result["concessions_text"] = _seg.strip()[:300]
         except Exception:
             pass
 
@@ -831,6 +858,205 @@ async def scrape(
             reset_clearance_cookies(_clr_token)
             return result
         adapter_result = AdapterResult(errors=[str(exc)])
+
+    # --- Path B/C: empty-exit + quality-gate retry with next-best PMS ---------
+    # Three retry triggers, same mechanism:
+    #   * Path B (``empty_exit``): adapter self-reports an empty-exit label
+    #     (see ``ma_poc.pms.empty_exit``) AND produces no units.
+    #   * Path C (``quality_gate``): adapter produced units but they fail
+    #     the dimension gate — name-only stubs with no beds/baths/sqft.
+    #   * Path C (``no_rent``): adapter produced units with dimensions but
+    #     no rent across the board — the JSON-LD inflated-SUCCESS shape
+    #     (`inferred_*` UIDs synthesized from name+beds+baths+sqft, no
+    #     `offers.price`). Covers the 1,031-prop inflated-SUCCESS bucket
+    #     identified in project_jsonld_recovery_2026-05-20.
+    #   * Path C (``no_area``): adapter produced units with rent but no
+    #     sqft/area across the board — partial extraction shape.
+    #
+    # On trigger: find the next PMS candidate and re-dispatch on the
+    # same page. Bounded by ``PATH_B_MAX_RETRIES`` (default 2).
+    #
+    # Win condition: retry result must have units AND pass the dimension
+    # gate AND have a rent signal. Retries with same-or-worse quality
+    # are not promoted.
+    #
+    # **Plan-level fallback**: when the BASELINE adapter returned
+    # plan-level rows (units with dims but no rent) and all retries
+    # failed, the baseline is restored and the result is marked with a
+    # ``_PLAN_LEVEL`` tier suffix + ``_verdict_quality=SUCCESS_PLAN_LEVEL``
+    # so the data isn't lost — just honestly flagged. Per the
+    # project_jsonld_recovery memo: "getting floor plan level data is
+    # okay but just should be flagged".
+    #
+    # Feature flag: ``PATH_B_RETRY_ENABLED=0`` falls back to telemetry-only.
+    try:
+        import os as _retry_os
+
+        from ma_poc.observability.events import EventKind as _RetryEventKind
+        from ma_poc.observability.events import emit as _retry_emit
+        from ma_poc.pms.adapters.registry import get_adapter as _retry_get_adapter
+        from ma_poc.pms.detector import detect_pms_candidates
+        from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
+        from ma_poc.validation.schema_gate import (
+            property_has_area_signal as _retry_area_signal,
+            property_has_rent_signal as _retry_rent_signal,
+            property_passes_quality_gate as _retry_quality_gate,
+        )
+
+        _PATH_B_RETRY_ENABLED = (
+            _retry_os.environ.get("PATH_B_RETRY_ENABLED", "1").lower()
+            not in {"0", "false", "no", ""}
+        )
+        _PATH_B_MAX_RETRIES = int(
+            _retry_os.environ.get("PATH_B_MAX_RETRIES", "2")
+        )
+
+        def _retry_trigger_reason(res: "AdapterResult") -> str | None:
+            """Return ``"empty_exit"`` / ``"quality_gate"`` / ``"no_rent"``
+            / ``"no_area"`` / None. None means the adapter is fine."""
+            if is_empty_exit(res.tier_used) and not res.units:
+                return "empty_exit"
+            if res.units:
+                if not _retry_quality_gate(res.units):
+                    return "quality_gate"
+                if not _retry_rent_signal(res.units):
+                    return "no_rent"
+                if not _retry_area_signal(res.units):
+                    return "no_area"
+            return None
+
+        def _retry_win_condition(res: "AdapterResult") -> bool:
+            """A retry winner must have units AND pass dimension gate AND
+            have a rent signal. Same-or-worse quality is not promoted."""
+            return bool(
+                res.units
+                and _retry_quality_gate(res.units)
+                and _retry_rent_signal(res.units)
+            )
+
+        # Preserve the baseline (initial-adapter) result so plan-level
+        # data isn't lost if all retries fail. Only relevant when the
+        # baseline HAS units — for empty_exit triggers there's nothing
+        # to preserve.
+        _baseline_result: "AdapterResult | None" = (
+            adapter_result if adapter_result.units else None
+        )
+        _baseline_adapter_name = adapter_name
+        _retry_tried_pms: set[str] = {adapter_name}
+        _retry_attempt = 0
+        _retry_won = False
+        _trigger_reason = _retry_trigger_reason(adapter_result)
+        _initial_trigger_reason = _trigger_reason
+        # The "current" result we evaluate triggers against. Starts as
+        # the baseline; rolls forward to the latest attempt. Does NOT
+        # mutate the public ``adapter_result`` until a win is confirmed.
+        _current_result = adapter_result
+        while (
+            _trigger_reason is not None
+            and _retry_attempt < _PATH_B_MAX_RETRIES
+        ):
+            _next_candidates = detect_pms_candidates(
+                url=getattr(ctx, "base_url", "") or "",
+                csv_row=None,
+                page_html=page_html,
+                exclude=_retry_tried_pms,
+                max_candidates=_PATH_B_MAX_RETRIES,
+            )
+            if not _next_candidates:
+                break
+            _next_cand = _next_candidates[0]
+            _previous_tier = _current_result.tier_used or ""
+            _previous_pms = (
+                adapter_name if _retry_attempt == 0 else _baseline_adapter_name
+            )
+
+            # Telemetry-only mode — emit and stop (no re-dispatch).
+            if not _PATH_B_RETRY_ENABLED:
+                _retry_emit(
+                    _RetryEventKind.RETRY_WOULD_DISPATCH,
+                    property_id=getattr(ctx, "property_id", "") or "",
+                    previous_pms=_previous_pms,
+                    previous_tier=_previous_tier,
+                    empty_exit_reason=empty_exit_reason(_previous_tier) or "",
+                    trigger_reason=_trigger_reason,
+                    next_pms=_next_cand.pms,
+                    next_confidence=_next_cand.confidence,
+                    remaining_candidates=len(_next_candidates),
+                )
+                break
+
+            _retry_attempt += 1
+            _retry_emit(
+                _RetryEventKind.RETRY_DISPATCHED,
+                property_id=getattr(ctx, "property_id", "") or "",
+                attempt=_retry_attempt,
+                previous_pms=_previous_pms,
+                previous_tier=_previous_tier,
+                empty_exit_reason=empty_exit_reason(_previous_tier) or "",
+                trigger_reason=_trigger_reason,
+                next_pms=_next_cand.pms,
+                next_confidence=_next_cand.confidence,
+            )
+
+            _retry_tried_pms.add(_next_cand.pms)
+            _new_adapter = _retry_get_adapter(_next_cand.pms)
+            _new_adapter_name = getattr(_new_adapter, "pms_name", _next_cand.pms)
+            # Update ctx so the new adapter sees the right detection.
+            ctx.detected = _next_cand
+            try:
+                _new_result = await _new_adapter.extract(page, ctx)  # type: ignore[arg-type]
+            except Exception as _retry_exc:
+                fallback_chain.append(
+                    f"retry_failed:{_new_adapter_name}:{type(_retry_exc).__name__}"
+                )
+                break
+
+            fallback_chain.append(f"retry:{_new_adapter_name}")
+            if _retry_win_condition(_new_result):
+                # WIN — promote
+                _retry_emit(
+                    _RetryEventKind.RETRY_SUCCESS,
+                    property_id=getattr(ctx, "property_id", "") or "",
+                    attempt=_retry_attempt,
+                    previous_pms=_previous_pms,
+                    previous_tier=_previous_tier,
+                    trigger_reason=_trigger_reason,
+                    won_pms=_new_adapter_name,
+                    won_tier=_new_result.tier_used or "",
+                    unit_count=len(_new_result.units),
+                )
+                adapter_result = _new_result
+                adapter = _new_adapter
+                adapter_name = _new_adapter_name
+                result["_adapter_used"] = _new_adapter_name
+                result["_detected_pms"] = _detection_to_dict(_next_cand)
+                _retry_won = True
+                break
+            # Retry didn't recover real units — roll forward and try next.
+            _current_result = _new_result
+            _trigger_reason = _retry_trigger_reason(_current_result)
+
+        # Plan-level fallback: all retries failed AND we had baseline
+        # plan-level rows. Per the project_jsonld_recovery memo:
+        # "getting floor plan level data is okay but just should be
+        # flagged and one another path should be retried ... if unit
+        # then pick that ... else floor plan".
+        if (
+            not _retry_won
+            and _baseline_result is not None
+            and _baseline_result.units
+            and _initial_trigger_reason in {"quality_gate", "no_rent", "no_area"}
+        ):
+            adapter_result = _baseline_result
+            # Stamp the tier with a _PLAN_LEVEL suffix and surface the
+            # honest verdict on the property result dict.
+            _baseline_tier = _baseline_result.tier_used or ""
+            if _baseline_tier and "_PLAN_LEVEL" not in _baseline_tier:
+                adapter_result.tier_used = f"{_baseline_tier}_PLAN_LEVEL"
+            result["_verdict_quality"] = "SUCCESS_PLAN_LEVEL"
+            result["_plan_level_reason"] = _initial_trigger_reason
+    except Exception:  # pragma: no cover — Path B/C must never block scrape
+        pass
 
     # --- F2: LLM rescue for Tier-1 API adapters --------------------------------
     # When the adapter captures API responses but produces no substantive units,
@@ -1183,6 +1409,70 @@ async def scrape(
                 )
         except Exception as exc:
             adapter_result.errors.append(f"generic-fallback-error: {exc}")
+
+    # --- Step 8b: Universal embed-recovery as the cross-vendor misroute net ---
+    # Closes the "detector picked the wrong primary, generic also returned 0,
+    # but the site really has an AppFolio iframe / LeaseLeads embed / ResMan
+    # portal / generic SSR plan grid one nav-hop deep" gap. The four
+    # recoveries are the same chain wired into wix/squarespace_nopms; here we
+    # also fire them when ANY non-syndication primary mis-routed.
+    # Idempotent: ``recover_universal_embed`` sets
+    # ``ctx._embed_recovery_attempted`` so the syndication adapters' inline
+    # run (when this is a wix/squarespace property) isn't repeated.
+    if not adapter_result.units and page is not None:
+        try:
+            from ma_poc.pms.adapters._universal_recovery import (
+                already_attempted as _ur_attempted,
+            )
+            from ma_poc.pms.adapters._universal_recovery import (
+                get_blocks as _ur_get_blocks,
+            )
+            from ma_poc.pms.adapters._universal_recovery import (
+                recover_universal_embed as _ur_recover,
+            )
+
+            if not _ur_attempted(ctx):
+                _ur_units, _ur_tier, _ur_winner = await _ur_recover(page, ctx)
+                if _ur_units:
+                    from ma_poc.extraction.post_process import (
+                        post_process as _ur_pp,
+                    )
+
+                    _ur_post = _ur_pp(
+                        _ur_units, property_id=getattr(ctx, "property_id", None)
+                    )
+                    if _ur_post.n_admitted > 0:
+                        adapter_result.units = _ur_post.admitted
+                        adapter_result.plan_summaries = _ur_post.plan_summaries
+                        adapter_result.tier_used = _ur_tier
+                        adapter_result.confidence = min(
+                            0.92, 0.65 + 0.04 * _ur_post.n_admitted
+                        )
+                        fallback_chain.append(f"universal_recovery:{_ur_winner}")
+
+            # Bot-block telemetry: when a recovery sub-fetch hit a wall
+            # (401/403/429/503), record it on the fallback chain so DLQ/
+            # triage can distinguish "routing-correct but bot-walled,
+            # worth a proxy/Camoufox retry" from "no signal anywhere".
+            # Emitted regardless of whether the chain ultimately recovered
+            # units (an AppFolio block on a property that later resolved
+            # via generic_dom is still useful signal).
+            _ur_blocks = _ur_get_blocks(ctx)
+            if _ur_blocks:
+                # Deduplicate by (recovery, status) — one entry per
+                # unique block kind is enough for triage.
+                _seen: set[tuple[str, int]] = set()
+                for _b in _ur_blocks:
+                    _rec = str(_b.get("recovery") or "")
+                    _st = int(_b.get("status") or 0)
+                    if not _rec or not _st or (_rec, _st) in _seen:
+                        continue
+                    _seen.add((_rec, _st))
+                    fallback_chain.append(
+                        f"universal_recovery_blocked:{_rec}:{_st}"
+                    )
+        except Exception as exc:
+            adapter_result.errors.append(f"universal-recovery-error: {exc}")
 
     # --- Step 9: Populate legacy result ---
     result["units"] = adapter_result.units
@@ -2466,33 +2756,82 @@ async def scrape_jugnu(
             else str(fetch_result.outcome)
         )
         if outcome_val != "OK":
-            result = _empty_result(base_url)
-            result["_property_id"] = property_id
-            result["extraction_tier_used"] = "generic:no_body_short_circuit"
-            _verdict_prefix = _OUTCOME_VERDICT_PREFIX.get(outcome_val, "FAILED_UNREACHABLE")
-            result["errors"].append(
-                f"{_verdict_prefix}: fetch_outcome={outcome_val} "
-                f"sig={getattr(fetch_result, 'error_signature', None)}"
-            )
-            # Attach the diagnostic so the report can render *why* it failed.
-            try:
-                fd = fetch_result.to_dict() if hasattr(fetch_result, "to_dict") else {}
-                fd["body_bytes"] = 0
-                fd["captcha_detected"] = False
-                fd["captcha_provider"] = None
-                result["_fetch_diagnostic"] = fd
-            except Exception:
-                pass
-            result["_extract_result"] = ExtractResult(
-                property_id=property_id,
-                records=[],
-                tier_used="generic:no_body_short_circuit",
-                adapter_name="none",
-                winning_url=None,
-                confidence=0.0,
-                errors=[f"fetch_outcome={outcome_val}"],
-            )
-            return result
+            # 2026-05-20 cluster #4 soft-404 recovery: some marketing
+            # sites return HTTP 404 for valid property URLs (e.g.
+            # liveatcrossroadsranch.com/home: 404 with 59 KB of real
+            # content + nav-link to /apartments/.../floor-plans where
+            # the SightMap embed lives). Main's prod extracts these
+            # via TIER_1_API_SIGHTMAP after link-hop. Short-circuiting
+            # on DEAD_URL drops the property entirely.
+            # Conservative recovery: when outcome=DEAD_URL AND the body
+            # has substantive apartment-shaped content (>=10 KB AND
+            # >=1 inventory nav link), skip the short-circuit and let
+            # the rest of the pipeline (link-hop, generic adapter, F2
+            # LLM rescue) try. Genuine 404s have empty/minimal bodies
+            # and don't trip this gate.
+            _soft_404_recovery = False
+            if outcome_val == "DEAD_URL":
+                _fr_body = getattr(fetch_result, "body", None) or b""
+                _body_size = len(_fr_body) if isinstance(_fr_body, (bytes, str)) else 0
+                if _body_size >= 10_000:
+                    try:
+                        _body_str = (
+                            _fr_body.decode("utf-8", errors="replace")
+                            if isinstance(_fr_body, bytes)
+                            else _fr_body
+                        ).lower()
+                        # Nav-link markers — any one is enough.
+                        _SOFT_404_MARKERS = (
+                            "/floor-plans",
+                            "/floorplans",
+                            "/availability",
+                            "/available-units",
+                            "/availableunits",
+                            "/apartments/",
+                            "sightmap.com/embed/",
+                            "rentcafe.com",
+                            "knockdoorway",
+                        )
+                        if any(m in _body_str for m in _SOFT_404_MARKERS):
+                            _soft_404_recovery = True
+                    except Exception:  # pragma: no cover — defensive
+                        pass
+
+            if _soft_404_recovery:
+                # Fall through to extraction. Record the recovery on the
+                # result dict so reports can distinguish "soft-404 recovered"
+                # from "genuine 200 OK".
+                result["_soft_404_recovery"] = True
+                result["_soft_404_status"] = getattr(fetch_result, "status_code", None)
+                # Don't short-circuit; continue past this block.
+            else:
+                result = _empty_result(base_url)
+                result["_property_id"] = property_id
+                result["extraction_tier_used"] = "generic:no_body_short_circuit"
+                _verdict_prefix = _OUTCOME_VERDICT_PREFIX.get(outcome_val, "FAILED_UNREACHABLE")
+                result["errors"].append(
+                    f"{_verdict_prefix}: fetch_outcome={outcome_val} "
+                    f"sig={getattr(fetch_result, 'error_signature', None)}"
+                )
+                # Attach the diagnostic so the report can render *why* it failed.
+                try:
+                    fd = fetch_result.to_dict() if hasattr(fetch_result, "to_dict") else {}
+                    fd["body_bytes"] = 0
+                    fd["captcha_detected"] = False
+                    fd["captcha_provider"] = None
+                    result["_fetch_diagnostic"] = fd
+                except Exception:
+                    pass
+                result["_extract_result"] = ExtractResult(
+                    property_id=property_id,
+                    records=[],
+                    tier_used="generic:no_body_short_circuit",
+                    adapter_name="none",
+                    winning_url=None,
+                    confidence=0.0,
+                    errors=[f"fetch_outcome={outcome_val}"],
+                )
+                return result
 
     # 2026-05-13 (C1 SGCaptcha wall, teammate analysis): when the fetch
     # outcome is technically OK but the page redirected to

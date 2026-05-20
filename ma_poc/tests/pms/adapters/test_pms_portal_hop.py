@@ -240,6 +240,77 @@ async def test_unrecognised_portal_host_ignored() -> None:
     assert units == []
 
 
+# --- 2026-05-19 bot-block telemetry --------------------------------------
+
+
+class _StatusFakePage:
+    """Same shape as ``_FakePage`` but responses are ``{status, body}`` dicts
+    — exercises the new ``fetch_with_status`` wire format used to detect
+    SecureCafe DataDome 403s.
+    """
+
+    def __init__(
+        self,
+        url: str,
+        live: list[str],
+        responses: dict[str, dict[str, object]],
+    ) -> None:
+        self.url = url
+        self._live = live
+        self._responses = responses
+
+    async def evaluate(self, _js: str, *args: object) -> object:
+        if not args:
+            return list(self._live)
+        u = str(args[0])
+        return self._responses.get(u, {"status": 0, "body": ""})
+
+
+@pytest.mark.asyncio
+async def test_securecafe_403_records_bot_block() -> None:
+    """SecureCafe DataDome 403 (the validated bot-wall): recovery returns
+    ``[]`` but stamps ``ctx._embed_recovery_blocks`` so the scraper can
+    emit ``universal_recovery_blocked:pms_portal_hop:rentcafe:403`` for
+    triage — production stack (proxy + Camoufox + cookies) may convert
+    these to hits on retry.
+    """
+    from ma_poc.pms.adapters._universal_recovery import get_blocks
+
+    canonical = (
+        "https://abc.securecafe.com/onlineleasing/forge-65/availableunits.aspx"
+    )
+    page = _StatusFakePage(
+        url="https://www.forge65.com/floorplans",
+        live=[canonical],
+        responses={canonical: {"status": 403, "body": ""}},
+    )
+    ctx = _ctx("https://www.forge65.com/")
+    units = await recover_pms_portal(page, ctx)  # type: ignore[arg-type]
+    assert units == []
+    blocks = get_blocks(ctx)
+    assert len(blocks) >= 1
+    assert blocks[0]["recovery"] == "pms_portal_hop:rentcafe"
+    assert blocks[0]["status"] == 403
+
+
+@pytest.mark.asyncio
+async def test_resman_500_not_recorded_as_bot_block() -> None:
+    """A 500 is an upstream server fault, not a bot-wall — must NOT
+    pollute the bot-block triage signal.
+    """
+    from ma_poc.pms.adapters._universal_recovery import get_blocks
+
+    page = _StatusFakePage(
+        url="https://www.cobblestonephx.com/",
+        live=[_RESMAN_PORTAL_URL],
+        responses={_RESMAN_PORTAL_URL: {"status": 500, "body": ""}},
+    )
+    ctx = _ctx("https://www.cobblestonephx.com/")
+    units = await recover_pms_portal(page, ctx)  # type: ignore[arg-type]
+    assert units == []
+    assert get_blocks(ctx) == []
+
+
 @pytest.mark.asyncio
 async def test_stale_portal_url_does_not_short_circuit() -> None:
     """First candidate returns empty parse → walker tries the next.

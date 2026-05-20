@@ -36,6 +36,7 @@ from __future__ import annotations
 import re
 import typing as t
 import urllib.parse
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -463,8 +464,44 @@ def _detect_url_extension(url: str) -> tuple[PmsName, float, list[str]] | None:
     return "rentcafe", 0.40, [f".aspx path on vanity host ({host}) — weak RentCafe/Yardi heuristic (needs HTML corroboration)"]
 
 
-def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | None:
+def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[str]]]:
     h = page_html.lower()
+    # 2026-05-20 fix (feature_fail_1429 cluster #3): G5 marketing-cloud
+    # markers (g5marketingcloud / g5dxm.com / g5-c- / g5-cl- /
+    # dnn506yrbagrg.cloudfront.net) are often co-resident with a real
+    # PMS widget — usually Knock/Doorway, sometimes RentCafe SecureCafe
+    # or ResMan. In that case G5's page-level URN is a company-level
+    # URN (e.g. ``g5-cl-...-lincoln-property-company-...``) and the
+    # G5 adapter bails empty (``TIER_1_API_G5_EMPTY`` / ``_NO_URN``)
+    # because the property-specific URN isn't on the page. Gate both
+    # G5 branches below on the absence of these competing-PMS markers
+    # so the real PMS detection wins.
+    #
+    # Live-verified 2026-05-20 against 6 Bucket-A worklist properties
+    # (cluster G5+TIER_1_API): altaaptstarga / avonleatributary /
+    # beechmeadowaptsin / unionthompson / 6thandalderapartments /
+    # liveatone55lofts — every one had G5 markers AND Knock/Doorway
+    # markers; none had securecafe/resman/rentcafe. The dominant
+    # co-resident pattern is Knock, not RentCafe. The 2026-05-19
+    # session memory of "hasRentCafe: true on Flatiron" was a recall
+    # error — not present in the real fetched HTML.
+    #
+    # Order note: Knock at line ~676 already fires before the G5
+    # *strong* branch at ~690 but AFTER the G5 *weak* branch at ~567.
+    # Without this gate the weak branch wins. With it, Knock and the
+    # later PMS-portal branches get a chance.
+    _has_competing_pms_for_g5 = (
+        # Knock / Doorway widget — the dominant co-resident PMS in
+        # this cluster (≥6 of 6 Bucket-A props sampled 2026-05-20).
+        "doorway.knck.io" in h
+        or "knockdoorway" in h
+        # RentCafe SecureCafe portal anchors (Flatiron pattern).
+        or ".securecafe.com" in h
+        or "securecafe.com/onlineleasing" in h
+        # ResMan portal anchors.
+        or "myresman.com" in h
+        or "/portal/applicants/availability" in h
+    )
     # F0.3 (2026-05-09): three-pass priority order so a real PMS portal
     # reachable from a Squarespace/Wix marketing shell (e.g. 123taylor.com →
     # ``onlineleasing.realpage.com``) isn't demoted to ``syndication_only``.
@@ -475,7 +512,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # truth even when the surrounding marketing site is built on a no-PMS
     # platform.
     if "onlineleasing.realpage.com" in h:
-        return "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
+        yield "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
     # RealPage OLL (Online Leasing) wizard — the "Category-D" cluster
     # (~187 props). Vanity marketing sites hop to ``leasing.realpage.com``
     # / embed an ``rp-leasing-widget`` / link ``<property>/content/apply#k=``
@@ -490,7 +527,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         or "rp.leasing.appservice" in h
         or "/content/apply#k=" in h
     ):
-        return (
+        yield (
             "realpage_oll",
             0.85,
             ["RealPage OLL wizard marker in HTML (leasing.realpage.com / "
@@ -529,7 +566,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # asset or analytics link. ``sightmap.com/embed/`` is iframe-specific.
     _has_sightmap_embed = "sightmap.com/embed/" in h
     if _has_sightmap_embed and _has_entrata_widget:
-        return (
+        yield (
             "sightmap",
             0.90,
             [
@@ -538,7 +575,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             ],
         )
     if _has_sightmap_embed:
-        return (
+        yield (
             "sightmap",
             0.90,
             ["SightMap embed iframe in HTML (sightmap.com/embed/)"],
@@ -548,7 +585,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # shells that hop to <sub>.prospectportal.com route to EntrataAdapter
     # whose _probe_prospectportal handles the check_availability surface.
     if _has_entrata_widget:
-        return (
+        yield (
             "entrata",
             0.85,
             [
@@ -564,7 +601,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # (same rationale as onlineleasing.realpage.com / commoncf.entrata.com
     # above). Bare ``appfolio.com`` stays a pass-3 weak marker.
     if ".appfolio.com/listings" in h:
-        return (
+        yield (
             "appfolio",
             0.85,
             ["AppFolio listings-iframe marker in HTML (.appfolio.com/listings)"],
@@ -572,10 +609,15 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # G5 (g5marketingcloud) Vue-SPA marketing sites. The g5dxm.com CDN /
     # g5marketingcloud asset hosts and the ``g5-c-{client}`` URN appear
     # site-wide incl. landing, so detection fires before the floor-plans
-    # hop. Unit data is in the SPA's Apollo cache (see G5Adapter); these
-    # sites carry no other PMS.
-    if "g5marketingcloud" in h or "g5dxm.com" in h or "g5-c-" in h:
-        return (
+    # hop. Unit data is in the SPA's Apollo cache (see G5Adapter); most
+    # sites carry no other PMS — but when a competing PMS marker (see
+    # ``_has_competing_pms_for_g5`` above) is present, the G5 page-URN
+    # is typically company-level and won't extract; fall through to
+    # the real PMS branch below.
+    if (
+        "g5marketingcloud" in h or "g5dxm.com" in h or "g5-c-" in h
+    ) and not _has_competing_pms_for_g5:
+        yield (
             "g5",
             0.85,
             ["G5 marketing-cloud marker in HTML (g5marketingcloud / g5dxm.com / g5-c- URN)"],
@@ -586,7 +628,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # fires on landing before any hop. SSR plan grid at
     # /Marketing/FloorPlans (see Residentservices365Adapter).
     if "365residentservices.com" in h:
-        return (
+        yield (
             "residentservices365",
             0.85,
             ["365 ResidentServices marker in HTML (365residentservices.com)"],
@@ -600,7 +642,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         or "powered by rentvision" in h
         or "rentvision.com" in h
     ):
-        return (
+        yield (
             "rentvision",
             0.85,
             ["RentVision CMS marker in HTML (created/powered by RentVision / rentvision.com)"],
@@ -610,12 +652,34 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # apartment-level rows only after a Check-Availability JS click;
     # adapter handles the per-plan interaction. 2026-05-19 deep probe —
     # encoreskyline.com / geneseepointe.com / highlineaustin.com verified.
+    #
+    # 2026-05-20 fix (feature_fail_1429 cluster #2): Jonah / MeetElise is
+    # sometimes a chat-widget bolt-on on top of a real PMS (RentCafe
+    # SecureCafe, Entrata, ResMan, RealPage). In that case the
+    # encoreskyline_template adapter has no way to extract — it expects
+    # the Jonah-driven /floorplans/{slug}/ layout — and returns
+    # NOT_ENCORESKYLINE_TEMPLATE / ENCORESKYLINE_NO_PLAN_LINKS, leaving
+    # the property at 0 units. Gate the Jonah branch on the absence of
+    # competing PMS markers so the real PMS detection below wins.
+    # Live-verified: ardencebloom.com (pid 238181) — meetelise + securecafe,
+    # main TIER_1_API_RENTCAFE captures 182 strict units.
+    _has_competing_pms_marker = (
+        ".securecafe.com" in h
+        or "securecafe.com/onlineleasing" in h
+        or "myresman.com/portal/applicants/availability" in h
+        or "commoncf.entrata.com" in h
+        or "/apartments/module/" in h
+        or "entrata-widget" in h
+        or ".prospectportal.com" in h
+        or "onlineleasing.realpage.com" in h
+        or ".appfolio.com/listings" in h
+    )
     if (
         "jonahwidget" in h
         or "jonahdigital" in h
         or "meetelise" in h
-    ):
-        return (
+    ) and not _has_competing_pms_marker:
+        yield (
             "encoreskyline_template",
             0.85,
             [
@@ -631,7 +695,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         or "funnel-gen-ai-chat" in h
         or "integrations.nestio.com" in h  # Nestio contact-widget = Funnel
     ):
-        return (
+        yield (
             "funnel",
             0.90,
             [
@@ -641,7 +705,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             ],
         )
     if "mytouchtour.com" in h:
-        return "touchtour", 0.85, ["TouchTour portal marker in HTML (mytouchtour.com)"]
+        yield "touchtour", 0.85, ["TouchTour portal marker in HTML (mytouchtour.com)"]
     # Spherexx Presentation Software ("Convert") — Leaflet-based interactive
     # building site-map widget. Identified by the ssploader.js script tag
     # and/or window.sspcfg config. Confirmed via 2026-05-13 deep probe of
@@ -652,7 +716,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         or "ssploader.js" in h
         or "sspcfg" in h
     ):
-        return (
+        yield (
             "spherexx",
             0.90,
             ["Spherexx marker in HTML (presentation.spherexx.app / ssploader.js / sspcfg)"],
@@ -662,7 +726,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # Public Doorway API serves full unit data: 2026-05-13 probe of
     # liveatcalista.com returned 53 units (incl. availableOn, price).
     if "doorway.knck.io" in h or "knockdoorway" in h:
-        return (
+        yield (
             "knock",
             0.90,
             ["Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"],
@@ -681,7 +745,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         or "g5-cl-" in h
         or "g5dxm.com" in h
         or "dnn506yrbagrg.cloudfront.net" in h
-    ):
+    ) and not _has_competing_pms_for_g5:
         # ``dnn506yrbagrg.cloudfront.net`` is G5's primary CDN — per teammate
         # 2026-05-13 deep-dive (C1.G5/RealPage SSR sub-class), 73 of 244 generic
         # Tier-1-API failures had this CDN as their script source but no
@@ -689,7 +753,10 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         # it. Adding it routes those sites to the G5 GraphQL adapter (which
         # then probes ``inventory.g5marketingcloud.com`` via the locationUrn
         # extracted from CDN paths).
-        return (
+        # 2026-05-20: gated on ``_has_competing_pms_for_g5`` so co-resident
+        # SecureCafe/ResMan/hasRentCafe pages route to the real PMS adapter
+        # instead of bailing on a company-level G5 URN.
+        yield (
             "g5",
             0.90,
             ["G5 Marketing Cloud marker in HTML "
@@ -706,7 +773,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # to ``rentcafe`` engages the iter-4 securecafe availableunits.aspx
     # unit-level probe.
     if "securecafe.com/onlineleasing" in h or ".securecafe.com" in h:
-        return (
+        yield (
             "rentcafe",
             0.90,
             ["RentCafe securecafe online-leasing portal marker in HTML "
@@ -719,7 +786,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # missed (fell to LLM/floorplan). Portal is NOT Cloudflare-fronted, so
     # the ResMan adapter recovers Tier-1 unit-level even proxy-less.
     if "myresman.com" in h or "/portal/applicants/availability" in h:
-        return (
+        yield (
             "resman",
             0.90,
             ["ResMan marker in HTML "
@@ -732,7 +799,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # ≥4-site cluster invisible to static curl_cffi (inventory is fetched
     # client-side). api_key is in the homepage HTML ⇒ deterministic Tier-1.
     if "apts247" in h or "rentdynamics.com" in h:
-        return (
+        yield (
             "apts247",
             0.90,
             ["Apts247/RentDynamics marker in HTML "
@@ -750,7 +817,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         or "getunitlistbyfloor(" in h
         or "rrac_listavailableunit" in h
     ):
-        return (
+        yield (
             "repli360",
             0.90,
             ["Repli360/rrac marker in HTML "
@@ -772,7 +839,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         or "cdn.rentmanager.com" in h
         or "iloveleasing.com" in h
     ):
-        return (
+        yield (
             "rentmanager",
             0.90,
             ["RentManager/iLoveLeasing marker in HTML "
@@ -783,9 +850,9 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong
     # "not-a-PMS" signals when no strong PMS marker appeared in pass 1.
     if "static.parastorage.com" in h or "wix.com" in h:
-        return "wix_nopms", 0.85, ["Wix script/platform marker in HTML"]
+        yield "wix_nopms", 0.85, ["Wix script/platform marker in HTML"]
     if "squarespace.com" in h:
-        return "squarespace_nopms", 0.85, ["Squarespace script/platform marker in HTML"]
+        yield "squarespace_nopms", 0.85, ["Squarespace script/platform marker in HTML"]
 
     # Pass 3 — WEAK PMS markers: substrings that could be incidental CDN
     # asset references or marketing links rather than actual portal
@@ -793,16 +860,15 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # image on a Squarespace site doesn't misroute to RentCafe — see
     # ``test_no_rentcafe_false_positive_on_squarespace_with_cdn_asset``.
     if "entrata.com" in h:
-        return "entrata", 0.80, ["Entrata marker in HTML (entrata.com)"]
+        yield "entrata", 0.80, ["Entrata marker in HTML (entrata.com)"]
     if "rentcafe" in h or "yardi" in h:
-        return "rentcafe", 0.80, ["RentCafe/Yardi marker in HTML"]
+        yield "rentcafe", 0.80, ["RentCafe/Yardi marker in HTML"]
     if "sightmap.com" in h:
-        return "sightmap", 0.80, ["SightMap iframe/script marker in HTML"]
+        yield "sightmap", 0.80, ["SightMap iframe/script marker in HTML"]
     if ".appfolio.com" in h:
-        return "appfolio", 0.80, ["AppFolio marker in HTML"]
+        yield "appfolio", 0.80, ["AppFolio marker in HTML"]
     if "liveovation.com" in h:
-        return "touchtour", 0.80, ["Ovation portfolio marker in HTML (liveovation.com)"]
-    return None
+        yield "touchtour", 0.80, ["Ovation portfolio marker in HTML (liveovation.com)"]
 
 
 # Signal helpers for DETECTOR_SIGNALS telemetry ---------------------------
@@ -876,6 +942,21 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "marketing_marketapts": ("marketapts.com",),
 }
 
+
+
+def _detect_html_markers(
+    page_html: str,
+) -> tuple[PmsName, float, list[str]] | None:
+    """First-match wrapper around :func:`_iter_html_markers`.
+
+    Path B Piece 2 (2026-05-20): the HTML-marker scan is now a generator
+    that yields ALL matching PMS candidates in detector priority order,
+    so the orchestrator can retry with the next candidate when the first
+    adapter returns an empty exit. This wrapper preserves the legacy
+    "first match wins" contract for callers (incl. ``_detect_pms_impl``)
+    that only need the top-priority signal.
+    """
+    return next(_iter_html_markers(page_html), None)
 
 def _unique_hosts(urls: list[str], limit: int = 10) -> list[str]:
     """Return up to ``limit`` unique hosts (deduped, in order)."""
@@ -1204,3 +1285,123 @@ def _detect_pms_impl(
         pms_client_account_id=client_id,
         recommended_strategy=_STRATEGY_BY_PMS[best_pms],
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Path B Piece 2 (2026-05-20): ranked PMS candidates.
+#
+# When an adapter dispatched by ``detect_pms`` returns an empty-exit
+# label (see :mod:`ma_poc.pms.empty_exit`), the orchestrator wants to
+# retry with the *next* most likely PMS. ``detect_pms_candidates``
+# returns up to ``max_candidates`` PMSs in detector priority order,
+# skipping any already in ``exclude`` (typically: the PMS that just
+# returned empty).
+#
+# Contract: ``detect_pms_candidates(url, csv_row, html)[0]`` is the
+# same PMS that ``detect_pms(url, csv_row, html)`` would return,
+# unless that PMS is in ``exclude``. This is the back-compat guarantee
+# — adding a single-element guard around `next(candidates, None)` is
+# equivalent to today's single-result API.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def detect_pms_candidates(
+    url: str,
+    csv_row: dict[str, object] | None = None,
+    page_html: str | None = None,
+    exclude: set[str] | frozenset[str] | None = None,
+    max_candidates: int = 4,
+) -> list[DetectedPMS]:
+    """Return up to *max_candidates* PMSs in detector priority order.
+
+    Used by the Path B orchestrator-retry mechanism: when the first
+    adapter returns an empty-exit label, the orchestrator calls this
+    with ``exclude={previous_pms}`` to find the next candidate to try.
+
+    Sources are exhausted in the same priority order as ``detect_pms``:
+    CSV override > host fingerprint > URL extension > HTML markers
+    (yielded in detector pass order) > CSV management prior. Each
+    distinct PMS appears at most once (first occurrence wins; later
+    sources for the same PMS just append evidence). The ``unknown``
+    PMS is never included in the candidate list.
+
+    Never raises; bad inputs return ``[]``.
+    """
+    excl: set[str] = set(exclude) if exclude else set()
+    excl.add("unknown")  # never offer the no-op as a retry candidate
+
+    seen: set[str] = set()
+    out: list[DetectedPMS] = []
+
+    def _emit(
+        pms: PmsName,
+        confidence: float,
+        evidence: list[str],
+        client_id: str | None = None,
+    ) -> None:
+        if pms in excl or pms in seen:
+            return
+        seen.add(pms)
+        out.append(
+            DetectedPMS(
+                pms=pms,
+                confidence=confidence,
+                evidence=list(evidence),
+                pms_client_account_id=client_id,
+                recommended_strategy=_STRATEGY_BY_PMS[pms],
+            )
+        )
+
+    try:
+        # 0. CSV override — exact human-authored hint.
+        override = _lookup_csv_pms_override(csv_row)
+        if override is not None:
+            pms, conf, reason = override
+            _emit(pms, conf, [reason])
+
+        # 1. Host fingerprint — high-confidence single hit.
+        if isinstance(url, str):
+            host_hit = _detect_host(url)
+            if host_hit is not None:
+                pms, conf, ev, client_id = host_hit
+                _emit(pms, conf, ev, client_id)
+
+        # 2. URL extension heuristic — weak Tier-1 hint.
+        if isinstance(url, str):
+            ext_hit = _detect_url_extension(url)
+            if ext_hit is not None:
+                pms, conf, ev = ext_hit
+                _emit(pms, conf, ev)
+
+        # 3. HTML markers — iterate ALL matches in detector priority order.
+        if isinstance(page_html, str) and page_html:
+            client_id_url = url if isinstance(url, str) else ""
+            for pms, conf, ev in _iter_html_markers(page_html):
+                client_id = (
+                    _client_account_id_from_url(client_id_url, pms)
+                    if client_id_url
+                    else None
+                )
+                _emit(pms, conf, ev, client_id)
+                if len(out) >= max_candidates:
+                    break
+
+        # 4. Management-company prior — weak fallback.
+        if len(out) < max_candidates:
+            mgmt_hit = _lookup_mgmt_prior(csv_row)
+            if mgmt_hit is not None:
+                pms, reason = mgmt_hit
+                _emit(pms, 0.70, [reason])
+
+    except Exception as exc:  # defensive — detector must never crash pipeline
+        # Return whatever we collected so far; never raise.
+        out.append(
+            DetectedPMS(
+                pms="unknown",
+                confidence=0.0,
+                evidence=[f"detector-internal-error: {type(exc).__name__}"],
+                recommended_strategy=_STRATEGY_BY_PMS["unknown"],
+            )
+        )
+
+    return out[:max_candidates]

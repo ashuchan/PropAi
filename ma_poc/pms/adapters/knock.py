@@ -41,10 +41,16 @@ if TYPE_CHECKING:
     from playwright.async_api import Page
 
 # Pattern matches the static-HTML init call. Captures (public_key, kind, id).
+# 2026-05-20: ``\\?`` before each quote class so the regex also matches the
+# JSON-escaped form ``knockDoorway.init(\"a8e...\",\"community\",\"69e...\")``
+# emitted by Next.js / Nuxt SSR bundles (the call is inside a string-encoded
+# JS source until the browser executes the bundle). Confirmed live against
+# 3 raw-fetched HTMLs (flatirondistrictataustinranch, altaaptstarga,
+# unionthompson) on 2026-05-20: original regex 0/3, relaxed regex 3/3.
 _KNOCK_INIT_RE = re.compile(
-    r"knockDoorway\.init\s*\(\s*['\"]([a-f0-9]{20,40})['\"]\s*,\s*"
-    r"['\"](community|application|public)['\"]\s*,\s*"
-    r"['\"]([a-zA-Z0-9_-]{8,40})['\"]",
+    r"knockDoorway\.init\s*\(\s*\\?['\"]([a-f0-9]{20,40})\\?['\"]\s*,\s*"
+    r"\\?['\"](community|application|public)\\?['\"]\s*,\s*"
+    r"\\?['\"]([a-zA-Z0-9_-]{8,40})\\?['\"]",
     re.IGNORECASE,
 )
 

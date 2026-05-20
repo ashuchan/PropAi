@@ -94,8 +94,12 @@ async () => {
 
 
 def _fetch_api_js(uuid: str) -> str:
-    """JS that fetches the LeaseLeads API and returns the JSON text. Runs
-    in the live page so cookies/origin/headers are the browser's.
+    """JS that fetches the LeaseLeads API and returns ``{status, body}``.
+    Runs in the live page so cookies/origin/headers are the browser's.
+
+    The dict-shape return lets ``recover_leaseleads_embed`` distinguish a
+    real 200-with-empty-body (no plans configured) from a 401/403/429/503
+    bot-wall on ``api.leaseleads.co`` — recorded for triage telemetry.
     """
     safe_uuid = re.sub(r"[^0-9a-fA-F-]", "", uuid)
     url = f"{_LL_API_BASE}/{safe_uuid}/floor-plans"
@@ -103,9 +107,8 @@ def _fetch_api_js(uuid: str) -> str:
 (async () => {{
   try {{
     const r = await fetch({json.dumps(url)}, {{credentials: 'include'}});
-    if (!r.ok) return null;
-    return await r.text();
-  }} catch (e) {{ return null; }}
+    return {{status: r.status, body: r.ok ? await r.text() : ''}};
+  }} catch (e) {{ return {{status: 0, body: ''}}; }}
 }})()
 """
 
@@ -239,11 +242,34 @@ async def recover_leaseleads_embed(
 
     api_url = f"{_LL_API_BASE}/{uuids[0]}/floor-plans"
     try:
-        body = await evaluate(_fetch_api_js(uuids[0]))
+        result = await evaluate(_fetch_api_js(uuids[0]))
     except Exception as exc:
         log.debug("LeaseLeads API fetch failed err=%s", exc)
         return []
-    if not body or not isinstance(body, str):
+
+    # Late import to avoid module-load circularity.
+    from ma_poc.pms.adapters._universal_recovery import is_bot_block, mark_blocked
+
+    # New wire format: {status, body}. Back-compat: a plain JSON string
+    # (legacy / test mocks) is treated as a 200.
+    status: int = 0
+    body: str = ""
+    if isinstance(result, dict):
+        try:
+            status = int(result.get("status") or 0)
+        except (TypeError, ValueError):
+            status = 0
+        b = result.get("body")
+        if isinstance(b, str):
+            body = b
+    elif isinstance(result, str):
+        status = 200 if result else 0
+        body = result
+
+    if is_bot_block(status):
+        mark_blocked(ctx, "leaseleads_embed", api_url, status)
+
+    if not body:
         return []
     try:
         plans = json.loads(body)

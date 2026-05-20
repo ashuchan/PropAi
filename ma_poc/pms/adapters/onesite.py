@@ -147,20 +147,42 @@ class OneSiteAdapter:
     _fingerprints: list[str] = ["onlineleasing.realpage.com"]
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
-        """Extract units from RealPage API responses captured during page load."""
+        """Extract units from RealPage API responses captured during page load.
+
+        Tier labels (post-2026-05-20 cluster #6 fix):
+
+          ``TIER_1_API_ONESITE``           — real unit-level data parsed
+          ``TIER_1_API_ONESITE_EMPTY``     — parsed but post_process admitted 0
+                                             (validity gate rejected everything)
+          ``TIER_1_API_ONESITE_NO_RESPONSE`` — no RealPage-shaped responses at
+                                             all (page is an OLL widget shell
+                                             that hasn't fired its API yet —
+                                             cluster #6 pattern)
+
+        Empty-exit labels (``_EMPTY``, ``_NO_RESPONSE``) trigger the
+        scraper's Path B/C retry mechanism with the next-best PMS, AND
+        let Step 8 generic fallback run. Previously the adapter set the
+        bare success label even on no-data, blocking both recovery paths.
+        """
         result = AdapterResult(tier_used="TIER_1_API_ONESITE")
         all_units: list[dict[str, str]] = []
+        # Track whether any RealPage-shaped response was seen at all so
+        # we can distinguish "page is an empty OLL shell" from "data was
+        # there but everything failed validity".
+        saw_any_realpage_response = False
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
         for resp in api_responses:
             body = resp.get("body")
             url = resp.get("url", "")
             if _is_realpage_response(body) and isinstance(body, dict):
+                saw_any_realpage_response = True
                 units = parse_realpage_floorplans(body, url)
                 if units:
                     all_units.extend(units)
                     result.api_responses.append(resp)
             elif _is_realpage_units_response(body, url):
+                saw_any_realpage_response = True
                 # RealPage /units endpoint — body may be null/[]/{response:[...]}
                 try:
                     units = _dr_realpage_units(body, url) or []
@@ -185,14 +207,29 @@ class OneSiteAdapter:
                 )
                 result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
             else:
+                # Responses were captured but every row failed the validity
+                # gate. Mark as empty-exit so retry / Step 8 generic can try.
+                result.tier_used = "TIER_1_API_ONESITE_EMPTY"
                 result.confidence = 0.0
                 result.errors.append(
                     f"ONESITE_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
                     f"failed unit_validity (no numeric dimension)"
                 )
         else:
+            # No usable RealPage data at all. Two flavors:
+            #   _NO_RESPONSE — no RealPage-shaped responses captured (cluster
+            #                  #6 OLL-widget-shell pattern: page bodyLen ~ 386,
+            #                  OneSite floorplans API never fired)
+            #   _EMPTY       — RealPage responses captured but floorplans/
+            #                  units lists were all empty
+            if saw_any_realpage_response:
+                result.tier_used = "TIER_1_API_ONESITE_EMPTY"
+            else:
+                result.tier_used = "TIER_1_API_ONESITE_NO_RESPONSE"
             result.confidence = 0.0
-            result.errors.append("No RealPage/OneSite floorplan data found in captured API responses")
+            result.errors.append(
+                "No RealPage/OneSite floorplan data found in captured API responses"
+            )
 
         return result
 

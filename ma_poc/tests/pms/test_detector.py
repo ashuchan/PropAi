@@ -9,8 +9,10 @@ from ma_poc.pms.detector import (
     _STRATEGY_BY_PMS,
     MGMT_TO_PMS_PRIOR,
     DetectedPMS,
+    _iter_html_markers,
     confirm_detection,
     detect_pms,
+    detect_pms_candidates,
 )
 
 # Hand-collected from ma_poc/data/runs/2026-04-15/property_reports/. A third
@@ -761,3 +763,388 @@ def test_bare_sightmap_com_without_embed_path_is_NOT_strong() -> None:
     assert not any(
         "embed iframe in HTML" in e for e in result.evidence
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 deep-probe finding (feature_fail_1429 cluster #2 of 7):
+# The Jonah-Digital marker (jonahwidget/meetelise/jonahdigital) is
+# sometimes present on RentCafe-SecureCafe / SightMap / etc. pages as
+# a chat-widget bolt-on, not as the primary PMS. When both signals
+# co-exist, the more specific PMS (RentCafe/SightMap) must win — the
+# encoreskyline_template adapter has no way to extract from those
+# sites and bails with NOT_ENCORESKYLINE_TEMPLATE, leaving the property
+# with 0 units. Live-verified on ardencebloom.com (pid 238181, main
+# extracts 182 strict via TIER_1_API_RENTCAFE).
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_securecafe_beats_jonah_widget_when_both_present() -> None:
+    """ardencebloom.com pattern — meetelise (Jonah chat widget) +
+    securecafe.com/onlineleasing (real PMS). Detector must route to
+    rentcafe, not encoreskyline_template."""
+    html = (
+        "<html><body>"
+        '<script>JonahWidget.meetelise({org:"x"});</script>'
+        '<a href="https://propmgr.securecafe.com/onlineleasing/ardence/'
+        'availableunits.aspx">Apply Now</a>'
+        "</body></html>"
+    )
+    result = detect_pms("https://www.ardencebloom.com/", page_html=html)
+    assert result.pms == "rentcafe", (
+        f"expected rentcafe (page has securecafe portal AND chat widget), "
+        f"got {result.pms!r}"
+    )
+
+
+def test_sightmap_embed_beats_jonah_widget_when_both_present() -> None:
+    """Same principle for sightmap.com/embed iframe + Jonah widget on the
+    same page. SightMap is the real data; Jonah is decoration."""
+    html = (
+        "<html><body>"
+        '<script src="//meetelise.com/widget.js"></script>'
+        '<iframe src="https://sightmap.com/embed/abc123def"></iframe>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "sightmap", (
+        f"expected sightmap (real PMS), got {result.pms!r}"
+    )
+
+
+def test_jonah_alone_still_routes_to_encoreskyline_template() -> None:
+    """Regression guard — when ONLY the Jonah marker is present and no
+    other PMS competes, encoreskyline_template still wins."""
+    html = (
+        "<html><body>"
+        '<script>JonahWidget.meetelise({organization:"X",building:"Y"});</script>'
+        '<a href="/floorplans/spruce/">Spruce</a>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "encoreskyline_template"
+    assert result.confidence >= 0.85
+
+
+def test_jonah_widget_does_not_block_entrata_widget() -> None:
+    """If a page has Jonah marker AND Entrata widget markers, Entrata
+    must win — the encoreskyline_template adapter can't extract from
+    an Entrata-backed site."""
+    html = (
+        "<html><body>"
+        '<script>JonahWidget.meetelise({});</script>'
+        '<script src="https://commoncf.entrata.com/widgets/x.js"></script>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "entrata"
+
+
+def test_jonah_widget_does_not_block_resman_portal() -> None:
+    """If a page has Jonah marker AND a myresman.com portal anchor,
+    ResMan must win."""
+    html = (
+        "<html><body>"
+        '<script src="//meetelise.com/x.js"></script>'
+        '<iframe src="https://acmepm.myresman.com/Portal/Applicants/'
+        'Availability?a=1&p=abc-def">'
+        "</iframe></body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    # bare ``myresman`` isn't in current detector but the test documents
+    # the intent; lower-confidence resman OR not-encoreskyline is the bar
+    assert result.pms != "encoreskyline_template", (
+        f"meetelise should not block a ResMan-portal-bearing page; "
+        f"got {result.pms!r}"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 feature_fail_1429 grind — cluster #3 (G5 + competing PMS).
+# 90+ properties tagged ``TIER_1_API_G5_EMPTY`` / ``_NO_URN`` in the
+# canary feature run had G5 markers PRESENT (g5marketingcloud / g5dxm /
+# g5-c-) but the unit data lives in a co-resident RentCafe (SecureCafe)
+# or ResMan portal — main reached TIER_1_API_RENTCAFE / TIER_1_API on
+# these sites for 41+ properties. G5 won the detector race (line 567 +
+# 690 both before the securecafe/myresman branches) and then bailed
+# because the page-level URN was company-level (e.g.
+# ``g5-cl-...-lincoln-property-company-...``), not property-level.
+# Live-verified: pid 13477 flatirondistrictataustinranch.com — G5
+# markers + hasRentCafe=true + 5 LPC company URNs; pid 6274 fmgnj.com
+# was a 404 (honest empty, no fix).
+#
+# Pattern is the same shape as the cluster-2 Jonah-gate: detector
+# routes to a co-resident PMS marker whose adapter actually extracts.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_securecafe_beats_g5_marker_when_both_present() -> None:
+    """flatirondistrictataustinranch.com pattern — G5 marketing-cloud
+    markers AND a securecafe online-leasing portal on the same page.
+    Detector must route to rentcafe, not g5. G5 adapter would extract a
+    company-level URN and return empty; rentcafe adapter hits the
+    securecafe ``availableunits.aspx`` path and gets real units."""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-cs-12345/main.js"></script>'
+        '<a href="https://lpcprop.securecafe.com/onlineleasing/flatiron/'
+        'availableunits.aspx">Apply</a>'
+        "</body></html>"
+    )
+    result = detect_pms(
+        "https://www.flatirondistrictataustinranch.com/",
+        page_html=html,
+    )
+    assert result.pms == "rentcafe", (
+        f"expected rentcafe (securecafe portal beats G5 page-marker), "
+        f"got {result.pms!r}"
+    )
+
+
+def test_resman_portal_beats_g5_marker_when_both_present() -> None:
+    """G5 markers + myresman.com portal anchor — resman wins. ResMan
+    adapter recovers Tier-1 unit-level; G5 would bail empty."""
+    html = (
+        "<html><body>"
+        '<script src="https://dnn506yrbagrg.cloudfront.net/themes/x.js"></script>'
+        '<iframe src="https://acme.myresman.com/Portal/Applicants/'
+        'Availability?a=1&p=abc"></iframe>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "resman", (
+        f"expected resman (portal anchor beats G5 CDN marker), "
+        f"got {result.pms!r}"
+    )
+
+
+def test_g5_alone_still_routes_to_g5_weak_marker() -> None:
+    """Regression guard — pass-2 G5 markers (g5marketingcloud /
+    g5dxm.com / g5-c-) WITHOUT any competing PMS marker still route
+    to g5. Verifies the gate doesn't over-broaden."""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "g5"
+    assert result.confidence >= 0.85
+
+
+def test_g5_alone_still_routes_to_g5_strong_marker() -> None:
+    """Regression guard for the pass-3 G5 branch (line 690) — the
+    stronger markers (inventory.g5marketingcloud / g5-cl- /
+    dnn506yrbagrg.cloudfront.net) WITHOUT any competing PMS marker
+    must still route to g5."""
+    html = (
+        "<html><body>"
+        '<script src="https://dnn506yrbagrg.cloudfront.net/themes/x.js"></script>'
+        '<meta name="urn" content="g5-cl-abc123-acme-tx">'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "g5"
+    assert result.confidence >= 0.85
+
+
+def test_knock_doorway_beats_g5_marker_when_both_present() -> None:
+    """Dominant cluster-3 pattern (2026-05-20 live probe of 6 Bucket-A
+    worklist props — altaaptstarga, avonleatributary, beechmeadowaptsin,
+    unionthompson, 6thandalderapartments, liveatone55lofts): G5 markers
+    co-resident with the Knock/Doorway widget. Without the gate the
+    pass-2 G5 weak marker at line 567 wins and the page-level URN is
+    company-level → empty. Detector must route to knock so the
+    KnockAdapter (api_first) hits the Doorway public API."""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+        '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+        '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+        '"community","69e936e6567a11ef");</script>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "knock", (
+        f"expected knock (Doorway widget beats G5 page-marker), "
+        f"got {result.pms!r}"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Path B Piece 2 (2026-05-20) — _iter_html_markers + detect_pms_candidates.
+#
+# The HTML-marker scan is now a generator yielding ALL matching PMSs in
+# detector priority order. The orchestrator uses detect_pms_candidates
+# to find the NEXT PMS to try when the first adapter returns an empty
+# exit. These tests pin the contract: candidates[0] == detect_pms()'s
+# winner (back-compat); exclude={prev_pms} surfaces the runner-up.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_iter_html_markers_yields_first_match_equal_to_detect_html_markers() -> None:
+    """The legacy first-match contract is preserved. Picking the first
+    yield must equal what the old single-result function returned."""
+    from ma_poc.pms.detector import _detect_html_markers
+    samples = [
+        '<script src="https://commoncf.entrata.com/widgets/x.js"></script>',
+        '<script>knockDoorway.init("a"*32,"community","abc123def");</script>',
+        '<iframe src="https://sightmap.com/embed/m9pzd4ezvk1"></iframe>',
+        '<a href="https://propmgr.securecafe.com/onlineleasing/x/availableunits.aspx">x</a>',
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>',
+    ]
+    for html in samples:
+        first_yielded = next(_iter_html_markers(html), None)
+        legacy = _detect_html_markers(html)
+        assert first_yielded == legacy, (
+            f"first yield differs from legacy first-match for html={html[:60]!r}: "
+            f"yield={first_yielded!r} legacy={legacy!r}"
+        )
+
+
+def test_iter_html_markers_yields_multiple_on_co_resident_pms() -> None:
+    """Page with G5 + Knock + SecureCafe markers — generator yields all
+    three that pass the existing detector gates. (G5 is gated out by
+    cluster #3 fix when securecafe/knock is present; Knock and RentCafe
+    both yield.)"""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+        '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+        '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+        '"community","69e936e6567a11ef");</script>'
+        '<a href="https://lpc.securecafe.com/onlineleasing/x/availableunits.aspx">x</a>'
+        "</body></html>"
+    )
+    yielded = [m[0] for m in _iter_html_markers(html)]
+    # First yield is the highest-priority survivor of the gates.
+    assert yielded[0] == "knock", f"first should be knock, got {yielded[0]!r}"
+    # RentCafe (via securecafe) is yielded later as a retry candidate.
+    assert "rentcafe" in yielded, (
+        f"rentcafe (via securecafe) should appear as a later candidate; got {yielded!r}"
+    )
+
+
+def test_detect_pms_candidates_first_equals_detect_pms() -> None:
+    """Back-compat: candidates[0] must equal detect_pms() result so any
+    existing call site can be swapped to take ``candidates[0]`` without
+    behavior change."""
+    samples = [
+        # (url, html or None, csv_row or None)
+        ("https://www.example.com/", '<iframe src="https://sightmap.com/embed/abc123xyz"></iframe>', None),
+        ("https://lakeline.example.com/", '<script src="//doorway.knck.io/latest/doorway.min.js"></script>', None),
+        ("https://example.com/", '<script src="https://commoncf.entrata.com/widgets/x.js"></script>', None),
+        ("https://example.com/", None, None),  # no signals → no candidates
+    ]
+    for url, html, csv_row in samples:
+        main = detect_pms(url, csv_row=csv_row, page_html=html)
+        cands = detect_pms_candidates(url, csv_row=csv_row, page_html=html)
+        if main.pms == "unknown":
+            # detect_pms returns "unknown" when no signal; candidates is empty.
+            assert cands == [], f"expected [] for no-signal input, got {cands!r}"
+        else:
+            assert cands, f"expected at least 1 candidate for {url!r}, got []"
+            assert cands[0].pms == main.pms, (
+                f"candidates[0] {cands[0].pms!r} differs from detect_pms {main.pms!r} "
+                f"for url={url!r}"
+            )
+
+
+def test_detect_pms_candidates_exclude_removes_first_winner() -> None:
+    """Calling with exclude={first_winner} returns the runner-up — the
+    primary Path B retry use case."""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+        '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+        '"community","69e936e6567a11ef");</script>'
+        '<a href="https://lpc.securecafe.com/onlineleasing/x/availableunits.aspx">x</a>'
+        "</body></html>"
+    )
+    full = detect_pms_candidates("https://example.com/", page_html=html)
+    assert len(full) >= 2, (
+        f"expected ≥2 candidates on multi-PMS page, got {len(full)}: {[c.pms for c in full]}"
+    )
+    winner = full[0].pms
+    runner_up = full[1].pms
+    second_call = detect_pms_candidates(
+        "https://example.com/", page_html=html, exclude={winner}
+    )
+    assert second_call, "expected non-empty list after excluding the winner"
+    assert second_call[0].pms == runner_up, (
+        f"excluding {winner!r} should surface {runner_up!r}; got {second_call[0].pms!r}"
+    )
+    assert all(c.pms != winner for c in second_call), (
+        f"excluded PMS appeared in candidates: {[c.pms for c in second_call]}"
+    )
+
+
+def test_detect_pms_candidates_caps_at_max_candidates() -> None:
+    """max_candidates default is 4; larger pools must be truncated."""
+    # Construct a page with many distinct PMS markers (more than 4).
+    html = (
+        "<html><body>"
+        '<iframe src="https://sightmap.com/embed/abc12345"></iframe>'
+        '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+        '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+        '"community","69e936e6567a11ef");</script>'
+        '<a href="https://lpc.securecafe.com/onlineleasing/x/availableunits.aspx">x</a>'
+        '<script src="https://commoncf.entrata.com/x.js"></script>'
+        '<a href="https://x.appfolio.com/listings">listings</a>'
+        "</body></html>"
+    )
+    capped = detect_pms_candidates(
+        "https://example.com/", page_html=html, max_candidates=2
+    )
+    assert len(capped) <= 2, f"expected ≤2, got {len(capped)}"
+    expanded = detect_pms_candidates(
+        "https://example.com/", page_html=html, max_candidates=10
+    )
+    assert len(expanded) >= len(capped)
+
+
+def test_detect_pms_candidates_excludes_unknown() -> None:
+    """``unknown`` is never offered as a retry candidate — it has no
+    adapter to dispatch to."""
+    cands = detect_pms_candidates("https://no-signal.example.com/")
+    for c in cands:
+        assert c.pms != "unknown", (
+            f"`unknown` must never appear in candidates list, got {[x.pms for x in cands]}"
+        )
+
+
+def test_detect_pms_candidates_no_signal_returns_empty() -> None:
+    """Bare URL, no HTML, no CSV → no candidates (not [DetectedPMS('unknown')])."""
+    assert detect_pms_candidates("https://nowhere.example.com/") == []
+
+
+def test_detect_pms_candidates_never_raises_on_bad_input() -> None:
+    """Defensive: every detector helper is wrapped; bad inputs return []
+    or partial list, never raise."""
+    assert detect_pms_candidates("") == []
+    # Garbled HTML / wrong types — must not raise.
+    out = detect_pms_candidates("https://x.com/", page_html=b"not str" * 100)  # type: ignore[arg-type]
+    assert isinstance(out, list)
+
+
+def test_detect_pms_candidates_host_fingerprint_wins_first_slot() -> None:
+    """Host-based fingerprint (e.g. ``*.rentcafe.com``) is high-trust
+    and should take the first slot even when the HTML carries other
+    markers."""
+    html = (
+        "<html><body>"
+        '<iframe src="https://sightmap.com/embed/abc12345"></iframe>'
+        "</body></html>"
+    )
+    cands = detect_pms_candidates(
+        "https://prop.rentcafe.com/apartments/", page_html=html
+    )
+    assert cands, "expected candidates"
+    assert cands[0].pms == "rentcafe", (
+        f"host fingerprint should win first slot, got {cands[0].pms!r}"
+    )
+    # SightMap from the HTML still appears later — orchestrator can
+    # retry to it if rentcafe returns empty.
+    assert any(c.pms == "sightmap" for c in cands), (
+        f"sightmap should still appear as a later candidate; got {[c.pms for c in cands]}"
+    )
+

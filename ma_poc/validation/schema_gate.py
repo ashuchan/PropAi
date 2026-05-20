@@ -82,6 +82,99 @@ def property_passes_quality_gate(units: list[dict[str, Any]], threshold: float =
     return (good / len(units)) >= threshold
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 Path C extensions — rent and area signal predicates.
+#
+# Per investigations/2026-05-20-path-b-design + the
+# project_jsonld_recovery_2026-05-20 memo: ``property_passes_quality_gate``
+# only requires a numeric DIMENSION (beds/baths/sqft). That admits the
+# 1,031-prop inflated-SUCCESS bucket — JSON-LD / inferred_id adapters
+# emit rows with ``beds=1, sqft=750, rent=None`` and the gate "passes".
+# Those are plan-level rows, not real units.
+#
+# The retry mechanism needs to distinguish "we got real unit data" from
+# "we got a plan-level skeleton with no rent and/or no area". These two
+# predicates surface that:
+#
+#   property_has_rent_signal — does ≥threshold of the rows have a usable
+#     numeric rent value? When False AND units list is non-empty, the
+#     property is rent-deficient (the JSON-LD-inflated-SUCCESS shape).
+#
+#   property_has_area_signal — does ≥threshold of the rows have a usable
+#     sqft/area value? When False AND rent is also missing, the rows are
+#     name-only stubs.
+#
+# Both are AND'd with the existing ``property_passes_quality_gate`` in
+# the Path C trigger, so failing EITHER triggers retry.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _is_positive_numeric(value: Any) -> bool:
+    """Return True when *value* is a positive numeric (>0) OR a string
+    that parses to one. Used by the rent/area presence predicates."""
+    if value is None:
+        return False
+    if isinstance(value, bool):  # bool is a subclass of int — exclude
+        return False
+    if isinstance(value, (int, float)):
+        return value > 0
+    if isinstance(value, str):
+        s = value.strip().replace(",", "").replace("$", "")
+        if not s:
+            return False
+        # Strip a trailing decimal so "$1,500.00" parses.
+        try:
+            return float(s) > 0
+        except ValueError:
+            return False
+    return False
+
+
+def _has_rent(unit: dict[str, Any]) -> bool:
+    """True when the unit carries at least one numeric rent value."""
+    return any(_is_positive_numeric(unit.get(k)) for k in _RENT_FIELDS)
+
+
+_AREA_FIELDS: tuple[str, ...] = ("sqft", "area", "_sqft", "size", "square_feet")
+
+
+def _has_area(unit: dict[str, Any]) -> bool:
+    """True when the unit carries at least one numeric sqft/area value."""
+    return any(_is_positive_numeric(unit.get(k)) for k in _AREA_FIELDS)
+
+
+def property_has_rent_signal(
+    units: list[dict[str, Any]],
+    threshold: float = 0.5,
+) -> bool:
+    """Return True when >=threshold of units carry a numeric rent value.
+
+    The 1,031 inflated-SUCCESS JSON-LD bucket consists of properties
+    where every row has dimensions but no rent — this predicate is the
+    signal that catches that shape and lets the Path C retry mechanism
+    fire. Empty list returns False (no units → no rent signal).
+    """
+    if not units:
+        return False
+    good = sum(1 for u in units if _has_rent(u))
+    return (good / len(units)) >= threshold
+
+
+def property_has_area_signal(
+    units: list[dict[str, Any]],
+    threshold: float = 0.5,
+) -> bool:
+    """Return True when >=threshold of units carry a numeric sqft/area value.
+
+    Used alongside rent-signal to detect the "name+beds+baths only" shape
+    that some JSON-LD and plan-card adapters emit. Empty list → False.
+    """
+    if not units:
+        return False
+    good = sum(1 for u in units if _has_area(u))
+    return (good / len(units)) >= threshold
+
+
 @dataclass(frozen=True)
 class SchemaGateResult:
     """Result of validating one unit record."""

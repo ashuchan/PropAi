@@ -74,15 +74,45 @@ _RESMAN_PORTAL_RE = re.compile(
     re.IGNORECASE,
 )
 
-# RentCafe SecureCafe online-leasing availability page. The host is the
-# ``securecafe.com`` PMS subdomain (sometimes ``rentcafe.com`` for the same
-# product); the canonical SSR path ends in ``availableunits.aspx``. The
-# page renders ``<tr class="AvailUnitRow">`` rows per real apartment.
+# RentCafe SecureCafe online-leasing portal. The host is the
+# ``securecafe.com`` PMS subdomain (sometimes ``rentcafe.com`` for the
+# same product). Real marketing pages link to ANY of the onlineleasing
+# entry points — ``guestlogin.aspx``, ``floorplans.aspx``,
+# ``availableunits.aspx`` — depending on the "Apply Now"/"Floor Plans"/
+# "Availability" anchor label. Match the slug-root broadly; the recovery
+# transforms whatever entry it captured into the canonical
+# ``/availableunits.aspx`` path before fetching (the SSR table we parse).
+#
+# 2026-05-19: broadened from the prior ``availableunits.aspx``-only
+# match, which missed sweetwaterfl / parkviewapartmenthomes /
+# parkerhouse — all three link to ``floorplans.aspx`` or
+# ``guestlogin.aspx`` from their marketing site.
 _RENTCAFE_PORTAL_RE = re.compile(
     r"""https?://[a-z0-9][a-z0-9-]*\.(?:securecafe|rentcafe)\.com"""
-    r"""/[^\s"'<>]*availableunits\.aspx[^\s"'<>]*""",
+    r"""/onlineleasing/[a-z0-9_-]+(?:/[a-z0-9_.-]*)?""",
     re.IGNORECASE,
 )
+# Canonical data-bearing path for the SecureCafe SSR parser.
+_RENTCAFE_SLUG_RE = re.compile(
+    r"https?://[a-z0-9][a-z0-9-]*\.(?:securecafe|rentcafe)\.com/onlineleasing/([a-z0-9_-]+)",
+    re.IGNORECASE,
+)
+
+
+def _to_rentcafe_availableunits(url: str) -> str:
+    """Transform any matched SecureCafe onlineleasing URL to the
+    ``…/availableunits.aspx`` form that ``parse_securecafe_availableunits``
+    expects.
+    """
+    try:
+        p = urlparse(url)
+    except Exception:
+        return url
+    m = _RENTCAFE_SLUG_RE.search(url)
+    if not m or not p.scheme or not p.netloc:
+        return url
+    slug = m.group(1)
+    return urlunparse((p.scheme, p.netloc, f"/onlineleasing/{slug}/availableunits.aspx", "", "", ""))
 
 # Sub-paths a marketing site uses for the page that links/embeds the PMS
 # portal. Ordered by observed frequency in the 2026-05-19 deep probe.
@@ -115,7 +145,7 @@ _LIVE_PORTAL_SRC_JS = r"""
     const s = (el.src || el.href || '');
     if (
       /\.myresman\.com\/Portal\/Applicants\/Availability/i.test(s) ||
-      /\.(securecafe|rentcafe)\.com\/[^"' <>]*availableunits\.aspx/i.test(s)
+      /\.(securecafe|rentcafe)\.com\/onlineleasing\/[a-z0-9_-]+/i.test(s)
     ) {
       out.push(s);
     }
@@ -143,21 +173,43 @@ def _origin(page: Page, ctx: AdapterContext) -> str:
     return urlunparse((p.scheme, p.netloc, "", "", "", ""))
 
 
-async def _fetch(page: Page, url: str) -> str:
-    """Fetch *url* in-session via ``page.evaluate``. Never raises — '' on failure."""
+async def _fetch_with_status(page: Page, url: str) -> tuple[int, str]:
+    """Fetch *url* in-session via ``page.evaluate``. Returns ``(status, body)``.
+
+    Status is 0 on network error / unavailable evaluate. Body is ``''`` on
+    any non-2xx. Dict-shape JS is the new wire format; string-shape result
+    keeps existing ``evaluate`` mocks (which return body strings keyed by
+    URL) working as ``(200, body)`` / ``(0, '')``.
+    """
     evaluate = getattr(page, "evaluate", None)
     if not callable(evaluate):
-        return ""
+        return 0, ""
     try:
-        body = await evaluate(
+        result = await evaluate(
             "(u) => fetch(u, {credentials: 'include'})"
-            ".then(r => r.ok ? r.text() : '').catch(() => '')",
+            ".then(r => r.text().then(b => ({status: r.status, body: r.ok ? b : ''})))"
+            ".catch(() => ({status: 0, body: ''}))",
             url,
         )
     except Exception as exc:  # pragma: no cover — network/SDK variance
         log.debug("PMS-portal fetch failed url=%s err=%s", url, exc)
-        return ""
-    return body if isinstance(body, str) else ""
+        return 0, ""
+    if isinstance(result, dict):
+        try:
+            status = int(result.get("status") or 0)
+        except (TypeError, ValueError):
+            status = 0
+        body = result.get("body")
+        return status, body if isinstance(body, str) else ""
+    if isinstance(result, str):
+        return (200, result) if result else (0, "")
+    return 0, ""
+
+
+async def _fetch(page: Page, url: str) -> str:
+    """Body-only convenience wrapper for callers that don't need status."""
+    _, body = await _fetch_with_status(page, url)
+    return body
 
 
 def _classify(portal_url: str) -> str:
@@ -229,12 +281,25 @@ async def recover_pms_portal(
     #    First non-empty parse wins. Walking the list (vs first-only) is
     #    cheap and makes us resilient to a stale anchor pointing at an
     #    expired ``p=<guid>``.
+    #    A 401/403/429/503 here is recorded as a bot-block — the most
+    #    common cause is SecureCafe ``availableunits.aspx`` DataDome on
+    #    bare httpx, which the production stack (residential proxy +
+    #    Camoufox + cookie-mint reuse) typically flips to a 200.
+    from ma_poc.pms.adapters._universal_recovery import is_bot_block, mark_blocked
+
     for src in candidates:
         kind = _classify(src)
         if not kind:
             continue
-        html = await _fetch(page, src)
-        units = _parse_portal_html(kind, html, src)
+        # For SecureCafe the captured entry can be any onlineleasing URL
+        # (guestlogin.aspx / floorplans.aspx / etc.). Canonicalize to the
+        # availableunits.aspx form before fetching — that's the SSR
+        # table parse_securecafe_availableunits expects.
+        fetch_url = _to_rentcafe_availableunits(src) if kind == "rentcafe" else src
+        status, html = await _fetch_with_status(page, fetch_url)
+        if is_bot_block(status):
+            mark_blocked(ctx, f"pms_portal_hop:{kind}", fetch_url, status)
+        units = _parse_portal_html(kind, html, fetch_url)
         if units:
             return units
     return []
