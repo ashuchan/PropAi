@@ -2,8 +2,9 @@
 
 **Working directory for every command:** `ma_poc/`
 **Audience:** Claude Code (or any engineer) debugging extraction failures after a cloud run.
-**Updated:** 2026-05-17. Last campaign reviewed: 2026-05-16 cloud run + post-deploy canaries on PIDs 20959 / 53592 / 55317 / 52331.
-**This update:** new §0 anti-patterns 14-16 (verdict-vs-unit-count, cascade-overwrite misdiagnosis, internal-vs-v2-shape); new Q13 in §3 (unit-fidelity check); §5 verdict decoder gains SUCCESS_PARTIAL row + analyzer-label-leak note; new §8.18-§8.22 extraction gaps (plan_summaries dropped at v2 formatter, hop plan_summaries not propagated, AVAILABLE+rent classification, cross-host per-plan URL discovery, wedge-rescue captcha guard); §15 file reference appended with 2026-05-17 additions; glossary gains SUCCESS_PARTIAL + plan_summaries.
+**Updated:** 2026-05-21. Last campaign reviewed: 2026-05-16 cloud run + post-deploy canaries on PIDs 20959 / 53592 / 55317 / 52331; concession capture pipeline shipped 2026-05-20/21.
+**This update (2026-05-21):** new §18 Concession data debugging (full debugging instructions, symptom decoder, Q14-Q17 checklist, 7 fixes implemented, telemetry SQL queries, known-good tradeoffs, file reference, decision tree); §15 file reference appended with 2026-05-21 concession additions block; §16 closing checklist gains item #10 concession-pipeline audit; glossary gains Preserve-and-flag invariant + `_concession_quality` + `concessions_structured` + `stealth_probe` + `HOP_CAPTCHA_DETECTED` + `CONCESSION_PROBE_RESULT`.
+**Prior update (2026-05-17):** new §0 anti-patterns 14-16 (verdict-vs-unit-count, cascade-overwrite misdiagnosis, internal-vs-v2-shape); new Q13 in §3 (unit-fidelity check); §5 verdict decoder gains SUCCESS_PARTIAL row + analyzer-label-leak note; new §8.18-§8.22 extraction gaps (plan_summaries dropped at v2 formatter, hop plan_summaries not propagated, AVAILABLE+rent classification, cross-host per-plan URL discovery, wedge-rescue captcha guard); §15 file reference appended with 2026-05-17 additions; glossary gains SUCCESS_PARTIAL + plan_summaries.
 
 ---
 
@@ -884,6 +885,28 @@ The deselect-list captures known pre-existing failures (`test_h5_visited_urls_de
 | Test: cross-host per-plan URL discovery (15 cases) | `tests/pms/test_cross_host_per_plan_discovery.py` |
 | Test: wedge-rescue decision (20 cases — RETRY / SKIP_ENTRY_CAPTCHA / NO_RETRY) | `tests/scripts/test_wedge_rescue_decision.py` |
 | Test: SUCCESS_PARTIAL admitted to success set, PARTIAL stays out | `tests/reporting/test_verdict_plan_level.py` |
+| **2026-05-21 concession additions** | |
+| `concession_clean.py` — quality classifier + best-effort cleaner | `core/concession_clean.py` |
+| `concession_normalize.py` — structured parser, returns dict-or-None | `core/concession_normalize.py` |
+| `_PROPERTY_CONCESSION_RE` + `_capture_concession_from_html` (script-strip + sentence-extend) | `pms/scraper.py` |
+| `_SPECIALS_PATHS` + `_probe_specials_pages` (stealth fetch + NOT_MODIFIED fallback + `max_paths` cap + telemetry) | `pms/scraper.py` |
+| `stealth_probe` helper (custom headers / POST / no conditional cache, identity sticky-key, captcha detect) | `fetch/probe.py` |
+| `vision_banner.capture_banner` — lazy env-gated vision-LLM banner fallback | `extraction/vision_banner.py` |
+| `_probe_realpage_cws` + `_probe_beacon_ajax` routed via `stealth_probe` with `telemetry_context` | `pms/adapters/generic.py` |
+| Schema_v2 emit chain: `concession_text` / `concession_text_clean` / `_concession_quality` / `concession_structured` (unit + property) | `core/schema_v2.py` |
+| Jugnu output surface for property-level concession trio + `concessions_source_url` | `scripts/runners/jugnu.py` |
+| `_bundle_unit_concessions` — bundles raw + clean + quality + structured + value + source into `units.concessions` JSON | `data_provider/sql/stores.py` |
+| `_SNAPSHOT_SOURCES["concessions"]` key chain widened to `("concession_text", "concession", "concessions")` | `data_provider/sql/stores.py` |
+| xlsx export read chain `concession_text_clean → concession_text → concessions` | `scripts/email/daily_failures.py` |
+| `EventKind.HOP_CAPTCHA_DETECTED` + `EventKind.CONCESSION_PROBE_RESULT` | `observability/events.py` |
+| `zstandard>=0.22.0` runtime dep (closes httpx zstd-decoder gap) | `requirements.txt` |
+| Concession canary (standalone, no DB, no Playwright) | `scripts/diagnostics/concession_canary.py` |
+| Test: classifier + cleaner invariants (29 cases) | `tests/core/test_concession_clean.py` |
+| Test: normalize offer shapes + no-match → None (27 cases) | `tests/core/test_concession_normalize.py` |
+| Test: end-to-end raw-preservation invariant + real-property fixtures (32 cases) | `tests/core/test_concession_pipeline.py` |
+| Test: script-strip / sentence-extend / /specials probe stealth / cap / telemetry (20+ cases) | `tests/pms/test_concession_capture.py` |
+| Test: `stealth_probe` stealth headers / sticky identity / captcha detect / hop-captcha telemetry | `tests/fetch/test_probe.py` |
+| Test: JSON-column bundle shape + raw-fallback when structured is None (7 cases) | `tests/data_provider/test_concession_bundle.py` |
 
 ---
 
@@ -937,6 +960,248 @@ Deferred because: requires careful slugification rules (vendor-specific edge cas
 
 ---
 
+## Phase 18 — Concession data debugging (2026-05-21)
+
+Concession capture is adjacent to FAILED_NO_DATA — a property can ship `verdict=SUCCESS` with full unit data but a blank, dirty, or un-parseable `concessions` column. This section is the diagnostic + fix reference for that class of bug.
+
+The capture pipeline has three layers; each emits its own field at the property and unit level so a downstream reader can always recover the raw text even when normalization fails:
+
+```
+raw page HTML                              units[].concession_text  (raw, ALWAYS preserved)
+        │
+        ▼  _capture_concession_from_html      ── property-level: concessions
+   pms/scraper.py
+        │
+        ▼  clean_concession_text             ── concessions_clean / concession_text_clean
+   core/concession_clean.py                     _concessions_quality / _concession_quality
+        │
+        ▼  normalize_concession              ── concessions_structured / concession_structured
+   core/concession_normalize.py                 (may be None — raw stays the source of truth)
+```
+
+**Preserve-and-flag invariant:** the raw text is *never* discarded. `concessions_structured` is None when the regex normaliser couldn't confidently parse one of the supported shapes; the cleaned text and the quality label still ship. xlsx readers fall back through `concession_text_clean → concession_text → concessions`. DB writes bundle all four into `units.concessions` JSON. If a future change touches any of these three modules, run `tests/core/test_concession_pipeline.py::TestPreserveAndFlagInvariant` before shipping.
+
+### 18.1 Symptom decoder
+
+| Symptom | Most likely cause | Fix reference |
+|---|---|---|
+| **Concessions xlsx column blank for every row** | `daily_failures.py` reading legacy plural key `concessions` while v2 emits `concession_text` | §18.3.6 — read chain is now `concession_text_clean → concession_text → concessions` |
+| **Concession text contains JS function bodies / CSS rules** (`href.indexOf`, `padding:`, `Functions["abc~1"]`) | `<script>`/`<style>` BODIES not stripped before tag-flatten in the page-HTML capture | §18.3.1 — script-strip regex landed BEFORE the tag-flatten |
+| **Captured `"Limited Time Offer!"` (header only, no body)** | Sentence-split discarded the body sentence; matched sentence is the banner header terminated by `!` | §18.3.1 — sentence-extend forward 1-2 sentences while staying under 300 chars |
+| **Property has concessions on page but ours shows none** | Concession copy lives on `/specials` (not homepage); the URL probe missed or hit captcha | §18.3.4 — `_probe_specials_pages` with stealth-fetch + NOT_MODIFIED fallback + 4-path cap |
+| **`concessions_structured` is `None` despite non-empty raw text** | Expected raw-fallback behaviour — text didn't match any supported offer shape (e.g. amenity-noise "Free WiFi", marketing prose) | NOT A BUG — verify raw is preserved at `concessions` / `concession_text` and downstream consumers fall back to it. See §18.4 invariant. |
+| **`units.concessions` JSON column is `None` despite per-unit emit** | `_SNAPSHOT_SOURCES["concessions"]` was reading `("concessions",)` but schema_v2 emits under `"concession_text"` | §18.3.6 — SNAPSHOT_SOURCES key chain now `("concession_text", "concession", "concessions")` + structured bundle in `_bundle_unit_concessions` |
+| **Concession found via stealth probe one day, missing next day** | L1 conditional-cache returned `NOT_MODIFIED, body=None` (carry-forward signal poisoned the probe) | §18.3.4 — NOT_MODIFIED falls through to `stealth_probe` (no conditional cache) for a fresh body |
+| **`HOP_CAPTCHA_DETECTED` event count high for one domain** | The L1 stealth posture isn't sufficient on this WAF — domain needs a stealth-tier escalation | §18.5 known limitation — first inspect `concession_probe.result outcome=all_blocked` rate |
+| **Garbled bytes in `concession_text` despite clean page** | Server returned `Content-Encoding: zstd` and `zstandard` was not installed | §18.5 — `zstandard>=0.22.0` is in `requirements.txt`; verify it shipped |
+
+### 18.2 Per-property concession diagnostic — 4-question checklist
+
+Run AFTER Phase 3 Q1-Q13 — concession capture is decoupled from unit extraction, so a SUCCESS verdict tells you nothing about concession health. For each property you investigate, answer all 4 from `events.jsonl` + the property record under `data/runs/<date>/properties.json`.
+
+| # | Question | Where to look | What different answers tell you |
+|---|---|---|---|
+| **Q14** | What's the raw `concessions` value at the property level? | `data/runs/<date>/properties.json` → property record | Non-empty raw → `_capture_concession_from_html` fired; check `_concessions_quality` next. Empty + `concessions_source_url` is None → no homepage hit and either the /specials probe missed or never fired. |
+| **Q15** | What does the `_concessions_quality` flag say? | property record | `clean` → text is safe to display. `unclean_script_leak` / `unclean_style_leak` / `unclean_dmapi` → the script-strip in scraper.py didn't catch this leak shape; add the marker to `_SCRIPT_LEAK_MARKERS` / `_STYLE_LEAK_MARKERS` (§18.3.2). `unclean_header_only` → header captured, body sentence dropped; check why sentence-extend didn't reach the body. `unclean_orphan_prefix` → text starts mid-statement; raw was truncated upstream. |
+| **Q16** | Did the /specials probe fire? What was its outcome? | grep events.jsonl for `extract.concession_probe.result` for this PID | `outcome=found` → probe rescued the concession; `source_url` tells you which path. `outcome=exhausted` → all probed paths returned non-OK (404 etc.); concession may genuinely not exist OR may be on a path outside the canonical list — consider raising `max_paths` for this domain. `outcome=all_blocked` → every probed path was captcha-blocked; domain needs stealth-tier escalation. Missing event → homepage capture succeeded (probe was short-circuited) OR concession capture wasn't invoked at all (check that `result["concessions_text"]` was already populated). |
+| **Q17** | Did any hop hit captcha? | grep events.jsonl for `extract.hop.captcha_detected` for this PID | Multiple captcha hits across the probe → same as Q16 `all_blocked`. Captcha on `context=realpage_cws_probe` → RealPage's WAF tightened, the CWS credential path is no longer viable for this property. Captcha on `context=beacon_ajax_probe` → Beacon's site is now Cloudflare-protected. Zero captcha events on a missed concession → not a stealth issue; check Q15 (quality flag) and Q16 (probe outcome). |
+
+### 18.3 Fixes implemented (2026-05-20 + 2026-05-21)
+
+#### 18.3.1 Property-level page-HTML capture (with script-strip + sentence-extend)
+
+**Signal:** before this fix, ~50% of canary concession captures contained JS function bodies leaked from the ±200-char window around the regex match. ~10K of 49,677 captures hit the 300-char cap with the real offer chopped off. A subsequent batch (~46 rows for Woodland Creek) captured just `Limited Time Offer!` — the body sentence was lost to sentence-split.
+
+**Where:** [pms/scraper.py](ma_poc/pms/scraper.py) — `_PROPERTY_CONCESSION_RE` + `_capture_concession_from_html()`. Capture runs once per scrape on `page_html` before the detector + adapter dispatch:
+
+1. Strip `<script>` / `<style>` / `<noscript>` *bodies* via `re.sub(r"<(script|style|noscript)\b[^>]*>.*?</\1>", " ", html, flags=re.IGNORECASE|re.DOTALL)` BEFORE the tag-flatten.
+2. Search the flattened text with `_PROPERTY_CONCESSION_RE` (anchored numbers + `weeks?/months? free`, `$X off`, `limited-time offer`, `move-in special`, etc.).
+3. Take a ±200-char window, sentence-split it, find the matched sentence, then walk forward 1-2 sentences while the running total stays under 300 chars. This recovers banner-header rows (`Limited Time Offer!`) by stitching the body sentence (`Move in by 6/15 and get 1 month free rent.`).
+
+**Source-grep pins:** `tests/pms/test_concession_capture.py::test_script_strip_pattern_present_in_scraper` and `test_sentence_extend_pattern_present_in_scraper` catch refactor regressions.
+
+#### 18.3.2 Raw-text preserve-and-flag
+
+**Where:** [core/concession_clean.py](ma_poc/core/concession_clean.py) (new). Two helpers:
+
+* `classify_concession_quality(text) -> str` — returns one of `clean | unclean_script_leak | unclean_style_leak | unclean_dmapi | unclean_orphan_prefix | unclean_header_only | empty`. Drives the `_concession_quality` / `_concessions_quality` field downstream.
+* `clean_concession_text(text) -> str` — best-effort cleaner. Two strategies (first wins): (a) 120-char window around the first recognised offer phrase (`weeks free`, `$X off`, `move-in special`, etc.); (b) boundary-split at the last `})` / `};` / `>` followed by capital letter or digit. **Never returns empty** when the input had visible-text content — preserves the user invariant.
+
+Header-only rows return whitespace-normalised banner (nothing to mine; the text IS the banner). The quality flag tells reporting to display with caution.
+
+#### 18.3.3 Structured normalizer with raw fallback
+
+**Where:** [core/concession_normalize.py](ma_poc/core/concession_normalize.py) (new). `normalize_concession(text, source="TEXT") -> dict | None`. Supported shapes (first match wins):
+
+| Shape | Output type | Example match |
+|---|---|---|
+| `N weeks/months/days free` (+ inverted form) | `free_rent` with `free_period: {value, unit}` | "2 months free rent" |
+| `$X off / save $X / $X welcome bonus` | `discount` with `amount: {value, currency}` | "Save $500 off" |
+| `N% off` (bounded 0-99 to reject "150% off" → matching "50% off") | `percent_off` with `percent` | "10% off" |
+| `Waived <kind> fee(s)` | `waived_fee` with `fee_kind` | "Waived application fee" |
+| `Reduced deposit` | `reduced_deposit` | "Reduced deposit" |
+| `Look and lease` | `look_and_lease` | "Look-and-lease special" |
+
+Each result also carries `deadline` (raw date string from `Move in by | Lease by | Valid through | Expires …` — best-effort, date-pipeline owns format normalisation downstream) and `conditions` (≤80 chars of qualifier copy after the offer phrase, sentence-bounded).
+
+**Raw-fallback invariant:** `normalize_concession` returns `None` for anything that doesn't match a supported shape. The caller MUST retain the raw text in a sibling field — `schema_v2.py` and `jugnu.py` both do this unconditionally. If you add a new offer shape, add a regex + builder + append to `_RULES`; never remove the `None`-return path.
+
+#### 18.3.4 /specials URL probe with stealth + cap + telemetry
+
+**Where:** [pms/scraper.py](ma_poc/pms/scraper.py) — `_probe_specials_pages()`. Fires only when the homepage capture missed. Iterates a fixed `_SPECIALS_PATHS` list (`/specials`, `/special-offers`, `/specials-offers`, `/promotions`, ...) and routes EACH candidate through `jugnu_fetch(CrawlTask)` — the L1 stealth stack with identity rotation, Chrome header set, captcha detect, proxy selection.
+
+**Key invariants:**
+
+* **Stealth on every hop.** Every probed URL carries `property_id` as the sticky-key — the entry-page fetch and every downstream probe present the same Chrome identity to the bot-management edge. Tests pin this (`tests/fetch/test_probe.py::test_stealth_probe_sticky_identity_by_property_id`).
+* **Captcha guards.** A `captcha_detected=True` response is skipped (interstitial HTML would yield false-positive matches like "Just a moment..."). The L1 captcha_detected flag is the canonical signal.
+* **NOT_MODIFIED fallback.** L1's conditional-GET cache returns `outcome=NOT_MODIFIED, body=None` when the server matches our `If-None-Match`. Correct for entry-page change-detection, WRONG for a concession probe that needs the current body. The probe falls through to `stealth_probe` (no conditional cache) on this outcome.
+* **Early-exit cap.** `max_paths: int = 4` bounds the worst-case probe time. Bumping to 12 lets a captcha-blocked property burn ~180s; capping at 4 bounds it to ~60s. Configurable per-call.
+
+#### 18.3.5 stealth_probe helper for adapter-side probes
+
+**Where:** [fetch/probe.py](ma_poc/fetch/probe.py) (new). The L1 `fetch()` entry point is GET-only and rejects custom headers because the `CrawlTask` contract is intentionally narrow. `stealth_probe` is the slimmer surface for adapter-side hops that need custom headers (RealPage CWS `x-ws-authkey`), non-GET methods (Beacon AJAX POST), or short-timeout fire-and-forget calls outside the L1 retry loop.
+
+Applies the same `IdentityPool.pick(sticky_key=property_id)` + `chrome_header_set(cold_visit=True)` + `looks_like_captcha` as the L1 fetcher. Skips the conditional-GET cache, the rate limiter, and the retry / identity-rotation loop — adapter probes piggy-back on the L1 budget.
+
+**Currently wired into:**
+
+* RealPage CWS API probe at `pms/adapters/generic.py:_probe_realpage_cws` — `telemetry_context="realpage_cws_probe"`.
+* Beacon AJAX POST probe at `pms/adapters/generic.py:_probe_beacon_ajax` — `telemetry_context="beacon_ajax_probe"`.
+* /specials NOT_MODIFIED fallback in `_probe_specials_pages` — `telemetry_context="specials_probe"`.
+
+#### 18.3.6 DB persistence + xlsx export fixes
+
+Two pre-existing bugs surfaced during the rewrite:
+
+| Bug | Fix |
+|---|---|
+| `data_provider/sql/stores.py::_SNAPSHOT_SOURCES["concessions"] = ("concessions",)` — read the wrong key. v2 schema emits `concession_text` per unit, so `units.concessions` JSON column was always None. | Chain widened to `("concession_text", "concession", "concessions")`. New `_bundle_unit_concessions()` runs after the snapshot loop and bundles `{text, text_clean, quality, structured, value, source}` into the JSON column. Pre-bundled dict (carry-forward path) passes through unchanged. |
+| `scripts/email/daily_failures.py` xlsx export read `u.get("concessions")` (legacy plural). v2 unit dict emits `concession_text` — the Concessions column was blank on every row. | Read chain now `concession_text_clean → concession_text → concessions`. Applied at both call sites (success-row and failed-row paths). |
+
+#### 18.3.7 Vision-LLM banner fallback (lazy, env-gated)
+
+**Where:** [extraction/vision_banner.py](ma_poc/extraction/vision_banner.py) (new). Fires only when text-based capture AND `/specials` probe both missed AND a Playwright `page` is available AND a vision provider is env-configured (`ANTHROPIC_API_KEY` or `AZURE_OPENAI_API_KEY + AZURE_OPENAI_DEPLOYMENT_GPT4O_VISION + AZURE_OPENAI_ENDPOINT`). No-op when any precondition fails — vision is opt-in.
+
+Crops to top-third of viewport (where banners sit), JPEG-encodes at 70% quality, caps base64 payload at 1.5 MB. Returns a dict with the same shape as `normalize_concession()` so `schema_v2.py` and `jugnu.py` prefer the vision-parsed structure over re-normalising the text (the LLM already aggregated sentence fragments and read structured terms directly from the image).
+
+**Cost guard:** bounded to one screenshot + one vision call per property. No retry. Failures return None — the structured-fallback chain ends here.
+
+### 18.4 Telemetry — measuring concession capture health in production
+
+Two new event kinds in [observability/events.py](ma_poc/observability/events.py):
+
+| Event | Payload | Aggregation question it answers |
+|---|---|---|
+| `extract.hop.captcha_detected` | `url`, `provider` (`cloudflare`/`recaptcha`/`hcaptcha`/`perimeterx`/`sgcaptcha`/`unknown`), `context` (`specials_probe`/`realpage_cws_probe`/`beacon_ajax_probe`/`other`), `status` | Hop-captcha rate per hop class — distinct from the much-noisier `fetch.captcha_detected` (entry-page) firehose. Filterable without URL-pattern regex. |
+| `extract.concession_probe.result` | `outcome` (`found`/`exhausted`/`all_blocked`), `paths_attempted`, `captcha_count`, `source_url` | Per-property terminal outcome of the /specials probe. `all_blocked` is the canonical signal that a domain needs a stealth-tier escalation. |
+
+Worked queries:
+
+```sql
+-- Hop-captcha rate per hop class (over the most recent N runs).
+SELECT context, provider, COUNT(*) AS hits
+FROM events
+WHERE kind = 'extract.hop.captcha_detected'
+  AND ts > now() - interval '7 days'
+GROUP BY context, provider
+ORDER BY hits DESC;
+```
+
+```sql
+-- /specials probe outcome distribution.
+SELECT outcome, COUNT(*) AS n,
+       round(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 1) AS pct
+FROM events
+WHERE kind = 'extract.concession_probe.result'
+  AND ts > now() - interval '7 days'
+GROUP BY outcome;
+-- found > 0% : probe is recovering concessions homepage capture missed.
+-- all_blocked > 5% : meaningful fraction of domains need a stealth escalation.
+```
+
+```sql
+-- Per-domain unit fidelity: which hostnames lose concession copy to all_blocked?
+SELECT split_part(split_part(source_url, '/', 3), ':', 1) AS host, COUNT(*) AS blocks
+FROM events
+WHERE kind = 'extract.concession_probe.result' AND outcome = 'all_blocked'
+GROUP BY host
+ORDER BY blocks DESC
+LIMIT 20;
+```
+
+### 18.5 Known limitations and known-good tradeoffs
+
+* **Quirky WordPress sites can backfire under full stealth.** Confirmed in the 2026-05-20 canary on `woodviewapartments.com/specials`: minimal Chrome UA returns 643 KB containing the offer; full stealth (Chrome UA + `Sec-Ch-Ua` client hints + `Sec-Fetch-*` suite) returns 116 KB without it. The WordPress server's caching layer / theme device-detects on the modern client-hint headers and serves a different variant. **This is a known tradeoff** — stealth helps on bot-managed sites (RentCafe, RealPage, Equity), occasionally hurts on idiosyncratic WordPress. Don't weaken stealth to chase WordPress quirks; if a specific domain matters, raise `max_paths` for that domain or add a per-domain header override.
+* **`zstandard` codec gap.** `Accept-Encoding: gzip, deflate, br, zstd` is advertised in `chrome_header_set`. Without `zstandard` installed httpx CANNOT decode `Content-Encoding: zstd` responses and hands back undecoded bytes that break UTF-8 decoding and regex matching. Closed by pinning `zstandard>=0.22.0` in `requirements.txt` (2026-05-21). If you see garbled `concession_text` in production despite a 200 status, confirm `zstandard` is in the runtime image.
+* **Capture is best-effort, never blocking.** Every probe wraps its core in `try/except` and the scrape continues on any failure. A property with extraction-side bugs may still ship correct units alongside a None concessions field; the inverse (units missing because of concession capture) is impossible by construction.
+* **`concessions_structured` is allowed to be None.** If a property's concession text is `"Welcome to our community"`, the normaliser correctly returns None and the raw text is the system of record. Do NOT count `concessions_structured IS NULL` as a failure metric — count `concessions IS NOT NULL AND _concessions_quality != 'empty'` for "we captured something" and `concessions_structured IS NOT NULL` for "we structured it".
+
+### 18.6 Concession files at a glance
+
+| File | What it owns |
+|---|---|
+| [core/concession_clean.py](ma_poc/core/concession_clean.py) | `classify_concession_quality`, `clean_concession_text`. Quality labels + best-effort cleaner. |
+| [core/concession_normalize.py](ma_poc/core/concession_normalize.py) | `normalize_concession` and the offer-shape rule table. Returns `dict` or `None`. |
+| [pms/scraper.py](ma_poc/pms/scraper.py) | `_PROPERTY_CONCESSION_RE`, `_capture_concession_from_html`, `_SPECIALS_PATHS`, `_probe_specials_pages` (with `max_paths`, NOT_MODIFIED fallback, telemetry emits). |
+| [fetch/probe.py](ma_poc/fetch/probe.py) | `stealth_probe` — slim L1-equivalent for adapter probes with custom headers / POST / short timeouts. |
+| [extraction/vision_banner.py](ma_poc/extraction/vision_banner.py) | Vision-LLM banner fallback. Lazy + env-gated. |
+| [pms/adapters/generic.py](ma_poc/pms/adapters/generic.py) | `_probe_realpage_cws` + `_probe_beacon_ajax` — wired through `stealth_probe` with telemetry contexts. |
+| [core/schema_v2.py](ma_poc/core/schema_v2.py) | Emits the trio (raw + clean + quality + structured) at unit AND property level. Prefers vision-LLM structured output when present. |
+| [scripts/runners/jugnu.py](ma_poc/scripts/runners/jugnu.py) | Property-record surface for `concessions_clean` / `_concessions_quality` / `concessions_structured` / `concessions_source_url`. |
+| [data_provider/sql/stores.py](ma_poc/data_provider/sql/stores.py) | `_bundle_unit_concessions` — bundles the trio into `units.concessions` JSON column. |
+| [scripts/email/daily_failures.py](ma_poc/scripts/email/daily_failures.py) | xlsx export read-chain. |
+| [scripts/diagnostics/concession_canary.py](ma_poc/scripts/diagnostics/concession_canary.py) | Standalone canary: fetches ~12 property home pages and runs the full pipeline. No DB, no Playwright. |
+| [tests/core/test_concession_clean.py](ma_poc/tests/core/test_concession_clean.py) | 29 tests — quality classifier + cleaner invariants. |
+| [tests/core/test_concession_normalize.py](ma_poc/tests/core/test_concession_normalize.py) | 27 tests — offer-shape coverage + no-match → None. |
+| [tests/core/test_concession_pipeline.py](ma_poc/tests/core/test_concession_pipeline.py) | 32 tests — end-to-end raw-preservation invariant + real-property fixtures. |
+| [tests/pms/test_concession_capture.py](ma_poc/tests/pms/test_concession_capture.py) | 20+ tests — script-strip, sentence-extend, /specials probe stealth + cap + telemetry. |
+| [tests/fetch/test_probe.py](ma_poc/tests/fetch/test_probe.py) | `stealth_probe` invariants — stealth headers, sticky identity, captcha detect, telemetry. |
+| [tests/data_provider/test_concession_bundle.py](ma_poc/tests/data_provider/test_concession_bundle.py) | 7 tests — JSON-column bundle shape + raw-fallback when structured is None. |
+
+### 18.7 Decision tree: how to handle a concession bug report
+
+```
+Property X shows blank concessions in the daily xlsx
+│
+├─ Q14: is properties.json[X].concessions populated?
+│  │
+│  ├─ YES → xlsx export bug. Check daily_failures.py read-chain (§18.3.6).
+│  │        Confirm concession_text_clean → concession_text → concessions order.
+│  │
+│  └─ NO → capture missed. Continue.
+│
+├─ Q15: any concession event in events.jsonl for this PID?
+│  │
+│  ├─ extract.concession_probe.result outcome=found → schema_v2 emit failed.
+│  │        Inspect concession_text vs concessions field name (unit vs property).
+│  │
+│  ├─ outcome=exhausted → probe didn't recover. Live-fetch the homepage:
+│  │        - If banner copy IS in the HTML → _PROPERTY_CONCESSION_RE missed
+│  │          the phrase shape. Add to the regex.
+│  │        - If banner is on /specials but not in probed paths → add path
+│  │          to _SPECIALS_PATHS OR raise max_paths for this domain.
+│  │
+│  ├─ outcome=all_blocked → domain is captcha-walled on the probe.
+│  │        Inspect extract.hop.captcha_detected events for provider.
+│  │        If cloudflare → consider stealth-tier escalation
+│  │        (residential proxy + Playwright RENDER) for this host.
+│  │
+│  └─ no event → capture never invoked. Check that scrape() reached the
+│        property-level capture block (page_html was non-empty, no
+│        exception before line ~570).
+│
+└─ Q16: vision banner fired?
+   │
+   ├─ Property has VISION provider env vars set → grep for
+   │    "vision_banner screenshot failed" or "vision_banner call failed"
+   │    in logs; provider may be erroring.
+   │
+   └─ No env vars set → vision is opt-in, this is expected. Land env vars
+        in production to enable image-only banner capture.
+```
+
+---
+
 ## Phase 16 — Closing checklist before shipping a fix
 
 1. **Code change** has file:line citations in the commit message.
@@ -948,6 +1213,11 @@ Deferred because: requires careful slugification rules (vendor-specific edge cas
 7. **Verify on at least one specifically-diagnosed PID** that the new event trace matches the expected tier sequence.
 8. **No half-finished changes** in the diff (TODO comments, commented-out code, unused imports).
 9. **Anti-patterns audit:** for each Phase 0 anti-pattern, ask yourself "did I avoid this in my diff?"
+10. **Concession-pipeline audit** (if your change touches `concession_clean.py` / `concession_normalize.py` / `_capture_concession_from_html` / `_probe_specials_pages` / schema_v2 concession emit):
+    a. Run `tests/core/test_concession_pipeline.py::TestPreserveAndFlagInvariant` — pins the raw-text-never-discarded contract.
+    b. Run `python ma_poc/scripts/diagnostics/concession_canary.py` against ≥4 properties known to advertise concessions; spot-check that `raw` and `_quality` and `structured` are all populated as expected.
+    c. If the change touches `_PROPERTY_CONCESSION_RE` or the script-strip regex, confirm the source-grep pins (`test_script_strip_pattern_present_in_scraper` + `test_sentence_extend_pattern_present_in_scraper`) still match — these catch refactor regressions.
+    d. Verify `_concessions_quality` distribution didn't regress (∼50% clean baseline pre-fix; should be ≥90% clean post-fix). Look at the canary JSON output's quality histogram.
 
 ---
 
@@ -967,3 +1237,9 @@ Deferred because: requires careful slugification rules (vendor-specific edge cas
 - **plan_summaries partition** (2026-05-17) — the second output of `extraction.post_process.post_process`. Rows admitted by Stage-1 validity but classified as plan-level (no per-unit identity). Ships under `Floor Plans` (v1) / `floor_plans` (v2). Before §8.18 fix these were silently dropped at the v2 formatter.
 - **Cross-host per-plan URL** (2026-05-17) — per-floorplan detail page URL whose host differs from the just-finished hop's host. Discovered by `_discover_cross_host_per_plan_urls` via URL SHAPE (`/floor[-]?plans?/{slug-with-br-ba}`). Required when a portal host (`*.securecafe.com`) yields plan-summary rows while per-apartment inventory lives on a different host (`{property}.com/floorplans/{slug}`).
 - **Unit-fidelity check (Q13)** — compare emitted `units` count to the extractor's reported `units_found`. A SUCCESS verdict with units lost in transit is a §8.18-8.20 silent regression, NOT a real fix. Always run before celebrating an "IMPROVED" cluster.
+- **Preserve-and-flag invariant** (2026-05-21) — the property-level + per-unit concession pipeline ALWAYS retains the raw text (`concessions` / `concession_text`) alongside the cleaned variant (`concessions_clean` / `concession_text_clean`), the quality label (`_concessions_quality` / `_concession_quality`), and the structured object (`concessions_structured` / `concession_structured` — may be `None`). When normalization fails, raw is the system of record. Pinned by `tests/core/test_concession_pipeline.py::TestPreserveAndFlagInvariant`.
+- **_concession_quality** (2026-05-21) — short label classifying the raw concession text. Values: `clean` / `unclean_script_leak` / `unclean_style_leak` / `unclean_dmapi` / `unclean_orphan_prefix` / `unclean_header_only` / `empty`. Each `unclean_*` value tells you something specific about the upstream capture; see §18.1 symptom decoder.
+- **concessions_structured** (2026-05-21) — regex-derived structured object. Shapes: `free_rent` / `discount` / `percent_off` / `waived_fee` / `reduced_deposit` / `look_and_lease`. Always carries `text` (whitespace-normalized source), `source` (`TEXT` / `IMAGE_BANNER` / `URL_PROBE` / `API`), `deadline`, `conditions`. `None` is a valid value — DO NOT count `IS NULL` as a failure metric.
+- **stealth_probe** (2026-05-21) — adapter-side HTTP probe helper at `fetch/probe.py`. Applies `IdentityPool.pick(sticky_key=property_id)` + `chrome_header_set(cold_visit=True)` + `looks_like_captcha`. Used when the L1 `fetch()` entry point can't be reached (custom request headers, non-GET method, or fire-and-forget probe outside the L1 retry loop). Sticky identity ensures a property's entry-page fetch and every adapter-side probe present the same Chrome identity to the bot-management edge.
+- **HOP_CAPTCHA_DETECTED** (2026-05-21) — new event kind at `observability/events.py`. Fires when a hop (concession `/specials` probe, RealPage CWS probe, Beacon AJAX probe) hits a captcha. Payload `context` distinguishes the hop class without URL-pattern regex. Distinct from the noisier entry-page `FETCH_CAPTCHA_DETECTED`.
+- **CONCESSION_PROBE_RESULT** (2026-05-21) — per-property terminal outcome of `_probe_specials_pages`. `outcome` is `found` / `exhausted` / `all_blocked`. `all_blocked` is the canonical signal that a domain needs a stealth-tier escalation.

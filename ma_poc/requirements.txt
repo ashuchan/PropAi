@@ -21,6 +21,13 @@ extruct>=0.17.0
 lxml>=5.2.0
 beautifulsoup4>=4.12.3
 httpx>=0.27.0
+# Optional httpx codec — Chrome 118+ sends ``Accept-Encoding: gzip, deflate, br, zstd``
+# (we mirror this in ``ma_poc/fetch/headers.py:chrome_header_set``). Without
+# the ``zstandard`` package httpx CANNOT decode ``Content-Encoding: zstd``
+# responses and silently hands back undecoded bytes, which break downstream
+# UTF-8 decoding and regex matching. Adding it here is a 1-line defensive
+# install — no API changes; httpx picks it up automatically at import.
+zstandard>=0.22.0
 tenacity>=8.3.0
 pydantic>=2.7.0
 pyyaml>=6.0.1

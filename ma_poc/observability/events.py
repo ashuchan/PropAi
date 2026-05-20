@@ -51,6 +51,22 @@ class EventKind(StrEnum):
     LINK_HOP_STARTED = "extract.link_hop_started"
     LINK_HOP_FETCHED = "extract.link_hop_fetched"
     LINK_HOP_RECOVERED = "extract.link_hop_recovered"
+    # Captcha hit on a hop (adapter-side probe or /specials probe).
+    # Distinct from ``FETCH_CAPTCHA_DETECTED`` (entry-page) so production
+    # telemetry can measure the hop-captcha rate without URL filtering.
+    # Payload carries ``context`` (``specials_probe`` |
+    # ``realpage_cws_probe`` | ``beacon_ajax_probe`` | ``other``) and
+    # ``provider`` (``cloudflare`` | ``recaptcha`` | ``hcaptcha`` |
+    # ``perimeterx`` | ``sgcaptcha`` | ``unknown``) so a single counter
+    # rollup answers "which hop class fights which WAF most often".
+    HOP_CAPTCHA_DETECTED = "extract.hop.captcha_detected"
+    # Once per property: terminal outcome of the /specials probe.
+    # ``outcome`` is ``found`` (concession copy recovered) /
+    # ``exhausted`` (no path returned a concession) /
+    # ``all_blocked`` (every probed path returned captcha/non-OK).
+    # ``paths_attempted`` is the count of paths actually fetched
+    # (caps out at ``max_paths`` — useful for cap-tuning analysis).
+    CONCESSION_PROBE_RESULT = "extract.concession_probe.result"
 
     # Validation (L4)
     RECORD_ACCEPTED = "validate.record_accepted"

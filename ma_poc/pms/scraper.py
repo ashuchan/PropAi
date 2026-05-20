@@ -51,6 +51,311 @@ _UNREACHABLE_PATTERNS: tuple[str, ...] = (
 )
 
 
+# ─────────────────────────────────────────────────────────────────────
+# Property-level concession capture (text-based, deterministic, $0)
+# ─────────────────────────────────────────────────────────────────────
+#
+# Detector regex for banner-style property-level concession copy.
+# Bounded number word so "free wifi" / "free parking" / "FLEX" don't
+# trigger; matches dollar amounts, weeks/months/days free, look-and-
+# lease, limited-time-offer, waived fees, reduced deposit.
+_CW_NUM = (
+    r"(?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve)"
+)
+_PROPERTY_CONCESSION_RE = re.compile(
+    rf"\b{_CW_NUM}[\s-]*(?:full[\s-]+)?(?:weeks?|months?)['’]?s?[\s-]*"
+    r"(?:of[\s-]+)?(?:rent[\s-]+)?(?:free|complimentary|on\s+us)\b"
+    rf"|\b(?:rent[\s-]?)?free\s+(?:for\s+)?(?:{_CW_NUM}\s+)?(?:full\s+)?"
+    r"(?:weeks?|months?)\b"
+    rf"|\b(?:first|1st)\s+(?:{_CW_NUM}\s+)?(?:full\s+)?months?\b"
+    r"[^.!?]{0,40}\bfree\b"
+    r"|\bfree\s+rent\b|\bmonths?\s+on\s+us\b"
+    r"|\$\s?\d{1,3}(?:,\d{3})*\s*(?:off|gift\s*card|credit|cash|savings|"
+    r"welcome\s+bonus)\b"
+    r"|\bsave\s+(?:up\s+to\s+)?\$\s?\d"
+    r"|\$\s?\d{2,5}\s+(?:welcome\s+)?bonus\b"
+    r"|\breduced\s+rents?\b|\brent\s+as\s+low\s+as\s+\$"
+    r"|\blook[\s-]*(?:and|&|\+|n)?[\s-]*lease\b"
+    r"|\b(?:move[- ]?in|mi)\s+special\b"
+    r"|\b(?:rent|lease|deposit|move[- ]?in)\s+special\b"
+    r"|\blimited[- ]time\s+(?:offer|special|savings|deal)\b"
+    r"|\breduced\s+deposit\b"
+    r"|\bwaived\s+(?:application|admin(?:istration)?|amenity|"
+    r"move[- ]?in|deposit)\s*fees?\b",
+    re.IGNORECASE,
+)
+
+# URL path candidates for the /specials discovery probe. Tried in order
+# against ``urljoin(base_url, path)``; first response carrying a
+# concession match wins. Lower-case canonical paths — sites that use
+# alternate capitalisation are caught by case-insensitive comparison
+# in the URL hop crawler.
+_SPECIALS_PATHS: tuple[str, ...] = (
+    "/specials",
+    "/special-offers",
+    "/specials-offers",
+    "/promotions",
+    "/promotion",
+    "/offers",
+    "/move-in-specials",
+    "/move-in-special",
+    "/concessions",
+    "/concession",
+    "/deals",
+    "/leasing-specials",
+)
+
+
+def _capture_concession_from_html(page_html: str) -> str | None:
+    """Return a property-level concession snippet from *page_html*.
+
+    Three-step pipeline:
+
+    1. Strip ``<script>`` / ``<style>`` / ``<noscript>`` BODIES via a
+       block regex BEFORE the tag-strip flatten. Eliminates the
+       JS/CSS prefix leak that consumed ~50% of canary captures.
+    2. Search the flattened text with :data:`_PROPERTY_CONCESSION_RE`
+       and extract a ±200-char window around the match.
+    3. Sentence-split the window; locate the matched sentence; extend
+       forward 1-2 sentences while the running total stays under 300
+       chars so banner-header rows (``Limited Time Offer!``) pick up
+       the body that lives in the next sentence.
+
+    Returns ``None`` when no match is found or the input is empty.
+    The caller decides what to do on miss — the /specials probe
+    re-runs the same capture against probed pages.
+    """
+    if not page_html or not isinstance(page_html, str):
+        return None
+    try:
+        # Strip script/style/noscript blocks BEFORE flattening tags so
+        # JS function bodies and CSS rules don't leak into the match
+        # window. Without this, ~50% of canary captures had the real
+        # offer text buried behind a PropLeadSource / CMS-Functions
+        # prefix that consumed the 300-char cap.
+        no_code = re.sub(
+            r"<(script|style|noscript)\b[^>]*>.*?</\1>",
+            " ",
+            page_html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        flat = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", no_code))
+    except Exception:
+        return None
+
+    m = _PROPERTY_CONCESSION_RE.search(flat)
+    if not m:
+        return None
+
+    s, e = m.span()
+    win = flat[max(0, s - 200): e + 200]
+    off = s - max(0, s - 200)
+
+    # Sentence-extend forward: the matched sentence is often a banner
+    # header ("Limited Time Offer!", "Move-in Special!") terminated by
+    # ``!`` while the actionable body ("Move in by 6/15 and get 1
+    # month free rent.") lives in the next sentence. Walk forward up
+    # to 2 extra sentences while the running total stays under 300
+    # chars so the downstream truncation doesn't lop off the body.
+    parts = re.split(r"(?<=[.!?|•·])\s+", win)
+    idx, acc = -1, 0
+    for i, p in enumerate(parts):
+        if acc <= off < acc + len(p) + 1:
+            idx = i
+            break
+        acc += len(p) + 1
+
+    if idx >= 0:
+        seg = parts[idx]
+        for nxt in parts[idx + 1: idx + 3]:
+            candidate = (seg + " " + nxt).strip()
+            if len(candidate) > 300:
+                break
+            seg = candidate
+    else:
+        seg = win
+
+    return seg.strip()[:300] or None
+
+
+async def _probe_specials_pages(
+    base_url: str,
+    *,
+    property_id: str | None = None,
+    timeout_seconds: float = 5.0,
+    max_paths: int = 4,
+) -> tuple[str | None, str | None]:
+    """Probe a fixed set of ``/specials``-style paths for concession copy.
+
+    Routes every candidate URL through the L1 stealth fetcher
+    (:func:`ma_poc.fetch.fetch`) so each hop inherits the same
+    identity rotation, Chrome header set, proxy selection, and
+    captcha-detect logic as the entry-page fetch. ``property_id``
+    is the sticky-key — the same property sees the same Chrome
+    identity across entry + every hop, which keeps a coherent
+    "single user session" footprint at the bot-management edge.
+
+    ``max_paths`` bounds the worst-case probe time. The default of 4
+    covers the four most common URL patterns observed in production
+    (``/specials``, ``/special-offers``, ``/specials-offers``,
+    ``/promotions``). Worst-case wall time = ``max_paths × (timeout
+    + L1 retry overhead)`` — bumping to 12 lets a property hitting
+    captcha on every path burn ~180s of the 600s per-property budget;
+    capping at 4 bounds that to ~60s. Override per-call when probing
+    on hopelessly bot-blocked domains is genuinely worthwhile.
+
+    Returns ``(concession_text, source_url)`` — both ``None`` when no
+    probed page yields a match. Captcha-blocked responses are
+    skipped (so we don't feed an interstitial HTML page into the
+    concession-capture regex), as are non-OK outcomes. Failures
+    are silent — concession capture is best-effort, never blocks
+    the primary scrape. Emits a single :data:`CONCESSION_PROBE_RESULT`
+    event per property at the end so production telemetry can
+    aggregate found / exhausted / all_blocked rates.
+    """
+    try:
+        parsed = urllib.parse.urlparse(base_url)
+        if not parsed.scheme or not parsed.netloc:
+            return None, None
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+    except Exception:
+        return None, None
+
+    # Lazy imports — keep scraper.py importable when the L1 fetch
+    # layer isn't wired (e.g. during a static-analysis-only run).
+    try:
+        from ma_poc.discovery.contracts import CrawlTask, TaskReason
+        from ma_poc.fetch import fetch as jugnu_fetch
+        from ma_poc.fetch.contracts import FetchOutcome, RenderMode
+    except ImportError:
+        return None, None
+
+    # Lazy import of stealth_probe for the NOT_MODIFIED fallback. The
+    # L1 conditional-GET cache returns ``outcome=NOT_MODIFIED, body=None``
+    # when the server matches our ``If-None-Match`` ETag — correct for
+    # entry-page change-detection (carry-forward today's data), but
+    # WRONG for a concession probe where we need the CURRENT body to
+    # re-scan. Without a fallback the probe loses coverage on
+    # second-and-subsequent runs after the cache warmed.
+    try:
+        from ma_poc.fetch.probe import stealth_probe as _stealth_probe
+    except ImportError:
+        _stealth_probe = None  # type: ignore[assignment]
+
+    # Telemetry accumulator — emitted as a single
+    # ``CONCESSION_PROBE_RESULT`` event at the end of the probe.
+    paths_attempted = 0
+    captcha_count = 0
+    outcome_label = "exhausted"
+    found_snippet: str | None = None
+    found_source_url: str | None = None
+
+    for path in _SPECIALS_PATHS[: max(1, max_paths)]:
+        paths_attempted += 1
+        url = urllib.parse.urljoin(origin + "/", path.lstrip("/"))
+        task = CrawlTask(
+            url=url,
+            property_id=property_id or "unknown",
+            priority=10,  # background — entry hops are priority 0
+            budget_ms=int(timeout_seconds * 1000),
+            reason=TaskReason.SCHEDULED,
+            render_mode=RenderMode.GET,
+        )
+        try:
+            fr = await jugnu_fetch(task)
+        except Exception:
+            continue
+        # Captcha-detected: skip without parse (interstitial HTML would
+        # yield false-positive matches like "Just a moment..."). Emit a
+        # hop-captcha counter event for production aggregation; the L1
+        # fetcher already emits FETCH_CAPTCHA_DETECTED but the
+        # ``context="specials_probe"`` payload here lets ops separate
+        # entry-page from hop captcha rates without URL filtering.
+        if fr.captcha_detected:
+            captcha_count += 1
+            try:
+                from ma_poc.observability.events import EventKind, emit
+
+                emit(
+                    EventKind.HOP_CAPTCHA_DETECTED,
+                    property_id or "unknown",
+                    url=url,
+                    provider="unknown",
+                    context="specials_probe",
+                    status=fr.status,
+                )
+            except Exception:
+                pass  # observability is best-effort
+            continue
+
+        body = fr.body
+
+        # NOT_MODIFIED → L1's conditional cache returned 304 with an
+        # empty body. The URL EXISTS (server's ETag matched), so it's
+        # worth re-probing without the conditional headers to get the
+        # current body. ``stealth_probe`` uses the same identity pool
+        # + chrome_header_set but skips the conditional cache.
+        if (
+            fr.outcome == FetchOutcome.NOT_MODIFIED
+            and not body
+            and _stealth_probe is not None
+        ):
+            try:
+                refetch_body, refetch_status, refetch_captcha = await _stealth_probe(
+                    url,
+                    method="GET",
+                    property_id=property_id,
+                    timeout_seconds=timeout_seconds,
+                    telemetry_context="specials_probe",
+                )
+            except Exception:
+                refetch_body, refetch_status, refetch_captcha = None, None, None
+            if refetch_captcha:
+                captcha_count += 1
+            if refetch_status == 200 and not refetch_captcha and refetch_body:
+                body = refetch_body
+            else:
+                continue
+        elif fr.outcome != FetchOutcome.OK:
+            continue
+
+        if not body:
+            continue
+        try:
+            text = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
+        except Exception:
+            continue
+        snippet = _capture_concession_from_html(text)
+        if snippet:
+            found_snippet = snippet
+            found_source_url = fr.final_url or url
+            outcome_label = "found"
+            break
+
+    # Per-property terminal event so production aggregation can answer
+    # "what fraction of /specials probes succeed / get exhausted / get
+    # captcha-blocked end-to-end". ``all_blocked`` is the worst-case
+    # signal that this domain needs a stealth tier escalation.
+    if outcome_label != "found" and captcha_count >= paths_attempted and paths_attempted > 0:
+        outcome_label = "all_blocked"
+    try:
+        from ma_poc.observability.events import EventKind, emit
+
+        emit(
+            EventKind.CONCESSION_PROBE_RESULT,
+            property_id or "unknown",
+            outcome=outcome_label,
+            paths_attempted=paths_attempted,
+            captcha_count=captcha_count,
+            source_url=found_source_url,
+        )
+    except Exception:
+        pass  # observability is best-effort
+
+    return found_snippet, found_source_url
+
+
 # Telemetry keys whose values are list-typed and concatenate across the
 # main + sub-page sources. Order matters for downstream readers
 # (cost_ledger walks _llm_interactions in arrival order), so we always
@@ -537,6 +842,66 @@ async def scrape(
                 page_html = None
         elif isinstance(body, str):
             page_html = body
+
+    # --- Property-level concession capture (deterministic, $0) ---
+    # Capture-first: surface a raw banner snippet from page_html. The
+    # downstream schema_v2 emitter is responsible for the clean /
+    # quality / structured derivatives — this block only owns the raw
+    # capture and a /specials URL probe fallback so structured-failure
+    # never costs us the underlying text.
+    if page_html and not result.get("concessions_text"):
+        snippet = _capture_concession_from_html(page_html)
+        if snippet:
+            result["concessions_text"] = snippet
+            result["concessions_source_url"] = base_url
+
+    # /specials probe — only fires when main-page capture missed.
+    # Routes through the L1 stealth fetcher so every hop inherits the
+    # property's sticky Chrome identity + captcha-detect logic; same
+    # session footprint as the entry-page fetch. First probed path
+    # that yields a concession match wins; captcha-blocked or non-OK
+    # responses are silently skipped.
+    if not result.get("concessions_text"):
+        try:
+            snippet, source_url = await _probe_specials_pages(
+                base_url,
+                property_id=property_id,
+            )
+            if snippet:
+                result["concessions_text"] = snippet
+                result["concessions_source_url"] = source_url
+        except Exception:
+            pass  # probe failures must never break the scrape
+
+    # Vision-LLM banner fallback — only fires when both text-based
+    # capture (page_html and /specials probe) missed AND a Playwright
+    # page is available for a screenshot AND a vision provider is
+    # configured via env vars. No-op when any precondition fails.
+    # Cost: <=1 screenshot + 1 vision call per property; the function
+    # itself enforces the bound.
+    if not result.get("concessions_text") and page is not None:
+        try:
+            from ma_poc.extraction.vision_banner import capture_banner
+
+            banner = await capture_banner(page, property_id=property_id)
+            if banner and isinstance(banner.get("text"), str) and banner["text"]:
+                result["concessions_text"] = banner["text"]
+                result["concessions_source"] = "vision"
+                # The vision-LLM also returns structured fields. We
+                # stash them so schema_v2 / jugnu.py can prefer the
+                # vision-parsed structure over re-normalising the
+                # text (which often loses precision because vision
+                # already aggregated multiple sentence fragments).
+                result["concessions_vision_structured"] = {
+                    "type": banner.get("type"),
+                    "value": banner.get("value"),
+                    "deadline": banner.get("deadline"),
+                    "conditions": banner.get("conditions"),
+                    "source": banner.get("source") or "IMAGE_BANNER",
+                    "text": banner.get("text"),
+                }
+        except Exception:
+            pass  # vision capture must never break the scrape
 
     # --- Step 4: Re-detect with page HTML if available ---
     if page_html:

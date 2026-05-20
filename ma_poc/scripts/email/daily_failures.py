@@ -360,7 +360,11 @@ def _fetch_scraped_units_from_sql(
                 "rent_high": u.get("rent_high"),
                 "available_date": u.get("available_date") or "",
                 "lease_term": u.get("lease_term"),
-                "concessions": _stringify_concessions(u.get("concessions")),
+                "concessions": _stringify_concessions(
+                    u.get("concession_text_clean")
+                    or u.get("concession_text")
+                    or u.get("concessions")
+                ),
             })
     return out
 
@@ -629,7 +633,11 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
                 "rent_high": u.get("rent_high"),
                 "available_date": u.get("available_date") or "",
                 "lease_term": u.get("lease_term"),
-                "concessions": _stringify_concessions(u.get("concessions")),
+                "concessions": _stringify_concessions(
+                    u.get("concession_text_clean")
+                    or u.get("concession_text")
+                    or u.get("concessions")
+                ),
             })
             out.append(row)
     return out

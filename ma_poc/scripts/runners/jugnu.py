@@ -1697,7 +1697,38 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
     }
     website_design = _platform_labels.get(str(platform).lower(), platform or None)
 
+    # Concessions — raw text is the source of truth (preserve-and-flag
+    # invariant). ``concessions_clean`` is a display-ready variant and
+    # ``concessions_structured`` is a deterministic regex-shaped object
+    # (None when un-parseable — raw stays). Lazy-import keeps schema_v2
+    # cycles out of jugnu.py's tight import path.
+    from ma_poc.core.concession_clean import (
+        classify_concession_quality,
+        clean_concession_text,
+    )
+    from ma_poc.core.concession_normalize import normalize_concession
+
     concessions_text = result.get("concessions_text") or md.get("concessions")
+    concessions_source_url = result.get("concessions_source_url")
+    concessions_clean = clean_concession_text(concessions_text) if concessions_text else None
+    concessions_quality = classify_concession_quality(concessions_text) if concessions_text else None
+    # Prefer vision-LLM structured output when the capture came via
+    # ``vision_banner`` — it already aggregated sentence fragments and
+    # read structured terms directly from the image.
+    vision_structured = result.get("concessions_vision_structured")
+    if isinstance(vision_structured, dict) and vision_structured.get("type"):
+        concessions_structured = vision_structured
+    else:
+        concessions_structured = (
+            normalize_concession(
+                concessions_clean or concessions_text,
+                source=(
+                    "IMAGE_BANNER" if result.get("concessions_source") == "vision"
+                    else ("URL_PROBE" if concessions_source_url and concessions_source_url != result.get("base_url") else "TEXT")
+                ),
+            )
+            if concessions_text else None
+        )
 
     prop: dict[str, Any] = {
         "apartment_id": apartment_id,
@@ -1715,7 +1746,15 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "website": _csv("website") or _csv("Website") or result.get("base_url"),
         "pmc": _pick(_csv("Management Company") or _csv("pmc"), md.get("management_company")),
         "website_design": website_design,
+        # Raw concession banner text — preserve-and-flag invariant.
         "concessions": concessions_text,
+        # Best-effort cleaned variant + quality label + structured
+        # object. ``concessions_structured`` is None when normalize
+        # couldn't confidently parse — raw stays the source of truth.
+        "concessions_clean": concessions_clean,
+        "_concessions_quality": concessions_quality,
+        "concessions_structured": concessions_structured,
+        "concessions_source_url": concessions_source_url,
         # 2026-05-21: after per-unit format, run the floor-plan rent
         # join post-pass so units that share a ``floor_plan_id`` with
         # a rent-bearing sibling pick up the sibling's rent_low/high.

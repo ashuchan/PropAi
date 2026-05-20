@@ -695,7 +695,12 @@ class SqlUnitStateStore(IUnitStateStore):
         "available_date_raw": ("available_date_raw", "_date_placeholder"),
         "lease_term": ("lease_term", "_lease_term"),
         "move_in_date": ("move_in_date", "_move_in_date"),
-        "concessions": ("concessions",),
+        # Concessions reads ``concession_text`` first (the v2 schema's
+        # canonical raw key) and falls back to the legacy ``concession``
+        # / ``concessions`` keys for older callers. The bundled
+        # structured dict is built in ``_bundle_unit_concessions`` and
+        # overwrites this snap value after the loop.
+        "concessions": ("concession_text", "concession", "concessions"),
         "amenities": ("amenities",),
     }
 
@@ -709,6 +714,45 @@ class SqlUnitStateStore(IUnitStateStore):
             if v is not None and v != "":
                 return v
         return None
+
+    @staticmethod
+    def _bundle_unit_concessions(u: dict[str, Any]) -> dict[str, Any] | str | None:
+        """Bundle the unit-level concession fields into a single JSON value.
+
+        Returns either:
+          * A structured dict carrying raw text + cleaned variant +
+            quality label + parsed object + value + source provenance
+            when ANY concession field was emitted by the v2 transform.
+          * The legacy raw string when only the older ``concession`` /
+            ``concessions`` key is present (compatibility with callers
+            that bypass the v2 transform).
+          * ``None`` when no concession data was captured.
+
+        Raw is ALWAYS preserved. ``structured`` is ``None`` when the
+        regex normaliser couldn't confidently parse the text — that
+        does not erase the raw, it only signals "no parsed shape".
+        """
+        text = u.get("concession_text") or u.get("concession") or u.get("concessions")
+        if isinstance(text, dict):
+            # Already a bundled dict (e.g. carried-forward unit). Pass
+            # through unchanged so we don't double-wrap.
+            return text
+        text_clean = u.get("concession_text_clean")
+        quality = u.get("_concession_quality")
+        structured = u.get("concession_structured")
+        value = u.get("concession_value")
+        source = u.get("concession_source")
+        # If nothing surfaced, return None (matches prior null contract).
+        if not text and structured is None and value is None and not source:
+            return None
+        return {
+            "text": text if isinstance(text, str) else None,
+            "text_clean": text_clean if isinstance(text_clean, str) else None,
+            "quality": quality,
+            "structured": structured,
+            "value": value,
+            "source": source,
+        }
 
     def get_units(self, canonical_id: str) -> dict[str, UnitIndexEntry]:
         with self._h.scope() as s:
@@ -777,6 +821,13 @@ class SqlUnitStateStore(IUnitStateStore):
                 # store null rather than a nonsensical numeric value.
                 if snap.get("area") == -1:
                     snap["area"] = None
+
+                # Bundle the v2 concession trio (raw + clean + quality +
+                # structured + value + source) into a single JSON value
+                # for ``units.concessions``. Overwrites the raw-text-
+                # only value populated by ``_SNAPSHOT_SOURCES`` above so
+                # the JSON column carries the full provenance.
+                snap["concessions"] = self._bundle_unit_concessions(u)
 
                 prior = prior_by_id.get(uid)
                 if prior is None:

@@ -815,11 +815,22 @@ _RPFP_UNIT_MAP: dict[str, str] = {
 }
 
 
-async def _probe_realpage_cws(html: str) -> list[dict[str, Any]]:
+async def _probe_realpage_cws(html: str, canonical_id: str | None = None) -> list[dict[str, Any]]:
     """Extract units from a RealPage CWS page by reading credentials from HTML.
 
+    Uses :func:`ma_poc.fetch.probe.stealth_probe` so the API call
+    inherits the property's sticky Chrome identity, proxy selection,
+    and captcha-detect logic — same stealth posture as the entry-page
+    fetch. RealPage's WAF profiles UA + TLS fingerprint per source IP
+    per second; a coherent identity across the entry-page fetch and
+    this downstream API call avoids the "Frankenstein session"
+    detection signal.
+
     Args:
-        html: Full page HTML containing RPFP_config.
+        html:         Full page HTML containing RPFP_config.
+        canonical_id: Property canonical_id — sticky-key for identity
+                      selection. Optional; falls back to the RealPage
+                      property_id if absent.
 
     Returns:
         Parsed unit dicts, empty list on any failure.
@@ -838,12 +849,23 @@ async def _probe_realpage_cws(html: str) -> list[dict[str, Any]]:
         "&bestprice=true&leaseterm=3,4,5,6,7,8,9,10,11,12,13,14,15&baseRent=true"
     )
     try:
-        import httpx as _httpx
-        async with _httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(url, headers={"x-ws-authkey": api_key})
-        if resp.status_code != 200:
+        from ma_poc.fetch.probe import stealth_probe
+
+        body, status, captcha_provider = await stealth_probe(
+            url,
+            method="GET",
+            property_id=canonical_id or property_id,
+            extra_headers={"x-ws-authkey": api_key},
+            timeout_seconds=15.0,
+            telemetry_context="realpage_cws_probe",
+        )
+        # Captcha-blocked or non-200: skip silently — feeding an HTML
+        # interstitial into the JSON parser raises and adds noise.
+        if status != 200 or captcha_provider or not body:
             return []
-        data = resp.json()
+        import json as _json
+
+        data = _json.loads(body)
     except Exception:
         return []
 
@@ -971,18 +993,28 @@ def _parse_beacon_response_table(html: str) -> list[dict[str, Any]]:
     return units
 
 
-async def _probe_beacon_ajax(html: str, base_url: str) -> list[dict[str, Any]]:
+async def _probe_beacon_ajax(
+    html: str, base_url: str, canonical_id: str | None = None
+) -> list[dict[str, Any]]:
     """Probe the Beacon Management WordPress admin-ajax endpoint for units.
+
+    Routes through :func:`ma_poc.fetch.probe.stealth_probe` so the POST
+    inherits the property's sticky Chrome identity + Sec-Ch-Ua headers
+    AND runs captcha detection on the response. The L1 ``fetch``
+    entry point is GET-only — this is the POST equivalent for adapter-
+    side hops that need a non-GET method.
 
     Gate: ``html`` must contain the ``beacon_property_aptmt_search`` marker.
 
     Args:
-        html:     Entry-page HTML (used only for the gate check).
-        base_url: The property's base URL — used to derive
-                  ``{scheme}://{host}/wp-admin/admin-ajax.php``.
+        html:         Entry-page HTML (used only for the gate check).
+        base_url:     The property's base URL — used to derive
+                      ``{scheme}://{host}/wp-admin/admin-ajax.php``.
+        canonical_id: Property canonical_id — sticky-key for identity
+                      selection. Optional.
 
-    Returns parsed unit dicts; empty list on any failure (no marker, network
-    error, non-200, or empty table).
+    Returns parsed unit dicts; empty list on any failure (no marker,
+    captcha-blocked, non-200, network error, or empty table).
     """
     if not html or not _BEACON_AJAX_MARKER.search(html):
         return []
@@ -995,23 +1027,28 @@ async def _probe_beacon_ajax(html: str, base_url: str) -> list[dict[str, Any]]:
     except Exception:
         return []
     try:
-        import httpx as _httpx
-        async with _httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-            resp = await client.post(
-                ajax_url,
-                data={"action": "beacon_property_aptmt_search"},
-                headers={
-                    "X-Requested-With": "XMLHttpRequest",
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    # Many Beacon sites validate Origin/Referer against the
-                    # request host — fail closed when unset on cloud proxies.
-                    "Referer": base_url,
-                    "Origin": f"{parsed.scheme}://{parsed.netloc}",
-                },
-            )
-        if resp.status_code != 200:
+        from ma_poc.fetch.probe import stealth_probe
+
+        body, status, captcha_provider = await stealth_probe(
+            ajax_url,
+            method="POST",
+            property_id=canonical_id,
+            extra_headers={
+                "X-Requested-With": "XMLHttpRequest",
+                "Content-Type": "application/x-www-form-urlencoded",
+                # Many Beacon sites validate Origin/Referer against the
+                # request host — fail closed when unset on cloud proxies.
+                "Referer": base_url,
+                "Origin": f"{parsed.scheme}://{parsed.netloc}",
+            },
+            data={"action": "beacon_property_aptmt_search"},
+            timeout_seconds=15.0,
+            telemetry_context="beacon_ajax_probe",
+        )
+        if status != 200 or captcha_provider or not body:
             return []
-        return _parse_beacon_response_table(resp.text or "")
+        text = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
+        return _parse_beacon_response_table(text)
     except Exception:
         return []
 
@@ -2052,7 +2089,7 @@ class GenericAdapter:
             # deterministic results without waiting for the JS bundle to load.
             if not result.units and html and "rpfp_config" in html.lower():
                 try:
-                    _cws_units = await _probe_realpage_cws(html)
+                    _cws_units = await _probe_realpage_cws(html, ctx.property_id)
                     if _cws_units:
                         result.units = _merge_into_result_units(
                             result.units, _cws_units, property_id=ctx.property_id
@@ -2098,7 +2135,7 @@ class GenericAdapter:
             # 2026-05-19 live).
             if not result.units and html and _BEACON_AJAX_MARKER.search(html):
                 try:
-                    _beacon_units = await _probe_beacon_ajax(html, ctx.base_url)
+                    _beacon_units = await _probe_beacon_ajax(html, ctx.base_url, ctx.property_id)
                     if _beacon_units:
                         result.units = _merge_into_result_units(
                             result.units, _beacon_units, property_id=ctx.property_id

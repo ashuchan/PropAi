@@ -21,6 +21,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ma_poc.core import issue_log as V
+from ma_poc.core.concession_clean import (
+    classify_concession_quality as _concession_quality,
+)
+from ma_poc.core.concession_clean import (
+    clean_concession_text as _concession_clean,
+)
+from ma_poc.core.concession_normalize import normalize_concession
 
 # ── V2 CSV column mapping ────────────────────────────────────────────────────
 #
@@ -118,8 +125,34 @@ def build_v2_property(
     platform = scrape_result.get("platform_detected") or (md.get("api_provider") if md else None) or ""
     website_design = _PLATFORM_LABELS.get(platform.lower(), platform or None)
 
-    # Concessions — prefer scraped banner text
+    # Concessions — prefer scraped banner text. Raw text is ALWAYS
+    # retained (capture-first); ``concessions_clean`` is best-effort
+    # de-leaked display variant and ``concessions_structured`` is the
+    # deterministic regex-shaped object (None when un-parseable — NOT
+    # data loss; raw stays in ``concessions``).
     concessions_text = scrape_result.get("concessions_text") or md.get("concessions") or None
+    concessions_source = scrape_result.get("concessions_source_url") or None
+    concessions_clean = _concession_clean(concessions_text) if concessions_text else None
+    concessions_quality = _concession_quality(concessions_text) if concessions_text else None
+    # Prefer the vision-LLM's structured fields when the banner was
+    # captured by ``vision_banner.capture_banner`` (the LLM already
+    # aggregated sentence fragments and read structured terms directly
+    # from the image — re-normalising the text often loses precision).
+    # Otherwise fall back to the regex normaliser.
+    vision_structured = scrape_result.get("concessions_vision_structured")
+    if isinstance(vision_structured, dict) and vision_structured.get("type"):
+        concessions_structured = vision_structured
+    else:
+        concessions_structured = (
+            normalize_concession(
+                concessions_clean or concessions_text,
+                source=(
+                    "IMAGE_BANNER" if scrape_result.get("concessions_source") == "vision"
+                    else ("URL_PROBE" if concessions_source and concessions_source != scrape_result.get("base_url") else "TEXT")
+                ),
+            )
+            if concessions_text else None
+        )
 
     prop: dict[str, Any] = {
         # ── Property-level fields ────────────────────────────────────────
@@ -143,7 +176,24 @@ def build_v2_property(
         )
         or None,
         "website_design": website_design if website_design else None,
+        # Raw concession banner text — ALWAYS preserved (capture-first).
+        # Backward-compatible — readers that expect a string still work.
         "concessions": concessions_text,
+        # Best-effort de-leaked variant. Empty string when no input;
+        # never None for non-empty raw so xlsx cells aren't blank.
+        "concessions_clean": concessions_clean,
+        # Quality label (clean / unclean_* / empty) — drives downstream
+        # filtering and reporting.
+        "_concessions_quality": concessions_quality,
+        # Structured object {type, value, deadline, conditions, source,
+        # text}. None when ``normalize_concession`` couldn't confidently
+        # parse one of the supported shapes — raw text remains the
+        # source of truth in that case.
+        "concessions_structured": concessions_structured,
+        # Provenance URL — base_url for main-page captures, the probed
+        # /specials URL when the URL probe rescued the snippet, None
+        # when no concession was captured.
+        "concessions_source_url": concessions_source,
         # ── Units ────────────────────────────────────────────────────────
         "units": [
             _format_v2_unit(u, scrape_ts, str(_safe_int(csv_id) or ""))
@@ -258,7 +308,26 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         "lease_term": _safe_lease_term(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
         # F10 additions — always present (None when unset).
+        # Raw text — ALWAYS preserved (capture-first invariant).
         "concession_text": concession_text or None,
+        # Best-effort cleaned variant. Empty string for empty raw so xlsx
+        # cells aren't blank when content existed.
+        "concession_text_clean": (
+            _concession_clean(concession_text) if concession_text else None
+        ),
+        # Quality label — drives reporting / downstream filtering.
+        "_concession_quality": (
+            _concession_quality(concession_text) if concession_text else None
+        ),
+        # Structured object — None when un-parseable. Raw text remains
+        # the source of truth in that case.
+        "concession_structured": (
+            normalize_concession(
+                _concession_clean(concession_text) or concession_text,
+                source=(unit.get("concession_source") or "API"),
+            )
+            if concession_text else None
+        ),
         "concession_value": _safe_float(unit.get("concession_value")),
         "concession_source": unit.get("concession_source") or None,
         "amenities": norm_amenities,

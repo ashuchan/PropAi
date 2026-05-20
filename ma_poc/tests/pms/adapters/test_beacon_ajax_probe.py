@@ -175,6 +175,7 @@ class TestProbeBeaconAjax:
         class _StubResp:
             status_code = 200
             text = ""  # empty → empty parse → empty list
+            content = b""
 
         class _StubClient:
             def __init__(self, *_args: object, **_kwargs: object) -> None:
@@ -185,6 +186,16 @@ class TestProbeBeaconAjax:
 
             async def __aexit__(self, *_args: object) -> None:
                 return None
+
+            async def request(self, _method: str, url: str, **_kwargs: object) -> _StubResp:
+                # 2026-05-21 (stealth-on-hops): Beacon probe now routes
+                # through ``stealth_probe`` which calls
+                # ``client.request("POST", url, data=...)`` rather than
+                # ``client.post(url, ...)``. Stub both shapes so the
+                # test stays valid regardless of which API the probe
+                # uses internally.
+                captured_url["url"] = url
+                return _StubResp()
 
             async def post(self, url: str, **_kwargs: object) -> _StubResp:
                 captured_url["url"] = url
@@ -207,6 +218,7 @@ class TestProbeBeaconAjax:
         class _StubResp:
             status_code = 500
             text = "internal server error"
+            content = b"internal server error"
 
         class _StubClient:
             def __init__(self, *_a: object, **_k: object) -> None:
@@ -217,6 +229,9 @@ class TestProbeBeaconAjax:
 
             async def __aexit__(self, *_a: object) -> None:
                 return None
+
+            async def request(self, *_a: object, **_k: object) -> _StubResp:
+                return _StubResp()
 
             async def post(self, *_a: object, **_k: object) -> _StubResp:
                 return _StubResp()
@@ -242,6 +257,7 @@ class TestProbeBeaconAjax:
         class _StubResp:
             status_code = 200
             text = table_html
+            content = table_html.encode("utf-8")
 
         class _StubClient:
             def __init__(self, *_a: object, **_k: object) -> None:
@@ -252,6 +268,9 @@ class TestProbeBeaconAjax:
 
             async def __aexit__(self, *_a: object) -> None:
                 return None
+
+            async def request(self, *_a: object, **_k: object) -> _StubResp:
+                return _StubResp()
 
             async def post(self, *_a: object, **_k: object) -> _StubResp:
                 return _StubResp()
@@ -281,6 +300,9 @@ class TestProbeBeaconAjax:
 
             async def __aexit__(self, *_a: object) -> None:
                 return None
+
+            async def request(self, *_a: object, **_k: object) -> None:
+                raise ConnectionError("network down")
 
             async def post(self, *_a: object, **_k: object) -> None:
                 raise ConnectionError("network down")
