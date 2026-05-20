@@ -86,27 +86,6 @@ _PROPERTY_CONCESSION_RE = re.compile(
     re.IGNORECASE,
 )
 
-# URL path candidates for the /specials discovery probe. Tried in order
-# against ``urljoin(base_url, path)``; first response carrying a
-# concession match wins. Lower-case canonical paths — sites that use
-# alternate capitalisation are caught by case-insensitive comparison
-# in the URL hop crawler.
-_SPECIALS_PATHS: tuple[str, ...] = (
-    "/specials",
-    "/special-offers",
-    "/specials-offers",
-    "/promotions",
-    "/promotion",
-    "/offers",
-    "/move-in-specials",
-    "/move-in-special",
-    "/concessions",
-    "/concession",
-    "/deals",
-    "/leasing-specials",
-)
-
-
 def _capture_concession_from_html(page_html: str) -> str | None:
     """Return a property-level concession snippet from *page_html*.
 
@@ -123,8 +102,6 @@ def _capture_concession_from_html(page_html: str) -> str | None:
        the body that lives in the next sentence.
 
     Returns ``None`` when no match is found or the input is empty.
-    The caller decides what to do on miss — the /specials probe
-    re-runs the same capture against probed pages.
     """
     if not page_html or not isinstance(page_html, str):
         return None
@@ -177,183 +154,6 @@ def _capture_concession_from_html(page_html: str) -> str | None:
         seg = win
 
     return seg.strip()[:300] or None
-
-
-async def _probe_specials_pages(
-    base_url: str,
-    *,
-    property_id: str | None = None,
-    timeout_seconds: float = 5.0,
-    max_paths: int = 4,
-) -> tuple[str | None, str | None]:
-    """Probe a fixed set of ``/specials``-style paths for concession copy.
-
-    Routes every candidate URL through the L1 stealth fetcher
-    (:func:`ma_poc.fetch.fetch`) so each hop inherits the same
-    identity rotation, Chrome header set, proxy selection, and
-    captcha-detect logic as the entry-page fetch. ``property_id``
-    is the sticky-key — the same property sees the same Chrome
-    identity across entry + every hop, which keeps a coherent
-    "single user session" footprint at the bot-management edge.
-
-    ``max_paths`` bounds the worst-case probe time. The default of 4
-    covers the four most common URL patterns observed in production
-    (``/specials``, ``/special-offers``, ``/specials-offers``,
-    ``/promotions``). Worst-case wall time = ``max_paths × (timeout
-    + L1 retry overhead)`` — bumping to 12 lets a property hitting
-    captcha on every path burn ~180s of the 600s per-property budget;
-    capping at 4 bounds that to ~60s. Override per-call when probing
-    on hopelessly bot-blocked domains is genuinely worthwhile.
-
-    Returns ``(concession_text, source_url)`` — both ``None`` when no
-    probed page yields a match. Captcha-blocked responses are
-    skipped (so we don't feed an interstitial HTML page into the
-    concession-capture regex), as are non-OK outcomes. Failures
-    are silent — concession capture is best-effort, never blocks
-    the primary scrape. Emits a single :data:`CONCESSION_PROBE_RESULT`
-    event per property at the end so production telemetry can
-    aggregate found / exhausted / all_blocked rates.
-    """
-    try:
-        parsed = urllib.parse.urlparse(base_url)
-        if not parsed.scheme or not parsed.netloc:
-            return None, None
-        origin = f"{parsed.scheme}://{parsed.netloc}"
-    except Exception:
-        return None, None
-
-    # Lazy imports — keep scraper.py importable when the L1 fetch
-    # layer isn't wired (e.g. during a static-analysis-only run).
-    try:
-        from ma_poc.discovery.contracts import CrawlTask, TaskReason
-        from ma_poc.fetch import fetch as jugnu_fetch
-        from ma_poc.fetch.contracts import FetchOutcome, RenderMode
-    except ImportError:
-        return None, None
-
-    # Lazy import of stealth_probe for the NOT_MODIFIED fallback. The
-    # L1 conditional-GET cache returns ``outcome=NOT_MODIFIED, body=None``
-    # when the server matches our ``If-None-Match`` ETag — correct for
-    # entry-page change-detection (carry-forward today's data), but
-    # WRONG for a concession probe where we need the CURRENT body to
-    # re-scan. Without a fallback the probe loses coverage on
-    # second-and-subsequent runs after the cache warmed.
-    try:
-        from ma_poc.fetch.probe import stealth_probe as _stealth_probe
-    except ImportError:
-        _stealth_probe = None  # type: ignore[assignment]
-
-    # Telemetry accumulator — emitted as a single
-    # ``CONCESSION_PROBE_RESULT`` event at the end of the probe.
-    paths_attempted = 0
-    captcha_count = 0
-    outcome_label = "exhausted"
-    found_snippet: str | None = None
-    found_source_url: str | None = None
-
-    for path in _SPECIALS_PATHS[: max(1, max_paths)]:
-        paths_attempted += 1
-        url = urllib.parse.urljoin(origin + "/", path.lstrip("/"))
-        task = CrawlTask(
-            url=url,
-            property_id=property_id or "unknown",
-            priority=10,  # background — entry hops are priority 0
-            budget_ms=int(timeout_seconds * 1000),
-            reason=TaskReason.SCHEDULED,
-            render_mode=RenderMode.GET,
-        )
-        try:
-            fr = await jugnu_fetch(task)
-        except Exception:
-            continue
-        # Captcha-detected: skip without parse (interstitial HTML would
-        # yield false-positive matches like "Just a moment..."). Emit a
-        # hop-captcha counter event for production aggregation; the L1
-        # fetcher already emits FETCH_CAPTCHA_DETECTED but the
-        # ``context="specials_probe"`` payload here lets ops separate
-        # entry-page from hop captcha rates without URL filtering.
-        if fr.captcha_detected:
-            captcha_count += 1
-            try:
-                from ma_poc.observability.events import EventKind, emit
-
-                emit(
-                    EventKind.HOP_CAPTCHA_DETECTED,
-                    property_id or "unknown",
-                    url=url,
-                    provider="unknown",
-                    context="specials_probe",
-                    status=fr.status,
-                )
-            except Exception:
-                pass  # observability is best-effort
-            continue
-
-        body = fr.body
-
-        # NOT_MODIFIED → L1's conditional cache returned 304 with an
-        # empty body. The URL EXISTS (server's ETag matched), so it's
-        # worth re-probing without the conditional headers to get the
-        # current body. ``stealth_probe`` uses the same identity pool
-        # + chrome_header_set but skips the conditional cache.
-        if (
-            fr.outcome == FetchOutcome.NOT_MODIFIED
-            and not body
-            and _stealth_probe is not None
-        ):
-            try:
-                refetch_body, refetch_status, refetch_captcha = await _stealth_probe(
-                    url,
-                    method="GET",
-                    property_id=property_id,
-                    timeout_seconds=timeout_seconds,
-                    telemetry_context="specials_probe",
-                )
-            except Exception:
-                refetch_body, refetch_status, refetch_captcha = None, None, None
-            if refetch_captcha:
-                captcha_count += 1
-            if refetch_status == 200 and not refetch_captcha and refetch_body:
-                body = refetch_body
-            else:
-                continue
-        elif fr.outcome != FetchOutcome.OK:
-            continue
-
-        if not body:
-            continue
-        try:
-            text = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body)
-        except Exception:
-            continue
-        snippet = _capture_concession_from_html(text)
-        if snippet:
-            found_snippet = snippet
-            found_source_url = fr.final_url or url
-            outcome_label = "found"
-            break
-
-    # Per-property terminal event so production aggregation can answer
-    # "what fraction of /specials probes succeed / get exhausted / get
-    # captcha-blocked end-to-end". ``all_blocked`` is the worst-case
-    # signal that this domain needs a stealth tier escalation.
-    if outcome_label != "found" and captcha_count >= paths_attempted and paths_attempted > 0:
-        outcome_label = "all_blocked"
-    try:
-        from ma_poc.observability.events import EventKind, emit
-
-        emit(
-            EventKind.CONCESSION_PROBE_RESULT,
-            property_id or "unknown",
-            outcome=outcome_label,
-            paths_attempted=paths_attempted,
-            captcha_count=captcha_count,
-            source_url=found_source_url,
-        )
-    except Exception:
-        pass  # observability is best-effort
-
-    return found_snippet, found_source_url
 
 
 # Telemetry keys whose values are list-typed and concatenate across the
@@ -855,30 +655,11 @@ async def scrape(
             result["concessions_text"] = snippet
             result["concessions_source_url"] = base_url
 
-    # /specials probe — only fires when main-page capture missed.
-    # Routes through the L1 stealth fetcher so every hop inherits the
-    # property's sticky Chrome identity + captcha-detect logic; same
-    # session footprint as the entry-page fetch. First probed path
-    # that yields a concession match wins; captcha-blocked or non-OK
-    # responses are silently skipped.
-    if not result.get("concessions_text"):
-        try:
-            snippet, source_url = await _probe_specials_pages(
-                base_url,
-                property_id=property_id,
-            )
-            if snippet:
-                result["concessions_text"] = snippet
-                result["concessions_source_url"] = source_url
-        except Exception:
-            pass  # probe failures must never break the scrape
-
-    # Vision-LLM banner fallback — only fires when both text-based
-    # capture (page_html and /specials probe) missed AND a Playwright
-    # page is available for a screenshot AND a vision provider is
-    # configured via env vars. No-op when any precondition fails.
-    # Cost: <=1 screenshot + 1 vision call per property; the function
-    # itself enforces the bound.
+    # Vision-LLM banner fallback — only fires when text-based capture
+    # (page_html) missed AND a Playwright page is available for a
+    # screenshot AND a vision provider is configured via env vars.
+    # No-op when any precondition fails. Cost: <=1 screenshot + 1
+    # vision call per property; the function itself enforces the bound.
     if not result.get("concessions_text") and page is not None:
         try:
             from ma_poc.extraction.vision_banner import capture_banner

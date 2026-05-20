@@ -41,10 +41,7 @@ from ma_poc.core.concession_clean import (  # noqa: E402
     clean_concession_text,
 )
 from ma_poc.core.concession_normalize import normalize_concession  # noqa: E402
-from ma_poc.pms.scraper import (  # noqa: E402
-    _capture_concession_from_html,
-    _probe_specials_pages,
-)
+from ma_poc.pms.scraper import _capture_concession_from_html  # noqa: E402
 
 _DEFAULT_PROPERTIES: list[tuple[str, str]] = [
     # (label, url)
@@ -91,17 +88,7 @@ async def _run_one(client: httpx.AsyncClient, label: str, url: str) -> dict:
     # Step 2: try home-page capture
     raw = _capture_concession_from_html(html)
     source = "homepage"
-
-    # Step 3: fall through to /specials probe if homepage missed
     probe_url: str | None = None
-    if not raw:
-        print("  homepage: NO_MATCH — trying /specials probe")
-        try:
-            raw, probe_url = await _probe_specials_pages(url)
-            if raw:
-                source = "/specials_probe"
-        except Exception as exc:
-            print(f"  probe_err: {type(exc).__name__}: {exc}")
 
     if not raw:
         print("  status  : NO_CONCESSION_FOUND")
@@ -158,7 +145,6 @@ async def _main(targets: list[tuple[str, str]]) -> None:
     print(f"  total                : {len(results)}")
     print(f"  concession found     : {len(found)}")
     print(f"     - via homepage    : {sum(1 for r in found if r.get('source') == 'homepage')}")
-    print(f"     - via /specials   : {sum(1 for r in found if r.get('source') == '/specials_probe')}")
     print(f"  no concession found  : {len(no_concession)}")
     print(f"  fetch failed         : {len(fetch_failed)}")
     if found:
