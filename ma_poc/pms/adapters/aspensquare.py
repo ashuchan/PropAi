@@ -227,10 +227,22 @@ class AspenSquareAdapter:
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Discover plans on the community page, drill each /floor-plans/
         {slug} for unit rows, emit unit-level dicts.
+
+        2026-05-20: when no live Playwright page is available (L1-only
+        pipeline mode), fall back to the Knock-community-hash path which
+        works from the static HTML body alone. Every Aspen Square site
+        embeds a Knock community hash + apiToken in the SSR-rendered
+        config blob; calling Knock's public API resolves to unit-level
+        inventory without needing the live DOM. Verified live 4/4 on
+        Adley 72nd / The Avenue / Edgewood Court / Country Manor.
         """
         result = AdapterResult(tier_used="TIER_1_DOM_ASPENSQUARE")
         evaluate = getattr(page, "evaluate", None)
         if not callable(evaluate):
+            # L1-only fallback: try the Knock community-hash recovery.
+            knock_units = await self._try_knock_community_fallback(ctx, result)
+            if knock_units:
+                return knock_units
             result.confidence = 0.0
             result.errors.append("aspensquare: no live page to parse")
             return result
@@ -271,6 +283,70 @@ class AspenSquareAdapter:
             return page.url or getattr(ctx, "base_url", "") or ""
         except Exception:
             return getattr(ctx, "base_url", "") or ""
+
+    @staticmethod
+    async def _try_knock_community_fallback(
+        ctx: AdapterContext, result: AdapterResult
+    ) -> AdapterResult | None:
+        """When the live-page DOM path can't run, try Knock-by-domain
+        recovery from the static HTML body. Returns a populated
+        ``AdapterResult`` (with ``tier_used`` stamped) on success, or
+        ``None`` to fall through to the failure path.
+
+        Every Aspen Square site embeds a Knock community hash + apiToken
+        in the SSR config (verified 4/4 live 2026-05-20). The two-call
+        Knock API resolves the property_id and returns unit-level
+        inventory without auth.
+        """
+        fr = getattr(ctx, "fetch_result", None)
+        body = getattr(fr, "body", None) if fr is not None else None
+        if isinstance(body, bytes):
+            try:
+                html = body.decode("utf-8", errors="replace")
+            except Exception:
+                return None
+        elif isinstance(body, str):
+            html = body
+        else:
+            return None
+        base_url = str(getattr(ctx, "base_url", "") or "")
+        if not html or not base_url:
+            return None
+        try:
+            from ma_poc.pms.adapters.knock import (
+                _fetch_knock_units_by_domain,
+                find_knock_community_hash,
+            )
+        except ImportError:
+            return None
+        # Only fire when the static HTML actually carries the Knock
+        # config blob — otherwise the API calls would burn time on a
+        # property that isn't really Knock-backed.
+        if not find_knock_community_hash(html):
+            return None
+        try:
+            pid, units = await _fetch_knock_units_by_domain(base_url, html)
+        except Exception as exc:
+            result.errors.append(
+                f"aspensquare-knock-fallback-error: {type(exc).__name__}: "
+                f"{str(exc)[:120]}"
+            )
+            return None
+        if not pid or not units:
+            return None
+        from ma_poc.extraction.post_process import post_process
+
+        pp = post_process(units, property_id=getattr(ctx, "property_id", None))
+        if pp.n_admitted == 0:
+            return None
+        result.units = pp.admitted
+        result.plan_summaries = pp.plan_summaries
+        result.tier_used = "TIER_1_API_ASPENSQUARE_KNOCK"
+        result.winning_url = (
+            f"https://doorway-api.knockrentals.com/v1/property/{pid}/units"
+        )
+        result.confidence = min(0.92, 0.65 + 0.04 * pp.n_admitted)
+        return result
 
     def static_fingerprints(self) -> list[str]:
         return list(self._fingerprints)

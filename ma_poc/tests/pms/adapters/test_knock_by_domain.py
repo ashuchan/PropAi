@@ -459,3 +459,147 @@ async def test_adapter_aspen_square_with_empty_html_still_resolves(
 
     assert result.tier_used == "TIER_1_KNOCK_API_BY_DOMAIN"
     assert len(result.units) == 2
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 post-canary e2e probe: Aspen Square's /v1/profile?domain=
+# returns 400 "PropertyId is not set" without a prior community
+# bootstrap. The bootstrap requires a community hash embedded in the
+# SSR-rendered HTML as a JSON-escaped config blob, NOT in any
+# ``knockDoorway.init()`` literal call.
+# Verified live 2026-05-20 (4/4 Aspen Square properties recovered:
+# Adley 72nd 15 units, The Avenue 9 units, Edgewood Court 6 units,
+# Country Manor 6 units).
+# ─────────────────────────────────────────────────────────────────────
+
+
+class TestFindKnockCommunityHash:
+    """``find_knock_community_hash`` extracts the SSR config hash."""
+
+    def test_extracts_unescaped_json_form(self) -> None:
+        from ma_poc.pms.adapters.knock import find_knock_community_hash
+        html = '"community","enabled":true,"propertyId":"58e4333ca711ea57"'
+        assert find_knock_community_hash(html) == "58e4333ca711ea57"
+
+    def test_extracts_json_escaped_form(self) -> None:
+        """Real Aspen Square HTML carries the config inside a JS-string
+        bundle, so the quotes are backslash-escaped."""
+        from ma_poc.pms.adapters.knock import find_knock_community_hash
+        html = (
+            r':\"community\",\"enabled\":true,'
+            r'\"propertyId\":\"58e4333ca711ea57\",'
+            r'\"apiToken\":\"7319ad04f51311e9abf012b98e995a24\"'
+        )
+        assert find_knock_community_hash(html) == "58e4333ca711ea57"
+
+    def test_returns_none_when_absent(self) -> None:
+        from ma_poc.pms.adapters.knock import find_knock_community_hash
+        assert find_knock_community_hash("<html>plain page</html>") is None
+        assert find_knock_community_hash("") is None
+
+    def test_uppercase_hex_also_matched(self) -> None:
+        from ma_poc.pms.adapters.knock import find_knock_community_hash
+        html = '"propertyId":"58E4333CA711EA57"'
+        h = find_knock_community_hash(html)
+        assert h is not None and h.lower() == "58e4333ca711ea57"
+
+    def test_rejects_non_hex_lookalike(self) -> None:
+        """The regex requires hex digits — a 16-char alphanumeric that
+        isn't valid hex must not match."""
+        from ma_poc.pms.adapters.knock import find_knock_community_hash
+        html = '"propertyId":"NOT-A-HASH-VALUE"'
+        assert find_knock_community_hash(html) is None
+
+
+@pytest.mark.asyncio
+async def test_community_hash_path_wins_when_html_carries_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When html contains the community-hash config blob, the new
+    bootstrap → units flow runs INSTEAD of the legacy /v1/profile?domain.
+    The fake client returns 400 for /v1/profile (mimics real Aspen
+    Square) but 200 for the community bootstrap — only the community
+    path produces units."""
+    fake = _FakeClient(
+        {
+            "https://doorway-api.knockrentals.com/v1/property/community/58e4333ca711ea57": _FakeResp(
+                200, {"property": {"id": 2007584}}
+            ),
+            "https://doorway-api.knockrentals.com/v1/property/2007584/units": _FakeResp(
+                200, _aspen_units_payload()
+            ),
+            "https://doorway-api.knockrentals.com/v1/profile": _FakeResp(400, {}),
+        }
+    )
+    _patch_async_client(monkeypatch, fake)
+
+    html_with_hash = (
+        '"community","enabled":true,"propertyId":"58e4333ca711ea57",'
+        '"apiToken":"7319ad04f51311e9abf012b98e995a24"'
+    )
+    pid, units = await _fetch_knock_units_by_domain(
+        "https://www.aspensquare.com/apartments/nebraska/papillion/adley-72nd",
+        html_with_hash,
+    )
+    assert pid == "2007584"
+    assert len(units) == 2
+
+    # Profile endpoint should NOT be called when community path wins.
+    assert not any("/v1/profile" in u for u in fake.calls), (
+        f"profile endpoint should not be called after community success; "
+        f"calls={fake.calls}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_community_hash_fallback_to_profile_when_bootstrap_404(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If the hash is present but community bootstrap returns 404 (stale
+    hash, deleted property), fall back to /v1/profile?domain."""
+    fake = _FakeClient(
+        {
+            "https://doorway-api.knockrentals.com/v1/property/community/deadhash00000000": _FakeResp(
+                404, {}
+            ),
+            "https://doorway-api.knockrentals.com/v1/profile": _FakeResp(
+                200, {"profile": {"property": "9999999"}}
+            ),
+            "https://doorway-api.knockrentals.com/v1/property/9999999/units": _FakeResp(
+                200, _aspen_units_payload()
+            ),
+        }
+    )
+    _patch_async_client(monkeypatch, fake)
+
+    html_with_stale_hash = '"propertyId":"deadhash00000000"'
+    pid, units = await _fetch_knock_units_by_domain(
+        "https://x.com", html_with_stale_hash
+    )
+    assert pid == "9999999"
+    assert len(units) == 2
+
+
+@pytest.mark.asyncio
+async def test_community_hash_path_handles_empty_html_gracefully(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When html is empty/missing, only the legacy profile path is tried.
+    Back-compat: callers that don't pass html see no behavior change."""
+    fake = _FakeClient(
+        {
+            "https://doorway-api.knockrentals.com/v1/profile": _FakeResp(
+                200, {"profile": {"property": "2007584"}}
+            ),
+            "https://doorway-api.knockrentals.com/v1/property/2007584/units": _FakeResp(
+                200, _aspen_units_payload()
+            ),
+        }
+    )
+    _patch_async_client(monkeypatch, fake)
+
+    pid, units = await _fetch_knock_units_by_domain("https://x.com", "")
+    assert pid == "2007584"
+    assert len(units) == 2
+    # No community call attempted when html is empty.
+    assert not any("/v1/property/community/" in u for u in fake.calls)
