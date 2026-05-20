@@ -854,3 +854,109 @@ def test_jonah_widget_does_not_block_resman_portal() -> None:
         f"meetelise should not block a ResMan-portal-bearing page; "
         f"got {result.pms!r}"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 feature_fail_1429 grind — cluster #3 (G5 + competing PMS).
+# 90+ properties tagged ``TIER_1_API_G5_EMPTY`` / ``_NO_URN`` in the
+# canary feature run had G5 markers PRESENT (g5marketingcloud / g5dxm /
+# g5-c-) but the unit data lives in a co-resident RentCafe (SecureCafe)
+# or ResMan portal — main reached TIER_1_API_RENTCAFE / TIER_1_API on
+# these sites for 41+ properties. G5 won the detector race (line 567 +
+# 690 both before the securecafe/myresman branches) and then bailed
+# because the page-level URN was company-level (e.g.
+# ``g5-cl-...-lincoln-property-company-...``), not property-level.
+# Live-verified: pid 13477 flatirondistrictataustinranch.com — G5
+# markers + hasRentCafe=true + 5 LPC company URNs; pid 6274 fmgnj.com
+# was a 404 (honest empty, no fix).
+#
+# Pattern is the same shape as the cluster-2 Jonah-gate: detector
+# routes to a co-resident PMS marker whose adapter actually extracts.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_securecafe_beats_g5_marker_when_both_present() -> None:
+    """flatirondistrictataustinranch.com pattern — G5 marketing-cloud
+    markers AND a securecafe online-leasing portal on the same page.
+    Detector must route to rentcafe, not g5. G5 adapter would extract a
+    company-level URN and return empty; rentcafe adapter hits the
+    securecafe ``availableunits.aspx`` path and gets real units."""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-cs-12345/main.js"></script>'
+        '<a href="https://lpcprop.securecafe.com/onlineleasing/flatiron/'
+        'availableunits.aspx">Apply</a>'
+        "</body></html>"
+    )
+    result = detect_pms(
+        "https://www.flatirondistrictataustinranch.com/",
+        page_html=html,
+    )
+    assert result.pms == "rentcafe", (
+        f"expected rentcafe (securecafe portal beats G5 page-marker), "
+        f"got {result.pms!r}"
+    )
+
+
+def test_resman_portal_beats_g5_marker_when_both_present() -> None:
+    """G5 markers + myresman.com portal anchor — resman wins. ResMan
+    adapter recovers Tier-1 unit-level; G5 would bail empty."""
+    html = (
+        "<html><body>"
+        '<script src="https://dnn506yrbagrg.cloudfront.net/themes/x.js"></script>'
+        '<iframe src="https://acme.myresman.com/Portal/Applicants/'
+        'Availability?a=1&p=abc"></iframe>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "resman", (
+        f"expected resman (portal anchor beats G5 CDN marker), "
+        f"got {result.pms!r}"
+    )
+
+
+def test_g5_alone_still_routes_to_g5_weak_marker() -> None:
+    """Regression guard — pass-2 G5 markers (g5marketingcloud /
+    g5dxm.com / g5-c-) WITHOUT any competing PMS marker still route
+    to g5. Verifies the gate doesn't over-broaden."""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "g5"
+    assert result.confidence >= 0.85
+
+
+def test_g5_alone_still_routes_to_g5_strong_marker() -> None:
+    """Regression guard for the pass-3 G5 branch (line 690) — the
+    stronger markers (inventory.g5marketingcloud / g5-cl- /
+    dnn506yrbagrg.cloudfront.net) WITHOUT any competing PMS marker
+    must still route to g5."""
+    html = (
+        "<html><body>"
+        '<script src="https://dnn506yrbagrg.cloudfront.net/themes/x.js"></script>'
+        '<meta name="urn" content="g5-cl-abc123-acme-tx">'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "g5"
+    assert result.confidence >= 0.85
+
+
+def test_hasrentcafe_config_beats_g5_marker() -> None:
+    """flatirondistrictataustinranch.com observed config: page has G5
+    markers AND a JS config flag ``hasRentCafe: true`` indicating the
+    building has a RentCafe integration even when no securecafe
+    anchor is rendered in the DOM. Detector must route to rentcafe."""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+        '<script>window.bldgCfg = {hasRentCafe: true, name: "Flatiron"};</script>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "rentcafe", (
+        f"expected rentcafe (hasRentCafe config flag), got {result.pms!r}"
+    )

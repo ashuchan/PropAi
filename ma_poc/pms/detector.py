@@ -455,6 +455,26 @@ def _detect_url_extension(url: str) -> tuple[PmsName, float, list[str]] | None:
 
 def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | None:
     h = page_html.lower()
+    # 2026-05-20 fix (feature_fail_1429 cluster #3): G5 marketing-cloud
+    # markers (g5marketingcloud / g5dxm.com / g5-c- / g5-cl- /
+    # dnn506yrbagrg.cloudfront.net) are sometimes co-resident with a
+    # real PMS portal (RentCafe SecureCafe or ResMan). In that case
+    # G5's page-level URN is a company-level URN (e.g.
+    # ``g5-cl-...-lincoln-property-company-...``) and the G5 adapter
+    # bails empty (``TIER_1_API_G5_EMPTY`` / ``_NO_URN``) because the
+    # property-specific URN isn't on the page. Gate both G5 branches
+    # below on the absence of these competing-PMS markers so the real
+    # PMS detection wins.
+    # Live-verified: pid 13477 flatirondistrictataustinranch.com — G5
+    # markers + hasRentCafe=true + LPC company URNs; main reached
+    # TIER_1_API for 69 strict units.
+    _has_competing_pms_for_g5 = (
+        ".securecafe.com" in h
+        or "securecafe.com/onlineleasing" in h
+        or "myresman.com" in h
+        or "/portal/applicants/availability" in h
+        or "hasrentcafe" in h
+    )
     # F0.3 (2026-05-09): three-pass priority order so a real PMS portal
     # reachable from a Squarespace/Wix marketing shell (e.g. 123taylor.com →
     # ``onlineleasing.realpage.com``) isn't demoted to ``syndication_only``.
@@ -562,9 +582,14 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # G5 (g5marketingcloud) Vue-SPA marketing sites. The g5dxm.com CDN /
     # g5marketingcloud asset hosts and the ``g5-c-{client}`` URN appear
     # site-wide incl. landing, so detection fires before the floor-plans
-    # hop. Unit data is in the SPA's Apollo cache (see G5Adapter); these
-    # sites carry no other PMS.
-    if "g5marketingcloud" in h or "g5dxm.com" in h or "g5-c-" in h:
+    # hop. Unit data is in the SPA's Apollo cache (see G5Adapter); most
+    # sites carry no other PMS — but when a competing PMS marker (see
+    # ``_has_competing_pms_for_g5`` above) is present, the G5 page-URN
+    # is typically company-level and won't extract; fall through to
+    # the real PMS branch below.
+    if (
+        "g5marketingcloud" in h or "g5dxm.com" in h or "g5-c-" in h
+    ) and not _has_competing_pms_for_g5:
         return (
             "g5",
             0.85,
@@ -693,7 +718,7 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         or "g5-cl-" in h
         or "g5dxm.com" in h
         or "dnn506yrbagrg.cloudfront.net" in h
-    ):
+    ) and not _has_competing_pms_for_g5:
         # ``dnn506yrbagrg.cloudfront.net`` is G5's primary CDN — per teammate
         # 2026-05-13 deep-dive (C1.G5/RealPage SSR sub-class), 73 of 244 generic
         # Tier-1-API failures had this CDN as their script source but no
@@ -701,6 +726,9 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         # it. Adding it routes those sites to the G5 GraphQL adapter (which
         # then probes ``inventory.g5marketingcloud.com`` via the locationUrn
         # extracted from CDN paths).
+        # 2026-05-20: gated on ``_has_competing_pms_for_g5`` so co-resident
+        # SecureCafe/ResMan/hasRentCafe pages route to the real PMS adapter
+        # instead of bailing on a company-level G5 URN.
         return (
             "g5",
             0.90,
