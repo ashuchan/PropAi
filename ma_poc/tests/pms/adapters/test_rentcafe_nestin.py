@@ -555,3 +555,70 @@ def test_apply_button_layout_wins_over_card_when_no_table() -> None:
     nums = {u["unit_number"] for u in units}
     assert "4112-3" in nums
     assert "9999" not in nums
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 pre-canary e2e finding — Playwright rewrites relative
+# anchors to absolute URLs in ``page.content()`` output. Raw curl_cffi
+# HTML keeps them relative. Both shapes must be accepted by the
+# detail-URL finder, otherwise the recovery silently emits zero units
+# when the adapter receives Playwright-rendered HTML (the production
+# pipeline path).
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_find_floorplan_detail_urls_accepts_absolute_hrefs() -> None:
+    """Playwright rewrites ``<a href="/floorplans/a">`` to
+    ``<a href="https://www.stonewaterpark.com/floorplans/a">``. Without
+    accepting both shapes, the recovery emits 0 units in production but
+    works fine in standalone tests — verified live 2026-05-20 against
+    Stonewater + Chatwell pipeline runs."""
+    from ma_poc.pms.adapters._rentcafe_nestin import _find_floorplan_detail_urls
+
+    abs_html = (
+        '<a href="https://www.stonewaterpark.com/floorplans/a">A</a>'
+        '<a href="https://www.stonewaterpark.com/floorplans/b1r">B1R</a>'
+    )
+    out = _find_floorplan_detail_urls(abs_html, "https://www.stonewaterpark.com")
+    assert out == [
+        "https://www.stonewaterpark.com/floorplans/a",
+        "https://www.stonewaterpark.com/floorplans/b1r",
+    ]
+
+
+def test_find_floorplan_detail_urls_mixed_relative_and_absolute() -> None:
+    """Some real-world HTML carries a mix — raw + JS-rewritten anchors."""
+    from ma_poc.pms.adapters._rentcafe_nestin import _find_floorplan_detail_urls
+
+    mixed_html = (
+        '<a href="/floorplans/a">A</a>'
+        '<a href="https://www.stonewaterpark.com/floorplans/b1r">B1R</a>'
+    )
+    out = _find_floorplan_detail_urls(mixed_html, "https://www.stonewaterpark.com")
+    assert set(out) == {
+        "https://www.stonewaterpark.com/floorplans/a",
+        "https://www.stonewaterpark.com/floorplans/b1r",
+    }
+
+
+def test_find_floorplan_detail_urls_rejects_foreign_domain_absolute_hrefs() -> None:
+    """An absolute href that points to a DIFFERENT host must be ignored
+    — that's a cross-site link, not a per-plan detail URL on this property."""
+    from ma_poc.pms.adapters._rentcafe_nestin import _find_floorplan_detail_urls
+
+    foreign_html = '<a href="https://other-site.com/floorplans/a">A</a>'
+    out = _find_floorplan_detail_urls(foreign_html, "https://www.stonewaterpark.com")
+    assert out == []
+
+
+def test_find_floorplan_detail_urls_dedup_across_relative_and_absolute() -> None:
+    """If the same plan appears both as relative and absolute (e.g. JS
+    duplicated the anchor), emit only once."""
+    from ma_poc.pms.adapters._rentcafe_nestin import _find_floorplan_detail_urls
+
+    dup_html = (
+        '<a href="/floorplans/a">A rel</a>'
+        '<a href="https://www.stonewaterpark.com/floorplans/a">A abs</a>'
+    )
+    out = _find_floorplan_detail_urls(dup_html, "https://www.stonewaterpark.com")
+    assert out == ["https://www.stonewaterpark.com/floorplans/a"]

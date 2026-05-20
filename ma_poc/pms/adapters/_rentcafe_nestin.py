@@ -205,16 +205,28 @@ def _find_floorplan_detail_urls(index_html: str, origin: str) -> list[str]:
 
     seen: set[str] = set()
     out: list[str] = []
+    # 2026-05-20 pre-canary e2e probe finding: Playwright rewrites relative
+    # ``<a href="/floorplans/{slug}">`` anchors to absolute URLs
+    # (``<a href="https://www.stonewaterpark.com/floorplans/{slug}">``)
+    # in ``page.content()`` output. The raw curl_cffi HTML keeps them
+    # relative. Accept both shapes — convert absolute matching-origin
+    # hrefs to relative paths before applying the slug regex.
+    origin_prefix = origin.rstrip("/") + "/"
     for a in soup.find_all("a", href=True):
         href = a["href"].strip()
-        if not href.startswith("/floorplans/"):
+        rel_path = href
+        if href.startswith(origin_prefix):
+            rel_path = "/" + href[len(origin_prefix):]
+        elif href.startswith(origin + "/"):  # exact origin (no trailing slash)
+            rel_path = href[len(origin):]
+        if not rel_path.startswith("/floorplans/"):
             continue
         # Skip the index itself + non-detail subpaths (gallery, etc.) — the
         # detail-page regex requires a non-empty slug.
-        m = _FLOORPLAN_DETAIL_HREF_RE.match(href)
+        m = _FLOORPLAN_DETAIL_HREF_RE.match(rel_path)
         if not m:
             continue
-        full = urljoin(origin + "/", href.lstrip("/"))
+        full = urljoin(origin + "/", rel_path.lstrip("/"))
         if full in seen:
             continue
         seen.add(full)
