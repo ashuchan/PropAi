@@ -761,3 +761,96 @@ def test_bare_sightmap_com_without_embed_path_is_NOT_strong() -> None:
     assert not any(
         "embed iframe in HTML" in e for e in result.evidence
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 deep-probe finding (feature_fail_1429 cluster #2 of 7):
+# The Jonah-Digital marker (jonahwidget/meetelise/jonahdigital) is
+# sometimes present on RentCafe-SecureCafe / SightMap / etc. pages as
+# a chat-widget bolt-on, not as the primary PMS. When both signals
+# co-exist, the more specific PMS (RentCafe/SightMap) must win — the
+# encoreskyline_template adapter has no way to extract from those
+# sites and bails with NOT_ENCORESKYLINE_TEMPLATE, leaving the property
+# with 0 units. Live-verified on ardencebloom.com (pid 238181, main
+# extracts 182 strict via TIER_1_API_RENTCAFE).
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_securecafe_beats_jonah_widget_when_both_present() -> None:
+    """ardencebloom.com pattern — meetelise (Jonah chat widget) +
+    securecafe.com/onlineleasing (real PMS). Detector must route to
+    rentcafe, not encoreskyline_template."""
+    html = (
+        "<html><body>"
+        '<script>JonahWidget.meetelise({org:"x"});</script>'
+        '<a href="https://propmgr.securecafe.com/onlineleasing/ardence/'
+        'availableunits.aspx">Apply Now</a>'
+        "</body></html>"
+    )
+    result = detect_pms("https://www.ardencebloom.com/", page_html=html)
+    assert result.pms == "rentcafe", (
+        f"expected rentcafe (page has securecafe portal AND chat widget), "
+        f"got {result.pms!r}"
+    )
+
+
+def test_sightmap_embed_beats_jonah_widget_when_both_present() -> None:
+    """Same principle for sightmap.com/embed iframe + Jonah widget on the
+    same page. SightMap is the real data; Jonah is decoration."""
+    html = (
+        "<html><body>"
+        '<script src="//meetelise.com/widget.js"></script>'
+        '<iframe src="https://sightmap.com/embed/abc123def"></iframe>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "sightmap", (
+        f"expected sightmap (real PMS), got {result.pms!r}"
+    )
+
+
+def test_jonah_alone_still_routes_to_encoreskyline_template() -> None:
+    """Regression guard — when ONLY the Jonah marker is present and no
+    other PMS competes, encoreskyline_template still wins."""
+    html = (
+        "<html><body>"
+        '<script>JonahWidget.meetelise({organization:"X",building:"Y"});</script>'
+        '<a href="/floorplans/spruce/">Spruce</a>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "encoreskyline_template"
+    assert result.confidence >= 0.85
+
+
+def test_jonah_widget_does_not_block_entrata_widget() -> None:
+    """If a page has Jonah marker AND Entrata widget markers, Entrata
+    must win — the encoreskyline_template adapter can't extract from
+    an Entrata-backed site."""
+    html = (
+        "<html><body>"
+        '<script>JonahWidget.meetelise({});</script>'
+        '<script src="https://commoncf.entrata.com/widgets/x.js"></script>'
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "entrata"
+
+
+def test_jonah_widget_does_not_block_resman_portal() -> None:
+    """If a page has Jonah marker AND a myresman.com portal anchor,
+    ResMan must win."""
+    html = (
+        "<html><body>"
+        '<script src="//meetelise.com/x.js"></script>'
+        '<iframe src="https://acmepm.myresman.com/Portal/Applicants/'
+        'Availability?a=1&p=abc-def">'
+        "</iframe></body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    # bare ``myresman`` isn't in current detector but the test documents
+    # the intent; lower-confidence resman OR not-encoreskyline is the bar
+    assert result.pms != "encoreskyline_template", (
+        f"meetelise should not block a ResMan-portal-bearing page; "
+        f"got {result.pms!r}"
+    )

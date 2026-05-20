@@ -600,11 +600,33 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # apartment-level rows only after a Check-Availability JS click;
     # adapter handles the per-plan interaction. 2026-05-19 deep probe —
     # encoreskyline.com / geneseepointe.com / highlineaustin.com verified.
+    #
+    # 2026-05-20 fix (feature_fail_1429 cluster #2): Jonah / MeetElise is
+    # sometimes a chat-widget bolt-on on top of a real PMS (RentCafe
+    # SecureCafe, Entrata, ResMan, RealPage). In that case the
+    # encoreskyline_template adapter has no way to extract — it expects
+    # the Jonah-driven /floorplans/{slug}/ layout — and returns
+    # NOT_ENCORESKYLINE_TEMPLATE / ENCORESKYLINE_NO_PLAN_LINKS, leaving
+    # the property at 0 units. Gate the Jonah branch on the absence of
+    # competing PMS markers so the real PMS detection below wins.
+    # Live-verified: ardencebloom.com (pid 238181) — meetelise + securecafe,
+    # main TIER_1_API_RENTCAFE captures 182 strict units.
+    _has_competing_pms_marker = (
+        ".securecafe.com" in h
+        or "securecafe.com/onlineleasing" in h
+        or "myresman.com/portal/applicants/availability" in h
+        or "commoncf.entrata.com" in h
+        or "/apartments/module/" in h
+        or "entrata-widget" in h
+        or ".prospectportal.com" in h
+        or "onlineleasing.realpage.com" in h
+        or ".appfolio.com/listings" in h
+    )
     if (
         "jonahwidget" in h
         or "jonahdigital" in h
         or "meetelise" in h
-    ):
+    ) and not _has_competing_pms_marker:
         return (
             "encoreskyline_template",
             0.85,
