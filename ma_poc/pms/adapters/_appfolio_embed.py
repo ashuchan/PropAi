@@ -95,6 +95,47 @@ _LIVE_APPFOLIO_SRC_JS = r"""
   return out;
 }
 """
+# 2026-05-20 fallback (probe finding from feature_fail_1429 grind):
+# Wix shells often have *no* ``/listings`` iframe anywhere — only an
+# auth link like ``{tenant}.appfolio.com/connect/users/sign_in`` (or
+# /request_access) in the footer. Same tenant subdomain, different path.
+# This scan harvests ANY ``*.appfolio.com/*`` URL from anchors as well as
+# iframes/scripts. The Python side extracts the tenant slug and
+# constructs the canonical ``https://{tenant}.appfolio.com/listings``.
+# Verified live on aptsedenprairie / aptslindenpark / rentdwp (the top
+# three SYNDICATION_ONLY_WIX→AppFolio cases worth 712 strict units).
+# Sentinel ``tenant-scan`` in the source lets test FakePages dispatch.
+_LIVE_APPFOLIO_TENANT_JS = r"""
+() => {
+  // tenant-scan: any *.appfolio.com URL on the page (anchors + frames)
+  const out = [];
+  document.querySelectorAll('a, iframe, script').forEach((el) => {
+    const s = el.href || el.src || '';
+    if (/\.appfolio\.com\//i.test(s)) out.push(s);
+  });
+  return out;
+}
+"""
+
+# Extract the tenant subdomain from any ``*.appfolio.com/*`` URL.
+# Captures ``bendermanagement`` from
+# ``https://bendermanagement.appfolio.com/connect/users/sign_in``.
+_APPFOLIO_TENANT_HOST_RE = re.compile(
+    r"https?://([a-z0-9][a-z0-9-]*)\.appfolio\.com/",
+    re.IGNORECASE,
+)
+
+
+def _tenant_listings_url(any_appfolio_url: str) -> str | None:
+    """Extract tenant slug from any AppFolio URL and synthesize the
+    canonical ``https://{tenant}.appfolio.com/listings`` root. Returns
+    ``None`` if the URL doesn't match the tenant-host pattern.
+    """
+    m = _APPFOLIO_TENANT_HOST_RE.match(any_appfolio_url)
+    if not m:
+        return None
+    tenant = m.group(1).lower()
+    return f"https://{tenant}.appfolio.com/listings"
 
 
 def _origin(page: Page, ctx: AdapterContext) -> str:
@@ -193,6 +234,28 @@ async def recover_appfolio_embed(
                 if m:
                     iframe_urls = [m.group(0)]
                     break
+
+    # 2.5. Tenant-only fallback (2026-05-20). If steps 1+2 produced no
+    # listings URL, scan the live page for ANY ``*.appfolio.com/*``
+    # reference (auth/login/dashboard etc.) and synthesize the canonical
+    # ``{tenant}.appfolio.com/listings`` URL from the host. Covers
+    # SYNDICATION_ONLY_WIX shells whose only AppFolio breadcrumb is a
+    # /connect/users/sign_in or /request_access anchor. Dedup by URL.
+    if not iframe_urls:
+        try:
+            tenants = await evaluate(_LIVE_APPFOLIO_TENANT_JS)
+        except Exception as exc:
+            log.debug("AppFolio-embed tenant scan failed err=%s", exc)
+            tenants = None
+        if isinstance(tenants, list):
+            seen: set[str] = set()
+            for u in tenants:
+                if not isinstance(u, str):
+                    continue
+                listings = _tenant_listings_url(u)
+                if listings and listings not in seen:
+                    seen.add(listings)
+                    iframe_urls.append(listings)
 
     # 3. Fetch the AppFolio listings page itself and run the existing SSR
     #    parser. First non-empty wins. A 401/403/429/503 here is recorded

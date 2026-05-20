@@ -51,16 +51,27 @@ _SUBPAGE_HTML = (
 
 
 class _FakePage:
-    """evaluate() dispatches: no-arg call = live AppFolio-src scan;
-    1-arg call = in-session fetch(url) → body string."""
+    """evaluate() dispatches by JS body + arg shape:
+        - no-args + JS containing 'tenant-scan' → live tenant scan (anchors/scripts)
+        - no-args + any other JS              → live /listings iframe scan (legacy)
+        - 1-arg                               → in-session fetch(url) → body string"""
 
-    def __init__(self, url: str, live: list[str], responses: dict[str, str]) -> None:
+    def __init__(
+        self,
+        url: str,
+        live: list[str],
+        responses: dict[str, str],
+        tenants: list[str] | None = None,
+    ) -> None:
         self.url = url
         self._live = live
+        self._tenants = tenants or []
         self._responses = responses
 
     async def evaluate(self, _js: str, *args: object) -> object:
         if not args:
+            if 'tenant-scan' in (_js or ''):
+                return list(self._tenants)
             return list(self._live)
         url = str(args[0])
         return self._responses.get(url, "")
@@ -277,3 +288,70 @@ async def test_recover_canonicalizes_showings_new_anchor_to_listings_root() -> N
     units = await recover_appfolio_embed(page, _ctx("https://www.yourmetropolitan.com/"))  # type: ignore[arg-type]
     assert len(units) == 2
     assert units[0]["floor_plan_name"] == "10 Creek Rd"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Tenant-only fallback (2026-05-20 — feature-fail-1429 probe finding):
+# Wix shells often have a *.appfolio.com/connect/users/sign_in (or
+# /request_access) link in the footer — the tenant subdomain is the
+# canonical one, but the path is auth not /listings. Pre-fix recovery
+# missed it. New behavior: extract tenant from ANY appfolio.com URL
+# and construct https://{tenant}.appfolio.com/listings.
+# Verified-live on aptsedenprairie (pid 30796, 298 strict),
+# aptslindenpark (32502, 297 strict), rentdwp (26772, 117 strict).
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_recover_via_tenant_only_login_url() -> None:
+    """Wix shell footer has *.appfolio.com/connect/users/sign_in link
+    (tenant subdomain, auth path). Pre-fix recovery missed it because
+    no /listings URL was present anywhere. The tenant fallback should
+    extract 'bendermanagement' from the auth URL and fetch the canonical
+    https://bendermanagement.appfolio.com/listings."""
+    login_url = "https://bendermanagement.appfolio.com/connect/users/sign_in"
+    canonical = "https://bendermanagement.appfolio.com/listings"
+    page = _FakePage(
+        url="https://www.aptsedenprairie.com/",
+        live=[],                        # no /listings URL on page
+        tenants=[login_url],            # but tenant URL is there
+        responses={canonical: _APPFOLIO_SSR},
+    )
+    units = await recover_appfolio_embed(
+        page, _ctx("https://www.aptsedenprairie.com/")  # type: ignore[arg-type]
+    )
+    assert len(units) == 2, "expected 2 units parsed from the canonical /listings page"
+    assert units[0]["extraction_tier"] == "TIER_1_DOM_APPFOLIO_SSR"
+
+
+@pytest.mark.asyncio
+async def test_recover_via_tenant_only_request_access_url() -> None:
+    """Same fallback fires on /connect/users/request_access (rentdwp pattern)."""
+    req_url = "https://dougwettonproperties.appfolio.com/connect/users/request_access"
+    canonical = "https://dougwettonproperties.appfolio.com/listings"
+    page = _FakePage(
+        url="https://www.rentdwp.com/parkviewpalms",
+        live=[],
+        tenants=[req_url],
+        responses={canonical: _APPFOLIO_SSR},
+    )
+    units = await recover_appfolio_embed(
+        page, _ctx("https://www.rentdwp.com/")  # type: ignore[arg-type]
+    )
+    assert len(units) == 2
+
+
+@pytest.mark.asyncio
+async def test_tenant_fallback_does_not_fire_when_no_appfolio_on_page() -> None:
+    """Genuine no-PMS shell: no /listings, no tenant URL → still []
+    (regression guard — the fallback must not invent tenants)."""
+    page = _FakePage(
+        url="https://www.plainshell.com/",
+        live=[],
+        tenants=[],
+        responses={},
+    )
+    units = await recover_appfolio_embed(
+        page, _ctx("https://www.plainshell.com/")  # type: ignore[arg-type]
+    )
+    assert units == []
