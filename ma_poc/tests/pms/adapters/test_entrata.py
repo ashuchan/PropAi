@@ -345,3 +345,85 @@ async def test_bug9_probe_skipped_when_captured_api_already_has_units() -> None:
     assert result.units[0]["floor_plan_name"] == "From Capture"
     assert page.calls == []
     assert result.tier_used == "TIER_1_API_ENTRATA"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20: structured empty-exit labels (Path B retry support).
+# 193 properties in canary sw9p4 had ``tier_used == "TIER_1_API_ENTRATA"``
+# with 0 strict units — the adapter initialised the result tier_used to
+# the success label and never overwrote on a 0-unit exit, so Path B
+# retry could not fire (``is_empty_exit("TIER_1_API_ENTRATA")`` is False
+# by design — that string is the SUCCESS label). Fix: classify the
+# failure mode and stamp ``_NO_RESPONSE`` / ``_SHAPE_REJECTED`` /
+# ``_EMPTY`` based on what happened.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_classify_entrata_failure_no_response() -> None:
+    """Empty api_responses → _NO_RESPONSE label."""
+    from ma_poc.pms.adapters.entrata import _classify_entrata_failure
+    tier, msg = _classify_entrata_failure([])
+    assert tier == "TIER_1_API_ENTRATA_NO_RESPONSE"
+    assert "NO_RESPONSE" in msg
+
+
+def test_classify_entrata_failure_shape_rejected() -> None:
+    """Responses captured but none Entrata-shaped → _SHAPE_REJECTED."""
+    from ma_poc.pms.adapters.entrata import _classify_entrata_failure
+    responses = [
+        {"url": "https://x.com/api/analytics", "body": {"event": "page_view"}},
+        {"url": "https://x.com/api/ga", "body": [{"unrelated": "data"}]},
+    ]
+    tier, msg = _classify_entrata_failure(responses)
+    assert tier == "TIER_1_API_ENTRATA_SHAPE_REJECTED"
+    assert "2 responses" in msg
+
+
+def test_classify_entrata_failure_empty_when_shape_matched() -> None:
+    """Entrata-shaped envelope captured but no parseable units → _EMPTY."""
+    from ma_poc.pms.adapters.entrata import _classify_entrata_failure
+    responses = [
+        {
+            "url": "https://x.com/Apartments/module/widgets/floorplans",
+            "body": [{"floorplan-name": "1BR", "no_of_bedroom": 1, "square_footage": 750}],
+        },
+    ]
+    tier, msg = _classify_entrata_failure(responses)
+    assert tier == "TIER_1_API_ENTRATA_EMPTY"
+    assert "shape-matched" in msg
+
+
+def test_is_entrata_response_recognizes_flat_list() -> None:
+    """Flat list of floorplan dicts with Entrata keys is shape-matched."""
+    from ma_poc.pms.adapters.entrata import _is_entrata_response
+    assert _is_entrata_response(
+        [{"floorplan-name": "1BR", "square_footage": 750}]
+    )
+    assert _is_entrata_response([{"no_of_bedroom": 1}])
+    # Non-Entrata-shaped body must NOT match.
+    assert not _is_entrata_response([{"random": "data"}])
+    assert not _is_entrata_response([])
+    assert not _is_entrata_response(None)
+
+
+def test_is_entrata_response_recognizes_widget_envelope() -> None:
+    """Widget envelope dicts with known Entrata keys are shape-matched."""
+    from ma_poc.pms.adapters.entrata import _is_entrata_response
+    assert _is_entrata_response({"widget_data": {"any": "thing"}})
+    assert _is_entrata_response({"floorplans": [{"x": 1}]})
+    assert _is_entrata_response({"available_units": []})
+    assert not _is_entrata_response({"unrelated": "data"})
+
+
+def test_empty_exit_label_recognised_by_path_b_registry() -> None:
+    """The new Entrata empty-exit tier_used labels MUST be recognised
+    by ``is_empty_exit()`` so the orchestrator's Path B retry fires.
+    This is the regression that the 193-property cohort exposed —
+    bare ``TIER_1_API_ENTRATA`` is success-label so retry never ran."""
+    from ma_poc.pms.empty_exit import is_empty_exit
+    # Bare success label is NOT empty-exit (by design).
+    assert not is_empty_exit("TIER_1_API_ENTRATA")
+    # All three failure labels MUST be recognised.
+    assert is_empty_exit("TIER_1_API_ENTRATA_NO_RESPONSE")
+    assert is_empty_exit("TIER_1_API_ENTRATA_SHAPE_REJECTED")
+    assert is_empty_exit("TIER_1_API_ENTRATA_EMPTY")
