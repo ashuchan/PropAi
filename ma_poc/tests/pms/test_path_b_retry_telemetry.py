@@ -117,9 +117,22 @@ def _emit_retry_telemetry(
 
     Calls ``_events_mod.emit`` via the module reference so the test
     fixture's monkeypatch is honored (a ``from … import emit`` import
-    would have bound the original function name at import time)."""
-    if not (is_empty_exit(tier_used) and not units):
+    would have bound the original function name at import time).
+
+    Trigger conditions (combined Path B + Path C):
+      * empty_exit: adapter self-reported empty-exit AND no units
+      * quality_gate: adapter returned units but they all failed
+        ``property_passes_quality_gate``
+    """
+    from ma_poc.validation.schema_gate import property_passes_quality_gate
+
+    if is_empty_exit(tier_used) and not units:
+        trigger_reason = "empty_exit"
+    elif units and not property_passes_quality_gate(units):
+        trigger_reason = "quality_gate"
+    else:
         return
+
     candidates = detect_pms_candidates(
         url=url,
         csv_row=None,
@@ -135,6 +148,7 @@ def _emit_retry_telemetry(
         previous_pms=adapter_name,
         previous_tier=tier_used or "",
         empty_exit_reason=empty_exit_reason(tier_used) or "",
+        trigger_reason=trigger_reason,
         next_pms=candidates[0].pms,
         next_confidence=candidates[0].confidence,
         remaining_candidates=len(candidates),
@@ -204,10 +218,13 @@ def test_emits_on_sightmap_shape_rejected_with_co_resident_pms(
     assert payload["next_pms"] == "knock"
 
 
-def test_does_not_emit_when_units_present(captured: _CapturedEvents) -> None:
-    """Adapter returned empty-exit label but ALSO returned units — the
-    SightMap _AMENITIES_ONLY partial case where the join recovered
-    *some* records. No retry telemetry."""
+def test_does_not_emit_when_substantive_units_present(
+    captured: _CapturedEvents,
+) -> None:
+    """Adapter returned empty-exit label but ALSO returned substantive
+    units (rent + a physical dimension) — the SightMap _AMENITIES_ONLY
+    partial case where the join recovered *some* records. No retry
+    telemetry: partial recovery beats no recovery."""
     html = (
         "<html><body>"
         '<iframe src="https://sightmap.com/embed/abc123xyz"></iframe>'
@@ -216,15 +233,52 @@ def test_does_not_emit_when_units_present(captured: _CapturedEvents) -> None:
     _emit_retry_telemetry(
         adapter_name="sightmap",
         tier_used="TIER_1_API_SIGHTMAP_AMENITIES_ONLY",
-        units=[{"unit_id": "1", "asking_rent": 1500}],  # one unit recovered
+        # Substantive unit — has rent + beds, passes quality gate.
+        units=[{"unit_id": "1", "asking_rent": 1500, "beds": 1}],
         url="https://example.com/",
         page_html=html,
         property_id="P-test-003",
     )
     matched = captured.of_kind(EventKind.RETRY_WOULD_DISPATCH)
     assert matched == [], (
-        f"should NOT emit when units were extracted; got {matched!r}"
+        f"should NOT emit when substantive units were extracted; got {matched!r}"
     )
+
+
+def test_emits_on_hollow_units_path_c(captured: _CapturedEvents) -> None:
+    """Path C trigger: adapter returned units, but they all fail the
+    quality gate (no physical dimension — floorplan-name-only rows or
+    rent-only rows). Retry telemetry fires with
+    ``trigger_reason='quality_gate'``."""
+    html = (
+        "<html><body>"
+        '<script src="https://themes.g5dxm.com/themes/g5-c-acme/main.js"></script>'
+        '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+        '"community","69e936e6567a11ef");</script>'
+        "</body></html>"
+    )
+    _emit_retry_telemetry(
+        adapter_name="g5",
+        tier_used="TIER_1_API_G5",  # bare success label — adapter claimed success
+        # Hollow units: rent + plan-name, no physical dimension.
+        # The classic "JSONLD-ALL-fail" / inferred_id shape.
+        units=[
+            {"unit_id": "g5-1", "asking_rent": 1500},
+            {"unit_id": "g5-2", "asking_rent": 1800},
+        ],
+        url="https://example.com/",
+        page_html=html,
+        property_id="P-test-pathc",
+    )
+    matched = captured.of_kind(EventKind.RETRY_WOULD_DISPATCH)
+    assert len(matched) == 1, (
+        f"Path C should emit 1 RETRY_WOULD_DISPATCH on hollow units; "
+        f"got {len(matched)}"
+    )
+    payload = matched[0].data
+    assert payload["trigger_reason"] == "quality_gate"
+    assert payload["previous_pms"] == "g5"
+    assert payload["next_pms"] == "knock"
 
 
 def test_does_not_emit_on_success_label(captured: _CapturedEvents) -> None:
@@ -318,6 +372,11 @@ def test_scraper_hook_kept_in_sync_with_test_helper() -> None:
         "PATH_B_RETRY_ENABLED",
         "PATH_B_MAX_RETRIES",
         "empty_exit_reason",
+        # Path C: quality-gate trigger uses property_passes_quality_gate.
+        "property_passes_quality_gate",
+        "trigger_reason",
+        '"quality_gate"',
+        '"empty_exit"',
     ):
         assert symbol in scraper_src, (
             f"Path B retry hook in scraper.py no longer references "
@@ -384,18 +443,23 @@ async def _run_retry_loop_under_test(
     from ma_poc.observability.events import EventKind
     from ma_poc.pms.detector import detect_pms_candidates
     from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
+    from ma_poc.validation.schema_gate import property_passes_quality_gate
+
+    def _trigger(res: _StubAdapterResult) -> str | None:
+        if is_empty_exit(res.tier_used) and not res.units:
+            return "empty_exit"
+        if res.units and not property_passes_quality_gate(res.units):
+            return "quality_gate"
+        return None
 
     adapter_result = initial_result
     adapter_name = initial_adapter_name
     tried: set[str] = {adapter_name}
     fallback_chain: list[str] = []
     attempt = 0
+    trigger_reason = _trigger(adapter_result)
 
-    while (
-        is_empty_exit(adapter_result.tier_used)
-        and not adapter_result.units
-        and attempt < max_retries
-    ):
+    while trigger_reason is not None and attempt < max_retries:
         candidates = detect_pms_candidates(
             url=ctx.base_url,
             csv_row=None,
@@ -416,6 +480,7 @@ async def _run_retry_loop_under_test(
                 previous_pms=previous_pms,
                 previous_tier=previous_tier,
                 empty_exit_reason=empty_exit_reason(previous_tier) or "",
+                trigger_reason=trigger_reason,
                 next_pms=nc.pms,
                 next_confidence=nc.confidence,
                 remaining_candidates=len(candidates),
@@ -430,6 +495,7 @@ async def _run_retry_loop_under_test(
             previous_pms=previous_pms,
             previous_tier=previous_tier,
             empty_exit_reason=empty_exit_reason(previous_tier) or "",
+            trigger_reason=trigger_reason,
             next_pms=nc.pms,
             next_confidence=nc.confidence,
         )
@@ -441,13 +507,15 @@ async def _run_retry_loop_under_test(
             break
         new_result = await new_adapter.extract(None, ctx)
         fallback_chain.append(f"retry:{nc.pms}")
-        if new_result.units:
+        # Win condition: units AND pass quality gate.
+        if new_result.units and property_passes_quality_gate(new_result.units):
             _events_mod.emit(
                 EventKind.RETRY_SUCCESS,
                 property_id=ctx.property_id,
                 attempt=attempt,
                 previous_pms=previous_pms,
                 previous_tier=previous_tier,
+                trigger_reason=trigger_reason,
                 won_pms=nc.pms,
                 won_tier=new_result.tier_used or "",
                 unit_count=len(new_result.units),
@@ -456,6 +524,7 @@ async def _run_retry_loop_under_test(
             adapter_name = nc.pms
             break
         adapter_result = new_result
+        trigger_reason = _trigger(adapter_result)
 
     return adapter_name, adapter_result, fallback_chain
 
@@ -481,7 +550,9 @@ async def test_retry_succeeds_on_first_attempt(captured: _CapturedEvents) -> Non
     initial = _StubAdapterResult(tier_used="TIER_1_API_G5_EMPTY", units=[])
     knock_result = _StubAdapterResult(
         tier_used="TIER_1_API_KNOCK",
-        units=[{"unit_id": "K1", "asking_rent": 1500}],
+        # Real units need a physical dimension to pass property_passes_quality_gate
+        # (post-Path-C win condition).
+        units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1}],
     )
     table = {
         "knock": _StubAdapter("knock", knock_result),
@@ -523,7 +594,11 @@ async def test_retry_succeeds_on_second_attempt(captured: _CapturedEvents) -> No
             "rentcafe",
             _StubAdapterResult(
                 tier_used="TIER_1_API_RENTCAFE",
-                units=[{"unit_id": "RC1"}, {"unit_id": "RC2"}],
+                # Real units with physical dimension (post-Path-C win condition).
+                units=[
+                    {"unit_id": "RC1", "asking_rent": 1500, "beds": 1},
+                    {"unit_id": "RC2", "asking_rent": 2200, "beds": 2},
+                ],
             ),
         ),
     }
@@ -658,10 +733,12 @@ async def test_retry_disabled_flag_falls_back_to_telemetry_only(
 async def test_retry_does_not_fire_when_initial_succeeds(
     captured: _CapturedEvents,
 ) -> None:
-    """First adapter returned units — retry never enters the loop."""
+    """First adapter returned substantive units — retry never enters the
+    loop. Unit needs a physical dimension to satisfy the post-Path-C
+    quality gate; rent alone isn't enough."""
     initial = _StubAdapterResult(
         tier_used="TIER_1_API_KNOCK",
-        units=[{"unit_id": "K1"}],
+        units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1}],
     )
     name, result, chain = await _run_retry_loop_under_test(
         initial_adapter_name="knock",
@@ -770,3 +847,189 @@ async def test_retry_handles_adapter_exception_gracefully(
     assert len(captured.of_kind(EventKind.RETRY_DISPATCHED)) == 1
     # No success was emitted
     assert captured.of_kind(EventKind.RETRY_SUCCESS) == []
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Section 7 — Path C: quality-gate retry trigger.
+#
+# Path B only triggers on adapter-self-reported empty exits. Path C
+# extends that to "adapter returned units but they're all hollow"
+# (no physical dimension — silent under-recovery). Uses the same
+# retry mechanism with ``trigger_reason="quality_gate"``.
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_path_c_retry_fires_on_hollow_units(
+    captured: _CapturedEvents,
+) -> None:
+    """Adapter returns SUCCESS label + units, but units fail the
+    quality gate (rent-only, no physical dimension). Path C re-dispatches
+    with the next PMS; retry adapter returns substantive units; retry
+    wins with trigger_reason='quality_gate'."""
+    # Initial: G5 produced 2 hollow rows (rent only, no beds/baths/area).
+    initial = _StubAdapterResult(
+        tier_used="TIER_1_API_G5",  # success label, NOT empty-exit
+        units=[
+            {"unit_id": "g5-1", "asking_rent": 1500},
+            {"unit_id": "g5-2", "asking_rent": 1800},
+        ],
+    )
+    # Retry adapter (Knock) returns real units with beds.
+    knock_result = _StubAdapterResult(
+        tier_used="TIER_1_API_KNOCK",
+        units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1}],
+    )
+    table = {"knock": _StubAdapter("knock", knock_result)}
+
+    name, result, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-pc-001"),
+        adapter_table=table,
+    )
+
+    assert name == "knock", (
+        f"Path C should promote the Knock retry winner; got {name!r}"
+    )
+    assert result.units == knock_result.units
+    assert chain == ["retry:knock"]
+
+    dispatched = captured.of_kind(EventKind.RETRY_DISPATCHED)
+    success = captured.of_kind(EventKind.RETRY_SUCCESS)
+    assert len(dispatched) == 1
+    assert dispatched[0].data["trigger_reason"] == "quality_gate"
+    assert dispatched[0].data["previous_pms"] == "g5"
+    assert dispatched[0].data["previous_tier"] == "TIER_1_API_G5"
+    assert len(success) == 1
+    assert success[0].data["trigger_reason"] == "quality_gate"
+    assert success[0].data["won_pms"] == "knock"
+
+
+@pytest.mark.asyncio
+async def test_path_c_retry_does_not_promote_more_hollow_units(
+    captured: _CapturedEvents,
+) -> None:
+    """Win condition is units AND quality-gate pass. A retry that
+    produces *more hollow* units is treated as a failed attempt; the
+    loop continues. Path C must not silently promote slightly-better
+    hollow output as if it were a real recovery."""
+    initial = _StubAdapterResult(
+        tier_used="TIER_1_API_G5",
+        units=[{"unit_id": "g5-1", "asking_rent": 1500}],  # hollow
+    )
+    # Knock also returns hollow units. RentCafe returns real units.
+    table = {
+        "knock": _StubAdapter(
+            "knock",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_KNOCK",
+                units=[{"unit_id": "K1", "asking_rent": 1200}],  # hollow
+            ),
+        ),
+        "rentcafe": _StubAdapter(
+            "rentcafe",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_RENTCAFE",
+                units=[{"unit_id": "RC1", "asking_rent": 1500, "beds": 1}],
+            ),
+        ),
+    }
+    name, result, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-pc-002"),
+        adapter_table=table,
+    )
+
+    assert name == "rentcafe", (
+        f"Path C should keep retrying until the quality gate passes; "
+        f"got {name!r}"
+    )
+    assert chain == ["retry:knock", "retry:rentcafe"]
+    # Both dispatches carry the quality_gate trigger because each
+    # successive attempt also failed the gate until rentcafe.
+    dispatched = captured.of_kind(EventKind.RETRY_DISPATCHED)
+    assert len(dispatched) == 2
+    for ev in dispatched:
+        assert ev.data["trigger_reason"] == "quality_gate"
+    # Only the final attempt emitted RETRY_SUCCESS.
+    success = captured.of_kind(EventKind.RETRY_SUCCESS)
+    assert len(success) == 1
+    assert success[0].data["won_pms"] == "rentcafe"
+
+
+@pytest.mark.asyncio
+async def test_path_c_no_retry_when_initial_passes_quality_gate(
+    captured: _CapturedEvents,
+) -> None:
+    """When the initial adapter's units pass the quality gate, no retry
+    fires even if there ARE co-resident PMS candidates. Path C must not
+    keep escalating after a clean win."""
+    initial = _StubAdapterResult(
+        tier_used="TIER_1_API_G5",
+        units=[
+            {"unit_id": "g5-1", "asking_rent": 1500, "beds": 1},
+            {"unit_id": "g5-2", "asking_rent": 1800, "beds": 2},
+        ],
+    )
+    # Co-resident PMS available, but no retry should fire.
+    table = {
+        "knock": _StubAdapter(
+            "knock",
+            _StubAdapterResult(
+                tier_used="TIER_1_API_KNOCK",
+                units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1}],
+            ),
+        ),
+    }
+    name, result, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-pc-003"),
+        adapter_table=table,
+    )
+
+    assert name == "g5"  # original adapter, no promotion
+    assert result.units == initial.units
+    assert chain == []
+    assert captured.events == [], (
+        f"clean win on first dispatch must not trigger any retry events; "
+        f"got {captured.events!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_path_c_telemetry_only_mode_emits_quality_gate_reason(
+    captured: _CapturedEvents,
+) -> None:
+    """With ``PATH_B_RETRY_ENABLED=0`` (enabled=False), Path C still
+    emits RETRY_WOULD_DISPATCH with trigger_reason='quality_gate' on
+    hollow-units input — telemetry without re-dispatch."""
+    initial = _StubAdapterResult(
+        tier_used="TIER_1_API_G5",
+        units=[{"unit_id": "g5-1", "asking_rent": 1500}],  # hollow
+    )
+    knock_result = _StubAdapterResult(
+        tier_used="TIER_1_API_KNOCK",
+        units=[{"unit_id": "K1", "asking_rent": 1500, "beds": 1}],
+    )
+    table = {"knock": _StubAdapter("knock", knock_result)}
+
+    name, result, chain = await _run_retry_loop_under_test(
+        initial_adapter_name="g5",
+        initial_result=initial,
+        page_html=_HTML_KNOCK_THEN_RENTCAFE,
+        ctx=_Ctx(base_url="https://example.com/", property_id="P-pc-004"),
+        adapter_table=table,
+        enabled=False,
+    )
+    assert name == "g5"
+    assert chain == []
+    would = captured.of_kind(EventKind.RETRY_WOULD_DISPATCH)
+    assert len(would) == 1
+    assert would[0].data["trigger_reason"] == "quality_gate"
+    assert captured.of_kind(EventKind.RETRY_DISPATCHED) == []

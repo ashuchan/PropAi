@@ -73,13 +73,19 @@ class EventKind(StrEnum):
     LLM_RESCUE_SUCCEEDED = "extract.llm_rescue_succeeded"
     LLM_RESCUE_FAILED = "extract.llm_rescue_failed"
 
-    # Path B (2026-05-20): adapter empty-exit retry events.
+    # Path B/C (2026-05-20): adapter retry events.
     # When env ``PATH_B_RETRY_ENABLED`` is unset/false, the orchestrator
     # emits ``RETRY_WOULD_DISPATCH`` (telemetry-only — Piece 3a).
     # When enabled, the orchestrator emits ``RETRY_DISPATCHED`` before
     # each retry attempt and ``RETRY_SUCCESS`` when an attempt recovers
     # units. The pair lets reporting split "retry tried & failed" from
     # "retry tried & won".
+    #
+    # Payload includes a ``trigger_reason`` field:
+    #   * ``"empty_exit"``  — adapter self-reported an empty-exit label
+    #                         (Path B, ``ma_poc.pms.empty_exit``)
+    #   * ``"quality_gate"`` — adapter returned units but they all failed
+    #                         ``property_passes_quality_gate`` (Path C)
     RETRY_WOULD_DISPATCH = "extract.retry_would_dispatch"
     RETRY_DISPATCHED = "extract.retry_dispatched"
     RETRY_SUCCESS = "extract.retry_success"

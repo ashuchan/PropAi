@@ -859,16 +859,27 @@ async def scrape(
             return result
         adapter_result = AdapterResult(errors=[str(exc)])
 
-    # --- Path B Piece 3: empty-exit retry with next-best PMS -------------------
-    # When an adapter dispatch returns an empty-exit label (see
-    # ``ma_poc.pms.empty_exit``) AND produces no units, find the next PMS
-    # candidate from ``detect_pms_candidates`` and re-dispatch on the same
-    # page (no re-fetch — the captured network state is shared via
-    # ``ctx._api_responses``). Max ``PATH_B_MAX_RETRIES`` attempts.
+    # --- Path B/C: empty-exit + quality-gate retry with next-best PMS ---------
+    # Two retry triggers, same mechanism:
+    #   * Path B (empty-exit): adapter self-reports an empty-exit label
+    #     (see ``ma_poc.pms.empty_exit``) AND produces no units.
+    #   * Path C (quality-gate): adapter produced units, but they all
+    #     fail ``property_passes_quality_gate`` — hollow rows with no
+    #     rent/dims, which would otherwise be reported as SUCCESS while
+    #     silently delivering no usable data.
     #
-    # Feature flag: set ``PATH_B_RETRY_ENABLED=0`` to fall back to Piece 3a
-    # telemetry-only behavior (emit ``RETRY_WOULD_DISPATCH`` without
-    # actually re-dispatching). Default is enabled.
+    # On trigger: find the next PMS candidate from ``detect_pms_candidates``
+    # and re-dispatch on the same page (no re-fetch — captured network
+    # state is shared via ``ctx._api_responses``). Bounded by
+    # ``PATH_B_MAX_RETRIES`` (default 2).
+    #
+    # Win condition is "real units" — the retry result must have units
+    # AND pass the quality gate. A retry that yields more hollow units
+    # is treated as a failed attempt; the loop continues to the next
+    # candidate until either a clean win or retries exhaust.
+    #
+    # Feature flag: ``PATH_B_RETRY_ENABLED=0`` falls back to Piece 3a
+    # telemetry-only behavior. Default enabled.
     #
     # Designed at investigations/2026-05-20-path-b-design/DESIGN.md.
     try:
@@ -879,6 +890,9 @@ async def scrape(
         from ma_poc.pms.detector import detect_pms_candidates
         from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
         from ma_poc.pms.adapters.registry import get_adapter as _retry_get_adapter
+        from ma_poc.validation.schema_gate import (
+            property_passes_quality_gate as _retry_quality_gate,
+        )
 
         _PATH_B_RETRY_ENABLED = (
             _retry_os.environ.get("PATH_B_RETRY_ENABLED", "1").lower()
@@ -888,11 +902,21 @@ async def scrape(
             _retry_os.environ.get("PATH_B_MAX_RETRIES", "2")
         )
 
+        def _retry_trigger_reason(res: "AdapterResult") -> str | None:
+            """Return ``"empty_exit"`` / ``"quality_gate"`` / None.
+
+            None means the adapter is fine — no retry needed."""
+            if is_empty_exit(res.tier_used) and not res.units:
+                return "empty_exit"
+            if res.units and not _retry_quality_gate(res.units):
+                return "quality_gate"
+            return None
+
         _retry_tried_pms: set[str] = {adapter_name}
         _retry_attempt = 0
+        _trigger_reason = _retry_trigger_reason(adapter_result)
         while (
-            is_empty_exit(adapter_result.tier_used)
-            and not adapter_result.units
+            _trigger_reason is not None
             and _retry_attempt < _PATH_B_MAX_RETRIES
         ):
             _next_candidates = detect_pms_candidates(
@@ -916,6 +940,7 @@ async def scrape(
                     previous_pms=_previous_pms,
                     previous_tier=_previous_tier,
                     empty_exit_reason=empty_exit_reason(_previous_tier) or "",
+                    trigger_reason=_trigger_reason,
                     next_pms=_next_cand.pms,
                     next_confidence=_next_cand.confidence,
                     remaining_candidates=len(_next_candidates),
@@ -930,6 +955,7 @@ async def scrape(
                 previous_pms=_previous_pms,
                 previous_tier=_previous_tier,
                 empty_exit_reason=empty_exit_reason(_previous_tier) or "",
+                trigger_reason=_trigger_reason,
                 next_pms=_next_cand.pms,
                 next_confidence=_next_cand.confidence,
             )
@@ -949,14 +975,18 @@ async def scrape(
                 break
 
             fallback_chain.append(f"retry:{_new_adapter_name}")
-            if _new_result.units:
-                # Winner — promote it.
+            # Win condition: units AND pass quality gate. A retry that
+            # produces more hollow units is treated as a failed attempt
+            # so Path C doesn't silently promote a slightly-better hollow
+            # result over an empty one.
+            if _new_result.units and _retry_quality_gate(_new_result.units):
                 _retry_emit(
                     _RetryEventKind.RETRY_SUCCESS,
                     property_id=getattr(ctx, "property_id", "") or "",
                     attempt=_retry_attempt,
                     previous_pms=_previous_pms,
                     previous_tier=_previous_tier,
+                    trigger_reason=_trigger_reason,
                     won_pms=_new_adapter_name,
                     won_tier=_new_result.tier_used or "",
                     unit_count=len(_new_result.units),
@@ -967,9 +997,10 @@ async def scrape(
                 result["_adapter_used"] = _new_adapter_name
                 result["_detected_pms"] = _detection_to_dict(_next_cand)
                 break
-            # Retry produced no units either — loop and try the next.
+            # Retry didn't recover real units — loop and try the next.
             adapter_result = _new_result
-    except Exception:  # pragma: no cover — Path B must never block scrape
+            _trigger_reason = _retry_trigger_reason(adapter_result)
+    except Exception:  # pragma: no cover — Path B/C must never block scrape
         pass
 
     # --- F2: LLM rescue for Tier-1 API adapters --------------------------------
