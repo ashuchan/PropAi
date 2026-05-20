@@ -5,13 +5,23 @@ Sources (highest-priority first):
   2. Prior canary (xlsx export, e.g. ``scraped_units_feature_2026-05-19.xlsx``)
   3. Scraping report / main prod (xlsx export, e.g. ``scraped_units_2026-05-20.xlsx``)
 
-Per-property selection:
+Per-property selection (quality-gated, tier-ranked):
   * Quality bar (configurable): ``strict`` (rent + beds + real-uid) or
     ``rent_sqft`` (rent + sqft, no UID restriction).
-  * If current canary clears the bar for that ``Canonical ID``, use it.
-  * Else if prior canary clears the bar, use it.
-  * Else fall back to scraping report (always — it's the last-resort
-    floor regardless of its own quality).
+  * For each source that clears the quality bar, compute its
+    extraction-tier score (deterministic Tier 1 = 1, JSON-LD = 2,
+    generic DOM = 3, LLM = 4, vision = 5). Lower score = more
+    reliable.
+  * Pick the source with the lowest tier score. So if scraping
+    report has Tier 1 deterministic data but the current canary
+    only has Tier 4 LLM extraction, the scraping report wins — even
+    though it's later in the source preference order.
+  * Tie-break (same tier score): current_canary > prior_canary >
+    scraping_report (preference order).
+  * If NO source clears the quality bar: pick the source with the
+    most-data rows (best-effort low-quality fallback) and tag
+    ``Provenance = "<source>_low_quality"`` so consumers can filter
+    these out for high-confidence analytics.
 
 Output:
   * Single ``.xlsx`` with the same 19-column schema as the input
@@ -186,7 +196,7 @@ def _load_canary_shards(shards_dir: Path, provenance: str) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=_STANDARD_COLS + ["Provenance"])
 
 
-# ── per-property quality assessment ─────────────────────────────────────────
+# ── per-property quality + tier assessment ─────────────────────────────────
 
 
 def _property_clears_bar(prop_rows: pd.DataFrame, bar: str) -> bool:
@@ -201,6 +211,59 @@ def _property_clears_bar(prop_rows: pd.DataFrame, bar: str) -> bool:
         if predicate(row.to_dict()):
             return True
     return False
+
+
+# Tier score: lower = more reliable. The extraction pipeline emits a wide
+# variety of ``Tier Used`` strings (PMS-specific suffixes, sub-tiers,
+# merged tiers). This map captures the broad reliability bands:
+#
+#   1.0  — deterministic Tier-1 API/DOM extraction (PMS-specific or
+#          merged from real adapters). Highest-confidence data.
+#   1.5  — Tier 1.5 embedded JSON (e.g. ``__NEXT_DATA__``). Still
+#          deterministic, still SSR-pulled.
+#   2.0  — Tier 2 JSON-LD (Apartment/Offer schema).
+#   3.0  — Tier 3 generic DOM scan.
+#   4.0  — Tier 4 LLM extraction (less reliable, model-dependent).
+#   5.0  — Tier 5 vision LLM.
+#   9.0  — empty exits / failure labels (``_EMPTY``, ``_NO_RESPONSE``,
+#          ``no_body_short_circuit``, etc.). Treated as "no real tier".
+#   99.0 — null / missing / unknown.
+_TIER_SCORE_RULES: list[tuple[re.Pattern[str], float]] = [
+    (re.compile(r"^(generic:)?no[_-]?body[_-]?short[_-]?circuit$", re.IGNORECASE), 9.0),
+    (re.compile(r"_(EMPTY|NO[_-]URN|NO[_-]RESPONSE|SHAPE[_-]REJECTED|PARSE[_-]FAILED|API[_-]ERROR|NO[_-]PLAN[_-]LINKS?)$", re.IGNORECASE), 9.0),
+    (re.compile(r"^(NOT[_-]ENCORESKYLINE|ENCORESKYLINE[_-]NO[_-]PLAN|SYNDICATION[_-]ONLY)", re.IGNORECASE), 9.0),
+    (re.compile(r"TIER[_-]?5[_-]?VISION", re.IGNORECASE), 5.0),
+    (re.compile(r"TIER[_-]?4[_-]?LLM", re.IGNORECASE), 4.0),
+    (re.compile(r"TIER[_-]?3[_-]?DOM", re.IGNORECASE), 3.0),
+    (re.compile(r"TIER[_-]?2[_-]?JSONLD", re.IGNORECASE), 2.0),
+    (re.compile(r"TIER[_-]?1[_-]?5[_-]?EMBEDDED", re.IGNORECASE), 1.5),
+    (re.compile(r"TIER[_-]?MERGED", re.IGNORECASE), 1.0),
+    (re.compile(r"TIER[_-]?1[_-](API|DOM)", re.IGNORECASE), 1.0),
+    (re.compile(r"^TIER[_-]?1[_-]?PROFILE", re.IGNORECASE), 1.0),
+    (re.compile(r"^TIER[_-]?1$", re.IGNORECASE), 1.0),
+]
+
+
+def _tier_score(tier_used: Any) -> float:
+    """Map a ``Tier Used`` string to a reliability score (lower = better)."""
+    if tier_used is None or (isinstance(tier_used, float) and tier_used != tier_used):
+        return 99.0
+    s = str(tier_used).strip()
+    if not s or s.lower() == "nan":
+        return 99.0
+    for pat, score in _TIER_SCORE_RULES:
+        if pat.search(s):
+            return score
+    return 99.0
+
+
+def _best_tier_score(prop_rows: pd.DataFrame) -> float:
+    """Return the BEST (lowest) tier score across all rows of a property."""
+    if prop_rows.empty:
+        return 99.0
+    if "Tier Used" not in prop_rows.columns:
+        return 99.0
+    return min(_tier_score(t) for t in prop_rows["Tier Used"]) if len(prop_rows) else 99.0
 
 
 # ── consolidation ──────────────────────────────────────────────────────────
@@ -243,26 +306,78 @@ def consolidate(
         "current_canary": 0,
         "prior_canary": 0,
         "scraping_report": 0,
-        "no_source": 0,
+        # When NO source clears the quality bar, we fall back to the source
+        # with the most-data rows but tag it as low-quality so analytics
+        # can filter these out. Broken out by which source supplied the
+        # row for traceability.
+        "current_canary_low_quality": 0,
+        "prior_canary_low_quality": 0,
+        "scraping_report_low_quality": 0,
+        "no_source_anywhere": 0,
     }
+    # Tier-trumping audit: count cases where the picked source isn't the
+    # default preference order winner because a lower-tier (more reliable)
+    # source elsewhere outranked it. Surfaces how often the new rule fires.
+    tier_overrides: dict[str, int] = {
+        "scraping_report_over_current_canary": 0,
+        "scraping_report_over_prior_canary":   0,
+        "prior_canary_over_current_canary":    0,
+    }
+
+    def _stamp(df: pd.DataFrame, prov: str) -> pd.DataFrame:
+        """Return a copy of *df* with Provenance rewritten to *prov*."""
+        out = df.copy()
+        out["Provenance"] = prov
+        return out
+
+    # Preference order for tie-breaking on equal tier scores.
+    _PREF_ORDER = {"current_canary": 0, "prior_canary": 1, "scraping_report": 2}
 
     for cid in all_ids:
         cur_g = cur_idx.get(cid)
         pri_g = pri_idx.get(cid)
         scr_g = scr_idx.get(cid)
 
-        if cur_g is not None and _property_clears_bar(cur_g, quality_bar):
-            chosen_rows.append(cur_g)
-            stats["current_canary"] += 1
-        elif pri_g is not None and _property_clears_bar(pri_g, quality_bar):
-            chosen_rows.append(pri_g)
-            stats["prior_canary"] += 1
-        elif scr_g is not None:
-            chosen_rows.append(scr_g)
-            stats["scraping_report"] += 1
+        # Build (source, group, clears_bar, tier_score) tuples
+        candidates_quality: list[tuple[str, pd.DataFrame, float]] = []
+        for name, g in (("current_canary", cur_g), ("prior_canary", pri_g),
+                        ("scraping_report", scr_g)):
+            if g is not None and _property_clears_bar(g, quality_bar):
+                candidates_quality.append((name, g, _best_tier_score(g)))
+
+        if candidates_quality:
+            # Sort: best tier first (lower score), then preference order.
+            candidates_quality.sort(key=lambda t: (t[2], _PREF_ORDER[t[0]]))
+            picked_name, picked_g, picked_tier = candidates_quality[0]
+            # Audit override cases: when we picked something OTHER than
+            # the default preference order winner BECAUSE of tier score.
+            default_winner = min(candidates_quality, key=lambda t: _PREF_ORDER[t[0]])
+            if default_winner[0] != picked_name:
+                key = f"{picked_name}_over_{default_winner[0]}"
+                tier_overrides[key] = tier_overrides.get(key, 0) + 1
+            chosen_rows.append(picked_g)
+            stats[picked_name] += 1
         else:
-            # No source has this id — should be rare, but bookkeep.
-            stats["no_source"] += 1
+            # No source cleared the quality bar — pick the source with
+            # the most rows as a low-quality fallback (still better than
+            # dropping the property entirely, but flag the provenance
+            # so consumers can exclude these from high-confidence cuts).
+            candidates: list[tuple[int, str, pd.DataFrame]] = []
+            if cur_g is not None: candidates.append((len(cur_g), "current_canary", cur_g))
+            if pri_g is not None: candidates.append((len(pri_g), "prior_canary", pri_g))
+            if scr_g is not None: candidates.append((len(scr_g), "scraping_report", scr_g))
+            if not candidates:
+                stats["no_source_anywhere"] += 1
+                continue
+            # Largest-row-count wins — that's the source with the most
+            # extractor effort even if it didn't clear quality.
+            candidates.sort(key=lambda t: -t[0])
+            _rows, src_name, picked = candidates[0]
+            chosen_rows.append(_stamp(picked, f"{src_name}_low_quality"))
+            stats[f"{src_name}_low_quality"] += 1
+
+    # Pass override audit out via the stats dict for the caller to print.
+    stats["_tier_overrides"] = tier_overrides  # type: ignore[assignment]
 
     merged = pd.concat(chosen_rows, ignore_index=True) if chosen_rows else pd.DataFrame(columns=_STANDARD_COLS + ["Provenance"])
     return merged, stats
@@ -298,12 +413,18 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(f"\nConsolidating (quality bar: {args.quality_bar}) …")
     merged, stats = consolidate(cur, pri, scr, args.quality_bar)
 
+    overrides = stats.pop("_tier_overrides", {})
     total = sum(stats.values())
     print("\n=== Source-selection counts ===")
     for src, c in stats.items():
         pct = (100 * c / total) if total else 0
-        print(f"  {src:<20} {c:>5} ({pct:.1f}%)")
-    print(f"  total properties     {total:>5}")
+        print(f"  {src:<32} {c:>5} ({pct:.1f}%)")
+    print(f"  total properties               {total:>5}")
+    if overrides and any(overrides.values()):
+        print("\n=== Tier-trump overrides (lower-tier source beat default preference) ===")
+        for k, v in overrides.items():
+            if v > 0:
+                print(f"  {k:<48} {v:>5}")
 
     print(f"\n=== Output ===")
     print(f"  rows: {len(merged)}")
