@@ -89,6 +89,35 @@ _UNIT_KEYWORD_RE = re.compile(
     re.IGNORECASE,
 )
 
+# 2026-05-21 (Phase 6.5): permitted <script type="..."> values for the
+# Strategy B inline-assignment sweep. Default-empty type ("" / unset)
+# is treated as text/javascript per the HTML spec. Adding x-template
+# MIMEs picks up Vue SSR shells observed in the HAR sample where the
+# unit JS sits inside a non-standard MIME but is otherwise valid.
+# (Pure-JSON MIMEs like ``application/x-json`` belong in
+# ``_JSON_SCRIPT_TYPE_ACCEPT`` — Strategy A — not here.)
+_SCRIPT_TYPE_ACCEPT: frozenset[str] = frozenset({
+    "",
+    "text/javascript",
+    "application/javascript",
+    "application/ecmascript",
+    "text/x-template",
+    "x-template",
+    "text/template",
+})
+
+# Strategy A: <script type="..."> bodies that are PURE JSON (not JS).
+# Broader than ``application/json`` to catch CMSes that serialise
+# inventory in a custom MIME (``application/x-json``). We deliberately
+# do NOT include ``application/ld+json`` here — that's Schema.org
+# territory and ``extract_jsonld_from_html`` already owns it; feeding
+# it through this path would re-process Schema.org @graph nodes as if
+# they were raw inventory payloads.
+_JSON_SCRIPT_TYPE_ACCEPT: frozenset[str] = frozenset({
+    "application/json",
+    "application/x-json",
+})
+
 # var/let/const/window.X = {...};  or  = [...];
 _ASSIGNMENT_RE = re.compile(
     r"(?:var|let|const|window\.)\s*(\w+)\s*=\s*"
@@ -96,6 +125,77 @@ _ASSIGNMENT_RE = re.compile(
     r"\s*;",
     re.MULTILINE,
 )
+
+# 2026-05-21 (Phase 6.1): namespaced JS member assignments —
+# ``ysi.floorplansList = [...]``, ``propConfig.fp_data = {...}``,
+# ``engrainState.units = [...]``, etc. Used by Yardi/RentCafe SSR
+# (the Yardi 'ysi' namespace) and several other CMSes that embed
+# inventory in the page rather than via XHR. The legacy regex above
+# matches only ``var/let/const/window.X``; this one accepts any
+# dotted-namespace LHS.
+#
+# Used together with ``_extract_balanced_value`` below — the regex
+# captures only the LHS position; we walk forward with proper bracket
+# matching to find the value end, which the non-greedy regex form
+# can't do when the value contains nested arrays/objects (e.g.
+# Yardi's ``"Amenities": []`` nested inside the floorplans array).
+_NAMESPACED_LHS_RE = re.compile(
+    r"(?:^|[;\n}\s])\s*"                 # statement boundary
+    r"([a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)+)"  # dotted: foo.bar[.baz...]
+    r"\s*=\s*",
+    re.MULTILINE,
+)
+
+
+def _extract_balanced_value(text: str, start: int, max_len: int = 2_000_000) -> str | None:
+    """Walk text from *start* looking for a balanced ``[...]`` or
+    ``{...}`` JSON value. Respects string quoting (`"..."`) and escape
+    sequences so brackets inside JSON strings don't unbalance the count.
+
+    Returns the substring (including outer brackets) or None if no
+    balanced value found within ``max_len`` characters. Tolerates a
+    trailing ``;`` but doesn't include it.
+
+    Phase 6.1: needed because the legacy ``_ASSIGNMENT_RE``'s
+    non-greedy ``[\\s\\S]*?`` form stops at the first inner ``]`` or
+    ``}``, missing the outer match when the value contains nested
+    arrays (e.g. ``"Amenities": []`` inside a floorplans array).
+    """
+    n = len(text)
+    end_limit = min(n, start + max_len)
+    # Skip whitespace
+    i = start
+    while i < end_limit and text[i] in " \t\r\n":
+        i += 1
+    if i >= end_limit or text[i] not in "[{":
+        return None
+    open_ch = text[i]
+    close_ch = "]" if open_ch == "[" else "}"
+    depth = 0
+    in_string = False
+    escape = False
+    for j in range(i, end_limit):
+        ch = text[j]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if in_string:
+            if ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+            continue
+        if ch == open_ch:
+            depth += 1
+        elif ch == close_ch:
+            depth -= 1
+            if depth == 0:
+                return text[i:j + 1]
+    return None
 
 
 # Schema.org container types that wrap a multi-Offer array where each Offer
@@ -908,7 +1008,13 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
     # every observed inline-inventory CMS so far. Pages above that limit
     # are almost certainly mis-rendered (the rendered HTML wraps real
     # data plus minified component code).
-    for script in soup.find_all("script", attrs={"type": "application/json"}):
+    for script in soup.find_all("script"):
+        script_type_raw = script.get("type") or ""
+        script_type = (
+            script_type_raw if isinstance(script_type_raw, str) else " ".join(script_type_raw)
+        ).lower()
+        if script_type not in _JSON_SCRIPT_TYPE_ACCEPT:
+            continue
         text = script.string or script.get_text()
         if not text or len(text) < 200 or len(text) > 4_000_000:
             continue
@@ -920,8 +1026,16 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
         found.append({"url": f"embedded:json-block:{block_id}", "body": data})
 
     # ── Strategy B: Inline <script> assignments ────────────────────────────
-    # Only look at scripts without src AND without a type (or with type
-    # text/javascript). Gate on unit-keyword presence to keep noise low.
+    # Only look at scripts without src AND with a permitted type. Gate on
+    # unit-keyword presence to keep noise low. Phase 6.5 (2026-05-21):
+    # broadened the accepted-type set to include Vue/SSR template MIMEs
+    # (``text/x-template``, ``x-template``) and lightly-mis-typed JSON
+    # variants (``application/x-json``). Several captured HARs ship the
+    # unit data inside ``type="text/x-template"`` blocks (Vue.js SSR
+    # serialises component templates this way); the legacy filter
+    # silently dropped them. JSON-validity + min-length + unit-keyword
+    # gates downstream still protect us against false-positive
+    # template-only blocks.
     for script in soup.find_all("script"):
         if script.get("src"):
             continue
@@ -929,7 +1043,7 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
         script_type = (
             script_type_raw if isinstance(script_type_raw, str) else " ".join(script_type_raw)
         ).lower()
-        if script_type and script_type not in ("", "text/javascript", "application/javascript"):
+        if script_type and script_type not in _SCRIPT_TYPE_ACCEPT:
             continue
         text = script.string or script.get_text()
         if not text or len(text) < 300 or len(text) > 500_000:
@@ -971,7 +1085,526 @@ def extract_embedded_blobs_from_html(html: str) -> list[dict[str, Any]]:
                 continue
             found.append({"url": f"embedded:js:{gvar}", "body": data})
 
+        # ── Strategy C (Phase 6.1, 2026-05-21): namespaced member
+        # assignments ── ``ysi.floorplansList = [...]``,
+        # ``propConfig.fp_data = {...}``, etc. The legacy assignment
+        # regex only matches ``var/let/const/window.X``; Yardi/RentCafe
+        # SSR injects unit data via dotted namespaces like ``ysi``
+        # which slipped through. Balanced-bracket parser handles
+        # nested arrays/objects in the value (the regex's non-greedy
+        # form can't).
+        # Real-world fixture: knollcrestsa.com /floorplans embeds
+        # ~6 floor plans × 20+ keys each (Yardi PascalCase shape:
+        # ``Id, Beds, Baths, MinSqFt, MaxSqFt, MinRent, MaxRent, ...``).
+        for m in _NAMESPACED_LHS_RE.finditer(text):
+            var_name = m.group(1)
+            value = _extract_balanced_value(text, m.end())
+            if not value or len(value) < 200:
+                continue
+            try:
+                data = json.loads(value)
+            except (json.JSONDecodeError, ValueError):
+                continue
+            found.append({
+                "url": f"embedded:script-member:{var_name}",
+                "body": data,
+            })
+
     return found
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 6.2 (2026-05-21) — HTML floor-plan tables
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# A non-trivial slice of the HAR ``actionable_html_extractor`` bucket ships
+# unit data as a plain ``<table>`` with a header row of column labels and one
+# row per floor plan. The existing extractors (JSON-LD, embedded blobs, DOM
+# unit-container scanner) miss tables because (a) tables have no Schema.org
+# typing, (b) the row HTML rarely contains the ``$NNNN`` pattern verbatim
+# inside the same flat container the DOM scanner looks for, and (c) tables
+# carry strong column semantics (header labels) that a generic text-scrape
+# discards.
+#
+# Strategy: walk every ``<table>``, score it on header-keyword presence,
+# extract one unit per data row by mapping column → canonical field. Apply
+# floor (≥2 data rows, ≥1 row with beds + (rent OR sqft)) to keep amenity /
+# nav tables out of the unit stream.
+
+# Header-keyword → canonical field. Keys are .lower() / .strip()'d before
+# lookup so labels like "Sq Ft", "Sq. Ft.", "Square Feet" all hit the same
+# canonical bucket. Order matters: leftmost canonical mapping wins.
+_TABLE_HEADER_VOCAB: dict[str, str] = {
+    # plan/name
+    "plan": "floor_plan_name",
+    "floor plan": "floor_plan_name",
+    "floorplan": "floor_plan_name",
+    "name": "floor_plan_name",
+    "unit": "unit_number",
+    "unit #": "unit_number",
+    "unit number": "unit_number",
+    "apt": "unit_number",
+    "apt #": "unit_number",
+    "apartment": "unit_number",
+    # beds
+    "beds": "bedrooms",
+    "bed": "bedrooms",
+    "bedrooms": "bedrooms",
+    "br": "bedrooms",
+    "bd": "bedrooms",
+    # baths
+    "baths": "bathrooms",
+    "bath": "bathrooms",
+    "bathrooms": "bathrooms",
+    "ba": "bathrooms",
+    # sqft
+    "sqft": "sqft",
+    "sq ft": "sqft",
+    "sq. ft.": "sqft",
+    "sq. ft": "sqft",
+    "square feet": "sqft",
+    "square footage": "sqft",
+    "size": "sqft",
+    "area": "sqft",
+    # rent
+    "rent": "rent_range",
+    "price": "rent_range",
+    "monthly rent": "rent_range",
+    "starting rent": "rent_range",
+    "starting at": "rent_range",
+    "from": "rent_range",
+    # availability
+    "available": "availability_status",
+    "availability": "availability_status",
+    "status": "availability_status",
+    "move in": "availability_date",
+    "move-in": "availability_date",
+    "move-in date": "availability_date",
+    "available date": "availability_date",
+    "date available": "availability_date",
+}
+
+# Header tokens that strongly suggest this table is NOT a unit table —
+# amenities / floor-plan-feature catalogues / nav menus.
+_TABLE_HEADER_NEGATIVE: frozenset[str] = frozenset({
+    "feature", "features", "amenity", "amenities",
+    "phone", "email", "address", "contact",
+    "fee", "deposit", "policy",  # "fees" tables are common on rental sites
+})
+
+
+def _normalise_header_label(text: str) -> str:
+    """Collapse whitespace, lowercase, strip trailing colons/asterisks."""
+    return re.sub(r"\s+", " ", text.strip().lower()).rstrip(":*")
+
+
+def _parse_rent_token(raw: str) -> tuple[int | None, int | None]:
+    """Pull (low, high) rent ints out of a cell text. Accepts ``$1,450``,
+    ``From $1,450``, ``$1,450 - $1,850``, ``$1450/mo``. Returns
+    ``(None, None)`` if nothing parseable (e.g. "Call for Pricing")."""
+    if not raw:
+        return (None, None)
+    # Drop trailing /mo, /month, *
+    s = raw.replace(",", "")
+    nums = re.findall(r"\$?\s*(\d{3,5})", s)
+    if not nums:
+        return (None, None)
+    ints = [int(n) for n in nums if _RENT_LO_BOUND <= int(n) <= _RENT_HI_BOUND]
+    if not ints:
+        return (None, None)
+    if len(ints) == 1:
+        return (ints[0], ints[0])
+    return (min(ints), max(ints))
+
+
+def _parse_int_token(raw: str) -> str:
+    """Extract the first integer-looking substring (used for beds / baths /
+    sqft). Returns "" if none. Preserves the string form so downstream code
+    doesn't have to re-encode."""
+    if not raw:
+        return ""
+    if re.search(r"\bstudio\b", raw, re.IGNORECASE):
+        return "0"
+    m = re.search(r"(\d+(?:\.\d+)?)", raw.replace(",", ""))
+    return m.group(1) if m else ""
+
+
+def extract_units_from_html_tables(
+    html: str,
+    source_url: str = "",
+) -> list[dict[str, Any]]:
+    """Extract unit records from ``<table>`` blocks with a recognisable
+    floor-plan header row.
+
+    Scoring: a table qualifies only if its header row contains at least
+    one floor-plan keyword (``beds`` / ``rent`` / ``sqft`` etc.) AND zero
+    strong-negative keywords (``amenities`` / ``features``). Below that
+    floor we skip — false positives on amenities/fees/nav tables are the
+    primary risk for this extractor.
+
+    Returns unit dicts in the same shape as the rest of this module
+    (``floor_plan_name``, ``bedrooms``, ``bathrooms``, ``sqft``,
+    ``rent_range``, ``market_rent_low/high``, ``unit_number``,
+    ``availability_status``, ``availability_date``). All fields default
+    to empty string / None.
+    """
+    if not html:
+        return []
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        soup = BeautifulSoup(html, "html.parser")
+
+    out: list[dict[str, Any]] = []
+
+    for table in soup.find_all("table"):
+        # Collect candidate header cells: either <th> rows OR the first
+        # <tr> of a <thead>, OR the first <tr> of <tbody> if there are
+        # no <th>s anywhere in the table (some hand-rolled CMSes).
+        header_cells: list[str] = []
+        thead = table.find("thead")
+        if thead:
+            first_row = thead.find("tr")
+            if first_row:
+                header_cells = [
+                    _normalise_header_label(c.get_text(" ", strip=True))
+                    for c in first_row.find_all(["th", "td"])
+                ]
+        if not header_cells:
+            th_cells = table.find_all("th")
+            if th_cells:
+                header_cells = [
+                    _normalise_header_label(c.get_text(" ", strip=True))
+                    for c in th_cells
+                ]
+        if not header_cells:
+            # Fall back: take the first <tr> as the header.
+            first_row = table.find("tr")
+            if first_row:
+                header_cells = [
+                    _normalise_header_label(c.get_text(" ", strip=True))
+                    for c in first_row.find_all(["th", "td"])
+                ]
+        if not header_cells:
+            continue
+
+        # Reject on negative keywords first. Word-boundary match — substring
+        # would false-positive ("fee" inside "square feet" → rejects every
+        # table that uses "Square Feet" as the sqft header).
+        header_tokens = {
+            tok for cell in header_cells for tok in re.findall(r"[a-z]+", cell)
+        }
+        if header_tokens & _TABLE_HEADER_NEGATIVE:
+            continue
+
+        # Map column index → canonical field.
+        col_map: dict[int, str] = {}
+        for idx, label in enumerate(header_cells):
+            if label in _TABLE_HEADER_VOCAB:
+                col_map[idx] = _TABLE_HEADER_VOCAB[label]
+                continue
+            # Substring fallback for compound labels like "starting rent / mo"
+            for vocab_key, canon in _TABLE_HEADER_VOCAB.items():
+                if vocab_key in label and idx not in col_map:
+                    col_map[idx] = canon
+                    break
+
+        # Require at least beds + (rent OR sqft) headers to qualify.
+        canons_present = set(col_map.values())
+        if "bedrooms" not in canons_present:
+            continue
+        if "rent_range" not in canons_present and "sqft" not in canons_present:
+            continue
+
+        # Collect data rows. Prefer <tbody> rows; if absent, take every <tr>
+        # after the first.
+        body = table.find("tbody")
+        if body:
+            data_rows = body.find_all("tr")
+        else:
+            all_rows = table.find_all("tr")
+            data_rows = all_rows[1:] if all_rows else []
+
+        emitted_for_table = 0
+        for row in data_rows:
+            cells = row.find_all(["td", "th"])
+            if not cells:
+                continue
+            cell_texts = [c.get_text(" ", strip=True) for c in cells]
+            # Skip header-styled rows that slipped into <tbody>
+            if all(t.lower() in _TABLE_HEADER_VOCAB for t in cell_texts if t):
+                continue
+
+            unit: dict[str, Any] = {
+                "floor_plan_name": "",
+                "bed_label": "",
+                "bedrooms": "",
+                "bathrooms": "",
+                "sqft": "",
+                "unit_number": "",
+                "floor": "",
+                "building": "",
+                "rent_range": "",
+                "market_rent_low": None,
+                "market_rent_high": None,
+                "deposit": "",
+                "concession": "",
+                "availability_status": "",
+                "available_units": "",
+                "availability_date": "",
+                "lease_term": "",
+                "move_in_date": "",
+                "source_api_url": source_url,
+                "source": "html_table",
+            }
+            for idx, raw in enumerate(cell_texts):
+                canon = col_map.get(idx)
+                if not canon:
+                    continue
+                if canon == "rent_range":
+                    lo, hi = _parse_rent_token(raw)
+                    if lo is None and hi is None:
+                        # "Call for Pricing" — leave rent fields blank.
+                        unit["availability_status"] = (
+                            unit["availability_status"]
+                            or ("call for pricing" if "call" in raw.lower() else "")
+                        )
+                        continue
+                    unit["market_rent_low"] = lo
+                    unit["market_rent_high"] = hi
+                    if lo is not None and hi is not None and lo != hi:
+                        unit["rent_range"] = f"${lo:,} - ${hi:,}"
+                    elif lo is not None:
+                        unit["rent_range"] = f"${lo:,}"
+                elif canon in ("bedrooms", "bathrooms"):
+                    unit[canon] = _parse_int_token(raw)
+                elif canon == "sqft":
+                    unit["sqft"] = _parse_int_token(raw)
+                else:
+                    unit[canon] = raw
+
+            # Per-row presence filter: need beds + (rent OR sqft).
+            if not unit["bedrooms"]:
+                continue
+            if not unit["rent_range"] and not unit["sqft"]:
+                continue
+            out.append(unit)
+            emitted_for_table += 1
+
+        # Table-level minimum: ≥2 data rows must qualify, otherwise we
+        # discard this table's contributions. A single row could be an
+        # accident (e.g. a "Pricing" footnote table).
+        if emitted_for_table < 2:
+            for _ in range(emitted_for_table):
+                out.pop()
+
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 6.3 (2026-05-21) — data-* attribute cards
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# A small but real cluster of properties ship unit data as
+# ``<div data-unit="A-101" data-beds="1" data-baths="1" data-sqft="720"
+#       data-rent="1450" data-available="2026-06-01">…</div>``
+# cards. The data is right there in the attribute payload — no JSON
+# envelope, no Schema.org typing, no visible $ pattern reliably co-located
+# with the rest in flat HTML. The DOM scanner can miss these because the
+# visible text is sometimes only the floor-plan image / name, with the
+# numeric data hidden behind ``data-*`` attributes for the client-side JS
+# renderer to pick up.
+#
+# Strategy: scan every element with ≥3 ``data-*`` attributes from the
+# unit vocabulary, group siblings sharing the same parent + class
+# signature so we don't double-count a card wrapper + its inner sub-card,
+# and emit one unit per group element.
+
+# Canonical mapping for data-* attribute names. Keys are .lower()'d and
+# the leading ``data-`` is stripped before lookup.
+_DATA_ATTR_VOCAB: dict[str, str] = {
+    # plan / name
+    "plan": "floor_plan_name",
+    "floorplan": "floor_plan_name",
+    "floor-plan": "floor_plan_name",
+    "fp": "floor_plan_name",
+    "name": "floor_plan_name",
+    # unit
+    "unit": "unit_number",
+    "unit-number": "unit_number",
+    "unit-no": "unit_number",
+    "apt": "unit_number",
+    # beds / baths
+    "beds": "bedrooms",
+    "bed": "bedrooms",
+    "bedrooms": "bedrooms",
+    "br": "bedrooms",
+    "baths": "bathrooms",
+    "bath": "bathrooms",
+    "bathrooms": "bathrooms",
+    "ba": "bathrooms",
+    # sqft
+    "sqft": "sqft",
+    "sq-ft": "sqft",
+    "square-feet": "sqft",
+    "size": "sqft",
+    "area": "sqft",
+    # rent / price
+    "rent": "rent_range",
+    "price": "rent_range",
+    "monthly-rent": "rent_range",
+    "starting-rent": "rent_range",
+    "min-rent": "rent_range",
+    # availability
+    "available": "availability_status",
+    "availability": "availability_status",
+    "status": "availability_status",
+    "available-date": "availability_date",
+    "availability-date": "availability_date",
+    "move-in": "availability_date",
+    "move-in-date": "availability_date",
+    # floor / building
+    "floor": "floor",
+    "level": "floor",
+    "building": "building",
+    "bldg": "building",
+}
+
+# Minimum number of unit-vocab data-* attributes an element must carry
+# to be considered a card candidate. Three keeps the false-positive
+# noise low (a random ``data-id`` plus ``data-href`` doesn't qualify).
+_DATA_ATTR_MIN_HITS = 3
+
+
+def _parse_data_attr_card(
+    elem: Any, source_url: str
+) -> dict[str, Any] | None:
+    """Read all ``data-*`` attributes off ``elem`` and convert vocab
+    matches into a unit dict. Returns None if fewer than
+    ``_DATA_ATTR_MIN_HITS`` vocab attributes were found or if neither
+    beds nor rent ended up populated."""
+    if not hasattr(elem, "attrs"):
+        return None
+    unit: dict[str, Any] = {
+        "floor_plan_name": "",
+        "bed_label": "",
+        "bedrooms": "",
+        "bathrooms": "",
+        "sqft": "",
+        "unit_number": "",
+        "floor": "",
+        "building": "",
+        "rent_range": "",
+        "market_rent_low": None,
+        "market_rent_high": None,
+        "deposit": "",
+        "concession": "",
+        "availability_status": "",
+        "available_units": "",
+        "availability_date": "",
+        "lease_term": "",
+        "move_in_date": "",
+        "source_api_url": source_url,
+        "source": "html_data_attr",
+    }
+    hits = 0
+    for raw_attr, raw_val in elem.attrs.items():
+        if not raw_attr.startswith("data-"):
+            continue
+        key = raw_attr[5:].lower()
+        canon = _DATA_ATTR_VOCAB.get(key)
+        if not canon:
+            continue
+        val = raw_val if isinstance(raw_val, str) else " ".join(raw_val)
+        val = val.strip()
+        if not val:
+            continue
+        hits += 1
+        if canon == "rent_range":
+            lo, hi = _parse_rent_token(val)
+            if lo is None and hi is None:
+                continue
+            unit["market_rent_low"] = lo
+            unit["market_rent_high"] = hi
+            if lo is not None and hi is not None and lo != hi:
+                unit["rent_range"] = f"${lo:,} - ${hi:,}"
+            elif lo is not None:
+                unit["rent_range"] = f"${lo:,}"
+        elif canon in ("bedrooms", "bathrooms"):
+            unit[canon] = _parse_int_token(val)
+        elif canon == "sqft":
+            unit["sqft"] = _parse_int_token(val)
+        elif canon == "availability_status":
+            # Sites use ``data-available`` for both status strings
+            # (Yes/No/Now) and ISO dates. Route date-shaped values
+            # into availability_date so the downstream "rent on X
+            # date" inference doesn't lose the temporal signal.
+            if re.match(r"^\d{4}-\d{2}-\d{2}", val):
+                unit["availability_date"] = val
+            else:
+                unit["availability_status"] = val
+        else:
+            unit[canon] = val
+
+    if hits < _DATA_ATTR_MIN_HITS:
+        return None
+    # Per-card minimum: must end up with a bedrooms value AND (rent OR sqft).
+    if not unit["bedrooms"]:
+        return None
+    if not unit["rent_range"] and not unit["sqft"]:
+        return None
+    return unit
+
+
+def extract_units_from_data_attr_cards(
+    html: str,
+    source_url: str = "",
+) -> list[dict[str, Any]]:
+    """Extract unit records from elements carrying ``data-*`` attribute
+    payloads. See module-level Phase 6.3 comment for shape + rationale.
+
+    Per-card requires ≥3 vocab-matching ``data-*`` attributes AND ends
+    up with beds + (rent OR sqft). Page-level requires ≥2 sibling cards
+    share the same parent before any are emitted — a single ``data-*``
+    div is almost certainly a "more info" link / analytics tag, not a
+    floor-plan record.
+    """
+    if not html:
+        return []
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        soup = BeautifulSoup(html, "html.parser")
+
+    # Collect candidate elements
+    candidates: list[Any] = []
+    for elem in soup.find_all(True):
+        if not getattr(elem, "attrs", None):
+            continue
+        if not any(a.startswith("data-") for a in elem.attrs):
+            continue
+        candidates.append(elem)
+
+    # Group by parent — sibling cards share a parent. We require ≥2 in
+    # the same group to qualify, with each card meeting the vocab floor.
+    by_parent: dict[int, list[Any]] = {}
+    for c in candidates:
+        parent_id = id(c.parent) if c.parent is not None else 0
+        by_parent.setdefault(parent_id, []).append(c)
+
+    out: list[dict[str, Any]] = []
+    for siblings in by_parent.values():
+        if len(siblings) < 2:
+            continue
+        group_units: list[dict[str, Any]] = []
+        for elem in siblings:
+            unit = _parse_data_attr_card(elem, source_url)
+            if unit:
+                group_units.append(unit)
+        if len(group_units) >= 2:
+            out.extend(group_units)
+
+    return out
 
 
 def detect_floorplan_subpage_urls(

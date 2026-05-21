@@ -24,6 +24,18 @@ TARGET_JSONLD_TYPES: frozenset[str] = frozenset({
     "FloorPlan",
     "Residence",
     "SingleFamilyResidence",
+    # Phase 6.4 (2026-05-21): broader Schema.org coverage. Several
+    # captured HARs in the actionable_html_extractor bucket use these
+    # lodging-coherent types instead of Apartment, and the existing
+    # ``_jsonld_item_has_unit_signal`` already gates on the presence
+    # of unit dimensions (offers/numberOfRooms/floorSize) so noise
+    # from unrelated lodging pages is rejected cheaply.
+    # Deliberately omitted: ``Hotel``, ``LodgingBusiness`` — those
+    # tend to describe whole-building hotel inventory, not multifamily
+    # unit listings, and pull in genuine noise.
+    "Accommodation",
+    "House",
+    "Suite",
 })
 
 _RENT_MIN = 200
@@ -335,8 +347,18 @@ def _jsonld_item_has_unit_signal(item: dict) -> bool:
         return True
     t = item.get("@type")
     t_list = t if isinstance(t, list) else [t]
+    # Phase 6.4 (2026-05-21): mirror the additions to
+    # TARGET_JSONLD_TYPES here — without this list the gate would
+    # accept the type for *walking* but reject it for *emission* on a
+    # bare-shell item with no offers/numberOfRooms/floorSize, leaving
+    # accommodations/houses/suites with only metadata as silent
+    # no-ops.
     if any(
-        x in ("Apartment", "FloorPlan", "Residence", "Offer", "SingleFamilyResidence")
+        x in (
+            "Apartment", "FloorPlan", "Residence", "Offer",
+            "SingleFamilyResidence",
+            "Accommodation", "House", "Suite",
+        )
         for x in t_list
         if isinstance(x, str)
     ):
