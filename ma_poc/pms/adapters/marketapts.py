@@ -33,13 +33,18 @@ Two SSR template variants are handled (probed live 2026-05-21):
     drill page server-renders a ``.unit-table-row`` × N table with
     columns Unit / Rent / Available / Special / Features / Apply.
 
-Two further variants exist in the cohort but are NOT handled in v1
-(deferred; see ``_DEFERRED_TEMPLATES``):
+  * **Template C — gallery + /unit/ drill** (1 / 13, e.g.
+    thereserveatwatertowervillage ``130RWT``): listing page is a
+    single ``.floorplan-container`` gallery with N plans rendered as
+    flat text and "N Available" anchors that drill to ``/unit/
+    {plan-slug}``. The drill page exposes ``.unit-details`` rows
+    (columns Unit / SqFt / Rent / Available), and plan specs live in
+    the drill h1 + body text ("BED: X BATH: Y SQ. FEET: Z").
+    Originally deferred (eyeball missed the badge-link drill); re-
+    probed 2026-05-21 after user pointed out the link in the badge.
 
-  * **Template C — gallery + plan-only** (1 / 13, e.g.
-    thereserveatwatertowervillage ``130RWT``): ``.floorplan-container``
-    gallery layout, plan-level data only — no per-unit roster published
-    on the public site.
+One further variant exists in the cohort but is NOT handled in v1
+(deferred; see ``_DEFERRED_TEMPLATES``):
 
   * **Template D — /apartments/{plan-slug} drill** (1 / 13, e.g.
     Riverbank ``20RIB``): hyphenated ``/floor-plans`` listing of
@@ -77,7 +82,6 @@ log = logging.getLogger(__name__)
 # Templates that exist in the cohort but are not handled in v1. Listed
 # in source so the next adapter author finds them without re-probing.
 _DEFERRED_TEMPLATES: tuple[str, ...] = (
-    "C: .floorplan-container gallery, plan-only (Reserve at Water Tower Village 130RWT)",
     "D: .floor-plans-block → /apartments/{plan-slug} drill (Riverbank 20RIB)",
 )
 
@@ -136,53 +140,103 @@ async () => {
 
   // ── Template B — drill-per-plan (.floorplan-item + /unit/{slug})
   const bItems = Array.from(doc.querySelectorAll('.floorplan-item'));
-  if (bItems.length === 0) {
-    return {template: 'NONE', plans: []};
-  }
-  const planTasks = bItems.map((item) => {
-    const drillAnchor = Array.from(item.querySelectorAll('a')).find((a) => {
-      const t = (a.innerText || a.textContent || '').toLowerCase();
-      return /view\s+available|view\s+details|see\s+available/.test(t);
+  if (bItems.length > 0) {
+    const planTasks = bItems.map((item) => {
+      const drillAnchor = Array.from(item.querySelectorAll('a')).find((a) => {
+        const t = (a.innerText || a.textContent || '').toLowerCase();
+        return /view\s+available|view\s+details|see\s+available/.test(t);
+      });
+      const title = T(item.querySelector('.floorplan-title'));
+      const features = T(item.querySelector('.floorplan-features'));
+      const num = T(item.querySelector('.floorplan-num'));
+      return {
+        title: title,
+        features: features,
+        startingPrice: num,
+        drillPath: drillAnchor ? drillAnchor.getAttribute('href') || '' : '',
+      };
     });
-    const title = T(item.querySelector('.floorplan-title'));
-    const features = T(item.querySelector('.floorplan-features'));
-    const num = T(item.querySelector('.floorplan-num'));
-    return {
-      title: title,
-      features: features,
-      startingPrice: num,
-      drillPath: drillAnchor ? drillAnchor.getAttribute('href') || '' : '',
-    };
-  });
 
-  const planRows = [];
-  for (const task of planTasks) {
-    let units = [];
-    if (task.drillPath) {
-      let drillUrl = task.drillPath;
+    const planRows = [];
+    for (const task of planTasks) {
+      let units = [];
+      if (task.drillPath) {
+        let drillUrl = task.drillPath;
+        if (drillUrl.startsWith('/')) drillUrl = location.origin + drillUrl;
+        try {
+          const r = await fetch(drillUrl, {credentials: 'include'});
+          if (r.ok) {
+            const drillDoc = new DOMParser().parseFromString(await r.text(), 'text/html');
+            units = Array.from(drillDoc.querySelectorAll('.unit-table-row')).map((row) => {
+              const cells = Array.from(row.children).map((c) => T(c));
+              return {cells: cells, dataAttrs: Object.assign({}, row.dataset || {})};
+            });
+          }
+        } catch (e) { /* per-plan drill failure → plan-level only */ }
+      }
+      planRows.push({...task, template: 'B', units});
+    }
+    return {template: 'B', plans: planRows};
+  }
+
+  // ── Template C — gallery (.floorplan-container) with /unit/{slug} drills
+  // Listing page is a single .floorplan-container with N plans rendered
+  // as flat text + "N Available" anchors to /unit/{slug}. Drill page
+  // exposes .unit-details rows with Unit / SqFt / Rent / Available cells.
+  // Plan title + specs live in the drill h1 + body text — not the
+  // listing — so the listing-side card extraction is just URL discovery.
+  const cContainers = Array.from(doc.querySelectorAll('.floorplan-container'));
+  if (cContainers.length > 0) {
+    const unitHrefs = [];
+    for (const cont of cContainers) {
+      const anchors = Array.from(cont.querySelectorAll('a[href*="/unit/"]'));
+      for (const a of anchors) {
+        const href = a.getAttribute('href') || '';
+        if (href && !unitHrefs.includes(href)) unitHrefs.push(href);
+      }
+    }
+    if (unitHrefs.length === 0) {
+      return {template: 'NONE', plans: []};
+    }
+    const planRows = [];
+    for (const href of unitHrefs) {
+      let drillUrl = href;
       if (drillUrl.startsWith('/')) drillUrl = location.origin + drillUrl;
+      let title = '';
+      let specsBlob = '';
+      let units = [];
       try {
         const r = await fetch(drillUrl, {credentials: 'include'});
         if (r.ok) {
           const drillDoc = new DOMParser().parseFromString(await r.text(), 'text/html');
-          units = Array.from(drillDoc.querySelectorAll('.unit-table-row')).map((row) => {
+          title = T(drillDoc.querySelector('h1'));
+          // Drill body has "BED: X BATH: Y SQ. FEET: Z" — capture the
+          // surrounding container that holds these labels.
+          const bodyText = T(drillDoc.querySelector('section.unit, .section.unit')) ||
+                           T(drillDoc.body).slice(0, 2000);
+          specsBlob = bodyText;
+          units = Array.from(drillDoc.querySelectorAll('.unit-details')).map((row) => {
             const cells = Array.from(row.children).map((c) => T(c));
-            return {
-              cells: cells,
-              dataAttrs: Object.assign({}, row.dataset || {}),
-            };
+            return {cells: cells, dataAttrs: Object.assign({}, row.dataset || {})};
           });
         }
-      } catch (e) { /* per-plan drill failure → plan-level only */ }
+      } catch (e) { /* drill failure → skip this plan */ }
+      planRows.push({title, specsBlob, drillPath: href, units, template: 'C'});
     }
-    planRows.push({...task, template: 'B', units});
+    return {template: 'C', plans: planRows};
   }
-  return {template: 'B', plans: planRows};
+
+  return {template: 'NONE', plans: []};
 }
 """
 
-_BED_RE = re.compile(r"BEDROOMS?\s*:?\s*(\d+|studio)", re.IGNORECASE)
-_BATH_RE = re.compile(r"BATHROOMS?\s*:?\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
+# BED/BATH/SQ.FEET labels appear in two shapes:
+#   * Template B: "BEDROOMS: 1 BATHROOMS: 1.0 SQ. FEET: 702" (plural long form)
+#   * Template C: "BED: Studio BATH: 1 SQ. FEET: 450"        (short form)
+# The (?:ROOMS?|S)? clause accepts BED / BEDS / BEDROOM / BEDROOMS and the
+# analogous BATH variants without false-matching unrelated words.
+_BED_RE = re.compile(r"BED(?:ROOMS?|S)?\s*:?\s*(\d+|studio)", re.IGNORECASE)
+_BATH_RE = re.compile(r"BATH(?:ROOMS?|S)?\s*:?\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
 _SQFT_RE = re.compile(r"SQ\s*[\.\s]?\s*FEET\s*:?\s*(\d[\d,]*)", re.IGNORECASE)
 _DEPOSIT_RE = re.compile(r"DEPOSIT\s*:?\s*\$?([\w,]+)", re.IGNORECASE)
 _MONEY_RE = re.compile(r"\$\s*([\d,]+)")
@@ -456,8 +510,100 @@ def parse_marketapts_template_b(
     return out
 
 
+def parse_marketapts_template_c(
+    plans: list[dict[str, object]], url: str
+) -> list[dict[str, str]]:
+    """Emit unit-level rows from Template C ``.floorplan-container`` gallery.
+
+    Listing-side is a single ``.floorplan-container`` with flat-text plans
+    and ``<a href="/unit/{slug}">N Available</a>`` drill links. The drill
+    page is the source of truth for both plan specs (h1 + body labels
+    BED/BATH/SQ.FEET) AND the per-unit roster (``.unit-details`` rows
+    with cells Unit / SqFt / Rent / Available). Each plan dict here
+    carries ``title``, ``specsBlob``, ``drillPath``, and ``units``.
+    """
+    out: list[dict[str, str]] = []
+    for plan in plans:
+        if not isinstance(plan, dict):
+            continue
+        title = str(plan.get("title") or "").strip()
+        specs_blob = str(plan.get("specsBlob") or "")
+        beds, baths, sqft = _parse_specs_blob(specs_blob)
+
+        units = plan.get("units") or []
+        if not isinstance(units, list) or not units:
+            # Drill failed or returned no rows — surface a plan-level
+            # marker so the verdict reflects the plan exists.
+            if title or specs_blob:
+                out.append(
+                    make_unit_dict(
+                        floor_plan_name=title,
+                        bed_label=bed_label_from(beds, title),
+                        bedrooms=str(beds) if beds is not None else "",
+                        bathrooms=baths,
+                        sqft=sqft,
+                        unit_number="",
+                        availability_status="UNAVAILABLE",
+                        source_api_url=url,
+                        extraction_tier="TIER_1_DOM_MARKETAPTS",
+                    )
+                )
+            continue
+
+        for u in units:
+            if not isinstance(u, dict):
+                continue
+            cells_raw = u.get("cells") or []
+            if not isinstance(cells_raw, list):
+                continue
+            cells = [str(c).strip() for c in cells_raw if str(c).strip()]
+            if not cells:
+                continue
+            unit_no = cells[0]
+            rent: int | None = None
+            avail_date = ""
+            row_sqft = sqft
+            for cell in cells[1:]:
+                if rent is None:
+                    m = _MONEY_RE.findall(cell)
+                    if m:
+                        rent = money_to_int(m[0])
+                        continue
+                # Template C interleaves sqft before rent. If the cell is
+                # pure digits and sqft from the specs blob is empty, use
+                # this as the per-unit sqft.
+                if not row_sqft and cell.replace(",", "").isdigit():
+                    row_sqft = cell.replace(",", "")
+                    continue
+                if not avail_date:
+                    candidate = _parse_avail_text(cell)
+                    if candidate or _DATE_LIKE_RE.search(cell):
+                        avail_date = candidate
+                        continue
+            if not unit_no and rent is None:
+                continue
+            out.append(
+                make_unit_dict(
+                    floor_plan_name=title,
+                    bed_label=bed_label_from(beds, title),
+                    bedrooms=str(beds) if beds is not None else "",
+                    bathrooms=baths,
+                    sqft=row_sqft,
+                    unit_number=unit_no,
+                    rent_low=rent,
+                    rent_high=rent,
+                    availability_status="AVAILABLE",
+                    available_units="1",
+                    availability_date=avail_date,
+                    source_api_url=url,
+                    extraction_tier="TIER_1_DOM_MARKETAPTS",
+                )
+            )
+    return out
+
+
 class MarketAptsAdapter:
-    """Market Apartments CMS adapter — handles Templates A + B from /floorplans."""
+    """Market Apartments CMS adapter — handles Templates A + B + C from /floorplans."""
 
     pms_name: str = "marketapts"
     _fingerprints: list[str] = [
@@ -504,6 +650,8 @@ class MarketAptsAdapter:
             units = parse_marketapts_template_a(plans, winning)
         elif template == "B":
             units = parse_marketapts_template_b(plans, winning)
+        elif template == "C":
+            units = parse_marketapts_template_c(plans, winning)
         else:
             units = []
 

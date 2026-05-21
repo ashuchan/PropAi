@@ -22,6 +22,7 @@ from ma_poc.pms.adapters.marketapts import (
     MarketAptsAdapter,
     parse_marketapts_template_a,
     parse_marketapts_template_b,
+    parse_marketapts_template_c,
 )
 from ma_poc.pms.detector import detect_pms
 
@@ -97,6 +98,51 @@ _PLAN_B_PLAN_ONLY = {
     "features": "SQ FEET: 500\nBEDROOMS: 1\nBATHROOMS: 1\nDEPOSIT: $OAC",
     "startingPrice": "Contact Us for More Details",
     "drillPath": "/unit/1x1-cc",
+    "units": [],
+}
+
+
+# ── Template C fixtures ─────────────────────────────────────────────
+# Reserve at Water Tower Village /floorplans gallery (.floorplan-container)
+# with two plan badges linking to /unit/{slug}. Drill page exposes
+# .unit-details rows with Unit / SqFt / Rent / Available cells.
+# 2026-05-21: user-flagged that the "N Available" badge IS the drill
+# anchor — the listing-side gallery looks plan-only at first glance but
+# the drill exposes the per-unit roster.
+_PLAN_C_STUDIO = {
+    "template": "C",
+    "title": "Studio",
+    "specsBlob": "Studio BED: Studio BATH: 1 SQ. FEET: 450 ...",
+    "drillPath": "/unit/studio",
+    "units": [
+        {
+            "cells": ["2-106", "450", "$1200", "07/17/2026", "Apply Now"],
+            "dataAttrs": {},
+        },
+        {
+            "cells": ["4-114", "450", "$1125", "Now", "Apply Now"],
+            "dataAttrs": {},
+        },
+    ],
+}
+_PLAN_C_ONE_BEDROOM = {
+    "template": "C",
+    "title": "1 Bedroom",
+    "specsBlob": "1 Bedroom BED: 1 BATH: 1 SQ. FEET: 560 ...",
+    "drillPath": "/unit/1bedroom1bathroom",
+    "units": [
+        {
+            "cells": ["3-201", "560", "$1235", "06/01/2026", "Apply Now"],
+            "dataAttrs": {},
+        },
+    ],
+}
+# Drill that returned no rows — empty roster but plan still surfaced.
+_PLAN_C_EMPTY_DRILL = {
+    "template": "C",
+    "title": "2 Bedroom",
+    "specsBlob": "2 Bedroom BED: 2 BATH: 2 SQ. FEET: 950",
+    "drillPath": "/unit/2bedroom",
     "units": [],
 }
 
@@ -248,6 +294,78 @@ def test_template_b_studio_features_blob() -> None:
     assert rows[0]["market_rent_low"] == 1125
 
 
+# ── Template C parser tests ─────────────────────────────────────────
+
+
+def test_template_c_studio_drill_two_units() -> None:
+    units = parse_marketapts_template_c([_PLAN_C_STUDIO], "u")
+    assert len(units) == 2
+    u0 = units[0]
+    assert u0["floor_plan_name"] == "Studio"
+    assert u0["unit_number"] == "2-106"
+    assert u0["bedrooms"] == "0"  # "BED: Studio" → 0
+    assert u0["bathrooms"] == "1"
+    assert u0["sqft"] == "450"
+    assert u0["market_rent_low"] == 1200
+    assert u0["availability_date"] == "07/17/2026"
+    assert u0["availability_status"] == "AVAILABLE"
+    assert u0["extraction_tier"] == "TIER_1_DOM_MARKETAPTS"
+    # Second unit — "Now" → blank date.
+    u1 = units[1]
+    assert u1["unit_number"] == "4-114"
+    assert u1["market_rent_low"] == 1125
+    assert u1["availability_date"] == ""
+
+
+def test_template_c_one_bedroom_drill_single_unit() -> None:
+    units = parse_marketapts_template_c([_PLAN_C_ONE_BEDROOM], "u")
+    assert len(units) == 1
+    u = units[0]
+    assert u["floor_plan_name"] == "1 Bedroom"
+    assert u["bedrooms"] == "1"
+    assert u["sqft"] == "560"
+    assert u["market_rent_low"] == 1235
+    assert u["availability_date"] == "06/01/2026"
+
+
+def test_template_c_empty_drill_surfaces_plan_level_row() -> None:
+    rows = parse_marketapts_template_c([_PLAN_C_EMPTY_DRILL], "u")
+    assert len(rows) == 1
+    p = rows[0]
+    assert p["unit_number"] == ""
+    assert p["floor_plan_name"] == "2 Bedroom"
+    assert p["bedrooms"] == "2"
+    assert p["sqft"] == "950"
+    assert p["availability_status"] == "UNAVAILABLE"
+
+
+def test_template_c_mixed_plans() -> None:
+    rows = parse_marketapts_template_c(
+        [_PLAN_C_STUDIO, _PLAN_C_ONE_BEDROOM, _PLAN_C_EMPTY_DRILL], "u"
+    )
+    # 2 (studio drill) + 1 (1br drill) + 1 (empty drill plan-level) = 4
+    assert len(rows) == 4
+
+
+def test_template_c_per_unit_sqft_from_drill_cell() -> None:
+    """When the specs blob doesn't carry SQ. FEET but the drill row has
+    a numeric SqFt cell, the row's sqft populates from the drill cell."""
+    plan = {
+        "template": "C",
+        "title": "Studio",
+        "specsBlob": "BED: Studio BATH: 1",  # NO sqft in specs
+        "drillPath": "/unit/studio",
+        "units": [
+            {
+                "cells": ["2-106", "450", "$1200", "07/17/2026", "Apply Now"],
+                "dataAttrs": {},
+            },
+        ],
+    }
+    rows = parse_marketapts_template_c([plan], "u")
+    assert rows[0]["sqft"] == "450"  # from drill cell, not specs blob
+
+
 # ── Adapter end-to-end ──────────────────────────────────────────────
 
 
@@ -270,6 +388,22 @@ async def test_adapter_template_b_extract() -> None:
     assert len(result.units) == 2
     assert result.units[0]["unit_number"] == "1060"
     assert result.units[0]["market_rent_low"] == 949
+    assert result.confidence > 0.7
+
+
+@pytest.mark.asyncio
+async def test_adapter_template_c_extract() -> None:
+    """End-to-end: Template C payload → Tier-1 DOM rows with tier
+    label ``TIER_1_DOM_MARKETAPTS_C``."""
+    payload = {"template": "C", "plans": [_PLAN_C_STUDIO, _PLAN_C_ONE_BEDROOM]}
+    fake = _FakePage(payload, url="https://www.thereserveatwatertowervillage.com/floorplans")
+    result = await MarketAptsAdapter().extract(
+        fake, _ctx("https://www.thereserveatwatertowervillage.com/")
+    )  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_C"
+    assert len(result.units) == 3
+    unit_numbers = sorted(u["unit_number"] for u in result.units)
+    assert unit_numbers == ["2-106", "3-201", "4-114"]
     assert result.confidence > 0.7
 
 
