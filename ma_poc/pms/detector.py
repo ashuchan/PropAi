@@ -861,16 +861,37 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # ``getUnitListByFloor(this,'<fp>',<tt>,<site_id>)`` against the
     # no-auth POST app.repli360.com/admin/getUnitListByFloor data API.
     # Markers appear post-render (the detector re-runs with page_html).
-    if (
-        "app.repli360.com" in h
-        or "getunitlistbyfloor(" in h
+    #
+    # 2026-05-21 HAR validation: thebelmontbyreside.com and
+    # liveattrailpoint.com have ALL the Repli360 markers (app.repli360.com,
+    # getUnitListByFloor, rrac-website-script, rracFloorplan_{id} classes)
+    # BUT they ALSO embed a Funnel/Nestio chat widget at the same site,
+    # which yields a 0.90 "funnel" marker EARLIER in this function. Since
+    # ties are broken by first-yielded, Funnel wins routing — and the
+    # FunnelAdapter has no extraction path for these sites → they fall
+    # to LLM. Fix: when the strong ``app.repli360.com`` host marker is
+    # present (which a co-resident chat widget would NOT produce),
+    # yield at 0.92 to outrank Funnel and route to RepliAdapter where
+    # extraction works.
+    has_strong_repli360 = "app.repli360.com" in h
+    has_weak_repli360 = (
+        "getunitlistbyfloor(" in h
         or "rrac_listavailableunit" in h
-    ):
+    )
+    if has_strong_repli360:
+        yield (
+            "repli360",
+            0.92,
+            ["Repli360/rrac marker in HTML — strong host signal "
+             "(app.repli360.com present, outranks co-resident funnel/"
+             "knock chat widgets that fire at 0.90)"],
+        )
+    elif has_weak_repli360:
         yield (
             "repli360",
             0.90,
             ["Repli360/rrac marker in HTML "
-             "(app.repli360.com / getUnitListByFloor / rrac_listAvailableUnit)"],
+             "(getUnitListByFloor / rrac_listAvailableUnit)"],
         )
 
     # RentManager / iLoveLeasing — the marketing shell embeds the JS-only

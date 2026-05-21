@@ -165,3 +165,56 @@ def test_matches_response_body() -> None:
     assert a.matches_response_body("x app.repli360.com x")
     assert not a.matches_response_body("unrelated html")
     assert not a.matches_response_body({"not": "a string"})
+
+
+# ─── 2026-05-21 HAR-validation regression ────────────────────────────
+
+
+def test_detector_repli360_beats_co_resident_funnel_chat_widget() -> None:
+    """HAR-validation finding: thebelmontbyreside.com and liveattrailpoint.com
+    have both Repli360 markers (app.repli360.com / getUnitListByFloor /
+    rrac-website-script) AND a co-resident Funnel/Nestio chat widget.
+    Both detector signals fire at 0.90 originally; tie was broken by
+    first-yielded → Funnel won → FunnelAdapter has no extraction path
+    for these sites → fall to LLM.
+
+    Fix: Repli360 yields at 0.92 when ``app.repli360.com`` host marker
+    is present (the chat widget alone wouldn't add this host). Higher
+    confidence outranks Funnel and routes to RepliAdapter where
+    extraction works.
+
+    This test pins the precedence: a page with BOTH markers must route
+    to repli360, not funnel.
+    """
+    html = """
+    <html><body>
+      <!-- Funnel/Nestio chat widget co-resident -->
+      <script src="https://funnelleasing.com/chat-widget.js"></script>
+      <div data-nestio-component="chat">x</div>
+      <!-- Repli360 actual extraction surface -->
+      <script src="https://app.repli360.com/public/admin/rrac-website-script/abc"></script>
+      <a onclick="getUnitListByFloor(this,'A1','2','1619')">View Details</a>
+    </body></html>
+    """
+    res = _detect_html_markers(html.lower())
+    assert res is not None and res[0] == "repli360", (
+        f"Expected repli360 to win over co-resident funnel chat widget; got {res}"
+    )
+
+
+def test_detector_repli360_strong_marker_alone_still_routes() -> None:
+    """Sanity: ``app.repli360.com`` alone (without co-resident markers)
+    still routes to repli360 (just at 0.92 now)."""
+    res = _detect_html_markers(
+        '<script src="https://app.repli360.com/widget.js"></script>'
+    )
+    assert res is not None and res[0] == "repli360"
+
+
+def test_detector_repli360_weak_marker_only_still_routes() -> None:
+    """Sanity: ``getUnitListByFloor`` JS call alone (no app.repli360.com
+    host) still routes to repli360 at the original 0.90 confidence."""
+    res = _detect_html_markers(
+        '<a onclick="getUnitListByFloor(this,\'A1\',2,1619)">x</a>'
+    )
+    assert res is not None and res[0] == "repli360"
