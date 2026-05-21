@@ -74,6 +74,7 @@ PmsName = Literal[
     "rentcafe_layout_tab",
     "wix_floor_plans",
     "equity_apartments",
+    "generic_plan_text",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -123,6 +124,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "rentcafe_layout_tab": "dom_first",
     "wix_floor_plans": "dom_first",
     "equity_apartments": "dom_first",
+    "generic_plan_text": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -1116,6 +1118,30 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             0.88,
             ["Equity Apartments REIT marker in HTML "
              "(equityapartments.com host OR .unit-expanded-card + /UnitFees/ pattern)"],
+        )
+    # 2026-05-21 HAR validation: bespoke / custom-CMS multifamily sites
+    # without any known PMS framework embed plan-level info in body
+    # text using common multifamily conventions. The GenericPlanText
+    # adapter is a last-resort fallback that regex-extracts repeating
+    # "{Beds} Bedroom / {Baths} Bath ... $rent" patterns.
+    #
+    # Yielded at 0.55 — every recognized PMS / CMS signal beats this.
+    # Only routes when no stronger adapter detected. The adapter's
+    # own ≥2-distinct-rows guard kills single-noise false fires
+    # (e.g. an amenity blurb saying "1 bedroom homes available for
+    # $500/month").
+    #
+    # Verified extracts on: colonialcourtapts.com/floor-plans (Drupal),
+    # stargatewest.com/tucson-rental-floor-plans/ (custom WP),
+    # www.countryvillageapthomes.com (slick carousel). Correctly emits
+    # nothing on wildwoodmanorapts.com and princetonmanagement.com
+    # (both truly-empty marketing pages).
+    if re.search(r"\d+\s*(?:bedroom|bdrm)\w*", h, re.IGNORECASE) and "$" in h:
+        yield (
+            "generic_plan_text",
+            0.55,
+            ["bedroom/bath + $ text pattern present in body "
+             "(last-resort plan-level extractor; gated by ≥2-row parser threshold)"],
         )
 
 

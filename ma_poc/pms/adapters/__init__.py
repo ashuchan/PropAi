@@ -23,6 +23,7 @@ from ma_poc.pms.adapters.essex import EssexAdapter
 from ma_poc.pms.adapters.funnel import FunnelAdapter
 from ma_poc.pms.adapters.g5 import G5Adapter
 from ma_poc.pms.adapters.generic import GenericAdapter
+from ma_poc.pms.adapters.generic_plan_text import GenericPlanTextAdapter
 from ma_poc.pms.adapters.imt_spaces import ImtSpacesAdapter
 from ma_poc.pms.adapters.irvine import IrvineAdapter
 from ma_poc.pms.adapters.knock import KnockAdapter
@@ -97,6 +98,7 @@ def _bootstrap_registry() -> None:
         RentCafeLayoutTabAdapter,
         WixFloorPlansAdapter,
         EquityApartmentsAdapter,
+        GenericPlanTextAdapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,

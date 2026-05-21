@@ -71,9 +71,13 @@ def test_every_adapter_has_nonempty_or_generic_fingerprints() -> None:
     # Concrete adapters must report at least one host fingerprint so the
     # orchestrator (Phase 5) can match intercepted URLs back to a PMS.
     # ``generic`` is the exception — it has no fingerprints.
+    # ``generic_plan_text`` (2026-05-21) is also an exception: it's a
+    # last-resort plan-level extractor with no host-specific markers;
+    # detection is via body-text pattern, not URL.
+    no_fingerprint_exceptions = {"generic", "generic_plan_text"}
     for adapter in all_adapters():
         fps = adapter.static_fingerprints()
-        if adapter.pms_name == "generic":
+        if adapter.pms_name in no_fingerprint_exceptions:
             assert fps == []
         else:
             assert fps, adapter.pms_name
