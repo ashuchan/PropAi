@@ -68,6 +68,7 @@ PmsName = Literal[
     "encoreskyline_template",
     "aspensquare",
     "marketapts",
+    "rentcafe_unit_roster",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -111,6 +112,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "encoreskyline_template": "dom_first",
     "aspensquare": "dom_first",
     "marketapts": "dom_first",
+    "rentcafe_unit_roster": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -968,6 +970,26 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
              "weak marketapts.com host (iframes/ or images/apartments/) "
              "co-occurs with a template selector; discriminates real MA "
              "from G5 fee-guide embeds (which lack the template selectors)"],
+        )
+    # 2026-05-21 HAR validation: RentCafe "modern" theme with inline
+    # ``.floorplan-block`` + ``.par-units`` + ``.unit-container``.
+    # Confirmed live on www.thefrankestate.com (9 plans, 11 units) and
+    # www.somaresidences.com (6 plans, 9 units). Distinct from the
+    # SecureCafe portal-hop variant most RentCafe sites use; these sites
+    # publish unit inventory inline in same-origin DOM. Routed to the
+    # dedicated RentCafeUnitRosterAdapter at 0.85 (higher than the
+    # weak rentcafe substring marker at 0.80 so this wins when both
+    # apply).
+    if (
+        "floorplan-block" in h
+        and "par-units" in h
+        and "unit-container" in h
+    ):
+        yield (
+            "rentcafe_unit_roster",
+            0.85,
+            ["RentCafe modern-theme marker in HTML "
+             "(.floorplan-block + .par-units + .unit-container all present)"],
         )
 
 

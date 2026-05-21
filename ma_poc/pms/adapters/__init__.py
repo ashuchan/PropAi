@@ -30,6 +30,7 @@ from ma_poc.pms.adapters.onesite import OneSiteAdapter
 from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
 from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
+from ma_poc.pms.adapters.rentcafe_unit_roster import RentCafeUnitRosterAdapter
 from ma_poc.pms.adapters.rentmanager import RentManagerAdapter
 from ma_poc.pms.adapters.rentvision import RentVisionAdapter
 from ma_poc.pms.adapters.repli360 import Repli360Adapter
@@ -85,6 +86,7 @@ def _bootstrap_registry() -> None:
         G5Adapter,
         EncoreSkylineTemplateAdapter,
         MarketAptsAdapter,
+        RentCafeUnitRosterAdapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,
