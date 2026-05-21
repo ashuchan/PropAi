@@ -555,3 +555,76 @@ async def test_resolver_detects_redirect() -> None:
     result = await resolve_target(page, "https://vanity.example/", detection)
     assert result.method == "redirect"
     assert "rentcafe.com" in result.resolved_url
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-21 grind600 portal additions — goprisma.com + fortresstech.io
+# are residents-only Angular/React SPAs (no public availableunits
+# endpoint). Adding them to _LEASING_PORTAL_DOMAINS stops the resolver
+# from treating their links as candidate floor-plan pages.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_url_is_known_portal_recognises_goprisma() -> None:
+    """grind600 finding: 13 of 600 sites link only to <prop>.goprisma.com.
+    These are residents-only Angular SPAs — the resolver must recognise
+    them so it doesn't waste a hop trying to crawl them as marketing
+    pages."""
+    from ma_poc.pms.resolver import _url_is_known_portal
+    for url in (
+        "https://aspirethunderbird.goprisma.com/auth/login",
+        "https://riverbank.goprisma.com/auth/login",
+        "https://reserveatwatertowervillage.goprisma.com/auth/login",
+        # Hashed-subdomain variant observed live (emersonparkapthomes.com).
+        "https://693c45120e14189f759c2889.goprisma.com/auth/login",
+    ):
+        assert _url_is_known_portal(url), (
+            f"{url!r} must match the goprisma.com leasing-portal domain "
+            f"so the resolver skips it as a candidate floor-plan page"
+        )
+
+
+def test_url_is_known_portal_recognises_fortresstech() -> None:
+    """grind600 finding: 7 of 600 sites link to
+    portal.fortresstech.io/{group-uuid}/{property-uuid}/. The same
+    group-uuid recurs across multiple properties = one ingestion endpoint
+    per management company. Same residents-only treatment as goprisma."""
+    from ma_poc.pms.resolver import _url_is_known_portal
+    for url in (
+        "https://www.portal.fortresstech.io/26b2b2cc-7df5-4d1f-b437-23fdf9e45d83/08c07271-eb06-4536-909a-7c6afe663068/contact-us",
+        "https://www.portal.fortresstech.io/4e8caee8-c99e-406c-864c-c8a5ba3e4a03/f9844047-bb44-4f9e-becc-6dde949ec379",
+        "https://www.portal.fortresstech.io/9733ced2-72a8-4978-aa6e-559fc187fd4d/179c6783-3c42-4395-83dd-94c92a4bcad1",
+    ):
+        assert _url_is_known_portal(url), (
+            f"{url!r} must match the fortresstech.io leasing-portal "
+            f"domain"
+        )
+
+
+def test_url_is_known_portal_negative_cases_still_negative() -> None:
+    """Sanity — non-portal URLs must still return False after these
+    additions. Avoid the new strings being too broad."""
+    from ma_poc.pms.resolver import _url_is_known_portal
+    for url in (
+        "https://www.example.com/floorplans",
+        "https://aspirethunderbird.com/floorplans",  # marketing CMS, NOT the portal
+        "https://www.google.com/",
+    ):
+        assert not _url_is_known_portal(url), (
+            f"{url!r} is not a leasing portal — should remain False"
+        )
+
+
+def test_host_keywords_include_goprisma_fortresstech() -> None:
+    """The signal-engine host-keyword list (parallel source of truth)
+    must include the same two new portals at the standard 115 score so
+    they're treated like other leasing-portal subdomains."""
+    from ma_poc.pms.signal_engine.defaults import DEFAULT_HOST_KEYWORDS
+    keywords = dict(DEFAULT_HOST_KEYWORDS)
+    assert "goprisma.com" in keywords, (
+        "goprisma.com must be in DEFAULT_HOST_KEYWORDS "
+        "(sync with resolver._LEASING_PORTAL_DOMAINS)"
+    )
+    assert "fortresstech.io" in keywords
+    assert keywords["goprisma.com"] == 115
+    assert keywords["fortresstech.io"] == 115

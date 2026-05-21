@@ -182,6 +182,12 @@ DEFAULT_HOST_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("myresman.com", 115),           # ResMan PMS portal
     ("reslisting.com", 110),         # marquette-management.reslisting.com
     ("rentcafewebsite.com", 115),    # legacy *.rentcafewebsite.com
+    # 2026-05-21 grind600 findings — residents-only SPA portals
+    # anchored on marketing-CMS sites. Score parity with the other
+    # cross-domain portals; resolver._LEASING_PORTAL_DOMAINS skips
+    # them as candidate floor-plan pages (login screen only).
+    ("goprisma.com", 115),           # GoPrisma — 13/600 sites (Angular SPA)
+    ("fortresstech.io", 115),        # FortressTech — 7/600 sites (UUID-scoped)
 )
 
 DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {

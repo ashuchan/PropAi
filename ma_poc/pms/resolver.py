@@ -152,6 +152,24 @@ _LEASING_PORTAL_DOMAINS = frozenset(
         "presentation.spherexx.app",
         "spherexx.app",
         "spherexx.com",
+        # 2026-05-21 (grind600 findings): two more residents-only portals
+        # that anchor on marketing-CMS sites. No public availableunits
+        # endpoint — both are Angular/React SPAs whose inventory is
+        # auth-walled. Recognising the host stops the resolver from
+        # treating these portal links as candidate floor-plan pages
+        # (which would just hit a login screen). Marketing CMS at the
+        # property's own root domain is the actual extraction target.
+        #
+        #   - goprisma.com — 13 / 600 sites (2.2%). Pattern
+        #     ``<property>.goprisma.com/auth/login``. SPA title
+        #     "Prisma". Hashed-subdomain variant also observed
+        #     (``693c45120e14189f759c2889.goprisma.com``).
+        #   - fortresstech.io — 7 / 600 sites (1.2%). Pattern
+        #     ``portal.fortresstech.io/{group-uuid}/{property-uuid}/``.
+        #     Same group-uuid shared across multiple properties =
+        #     single ingestion endpoint per management company.
+        "goprisma.com",
+        "fortresstech.io",
     }
 )
 
