@@ -84,9 +84,21 @@ async () => {
     return {
       id: id,
       data: Object.assign({}, fb.dataset || {}),
+      // 2026-05-21 HAR validation: thebeachapts.com renders the unit-
+      // container with block-level child divs (.unit-number, .unit-sqft,
+      // .available-now) that get concatenated WITHOUT spaces when read
+      // via .innerText/.textContent. Reading from structured child
+      // selectors is correct on both thefrankestate (which also has
+      // these classes) and thebeachapts (where the unstructured text
+      // would mis-extract). Still emit ``text`` as a fallback for older
+      // RentCafe themes that lack the structured children.
       units: ucs.map((uc) => ({
         id: uc.id || '',
         text: T(uc),
+        unitNumberSel: T(uc.querySelector('.unit-number')),
+        unitSqftSel: T(uc.querySelector('.unit-sqft')),
+        unitRentSel: T(uc.querySelector('.unit-rent, .pricing, .unit-price')),
+        availableNow: !!uc.querySelector('.available-now'),
       })),
     };
   });
@@ -107,25 +119,48 @@ _LEASE_TERM_RE = re.compile(r"Lease\s*Term\s*:\s*(\d+)", re.IGNORECASE)
 _RENT_RE = re.compile(r"\$\s*([\d,]+)")
 
 
-def _parse_unit_text(text: str) -> dict[str, str]:
-    """Parse a single ``.unit-container`` innerText blob.
+def _parse_unit_text(text: str, structured: dict | None = None) -> dict[str, str]:
+    """Parse a single ``.unit-container``.
 
-    Sample input:
+    Prefers structured child selectors when provided (more reliable —
+    handles thebeachapts where block-level divs concatenate without
+    spaces in innerText). Falls back to regex on the unstructured text
+    for older RentCafe themes.
+
+    Sample input (thefrankestate, spaces preserved by CSS):
         ``Unit #08-7 750 sqft Available: NOW Lease Term: 12
-          See Unit Amenities Starting At: $1,694 Lease Now
-          Stainless Steel Appliances Hardwood-Style Vinyl Flooring``
+          See Unit Amenities Starting At: $1,694 Lease Now ...``
 
-    Returns dict with: unit_number, sqft, availability_date,
-    availability_status, lease_term, rent.
+    Sample input (thebeachapts, no spaces in innerText):
+        ``Unit #123468 sqftAvailable: NOWLease Term: 9Inquire``
+    but with structured selectors: unitNumberSel="Unit #123",
+    unitSqftSel="468 sqft", availableNow=True.
     """
     out: dict[str, str] = {}
-    m = _UNIT_NUMBER_RE.search(text)
-    if m:
-        out["unit_number"] = m.group(1)
-    m = _SQFT_RE.search(text)
-    if m:
-        out["sqft"] = m.group(1).replace(",", "")
-    if _AVAIL_NOW_RE.search(text):
+    # Unit number: try .unit-number first, then regex on full text.
+    if structured and structured.get("unitNumberSel"):
+        m = _UNIT_NUMBER_RE.search(str(structured["unitNumberSel"]))
+        if m:
+            out["unit_number"] = m.group(1)
+    if "unit_number" not in out:
+        m = _UNIT_NUMBER_RE.search(text)
+        if m:
+            out["unit_number"] = m.group(1)
+    # Sqft: prefer .unit-sqft selector.
+    if structured and structured.get("unitSqftSel"):
+        m = _SQFT_RE.search(str(structured["unitSqftSel"]))
+        if m:
+            out["sqft"] = m.group(1).replace(",", "")
+    if "sqft" not in out:
+        m = _SQFT_RE.search(text)
+        if m:
+            out["sqft"] = m.group(1).replace(",", "")
+    # Availability: .available-now boolean from structured probe is the
+    # most reliable signal; fall back to regex.
+    if structured and structured.get("availableNow"):
+        out["availability_status"] = "AVAILABLE"
+        out["availability_date"] = ""
+    elif _AVAIL_NOW_RE.search(text):
         out["availability_status"] = "AVAILABLE"
         out["availability_date"] = ""
     else:
@@ -139,9 +174,15 @@ def _parse_unit_text(text: str) -> dict[str, str]:
     m = _LEASE_TERM_RE.search(text)
     if m:
         out["lease_term"] = m.group(1)
-    m = _RENT_RE.search(text)
-    if m:
-        out["rent"] = m.group(1).replace(",", "")
+    # Rent: prefer .unit-rent / .pricing selector, else regex.
+    if structured and structured.get("unitRentSel"):
+        m = _RENT_RE.search(str(structured["unitRentSel"]))
+        if m:
+            out["rent"] = m.group(1).replace(",", "")
+    if "rent" not in out:
+        m = _RENT_RE.search(text)
+        if m:
+            out["rent"] = m.group(1).replace(",", "")
     return out
 
 
@@ -214,7 +255,16 @@ def parse_rentcafe_unit_roster(plans: list[dict], url: str) -> list[dict]:
             text = str(u.get("text") or "")
             if not text:
                 continue
-            parsed = _parse_unit_text(text)
+            # Pass through the structured child selectors when DOM JS
+            # provided them (newer payload shape from 2026-05-21);
+            # _parse_unit_text falls back to regex for older payloads
+            # that don't include the structured fields.
+            structured = {
+                k: u.get(k)
+                for k in ("unitNumberSel", "unitSqftSel", "unitRentSel", "availableNow")
+                if k in u
+            }
+            parsed = _parse_unit_text(text, structured or None)
             unit_no = parsed.get("unit_number", "")
             sqft = parsed.get("sqft") or plan_sqft
             rent_str = parsed.get("rent", "")

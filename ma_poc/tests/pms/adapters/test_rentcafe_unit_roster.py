@@ -330,3 +330,78 @@ def test_adapter_registered() -> None:
 def test_strategy_is_dom_first() -> None:
     from ma_poc.pms.detector import _STRATEGY_BY_PMS
     assert _STRATEGY_BY_PMS["rentcafe_unit_roster"] == "dom_first"
+
+
+# ── 2026-05-21 thebeachapts regression — structured child selectors ─────
+
+
+def test_parse_uses_structured_selectors_when_innerText_lacks_spaces() -> None:
+    """thebeachapts.com renders the unit-container with block-level
+    child divs (.unit-number, .unit-sqft, .available-now) that
+    concatenate WITHOUT spaces in .innerText:
+        "Unit #123468 sqftAvailable: NOWLease Term: 9Inquire"
+
+    Naive regex on the unstructured text would extract unit_number
+    "123468" (the wrong concatenation). The parser must prefer the
+    structured child selectors when present.
+    """
+    structured = {
+        "unitNumberSel": "Unit #123",
+        "unitSqftSel": "468 sqft",
+        "unitRentSel": "",
+        "availableNow": True,
+    }
+    parsed = _parse_unit_text(
+        "Unit #123468 sqftAvailable: NOWLease Term: 9Inquire",
+        structured,
+    )
+    assert parsed["unit_number"] == "123", (
+        f"Expected unit_number from .unit-number selector to override "
+        f"the concatenated full-text regex; got {parsed}"
+    )
+    assert parsed["sqft"] == "468"
+    assert parsed["availability_status"] == "AVAILABLE"
+    assert parsed["availability_date"] == ""  # NOW → empty
+    assert parsed["lease_term"] == "9"
+
+
+def test_parse_full_payload_with_structured_selectors() -> None:
+    """End-to-end: payload mirroring DOM JS output for a thebeachapts-style
+    site. The structured fields per unit produce the correct row."""
+    plans = [
+        {
+            "id": "100",
+            "data": {
+                "floorplanName": "1 Bedroom",
+                "bed": "1",
+                "bath": "1",
+                "sqft": "567",
+                "rent": "",  # thebeachapts: no rent in floorplan-block either
+                "numunits": "3",
+                "building": "1",
+            },
+            "units": [
+                {
+                    "id": "unit-545388",
+                    "text": "Unit #123468 sqftAvailable: NOWLease Term: 9Inquire",
+                    "unitNumberSel": "Unit #123",
+                    "unitSqftSel": "468 sqft",
+                    "unitRentSel": "",
+                    "availableNow": True,
+                },
+            ],
+        },
+    ]
+    rows = parse_rentcafe_unit_roster(plans, "u")
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["unit_number"] == "123"
+    assert r["sqft"] == "468"
+    assert r["floor_plan_name"] == "1 Bedroom"
+    assert r["bedrooms"] == "1"
+    assert r["building"] == "1"
+    # No rent visible anywhere on thebeachapts unit roster — plan-card
+    # data-rent was also empty — so rent is None. The row still emits
+    # because unit_number is present.
+    assert r["market_rent_low"] is None
+    assert r["availability_status"] == "AVAILABLE"
