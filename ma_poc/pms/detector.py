@@ -69,6 +69,7 @@ PmsName = Literal[
     "aspensquare",
     "marketapts",
     "rentcafe_unit_roster",
+    "imt_spaces",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -113,6 +114,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "aspensquare": "dom_first",
     "marketapts": "dom_first",
     "rentcafe_unit_roster": "dom_first",
+    "imt_spaces": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -990,6 +992,31 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             0.85,
             ["RentCafe modern-theme marker in HTML "
              "(.floorplan-block + .par-units + .unit-container all present)"],
+        )
+    # 2026-05-21 HAR validation: IMT Residential portfolio uses a custom
+    # CMS branded "Spaces" with article.spaces-plan elements carrying
+    # data-spaces-* attributes (rent, sqft, bed, bath, soonest-available
+    # date, plan name). ~25 IMT properties fleet-wide. Confirmed live on
+    # www.imtresidential.com/properties/imt-sorrento-valley/apartments/
+    # (57 spaces-plan articles).
+    #
+    # Combined-signal rule: a real IMT site has BOTH the host marker
+    # (imtresidential.com) AND/OR the spaces-community class prefix +
+    # the spaces-plan article shape. Both conditions are tight enough
+    # that either alone would route correctly; combined ensures
+    # discrimination against incidental "spaces" word matches in
+    # unrelated HTML.
+    if (
+        ("imtresidential.com" in h or "spaces-community-" in h)
+        and "spaces-plan" in h
+        and "data-spaces-plan" in h
+    ):
+        yield (
+            "imt_spaces",
+            0.85,
+            ["IMT 'Spaces' theme marker in HTML "
+             "(imtresidential.com host or spaces-community-* class) + "
+             "article.spaces-plan with data-spaces-plan attr"],
         )
 
 

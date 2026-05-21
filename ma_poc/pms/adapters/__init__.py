@@ -22,6 +22,7 @@ from ma_poc.pms.adapters.essex import EssexAdapter
 from ma_poc.pms.adapters.funnel import FunnelAdapter
 from ma_poc.pms.adapters.g5 import G5Adapter
 from ma_poc.pms.adapters.generic import GenericAdapter
+from ma_poc.pms.adapters.imt_spaces import ImtSpacesAdapter
 from ma_poc.pms.adapters.irvine import IrvineAdapter
 from ma_poc.pms.adapters.knock import KnockAdapter
 from ma_poc.pms.adapters.maac import MaacAdapter
@@ -87,6 +88,7 @@ def _bootstrap_registry() -> None:
         EncoreSkylineTemplateAdapter,
         MarketAptsAdapter,
         RentCafeUnitRosterAdapter,
+        ImtSpacesAdapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,
