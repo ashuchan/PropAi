@@ -73,6 +73,17 @@ Two SSR template variants are handled (probed live 2026-05-21):
     in the Available column maps to UNAVAILABLE. Discovered 2026-05-
     21 by fleet grep + live probe.
 
+URL-path note (2026-05-21 user-validation correction): the
+``/floorplans`` (no hyphen) vs ``/floor-plans`` (hyphenated) split
+crosses templates — Templates A/B/C usually serve ``/floorplans``;
+Template D serves ``/floor-plans``. Earlier eyeball probing missed 4
+properties (mountainridgemanor, theazleeapartments, liveatthejuniper,
+embarcatwestjordan) by checking only ``/floorplans`` — re-probe
+confirmed they all render Template D at ``/floor-plans``. The DOM JS
+self-fetch already tries both paths in order, so the adapter routes
+them correctly in production; the misclassification was a probing
+mistake, not a code gap.
+
 Probed cohort size: 13 GoPrisma-tagged + 4 marketapts-tagged in
 results_deep.jsonl = 17 confirmed properties; the fleet-wide signal is
 broader because ``marketing_marketapts`` is a generic detector marker
