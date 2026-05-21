@@ -288,6 +288,21 @@ class KnockAdapter:
 
         if not (public_key and comm_id) and not result.units:
             result.errors.append("knock-adapter: no knockDoorway.init() call in HTML")
+
+        # ── Empty-Knock-API fallthrough (2026-05-21) ───────────────────────
+        # When Knock is correctly DETECTED (knockDoorway.init in HTML) but
+        # the public Doorway API returns 0 units, the operator publishes
+        # inventory via SSR HTML on /floorplans rather than syncing to
+        # Knock's database. Empirically: ~5 properties in T4_code_merge_cross_page
+        # (lochravenapts, manchesterlake, ...) follow this exact pattern.
+        # See ``project_knock_empty_api_fallthrough_2026-05-21`` memo.
+        #
+        # Surface the standard floor-plan paths as subpage hints so the
+        # orchestrator's link-hop fetches them. The Phase 6.2 HTML-table
+        # extractor + Phase 6.3 data-attr extractor (shipped 2026-05-21)
+        # handle the SSR'd unit data.
+        if (public_key and comm_id) and not result.units and base_url:
+            _knock_empty_emit_subpage_hints(result, base_url)
         return result
 
 
@@ -529,3 +544,51 @@ async def _fetch_knock_units_by_domain(
             return pid_str, await _fetch_units(c, pid_str)
     except Exception:
         return None, []
+
+
+# ── Empty-Knock-API fallthrough helper (2026-05-21) ─────────────────────────
+
+# Standard floor-plan paths to try when Knock detection succeeds but the
+# Doorway API returns no units. Ordered by observed prevalence —
+# ``/floorplans`` (no hyphen) is the dominant form among Knock-empty
+# properties (lochravenapts, manchesterlake); the hyphenated and
+# ``/availability`` variants exist on a small tail. The orchestrator's
+# link-hop tries each in order and stops at the first 200-with-units.
+_KNOCK_EMPTY_FALLTHROUGH_PATHS: tuple[str, ...] = (
+    "/floorplans",
+    "/floor-plans",
+    "/availability",
+)
+
+
+def _knock_empty_emit_subpage_hints(result: AdapterResult, base_url: str) -> None:
+    """Append ``/floorplans`` family URLs as subpage hints on ``result``.
+
+    Idempotent: if ``result._embedded_floorplan_subpage_hints`` already
+    contains any of the candidate URLs, that one is not re-added. The
+    hint shape ``(url, parser_id)`` matches the existing emission
+    pattern in ``_html_extract.detect_floorplan_subpage_urls``.
+    """
+    from urllib.parse import urljoin, urlparse
+
+    parsed = urlparse(base_url)
+    if not parsed.scheme or not parsed.netloc:
+        return  # malformed base_url — do nothing rather than emit bad URLs
+
+    # Honour same-host redirects implicitly — the orchestrator will follow
+    # them. We always anchor on the configured base_url so the hop stays
+    # on the property's own domain.
+    existing = list(getattr(result, "_embedded_floorplan_subpage_hints", None) or [])
+    existing_urls: set[str] = {u for u, _ in existing}
+
+    additions: list[tuple[str, str]] = []
+    for path in _KNOCK_EMPTY_FALLTHROUGH_PATHS:
+        candidate = urljoin(base_url, path)
+        if candidate in existing_urls:
+            continue
+        additions.append((candidate, "knock_empty_fallthrough"))
+
+    if additions:
+        result._embedded_floorplan_subpage_hints = (  # type: ignore[attr-defined]
+            existing + additions
+        )

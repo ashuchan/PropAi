@@ -30,8 +30,11 @@ from __future__ import annotations
 
 import html as _html
 import json
-from datetime import datetime, timezone
+import re
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+
+from bs4 import BeautifulSoup
 
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -56,7 +59,7 @@ def _epoch_to_date(v: Any) -> str:
     if ms <= 0:
         return ""
     try:
-        return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        return datetime.fromtimestamp(ms / 1000, tz=UTC).strftime("%Y-%m-%d")
     except (OverflowError, OSError, ValueError):
         return ""
 
@@ -91,6 +94,179 @@ def _extract_floorplans(html: str) -> dict[str, Any]:
     except (json.JSONDecodeError, ValueError):
         return {}
     return obj if isinstance(obj, dict) else {}
+
+
+# ── Card-DOM parser (2026-05-21) ────────────────────────────────────────────
+#
+# Cortland migrated from the ``preload = {floorplans: ...}`` JSON envelope to
+# server-side-rendered ``<div class="apartments__card">`` cards sometime
+# between 2026-05-18 (when the original adapter was written) and 2026-05-21
+# (when we re-verified). The new card text shape is identical across all
+# 196 Cortland properties — confirmed live on cortland-macarthur (64 cards):
+#
+#   Apt #441007                                  ← unit number link text
+#   Volterra                                     ← floor plan name
+#   Apt #441007                                  ← repeated as h3/heading
+#   Starting at $1,481                           ← rent
+#   Floor 1                                      ← floor
+#   1 Bed | 1 Bath | 740 sq. ft.                 ← beds | baths | sqft
+#   Available starting 7/15  (or "Available Now")  ← availability
+#
+# The data is in static HTML — curl_cffi chrome120 sees the same cards a
+# real browser does. No Playwright render needed.
+
+_APT_NUMBER_RE = re.compile(r"Apt\s*#\s*([A-Z0-9][A-Z0-9\-]{1,12})", re.IGNORECASE)
+_STARTING_AT_RE = re.compile(r"Starting\s+at\s+\$\s*([1-9]\d{0,3}(?:,\d{3})*)", re.IGNORECASE)
+_FLOOR_RE = re.compile(r"Floor\s+(\d{1,3})", re.IGNORECASE)
+_BBS_RE = re.compile(
+    r"(\d+(?:\.\d+)?|studio)\s*Bed[s]?\s*[|•/· \s]+\s*"
+    r"(\d+(?:\.\d+)?)\s*Bath[s]?\s*[|•/· \s]+\s*"
+    r"(\d{2,5}(?:,\d{3})*)\s*sq\.?\s*ft\.?",
+    re.IGNORECASE,
+)
+_AVAIL_DATE_RE = re.compile(
+    r"Available\s+(starting\s+)?(\d{1,2})[/\-](\d{1,2})(?:[/\-](\d{2,4}))?",
+    re.IGNORECASE,
+)
+_AVAIL_NOW_RE = re.compile(r"Available\s+Now", re.IGNORECASE)
+
+
+def parse_cortland_cards(html: str, url: str) -> list[dict[str, str]]:
+    """Parse Cortland's new ``.apartments__card`` SSR HTML into unit dicts.
+
+    Each card produces one unit. Floor-plan name, unit number, rent, floor,
+    beds, baths, sqft, and availability date are all in the card's
+    visible text — no XHR, no Playwright. Returns empty list if no cards
+    are found (caller falls back to legacy ``parse_cortland_units``).
+
+    Date normalization: dates ship as ``M/D`` (no year on the marketing
+    page) — we interpret them as the next-occurrence of that month/day
+    relative to today. ``Available Now`` → today's date.
+    """
+    if not html or "apartments__card" not in html:
+        return []
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        soup = BeautifulSoup(html, "html.parser")
+
+    today = datetime.now(tz=UTC).date()
+    out: list[dict[str, str]] = []
+
+    for card in soup.find_all("div", class_="apartments__card"):
+        text = card.get_text("\n", strip=True)
+        if not text:
+            continue
+        # Unit number — first "Apt #X" mention in the card text
+        unum_m = _APT_NUMBER_RE.search(text)
+        if not unum_m:
+            continue  # not a unit card
+        unit_number = unum_m.group(1)
+
+        # Floor plan name — the first non-Apt#-prefixed line of the
+        # ``apartments__card-columns`` span. Walk text lines, skip the
+        # leading "Apt #X" lines, the first remaining line is the plan.
+        floor_plan_name = ""
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("Apt") or _APT_NUMBER_RE.fullmatch(line):
+                continue
+            if line.startswith("Starting at") or line.startswith("Floor "):
+                continue
+            if "Bed" in line and "Bath" in line:
+                continue
+            if "Available" in line:
+                continue
+            # First non-noise line: that's the plan name
+            floor_plan_name = line
+            break
+
+        # Rent
+        rent_m = _STARTING_AT_RE.search(text)
+        rent = None
+        if rent_m:
+            try:
+                rent = int(rent_m.group(1).replace(",", ""))
+            except (ValueError, TypeError):
+                rent = None
+
+        # Floor
+        floor_m = _FLOOR_RE.search(text)
+        floor = floor_m.group(1) if floor_m else ""
+
+        # Beds / baths / sqft from the "N Bed | N Bath | NNN sq. ft." line.
+        # The ``&nbsp;`` non-breaking-space variant is normalised by
+        # ``get_text``; the regex's whitespace class catches both.
+        bbs_m = _BBS_RE.search(text)
+        beds = ""
+        baths = ""
+        sqft = ""
+        if bbs_m:
+            bed_raw = bbs_m.group(1)
+            beds = "0" if bed_raw.lower() == "studio" else bed_raw
+            baths = bbs_m.group(2)
+            sqft = bbs_m.group(3).replace(",", "")
+
+        # Availability — "Available Now" OR "Available starting M/D"
+        avail_status = ""
+        avail_date = ""
+        if _AVAIL_NOW_RE.search(text):
+            avail_status = "AVAILABLE"
+            avail_date = today.isoformat()
+        else:
+            adm = _AVAIL_DATE_RE.search(text)
+            if adm:
+                mm = int(adm.group(2))
+                dd = int(adm.group(3))
+                yy = adm.group(4)
+                year = today.year
+                if yy:
+                    year = int(yy) if len(yy) == 4 else 2000 + int(yy)
+                else:
+                    # No year — assume next-occurrence of MM/DD. If the
+                    # MM/DD already passed this year, roll to next year.
+                    try:
+                        candidate = datetime(year, mm, dd).date()
+                        if candidate < today:
+                            year += 1
+                    except ValueError:
+                        pass
+                try:
+                    avail_date = datetime(year, mm, dd).date().isoformat()
+                    avail_status = "AVAILABLE"
+                except ValueError:
+                    avail_date = ""
+
+        beds_int = None
+        if beds:
+            try:
+                beds_int = int(float(beds))
+            except (ValueError, TypeError):
+                beds_int = None
+
+        out.append(
+            make_unit_dict(
+                floor_plan_name=floor_plan_name,
+                bed_label=bed_label_from(beds_int, floor_plan_name),
+                bedrooms=beds,
+                bathrooms=baths,
+                sqft=sqft,
+                unit_number=unit_number,
+                floor=floor,
+                rent_range=format_rent_range(rent, rent) if rent else "",
+                rent_low=rent,
+                rent_high=rent,
+                availability_status=avail_status,
+                availability_date=avail_date,
+                concession="",
+                source_api_url=url,
+                extraction_tier=OLL_TIER,
+            )
+        )
+
+    return out
 
 
 def parse_cortland_units(floorplans: dict[str, Any], url: str) -> list[dict[str, str]]:
@@ -205,8 +381,20 @@ class CortlandAdapter:
         result = AdapterResult(tier_used=OLL_TIER)
 
         html, url = await _fetch_available_html(page, ctx)
+
+        # Path 1 (legacy, pre-2026-05-21): ``preload = {floorplans: ...}`` JSON
+        # blob. Some Cortland properties may still serve this if they're on
+        # a different deploy tier, so we try it first. Empty result → fall
+        # through.
         floorplans = _extract_floorplans(html)
         all_units = parse_cortland_units(floorplans, url) if floorplans else []
+
+        # Path 2 (current, 2026-05-21+): server-side-rendered
+        # ``<div class="apartments__card">`` cards. Cortland migrated the
+        # /available-apartments/ page to this shape — the legacy preload
+        # JSON is gone. 64 cards observed on cortland-macarthur live.
+        if not all_units:
+            all_units = parse_cortland_cards(html, url)
 
         if all_units:
             from ma_poc.extraction.post_process import post_process

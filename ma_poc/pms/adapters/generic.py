@@ -29,14 +29,45 @@ from __future__ import annotations
 
 import logging
 import re as _re
-from datetime import datetime, timezone as _timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from ma_poc.models.scrape_profile import FieldSelectorMap as _FieldSelectorMap
+from ma_poc.pms.adapters._air_communities import (
+    derive_plan_context_from_url as _air_url_ctx,
+)
+from ma_poc.pms.adapters._air_communities import (
+    detect_air_communities as _detect_air,
+)
+from ma_poc.pms.adapters._air_communities import (
+    parse_per_plan_html as _air_parse_per_plan,
+)
+from ma_poc.pms.adapters._air_communities import (
+    parse_residences_html as _air_parse_residences,
+)
+from ma_poc.pms.adapters._amli import (
+    detect_amli_trpc_blob as _detect_amli,
+)
+from ma_poc.pms.adapters._amli import (
+    parse_amli_trpc_blob as _parse_amli,
+)
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_api_responses as _dr_parse_api_responses,
 )
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_sightmap_payload as _dr_parse_sightmap,
+)
+from ma_poc.pms.adapters._funnel import (
+    build_availability_api_url as _funnel_api_url,
+)
+from ma_poc.pms.adapters._funnel import (
+    detect_funnel as _detect_funnel,
+)
+from ma_poc.pms.adapters._funnel import (
+    find_property_id as _funnel_property_id,
+)
+from ma_poc.pms.adapters._funnel import (
+    parse_funnel_api_response as _parse_funnel,
 )
 from ma_poc.pms.adapters.g5 import (
     is_g5_graphql_body as _is_g5_graphql_body,
@@ -47,8 +78,28 @@ from ma_poc.models.scrape_profile import FieldSelectorMap as _FieldSelectorMap
 from ma_poc.pms.adapters._html_extract import (
     extract_embedded_blobs_from_html,
     extract_jsonld_from_html,
+    extract_units_from_data_attr_cards,
     extract_units_from_dom,
+    extract_units_from_html_tables,
     extract_with_hints,
+)
+from ma_poc.pms.adapters._merge_fns import (
+    aggregate_quality as _aggregate_quality,
+)
+from ma_poc.pms.adapters._merge_fns import (
+    find_unit_list as _find_unit_list,
+)
+from ma_poc.pms.adapters._merge_fns import (
+    has_unit_signals as _has_unit_signals,
+)
+from ma_poc.pms.adapters._merge_fns import (
+    merge_into_result_units as _merge_into_result_units,
+)
+from ma_poc.pms.adapters._nestio_widget import (
+    detect_widget_rendered as _detect_nestio_widget_rendered,
+)
+from ma_poc.pms.adapters._nestio_widget import (
+    parse_widget_dom as _parse_nestio_widget,
 )
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
@@ -59,27 +110,6 @@ from ma_poc.pms.adapters._parsing import (
     make_unit_dict,
     money_to_int,
     rent_in_sanity_range,
-)
-from ma_poc.pms.adapters._merge_fns import (
-    AMBIGUITY_RANKS as _AMBIGUITY_RANKS,
-    MERGE_MUTABLE_FIELDS as _MERGE_MUTABLE_FIELDS,
-    MERGE_PHYSICAL_FIELDS as _MERGE_PHYSICAL_FIELDS,
-    MERGE_UNION_FIELDS as _MERGE_UNION_FIELDS,
-    RANK_LADDER as _RANK_LADDER,
-    aggregate_quality as _aggregate_quality,
-    availability_count_aware_merge as _availability_count_aware_merge,
-    emit_ambiguous_fail_closed as _emit_ambiguous_fail_closed,
-    emit_physical_conflicts as _emit_physical_conflicts,
-    find_unit_list as _find_unit_list,
-    has_unit_signals as _has_unit_signals,
-    merge_field_values as _merge_field_values,
-    merge_float_or_none as _merge_float_or_none,
-    merge_int_or_none as _merge_int_or_none,
-    merge_into_result_units as _merge_into_result_units,
-    merge_norm as _merge_norm,
-    merge_field_present as _merge_field_present,
-    merge_rank_signature as _merge_rank_signature,
-    rank_matches as _rank_matches,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
@@ -139,19 +169,29 @@ def _is_non_data_response(resp: dict[str, Any]) -> bool:
 # together. When any import fails the fallback path (_has_unit_signals,
 # inline RC1 checks) is used throughout. Graceful degradation — never raises.
 try:
+    from ma_poc.pms.signal_engine.decider import (
+        ActionDecider as _SEActionDecider,
+    )
+    from ma_poc.pms.signal_engine.decider import (
+        ActionType as _SEActionType,
+    )
+    from ma_poc.pms.signal_engine.decider import (
+        DecisionContext as _SEDecisionContext,
+    )
+    from ma_poc.pms.signal_engine.decider import (
+        DOMAnalysisResult as _SEDOMAnalysisResult,
+    )
     from ma_poc.pms.signal_engine.defaults import (
         create_default_qualifier as _create_sq,
+    )
+    from ma_poc.pms.signal_engine.defaults import (
         create_default_ranker as _create_sr,
     )
     from ma_poc.pms.signal_engine.models import (
         SourceKind as _SESourceKind,
-        SourceSignal as _SESourceSignal,
     )
-    from ma_poc.pms.signal_engine.decider import (
-        ActionDecider as _SEActionDecider,
-        ActionType as _SEActionType,
-        DecisionContext as _SEDecisionContext,
-        DOMAnalysisResult as _SEDOMAnalysisResult,
+    from ma_poc.pms.signal_engine.models import (
+        SourceSignal as _SESourceSignal,
     )
     _source_qualifier = _create_sq()
     _source_ranker = _create_sr()
@@ -174,7 +214,7 @@ _MIN_NOISE_VERDICTS: int = 2
 
 def _should_block_endpoint(
     be: Any,
-    now: "datetime",
+    now: datetime,
     ttl_days: int = _BLOCK_TTL_DAYS,
     min_verdicts: int = _MIN_NOISE_VERDICTS,
 ) -> bool:
@@ -192,7 +232,7 @@ def _should_block_endpoint(
         try:
             _ba = blocked_at
             if hasattr(_ba, "tzinfo") and _ba.tzinfo is not None:
-                _ba = _ba.astimezone(_timezone.utc).replace(tzinfo=None)
+                _ba = _ba.astimezone(UTC).replace(tzinfo=None)
             age_days = (now - _ba).days
             if age_days >= ttl_days:
                 return False
@@ -201,7 +241,7 @@ def _should_block_endpoint(
     return True
 
 
-def _api_signal_qualifies(resp: "dict[str, Any]", items: "list[Any]") -> bool:
+def _api_signal_qualifies(resp: dict[str, Any], items: list[Any]) -> bool:
     """Return True when the API response body matches a recognisable unit-data shape.
 
     Phase 4: SourceQualifier is the single gate, replacing the dual-run of
@@ -269,9 +309,9 @@ def _assess_and_decide(
     if not units_so_far:
         return None
     try:
-        from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
-        from ma_poc.models.source import SourceId, from_legacy_unit
         from ma_poc.models.scrape_profile import ProfileMaturity
+        from ma_poc.models.source import SourceId, from_legacy_unit
+        from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
     except Exception:
         return None
     try:
@@ -853,8 +893,9 @@ class GenericAdapter:
         # floor-plan sqft filled in here.
         if result.units:
             try:
+                from ma_poc.observability.events import EventKind
+                from ma_poc.observability.events import emit as _emit_ev
                 from ma_poc.pms.adapters._sqft_backfill import run_sqft_backfill
-                from ma_poc.observability.events import EventKind, emit as _emit_ev
 
                 _api_responses: list[dict] = getattr(ctx, "_api_responses", []) or []
                 _ctx_keys, _filled = run_sqft_backfill(result.units, _api_responses)
@@ -1036,7 +1077,8 @@ class GenericAdapter:
         # Phase I: emit IDENTITY_FUZZY_LINK events via callback; merger stays pure
         def _emit_fuzzy(unit: Any, key: Any, conf: float) -> None:
             try:
-                from ma_poc.observability.events import EventKind as _EK, emit as _ev
+                from ma_poc.observability.events import EventKind as _EK
+                from ma_poc.observability.events import emit as _ev
                 _ev(_EK.IDENTITY_FUZZY_LINK, ctx.property_id, bucket_key=str(key)[:80], confidence=conf)
             except Exception:
                 pass
@@ -1055,7 +1097,8 @@ class GenericAdapter:
         result._merged_units = list(merged)  # type: ignore[attr-defined]
         # Phase I: emit SOURCES_MERGED telemetry
         try:
-            from ma_poc.observability.events import EventKind as _EK2, emit as _ev2
+            from ma_poc.observability.events import EventKind as _EK2
+            from ma_poc.observability.events import emit as _ev2
             _ev2(
                 _EK2.SOURCES_MERGED,
                 ctx.property_id,
@@ -1150,7 +1193,7 @@ class GenericAdapter:
         blocked_urls: set[str] = set()
         if profile is not None:
             try:
-                _now = datetime.now(_timezone.utc).replace(tzinfo=None)
+                _now = datetime.now(UTC).replace(tzinfo=None)
                 for be in getattr(profile.api_hints, "blocked_endpoints", []) or []:
                     pat = getattr(be, "url_pattern", None)
                     if not pat:
@@ -1346,6 +1389,8 @@ class GenericAdapter:
                                         from ma_poc.config.feature_flags import enable_promote_on_hint
                                         from ma_poc.services.profile_updater import (
                                             DOM_HINT_QUALITY_MAX as _Q_MAX,
+                                        )
+                                        from ma_poc.services.profile_updater import (
                                             DOM_HINT_QUALITY_PROMOTE_STEP as _Q_STEP,
                                         )
                                         if enable_promote_on_hint() and hasattr(mapping, "quality_score"):
@@ -1570,6 +1615,192 @@ class GenericAdapter:
         # / static-site cases where no XHR fires during load.
         html = await _get_page_html(page, ctx)
         if html:
+            # ── Sub-tier 2.5 (2026-05-21): AIR Communities AEM adapter ──
+            # AIR runs the entire 76-community / 27K-unit portfolio on a
+            # single Adobe Experience Manager stack with a deterministic
+            # /residences.html → /floor-plan/{bed}/{slug}.html URL family.
+            # We detect via the ``apartmentIncomeReit/clientlibs`` marker
+            # and fan out to the right parser based on which page in the
+            # family we received. Validated against 5 AIR properties
+            # (laurelcrossing, adara, arcadia, 20thstreetstation,
+            # 21fitzsimons, 15fifty5).
+            if _detect_air(html):
+                t0 = _time.monotonic()
+                cur_url = (ctx.base_url or "").lower()
+                air_units: list[dict[str, Any]] = []
+                if "/floor-plan/" in cur_url:
+                    # Per-plan page → unit-level records. Derive bedrooms
+                    # + plan-slug from URL since we may not have parent
+                    # residences.html context.
+                    plan_ctx = _air_url_ctx(ctx.base_url)
+                    try:
+                        air_units = _air_parse_per_plan(
+                            html, plan_context=plan_ctx, base_url=ctx.base_url
+                        )
+                    except Exception as _ae:
+                        result.errors.append(f"air-per-plan-error: {_ae}")
+                else:
+                    # Default: residences.html → plan-level records +
+                    # surface per-plan deep-links as floor-plan subpage
+                    # hints for the orchestrator to follow.
+                    try:
+                        air_units = _air_parse_residences(html, base_url=ctx.base_url)
+                    except Exception as _ae:
+                        result.errors.append(f"air-residences-error: {_ae}")
+                    if air_units:
+                        # Emit details_urls as subpage hints so link-hop
+                        # fetches each per-plan page on the next pass.
+                        subpages = [
+                            (u["details_url"], "air_per_plan")
+                            for u in air_units
+                            if u.get("details_url")
+                        ]
+                        if subpages:
+                            existing_sp = (
+                                getattr(result, "_embedded_floorplan_subpage_hints", None)
+                                or []
+                            )
+                            result._embedded_floorplan_subpage_hints = (  # type: ignore[attr-defined]
+                                existing_sp + subpages
+                            )
+                _log_attempt(
+                    "generic:air_communities",
+                    "ran_units" if air_units else "ran_empty",
+                    units=len(air_units),
+                    reason="" if air_units else (
+                        "AIR marker present but no plan/unit signal extracted"
+                    ),
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if air_units:
+                    result.units = _merge_into_result_units(
+                        result.units, air_units, property_id=ctx.property_id
+                    )
+                    result.tier_used = "TIER_3_DOM"
+                    result.winning_url = ctx.base_url
+                    result.confidence = min(0.85, 0.6 + 0.04 * len(result.units))
+                    from ma_poc.models.source import SourceId as _SI_AIR
+                    sources_already_run.add(_SI_AIR.DOM_CASCADE)
+                    _aird = _assess_and_decide(
+                        result.units, sources_already_run, ctx, decision_log
+                    )
+                    if _aird is None or _aird.action == "STOP":
+                        result._decision_log = decision_log  # type: ignore[attr-defined]
+                        return result
+                    skip_llm = False
+
+            # ── Sub-tier 2.6 (2026-05-21): Funnel Leasing (formerly Nestio) ─
+            # Funnel powers Essex Property Trust (~247 properties),
+            # plus parts of Cortland / UDR / RedPeak / Monument / Avanti /
+            # Dermot portfolios. Server-side proxy at
+            # ``{site}.com/api/properties/{prop_id}/availability``
+            # returns clean ``result.floorplans[].units[]`` JSON.
+            # Vercel-fronted endpoint passes via curl_cffi chrome120
+            # impersonation. Validated 2026-05-21 against 3 distinct
+            # Essex properties (Belcarra, Connolly Station, Allure at
+            # Scripps Ranch). See project_nestio_funnel_discovery memo.
+            if not result.units and _detect_funnel(html):
+                t0 = _time.monotonic()
+                funnel_units: list[dict[str, Any]] = []
+                pid = _funnel_property_id(html)
+                if pid:
+                    api_url = _funnel_api_url(ctx.base_url, pid)
+                    try:
+                        from ma_poc.pms.adapters._probe import probe_get
+                        resp = probe_get(api_url, headers={
+                            "Accept": "application/json",
+                            "Referer": ctx.base_url,
+                        })
+                        if resp is not None and getattr(resp, "status_code", 0) == 200:
+                            import json as _json
+                            try:
+                                data = _json.loads(resp.text)
+                                funnel_units = _parse_funnel(data, source_url=api_url)
+                            except Exception as _fpe:
+                                result.errors.append(f"funnel-parse-error: {_fpe}")
+                        else:
+                            _status = getattr(resp, "status_code", "?") if resp else "?"
+                            result.errors.append(
+                                f"funnel-api-error: status={_status}"
+                            )
+                    except Exception as _fe:
+                        result.errors.append(
+                            f"funnel-api-error: {type(_fe).__name__}: {str(_fe)[:120]}"
+                        )
+                _log_attempt(
+                    "generic:funnel",
+                    "ran_units" if funnel_units else "ran_empty",
+                    units=len(funnel_units),
+                    reason="" if funnel_units else (
+                        "Funnel detected but property_id missing or API empty"
+                        if pid else "Funnel marker but no data-communityid in HTML"
+                    ),
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if funnel_units:
+                    result.units = _merge_into_result_units(
+                        result.units, funnel_units, property_id=ctx.property_id
+                    )
+                    result.tier_used = "TIER_1_API"
+                    result.winning_url = _funnel_api_url(ctx.base_url, pid)
+                    result.confidence = min(0.9, 0.65 + 0.04 * len(result.units))
+                    from ma_poc.models.source import SourceId as _SI_FN
+                    sources_already_run.add(_SI_FN.API_GENERIC_NARROW)
+                    _fnd = _assess_and_decide(
+                        result.units, sources_already_run, ctx, decision_log
+                    )
+                    if _fnd is None or _fnd.action == "STOP":
+                        result._decision_log = decision_log  # type: ignore[attr-defined]
+                        return result
+                    skip_llm = False
+
+            # ── Sub-tier 2.7 (2026-05-21): Nestio contact-widget rendered DOM
+            # Some Funnel/Nestio customers (Dermot Company; some non-Essex
+            # customers) embed the contact widget
+            # (``integrations.nestio.com/contact-widget/v1/integration.js``)
+            # which client-side renders unit detail into a fixed DOM
+            # template — distinct from the Essex-style server-side proxy
+            # the Funnel sub-tier above targets. The widget's direct API
+            # call (``nestiolistings.com/api/v2/...``) is 503-prone, but
+            # the rendered DOM is deterministic. ``_get_page_html`` already
+            # prefers Playwright-rendered content over the L1 shell when
+            # available, so the parser fires only when the rendered DOM
+            # is actually present (detector requires ≥2 ``apt-*`` IDs).
+            # One unit per page (the URL is per-apartment), so this
+            # contributes a single record per scrape.
+            if not result.units and _detect_nestio_widget_rendered(html):
+                t0 = _time.monotonic()
+                try:
+                    widget_units = _parse_nestio_widget(html, source_url=ctx.base_url)
+                except Exception as _nwe:
+                    widget_units = []
+                    result.errors.append(f"nestio-widget-error: {_nwe}")
+                _log_attempt(
+                    "generic:nestio_widget",
+                    "ran_units" if widget_units else "ran_empty",
+                    units=len(widget_units),
+                    reason="" if widget_units else (
+                        "Nestio widget rendered but no unit fields extracted"
+                    ),
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if widget_units:
+                    result.units = _merge_into_result_units(
+                        result.units, widget_units, property_id=ctx.property_id
+                    )
+                    result.tier_used = "TIER_3_DOM"
+                    result.winning_url = ctx.base_url
+                    result.confidence = min(0.85, 0.6 + 0.05 * len(result.units))
+                    from ma_poc.models.source import SourceId as _SI_NW
+                    sources_already_run.add(_SI_NW.DOM_CASCADE)
+                    _nwd = _assess_and_decide(
+                        result.units, sources_already_run, ctx, decision_log
+                    )
+                    if _nwd is None or _nwd.action == "STOP":
+                        result._decision_log = decision_log  # type: ignore[attr-defined]
+                        return result
+                    skip_llm = False
+
             # Sub-tier 3: JSON-LD
             t0 = _time.monotonic()
             jsonld_units = extract_jsonld_from_html(html, ctx.base_url)
@@ -1637,14 +1868,33 @@ class GenericAdapter:
             # Sub-tier 4: Embedded JSON / SSR blobs -------------------------
             t0 = _time.monotonic()
             embedded = extract_embedded_blobs_from_html(html)
+            embedded_units: list[dict[str, Any]] = []
+            amli_units: list[dict[str, Any]] = []
             if embedded:
-                try:
-                    embedded_units = _dr_parse_api_responses(embedded) or []
-                except Exception as exc:
-                    embedded_units = []
-                    result.errors.append(f"embedded-parse-error: {exc}")
-            else:
-                embedded_units = []
+                # ── Sub-tier 4a (Phase 6 / AMLI, 2026-05-21): tRPC-aware
+                # extraction. AMLI Residential (76+ Next.js properties)
+                # embeds its full unit list inside __NEXT_DATA__ but
+                # behind a tRPC envelope the generic parser only
+                # partially walks. Detect first to avoid touching
+                # non-AMLI Next.js blobs. When we have an AMLI match,
+                # PREFER its units over the generic parser's output
+                # (generic recovers ~17%; AMLI recovers 100%).
+                for blob in embedded:
+                    if _detect_amli(blob.get("body")):
+                        try:
+                            amli_units.extend(
+                                _parse_amli(blob["body"], source_url=ctx.base_url)
+                            )
+                        except Exception as _ax:
+                            result.errors.append(f"amli-parse-error: {_ax}")
+                if amli_units:
+                    embedded_units = amli_units
+                else:
+                    try:
+                        embedded_units = _dr_parse_api_responses(embedded) or []
+                    except Exception as exc:
+                        embedded_units = []
+                        result.errors.append(f"embedded-parse-error: {exc}")
             _log_attempt(
                 "generic:embedded_json",
                 "ran_units" if embedded_units else ("ran_empty" if embedded else "skipped"),
@@ -1829,6 +2079,81 @@ class GenericAdapter:
                         units=0,
                         reason=f"probe error: {_cws_exc}",
                     )
+
+            # Sub-tier 4.7 (Phase 6.2, 2026-05-21): HTML floor-plan tables --
+            # Some properties ship unit data as a plain ``<table>`` with a
+            # header row of column labels. The DOM cascade below misses
+            # these because table rows don't carry ``.unit`` /
+            # ``.floor-plan`` class containers — the column semantics live
+            # in the ``<th>`` row. Run this between embedded-JSON and
+            # DOM-scan so tables that match merge in before the DOM
+            # scanner's looser heuristics fire.
+            if not result.units:
+                t0 = _time.monotonic()
+                try:
+                    table_units = extract_units_from_html_tables(html, ctx.base_url)
+                except Exception as _tbl_exc:
+                    table_units = []
+                    result.errors.append(f"table-scan-error: {_tbl_exc}")
+                _log_attempt(
+                    "generic:html_tables",
+                    "ran_units" if table_units else "ran_empty",
+                    units=len(table_units),
+                    reason="" if table_units else (
+                        "no <table> with floor-plan headers + ≥2 qualifying rows"
+                    ),
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if table_units:
+                    result.units = _merge_into_result_units(
+                        result.units, table_units, property_id=ctx.property_id
+                    )
+                    result.tier_used = "TIER_3_DOM"
+                    result.winning_url = ctx.base_url
+                    result.confidence = min(0.75, 0.5 + 0.04 * len(result.units))
+                    from ma_poc.models.source import SourceId as _SI_T
+                    sources_already_run.add(_SI_T.DOM_CASCADE)
+                    _td = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
+                    if _td is None or _td.action == "STOP":
+                        result._decision_log = decision_log  # type: ignore[attr-defined]
+                        return result
+                    skip_llm = False  # planner escalated — allow LLM
+
+            # Sub-tier 4.8 (Phase 6.3, 2026-05-21): data-* attribute cards -
+            # Some properties render floor-plan cards where the numeric
+            # data is hidden behind ``data-*`` attributes (the JS hydrates
+            # the visible text after page-load). Reads attributes directly,
+            # so the DOM cascade's text-scrape doesn't miss them.
+            if not result.units:
+                t0 = _time.monotonic()
+                try:
+                    da_units = extract_units_from_data_attr_cards(html, ctx.base_url)
+                except Exception as _da_exc:
+                    da_units = []
+                    result.errors.append(f"data-attr-scan-error: {_da_exc}")
+                _log_attempt(
+                    "generic:html_data_attr",
+                    "ran_units" if da_units else "ran_empty",
+                    units=len(da_units),
+                    reason="" if da_units else (
+                        "no ≥2 sibling elements with ≥3 unit-vocab data-* attributes"
+                    ),
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if da_units:
+                    result.units = _merge_into_result_units(
+                        result.units, da_units, property_id=ctx.property_id
+                    )
+                    result.tier_used = "TIER_3_DOM"
+                    result.winning_url = ctx.base_url
+                    result.confidence = min(0.75, 0.5 + 0.04 * len(result.units))
+                    from ma_poc.models.source import SourceId as _SI_D
+                    sources_already_run.add(_SI_D.DOM_CASCADE)
+                    _ad = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
+                    if _ad is None or _ad.action == "STOP":
+                        result._decision_log = decision_log  # type: ignore[attr-defined]
+                        return result
+                    skip_llm = False
 
             # Sub-tier 5: DOM selector cascade ------------------------------
             # Scans container elements (.unit, .floor-plan, .pricing-card, …)

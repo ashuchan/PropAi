@@ -1,0 +1,1074 @@
+{
+  "result": {
+    "floorplans": [
+      {
+        "floorplan_id": 2228326,
+        "name": "Plan SB",
+        "beds": 0,
+        "baths": 1,
+        "minimum_sqft": 552,
+        "maximum_sqft": 552,
+        "minimum_rent": 2237,
+        "maximum_rent": 3507,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Autry_Studiox1_552sqft.png",
+        "available_units_count": 2,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=QxJp2MvZ9ky",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=QxJp2MvZ9ky",
+            "title": "Belcarra - Plan SB - Studio / 1 Bath"
+          }
+        ],
+        "availableDisplayDate": "2026-05-21T00:00:00.000Z",
+        "units": [
+          {
+            "unit_id": 6541560,
+            "name": "C518",
+            "floorplan_id": 2228326,
+            "floorplan_name": "Plan SB",
+            "beds": 0,
+            "baths": 1,
+            "sqft": 552,
+            "minimum_rent": 2237,
+            "maximum_rent": 3439,
+            "availability_date": "2026-05-12T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Courtyard view",
+              "Partial city view",
+              "Top floor",
+              "Wood-style flooring throughout home",
+              "Stainless steel appliances",
+              "Sleeping alcove",
+              "A/C port",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6541551,
+            "name": "B506",
+            "floorplan_id": 2228326,
+            "floorplan_name": "Plan SB",
+            "beds": 0,
+            "baths": 1,
+            "sqft": 552,
+            "minimum_rent": 2289,
+            "maximum_rent": 3507,
+            "availability_date": "2026-05-19T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Remodeled unit interior, Maple cabinetry, White quartz countertops, Modern tile backsplash, Polished chrome faucets, Stainless steel appliances, Designer lighting",
+              "Courtyard view",
+              "Top floor",
+              "Stainless steel appliances",
+              "Sleeping alcove",
+              "A/C port",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          }
+        ]
+      },
+      {
+        "floorplan_id": 2228331,
+        "name": "Plan 1B",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 646,
+        "maximum_sqft": 646,
+        "minimum_rent": 2697,
+        "maximum_rent": 3967,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Stuart_1x1_646sqft.png",
+        "available_units_count": 1,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=Vd3w89BgwQS",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=Vd3w89BgwQS",
+            "title": "Belcarra - Plan 1B - 1 Bed / 1 Bath"
+          }
+        ],
+        "availableDisplayDate": "2026-06-01T00:00:00.000Z",
+        "units": [
+          {
+            "unit_id": 6541435,
+            "name": "B520",
+            "floorplan_id": 2228331,
+            "floorplan_name": "Plan 1B",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 646,
+            "minimum_rent": 2697,
+            "maximum_rent": 3967,
+            "availability_date": "2026-06-01T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Courtyard view",
+              "Top floor",
+              "Wood-style flooring",
+              "Upgraded countertops",
+              "A/C port",
+              "Walk-in closet",
+              "Balcony",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          }
+        ]
+      },
+      {
+        "floorplan_id": 2228332,
+        "name": "Plan 1C",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 700,
+        "maximum_sqft": 700,
+        "minimum_rent": 2759,
+        "maximum_rent": 4039,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Marvin_1x1_700sqft.png",
+        "available_units_count": 1,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=194HxYQWC7y",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=194HxYQWC7y",
+            "title": "Belcarra - Plan 1C - 1 Bed / 1 Bath"
+          }
+        ],
+        "availableDisplayDate": "2026-06-07T00:00:00.000Z",
+        "units": [
+          {
+            "unit_id": 6541664,
+            "name": "B302",
+            "floorplan_id": 2228332,
+            "floorplan_name": "Plan 1C",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 700,
+            "minimum_rent": 2759,
+            "maximum_rent": 4039,
+            "availability_date": "2026-06-07T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "3rd floor",
+              "Wood-style flooring",
+              "Stainless steel appliances",
+              "Washer/dryer",
+              "A/C port",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          }
+        ]
+      },
+      {
+        "floorplan_id": 2228336,
+        "name": "Plan 1G",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 792,
+        "maximum_sqft": 792,
+        "minimum_rent": 2859,
+        "maximum_rent": 4157,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Crosby_1Bed1Bath.jpg",
+        "available_units_count": 1,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=pT13M7yfkBW",
+        "virtual_tour_url_count": 2,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=pT13M7yfkBW",
+            "title": "Belcarra - Plan 1G - 1 Bed / 1 Bath"
+          },
+          {
+            "src": "https://my.matterport.com/show/?m=YPJ5dUx5a4y",
+            "title": "Belcarra - Plan 1G - 1 Bed / 1 Bath"
+          }
+        ],
+        "availableDisplayDate": "2026-05-21T00:00:00.000Z",
+        "units": [
+          {
+            "unit_id": 6541710,
+            "name": "C117",
+            "floorplan_id": 2228336,
+            "floorplan_name": "Plan 1G",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 792,
+            "minimum_rent": 2859,
+            "maximum_rent": 4157,
+            "availability_date": "2026-04-13T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Remodeled unit interior, Maple cabinetry, White quartz countertops, Modern tile backsplash, Polished chrome faucets, Stainless steel appliances, Designer lighting",
+              "Northern exposure",
+              "Wood-style flooring",
+              "Stainless steel appliances",
+              "A/C port",
+              "Balcony",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          }
+        ]
+      },
+      {
+        "floorplan_id": 2228359,
+        "name": "Plan 22A",
+        "beds": 2,
+        "baths": 2,
+        "minimum_sqft": 999,
+        "maximum_sqft": 999,
+        "minimum_rent": 3587,
+        "maximum_rent": 4987,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Grant_2Bed2Bath.png",
+        "available_units_count": 1,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=FV9XDVEb8Zg",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=FV9XDVEb8Zg",
+            "title": "Belcarra - Plan 22A - 2 Bed / 2 Bath"
+          }
+        ],
+        "availableDisplayDate": "2026-06-07T00:00:00.000Z",
+        "units": [
+          {
+            "unit_id": 6541672,
+            "name": "C505",
+            "floorplan_id": 2228359,
+            "floorplan_name": "Plan 22A",
+            "beds": 2,
+            "baths": 2,
+            "sqft": 999,
+            "minimum_rent": 3587,
+            "maximum_rent": 4987,
+            "availability_date": "2026-06-07T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Courtyard view",
+              "Top floor",
+              "Wood-style flooring throughout home",
+              "Stainless steel appliances",
+              "A/C port",
+              "Walk-in closet",
+              "Balcony",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          }
+        ]
+      },
+      {
+        "floorplan_id": 2228325,
+        "name": "Plan SA",
+        "beds": 0,
+        "baths": 1,
+        "minimum_sqft": 515,
+        "maximum_sqft": 515,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Benny_Studio1Bath_ 515sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=9WXrgGqJKm1",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=9WXrgGqJKm1",
+            "title": "Belcarra - Plan SA - Studio / 1 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228327,
+        "name": "Plan SC",
+        "beds": 0,
+        "baths": 1,
+        "minimum_sqft": 563,
+        "maximum_sqft": 563,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Powell_Studiox1_563sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=R7DGw9k6ij9",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=R7DGw9k6ij9",
+            "title": "Belcarra - Plan SC - Studio / 1 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228329,
+        "name": "Plan 1M Loft",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 1033,
+        "maximum_sqft": 1033,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Hepburn_2x1Loft_1033sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=zSuTBTsYc86",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=zSuTBTsYc86",
+            "title": "Belcarra - Plan 1M - 1 Bed / 1 Bath plus Loft"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228330,
+        "name": "Plan 1A",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 541,
+        "maximum_sqft": 541,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Kelly_1x1_541sqftsvg.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=BpogwcbHWXL",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=BpogwcbHWXL",
+            "title": "Belcarra - Plan 1A - 1 Bed / 1 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228333,
+        "name": "Plan 1D",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 746,
+        "maximum_sqft": 746,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Cantor_1x1_746sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=JWpfF1LLwXg",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=JWpfF1LLwXg",
+            "title": "Belcarra - Plan 1D - 1 Bed / 1 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228334,
+        "name": "Plan 1E",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 756,
+        "maximum_sqft": 756,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Caron_1x1_756sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=8dSux7XNoWj",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=8dSux7XNoWj",
+            "title": "Belcarra - Plan 1E - 1 Bed / 1 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228335,
+        "name": "Plan 1F",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 773,
+        "maximum_sqft": 773,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Allen_1Bed1Bath.jpg",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=qYPw8iRDP1r",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=qYPw8iRDP1r",
+            "title": "Belcarra - Plan 1F - 1 Bed / 1 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228337,
+        "name": "Plan 1H Loft",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 818,
+        "maximum_sqft": 818,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Clooney_1Bed1BathLoft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=uzX53YumnCh",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=uzX53YumnCh",
+            "title": "Belcarra - Plan 1H - 1 Bed / 1 Bath plus Loft"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228339,
+        "name": "Plan 1I Loft",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 818,
+        "maximum_sqft": 818,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Gabel_1Bed1BathLoft.png",
+        "available_units_count": 0,
+        "virtual_tour_url_count": 0,
+        "virtual_tour_list": [],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228340,
+        "name": "Plan 1J",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 871,
+        "maximum_sqft": 871,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Reynolds_1Bed1Bath.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=jG2mUDZi4Hr",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=jG2mUDZi4Hr",
+            "title": "Belcarra - Plan 1J - 1 Bed / 1 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228341,
+        "name": "Plan 1K",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 912,
+        "maximum_sqft": 912,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Martin_1Bed1Bath.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=JiEjzH8n6jk",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=JiEjzH8n6jk",
+            "title": "Belcarra - Plan 1K - 1 Bed / 1 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228342,
+        "name": "Plan 1L Loft",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 926,
+        "maximum_sqft": 926,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Rogers_1Bed1BathLoft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=N538LVH7wL4",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=N538LVH7wL4",
+            "title": "Belcarra - Plan 1L - 1 Bed / 1 Bath plus Loft"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228343,
+        "name": "Plan 21E",
+        "beds": 2,
+        "baths": 1,
+        "minimum_sqft": 1024,
+        "maximum_sqft": 1024,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Bogart_2x1_1024sqft.jpg",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=w3qXtQ9okQY",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=w3qXtQ9okQY",
+            "title": "Belcarra - Plan 21E - 2 Bed / 1 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228345,
+        "name": "Plan 21F Loft",
+        "beds": 2,
+        "baths": 1,
+        "minimum_sqft": 1065,
+        "maximum_sqft": 1065,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Connery_2X1Loft_ 1065sqft.jpg",
+        "available_units_count": 0,
+        "virtual_tour_url_count": 0,
+        "virtual_tour_list": [],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228346,
+        "name": "Plan 21A Loft",
+        "beds": 2,
+        "baths": 1,
+        "minimum_sqft": 874,
+        "maximum_sqft": 874,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Bishop_1x1Loft_874sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=eTnJ1UnnDH5",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=eTnJ1UnnDH5",
+            "title": "Belcarra - Plan 21A - 2 Bed / 1 Bath Loft"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228348,
+        "name": "Plan 21B",
+        "beds": 2,
+        "baths": 1,
+        "minimum_sqft": 892,
+        "maximum_sqft": 892,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Davis_2x1_892sqft.jpg",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=sCYpzZQrKnY",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=sCYpzZQrKnY",
+            "title": "Belcarra - Plan 21B - 2 Bed / 1 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228349,
+        "name": "Plan 21C Townhome",
+        "beds": 2,
+        "baths": 1,
+        "minimum_sqft": 954,
+        "maximum_sqft": 954,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Sinatra_2x1Loft_954sqft.jpg",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=zb9d7zXUvyC",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=zb9d7zXUvyC",
+            "title": "Belcarra - Plan 21C - 2 Bed / 1 Bath Townhome"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228350,
+        "name": "Plan 21D Loft",
+        "beds": 2,
+        "baths": 1,
+        "minimum_sqft": 960,
+        "maximum_sqft": 960,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Garbo_2x1Loft_960sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=nhhNdiRUQiL",
+        "virtual_tour_url_count": 2,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=nhhNdiRUQiL",
+            "title": "Belcarra - Plan 21D - 2 Bed / 1 Bath Loft"
+          },
+          {
+            "src": "https://my.matterport.com/show/?m=rYwCDKubyHX",
+            "title": "Belcarra - Plan 21D - 2 Bed / 1 Bath Loft"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228353,
+        "name": "Plan 22B",
+        "beds": 2,
+        "baths": 2,
+        "minimum_sqft": 1046,
+        "maximum_sqft": 1046,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Bardot_2x2_1046sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=sQmX86g4XyW",
+        "virtual_tour_url_count": 3,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=sQmX86g4XyW",
+            "title": "Belcarra - Plan 22B - 2 Bed / 2 Bath"
+          },
+          {
+            "src": "https://my.matterport.com/show/?m=acBWTZi2cQY",
+            "title": "Belcarra - Plan 22B - 2 Bed / 2 Bath"
+          },
+          {
+            "src": "https://my.matterport.com/show/?m=WXZ1ivT99cz",
+            "title": "Belcarra - Plan 22B - 2 Bed / 2 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228354,
+        "name": "Plan 22C",
+        "beds": 2,
+        "baths": 2,
+        "minimum_sqft": 1049,
+        "maximum_sqft": 1049,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Charise_2x2_1049sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=E6hPwLjjkH9",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=E6hPwLjjkH9",
+            "title": "Belcarra - Plan 22C - 2 Bed / 2 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228355,
+        "name": "Plan 22D",
+        "beds": 2,
+        "baths": 2,
+        "minimum_sqft": 1145,
+        "maximum_sqft": 1145,
+        "minimum_rent": 3777,
+        "maximum_rent": 5199,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Bacall_2x2_1145sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=aSAn5AFxP7t",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=aSAn5AFxP7t",
+            "title": "Belcarra - Plan 22D - 2 Bed / 2 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228356,
+        "name": "Plan 22E",
+        "beds": 2,
+        "baths": 2,
+        "minimum_sqft": 1152,
+        "maximum_sqft": 1152,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Tracy_2x2_1152sqft.jpg",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=VWSqJnooTs2",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=VWSqJnooTs2",
+            "title": "Belcarra - Plan 22E - 2 Bed / 2 Bath"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228357,
+        "name": "Plan 22F Loft",
+        "beds": 2,
+        "baths": 2,
+        "minimum_sqft": 1158,
+        "maximum_sqft": 1158,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Loren_2x2Loft_1158sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url_count": 0,
+        "virtual_tour_list": [],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228358,
+        "name": "Plan 22G",
+        "beds": 2,
+        "baths": 2,
+        "minimum_sqft": 1193,
+        "maximum_sqft": 1193,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/510860/Belcarra_Astaire_2x2_1193sqft.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=nYeYr3X1FfL",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=nYeYr3X1FfL",
+            "title": "Belcarra - Plan 22G - 2 Bed / 2 Bath"
+          }
+        ],
+        "units": []
+      }
+    ],
+    "units": [
+      {
+        "unit_id": 6541560,
+        "name": "C518",
+        "floorplan_id": 2228326,
+        "floorplan_name": "Plan SB",
+        "beds": 0,
+        "baths": 1,
+        "sqft": 552,
+        "minimum_rent": 2237,
+        "maximum_rent": 3439,
+        "availability_date": "2026-05-12T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Courtyard view",
+          "Partial city view",
+          "Top floor",
+          "Wood-style flooring throughout home",
+          "Stainless steel appliances",
+          "Sleeping alcove",
+          "A/C port",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6541551,
+        "name": "B506",
+        "floorplan_id": 2228326,
+        "floorplan_name": "Plan SB",
+        "beds": 0,
+        "baths": 1,
+        "sqft": 552,
+        "minimum_rent": 2289,
+        "maximum_rent": 3507,
+        "availability_date": "2026-05-19T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Remodeled unit interior, Maple cabinetry, White quartz countertops, Modern tile backsplash, Polished chrome faucets, Stainless steel appliances, Designer lighting",
+          "Courtyard view",
+          "Top floor",
+          "Stainless steel appliances",
+          "Sleeping alcove",
+          "A/C port",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6541435,
+        "name": "B520",
+        "floorplan_id": 2228331,
+        "floorplan_name": "Plan 1B",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 646,
+        "minimum_rent": 2697,
+        "maximum_rent": 3967,
+        "availability_date": "2026-06-01T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Courtyard view",
+          "Top floor",
+          "Wood-style flooring",
+          "Upgraded countertops",
+          "A/C port",
+          "Walk-in closet",
+          "Balcony",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6541664,
+        "name": "B302",
+        "floorplan_id": 2228332,
+        "floorplan_name": "Plan 1C",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 700,
+        "minimum_rent": 2759,
+        "maximum_rent": 4039,
+        "availability_date": "2026-06-07T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "3rd floor",
+          "Wood-style flooring",
+          "Stainless steel appliances",
+          "Washer/dryer",
+          "A/C port",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6541710,
+        "name": "C117",
+        "floorplan_id": 2228336,
+        "floorplan_name": "Plan 1G",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 792,
+        "minimum_rent": 2859,
+        "maximum_rent": 4157,
+        "availability_date": "2026-04-13T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Remodeled unit interior, Maple cabinetry, White quartz countertops, Modern tile backsplash, Polished chrome faucets, Stainless steel appliances, Designer lighting",
+          "Northern exposure",
+          "Wood-style flooring",
+          "Stainless steel appliances",
+          "A/C port",
+          "Balcony",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6541672,
+        "name": "C505",
+        "floorplan_id": 2228359,
+        "floorplan_name": "Plan 22A",
+        "beds": 2,
+        "baths": 2,
+        "sqft": 999,
+        "minimum_rent": 3587,
+        "maximum_rent": 4987,
+        "availability_date": "2026-06-07T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Courtyard view",
+          "Top floor",
+          "Wood-style flooring throughout home",
+          "Stainless steel appliances",
+          "A/C port",
+          "Walk-in closet",
+          "Balcony",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      }
+    ],
+    "is_floorplate": false
+  }
+}

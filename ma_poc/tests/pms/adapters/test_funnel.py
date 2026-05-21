@@ -1,251 +1,319 @@
-"""Change 3 — Funnel / Nestio adapter tests."""
+"""Funnel Leasing (formerly Nestio) adapter — detector + URL builder +
+API parser.
+
+Validated 2026-05-21 against 3 distinct Essex Property Trust properties
+(Belcarra, Connolly Station, Allure at Scripps Ranch). All exhibit the
+same pattern:
+  • ``<div id="CommunityId" data-communityid="...">`` in HTML
+  • ``/api/properties/{prop_id}/availability?start_date=...&end_date=
+    ...&format=spa`` returns ``{result: {floorplans: [{units: [...]}]}}``
+  • curl_cffi ``impersonate="chrome120"`` bypasses Vercel's bot
+    challenge cleanly (plain curl gets 429).
+
+Fixtures (real captures, 2026-05-21):
+  • ``belcarra_property_page.html`` (1.0 MB), ``belcarra_api_response.json`` (29 fps, 6 units)
+  • ``connolly_station_property_page.html`` (993 KB), ``connolly_station_api_response.json`` (8 fps, 17 units)
+
+Funnel customer roster (per their marketing): Essex ~247 props, Cortland,
+UDR, RedPeak, Monument, Avanti, Dermot. The Essex pattern (server-side
+proxy at ``{site}.com/api/properties/{id}/availability``) is what this
+adapter targets; non-proxied direct-to-Nestio integrations (Dermot's
+``/properties/building/availability/apartment?id=...&team_id=...``) are
+not covered today and need separate work.
+"""
 
 from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from pathlib import Path
 
-import pytest
-
-import ma_poc.pms.adapters  # noqa: F401  # ensure adapters registry is populated
-from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
-from ma_poc.pms.adapters.funnel import (
-    FunnelAdapter,
-    _is_funnel_response_body,
-    _is_funnel_response_url,
-    parse_funnel_listings,
+from ma_poc.pms.adapters._funnel import (
+    build_availability_api_url,
+    detect_funnel,
+    find_property_id,
+    parse_funnel_api_response,
 )
-from ma_poc.pms.detector import DetectedPMS
 
-FIXTURES = Path(__file__).parent / "fixtures" / "funnel"
-
-
-def _load_fixture(name: str):
-    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+_FIXTURE = Path("ma_poc/tests/fixtures/funnel")
 
 
-def _make_ctx(
-    api_responses: list[dict],
-    *,
-    base_url: str = "https://nestiolistings.com/api/v2/listings/residential/rentals/",
-) -> AdapterContext:
-    ctx = AdapterContext(
-        base_url=base_url,
-        detected=DetectedPMS(
-            pms="funnel",
-            confidence=0.95,
-            evidence=["test"],
-            recommended_strategy="api_first",
-        ),
-        profile=None,
-        expected_total_units=None,
-        property_id="65069",
+def _load_html(name: str) -> str:
+    return (_FIXTURE / name).read_text(encoding="utf-8")
+
+
+def _load_json(name: str) -> dict:
+    return json.loads((_FIXTURE / name).read_text(encoding="utf-8"))
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Detector
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_detect_matches_belcarra_property_page() -> None:
+    assert detect_funnel(_load_html("belcarra_property_page.html")) is True
+
+
+def test_detect_matches_connolly_station_property_page() -> None:
+    """Generalizes across distinct Essex properties — not overfit to Belcarra."""
+    assert detect_funnel(_load_html("connolly_station_property_page.html")) is True
+
+
+def test_detect_rejects_html_without_communityid() -> None:
+    """Plain HTML without the marker is NOT Funnel."""
+    html = "<html><body><h1>Welcome</h1><p>Generic page.</p></body></html>"
+    assert detect_funnel(html) is False
+
+
+def test_detect_does_not_match_bare_data_property_id() -> None:
+    """Other CMSes use ``data-property-id`` for unrelated purposes
+    (Cortland's favorites button). Require pairing with Funnel asset
+    host to accept the secondary marker."""
+    html = (
+        '<html><body><a data-property-id="348" data-favorite-id="348">'
+        'Save</a></body></html>'
     )
-    ctx._api_responses = api_responses  # type: ignore[attr-defined]
-    return ctx
+    assert detect_funnel(html) is False
 
 
-class _DummyPage:
-    pass
-
-
-# ---------------------------------------------------------------------------
-# Happy-path + second-fixture (over-fit guard)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_funnel_extract_happy_path_from_fixture() -> None:
-    body = _load_fixture("synthetic_listings.json")
-    responses = [
-        {
-            "url": "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x",
-            "body": body,
-        }
-    ]
-    adapter = FunnelAdapter()
-    ctx = _make_ctx(responses)
-    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
-    assert isinstance(result, AdapterResult)
-    assert result.tier_used == "TIER_1_API_FUNNEL"
-    assert len(result.units) == 3
-    first = result.units[0]
-    assert first["floor_plan_name"]
-    assert first["rent_range"] or first["unit_number"]
-
-
-@pytest.mark.asyncio
-async def test_funnel_extract_from_second_fixture() -> None:
-    body = _load_fixture("synthetic_wrapped.json")
-    responses = [
-        {
-            "url": "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=y",
-            "body": body,
-        }
-    ]
-    adapter = FunnelAdapter()
-    ctx = _make_ctx(responses)
-    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
-    assert len(result.units) == 3
-    studios = [u for u in result.units if u["bed_label"] == "Studio"]
-    assert len(studios) == 2, "wrapped fixture is expected to contain 2 studios"
-
-
-# ---------------------------------------------------------------------------
-# Failure-tier stamping
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_funnel_returns_empty_on_no_data() -> None:
-    adapter = FunnelAdapter()
-    ctx = _make_ctx([])
-    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
-    assert result.units == []
-    assert result.tier_used == "TIER_1_API_FUNNEL_NO_RESPONSE"
-    assert result.confidence == 0.0
-
-
-@pytest.mark.asyncio
-async def test_funnel_tier_re_stamped_on_shape_reject() -> None:
-    # RentCafe-shaped body, no nestiolistings URL — must shape-reject.
-    rentcafe_body = [
-        {
-            "floorplanName": "A1",
-            "floorplanId": "1",
-            "minimumRent": "1500",
-            "maximumRent": "1600",
-            "api": "rentcafe",
-        }
-    ]
-    adapter = FunnelAdapter()
-    ctx = _make_ctx([{"url": "https://other.example/x", "body": rentcafe_body}])
-    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
-    assert result.tier_used == "TIER_1_API_FUNNEL_SHAPE_REJECTED"
-
-
-@pytest.mark.asyncio
-async def test_funnel_tier_re_stamped_on_empty_list() -> None:
-    adapter = FunnelAdapter()
-    ctx = _make_ctx(
-        [
-            {
-                "url": "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x",
-                "body": {"results": []},
-            }
-        ]
+def test_detect_accepts_secondary_marker_with_asset_host() -> None:
+    """If primary ``data-communityid`` is absent but the HTML
+    references a Funnel asset host AND has ``data-property-id``, accept
+    it as Funnel-shaped — this covers properties where the CommunityId
+    div is dynamically inserted post-load."""
+    html = (
+        '<html><body>'
+        '<img src="https://assets.nestiostatic.com/community_logos/x.jpg">'
+        '<button data-property-id="42">Apply</button>'
+        '</body></html>'
     )
-    result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
-    assert result.tier_used == "TIER_1_API_FUNNEL_LIST_EMPTY"
+    assert detect_funnel(html) is True
 
 
-# ---------------------------------------------------------------------------
-# Static fingerprints / body-shape checks
-# ---------------------------------------------------------------------------
+def test_detect_empty_or_none() -> None:
+    assert detect_funnel("") is False
+    assert detect_funnel("<html></html>") is False
 
 
-def test_funnel_static_fingerprints_contains_nestio() -> None:
-    assert "nestiolistings.com" in FunnelAdapter().static_fingerprints()
+# ─────────────────────────────────────────────────────────────────────
+# Property-id discovery
+# ─────────────────────────────────────────────────────────────────────
 
 
-def test_funnel_matches_response_body_accepts_real_capture() -> None:
-    body = _load_fixture("synthetic_listings.json")
-    assert FunnelAdapter().matches_response_body(body) is True
-    body2 = _load_fixture("synthetic_wrapped.json")
-    assert FunnelAdapter().matches_response_body(body2) is True
+def test_find_property_id_belcarra() -> None:
+    """Belcarra → 510860 (confirmed via live probe + HAR)."""
+    pid = find_property_id(_load_html("belcarra_property_page.html"))
+    assert pid == "510860"
 
 
-def test_funnel_matches_response_body_rejects_rentcafe_and_sightmap() -> None:
-    rentcafe_body = {
-        "data": [
-            {
-                "floorplanName": "A1",
-                "floorplanId": "1",
-                "minimumRent": "1500",
-                "maximumRent": "1600",
-            }
-        ]
+def test_find_property_id_connolly_station() -> None:
+    """Connolly Station → 518103 (different property, same pattern)."""
+    pid = find_property_id(_load_html("connolly_station_property_page.html"))
+    assert pid == "518103"
+
+
+def test_find_property_id_returns_none_when_absent() -> None:
+    assert find_property_id("<html></html>") is None
+    assert find_property_id("") is None
+
+
+def test_find_property_id_picks_first_community_id() -> None:
+    """Some property pages may have multiple data-communityid attrs
+    (e.g. footer widget); the first one is the correct property."""
+    html = (
+        '<div data-communityid="123" id="CommunityId"></div>'
+        '<footer><div data-communityid="999"></div></footer>'
+    )
+    assert find_property_id(html) == "123"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# API URL builder
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_build_api_url_default_60_day_window() -> None:
+    """Default date range is today + 60 days."""
+    url = build_availability_api_url(
+        "https://www.essexapartmenthomes.com/", "510860",
+        start_date=date(2026, 5, 21),
+    )
+    assert url == (
+        "https://www.essexapartmenthomes.com"
+        "/api/properties/510860/availability"
+        "?start_date=2026-05-21&end_date=2026-07-20&format=spa"
+    )
+
+
+def test_build_api_url_custom_dates() -> None:
+    url = build_availability_api_url(
+        "https://www.essexapartmenthomes.com/apartments/bellevue/belcarra",
+        "510860",
+        start_date=date(2026, 6, 1),
+        end_date=date(2026, 8, 30),
+    )
+    assert url.endswith(
+        "/api/properties/510860/availability"
+        "?start_date=2026-06-01&end_date=2026-08-30&format=spa"
+    )
+
+
+def test_build_api_url_strips_path_keeps_origin() -> None:
+    """When given a deep property URL, the API URL is rooted at origin
+    — not relative to the property path."""
+    url = build_availability_api_url(
+        "https://www.essexapartmenthomes.com/apartments/sunnyvale/bristol-commons",
+        "491712",
+        start_date=date(2026, 5, 21),
+        end_date=date(2026, 7, 20),
+    )
+    # Path is replaced by /api/properties/...
+    assert "/apartments/sunnyvale" not in url
+    assert url.startswith("https://www.essexapartmenthomes.com/api/properties/")
+
+
+# ─────────────────────────────────────────────────────────────────────
+# API response parser
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_parse_belcarra_returns_units() -> None:
+    """Belcarra fixture has 6 units across 29 floor plans."""
+    data = _load_json("belcarra_api_response.json")
+    units = parse_funnel_api_response(data, source_url="https://x.test/")
+    assert len(units) == 6, f"expected 6 units; got {len(units)}"
+
+
+def test_parse_belcarra_unit_fields() -> None:
+    """Each unit must carry the standard fields populated from the
+    Funnel schema. First unit verified against the live probe."""
+    data = _load_json("belcarra_api_response.json")
+    units = parse_funnel_api_response(data, source_url="https://x.test/")
+    # Find unit C518 (the one seen in probe + Chrome MCP)
+    c518 = next((u for u in units if u["unit_number"] == "C518"), None)
+    assert c518 is not None, (
+        f"C518 missing; got: {[u['unit_number'] for u in units]}"
+    )
+    assert c518["bedrooms"] == "0"
+    assert c518["bathrooms"] == "1"
+    assert c518["sqft"] == "552"
+    assert c518["market_rent_low"] == 2237
+    assert c518["market_rent_high"] == 3439
+    assert c518["rent_range"] == "$2,237 - $3,439"
+    assert c518["availability_date"] == "2026-05-12"
+    assert c518["floor_plan_name"] == "Plan SB"
+    assert c518["availability_status"] == "AVAILABLE"
+    assert c518["source"] == "funnel_api"
+    assert c518["property_unit_id"]  # has Funnel unit_id
+
+
+def test_parse_connolly_station_returns_17_units() -> None:
+    """Different property, larger result set (17 units / 8 floor plans).
+    Confirms the parser isn't overfit to Belcarra's shape."""
+    data = _load_json("connolly_station_api_response.json")
+    units = parse_funnel_api_response(data, source_url="https://x.test/")
+    assert len(units) == 17, f"expected 17 units; got {len(units)}"
+
+
+def test_parse_connolly_station_inherits_floor_plan_per_unit() -> None:
+    """Every unit carries its own floor_plan_name from the per-unit
+    payload — not lost to the floor-plan-level container."""
+    data = _load_json("connolly_station_api_response.json")
+    units = parse_funnel_api_response(data, source_url="")
+    no_plan = [u for u in units if not u["floor_plan_name"]]
+    assert no_plan == [], (
+        f"{len(no_plan)} units missing floor_plan_name"
+    )
+
+
+def test_parse_handles_concession_from_specials() -> None:
+    """When the Funnel ``specials`` array carries a concession, the
+    description is surfaced as the concession field."""
+    data = {
+        "result": {
+            "floorplans": [{
+                "name": "1BR",
+                "units": [{
+                    "unit_id": 1, "name": "101",
+                    "floorplan_name": "1BR", "beds": 1, "baths": 1,
+                    "sqft": 700, "minimum_rent": 1500, "maximum_rent": 1500,
+                    "availability_date": "2026-06-01T00:00:00.000Z",
+                    "specials": [
+                        {"description": "1 Month Free on 13-month lease"}
+                    ],
+                    "amenities": [],
+                }],
+            }],
+        }
     }
-    sightmap_body = {
-        "data": {
-            "floor_plans": [{"id": 1, "name": "A", "bedroom_count": 1, "filter_label": "1BR"}],
-            "units": [{"floor_plan_id": "1", "price": 1500}],
+    units = parse_funnel_api_response(data)
+    assert len(units) == 1
+    assert units[0]["concession"] == "1 Month Free on 13-month lease"
+
+
+def test_parse_strips_iso_timestamp_from_availability_date() -> None:
+    """Funnel ships ``YYYY-MM-DDTHH:MM:SS.000Z``; we keep only the
+    date prefix so it matches the rest of the adapter's date format."""
+    data = _load_json("belcarra_api_response.json")
+    units = parse_funnel_api_response(data)
+    for u in units:
+        if u["availability_date"]:
+            assert "T" not in u["availability_date"], (
+                f"date has T-suffix: {u['availability_date']}"
+            )
+            assert re.match(r"^\d{4}-\d{2}-\d{2}$", u["availability_date"])
+
+
+def test_parse_dedups_units_by_unit_id() -> None:
+    """If the same unit somehow appears in multiple floor plans (e.g.
+    re-categorisation), dedup by unit_id to avoid double-emitting."""
+    data = {
+        "result": {
+            "floorplans": [
+                {"name": "A", "units": [
+                    {"unit_id": 42, "name": "X", "floorplan_name": "A",
+                     "beds": 1, "baths": 1, "sqft": 700,
+                     "minimum_rent": 1500, "maximum_rent": 1500,
+                     "availability_date": "", "specials": []},
+                ]},
+                {"name": "B", "units": [
+                    {"unit_id": 42, "name": "X", "floorplan_name": "B",
+                     "beds": 1, "baths": 1, "sqft": 700,
+                     "minimum_rent": 1500, "maximum_rent": 1500,
+                     "availability_date": "", "specials": []},
+                ]},
+            ]
         }
     }
-    adapter = FunnelAdapter()
-    assert adapter.matches_response_body(rentcafe_body) is False
-    assert adapter.matches_response_body(sightmap_body) is False
+    units = parse_funnel_api_response(data)
+    assert len(units) == 1
 
 
-# ---------------------------------------------------------------------------
-# Emitted-unit invariants
-# ---------------------------------------------------------------------------
+def test_parse_returns_empty_on_malformed() -> None:
+    assert parse_funnel_api_response({}) == []
+    assert parse_funnel_api_response(None) == []  # type: ignore[arg-type]
+    assert parse_funnel_api_response({"result": {}}) == []
+    assert parse_funnel_api_response({"result": {"floorplans": "not-a-list"}}) == []
 
 
-def test_funnel_tier_used_is_pms_specific() -> None:
-    body = _load_fixture("synthetic_listings.json")
-    units = parse_funnel_listings(
-        body, "https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x"
-    )
-    assert units
-    for u in units:
-        assert "FUNNEL" in u["extraction_tier"]
-
-
-def test_funnel_unit_id_format_valid() -> None:
-    body = _load_fixture("synthetic_listings.json")
-    units = parse_funnel_listings(body, "https://x")
-    # Synthetic fixture uses numeric unit ids — acceptable alphanumeric regex
-    # is "at least one digit or >=2 chars". Any extracted unit_number must
-    # match that relaxed shape.
-    valid = re.compile(r"^[A-Za-z0-9_\-]{2,}$")
-    for u in units:
-        assert valid.match(u["unit_number"]), u["unit_number"]
-
-
-def test_funnel_rent_within_sanity_range() -> None:
-    for name in ("synthetic_listings.json", "synthetic_wrapped.json"):
-        body = _load_fixture(name)
-        units = parse_funnel_listings(body, "https://x")
-        for u in units:
-            lo = u.get("market_rent_low")
-            hi = u.get("market_rent_high")
-            for r in (lo, hi):
-                if r is None:
-                    continue
-                assert 200 <= r <= 50000, (u, r)
-
-
-# ---------------------------------------------------------------------------
-# URL / body-shape helper tests
-# ---------------------------------------------------------------------------
-
-
-def test_funnel_url_marker_check() -> None:
-    assert _is_funnel_response_url("https://nestiolistings.com/api/v2/listings/residential/rentals/?key=x")
-    assert _is_funnel_response_url("https://nestiostaging.com/api/v2/listings/residential/rentals/?key=y")
-    assert not _is_funnel_response_url("https://windsorcommunities.com/")
-
-
-def test_funnel_body_check_handles_various_envelopes() -> None:
-    list_at_root = _load_fixture("synthetic_listings.json")
-    dict_wrapped = _load_fixture("synthetic_wrapped.json")
-    assert _is_funnel_response_body(list_at_root) is True
-    assert _is_funnel_response_body(dict_wrapped) is True
-    assert _is_funnel_response_body({"unrelated": "payload"}) is False
-    assert _is_funnel_response_body(None) is False
-    assert _is_funnel_response_body([]) is False
-
-
-# ---------------------------------------------------------------------------
-# Research-blocked real-capture test — surfaces the gate without failing CI.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.skip(
-    reason="research-blocked: need >=2 real Funnel captures from "
-    "Windsor 65069/77589/5715 before enabling this test"
-)
-def test_funnel_real_capture_unit_count_matches_property_inventory() -> None:
-    raise AssertionError("placeholder for real-capture validation")
+def test_parse_handles_zero_rent_unit() -> None:
+    """Belcarra fixture has no such zero-rent units, but verify the
+    parser handles them sanely (empty rent → emit with empty rent fields,
+    not crash)."""
+    data = {
+        "result": {
+            "floorplans": [{"name": "X", "units": [
+                {"unit_id": 1, "name": "1A", "floorplan_name": "X",
+                 "beds": 1, "baths": 1, "sqft": 700,
+                 "minimum_rent": None, "maximum_rent": None,
+                 "availability_date": "", "specials": []},
+            ]}]
+        }
+    }
+    units = parse_funnel_api_response(data)
+    assert len(units) == 1
+    assert units[0]["market_rent_low"] is None
+    assert units[0]["rent_range"] == ""
+    assert units[0]["availability_status"] == ""

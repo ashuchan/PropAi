@@ -1,0 +1,59 @@
+<!--
+Real DOM from www.dermotcompany.com 2026-05-21, unit 11C at
+101 West End Avenue. Captured via Chrome MCP javascript_exec, ID
+enumeration + getElementById on each named selector. The page is
+rendered by the integrations.nestio.com/contact-widget/v1/integration.js
+JS bundle — every site embedding that widget produces this same DOM
+template, just with different per-unit values.
+
+Values are real (matching the live page on 2026-05-21):
+  unit_number: 11C
+  bedrooms: studio (rendered as "-")
+  bathrooms: 1
+  sqft: 561
+  rent: $4,212
+  fee: No Fee
+  availability_date: 05 / 05 / 2026
+  address: 101 West End Avenue, Upper West Side, Manhattan, NY, 10023
+-->
+<!DOCTYPE html>
+<html><head><title>Dermot Company | Apartment</title></head><body>
+<div id="apt-results">
+  <nav><a id="apt-contact-us">Contact Us</a></nav>
+
+  <div id="apt-title-container">
+    <h1 id="apt-title">101 West End Avenue #11C</h1>
+  </div>
+  <div id="apt-title-container-02">
+    <h2 id="apt-title-02">101 West End Avenue</h2>
+    <span id="apt-number-02">11C</span>
+  </div>
+
+  <p id="apt-address">101 West End Avenue, Upper West Side, Manhattan, NY, 10023</p>
+
+  <div class="apt-price_container is-align-bot" id="apt-price-container">
+    <div class="apt_fee is-5px-bot" id="apt-fee">No Fee</div>
+    <div class="apt_price is-30px" id="apt-price">$ 4,212</div>
+  </div>
+
+  <div id="apt-bedroom-container">
+    <span id="apt-value-bedroom">-</span><span id="apt-bedroom">Bedrooms</span>
+  </div>
+  <div id="apt-bathroom-container">
+    <span id="apt-value-bathroom">1</span><span id="apt-bathroom">Bathroom</span>
+  </div>
+  <div id="apt-sf-container">
+    <span id="apt-value-sf">561</span><span id="apt-sf">SF</span>
+  </div>
+
+  <div class="availability-row">
+    <span>Availability</span>
+    <span id="apt-date-available">05 / 05 / 2026</span>
+  </div>
+
+  <p id="apt-description-container">
+    <span id="apt-description">* Listed rent is net effective rent, based on a gross rent of $4395.00 and 0.5 Months Free</span>
+  </p>
+</div>
+<script src="https://integrations.nestio.com/contact-widget/v1/integration.js"></script>
+</body></html>

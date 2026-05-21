@@ -1,381 +1,227 @@
-"""AMLI adapter tests."""
+"""AMLI Residential tRPC blob extractor.
+
+Validated 2026-05-21 against the captured AMLI South Shore HAR
+(Austin, TX). The HTML page embeds a Next.js __NEXT_DATA__ blob with
+the entire tRPC state, which includes 36 unit-level records nested
+under ``props.pageProps.trpcState.json.queries[].state.data[].units``.
+
+The generic ``parse_api_responses`` only finds 5 of those 36 units
+(13% recovery) and drops bedrooms / bathrooms / floor_plan_name —
+that's the root cause of the T4_code_merge_cross_page failure label
+for AMLI in production.
+
+Fixture: ``ma_poc/tests/fixtures/amli/south_shore_property.html`` (527 KB).
+"""
 
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-from typing import Any
 
-import pytest
-
-import ma_poc.pms.adapters  # noqa: F401  # populates registry
-from ma_poc.pms.adapters.amli import (
-    AmliAdapter,
-    _floorplan_arrays,
-    _looks_like_amli_next_data,
-    parse_amli_floor_plans,
+from ma_poc.pms.adapters._amli import (
+    detect_amli_trpc_blob,
+    parse_amli_trpc_blob,
 )
-from ma_poc.pms.adapters.base import AdapterContext
-from ma_poc.pms.detector import DetectedPMS, detect_pms
+from ma_poc.pms.adapters._html_extract import extract_embedded_blobs_from_html
 
-FIXTURES = Path(__file__).parent / "fixtures" / "amli"
-
-
-# ── Synthetic _next/data fixtures ────────────────────────────────────────────
+_FIXTURE = Path("ma_poc/tests/fixtures/amli/south_shore_property.html")
 
 
-def _make_floorplan(
-    name: str,
-    property_uid: str,
-    beds: int,
-    sqft: int,
-    units: list[dict[str, Any]],
-) -> dict[str, Any]:
-    return {
-        "floorplanName": name,
-        "propertyUid": property_uid,
-        "bedrooms": beds,
-        "bathroomMax": 1,
-        "sqftMin": sqft,
-        "sqftMax": sqft,
-        "priceMin": units[0]["rent"] if units else 0,
-        "units": units,
+def _extract_next_data_blob() -> dict:
+    """Helper: pull the __NEXT_DATA__ JSON out of the fixture HTML."""
+    html = _FIXTURE.read_text(encoding="utf-8")
+    m = re.search(
+        r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>',
+        html, re.S,
+    )
+    assert m is not None
+    return json.loads(m.group(1))
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Detector
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_detect_matches_real_amli_blob() -> None:
+    """The real AMLI __NEXT_DATA__ blob must trip the detector."""
+    blob = _extract_next_data_blob()
+    assert detect_amli_trpc_blob(blob) is True
+
+
+def test_detect_rejects_non_next_data_object() -> None:
+    assert detect_amli_trpc_blob({}) is False
+    assert detect_amli_trpc_blob({"foo": "bar"}) is False
+
+
+def test_detect_rejects_next_data_without_trpc() -> None:
+    """A Next.js page without tRPC state must not be matched —
+    protects against false-positive routing on other Next.js sites."""
+    blob = {
+        "buildId": "x",
+        "props": {"pageProps": {"someOtherShape": []}},
     }
+    assert detect_amli_trpc_blob(blob) is False
 
 
-def _submarket_payload() -> dict[str, Any]:
-    """Synthetic subregion JSON with two AMLI properties' floor plans."""
-    return {
-        "buildId": "synth_buildid_1",
-        "pageProps": {
-            "trpcState": {
-                "json": {
-                    "queries": [
-                        # queries[0] — Prismic CMS, no floorplanName
-                        {"state": {"data": [{"foo": "bar"}]}},
-                        # queries[1] — also Prismic
-                        {"state": {"data": {"randomKey": 1}}},
-                        # queries[2] — actual floor plans (two properties)
-                        {"state": {"data": [
-                            _make_floorplan(
-                                "A1",
-                                "amli-target",
-                                1,
-                                720,
-                                [
-                                    {"unitNumber": "101", "floor": "1", "rent": 1850, "rpAvailableDate": "2026-06-01"},
-                                    {"unitNumber": "207", "floor": "2", "rent": 1900, "rpAvailableDate": "2026-06-15"},
-                                ],
-                            ),
-                            _make_floorplan(
-                                "B2",
-                                "amli-target",
-                                2,
-                                1100,
-                                [{"unitNumber": "510", "floor": "5", "rent": 2700, "rpAvailableDate": "2026-07-01T00:00:00Z"}],
-                            ),
-                            # Different property — must be filtered out.
-                            _make_floorplan(
-                                "C3",
-                                "amli-other-property",
-                                3,
-                                1500,
-                                [{"unitNumber": "999", "floor": "9", "rent": 3500, "rpAvailableDate": "2026-08-01"}],
-                            ),
-                        ]}},
-                    ],
+def test_detect_rejects_trpc_without_units() -> None:
+    """tRPC envelope present but no query carries a units array →
+    not AMLI-shaped, must be rejected."""
+    blob = {
+        "buildId": "x",
+        "props": {
+            "pageProps": {
+                "trpcState": {
+                    "json": {
+                        "queries": [
+                            {"state": {"data": [{"foo": "bar"}]}},
+                        ]
+                    }
                 }
             }
         },
     }
+    assert detect_amli_trpc_blob(blob) is False
 
 
-def _amli_html(build_id: str = "synth_buildid_1") -> str:
-    """Minimal AMLI homepage HTML carrying a __NEXT_DATA__ blob."""
-    next_data = {
-        "buildId": build_id,
-        "pageProps": {
-            "trpcState": {
-                "json": {
-                    # No floor-plan queries inline (the typical case).
-                    "queries": [{"state": {"data": [{"prismic": "stuff"}]}}],
-                }
-            }
-        },
-    }
-    return f"""<!doctype html>
-<html><head><title>AMLI Target</title></head>
-<body>
-<script id="__NEXT_DATA__" type="application/json">{json.dumps(next_data)}</script>
-</body></html>"""
+def test_detect_rejects_non_dict() -> None:
+    assert detect_amli_trpc_blob(None) is False
+    assert detect_amli_trpc_blob([]) is False
+    assert detect_amli_trpc_blob("string") is False
 
 
-# ── Detector ────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────
+# Parser — end-to-end against real fixture
+# ─────────────────────────────────────────────────────────────────────
 
 
-def test_detector_picks_amli_for_amli_com() -> None:
-    for url in (
-        "https://www.amli.com/apartments/austin/downtown-austin-apartments/amli-south-shore",
-        "https://amli.com/apartments/chicago/west-loop-apartments/amli-west-loop",
-        "https://www.amli.com/apartments/southeast-florida/dadeland-apartments/amli-joya",
-    ):
-        d = detect_pms(url)
-        assert d.pms == "amli", f"{url} -> {d.pms}"
-        assert d.confidence >= 0.95
+def test_parser_finds_all_distinct_units() -> None:
+    """Real fixture has 36 unit entries across multiple tRPC queries
+    but only 29 DISTINCT unitIds (units appear in multiple queries
+    — homepage + floorplans + property pages all materialize them).
+    Parser must dedupe to 29.
 
-
-def test_detector_amli_beats_entrata_and_sightmap_in_html() -> None:
-    """AMLI HTML embeds entrata.com and sightmap.com vendor strings; the
-    host fingerprint must win regardless."""
-    html = "<html>" + "entrata.com sightmap.com" * 50 + "</html>"
-    d = detect_pms("https://www.amli.com/apartments/x/y/z", page_html=html)
-    assert d.pms == "amli"
-
-
-# ── Parser ──────────────────────────────────────────────────────────────────
-
-
-def test_floorplan_arrays_finds_floor_plan_query() -> None:
-    payload = _submarket_payload()
-    arrays = _floorplan_arrays(payload)
-    assert len(arrays) == 1
-    assert arrays[0][0]["floorplanName"] == "A1"
-
-
-def test_parse_amli_floor_plans_filters_by_property_slug() -> None:
-    payload = _submarket_payload()
-    floor_plans = _floorplan_arrays(payload)[0]
-    units = parse_amli_floor_plans(floor_plans, "amli-target", "https://www.amli.com/_next/data/x.json")
-    # 2 + 1 = 3 units for amli-target; the C3 entry for the other property is filtered out.
-    assert len(units) == 3
-    fp_names = {u["floor_plan_name"] for u in units}
-    assert fp_names == {"A1", "B2"}
-    unit_numbers = {u["unit_number"] for u in units}
-    assert unit_numbers == {"101", "207", "510"}
-    # Rent + availability roundtripped
-    rents = sorted(int(u["market_rent_low"]) for u in units if u.get("market_rent_low"))
-    assert rents == [1850, 1900, 2700]
-    # ISO timestamp is trimmed to date
-    target_unit = next(u for u in units if u["unit_number"] == "510")
-    assert target_unit["availability_date"] == "2026-07-01"
-
-
-def test_parse_amli_floor_plans_no_filter_returns_all() -> None:
-    payload = _submarket_payload()
-    floor_plans = _floorplan_arrays(payload)[0]
-    units = parse_amli_floor_plans(floor_plans, None, "https://x")
-    # All 4 units across all properties when no filter.
-    assert len(units) == 4
-
-
-def test_parse_amli_floor_plans_substring_match_for_renamed_slug() -> None:
-    payload = _submarket_payload()
-    floor_plans = _floorplan_arrays(payload)[0]
-    # Old slug "target" should still find amli-target via substring fallback.
-    units = parse_amli_floor_plans(floor_plans, "target", "https://x")
-    assert len(units) == 3
-
-
-# ── Body shape check ────────────────────────────────────────────────────────
-
-
-def test_looks_like_amli_next_data_positive() -> None:
-    assert _looks_like_amli_next_data(_submarket_payload())
-
-
-def test_looks_like_amli_next_data_rejects_unrelated_body() -> None:
-    assert not _looks_like_amli_next_data({"foo": "bar"})
-    assert not _looks_like_amli_next_data({"pageProps": {"trpcState": {}}})
-    assert not _looks_like_amli_next_data(None)
-    assert not _looks_like_amli_next_data([])
-
-
-# ── Adapter end-to-end (with mocked Playwright page) ────────────────────────
-
-
-class _StubResponse:
-    def __init__(self, status: int, body: dict[str, Any]) -> None:
-        self.status = status
-        self.ok = 200 <= status < 300
-        self._body = body
-
-    async def json(self) -> dict[str, Any]:
-        return self._body
-
-
-class _StubRequest:
-    def __init__(self, response: _StubResponse) -> None:
-        self._response = response
-        self.last_url: str | None = None
-
-    async def get(self, url: str, timeout: int = 0) -> _StubResponse:  # noqa: ARG002
-        self.last_url = url
-        return self._response
-
-
-class _StubContext:
-    def __init__(self, request: _StubRequest) -> None:
-        self.request = request
-
-
-class _StubPage:
-    def __init__(self, request: _StubRequest) -> None:
-        self.context = _StubContext(request)
-
-
-class _StubFetchResult:
-    def __init__(self, body: bytes) -> None:
-        self.body = body
-
-
-def _make_ctx(html: str, base_url: str) -> AdapterContext:
-    return AdapterContext(
-        base_url=base_url,
-        detected=DetectedPMS(
-            pms="amli",
-            confidence=0.95,
-            evidence=["test"],
-            recommended_strategy="api_first",
-        ),
-        profile=None,
-        expected_total_units=None,
-        property_id="61552",
-        fetch_result=_StubFetchResult(html.encode("utf-8")),
+    Compare: the generic parser only emits 5 of these 29 (17% recovery)
+    AND drops bedrooms/bathrooms/floor_plan_name — that's the root
+    cause of the T4_code_merge_cross_page failure label for AMLI."""
+    blob = _extract_next_data_blob()
+    units = parse_amli_trpc_blob(blob, source_url="https://www.amli.com/test/")
+    assert len(units) == 29, (
+        f"expected 29 distinct units after dedup; got {len(units)}."
     )
 
 
-@pytest.mark.asyncio
-async def test_amli_adapter_fetches_submarket_json_and_extracts_units() -> None:
-    """Happy path: inline blob carries no plans, adapter falls back to
-    the submarket _next/data fetch and pulls 3 filtered units."""
-    request = _StubRequest(_StubResponse(200, _submarket_payload()))
-    page = _StubPage(request)
-    ctx = _make_ctx(
-        _amli_html(),
-        "https://www.amli.com/apartments/austin/downtown-austin/amli-target",
+def test_parser_emits_floor_plan_metadata_per_unit() -> None:
+    """Every unit must carry the floor-plan-level metadata —
+    floor_plan_name, bedrooms, bathrooms — inherited from its
+    containing tRPC query.state.data[] entry."""
+    blob = _extract_next_data_blob()
+    units = parse_amli_trpc_blob(blob)
+    # Every unit must have a non-empty floor_plan_name
+    no_plan = [u for u in units if not u["floor_plan_name"]]
+    assert no_plan == [], f"{len(no_plan)} units missing floor_plan_name"
+    # bedrooms / bathrooms come from bedroomMax / bathroomMax — must be
+    # populated (AMLI doesn't ship Studio-only buildings; South Shore has
+    # mixed bedrooms).
+    bedrooms_set = {u["bedrooms"] for u in units if u["bedrooms"]}
+    assert bedrooms_set, "no unit got a bedrooms value"
+    bathrooms_set = {u["bathrooms"] for u in units if u["bathrooms"]}
+    assert bathrooms_set, "no unit got a bathrooms value"
+
+
+def test_parser_emits_unit_level_rent() -> None:
+    """Each unit must have its own rent value (not the floor plan's
+    minimum). The fixture has unit-level rent in $1,710-$2,036 range."""
+    blob = _extract_next_data_blob()
+    units = parse_amli_trpc_blob(blob)
+    with_rent = [u for u in units if u["market_rent_low"]]
+    assert len(with_rent) >= 25, (
+        f"expected at least 25 of 29 units to have rent; got {len(with_rent)}"
     )
-    result = await AmliAdapter().extract(page, ctx)
-
-    assert result.tier_used == "TIER_1_API_AMLI_NEXT_DATA"
-    assert len(result.units) == 3
-    assert result.winning_url and "amli-target" not in result.winning_url
-    assert request.last_url is not None
-    assert "/_next/data/synth_buildid_1/en/apartments/austin/downtown-austin.json" in request.last_url
+    for u in with_rent:
+        assert 500 < u["market_rent_low"] < 50_000, (
+            f"unit rent outside band: {u['market_rent_low']}"
+        )
 
 
-@pytest.mark.asyncio
-async def test_amli_adapter_uses_inline_when_floor_plans_present() -> None:
-    """If the inline __NEXT_DATA__ blob already carries floor plans for this
-    property, we don't bother with the submarket fetch."""
-    inline_with_plans = {
-        "buildId": "synth_buildid_1",
-        "pageProps": {"trpcState": {"json": {"queries": [
-            {"state": {"data": [
-                _make_floorplan("A1", "amli-target", 1, 700, [
-                    {"unitNumber": "12", "floor": "1", "rent": 1750, "rpAvailableDate": "2026-06-01"}
-                ])
-            ]}},
-        ]}}},
-    }
-    html = (
-        f'<html><body><script id="__NEXT_DATA__" type="application/json">'
-        f"{json.dumps(inline_with_plans)}</script></body></html>"
+def test_parser_emits_unit_number_per_record() -> None:
+    """The whole reason this adapter exists: production needs per-unit
+    granularity, not floor-plan-aggregate."""
+    blob = _extract_next_data_blob()
+    units = parse_amli_trpc_blob(blob)
+    with_unum = [u for u in units if u["unit_number"]]
+    assert len(with_unum) >= 25, (
+        f"expected ≥25 units with unit_number; got {len(with_unum)}"
     )
-    request = _StubRequest(_StubResponse(500, {}))  # would fail if called
-    page = _StubPage(request)
-    ctx = _make_ctx(
-        html,
-        "https://www.amli.com/apartments/austin/downtown-austin/amli-target",
+    # All unit numbers should be distinct after dedup
+    nums = [u["unit_number"] for u in with_unum]
+    assert len(nums) == len(set(nums)), (
+        "duplicate unit_numbers leaked through dedup"
     )
-    result = await AmliAdapter().extract(page, ctx)
-
-    assert result.tier_used == "TIER_1_API_AMLI_INLINE"
-    assert len(result.units) == 1
-    assert request.last_url is None  # never made a fetch call
 
 
-@pytest.mark.asyncio
-async def test_amli_adapter_handles_missing_build_id() -> None:
-    """No buildId in __NEXT_DATA__ → adapter records error, doesn't crash."""
-    html = '<html><body><script id="__NEXT_DATA__" type="application/json">{"foo":"bar"}</script></body></html>'
-    request = _StubRequest(_StubResponse(200, {}))
-    page = _StubPage(request)
-    ctx = _make_ctx(
-        html,
-        "https://www.amli.com/apartments/austin/downtown-austin/amli-target",
+def test_parser_emits_availability_date_iso_format() -> None:
+    """``rpAvailableDate`` is ISO YYYY-MM-DD. Verify the parser
+    preserves it (strips any ``T...`` suffix from realPageAvailabilityDate
+    fallback)."""
+    blob = _extract_next_data_blob()
+    units = parse_amli_trpc_blob(blob)
+    dates = {u["availability_date"] for u in units if u["availability_date"]}
+    assert dates, "no unit got an availability_date"
+    for d in dates:
+        assert re.match(r"^\d{4}-\d{2}-\d{2}$", d), (
+            f"availability_date not ISO YYYY-MM-DD: {d!r}"
+        )
+
+
+def test_parser_attaches_backing_pms_ids() -> None:
+    """AMLI is dual-backed by RealPage + Entrata. Per-unit IDs from both
+    PMSes are present in the tRPC payload — the parser surfaces them so
+    downstream entity resolution can de-dup against canonical PMS IDs."""
+    blob = _extract_next_data_blob()
+    units = parse_amli_trpc_blob(blob)
+    realpage = sum(1 for u in units if u.get("realpage_unit_id"))
+    entrata = sum(1 for u in units if u.get("entrata_unit_id"))
+    # Most units carry a PMS-backing ID from at least one of the two.
+    assert realpage + entrata >= len(units), (
+        f"expected most units to carry a PMS-backing ID; "
+        f"realpage={realpage} entrata={entrata} units={len(units)}"
     )
-    result = await AmliAdapter().extract(page, ctx)
-    assert result.units == []
-    assert any("buildId" in e for e in result.errors)
-    assert request.last_url is None  # short-circuited before fetch
 
 
-@pytest.mark.asyncio
-async def test_amli_adapter_rejects_non_amli_url() -> None:
-    """Non-property URLs do not crash and produce a structured error."""
-    request = _StubRequest(_StubResponse(200, _submarket_payload()))
-    page = _StubPage(request)
-    ctx = _make_ctx(_amli_html(), "https://www.amli.com/about")
-    result = await AmliAdapter().extract(page, ctx)
-    assert result.units == []
-    assert any("path" in e for e in result.errors)
+def test_parser_returns_empty_on_non_amli_blob() -> None:
+    """Defensive contract: a non-AMLI blob → empty list, no exception."""
+    assert parse_amli_trpc_blob({}) == []
+    assert parse_amli_trpc_blob({"buildId": "x", "props": {}}) == []
+    assert parse_amli_trpc_blob(None) == []
 
 
-@pytest.mark.asyncio
-async def test_amli_adapter_handles_submarket_fetch_failure() -> None:
-    """5xx from _next/data does not crash; error is recorded."""
-    request = _StubRequest(_StubResponse(503, {}))
-    page = _StubPage(request)
-    ctx = _make_ctx(
-        _amli_html(),
-        "https://www.amli.com/apartments/austin/downtown-austin/amli-target",
-    )
-    result = await AmliAdapter().extract(page, ctx)
-    assert result.units == []
-    assert any("503" in e for e in result.errors)
+# ─────────────────────────────────────────────────────────────────────
+# Integration with the existing embedded-JSON extractor
+# ─────────────────────────────────────────────────────────────────────
 
 
-# ── Realistic-shape fixture (matches observed prod _next/data schema) ────────
+def test_integration_extract_blobs_then_parse_amli() -> None:
+    """End-to-end: the generic embedded-JSON extractor finds the
+    __NEXT_DATA__ blob; the AMLI parser walks it into unit records.
 
-
-def test_parse_amli_floor_plans_against_realistic_fixture() -> None:
-    """Asserts the parser handles the actual production shape — including
-    fields we don't currently extract (entrataPropertyId, priceMinWithFees,
-    bathroomMin, propertySlug). If AMLI's _next/data schema drifts this
-    fixture is the canary.
+    This is the path the adapter dispatch should use:
+      1. ``extract_embedded_blobs_from_html(html)`` → list of blobs
+      2. For each blob, ``detect_amli_trpc_blob(blob.body)`` then
+         ``parse_amli_trpc_blob(blob.body)``.
     """
-    payload = json.loads((FIXTURES / "submarket_realistic.json").read_text(encoding="utf-8"))
-    floor_plans_arrays = _floorplan_arrays(payload)
-    # The fixture has one floor-plan-shaped queries[*] entry.
-    assert len(floor_plans_arrays) == 1, "expected exactly one floor-plan query"
-    floor_plans = floor_plans_arrays[0]
-
-    units = parse_amli_floor_plans(floor_plans, "amli-south-shore", "https://x")
-    # 2 + 1 + 0 = 3 units for amli-south-shore (S1 has no units, AD1 is a
-    # different property and must not leak through).
-    assert len(units) == 3
-    fp_names = {u["floor_plan_name"] for u in units}
-    assert fp_names == {"A1a", "B2"}
-    # AD-101 (other property) must not be present.
-    assert "AD-101" not in {u["unit_number"] for u in units}
-    # Floor numbers come through as strings.
-    assert {u["floor"] for u in units} == {"15", "8", "22"}
-    # Rent floats are coerced to int dollars.
-    rents = sorted(int(u["market_rent_low"]) for u in units if u.get("market_rent_low"))
-    assert rents == [2750, 2920, 4100]
-    # ISO timestamp on unit 0814 must be trimmed to date.
-    by_unit = {u["unit_number"]: u for u in units}
-    assert by_unit["0814"]["availability_date"] == "2026-07-02"
-    # bathroomMax is preferred over bathroomMin when both present.
-    assert by_unit["1515"]["bathrooms"] == "1"
-    assert by_unit["2207"]["bathrooms"] == "2"
-
-
-def test_parse_amli_floor_plans_realistic_other_property_filter() -> None:
-    """Switching the slug filter to amli-downtown extracts only that property."""
-    payload = json.loads((FIXTURES / "submarket_realistic.json").read_text(encoding="utf-8"))
-    floor_plans = _floorplan_arrays(payload)[0]
-    units = parse_amli_floor_plans(floor_plans, "amli-downtown", "https://x")
-    assert len(units) == 1
-    assert units[0]["unit_number"] == "AD-101"
-    assert units[0]["floor_plan_name"] == "AD1"
+    html = _FIXTURE.read_text(encoding="utf-8")
+    blobs = extract_embedded_blobs_from_html(html)
+    next_data = next(
+        (b for b in blobs if b["url"] == "embedded:json-block:__NEXT_DATA__"),
+        None,
+    )
+    assert next_data is not None, (
+        f"__NEXT_DATA__ blob missing; got URLs: {[b['url'] for b in blobs]}"
+    )
+    assert detect_amli_trpc_blob(next_data["body"])
+    units = parse_amli_trpc_blob(
+        next_data["body"], source_url="https://www.amli.com/x/"
+    )
+    assert len(units) == 29

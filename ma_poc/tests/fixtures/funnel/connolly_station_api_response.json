@@ -1,0 +1,1351 @@
+{
+  "result": {
+    "floorplans": [
+      {
+        "floorplan_id": 2228856,
+        "name": "The Oxford",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 786,
+        "maximum_sqft": 786,
+        "minimum_rent": 2569,
+        "maximum_rent": 9759,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/518103/ConnollyOxford1x1-786-849.png",
+        "available_units_count": 9,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=8MaLrSFamMm",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=8MaLrSFamMm",
+            "title": "Connolly Station - The Oxford - 1 Bed / 1 Bath"
+          }
+        ],
+        "availableDisplayDate": "2026-05-21T00:00:00.000Z",
+        "units": [
+          {
+            "unit_id": 6890111,
+            "name": "221",
+            "floorplan_id": 2228856,
+            "floorplan_name": "The Oxford",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 786,
+            "minimum_rent": 2579,
+            "maximum_rent": 9497,
+            "availability_date": "2026-03-03T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Courtyard view",
+              "2nd floor",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890115,
+            "name": "225",
+            "floorplan_id": 2228856,
+            "floorplan_name": "The Oxford",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 786,
+            "minimum_rent": 2649,
+            "maximum_rent": 9619,
+            "availability_date": "2026-03-30T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Courtyard view",
+              "2nd floor",
+              "Interior corner location",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890128,
+            "name": "244",
+            "floorplan_id": 2228856,
+            "floorplan_name": "The Oxford",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 786,
+            "minimum_rent": 2719,
+            "maximum_rent": 9747,
+            "availability_date": "2026-05-11T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Courtyard view",
+              "2nd floor",
+              "Wood-style flooring",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890366,
+            "name": "644",
+            "floorplan_id": 2228856,
+            "floorplan_name": "The Oxford",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 786,
+            "minimum_rent": 2727,
+            "maximum_rent": 9749,
+            "availability_date": "2026-05-10T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Courtyard view",
+              "6th floor",
+              "Interior corner location",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890268,
+            "name": "460",
+            "floorplan_id": 2228856,
+            "floorplan_name": "The Oxford",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 786,
+            "minimum_rent": 2619,
+            "maximum_rent": 9567,
+            "availability_date": "2026-06-15T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "4th floor",
+              "Front load washer/dryer",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890287,
+            "name": "507",
+            "floorplan_id": 2228856,
+            "floorplan_name": "The Oxford",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 786,
+            "minimum_rent": 2679,
+            "maximum_rent": 9669,
+            "availability_date": "2026-06-20T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Courtyard view",
+              "5th floor",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890335,
+            "name": "563",
+            "floorplan_id": 2228856,
+            "floorplan_name": "The Oxford",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 786,
+            "minimum_rent": 2697,
+            "maximum_rent": 9699,
+            "availability_date": "2026-06-24T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Pool view",
+              "5th floor",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890135,
+            "name": "254",
+            "floorplan_id": 2228856,
+            "floorplan_name": "The Oxford",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 786,
+            "minimum_rent": 2569,
+            "maximum_rent": 9477,
+            "availability_date": "2026-06-29T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "2nd floor",
+              "Courtyard access",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890356,
+            "name": "625",
+            "floorplan_id": 2228856,
+            "floorplan_name": "The Oxford",
+            "beds": 1,
+            "baths": 1,
+            "sqft": 786,
+            "minimum_rent": 2729,
+            "maximum_rent": 9759,
+            "availability_date": "2026-07-07T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Courtyard view",
+              "6th floor",
+              "End/corner location",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          }
+        ]
+      },
+      {
+        "floorplan_id": 2228858,
+        "name": "The Metro",
+        "beds": 2,
+        "baths": 2,
+        "minimum_sqft": 1118,
+        "maximum_sqft": 1140,
+        "minimum_rent": 3157,
+        "maximum_rent": 10719,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/518103/ConnollyMetro2B2B_1094_1240.png",
+        "available_units_count": 5,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=6GPxKgLmAn7",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=6GPxKgLmAn7",
+            "title": "Connolly Station - The Metro - 2 Bed / 2 Bath"
+          }
+        ],
+        "availableDisplayDate": "2026-05-21T00:00:00.000Z",
+        "units": [
+          {
+            "unit_id": 6890106,
+            "name": "216",
+            "floorplan_id": 2228858,
+            "floorplan_name": "The Metro",
+            "beds": 2,
+            "baths": 2,
+            "sqft": 1140,
+            "minimum_rent": 3157,
+            "maximum_rent": 10527,
+            "availability_date": "2026-05-01T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "2nd floor",
+              "Courtyard access",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890167,
+            "name": "314",
+            "floorplan_id": 2228858,
+            "floorplan_name": "The Metro",
+            "beds": 2,
+            "baths": 2,
+            "sqft": 1140,
+            "minimum_rent": 3157,
+            "maximum_rent": 10517,
+            "availability_date": "2026-06-14T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "3rd floor",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890231,
+            "name": "416",
+            "floorplan_id": 2228858,
+            "floorplan_name": "The Metro",
+            "beds": 2,
+            "baths": 2,
+            "sqft": 1140,
+            "minimum_rent": 3167,
+            "maximum_rent": 10537,
+            "availability_date": "2026-06-21T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "4th floor",
+              "Interior corner location",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890136,
+            "name": "255",
+            "floorplan_id": 2228858,
+            "floorplan_name": "The Metro",
+            "beds": 2,
+            "baths": 2,
+            "sqft": 1118,
+            "minimum_rent": 3267,
+            "maximum_rent": 10709,
+            "availability_date": "2026-06-24T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Partial pool view",
+              "2nd floor",
+              "Wood-style flooring throughout home",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890184,
+            "name": "336",
+            "floorplan_id": 2228858,
+            "floorplan_name": "The Metro",
+            "beds": 2,
+            "baths": 2,
+            "sqft": 1118,
+            "minimum_rent": 3267,
+            "maximum_rent": 10719,
+            "availability_date": "2026-06-29T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "Courtyard view",
+              "3rd floor",
+              "Interior corner location",
+              "Wood-style flooring throughout home",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          }
+        ]
+      },
+      {
+        "floorplan_id": 2228860,
+        "name": "The Uptown",
+        "beds": 2,
+        "baths": 3,
+        "minimum_sqft": 1518,
+        "maximum_sqft": 1520,
+        "minimum_rent": 4307,
+        "maximum_rent": 12627,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/518103/ConnollyUptown2B3B-1-518.png",
+        "available_units_count": 2,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=CSg3jFBrEsF",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=CSg3jFBrEsF",
+            "title": "Connolly Station - The Uptown - 2 Bed / 3 Bath Townhome"
+          }
+        ],
+        "availableDisplayDate": "2026-05-21T00:00:00.000Z",
+        "units": [
+          {
+            "unit_id": 6890069,
+            "name": "104",
+            "floorplan_id": 2228860,
+            "floorplan_name": "The Uptown",
+            "beds": 2,
+            "baths": 3,
+            "sqft": 1520,
+            "minimum_rent": 4337,
+            "maximum_rent": 12627,
+            "availability_date": "2026-05-15T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "1st floor",
+              "Wood-style flooring",
+              "Washer/dryer",
+              "Designer lighting",
+              "Street accessible",
+              "Enclosed patio/balcony",
+              "Yard",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          },
+          {
+            "unit_id": 6890072,
+            "name": "110",
+            "floorplan_id": 2228860,
+            "floorplan_name": "The Uptown",
+            "beds": 2,
+            "baths": 3,
+            "sqft": 1518,
+            "minimum_rent": 4307,
+            "maximum_rent": 12569,
+            "availability_date": "2026-06-06T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "1st floor",
+              "Wood-style flooring throughout home",
+              "Street accessible",
+              "Enclosed patio/balcony",
+              "Yard",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          }
+        ]
+      },
+      {
+        "floorplan_id": 2228861,
+        "name": "The Icon",
+        "beds": 3,
+        "baths": 2,
+        "minimum_sqft": 1590,
+        "maximum_sqft": 1590,
+        "minimum_rent": 4349,
+        "maximum_rent": 12649,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/518103/ConnollyIcon3B2B-1424-1590.png",
+        "available_units_count": 1,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=FL4QgiEnTem",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=FL4QgiEnTem",
+            "title": "Connolly Station - The Icon - 3 Bed / 2 Bath"
+          }
+        ],
+        "availableDisplayDate": "2026-05-24T00:00:00.000Z",
+        "units": [
+          {
+            "unit_id": 6890073,
+            "name": "112",
+            "floorplan_id": 2228861,
+            "floorplan_name": "The Icon",
+            "beds": 3,
+            "baths": 2,
+            "sqft": 1590,
+            "minimum_rent": 4349,
+            "maximum_rent": 12649,
+            "availability_date": "2026-05-24T00:00:00.000Z",
+            "specials": [],
+            "amenities": [
+              "1st floor",
+              "End/corner location",
+              "Wood-style flooring",
+              "Stainless steel appliances",
+              "Front load washer/dryer",
+              "Soaking tub",
+              "Kitchen window",
+              "Bedroom sliding door",
+              "Extra patio/balcony",
+              "Wraparound patio/balcony",
+              "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+            ],
+            "floorplate": {
+              "floor": null,
+              "building_name": null,
+              "floorplate_url": "",
+              "unit_center": {
+                "x": "",
+                "y": ""
+              },
+              "unit_bounds": {
+                "x1": null,
+                "y1": null,
+                "x2": null,
+                "y2": null
+              }
+            }
+          }
+        ]
+      },
+      {
+        "floorplan_id": 2228855,
+        "name": "The Riser",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 569,
+        "maximum_sqft": 569,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/518103/ConnollyRiser1x1-570.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=v2RsMkLkqMm",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=v2RsMkLkqMm",
+            "title": "Connolly Station - The Riser - 1 BR, 1 BA"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228857,
+        "name": "The Venture",
+        "beds": 1,
+        "baths": 1,
+        "minimum_sqft": 955,
+        "maximum_sqft": 955,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/518103/ConnollyStation_Venture_1x1_908-955sf-01.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=pZxFGgUeoyU",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=pZxFGgUeoyU",
+            "title": "Connolly Station - The Venture - 1 Bed / 1 Bath plus Loft"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228859,
+        "name": "The Founder",
+        "beds": 2,
+        "baths": 2,
+        "minimum_sqft": 1281,
+        "maximum_sqft": 1281,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/518103/ConnollyStation_Founder_2x2_1235-1281sf-01.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=uET7STGeaEu",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=uET7STGeaEu",
+            "title": "Connolly Station - The Founder - 2 Bed / 2 Bath plus Loft"
+          }
+        ],
+        "units": []
+      },
+      {
+        "floorplan_id": 2228862,
+        "name": "The Visionary",
+        "beds": 3,
+        "baths": 2,
+        "minimum_sqft": 1739,
+        "maximum_sqft": 1739,
+        "minimum_rent": 0,
+        "maximum_rent": 0,
+        "image_url": "https://cdngeneralcf.rentcafe.com/dmslivecafe/3/518103/ConnollyStation_Visionary_3x2_1739sf-01.png",
+        "available_units_count": 0,
+        "virtual_tour_url": "https://my.matterport.com/show/?m=Fwosqkcwyym",
+        "virtual_tour_url_count": 1,
+        "virtual_tour_list": [
+          {
+            "src": "https://my.matterport.com/show/?m=Fwosqkcwyym",
+            "title": "Connolly Station - The Visionary - 3 Bed / 2 Bath plus Loft"
+          }
+        ],
+        "units": []
+      }
+    ],
+    "units": [
+      {
+        "unit_id": 6890111,
+        "name": "221",
+        "floorplan_id": 2228856,
+        "floorplan_name": "The Oxford",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 786,
+        "minimum_rent": 2579,
+        "maximum_rent": 9497,
+        "availability_date": "2026-03-03T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Courtyard view",
+          "2nd floor",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890115,
+        "name": "225",
+        "floorplan_id": 2228856,
+        "floorplan_name": "The Oxford",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 786,
+        "minimum_rent": 2649,
+        "maximum_rent": 9619,
+        "availability_date": "2026-03-30T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Courtyard view",
+          "2nd floor",
+          "Interior corner location",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890128,
+        "name": "244",
+        "floorplan_id": 2228856,
+        "floorplan_name": "The Oxford",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 786,
+        "minimum_rent": 2719,
+        "maximum_rent": 9747,
+        "availability_date": "2026-05-11T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Courtyard view",
+          "2nd floor",
+          "Wood-style flooring",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890366,
+        "name": "644",
+        "floorplan_id": 2228856,
+        "floorplan_name": "The Oxford",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 786,
+        "minimum_rent": 2727,
+        "maximum_rent": 9749,
+        "availability_date": "2026-05-10T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Courtyard view",
+          "6th floor",
+          "Interior corner location",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890268,
+        "name": "460",
+        "floorplan_id": 2228856,
+        "floorplan_name": "The Oxford",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 786,
+        "minimum_rent": 2619,
+        "maximum_rent": 9567,
+        "availability_date": "2026-06-15T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "4th floor",
+          "Front load washer/dryer",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890287,
+        "name": "507",
+        "floorplan_id": 2228856,
+        "floorplan_name": "The Oxford",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 786,
+        "minimum_rent": 2679,
+        "maximum_rent": 9669,
+        "availability_date": "2026-06-20T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Courtyard view",
+          "5th floor",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890335,
+        "name": "563",
+        "floorplan_id": 2228856,
+        "floorplan_name": "The Oxford",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 786,
+        "minimum_rent": 2697,
+        "maximum_rent": 9699,
+        "availability_date": "2026-06-24T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Pool view",
+          "5th floor",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890135,
+        "name": "254",
+        "floorplan_id": 2228856,
+        "floorplan_name": "The Oxford",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 786,
+        "minimum_rent": 2569,
+        "maximum_rent": 9477,
+        "availability_date": "2026-06-29T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "2nd floor",
+          "Courtyard access",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890356,
+        "name": "625",
+        "floorplan_id": 2228856,
+        "floorplan_name": "The Oxford",
+        "beds": 1,
+        "baths": 1,
+        "sqft": 786,
+        "minimum_rent": 2729,
+        "maximum_rent": 9759,
+        "availability_date": "2026-07-07T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Courtyard view",
+          "6th floor",
+          "End/corner location",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890106,
+        "name": "216",
+        "floorplan_id": 2228858,
+        "floorplan_name": "The Metro",
+        "beds": 2,
+        "baths": 2,
+        "sqft": 1140,
+        "minimum_rent": 3157,
+        "maximum_rent": 10527,
+        "availability_date": "2026-05-01T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "2nd floor",
+          "Courtyard access",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890167,
+        "name": "314",
+        "floorplan_id": 2228858,
+        "floorplan_name": "The Metro",
+        "beds": 2,
+        "baths": 2,
+        "sqft": 1140,
+        "minimum_rent": 3157,
+        "maximum_rent": 10517,
+        "availability_date": "2026-06-14T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "3rd floor",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890231,
+        "name": "416",
+        "floorplan_id": 2228858,
+        "floorplan_name": "The Metro",
+        "beds": 2,
+        "baths": 2,
+        "sqft": 1140,
+        "minimum_rent": 3167,
+        "maximum_rent": 10537,
+        "availability_date": "2026-06-21T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "4th floor",
+          "Interior corner location",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890136,
+        "name": "255",
+        "floorplan_id": 2228858,
+        "floorplan_name": "The Metro",
+        "beds": 2,
+        "baths": 2,
+        "sqft": 1118,
+        "minimum_rent": 3267,
+        "maximum_rent": 10709,
+        "availability_date": "2026-06-24T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Partial pool view",
+          "2nd floor",
+          "Wood-style flooring throughout home",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890184,
+        "name": "336",
+        "floorplan_id": 2228858,
+        "floorplan_name": "The Metro",
+        "beds": 2,
+        "baths": 2,
+        "sqft": 1118,
+        "minimum_rent": 3267,
+        "maximum_rent": 10719,
+        "availability_date": "2026-06-29T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "Courtyard view",
+          "3rd floor",
+          "Interior corner location",
+          "Wood-style flooring throughout home",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890069,
+        "name": "104",
+        "floorplan_id": 2228860,
+        "floorplan_name": "The Uptown",
+        "beds": 2,
+        "baths": 3,
+        "sqft": 1520,
+        "minimum_rent": 4337,
+        "maximum_rent": 12627,
+        "availability_date": "2026-05-15T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "1st floor",
+          "Wood-style flooring",
+          "Washer/dryer",
+          "Designer lighting",
+          "Street accessible",
+          "Enclosed patio/balcony",
+          "Yard",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890072,
+        "name": "110",
+        "floorplan_id": 2228860,
+        "floorplan_name": "The Uptown",
+        "beds": 2,
+        "baths": 3,
+        "sqft": 1518,
+        "minimum_rent": 4307,
+        "maximum_rent": 12569,
+        "availability_date": "2026-06-06T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "1st floor",
+          "Wood-style flooring throughout home",
+          "Street accessible",
+          "Enclosed patio/balcony",
+          "Yard",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      },
+      {
+        "unit_id": 6890073,
+        "name": "112",
+        "floorplan_id": 2228861,
+        "floorplan_name": "The Icon",
+        "beds": 3,
+        "baths": 2,
+        "sqft": 1590,
+        "minimum_rent": 4349,
+        "maximum_rent": 12649,
+        "availability_date": "2026-05-24T00:00:00.000Z",
+        "specials": [],
+        "amenities": [
+          "1st floor",
+          "End/corner location",
+          "Wood-style flooring",
+          "Stainless steel appliances",
+          "Front load washer/dryer",
+          "Soaking tub",
+          "Kitchen window",
+          "Bedroom sliding door",
+          "Extra patio/balcony",
+          "Wraparound patio/balcony",
+          "Mandatory Fee: Utilities cost based on usage plus Monthly Utility Service Fee (ConService) $6.11/month"
+        ],
+        "floorplate": {
+          "floor": null,
+          "building_name": null,
+          "floorplate_url": "",
+          "unit_center": {
+            "x": "",
+            "y": ""
+          },
+          "unit_bounds": {
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null
+          }
+        }
+      }
+    ],
+    "is_floorplate": false
+  }
+}
