@@ -73,6 +73,7 @@ PmsName = Literal[
     "realpage_cws",
     "rentcafe_layout_tab",
     "wix_floor_plans",
+    "equity_apartments",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -121,6 +122,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "realpage_cws": "dom_first",
     "rentcafe_layout_tab": "dom_first",
     "wix_floor_plans": "dom_first",
+    "equity_apartments": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -1096,6 +1098,24 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             0.86,
             ["RentCafe layout-tab theme marker in HTML "
              "(.page-content-floorplans + .floorplans-layout-tab)"],
+        )
+    # 2026-05-21 HAR validation: Equity Apartments REIT (~300 properties)
+    # uses a custom Angular-based platform at equityapartments.com/{city}/
+    # {neighborhood}/{slug}. Unit-level data renders inline in
+    # ``.unit-expanded-card`` elements with text like:
+    # ``$1,660 ... 0 Bed / 1 Bath 488 sq. ft. / Floor 7 Available 5/27/2026``.
+    # Unit number is in the ``/UnitFees/{prop_id}/{building_id}/{unit_id}``
+    # href on each card.
+    if (
+        "equityapartments.com" in h
+        or "media.equityapartments.com" in h
+        or ("unit-expanded-card" in h and "/unitfees/" in h)
+    ):
+        yield (
+            "equity_apartments",
+            0.88,
+            ["Equity Apartments REIT marker in HTML "
+             "(equityapartments.com host OR .unit-expanded-card + /UnitFees/ pattern)"],
         )
 
 
