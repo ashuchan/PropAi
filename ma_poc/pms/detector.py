@@ -937,6 +937,38 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
              "(assets.marketapts.com / api.marketapts.com / "
              "marketapts.com/js/schedule / Powered by MarketApts)"],
         )
+    # 2026-05-21 HAR validation: sylispm.com is a real Market Apartments
+    # site that uses ``www.marketapts.com/images/apartments/`` and
+    # ``www.marketapts.com/iframes/fee-guide`` instead of the canonical
+    # ``assets.marketapts.com`` asset host, so the strict signal above
+    # misses it. The fee-guide / iframeResizer assets ALSO appear on
+    # G5 sites (bellavista, lavina) that just embed Market Apartments'
+    # fee-guide widget — so the weak host alone would false-fire.
+    #
+    # Combined rule: the weak host counts as a strong MA signal IFF a
+    # MarketAptsAdapter template selector is ALSO present in the same
+    # HTML body. G5/RentCafe co-residents with a fee-guide widget don't
+    # ship Market Apartments template DOM, so this discriminates cleanly.
+    _ma_weak_host = (
+        "marketapts.com/iframes/" in h
+        or "marketapts.com/images/apartments/" in h
+    )
+    _ma_template_present = (
+        "floorplan-unit-single" in h  # Template A discriminator
+        or "floorplan-item" in h       # Template B
+        or "floorplan-container" in h  # Template C
+        or "floor-plans-block" in h    # Template D
+        or "floorplan-name" in h       # Template E
+    )
+    if _ma_weak_host and _ma_template_present:
+        yield (
+            "marketapts",
+            0.80,
+            ["Market Apartments CMS (combined-host + selector) marker — "
+             "weak marketapts.com host (iframes/ or images/apartments/) "
+             "co-occurs with a template selector; discriminates real MA "
+             "from G5 fee-guide embeds (which lack the template selectors)"],
+        )
 
 
 # Signal helpers for DETECTOR_SIGNALS telemetry ---------------------------

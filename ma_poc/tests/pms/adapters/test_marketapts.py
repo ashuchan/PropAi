@@ -739,3 +739,104 @@ def test_strategy_for_marketapts_is_dom_first() -> None:
     runs the DOM extractor before falling to API-first / LLM cascade."""
     from ma_poc.pms.detector import _STRATEGY_BY_PMS
     assert _STRATEGY_BY_PMS["marketapts"] == "dom_first"
+
+
+# ── 2026-05-21 HAR-validation regressions ────────────────────────────
+
+
+def test_detector_combined_signal_recovers_sylispm_style() -> None:
+    """HAR-validation finding: sylispm.com is a real Market Apartments
+    site that uses ``www.marketapts.com/iframes/`` + ``/images/apartments/``
+    instead of the canonical ``assets.marketapts.com`` asset host. The
+    strict signal misses it; the combined host+selector signal must
+    recover it. Sample is a minimal sylispm-shaped fragment."""
+    from ma_poc.pms.detector import _iter_html_markers
+    # Sylispm-style HTML: weak MA host + Template-E ``floorplan-name`` selector.
+    html = """
+    <html><body>
+    <iframe src="https://www.marketapts.com/iframes/fee-guide?code=WOODWAYA"></iframe>
+    <div class="card"><h3 class="floorplan-name card-title">Woodway Efficiency</h3>
+    <ul class="list-group floorplan-info"><li class="list-group-item">880</li></ul></div>
+    </body></html>
+    """
+    markers = list(_iter_html_markers(html.lower()))
+    assert any(m[0] == "marketapts" for m in markers), (
+        f"sylispm-style site (weak host + .floorplan-name selector) must "
+        f"route to marketapts; got: {markers}"
+    )
+
+
+def test_detector_combined_signal_still_excludes_g5_fee_guide_embed() -> None:
+    """The combined-signal rule must NOT false-fire on G5 sites that
+    just embed a Market Apartments fee-guide widget. The discriminator
+    is the absence of any MA template selector in the HTML body. Sample
+    is a minimal bellavista-shaped fragment."""
+    from ma_poc.pms.detector import _iter_html_markers
+    # Bellavista-style HTML: marketapts.com/iframes/fee-guide present but
+    # NO template selectors (real site is G5).
+    html = """
+    <html><body>
+    <iframe src="https://www.marketapts.com/iframes/fee-guide?code=533BLV"></iframe>
+    <script src="https://www.marketapts.com/js/iframeResizer.min.js"></script>
+    <link rel="stylesheet" href="https://www.marketapts.com/css/2023/bootstrap.min.css">
+    <!-- G5 markers below, no MA template selectors -->
+    <script src="https://g5marketingcloud.com/widget.js"></script>
+    </body></html>
+    """
+    markers = list(_iter_html_markers(html.lower()))
+    # marketapts must NOT appear; g5 SHOULD appear as the primary signal.
+    ma_markers = [m for m in markers if m[0] == "marketapts"]
+    assert not ma_markers, (
+        f"G5 fee-guide-embed site must NOT route to marketapts (no template "
+        f"selectors in body); got: {ma_markers}"
+    )
+    g5_markers = [m for m in markers if m[0] == "g5"]
+    assert g5_markers, f"expected g5 to be detected on this fragment; got: {markers}"
+
+
+def test_template_a_guard_requires_unit_single_selector() -> None:
+    """Class-collision guard: ``.floorplan-block`` alone is NOT a
+    sufficient marker for Template A — RentCafe/Yardi ASPX legacy theme
+    (somaresidences.com, thefrankestate.com) uses the SAME class. Template
+    A's guard MUST also require ``.floorplan-unit-single`` to discriminate.
+
+    This is a source-shape contract test, parallel to
+    test_render_gate_source_contract in test_top_level_fetch_profile_arg.py.
+    Without this guard, 9+ RentCafe-ASPX sites would false-route to the
+    MA adapter and emit malformed rows.
+    """
+    import inspect
+    from ma_poc.pms.adapters.marketapts import _MARKETAPTS_DOM_JS
+    src = _MARKETAPTS_DOM_JS
+    # The Template A branch MUST AND-guard on .floorplan-unit-single.
+    assert ".floorplan-unit-single" in src, (
+        "Template A guard requires .floorplan-unit-single selector"
+    )
+    # The discriminator comment must be present so future maintainers
+    # know not to simplify this guard.
+    assert "CLASS-COLLISION GUARD" in src, (
+        "Template A class-collision guard documentation must be preserved "
+        "in source; do not simplify the .floorplan-block guard without "
+        "reading the rationale comment"
+    )
+
+
+def test_dom_js_url_probe_includes_availability_path() -> None:
+    """HAR finding: 223etown.com publishes unit-level data on
+    ``/availability`` (Template F) rather than ``/floorplans``. The DOM JS
+    self-fetch loop must probe ``/availability`` after the two floorplans
+    spellings so Template F sites resolve from the property root.
+    """
+    from ma_poc.pms.adapters.marketapts import _MARKETAPTS_DOM_JS
+    src = _MARKETAPTS_DOM_JS
+    # All three probe paths must be in the self-fetch list, in order.
+    fp_idx = src.find("/floorplans'")
+    fph_idx = src.find("/floor-plans'")
+    avail_idx = src.find("/availability'")
+    assert fp_idx > 0, "/floorplans path must be probed"
+    assert fph_idx > 0, "/floor-plans (hyphenated) path must be probed"
+    assert avail_idx > 0, "/availability path must be probed (Template F sites)"
+    # Order: /floorplans → /floor-plans → /availability
+    assert fp_idx < fph_idx < avail_idx, (
+        "URL probe order must be /floorplans → /floor-plans → /availability"
+    )

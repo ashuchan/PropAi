@@ -141,7 +141,13 @@ async () => {
     document.querySelector('.floorplan-name')
   );
   if (!hasMarker) {
-    for (const path of ['/floorplans', '/floor-plans']) {
+    // 2026-05-21 HAR validation: 223etown.com keeps /floorplans plan-only
+    // and publishes unit data at /availability. Other sites use /floor-plans
+    // (hyphenated, Template D pattern). Probe both spellings + the
+    // /availability fallback. The self-fetch only "wins" when the candidate
+    // doc carries an expected selector OR a Template-F table, so adding
+    // paths has no false-positive risk.
+    for (const path of ['/floorplans', '/floor-plans', '/availability']) {
       try {
         const r = await fetch(location.origin + path, {credentials: 'include'});
         if (r.ok) {
@@ -152,7 +158,8 @@ async () => {
             candidate.querySelector('.floorplan-unit-single') ||
             candidate.querySelector('.floor-plans-block') ||
             candidate.querySelector('.floorplan-container') ||
-            candidate.querySelector('.floorplan-name')
+            candidate.querySelector('.floorplan-name') ||
+            candidate.querySelector('table.table-hover')
           ) {
             doc = candidate;
             break;
@@ -163,6 +170,21 @@ async () => {
   }
 
   // ── Template A — inline unit rows (.floorplan-block + .floorplan-unit-single)
+  //
+  // CLASS-COLLISION GUARD (2026-05-21 HAR validation finding): the
+  // ``.floorplan-block`` class is ALSO used by a RentCafe / Yardi ASPX
+  // legacy theme (observed on somaresidences.com/Floor-Plans.aspx,
+  // thefrankestate.com/, etc.) where the data shape is
+  // ``data-rent`` / ``data-numunits`` / ``data-bed`` — completely
+  // different from Market Apartments' Template A
+  // (``data-bedrooms`` / ``data-bathrooms`` / ``data-when``).
+  //
+  // The guard ``&& doc.querySelector('.floorplan-unit-single')`` is the
+  // discriminator: real Market Apartments Template A pages ALWAYS embed
+  // ``.floorplan-unit-single`` unit rows inside each ``.floorplan-block``,
+  // while the RentCafe-ASPX theme has plan cards but NO unit-row class.
+  // Do NOT simplify this to just ``.floorplan-block`` — it would
+  // mis-route 9+ RentCafe-ASPX sites observed in the HAR set.
   const aBlocks = Array.from(doc.querySelectorAll('.floorplan-block'));
   if (aBlocks.length > 0 && doc.querySelector('.floorplan-unit-single')) {
     const planRows = aBlocks.map((b) => {
