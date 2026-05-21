@@ -72,6 +72,7 @@ PmsName = Literal[
     "imt_spaces",
     "realpage_cws",
     "rentcafe_layout_tab",
+    "wix_floor_plans",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -119,6 +120,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "imt_spaces": "dom_first",
     "realpage_cws": "dom_first",
     "rentcafe_layout_tab": "dom_first",
+    "wix_floor_plans": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -922,7 +924,21 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong
     # "not-a-PMS" signals when no strong PMS marker appeared in pass 1.
     if "static.parastorage.com" in h or "wix.com" in h:
-        yield "wix_nopms", 0.85, ["Wix script/platform marker in HTML"]
+        # 2026-05-21 HAR validation: some Wix-hosted multifamily sites
+        # embed plan-level data via a templated "Starting at $X" text
+        # pattern (e.g. www.liveatarcos.com — 3 plan cards with
+        # ``{Plan Title} {Code} {Beds} | {Baths} | {Sqft} Sq. Ft. $deposit
+        # Starting at $rent``). The WixFloorPlansAdapter extracts these;
+        # otherwise the generic WixNoPmsAdapter fallback handles bare
+        # marketing brochures.
+        if "starting at $" in h:
+            yield (
+                "wix_floor_plans",
+                0.88,
+                ["Wix host marker + 'Starting at $' plan-card text pattern"],
+            )
+        else:
+            yield "wix_nopms", 0.85, ["Wix script/platform marker in HTML"]
     if "squarespace.com" in h:
         yield "squarespace_nopms", 0.85, ["Squarespace script/platform marker in HTML"]
 

@@ -43,6 +43,7 @@ from ma_poc.pms.adapters.sightmap import SightMapAdapter
 from ma_poc.pms.adapters.spherexx import SpherexxAdapter
 from ma_poc.pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
 from ma_poc.pms.adapters.touchtour import TouchTourAdapter
+from ma_poc.pms.adapters.wix_floor_plans import WixFloorPlansAdapter
 from ma_poc.pms.adapters.wix_nopms import WixNoPmsAdapter
 
 __all__ = [
@@ -93,6 +94,7 @@ def _bootstrap_registry() -> None:
         ImtSpacesAdapter,
         RealPageCwsAdapter,
         RentCafeLayoutTabAdapter,
+        WixFloorPlansAdapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,
