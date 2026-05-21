@@ -1,0 +1,177 @@
+name: probe-experiment
+
+# Manually-triggered diagnostic that runs ``ma_poc/scripts/diagnostics/
+# asn_ipv6_probe.py`` from a Cloud Run job in the same egress path as
+# production. Answers whether ``*.securecafe.com`` is ASN-gated (Test A),
+# IPv6-reachable (Test C), or proxy-bypassable (Test E by re-running with
+# ``with_proxy: true``).
+#
+# Trigger: GitHub UI → Actions → probe-experiment → Run workflow.
+# Or: ``gh workflow run probe-experiment.yml -f with_proxy=false``.
+
+on:
+  workflow_dispatch:
+    inputs:
+      git-ref:
+        description: "git ref to build (commit/branch/tag)"
+        required: false
+        default: ""
+      with_proxy:
+        description: "Set PROBE_PROXY_URL on the job (true = use BrightData)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+  id-token: write   # required for Workload Identity Federation
+
+env:
+  REGION: us-central1
+  AR_REPO: jugnu-images
+  JOB_NAME: canary-introspect
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git-ref || github.sha }}
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - id: tag
+        name: Compute image tag
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-12)
+          TAG="probe-${SHORT_SHA}"
+          URI="${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/jugnu:${TAG}"
+          RUN_ID="${{ github.run_id }}-${SHORT_SHA}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "uri=${URI}" >> "$GITHUB_OUTPUT"
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push probe image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.tag.outputs.uri }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ─── Override canary-introspect to run the probe script ──────────────
+      # The job currently runs ``/bin/ls -la /app/ma_poc/config/`` on an old
+      # image. ``jobs replace`` is the only way to atomically rewrite both
+      # the image AND the command/args. We pipe a fresh spec via stdin.
+      - name: Override canary-introspect job spec
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          IMAGE_URI: ${{ steps.tag.outputs.uri }}
+          RUN_ID: ${{ steps.tag.outputs.run_id }}
+          PROXY_ENV_BLOCK: ${{ inputs.with_proxy == 'true' && 'PROBE_PROXY_URL:projects/jugnu-494013/secrets/brightdata-probe-proxy/versions/latest' || '' }}
+        run: |
+          cat > /tmp/canary-introspect-spec.yaml <<EOF
+          apiVersion: run.googleapis.com/v1
+          kind: Job
+          metadata:
+            name: ${{ env.JOB_NAME }}
+            labels:
+              cloud.googleapis.com/location: ${{ env.REGION }}
+          spec:
+            template:
+              spec:
+                parallelism: 1
+                taskCount: 1
+                template:
+                  spec:
+                    containers:
+                    - image: ${IMAGE_URI}
+                      command:
+                      - python
+                      - -u
+                      - -m
+                      - ma_poc.scripts.diagnostics.asn_ipv6_probe
+                      env:
+                      - name: PROBE_RUN_ID
+                        value: "${RUN_ID}"
+                      resources:
+                        limits:
+                          cpu: "1"
+                          memory: 1Gi
+                    maxRetries: 0
+                    serviceAccountName: jugnu-worker-production@${PROJECT}.iam.gserviceaccount.com
+                    timeoutSeconds: "900"
+          EOF
+          gcloud run jobs replace /tmp/canary-introspect-spec.yaml \
+            --region=${{ env.REGION }} --project=${PROJECT}
+
+      # If the user asked for proxy=true, patch the env to add the secret.
+      - name: Add BrightData proxy secret (if requested)
+        if: inputs.with_proxy == 'true'
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          gcloud run jobs update ${{ env.JOB_NAME }} \
+            --region=${{ env.REGION }} --project=${PROJECT} \
+            --update-secrets=PROBE_PROXY_URL=brightdata-probe-proxy:latest
+
+      - name: Execute probe job
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          gcloud run jobs execute ${{ env.JOB_NAME }} \
+            --region=${{ env.REGION }} --project=${PROJECT} \
+            --wait
+
+      - name: Download probe results from GCS
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          RUN_ID: ${{ steps.tag.outputs.run_id }}
+        run: |
+          mkdir -p probe-results
+          gcloud storage cp \
+            "gs://jugnu-canary/diagnostics/asn_ipv6_probe/${RUN_ID}/results.jsonl" \
+            probe-results/results.jsonl \
+            --project=${PROJECT}
+          echo "── results.jsonl ──"
+          cat probe-results/results.jsonl
+          echo
+          echo "── summary ──"
+          python3 - <<'PY'
+          import json, collections
+          counts = collections.Counter()
+          v6_aaaa = 0
+          for line in open("probe-results/results.jsonl"):
+              try: r = json.loads(line)
+              except: continue
+              if r.get("test") in ("A","A2","C") and "outcome" in r:
+                  counts[f"{r['test']}:{r['outcome']}"] += 1
+              if r.get("test") == "C_pretest" and r.get("has_aaaa"):
+                  v6_aaaa += 1
+          print("Outcome counts:")
+          for k, v in sorted(counts.items()):
+              print(f"  {k}: {v}")
+          print(f"AAAA records found on SC hosts: {v6_aaaa}")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe-results-${{ steps.tag.outputs.run_id }}
+          path: probe-results/
