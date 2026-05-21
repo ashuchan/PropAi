@@ -43,10 +43,15 @@ if TYPE_CHECKING:
 
 _G5_ENDPOINT = "https://inventory.g5marketingcloud.com/graphql"
 
-# Property URN regex — matches ``g5-cl-<id>[-<slug>]`` anywhere in the
-# rendered HTML. The image CDN paths carry the slug consistently so this
-# captures it on every G5-hosted property page.
-_G5_URN_RE = re.compile(r"g5-cl-[a-z0-9]+(?:-[a-z0-9]+)*", re.IGNORECASE)
+# Property URN regex — matches ``g5-cl-<id>[-<slug>]`` and the property-
+# level ``g5-cl<x>-<id>[-<slug>]`` variants (e.g. ``g5-clw-...`` is the
+# COMPLEX-scoped form used by Villas Willow Glen / similar single-
+# property sites; ``g5-cl-`` is the company-scoped form used by Lincoln
+# Property Company and other multi-property operators). The image CDN
+# paths and inline data attrs carry the slug on every G5-hosted page.
+# Verified live 2026-05-20: g5-clw-guhjplm75w-villas-willow-glen-...
+# returned 200 from the GraphQL endpoint when passed as ``locationUrn``.
+_G5_URN_RE = re.compile(r"g5-cl[a-z]?-[a-z0-9]+(?:-[a-z0-9]+)*", re.IGNORECASE)
 
 # GraphQL query — returns the unit + floor-plan join in one round trip.
 # perPage:200 covers any normal property; pagination would need the API's
@@ -61,9 +66,15 @@ _G5_URN_RE = re.compile(r"g5-cl-[a-z0-9]+(?:-[a-z0-9]+)*", re.IGNORECASE)
 # false) — parsed defensively; revalidate when a populated G5 special
 # is observed.
 _G5_UNITS_QUERY = (
+    # 2026-05-20: ``floorplanSpecials`` schema is now an object (with
+    # ``id``/``name`` fields) — previously scalar. Sending it as scalar
+    # returns ``Field must have selections (field 'floorplanSpecials'
+    # returns FloorplanSpecials but has no selections)``. Live-introspected
+    # the type to confirm shape; specify ``{id name}`` subfields so the
+    # query parses on the current schema while remaining forward-compatible.
     "query($urn:String!){apartmentComplex(locationUrn:$urn){"
     "id name hasApartmentSpecials hasFloorplanSpecials "
-    "floorplans{id name floorplanSpecials} "
+    "floorplans{id name floorplanSpecials{id name}} "
     "apartments(perPage:200){"
     "id name displayName building availabilityDate sqftDisplay "
     "prices{value formattedPrice priceType} "
@@ -78,13 +89,19 @@ _TIER_EMPTY = f"{_TIER_BASE}_EMPTY"
 
 
 def find_g5_urn(html: str) -> str | None:
-    """Return the longest ``g5-cl-...`` slug in *html*, or None.
+    """Return the longest ``g5-cl-...`` / ``g5-cl<x>-...`` slug in *html*,
+    or ``None``.
 
     Longest match wins because the same property might have both the bare
     ``g5-cl-<id>`` and the full ``g5-cl-<id>-<name-slug>`` form; the
     GraphQL API accepts either but the longer form is unambiguous.
+
+    2026-05-20: ``"g5-cl"`` substring (without trailing dash) is the
+    early-out gate so we also match the ``g5-clw-`` property-level
+    variant (e.g. ``g5-clw-guhjplm75w-villas-willow-glen-...``). The
+    regex itself enforces the ``g5-cl<x?>-<id>`` shape.
     """
-    if not html or "g5-cl-" not in html.lower():
+    if not html or "g5-cl" not in html.lower():
         return None
     matches = {m.group(0).lower() for m in _G5_URN_RE.finditer(html)}
     if not matches:
@@ -243,7 +260,9 @@ class G5Adapter:
             return result
 
         try:
-            payload = await _fetch_g5_units(urn)
+            payload = await _fetch_g5_units(
+                urn, base_url=str(getattr(ctx, "base_url", "") or "")
+            )
         except Exception as exc:
             if await self._try_apollo(page, ctx, result):
                 return result
@@ -325,9 +344,28 @@ class G5Adapter:
         return False
 
 
-async def _fetch_g5_units(urn: str) -> dict[str, Any] | None:
-    """Hit the G5 GraphQL endpoint with our units query."""
+async def _fetch_g5_units(urn: str, base_url: str = "") -> dict[str, Any] | None:
+    """Hit the G5 GraphQL endpoint with our units query.
+
+    2026-05-20: G5's inventory endpoint returns 404 for requests missing
+    proper ``Origin``/``Referer`` headers (verified by live probe — same
+    payload, different headers, different outcome). Adding the property
+    site as Origin/Referer makes the request indistinguishable from the
+    browser's in-page POST and the server returns the data shape.
+    """
     import httpx
+
+    origin = ""
+    referer = ""
+    if base_url:
+        try:
+            from urllib.parse import urlparse
+            p = urlparse(base_url)
+            if p.scheme and p.netloc:
+                origin = f"{p.scheme}://{p.netloc}"
+                referer = base_url
+        except Exception:
+            pass
 
     headers = {
         "User-Agent": (
@@ -338,6 +376,10 @@ async def _fetch_g5_units(urn: str) -> dict[str, Any] | None:
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
+    if origin:
+        headers["Origin"] = origin
+    if referer:
+        headers["Referer"] = referer
     payload = {"query": _G5_UNITS_QUERY, "variables": {"urn": urn}}
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
         r = await c.post(_G5_ENDPOINT, json=payload, headers=headers)
@@ -485,3 +527,46 @@ def parse_g5_apollo_units(
             )
         )
     return units
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Captured-response defense-in-depth shims for generic.py dispatch.
+# generic.py imports these to parse a G5 GraphQL body if one was captured
+# during the page load but detection didn't route to G5Adapter. The current
+# G5Adapter does its own fetching via _fetch_g5_units; these shims handle
+# the captured-response edge case without re-implementing the parser.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def is_g5_graphql_url(url: str) -> bool:
+    """True iff the URL is the G5 Marketing Cloud GraphQL endpoint."""
+    if not url:
+        return False
+    u = url.lower()
+    return "inventory.g5marketingcloud.com" in u and "/graphql" in u
+
+
+def is_g5_graphql_body(body: Any) -> bool:
+    """True iff body looks like a G5 GraphQL response with apartmentComplex
+    data. Pure / never raises."""
+    if not isinstance(body, dict):
+        return False
+    data = body.get("data")
+    if not isinstance(data, dict):
+        return False
+    ac = data.get("apartmentComplex")
+    return isinstance(ac, dict) and isinstance(ac.get("apartments"), list)
+
+
+def parse_g5_response(body: Any, url: str) -> list[dict[str, str]]:
+    """Parse a captured G5 GraphQL response body into unit dicts.
+
+    Thin wrapper around ``parse_g5_apartments``; ``url`` is accepted for
+    parity with the generic.py dispatch signature but unused (the parser
+    tags ``extraction_tier`` itself).
+    """
+    del url  # signature parity only
+    try:
+        return parse_g5_apartments(body) if isinstance(body, dict) else []
+    except Exception:  # defensive — never raise into dispatch
+        return []

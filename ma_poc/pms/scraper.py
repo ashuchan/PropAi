@@ -514,20 +514,66 @@ async def scrape(
     # structured concessions_json from it.
     if page_html and not result.get("concessions_text"):
         try:
+            # 2026-05-20 (concession-leak fix): the previous flat-text
+            # build stripped ``<tag>`` markers but kept ``<script>`` and
+            # ``<style>`` BODIES — adjacent JS code (e.g. Woodland Creek's
+            # PropLeadSource ``href.indexOf("?") == -1`` block) and CSS
+            # rules leaked into the ±200-char window around the
+            # concession-pattern match. Of 49,677 captured concessions
+            # in the 2026-05-19 feature canary, 49.9% were polluted this
+            # way and 10,102 (~20%) hit the 300-char cap with junk-only
+            # content — truncating the real offer entirely.
+            # Strip script/style BLOCKS before tag-stripping so the
+            # match window sees only visible text.
+            _no_code = re.sub(
+                r"<(script|style|noscript)\b[^>]*>.*?</\1>",
+                " ",
+                page_html,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
             _flat = re.sub(
-                r"\s+", " ", re.sub(r"<[^>]+>", " ", page_html)
+                r"\s+", " ", re.sub(r"<[^>]+>", " ", _no_code)
             )
             _cm = _PROPERTY_CONCESSION_RE.search(_flat)
             if _cm:
                 _s, _e = _cm.span()
                 _win = _flat[max(0, _s - 200):_e + 200]
                 _off = _s - max(0, _s - 200)
-                _seg, _acc = _win, 0
-                for _p in re.split(r"(?<=[.!?|•·])\s+", _win):
+                # 2026-05-20 (header-only fix): the matched sentence is
+                # often a banner header — "Limited Time Offer!",
+                # "Move-in Special!", "Don't Miss Out!" — terminated by
+                # ``!`` while the actionable body ("Move in by 6/15 and
+                # get 1 month free rent.") lives in the NEXT sentence.
+                # Single-sentence pick dropped the body entirely. Real
+                # bytes from feature canary 2026-05-19 cid 74567
+                # (Woodland Creek): all 46 rows captured just "Limited
+                # Time Offer!" — the regex's ``limited time offer``
+                # alternative anchored on the header, then sentence-
+                # split discarded the body two sentences over. Fix:
+                # start at the matched sentence and walk FORWARD while
+                # the running total stays under 300 chars. Up to 2
+                # extra sentences — bounded to keep the field
+                # representative and avoid greedy capture of unrelated
+                # marketing copy that follows.
+                _parts = re.split(r"(?<=[.!?|•·])\s+", _win)
+                _idx, _acc = -1, 0
+                for _i, _p in enumerate(_parts):
                     if _acc <= _off < _acc + len(_p) + 1:
-                        _seg = _p
+                        _idx = _i
                         break
                     _acc += len(_p) + 1
+                if _idx >= 0:
+                    _seg = _parts[_idx]
+                    # Extend forward; cap at 300 chars total so the
+                    # downstream truncation doesn't lop off the body
+                    # we just rescued.
+                    for _nxt in _parts[_idx + 1:_idx + 3]:
+                        _candidate = (_seg + " " + _nxt).strip()
+                        if len(_candidate) > 300:
+                            break
+                        _seg = _candidate
+                else:
+                    _seg = _win
                 result["concessions_text"] = _seg.strip()[:300]
         except Exception:
             pass
@@ -2364,7 +2410,31 @@ async def _try_link_hop(
                 and dynamic_appended < max_dynamic_appends
                 and not _is_login_path
             ):
-                _prop_sub_paths = ("/floorplans", "/floor-plans", "/pricing", "/apartments-pricing")
+                # 2026-05-20: extended set of property-level sub-paths the
+                # dynamic appender queues when link-hop is already at a
+                # 3+-segment URL (i.e. a brand-CMS property page like
+                # ``/apartments/ca/san-jose/villas-willow-glen``). The
+                # original 4-path list missed ``/availability`` and its
+                # variants, which is where the actual unit roster lives
+                # on many sites that show only a price-range slider or
+                # filter UI on the floor-plans page (IMT, TGM, others
+                # observed in the 2026-05-20 random-30 sample). The
+                # universal-priors list already includes /availability
+                # for level-1 hops; this completes the cascade so when
+                # we're already on /floor-plans, we discover deeper
+                # /availability + /our-apartments paths too.
+                _prop_sub_paths = (
+                    "/floorplans",
+                    "/floor-plans",
+                    "/pricing",
+                    "/apartments-pricing",
+                    "/availability",
+                    "/view-availability",
+                    "/our-apartments",
+                    "/apartments",
+                    "/units",
+                    "/leasing",
+                )
                 for _psp in _prop_sub_paths:
                     _psp_url = _sub_url_no_query.rstrip("/") + _psp
                     if _psp_url not in visited and not any(u == _psp_url for u, _, _ in queue):

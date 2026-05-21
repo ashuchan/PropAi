@@ -526,6 +526,76 @@ async def _entrata_static_fetch(url: str) -> str:
     return (r.text or "") if r.status_code == 200 else ""
 
 
+# 2026-05-20: structured empty-exit labels for Path B retry. Same pattern
+# as ``_classify_rentcafe_failure`` (rentcafe.py:311). Previously the
+# adapter exited with the bare ``TIER_1_API_ENTRATA`` success label even
+# on 0-unit outcomes; ``is_empty_exit()`` returned False so the
+# orchestrator never re-dispatched. The 193-property ENTRATA failed-
+# strict cohort from sw9p4 (mostly false-positive Entrata detection
+# triggered by ``/Apartments/module/application_authentication/`` link)
+# is unblocked by this — Path B can now route them to Knock / SightMap /
+# RentCafe / etc. on the retry.
+_TIER_BASE = "TIER_1_API_ENTRATA"
+_TIER_NO_RESPONSE = f"{_TIER_BASE}_NO_RESPONSE"
+_TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
+_TIER_EMPTY = f"{_TIER_BASE}_EMPTY"
+
+
+def _is_entrata_response(body: Any) -> bool:
+    """Loose body-shape check matching the two known Entrata response
+    formats (flat list of floorplan dicts, or widget envelope).
+
+    Returns True when ``body`` carries Entrata-shaped data — used in the
+    failure classifier to distinguish ``_SHAPE_REJECTED`` (no body
+    matched) from ``_EMPTY`` (bodies matched, parser found 0 units).
+    """
+    if isinstance(body, list) and body and isinstance(body[0], dict):
+        first = body[0]
+        if any(k in first for k in ("floorplan-name", "no_of_bedroom", "square_footage")):
+            return True
+    if isinstance(body, dict):
+        # Widget envelope — gated by _filter_widget_response in the main
+        # extract path. Cheap match here: presence of common Entrata
+        # widget keys.
+        for k in ("widget_data", "floorplans", "available_units"):
+            if k in body:
+                return True
+    return False
+
+
+def _classify_entrata_failure(
+    api_responses: list[dict[str, Any]],
+) -> tuple[str, str]:
+    """Return (tier_code, machine-readable error message) for a 0-unit
+    Entrata extraction.
+
+    Tier resolution:
+      * No API responses captured at all → ``_NO_RESPONSE``
+      * Responses captured but none Entrata-shaped → ``_SHAPE_REJECTED``
+      * Otherwise (responses matched but parser produced 0 records) →
+        ``_EMPTY``
+    """
+    if not api_responses:
+        return (
+            _TIER_NO_RESPONSE,
+            "ENTRATA_NO_RESPONSE: no Entrata-shaped network responses captured "
+            "during page load (false-positive detector signal or marketing-only "
+            "shell)",
+        )
+    shape_matches = [r for r in api_responses if _is_entrata_response(r.get("body"))]
+    if not shape_matches:
+        return (
+            _TIER_SHAPE_REJECTED,
+            f"ENTRATA_SHAPE_REJECTED: {len(api_responses)} responses captured, "
+            "none matched Entrata envelope/key signature",
+        )
+    return (
+        _TIER_EMPTY,
+        f"ENTRATA_EMPTY: {len(shape_matches)} shape-matched response(s), "
+        "but parser emitted 0 admitted units",
+    )
+
+
 class EntrataAdapter:
     """Entrata PMS adapter. Parses /Apartments/module/widgets/ API responses."""
 
@@ -709,8 +779,26 @@ class EntrataAdapter:
                 result.confidence = min(0.92, 0.7 + 0.04 * _ppp.n_admitted)
                 return result
 
+        # 2026-05-20: emit a structured empty-exit label so Path B retry
+        # can route this property to its next-best PMS candidate. The
+        # default ``TIER_1_API_ENTRATA`` initial value on line 424 was
+        # the SUCCESS label — leaving it on a 0-unit exit meant
+        # ``is_empty_exit()`` returned False and the orchestrator never
+        # retried with a different adapter. Same bug-shape as the OneSite
+        # cluster #6 fix (`5a7a676`) and the Equity sub-cluster fix
+        # (`bffb24e`).
+        #
+        # Verified live 2026-05-20 against 4 of the 193 ENTRATA failed-
+        # strict properties from canary sw9p4 (Centennial Place,
+        # Foxchase, Hills at North Mesa, Grove Luxury) — all have
+        # ``commoncf.entrata.com`` or ``application_authentication`` URL
+        # markers but no real Entrata inventory backing; the detector
+        # picks Entrata at 0.85 based on the marker, the adapter runs
+        # empty, and Path B should re-dispatch to the next candidate.
+        tier_code, err_msg = _classify_entrata_failure(api_responses)
+        result.tier_used = tier_code
         result.confidence = 0.0
-        result.errors.append("No Entrata floorplan data found in captured API responses")
+        result.errors.append(err_msg)
 
         return result
 

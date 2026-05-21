@@ -186,6 +186,43 @@ async () => {
     }
   }
 
+  // 3) Brand-CMS `/apartments/{state}/{city}/floor-plans` URL discovery.
+  // The 2026-05-20 TIER_3_DOM + TIER_MERGED ALL_fail probes (see
+  // project_tier3_dom_recovery_2026-05-20.md + project_tier_merged_recovery_
+  // 2026-05-20.md) found that 16-18% of failed properties use a
+  // multi-property brand template where `/floorplans` returns 404 but
+  // floor plans actually live at `/apartments/{state}/{city}/floor-plans`.
+  // Brands observed: Lincoln Property Co (Fairways 5, Museum Terrace,
+  // Villas Willow Glen, Renaissance), McKinley (Roundtree, Golfside Lake),
+  // HG Living (Alcove at Seahurst), MG Properties (Bristol at Sunset).
+  // When earlier subpath probes failed, scan landing-page anchor hrefs
+  // for the brand-CMS pattern and probe each unique match.
+  if (cards.length < 2) {
+    // Pattern: /apartments/{state}/{city}[/{property-slug}]/floor-plans
+    // 3-segment form: Lincoln, McKinley, Renaissance (state/city/tail)
+    // 4-segment form: HG Living (state/city/property-slug/tail)
+    const seen = new Set();
+    const brandPaths = [];
+    document.querySelectorAll('a[href]').forEach((a) => {
+      const href = a.getAttribute('href') || '';
+      const m = href.match(/^(\/apartments\/[a-z-]+\/[a-z0-9-]+(?:\/[a-z0-9-]+)?\/(?:floor-plans|floorplans))(?:[?#].*)?$/i);
+      if (m && !seen.has(m[1])) {
+        seen.add(m[1]);
+        brandPaths.push(m[1]);
+      }
+    });
+    for (const p of brandPaths) {
+      try {
+        const r = await fetch(location.origin + p, {credentials: 'include'});
+        if (!r.ok) continue;
+        const html = await r.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const found = findCardsIn(doc);
+        if (found.length >= 2) { cards = found; winningPath = p; break; }
+      } catch (e) { /* next */ }
+    }
+  }
+
   return {cards, winningPath, count: cards.length};
 }
 """

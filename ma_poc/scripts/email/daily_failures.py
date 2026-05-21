@@ -120,7 +120,7 @@ import os
 import sys
 import tempfile
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -142,11 +142,11 @@ from data_provider.sql.models import (  # noqa: E402
     ScrapeEventRow,
 )
 from data_provider.sql.provider import SqlDataProvider  # noqa: E402
+from scripts.email._client import send_html_email  # noqa: E402
 from scripts.email.daily import (  # noqa: E402
     _open_provider,
     _parse_recipients,
 )
-from scripts.email._client import send_html_email  # noqa: E402
 
 log = logging.getLogger("email_daily_failures_report")
 
@@ -178,7 +178,7 @@ def _resolve_run_date(
     except Exception as exc:  # noqa: BLE001 — never block on SQL errors
         log.warning("runs.list_runs() failed (%s); falling back to GCS", exc)
 
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = datetime.now(UTC).date().isoformat()
 
     chosen: str | None = None
     if requested:
@@ -326,14 +326,27 @@ def _fetch_scraped_units_from_sql(
                 "tier_used": tier,
                 "unit_id": "",
                 "floor_plan_name": "",
+                "floor_plan_id": "",
                 "beds": None,
                 "baths": None,
                 "area": None,
                 "rent_low": None,
                 "rent_high": None,
+                "rent_range_raw": "",
                 "available_date": "",
+                "available_date_raw": "",
+                "availability_status": "",
                 "lease_term": None,
+                "move_in_date": "",
+                "building": "",
+                "floor": "",
+                "available_units": "",
+                "deposit": "",
                 "concessions": "",
+                "concession_clean": "",
+                "concession_quality": "",
+                "inferred_id": None,
+                "source_ids": "",
             })
             continue
 
@@ -350,16 +363,82 @@ def _fetch_scraped_units_from_sql(
                 "tier_used": tier,
                 "unit_id": u.get("unit_id") or "",
                 "floor_plan_name": u.get("floor_plan_name") or "",
+                "floor_plan_id": u.get("floor_plan_id") or "",
                 "beds": u.get("beds"),
                 "baths": u.get("baths"),
                 "area": u.get("area"),
                 "rent_low": u.get("rent_low"),
                 "rent_high": u.get("rent_high"),
+                # Raw rent-range string (e.g. "$1,200 - $1,500") when the
+                # adapter emitted one — useful for verification when the
+                # numeric rent_low/rent_high parse differs from the source.
+                "rent_range_raw": u.get("_rent_range_raw") or "",
                 "available_date": u.get("available_date") or "",
+                # Raw availability string preserved by v2 schema (text forms
+                # like "Available Now" / "Call" that don't ISO-normalize).
+                "available_date_raw": u.get("_available_date_raw") or "",
+                "availability_status": u.get("availability_status") or "",
                 "lease_term": u.get("lease_term"),
-                "concessions": _stringify_concessions(u.get("concessions")),
+                "move_in_date": u.get("move_in_date") or "",
+                "building": u.get("building") or "",
+                "floor": u.get("floor") or "",
+                "available_units": u.get("available_units") or "",
+                "deposit": u.get("deposit") or "",
+                # 2026-05-20 export-wiring fix: the v2 schema emits the
+                # unit-level concession under ``concession_text``, not
+                # ``concessions``. Reading the wrong key silently produced
+                # a 100% empty Concessions column in main 2026-05-20 xlsx
+                # (0 / 69,992 rows populated). Prefer the cleaned variant
+                # when present (display-ready, JS/CSS-stripped); fall back
+                # to the raw text; legacy ``concessions`` key as final
+                # fallback for any non-v2 input shape.
+                "concessions": _stringify_concessions(
+                    u.get("concession_text_clean")
+                    or u.get("concession_text")
+                    or u.get("concessions")
+                ),
+                # The full cleaned variant + quality flag, surfaced as
+                # their own columns so downstream consumers can filter by
+                # quality without re-running the cleaner.
+                "concession_clean": _stringify_concessions(
+                    u.get("concession_text_clean")
+                ),
+                "concession_quality": u.get("_concession_quality") or "",
+                # Provenance — True when the unit_id was synthesized from
+                # physical attributes (no real PMS unit number captured).
+                # Lets reports filter to "real-ID" units only.
+                "inferred_id": (
+                    bool(u.get("_inferred_id"))
+                    if u.get("_inferred_id") is not None
+                    else None
+                ),
+                # 2026-05-20 (canary-output surfacing): PMS-native join
+                # keys (sightmap_unit_id, appfolio_listing_id, etc.) —
+                # the user's "raw id" requirement for cross-source join
+                # surfacing. Rendered as a single ``k1=v1; k2=v2`` cell
+                # for readability; the raw dict survives on the unit
+                # record itself.
+                "source_ids": _stringify_source_ids(u.get("source_ids")),
             })
     return out
+
+
+def _stringify_source_ids(value: Any) -> str:
+    """Render a source_ids dict as ``key1=v1; key2=v2`` for one cell.
+
+    Empty dict → empty string. Non-dict input (defensive) is JSON-encoded
+    as a fallback. Keys are sorted so two rows with the same source-IDs
+    set have identical string output (stable for diffing/joining)."""
+    if not value:
+        return ""
+    if isinstance(value, dict):
+        if not value:
+            return ""
+        return "; ".join(f"{k}={value[k]}" for k in sorted(value.keys()))
+    try:
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def _stringify_concessions(value: Any) -> str:
@@ -604,10 +683,16 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
         if not units:
             placeholder = dict(common)
             placeholder.update({
-                "unit_id": "", "floor_plan_name": "",
+                "unit_id": "", "floor_plan_name": "", "floor_plan_id": "",
                 "beds": None, "baths": None, "area": None,
-                "rent_low": None, "rent_high": None,
-                "available_date": "", "lease_term": None, "concessions": "",
+                "rent_low": None, "rent_high": None, "rent_range_raw": "",
+                "available_date": "", "available_date_raw": "",
+                "availability_status": "", "lease_term": None,
+                "move_in_date": "", "building": "", "floor": "",
+                "available_units": "", "deposit": "",
+                "concessions": "", "concession_clean": "",
+                "concession_quality": "", "inferred_id": None,
+                "source_ids": "",
             })
             out.append(placeholder)
             continue
@@ -616,14 +701,39 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
             row.update({
                 "unit_id": u.get("unit_id") or "",
                 "floor_plan_name": u.get("floor_plan_name") or "",
+                "floor_plan_id": u.get("floor_plan_id") or "",
                 "beds": u.get("beds"),
                 "baths": u.get("baths"),
                 "area": u.get("area"),
                 "rent_low": u.get("rent_low"),
                 "rent_high": u.get("rent_high"),
+                "rent_range_raw": u.get("_rent_range_raw") or "",
                 "available_date": u.get("available_date") or "",
+                "available_date_raw": u.get("_available_date_raw") or "",
+                "availability_status": u.get("availability_status") or "",
                 "lease_term": u.get("lease_term"),
-                "concessions": _stringify_concessions(u.get("concessions")),
+                "move_in_date": u.get("move_in_date") or "",
+                "building": u.get("building") or "",
+                "floor": u.get("floor") or "",
+                "available_units": u.get("available_units") or "",
+                "deposit": u.get("deposit") or "",
+                # 2026-05-20 export-wiring fix: v2 schema emits
+                # ``concession_text``; prefer the cleaned variant.
+                "concessions": _stringify_concessions(
+                    u.get("concession_text_clean")
+                    or u.get("concession_text")
+                    or u.get("concessions")
+                ),
+                "concession_clean": _stringify_concessions(
+                    u.get("concession_text_clean")
+                ),
+                "concession_quality": u.get("_concession_quality") or "",
+                "inferred_id": (
+                    bool(u.get("_inferred_id"))
+                    if u.get("_inferred_id") is not None
+                    else None
+                ),
+                "source_ids": _stringify_source_ids(u.get("source_ids")),
             })
             out.append(row)
     return out
@@ -662,14 +772,31 @@ _SCRAPED_COLUMNS: list[tuple[str, str]] = [
     ("tier_used", "Tier Used"),
     ("unit_id", "Unit ID"),
     ("floor_plan_name", "Floor Plan"),
+    ("floor_plan_id", "Floor Plan ID"),
     ("beds", "Beds"),
     ("baths", "Baths"),
     ("area", "Area (sqft)"),
     ("rent_low", "Rent Low"),
     ("rent_high", "Rent High"),
+    ("rent_range_raw", "Rent Range (raw)"),
     ("available_date", "Available Date"),
+    ("available_date_raw", "Available Date (raw)"),
+    ("availability_status", "Availability Status"),
     ("lease_term", "Lease Term"),
+    ("move_in_date", "Move-In Date"),
+    ("building", "Building"),
+    ("floor", "Floor"),
+    ("available_units", "Available Units"),
+    ("deposit", "Deposit"),
     ("concessions", "Concessions"),
+    # 2026-05-20 columns added for canary-output cross-source joining +
+    # data-quality filtering. ``Source IDs`` carries PMS-native join
+    # keys (sightmap_unit_id / appfolio_listing_id / etc.); the
+    # remaining three preserve quality provenance.
+    ("concession_clean", "Concession (Cleaned)"),
+    ("concession_quality", "Concession Quality"),
+    ("inferred_id", "Inferred ID"),
+    ("source_ids", "Source IDs"),
 ]
 
 _FAILED_COLUMNS: list[tuple[str, str]] = [

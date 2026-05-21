@@ -17,7 +17,6 @@ from ma_poc.pms.adapters._generic_dom_floorplans import (
 from ma_poc.pms.adapters.base import AdapterContext
 from ma_poc.pms.detector import detect_pms
 
-
 # Real-shape cards (mckinley-style "The Birch $1,179-$1,349" + similar)
 _GOOD_CARDS = [
     {"name": "The Birch", "text": "The Birch 1 Bed 1 Bath 850 sq ft $1,179 - $1,349 Available Now", "klass": "fp-card"},
@@ -169,7 +168,7 @@ def test_js_has_brand_cms_url_pattern() -> None:
     assert "new Set()" in js
     # The fall-through ordering: brand-CMS scan is LAST (after standard
     # subpaths) so common /floorplans paths still win first
-    assert js.index("SUBPATHS") < js.index("BRAND_HREF_RE")
+    assert js.index("SUBPATHS") < js.index("brand-CMS")
 
 
 def test_brand_cms_pattern_matches_real_examples() -> None:
@@ -177,9 +176,10 @@ def test_brand_cms_pattern_matches_real_examples() -> None:
     brand-CMS URLs observed during the 2026-05-20 TIER_3_DOM probe."""
     import re
 
-    # Mirror the JS regex literally (case-insensitive, anchored)
+    # Mirror the JS regex — supports both 3-segment (state/city/tail) and
+    # 4-segment (state/city/property-slug/tail) brand-CMS URL shapes.
     py_re = re.compile(
-        r"^(\/apartments\/[a-z-]+\/[a-z0-9-]+\/(?:floor-plans|floorplans))(?:[?#].*)?$",
+        r"^(\/apartments\/[a-z-]+\/[a-z0-9-]+(?:\/[a-z0-9-]+)?\/(?:floor-plans|floorplans))(?:[?#].*)?$",
         re.IGNORECASE,
     )
     # Live-verified URLs from the TIER_3_DOM probe
@@ -203,8 +203,10 @@ def test_brand_cms_pattern_rejects_non_brand_urls() -> None:
     irrelevant scan results."""
     import re
 
+    # Mirror the JS regex — supports both 3-segment (state/city/tail) and
+    # 4-segment (state/city/property-slug/tail) brand-CMS URL shapes.
     py_re = re.compile(
-        r"^(\/apartments\/[a-z-]+\/[a-z0-9-]+\/(?:floor-plans|floorplans))(?:[?#].*)?$",
+        r"^(\/apartments\/[a-z-]+\/[a-z0-9-]+(?:\/[a-z0-9-]+)?\/(?:floor-plans|floorplans))(?:[?#].*)?$",
         re.IGNORECASE,
     )
     rejects = [

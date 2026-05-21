@@ -207,9 +207,22 @@ class KnockAdapter:
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units via Knock's Doorway API.
 
+        Two extraction paths:
+
+        1. **knockDoorway.init() in static HTML** (existing, 2026-04-30):
+           extract ``(public_key, kind, comm_id)`` from the JS init call,
+           then call ``/v1/property/community/{comm_id}``.
+
+        2. **By-domain resolver** (added 2026-05-20 per
+           ``project_jsonld_recovery_2026-05-20.md``): when the init call
+           isn't in static HTML — common on Aspen Square / brand portfolio
+           sites where Knock loads dynamically — query
+           ``/v1/profile?code=w&domain={SITE_URL}`` to resolve a property_id
+           directly from the marketing-site URL, then hit
+           ``/v1/property/{property_id}/units``.
+
         The ``page`` argument is unused — Knock units come from a public
-        JSON API, no rendering is required. We use the entry HTML (already
-        in ctx.fetch_result.body) to find the community_id.
+        JSON API, no rendering is required.
         """
         result = AdapterResult(tier_used="TIER_1_KNOCK_API")
 
@@ -225,31 +238,56 @@ class KnockAdapter:
         elif isinstance(body, str):
             html = body
 
-        if not html:
-            result.errors.append("knock-adapter: no entry HTML to scan for init call")
-            return result
+        # Path 1: knockDoorway.init() in static HTML.
+        public_key, kind, comm_id = find_knock_ids(html) if html else (None, None, None)
+        if public_key and comm_id:
+            try:
+                units = await _fetch_knock_units(comm_id, kind or "community")
+            except Exception as exc:
+                result.errors.append(f"knock-api-error: {exc}")
+                units = []
+            if units:
+                result.units = units
+                result.winning_url = (
+                    f"https://doorway-api.knockrentals.com/v1/property/community/{comm_id}"
+                )
+                result.confidence = min(0.9, 0.6 + 0.02 * len(units))
+                return result
+            result.errors.append("knock-adapter: Doorway API returned no units for community_id")
 
-        public_key, kind, comm_id = find_knock_ids(html)
-        if not (public_key and comm_id):
+        # Path 2: by-domain resolver. Trigger when the static HTML doesn't
+        # have the init call AND there's a credible signal that Knock is
+        # the primary inventory backend (NOT just a UTM tracking tag on a
+        # RentCafe-hosted site — see project_jsonld_recovery memo's
+        # utm_knock-is-red-herring rule).
+        base_url = str(getattr(ctx, "base_url", "") or "")
+        if base_url and _should_try_knock_by_domain(html, base_url):
+            try:
+                pid, units = await _fetch_knock_units_by_domain(base_url, html)
+            except Exception as exc:
+                result.errors.append(
+                    f"knock-by-domain-error: {type(exc).__name__}: {str(exc)[:120]}"
+                )
+                pid, units = None, []
+            if pid and units:
+                result.units = units
+                result.winning_url = (
+                    f"https://doorway-api.knockrentals.com/v1/property/{pid}/units"
+                )
+                result.tier_used = "TIER_1_KNOCK_API_BY_DOMAIN"
+                result.confidence = min(0.9, 0.6 + 0.02 * len(units))
+                return result
+            if pid is None:
+                result.errors.append(
+                    "knock-by-domain: /v1/profile resolver returned no property_id"
+                )
+            elif not units:
+                result.errors.append(
+                    f"knock-by-domain: property_id={pid} /units returned no units"
+                )
+
+        if not (public_key and comm_id) and not result.units:
             result.errors.append("knock-adapter: no knockDoorway.init() call in HTML")
-            return result
-
-        # Hit the Doorway API. Two-step: community → property metadata → units.
-        try:
-            units = await _fetch_knock_units(comm_id, kind or "community")
-        except Exception as exc:
-            result.errors.append(f"knock-api-error: {exc}")
-            return result
-
-        if not units:
-            result.errors.append("knock-adapter: Doorway API returned no units")
-            return result
-
-        result.units = units
-        result.winning_url = (
-            f"https://doorway-api.knockrentals.com/v1/property/community/{comm_id}"
-        )
-        result.confidence = min(0.9, 0.6 + 0.02 * len(units))
         return result
 
 
@@ -305,3 +343,189 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
             return parse_knock_units(r2.json())
         except Exception:
             return []
+
+
+# 2026-05-20: Knock-by-domain fallback signal detection.
+#
+# The JSON-LD recovery probe (project_jsonld_recovery_2026-05-20.md)
+# confirmed two reliable signals AND one red-herring:
+#
+#   ✓ doorway-api.knockrentals.com URL in static HTML (any context) → Knock
+#   ✓ knockrentals.com/widget URL → Knock
+#   ✓ Aspen Square brand portfolio (aspensquare.com/apartments/{state}/{city}/{slug})
+#     — verified live: every Aspen Square site has Knock as primary inventory
+#   ✗ ``?utm_knock=`` URL param ALONE is NOT reliable — RentCafe-hosted
+#     properties (10X Iona Lakes, Main Street Square) use this UTM for lead
+#     tracking while their actual inventory lives in RentCafe + SecureCafe.
+#     Only treat utm_knock as a Knock signal when RentCafe is ABSENT.
+
+_KNOCK_API_HOST_RE = re.compile(
+    r"doorway-api\.knockrentals\.com|knockrentals\.com/widget", re.IGNORECASE
+)
+_RENTCAFE_PRESENCE_RE = re.compile(r"resource\.rentcafe\.com", re.IGNORECASE)
+_ASPEN_SQUARE_URL_RE = re.compile(
+    r"https?://(?:www\.)?aspensquare\.com/apartments/[a-z-]+/[a-z-]+/[a-z0-9-]+",
+    re.IGNORECASE,
+)
+
+# 2026-05-20 (post-canary e2e probe): Aspen Square and similar Knock-
+# backed brands embed the Knock community hash in their static SSR HTML
+# as a JSON-stringified config blob — typically inside a Next.js bundle
+# or React Server Component data dump. The actual call is
+# ``knockDoorway.init(<api_token>, "community", <community_hash>)`` but
+# that call is INSIDE a string-encoded JS module that the browser
+# executes — so the literal init call doesn't appear in static HTML.
+# What DOES appear is the SSR-emitted config:
+#
+#   ":\"community\",\"enabled\":true,\"propertyId\":\"<16-char hex>\","
+#   "apiToken\":\"<32-char hex>\""
+#
+# Captures both the unescaped (``"propertyId":"<hex>"``) and JSON-
+# escaped (``\"propertyId\":\"<hex>\"``) forms.
+# Verified live 2026-05-20 against 4 Aspen Square properties (Adley
+# 72nd, The Avenue Cabot, Edgewood Court, Country Manor). All four
+# carry a UNIQUE community hash + the SHARED Aspen Square api_token
+# (7319ad04f51311e9abf012b98e995a24).
+_KNOCK_COMMUNITY_HASH_RE = re.compile(
+    r'propertyId\\?"\s*:\s*\\?"([a-f0-9]{14,18})\\?"', re.IGNORECASE
+)
+
+
+def find_knock_community_hash(html: str) -> str | None:
+    """Extract the Knock community hash from a JSON-embedded config blob.
+
+    Returns the 16-char hex hash on match, ``None`` otherwise. Used by the
+    by-domain resolver for sites (like Aspen Square) that don't fire the
+    ``knockDoorway.init()`` literal call in static HTML but DO ship the
+    config object via SSR.
+    """
+    if not html:
+        return None
+    m = _KNOCK_COMMUNITY_HASH_RE.search(html)
+    return m.group(1) if m else None
+
+
+def _should_try_knock_by_domain(html: str, base_url: str) -> bool:
+    """Decide whether to fire the Knock-by-domain resolver.
+
+    Returns ``True`` only when there's positive evidence Knock is the
+    primary inventory backend (not just a UTM-tracking layer on a
+    RentCafe-hosted property).
+    """
+    # Aspen Square brand always uses Knock — match the URL directly without
+    # requiring the JS bundle to expose the API host in static HTML.
+    if base_url and _ASPEN_SQUARE_URL_RE.match(base_url):
+        return True
+    if not html:
+        return False
+    lo = html.lower()
+    # Hard signal: Knock API host referenced anywhere in the HTML.
+    if _KNOCK_API_HOST_RE.search(html):
+        # Exclude RentCafe-hosted properties — Knock is just lead tracking
+        # there, the inventory lives in RentCafe / SecureCafe.
+        if _RENTCAFE_PRESENCE_RE.search(html):
+            return False
+        return True
+    # Soft signal: ``utm_knock=`` URL param, but only when there's no
+    # RentCafe CDN load (otherwise it's the utm_knock red-herring case).
+    if "utm_knock=" in lo and not _RENTCAFE_PRESENCE_RE.search(html):
+        return True
+    return False
+
+
+async def _fetch_knock_units_by_domain(
+    base_url: str,
+    html: str = "",
+) -> tuple[str | None, list[dict[str, Any]]]:
+    """Resolve property_id from marketing-site URL via Knock Doorway,
+    then fetch units.
+
+    Two-path strategy (2026-05-20):
+
+    1. **Community-hash path** (preferred, verified 4/4 on Aspen Square):
+       Extract the community hash from ``html`` (SSR-embedded JSON config),
+       call ``/v1/property/community/{hash}`` to bootstrap and get the
+       numeric property_id, then call ``/v1/property/{pid}/units``. This
+       is the ONLY path that works on Aspen Square sites — the
+       ``/v1/profile?domain=`` resolver returns 400 without a community
+       bootstrap first.
+
+    2. **Profile-by-domain path** (legacy fallback): call ``/v1/profile``
+       with the URL as the ``domain`` param. Works on sites that publish
+       the API host in static HTML but don't ship the SSR config blob.
+
+    Args:
+        base_url: The property's marketing-site URL.
+        html: Static HTML body (optional). When supplied, the community-
+            hash path is tried first.
+
+    Returns:
+        ``(property_id, units)``. ``property_id`` is ``None`` when both
+        paths return nothing; ``units`` is the parsed list (may be empty
+        if the property exists in Knock but has no available units).
+
+    Never raises — exceptions return ``(None, [])``.
+    """
+    from urllib.parse import quote
+
+    import httpx
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Origin": "https://doorway.knck.io",
+        "Accept": "application/json",
+    }
+
+    async def _fetch_units(c: httpx.AsyncClient, pid_str: str) -> list[dict[str, Any]]:
+        units_url = f"https://doorway-api.knockrentals.com/v1/property/{pid_str}/units"
+        ur = await c.get(units_url, headers=headers)
+        if ur.status_code != 200:
+            return []
+        try:
+            return parse_knock_units(ur.json())
+        except Exception:
+            return []
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+            # Path 1: community-hash from SSR-embedded JSON config.
+            community_hash = find_knock_community_hash(html) if html else None
+            if community_hash:
+                boot_url = (
+                    f"https://doorway-api.knockrentals.com/v1/property/"
+                    f"community/{community_hash}"
+                )
+                br = await c.get(boot_url, headers=headers)
+                if br.status_code == 200:
+                    try:
+                        boot_body = br.json()
+                    except Exception:
+                        boot_body = {}
+                    pid = (boot_body.get("property") or {}).get("id")
+                    if pid:
+                        pid_str = str(pid)
+                        return pid_str, await _fetch_units(c, pid_str)
+
+            # Path 2: legacy /v1/profile?domain= resolver.
+            profile_url = (
+                "https://doorway-api.knockrentals.com/v1/profile"
+                f"?code=w&domain={quote(base_url, safe='')}&refresh=true"
+            )
+            pr = await c.get(profile_url, headers=headers)
+            if pr.status_code != 200:
+                return None, []
+            try:
+                profile_body = pr.json()
+            except Exception:
+                return None, []
+            pid = (profile_body.get("profile") or {}).get("property")
+            if not pid:
+                return None, []
+            pid_str = str(pid)
+            return pid_str, await _fetch_units(c, pid_str)
+    except Exception:
+        return None, []

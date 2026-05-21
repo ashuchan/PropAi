@@ -1677,6 +1677,28 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
     "div.floorplan",
     "div.apartment",
     "div.listing",
+    # 2026-05-20: custom-CMS table-row unit listings. Multiple small
+    # multifamily CMSes (Corsa Management's ``prisma-units-table``,
+    # generic ``unit-table``/``floor-plan-table`` themes) ship the unit
+    # roster as ``<table><tr class="*-unit-row">`` — divs cover most
+    # patterns but TR-based markup was completely uncovered.
+    # Verified live on Greenwood Village (Corsa Management): the
+    # ``tr.prisma-units-row`` contains "1BR-3RM 1BA 560 sqft $1,450"
+    # which passes the existing rent + structural-signal gate.
+    "tr.prisma-units-row",
+    "tr.unit-row",
+    "tr.floorplan-row",
+    "tr.floor-plan-row",
+    "tr.apartment-row",
+    "tr.listing-row",
+    # Generic class-suffix patterns covering the long-tail of custom
+    # CMS variants (``tr.greenwood-units-row``, ``tr.fp-row``, etc.).
+    # The existing >200-node and rent+structural gates keep false
+    # positives in check.
+    "tr[class*='unit-row']",
+    "tr[class*='units-row']",
+    "tr[class*='floor-plan-row']",
+    "tr[class*='floorplan-row']",
 )
 
 _RENT_PATTERN = re.compile(

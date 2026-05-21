@@ -21,6 +21,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ma_poc.core import issue_log as V
+from ma_poc.core.concession_clean import (
+    classify_concession_quality as _concession_quality,
+)
+from ma_poc.core.concession_clean import (
+    clean_concession_text as _concession_clean,
+)
 from ma_poc.core.concession_normalize import normalize_concession
 
 # ── V2 CSV column mapping ────────────────────────────────────────────────────
@@ -337,8 +343,32 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         "move_in_date": _format_date(unit.get("move_in_date") or unit.get("_move_in_date")),
         # F10 additions — always present (None when unset).
         "concession_text": concession_text or None,
+        # 2026-05-20 preserve-and-flag (per user "error on side of unclean
+        # rather than discard"): emit a best-effort cleaned variant and a
+        # quality label alongside the raw text. The raw is ALWAYS the
+        # ``concession_text`` field above; consumers that prefer a
+        # display-ready version can read ``concession_text_clean``.
+        # See ma_poc/core/concession_clean.py for the classifier.
+        "concession_text_clean": (
+            _concession_clean(concession_text) if concession_text else None
+        ),
+        "_concession_quality": (
+            _concession_quality(concession_text) if concession_text else None
+        ),
         "concession_value": _safe_float(unit.get("concession_value")),
         "concession_source": unit.get("concession_source") or None,
+        # 2026-05-20 (canary-output surfacing): PMS-native identifiers
+        # the adapters populate via ``source_ids={...}`` in make_unit_dict
+        # — used as JOIN keys against external sources (RealPage, SurgeX,
+        # cross-canary diffs). Was silently dropped by the v2 transform
+        # despite being captured upstream. Examples:
+        #   SightMap   → {sightmap_unit_id, sightmap_floor_plan_id}
+        #   AppFolio   → {appfolio_listing_id}
+        #   Spherexx   → {spherexx_unit_id, spherexx_floorplan_id}
+        # Carry through as a dict; xlsx export stringifies for the cell.
+        # Empty {} when the adapter hasn't wired it yet (additive,
+        # non-breaking).
+        "source_ids": dict(unit.get("source_ids") or {}),
         "amenities": norm_amenities,
         # Validation provenance flags (surfaced from schema_gate).
         "_inferred_id": bool(unit.get("_inferred_id")) if "_inferred_id" in unit else None,

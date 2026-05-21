@@ -117,6 +117,8 @@ def compute(
     carry_forward_applied: bool = False,
     units_hollow: bool = False,
     plan_summaries: list[Any] | None = None,
+    verdict_quality_override: str | None = None,
+    units: list[dict[str, Any]] | None = None,
 ) -> VerdictResult:
     """Compute the verdict for a property scrape.
 
@@ -130,6 +132,17 @@ def compute(
             non-empty AND no unit-level records survive, the verdict is
             ``SUCCESS_PLAN_LEVEL`` rather than ``FAILED_NO_DATA``. Pass
             ``None`` (or omit) to keep pre-Stage-2 behaviour.
+        verdict_quality_override: Authoritative downgrade signal set by
+            scraper.py Path C plan-level fallback (``result["_verdict_quality"]``).
+            When ``"SUCCESS_PLAN_LEVEL"``, an otherwise-SUCCESS verdict is
+            downgraded; other verdicts (FAILED_*, DEAD_URL, CARRY_FORWARD,
+            PARTIAL) are unaffected.
+        units: The final unit list. When provided AND the computed verdict
+            is SUCCESS, applies the verdict-honesty downgrade: if every
+            unit has an ``inferred_*`` UID prefix OR no unit carries a
+            numeric rent value, downgrade to SUCCESS_PLAN_LEVEL. Catches
+            the 1,031-prop inflated-SUCCESS bucket flagged by the 2026-05-20
+            JSON-LD recovery audit.
 
     Returns:
         VerdictResult with verdict, reason, and source.
@@ -196,6 +209,38 @@ def compute(
                 "validate",
             )
         return VerdictResult(Verdict.FAILED_NO_DATA, "units_hollow_all_tiers", "validate")
+
+    # 2026-05-20 verdict-honesty downgrade: an otherwise-SUCCESS property
+    # is downgraded to SUCCESS_PLAN_LEVEL when (a) Path C's plan-level
+    # fallback already stamped ``_verdict_quality="SUCCESS_PLAN_LEVEL"`` or
+    # (b) every accepted unit is plan-level-shaped — either an inferred_*
+    # UID prefix on all rows OR no rent on any row.
+    if verdict_quality_override == Verdict.SUCCESS_PLAN_LEVEL.value:
+        return VerdictResult(
+            Verdict.SUCCESS_PLAN_LEVEL,
+            "path_c_plan_level_fallback",
+            "validate",
+        )
+
+    if units:
+        all_inferred = all(
+            str(u.get("unit_id", "")).startswith("inferred_") for u in units
+        )
+        if all_inferred:
+            return VerdictResult(
+                Verdict.SUCCESS_PLAN_LEVEL,
+                f"all_inferred_uids ({len(units)} units)",
+                "validate",
+            )
+        # Late import to avoid layer-ordering issues; predicate is pure.
+        from ma_poc.validation.schema_gate import property_has_rent_signal
+
+        if not property_has_rent_signal(units):
+            return VerdictResult(
+                Verdict.SUCCESS_PLAN_LEVEL,
+                f"no_rent_signal ({len(units)} units)",
+                "validate",
+            )
 
     return VerdictResult(Verdict.SUCCESS, "all checks passed", "extract")
 
