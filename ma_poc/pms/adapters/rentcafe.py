@@ -702,12 +702,18 @@ async def _try_rentcafe_wp_probe(
 # (the adapter's ``probe_get`` already uses chrome120).
 _SECURECAFE_URL_RE = re.compile(
     r"""https?://
-        (?P<sub>[a-z0-9][a-z0-9-]*)\.securecafe\.com
+        (?P<sub>[a-z0-9][a-z0-9-]*)\.(?P<dom>securecafe(?:net)?)\.com
         /(?:onlineleasing|residentservices)/
         (?P<slug>[a-z0-9][a-z0-9-]*)
     """,
     re.IGNORECASE | re.VERBOSE,
 )
+# 2026-05-21 grind600 finding: 100/600 random-sample properties (16.7%) route
+# through SecureCafe. The original regex matched only ``securecafe.com``;
+# ``securecafenet.com`` (resident-portal alt domain) was a blind spot. The
+# union accepts both. ``availableunits.aspx`` is hosted on both — the
+# residentservices login redirects to the onlineleasing leasing flow on
+# the same Yardi tenant.
 
 _WORD_NUM = {
     "studio": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
@@ -739,8 +745,21 @@ _SC_DATE_RE = re.compile(
 )
 
 
+def _securecafe_base_from_match(m: re.Match[str]) -> str:
+    """Build ``https://<sub>.<dom>.com/onlineleasing/<slug>`` from a regex
+    match. Preserves whichever Yardi sub-product domain was matched
+    (securecafe.com or securecafenet.com); both expose the same
+    ``onlineleasing/<slug>/availableunits.aspx`` server-rendered endpoint
+    on the underlying Yardi tenant."""
+    return (
+        f"https://{m.group('sub')}.{m.group('dom')}.com"
+        f"/onlineleasing/{m.group('slug')}"
+    )
+
+
 def _find_securecafe_base(html: str, ctx: AdapterContext) -> str | None:
-    """Return ``https://<sub>.securecafe.com/onlineleasing/<slug>`` or None.
+    """Return ``https://<sub>.(securecafe|securecafenet).com/onlineleasing/<slug>``
+    or None.
 
     Looks in the rendered HTML first (marketing sites link/iframe to their
     securecafe portal), then falls back to the property's own host when it
@@ -749,7 +768,7 @@ def _find_securecafe_base(html: str, ctx: AdapterContext) -> str | None:
     if html:
         m = _SECURECAFE_URL_RE.search(html)
         if m:
-            return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
+            return _securecafe_base_from_match(m)
     # 2026-05-17 iter-7: the rendered fetch_result.body frequently lacks a
     # clean securecafe link (patchright DOM differs from raw server HTML;
     # link injected post-render or behind a menu), but the scraper's
@@ -760,19 +779,20 @@ def _find_securecafe_base(html: str, ctx: AdapterContext) -> str | None:
     # guestlogin.aspx. Scan captured response URLs as a second source.
     for resp in getattr(ctx, "_api_responses", []) or []:
         u = str(resp.get("url", "") or "")
-        if "securecafe.com/onlineleasing/" not in u.lower():
+        ul = u.lower()
+        if "securecafe.com/" not in ul and "securecafenet.com/" not in ul:
             continue
         m = _SECURECAFE_URL_RE.search(u)
         if m:
-            return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
+            return _securecafe_base_from_match(m)
     origin = _origin_from_ctx(ctx)
-    if "securecafe.com" in origin:
+    if "securecafe.com" in origin or "securecafenet.com" in origin:
         # Host is the portal; recover the slug from the effective URL path.
         fr = getattr(ctx, "fetch_result", None)
         final = str(getattr(fr, "final_url", "") or "") if fr else ""
         m = _SECURECAFE_URL_RE.search(final or origin)
         if m:
-            return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
+            return _securecafe_base_from_match(m)
     return None
 
 

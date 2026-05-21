@@ -801,12 +801,24 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # "other" no-fingerprint pool) were misrouted to generic/LLM. Routing
     # to ``rentcafe`` engages the iter-4 securecafe availableunits.aspx
     # unit-level probe.
-    if "securecafe.com/onlineleasing" in h or ".securecafe.com" in h:
+    #
+    # 2026-05-21 grind600 finding: ``securecafenet.com`` (Yardi
+    # resident-services alt domain) routes the same way — 100 of 600
+    # random-sample properties used the .net domain via
+    # ``<sub>.securecafenet.com/residentservices/<slug>/userlogin``. The
+    # underlying Yardi tenant exposes the same ``onlineleasing/<slug>/
+    # availableunits.aspx`` endpoint; rentcafe adapter handles both.
+    if (
+        "securecafe.com/onlineleasing" in h
+        or ".securecafe.com" in h
+        or "securecafenet.com/residentservices" in h
+        or ".securecafenet.com" in h
+    ):
         yield (
             "rentcafe",
             0.90,
-            ["RentCafe securecafe online-leasing portal marker in HTML "
-             "(<sub>.securecafe.com/onlineleasing)"],
+            ["RentCafe securecafe(net) portal marker in HTML "
+             "(<sub>.securecafe[net].com/{online,resident}leasing)"],
         )
 
     # ResMan — public availability portal at <client>.myresman.com/Portal/

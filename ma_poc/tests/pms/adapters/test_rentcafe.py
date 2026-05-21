@@ -754,3 +754,129 @@ def test_securecafe_regex_does_not_match_unrelated_paths() -> None:
             f"path-form not in {{onlineleasing, residentservices}} must NOT match; "
             f"url={url!r}"
         )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-21 grind600 finding — extend coverage to securecafenet.com
+# (the Yardi resident-services alt domain). 100/600 = 16.7% of the
+# random-sample worklist routed via ``<sub>.securecafenet.com/
+# residentservices/<slug>/userlogin``. The legacy regex only matched
+# securecafe.com so those drilled-down to TIER_3_DOM / LLM fallback.
+# The Yardi tenant exposes the same onlineleasing/<slug>/availableunits
+# .aspx endpoint regardless of which Yardi sub-product (securecafe.com
+# vs. securecafenet.com) the marketing site links to.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_securecafe_regex_matches_securecafenet_residentservices() -> None:
+    """grind600 #1 finding — ``<sub>.securecafenet.com/residentservices/
+    <slug>/userlogin`` must extract sub + slug for downstream probing.
+    """
+    from ma_poc.pms.adapters.rentcafe import _SECURECAFE_URL_RE
+    m = _SECURECAFE_URL_RE.search(
+        "https://livebrez.securecafenet.com/residentservices/atlantic-crossing0/userlogin"
+    )
+    assert m is not None
+    assert m.group("sub") == "livebrez"
+    assert m.group("dom") == "securecafenet"
+    assert m.group("slug") == "atlantic-crossing0"
+
+
+def test_securecafe_regex_matches_securecafenet_onlineleasing() -> None:
+    """Some securecafenet sites also expose /onlineleasing/<slug> directly."""
+    from ma_poc.pms.adapters.rentcafe import _SECURECAFE_URL_RE
+    m = _SECURECAFE_URL_RE.search(
+        "https://thecolumnsatbearcreek.securecafenet.com/onlineleasing/the-columns-at-bear-creek/guestlogin"
+    )
+    assert m is not None
+    assert m.group("dom") == "securecafenet"
+    assert m.group("slug") == "the-columns-at-bear-creek"
+
+
+def test_securecafe_find_base_preserves_securecafenet_domain() -> None:
+    """When the source URL is on securecafenet.com, the synthesized base
+    must also live on securecafenet.com (not silently rewritten to
+    securecafe.com). The Yardi tenant routes both, but cross-domain
+    rewrites would risk hitting a stale or differently-configured tenant.
+    """
+    from ma_poc.pms.adapters.base import AdapterContext
+    from ma_poc.pms.adapters.rentcafe import _find_securecafe_base
+    html = (
+        '<html><body>'
+        '<a href="https://livebrez.securecafenet.com/residentservices/'
+        'atlantic-crossing0/userlogin">Resident Login</a>'
+        '</body></html>'
+    )
+    ctx = AdapterContext(
+        base_url="https://www.livebrez.com/",
+        detected=None,  # type: ignore[arg-type]
+        profile=None,
+        expected_total_units=None,
+        property_id="P-test",
+    )
+    base = _find_securecafe_base(html, ctx)
+    assert base == (
+        "https://livebrez.securecafenet.com/onlineleasing/atlantic-crossing0"
+    ), (
+        f"securecafenet source must produce a securecafenet base, not "
+        f"silently switch to securecafe.com; got {base!r}"
+    )
+
+
+def test_securecafe_find_base_preserves_securecafe_com_domain() -> None:
+    """Regression — original securecafe.com path must still produce a
+    securecafe.com base (no domain drift)."""
+    from ma_poc.pms.adapters.base import AdapterContext
+    from ma_poc.pms.adapters.rentcafe import _find_securecafe_base
+    html = (
+        '<html><body>'
+        '<a href="https://cityridgedc.securecafe.com/onlineleasing/'
+        'city-ridge-clo/guestlogin.aspx">Online Leasing</a>'
+        '</body></html>'
+    )
+    ctx = AdapterContext(
+        base_url="https://cityridgedc.com/",
+        detected=None,  # type: ignore[arg-type]
+        profile=None,
+        expected_total_units=None,
+        property_id="P-test",
+    )
+    base = _find_securecafe_base(html, ctx)
+    assert base == (
+        "https://cityridgedc.securecafe.com/onlineleasing/city-ridge-clo"
+    )
+
+
+def test_securecafe_regex_does_not_match_securecafenet_unrelated_paths() -> None:
+    """Sanity — only onlineleasing + residentservices are accepted on the
+    .net domain too (no accidental matches on /payments, /maintenance, etc).
+    """
+    from ma_poc.pms.adapters.rentcafe import _SECURECAFE_URL_RE
+    for url in (
+        "https://foo.securecafenet.com/payments/auth",
+        "https://foo.securecafenet.com/maintenance/requests",
+        "https://foo.securecafenet.com/marketing/slug",
+    ):
+        assert _SECURECAFE_URL_RE.search(url) is None, (
+            f"securecafenet path-form not in {{onlineleasing, residentservices}} "
+            f"must NOT match; url={url!r}"
+        )
+
+
+def test_detector_routes_securecafenet_html_to_rentcafe() -> None:
+    """grind600 finding — a marketing site that only links to
+    securecafenet.com (no rentcafe.com / securecafe.com link) must still
+    route to the rentcafe adapter so the SecureCafe drill-down probe runs.
+    """
+    from ma_poc.pms.detector import detect_pms
+    html = (
+        '<html><body>'
+        '<a href="https://livebrez.securecafenet.com/residentservices/'
+        'atlantic-crossing0/userlogin">Resident Portal</a>'
+        '</body></html>'
+    )
+    det = detect_pms("https://www.livebrez.com/", page_html=html)
+    assert det.pms == "rentcafe", (
+        f"securecafenet link must route to rentcafe adapter; got "
+        f"pms={det.pms!r}, confidence={det.confidence!r}"
+    )
