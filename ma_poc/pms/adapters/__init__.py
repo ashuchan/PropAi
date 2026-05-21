@@ -10,6 +10,8 @@ from ma_poc.pms.adapters.amli import AmliAdapter
 from ma_poc.pms.adapters.appfolio import AppFolioAdapter
 # 2026-05-13 port (Commit 12): browser-intercept Tier-1 adapters.
 from ma_poc.pms.adapters.apts247 import Apts247Adapter
+# 2026-05-21 port (Fix 5b): Aspen Square Management operator adapter.
+from ma_poc.pms.adapters.aspensquare import AspenSquareAdapter
 from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
 # 2026-05-13 port (Commit 11): server-only Tier-1 adapters.
@@ -34,6 +36,8 @@ from ma_poc.pms.adapters.rentmanager import RentManagerAdapter
 from ma_poc.pms.adapters.rentvision import RentVisionAdapter
 # 2026-05-21 port (P2a): ResMan public availability portal adapter.
 from ma_poc.pms.adapters.resman import ResManAdapter
+# 2026-05-21 port (Fix 5c): Repli360 / rrac popup family adapter.
+from ma_poc.pms.adapters.repli360 import Repli360Adapter
 from ma_poc.pms.adapters.sightmap import SightMapAdapter
 from ma_poc.pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
 from ma_poc.pms.adapters.touchtour import TouchTourAdapter
@@ -83,6 +87,10 @@ def _bootstrap_registry() -> None:
         EncoreSkylineTemplateAdapter,
         # 2026-05-21 port (P2a): ResMan public availability portal adapter.
         ResManAdapter,
+        # 2026-05-21 port (Fix 5b): Aspen Square operator adapter.
+        AspenSquareAdapter,
+        # 2026-05-21 port (Fix 5c): Repli360 / rrac popup family adapter.
+        Repli360Adapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,

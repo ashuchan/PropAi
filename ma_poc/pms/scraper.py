@@ -3855,7 +3855,47 @@ async def _try_link_hop(
                 _profile_conf = getattr(profile, "confidence", None) if profile else None
                 _profile_maturity = str(getattr(_profile_conf, "maturity", "COLD") or "COLD").upper()
                 _profile_failures = int(getattr(_profile_conf, "consecutive_failures", 99) or 0)
-                if _profile_maturity in ("WARM", "HOT") and _profile_failures == 0:
+                # 2026-05-21 (architecture audit Invariant C): when the
+                # detector named a PMS with a dedicated adapter, do NOT
+                # short-circuit lower-scored PMS-prior URLs. Yesterday's
+                # winning_page_url is often a marketing page from which
+                # the LLM hallucinated a couple of unit-shaped rows; the
+                # new RentCafe Nestin / AspenSquare / EncoreSkyline /
+                # ResMan / Repli360 adapters need their per-plan sub-page
+                # hops to displace that hallucination. Without this guard
+                # the new adapters can't beat a HOT/WARM profile carrying
+                # a stale LLM win.
+                _detected_pms_name = str(getattr(detected, "pms", "") or "")
+                _pms_has_dedicated_adapter = _detected_pms_name in (
+                    "rentcafe",
+                    "entrata",
+                    "appfolio",
+                    "onesite",
+                    "sightmap",
+                    "realpage_oll",
+                    "avalonbay",
+                    "amli",
+                    "funnel",
+                    "cortland",
+                    "equity",
+                    "rentmanager",
+                    "g5",
+                    "knock",
+                    "irvine",
+                    "apts247",
+                    "essex",
+                    "maac",
+                    "rentvision",
+                    "resman",
+                    "aspensquare",
+                    "repli360",
+                    "encoreskyline_template",
+                )
+                if (
+                    _profile_maturity in ("WARM", "HOT")
+                    and _profile_failures == 0
+                    and not _pms_has_dedicated_adapter
+                ):
                     _winning_page_satisfied = True
 
             # Floor-plan index accumulation: after a successful sub-page

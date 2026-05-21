@@ -263,7 +263,7 @@ class KnockAdapter:
         base_url = str(getattr(ctx, "base_url", "") or "")
         if base_url and _should_try_knock_by_domain(html, base_url):
             try:
-                pid, units = await _fetch_knock_units_by_domain(base_url)
+                pid, units = await _fetch_knock_units_by_domain(base_url, html)
             except Exception as exc:
                 result.errors.append(
                     f"knock-by-domain-error: {type(exc).__name__}: {str(exc)[:120]}"
@@ -368,6 +368,41 @@ _ASPEN_SQUARE_URL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# 2026-05-21 port (Fix 5a): Aspen Square + similar Knock-backed brands
+# embed the Knock community hash in their static SSR HTML as a
+# JSON-stringified config blob — typically inside a Next.js bundle or
+# React Server Component data dump. The actual call is
+# ``knockDoorway.init(<api_token>, "community", <community_hash>)`` but
+# that call is INSIDE a string-encoded JS module that the browser
+# executes — so the literal init call doesn't appear in static HTML.
+# What DOES appear is the SSR-emitted config:
+#
+#   ":\"community\",\"enabled\":true,\"propertyId\":\"<16-char hex>\","
+#   "apiToken\":\"<32-char hex>\""
+#
+# Captures both unescaped (``"propertyId":"<hex>"``) and JSON-escaped
+# (``\"propertyId\":\"<hex>\"``) forms. Verified live 2026-05-20 against
+# 4 Aspen Square properties (Adley 72nd, The Avenue Cabot, Edgewood
+# Court, Country Manor) — all four carry a UNIQUE community hash + the
+# SHARED Aspen Square api_token.
+_KNOCK_COMMUNITY_HASH_RE = re.compile(
+    r'propertyId\\?"\s*:\s*\\?"([a-f0-9]{14,18})\\?"', re.IGNORECASE
+)
+
+
+def find_knock_community_hash(html: str) -> str | None:
+    """Extract the Knock community hash from a JSON-embedded config blob.
+
+    Returns the 16-char hex hash on match, ``None`` otherwise. Used by the
+    by-domain resolver for sites (like Aspen Square) that don't fire the
+    ``knockDoorway.init()`` literal call in static HTML but DO ship the
+    config object via SSR.
+    """
+    if not html:
+        return None
+    m = _KNOCK_COMMUNITY_HASH_RE.search(html)
+    return m.group(1) if m else None
+
 
 def _should_try_knock_by_domain(html: str, base_url: str) -> bool:
     """Decide whether to fire the Knock-by-domain resolver.
@@ -399,18 +434,34 @@ def _should_try_knock_by_domain(html: str, base_url: str) -> bool:
 
 async def _fetch_knock_units_by_domain(
     base_url: str,
+    html: str = "",
 ) -> tuple[str | None, list[dict[str, Any]]]:
     """Resolve property_id from marketing-site URL via Knock Doorway,
     then fetch units.
 
+    Two-path strategy (2026-05-21 port from feature branch):
+
+    1. **Community-hash path** (preferred, verified 4/4 on Aspen Square):
+       Extract the community hash from ``html`` (SSR-embedded JSON
+       config), call ``/v1/property/community/{hash}`` to bootstrap and
+       get the numeric property_id, then call ``/v1/property/{pid}/units``.
+       This is the ONLY path that works on Aspen Square sites — the
+       ``/v1/profile?domain=`` resolver returns 400 without a community
+       bootstrap first.
+
+    2. **Profile-by-domain path** (legacy fallback): call ``/v1/profile``
+       with the URL as the ``domain`` param. Works on sites that publish
+       the API host in static HTML but don't ship the SSR config blob.
+
     Args:
-        base_url: The property's marketing-site URL (used as the
-            ``domain`` parameter to ``/v1/profile``).
+        base_url: The property's marketing-site URL.
+        html: Static HTML body (optional). When supplied, the community-
+            hash path is tried first.
 
     Returns:
-        ``(property_id, units)``. ``property_id`` is ``None`` when the
-        resolver returns nothing; ``units`` is the parsed list (may be
-        empty if the property exists in Knock but has no available units).
+        ``(property_id, units)``. ``property_id`` is ``None`` when both
+        paths return nothing; ``units`` is the parsed list (may be empty
+        if the property exists in Knock but has no available units).
 
     Never raises — exceptions return ``(None, [])``.
     """
@@ -427,12 +478,42 @@ async def _fetch_knock_units_by_domain(
         "Origin": "https://doorway.knck.io",
         "Accept": "application/json",
     }
-    profile_url = (
-        "https://doorway-api.knockrentals.com/v1/profile"
-        f"?code=w&domain={quote(base_url, safe='')}&refresh=true"
-    )
+
+    async def _fetch_units(c: httpx.AsyncClient, pid_str: str) -> list[dict[str, Any]]:
+        units_url = f"https://doorway-api.knockrentals.com/v1/property/{pid_str}/units"
+        ur = await c.get(units_url, headers=headers)
+        if ur.status_code != 200:
+            return []
+        try:
+            return parse_knock_units(ur.json())
+        except Exception:
+            return []
+
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+            # Path 1: community-hash from SSR-embedded JSON config.
+            community_hash = find_knock_community_hash(html) if html else None
+            if community_hash:
+                boot_url = (
+                    f"https://doorway-api.knockrentals.com/v1/property/"
+                    f"community/{community_hash}"
+                )
+                br = await c.get(boot_url, headers=headers)
+                if br.status_code == 200:
+                    try:
+                        boot_body = br.json()
+                    except Exception:
+                        boot_body = {}
+                    pid = (boot_body.get("property") or {}).get("id")
+                    if pid:
+                        pid_str = str(pid)
+                        return pid_str, await _fetch_units(c, pid_str)
+
+            # Path 2: legacy /v1/profile?domain= resolver.
+            profile_url = (
+                "https://doorway-api.knockrentals.com/v1/profile"
+                f"?code=w&domain={quote(base_url, safe='')}&refresh=true"
+            )
             pr = await c.get(profile_url, headers=headers)
             if pr.status_code != 200:
                 return None, []
@@ -444,15 +525,6 @@ async def _fetch_knock_units_by_domain(
             if not pid:
                 return None, []
             pid_str = str(pid)
-            units_url = (
-                f"https://doorway-api.knockrentals.com/v1/property/{pid_str}/units"
-            )
-            ur = await c.get(units_url, headers=headers)
-            if ur.status_code != 200:
-                return pid_str, []
-            try:
-                return pid_str, parse_knock_units(ur.json())
-            except Exception:
-                return pid_str, []
+            return pid_str, await _fetch_units(c, pid_str)
     except Exception:
         return None, []

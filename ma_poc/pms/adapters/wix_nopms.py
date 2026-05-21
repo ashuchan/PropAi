@@ -28,16 +28,33 @@ if TYPE_CHECKING:
 
 
 class WixNoPmsAdapter:
-    """Wix (no PMS) adapter. Returns empty — syndication_only strategy."""
+    """Wix (no PMS) adapter — runs universal embed-recovery first."""
 
     pms_name: str = "wix_nopms"
     _fingerprints: list[str] = ["wix.com", "static.parastorage.com"]
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
-        """Wix sites have no structured unit data to extract.
-
-        Returns empty result with informative error.
+        """Try the universal embed-recovery chain (AppFolio iframe →
+        LeaseLeads iframe → PMS portal hop → generic SSR plan grid) before
+        declaring syndication_only.
         """
+        from ma_poc.extraction.post_process import post_process
+        from ma_poc.pms.adapters._universal_recovery import (
+            recover_universal_embed,
+        )
+
+        units, tier, _winner = await recover_universal_embed(page, ctx)
+        if units:
+            pp = post_process(units, property_id=getattr(ctx, "property_id", None))
+            if pp.n_admitted > 0:
+                return AdapterResult(
+                    units=list(pp.units),
+                    plan_summaries=list(pp.plan_summaries),
+                    post_process_meta=pp.to_meta(),
+                    tier_used=tier,
+                    confidence=min(0.95, 0.7 + 0.04 * pp.n_admitted),
+                )
+
         return AdapterResult(
             tier_used="SYNDICATION_ONLY_WIX",
             confidence=0.0,

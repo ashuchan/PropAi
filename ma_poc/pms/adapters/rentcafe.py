@@ -483,10 +483,16 @@ class RentCafeAdapter:
                 result.units = list(pp.units)
                 result.plan_summaries = list(pp.plan_summaries)
                 result.post_process_meta = pp.to_meta()
-                result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
-                # Keep _TIER_BASE -- recovery via probe is recorded in
-                # result.api_responses[*].via="wp_probe".
-                result.tier_used = _TIER_BASE
+                # 2026-05-21 (P0 follow-up): realign with feature branch.
+                # WP-probe recovery gets a distinct tier label so the
+                # downstream tier-distribution dashboard can quantify how
+                # often the captured-API path missed but the probe
+                # rescued. The previous "keep _TIER_BASE" collapse was a
+                # May-13 partial-rollout decision that is no longer
+                # warranted now that the analyzer's PLATFORM_TIERS map
+                # includes the WP_PROBE label.
+                result.tier_used = f"{_TIER_BASE}_WP_PROBE"
+                result.confidence = min(0.90, 0.65 + 0.05 * pp.n_admitted)
                 return result
 
         # 2026-05-21 (port from feature-branch fix/resolver-path-patterns-may13):

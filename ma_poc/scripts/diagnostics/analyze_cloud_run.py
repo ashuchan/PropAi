@@ -84,6 +84,11 @@ PLATFORM_TIERS = {
     "TIER_1_DOM_APPFOLIO_SSR": "appfolio",        # F11 SSR fallback
     "TIER_1_DOM_RENTCAFE_HOSTED": "rentcafe",     # hosted-table parser
     "TIER_1_DOM_RENTCAFE_NESTIN": "rentcafe",     # Nestin per-plan recovery
+    # 2026-05-21 (P0 follow-up): WP-probe recovery is now stamped distinctly.
+    "TIER_1_API_RENTCAFE_WP_PROBE": "rentcafe",
+    "TIER_1_API_RENTCAFE_SECURECAFE": "rentcafe",
+    "TIER_1_API_RESMAN": "resman",
+    "TIER_1_DOM_ENCORESKYLINE_TEMPLATE": "encoreskyline_template",
     "TIER_1_DOM_RENTMANAGER_ILOVELEASING": "rentmanager",
     # Equity adapter emits these three labels (success / empty / no_response).
     "TIER_1_API_EQUITY_EMPTY": "equity",

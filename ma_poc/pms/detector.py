@@ -78,6 +78,14 @@ PmsName = Literal[
     "rentvision",
     # 2026-05-21 port (P2a): ResMan public availability portal.
     "resman",
+    # 2026-05-21 port (Fix 5b): Aspen Square Management — multi-property
+    # operator on aspensquare.com (Strapi CMS, two-stage SSR DOM).
+    "aspensquare",
+    # 2026-05-21 port (Fix 5c): Repli360 / rrac popup family — 158-site
+    # caf_v2 cluster (royce-like) currently falling to TIER_4_LLM
+    # floorplan-level. Deterministic Tier-1 via no-auth POST
+    # app.repli360.com/admin/getUnitListByFloor.
+    "repli360",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -109,7 +117,13 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     # PMS's adapter lands (Commit 12 for g5/knock).
     "g5": "api_first",
     "knock": "api_first",
-    "encoreskyline_template": "cascade",
+    # 2026-05-21 (P1a follow-up): now that the real adapter is registered,
+    # promote from ``cascade`` (stub-era safe default) to ``dom_first`` so
+    # the per-plan Playwright crawl runs ahead of the generic API tier
+    # instead of after it. The adapter scrapes SSR DOM directly (no XHR);
+    # running it ``dom_first`` saves the wasted generic-API-empty events
+    # observed in the 2026-05-21 cloud run.
+    "encoreskyline_template": "dom_first",
     # 2026-05-13 port (Commit 11): server-only adapters.
     "cortland": "api_first",
     "equity": "api_first",
@@ -123,6 +137,10 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "rentvision": "cascade",
     # 2026-05-21 port (P2a): ResMan public availability portal.
     "resman": "api_first",
+    # 2026-05-21 port (Fix 5b): Aspen Square — SSR-DOM-driven adapter.
+    "aspensquare": "dom_first",
+    # 2026-05-21 port (Fix 5c): Repli360 / rrac — no-auth POST API adapter.
+    "repli360": "api_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -204,6 +222,17 @@ _HOST_FINGERPRINTS: list[tuple[re.Pattern[str], PmsName, float, str]] = [
         "touchtour",
         0.85,
         "host ends in liveovation.com (Ovation parent portfolio)",
+    ),
+    # 2026-05-21 port (Fix 5b): Aspen Square Management — multi-property
+    # operator on its own Strapi CMS at aspensquare.com. Community pages
+    # at /apartments/{st}/{city}/{community}/; unit roster at
+    # /floor-plans/{plan-slug}/ on the same domain. Three confirmed
+    # properties in the deep-probe sample (16186, 6526, 14907).
+    (
+        re.compile(r"(?:^|\.)aspensquare\.com$"),
+        "aspensquare",
+        0.95,
+        "host ends in aspensquare.com (Aspen Square Management operator)",
     ),
 ]
 
@@ -662,31 +691,32 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # ``/api/v1/floorplans/?api_key=<hex>`` with the key embedded in
     # static HTML. ≥4-site cluster observed 2026-05-17.
     #
-    # 2026-05-21 tightening (P1b — post-merge audit): the bare-host
-    # substring gate over-routed 19 AppFolio/SightMap sites because they
-    # serve hero images from the apts247.info media CDN (e.g.
-    # ``apts247.info/de/.../hero_shot/community/*.jpg``). Distinguish:
-    #   * Real Apts247 signals: api-keyed floorplans URL, widget loader
-    #     script (static2/cdn.apts247.info/widget*), or the RentDynamics
-    #     data API host (api.rentdynamics.com).
-    #   * Regression source: bare ``apts247.info`` in <img src=> paths
-    #     under /hero_shot/, /community/, /photos/, etc.
-    # Regression PIDs (had only image-CDN refs, no inventory shape):
-    #   16499 palmflats / 235996 stratfordchase / 77537 parlaapts.
-    _apts247_positive_signal = bool(
-        _APTS247_INVENTORY_RE.search(h)
-        or "static2.apts247.info/widget" in h
-        or "cdn.apts247.info/widget" in h
-        or "apts247.info/widget" in h
-        or "api.rentdynamics.com/" in h
-        or "rentdynamics.com/api/" in h
+    # 2026-05-21 gate (P1b — post-merge audit, revised after agent live-
+    # sampling of 6/6 real apts247 SUCCESS properties): the bare-substring
+    # gate over-routed 3 AppFolio/SightMap sites that serve hero images
+    # from apts247.info CDN. But the original tightening (require api_key
+    # URL or `/widget` path) was empirically too tight — real Apts247
+    # sites use `static2.apts247.info/lightning/_widgets/...` (not
+    # `/widget`) and do NOT inline the api_key URL (the adapter is
+    # designed to recover it via homepage refetch — see apts247.py:_fetch
+    # line 210). Revert to substring trigger + reject when a structurally-
+    # specific competing PMS marker dominates the page. PIDs at risk under
+    # the over-tight version: 10787, 12989, 13756, 14728, 11728, 46967 +
+    # ~120 more on the TIER_1_API_APTS247 win-list.
+    _has_competing_pms_for_apts247 = (
+        "apartments.appfolio.com" in h
+        or "widgets.appfolio.com" in h
+        or ".appfolio.com/listings" in h
+        or ".appfolio.com/connect" in h
+        or "sightmap.com/embed/" in h
+        or "sightmap.com/app/api" in h
     )
-    if _apts247_positive_signal:
+    if ("apts247" in h or "rentdynamics.com" in h) and not _has_competing_pms_for_apts247:
         return (
             "apts247",
-            0.90,
-            ["Apts247/RentDynamics inventory signal in HTML "
-             "(api_key URL, widget loader, or RentDynamics API host)"],
+            0.85,
+            ["Apts247/RentDynamics marker in HTML "
+             "(apts247 / rentdynamics.com) without competing AppFolio/SightMap marker"],
         )
 
     # 2026-05-13 port (Commit 13): Essex Property Trust REIT. Bulk
@@ -786,6 +816,24 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # — they CANNOT appear on a real Entrata site, so they're a stronger
     # positive ID for RentCafe than a bare ``entrata.com`` substring is
     # for Entrata.
+    # 2026-05-21 port (Fix 5c): Repli360 / rrac popup family (royce-like
+    # caf_v2 cluster — 158 sites in the 5K corpus per deep-probe sample).
+    # JS-rendered "View Details" anchors call
+    # ``getUnitListByFloor(this,'<fp>',<tt>,<site_id>)`` against the
+    # no-auth POST ``app.repli360.com/admin/getUnitListByFloor`` data API.
+    # Markers appear post-render (the detector re-runs with page_html).
+    if (
+        "app.repli360.com" in h
+        or "getunitlistbyfloor(" in h
+        or "rrac_listavailableunit" in h
+    ):
+        return (
+            "repli360",
+            0.90,
+            ["Repli360/rrac marker in HTML "
+             "(app.repli360.com / getUnitListByFloor / rrac_listAvailableUnit)"],
+        )
+
     # 2026-05-21 port (P2a): ResMan public availability portal at
     # ``<client>.myresman.com/Portal/Applicants/Availability?a=&p=``,
     # linked from the marketing /floorplans/ page. 2026-05-17 canary

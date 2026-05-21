@@ -114,20 +114,46 @@ class TestDetectorRouting:
         r = detect_pms("https://example.com/", page_html=html)
         assert r.pms == "apts247"
 
-    def test_apts247_rejects_bare_media_cdn_host(self):
-        """2026-05-21 P1b regression guard: hero-image URLs on the
-        apts247.info CDN must NOT route to apts247. AppFolio/SightMap
-        sites embed these as marketing hero images (e.g. PIDs 16499
-        palmflats, 235996 stratfordchase, 77537 parlaapts on
-        2026-05-21). The widget loader / api_key URL / RentDynamics
-        host signals remain admitted; bare media CDN host alone is not
-        a real Apts247 deployment."""
+    def test_apts247_rejects_when_appfolio_inventory_also_present(self):
+        """2026-05-21 P1b regression guard (revised): when a page carries
+        BOTH an apts247.info reference (hero images / widget loader) AND
+        a structurally-specific AppFolio inventory marker, route to
+        AppFolio. The apts247 reference is then almost certainly the
+        hero-image CDN on an AppFolio site (PIDs 16499 palmflats,
+        235996 stratfordchase, 77537 parlaapts as of 2026-05-21).
+
+        Real Apts247-only sites (no AppFolio/SightMap marker) continue
+        to route to apts247 via the bare-substring trigger.
+        """
+        # Both markers present → AppFolio wins.
         html = (
             '<img src="https://media.apts247.info/de/community/hero_shot/x.jpg">'
-            '<img src="https://apts247.info/de/community/hero_shot/y.jpg">'
+            '<iframe src="https://acme.appfolio.com/listings"></iframe>'
         )
         r = detect_pms("https://example.com/", page_html=html)
         assert r.pms != "apts247"
+
+    def test_apts247_rejects_when_sightmap_embed_also_present(self):
+        """Same gate, SightMap variant. PID 77537 parlaapts had a
+        SightMap embed alongside apts247 image-CDN references."""
+        html = (
+            '<img src="https://apts247.info/de/community/hero_shot/y.jpg">'
+            '<iframe src="https://sightmap.com/embed/abcd1234"></iframe>'
+        )
+        r = detect_pms("https://example.com/", page_html=html)
+        assert r.pms != "apts247"
+
+    def test_apts247_via_widget_loader_no_competing_marker(self):
+        """Real Apts247 sites use widget loader scripts via
+        static2.apts247.info — when no competing PMS marker is present,
+        the substring trigger correctly routes to apts247 so the
+        adapter's homepage-refetch api_key recovery can run."""
+        html = (
+            '<script src="https://static2.apts247.info/lightning/_widgets/x.js"></script>'
+            '<img src="https://media.apts247.info/de/community/hero_shot/y.jpg">'
+        )
+        r = detect_pms("https://example.com/", page_html=html)
+        assert r.pms == "apts247"
 
 
 class TestEmptyInputContract:

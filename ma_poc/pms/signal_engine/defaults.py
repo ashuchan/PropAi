@@ -191,6 +191,12 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     "encoreskyline_template": ("/floorplans", "/floor-plans"),
     # 2026-05-21 port (P2a): ResMan public availability portal.
     "resman": ("/floorplans", "/floor-plans", "/availability"),
+    # 2026-05-21 port (Fix 5b): Aspen Square operator drill at
+    # /apartments/{state}/{city}/{community}/floor-plans/{plan-slug}/.
+    "aspensquare": ("/floor-plans", "/apartments"),
+    # 2026-05-21 port (Fix 5c): Repli360 / rrac — fetches its own data
+    # via POST so URL priors are best-effort for link-hop discovery.
+    "repli360": ("/floorplans", "/floor-plans"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (
