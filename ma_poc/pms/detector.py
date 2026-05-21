@@ -67,6 +67,7 @@ PmsName = Literal[
     "residentservices365",
     "encoreskyline_template",
     "aspensquare",
+    "marketapts",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -109,6 +110,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "residentservices365": "dom_first",
     "encoreskyline_template": "dom_first",
     "aspensquare": "dom_first",
+    "marketapts": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -910,6 +912,31 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
         yield "appfolio", 0.80, ["AppFolio marker in HTML"]
     if "liveovation.com" in h:
         yield "touchtour", 0.80, ["Ovation portfolio marker in HTML (liveovation.com)"]
+    # Market Apartments CMS — vendor-templated marketing site. Strong
+    # signal: ``assets.marketapts.com`` (asset CDN), ``api.marketapts.com``
+    # (widget-config API), ``marketapts.com/js/schedule`` (scheduler
+    # widget), or the footer "Powered by MarketApts" string. 2026-05-21
+    # grind600: 13 properties originally tagged GoPrisma (residents-only
+    # SPA portal) + 4 marketapts-tagged failures all share this CMS. The
+    # unit-level data is server-rendered on the property's own
+    # ``/floorplans`` page (Template A: inline .floorplan-unit-single
+    # rows) or one click away on ``/unit/{plan-slug}`` (Template B:
+    # .unit-table-row drill). Pre-fix: ``marketing_marketapts`` was a
+    # signal-only label with no adapter, so these sites landed in
+    # ``t2_llm_only``. The MarketAptsAdapter consumes this routing.
+    if (
+        "assets.marketapts.com" in h
+        or "api.marketapts.com" in h
+        or "marketapts.com/js/schedule" in h
+        or "powered by marketapts" in h
+    ):
+        yield (
+            "marketapts",
+            0.80,
+            ["Market Apartments CMS marker in HTML "
+             "(assets.marketapts.com / api.marketapts.com / "
+             "marketapts.com/js/schedule / Powered by MarketApts)"],
+        )
 
 
 # Signal helpers for DETECTOR_SIGNALS telemetry ---------------------------
@@ -981,6 +1008,16 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "marketing_knock": ("doorway.knck.io", "knockrentals.com"),
     "marketing_hyly": ("hy.ly", "hyly.ai"),
     "marketing_marketapts": ("marketapts.com",),
+    # 2026-05-21 grind600: MarketAptsAdapter consumes this fingerprint —
+    # the CMS hosts the unit-level data on /floorplans (Template A inline
+    # rows) or /unit/{plan-slug} (Template B drill). Distinct from the
+    # ``marketing_marketapts`` signal-only label above.
+    "marketapts": (
+        "assets.marketapts.com",
+        "api.marketapts.com",
+        "marketapts.com/js/schedule",
+        "Powered by MarketApts",
+    ),
 }
 
 

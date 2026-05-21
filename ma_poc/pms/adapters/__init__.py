@@ -25,6 +25,7 @@ from ma_poc.pms.adapters.generic import GenericAdapter
 from ma_poc.pms.adapters.irvine import IrvineAdapter
 from ma_poc.pms.adapters.knock import KnockAdapter
 from ma_poc.pms.adapters.maac import MaacAdapter
+from ma_poc.pms.adapters.marketapts import MarketAptsAdapter
 from ma_poc.pms.adapters.onesite import OneSiteAdapter
 from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
@@ -83,6 +84,7 @@ def _bootstrap_registry() -> None:
         KnockAdapter,
         G5Adapter,
         EncoreSkylineTemplateAdapter,
+        MarketAptsAdapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,
