@@ -32,6 +32,7 @@ from ma_poc.pms.adapters.realpage_cws import RealPageCwsAdapter
 from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
 from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
+from ma_poc.pms.adapters.rentcafe_layout_tab import RentCafeLayoutTabAdapter
 from ma_poc.pms.adapters.rentcafe_unit_roster import RentCafeUnitRosterAdapter
 from ma_poc.pms.adapters.rentmanager import RentManagerAdapter
 from ma_poc.pms.adapters.rentvision import RentVisionAdapter
@@ -91,6 +92,7 @@ def _bootstrap_registry() -> None:
         RentCafeUnitRosterAdapter,
         ImtSpacesAdapter,
         RealPageCwsAdapter,
+        RentCafeLayoutTabAdapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,

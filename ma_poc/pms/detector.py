@@ -71,6 +71,7 @@ PmsName = Literal[
     "rentcafe_unit_roster",
     "imt_spaces",
     "realpage_cws",
+    "rentcafe_layout_tab",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -117,6 +118,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "rentcafe_unit_roster": "dom_first",
     "imt_spaces": "dom_first",
     "realpage_cws": "dom_first",
+    "rentcafe_layout_tab": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -1059,6 +1061,25 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             0.85,
             ["RealPage CWS RPFP widget marker in HTML "
              "(cs-cdn.realpage.com/CWS/ OR .rpfp-container + .rpfp-card)"],
+        )
+    # 2026-05-21 HAR validation: RentCafe "layout-tab" theme — bedroom-tab
+    # listing on /floorplans with per-plan drill at /floorplans/{slug}.
+    # Verified live on www.tudorplaceapts.com (drill /floorplans/two-bedrooms
+    # has .unit-container × 12 with "#840_09 900 $1,765.00" rows) and
+    # www.campobassoapts.com (drill /floorplans/studio has "Apartment: #
+    # F_205 Starting at: $1,425.00" text format). Same class signature
+    # ``.page-content-floorplans.floorplans-layout-tab`` confirmed on
+    # both. RentCafeLayoutTabAdapter follows the per-plan drills and
+    # parses both tabular and text-style unit rows.
+    if (
+        "page-content-floorplans" in h
+        and "floorplans-layout-tab" in h
+    ):
+        yield (
+            "rentcafe_layout_tab",
+            0.86,
+            ["RentCafe layout-tab theme marker in HTML "
+             "(.page-content-floorplans + .floorplans-layout-tab)"],
         )
 
 
