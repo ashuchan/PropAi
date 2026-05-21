@@ -74,8 +74,14 @@ jugnu_runner.py              # Integrated runner wiring all 5 layers
     |   +-- detector.py       # Offline PMS detection from URL/HTML signals
     |   +-- resolver.py       # CTA-hop + leasing portal resolver
     |   +-- scraper.py        # scrape_jugnu(): detect → resolve → adapt
-    |   +-- adapters/         # 10 adapters: RentCafe, Entrata, AppFolio, OneSite,
-    |                         #   SightMap, RealPage OLL, AvalonBay, Squarespace, Wix, Generic
+    |   +-- adapters/         # 22 adapters (after May-13 port). Original 10:
+    |                         #   RentCafe, Entrata, AppFolio, OneSite, SightMap,
+    |                         #   RealPage OLL, AvalonBay, Amli, Funnel, TouchTour,
+    |                         #   Squarespace_NoPms, Wix_NoPms, Generic.
+    |                         # 2026-05-13 port additions (Tier-1):
+    |                         #   Cortland, Equity, RentManager (server-only),
+    |                         #   G5, Knock, Irvine, Apts247 (browser-intercept),
+    |                         #   Essex, MAA, RentVision (REIT/CMS).
     |
     L4 Validation             # Schema enforcement + identity resolution
     |   +-- schema_gate.py    # Rent bounds, sqft bounds, date format checks

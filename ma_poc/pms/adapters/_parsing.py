@@ -12,12 +12,24 @@ from typing import Any
 
 
 def money_to_int(s: str) -> int | None:
-    """Parse '$1,450', '1450.00', '1,450 USD' -> 1450. Returns None on failure."""
+    """Parse '$1,450', '1450.00', '1,450 USD' -> 1450. Returns None on failure.
+
+    For range strings like ``"$1,200 - $1,400"`` returns the LOW value
+    (1200). Callers that need both bounds must use ``parse_rent_range``.
+
+    2026-05-13 port (project_run_2026_05_11 deposit->rent leakage):
+    pre-port the implementation was ``re.sub(r"[^\\d.]", "", s)`` which
+    concatenated "1,200 - 1,400" to "12001400" and emitted 12_001_400 --
+    a value that failed downstream sanity bounds (200..50_000) and
+    silently produced null rent. The fix matches the first numeric
+    token instead, returning the semantically correct low bound.
+    """
     if not s:
         return None
-    cleaned = re.sub(r"[^\d.]", "", s)
-    if not cleaned or cleaned == ".":
+    m = re.search(r"\d[\d,]*(?:\.\d{1,2})?", s)
+    if not m:
         return None
+    cleaned = m.group(0).replace(",", "")
     try:
         return int(float(cleaned))
     except ValueError:
@@ -398,6 +410,35 @@ def parse_rent_range(rent_range: str) -> tuple[int | None, int | None]:
     return min(nums), max(nums)
 
 
+# 2026-05-13 port (project_run_2026_05_11 floor-plan blob taxonomy):
+# Some API payloads pack a JSON object into the floor-plan-name field,
+# e.g. ``{"name":"B06","provider_id":"abc"}``. Storing that verbatim as
+# a name produces 2,534 unreadable rows (observed in prior runs).
+_NAME_BLOB_NAME_RE = re.compile(r'"name"\s*:\s*"([^"]+)"', re.IGNORECASE)
+
+
+def _unwrap_name_blob(name: Any) -> str:
+    """Strip a JSON-object blob from a floor-plan-name string.
+
+    For input like ``'{"name":"B06","provider_id":"..."}'`` returns
+    ``"B06"``. Plain strings pass through. Non-strings are stringified
+    if possible (with the empty default). Never raises.
+
+    Cheap heuristic: if the trimmed string starts with ``{`` and contains
+    a JSON-style ``"name":"..."`` token, extract that token. Anything
+    else is returned as the original input (str-coerced).
+    """
+    if name is None:
+        return ""
+    s = str(name).strip()
+    if not s:
+        return s
+    if not s.startswith("{"):
+        return s
+    m = _NAME_BLOB_NAME_RE.search(s)
+    return m.group(1).strip() if m else s
+
+
 def make_unit_dict(
     *,
     floor_plan_name: str = "",
@@ -426,12 +467,26 @@ def make_unit_dict(
     Emits BOTH the human-readable ``rent_range`` string AND the numeric
     ``market_rent_low`` / ``market_rent_high`` fields that the v2 schema
     transform reads. If ``rent_low`` / ``rent_high`` are not supplied but
-    ``rent_range`` is, the numeric values are parsed from the string so the
-    downstream transform doesn't silently drop rent.
+    ``rent_range`` is, the numeric values are parsed from the string so
+    the downstream transform doesn't silently drop rent.
 
-    ``lease_term`` and ``move_in_date`` are plumbed through so parsers that
-    learn to extract them don't need further format changes.
+    ``lease_term`` and ``move_in_date`` are plumbed through so parsers
+    that learn to extract them don't need further format changes.
+
+    2026-05-13 port:
+      * ``floor_plan_name`` is unwrapped via ``_unwrap_name_blob`` so
+        JSON-object names like ``{"name":"B06","provider_id":"..."}``
+        ship as ``"B06"`` instead of the literal blob.
+      * Emits BOTH ``availability_date`` (legacy v1) AND ``available_date``
+        (v2 schema-reader convention). ``ma_poc/core/schema_v2.py:282``
+        reads ``unit.get("available_date")`` first; pre-port many
+        adapters set only ``availability_date`` and the date silently
+        dropped at the v2 boundary (the jugnu v2 formatter has an
+        alias resolver but it doesn't run on every code path).
     """
+    # Unwrap JSON-blob names before anything else looks at them.
+    floor_plan_name = _unwrap_name_blob(floor_plan_name)
+
     # Prefer explicit ints when passed; otherwise recover from the string.
     if rent_low is None and rent_high is None and rent_range:
         lo, hi = parse_rent_range(rent_range)
@@ -457,7 +512,12 @@ def make_unit_dict(
         "concession": concession,
         "availability_status": availability_status,
         "available_units": available_units,
+        # Dual emission: the legacy v1 key + the v2 schema-reader key.
+        # Both carry the same value so schema_v2._format_v2_unit (which
+        # reads ``available_date`` first) gets the date regardless of
+        # which adapter produced the row.
         "availability_date": availability_date,
+        "available_date": availability_date,
         "lease_term": lease_term,
         "move_in_date": move_in_date,
         "source_api_url": source_api_url,

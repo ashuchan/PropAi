@@ -68,6 +68,35 @@ _DETAIL_MAIN_RE = re.compile(
 )
 _DETAIL_TAG_RE = re.compile(r"<[^>]+>")
 
+# 2026-05-13 port: vanity-domain slug discovery. Every AppFolio-hosted
+# vanity site references its PMC subdomain at least once (a ``connect`` /
+# ``request_access`` link). Extract that slug and follow it to
+# ``<slug>.appfolio.com/listings``. Source: 2026-04-30 failure-recovery
+# investigation (33/46 recoveries).
+_APPFOLIO_SLUG_RE = re.compile(
+    r"https?://([a-z0-9-]+)\.appfolio\.com", re.IGNORECASE
+)
+_APPFOLIO_SKIP_SLUGS = frozenset({
+    "www", "app", "support", "secure", "tenant", "tenants", "owner", "owners", "demo",
+})
+
+
+def find_appfolio_slug(html: str) -> str | None:
+    """Return the first PMC slug referenced in *html* (or ``None``).
+
+    Skips known infra subdomains (www, app, support, etc.). Used by the
+    vanity-domain fallback path when the page being scraped is the
+    property's marketing site rather than an ``<slug>.appfolio.com``
+    subdomain. 2026-05-13 port from fix/resolver-path-patterns-may13.
+    """
+    if not html or "appfolio.com" not in html.lower():
+        return None
+    for m in _APPFOLIO_SLUG_RE.finditer(html):
+        slug = m.group(1).lower()
+        if slug and slug not in _APPFOLIO_SKIP_SLUGS:
+            return slug
+    return None
+
 
 def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any]]:
     """Bug 7: parse a single AppFolio /listings/detail/<uuid> page into one unit.
@@ -426,6 +455,29 @@ class AppFolioAdapter:
                     result.winning_url = current_url or None
                     result.confidence = 0.85
                     return result
+
+        # 2026-05-13 port (Commit 14 wiring): cross-origin embed-recovery.
+        # When the page being scraped is a Wix/Squarespace marketing shell
+        # with a cross-origin iframe to ``{tenant}.appfolio.com/listings``,
+        # the SSR fallback above misses the iframe contents. ``recover_
+        # appfolio_embed`` uses ``page.evaluate`` to (a) scan the live
+        # page for the iframe URL, then (b) fetch the iframe HTML in
+        # session and hand it to the existing SSR parser. Net-new for
+        # ~26 Wix/Squarespace shells (memory project_run_2026_05_19).
+        if page is not None:
+            try:
+                from ma_poc.pms.adapters._appfolio_embed import recover_appfolio_embed
+                embed_units = await recover_appfolio_embed(page, ctx)
+            except Exception as exc:  # never raise out of an adapter
+                embed_units = []
+                result.errors.append(
+                    f"appfolio-embed-recovery-error: {type(exc).__name__}: {str(exc)[:120]}"
+                )
+            if embed_units:
+                result.units = embed_units
+                result.tier_used = "TIER_1_DOM_APPFOLIO_EMBED"
+                result.confidence = min(0.90, 0.7 + 0.04 * len(embed_units))
+                return result
 
         result.confidence = 0.0
         result.errors.append("No AppFolio unit data found in captured API responses or SSR DOM")

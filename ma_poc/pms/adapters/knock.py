@@ -1,0 +1,458 @@
+"""
+Knock vendor adapter — Doorway public API.
+
+Research log
+------------
+Knock's web widget (``doorway.knck.io/latest/doorway.min.js``) is initialised
+in static HTML with::
+
+    window.knockDoorway.init('<public_key>', 'community', '<community_id>');
+
+Where ``<public_key>`` is a 32-char hex application key and ``<community_id>``
+is the property's identifier (16+ char hex). With those in hand, Knock's
+public Doorway API returns full unit data without authentication:
+
+  GET ``doorway-api.knockrentals.com/v1/property/community/<community_id>``
+    → ``{property: {id: <numeric_id>, ...}}``
+
+  GET ``doorway-api.knockrentals.com/v1/property/<numeric_id>/units``
+    → ``{units_data: {units: [...], layouts: [...]}}``
+
+Each unit entry observed in the wild::
+
+    { area: 1200, available: true, availableOn: "2026-05-30",
+      bathrooms: 2, bedrooms: 2, displayPrice: "2409", price: "2409",
+      knockPrice: null, hidden: false, leased: false, occupied: false,
+      reserved: false, layoutId: null, layoutName: null,
+      name: "M6-202", propertyId: 2023560, ... }
+
+Source: 2026-04-30 failure-recovery investigation. 26 of 38 Knock-flagged
+properties recovered (619 units total) via this path.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import TYPE_CHECKING, Any
+
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+
+if TYPE_CHECKING:
+    from playwright.async_api import Page
+
+# Pattern matches the static-HTML init call. Captures (public_key, kind, id).
+# 2026-05-20: ``\\?`` before each quote class so the regex also matches the
+# JSON-escaped form ``knockDoorway.init(\"a8e...\",\"community\",\"69e...\")``
+# emitted by Next.js / Nuxt SSR bundles (the call is inside a string-encoded
+# JS source until the browser executes the bundle). Confirmed live against
+# 3 raw-fetched HTMLs (flatirondistrictataustinranch, altaaptstarga,
+# unionthompson) on 2026-05-20: original regex 0/3, relaxed regex 3/3.
+_KNOCK_INIT_RE = re.compile(
+    r"knockDoorway\.init\s*\(\s*\\?['\"]([a-f0-9]{20,40})\\?['\"]\s*,\s*"
+    r"\\?['\"](community|application|public)\\?['\"]\s*,\s*"
+    r"\\?['\"]([a-zA-Z0-9_-]{8,40})\\?['\"]",
+    re.IGNORECASE,
+)
+
+_RENT_INT_RE = re.compile(r"(\d[\d,]*)")
+
+
+def _to_int(v: Any) -> int | None:
+    """Best-effort int conversion for Knock's mixed rent fields (str / int / float)."""
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        n = int(v)
+        return n if 0 < n < 1_000_000 else None
+    if isinstance(v, str):
+        m = _RENT_INT_RE.search(v)
+        if m:
+            try:
+                return int(m.group(1).replace(",", ""))
+            except ValueError:
+                return None
+    return None
+
+
+def find_knock_ids(html: str) -> tuple[str | None, str | None, str | None]:
+    """Return ``(public_key, kind, id)`` if a Knock init call is present.
+
+    ``kind`` is one of ``community`` | ``application`` | ``public``.
+    """
+    if not html or "knock" not in html.lower():
+        return None, None, None
+    m = _KNOCK_INIT_RE.search(html)
+    if m:
+        return m.group(1), m.group(2).lower(), m.group(3)
+    return None, None, None
+
+
+def parse_knock_units(units_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert Knock's ``units_data.units`` array into standard unit dicts.
+
+    Skips units flagged ``hidden`` / ``leased`` / ``reserved`` (no useful
+    rent), and filters out any record without a price in the $200-$50K range.
+    """
+    units: list[dict[str, Any]] = []
+    units_data = units_payload.get("units_data", {})
+    raw_units = units_data.get("units") or []
+    layouts_list = units_data.get("layouts") or []
+    layouts: dict[Any, dict[str, Any]] = {
+        layout.get("id"): layout for layout in layouts_list if isinstance(layout, dict)
+    }
+
+    for u in raw_units:
+        if not isinstance(u, dict):
+            continue
+        if u.get("hidden") or u.get("leased") or u.get("reserved"):
+            continue
+
+        rent = (
+            _to_int(u.get("price"))
+            or _to_int(u.get("displayPrice"))
+            or _to_int(u.get("knockPrice"))
+            or _to_int(u.get("min_rent"))
+            or _to_int(u.get("rent"))
+        )
+        if not rent or not (200 <= rent <= 50_000):
+            continue
+
+        layout_id = u.get("layoutId") or u.get("layout_id") or u.get("layout")
+        layout = layouts.get(layout_id, {}) if layout_id else {}
+
+        beds = u.get("bedrooms")
+        if beds is None:
+            beds = layout.get("bedrooms")
+        baths = u.get("bathrooms")
+        if baths is None:
+            baths = layout.get("bathrooms")
+        sqft = (
+            _to_int(u.get("area"))
+            or _to_int(u.get("square_feet"))
+            or _to_int(u.get("sqft"))
+            or _to_int(layout.get("area"))
+            or _to_int(layout.get("square_feet"))
+        )
+        unit_number = (
+            u.get("name") or u.get("unit_number") or u.get("apartment_number") or ""
+        )
+        avail = (
+            u.get("availableOn")
+            or u.get("available_on")
+            or u.get("ready_date")
+            or ""
+        )
+        status = "AVAILABLE" if (u.get("available") and not u.get("occupied")) else "UNAVAILABLE"
+
+        # 2026-05-19 capture-first: Knock payload carries concession as
+        # `SpecialsDescription`/specials on the unit or layout. Was
+        # unmapped (Knock = 9k genuine units, 0% concession). Alias-
+        # tolerant; raw; empty when no active special (correct).
+        concession = ""
+        for _src in (u, layout):
+            for _ck in ("SpecialsDescription", "specialsDescription",
+                        "specials_description", "specials", "special",
+                        "concession", "concessions", "leasingSpecial",
+                        "incentive", "promotion", "offer"):
+                _cv = _src.get(_ck) if isinstance(_src, dict) else None
+                if isinstance(_cv, str) and _cv.strip():
+                    concession = _cv.strip()
+                    break
+            if concession:
+                break
+
+        units.append(
+            {
+                "unit_number": str(unit_number),
+                "floor_plan_name": str(u.get("layoutName") or layout.get("name") or ""),
+                "bedrooms": str(beds) if beds is not None else "",
+                "bathrooms": str(baths) if baths is not None else "",
+                "sqft": str(sqft) if sqft else "",
+                "market_rent_low": rent,
+                "market_rent_high": rent,
+                "rent_range": str(rent),
+                "availability_status": status,
+                "availability_date": str(avail)[:30],
+                "building": str(u.get("buildingName") or ""),
+                "concession": concession,
+                "extraction_tier": "TIER_1_KNOCK_API",
+            }
+        )
+    return units
+
+
+class KnockAdapter:
+    """Adapter for Knock-managed properties.
+
+    Public-API path: extract the ``community_id`` from the static page,
+    then call ``doorway-api.knockrentals.com`` directly. No browser needed.
+    Falls back to the generic cascade if the init call isn't found in the
+    static HTML.
+    """
+
+    pms_name = "knock"
+
+    def __init__(self) -> None:
+        self._fingerprints: list[str] = [
+            "doorway.knck.io",
+            "knockDoorway",
+            "doorway-api.knockrentals.com",
+        ]
+
+    def static_fingerprints(self) -> list[str]:
+        return list(self._fingerprints)
+
+    async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
+        """Extract units via Knock's Doorway API.
+
+        Two extraction paths:
+
+        1. **knockDoorway.init() in static HTML** (existing, 2026-04-30):
+           extract ``(public_key, kind, comm_id)`` from the JS init call,
+           then call ``/v1/property/community/{comm_id}``.
+
+        2. **By-domain resolver** (added 2026-05-20 per
+           ``project_jsonld_recovery_2026-05-20.md``): when the init call
+           isn't in static HTML — common on Aspen Square / brand portfolio
+           sites where Knock loads dynamically — query
+           ``/v1/profile?code=w&domain={SITE_URL}`` to resolve a property_id
+           directly from the marketing-site URL, then hit
+           ``/v1/property/{property_id}/units``.
+
+        The ``page`` argument is unused — Knock units come from a public
+        JSON API, no rendering is required.
+        """
+        result = AdapterResult(tier_used="TIER_1_KNOCK_API")
+
+        # Pull HTML from the L1 fetch result.
+        fr = getattr(ctx, "fetch_result", None)
+        body = getattr(fr, "body", None) if fr is not None else None
+        html: str = ""
+        if isinstance(body, bytes):
+            try:
+                html = body.decode("utf-8", errors="replace")
+            except Exception:
+                html = ""
+        elif isinstance(body, str):
+            html = body
+
+        # Path 1: knockDoorway.init() in static HTML.
+        public_key, kind, comm_id = find_knock_ids(html) if html else (None, None, None)
+        if public_key and comm_id:
+            try:
+                units = await _fetch_knock_units(comm_id, kind or "community")
+            except Exception as exc:
+                result.errors.append(f"knock-api-error: {exc}")
+                units = []
+            if units:
+                result.units = units
+                result.winning_url = (
+                    f"https://doorway-api.knockrentals.com/v1/property/community/{comm_id}"
+                )
+                result.confidence = min(0.9, 0.6 + 0.02 * len(units))
+                return result
+            result.errors.append("knock-adapter: Doorway API returned no units for community_id")
+
+        # Path 2: by-domain resolver. Trigger when the static HTML doesn't
+        # have the init call AND there's a credible signal that Knock is
+        # the primary inventory backend (NOT just a UTM tracking tag on a
+        # RentCafe-hosted site — see project_jsonld_recovery memo's
+        # utm_knock-is-red-herring rule).
+        base_url = str(getattr(ctx, "base_url", "") or "")
+        if base_url and _should_try_knock_by_domain(html, base_url):
+            try:
+                pid, units = await _fetch_knock_units_by_domain(base_url)
+            except Exception as exc:
+                result.errors.append(
+                    f"knock-by-domain-error: {type(exc).__name__}: {str(exc)[:120]}"
+                )
+                pid, units = None, []
+            if pid and units:
+                result.units = units
+                result.winning_url = (
+                    f"https://doorway-api.knockrentals.com/v1/property/{pid}/units"
+                )
+                result.tier_used = "TIER_1_KNOCK_API_BY_DOMAIN"
+                result.confidence = min(0.9, 0.6 + 0.02 * len(units))
+                return result
+            if pid is None:
+                result.errors.append(
+                    "knock-by-domain: /v1/profile resolver returned no property_id"
+                )
+            elif not units:
+                result.errors.append(
+                    f"knock-by-domain: property_id={pid} /units returned no units"
+                )
+
+        if not (public_key and comm_id) and not result.units:
+            result.errors.append("knock-adapter: no knockDoorway.init() call in HTML")
+        return result
+
+
+async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict[str, Any]]:
+    """Two-step Doorway API fetch: community → numeric_id → units.
+
+    This is its own coroutine so the adapter ``extract`` method stays
+    focused on orchestration.
+    """
+    import httpx
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Origin": "https://doorway.knck.io",
+        "Accept": "application/json",
+    }
+    base = "https://doorway-api.knockrentals.com/v1/property"
+    if kind == "numeric_property":
+        # Community API was already short-circuited to a numeric id by the
+        # caller; hit /units directly.
+        units_url = f"{base}/{comm_id}/units"
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+            r = await c.get(units_url, headers=headers)
+            if r.status_code != 200:
+                return []
+            try:
+                return parse_knock_units(r.json())
+            except Exception:
+                return []
+
+    # Community-keyed: fetch property meta first.
+    community_url = f"{base}/community/{comm_id}"
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+        r = await c.get(community_url, headers=headers)
+        if r.status_code != 200:
+            return []
+        try:
+            prop_data = r.json().get("property") or {}
+        except Exception:
+            return []
+        numeric_id = prop_data.get("id")
+        if not numeric_id:
+            return []
+        units_url = f"{base}/{numeric_id}/units"
+        r2 = await c.get(units_url, headers=headers)
+        if r2.status_code != 200:
+            return []
+        try:
+            return parse_knock_units(r2.json())
+        except Exception:
+            return []
+
+
+# 2026-05-20: Knock-by-domain fallback signal detection.
+#
+# The JSON-LD recovery probe (project_jsonld_recovery_2026-05-20.md)
+# confirmed two reliable signals AND one red-herring:
+#
+#   ✓ doorway-api.knockrentals.com URL in static HTML (any context) → Knock
+#   ✓ knockrentals.com/widget URL → Knock
+#   ✓ Aspen Square brand portfolio (aspensquare.com/apartments/{state}/{city}/{slug})
+#     — verified live: every Aspen Square site has Knock as primary inventory
+#   ✗ ``?utm_knock=`` URL param ALONE is NOT reliable — RentCafe-hosted
+#     properties (10X Iona Lakes, Main Street Square) use this UTM for lead
+#     tracking while their actual inventory lives in RentCafe + SecureCafe.
+#     Only treat utm_knock as a Knock signal when RentCafe is ABSENT.
+
+_KNOCK_API_HOST_RE = re.compile(
+    r"doorway-api\.knockrentals\.com|knockrentals\.com/widget", re.IGNORECASE
+)
+_RENTCAFE_PRESENCE_RE = re.compile(r"resource\.rentcafe\.com", re.IGNORECASE)
+_ASPEN_SQUARE_URL_RE = re.compile(
+    r"https?://(?:www\.)?aspensquare\.com/apartments/[a-z-]+/[a-z-]+/[a-z0-9-]+",
+    re.IGNORECASE,
+)
+
+
+def _should_try_knock_by_domain(html: str, base_url: str) -> bool:
+    """Decide whether to fire the Knock-by-domain resolver.
+
+    Returns ``True`` only when there's positive evidence Knock is the
+    primary inventory backend (not just a UTM-tracking layer on a
+    RentCafe-hosted property).
+    """
+    # Aspen Square brand always uses Knock — match the URL directly without
+    # requiring the JS bundle to expose the API host in static HTML.
+    if base_url and _ASPEN_SQUARE_URL_RE.match(base_url):
+        return True
+    if not html:
+        return False
+    lo = html.lower()
+    # Hard signal: Knock API host referenced anywhere in the HTML.
+    if _KNOCK_API_HOST_RE.search(html):
+        # Exclude RentCafe-hosted properties — Knock is just lead tracking
+        # there, the inventory lives in RentCafe / SecureCafe.
+        if _RENTCAFE_PRESENCE_RE.search(html):
+            return False
+        return True
+    # Soft signal: ``utm_knock=`` URL param, but only when there's no
+    # RentCafe CDN load (otherwise it's the utm_knock red-herring case).
+    if "utm_knock=" in lo and not _RENTCAFE_PRESENCE_RE.search(html):
+        return True
+    return False
+
+
+async def _fetch_knock_units_by_domain(
+    base_url: str,
+) -> tuple[str | None, list[dict[str, Any]]]:
+    """Resolve property_id from marketing-site URL via Knock Doorway,
+    then fetch units.
+
+    Args:
+        base_url: The property's marketing-site URL (used as the
+            ``domain`` parameter to ``/v1/profile``).
+
+    Returns:
+        ``(property_id, units)``. ``property_id`` is ``None`` when the
+        resolver returns nothing; ``units`` is the parsed list (may be
+        empty if the property exists in Knock but has no available units).
+
+    Never raises — exceptions return ``(None, [])``.
+    """
+    from urllib.parse import quote
+
+    import httpx
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Origin": "https://doorway.knck.io",
+        "Accept": "application/json",
+    }
+    profile_url = (
+        "https://doorway-api.knockrentals.com/v1/profile"
+        f"?code=w&domain={quote(base_url, safe='')}&refresh=true"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+            pr = await c.get(profile_url, headers=headers)
+            if pr.status_code != 200:
+                return None, []
+            try:
+                profile_body = pr.json()
+            except Exception:
+                return None, []
+            pid = (profile_body.get("profile") or {}).get("property")
+            if not pid:
+                return None, []
+            pid_str = str(pid)
+            units_url = (
+                f"https://doorway-api.knockrentals.com/v1/property/{pid_str}/units"
+            )
+            ur = await c.get(units_url, headers=headers)
+            if ur.status_code != 200:
+                return pid_str, []
+            try:
+                return pid_str, parse_knock_units(ur.json())
+            except Exception:
+                return pid_str, []
+    except Exception:
+        return None, []

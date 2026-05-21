@@ -372,3 +372,75 @@ async def test_bug7_adapter_routes_detail_url_to_detail_parser() -> None:
     assert len(result.units) == 1
     assert result.tier_used == "TIER_1_DOM_APPFOLIO_DETAIL"
     assert result.confidence == 0.85
+
+
+# ────────────────────────────────────────────────────────────────────
+# 2026-05-13 port (Commit 8 of MAY13_API_TIER_PORT_PLAN.md):
+# vanity-domain slug discovery + cross-origin embed recovery.
+# ────────────────────────────────────────────────────────────────────
+
+
+class TestFindAppfolioSlug:
+    def test_extracts_pmc_slug(self):
+        from ma_poc.pms.adapters.appfolio import find_appfolio_slug
+        html = '<a href="https://illumepm.appfolio.com/listings">Apply</a>'
+        assert find_appfolio_slug(html) == "illumepm"
+
+    def test_skips_known_infra_subdomains(self):
+        """www, app, support, secure, tenant, owner, demo etc. are
+        infra subdomains, never PMC slugs."""
+        from ma_poc.pms.adapters.appfolio import find_appfolio_slug
+        # Only www in the HTML -> nothing extractable.
+        assert find_appfolio_slug('<a href="https://www.appfolio.com">x</a>') is None
+        # Mix of www + real PMC -> real PMC wins (infra skipped).
+        html = (
+            '<a href="https://www.appfolio.com">marketing</a>'
+            '<a href="https://illumepm.appfolio.com">apply</a>'
+        )
+        assert find_appfolio_slug(html) == "illumepm"
+
+    def test_no_appfolio_returns_none(self):
+        from ma_poc.pms.adapters.appfolio import find_appfolio_slug
+        assert find_appfolio_slug("") is None
+        assert find_appfolio_slug("<html>no appfolio</html>") is None
+
+    def test_case_insensitive(self):
+        from ma_poc.pms.adapters.appfolio import find_appfolio_slug
+        html = '<a href="https://Becovic.AppFolio.com/listings">x</a>'
+        assert find_appfolio_slug(html) == "becovic"
+
+
+class TestAppfolioEmbedHelpers:
+    """Smoke tests for _appfolio_embed.py module-level helpers.
+
+    The async ``recover_appfolio_embed`` orchestrator requires a live
+    Playwright page; covered by integration tests under a separate harness.
+    These tests verify the pure helpers ship correctly."""
+
+    def test_tenant_listings_url_from_full_url(self):
+        from ma_poc.pms.adapters._appfolio_embed import _tenant_listings_url
+        assert _tenant_listings_url(
+            "https://illumepm.appfolio.com/listings/detail/abc123"
+        ) == "https://illumepm.appfolio.com/listings"
+
+    def test_tenant_listings_url_passthrough_for_bare_root(self):
+        from ma_poc.pms.adapters._appfolio_embed import _tenant_listings_url
+        # Bare tenant root -> /listings synth (canonical path).
+        out = _tenant_listings_url("https://illumepm.appfolio.com/")
+        assert out and "illumepm.appfolio.com" in out and "/listings" in out
+
+    def test_tenant_listings_url_rejects_non_appfolio_host(self):
+        from ma_poc.pms.adapters._appfolio_embed import _tenant_listings_url
+        assert _tenant_listings_url("https://www.example.com/x") is None
+
+    def test_to_appfolio_listings_root_strips_subpaths(self):
+        from ma_poc.pms.adapters._appfolio_embed import _to_appfolio_listings_root
+        # /listings/showings/new and /listings/detail/... -> /listings root.
+        out = _to_appfolio_listings_root(
+            "https://illumepm.appfolio.com/listings/showings/new?listable_uid=abc"
+        )
+        assert out.endswith("/listings")
+        out = _to_appfolio_listings_root(
+            "https://illumepm.appfolio.com/listings/detail/abc123"
+        )
+        assert out.endswith("/listings")

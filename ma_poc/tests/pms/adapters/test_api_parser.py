@@ -57,6 +57,23 @@ class TestMoneyToInt:
     def test_zero_returns_zero(self):
         assert _money_to_int("0") == 0
 
+    # 2026-05-13 port: deposit -> rent leakage fix
+    # (project_run_2026_05_11). Pre-port "$1,200 - $1,400" was sub-cleaned
+    # to "12001400" and emitted as 12_001_400 (then nulled by sanity
+    # bounds, so the user-visible symptom was null rent). Post-port the
+    # first numeric token wins and the low bound is returned.
+    def test_range_string_returns_low_bound(self):
+        assert _money_to_int("$1,200 - $1,400") == 1200
+        assert _money_to_int("1200 - 1400") == 1200
+        assert _money_to_int("$1,200-$1,400") == 1200
+
+    def test_range_no_longer_concatenates_to_absurd_value(self):
+        # Regression guard for the original sub-cleaning bug.
+        out = _money_to_int("$1,200 - $1,400")
+        assert out is not None and out < 50000, (
+            f"range string produced {out}; bug would have produced 12001400"
+        )
+
 
 # ── _get ───────────────────────────────────────────────────────────────────────
 
@@ -401,3 +418,186 @@ class TestConstants:
         assert "minRent" in _RENT_KEYS
         assert "rent" in _RENT_KEYS
         assert "price" in _RENT_KEYS
+
+
+# ────────────────────────────────────────────────────────────────────
+# 2026-05-13 port: _unwrap_name_blob + make_unit_dict dual-key emission.
+# See ma_poc/docs/MAY13_API_TIER_PORT_PLAN.md §4 Commit 4.
+# ────────────────────────────────────────────────────────────────────
+
+
+class TestUnwrapNameBlob:
+    """JSON-object floor-plan names like ``{"name":"B06","provider_id":"..."}``
+    must reduce to ``"B06"`` so downstream consumers don't ship the blob.
+    Memory project_run_2026_05_11: 2,534 rows affected historically."""
+
+    def test_passthrough_plain_string(self):
+        from ma_poc.pms.adapters._parsing import _unwrap_name_blob
+        assert _unwrap_name_blob("Studio A") == "Studio A"
+
+    def test_none_returns_empty(self):
+        from ma_poc.pms.adapters._parsing import _unwrap_name_blob
+        assert _unwrap_name_blob(None) == ""
+
+    def test_unwraps_json_object_with_name_key(self):
+        from ma_poc.pms.adapters._parsing import _unwrap_name_blob
+        assert _unwrap_name_blob('{"name":"B06","provider_id":"abc"}') == "B06"
+
+    def test_unwraps_with_whitespace(self):
+        from ma_poc.pms.adapters._parsing import _unwrap_name_blob
+        assert _unwrap_name_blob('  {"name": "Studio Loft"} ') == "Studio Loft"
+
+    def test_passes_through_object_without_name_key(self):
+        from ma_poc.pms.adapters._parsing import _unwrap_name_blob
+        # No "name" key -> return original (caller can still inspect/discard).
+        assert _unwrap_name_blob('{"id": 1, "label": "A"}') == '{"id": 1, "label": "A"}'
+
+    def test_stringifies_non_string_input(self):
+        from ma_poc.pms.adapters._parsing import _unwrap_name_blob
+        assert _unwrap_name_blob(123) == "123"
+
+
+class TestMakeUnitDictDualDateKeys:
+    """make_unit_dict must emit BOTH ``availability_date`` (legacy v1)
+    AND ``available_date`` (v2 schema-reader convention).
+
+    Background: ma_poc/core/schema_v2.py:282 reads
+    ``unit.get("available_date")`` first. Pre-port adapters set only
+    ``availability_date`` and the date silently dropped at the v2
+    boundary on any code path that bypassed the jugnu v2 alias resolver.
+    """
+
+    def test_emits_both_date_keys(self):
+        from ma_poc.pms.adapters._parsing import make_unit_dict
+        u = make_unit_dict(availability_date="2026-06-15")
+        assert u["availability_date"] == "2026-06-15"
+        assert u["available_date"] == "2026-06-15"
+
+    def test_both_keys_empty_when_no_date_supplied(self):
+        from ma_poc.pms.adapters._parsing import make_unit_dict
+        u = make_unit_dict()
+        assert u["availability_date"] == ""
+        assert u["available_date"] == ""
+
+    def test_floor_plan_name_blob_unwrapped(self):
+        """make_unit_dict pipes floor_plan_name through _unwrap_name_blob
+        so adapters that emit JSON-object names don't poison the v2
+        output."""
+        from ma_poc.pms.adapters._parsing import make_unit_dict
+        u = make_unit_dict(floor_plan_name='{"name":"A1","provider_id":"x"}')
+        assert u["floor_plan_name"] == "A1"
+
+
+# ────────────────────────────────────────────────────────────────────
+# Coverage fills for _parsing.py helpers. These exercise the edge
+# paths missed by adapter-level tests.
+# ────────────────────────────────────────────────────────────────────
+
+
+class TestParsingHelpers:
+    def test_get_field_first_present_key_wins(self):
+        from ma_poc.pms.adapters._parsing import get_field
+        d = {"a": "x", "b": "y"}
+        assert get_field(d, "a", "b") == "x"
+
+    def test_get_field_skips_empty_and_list_and_dict_without_subkey(self):
+        from ma_poc.pms.adapters._parsing import get_field
+        # None / "" / [] / {} are all skip-worthy.
+        d = {"a": None, "b": "", "c": [], "d": {}, "e": "found"}
+        assert get_field(d, "a", "b", "c", "d", "e") == "found"
+
+    def test_get_field_unwraps_nested_dict_via_min_low_amount(self):
+        from ma_poc.pms.adapters._parsing import get_field
+        # Nested dict with 'min' is unwrapped to its scalar.
+        d = {"rent": {"min": 1351, "max": 1500}}
+        assert get_field(d, "rent") == "1351"
+        # Same for 'low'
+        d = {"rent": {"low": 1200}}
+        assert get_field(d, "rent") == "1200"
+        # 'effectiveRent' is also recognised.
+        d = {"rent": {"effectiveRent": 1450}}
+        assert get_field(d, "rent") == "1450"
+
+    def test_get_field_returns_empty_when_all_keys_missing(self):
+        from ma_poc.pms.adapters._parsing import get_field
+        assert get_field({}, "a", "b") == ""
+
+    def test_format_rent_range_one_value(self):
+        from ma_poc.pms.adapters._parsing import format_rent_range
+        # Single value -> no range marker.
+        assert format_rent_range(1500, 1500) == "$1,500"
+        assert format_rent_range(1500, None) == "$1,500"
+        assert format_rent_range(None, 1500) == "$1,500"
+        assert format_rent_range(None, None) == ""
+
+    def test_format_rent_range_proper_range(self):
+        from ma_poc.pms.adapters._parsing import format_rent_range
+        assert format_rent_range(1500, 1700) == "$1,500 - $1,700"
+
+    def test_parse_rent_range_handles_various_forms(self):
+        from ma_poc.pms.adapters._parsing import parse_rent_range
+        # Single value
+        assert parse_rent_range("$1,500") == (1500, 1500)
+        # Range with hyphen
+        assert parse_rent_range("$1,200 - $1,500") == (1200, 1500)
+        # No-dollar form
+        assert parse_rent_range("1295-1500") == (1295, 1500)
+        # Garbage returns (None, None)
+        assert parse_rent_range("") == (None, None)
+        assert parse_rent_range("not a price") == (None, None)
+        # Type-defensive: non-string -> (None, None)
+        assert parse_rent_range(None) == (None, None)  # type: ignore[arg-type]
+
+    def test_parse_rent_range_rejects_out_of_band_numbers(self):
+        """Sanity filter: numbers outside $200-$50K are dropped so a
+        rent string that accidentally contains a sqft (e.g. "$100 750sqft")
+        doesn't pollute the rent slot."""
+        from ma_poc.pms.adapters._parsing import parse_rent_range
+        # 100 too low, 750 in range -> picked up but ranged
+        out = parse_rent_range("$100 - 750")
+        # 100 filtered out by sanity (under 200 floor).
+        assert out == (750, 750) or out == (None, None)
+
+    def test_rent_in_sanity_range_bounds(self):
+        from ma_poc.pms.adapters._parsing import rent_in_sanity_range
+        assert rent_in_sanity_range(None) is True   # null ok
+        assert rent_in_sanity_range(200) is True
+        assert rent_in_sanity_range(50000) is True
+        assert rent_in_sanity_range(199) is False
+        assert rent_in_sanity_range(50001) is False
+
+    def test_bed_label_from_studio(self):
+        from ma_poc.pms.adapters._parsing import bed_label_from
+        assert bed_label_from(0) == "Studio"
+        assert bed_label_from(None, "Studio Loft") == "Studio"
+
+    def test_bed_label_from_n_bedroom(self):
+        from ma_poc.pms.adapters._parsing import bed_label_from
+        assert bed_label_from(1) == "1 Bedroom"
+        assert bed_label_from(2) == "2 Bedroom"
+
+    def test_bed_label_from_unknown_returns_empty(self):
+        from ma_poc.pms.adapters._parsing import bed_label_from
+        assert bed_label_from(None) == ""
+
+    def test_money_to_int_returns_none_on_unparseable_numeric(self):
+        """The post-regex ``int(float(...))`` raise path."""
+        from ma_poc.pms.adapters._parsing import money_to_int
+        # No digits at all -> regex finds nothing -> None
+        assert money_to_int("no digits") is None
+        assert money_to_int("") is None
+
+    def test_compute_floor_plan_id_deterministic(self):
+        from ma_poc.pms.adapters._parsing import compute_floor_plan_id
+        a = compute_floor_plan_id("P1", "A1", 1, 1.0)
+        b = compute_floor_plan_id("P1", "A1", 1, 1.0)
+        assert a == b
+        # Different inputs -> different hash
+        c = compute_floor_plan_id("P1", "B2", 2, 2.0)
+        assert a != c
+
+    def test_compute_floor_plan_id_returns_none_without_signal(self):
+        """No name and no beds/baths -> can't identify a plan -> None."""
+        from ma_poc.pms.adapters._parsing import compute_floor_plan_id
+        assert compute_floor_plan_id("P1", None, None, None) is None
+        assert compute_floor_plan_id("P1", "", None, None) is None

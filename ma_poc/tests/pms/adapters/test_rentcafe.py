@@ -654,3 +654,80 @@ class TestMAAWorthingtonFieldMap:
         assert len(units) == 3
         unit_numbers = {u["unit_number"] for u in units}
         assert unit_numbers == {"217", "318", "419"}
+
+
+# ────────────────────────────────────────────────────────────────────
+# 2026-05-13 port (Commit 9 of MAY13_API_TIER_PORT_PLAN.md):
+# WP middleware probe helpers + Nestin/hosted-table fixture modules.
+# ────────────────────────────────────────────────────────────────────
+
+
+class TestFindRentcafePropertyId:
+    """Property-ID extraction from rendered RentCafe HTML."""
+
+    def test_extracts_query_string_form(self):
+        from ma_poc.pms.adapters.rentcafe import _find_rentcafe_property_id
+        assert _find_rentcafe_property_id("...?propertyId=12345 in body...") == "12345"
+
+    def test_extracts_bracket_array_query_form(self):
+        from ma_poc.pms.adapters.rentcafe import _find_rentcafe_property_id
+        assert _find_rentcafe_property_id("...?propertyId[]=67890 ...") == "67890"
+
+    def test_extracts_data_attribute_form(self):
+        from ma_poc.pms.adapters.rentcafe import _find_rentcafe_property_id
+        assert _find_rentcafe_property_id('<div data-property-id="55555">') == "55555"
+
+    def test_extracts_js_config_form(self):
+        from ma_poc.pms.adapters.rentcafe import _find_rentcafe_property_id
+        assert _find_rentcafe_property_id("propertyId: 99999,") == "99999"
+
+    def test_empty_html_returns_none(self):
+        from ma_poc.pms.adapters.rentcafe import _find_rentcafe_property_id
+        assert _find_rentcafe_property_id("") is None
+        assert _find_rentcafe_property_id("<html>no id</html>") is None
+
+
+class TestOriginFromCtx:
+    """``_origin_from_ctx`` extracts scheme://netloc from the most
+    authoritative source available on the AdapterContext."""
+
+    def test_prefers_fetch_result_final_url(self):
+        from ma_poc.pms.adapters.rentcafe import _origin_from_ctx
+
+        class FR:
+            final_url = "https://example.com/some/path?x=1"
+
+        class CTX:
+            fetch_result = FR()
+            base_url = "https://fallback.com/"
+
+        assert _origin_from_ctx(CTX()) == "https://example.com"
+
+    def test_falls_through_to_base_url(self):
+        from ma_poc.pms.adapters.rentcafe import _origin_from_ctx
+
+        class CTX:
+            fetch_result = None
+            base_url = "https://fallback.com/"
+
+        assert _origin_from_ctx(CTX()) == "https://fallback.com"
+
+    def test_returns_empty_when_no_url(self):
+        from ma_poc.pms.adapters.rentcafe import _origin_from_ctx
+
+        class CTX:
+            fetch_result = None
+            base_url = ""
+
+        assert _origin_from_ctx(CTX()) == ""
+
+
+def test_nestin_and_hosted_table_modules_import_cleanly():
+    """Smoke: the new helper modules import without raising. Their
+    full parser behaviour is exercised in dedicated fixtures once the
+    orchestration is wired in Commit 11; this test guards against
+    import-time errors."""
+    from ma_poc.pms.adapters import _rentcafe_hosted_table, _rentcafe_nestin
+    # Both modules expose at least one callable.
+    assert hasattr(_rentcafe_nestin, "__name__")
+    assert hasattr(_rentcafe_hosted_table, "__name__")

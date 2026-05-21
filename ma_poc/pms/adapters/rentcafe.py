@@ -33,6 +33,7 @@ Key findings:
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
@@ -441,6 +442,26 @@ class RentCafeAdapter:
                 f"failed unit_validity (no numeric dimension)"
             )
 
+        # 2026-05-13 port (Commit 14 wiring): WP middleware fallback.
+        # Many SHAPE_REJECTED RentCafe sites mount the floorplans endpoint
+        # at ``<origin>/wp-json/middleware/v1/getFloorplans/?propertyId=<id>``
+        # but the XHR doesn't fire client-side during page load. Probe it
+        # directly when the captured path didn't yield admissable units.
+        wp_units = await _try_rentcafe_wp_probe(ctx, result)
+        if wp_units:
+            from ma_poc.extraction.post_process import post_process
+
+            pp = post_process(wp_units, property_id=getattr(ctx, "property_id", None))
+            if pp.n_admitted > 0:
+                result.units = list(pp.units)
+                result.plan_summaries = list(pp.plan_summaries)
+                result.post_process_meta = pp.to_meta()
+                result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
+                # Keep _TIER_BASE -- recovery via probe is recorded in
+                # result.api_responses[*].via="wp_probe".
+                result.tier_used = _TIER_BASE
+                return result
+
         # Failure path: re-stamp tier_used with a structured sub-code so the
         # downstream report can distinguish misrouting from genuine zero data.
         tier_code, err_msg = _classify_rentcafe_failure(api_responses)
@@ -460,3 +481,146 @@ class RentCafeAdapter:
         the router and the parser agree on what "RentCafe-shaped" means.
         """
         return _is_rentcafe_response(body)
+
+
+# ────────────────────────────────────────────────────────────────────
+# 2026-05-13 port (Commit 9 of MAY13_API_TIER_PORT_PLAN.md):
+# WordPress middleware fallback. SHAPE_REJECTED RentCafe sites often
+# embed the floorplans endpoint at:
+#   <origin>/wp-json/middleware/v1/getFloorplans/?propertyId[]=<id>
+# Property ID is server-rendered into the marketing HTML in any of
+# three forms (query, data-attribute, JS config). Adapter wiring of
+# this probe into RentCafeAdapter.extract() is deferred to Commit 11
+# (alongside the SecureCafe drill-down which needs curl_cffi).
+# ────────────────────────────────────────────────────────────────────
+
+
+# Property-ID extraction: vanity sites embed propertyId in any of (a)
+# the XHR query string (``propertyId=<id>``), (b) data-attrs on the
+# property card (``data-property-id="..."``), and (c) inline script
+# tags (``propertyId: <id>``).
+_RENTCAFE_PROP_ID_HTML_RE = re.compile(
+    r"""
+    (?:
+        propertyId(?:\[\])?=(\d{3,9})           # query-string form
+      | data-property[-_]id=["'](\d{3,9})["']   # data-attribute form
+      | propertyId[\"']?\s*[:=]\s*(\d{3,9})     # JS-config form
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _find_rentcafe_property_id(html: str) -> str | None:
+    """Return the first RentCafe propertyId seen in *html*, or ``None``."""
+    if not html:
+        return None
+    m = _RENTCAFE_PROP_ID_HTML_RE.search(html)
+    if not m:
+        return None
+    for grp in m.groups():
+        if grp:
+            return grp
+    return None
+
+
+def _origin_from_ctx(ctx: AdapterContext) -> str:
+    """``scheme://netloc`` for the property's effective URL (post-redirect).
+
+    Prefers ``fetch_result.final_url`` since redirects may have already
+    settled there; falls back to ``ctx.base_url``. Returns ``""`` when
+    neither is parseable.
+    """
+    from urllib.parse import urlparse as _urlparse
+
+    candidate = ""
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is not None:
+        candidate = str(getattr(fr, "final_url", "") or "")
+    if not candidate:
+        candidate = getattr(ctx, "base_url", "") or ""
+    try:
+        p = _urlparse(candidate)
+    except Exception:
+        return ""
+    if not p.scheme or not p.netloc:
+        return ""
+    return f"{p.scheme}://{p.netloc}"
+
+
+async def _try_rentcafe_wp_probe(
+    ctx: AdapterContext, result: AdapterResult
+) -> list[dict[str, str]]:
+    """Probe ``<origin>/wp-json/middleware/v1/getFloorplans/`` directly.
+
+    Used when XHR capture missed the floorplans endpoint (typical for
+    RentCafe sites mounted on WordPress where the XHR fires from a
+    client-side bundle whose load was missed by the network listener).
+    Returns parsed unit dicts on success, empty list on any failure.
+
+    Never raises -- exceptions append to ``result.errors`` and the
+    function returns ``[]``.
+
+    NOTE: This helper is not yet wired into ``RentCafeAdapter.extract()``;
+    that wiring lands in Commit 11. The function is exposed here so
+    tests can exercise it in isolation and so the adapter can simply
+    add a call site once the curl_cffi-based SecureCafe probe is ready
+    to land alongside it.
+    """
+    html = ""
+    fr = getattr(ctx, "fetch_result", None)
+    body = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(body, bytes):
+        try:
+            html = body.decode("utf-8", errors="replace")
+        except Exception:
+            html = ""
+    elif isinstance(body, str):
+        html = body
+    if not html:
+        return []
+
+    prop_id = _find_rentcafe_property_id(html)
+    if not prop_id:
+        return []
+
+    origin = _origin_from_ctx(ctx)
+    if not origin:
+        return []
+
+    api_url = f"{origin}/wp-json/middleware/v1/getFloorplans/?propertyId[]={prop_id}"
+    try:
+        import httpx
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json",
+        }
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+            r = await c.get(api_url, headers=headers)
+        if r.status_code != 200:
+            return []
+        try:
+            payload = r.json()
+        except (ValueError, Exception):
+            return []
+    except Exception as exc:
+        result.errors.append(
+            f"rentcafe-wp-probe-error: prop_id={prop_id!r} "
+            f"{type(exc).__name__}: {str(exc)[:120]}"
+        )
+        return []
+
+    items = _unwrap_rentcafe_list(payload)
+    if not items:
+        return []
+    units = parse_rentcafe_floorplans(items, api_url)
+    if units:
+        result.api_responses.append(
+            {"url": api_url, "status": 200, "body": payload, "via": "wp_probe"}
+        )
+        result.winning_url = api_url
+    return units

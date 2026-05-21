@@ -518,3 +518,164 @@ def test_confirm_detection_preserves_when_only_initial_adapter_has_checker(
         f"alternative to cross-match against. P3 says preserve when no "
         f"negative evidence is found — got {result.pms!r}"
     )
+
+
+# ────────────────────────────────────────────────────────────────────
+# 2026-05-13 port: new tests for disambiguation gates added in Commit 3
+# of ma_poc/docs/MAY13_API_TIER_PORT_PLAN.md.
+# ────────────────────────────────────────────────────────────────────
+
+
+def test_realpage_oll_detected_via_content_apply_key() -> None:
+    """RealPage OLL Category-D cluster (~187 props): static HTML carries
+    ``<property>/content/apply#k=...`` link that bootstraps the OLL
+    appstate session. Must beat the bare entrata.com weak marker."""
+    html = (
+        '<html><body>'
+        '<a href="https://example.com/content/apply#k=AB12CD">Apply Now</a>'
+        '</body></html>'
+    )
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms == "realpage_oll"
+    assert r.confidence >= 0.85
+
+
+def test_realpage_oll_via_leasing_realpage_host() -> None:
+    """leasing.realpage.com substring also triggers OLL routing."""
+    html = '<html><iframe src="https://leasing.realpage.com/widget"></iframe></html>'
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms == "realpage_oll"
+
+
+def test_entrata_module_auth_path_does_not_trigger_entrata() -> None:
+    """Negative lookahead in _ENTRATA_REAL_MODULE_RE: the bare
+    ``/Apartments/module/application_authentication/`` login form must
+    NOT route to Entrata. 4-of-4 false-positive sites (Foxchase, Muse
+    ATL, Laurel Crossing, livemuseatl) had ONLY this auth path; no
+    Entrata API ever fired."""
+    html = (
+        '<html><a href="/Apartments/module/application_authentication/">'
+        'Resident Login</a></html>'
+    )
+    r = detect_pms("https://example.com/", page_html=html)
+    # Must NOT be entrata. Likely unknown if nothing else matches.
+    assert r.pms != "entrata", (
+        f"auth-only Entrata path leaked through; got {r.pms} (conf {r.confidence})"
+    )
+
+
+def test_entrata_real_widget_path_still_triggers_entrata() -> None:
+    """Sanity: legitimate /Apartments/module/<widget>/ paths still
+    route to Entrata after the negative-lookahead fix."""
+    for path in (
+        "/Apartments/module/floorplans/",
+        "/Apartments/module/availability/",
+        "/Apartments/module/check_availability_step_1/",
+    ):
+        html = f'<html><a href="{path}">Plans</a></html>'
+        r = detect_pms("https://example.com/", page_html=html)
+        assert r.pms == "entrata", f"{path!r} should route to entrata, got {r.pms}"
+
+
+def test_engrain_widget_routes_to_sightmap() -> None:
+    """data-unit + data-floorplan paired with realpage.com script ->
+    SightMap. Verified 2026-05-20 on 7 of 25 TIER_3_DOM ALL_fail probes
+    (Sawmill Station, Headwaters Autumn Hall, etc.)."""
+    html = (
+        '<html><body>'
+        '<div data-unit="101" data-floorplan="A1">Unit A1-101</div>'
+        '<script src="https://realpage.com/widget.js"></script>'
+        '</body></html>'
+    )
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms == "sightmap"
+    assert r.confidence == 0.88
+
+
+def test_engrain_widget_does_not_route_when_sightmap_embed_present() -> None:
+    """When sightmap.com/embed/ is already in HTML, the explicit-embed
+    branch wins; Engrain shouldn't fire its 0.88 fallback."""
+    html = (
+        '<html><body>'
+        '<iframe src="https://sightmap.com/embed/abc"></iframe>'
+        '<div data-unit="101" data-floorplan="A1"></div>'
+        '<script src="https://realpage.com/x.js"></script>'
+        '</body></html>'
+    )
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms == "sightmap"
+    # Explicit embed beats Engrain fallback; confidence 0.90 not 0.88
+    assert r.confidence == 0.90
+
+
+def test_g5_detected_when_no_competing_pms() -> None:
+    """G5 alone -> g5 PMS at 0.85."""
+    html = (
+        '<html><script src="https://inventory.g5marketingcloud.com/widget.js">'
+        '</script></html>'
+    )
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms == "g5"
+    assert r.confidence == 0.85
+
+
+def test_g5_gated_when_knock_marker_co_resident() -> None:
+    """G5 + Knock co-resident: Knock wins because G5 URN is company-
+    level in that pattern (bails empty). Verified 2026-05-20 on 6 of 6
+    Bucket-A worklist properties."""
+    html = (
+        '<html>'
+        '<script src="https://g5marketingcloud.com/widget.js"></script>'
+        '<script src="https://doorway.knck.io/loader.js"></script>'
+        '</html>'
+    )
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms == "knock"
+
+
+def test_g5_gated_when_securecafe_marker_co_resident() -> None:
+    """G5 + RentCafe SecureCafe co-resident: rentcafe wins."""
+    html = (
+        '<html>'
+        '<script src="https://g5dxm.com/theme.css"></script>'
+        '<a href="https://acme.securecafe.com/onlineleasing/">Apply</a>'
+        '</html>'
+    )
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms == "rentcafe"
+
+
+def test_knock_doorway_detected() -> None:
+    """doorway.knck.io script tag triggers knock detection at 0.90."""
+    html = '<html><script src="https://doorway.knck.io/widget.js"></script></html>'
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms == "knock"
+    assert r.confidence == 0.90
+
+
+def test_encoreskyline_template_detected_when_no_competing_pms() -> None:
+    """Jonah/MeetElise alone -> encoreskyline_template."""
+    html = '<html><script src="https://example.com/meetelise.js"></script></html>'
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms == "encoreskyline_template"
+
+
+def test_encoreskyline_gated_when_securecafe_co_resident() -> None:
+    """Jonah + SecureCafe (ardencebloom.com pattern, live-verified
+    2026-05-20): real data lives in RentCafe, Jonah is a chat-widget
+    bolt-on. Must route to rentcafe."""
+    html = (
+        '<html>'
+        '<script src="https://example.com/meetelise.js"></script>'
+        '<a href="https://acme.securecafe.com/onlineleasing/">Apply</a>'
+        '</html>'
+    )
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms == "rentcafe"
+
+
+def test_new_pms_names_in_pmsname_literal_and_strategy_map() -> None:
+    """Sanity: the three new PmsName entries are also wired into
+    _STRATEGY_BY_PMS so detect_pms() never KeyErrors on them."""
+    for name in ("g5", "knock", "encoreskyline_template"):
+        assert name in _STRATEGY_BY_PMS, f"{name} missing from _STRATEGY_BY_PMS"

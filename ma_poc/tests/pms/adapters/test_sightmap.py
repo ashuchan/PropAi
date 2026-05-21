@@ -353,3 +353,110 @@ def test_sightmap_matches_response_body_protocol() -> None:
         is True
     )
     assert adapter.matches_response_body({"random": "not-sightmap"}) is False
+
+
+# ────────────────────────────────────────────────────────────────────
+# 2026-05-13 port (Commit 7 of MAY13_API_TIER_PORT_PLAN.md):
+# embed-code + direct-API discovery helpers for SHAPE_REJECTED recovery.
+# ────────────────────────────────────────────────────────────────────
+
+
+class TestFindSightmapEmbedCodes:
+    def test_fancybox_data_src_anchor(self):
+        from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+        html = '<a data-fancybox data-src="https://sightmap.com/embed/abc12345">map</a>'
+        assert find_sightmap_embed_codes(html) == ["abc12345"]
+
+    def test_engrain_js_assignment(self):
+        from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+        html = "<script>var EngrainedUrl = 'https://sightmap.com/embed/xyz98765';</script>"
+        assert find_sightmap_embed_codes(html) == ["xyz98765"]
+
+    def test_plain_anchor_href(self):
+        from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+        html = '<a href="https://sightmap.com/embed/plain123">link</a>'
+        assert find_sightmap_embed_codes(html) == ["plain123"]
+
+    def test_classic_iframe_src(self):
+        from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+        html = '<iframe src="https://sightmap.com/embed/iframe999"></iframe>'
+        assert find_sightmap_embed_codes(html) == ["iframe999"]
+
+    def test_json_value_position_skipped(self):
+        """``"embed_url":"https://..."`` is a config blob, NOT a real
+        loading URL. Must be skipped so we don't mis-route to a SightMap
+        the page hasn't actually loaded."""
+        from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+        html = '{"embed_url":"https://sightmap.com/embed/dontmatch"}'
+        assert find_sightmap_embed_codes(html) == []
+
+    def test_reserved_infra_segments_filtered(self):
+        """``embed/api``, ``embed/app``, etc. are internal routes, not
+        customer codes -- must be filtered."""
+        from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+        for seg in ("api", "app", "admin", "embed"):
+            html = f'<a href="https://sightmap.com/embed/{seg}">x</a>'
+            assert find_sightmap_embed_codes(html) == [], f"infra segment {seg!r} leaked"
+
+    def test_dedupes_repeated_codes(self):
+        # Regex requires 4-32 char codes; "dup" (3 chars) would correctly
+        # not match. Use a 5-char code for the dedup case.
+        from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+        html = (
+            '<iframe src="https://sightmap.com/embed/dup99">x</iframe>'
+            '<a href="https://sightmap.com/embed/dup99">y</a>'
+        )
+        assert find_sightmap_embed_codes(html) == ["dup99"]
+
+    def test_no_sightmap_returns_empty(self):
+        from ma_poc.pms.adapters.sightmap import find_sightmap_embed_codes
+        assert find_sightmap_embed_codes("<html>no map</html>") == []
+        assert find_sightmap_embed_codes("") == []
+
+
+class TestFindSightmapDirectApiUrls:
+    def test_inline_api_url(self):
+        from ma_poc.pms.adapters.sightmap import find_sightmap_direct_api_urls
+        html = 'var apiUrl = "https://sightmap.com/app/api/v1/abc/sightmaps/12345";'
+        urls = find_sightmap_direct_api_urls(html)
+        assert len(urls) == 1
+        assert "sightmaps/12345" in urls[0]
+
+    def test_json_escaped_api_url(self):
+        """Angular bundles often emit JSON-escaped ``\\/`` instead of ``/``.
+        Both must normalise to the same canonical URL."""
+        from ma_poc.pms.adapters.sightmap import find_sightmap_direct_api_urls
+        html = r'{"href":"https:\/\/sightmap.com\/app\/api\/v1\/abc\/sightmaps\/12345"}'
+        urls = find_sightmap_direct_api_urls(html)
+        assert len(urls) == 1
+        assert "sightmaps/12345" in urls[0]
+        assert "\\" not in urls[0]
+
+    def test_dedupes(self):
+        from ma_poc.pms.adapters.sightmap import find_sightmap_direct_api_urls
+        html = (
+            'https://sightmap.com/app/api/v1/abc/sightmaps/12345 '
+            'https://sightmap.com/app/api/v1/abc/sightmaps/12345'
+        )
+        urls = find_sightmap_direct_api_urls(html)
+        assert len(urls) == 1
+
+
+class TestExtractSightmapApiUrl:
+    def test_app_config_href(self):
+        from ma_poc.pms.adapters.sightmap import extract_sightmap_api_url
+        embed = '{"sightmaps":[{"href":"https://sightmap.com/app/api/v1/abc/sightmaps/12345"}]}'
+        assert (
+            extract_sightmap_api_url(embed)
+            == "https://sightmap.com/app/api/v1/abc/sightmaps/12345"
+        )
+
+    def test_json_escaped_href(self):
+        from ma_poc.pms.adapters.sightmap import extract_sightmap_api_url
+        embed = r'{"href":"https:\/\/sightmap.com\/app\/api\/v1\/xyz\/sightmaps\/99"}'
+        assert extract_sightmap_api_url(embed) == "https://sightmap.com/app/api/v1/xyz/sightmaps/99"
+
+    def test_no_match_returns_none(self):
+        from ma_poc.pms.adapters.sightmap import extract_sightmap_api_url
+        assert extract_sightmap_api_url("<html>no config here</html>") is None
+        assert extract_sightmap_api_url("") is None

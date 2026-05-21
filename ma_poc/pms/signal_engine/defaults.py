@@ -171,6 +171,22 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     "avalonbay": ("/floor-plans-pricing", "/apartments"),
     "amli": ("/floor-plans", "/availability"),
     "funnel": ("/floorplans", "/availability"),
+    # 2026-05-13 port (Commit 11): server-only Tier-1 adapters. Their
+    # ``matches_response_body`` checkers gate confirm_detection; the
+    # link-hop priors below give the cascade canonical sub-paths to try
+    # when the entry page doesn't carry the data directly.
+    "cortland": ("/floorplans", "/floor-plans", "/availability"),
+    "equity": ("/apartments", "/availability", "/units"),
+    "rentmanager": ("/floorplans", "/floor-plans", "/availability"),
+    # 2026-05-13 port (Commit 12): browser-intercept Tier-1 adapters.
+    "g5": ("/floorplans", "/floor-plans", "/availability"),
+    "knock": ("/floorplans", "/floor-plans", "/availability"),
+    "irvine": ("/apartments", "/availability", "/units"),
+    "apts247": ("/floorplans", "/availability"),
+    # 2026-05-13 port (Commit 13): REIT adapters.
+    "essex": ("/apartments", "/availability"),
+    "maac": ("/floorplans", "/availability", "/apartments"),
+    "rentvision": ("/floorplans", "/floor-plans", "/availability"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (

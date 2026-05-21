@@ -1,0 +1,487 @@
+"""G5 Marketing Cloud adapter.
+
+Research log
+------------
+G5 (https://www.getg5.com/) is the marketing platform powering Morgan
+Properties and many other multifamily operators (Aimco, Bell Partners, ZRS,
+JMG, BH Companies). The platform exposes a public GraphQL inventory API at
+``inventory.g5marketingcloud.com/graphql``. Discovered 2026-05-13 via Chrome
+MCP probe of www.morgan-properties.com/apartments/pa/harrisburg/kings-manor-apartments/.
+
+Key findings (2026-05-13)
+-------------------------
+* Endpoint: ``POST https://inventory.g5marketingcloud.com/graphql``
+* No auth required for read queries (introspection enabled).
+* Property identified by ``locationUrn`` — the full G5 slug, e.g.
+  ``g5-cl-1jsdmzcxpf-king-s-manor-apartments``. Slug is discoverable from
+  any ``g5-cl-...`` reference in the property's HTML (image CDN paths
+  carry it: ``g5-assets-cld-res.cloudinary.com/.../g5-cl-{slug}/uploads/...``).
+* Query path that returns unit-level data:
+  ``apartmentComplex(locationUrn:$urn){apartments(perPage:200){...}}``
+  — each apartment carries ``name``, ``availabilityDate``, ``prices`` (list
+  of priced lease terms), ``sqftDisplay``, plus a joined ``floorplan`` with
+  ``beds``/``baths``/``sqft``/``name``.
+* Sample: King's Manor returned 21 apartments, every one with
+  ``availabilityDate`` populated — a strict improvement over the current
+  generic Tier 1 pipeline which loses the date.
+"""
+from __future__ import annotations
+
+import re
+from typing import TYPE_CHECKING, Any
+
+from ma_poc.pms.adapters._parsing import (
+    bed_label_from,
+    format_rent_range,
+    make_unit_dict,
+)
+from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+
+if TYPE_CHECKING:
+    from playwright.async_api import Page
+
+
+_G5_ENDPOINT = "https://inventory.g5marketingcloud.com/graphql"
+
+# Property URN regex — matches ``g5-cl-<id>[-<slug>]`` anywhere in the
+# rendered HTML. The image CDN paths carry the slug consistently so this
+# captures it on every G5-hosted property page.
+_G5_URN_RE = re.compile(r"g5-cl-[a-z0-9]+(?:-[a-z0-9]+)*", re.IGNORECASE)
+
+# GraphQL query — returns the unit + floor-plan join in one round trip.
+# perPage:200 covers any normal property; pagination would need the API's
+# total-count hint (not currently used).
+# 2026-05-19: concession fields added — HAR-confirmed valid on
+# ``apartmentComplex`` (morgan-properties browser query returned 200
+# with these exact fields). G5 specials are property/floorplan-level:
+# ``hasApartmentSpecials``/``hasFloorplanSpecials`` (bool) +
+# ``floorplans[].floorplanSpecials`` (array, joined by floorplan id).
+# No auth token (scalable). NOTE: value-shape of floorplanSpecials is
+# INFERRED (the captured HAR property had no active special, [] /
+# false) — parsed defensively; revalidate when a populated G5 special
+# is observed.
+_G5_UNITS_QUERY = (
+    "query($urn:String!){apartmentComplex(locationUrn:$urn){"
+    "id name hasApartmentSpecials hasFloorplanSpecials "
+    "floorplans{id name floorplanSpecials} "
+    "apartments(perPage:200){"
+    "id name displayName building availabilityDate sqftDisplay "
+    "prices{value formattedPrice priceType} "
+    "floorplan{id name beds baths sqft sqftDisplay}"
+    "}}}"
+)
+
+_TIER_BASE = "TIER_1_API_G5"
+_TIER_NO_URN = f"{_TIER_BASE}_NO_URN"
+_TIER_API_ERROR = f"{_TIER_BASE}_API_ERROR"
+_TIER_EMPTY = f"{_TIER_BASE}_EMPTY"
+
+
+def find_g5_urn(html: str) -> str | None:
+    """Return the longest ``g5-cl-...`` slug in *html*, or None.
+
+    Longest match wins because the same property might have both the bare
+    ``g5-cl-<id>`` and the full ``g5-cl-<id>-<name-slug>`` form; the
+    GraphQL API accepts either but the longer form is unambiguous.
+    """
+    if not html or "g5-cl-" not in html.lower():
+        return None
+    matches = {m.group(0).lower() for m in _G5_URN_RE.finditer(html)}
+    if not matches:
+        return None
+    return max(matches, key=len)
+
+
+def _price_to_int(prices: Any) -> int | None:
+    """Pull the first sensible price out of G5's ``prices: [...]`` list.
+
+    G5 lists multiple ``priceType`` entries (``min_rent``, ``rate``,
+    lease-term-specific). Prefer ``min_rent`` then ``rate`` then any.
+    """
+    if not isinstance(prices, list):
+        return None
+    by_type: dict[str, float | None] = {}
+    fallback: float | None = None
+    for p in prices:
+        if not isinstance(p, dict):
+            continue
+        val = p.get("value")
+        try:
+            n = float(val) if val is not None else None
+        except (TypeError, ValueError):
+            n = None
+        if n is None:
+            continue
+        pt = (p.get("priceType") or "").lower()
+        if pt and pt not in by_type:
+            by_type[pt] = n
+        if fallback is None:
+            fallback = n
+    for key in ("min_rent", "rate", "market_rent"):
+        if by_type.get(key) is not None:
+            return int(by_type[key])  # type: ignore[arg-type]
+    return int(fallback) if fallback is not None else None
+
+
+def _sqft_to_int(val: Any) -> int | None:
+    """G5 sqft can be int or display string like '950'."""
+    if val is None:
+        return None
+    if isinstance(val, int):
+        return val if 50 < val < 20_000 else None
+    if isinstance(val, str):
+        m = re.search(r"(\d{2,5})", val)
+        if m:
+            n = int(m.group(1))
+            return n if 50 < n < 20_000 else None
+    return None
+
+
+def _g5_specials_to_str(val: Any) -> str:
+    """Defensive: G5 floorplanSpecials value-shape is inferred (no
+    populated HAR example). Coerce list[str] / list[dict] / str / dict
+    → a single raw string, capture-first. '' when absent."""
+    if not val:
+        return ""
+    if isinstance(val, str):
+        return val.strip()
+    if isinstance(val, dict):
+        for k in ("description", "title", "text", "name", "value"):
+            if isinstance(val.get(k), str) and val[k].strip():
+                return val[k].strip()
+        return ""
+    if isinstance(val, list):
+        parts: list[str] = []
+        for it in val:
+            s = _g5_specials_to_str(it)
+            if s:
+                parts.append(s)
+        return " | ".join(parts)
+    return ""
+
+
+def parse_g5_apartments(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Convert G5's ``apartmentComplex.apartments`` list into unit dicts."""
+    ac = (payload.get("data") or {}).get("apartmentComplex") or {}
+    apts = ac.get("apartments") or []
+    # Map floorplanId -> concession text (HAR-confirmed schema path).
+    _fp_spec: dict[Any, str] = {}
+    for _fp in ac.get("floorplans") or []:
+        if isinstance(_fp, dict):
+            _s = _g5_specials_to_str(_fp.get("floorplanSpecials"))
+            if _s:
+                _fp_spec[_fp.get("id")] = _s
+    out: list[dict[str, Any]] = []
+    for a in apts:
+        if not isinstance(a, dict):
+            continue
+        rent = _price_to_int(a.get("prices"))
+        if not rent or not (200 <= rent <= 50_000):
+            continue
+        fp = a.get("floorplan") or {}
+        beds = fp.get("beds")
+        baths = fp.get("baths")
+        sqft = _sqft_to_int(fp.get("sqft")) or _sqft_to_int(a.get("sqftDisplay"))
+        unit_number = a.get("name") or a.get("displayName") or ""
+        avail = a.get("availabilityDate") or ""
+        out.append(
+            {
+                "unit_number": str(unit_number),
+                "floor_plan_name": str(fp.get("name") or ""),
+                "bedrooms": str(beds) if beds is not None else "",
+                "bathrooms": str(baths) if baths is not None else "",
+                "sqft": str(sqft) if sqft else "",
+                "market_rent_low": rent,
+                "market_rent_high": rent,
+                "rent_range": str(rent),
+                "availability_status": "AVAILABLE",
+                "availability_date": str(avail)[:30],
+                "building": str(a.get("building") or ""),
+                "concession": _fp_spec.get(fp.get("id"), ""),
+                "extraction_tier": _TIER_BASE,
+            }
+        )
+    return out
+
+
+class G5Adapter:
+    """Adapter for G5-hosted multifamily marketing sites.
+
+    G5 sites embed unit data via JS calls to ``inventory.g5marketingcloud.com``
+    that PropAi's network capture often misses (the call fires after the
+    settle window). The adapter discovers the property URN from any
+    ``g5-cl-...`` slug in the rendered HTML and queries the GraphQL API
+    directly. No browser required for the API call itself.
+    """
+
+    pms_name: str = "g5"
+    _fingerprints: list[str] = [
+        "inventory.g5marketingcloud.com",
+        "g5-assets-cld-res.cloudinary.com",
+        "g5marketingcloud",
+    ]
+
+    async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
+        """Discover URN → fetch units → emit AdapterResult."""
+        result = AdapterResult(tier_used=_TIER_BASE)
+
+        fr = getattr(ctx, "fetch_result", None)
+        body = getattr(fr, "body", None) if fr is not None else None
+        html = ""
+        if isinstance(body, bytes):
+            try:
+                html = body.decode("utf-8", errors="replace")
+            except Exception:
+                html = ""
+        elif isinstance(body, str):
+            html = body
+
+        urn = find_g5_urn(html) if html else None
+        if not urn:
+            result.tier_used = _TIER_NO_URN
+            result.errors.append("g5-adapter: no g5-cl-... URN in rendered HTML")
+            return result
+
+        try:
+            payload = await _fetch_g5_units(urn)
+        except Exception as exc:
+            if await self._try_apollo(page, ctx, result):
+                return result
+            result.tier_used = _TIER_API_ERROR
+            result.errors.append(
+                f"g5-api-error: urn={urn!r} {type(exc).__name__}: {str(exc)[:120]}"
+            )
+            return result
+
+        if not payload:
+            if await self._try_apollo(page, ctx, result):
+                return result
+            result.tier_used = _TIER_API_ERROR
+            result.errors.append(f"g5-api: empty response for urn={urn!r}")
+            return result
+
+        units = parse_g5_apartments(payload)
+        if not units:
+            if await self._try_apollo(page, ctx, result):
+                return result
+            result.tier_used = _TIER_EMPTY
+            result.errors.append(
+                f"g5-api: returned 0 parseable units for urn={urn!r} "
+                "(property may have no live inventory)"
+            )
+            return result
+
+        result.units = units
+        result.winning_url = f"{_G5_ENDPOINT} (urn={urn})"
+        result.confidence = min(0.95, 0.7 + 0.02 * len(units))
+        return result
+
+    def static_fingerprints(self) -> list[str]:
+        return list(self._fingerprints)
+
+    async def _try_apollo(
+        self,
+        page: Page,
+        ctx: AdapterContext,
+        result: AdapterResult,
+    ) -> bool:
+        """2026-05-19 Apollo-cache fallback. G5 is a Vue SPA whose GraphQL
+        XHR is frequently not captured (it fires once at boot, before
+        interception). The resolved data still lives in
+        ``window.__APOLLO_CLIENT__.cache`` — read it directly when the
+        primary URN+POST path failed. Unit-level Apartment↔Prices↔Floorplan
+        join preferred; falls back to plan-level Floorplan rows.
+        """
+        evaluate = getattr(page, "evaluate", None)
+        if not callable(evaluate):
+            return False
+        try:
+            cache = await evaluate(_G5_APOLLO_JS)
+        except Exception:
+            return False
+        if not isinstance(cache, dict):
+            return False
+        win = ""
+        try:
+            win = page.url or getattr(ctx, "base_url", "") or ""
+        except Exception:
+            win = getattr(ctx, "base_url", "") or ""
+        for parsed in (
+            parse_g5_apollo_units(cache.get("units") or [], win),
+            parse_g5_apollo_floorplans(cache.get("floorplans") or [], win),
+        ):
+            if not parsed:
+                continue
+            from ma_poc.extraction.post_process import post_process
+
+            pp = post_process(parsed, property_id=getattr(ctx, "property_id", None))
+            if pp.n_admitted > 0:
+                result.units = pp.admitted
+                result.plan_summaries = pp.plan_summaries
+                result.tier_used = "TIER_2_API_G5_APOLLO"
+                result.winning_url = win
+                result.confidence = min(0.92, 0.7 + 0.05 * pp.n_admitted)
+                return True
+        return False
+
+
+async def _fetch_g5_units(urn: str) -> dict[str, Any] | None:
+    """Hit the G5 GraphQL endpoint with our units query."""
+    import httpx
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    payload = {"query": _G5_UNITS_QUERY, "variables": {"urn": urn}}
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
+        r = await c.post(_G5_ENDPOINT, json=payload, headers=headers)
+        if r.status_code != 200:
+            return None
+        try:
+            return r.json()
+        except Exception:
+            return None
+
+
+# ── Apollo-cache fallback helpers (2026-05-19) ───────────────────────────────
+# G5 is a Vue SPA; the GraphQL POST fires once at boot and is frequently NOT
+# captured by XHR interception. The resolved inventory still lives in the
+# Apollo client cache (`window.__APOLLO_CLIENT__.cache`). Verified live on
+# livemarleymanor.com: cache held 7 Floorplan + 20 Apartment + 20 Prices
+# objects with clean numeric rents.
+
+_G5_APOLLO_JS = r"""
+() => {
+  const c = window.__APOLLO_CLIENT__;
+  if (!c || !c.cache || typeof c.cache.extract !== 'function') return {floorplans: [], units: []};
+  let d;
+  try { d = c.cache.extract(); } catch (e) { return {floorplans: [], units: []}; }
+  const ents = Object.entries(d);
+  const fpById = {};
+  const floorplans = [];
+  for (const [, o] of ents) {
+    if (o && o.__typename === 'Floorplan') {
+      fpById[String(o.id)] = {name: o.name || '', beds: o.beds, baths: o.baths, sqft: o.sqft};
+      floorplans.push({
+        name: o.name || '', beds: o.beds, baths: o.baths, sqft: o.sqft,
+        startingRate: o.startingRate, endingRate: o.endingRate,
+        available: o.totalAvailableUnits, hasSpecials: !!o.hasSpecials,
+      });
+    }
+  }
+  const price = (ref) => {
+    const id = ref && (ref.id || ref.__ref);
+    return id ? d[id] : null;
+  };
+  const units = [];
+  for (const [k, o] of ents) {
+    if (!o || o.__typename !== 'Apartment') continue;
+    const m = k.match(/floorplanId"?\s*:\s*"?(\d+)/);
+    const fp = m ? fpById[m[1]] : null;
+    const vals = (o.prices || [])
+      .map(price).filter(Boolean)
+      .map((p) => parseFloat(p.value)).filter((v) => !isNaN(v) && v > 0);
+    units.push({
+      unit: o.name || '', avail: o.availabilityDate || '',
+      rentLow: vals.length ? Math.min.apply(null, vals) : null,
+      rentHigh: vals.length ? Math.max.apply(null, vals) : null,
+      fpName: fp ? fp.name : '', beds: fp ? fp.beds : null,
+      baths: fp ? fp.baths : null, sqft: fp ? fp.sqft : null,
+    });
+  }
+  return {floorplans, units};
+}
+"""
+
+
+def _to_int(v: object) -> int | None:
+    try:
+        if v is None or v == "":
+            return None
+        return int(float(v))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_g5_apollo_floorplans(
+    fps: list[dict[str, object]], url: str
+) -> list[dict[str, str]]:
+    """Plan-level rows from Apollo ``Floorplan`` objects (rates numeric)."""
+    units: list[dict[str, str]] = []
+    for fp in fps:
+        if not isinstance(fp, dict):
+            continue
+        name = str(fp.get("name") or "").strip()
+        beds = _to_int(fp.get("beds"))
+        baths_raw = fp.get("baths")
+        baths = str(baths_raw).strip() if baths_raw not in (None, "") else ""
+        sqft = _to_int(fp.get("sqft"))
+        rent_lo = _to_int(fp.get("startingRate"))
+        rent_hi = _to_int(fp.get("endingRate"))
+        avail = _to_int(fp.get("available"))
+        if not name and beds is None and sqft is None:
+            continue
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=baths,
+                sqft=str(sqft) if sqft is not None else "",
+                unit_number="",
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                availability_status="AVAILABLE",
+                available_units=str(avail) if avail is not None else "",
+                concession="SPECIAL" if fp.get("hasSpecials") else "",
+                source_api_url=url,
+                extraction_tier="TIER_2_API_G5_APOLLO",
+            )
+        )
+    return units
+
+
+def parse_g5_apollo_units(
+    rows: list[dict[str, object]], url: str
+) -> list[dict[str, str]]:
+    """Unit-level rows from Apollo Apartment↔Prices↔Floorplan join."""
+    units: list[dict[str, str]] = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        unit_no = str(r.get("unit") or "").strip()
+        fp_name = str(r.get("fpName") or "").strip()
+        rent_lo = _to_int(r.get("rentLow"))
+        rent_hi = _to_int(r.get("rentHigh"))
+        if not unit_no and not fp_name and rent_lo is None:
+            continue
+        beds = _to_int(r.get("beds"))
+        baths_raw = r.get("baths")
+        baths = str(baths_raw).strip() if baths_raw not in (None, "") else ""
+        sqft = _to_int(r.get("sqft"))
+        units.append(
+            make_unit_dict(
+                floor_plan_name=fp_name,
+                bed_label=bed_label_from(beds, fp_name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=baths,
+                sqft=str(sqft) if sqft is not None else "",
+                unit_number=unit_no,
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                availability_status="AVAILABLE",
+                available_units="1",
+                availability_date=str(r.get("avail") or "").strip(),
+                source_api_url=url,
+                extraction_tier="TIER_2_API_G5_APOLLO",
+            )
+        )
+    return units

@@ -97,12 +97,18 @@ def _unwrap_name(v: Any) -> str:
 
 
 def _money_to_int(s: Any) -> int | None:
-    """Parse '$1,450', '1450.00', '1,450 USD' → 1450. Returns None on failure."""
+    """Parse '$1,450', '1450.00', '1,450 USD' -> 1450. Returns None on failure.
+
+    For range strings like ``"$1,200 - $1,400"`` returns the LOW value.
+    See ``ma_poc/pms/adapters/_parsing.py::money_to_int`` for the
+    rationale (project_run_2026_05_11 deposit->rent leakage fix).
+    """
     if s is None:
         return None
-    cleaned = re.sub(r"[^\d.]", "", str(s))
-    if not cleaned or cleaned == ".":
+    m = re.search(r"\d[\d,]*(?:\.\d{1,2})?", str(s))
+    if not m:
         return None
+    cleaned = m.group(0).replace(",", "")
     try:
         return int(float(cleaned))
     except ValueError:

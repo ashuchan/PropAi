@@ -8,7 +8,11 @@ from pathlib import Path
 import pytest
 
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
-from ma_poc.pms.adapters.onesite import OneSiteAdapter, parse_realpage_floorplans
+from ma_poc.pms.adapters.onesite import (
+    _ONESITE_AVAIL_DATE_ALIASES,
+    OneSiteAdapter,
+    parse_realpage_floorplans,
+)
 from ma_poc.pms.detector import detect_pms
 
 FIXTURES = Path(__file__).parent / "fixtures" / "onesite"
@@ -141,3 +145,92 @@ def test_rent_within_sanity_range() -> None:
                     for n in nums:
                         val = int(n.replace(",", ""))
                         assert 200 <= val <= 50000
+
+
+# ────────────────────────────────────────────────────────────────────
+# 2026-05-13 port (Commit 6 of MAY13_API_TIER_PORT_PLAN.md):
+# - 7-alias available_date lookup on RealPage /floorplans payloads
+# - Three-label outcome (SUCCESS / _EMPTY / _NO_RESPONSE) for Phase-B
+# ────────────────────────────────────────────────────────────────────
+
+
+def _fp_body(extras: dict) -> dict:
+    """Minimal valid RealPage /floorplans payload with one floorplan."""
+    base_fp = {
+        "name": "A1",
+        "bedRooms": 1,
+        "bathRooms": 1,
+        "id": 99,
+        "minimumMarketRent": 1500,
+        "maximumMarketRent": 1500,
+    }
+    base_fp.update(extras)
+    return {"response": {"floorplans": [base_fp]}}
+
+
+class TestOneSiteAliasLookup:
+    def test_alias_firstAvailableDate_threaded_through(self):
+        out = parse_realpage_floorplans(_fp_body({"firstAvailableDate": "2026-07-01"}), "https://x/floorplans")
+        assert out[0]["availability_date"] == "2026-07-01"
+        # Dual emission (Commit 4) populates both keys.
+        assert out[0]["available_date"] == "2026-07-01"
+
+    def test_alias_availableDate(self):
+        out = parse_realpage_floorplans(_fp_body({"availableDate": "2026-08-01"}), "https://x")
+        assert out[0]["availability_date"] == "2026-08-01"
+
+    def test_alias_minimumAvailableDate(self):
+        out = parse_realpage_floorplans(_fp_body({"minimumAvailableDate": "2026-09-01"}), "https://x")
+        assert out[0]["availability_date"] == "2026-09-01"
+
+    def test_no_date_alias_yields_empty(self):
+        out = parse_realpage_floorplans(_fp_body({}), "https://x")
+        assert out[0]["availability_date"] == ""
+
+    def test_all_7_aliases_present(self):
+        expected = {
+            "availableDate", "firstAvailableDate", "dateAvailable",
+            "minimumAvailableDate", "availabilityDate", "available_date",
+            "minAvailableDate",
+        }
+        assert set(_ONESITE_AVAIL_DATE_ALIASES) == expected
+
+
+@pytest.mark.asyncio
+class TestOneSiteThreeLabelOutcomes:
+    """Branch-port: split TIER_1_API_ONESITE into three distinct labels
+    so Phase-B retry can fire on the "empty" / "no response" paths.
+
+    Pre-port all three terminal states shipped TIER_1_API_ONESITE which
+    falsely indicated success and blocked the cascade fallback."""
+
+    async def test_success_keeps_bare_tier_label(self):
+        responses = _load_fixture("293707.json")
+        ctx = _make_ctx(responses)
+        result = await OneSiteAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+        assert result.tier_used == "TIER_1_API_ONESITE"
+        assert len(result.units) > 0
+
+    async def test_no_response_path_emits_no_response_label(self):
+        # Empty response list -> No RealPage-shaped data ever seen.
+        ctx = _make_ctx([])
+        result = await OneSiteAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+        assert result.tier_used == "TIER_1_API_ONESITE_NO_RESPONSE"
+        assert len(result.units) == 0
+        # Errors should reflect the no-response state.
+        assert any("No RealPage" in e for e in result.errors)
+
+    async def test_empty_path_emits_empty_label_when_validity_rejects_all(self):
+        # Floorplans response present but ALL rows fail validity gate
+        # (no beds/baths/sqft -- forcing rejection at the dim-less gate).
+        bad_body = {"response": {"floorplans": [{
+            "name": "Junk",
+            "id": "1",
+            # No bedRooms / bathRooms / squareFeet -> validity gate rejects.
+        }]}}
+        ctx = _make_ctx([{"url": "https://api.ws.realpage.com/v2/property/1/floorplans",
+                          "body": bad_body}])
+        result = await OneSiteAdapter().extract(_DummyPage(), ctx)  # type: ignore[arg-type]
+        assert result.tier_used == "TIER_1_API_ONESITE_EMPTY"
+        assert len(result.units) == 0
+        assert any("VALIDITY_REJECTED" in e for e in result.errors)

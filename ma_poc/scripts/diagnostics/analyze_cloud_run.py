@@ -43,7 +43,15 @@ DEFAULT_OUT_ROOT = REPO_ROOT / "data" / "reports"
 
 # Tier categorisation lifted from the May 8 patterns. Update when new
 # adapter tiers are introduced.
+#
+# 2026-05-13 port (MAY13_API_TIER_PORT_PLAN.md): added entries for the 10
+# new Tier-1 adapters + the new Entrata/OneSite/AppFolio variant labels
+# emitted by the per-adapter improvements. Without these entries the
+# downstream platform-tier breakdown silently bucketed properties using
+# new adapters as "other", under-counting per-PMS yield in the daily
+# report and in canary_diff.py's per-PMS gate.
 PLATFORM_TIERS = {
+    # Original 9 entries (pre-May-13).
     "TIER_1_API_ENTRATA": "entrata",
     "TIER_1_API_APPFOLIO": "appfolio",
     "TIER_1_API_ONESITE": "onesite",
@@ -53,6 +61,33 @@ PLATFORM_TIERS = {
     "TIER_1_API_AVALONBAY": "avalonbay",
     "SYNDICATION_ONLY_SQUARESPACE": "squarespace",
     "SYNDICATION_ONLY_WIX": "wix",
+    # May-13 port: 10 new Tier-1 adapters (Commits 10-13).
+    "TIER_1_API_REALPAGE_OLL": "realpage_oll",
+    "TIER_1_API_G5": "g5",
+    "TIER_1_API_KNOCK": "knock",
+    "TIER_1_API_CORTLAND": "cortland",
+    "TIER_1_API_EQUITY": "equity",
+    "TIER_1_API_RENTMANAGER": "rentmanager",
+    "TIER_1_API_IRVINE": "irvine",
+    "TIER_1_API_APTS247": "apts247",
+    "TIER_1_API_ESSEX": "essex",
+    "TIER_1_API_MAAC": "maac",
+    "TIER_1_API_RENTVISION": "rentvision",
+    # May-13 port: new variant labels (Commits 5, 6, 8, 9).
+    "TIER_1_API_ENTRATA_PROBE": "entrata",        # 5-path probe success
+    "TIER_1_DOM_ENTRATA_WP": "entrata",           # WordPress fallback
+    "TIER_1_DOM_ENTRATA_PROSPECTPORTAL": "entrata",  # PP HTML fragment
+    "TIER_1_API_ONESITE_EMPTY": "onesite",        # parsed but validity-rejected
+    "TIER_1_API_ONESITE_NO_RESPONSE": "onesite",  # no RealPage responses
+    "TIER_1_DOM_APPFOLIO_EMBED": "appfolio",      # cross-origin iframe
+    "TIER_1_DOM_APPFOLIO_DETAIL": "appfolio",     # listings/detail/<uuid> parser
+    "TIER_1_DOM_APPFOLIO_SSR": "appfolio",        # F11 SSR fallback
+    "TIER_1_DOM_RENTCAFE_HOSTED": "rentcafe",     # hosted-table parser
+    "TIER_1_DOM_RENTCAFE_NESTIN": "rentcafe",     # Nestin per-plan recovery
+    "TIER_1_DOM_RENTMANAGER_ILOVELEASING": "rentmanager",
+    # Equity adapter emits these three labels (success / empty / no_response).
+    "TIER_1_API_EQUITY_EMPTY": "equity",
+    "TIER_1_API_EQUITY_NO_RESPONSE": "equity",
 }
 
 # Outcomes that mean "we never got data". UNREACHABLE = pre-extraction termination,

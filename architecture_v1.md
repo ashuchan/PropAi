@@ -542,7 +542,15 @@ Two-pass: (1) offline from URL + CSV, (2) re-run with page HTML; higher confiden
 
 `get_adapter(pms_name)` — never returns None. Falls back to `GenericAdapter`.
 
-Known adapters: `rentcafe`, `entrata`, `appfolio`, `sightmap`, `generic` (+ others).
+Known adapters (22 total as of 2026-05-21 May-13 port):
+- **Core PMS** (pre-May-13): `rentcafe`, `entrata`, `appfolio`, `onesite`, `sightmap`,
+  `realpage_oll`, `avalonbay`, `amli`, `funnel`, `touchtour`.
+- **Server-only Tier-1** (Commit 11): `cortland`, `equity`, `rentmanager`.
+- **Browser-intercept Tier-1** (Commit 12): `g5`, `knock`, `irvine`, `apts247`.
+- **REIT/CMS** (Commit 13): `essex`, `maac`, `rentvision`.
+- **Detector-only** (adapter defers to generic for now):
+  `encoreskyline_template`.
+- **No-PMS / generic**: `squarespace_nopms`, `wix_nopms`, `generic`.
 
 **PMS-specific adapters:** deterministic parsing, no LLM. Own their PMS quirks entirely.
 **GenericAdapter:** runs the full tier cascade including LLM paths. Is the fallback for unknown/undetected PMS.

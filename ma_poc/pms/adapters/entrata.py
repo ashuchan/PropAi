@@ -106,8 +106,41 @@ def _filter_widget_response(body: dict[str, Any]) -> dict[str, Any] | None:
     return body
 
 
+# 2026-05-13 port: aliases the producer may emit for the same move-in
+# date field. Pre-port the adapter dropped this field entirely, leading
+# to fleet-wide 0% available_date on TIER_1_API_ENTRATA properties
+# (memory note on 2026-05-19 run). Empty when absent so adapters not
+# yet emitting dates continue to produce identical output.
+_ENTRATA_AVAIL_DATE_ALIASES: tuple[str, ...] = (
+    "available_date",
+    "availableDate",
+    "availability_date",
+    "move_in_date",
+    "min_move_in_date",
+    "date_available",
+    "available_on",
+    "first_available_date",
+)
+
+
+def _first_alias(item: dict[str, Any], aliases: tuple[str, ...]) -> str:
+    """First non-empty string value among *aliases* in *item*; '' otherwise."""
+    for k in aliases:
+        v = item.get(k)
+        if v:
+            return str(v)
+    return ""
+
+
 def parse_entrata_floorplans(items: list[dict[str, Any]], url: str) -> list[dict[str, str]]:
-    """Parse a flat list of Entrata floorplan dicts into standard unit dicts."""
+    """Parse a flat list of Entrata floorplan dicts into standard unit dicts.
+
+    2026-05-13 port: now extracts move-in date via the 7-alias lookup
+    (``_ENTRATA_AVAIL_DATE_ALIASES``). schema_v2._format_date normalises
+    the value downstream; ``make_unit_dict`` emits both ``availability_date``
+    and ``available_date`` so the v2 reader picks it up regardless of
+    which alias the producer used.
+    """
     units: list[dict[str, str]] = []
     for item in items:
         if not isinstance(item, dict):
@@ -123,6 +156,8 @@ def parse_entrata_floorplans(items: list[dict[str, Any]], url: str) -> list[dict
         rent_hi = money_to_int(str(item.get("max_rent") or ""))
         rent_range = format_rent_range(rent_lo, rent_hi)
 
+        avail_dt = _first_alias(item, _ENTRATA_AVAIL_DATE_ALIASES)
+
         units.append(
             make_unit_dict(
                 floor_plan_name=name,
@@ -133,6 +168,7 @@ def parse_entrata_floorplans(items: list[dict[str, Any]], url: str) -> list[dict
                 unit_number=str(item.get("id") or ""),
                 rent_range=rent_range,
                 availability_status="AVAILABLE",
+                availability_date=avail_dt,
                 available_units="1",
                 source_api_url=url,
                 extraction_tier="TIER_1_API_ENTRATA",
@@ -154,6 +190,261 @@ def parse_entrata_widget_envelope(
         if isinstance(fp_list, list) and fp_list:
             return parse_entrata_floorplans(fp_list, url)
     return []
+
+
+# ────────────────────────────────────────────────────────────────────
+# 2026-05-13 port: WordPress-embedded Entrata + ProspectPortal parsers.
+# These are standalone functions callable from tests; orchestration
+# wiring into ``EntrataAdapter.extract`` lands in a follow-up commit
+# once the ``_probe.py`` curl_cffi helper is available
+# (Commit 11 of MAY13_API_TIER_PORT_PLAN.md).
+# ────────────────────────────────────────────────────────────────────
+
+
+_AVAIL_UNITS_RE = re.compile(r'"available_units"\s*:\s*(\[)')
+_FP_DETAIL_RE = re.compile(r"/floorplan/[a-z0-9][a-z0-9-]*/?", re.IGNORECASE)
+_SLUG_BB_RE = re.compile(r"(\d+)\s*br[\s_-]*(\d+(?:\.\d+)?)\s*ba", re.IGNORECASE)
+
+
+def _iso_date(s: Any) -> str:
+    """Normalize ``MM/DD/YYYY`` -> ``YYYY-MM-DD``; passthrough/'' otherwise."""
+    m = re.match(r"\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*$", str(s or ""))
+    if not m:
+        return ""
+    mo, d, y = m.groups()
+    return f"{y}-{int(mo):02d}-{int(d):02d}"
+
+
+def _bracket_json(text: str, start: int) -> str | None:
+    """Return the balanced ``[...]`` JSON array starting at *start*.
+
+    Returns ``None`` if the array is malformed (never raises). Used by
+    ``parse_entrata_available_units`` to slice an HTML-embedded JSON
+    payload without depending on a regex that has to encode bracket
+    balancing.
+    """
+    depth = 0
+    for j in range(start, len(text)):
+        c = text[j]
+        if c == "[":
+            depth += 1
+        elif c == "]":
+            depth -= 1
+            if depth == 0:
+                return text[start : j + 1]
+    return None
+
+
+def parse_entrata_available_units(html: str, url: str) -> list[dict[str, str]]:
+    """Parse Entrata-WP per-floorplan-detail embedded ``available_units``.
+
+    Entrata marketing sites (WordPress + ProspectPortal apply links)
+    server-render an HTML-entity-encoded JSON blob on
+    ``/floorplan/<slug>/`` detail pages::
+
+        "available_units":[{"id","name","available_on","price",
+                            "deposit","apply_url"}, ...]
+
+    Each entry is a real unit (stable ``id`` + unit ``name`` + date +
+    rent) -> deterministic Tier-1, no render needed. Beds/baths come
+    from the floorplan slug (``1br-1ba-pennsylvania``).
+
+    Never raises. Returns ``[]`` if the page lacks ``available_units``
+    or the JSON is malformed.
+    """
+    if not html or "available_units" not in html:
+        return []
+    # Lazy-import the stdlib `html` module to avoid shadowing the
+    # ``html`` parameter above.
+    import html as _htmlmod
+    import json
+
+    decoded = _htmlmod.unescape(html).replace("\\/", "/")
+    beds = baths = plan = ""
+    ms = re.search(r"/floorplan/([a-z0-9][a-z0-9-]*)", url, re.IGNORECASE)
+    slug = ms.group(1) if ms else ""
+    mb = _SLUG_BB_RE.search(slug)
+    if mb:
+        beds, baths = mb.group(1), mb.group(2)
+    plan = re.sub(r"^\d+br[-_]?\d+(?:\.\d+)?ba[-_]?", "", slug, flags=re.IGNORECASE)
+    plan = plan.replace("-", " ").strip().title() or slug
+
+    units: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for m in _AVAIL_UNITS_RE.finditer(decoded):
+        arr = _bracket_json(decoded, m.start(1))
+        if not arr:
+            continue
+        try:
+            data = json.loads(arr)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(data, list):
+            continue
+        for u in data:
+            if not isinstance(u, dict):
+                continue
+            uid = str(u.get("id") or "").strip()
+            name = str(u.get("name") or "").strip()
+            key = uid or name
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            rent_i: int | None = None
+            pr = re.search(r"[\d,]+", str(u.get("price") or ""))
+            if pr:
+                try:
+                    rent_i = int(round(float(pr.group(0).replace(",", ""))))
+                except (TypeError, ValueError):
+                    rent_i = None
+            units.append(
+                make_unit_dict(
+                    floor_plan_name=plan,
+                    bedrooms=beds,
+                    bathrooms=baths,
+                    unit_number=name or f"ent-{uid}",
+                    rent_low=rent_i,
+                    rent_high=rent_i,
+                    availability_status="AVAILABLE",
+                    availability_date=_iso_date(u.get("available_on")),
+                    source_api_url=url,
+                    extraction_tier="TIER_1_DOM_ENTRATA_WP",
+                )
+            )
+    return units
+
+
+def find_entrata_fp_detail_links(index_html: str, origin: str) -> list[str]:
+    """Return absolute ``/floorplan/<slug>/`` URLs from an Entrata-WP
+    index page. Used by the WP fallback to crawl per-plan detail pages.
+
+    Pure HTML parser -- no network. Never raises.
+    """
+    if not index_html or not origin:
+        return []
+    out: list[str] = []
+    base = origin.rstrip("/")
+    for m in _FP_DETAIL_RE.finditer(index_html):
+        path = m.group(0)
+        if not path.endswith("/"):
+            path += "/"
+        u = base + path
+        if u not in out:
+            out.append(u)
+    return out
+
+
+# ProspectPortal `view_unit_spaces` HTML-fragment parser. The marketing
+# shell links to <sub>.prospectportal.com; the real unit list is GET
+# ?module=check_availability&action=view_unit_spaces&property[id]=<pid>&
+# property_floorplan[id]=<fpid> returning an HTML fragment with
+# <a class="unit-button" data-*> rows. Stateless GET, Cloudflare-fronted.
+_PP_HOST_RE = re.compile(
+    r"https?://([a-z0-9][a-z0-9-]*)\.prospectportal\.com", re.IGNORECASE
+)
+_PP_PROPID_RE = re.compile(r"property\[id\][^0-9]{0,6}(\d{3,9})", re.IGNORECASE)
+_PP_FPID_RE = re.compile(
+    r"""(?:property_floorplan\[id\]|data-floorplan)["'\]=\s/]{1,4}(\d{4,9})""",
+    re.IGNORECASE,
+)
+
+
+def _pp_iso(s: Any) -> str:
+    """``2026/05/17`` | ``2026-05-17`` -> ``2026-05-17``; '' otherwise."""
+    m = re.search(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", str(s or ""))
+    if not m:
+        return ""
+    return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+
+
+def parse_prospectportal_unit_spaces(html: str, url: str) -> list[dict[str, str]]:
+    """Parse a ProspectPortal ``view_unit_spaces`` HTML fragment.
+
+    One row per ``<a class="unit-button" data-*>``. The ``data-*`` attrs
+    are authoritative:
+      * data-unit                       -- unit_space id
+      * data-rent                       -- numeric rent
+      * data-bedroom / data-bathroom    -- bed/bath counts
+      * data-unitavailabilitydate       -- ISO-ish move-in date
+
+    Visible unit number is the sibling ``.unit-col.unit .unit-col-text``.
+    Floorplan name/sqft from the fragment header. Live-verified
+    2026-05-18: springriver.prospectportal.com A1 fp 712595 -> 3 units
+    at $1,291, 642 sqft.
+
+    Never raises; returns ``[]`` if BeautifulSoup parse fails or the
+    fragment lacks ``unit-button`` rows.
+    """
+    if not html or "unit-button" not in html:
+        return []
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:  # pragma: no cover -- bs4 is in main deps
+        return []
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        # lxml not installed or input not parseable -- fall back silently.
+        return []
+
+    fp_name = ""
+    h = soup.select_one("h6.availability-fp-name")
+    if h:
+        fp_name = h.get_text(strip=True)
+    fp_sqft = ""
+    for li in soup.select("li.fp-stats-item.modal-sq-feet .stat-value"):
+        fp_sqft = li.get_text(strip=True)
+        break
+
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for a in soup.select("a.unit-button"):
+        uid = str(a.get("data-unit") or a.get("rel") or "").strip()
+        row = a.find_parent(class_="unit-row-wrapper") or a.find_parent(class_="unit-row")
+        unum = ""
+        if row is not None:
+            uc = row.select_one(".unit-col.unit .unit-col-text")
+            if uc:
+                unum = uc.get_text(strip=True)
+        unum = unum or uid
+        if not unum or unum in seen:
+            continue
+        seen.add(unum)
+        rent_i: int | None = None
+        rraw = str(
+            a.get("data-rent")
+            or a.get("data-min-advertised-base-rent")
+            or ""
+        )
+        rm = re.search(r"[\d,]+", rraw)
+        if rm:
+            try:
+                rent_i = int(round(float(rm.group(0).replace(",", ""))))
+            except (TypeError, ValueError):
+                rent_i = None
+        sqft = ""
+        if row is not None:
+            sc = row.select_one(".unit-col.sqft .unit-col-text") or row.select_one(
+                ".unit-col.sq-ft .unit-col-text"
+            )
+            if sc:
+                sqft = sc.get_text(strip=True)
+        out.append(
+            make_unit_dict(
+                floor_plan_name=fp_name,
+                bedrooms=str(a.get("data-bedroom") or ""),
+                bathrooms=str(a.get("data-bathroom") or ""),
+                sqft=sqft or fp_sqft,
+                unit_number=unum,
+                rent_low=rent_i,
+                rent_high=rent_i,
+                availability_status="AVAILABLE",
+                availability_date=_pp_iso(str(a.get("data-unitavailabilitydate") or "")),
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_ENTRATA_PROSPECTPORTAL",
+            )
+        )
+    return out
 
 
 class EntrataAdapter:

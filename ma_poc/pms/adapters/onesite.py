@@ -43,8 +43,39 @@ if TYPE_CHECKING:
     from playwright.async_api import Page
 
 
+# 2026-05-13 port: aliases the RealPage /floorplans payload may carry
+# for the first-available date. Pre-port these keys were dropped,
+# producing fleet-wide 0% available_date on TIER_1_API_ONESITE.
+# schema_v2._format_date handles "NOW" / relative / 2-digit forms
+# downstream; ``make_unit_dict`` emits both ``availability_date`` and
+# ``available_date`` (Commit 4 dual emission) so the v2 reader picks
+# the value up.
+_ONESITE_AVAIL_DATE_ALIASES: tuple[str, ...] = (
+    "availableDate",
+    "firstAvailableDate",
+    "dateAvailable",
+    "minimumAvailableDate",
+    "availabilityDate",
+    "available_date",
+    "minAvailableDate",
+)
+
+
+def _first_alias(item: dict[str, Any], aliases: tuple[str, ...]) -> str:
+    """First non-empty string value among *aliases* in *item*; '' otherwise."""
+    for k in aliases:
+        v = item.get(k)
+        if v:
+            return str(v)
+    return ""
+
+
 def parse_realpage_floorplans(body: dict[str, Any], url: str) -> list[dict[str, str]]:
-    """Parse RealPage /floorplans response into standard unit dicts."""
+    """Parse RealPage /floorplans response into standard unit dicts.
+
+    2026-05-13 port: now extracts first-available date via the 7-alias
+    lookup (``_ONESITE_AVAIL_DATE_ALIASES``).
+    """
     units: list[dict[str, str]] = []
     response = body.get("response", {})
     if not isinstance(response, dict):
@@ -74,6 +105,8 @@ def parse_realpage_floorplans(body: dict[str, Any], url: str) -> list[dict[str, 
         deposit = str(fp.get("depositAmount") or "")
         num_units = str(fp.get("numberOfUnitsDisplay") or "")
 
+        avail_dt = _first_alias(fp, _ONESITE_AVAIL_DATE_ALIASES)
+
         units.append(
             make_unit_dict(
                 floor_plan_name=name,
@@ -85,6 +118,7 @@ def parse_realpage_floorplans(body: dict[str, Any], url: str) -> list[dict[str, 
                 rent_range=format_rent_range(rent_lo, rent_hi),
                 deposit=deposit,
                 availability_status="AVAILABLE",
+                availability_date=avail_dt,
                 available_units=num_units,
                 source_api_url=url,
                 extraction_tier="TIER_1_API_ONESITE",
@@ -221,13 +255,26 @@ class OneSiteAdapter:
                     result.api_responses[0].get("url") if result.api_responses else None
                 )
                 result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
+                # Keep the bare TIER_1_API_ONESITE label for the success path.
             else:
+                # 2026-05-13 port: distinct label for "parsed rows but
+                # validity gate rejected all". Unblocks Phase-B retry --
+                # bare TIER_1_API_ONESITE pre-port indicated success and
+                # locked out the retry path.
+                result.tier_used = "TIER_1_API_ONESITE_EMPTY"
                 result.confidence = 0.0
                 result.errors.append(
                     f"ONESITE_VALIDITY_REJECTED: {_pp_parsed} parsed rows "
                     f"failed unit_validity (no numeric dimension)"
                 )
         else:
+            # 2026-05-13 port: distinct label for "no RealPage-shaped
+            # responses captured at all" -- the cluster #6 OLL-widget-shell
+            # pattern where the page loaded but nothing fired. Pre-port
+            # this also reported TIER_1_API_ONESITE, masking the
+            # difference between "we saw data but rejected it" and "we
+            # saw nothing".
+            result.tier_used = "TIER_1_API_ONESITE_NO_RESPONSE"
             result.confidence = 0.0
             result.errors.append("No RealPage/OneSite floorplan data found in captured API responses")
 

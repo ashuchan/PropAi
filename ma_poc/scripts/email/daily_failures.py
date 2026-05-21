@@ -336,7 +336,12 @@ def _fetch_scraped_units_from_sql(
                 "rent_high": None,
                 "available_date": "",
                 "lease_term": None,
-                "concessions": "",
+                # 2026-05-21 fix: emit all three V2 concession fields,
+                # not the legacy single "concessions" cell.
+                "concession_text": "",
+                "concession_text_clean": "",
+                "_concession_quality": "",
+                "concessions": "",  # kept for non-xlsx consumers; harmless null
             })
             continue
 
@@ -360,6 +365,16 @@ def _fetch_scraped_units_from_sql(
                 "rent_high": u.get("rent_high"),
                 "available_date": u.get("available_date") or "",
                 "lease_term": u.get("lease_term"),
+                # 2026-05-21 fix: pre-fix collapsed the three V2 concession
+                # fields into a single "concessions" cell via the cleaned
+                # || raw || legacy fallback. That hid the raw producer
+                # string when only the dirty variant existed and made
+                # data-quality triage impossible. Emit each field
+                # separately. The legacy `concessions` key is retained
+                # for backward compatibility with non-xlsx consumers.
+                "concession_text": _stringify_concessions(u.get("concession_text")),
+                "concession_text_clean": _stringify_concessions(u.get("concession_text_clean")),
+                "_concession_quality": u.get("_concession_quality") or "",
                 "concessions": _stringify_concessions(
                     u.get("concession_text_clean")
                     or u.get("concession_text")
@@ -617,7 +632,11 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
                 "unit_id": "", "floor_plan_name": "",
                 "beds": None, "baths": None, "area": None,
                 "rent_low": None, "rent_high": None,
-                "available_date": "", "lease_term": None, "concessions": "",
+                "available_date": "", "lease_term": None,
+                # 2026-05-21 fix: emit all three V2 concession fields.
+                "concession_text": "", "concession_text_clean": "",
+                "_concession_quality": "",
+                "concessions": "",  # legacy key
             })
             out.append(placeholder)
             continue
@@ -633,6 +652,10 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
                 "rent_high": u.get("rent_high"),
                 "available_date": u.get("available_date") or "",
                 "lease_term": u.get("lease_term"),
+                # 2026-05-21 fix: emit all three V2 concession fields.
+                "concession_text": _stringify_concessions(u.get("concession_text")),
+                "concession_text_clean": _stringify_concessions(u.get("concession_text_clean")),
+                "_concession_quality": u.get("_concession_quality") or "",
                 "concessions": _stringify_concessions(
                     u.get("concession_text_clean")
                     or u.get("concession_text")
@@ -683,7 +706,17 @@ _SCRAPED_COLUMNS: list[tuple[str, str]] = [
     ("rent_high", "Rent High"),
     ("available_date", "Available Date"),
     ("lease_term", "Lease Term"),
-    ("concessions", "Concessions"),
+    # 2026-05-21 fix: the prior single "Concessions" column collapsed three
+    # distinct V2 schema fields into one stringified cell, masking which
+    # rows had clean-vs-dirty concession text and which had nothing at
+    # all. Split into three explicit columns so reviewers can see the
+    # raw producer string, the cleaned variant (may be empty for
+    # malformed input), and the quality label. The legacy ``concessions``
+    # key is retained on the row dict for backward compatibility with
+    # any other consumer, but only the three split columns ship in xlsx.
+    ("concession_text", "Concession (Raw)"),
+    ("concession_text_clean", "Concession (Cleaned)"),
+    ("_concession_quality", "Concession Quality"),
 ]
 
 _FAILED_COLUMNS: list[tuple[str, str]] = [

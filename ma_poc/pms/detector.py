@@ -50,6 +50,32 @@ PmsName = Literal[
     "amli",
     "funnel",
     "touchtour",
+    # 2026-05-13 port (fix/resolver-path-patterns-may13): three new PMSes
+    # whose detector gates land in this commit. Their adapters arrive in
+    # later commits (knock/g5 in Commit 12, encoreskyline_template later).
+    # Until then, ``get_adapter("knock"|"g5"|"encoreskyline_template")``
+    # falls back to GenericAdapter -- detection alone is enough to log the
+    # PMS in tier_distribution and route through the cascade with the
+    # right strategy.
+    "g5",
+    "knock",
+    "encoreskyline_template",
+    # 2026-05-13 port (Commit 11): server-only Tier-1 adapters (no
+    # Playwright -- pure curl_cffi / SSR HTML scraping). Each has a
+    # dedicated adapter shipping in this commit.
+    "cortland",
+    "equity",
+    "rentmanager",
+    # 2026-05-13 port (Commit 12): browser-intercept Tier-1 adapters.
+    # G5 + Knock detector gates already landed in Commit 3; adapters
+    # arrive here. Irvine + apts247 are net-new in both detector and
+    # adapter.
+    "irvine",
+    "apts247",
+    # 2026-05-13 port (Commit 13): REIT adapters.
+    "essex",
+    "maac",
+    "rentvision",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -76,6 +102,23 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "amli": "api_first",
     "funnel": "api_first",
     "touchtour": "cascade",
+    # 2026-05-13 port: strategies for the new PMSes whose detector gates
+    # arrive in Commit 3. ``cascade`` is the safe default until each
+    # PMS's adapter lands (Commit 12 for g5/knock).
+    "g5": "api_first",
+    "knock": "api_first",
+    "encoreskyline_template": "cascade",
+    # 2026-05-13 port (Commit 11): server-only adapters.
+    "cortland": "api_first",
+    "equity": "api_first",
+    "rentmanager": "api_first",
+    # 2026-05-13 port (Commit 12): browser-intercept adapters.
+    "irvine": "api_first",
+    "apts247": "api_first",
+    # 2026-05-13 port (Commit 13): REIT adapters.
+    "essex": "api_first",
+    "maac": "api_first",
+    "rentvision": "cascade",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -172,6 +215,20 @@ _ENTRATA_PROPERTY_ID_RE = re.compile(r"property\[id\]=(\d+)|/Apartments/(\d+)/",
 _SIGHTMAP_CLIENT_KEY_RE = re.compile(r"sightmap\.com/app/api/v1/([a-z0-9_-]+)/", re.IGNORECASE)
 _APPFOLIO_SUBDOMAIN_RE = re.compile(r"https?://([a-z0-9-]+)\.appfolio\.com", re.IGNORECASE)
 _AVALONBAY_SLUG_RE = re.compile(r"avaloncommunities\.com/[a-z]{2}/[^/]+/([a-z0-9-]+)", re.IGNORECASE)
+
+# 2026-05-13 port: Entrata module-path negative lookahead. The bare path
+# ``/Apartments/module/`` is too broad -- Entrata also exposes a generic
+# tenant login form at ``/Apartments/module/application_authentication/``
+# that many vanity multifamily marketing sites link to even when their
+# actual unit data lives elsewhere (Jonah Digital / ProspectPortal etc.).
+#
+# Pre-port 4 of 4 false-positive sites (Foxchase, Muse ATL, Laurel
+# Crossing, livemuseatl) had only the application_authentication path;
+# no Entrata API ever fired. Require a real widget-specific subpath.
+_ENTRATA_REAL_MODULE_RE = re.compile(
+    r"/apartments/module/(?!application_authentication/)[a-z0-9_-]+/?",
+    re.IGNORECASE,
+)
 
 
 def _client_account_id_from_url(url: str, pms: str) -> str | None:
@@ -353,38 +410,105 @@ def _detect_url_extension(url: str) -> tuple[PmsName, float, list[str]] | None:
 
 def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | None:
     h = page_html.lower()
+
+    # 2026-05-13 port: precompute competing-PMS flags. Used to gate
+    # ambiguous-but-strong markers (G5, Jonah/MeetElise) so they don't
+    # win when the page actually carries a real PMS portal embed.
+    # Live-verified 2026-05-20 against the 6 G5+Knock co-resident
+    # properties (altaaptstarga, avonleatributary, etc.) -- every one
+    # would have routed to G5 (company-level URN, bails empty) without
+    # this gate; Knock had the real unit data.
+    _has_competing_pms_for_g5 = (
+        # Knock / Doorway widget -- dominant co-resident in the cluster.
+        "doorway.knck.io" in h
+        or "knockdoorway" in h
+        # RentCafe SecureCafe portal anchors.
+        or ".securecafe.com" in h
+        or "securecafe.com/onlineleasing" in h
+        # ResMan portal anchors.
+        or "myresman.com" in h
+        or "/portal/applicants/availability" in h
+    )
+    # Jonah/MeetElise is sometimes a chat-widget bolt-on on top of a real
+    # PMS. Gate the encoreskyline_template branch so it doesn't lock out
+    # the real PMS detection below.
+    _has_competing_pms_marker = (
+        ".securecafe.com" in h
+        or "securecafe.com/onlineleasing" in h
+        or "myresman.com/portal/applicants/availability" in h
+        or "commoncf.entrata.com" in h
+        or "/apartments/module/" in h
+        or "entrata-widget" in h
+        or ".prospectportal.com" in h
+        or "onlineleasing.realpage.com" in h
+        or ".appfolio.com/listings" in h
+    )
+
     # F0.3 (2026-05-09): three-pass priority order so a real PMS portal
-    # reachable from a Squarespace/Wix marketing shell (e.g. 123taylor.com →
-    # ``onlineleasing.realpage.com``) isn't demoted to ``syndication_only``.
+    # reachable from a Squarespace/Wix marketing shell (e.g. 123taylor.com
+    # -> ``onlineleasing.realpage.com``) isn't demoted to ``syndication_only``.
     #
-    # Pass 1 — STRONG PMS markers: definitive portal/widget evidence that
+    # Pass 1 -- STRONG PMS markers: definitive portal/widget evidence that
     # cannot be an incidental CDN asset or marketing link. These beat
     # Wix/Squarespace shells because a real leasing path is the source of
     # truth even when the surrounding marketing site is built on a no-PMS
     # platform.
     if "onlineleasing.realpage.com" in h:
         return "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
+
+    # 2026-05-13 port: RealPage OLL (Online Leasing) wizard -- the
+    # "Category-D" cluster (~187 props). Vanity sites hop to
+    # ``leasing.realpage.com`` / embed ``rp-leasing-widget`` / link
+    # ``<property>/content/apply#k=`` whose ``#k=`` key bootstraps the
+    # stateful RP.Leasing.AppService appstate session. None of these
+    # markers can appear on a real OneSite numeric-subdomain site, so
+    # this is checked AFTER the OneSite marker above and does not
+    # regress it. Adapter (lands Commit 10) intercepts the
+    # OLL.SearchFloorPlan PUT response.
+    if (
+        "leasing.realpage.com" in h
+        or "rp-leasing-widget" in h
+        or "rp.leasing.appservice" in h
+        or "/content/apply#k=" in h
+    ):
+        return (
+            "realpage_oll",
+            0.85,
+            ["RealPage OLL wizard marker in HTML (leasing.realpage.com / "
+             "rp-leasing-widget / RP.Leasing.AppService / /content/apply#k=)"],
+        )
+
+    # 2026-05-13 port: Entrata widget detection uses a negative-lookahead
+    # regex so ``/Apartments/module/application_authentication/`` (a
+    # generic tenant login form) no longer triggers Entrata routing.
+    # Pre-port 4 of 4 false-positive sites had only this auth path; no
+    # Entrata API fired. The ``.prospectportal.com`` host marker is also
+    # accepted -- Entrata's ProspectPortal product is definitively
+    # Entrata-backed.
+    has_entrata_widget_path = bool(_ENTRATA_REAL_MODULE_RE.search(h))
+    _has_entrata_widget = (
+        has_entrata_widget_path
+        or "entrata-widget" in h
+        or "commoncf.entrata.com" in h
+        or ".prospectportal.com" in h
+    )
+
     # Multi-PMS routing: when a page contains BOTH an Entrata widget marker
     # AND a SightMap embed iframe (sightmap.com/embed/), the unit data lives
-    # in the SightMap iframe — the Entrata widget on the same page is
+    # in the SightMap iframe -- the Entrata widget on the same page is
     # typically a contact/amenities/photo module that doesn't carry units.
     # Promote SightMap to STRONG in this case so it beats the Entrata-widget
     # path that would otherwise lock the SightMap adapter out (PID 16139
     # chaseknollsapts.com observed 2026-05-14: Entrata STRONG won, SightMap
     # iframe with 9 units never got read).
-    # Note: bare ``sightmap.com`` substring is NOT enough — could be a CDN
+    # Note: bare ``sightmap.com`` substring is NOT enough -- could be a CDN
     # asset or analytics link. ``sightmap.com/embed/`` is iframe-specific.
     _has_sightmap_embed = "sightmap.com/embed/" in h
-    _has_entrata_widget = (
-        "/apartments/module/" in h
-        or "entrata-widget" in h
-        or "commoncf.entrata.com" in h
-    )
     if _has_sightmap_embed and _has_entrata_widget:
         return (
             "sightmap",
             0.90,
-            ["SightMap embed iframe + Entrata widget both present — "
+            ["SightMap embed iframe + Entrata widget both present -- "
              "SightMap carries unit data, routed there"],
         )
     if _has_sightmap_embed:
@@ -393,12 +517,39 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
             0.90,
             ["SightMap embed iframe in HTML (sightmap.com/embed/)"],
         )
+
+    # 2026-05-13 port: Engrain widget signal. RealPage's interactive-map
+    # vendor (Engrain) loads the SightMap iframe dynamically post-JS, so
+    # static HTML often lacks ``sightmap.com/embed/``. But the server-
+    # rendered HTML carries paired ``data-unit``/``data-floorplan``
+    # attributes (Engrain hydration placeholders) AND a ``realpage.com``
+    # script load. When BOTH appear in static HTML, route to sightmap so
+    # the adapter's iframe-fallback discovery (cluster #5 broadening,
+    # lands Commit 7) fires. Verified live 2026-05-20 on 7 of 25
+    # TIER_3_DOM ALL_fail probes (Sawmill Station, Headwaters Autumn
+    # Hall, Stadia Med Main, Delwyn, etc.).
+    _has_engrain_widget = (
+        "data-unit" in h
+        and "data-floorplan" in h
+        and "realpage.com" in h
+    )
+    if _has_engrain_widget and not _has_sightmap_embed:
+        return (
+            "sightmap",
+            0.88,
+            ["Engrain widget signal in HTML (data-unit + data-floorplan "
+             "paired attrs + realpage.com script -- SightMap iframe loads "
+             "dynamically post-JS)"],
+        )
+
     if _has_entrata_widget:
         return (
             "entrata",
             0.85,
-            ["Entrata widget marker in HTML (/Apartments/module/ / entrata-widget / commoncf.entrata.com)"],
+            ["Entrata widget marker in HTML (/Apartments/module/<widget>/ / "
+             "entrata-widget / commoncf.entrata.com / .prospectportal.com)"],
         )
+
     if "nestiolistings.com" in h or "nestio_" in h or "data-nestio-" in h:
         return (
             "funnel",
@@ -408,7 +559,159 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     if "mytouchtour.com" in h:
         return "touchtour", 0.85, ["TouchTour portal marker in HTML (mytouchtour.com)"]
 
-    # Pass 2 — Wix/Squarespace platform giveaway scripts. These are strong
+    # 2026-05-13 port: Knock / Doorway widget. Marketing-led PMS;
+    # doorway.knck.io script tag or knockDoorway.init() call. Public
+    # Doorway API serves full unit data (verified 2026-05-13 on
+    # liveatcalista.com -- 53 units with availableOn + price). Adapter
+    # lands Commit 12; until then, knock detection logs via tier
+    # distribution and falls back to generic cascade.
+    if "doorway.knck.io" in h or "knockdoorway" in h:
+        return (
+            "knock",
+            0.90,
+            ["Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"],
+        )
+
+    # 2026-05-13 port (Commit 11): Cortland Real Estate -- single-REIT
+    # custom CMS with server-rendered ``preload = {floorplans: {...}}``
+    # JSON in the marketing HTML. Brace-matched parser yields true
+    # unit-level data without an XHR. Verified live on cortland.com
+    # subset 2026-05-13.
+    if "cortland.com" in h or "cortlandapt" in h:
+        return (
+            "cortland",
+            0.85,
+            ["Cortland marker in HTML (cortland.com / cortlandapt)"],
+        )
+
+    # 2026-05-13 port (Commit 11): Equity Residential REIT -- SSR
+    # ``<ea5-unit>`` HTML blocks via curl_cffi (Cloudflare-fronted).
+    # ~31 properties.
+    if (
+        "equityapartments.com" in h
+        or "<ea5-unit" in h
+        or "ledgerid" in h.lower() and "buildingid" in h.lower()
+    ):
+        return (
+            "equity",
+            0.85,
+            ["Equity Residential marker in HTML (equityapartments.com / <ea5-unit>)"],
+        )
+
+    # 2026-05-13 port (Commit 11): RentManager / iLoveLeasing -- JS
+    # widget embed, but the real unit feed is the no-auth
+    # ``<eid>.ua.rentmanager.com/Search_Result`` endpoint (full URL
+    # usually verbatim in static HTML).
+    if (
+        ".ua.rentmanager.com" in h
+        or ".twa.rentmanager.com" in h
+        or "cdn.rentmanager.com" in h
+        or "iloveleasing.com" in h
+    ):
+        return (
+            "rentmanager",
+            0.85,
+            ["RentManager/iLoveLeasing marker in HTML "
+             "(.ua.rentmanager.com / .twa.rentmanager.com / iloveleasing.com)"],
+        )
+
+    # 2026-05-13 port (Commit 12): Irvine Company Apartments. POST
+    # ``/units/rank {communityId}`` with GUID discovery, unit-level
+    # lease-term price ladder. 5+ verified communities (live probe
+    # 2026-05-18).
+    if "irvinecompanyapartments.com" in h or "communityidaem" in h.lower():
+        return (
+            "irvine",
+            0.85,
+            ["Irvine Company marker in HTML "
+             "(irvinecompanyapartments.com / communityIdAEM)"],
+        )
+
+    # 2026-05-13 port (Commit 12): Apts247 / RentDynamics. Same-origin
+    # ``/api/v1/floorplans/?api_key=<hex>`` with the key embedded in
+    # static HTML. ≥4-site cluster observed 2026-05-17.
+    if "apts247" in h or "rentdynamics.com" in h:
+        return (
+            "apts247",
+            0.85,
+            ["Apts247/RentDynamics marker in HTML "
+             "(apts247 / rentdynamics.com)"],
+        )
+
+    # 2026-05-13 port (Commit 13): Essex Property Trust REIT. Bulk
+    # ``/availability?format=spa`` passes curl_cffi (~250 communities).
+    if "essexapartmenthomes.com" in h or "essex.com/api" in h:
+        return (
+            "essex",
+            0.85,
+            ["Essex REIT marker in HTML (essexapartmenthomes.com / essex.com/api)"],
+        )
+
+    # 2026-05-13 port (Commit 13): MAA Communities REIT.
+    if "maac.com" in h or "maacommunities.com" in h:
+        return (
+            "maac",
+            0.85,
+            ["MAA REIT marker in HTML (maac.com / maacommunities.com)"],
+        )
+
+    # 2026-05-13 port (Commit 13): RentVision multifamily marketing CMS.
+    # Detection markers: "powered by RentVision" / "created by RentVision"
+    # / rentvision.com link. Platform credit appears site-wide.
+    if (
+        "rentvision.com" in h
+        or "powered by rentvision" in h
+        or "created by rentvision" in h
+    ):
+        return (
+            "rentvision",
+            0.85,
+            ["RentVision CMS marker in HTML "
+             "(rentvision.com / powered by RentVision)"],
+        )
+
+    # 2026-05-13 port: G5 Marketing Cloud (multifamily CMS used by Morgan
+    # Properties, Aimco, Bell Partners, ZRS, JMG, BH). Strong fingerprints
+    # are ``inventory.g5marketingcloud`` (the GraphQL endpoint) and
+    # ``g5-cl-...`` URN slugs in asset CDN paths. ``g5dxm.com`` /
+    # ``dnn506yrbagrg.cloudfront.net`` are the vendor's theme + CDN.
+    # Gated on absence of Knock/SecureCafe/ResMan markers -- in that
+    # co-resident case the G5 URN is company-level and won't extract;
+    # let the real PMS branch above win. Adapter lands Commit 12.
+    if (
+        "inventory.g5marketingcloud" in h
+        or "g5marketingcloud" in h
+        or "g5-cl-" in h
+        or "g5dxm.com" in h
+        or "dnn506yrbagrg.cloudfront.net" in h
+    ) and not _has_competing_pms_for_g5:
+        return (
+            "g5",
+            0.85,
+            ["G5 Marketing Cloud marker in HTML "
+             "(inventory.g5marketingcloud / g5-cl- / g5dxm.com / dnn506yrbagrg.cloudfront.net)"],
+        )
+
+    # 2026-05-13 port: Encoreskyline-template family driven by Jonah
+    # Digital / MeetElise widget. Per-plan /floorplans/{slug}/ pages
+    # render apartment rows only after a Check-Availability JS click;
+    # adapter (deferred) handles the per-plan interaction. Gated on
+    # competing PMS markers because Jonah is sometimes a chat-widget
+    # bolt-on -- live-verified 2026-05-20 on ardencebloom.com
+    # (meetelise + securecafe; real data is in RentCafe).
+    if (
+        "jonahwidget" in h
+        or "jonahdigital" in h
+        or "meetelise" in h
+    ) and not _has_competing_pms_marker:
+        return (
+            "encoreskyline_template",
+            0.85,
+            ["Jonah Digital / MeetElise widget marker in HTML "
+             "(JonahWidget / jonahdigital / meetelise)"],
+        )
+
+    # Pass 2 -- Wix/Squarespace platform giveaway scripts. These are strong
     # "not-a-PMS" signals when no strong PMS marker appeared in pass 1.
     if "static.parastorage.com" in h or "wix.com" in h:
         return "wix_nopms", 0.85, ["Wix script/platform marker in HTML"]

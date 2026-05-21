@@ -8,15 +8,28 @@ from __future__ import annotations
 
 from ma_poc.pms.adapters.amli import AmliAdapter
 from ma_poc.pms.adapters.appfolio import AppFolioAdapter
+# 2026-05-13 port (Commit 12): browser-intercept Tier-1 adapters.
+from ma_poc.pms.adapters.apts247 import Apts247Adapter
 from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
+# 2026-05-13 port (Commit 11): server-only Tier-1 adapters.
+from ma_poc.pms.adapters.cortland import CortlandAdapter
 from ma_poc.pms.adapters.entrata import EntrataAdapter
+from ma_poc.pms.adapters.equity import EquityAdapter
+# 2026-05-13 port (Commit 13): REIT adapters.
+from ma_poc.pms.adapters.essex import EssexAdapter
 from ma_poc.pms.adapters.funnel import FunnelAdapter
+from ma_poc.pms.adapters.g5 import G5Adapter
 from ma_poc.pms.adapters.generic import GenericAdapter
+from ma_poc.pms.adapters.irvine import IrvineAdapter
+from ma_poc.pms.adapters.knock import KnockAdapter
+from ma_poc.pms.adapters.maac import MaacAdapter
 from ma_poc.pms.adapters.onesite import OneSiteAdapter
 from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
 from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
+from ma_poc.pms.adapters.rentmanager import RentManagerAdapter
+from ma_poc.pms.adapters.rentvision import RentVisionAdapter
 from ma_poc.pms.adapters.sightmap import SightMapAdapter
 from ma_poc.pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
 from ma_poc.pms.adapters.touchtour import TouchTourAdapter
@@ -49,6 +62,19 @@ def _bootstrap_registry() -> None:
         AmliAdapter,
         FunnelAdapter,
         TouchTourAdapter,
+        # 2026-05-13 port (Commit 11): server-only Tier-1 adapters.
+        CortlandAdapter,
+        EquityAdapter,
+        RentManagerAdapter,
+        # 2026-05-13 port (Commit 12): browser-intercept Tier-1 adapters.
+        G5Adapter,
+        KnockAdapter,
+        IrvineAdapter,
+        Apts247Adapter,
+        # 2026-05-13 port (Commit 13): REIT adapters.
+        EssexAdapter,
+        MaacAdapter,
+        RentVisionAdapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,
