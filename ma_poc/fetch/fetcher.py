@@ -200,7 +200,25 @@ class Fetcher:
         Returns:
             A FetchResult. Never raises.
         """
-        if ENABLE_TIER_ESCALATION and profile is not None:
+        # 2026-05-21 fetch-layer regression fix: the tier_escalator uses
+        # httpx (DIRECT) + curl_cffi (DC_PROXY / RESIDENTIAL) providers —
+        # none of them execute JavaScript. For tasks that need
+        # ``RenderMode.RENDER`` (AppFolio / Avalon / Knock / RentCafe SPA
+        # marketing sites where the unit data lives in JS-rendered DOM),
+        # routing through the escalator returns empty bodies on every tier
+        # → ladder exhausted → ``generic:no_body_short_circuit``.
+        #
+        # Validated 2026-05-21 against 50 known-passing controls: baseline
+        # image (4046a2a) fetched all 50 RENDER tasks successfully via the
+        # patchright path below; the post-merge HEAD routed them through
+        # the escalator and got 0/50 strict units. Restrict escalator to
+        # non-RENDER tasks (HEAD/GET); RENDER falls through to the
+        # patchright renderer.
+        if (
+            ENABLE_TIER_ESCALATION
+            and profile is not None
+            and task.render_mode != RenderMode.RENDER
+        ):
             from .tier_escalator import fetch_with_escalation
             return await fetch_with_escalation(task, profile)
         start_ms = _now_ms()

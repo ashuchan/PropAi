@@ -121,3 +121,60 @@ async def test_top_level_fetch_signature_accepts_positional_profile() -> None:
 
     assert result is expected
     fake_fetcher.fetch.assert_awaited_once_with(task, profile=profile)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-21 regression guard — RENDER tasks MUST bypass tier_escalator.
+#
+# The cluster #4 profile-bootstrap fix (337ebaa) inadvertently broke
+# RenderMode.RENDER tasks: with profile non-None after bootstrap, the
+# fetcher.fetch() gate routed RENDER tasks through the tier_escalator,
+# which uses curl_cffi providers that don't execute JavaScript. SPA
+# properties (AppFolio, Avalon, Knock, RentCafe marketing sites) all
+# returned empty bodies → "generic:no_body_short_circuit".
+#
+# Validated 2026-05-21: baseline image 4046a2a (pre-cluster #4 fix) had
+# 50/50 cohort succeed via RENDER path; HEAD (post-fix) had 50/50 hit
+# the escalator and 0/50 strict units. Fix: gate the escalator on
+# task.render_mode != RENDER as well.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_render_gate_source_contract() -> None:
+    """Structural test — fetcher.py's escalator gate MUST exclude
+    RenderMode.RENDER tasks. This pins the source-shape contract so
+    accidental removal during refactor (the kind that caused the
+    2026-05-21 cohort-wide regression) fails CI loudly.
+
+    The gate at fetcher.Fetcher.fetch must contain all three conditions
+    AND'd together right before the ``fetch_with_escalation`` import:
+      - ENABLE_TIER_ESCALATION
+      - profile is not None
+      - task.render_mode != RenderMode.RENDER
+
+    Without the third condition, AppFolio/Avalon/Knock/RentCafe SPA
+    properties route to the curl_cffi tier_escalator that can't run JS
+    and silently emit zero units.
+    """
+    import inspect
+    import re
+    from ma_poc.fetch.fetcher import Fetcher
+
+    src = inspect.getsource(Fetcher.fetch)
+    # The three gate conditions must appear in the same if-block.
+    # Look for the ``from .tier_escalator import fetch_with_escalation``
+    # statement (uniquely identifies the actual code, not the docstring)
+    # and walk backward to find the gate condition.
+    m = re.search(
+        r"from \.tier_escalator import fetch_with_escalation",
+        src,
+    )
+    assert m is not None, "tier_escalator import not found"
+    pre_block = src[: m.start()]
+    assert "ENABLE_TIER_ESCALATION" in pre_block
+    assert "profile is not None" in pre_block
+    assert "RenderMode.RENDER" in pre_block, (
+        "RenderMode.RENDER exclusion missing from the escalator gate — "
+        "RENDER tasks will route through the curl_cffi tier_escalator "
+        "and silently fail on SPA properties (AppFolio/Avalon/Knock)"
+    )
