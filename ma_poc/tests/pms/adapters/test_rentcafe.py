@@ -793,11 +793,18 @@ def test_securecafe_regex_matches_securecafenet_onlineleasing() -> None:
     assert m.group("slug") == "the-columns-at-bear-creek"
 
 
-def test_securecafe_find_base_preserves_securecafenet_domain() -> None:
-    """When the source URL is on securecafenet.com, the synthesized base
-    must also live on securecafenet.com (not silently rewritten to
-    securecafe.com). The Yardi tenant routes both, but cross-domain
-    rewrites would risk hitting a stale or differently-configured tenant.
+def test_securecafe_find_base_rewrites_securecafenet_to_securecafe() -> None:
+    """When the source URL is on securecafenet.com (resident portal), the
+    synthesized base must rewrite to securecafe.com (leasing portal).
+
+    Validated live 2026-05-21 against 4 properties (livebrez,
+    10xwoodwaysquare, livingatmarbella, thereservevisalia): the .net
+    host returns 404 on /onlineleasing/<slug>/availableunits.aspx; the
+    .com host returns the AvailUnitRow inventory page (CF-challenged
+    for plain httpx; 200 with curl_cffi chrome120 impersonation).
+
+    A .net→.com rewrite is the correct synthesis. Reverting to a
+    domain-preserving synthesis ships a 404 → silent zero-unit exit.
     """
     from ma_poc.pms.adapters.base import AdapterContext
     from ma_poc.pms.adapters.rentcafe import _find_securecafe_base
@@ -816,10 +823,10 @@ def test_securecafe_find_base_preserves_securecafenet_domain() -> None:
     )
     base = _find_securecafe_base(html, ctx)
     assert base == (
-        "https://livebrez.securecafenet.com/onlineleasing/atlantic-crossing0"
+        "https://livebrez.securecafe.com/onlineleasing/atlantic-crossing0"
     ), (
-        f"securecafenet source must produce a securecafenet base, not "
-        f"silently switch to securecafe.com; got {base!r}"
+        f"securecafenet source must rewrite to securecafe.com (leasing "
+        f"portal lives on .com only); got {base!r}"
     )
 
 

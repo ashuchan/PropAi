@@ -746,13 +746,21 @@ _SC_DATE_RE = re.compile(
 
 
 def _securecafe_base_from_match(m: re.Match[str]) -> str:
-    """Build ``https://<sub>.<dom>.com/onlineleasing/<slug>`` from a regex
-    match. Preserves whichever Yardi sub-product domain was matched
-    (securecafe.com or securecafenet.com); both expose the same
-    ``onlineleasing/<slug>/availableunits.aspx`` server-rendered endpoint
-    on the underlying Yardi tenant."""
+    """Build ``https://<sub>.securecafe.com/onlineleasing/<slug>`` from a
+    regex match.
+
+    The Yardi tenant exposes the public leasing endpoint at
+    ``<sub>.securecafe.com/onlineleasing/<slug>/availableunits.aspx``.
+    The ``securecafenet.com`` host is the resident-services portal only
+    — leasing data is NOT mounted there (verified 2026-05-21: every
+    ``.net`` variant we synthesized returned 404 while the corresponding
+    ``.com`` host returned 403/CF-challenge → 200 with curl_cffi).
+
+    So when the regex matches a ``.securecafenet.com`` URL we still
+    rewrite the synthesized base onto ``.securecafe.com``: same
+    ``<sub>`` and ``<slug>``, different host."""
     return (
-        f"https://{m.group('sub')}.{m.group('dom')}.com"
+        f"https://{m.group('sub')}.securecafe.com"
         f"/onlineleasing/{m.group('slug')}"
     )
 
