@@ -138,3 +138,105 @@ async def test_recover_pageless_stub() -> None:
 
     units, _ = await recover_generic_floorplans(_Bare(), _ctx())  # type: ignore[arg-type]
     assert units == []
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-20 brand-CMS URL discovery: `/apartments/{state}/{city}/floor-plans`
+# The TIER_3_DOM + TIER_MERGED ALL_fail probes found ~16-18% of failed
+# properties use a multi-property brand template (Lincoln, McKinley,
+# HG Living, MG Properties) where `/floorplans` returns 404 but the real
+# floor-plans page lives at `/apartments/{state}/{city}/floor-plans`.
+# The JS discovery scans landing-page hrefs for this pattern.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_js_has_brand_cms_url_pattern() -> None:
+    """The JS source contains the brand-CMS regex + the scan + probe loop.
+
+    Structural test only — we can't execute the JS in unit tests; this
+    pins the source-shape contract so accidental removal during refactor
+    fails CI loudly.
+    """
+    from ma_poc.pms.adapters._generic_dom_floorplans import _GENERIC_DOM_JS
+
+    js = _GENERIC_DOM_JS
+    # Pattern matches `/apartments/{state-slug}/{city-slug}/(floor-plans|floorplans)`
+    assert "/apartments/" in js
+    assert "floor-plans|floorplans" in js
+    # Scan source: anchors on the landing page
+    assert "a[href]" in js
+    # The scan dedupes via Set
+    assert "new Set()" in js
+    # The fall-through ordering: brand-CMS scan is LAST (after standard
+    # subpaths) so common /floorplans paths still win first
+    assert js.index("SUBPATHS") < js.index("BRAND_HREF_RE")
+
+
+def test_brand_cms_pattern_matches_real_examples() -> None:
+    """Regression: the regex used in the JS source must match the real-world
+    brand-CMS URLs observed during the 2026-05-20 TIER_3_DOM probe."""
+    import re
+
+    # Mirror the JS regex literally (case-insensitive, anchored)
+    py_re = re.compile(
+        r"^(\/apartments\/[a-z-]+\/[a-z0-9-]+\/(?:floor-plans|floorplans))(?:[?#].*)?$",
+        re.IGNORECASE,
+    )
+    # Live-verified URLs from the TIER_3_DOM probe
+    matches = [
+        "/apartments/tx/san-antonio/floor-plans",       # Fairways 5
+        "/apartments/ca/los-angeles/floor-plans",       # Museum Terrace
+        "/apartments/ca/san-jose/floor-plans",          # Villas Willow Glen
+        "/apartments/tx/lubbock/floor-plans",           # Renaissance at Northpark
+        "/apartments/wa/burien/alcove-at-seahurst/floor-plans",  # HG Living
+        "/apartments/michigan/ypsilanti/roundtree/floorplans",   # McKinley (no dash)
+        "/apartments/tx/san-antonio/floor-plans?utm=x",  # with query string
+        "/apartments/tx/san-antonio/floor-plans#section",  # with fragment
+    ]
+    for url in matches:
+        assert py_re.match(url), f"expected brand-CMS regex to match {url!r}"
+
+
+def test_brand_cms_pattern_rejects_non_brand_urls() -> None:
+    """The regex must NOT match URLs that aren't the brand-CMS shape —
+    avoid false-positive probes that waste fetches and could surface
+    irrelevant scan results."""
+    import re
+
+    py_re = re.compile(
+        r"^(\/apartments\/[a-z-]+\/[a-z0-9-]+\/(?:floor-plans|floorplans))(?:[?#].*)?$",
+        re.IGNORECASE,
+    )
+    rejects = [
+        "/floorplans",                              # plain root
+        "/apartments",                              # too shallow
+        "/apartments/tx",                           # missing city
+        "/apartments/tx/san-antonio",               # missing /floor-plans
+        "/apartments/tx/san-antonio/amenities",     # wrong tail
+        "/apartments/tx/san-antonio/floor-plans/the-birch",  # nested deeper
+        "https://example.com/apartments/tx/san-antonio/floor-plans",  # absolute (not relative)
+    ]
+    for url in rejects:
+        assert not py_re.match(url), f"expected regex to REJECT {url!r}"
+
+
+@pytest.mark.asyncio
+async def test_recover_accepts_brand_cms_winning_path() -> None:
+    """Full recovery flow: scan result reports a brand-CMS winning path
+    with valid cards → admit. Same code path as standard /floorplans win;
+    the brand path just looks different in the source_api_url provenance.
+    """
+    scan = {
+        "cards": _GOOD_CARDS,
+        "winningPath": "/apartments/tx/san-antonio/floor-plans",
+        "count": 3,
+    }
+    page = _FakePage(scan, url="https://www.fairways5.com/")
+    units, path = await recover_generic_floorplans(page, _ctx())  # type: ignore[arg-type]
+    assert len(units) == 3
+    assert path == "/apartments/tx/san-antonio/floor-plans"
+    # Provenance is stamped on each unit dict via the recover wrapper
+    assert all(
+        "fairways5.com/apartments/tx/san-antonio/floor-plans" in (u.get("source_api_url") or "")
+        for u in units
+    )
