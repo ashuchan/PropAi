@@ -70,6 +70,7 @@ PmsName = Literal[
     "marketapts",
     "rentcafe_unit_roster",
     "imt_spaces",
+    "realpage_cws",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -115,6 +116,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "marketapts": "dom_first",
     "rentcafe_unit_roster": "dom_first",
     "imt_spaces": "dom_first",
+    "realpage_cws": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -1017,6 +1019,25 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             ["IMT 'Spaces' theme marker in HTML "
              "(imtresidential.com host or spaces-community-* class) + "
              "article.spaces-plan with data-spaces-plan attr"],
+        )
+    # 2026-05-21 HAR validation: RealPage CWS (Community Website Solution)
+    # ships the RPFP (RealPage Floor Plans) widget that renders plan
+    # cards client-side. Verified live on www.liveatpenthouse.com and
+    # www.liveatshadowglen.com — both /Floor-Plans.aspx, both load
+    # cs-cdn.realpage.com/CWS/{numeric}/ assets and render
+    # ``.rpfp-container > .rpfp-cards > .rpfp-card`` plan-level data.
+    # Distinct from RealPage OLL (leasing.realpage.com BPM workflow)
+    # which is a different product handled by RealPageOllAdapter.
+    if (
+        "cs-cdn.realpage.com/cws" in h
+        or ("rpfp-container" in h and "rpfp-card" in h)
+        or ("floorplans-widget" in h and "rpfp-" in h)
+    ):
+        yield (
+            "realpage_cws",
+            0.85,
+            ["RealPage CWS RPFP widget marker in HTML "
+             "(cs-cdn.realpage.com/CWS/ OR .rpfp-container + .rpfp-card)"],
         )
 
 
