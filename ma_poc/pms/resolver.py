@@ -174,6 +174,28 @@ _LEASING_PORTAL_DOMAINS = frozenset(
 )
 
 
+# 2026-05-21 (grind600 findings): "plan-level only" portfolio brands.
+# The marketing-CMS root page exposes plan-level "N Homes Available"
+# counts but the per-plan deep-probe sub-page is empty — no XHR loads
+# unit-level data. Resolver should prefer the parent page and skip the
+# documented dead-end sub-path; deep-probe attempts waste time and emit
+# zero strict units.
+#
+#   - Harbor Group Management — 12 / 600 sites (2.0%). Pattern
+#     ``harborgroupmanagement.com/apartments/{state}/{city}/{slug}``
+#     exposes plan cards with "N Homes Available". The per-plan
+#     ``…/{slug}/listing`` sub-page is empty (verified 2026-05-21
+#     deep-probe on Aurella Cary, Waterford Village, The Canterbury).
+#
+# This constant is documented for future-adapter-author discovery.
+# Not yet wired into resolver hop logic — call sites that already
+# handle these brands (e.g. a custom Harbor Group adapter) should
+# reference this constant when deciding to short-circuit deep probes.
+_KNOWN_PLAN_LEVEL_ONLY_PATTERNS: tuple[str, ...] = (
+    "harborgroupmanagement.com/apartments/",
+)
+
+
 # 2026-05-13 — URL-path patterns that strongly suggest leasing/availability
 # content regardless of anchor text. Empirical priors derived from the
 # May 13 manual-QC tagging of 400 failed properties (rank by frequency):
