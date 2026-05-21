@@ -147,6 +147,38 @@ _PLAN_C_EMPTY_DRILL = {
 }
 
 
+# ── Template D fixtures ─────────────────────────────────────────────
+# Riverbank Apts (20RIB) /floor-plans → /apartments/{slug}. Drill page
+# uses ``.unit-table-row`` (SAME selector as Template B) but with the
+# bonus that each row carries ``data-available-date`` (ISO) — captured
+# 2026-05-21 from /apartments/plan1.
+_PLAN_D_TWO_UNITS = {
+    "template": "D",
+    "title": "Plan1",
+    "features": "BEDROOM: 1 BATHROOM: 1.0 SQ. FEET: 702 DEPOSIT: $1,000 FROM: $1,565",
+    "startingPrice": "$1,565",
+    "drillPath": "/apartments/plan1",
+    "units": [
+        {
+            "cells": ["19-411", "$1,565", "Today", "Corner Unit", "APPLY NOW"],
+            "dataAttrs": {
+                "availableDate": "05/21/2026",
+                "beds": "1",
+                "baths": "1.0",
+            },
+        },
+        {
+            "cells": ["24-527", "$1,575", "Today", "Corner Unit", "APPLY NOW"],
+            "dataAttrs": {
+                "availableDate": "05/21/2026",
+                "beds": "1",
+                "baths": "1.0",
+            },
+        },
+    ],
+}
+
+
 class _FakePage:
     """Tiny stand-in for a Playwright page. ``extract`` only calls
     ``page.evaluate`` and ``page.url``."""
@@ -366,6 +398,54 @@ def test_template_c_per_unit_sqft_from_drill_cell() -> None:
     assert rows[0]["sqft"] == "450"  # from drill cell, not specs blob
 
 
+# ── Template D parser tests ─────────────────────────────────────────
+# Template D reuses ``parse_marketapts_template_b`` — the drill selector
+# (``.unit-table-row``) and cell shape are identical to Template B. The
+# only divergence is the row-level ``data-available-date`` attr, which
+# the shared B parser consumes when present.
+
+
+def test_template_d_drill_uses_iso_data_available_date() -> None:
+    """When ``data-available-date`` is present on the row (Template D's
+    drill rows have it), the parser prefers it over the visible cell
+    text ("Today" → would have rendered empty)."""
+    rows = parse_marketapts_template_b([_PLAN_D_TWO_UNITS], "u")
+    assert len(rows) == 2
+    u0 = rows[0]
+    assert u0["floor_plan_name"] == "Plan1"
+    assert u0["unit_number"] == "19-411"
+    assert u0["bedrooms"] == "1"
+    assert u0["bathrooms"] == "1.0"
+    assert u0["sqft"] == "702"
+    assert u0["market_rent_low"] == 1565
+    # ISO data-available-date wins over the "Today" cell text.
+    assert u0["availability_date"] == "05/21/2026"
+    assert u0["availability_status"] == "AVAILABLE"
+    assert u0["extraction_tier"] == "TIER_1_DOM_MARKETAPTS"
+
+
+def test_template_d_falls_back_to_cell_text_when_no_data_attr() -> None:
+    """If a drill row carries no ``data-available-date`` (defensive —
+    Template B's drill rows don't always have it), the cell-walking
+    fallback still finds the date."""
+    plan = {
+        "template": "D",
+        "title": "Plan2",
+        "features": "BEDROOM: 2 BATHROOM: 2 SQ. FEET: 950",
+        "startingPrice": "$1,800",
+        "drillPath": "/apartments/plan2",
+        "units": [
+            {
+                "cells": ["32-101", "$1,800", "05/30/2026", "Pool View", "APPLY NOW"],
+                "dataAttrs": {},
+            },
+        ],
+    }
+    rows = parse_marketapts_template_b([plan], "u")
+    assert len(rows) == 1
+    assert rows[0]["availability_date"] == "05/30/2026"
+
+
 # ── Adapter end-to-end ──────────────────────────────────────────────
 
 
@@ -404,6 +484,24 @@ async def test_adapter_template_c_extract() -> None:
     assert len(result.units) == 3
     unit_numbers = sorted(u["unit_number"] for u in result.units)
     assert unit_numbers == ["2-106", "3-201", "4-114"]
+    assert result.confidence > 0.7
+
+
+@pytest.mark.asyncio
+async def test_adapter_template_d_extract() -> None:
+    """End-to-end: Template D payload → Tier-1 DOM rows with tier
+    label ``TIER_1_DOM_MARKETAPTS_D`` (D reuses the B parser internally
+    but the adapter stamps the D label so reporting can tell them
+    apart)."""
+    payload = {"template": "D", "plans": [_PLAN_D_TWO_UNITS]}
+    fake = _FakePage(payload, url="https://www.riverbankapartments.com/floor-plans")
+    result = await MarketAptsAdapter().extract(
+        fake, _ctx("https://www.riverbankapartments.com/")
+    )  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_D"
+    assert len(result.units) == 2
+    assert result.units[0]["unit_number"] == "19-411"
+    assert result.units[0]["availability_date"] == "05/21/2026"
     assert result.confidence > 0.7
 
 

@@ -43,15 +43,13 @@ Two SSR template variants are handled (probed live 2026-05-21):
     Originally deferred (eyeball missed the badge-link drill); re-
     probed 2026-05-21 after user pointed out the link in the badge.
 
-One further variant exists in the cohort but is NOT handled in v1
-(deferred; see ``_DEFERRED_TEMPLATES``):
-
   * **Template D — /apartments/{plan-slug} drill** (1 / 13, e.g.
     Riverbank ``20RIB``): hyphenated ``/floor-plans`` listing of
     ``.floor-plans-block`` plan cards that drill to ``/apartments/
-    {plan-slug}``. Structurally similar to Template B but enough
-    selector/URL differences to warrant a separate implementation
-    pass.
+    {plan-slug}``. Drill rows are ``.unit-table-row`` (SAME selector
+    as Template B) with the bonus that each row carries
+    ``data-available-date`` (ISO, authoritative). The Template B
+    parser is reused here; only listing-side detection differs.
 
 Probed cohort size: 13 GoPrisma-tagged + 4 marketapts-tagged in
 results_deep.jsonl = 17 confirmed properties; the fleet-wide signal is
@@ -81,9 +79,10 @@ log = logging.getLogger(__name__)
 
 # Templates that exist in the cohort but are not handled in v1. Listed
 # in source so the next adapter author finds them without re-probing.
-_DEFERRED_TEMPLATES: tuple[str, ...] = (
-    "D: .floor-plans-block → /apartments/{plan-slug} drill (Riverbank 20RIB)",
-)
+# All four template variants observed in the 13-site cohort are
+# handled. This tuple is retained for future variants discovered
+# beyond the original cohort.
+_DEFERRED_TEMPLATES: tuple[str, ...] = ()
 
 # Self-fetch /floorplans if the live page isn't there, then probe for
 # Template A first (inline unit rows). If found, return them with their
@@ -95,21 +94,37 @@ async () => {
   const T = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : '');
   const A = (el, name) => (el ? (el.getAttribute(name) || '') : '');
 
-  // ── locate the /floorplans document ──────────────────────────────
+  // ── locate the floorplans document ───────────────────────────────
   // Live page already on a floorplans-style path? Use document directly.
-  // Otherwise fetch /floorplans (with credentials so cookie-walled sites
-  // still serve their SSR markup).
+  // Otherwise probe ``/floorplans`` first (Templates A/B/C), then
+  // ``/floor-plans`` (Template D, hyphenated). credentials: 'include'
+  // so cookie-walled sites still serve their SSR markup.
   let doc = document;
   const hasMarker = !!(
     document.querySelector('.floorplan-block') ||
     document.querySelector('.floorplan-item') ||
-    document.querySelector('.floorplan-unit-single')
+    document.querySelector('.floorplan-unit-single') ||
+    document.querySelector('.floor-plans-block')
   );
   if (!hasMarker) {
-    try {
-      const r = await fetch(location.origin + '/floorplans', {credentials: 'include'});
-      if (r.ok) doc = new DOMParser().parseFromString(await r.text(), 'text/html');
-    } catch (e) { /* fall through */ }
+    for (const path of ['/floorplans', '/floor-plans']) {
+      try {
+        const r = await fetch(location.origin + path, {credentials: 'include'});
+        if (r.ok) {
+          const candidate = new DOMParser().parseFromString(await r.text(), 'text/html');
+          if (
+            candidate.querySelector('.floorplan-block') ||
+            candidate.querySelector('.floorplan-item') ||
+            candidate.querySelector('.floorplan-unit-single') ||
+            candidate.querySelector('.floor-plans-block') ||
+            candidate.querySelector('.floorplan-container')
+          ) {
+            doc = candidate;
+            break;
+          }
+        }
+      } catch (e) { /* try next */ }
+    }
   }
 
   // ── Template A — inline unit rows (.floorplan-block + .floorplan-unit-single)
@@ -224,6 +239,60 @@ async () => {
       planRows.push({title, specsBlob, drillPath: href, units, template: 'C'});
     }
     return {template: 'C', plans: planRows};
+  }
+
+  // ── Template D — hyphenated /floor-plans + /apartments/{slug} drill
+  // Listing-side ``.floor-plans-block`` plan cards each carry an
+  // "N APARTMENTS AVAILABLE" anchor pointing to ``/apartments/{slug}``.
+  // The drill page exposes ``.unit-table-row`` (SAME selector as
+  // Template B's drill) with cells Unit / Rent / Available / Special /
+  // Apply. Drill rows often carry ``data-available-date`` (ISO),
+  // ``data-beds``, ``data-baths`` — captured here for downstream use
+  // (the current parser is happy to fall back to cell-walking).
+  const dBlocks = Array.from(doc.querySelectorAll('.floor-plans-block'));
+  if (dBlocks.length > 0) {
+    const planTasks = dBlocks.map((block) => {
+      const drillAnchor = Array.from(block.querySelectorAll('a')).find((a) => {
+        const href = a.getAttribute('href') || '';
+        const t = (a.innerText || a.textContent || '').toLowerCase();
+        return /\/apartments\//.test(href) ||
+               /apartments?\s+available|view\s+available|view\s+details/.test(t);
+      });
+      const heading = T(block.querySelector('h1, h2, h3, h4, h5, h6'));
+      const detailsBlock = T(block.querySelector('.floor-plans-block-details, .list-group'));
+      // Pull a starting price out of the body text — Template D often
+      // states "FROM: $X,XXX" inline.
+      const bodyText = T(block);
+      const fromMatch = bodyText.match(/FROM\s*:?\s*\$\s*([\d,]+)/i);
+      const startingPrice = fromMatch ? '$' + fromMatch[1] : '';
+      return {
+        title: heading,
+        features: detailsBlock,
+        startingPrice: startingPrice,
+        drillPath: drillAnchor ? drillAnchor.getAttribute('href') || '' : '',
+      };
+    });
+
+    const planRows = [];
+    for (const task of planTasks) {
+      let units = [];
+      if (task.drillPath) {
+        let drillUrl = task.drillPath;
+        if (drillUrl.startsWith('/')) drillUrl = location.origin + drillUrl;
+        try {
+          const r = await fetch(drillUrl, {credentials: 'include'});
+          if (r.ok) {
+            const drillDoc = new DOMParser().parseFromString(await r.text(), 'text/html');
+            units = Array.from(drillDoc.querySelectorAll('.unit-table-row')).map((row) => {
+              const cells = Array.from(row.children).map((c) => T(c));
+              return {cells: cells, dataAttrs: Object.assign({}, row.dataset || {})};
+            });
+          }
+        } catch (e) { /* per-plan drill failure → plan-level only */ }
+      }
+      planRows.push({...task, template: 'D', units});
+    }
+    return {template: 'D', plans: planRows};
   }
 
   return {template: 'NONE', plans: []};
@@ -463,6 +532,7 @@ def parse_marketapts_template_b(
             if not isinstance(u, dict):
                 continue
             cells_raw = u.get("cells") or []
+            data_attrs = u.get("dataAttrs") or {}
             if not isinstance(cells_raw, list):
                 continue
             # Strip empty cells; Apply-button cell sometimes interleaves.
@@ -471,7 +541,15 @@ def parse_marketapts_template_b(
                 continue
             unit_no = cells[0]
             rent: int | None = None
+            # Prefer the row's ``data-available-date`` (ISO, authoritative)
+            # when present — Template D's drill rows carry it. Falls back
+            # to cell-walking text parse for Templates B/C drills that
+            # don't.
             avail_date = ""
+            if isinstance(data_attrs, dict):
+                iso_candidate = str(data_attrs.get("availableDate") or "").strip()
+                if iso_candidate:
+                    avail_date = iso_candidate
             # Walk remaining cells positionally to find rent + availability.
             # Defensive against column drift between properties.
             for cell in cells[1:]:
@@ -603,7 +681,7 @@ def parse_marketapts_template_c(
 
 
 class MarketAptsAdapter:
-    """Market Apartments CMS adapter — handles Templates A + B + C from /floorplans."""
+    """Market Apartments CMS adapter — handles Templates A + B + C + D."""
 
     pms_name: str = "marketapts"
     _fingerprints: list[str] = [
@@ -652,6 +730,14 @@ class MarketAptsAdapter:
             units = parse_marketapts_template_b(plans, winning)
         elif template == "C":
             units = parse_marketapts_template_c(plans, winning)
+        elif template == "D":
+            # Template D's drill rows share Template B's selector and
+            # cell shape; the row-level ``data-available-date`` is
+            # consumed by ``parse_marketapts_template_b`` (see dataAttrs
+            # branch). Listing-side title/features come from the
+            # ``.floor-plans-block`` heading + details, ``startingPrice``
+            # synthesised from "FROM: $X,XXX".
+            units = parse_marketapts_template_b(plans, winning)
         else:
             units = []
 
