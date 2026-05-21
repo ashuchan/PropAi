@@ -51,6 +51,28 @@ Two SSR template variants are handled (probed live 2026-05-21):
     ``data-available-date`` (ISO, authoritative). The Template B
     parser is reused here; only listing-side detection differs.
 
+  * **Template E — subpath tabbed accordion (plan-only)** (2 / 32
+    fleet sites — sylispm.com/woodway-apartments,
+    sylispm.com/oakstone-apartment-homes): shared-host CMS where
+    each property lives at ``{cms-host}/{property-slug}/`` and the
+    floor-plans render inline at ``#floorplans`` as Bootstrap card
+    panes inside ``.tab-pane`` × N (one pane per bedroom count).
+    Cards expose ``.floorplan-name`` + ``.list-group.floorplan-info``
+    items ("0 Bedroom" / "1 Bathroom" / "504 Square Feet" / "880"
+    where the bare number is the rent). No per-unit drill — plan-
+    level only. Discovered 2026-05-21 by fleet grep + live probe.
+
+  * **Template F — /availability data-table (unit-level)** (1 / 32
+    fleet sites — 223etown.com): ``/floorplans`` is plan-only but
+    ``/availability`` publishes the unit roster as
+    ``<table class="table table-hover f{N} Bedroom Apartments">``
+    tables partitioned by bedroom count. Cells (positionally
+    stable): Beds / Bath / Rent / Sq.Ft. / Style (= plan name) /
+    Features / Available date. No explicit ``unit_number`` —
+    downstream dedup is by (plan, rent, sqft). "Call For Details"
+    in the Available column maps to UNAVAILABLE. Discovered 2026-05-
+    21 by fleet grep + live probe.
+
 Probed cohort size: 13 GoPrisma-tagged + 4 marketapts-tagged in
 results_deep.jsonl = 17 confirmed properties; the fleet-wide signal is
 broader because ``marketing_marketapts`` is a generic detector marker
@@ -104,7 +126,8 @@ async () => {
     document.querySelector('.floorplan-block') ||
     document.querySelector('.floorplan-item') ||
     document.querySelector('.floorplan-unit-single') ||
-    document.querySelector('.floor-plans-block')
+    document.querySelector('.floor-plans-block') ||
+    document.querySelector('.floorplan-name')
   );
   if (!hasMarker) {
     for (const path of ['/floorplans', '/floor-plans']) {
@@ -117,7 +140,8 @@ async () => {
             candidate.querySelector('.floorplan-item') ||
             candidate.querySelector('.floorplan-unit-single') ||
             candidate.querySelector('.floor-plans-block') ||
-            candidate.querySelector('.floorplan-container')
+            candidate.querySelector('.floorplan-container') ||
+            candidate.querySelector('.floorplan-name')
           ) {
             doc = candidate;
             break;
@@ -293,6 +317,75 @@ async () => {
       planRows.push({...task, template: 'D', units});
     }
     return {template: 'D', plans: planRows};
+  }
+
+  // ── Template E — subpath site with tabbed accordion (plan-only)
+  // Used by shared-host operators like sylispm.com where each property
+  // lives at sylispm.com/{property-slug}/ and the floor-plans render
+  // inline as Bootstrap card panes inside ``.tab-pane`` elements (one
+  // pane per bedroom count). Each plan card has a ``.floorplan-name``
+  // heading + ``.list-group.floorplan-info > li`` items carrying
+  // "N Bedroom" / "N Bathroom" / "NNN Square Feet" / "NNN" (rent, no $).
+  // No per-unit drill — these sites only publish plan-level data.
+  const eCards = Array.from(doc.querySelectorAll('.floorplan-name'));
+  if (eCards.length > 0) {
+    // De-duplicate: Bootstrap nests .card inside .card-block which both
+    // contain the .floorplan-name, so the same plan can be matched twice.
+    // Group by the nearest .card ancestor.
+    const seenCards = new Set();
+    const planRows = [];
+    for (const nameEl of eCards) {
+      const card = nameEl.closest('.card') || nameEl.parentElement;
+      if (!card || seenCards.has(card)) continue;
+      seenCards.add(card);
+      const items = Array.from(card.querySelectorAll('.list-group-item, .floorplan-info li'))
+        .map((li) => T(li))
+        .filter((t) => t);
+      planRows.push({
+        template: 'E',
+        name: T(nameEl),
+        infoItems: items,
+      });
+    }
+    if (planRows.length > 0) {
+      return {template: 'E', plans: planRows};
+    }
+  }
+
+  // ── Template F — separate /availability sub-page with data tables
+  // Some Market Apartments sites (e.g. 223etown.com) keep /floorplans
+  // plan-only and publish the unit-level roster on /availability as
+  // <table class="table table-hover f{N} Bedroom Apartments"> tables
+  // (one per bedroom count). Cell columns: Beds / Bath / Rent / Sq.Ft.
+  // / Style (plan name) / Features / Available.
+  let availDoc = null;
+  if (document.querySelector('table.table-hover')) {
+    availDoc = document;
+  } else {
+    try {
+      const r = await fetch(location.origin + '/availability', {credentials: 'include'});
+      if (r.ok) {
+        const candidate = new DOMParser().parseFromString(await r.text(), 'text/html');
+        if (candidate.querySelector('table.table-hover')) {
+          availDoc = candidate;
+        }
+      }
+    } catch (e) { /* fall through */ }
+  }
+  if (availDoc) {
+    const tables = Array.from(availDoc.querySelectorAll('table.table-hover'));
+    const rows = [];
+    for (const t of tables) {
+      const tableName = t.className || '';  // "table table-hover f1 Bedroom Apartments"
+      const trs = Array.from(t.querySelectorAll('tbody tr'));
+      for (const tr of trs) {
+        const cells = Array.from(tr.children).map((c) => T(c));
+        rows.push({cells: cells, tableName: tableName, dataAttrs: Object.assign({}, tr.dataset || {})});
+      }
+    }
+    if (rows.length > 0) {
+      return {template: 'F', plans: [], rows: rows};
+    }
   }
 
   return {template: 'NONE', plans: []};
@@ -680,8 +773,178 @@ def parse_marketapts_template_c(
     return out
 
 
+def parse_marketapts_template_e(
+    plans: list[dict[str, object]], url: str
+) -> list[dict[str, str]]:
+    """Emit plan-level rows from Template E ``.floorplan-name`` cards.
+
+    Used by sylispm.com-style subpath sites. Cards live in ``.tab-pane``
+    panes (one per bedroom count) and expose plan name + a
+    ``.list-group.floorplan-info`` with items like "0 Bedroom" /
+    "1 Bathroom" / "504 Square Feet" / "880" (the bare-number item is
+    the rent — no ``$`` prefix). No per-unit drill exists; these are
+    intentionally plan-only rows.
+    """
+    out: list[dict[str, str]] = []
+    item_bed_re = re.compile(r"(\d+|studio)\s*bedrooms?", re.IGNORECASE)
+    item_bath_re = re.compile(r"(\d+(?:\.\d+)?)\s*bathrooms?", re.IGNORECASE)
+    item_sqft_re = re.compile(r"(\d[\d,]*)\s*square\s*feet", re.IGNORECASE)
+    for plan in plans:
+        if not isinstance(plan, dict):
+            continue
+        name = str(plan.get("name") or "").strip()
+        items_raw = plan.get("infoItems") or []
+        if not isinstance(items_raw, list):
+            continue
+        items = [str(x).strip() for x in items_raw if str(x).strip()]
+        beds: int | None = None
+        baths = ""
+        sqft = ""
+        rent: int | None = None
+        # Walk the list items to extract specs; the bare-number item
+        # (no $, no unit suffix) is the rent.
+        for it in items:
+            if beds is None:
+                bm = item_bed_re.search(it)
+                if bm:
+                    v = bm.group(1)
+                    beds = 0 if v.lower() == "studio" else int(v)
+                    continue
+            if not baths:
+                bm2 = item_bath_re.search(it)
+                if bm2:
+                    baths = bm2.group(1)
+                    continue
+            if not sqft:
+                sm = item_sqft_re.search(it)
+                if sm:
+                    sqft = sm.group(1).replace(",", "")
+                    continue
+            # The rent item is a bare number — no $, no other tokens
+            # except optional commas. Filter out address / "Apply Now
+            # For More Information" / etc.
+            if rent is None:
+                stripped = it.replace(",", "").strip()
+                if stripped.isdigit():
+                    rent_val = int(stripped)
+                    # Defensive: filter implausible rent values (a stray
+                    # year, an address number — must be >= 200 and < 99999).
+                    if 200 <= rent_val < 99999:
+                        rent = rent_val
+                        continue
+        if not name and rent is None:
+            continue
+        out.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=baths,
+                sqft=sqft,
+                unit_number="",
+                rent_low=rent,
+                rent_high=rent,
+                rent_range=format_rent_range(rent, rent),
+                availability_status="AVAILABLE" if rent is not None else "UNAVAILABLE",
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_MARKETAPTS",
+            )
+        )
+    return out
+
+
+def parse_marketapts_template_f(
+    rows: list[dict[str, object]], url: str
+) -> list[dict[str, str]]:
+    """Emit unit-level rows from Template F ``/availability`` tables.
+
+    223etown.com-style sites publish unit inventory as
+    ``<table class="table table-hover f{N} Bedroom Apartments">`` rows
+    with cells [Beds, Bath, Rent, Sq.Ft., Style (plan name), Features,
+    Available date]. Each row is a unit (no explicit unit number — the
+    Style + Sqft combo is the closest soft identifier; downstream
+    dedup-by-(plan, rent, sqft) handles uniqueness).
+
+    "Call For Details" in the Available column means contact-gated;
+    we surface those as UNAVAILABLE so they don't masquerade as
+    immediately-available unit roster.
+    """
+    out: list[dict[str, str]] = []
+    bed_cell_re = re.compile(r"(\d+|studio)\s*bed", re.IGNORECASE)
+    bath_cell_re = re.compile(r"(\d+(?:\.\d+)?)\s*bath", re.IGNORECASE)
+    sqft_cell_re = re.compile(r"(\d[\d,]*)\s*sq", re.IGNORECASE)
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        cells_raw = row.get("cells") or []
+        if not isinstance(cells_raw, list):
+            continue
+        cells = [str(c).strip() for c in cells_raw if str(c).strip()]
+        if len(cells) < 3:
+            continue
+        # Cell positions are stable per the 223etown table:
+        # [0] Beds, [1] Bath, [2] Rent, [3] Sqft, [4] Style (plan name),
+        # [5] Features (concession/upgrade), [6] Available date.
+        bed_cell = cells[0]
+        bath_cell = cells[1]
+        rent_cell = cells[2]
+        sqft_cell = cells[3] if len(cells) > 3 else ""
+        plan_name = cells[4] if len(cells) > 4 else ""
+        avail_cell = cells[6] if len(cells) > 6 else (cells[5] if len(cells) > 5 else "")
+
+        bm = bed_cell_re.search(bed_cell)
+        if bm:
+            v = bm.group(1)
+            beds: int | None = 0 if v.lower() == "studio" else int(v)
+        else:
+            beds = None
+        bath_m = bath_cell_re.search(bath_cell)
+        baths = bath_m.group(1) if bath_m else ""
+        sqft_m = sqft_cell_re.search(sqft_cell)
+        sqft = sqft_m.group(1).replace(",", "") if sqft_m else ""
+
+        money = _MONEY_RE.findall(rent_cell)
+        rent = money_to_int(money[0]) if money else None
+
+        # Availability: "Call For Details" → unavailable; else date or
+        # empty.
+        avail_status = "AVAILABLE"
+        avail_date = ""
+        if avail_cell:
+            if re.search(r"call\s+for", avail_cell, re.IGNORECASE):
+                avail_status = "UNAVAILABLE"
+            else:
+                avail_date = _parse_avail_text(avail_cell)
+                if not avail_date and not _DATE_LIKE_RE.search(avail_cell):
+                    # Unparseable but non-empty — leave date blank, keep
+                    # available-status optimistic only if rent is known.
+                    if rent is None:
+                        avail_status = "UNAVAILABLE"
+
+        if rent is None and not plan_name:
+            continue
+        out.append(
+            make_unit_dict(
+                floor_plan_name=plan_name,
+                bed_label=bed_label_from(beds, plan_name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=baths,
+                sqft=sqft,
+                unit_number="",  # no explicit unit number in the table
+                rent_low=rent,
+                rent_high=rent,
+                availability_status=avail_status,
+                available_units="1" if avail_status == "AVAILABLE" else "",
+                availability_date=avail_date,
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_MARKETAPTS",
+            )
+        )
+    return out
+
+
 class MarketAptsAdapter:
-    """Market Apartments CMS adapter — handles Templates A + B + C + D."""
+    """Market Apartments CMS adapter — handles Templates A/B/C/D/E/F."""
 
     pms_name: str = "marketapts"
     _fingerprints: list[str] = [
@@ -716,10 +979,21 @@ class MarketAptsAdapter:
 
         template = str(payload.get("template") or "NONE")
         plans = payload.get("plans") or []
-        if template == "NONE" or not isinstance(plans, list) or not plans:
+        # Template F carries its data under ``rows`` (not ``plans``) — the
+        # /availability table format has no plan-level container, just a
+        # flat list of unit rows. Don't bail when plans is empty if F
+        # provides rows.
+        f_rows = payload.get("rows") or []
+        has_data = (
+            (isinstance(plans, list) and len(plans) > 0)
+            or (isinstance(f_rows, list) and len(f_rows) > 0)
+        )
+        if template == "NONE" or not has_data:
             result.confidence = 0.0
             result.errors.append(
-                "marketapts: no .floorplan-block/.floorplan-item cards found on /floorplans"
+                "marketapts: no .floorplan-block/.floorplan-item/.floor-plans-block/"
+                ".floorplan-container/.floorplan-name cards and no /availability "
+                "table found"
             )
             return result
 
@@ -738,6 +1012,19 @@ class MarketAptsAdapter:
             # ``.floor-plans-block`` heading + details, ``startingPrice``
             # synthesised from "FROM: $X,XXX".
             units = parse_marketapts_template_b(plans, winning)
+        elif template == "E":
+            # Subpath tabbed accordion (sylispm-style). Plan-level only;
+            # cards expose ``.floorplan-name`` + ``.list-group`` items.
+            units = parse_marketapts_template_e(plans, winning)
+        elif template == "F":
+            # ``/availability`` data-tables (223etown-style). Plans live
+            # in the per-row "Style" cell; unit roster has no explicit
+            # unit_number.
+            payload_rows = payload.get("rows") or []
+            if isinstance(payload_rows, list):
+                units = parse_marketapts_template_f(payload_rows, winning)
+            else:
+                units = []
         else:
             units = []
 

@@ -23,6 +23,8 @@ from ma_poc.pms.adapters.marketapts import (
     parse_marketapts_template_a,
     parse_marketapts_template_b,
     parse_marketapts_template_c,
+    parse_marketapts_template_e,
+    parse_marketapts_template_f,
 )
 from ma_poc.pms.detector import detect_pms
 
@@ -446,6 +448,131 @@ def test_template_d_falls_back_to_cell_text_when_no_data_attr() -> None:
     assert rows[0]["availability_date"] == "05/30/2026"
 
 
+# ── Template E fixtures + tests ─────────────────────────────────────
+# sylispm.com / Woodway Apartments (subpath on a shared-host CMS).
+# Single-page tabbed accordion at /woodway-apartments/#floorplans —
+# .floorplan-name cards inside .tab-pane bedroom-count panes, each
+# with .list-group items "0 Bedroom"/"1 Bathroom"/"504 Square Feet"/
+# "880" (bare number = rent). Plan-level only, no per-unit drill.
+_PLAN_E_STUDIO = {
+    "template": "E",
+    "name": "Woodway Efficiency",
+    "infoItems": [
+        "0 Bedroom",
+        "1 Bathroom",
+        "504 Square Feet",
+        "880",
+        "8100 Pinebrook Drive, San Antonio, TX",
+        "Apply Now For More Information",
+    ],
+}
+_PLAN_E_ONE_BR = {
+    "template": "E",
+    "name": "One Bedroom With Den",
+    "infoItems": [
+        "1 Bedroom",
+        "1 Bathroom",
+        "728 Square Feet",
+        "1010",
+        "8100 Pinebrook Drive, San Antonio, TX",
+        "Apply Now For More Information",
+    ],
+}
+
+
+def test_template_e_studio_plan() -> None:
+    rows = parse_marketapts_template_e([_PLAN_E_STUDIO], "u")
+    assert len(rows) == 1
+    p = rows[0]
+    assert p["floor_plan_name"] == "Woodway Efficiency"
+    assert p["bedrooms"] == "0"  # "0 Bedroom" → studio
+    assert p["bathrooms"] == "1"
+    assert p["sqft"] == "504"
+    assert p["market_rent_low"] == 880
+    assert p["availability_status"] == "AVAILABLE"
+    assert p["unit_number"] == ""  # plan-only, no unit number
+
+
+def test_template_e_one_bedroom_plan() -> None:
+    rows = parse_marketapts_template_e([_PLAN_E_ONE_BR], "u")
+    assert len(rows) == 1
+    p = rows[0]
+    assert p["bedrooms"] == "1"
+    assert p["sqft"] == "728"
+    assert p["market_rent_low"] == 1010
+
+
+def test_template_e_filters_out_address_number_as_rent() -> None:
+    """The address starts with "8100" — a plausible rent value. The
+    parser must consume "504" / "1010" (bare numbers earlier in the
+    list) as the rent, NOT the "8100" inside the address string. This
+    test ensures the regex doesn't fall through to address numbers."""
+    rows = parse_marketapts_template_e([_PLAN_E_ONE_BR], "u")
+    assert rows[0]["market_rent_low"] == 1010  # not 8100
+
+
+def test_template_e_multiple_plans() -> None:
+    rows = parse_marketapts_template_e([_PLAN_E_STUDIO, _PLAN_E_ONE_BR], "u")
+    assert len(rows) == 2
+
+
+# ── Template F fixtures + tests ─────────────────────────────────────
+# 223etown.com /availability — table.table-hover with bedroom-count
+# tables, columns: Beds / Bath / Rent / Sq.Ft. / Style / Features /
+# Available. Cell positions are stable across all confirmed tables.
+_ROW_F_AVAILABLE_DATE = {
+    "cells": ["1 Bed", "1.0 Bath", "$1,425", "661 Sq Ft", "The Franklin", "Tech Package Upgrade", "06/10/2026"],
+    "tableName": "table table-hover f1 Bedroom Apartments",
+    "dataAttrs": {},
+}
+_ROW_F_CALL_FOR_DETAILS = {
+    "cells": ["Studio Bed", "0.0 Bath", "$8,514", "4730 Sq Ft", "COMM", "", "Call For Details"],
+    "tableName": "table table-hover fStudio Apartments",
+    "dataAttrs": {},
+}
+
+
+def test_template_f_unit_level_row_with_date() -> None:
+    rows = parse_marketapts_template_f([_ROW_F_AVAILABLE_DATE], "u")
+    assert len(rows) == 1
+    u = rows[0]
+    assert u["floor_plan_name"] == "The Franklin"  # "Style" cell
+    assert u["bedrooms"] == "1"
+    assert u["bathrooms"] == "1.0"
+    assert u["sqft"] == "661"
+    assert u["market_rent_low"] == 1425
+    assert u["availability_date"] == "06/10/2026"
+    assert u["availability_status"] == "AVAILABLE"
+    assert u["unit_number"] == ""  # no unit number in this table format
+    assert u["extraction_tier"] == "TIER_1_DOM_MARKETAPTS"
+
+
+def test_template_f_call_for_details_is_unavailable() -> None:
+    """When the Available cell says "Call For Details", the unit isn't
+    publicly available — surface UNAVAILABLE so downstream consumers
+    don't treat the row as immediately leasable."""
+    rows = parse_marketapts_template_f([_ROW_F_CALL_FOR_DETAILS], "u")
+    assert len(rows) == 1
+    assert rows[0]["availability_status"] == "UNAVAILABLE"
+    assert rows[0]["floor_plan_name"] == "COMM"
+
+
+def test_template_f_studio_row_parses_bed_count_correctly() -> None:
+    """"Studio Bed" should map to bedrooms="0" (not None or "Studio")
+    so downstream bed-count aggregation works."""
+    rows = parse_marketapts_template_f([_ROW_F_CALL_FOR_DETAILS], "u")
+    assert rows[0]["bedrooms"] == "0"
+
+
+def test_template_f_multiple_rows_across_bedroom_tables() -> None:
+    """Rows from different bedroom-count tables (different ``tableName``)
+    all flow through the same parser and emit independent rows."""
+    rows = parse_marketapts_template_f(
+        [_ROW_F_AVAILABLE_DATE, _ROW_F_CALL_FOR_DETAILS], "u"
+    )
+    assert len(rows) == 2
+
+
 # ── Adapter end-to-end ──────────────────────────────────────────────
 
 
@@ -503,6 +630,46 @@ async def test_adapter_template_d_extract() -> None:
     assert result.units[0]["unit_number"] == "19-411"
     assert result.units[0]["availability_date"] == "05/21/2026"
     assert result.confidence > 0.7
+
+
+@pytest.mark.asyncio
+async def test_adapter_template_e_extract() -> None:
+    """End-to-end: Template E payload → plan-level rows with tier label
+    ``TIER_1_DOM_MARKETAPTS_E``."""
+    payload = {"template": "E", "plans": [_PLAN_E_STUDIO, _PLAN_E_ONE_BR]}
+    fake = _FakePage(payload, url="https://www.sylispm.com/woodway-apartments/")
+    result = await MarketAptsAdapter().extract(
+        fake, _ctx("https://www.sylispm.com/woodway-apartments/")
+    )  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_E"
+    assert len(result.units) == 2
+    assert result.units[0]["floor_plan_name"] == "Woodway Efficiency"
+    assert result.units[0]["market_rent_low"] == 880
+    assert result.confidence > 0.7
+
+
+@pytest.mark.asyncio
+async def test_adapter_template_f_extract() -> None:
+    """End-to-end: Template F payload (rows under the ``rows`` key, not
+    ``plans``) → unit-level rows with tier label
+    ``TIER_1_DOM_MARKETAPTS_F``."""
+    payload = {
+        "template": "F",
+        "plans": [],  # F doesn't use plans
+        "rows": [_ROW_F_AVAILABLE_DATE, _ROW_F_CALL_FOR_DETAILS],
+    }
+    fake = _FakePage(payload, url="https://223etown.com/floorplans")
+    result = await MarketAptsAdapter().extract(
+        fake, _ctx("https://223etown.com/")
+    )  # type: ignore[arg-type]
+    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_F"
+    assert len(result.units) == 2
+    # First row is AVAILABLE-dated; second is "Call For Details".
+    franklin = next(u for u in result.units if u["floor_plan_name"] == "The Franklin")
+    assert franklin["market_rent_low"] == 1425
+    assert franklin["availability_date"] == "06/10/2026"
+    comm = next(u for u in result.units if u["floor_plan_name"] == "COMM")
+    assert comm["availability_status"] == "UNAVAILABLE"
 
 
 @pytest.mark.asyncio
