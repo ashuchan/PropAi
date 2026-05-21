@@ -69,6 +69,31 @@ class TestDetectorRouting:
         r = detect_pms("https://example.com/", page_html=html)
         assert r.pms == "knock"
 
+    def test_knock_yields_to_securecafe_when_both_markers_present(self):
+        """2026-05-21 P2b regression guard: Knock often appears as a chat
+        overlay on a primary RentCafe/SecureCafe site. When the structural
+        portal marker is also present, the primary PMS owns the real
+        inventory. Canonical PID 279299 thewildsapts.com: Knock chat
+        returned 9 units; the co-resident SecureCafe portal carries 402."""
+        html = (
+            '<script src="https://doorway.knck.io/widget.js"></script>'
+            '<a href="https://acme.securecafe.com/onlineleasing/wilds/'
+            'floorplans.aspx">view floorplans</a>'
+        )
+        r = detect_pms("https://example.com/", page_html=html)
+        assert r.pms == "rentcafe"  # SecureCafe is the rentcafe portal family
+
+    def test_knock_yields_to_resman_when_both_markers_present(self):
+        """Same gate, ResMan version. Knock overlay + ResMan availability
+        portal → route to ResMan (it carries the real unit list)."""
+        html = (
+            '<script src="https://doorway.knck.io/widget.js"></script>'
+            '<a href="https://acme.myresman.com/Portal/Applicants/'
+            'Availability?a=1&p=2">apply</a>'
+        )
+        r = detect_pms("https://example.com/", page_html=html)
+        assert r.pms == "resman"
+
     def test_irvine_via_host(self):
         html = '<a href="https://www.irvinecompanyapartments.com/listings">view</a>'
         r = detect_pms("https://example.com/", page_html=html)
@@ -88,6 +113,21 @@ class TestDetectorRouting:
         html = '<script src="https://api.rentdynamics.com/v1/x"></script>'
         r = detect_pms("https://example.com/", page_html=html)
         assert r.pms == "apts247"
+
+    def test_apts247_rejects_bare_media_cdn_host(self):
+        """2026-05-21 P1b regression guard: hero-image URLs on the
+        apts247.info CDN must NOT route to apts247. AppFolio/SightMap
+        sites embed these as marketing hero images (e.g. PIDs 16499
+        palmflats, 235996 stratfordchase, 77537 parlaapts on
+        2026-05-21). The widget loader / api_key URL / RentDynamics
+        host signals remain admitted; bare media CDN host alone is not
+        a real Apts247 deployment."""
+        html = (
+            '<img src="https://media.apts247.info/de/community/hero_shot/x.jpg">'
+            '<img src="https://apts247.info/de/community/hero_shot/y.jpg">'
+        )
+        r = detect_pms("https://example.com/", page_html=html)
+        assert r.pms != "apts247"
 
 
 class TestEmptyInputContract:

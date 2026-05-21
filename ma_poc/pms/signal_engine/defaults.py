@@ -187,6 +187,10 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     "essex": ("/apartments", "/availability"),
     "maac": ("/floorplans", "/availability", "/apartments"),
     "rentvision": ("/floorplans", "/floor-plans", "/availability"),
+    # 2026-05-21 port (P1a): EncoreSkyline marketing-template adapter.
+    "encoreskyline_template": ("/floorplans", "/floor-plans"),
+    # 2026-05-21 port (P2a): ResMan public availability portal.
+    "resman": ("/floorplans", "/floor-plans", "/availability"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (

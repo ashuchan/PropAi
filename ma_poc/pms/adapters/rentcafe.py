@@ -42,6 +42,7 @@ from ma_poc.pms.adapters._parsing import (
     make_unit_dict,
     money_to_int,
 )
+from ma_poc.pms.adapters._rentcafe_hosted_table import parse_rentcafe_hosted_table
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 # Note: ``ma_poc.extraction.post_process`` is imported lazily inside ``extract``
@@ -416,6 +417,32 @@ class RentCafeAdapter:
 
             pp = post_process(all_units, property_id=getattr(ctx, "property_id", None))
             if pp.n_admitted > 0:
+                # 2026-05-21 (port of feature-branch SecureCafe drill-down):
+                # the network getFloorplans response is often plan-level
+                # only (one row per floorplan with min/max rent). When
+                # admitted set is plan-level only (no unit_number), drill
+                # into the securecafe online-leasing portal which carries
+                # the real unit-level inventory. Prefer unit-level; fall
+                # back to plan-level if the drill-down fails.
+                _has_unit_level = any(
+                    str(u.get("unit_number") or "").strip() for u in pp.units
+                )
+                if not _has_unit_level:
+                    sc_units = await _try_rentcafe_securecafe_probe(ctx, result)
+                    if sc_units:
+                        sc_pp = post_process(
+                            sc_units,
+                            property_id=getattr(ctx, "property_id", None),
+                        )
+                        if sc_pp.n_admitted > 0:
+                            result.units = list(sc_pp.units)
+                            result.plan_summaries = list(sc_pp.plan_summaries)
+                            result.post_process_meta = sc_pp.to_meta()
+                            result.tier_used = f"{_TIER_BASE}_SECURECAFE"
+                            result.confidence = min(
+                                0.92, 0.7 + 0.04 * sc_pp.n_admitted
+                            )
+                            return result
                 # Stage 2: surface unit-level AND plan-level lists. The
                 # runner promotes ``plan_summaries`` into the V2 record's
                 # ``floor_plans[]`` field; verdict treats a property with
@@ -461,6 +488,101 @@ class RentCafeAdapter:
                 # result.api_responses[*].via="wp_probe".
                 result.tier_used = _TIER_BASE
                 return result
+
+        # 2026-05-21 (port from feature-branch fix/resolver-path-patterns-may13):
+        # SecureCafe online-leasing portal drill-down. Highest-leverage
+        # RentCafe path — promotes the ~1,060-property floorplan/LLM pool
+        # to deterministic Tier-1. The portal carries the real UNIT-LEVEL
+        # inventory one drill-down past the floorplan page; reachable via
+        # curl_cffi (probe_get) which clears Cloudflare with chrome120
+        # impersonation.
+        sc_units = await _try_rentcafe_securecafe_probe(ctx, result)
+        if sc_units:
+            from ma_poc.extraction.post_process import post_process
+
+            pp = post_process(sc_units, property_id=getattr(ctx, "property_id", None))
+            if pp.n_admitted > 0:
+                result.units = list(pp.units)
+                result.plan_summaries = list(pp.plan_summaries)
+                result.post_process_meta = pp.to_meta()
+                result.tier_used = f"{_TIER_BASE}_SECURECAFE"
+                result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
+                return result
+
+        # 2026-05-21 (port): RentCafe-HOSTED SSR unit table fallback.
+        # The rentcafe.com/.../default.aspx portal (and the same RC widget
+        # on rendered vanity pages) SSRs every unit as
+        # ``<tr class="fp-unit" data-unit-*>``. Server-200, no bot-wall,
+        # no login. Generic extractor misses this markup — parser lives in
+        # ``_rentcafe_hosted_table.py``. Render-dependent, so parse the
+        # already-rendered page HTML.
+        try:
+            from ma_poc.pms.adapters.generic import _get_page_html
+            _rc_html = await _get_page_html(page, ctx)
+        except Exception:
+            _rc_html = ""
+        if _rc_html and "fp-unit" in _rc_html:
+            from ma_poc.extraction.post_process import post_process
+
+            hosted = parse_rentcafe_hosted_table(
+                _rc_html, str(getattr(ctx, "base_url", "") or "")
+            )
+            if hosted:
+                pp = post_process(
+                    hosted, property_id=getattr(ctx, "property_id", None)
+                )
+                if pp.n_admitted > 0:
+                    result.units = list(pp.units)
+                    result.plan_summaries = list(pp.plan_summaries)
+                    result.post_process_meta = pp.to_meta()
+                    result.tier_used = "TIER_1_DOM_RENTCAFE_HOSTED"
+                    result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
+                    return result
+
+        # 2026-05-21 (port): RentCafe-Nestin per-plan DOM recovery. The
+        # 35-prop JSON-LD probe (project_jsonld_recovery_2026-05-20.md)
+        # found ~89% of the 298-prop JSON-LD ALL_fail bucket are
+        # RentCafe-Nestin marketing sites where the unit + rent + date
+        # data lives one nav-hop deeper at /floorplans/{plan-slug}.
+        # Detection: resource.rentcafe.com CDN signal in rendered HTML.
+        # Probes each /floorplans/{slug} detail page via the live
+        # Playwright page (probe_get hits CF-403 even with static
+        # cf_clearance cookies — only the browser session works).
+        if _rc_html:
+            try:
+                from ma_poc.pms.adapters._rentcafe_nestin import (
+                    is_nestin_template,
+                    recover_rentcafe_nestin_per_plan,
+                )
+
+                if is_nestin_template(_rc_html):
+                    from ma_poc.extraction.post_process import post_process
+
+                    nestin_units, nestin_source = await recover_rentcafe_nestin_per_plan(
+                        _rc_html,
+                        str(getattr(ctx, "base_url", "") or ""),
+                        page=page,
+                    )
+                    if nestin_units:
+                        pp = post_process(
+                            nestin_units, property_id=getattr(ctx, "property_id", None)
+                        )
+                        if pp.n_admitted > 0:
+                            result.units = list(pp.units)
+                            result.plan_summaries = list(pp.plan_summaries)
+                            result.post_process_meta = pp.to_meta()
+                            result.tier_used = "TIER_1_DOM_RENTCAFE_NESTIN"
+                            if nestin_source:
+                                result.winning_url = nestin_source
+                            result.confidence = min(0.90, 0.65 + 0.04 * pp.n_admitted)
+                            return result
+            except Exception as nestin_exc:
+                # Recovery must never block scrape — log + fall through to
+                # failure classification.
+                result.errors.append(
+                    f"rentcafe-nestin-error: {type(nestin_exc).__name__}: "
+                    f"{str(nestin_exc)[:120]}"
+                )
 
         # Failure path: re-stamp tier_used with a structured sub-code so the
         # downstream report can distinguish misrouting from genuine zero data.
@@ -623,4 +745,217 @@ async def _try_rentcafe_wp_probe(
             {"url": api_url, "status": 200, "body": payload, "via": "wp_probe"}
         )
         result.winning_url = api_url
+    return units
+
+
+# ────────────────────────────────────────────────────────────────────
+# 2026-05-21 port (P0 — feature-branch fix/resolver-path-patterns-may13):
+# SecureCafe online-leasing portal drill-down. Most RentCafe vanity sites
+# have only floorplan-level rent on the marketing page; the per-apartment
+# inventory lives at ``{sub}.securecafe.com/onlineleasing/{slug}/
+# availableunits.aspx``. The Cloudflare/Akamai wall on those pages is
+# defeated by curl_cffi chrome120 impersonation (probe_get).
+#
+# Coverage: ~84% of brochure + ~67% of has-inventory RC residual
+# (sc_gap probe, 112 sites, CF-walled=0). Highest single-fix LLM-cost
+# reduction in the May-21 post-merge audit (~1,060 of 1,738 detected
+# RentCafe properties currently fall through to LLM cascade at 99% rate).
+# ────────────────────────────────────────────────────────────────────
+
+
+_SECURECAFE_URL_RE = re.compile(
+    r"""https?://
+        (?P<sub>[a-z0-9][a-z0-9-]*)\.securecafe\.com
+        /(?:onlineleasing|residentservices)/
+        (?P<slug>[a-z0-9][a-z0-9-]*)
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+_SECURECAFE_FP_HDR_RE = re.compile(
+    r"Floor\s+Plan:\s*(?P<name>[^<\-]{1,80}?)\s*-\s*"
+    r"(?P<bedtxt>Studio|\d+\s*Bedroom[s]?)\s*,\s*"
+    r"(?P<bathtxt>\d+(?:\.\d+)?)\s*Bathroom",
+    re.IGNORECASE,
+)
+
+_SECURECAFE_UNIT_ROW_RE = re.compile(
+    r"<tr[^>]*class='AvailUnitRow'.*?</tr>", re.IGNORECASE | re.DOTALL
+)
+_SC_APT_RE = re.compile(
+    r"data-label=['\"]?Apartment['\"]?[^>]*>\s*#?\s*([A-Za-z0-9-]+)", re.I
+)
+_SC_SQFT_RE = re.compile(r"data-label=['\"]?Sq\.?Ft\.?['\"]?[^>]*>\s*([\d,]+)", re.I)
+_SC_RENT_RE = re.compile(
+    r"data-label=['\"]?Rent['\"]?[^>]*>\s*\$?\s*([\d,]+)\s*(?:-\s*\$?\s*([\d,]+))?", re.I
+)
+# 2026-05-18: securecafe AvailUnitRow has a ``data-label='Date Available'``
+# cell with "Available" or "M/D/YY" inner text. Earlier parser ignored it,
+# resulting in 0% available_date on the SECURECAFE tier (21.6k units).
+_SC_DATE_RE = re.compile(
+    r"data-label=['\"]?Date Available['\"]?[^>]*>(.*?)</td>", re.I | re.S
+)
+
+
+def _find_securecafe_base(html: str, ctx: AdapterContext) -> str | None:
+    """Return ``https://<sub>.securecafe.com/onlineleasing/<slug>`` or None.
+
+    Looks in the rendered HTML first (marketing sites link/iframe to their
+    securecafe portal), then falls back to captured response URLs in
+    ``ctx._api_responses`` (link-hop discovered URLs surface here), and
+    finally the property's own host when it *is* a securecafe portal.
+    """
+    if html:
+        m = _SECURECAFE_URL_RE.search(html)
+        if m:
+            return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
+    # Scan captured response URLs (link-hop often surfaces a securecafe
+    # portal request like guestlogin.aspx / floorplans there even when
+    # the rendered body lost the marketing-site anchor).
+    for resp in getattr(ctx, "_api_responses", []) or []:
+        u = str(resp.get("url", "") or "")
+        if "securecafe.com/onlineleasing/" not in u.lower():
+            continue
+        m = _SECURECAFE_URL_RE.search(u)
+        if m:
+            return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
+    origin = _origin_from_ctx(ctx)
+    if "securecafe.com" in origin:
+        fr = getattr(ctx, "fetch_result", None)
+        final = str(getattr(fr, "final_url", "") or "") if fr else ""
+        m = _SECURECAFE_URL_RE.search(final or origin)
+        if m:
+            return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
+    return None
+
+
+def _beds_from_text(bedtxt: str) -> int:
+    bedtxt = bedtxt.strip().lower()
+    if bedtxt.startswith("studio"):
+        return 0
+    m = re.match(r"(\d+)", bedtxt)
+    return int(m.group(1)) if m else 0
+
+
+def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str, Any]]:
+    """Parse a securecafe ``availableunits.aspx`` page into unit-level dicts.
+
+    The page is a sequence of floorplan sections; each section header
+    ("... Floor Plan: A1 One Bedroom / One Bath - 1 Bedroom, 1 Bathroom")
+    is followed by ``<tr class='AvailUnitRow'>`` rows, one per apartment.
+    Returns ``[]`` on a CF-challenge shell or unparseable HTML.
+    """
+    if not html or "AvailUnitRow" not in html:
+        return []
+    units: list[dict[str, Any]] = []
+    headers = list(_SECURECAFE_FP_HDR_RE.finditer(html))
+    if not headers:
+        return []
+    for idx, hm in enumerate(headers):
+        seg_start = hm.end()
+        seg_end = headers[idx + 1].start() if idx + 1 < len(headers) else len(html)
+        segment = html[seg_start:seg_end]
+        fp_name = re.sub(r"\s+", " ", hm.group("name")).strip()
+        beds = _beds_from_text(hm.group("bedtxt"))
+        try:
+            baths = float(hm.group("bathtxt"))
+        except (TypeError, ValueError):
+            baths = 0.0
+        for row in _SECURECAFE_UNIT_ROW_RE.findall(segment):
+            apt = _SC_APT_RE.search(row)
+            if not apt:
+                continue
+            sqft_m = _SC_SQFT_RE.search(row)
+            rent_m = _SC_RENT_RE.search(row)
+            rent_low = rent_high = None
+            if rent_m:
+                rent_low = money_to_int(rent_m.group(1))
+                rent_high = money_to_int(rent_m.group(2)) if rent_m.group(2) else rent_low
+            date_m = _SC_DATE_RE.search(row)
+            avail_date = ""
+            if date_m:
+                avail_date = re.sub(r"<[^>]+>", " ", date_m.group(1))
+                avail_date = re.sub(r"\s+", " ", avail_date).strip()
+            units.append(
+                make_unit_dict(
+                    floor_plan_name=fp_name,
+                    bedrooms=str(beds),
+                    bathrooms=str(baths),
+                    sqft=(sqft_m.group(1).replace(",", "") if sqft_m else ""),
+                    unit_number=apt.group(1),
+                    rent_low=rent_low,
+                    rent_high=rent_high,
+                    availability_status="AVAILABLE",
+                    availability_date=avail_date,
+                    source_api_url=source_url,
+                    extraction_tier="TIER_1_API_RENTCAFE_SECURECAFE",
+                )
+            )
+    return units
+
+
+async def _try_rentcafe_securecafe_probe(
+    ctx: AdapterContext, result: AdapterResult
+) -> list[dict[str, Any]]:
+    """Follow the securecafe online-leasing portal and parse
+    ``availableunits.aspx`` for unit-level inventory.
+
+    Returns parsed unit dicts on success, ``[]`` on any failure.
+    Never raises -- exceptions append to ``result.errors``.
+    """
+    html = ""
+    fr = getattr(ctx, "fetch_result", None)
+    body = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(body, bytes):
+        html = body.decode("utf-8", errors="replace")
+    elif isinstance(body, str):
+        html = body
+
+    # Lazy probe_get import — silently bail when curl_cffi isn't available
+    # (test env / partial install). The probe is a best-effort recovery; an
+    # absent dependency is not a property-level error.
+    try:
+        from ma_poc.pms.adapters._probe import probe_get
+    except ImportError:
+        return []
+
+    base = _find_securecafe_base(html, ctx)
+    if not base:
+        # Patchright-rendered body sometimes lacks the securecafe link in
+        # a regex-matchable form (link injected post-render or behind a
+        # menu), and securecafe direct fetches CF-403 even with cookies.
+        # Re-fetch the property's homepage via curl_cffi (bypasses CF +
+        # raw server HTML) and scan that for the securecafe base.
+        origin = _origin_from_ctx(ctx)
+        if origin:
+            try:
+                _hr = probe_get(origin, timeout=20)
+                if _hr.status_code == 200 and _hr.text:
+                    base = _find_securecafe_base(_hr.text, ctx)
+            except Exception:
+                # Best-effort recovery — silently fall through. The
+                # failure-classification path emits the canonical
+                # RENTCAFE_* error code; this probe should not pollute
+                # result.errors with mid-cascade debug noise.
+                pass
+    if not base:
+        return []
+    au_url = f"{base}/availableunits.aspx"
+
+    try:
+        r = probe_get(au_url, timeout=25)
+    except Exception:
+        return []
+    if r.status_code != 200:
+        return []
+    page_html = r.text or ""
+    # CF challenge shell is tiny and carries no unit rows.
+    if "AvailUnitRow" not in page_html:
+        return []
+    units = parse_securecafe_availableunits(page_html, au_url)
+    if units:
+        result.api_responses.append(
+            {"url": au_url, "status": 200, "body": "<securecafe-html>", "via": "securecafe_probe"}
+        )
+        result.winning_url = au_url
     return units

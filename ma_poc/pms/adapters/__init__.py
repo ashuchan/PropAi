@@ -14,6 +14,8 @@ from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
 # 2026-05-13 port (Commit 11): server-only Tier-1 adapters.
 from ma_poc.pms.adapters.cortland import CortlandAdapter
+# 2026-05-21 port (P1a): EncoreSkyline marketing-template adapter.
+from ma_poc.pms.adapters.encoreskyline_template import EncoreSkylineTemplateAdapter
 from ma_poc.pms.adapters.entrata import EntrataAdapter
 from ma_poc.pms.adapters.equity import EquityAdapter
 # 2026-05-13 port (Commit 13): REIT adapters.
@@ -30,6 +32,8 @@ from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
 from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
 from ma_poc.pms.adapters.rentmanager import RentManagerAdapter
 from ma_poc.pms.adapters.rentvision import RentVisionAdapter
+# 2026-05-21 port (P2a): ResMan public availability portal adapter.
+from ma_poc.pms.adapters.resman import ResManAdapter
 from ma_poc.pms.adapters.sightmap import SightMapAdapter
 from ma_poc.pms.adapters.squarespace_nopms import SquarespaceNoPmsAdapter
 from ma_poc.pms.adapters.touchtour import TouchTourAdapter
@@ -75,6 +79,10 @@ def _bootstrap_registry() -> None:
         EssexAdapter,
         MaacAdapter,
         RentVisionAdapter,
+        # 2026-05-21 port (P1a): EncoreSkyline marketing-template adapter.
+        EncoreSkylineTemplateAdapter,
+        # 2026-05-21 port (P2a): ResMan public availability portal adapter.
+        ResManAdapter,
         SquarespaceNoPmsAdapter,
         WixNoPmsAdapter,
         GenericAdapter,

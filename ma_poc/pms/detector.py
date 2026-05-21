@@ -76,6 +76,8 @@ PmsName = Literal[
     "essex",
     "maac",
     "rentvision",
+    # 2026-05-21 port (P2a): ResMan public availability portal.
+    "resman",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -119,6 +121,8 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "essex": "api_first",
     "maac": "api_first",
     "rentvision": "cascade",
+    # 2026-05-21 port (P2a): ResMan public availability portal.
+    "resman": "api_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -227,6 +231,17 @@ _AVALONBAY_SLUG_RE = re.compile(r"avaloncommunities\.com/[a-z]{2}/[^/]+/([a-z0-9
 # no Entrata API ever fired. Require a real widget-specific subpath.
 _ENTRATA_REAL_MODULE_RE = re.compile(
     r"/apartments/module/(?!application_authentication/)[a-z0-9_-]+/?",
+    re.IGNORECASE,
+)
+
+# 2026-05-21 (P1b — post-merge audit): tightens the apts247 detector. The
+# media CDN ``apts247.info`` is reused by AppFolio/SightMap sites for hero
+# images, which is enough to mis-route them when the only signal is a bare
+# host substring. Real Apts247/RentDynamics inventory sites embed the
+# api-keyed floorplans URL in static HTML. Require that shape (or a
+# rentdynamics.com API path) before classifying as apts247.
+_APTS247_INVENTORY_RE = re.compile(
+    r"apts247\.info/api/v\d+/floorplans/?\?api_key=[0-9a-f]{16,}",
     re.IGNORECASE,
 )
 
@@ -562,10 +577,26 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # 2026-05-13 port: Knock / Doorway widget. Marketing-led PMS;
     # doorway.knck.io script tag or knockDoorway.init() call. Public
     # Doorway API serves full unit data (verified 2026-05-13 on
-    # liveatcalista.com -- 53 units with availableOn + price). Adapter
-    # lands Commit 12; until then, knock detection logs via tier
-    # distribution and falls back to generic cascade.
-    if "doorway.knck.io" in h or "knockdoorway" in h:
+    # liveatcalista.com -- 53 units with availableOn + price).
+    #
+    # 2026-05-21 gate (P2b — post-merge audit): Knock often appears as a
+    # chat-widget overlay on a primary RentCafe/SecureCafe/ResMan site.
+    # When both markers are present, the primary PMS owns the real
+    # inventory while Knock returns only the chat-tracked subset.
+    # Regression PID 279299 (thewildsapts.com): Knock 9 units vs
+    # RentCafe SecureCafe 402 units. Yield to the structurally-specific
+    # PMS when its portal marker is present.
+    _has_competing_primary_pms_for_knock = (
+        ".securecafe.com" in h
+        or "securecafe.com/onlineleasing" in h
+        or "rentcafe.com/onlineleasing" in h
+        or "rentcafe.com/apartments" in h
+        or "widgets.rentcafe.com" in h
+        or "rentcafeapi.com" in h
+        or "myresman.com" in h
+        or "/portal/applicants/availability" in h
+    )
+    if ("doorway.knck.io" in h or "knockdoorway" in h) and not _has_competing_primary_pms_for_knock:
         return (
             "knock",
             0.90,
@@ -630,12 +661,32 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # 2026-05-13 port (Commit 12): Apts247 / RentDynamics. Same-origin
     # ``/api/v1/floorplans/?api_key=<hex>`` with the key embedded in
     # static HTML. ≥4-site cluster observed 2026-05-17.
-    if "apts247" in h or "rentdynamics.com" in h:
+    #
+    # 2026-05-21 tightening (P1b — post-merge audit): the bare-host
+    # substring gate over-routed 19 AppFolio/SightMap sites because they
+    # serve hero images from the apts247.info media CDN (e.g.
+    # ``apts247.info/de/.../hero_shot/community/*.jpg``). Distinguish:
+    #   * Real Apts247 signals: api-keyed floorplans URL, widget loader
+    #     script (static2/cdn.apts247.info/widget*), or the RentDynamics
+    #     data API host (api.rentdynamics.com).
+    #   * Regression source: bare ``apts247.info`` in <img src=> paths
+    #     under /hero_shot/, /community/, /photos/, etc.
+    # Regression PIDs (had only image-CDN refs, no inventory shape):
+    #   16499 palmflats / 235996 stratfordchase / 77537 parlaapts.
+    _apts247_positive_signal = bool(
+        _APTS247_INVENTORY_RE.search(h)
+        or "static2.apts247.info/widget" in h
+        or "cdn.apts247.info/widget" in h
+        or "apts247.info/widget" in h
+        or "api.rentdynamics.com/" in h
+        or "rentdynamics.com/api/" in h
+    )
+    if _apts247_positive_signal:
         return (
             "apts247",
-            0.85,
-            ["Apts247/RentDynamics marker in HTML "
-             "(apts247 / rentdynamics.com)"],
+            0.90,
+            ["Apts247/RentDynamics inventory signal in HTML "
+             "(api_key URL, widget loader, or RentDynamics API host)"],
         )
 
     # 2026-05-13 port (Commit 13): Essex Property Trust REIT. Bulk
@@ -735,6 +786,23 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # — they CANNOT appear on a real Entrata site, so they're a stronger
     # positive ID for RentCafe than a bare ``entrata.com`` substring is
     # for Entrata.
+    # 2026-05-21 port (P2a): ResMan public availability portal at
+    # ``<client>.myresman.com/Portal/Applicants/Availability?a=&p=``,
+    # linked from the marketing /floorplans/ page. 2026-05-17 canary
+    # 842-pool deep-probe: 67+ sites the detector missed (fell to LLM /
+    # floorplan / failed). Portal is NOT Cloudflare-fronted, so the
+    # ResMan adapter recovers Tier-1 unit-level even proxy-less.
+    # Placed before the RentCafe portal-path block because a property
+    # can carry both markers (legacy RentCafe widget + active ResMan
+    # availability) — ResMan is the structurally-specific signal.
+    if "myresman.com" in h or "/portal/applicants/availability" in h:
+        return (
+            "resman",
+            0.90,
+            ["ResMan marker in HTML "
+             "(myresman.com / Portal/Applicants/Availability)"],
+        )
+
     if (
         ".securecafe.com" in h
         or "rentcafe.com/onlineleasing" in h
