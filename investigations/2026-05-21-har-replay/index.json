@@ -1,0 +1,5346 @@
+[
+  {
+    "property_domain": "apartments.thepointeatlapts.com",
+    "size_bytes": 35329,
+    "entries": 3,
+    "distinct_hosts": 2,
+    "page_urls": [],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://apartments.thepointeatlapts.com/favicon.ico",
+        "host": "apartments.thepointeatlapts.com",
+        "status": 200,
+        "content_type": "image/x-icon",
+        "body_size": 9662,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "arise.myresman.com",
+    "size_bytes": 102172321,
+    "entries": 27,
+    "distinct_hosts": 6,
+    "page_urls": [
+      "https://arise.myresman.com/Portal/Applicants/Availability?a=1526&p=fbe7867d-b879-4f81-9fc4-527465e08a4e&moveInDate=5/21/2026&refreshPricing=true"
+    ],
+    "pms_signals": [
+      "resman"
+    ],
+    "pms_host_examples": {
+      "resman": [
+        "www.google-analytics.com",
+        "arise.myresman.com"
+      ]
+    },
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://arise.myresman.com/Areas/Portal/Content/Availability/OldTheme.css?v=639149195042755964",
+        "host": "arise.myresman.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 543389,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://arise.myresman.com/Portal/Applicants/Availability?a=1526&p=fbe7867d-b879-4f81-9fc4-527465e08a4e&moveInDate=5/21/2026&refreshPricing=true",
+        "host": "arise.myresman.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 104539,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://arise.myresman.com/Areas/Portal/Scripts/Applicants/Availability.js?v=639149192014874199",
+        "host": "arise.myresman.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 41263,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "ashtonparc.com",
+    "size_bytes": 3788974,
+    "entries": 381,
+    "distinct_hosts": 6,
+    "page_urls": [
+      "https://ashtonparc.com/floor-plans/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "home.securityproperties.com",
+    "size_bytes": 9934906,
+    "entries": 85,
+    "distinct_hosts": 21,
+    "page_urls": [
+      "https://home.securityproperties.com/summitriverside/littleton/summit-riverside-apartments/conventional/"
+    ],
+    "pms_signals": [
+      "entrata",
+      "funnel"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycf.entrata.com",
+        "medialibrarycfo.entrata.com"
+      ],
+      "funnel": [
+        "chatbot.funnelleasing.com",
+        "integrations.funnelleasing.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "imtresidential.com",
+    "size_bytes": 20698324,
+    "entries": 65,
+    "distinct_hosts": 13,
+    "page_urls": [
+      "https://imtresidential.com/properties/imt-woodland-meadows/apartments"
+    ],
+    "pms_signals": [
+      "sightmap"
+    ],
+    "pms_host_examples": {
+      "sightmap": [
+        "sightmap.com"
+      ]
+    },
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://imtresidential.com/properties/imt-woodland-meadows/apartments/",
+        "host": "imtresidential.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 9963470,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://imtresidential.com/wp-content/uploads/spaces/spaces-global.css?v=1778139219",
+        "host": "imtresidential.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 111634,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://imtresidential.com/wp-content/plugins/ecs-spaces/public/fonts/spaces-icon-font-v2.ttf?vdvebz",
+        "host": "imtresidential.com",
+        "status": 200,
+        "content_type": "application/x-font-ttf",
+        "body_size": 14992,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "ironhorseflats.com",
+    "size_bytes": 7941213,
+    "entries": 80,
+    "distinct_hosts": 10,
+    "page_urls": [
+      "https://ironhorseflats.com/floor-plans/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "jalexrentals.com",
+    "size_bytes": 15242120,
+    "entries": 110,
+    "distinct_hosts": 18,
+    "page_urls": [
+      "https://jalexrentals.com/property-detail/?propID=61&rmwebsvc_id=61&rmwebsvc_command=PropertyDetail.aspx&rmwebsvc_corpid=jalex&rmwebsvc_location=1&rmwebsvc_mode=javaScript&rmwebsvc_AvailabilityDate=11/18/2019&rmwebsvc_template=default"
+    ],
+    "pms_signals": [
+      "spherexx"
+    ],
+    "pms_host_examples": {
+      "spherexx": [
+        "chats.spherexx.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "krcreserveapts.com",
+    "size_bytes": 13917346,
+    "entries": 115,
+    "distinct_hosts": 20,
+    "page_urls": [
+      "https://krcreserveapts.com/en/floor-plans/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 5,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://ares.betternoi.com/media/floor_plans/2021/06/28/896.jpg",
+        "host": "ares.betternoi.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 272622,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://ares.betternoi.com/media/floor_plans/2021/06/28/747.jpg",
+        "host": "ares.betternoi.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 269029,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://ares.betternoi.com/media/floor_plans/2021/06/28/975.jpg",
+        "host": "ares.betternoi.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 266812,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "lincolngreenapartments.com",
+    "size_bytes": 2920915,
+    "entries": 54,
+    "distinct_hosts": 6,
+    "page_urls": [
+      "https://lincolngreenapartments.com/floor-plan/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "liveatgraysonpark.com",
+    "size_bytes": 31004466,
+    "entries": 125,
+    "distinct_hosts": 19,
+    "page_urls": [
+      "https://liveatgraysonpark.com/floorplans/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 2,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://liveatgraysonpark.com/floorplans/",
+        "host": "liveatgraysonpark.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 160883,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://swifty-media.s3.us-east-1.amazonaws.com/sites/2975/2021/02/floorplan-banner-grayson-park-1536x597.jpg",
+        "host": "swifty-media.s3.us-east-1.amazonaws.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 71243,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "livegrammercy.com",
+    "size_bytes": 7368026,
+    "entries": 53,
+    "distinct_hosts": 6,
+    "page_urls": [
+      "https://livegrammercy.com/floorplans/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://livegrammercy.com/floorplans/",
+        "host": "livegrammercy.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 163448,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://livegrammercy.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Dlisting-chunks/?forcecache=1",
+        "host": "livegrammercy.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 40846,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://livegrammercy.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Ddetails%26resource%3Dfloorplan%26id%3D3/?forcecache=1",
+        "host": "livegrammercy.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 19175,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "npmainc.com",
+    "size_bytes": 17900737,
+    "entries": 87,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "https://npmainc.com/listing/chisholm-trail-townhomes/"
+    ],
+    "pms_signals": [
+      "sightmap"
+    ],
+    "pms_host_examples": {
+      "sightmap": [
+        "sightmap.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "tenzenapartments.com",
+    "size_bytes": 8680565,
+    "entries": 82,
+    "distinct_hosts": 6,
+    "page_urls": [
+      "https://tenzenapartments.com/floor-plans/"
+    ],
+    "pms_signals": [
+      "knock"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "terrainaustin.com",
+    "size_bytes": 7720638,
+    "entries": 107,
+    "distinct_hosts": 15,
+    "page_urls": [
+      "https://terrainaustin.com/available-units/"
+    ],
+    "pms_signals": [
+      "appfolio"
+    ],
+    "pms_host_examples": {
+      "appfolio": [
+        "listings.cdn.appfolio.com",
+        "propertysociety.appfolio.com"
+      ]
+    },
+    "data_entries_count": 8,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://listings.cdn.appfolio.com/listings/assets/listings/application2-b0f197292ab612d566f03b2fce507933939f13cd8dab7bb1c4befcee8f024506.js",
+        "host": "listings.cdn.appfolio.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 232753,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://listings.cdn.appfolio.com/listings/assets/listings/application2-09f63b334c5546fef4434a8f82f83bca70ea2b084017614422be88418b52adfc.css",
+        "host": "listings.cdn.appfolio.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 67054,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://terrainaustin.com/available-units/",
+        "host": "terrainaustin.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 61215,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "tgmautumnwoods.com",
+    "size_bytes": 7666408,
+    "entries": 145,
+    "distinct_hosts": 48,
+    "page_urls": [
+      "http://www.tgmautumnwoods.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "tgmdanada.com",
+    "size_bytes": 9057500,
+    "entries": 149,
+    "distinct_hosts": 22,
+    "page_urls": [
+      "http://www.tgmdanada.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "therailat1380.com",
+    "size_bytes": 19118977,
+    "entries": 141,
+    "distinct_hosts": 22,
+    "page_urls": [
+      "https://therailat1380.com/floorplans/"
+    ],
+    "pms_signals": [
+      "knock"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://therailat1380.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Dlisting-chunks/?forcecache=1",
+        "host": "therailat1380.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 302011,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://therailat1380.com/floorplans/",
+        "host": "therailat1380.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 147671,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2021111/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 3267,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "townecrest.com",
+    "size_bytes": 15227301,
+    "entries": 100,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "https://townecrest.com/floorplans/"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "cs-cdn.realpage.com",
+        "leasing.realpage.com"
+      ]
+    },
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://townecrest.com/floorplans/",
+        "host": "townecrest.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 70210,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/blurb/v1/5194917/3479711/Floorplan%20List?BpmId=OLL.CurrentActivityHeaderText&BpmSequence=0&LogSequence=4&ClientSessionID=6ed3f473-5e09-044d-bbb5-ee02066ba471",
+        "host": "leasing.realpage.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 518,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/UnitAccessibilityDetails/v1/5194917/3479711/Unit?BpmId=OLL.UnitAccessibilityDetails&BpmSequence=0&LogSequence=5&ClientSessionID=6ed3f473-5e09-044d-bbb5-ee02066ba471",
+        "host": "leasing.realpage.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 313,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "venterraliving.com",
+    "size_bytes": 2667211,
+    "entries": 62,
+    "distinct_hosts": 3,
+    "page_urls": [
+      "https://venterraliving.com/apartments/riverbend/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://venterraliving.com/apartments/riverbend/",
+        "host": "venterraliving.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 512684,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "vineyardscartersville.com",
+    "size_bytes": 19779460,
+    "entries": 149,
+    "distinct_hosts": 25,
+    "page_urls": [
+      "https://vineyardscartersville.com/floorplans/"
+    ],
+    "pms_signals": [
+      "knock"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 4,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://vineyardscartersville.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Dlisting-chunks/?forcecache=1",
+        "host": "vineyardscartersville.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 244753,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://vineyardscartersville.com/floorplans/",
+        "host": "vineyardscartersville.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 156307,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://vineyardscartersville.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Ddetails%26resource%3Dfloorplan%26id%3D2/?forcecache=1",
+        "host": "vineyardscartersville.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 89008,
+        "has_rent_shape": true,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.1020atwinterspringsfl.com",
+    "size_bytes": 4206411,
+    "entries": 82,
+    "distinct_hosts": 9,
+    "page_urls": [
+      "https://www.1020atwinterspringsfl.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.1020atwinterspringsfl.com/Content/js/zrscustom/floorplans.js",
+        "host": "www.1020atwinterspringsfl.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 18338,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.allenproperties.net",
+    "size_bytes": 21093869,
+    "entries": 113,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "https://www.allenproperties.net/greentree-gardens-san-bernardino-ca/"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.allenproperties.net/uploads/floorplans/images/1023x768G/98653/GreetreeGardensApartments_2618FlintWay_3DF_1X1.jpg?1619468835",
+        "host": "www.allenproperties.net",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 32014,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.amherstbedford.com",
+    "size_bytes": 16659686,
+    "entries": 158,
+    "distinct_hosts": 29,
+    "page_urls": [
+      "https://www.amherstbedford.com/floorplans/"
+    ],
+    "pms_signals": [
+      "apts247",
+      "knock"
+    ],
+    "pms_host_examples": {
+      "apts247": [
+        "images.apts247.info",
+        "media.apts247.info"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 15,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://static2.apts247.info/js/nextgen/floorplans/one/dist/main.min.js",
+        "host": "static2.apts247.info",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 600531,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.amherstbedford.com/floorplans/",
+        "host": "www.amherstbedford.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 116235,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://static2.apts247.info/css/deferred-stylesheets/pages/floorplans/one/__floorplans-deferred.css",
+        "host": "static2.apts247.info",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 108524,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.ampresidential.com",
+    "size_bytes": 26578392,
+    "entries": 234,
+    "distinct_hosts": 29,
+    "page_urls": [
+      "https://www.ampresidential.com/aspen-lakes-grand-rapids-mi/contact?utm_source=GoogleMyBusiness&utm_medium=organic&utm_campaign=website_link"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "www.google-analytics.com"
+      ]
+    },
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.ampresidential.com/uploads/floorplans/images/1023x1023G/130015/Cheboygan.jpg?1672953190",
+        "host": "www.ampresidential.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 70256,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.arborpointeapthomes.com",
+    "size_bytes": 6491797,
+    "entries": 111,
+    "distinct_hosts": 14,
+    "page_urls": [
+      "https://www.arborpointeapthomes.com/floorplans"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 9,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.arborpointeapthomes.com/floorplans",
+        "host": "www.arborpointeapthomes.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 271299,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-assistant-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 17330,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/148261/regio/widgets/floorplans-optimized-image-modal.543842.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.ashfordcasaserena.com",
+    "size_bytes": 12898568,
+    "entries": 83,
+    "distinct_hosts": 15,
+    "page_urls": [
+      "https://www.ashfordcasaserena.com/houston/ashford-casa-serena/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycfo.entrata.com",
+        "commoncf.entrata.com"
+      ]
+    },
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.ashfordcasaserena.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1311810/?occupancy_type=conventional&analytics=1&fp_filter_request&&occupancy_type=conventional&is_filter_request=0&",
+        "host": "www.ashfordcasaserena.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 2152896,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.ashfordstancliff.com",
+    "size_bytes": 14109639,
+    "entries": 73,
+    "distinct_hosts": 12,
+    "page_urls": [
+      "https://www.ashfordstancliff.com/houston/ashford-stancliff-park/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycfo.entrata.com",
+        "commoncf.entrata.com"
+      ]
+    },
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.ashfordstancliff.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1311824/?occupancy_type=conventional&analytics=1&fp_filter_request&&occupancy_type=conventional&is_filter_request=0&",
+        "host": "www.ashfordstancliff.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 3367525,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.ashfordwillowfalls.com",
+    "size_bytes": 13404274,
+    "entries": 98,
+    "distinct_hosts": 15,
+    "page_urls": [
+      "https://www.ashfordwillowfalls.com/houston/ashford-willow-falls/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycfo.entrata.com",
+        "commoncf.entrata.com"
+      ]
+    },
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.ashfordwillowfalls.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1311828/?occupancy_type=conventional&analytics=1&fp_filter_request&&occupancy_type=conventional&is_filter_request=0&",
+        "host": "www.ashfordwillowfalls.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 2011240,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.atwatercove.com",
+    "size_bytes": 8529092,
+    "entries": 104,
+    "distinct_hosts": 30,
+    "page_urls": [
+      "https://www.atwatercove.com/floorplans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 5,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.atwatercove.com/floorplans",
+        "host": "www.atwatercove.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 107110,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/513AWC/images/apartments/floorplans/1a5yb0blraqlesfcto38zc125na907vy.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 22278,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/513AWC/images/apartments/floorplans/8rspdmqfou0fsjmadmuchaqjo1ptovqa.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 17690,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.avanachestnuthills.com",
+    "size_bytes": 20015626,
+    "entries": 161,
+    "distinct_hosts": 31,
+    "page_urls": [
+      "https://www.avanachestnuthills.com/puyallup/avana-chestnut-hills/conventional/"
+    ],
+    "pms_signals": [
+      "entrata",
+      "sightmap"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycf.entrata.com",
+        "medialibrarycfo.entrata.com"
+      ],
+      "sightmap": [
+        "www.google-analytics.com",
+        "cdn.sightmap.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.avenliving.com",
+    "size_bytes": 9971755,
+    "entries": 116,
+    "distinct_hosts": 10,
+    "page_urls": [
+      "https://www.avenliving.com/floorplans/all/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.avenliving.com/floorplans/all/",
+        "host": "www.avenliving.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 223766,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.avenliving.com/Content/js/zrscustom/floorplans-filter.js",
+        "host": "www.avenliving.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 29777,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.avenliving.com/Content/css/zrsfull/zrs/floorplans-filter.css",
+        "host": "www.avenliving.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 11750,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.avonleariverside.com",
+    "size_bytes": 15009444,
+    "entries": 130,
+    "distinct_hosts": 35,
+    "page_urls": [
+      "https://www.avonleariverside.com/apartments/ga/atlanta/floor-plans"
+    ],
+    "pms_signals": [
+      "g5",
+      "knock",
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ],
+      "g5": [
+        "reputation.g5search.com"
+      ],
+      "realpage": [
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 6,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.avonleariverside.com/apartments/ga/atlanta/floor-plans",
+        "host": "www.avonleariverside.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 72161,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2004748/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 12938,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 5724,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.bankloftsapartments.com",
+    "size_bytes": 15254248,
+    "entries": 94,
+    "distinct_hosts": 17,
+    "page_urls": [
+      "https://www.bankloftsapartments.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.bayvilleapts.com",
+    "size_bytes": 13178536,
+    "entries": 139,
+    "distinct_hosts": 27,
+    "page_urls": [
+      "https://www.bayvilleapts.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "cdngeneralmvc.rentcafe.com",
+        "resource.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 8,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.bayvilleapts.com/floorplans",
+        "host": "www.bayvilleapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 230671,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2016044/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 23675,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/262406/merel/widgets/floorplans-optimized-image-modal.307251.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.beaconhillva.com",
+    "size_bytes": 9621227,
+    "entries": 132,
+    "distinct_hosts": 38,
+    "page_urls": [
+      "https://www.beaconhillva.com/apartments/va/alexandria/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 10,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.beaconhillva.com/apartments/va/alexandria/floor-plans",
+        "host": "www.beaconhillva.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 81721,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 10003,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 1442,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.beechwoodnc.net",
+    "size_bytes": 4497216,
+    "entries": 95,
+    "distinct_hosts": 5,
+    "page_urls": [
+      "https://www.beechwoodnc.net/check_availability"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.bremertonparkapts.com",
+    "size_bytes": 5568236,
+    "entries": 106,
+    "distinct_hosts": 15,
+    "page_urls": [
+      "https://www.bremertonparkapts.com/floorplans"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 9,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.bremertonparkapts.com/floorplans",
+        "host": "www.bremertonparkapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 306190,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-assistant-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 17330,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/127923/gleam/widgets/floorplans-optimized-image-modal.264272.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.brooklaneapts.com",
+    "size_bytes": 48932105,
+    "entries": 382,
+    "distinct_hosts": 28,
+    "page_urls": [
+      "https://www.brooklaneapts.com/"
+    ],
+    "pms_signals": [
+      "funnel"
+    ],
+    "pms_host_examples": {
+      "funnel": [
+        "integrations.funnelleasing.com"
+      ]
+    },
+    "data_entries_count": 2,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.availability.fortresstech.io/_next/static/chunks/app/unit-availability/%5BorgId%5D/%5BpropertyId%5D/page-9a1f038d681558f0.js",
+        "host": "www.availability.fortresstech.io",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 28989,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.embed.fortresstech.io/unit-availability/4e8caee8-c99e-406c-864c-c8a5ba3e4a03/9c1e6c17-a0dd-4791-bbc5-0e6274db4101/?ft_header=C15F1E&ft_body=0c4366&bg_border=004963",
+        "host": "www.embed.fortresstech.io",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 437,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.brynmawrapartments.com",
+    "size_bytes": 8638421,
+    "entries": 81,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "https://www.brynmawrapartments.com/pittsburgh/bryn-mawr/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycfo.entrata.com",
+        "cdn77.api.userway.org"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.candlewoodnorthapts.com",
+    "size_bytes": 8336990,
+    "entries": 129,
+    "distinct_hosts": 17,
+    "page_urls": [
+      "https://www.candlewoodnorthapts.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 9,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.candlewoodnorthapts.com/floorplans",
+        "host": "www.candlewoodnorthapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 217018,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-assistant-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 17330,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/394999/azul/widgets/floorplans-optimized-image-modal.447221.134232204110000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.centralparkmontgomery.com",
+    "size_bytes": 21155602,
+    "entries": 236,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "https://www.centralparkmontgomery.com/floorplans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 10,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.centralparkmontgomery.com/floorplans",
+        "host": "www.centralparkmontgomery.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 93439,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/CENTLPA/images/apartments/floorplans/2d66dc0f-4412-468a-9e2f-683238ec8409.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 50206,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/CENTLPA/images/apartments/floorplans/017d6c9b-d5a4-4f26-a192-632e6bda1610.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 47496,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.chaseheritageapartments.com",
+    "size_bytes": 24692235,
+    "entries": 183,
+    "distinct_hosts": 41,
+    "page_urls": [
+      "https://www.chaseheritageapartments.com/apartments/va/sterling/floor-plans"
+    ],
+    "pms_signals": [
+      "knock",
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "cs-cdn.realpage.com",
+        "telescope.realpage.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 5,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.chaseheritageapartments.com/apartments/va/sterling/floor-plans",
+        "host": "www.chaseheritageapartments.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 79259,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 10540,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 5991,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.chathamsquareapartments.com",
+    "size_bytes": 84705880,
+    "entries": 133,
+    "distinct_hosts": 11,
+    "page_urls": [
+      "https://www.chathamsquareapartments.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 2,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.chathamsquareapartments.com/Content/css/zrscustom/zrs/floorplans.css",
+        "host": "www.chathamsquareapartments.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 40513,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.chathamsquareapartments.com/Content/js/zrscustom/floorplans.js",
+        "host": "www.chathamsquareapartments.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 18338,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.clearwatercreekapartments.com",
+    "size_bytes": 6963685,
+    "entries": 111,
+    "distinct_hosts": 21,
+    "page_urls": [
+      "https://www.clearwatercreekapartments.com/floorplans"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.clearwatercreekapartments.com/floorplans",
+        "host": "www.clearwatercreekapartments.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 267426,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/222070/melange/widgets/floorplans-optimized-image-modal.394697.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-optimized-layout-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 11984,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.cottonwoodcreekapartments.com",
+    "size_bytes": 3296141,
+    "entries": 50,
+    "distinct_hosts": 6,
+    "page_urls": [
+      "http://www.cottonwoodcreekapartments.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.crossdaleflatsapts.com",
+    "size_bytes": 13225341,
+    "entries": 140,
+    "distinct_hosts": 32,
+    "page_urls": [
+      "https://www.crossdaleflatsapts.com/floorplans?utm_knock=gmb"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 9,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.crossdaleflatsapts.com/floorplans?utm_knock=gmb",
+        "host": "www.crossdaleflatsapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 213714,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://www.crossdaleflatsapts.com/floorplans?handler=Filters",
+        "host": "www.crossdaleflatsapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 46614,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2025876/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 18058,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.crossingsmadison.com",
+    "size_bytes": 13338874,
+    "entries": 197,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "https://www.crossingsmadison.com/floor-plans-1"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "www.google-analytics.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.eclipseoaklawn.com",
+    "size_bytes": 11308056,
+    "entries": 103,
+    "distinct_hosts": 19,
+    "page_urls": [
+      "https://www.eclipseoaklawn.com/floorplans/"
+    ],
+    "pms_signals": [
+      "apts247",
+      "knock"
+    ],
+    "pms_host_examples": {
+      "apts247": [
+        "images.apts247.info",
+        "media.apts247.info"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 15,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://static2.apts247.info/js/nextgen/floorplans/one/dist/main.min.js",
+        "host": "static2.apts247.info",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 600531,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.eclipseoaklawn.com/floorplans/",
+        "host": "www.eclipseoaklawn.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 118402,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://static2.apts247.info/css/deferred-stylesheets/pages/floorplans/one/__floorplans-deferred.css",
+        "host": "static2.apts247.info",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 108524,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.elan41apts.com",
+    "size_bytes": 15160503,
+    "entries": 162,
+    "distinct_hosts": 36,
+    "page_urls": [
+      "https://www.elan41apts.com/apartments/wa/seattle/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 6,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.elan41apts.com/apartments/wa/seattle/floor-plans",
+        "host": "www.elan41apts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 155900,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 11275,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 1041,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.ellyncrossing.com",
+    "size_bytes": 6081302,
+    "entries": 56,
+    "distinct_hosts": 13,
+    "page_urls": [
+      "https://www.ellyncrossing.com/glendale-heights/ellyn-crossing/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycfo.entrata.com",
+        "commoncf.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.embarcatwestjordan.com",
+    "size_bytes": 3972119,
+    "entries": 41,
+    "distinct_hosts": 12,
+    "page_urls": [
+      "https://www.embarcatwestjordan.com/floor-plans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 9,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/52EWJ/images/apartments/properties/b925d1db-d31d-4e9d-a5af-1e39c3e65d40.jpg.1920x1080.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 356068,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/52EWJ/images/apartments/floorplans/8c35d6fc-779c-4f08-8c0c-ce9bbb4d128b.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 19260,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/52EWJ/images/apartments/floorplans/b6e701b8-1b3a-4fa7-8fb3-e0a8e846e780.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 18792,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.esring.com",
+    "size_bytes": 6784096,
+    "entries": 98,
+    "distinct_hosts": 17,
+    "page_urls": [
+      "https://www.esring.com/apartments/ca/los-angeles/west-park-village/floorplans"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.esring.com/apartments/ca/los-angeles/west-park-village/floorplans",
+        "host": "www.esring.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 197255,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/277334/askka/widgets/floorplans-optimized-image-modal.452403.134232204110000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-optimized-layout-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 11984,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.fmgnj.com",
+    "size_bytes": 27514749,
+    "entries": 181,
+    "distinct_hosts": 39,
+    "page_urls": [
+      "https://www.fmgnj.com/apartments/pa/malvern/westgate-village/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com",
+        "leasing.realpage.com"
+      ]
+    },
+    "data_entries_count": 5,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.fmgnj.com/apartments/pa/malvern/westgate-village/stylesheets/application-d44b4fc51effa65c75953e04b5e4dd7e0c6cc775.min.css",
+        "host": "www.fmgnj.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 471678,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.fmgnj.com/apartments/pa/malvern/westgate-village/floor-plans",
+        "host": "www.fmgnj.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 97957,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.fmgnj.com/apartments/pa/malvern/westgate-village/javascripts/application-6bc6430282.min.js",
+        "host": "www.fmgnj.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 96035,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.foxchaseofalexandriaapts.com",
+    "size_bytes": 14847877,
+    "entries": 107,
+    "distinct_hosts": 19,
+    "page_urls": [
+      "https://www.foxchaseofalexandriaapts.com/residences.html"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.foxchaseofalexandriaapts.com/content/air-properties/foxchase/us/en/residences/jcr:content/root/container/container/floorplan.json",
+        "host": "www.foxchaseofalexandriaapts.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 556,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.gatewaypark-apts.com",
+    "size_bytes": 15489142,
+    "entries": 156,
+    "distinct_hosts": 37,
+    "page_urls": [
+      "https://www.gatewaypark-apts.com/apartments/co/denver/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.gatewaypark-apts.com/apartments/co/denver/floor-plans",
+        "host": "www.gatewaypark-apts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 151311,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 6556,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 4238,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.harborgroupmanagement.com",
+    "size_bytes": 21098066,
+    "entries": 149,
+    "distinct_hosts": 13,
+    "page_urls": [
+      "https://www.harborgroupmanagement.com/apartments/tx/lewisville/rockbrook-creek/floor-plans"
+    ],
+    "pms_signals": [
+      "knock"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 19,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://media.hgmc.io/floorplan/ROC/1X1A/Print_Aldridge33999.jpg",
+        "host": "media.hgmc.io",
+        "status": 200,
+        "content_type": "application/octet-stream",
+        "body_size": 1504790,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://media.hgmc.io/floorplan/ROC/1X1AR/Print_Aldridge33999.jpg",
+        "host": "media.hgmc.io",
+        "status": 200,
+        "content_type": "application/octet-stream",
+        "body_size": 1504790,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://media.hgmc.io/floorplan/ROC/1X1C/Arbor.png",
+        "host": "media.hgmc.io",
+        "status": 200,
+        "content_type": "image/png",
+        "body_size": 861842,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.haven-apts.com",
+    "size_bytes": 320356663,
+    "entries": 134,
+    "distinct_hosts": 5,
+    "page_urls": [],
+    "pms_signals": [
+      "knock"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.havenatsouthmountainapts.com",
+    "size_bytes": 11863054,
+    "entries": 121,
+    "distinct_hosts": 21,
+    "page_urls": [
+      "https://www.havenatsouthmountainapts.com/floor-plans"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "www.google.com",
+        "havenatsouthmountain.prospectportal.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.haydenatenclave.com",
+    "size_bytes": 13877872,
+    "entries": 139,
+    "distinct_hosts": 26,
+    "page_urls": [
+      "https://www.haydenatenclave.com/floor-plans"
+    ],
+    "pms_signals": [
+      "repli360"
+    ],
+    "pms_host_examples": {
+      "repli360": [
+        "app.repli360.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.hpluxuryapts.com",
+    "size_bytes": 7487069,
+    "entries": 143,
+    "distinct_hosts": 22,
+    "page_urls": [
+      "https://www.hpluxuryapts.com/floorplans"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.hpluxuryapts.com/floorplans",
+        "host": "www.hpluxuryapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 223812,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/222073/melange/widgets/floorplans-optimized-image-modal.293424.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-optimized-layout-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 11984,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.hvca2.com",
+    "size_bytes": 15837528,
+    "entries": 151,
+    "distinct_hosts": 23,
+    "page_urls": [
+      "https://www.hvca2.com/floorplans/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 2,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.hvca2.com/floorplans/",
+        "host": "www.hvca2.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 135197,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.hvca2.com/wp-content/mu-plugins/rm-helper-plugin/assets/js/floorplan.js?ver=3.1.1",
+        "host": "www.hvca2.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 9114,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.indigosanantonio.com",
+    "size_bytes": 14776793,
+    "entries": 93,
+    "distinct_hosts": 5,
+    "page_urls": [
+      "https://www.indigosanantonio.com/floor-plans/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.invitationalapartments.com",
+    "size_bytes": 19910672,
+    "entries": 128,
+    "distinct_hosts": 33,
+    "page_urls": [
+      "https://www.invitationalapartments.com/apartments/nv/henderson/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage",
+      "spherexx"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com"
+      ],
+      "spherexx": [
+        "optimize.spherexx.com"
+      ]
+    },
+    "data_entries_count": 5,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.invitationalapartments.com/apartments/nv/henderson/floor-plans",
+        "host": "www.invitationalapartments.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 3434964,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://optimize.spherexx.com/app/assets/communities/6725/floorplans/cFloorplan372024%2044440%20PM_2x2Pearl1035sf.jpg",
+        "host": "optimize.spherexx.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 97594,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://optimize.spherexx.com/app/assets/communities/6725/floorplans/cFloorplan372024%2044345%20PM_1x1Coral725sf.jpg",
+        "host": "optimize.spherexx.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 83323,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.james-towne-village.com",
+    "size_bytes": 14419002,
+    "entries": 125,
+    "distinct_hosts": 35,
+    "page_urls": [
+      "https://www.james-towne-village.com/apartments/sc/charleston/floor-plans"
+    ],
+    "pms_signals": [
+      "g5",
+      "knock",
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ],
+      "g5": [
+        "reputation.g5search.com"
+      ],
+      "realpage": [
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.james-towne-village.com/apartments/sc/charleston/floor-plans",
+        "host": "www.james-towne-village.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 104708,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2029784/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 10354,
+        "has_rent_shape": true,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 6682,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.kingswoodenton.com",
+    "size_bytes": 15422730,
+    "entries": 152,
+    "distinct_hosts": 21,
+    "page_urls": [
+      "https://www.kingswoodenton.com/floor-plans-1/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.knollcrestsa.com",
+    "size_bytes": 7735316,
+    "entries": 110,
+    "distinct_hosts": 17,
+    "page_urls": [
+      "https://www.knollcrestsa.com/floorplans"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 9,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.knollcrestsa.com/floorplans",
+        "host": "www.knollcrestsa.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 257592,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-assistant-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 17330,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/449423/aeon/widgets/floorplans-optimized-image-modal.546409.134232204110000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.lakesideterracesapts.com",
+    "size_bytes": 19092282,
+    "entries": 137,
+    "distinct_hosts": 36,
+    "page_urls": [
+      "https://www.lakesideterracesapts.com/apartments/mi/sterling-heights/floor-plans"
+    ],
+    "pms_signals": [
+      "knock",
+      "realpage",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ],
+      "realpage": [
+        "telescope.realpage.com"
+      ],
+      "rentcafe": [
+        "cdngeneralcf.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.lakesideterracesapts.com/apartments/mi/sterling-heights/floor-plans",
+        "host": "www.lakesideterracesapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 91733,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 10918,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 6764,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.lakeviewatnewcastle.com",
+    "size_bytes": 21188589,
+    "entries": 212,
+    "distinct_hosts": 38,
+    "page_urls": [
+      "https://www.lakeviewatnewcastle.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe",
+      "sightmap"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ],
+      "sightmap": [
+        "sightmap.com"
+      ]
+    },
+    "data_entries_count": 8,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.lakeviewatnewcastle.com/floorplans",
+        "host": "www.lakeviewatnewcastle.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 181494,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/136858/jade/widgets/floorplans-optimized-image-modal.320649.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-optimized-layout-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 11984,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.laramadaapartments.com",
+    "size_bytes": 14594560,
+    "entries": 110,
+    "distinct_hosts": 19,
+    "page_urls": [
+      "https://www.laramadaapartments.com/floorplans/"
+    ],
+    "pms_signals": [
+      "apts247",
+      "knock"
+    ],
+    "pms_host_examples": {
+      "apts247": [
+        "media.apts247.info",
+        "thumbs.apts247.info"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 13,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://static2.apts247.info/js/nextgen/floorplans/one/dist/main.min.js",
+        "host": "static2.apts247.info",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 600531,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://static2.apts247.info/css/deferred-stylesheets/pages/floorplans/one/__floorplans-deferred.css",
+        "host": "static2.apts247.info",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 108524,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.laramadaapartments.com/floorplans/",
+        "host": "www.laramadaapartments.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 94025,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.leaselondonsquareapartments.com",
+    "size_bytes": 7232772,
+    "entries": 66,
+    "distinct_hosts": 13,
+    "page_urls": [
+      "https://www.leaselondonsquareapartments.com/farmers-branch/london-square-apartments/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycf.entrata.com",
+        "medialibrarycfo.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.lifeatthecobb.com",
+    "size_bytes": 14328024,
+    "entries": 125,
+    "distinct_hosts": 22,
+    "page_urls": [
+      "https://www.lifeatthecobb.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 9,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.lifeatthecobb.com/floorplans",
+        "host": "www.lifeatthecobb.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 156484,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-assistant-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 17330,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/140362/estelle/widgets/floorplans-optimized-image-modal.396217.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.livearborparkapts.com",
+    "size_bytes": 13677041,
+    "entries": 124,
+    "distinct_hosts": 34,
+    "page_urls": [
+      "https://www.livearborparkapts.com/apartments/tx/hurst/floor-plans"
+    ],
+    "pms_signals": [
+      "knock",
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ],
+      "realpage": [
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 6,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.livearborparkapts.com/apartments/tx/hurst/floor-plans",
+        "host": "www.livearborparkapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 87237,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2028448/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 9451,
+        "has_rent_shape": true,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 4345,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.liveatlascolinasheights.com",
+    "size_bytes": 7577246,
+    "entries": 65,
+    "distinct_hosts": 13,
+    "page_urls": [
+      "https://www.liveatlascolinasheights.com/irving/las-colinas-heights/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycfo.entrata.com",
+        "commoncf.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.liveatpalmhaven.com",
+    "size_bytes": 14874278,
+    "entries": 153,
+    "distinct_hosts": 36,
+    "page_urls": [
+      "https://www.liveatpalmhaven.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 8,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.liveatpalmhaven.com/floorplans",
+        "host": "www.liveatpalmhaven.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 426204,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2024406/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 91434,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/289207/merel/widgets/floorplans-optimized-image-modal.329843.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.liveatsymphony.com",
+    "size_bytes": 13718076,
+    "entries": 171,
+    "distinct_hosts": 22,
+    "page_urls": [
+      "https://www.liveatsymphony.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.liveatsymphony.com/floorplans",
+        "host": "www.liveatsymphony.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 268609,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/50102/stella/widgets/floorplans-optimized-image-modal.513872.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-optimized-layout-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 11984,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.livecasadelmar.com",
+    "size_bytes": 14838909,
+    "entries": 81,
+    "distinct_hosts": 13,
+    "page_urls": [
+      "https://www.livecasadelmar.com/floor-plans"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "casadelmar.prospectportal.com",
+        "commoncdn.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.maplewoodapthomes.com",
+    "size_bytes": 15517770,
+    "entries": 118,
+    "distinct_hosts": 19,
+    "page_urls": [
+      "https://www.maplewoodapthomes.com/floorplans/"
+    ],
+    "pms_signals": [
+      "apts247",
+      "knock"
+    ],
+    "pms_host_examples": {
+      "apts247": [
+        "media.apts247.info",
+        "thumbs.apts247.info"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 11,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://static2.apts247.info/js/nextgen/floorplans/one/dist/main.min.js",
+        "host": "static2.apts247.info",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 600531,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://static2.apts247.info/css/deferred-stylesheets/pages/floorplans/one/__floorplans-deferred.css",
+        "host": "static2.apts247.info",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 108524,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.maplewoodapthomes.com/floorplans/",
+        "host": "www.maplewoodapthomes.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 101496,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.meridiangreentownhomes.com",
+    "size_bytes": 19618694,
+    "entries": 87,
+    "distinct_hosts": 12,
+    "page_urls": [
+      "https://www.meridiangreentownhomes.com/kent/meridian-green-townhomes/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycf.entrata.com",
+        "common.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.mountainviewcasitas.com",
+    "size_bytes": 8776304,
+    "entries": 91,
+    "distinct_hosts": 25,
+    "page_urls": [
+      "https://www.mountainviewcasitas.com/floorplans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 5,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.mountainviewcasitas.com/floorplans",
+        "host": "www.mountainviewcasitas.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 91387,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/250MVC/images/apartments/floorplans/d4565366-458e-488b-902f-f039b2776fcf.jpg.800x600.jpg",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 58294,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/250MVC/images/apartments/floorplans/d4565366-458e-488b-902f-f039b2776fcf.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 28814,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.museumterraceapts.com",
+    "size_bytes": 18261587,
+    "entries": 150,
+    "distinct_hosts": 40,
+    "page_urls": [
+      "https://www.museumterraceapts.com/apartments/ca/los-angeles/floor-plans"
+    ],
+    "pms_signals": [
+      "knock",
+      "realpage",
+      "sightmap"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "cdn-dam.realpage.com",
+        "cs-cdn.realpage.com"
+      ],
+      "sightmap": [
+        "sightmap.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 6,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.museumterraceapts.com/apartments/ca/los-angeles/floor-plans",
+        "host": "www.museumterraceapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 110882,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 6625,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 5246,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.myboulderapartment.com",
+    "size_bytes": 2393374,
+    "entries": 62,
+    "distinct_hosts": 6,
+    "page_urls": [
+      "https://www.myboulderapartment.com/floorplans/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.myboulderapartment.com/floorplans/",
+        "host": "www.myboulderapartment.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 83233,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.oakbendapt.com",
+    "size_bytes": 12511673,
+    "entries": 133,
+    "distinct_hosts": 30,
+    "page_urls": [
+      "https://www.oakbendapt.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.ovationattempe.com",
+    "size_bytes": 11963918,
+    "entries": 142,
+    "distinct_hosts": 26,
+    "page_urls": [
+      "https://www.ovationattempe.com/floorplans"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.ovationattempe.com/floorplans",
+        "host": "www.ovationattempe.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 200911,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/163419/ariana/widgets/floorplans-optimized-image-modal.364784.134232204110000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-optimized-layout-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 11984,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.pacesridgeatvinings.com",
+    "size_bytes": 10513514,
+    "entries": 143,
+    "distinct_hosts": 22,
+    "page_urls": [
+      "https://www.pacesridgeatvinings.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 11,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.pacesridgeatvinings.com/floorplans",
+        "host": "www.pacesridgeatvinings.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 342517,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2007518/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 23267,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-assistant-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 17330,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.pearridgeapts.com",
+    "size_bytes": 12079951,
+    "entries": 124,
+    "distinct_hosts": 32,
+    "page_urls": [
+      "https://www.pearridgeapts.com/floorplans/a2"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 6,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.pearridgeapts.com/floorplans/a2",
+        "host": "www.pearridgeapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 176952,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2029314/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 14702,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplans-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 8330,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.pebblebrookapts.com",
+    "size_bytes": 9391258,
+    "entries": 114,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "http://www.pebblebrookapts.com/"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-assistant-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 17330,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/129969/esteem/widgets/floorplan-assistant-widget.392353.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 10235,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/apartment-search.134232201520000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 887,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.pedcorliving.com",
+    "size_bytes": 4324774,
+    "entries": 48,
+    "distinct_hosts": 14,
+    "page_urls": [
+      "https://www.pedcorliving.com/apartments/kings-mill-apartment-homes/floorplans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.pedcorliving.com/apartments/kings-mill-apartment-homes/floorplans",
+        "host": "www.pedcorliving.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 67519,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.pelhamgreenville.com",
+    "size_bytes": 11988578,
+    "entries": 124,
+    "distinct_hosts": 9,
+    "page_urls": [
+      "https://pelhamgreenville.com/home"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 4,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.pelhamgreenville.com/floorplans/1-bedroom/calcite/?popup=1",
+        "host": "www.pelhamgreenville.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 125514,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.pelhamgreenville.com/Content/js/core/floorplans.js",
+        "host": "www.pelhamgreenville.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 44864,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.pelhamgreenville.com/Content/js/core/floorplan-detail.js",
+        "host": "www.pelhamgreenville.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 42230,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.pepperwoodknoll.com",
+    "size_bytes": 17096075,
+    "entries": 163,
+    "distinct_hosts": 29,
+    "page_urls": [
+      "https://www.pepperwoodknoll.com/"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "cs-cdn.realpage.com",
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 5,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://cs-cdn.realpage.com/CWS/2267476/CMSScripts/Custom/RPWebParts/floorplan-V3.js",
+        "host": "cs-cdn.realpage.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 53047,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.pepperwoodknoll.com/CmsSiteManager/callback.aspx?act=Proxy/GetUnits&available=true&honordisplayorder=true&siteid=8702270&leaseterm=12&dateneeded=2026-05-21&callback=jQuery22404588243600693217_1779355853778&_=1779355853779",
+        "host": "www.pepperwoodknoll.com",
+        "status": 200,
+        "content_type": "application/x-javascript",
+        "body_size": 37093,
+        "has_rent_shape": true,
+        "has_unit_shape": true
+      },
+      {
+        "method": "GET",
+        "url": "https://www.pepperwoodknoll.com/CmsSiteManager/callback.aspx?act=Proxy/GetFloorPlans&callback=jQuery22404588243600693217_1779355853776&_=1779355853777",
+        "host": "www.pepperwoodknoll.com",
+        "status": 200,
+        "content_type": "application/x-javascript",
+        "body_size": 25916,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.portolabiltmore.com",
+    "size_bytes": 10302765,
+    "entries": 95,
+    "distinct_hosts": 27,
+    "page_urls": [
+      "https://www.portolabiltmore.com/floorplans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.portolabiltmore.com/floorplans",
+        "host": "www.portolabiltmore.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 76210,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/231PBM/images/apartments/floorplans/0316f1b83e2bc9ae7a62ae89a5b24987.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 29920,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/231PBM/images/apartments/floorplans/6264ffe32c92892106f806f94c79c879.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 27056,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.portolasouthmountain.com",
+    "size_bytes": 8311589,
+    "entries": 81,
+    "distinct_hosts": 23,
+    "page_urls": [
+      "https://www.portolasouthmountain.com/floorplans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 4,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.portolasouthmountain.com/floorplans",
+        "host": "www.portolasouthmountain.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 91456,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/97PMT/images/apartments/floorplans/b543f59f-d7f1-43a0-9945-284853635ff2.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 19952,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://assets.marketapts.com/assets/converted/97PMT/images/apartments/floorplans/f622fa94-73d5-45e9-a316-e3beba5b7c8b.jpg.800x600.webp",
+        "host": "assets.marketapts.com",
+        "status": 200,
+        "content_type": "image/webp",
+        "body_size": 14232,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.qtowneoaks.com",
+    "size_bytes": 12069037,
+    "entries": 142,
+    "distinct_hosts": 32,
+    "page_urls": [
+      "https://www.qtowneoaks.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 8,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.qtowneoaks.com/floorplans",
+        "host": "www.qtowneoaks.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 372302,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2013868/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 22608,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/161420/auric/widgets/floorplans-optimized-image-modal.194879.134232204110000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.renewmarinashores.com",
+    "size_bytes": 6723790,
+    "entries": 81,
+    "distinct_hosts": 11,
+    "page_urls": [
+      "https://www.renewmarinashores.com/virginia-beach/renew-marina-shores/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycf.entrata.com",
+        "medialibrarycfo.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.renewone59.com",
+    "size_bytes": 8837049,
+    "entries": 92,
+    "distinct_hosts": 17,
+    "page_urls": [
+      "https://www.renewone59.com/san-leandro/renew-one59/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycf.entrata.com",
+        "medialibrarycfo.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.rent-desertoasis.com",
+    "size_bytes": 9774627,
+    "entries": 92,
+    "distinct_hosts": 27,
+    "page_urls": [
+      "https://www.rent-desertoasis.com/apartments/ca/palm-desert/floor-plans"
+    ],
+    "pms_signals": [
+      "g5",
+      "realpage",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "g5": [
+        "reputation.g5search.com"
+      ],
+      "realpage": [
+        "telescope.realpage.com"
+      ],
+      "rentcafe": [
+        "cdngeneralcf.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 6,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.rent-desertoasis.com/apartments/ca/palm-desert/floor-plans",
+        "host": "www.rent-desertoasis.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 146352,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 7618,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 6458,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.rentcitadel.com",
+    "size_bytes": 7705219,
+    "entries": 91,
+    "distinct_hosts": 21,
+    "page_urls": [
+      "https://www.rentcitadel.com/Floor-plans.aspx"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "cs-cdn.realpage.com",
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://cs-cdn.realpage.com/CWS/2267476/CMSScripts/Custom/RPWebParts/floorplan-1.js",
+        "host": "cs-cdn.realpage.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 51875,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.rentcitadel.com/CmsSiteManager/callback.aspx?act=Proxy/GetFloorPlans&uniqueamenities=true&callback=jQuery18209607570401888281_1779355918754&_=1779355919519",
+        "host": "www.rentcitadel.com",
+        "status": 200,
+        "content_type": "application/x-javascript",
+        "body_size": 26555,
+        "has_rent_shape": true,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.rentcitadel.com/CmsSiteManager/callback.aspx?act=Proxy/GetUnits&available=true&honordisplayorder=true&dateneeded=2026-05-21&callback=jQuery18209607570401888281_1779355918754&_=1779355920269",
+        "host": "www.rentcitadel.com",
+        "status": 200,
+        "content_type": "application/x-javascript",
+        "body_size": 18841,
+        "has_rent_shape": true,
+        "has_unit_shape": true
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.rentharborcliff.com",
+    "size_bytes": 10670381,
+    "entries": 140,
+    "distinct_hosts": 27,
+    "page_urls": [
+      "https://www.rentharborcliff.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 8,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.rentharborcliff.com/floorplans",
+        "host": "www.rentharborcliff.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 171234,
+        "has_rent_shape": true,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/82767/miera/widgets/floorplans-optimized-image-modal.91305.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-optimized-layout-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 11984,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.rentthebeachhouseapts.com",
+    "size_bytes": 3997394,
+    "entries": 82,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "https://www.rentthebeachhouseapts.com/floor_plans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.rentthebeachhouseapts.com/floor_plans",
+        "host": "www.rentthebeachhouseapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 46773,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.reserveatbellfort.com",
+    "size_bytes": 14447967,
+    "entries": 151,
+    "distinct_hosts": 19,
+    "page_urls": [
+      "http://www.reserveatbellfort.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.riseatthepreserve.com",
+    "size_bytes": 7999125,
+    "entries": 85,
+    "distinct_hosts": 17,
+    "page_urls": [
+      "https://www.riseatthepreserve.com/phoenix/rise-at-the-preserve/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycfo.entrata.com",
+        "commoncf.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.risesuncrest.com",
+    "size_bytes": 7541908,
+    "entries": 67,
+    "distinct_hosts": 17,
+    "page_urls": [
+      "https://www.risesuncrest.com/tempe/rise-suncrest/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycfo.entrata.com",
+        "commoncf.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.riverloftapartments.com",
+    "size_bytes": 14934735,
+    "entries": 110,
+    "distinct_hosts": 19,
+    "page_urls": [
+      "https://www.riverloftapartments.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.robbinspropertyllc.com",
+    "size_bytes": 11441103,
+    "entries": 111,
+    "distinct_hosts": 29,
+    "page_urls": [
+      "https://www.robbinspropertyllc.com/apartments/fl/boynton-beach/boynton-place/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "cs-cdn.realpage.com",
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 9,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.robbinspropertyllc.com/apartments/fl/boynton-beach/boynton-place/javascripts/floor-plans-plus-250e96fc253bd7a82955f1c1c2c00a7a8814e725.js",
+        "host": "www.robbinspropertyllc.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 918589,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.robbinspropertyllc.com/apartments/fl/boynton-beach/boynton-place/stylesheets/application-7519d7bc5f1b5efd21217ec436e748bfa160cf2c.min.css",
+        "host": "www.robbinspropertyllc.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 616944,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.robbinspropertyllc.com/apartments/fl/boynton-beach/boynton-place/javascripts/application-806aa1f994.min.js",
+        "host": "www.robbinspropertyllc.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 80494,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.sagewoodatwestchase.com",
+    "size_bytes": 10916444,
+    "entries": 147,
+    "distinct_hosts": 24,
+    "page_urls": [
+      "https://www.sagewoodatwestchase.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 8,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.sagewoodatwestchase.com/floorplans",
+        "host": "www.sagewoodatwestchase.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 303712,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2023945/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 59918,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/284308/merel/widgets/floorplans-optimized-image-modal.538910.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.saybrookeapartments.com",
+    "size_bytes": 12121063,
+    "entries": 91,
+    "distinct_hosts": 27,
+    "page_urls": [
+      "https://www.saybrookeapartments.com/apartments/md/gaithersburg/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com"
+      ],
+      "rentcafe": [
+        "cdngeneralcf.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 8,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.saybrookeapartments.com/apartments/md/gaithersburg/floor-plans",
+        "host": "www.saybrookeapartments.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 79776,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 9157,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 3725,
+        "has_rent_shape": true,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.shadowbrookapartments.com",
+    "size_bytes": 14363890,
+    "entries": 156,
+    "distinct_hosts": 36,
+    "page_urls": [
+      "https://www.shadowbrookapartments.com/apartments/ut/west-valley-city/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 10,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.shadowbrookapartments.com/apartments/ut/west-valley-city/floor-plans",
+        "host": "www.shadowbrookapartments.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 152681,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 18348,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 6230,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.sherwoodacresapts.com",
+    "size_bytes": 24263323,
+    "entries": 172,
+    "distinct_hosts": 41,
+    "page_urls": [
+      "https://www.sherwoodacresapts.com/apartments/la/baton-rouge/floor-plans"
+    ],
+    "pms_signals": [
+      "knock",
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ],
+      "realpage": [
+        "telescope.realpage.com",
+        "leasing.realpage.com"
+      ]
+    },
+    "data_entries_count": 4,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.sherwoodacresapts.com/apartments/la/baton-rouge/floor-plans",
+        "host": "www.sherwoodacresapts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 76825,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2017509/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 14441,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/blurb/v1/4423290/4369890/Floorplan%20List?BpmId=OLL.CurrentActivityHeaderText&BpmSequence=0&LogSequence=4&ClientSessionID=d56d85b7-dd5c-d278-1ada-5be6db6c8575",
+        "host": "leasing.realpage.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 726,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.staywelleby.com",
+    "size_bytes": 31882186,
+    "entries": 246,
+    "distinct_hosts": 32,
+    "page_urls": [
+      "https://www.staywelleby.com/"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "cs-cdn.realpage.com",
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://cs-cdn.realpage.com/CWS/2256871/CMSScripts/Custom/RPWebParts/floorplan-V3.js",
+        "host": "cs-cdn.realpage.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 53047,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.staywelleby.com/CmsSiteManager/callback.aspx?act=Proxy/GetUnits&available=true&honordisplayorder=true&siteid=8943090&bestprice=true&leaseterm=1&leaseterm=7&leaseterm=12&dateneeded=2026-05-21&callback=jQuery22408028198460368556_1779356350619&_=1779356350620",
+        "host": "www.staywelleby.com",
+        "status": 200,
+        "content_type": "application/x-javascript",
+        "body_size": 50599,
+        "has_rent_shape": true,
+        "has_unit_shape": true
+      },
+      {
+        "method": "GET",
+        "url": "https://www.staywelleby.com/CmsSiteManager/callback.aspx?act=Proxy/GetFloorPlans&callback=jQuery22408028198460368556_1779356350617&_=1779356350618",
+        "host": "www.staywelleby.com",
+        "status": 200,
+        "content_type": "application/x-javascript",
+        "body_size": 25057,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.sylispm.com",
+    "size_bytes": 18687601,
+    "entries": 140,
+    "distinct_hosts": 13,
+    "page_urls": [
+      "https://www.sylispm.com/oakstone-apartment-homes/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 43,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.marketapts.com/images/apartments/photos/c046h2kw503yjh58p4yh96jgmlw9wioy.jpg",
+        "host": "www.marketapts.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 371288,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.marketapts.com/images/apartments/photos/6bq8h316xfw0287mlokphkpsib952pjs.jpg",
+        "host": "www.marketapts.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 362165,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.marketapts.com/images/apartments/photos/64es30bbfwybiyiauexwmtfa7z6fzbjc.jpg",
+        "host": "www.marketapts.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 342146,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.ten68west.com",
+    "size_bytes": 18486109,
+    "entries": 148,
+    "distinct_hosts": 36,
+    "page_urls": [
+      "https://www.ten68west.com/apartments/ga/dallas/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com",
+        "leasing.realpage.com"
+      ]
+    },
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.ten68west.com/apartments/ga/dallas/floor-plans",
+        "host": "www.ten68west.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 91954,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/blurb/v1/5265074/1469095/Floorplan%20List?BpmId=OLL.CurrentActivityHeaderText&BpmSequence=0&LogSequence=4&ClientSessionID=a9c251fb-37fc-8340-43d1-5a6947d8c9b8",
+        "host": "leasing.realpage.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 518,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://leasing.realpage.com/RP.Leasing.AppService.WebHost/UnitAccessibilityDetails/v1/5265074/1469095/Unit?BpmId=OLL.UnitAccessibilityDetails&BpmSequence=0&LogSequence=5&ClientSessionID=a9c251fb-37fc-8340-43d1-5a6947d8c9b8",
+        "host": "leasing.realpage.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 313,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.the-hilltop.com",
+    "size_bytes": 19402947,
+    "entries": 144,
+    "distinct_hosts": 37,
+    "page_urls": [
+      "https://www.the-hilltop.com/apartments/tx/temple/floor-plans"
+    ],
+    "pms_signals": [
+      "knock",
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ],
+      "realpage": [
+        "cdn-dam.realpage.com",
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 8,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.the-hilltop.com/apartments/tx/temple/floor-plans",
+        "host": "www.the-hilltop.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 105030,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2018626/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 25623,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 7231,
+        "has_rent_shape": true,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.theatlanticateastdelraybeachfl.com",
+    "size_bytes": 42410061,
+    "entries": 137,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "http://www.theatlanticdelray.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.theatlanticateastdelraybeachfl.com/Content/js/zrscustom/floorplans.js",
+        "host": "www.theatlanticateastdelraybeachfl.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 18338,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.theavenuesofkennesaw.com",
+    "size_bytes": 8256195,
+    "entries": 74,
+    "distinct_hosts": 13,
+    "page_urls": [
+      "https://www.theavenuesofkennesaw.com/kennesaw/avenues-of-kennesaw/conventional/"
+    ],
+    "pms_signals": [
+      "entrata"
+    ],
+    "pms_host_examples": {
+      "entrata": [
+        "medialibrarycfo.entrata.com",
+        "commoncf.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.theberkleyatx.com",
+    "size_bytes": 6913897,
+    "entries": 158,
+    "distinct_hosts": 10,
+    "page_urls": [
+      "https://www.theberkleyatx.com/floorplans/"
+    ],
+    "pms_signals": [
+      "apts247"
+    ],
+    "pms_host_examples": {
+      "apts247": [
+        "media.apts247.info",
+        "thumbs.apts247.info"
+      ]
+    },
+    "data_entries_count": 3,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://media.apts247.info/ae/ae337a5c484a4a60b3b305dd83e7b9bf/floorplans/The_Berk_880644.png",
+        "host": "media.apts247.info",
+        "status": 200,
+        "content_type": "image/png",
+        "body_size": 146811,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.theberkleyatx.com/floorplans/",
+        "host": "www.theberkleyatx.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 73562,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.theberkleyatx.com/api/v3/floorplans/all/?api_key=280ce7809354a383ff84ec10f25735091d641584&show_all_units=True",
+        "host": "www.theberkleyatx.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 12349,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.thebluffs-apts.com",
+    "size_bytes": 10976090,
+    "entries": 104,
+    "distinct_hosts": 26,
+    "page_urls": [
+      "https://www.thebluffs-apts.com/apartments/ca/rancho-cucamonga/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.thebluffs-apts.com/apartments/ca/rancho-cucamonga/floor-plans",
+        "host": "www.thebluffs-apts.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 136638,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 6564,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "POST",
+        "url": "https://inventory.g5marketingcloud.com/graphql",
+        "host": "inventory.g5marketingcloud.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 3420,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.thecarsonlongview.com",
+    "size_bytes": 25041174,
+    "entries": 161,
+    "distinct_hosts": 27,
+    "page_urls": [
+      "https://www.thecarsonlongview.com/floor-plans"
+    ],
+    "pms_signals": [
+      "knock",
+      "repli360"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ],
+      "repli360": [
+        "app.repli360.com"
+      ]
+    },
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2014660/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 7192,
+        "has_rent_shape": true,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.thecharlesatbexley.com",
+    "size_bytes": 9373689,
+    "entries": 47,
+    "distinct_hosts": 13,
+    "page_urls": [
+      "https://www.thecharlesatbexley.com/floor-plans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.theleightonapartments.com",
+    "size_bytes": 11262350,
+    "entries": 91,
+    "distinct_hosts": 20,
+    "page_urls": [
+      "https://www.theleightonapartments.com/Floor-plans.aspx"
+    ],
+    "pms_signals": [
+      "knock",
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "cs-cdn.realpage.com"
+      ],
+      "knock": [
+        "doorway.knck.io"
+      ]
+    },
+    "data_entries_count": 4,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.theleightonapartments.com/CmsSiteManager/callback.aspx?act=Proxy/GetFloorPlans&callback=jQuery2240641986746551141_1779358020513&_=1779358020514",
+        "host": "www.theleightonapartments.com",
+        "status": 200,
+        "content_type": "application/x-javascript",
+        "body_size": 100467,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cs-cdn.realpage.com/CWS/2267476/CMSScripts/Custom/RPWebParts/floorplan-V3.js",
+        "host": "cs-cdn.realpage.com",
+        "status": 200,
+        "content_type": "application/javascript",
+        "body_size": 53047,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.theleightonapartments.com/CmsSiteManager/callback.aspx?act=Proxy/GetUnits&available=true&honordisplayorder=true&siteid=8780657&bestprice=true&leaseterm=6&leaseterm=7&leaseterm=8&leaseterm=9&leaseterm=10&leaseterm=11&leaseterm=12&leaseterm=13&leaseterm=14&leaseterm=15&dateneeded=2026-05-21&callback=jQuery2240641986746551141_1779358020515&_=1779358020516",
+        "host": "www.theleightonapartments.com",
+        "status": 200,
+        "content_type": "application/x-javascript",
+        "body_size": 11445,
+        "has_rent_shape": true,
+        "has_unit_shape": true
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.themeadowsnovato.com",
+    "size_bytes": 7480365,
+    "entries": 79,
+    "distinct_hosts": 9,
+    "page_urls": [
+      "https://www.themeadowsnovato.com/floorplans.aspx"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "cdngeneral.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.themeadowsnovato.com/floorplans.aspx",
+        "host": "www.themeadowsnovato.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 78218,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.theplaceatbarkercypress.com",
+    "size_bytes": 8119019,
+    "entries": 124,
+    "distinct_hosts": 17,
+    "page_urls": [
+      "https://www.theplaceatbarkercypress.com/floorplans"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.theplaceatbarkercypress.com/floorplans",
+        "host": "www.theplaceatbarkercypress.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 448136,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/378685/merel/widgets/floorplans-optimized-image-modal.426848.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-optimized-layout-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 11984,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.theroseapts.com",
+    "size_bytes": 10519103,
+    "entries": 66,
+    "distinct_hosts": 12,
+    "page_urls": [
+      "https://www.theroseapts.com/floor-plans/"
+    ],
+    "pms_signals": [
+      "knock"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.thetrailsarlington.com",
+    "size_bytes": 7628852,
+    "entries": 99,
+    "distinct_hosts": 12,
+    "page_urls": [
+      "https://www.thetrailsarlington.com/floor-plans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.thevillasapts.com",
+    "size_bytes": 11931959,
+    "entries": 76,
+    "distinct_hosts": 11,
+    "page_urls": [
+      "https://www.thevillasapts.com/"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.tideson27th.com",
+    "size_bytes": 18993990,
+    "entries": 131,
+    "distinct_hosts": 33,
+    "page_urls": [
+      "https://www.tideson27th.com/floorplans/"
+    ],
+    "pms_signals": [
+      "knock"
+    ],
+    "pms_host_examples": {
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 2,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.tideson27th.com/floorplans/",
+        "host": "www.tideson27th.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 131480,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2027940/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 35190,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.townhomesathighcrest.com",
+    "size_bytes": 14579753,
+    "entries": 176,
+    "distinct_hosts": 28,
+    "page_urls": [
+      "https://www.townhomesathighcrest.com/floor-plans"
+    ],
+    "pms_signals": [
+      "entrata",
+      "funnel",
+      "repli360"
+    ],
+    "pms_host_examples": {
+      "funnel": [
+        "cdn-ikppojb.nitrocdn.com",
+        "integrations.funnelleasing.com"
+      ],
+      "repli360": [
+        "app.repli360.com"
+      ],
+      "entrata": [
+        "medialibrarycf.entrata.com"
+      ]
+    },
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.trailsofvalleyranch.com",
+    "size_bytes": 5448409,
+    "entries": 95,
+    "distinct_hosts": 12,
+    "page_urls": [
+      "https://www.trailsofvalleyranch.com/floor-plans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 0,
+    "data_entries_top": [],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.udr.com",
+    "size_bytes": 16159215,
+    "entries": 79,
+    "distinct_hosts": 20,
+    "page_urls": [
+      "https://www.udr.com/washington-dc-apartments/alexandria/arbor-park-of-alexandria/apartments-pricing/"
+    ],
+    "pms_signals": [
+      "funnel"
+    ],
+    "pms_host_examples": {
+      "funnel": [
+        "integrations.funnelleasing.com"
+      ]
+    },
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.udr.com/washington-dc-apartments/alexandria/arbor-park-of-alexandria/apartments-pricing/",
+        "host": "www.udr.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 1885899,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.villagesquarewheaton.com",
+    "size_bytes": 9611420,
+    "entries": 51,
+    "distinct_hosts": 18,
+    "page_urls": [
+      "https://www.villagesquarewheaton.com/Marketing/FloorPlans"
+    ],
+    "pms_signals": [],
+    "pms_host_examples": {},
+    "data_entries_count": 4,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://apollostore.blob.core.windows.net/villagesquare/uploads/images/floorplans/mult-layouts-9.0f1ec95f-d837-4411-9e84-4e862be4136f.jpg",
+        "host": "apollostore.blob.core.windows.net",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 56386,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://www.villagesquarewheaton.com/Marketing/FloorPlans",
+        "host": "www.villagesquarewheaton.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 44941,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://apollostore.blob.core.windows.net/villagesquare/uploads/images/floorplans/mult-layouts-10.cce70ee4-2f70-48d8-a678-9215dec806d2.jpg",
+        "host": "apollostore.blob.core.windows.net",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 38248,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.waverlyplace-apts.com",
+    "size_bytes": 11675978,
+    "entries": 114,
+    "distinct_hosts": 25,
+    "page_urls": [
+      "https://www.waverlyplace-apts.com/Floor-plans.aspx"
+    ],
+    "pms_signals": [
+      "realpage"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "cs-cdn.realpage.com",
+        "telescope.realpage.com"
+      ]
+    },
+    "data_entries_count": 1,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://api.ws.realpage.com/v2/property/9311373/floorplans",
+        "host": "api.ws.realpage.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 49558,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.westlakeatsummercove.com",
+    "size_bytes": 7499264,
+    "entries": 104,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "https://www.westlakeatsummercove.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 8,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.westlakeatsummercove.com/floorplans",
+        "host": "www.westlakeatsummercove.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 164149,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/123633/zeal/widgets/floorplans-optimized-image-modal.159196.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2015774/units",
+        "host": "doorway-api.knockrentals.com",
+        "status": 200,
+        "content_type": "application/json",
+        "body_size": 13355,
+        "has_rent_shape": true,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.westonplaceapartments.com",
+    "size_bytes": 35477781,
+    "entries": 278,
+    "distinct_hosts": 37,
+    "page_urls": [
+      "https://www.westonplaceapartments.com/apartments/fl/weston/floor-plans"
+    ],
+    "pms_signals": [
+      "realpage",
+      "spherexx"
+    ],
+    "pms_host_examples": {
+      "realpage": [
+        "telescope.realpage.com"
+      ],
+      "spherexx": [
+        "optimize.spherexx.com"
+      ]
+    },
+    "data_entries_count": 6,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.westonplaceapartments.com/apartments/fl/weston/floor-plans",
+        "host": "www.westonplaceapartments.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 3036648,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://optimize.spherexx.com/app/assets/communities/6714/floorplans/cFloorplan2292024%2034804%20PM_1x1Acacia925sf.jpg",
+        "host": "optimize.spherexx.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 72449,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://optimize.spherexx.com/app/assets/communities/6714/floorplans/cFloorplan5132024%2044734%20PM_3x2Holly1335sf.jpg",
+        "host": "optimize.spherexx.com",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "body_size": 64694,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.woodmanpark.com",
+    "size_bytes": 11535045,
+    "entries": 127,
+    "distinct_hosts": 22,
+    "page_urls": [
+      "https://www.woodmanpark.com/floorplans"
+    ],
+    "pms_signals": [
+      "knock",
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ],
+      "knock": [
+        "doorway.knck.io",
+        "doorway-api.knockrentals.com"
+      ]
+    },
+    "data_entries_count": 10,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.woodmanpark.com/floorplans",
+        "host": "www.woodmanpark.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 201843,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-assistant-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 17330,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/151441/regio/widgets/floorplans-optimized-image-modal.540973.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  },
+  {
+    "property_domain": "www.wyandotteliving.com",
+    "size_bytes": 5171345,
+    "entries": 101,
+    "distinct_hosts": 16,
+    "page_urls": [
+      "https://www.wyandotteliving.com/floorplans"
+    ],
+    "pms_signals": [
+      "rentcafe"
+    ],
+    "pms_host_examples": {
+      "rentcafe": [
+        "resource.rentcafe.com",
+        "t.rentcafe.com"
+      ]
+    },
+    "data_entries_count": 7,
+    "data_entries_top": [
+      {
+        "method": "GET",
+        "url": "https://www.wyandotteliving.com/floorplans",
+        "host": "www.wyandotteliving.com",
+        "status": 200,
+        "content_type": "text/html",
+        "body_size": 179667,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/css/scss/48404/miera/widgets/floorplans-optimized-image-modal.57047.134232204120000000.css",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/css",
+        "body_size": 13356,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      },
+      {
+        "method": "GET",
+        "url": "https://cdngeneralmvc.rentcafe.com/common/js/widgets/floorplan-optimized-layout-widget.134232201540000000.js",
+        "host": "cdngeneralmvc.rentcafe.com",
+        "status": 200,
+        "content_type": "text/javascript",
+        "body_size": 11984,
+        "has_rent_shape": false,
+        "has_unit_shape": false
+      }
+    ],
+    "prop_cookies_count": 0,
+    "prop_cookies_names": []
+  }
+]

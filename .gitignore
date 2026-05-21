@@ -241,3 +241,7 @@ infra/terraform/.terraform/providers/registry.terraform.io/hashicorp/google-beta
 ma_poc/.claude/worktrees/
 =2.7.0
 .claude/scheduled_tasks.lock
+
+# 2026-05-21 — HAR replay investigation raw files (too big for git, kept locally)
+investigations/*/raw/
+investigations/*/per-har.capped/

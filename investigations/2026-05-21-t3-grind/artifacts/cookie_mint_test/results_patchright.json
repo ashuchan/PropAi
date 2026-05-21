@@ -1,0 +1,127 @@
+[
+  {
+    "canonical_id": 16831,
+    "home_url": "https://agoraatportrichey.prospectportal.com/",
+    "target_url": "https://agoraatportrichey.prospectportal.com/port-richey/agora-at-port-richey/conventional/",
+    "render_status": null,
+    "render_outcome": "OK",
+    "render_signature": null,
+    "render_html_len": 228769,
+    "render_elapsed_ms": 3784,
+    "clearance_cookies": [
+      "cf_clearance",
+      "__cf_bm"
+    ],
+    "clearance_n": 2,
+    "target_status": 403,
+    "target_html_len": 6034,
+    "target_signals": {
+      "rents": 0,
+      "sqfts": 0,
+      "title": "Just a moment..."
+    },
+    "target_blocked": true,
+    "unblocked": false,
+    "unblocked_reason": "status=403 html_len=6034 title='Just a moment...'"
+  },
+  {
+    "canonical_id": 18082,
+    "home_url": "https://riverrockapt.prospectportal.com/",
+    "target_url": "https://riverrockapt.prospectportal.com/temple-terrace/river-rock-apartments/conventional/",
+    "render_status": null,
+    "render_outcome": "OK",
+    "render_signature": null,
+    "render_html_len": 197491,
+    "render_elapsed_ms": 14724,
+    "clearance_cookies": [
+      "cf_clearance",
+      "__cf_bm"
+    ],
+    "clearance_n": 2,
+    "target_status": 403,
+    "target_html_len": 6041,
+    "target_signals": {
+      "rents": 0,
+      "sqfts": 0,
+      "title": "Just a moment..."
+    },
+    "target_blocked": true,
+    "unblocked": false,
+    "unblocked_reason": "status=403 html_len=6041 title='Just a moment...'"
+  },
+  {
+    "canonical_id": 15303,
+    "home_url": "http://www.villageatwestuniversity.com/",
+    "target_url": "https://www.villageatwestuniversity.com/houston/village-at-west-university/conventional/",
+    "render_status": null,
+    "render_outcome": "OK",
+    "render_signature": null,
+    "render_html_len": 210755,
+    "render_elapsed_ms": 2838,
+    "clearance_cookies": [
+      "__cf_bm",
+      "cf_clearance"
+    ],
+    "clearance_n": 2,
+    "target_status": 403,
+    "target_html_len": 6163,
+    "target_signals": {
+      "rents": 0,
+      "sqfts": 0,
+      "title": "Just a moment..."
+    },
+    "target_blocked": true,
+    "unblocked": false,
+    "unblocked_reason": "status=403 html_len=6163 title='Just a moment...'"
+  },
+  {
+    "canonical_id": 16139,
+    "home_url": "https://www.chaseknollsapts.com/",
+    "target_url": "https://www.chaseknollsapts.com/sherman-oaks/chase-knolls-i/conventional/",
+    "render_status": null,
+    "render_outcome": "OK",
+    "render_signature": null,
+    "render_html_len": 242712,
+    "render_elapsed_ms": 3358,
+    "clearance_cookies": [
+      "__cf_bm",
+      "cf_clearance"
+    ],
+    "clearance_n": 2,
+    "target_status": 403,
+    "target_html_len": 5964,
+    "target_signals": {
+      "rents": 0,
+      "sqfts": 0,
+      "title": "Just a moment..."
+    },
+    "target_blocked": true,
+    "unblocked": false,
+    "unblocked_reason": "status=403 html_len=5964 title='Just a moment...'"
+  },
+  {
+    "canonical_id": 16554,
+    "home_url": "http://www.ridgeviewseminole.com/",
+    "target_url": "https://www.ridgeviewseminole.com/seminole/ridgeview/conventional/",
+    "render_status": null,
+    "render_outcome": "OK",
+    "render_signature": null,
+    "render_html_len": 190742,
+    "render_elapsed_ms": 2620,
+    "clearance_cookies": [
+      "__cf_bm",
+      "cf_clearance"
+    ],
+    "clearance_n": 2,
+    "target_status": 403,
+    "target_html_len": 6088,
+    "target_signals": {
+      "rents": 0,
+      "sqfts": 0,
+      "title": "Just a moment..."
+    },
+    "target_blocked": true,
+    "unblocked": false,
+    "unblocked_reason": "status=403 html_len=6088 title='Just a moment...'"
+  }
+]

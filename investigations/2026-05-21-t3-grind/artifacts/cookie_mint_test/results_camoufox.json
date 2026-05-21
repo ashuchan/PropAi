@@ -1,0 +1,107 @@
+[
+  {
+    "canonical_id": 16831,
+    "home_url": "https://agoraatportrichey.prospectportal.com/",
+    "target_url": "https://agoraatportrichey.prospectportal.com/port-richey/agora-at-port-richey/conventional/",
+    "render_status": null,
+    "render_outcome": "TRANSIENT",
+    "render_signature": "TypeError",
+    "render_html_len": 0,
+    "render_elapsed_ms": 3035,
+    "clearance_cookies": [],
+    "clearance_n": 0,
+    "unblocked": false,
+    "unblocked_reason": "L1 RENDER did not mint clearance cookies (CF may have blocked patchright/Camoufox too)",
+    "target_status_no_cookie": 200,
+    "target_html_len_no_cookie": 182597,
+    "target_signals_no_cookie": {
+      "rents": 7,
+      "sqfts": 10,
+      "title": "1 - 3 Bed Apartments - Check Availability | Agora at Port Richey"
+    }
+  },
+  {
+    "canonical_id": 18082,
+    "home_url": "https://riverrockapt.prospectportal.com/",
+    "target_url": "https://riverrockapt.prospectportal.com/temple-terrace/river-rock-apartments/conventional/",
+    "render_status": null,
+    "render_outcome": "TRANSIENT",
+    "render_signature": "TypeError",
+    "render_html_len": 0,
+    "render_elapsed_ms": 1844,
+    "clearance_cookies": [],
+    "clearance_n": 0,
+    "unblocked": false,
+    "unblocked_reason": "L1 RENDER did not mint clearance cookies (CF may have blocked patchright/Camoufox too)",
+    "target_status_no_cookie": 200,
+    "target_html_len_no_cookie": 150864,
+    "target_signals_no_cookie": {
+      "rents": 2,
+      "sqfts": 0,
+      "title": "2 - 3 Bed Apartments - Check Availability | River Rock Apartments"
+    }
+  },
+  {
+    "canonical_id": 15303,
+    "home_url": "http://www.villageatwestuniversity.com/",
+    "target_url": "https://www.villageatwestuniversity.com/houston/village-at-west-university/conventional/",
+    "render_status": null,
+    "render_outcome": "TRANSIENT",
+    "render_signature": "TypeError",
+    "render_html_len": 0,
+    "render_elapsed_ms": 1496,
+    "clearance_cookies": [],
+    "clearance_n": 0,
+    "unblocked": false,
+    "unblocked_reason": "L1 RENDER did not mint clearance cookies (CF may have blocked patchright/Camoufox too)",
+    "target_status_no_cookie": 200,
+    "target_html_len_no_cookie": 181261,
+    "target_signals_no_cookie": {
+      "rents": 7,
+      "sqfts": 25,
+      "title": "1-3 Bedroom Houston Apartments | Village at West University"
+    }
+  },
+  {
+    "canonical_id": 16139,
+    "home_url": "https://www.chaseknollsapts.com/",
+    "target_url": "https://www.chaseknollsapts.com/sherman-oaks/chase-knolls-i/conventional/",
+    "render_status": null,
+    "render_outcome": "TRANSIENT",
+    "render_signature": "TypeError",
+    "render_html_len": 0,
+    "render_elapsed_ms": 1956,
+    "clearance_cookies": [],
+    "clearance_n": 0,
+    "unblocked": false,
+    "unblocked_reason": "L1 RENDER did not mint clearance cookies (CF may have blocked patchright/Camoufox too)",
+    "target_status_no_cookie": 200,
+    "target_html_len_no_cookie": 291017,
+    "target_signals_no_cookie": {
+      "rents": 0,
+      "sqfts": 7,
+      "title": "Studio - 3 Bed Apartments - Check Availability | Chase Knolls"
+    }
+  },
+  {
+    "canonical_id": 16554,
+    "home_url": "http://www.ridgeviewseminole.com/",
+    "target_url": "https://www.ridgeviewseminole.com/seminole/ridgeview/conventional/",
+    "render_status": null,
+    "render_outcome": "TRANSIENT",
+    "render_signature": "TypeError",
+    "render_html_len": 0,
+    "render_elapsed_ms": 1618,
+    "clearance_cookies": [],
+    "clearance_n": 0,
+    "unblocked": false,
+    "unblocked_reason": "L1 RENDER did not mint clearance cookies (CF may have blocked patchright/Camoufox too)",
+    "target_status_no_cookie": 200,
+    "target_html_len_no_cookie": 166114,
+    "target_signals_no_cookie": {
+      "rents": 17,
+      "sqfts": 8,
+      "title": "1-2 Bedroom Floor Plans, Apartments for Rent in Seminole, FL"
+    }
+  }
+]

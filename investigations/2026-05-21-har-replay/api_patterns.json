@@ -1,0 +1,1423 @@
+[
+  {
+    "key": "GET https://doorway-api.knockrentals.com/v1/property/{NUM_ID}/units",
+    "url_template": "https://doorway-api.knockrentals.com/v1/property/{NUM_ID}/units",
+    "method": "GET",
+    "n_properties": 10,
+    "property_examples": [
+      "www.crossdaleflatsapts.com",
+      "www.james-towne-village.com",
+      "www.lakeviewatnewcastle.com",
+      "www.laramadaapartments.com",
+      "www.liveatpalmhaven.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.crossdaleflatsapts.com",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2025876/units"
+      },
+      {
+        "property": "www.james-towne-village.com",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2029784/units"
+      },
+      {
+        "property": "www.lakeviewatnewcastle.com",
+        "url": "https://doorway-api.knockrentals.com/v1/property/2023409/units"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "application/json": 10
+    },
+    "body_size_median": 18058
+  },
+  {
+    "key": "GET https://presentation.spherexx.app/api/unit",
+    "url_template": "https://presentation.spherexx.app/api/unit",
+    "method": "GET",
+    "n_properties": 2,
+    "property_examples": [
+      "www.invitationalapartments.com",
+      "www.westonplaceapartments.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.invitationalapartments.com",
+        "url": "https://presentation.spherexx.app/api/unit"
+      },
+      {
+        "property": "www.westonplaceapartments.com",
+        "url": "https://presentation.spherexx.app/api/unit"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "application/json": 2
+    },
+    "body_size_median": 31460
+  },
+  {
+    "key": "GET https://arise.myresman.com/Portal/Applicants/Availability?a={VALUE}&moveInDate=5/21/2026&p={VALUE}&refreshPricing=true",
+    "url_template": "https://arise.myresman.com/Portal/Applicants/Availability?a={VALUE}&moveInDate=5/21/2026&p={VALUE}&refreshPricing=true",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "arise.myresman.com"
+    ],
+    "url_examples": [
+      {
+        "property": "arise.myresman.com",
+        "url": "https://arise.myresman.com/Portal/Applicants/Availability?a=1526&p=fbe7867d-b879-4f81-9fc4-527465e08a4e&moveInDate=5/21/2026&refreshPricing=true"
+      }
+    ],
+    "known_adapter": "resman.api",
+    "novel": false,
+    "sample_query_values": {
+      "a": "1526",
+      "p": "fbe7867d-b879-4f81-9fc4-527465e08a4e"
+    },
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 104534
+  },
+  {
+    "key": "GET https://ashtonparc.com/floor-plans/",
+    "url_template": "https://ashtonparc.com/floor-plans/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "ashtonparc.com"
+    ],
+    "url_examples": [
+      {
+        "property": "ashtonparc.com",
+        "url": "https://ashtonparc.com/floor-plans/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 74578
+  },
+  {
+    "key": "GET https://home.securityproperties.com/summitriverside/littleton/summit-riverside-apartments/conventional/",
+    "url_template": "https://home.securityproperties.com/summitriverside/littleton/summit-riverside-apartments/conventional/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "home.securityproperties.com"
+    ],
+    "url_examples": [
+      {
+        "property": "home.securityproperties.com",
+        "url": "https://home.securityproperties.com/summitriverside/littleton/summit-riverside-apartments/conventional/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 201237
+  },
+  {
+    "key": "GET https://imtresidential.com/properties/imt-woodland-meadows/apartments/",
+    "url_template": "https://imtresidential.com/properties/imt-woodland-meadows/apartments/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "imtresidential.com"
+    ],
+    "url_examples": [
+      {
+        "property": "imtresidential.com",
+        "url": "https://imtresidential.com/properties/imt-woodland-meadows/apartments/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 9963456
+  },
+  {
+    "key": "GET https://krcreserveapts.com/en/floor-plans/",
+    "url_template": "https://krcreserveapts.com/en/floor-plans/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "krcreserveapts.com"
+    ],
+    "url_examples": [
+      {
+        "property": "krcreserveapts.com",
+        "url": "https://krcreserveapts.com/en/floor-plans/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 88165
+  },
+  {
+    "key": "GET https://lincolngreenapartments.com/floor-plan/",
+    "url_template": "https://lincolngreenapartments.com/floor-plan/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "lincolngreenapartments.com"
+    ],
+    "url_examples": [
+      {
+        "property": "lincolngreenapartments.com",
+        "url": "https://lincolngreenapartments.com/floor-plan/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 112341
+  },
+  {
+    "key": "POST https://liveatgraysonpark.com/wp-admin/admin-ajax.php",
+    "url_template": "https://liveatgraysonpark.com/wp-admin/admin-ajax.php",
+    "method": "POST",
+    "n_properties": 1,
+    "property_examples": [
+      "liveatgraysonpark.com"
+    ],
+    "url_examples": [
+      {
+        "property": "liveatgraysonpark.com",
+        "url": "https://liveatgraysonpark.com/wp-admin/admin-ajax.php"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 39826
+  },
+  {
+    "key": "GET https://npmainc.com/property/chisholm-trail-townhomes/",
+    "url_template": "https://npmainc.com/property/chisholm-trail-townhomes/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "npmainc.com"
+    ],
+    "url_examples": [
+      {
+        "property": "npmainc.com",
+        "url": "https://npmainc.com/property/chisholm-trail-townhomes/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 184086
+  },
+  {
+    "key": "GET https://fa-chatbot-prod-e418.azurewebsites.net/api/GetPropertyBlob/Settings-A8223A16-7DF1-462C-A2A4-86D67E294B39",
+    "url_template": "https://fa-chatbot-prod-e418.azurewebsites.net/api/GetPropertyBlob/Settings-A8223A16-7DF1-462C-A2A4-86D67E294B39",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "npmainc.com"
+    ],
+    "url_examples": [
+      {
+        "property": "npmainc.com",
+        "url": "https://fa-chatbot-prod-e418.azurewebsites.net/api/GetPropertyBlob/Settings-A8223A16-7DF1-462C-A2A4-86D67E294B39"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "application/json": 1
+    },
+    "body_size_median": 37176
+  },
+  {
+    "key": "GET https://therailat1380.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Dlisting-chunks/?forcecache=1",
+    "url_template": "https://therailat1380.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Dlisting-chunks/?forcecache=1",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "therailat1380.com"
+    ],
+    "url_examples": [
+      {
+        "property": "therailat1380.com",
+        "url": "https://therailat1380.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Dlisting-chunks/?forcecache=1"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 302011
+  },
+  {
+    "key": "GET https://vineyardscartersville.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Dlisting-chunks/?forcecache=1",
+    "url_template": "https://vineyardscartersville.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Dlisting-chunks/?forcecache=1",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "vineyardscartersville.com"
+    ],
+    "url_examples": [
+      {
+        "property": "vineyardscartersville.com",
+        "url": "https://vineyardscartersville.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Dlisting-chunks/?forcecache=1"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 244753
+  },
+  {
+    "key": "GET https://vineyardscartersville.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Ddetails%26resource%3Dfloorplan%26id%3D2/?forcecache=1",
+    "url_template": "https://vineyardscartersville.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Ddetails%26resource%3Dfloorplan%26id%3D2/?forcecache=1",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "vineyardscartersville.com"
+    ],
+    "url_examples": [
+      {
+        "property": "vineyardscartersville.com",
+        "url": "https://vineyardscartersville.com/floorplans/_fp-renderable/params%3Ainstance%3D20f4d721f54a51b85d9fed8b7f6d8490%26action%3Drender%26type%3Ddetails%26resource%3Dfloorplan%26id%3D2/?forcecache=1"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 89006
+  },
+  {
+    "key": "GET https://www.amherstbedford.com/api/v3/floorplans/all/?api_key={VALUE}",
+    "url_template": "https://www.amherstbedford.com/api/v3/floorplans/all/?api_key={VALUE}",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.amherstbedford.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.amherstbedford.com",
+        "url": "https://www.amherstbedford.com/api/v3/floorplans/all/?api_key=272616b0ece52ed18b08e66e78e351e36f744481"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {
+      "api_key": "272616b0ece52ed18b08e66e78e351e36f744481"
+    },
+    "content_types": {
+      "application/json": 1
+    },
+    "body_size_median": 51024
+  },
+  {
+    "key": "GET https://www.ashfordcasaserena.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/{NUM_ID}/?analytics=1&fp_filter_request=&is_filter_request=0&occupancy_type=conventional",
+    "url_template": "https://www.ashfordcasaserena.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/{NUM_ID}/?analytics=1&fp_filter_request=&is_filter_request=0&occupancy_type=conventional",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.ashfordcasaserena.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.ashfordcasaserena.com",
+        "url": "https://www.ashfordcasaserena.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1311810/?occupancy_type=conventional&analytics=1&fp_filter_request&&occupancy_type=conventional&is_filter_request=0&"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 2152896
+  },
+  {
+    "key": "GET https://www.ashfordwillowfalls.com/houston/ashford-willow-falls/conventional/",
+    "url_template": "https://www.ashfordwillowfalls.com/houston/ashford-willow-falls/conventional/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.ashfordwillowfalls.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.ashfordwillowfalls.com",
+        "url": "https://www.ashfordwillowfalls.com/houston/ashford-willow-falls/conventional/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 310408
+  },
+  {
+    "key": "GET https://www.ashfordwillowfalls.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/{NUM_ID}/?analytics=1&fp_filter_request=&is_filter_request=0&occupancy_type=conventional",
+    "url_template": "https://www.ashfordwillowfalls.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/{NUM_ID}/?analytics=1&fp_filter_request=&is_filter_request=0&occupancy_type=conventional",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.ashfordwillowfalls.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.ashfordwillowfalls.com",
+        "url": "https://www.ashfordwillowfalls.com/Apartments/module/property_info/action/view_beans_map/property%5Bid%5D/1311828/?occupancy_type=conventional&analytics=1&fp_filter_request&&occupancy_type=conventional&is_filter_request=0&"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 2011240
+  },
+  {
+    "key": "GET https://www.avanachestnuthills.com/puyallup/avana-chestnut-hills/conventional/",
+    "url_template": "https://www.avanachestnuthills.com/puyallup/avana-chestnut-hills/conventional/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.avanachestnuthills.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.avanachestnuthills.com",
+        "url": "https://www.avanachestnuthills.com/puyallup/avana-chestnut-hills/conventional/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 204142
+  },
+  {
+    "key": "GET https://sightmap.com/app/api/v1/r5v52zemvny/sightmaps/{NUM_ID}",
+    "url_template": "https://sightmap.com/app/api/v1/r5v52zemvny/sightmaps/{NUM_ID}",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.avanachestnuthills.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.avanachestnuthills.com",
+        "url": "https://sightmap.com/app/api/v1/r5v52zemvny/sightmaps/27816"
+      }
+    ],
+    "known_adapter": "sightmap.api",
+    "novel": false,
+    "sample_query_values": {},
+    "content_types": {
+      "application/json": 1
+    },
+    "body_size_median": 226032
+  },
+  {
+    "key": "GET https://www.avenliving.com/floorplans/all/",
+    "url_template": "https://www.avenliving.com/floorplans/all/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.avenliving.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.avenliving.com",
+        "url": "https://www.avenliving.com/floorplans/all/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 223756
+  },
+  {
+    "key": "GET https://www.bremertonparkapts.com/floorplans",
+    "url_template": "https://www.bremertonparkapts.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.bremertonparkapts.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.bremertonparkapts.com",
+        "url": "https://www.bremertonparkapts.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 306185
+  },
+  {
+    "key": "POST https://apps.3dplans.com/InteractivePropertyMap/screenservices/InteractivePropertyMap/Blocks/Map/DataActionGetData",
+    "url_template": "https://apps.3dplans.com/InteractivePropertyMap/screenservices/InteractivePropertyMap/Blocks/Map/DataActionGetData",
+    "method": "POST",
+    "n_properties": 1,
+    "property_examples": [
+      "www.centralparkmontgomery.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.centralparkmontgomery.com",
+        "url": "https://apps.3dplans.com/InteractivePropertyMap/screenservices/InteractivePropertyMap/Blocks/Map/DataActionGetData"
+      },
+      {
+        "property": "www.centralparkmontgomery.com",
+        "url": "https://apps.3dplans.com/InteractivePropertyMap/screenservices/InteractivePropertyMap/Blocks/Map/DataActionGetData"
+      },
+      {
+        "property": "www.centralparkmontgomery.com",
+        "url": "https://apps.3dplans.com/InteractivePropertyMap/screenservices/InteractivePropertyMap/Blocks/Map/DataActionGetData"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "application/json": 6
+    },
+    "body_size_median": 19309
+  },
+  {
+    "key": "GET https://www.chathamsquareapartments.com/",
+    "url_template": "https://www.chathamsquareapartments.com/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.chathamsquareapartments.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.chathamsquareapartments.com",
+        "url": "https://www.chathamsquareapartments.com/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 429591
+  },
+  {
+    "key": "GET https://www.eclipseoaklawn.com/api/v3/floorplans/all/?api_key={VALUE}",
+    "url_template": "https://www.eclipseoaklawn.com/api/v3/floorplans/all/?api_key={VALUE}",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.eclipseoaklawn.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.eclipseoaklawn.com",
+        "url": "https://www.eclipseoaklawn.com/api/v3/floorplans/all/?api_key=7b64d3548c88b7f985c7cd88d9b608ae4989f2e4"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {
+      "api_key": "7b64d3548c88b7f985c7cd88d9b608ae4989f2e4"
+    },
+    "content_types": {
+      "application/json": 1
+    },
+    "body_size_median": 49680
+  },
+  {
+    "key": "GET https://www.ellyncrossing.com/glendale-heights/ellyn-crossing/conventional/",
+    "url_template": "https://www.ellyncrossing.com/glendale-heights/ellyn-crossing/conventional/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.ellyncrossing.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.ellyncrossing.com",
+        "url": "https://www.ellyncrossing.com/glendale-heights/ellyn-crossing/conventional/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 156711
+  },
+  {
+    "key": "GET https://www.embarcatwestjordan.com/floor-plans",
+    "url_template": "https://www.embarcatwestjordan.com/floor-plans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.embarcatwestjordan.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.embarcatwestjordan.com",
+        "url": "https://www.embarcatwestjordan.com/floor-plans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 117208
+  },
+  {
+    "key": "GET https://www.esring.com/apartments/ca/los-angeles/west-park-village/floorplans",
+    "url_template": "https://www.esring.com/apartments/ca/los-angeles/west-park-village/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.esring.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.esring.com",
+        "url": "https://www.esring.com/apartments/ca/los-angeles/west-park-village/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 197249
+  },
+  {
+    "key": "GET https://www.harborgroupmanagement.com/apartments/tx/lewisville/rockbrook-creek/floor-plans",
+    "url_template": "https://www.harborgroupmanagement.com/apartments/tx/lewisville/rockbrook-creek/floor-plans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.harborgroupmanagement.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.harborgroupmanagement.com",
+        "url": "https://www.harborgroupmanagement.com/apartments/tx/lewisville/rockbrook-creek/floor-plans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 152647
+  },
+  {
+    "key": "GET https://www.havenatsouthmountainapts.com/floor-plans",
+    "url_template": "https://www.havenatsouthmountainapts.com/floor-plans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.havenatsouthmountainapts.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.havenatsouthmountainapts.com",
+        "url": "https://www.havenatsouthmountainapts.com/floor-plans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 57558
+  },
+  {
+    "key": "GET https://havenatsouthmountain.prospectportal.com/phoenix/haven-at-south-mountain-apartments-new/?host_domain=www.havenatsouthmountainapts.com&include_paragraph_content=1&is_collapsed=0&is_responsive_snippet=1&locale_code=en_US&move_in_date=02/02/2024&occupancy_type=1&snippet_type=website",
+    "url_template": "https://havenatsouthmountain.prospectportal.com/phoenix/haven-at-south-mountain-apartments-new/?host_domain=www.havenatsouthmountainapts.com&include_paragraph_content=1&is_collapsed=0&is_responsive_snippet=1&locale_code=en_US&move_in_date=02/02/2024&occupancy_type=1&snippet_type=website",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.havenatsouthmountainapts.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.havenatsouthmountainapts.com",
+        "url": "https://havenatsouthmountain.prospectportal.com/phoenix/haven-at-south-mountain-apartments-new/?&is_responsive_snippet=1&snippet_type=website&occupancy_type=1&move_in_date=02/02/2024&locale_code=en_US&is_collapsed=0&include_paragraph_content=1&host_domain=www.havenatsouthmountainapts.com"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 152473
+  },
+  {
+    "key": "GET https://www.hvca2.com/floorplans/",
+    "url_template": "https://www.hvca2.com/floorplans/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.hvca2.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.hvca2.com",
+        "url": "https://www.hvca2.com/floorplans/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 135187
+  },
+  {
+    "key": "GET https://fa-chatbot-prod-e418.azurewebsites.net/api/GetPropertyBlob/Settings-E0175BEA-3D58-41B0-A1C4-47A4E49BFD65",
+    "url_template": "https://fa-chatbot-prod-e418.azurewebsites.net/api/GetPropertyBlob/Settings-E0175BEA-3D58-41B0-A1C4-47A4E49BFD65",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.invitationalapartments.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.invitationalapartments.com",
+        "url": "https://fa-chatbot-prod-e418.azurewebsites.net/api/GetPropertyBlob/Settings-E0175BEA-3D58-41B0-A1C4-47A4E49BFD65"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "application/json": 1
+    },
+    "body_size_median": 18034
+  },
+  {
+    "key": "GET https://www.kingswoodenton.com/floor-plans-1/",
+    "url_template": "https://www.kingswoodenton.com/floor-plans-1/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.kingswoodenton.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.kingswoodenton.com",
+        "url": "https://www.kingswoodenton.com/floor-plans-1/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 188048
+  },
+  {
+    "key": "GET https://www.knollcrestsa.com/floorplans",
+    "url_template": "https://www.knollcrestsa.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.knollcrestsa.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.knollcrestsa.com",
+        "url": "https://www.knollcrestsa.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 257592
+  },
+  {
+    "key": "GET https://www.laramadaapartments.com/api/v3/floorplans/all/?api_key={VALUE}",
+    "url_template": "https://www.laramadaapartments.com/api/v3/floorplans/all/?api_key={VALUE}",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.laramadaapartments.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.laramadaapartments.com",
+        "url": "https://www.laramadaapartments.com/api/v3/floorplans/all/?api_key=36a1ad6c21c06b6f88dfeede75fd766f22584c86"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {
+      "api_key": "36a1ad6c21c06b6f88dfeede75fd766f22584c86"
+    },
+    "content_types": {
+      "application/json": 1
+    },
+    "body_size_median": 35733
+  },
+  {
+    "key": "GET https://www.leaselondonsquareapartments.com/farmers-branch/london-square-apartments/conventional/",
+    "url_template": "https://www.leaselondonsquareapartments.com/farmers-branch/london-square-apartments/conventional/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.leaselondonsquareapartments.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.leaselondonsquareapartments.com",
+        "url": "https://www.leaselondonsquareapartments.com/farmers-branch/london-square-apartments/conventional/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 169879
+  },
+  {
+    "key": "GET https://www.liveatlascolinasheights.com/irving/las-colinas-heights/conventional/",
+    "url_template": "https://www.liveatlascolinasheights.com/irving/las-colinas-heights/conventional/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.liveatlascolinasheights.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.liveatlascolinasheights.com",
+        "url": "https://www.liveatlascolinasheights.com/irving/las-colinas-heights/conventional/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 252504
+  },
+  {
+    "key": "GET https://www.maplewoodapthomes.com/api/v1/community_info/?api_key={VALUE}",
+    "url_template": "https://www.maplewoodapthomes.com/api/v1/community_info/?api_key={VALUE}",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.maplewoodapthomes.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.maplewoodapthomes.com",
+        "url": "https://www.maplewoodapthomes.com/api/v1/community_info/?api_key=f373e4525047d5dc6e518145e471deac9adc88ff"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {
+      "api_key": "f373e4525047d5dc6e518145e471deac9adc88ff"
+    },
+    "content_types": {
+      "application/json": 1
+    },
+    "body_size_median": 21522
+  },
+  {
+    "key": "GET https://www.maplewoodapthomes.com/api/v3/floorplans/all/?api_key={VALUE}",
+    "url_template": "https://www.maplewoodapthomes.com/api/v3/floorplans/all/?api_key={VALUE}",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.maplewoodapthomes.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.maplewoodapthomes.com",
+        "url": "https://www.maplewoodapthomes.com/api/v3/floorplans/all/?api_key=f373e4525047d5dc6e518145e471deac9adc88ff"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {
+      "api_key": "f373e4525047d5dc6e518145e471deac9adc88ff"
+    },
+    "content_types": {
+      "application/json": 1
+    },
+    "body_size_median": 30927
+  },
+  {
+    "key": "GET https://www.mountainviewcasitas.com/floorplans",
+    "url_template": "https://www.mountainviewcasitas.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.mountainviewcasitas.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.mountainviewcasitas.com",
+        "url": "https://www.mountainviewcasitas.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 91357
+  },
+  {
+    "key": "GET https://www.pelhamgreenville.com/ajax/api/plansandpricing/",
+    "url_template": "https://www.pelhamgreenville.com/ajax/api/plansandpricing/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.pelhamgreenville.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.pelhamgreenville.com",
+        "url": "https://www.pelhamgreenville.com/ajax/api/plansandpricing/"
+      },
+      {
+        "property": "www.pelhamgreenville.com",
+        "url": "https://www.pelhamgreenville.com/ajax/api/plansandpricing/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "application/json": 2
+    },
+    "body_size_median": 3518
+  },
+  {
+    "key": "GET https://www.pelhamgreenville.com/ajax/availabilityv2/",
+    "url_template": "https://www.pelhamgreenville.com/ajax/availabilityv2/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.pelhamgreenville.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.pelhamgreenville.com",
+        "url": "https://www.pelhamgreenville.com/ajax/availabilityv2/"
+      },
+      {
+        "property": "www.pelhamgreenville.com",
+        "url": "https://www.pelhamgreenville.com/ajax/availabilityv2/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "application/json": 2
+    },
+    "body_size_median": 18272
+  },
+  {
+    "key": "GET https://www.pepperwoodknoll.com/CmsSiteManager/callback.aspx?_={VALUE}&act=Proxy/GetUnits&available=true&callback=jQuery22404588243600693217_1779355853778&dateneeded=2026-05-21&honordisplayorder=true&leaseterm=12&siteid={VALUE}",
+    "url_template": "https://www.pepperwoodknoll.com/CmsSiteManager/callback.aspx?_={VALUE}&act=Proxy/GetUnits&available=true&callback=jQuery22404588243600693217_1779355853778&dateneeded=2026-05-21&honordisplayorder=true&leaseterm=12&siteid={VALUE}",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.pepperwoodknoll.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.pepperwoodknoll.com",
+        "url": "https://www.pepperwoodknoll.com/CmsSiteManager/callback.aspx?act=Proxy/GetUnits&available=true&honordisplayorder=true&siteid=8702270&leaseterm=12&dateneeded=2026-05-21&callback=jQuery22404588243600693217_1779355853778&_=1779355853779"
+      }
+    ],
+    "known_adapter": "realpage.cms_sitemanager",
+    "novel": false,
+    "sample_query_values": {
+      "_": "1779355853779",
+      "siteid": "8702270"
+    },
+    "content_types": {
+      "application/x-javascript": 1
+    },
+    "body_size_median": 37093
+  },
+  {
+    "key": "GET https://www.portolasouthmountain.com/floorplans",
+    "url_template": "https://www.portolasouthmountain.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.portolasouthmountain.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.portolasouthmountain.com",
+        "url": "https://www.portolasouthmountain.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 91434
+  },
+  {
+    "key": "GET https://www.qtowneoaks.com/floorplans",
+    "url_template": "https://www.qtowneoaks.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.qtowneoaks.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.qtowneoaks.com",
+        "url": "https://www.qtowneoaks.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 372302
+  },
+  {
+    "key": "GET https://www.renewmarinashores.com/virginia-beach/renew-marina-shores/conventional/",
+    "url_template": "https://www.renewmarinashores.com/virginia-beach/renew-marina-shores/conventional/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.renewmarinashores.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.renewmarinashores.com",
+        "url": "https://www.renewmarinashores.com/virginia-beach/renew-marina-shores/conventional/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 167179
+  },
+  {
+    "key": "GET https://www.rentcitadel.com/CmsSiteManager/callback.aspx?_={VALUE}&act=Proxy/GetUnits&available=true&callback=jQuery18209607570401888281_1779355918754&dateneeded=2026-05-21&honordisplayorder=true",
+    "url_template": "https://www.rentcitadel.com/CmsSiteManager/callback.aspx?_={VALUE}&act=Proxy/GetUnits&available=true&callback=jQuery18209607570401888281_1779355918754&dateneeded=2026-05-21&honordisplayorder=true",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.rentcitadel.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.rentcitadel.com",
+        "url": "https://www.rentcitadel.com/CmsSiteManager/callback.aspx?act=Proxy/GetUnits&available=true&honordisplayorder=true&dateneeded=2026-05-21&callback=jQuery18209607570401888281_1779355918754&_=1779355920269"
+      }
+    ],
+    "known_adapter": "realpage.cms_sitemanager",
+    "novel": false,
+    "sample_query_values": {
+      "_": "1779355920269"
+    },
+    "content_types": {
+      "application/x-javascript": 1
+    },
+    "body_size_median": 18841
+  },
+  {
+    "key": "GET https://www.rentharborcliff.com/floorplans",
+    "url_template": "https://www.rentharborcliff.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.rentharborcliff.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.rentharborcliff.com",
+        "url": "https://www.rentharborcliff.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 171233
+  },
+  {
+    "key": "GET https://www.reserveatbellfort.com/",
+    "url_template": "https://www.reserveatbellfort.com/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.reserveatbellfort.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.reserveatbellfort.com",
+        "url": "https://www.reserveatbellfort.com/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 84309
+  },
+  {
+    "key": "GET https://www.riseatthepreserve.com/phoenix/rise-at-the-preserve/conventional/",
+    "url_template": "https://www.riseatthepreserve.com/phoenix/rise-at-the-preserve/conventional/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.riseatthepreserve.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.riseatthepreserve.com",
+        "url": "https://www.riseatthepreserve.com/phoenix/rise-at-the-preserve/conventional/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 206448
+  },
+  {
+    "key": "GET https://www.sagewoodatwestchase.com/floorplans",
+    "url_template": "https://www.sagewoodatwestchase.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.sagewoodatwestchase.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.sagewoodatwestchase.com",
+        "url": "https://www.sagewoodatwestchase.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 303712
+  },
+  {
+    "key": "GET https://www.staywelleby.com/CmsSiteManager/callback.aspx?_={VALUE}&act=Proxy/GetUnits&available=true&bestprice=true&callback=jQuery22408028198460368556_1779356350619&dateneeded=2026-05-21&honordisplayorder=true&leaseterm=1&siteid={VALUE}",
+    "url_template": "https://www.staywelleby.com/CmsSiteManager/callback.aspx?_={VALUE}&act=Proxy/GetUnits&available=true&bestprice=true&callback=jQuery22408028198460368556_1779356350619&dateneeded=2026-05-21&honordisplayorder=true&leaseterm=1&siteid={VALUE}",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.staywelleby.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.staywelleby.com",
+        "url": "https://www.staywelleby.com/CmsSiteManager/callback.aspx?act=Proxy/GetUnits&available=true&honordisplayorder=true&siteid=8943090&bestprice=true&leaseterm=1&leaseterm=7&leaseterm=12&dateneeded=2026-05-21&callback=jQuery22408028198460368556_1779356350619&_=1779356350620"
+      }
+    ],
+    "known_adapter": "realpage.cms_sitemanager",
+    "novel": false,
+    "sample_query_values": {
+      "_": "1779356350620",
+      "siteid": "8943090"
+    },
+    "content_types": {
+      "application/x-javascript": 1
+    },
+    "body_size_median": 50599
+  },
+  {
+    "key": "GET https://www.sylispm.com/oakstone-apartment-homes/",
+    "url_template": "https://www.sylispm.com/oakstone-apartment-homes/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.sylispm.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.sylispm.com",
+        "url": "https://www.sylispm.com/oakstone-apartment-homes/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 117514
+  },
+  {
+    "key": "GET https://www.theleightonapartments.com/CmsSiteManager/callback.aspx?_={VALUE}&act=Proxy/GetUnits&available=true&bestprice=true&callback=jQuery2240641986746551141_1779358020515&dateneeded=2026-05-21&honordisplayorder=true&leaseterm=6&siteid={VALUE}",
+    "url_template": "https://www.theleightonapartments.com/CmsSiteManager/callback.aspx?_={VALUE}&act=Proxy/GetUnits&available=true&bestprice=true&callback=jQuery2240641986746551141_1779358020515&dateneeded=2026-05-21&honordisplayorder=true&leaseterm=6&siteid={VALUE}",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.theleightonapartments.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.theleightonapartments.com",
+        "url": "https://www.theleightonapartments.com/CmsSiteManager/callback.aspx?act=Proxy/GetUnits&available=true&honordisplayorder=true&siteid=8780657&bestprice=true&leaseterm=6&leaseterm=7&leaseterm=8&leaseterm=9&leaseterm=10&leaseterm=11&leaseterm=12&leaseterm=13&leaseterm=14&leaseterm=15&dateneeded=2026-05-21&callback=jQuery2240641986746551141_1779358020515&_=1779358020516"
+      }
+    ],
+    "known_adapter": "realpage.cms_sitemanager",
+    "novel": false,
+    "sample_query_values": {
+      "_": "1779358020516",
+      "siteid": "8780657"
+    },
+    "content_types": {
+      "application/x-javascript": 1
+    },
+    "body_size_median": 11445
+  },
+  {
+    "key": "GET https://www.theplaceatbarkercypress.com/floorplans",
+    "url_template": "https://www.theplaceatbarkercypress.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.theplaceatbarkercypress.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.theplaceatbarkercypress.com",
+        "url": "https://www.theplaceatbarkercypress.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 448136
+  },
+  {
+    "key": "POST https://www.tideson27th.com/wp-admin/admin-ajax.php",
+    "url_template": "https://www.tideson27th.com/wp-admin/admin-ajax.php",
+    "method": "POST",
+    "n_properties": 1,
+    "property_examples": [
+      "www.tideson27th.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.tideson27th.com",
+        "url": "https://www.tideson27th.com/wp-admin/admin-ajax.php"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 28678
+  },
+  {
+    "key": "GET https://www.udr.com/washington-dc-apartments/alexandria/arbor-park-of-alexandria/apartments-pricing/",
+    "url_template": "https://www.udr.com/washington-dc-apartments/alexandria/arbor-park-of-alexandria/apartments-pricing/",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.udr.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.udr.com",
+        "url": "https://www.udr.com/washington-dc-apartments/alexandria/arbor-park-of-alexandria/apartments-pricing/"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 1885877
+  },
+  {
+    "key": "GET https://www.westlakeatsummercove.com/floorplans",
+    "url_template": "https://www.westlakeatsummercove.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.westlakeatsummercove.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.westlakeatsummercove.com",
+        "url": "https://www.westlakeatsummercove.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 164149
+  },
+  {
+    "key": "GET https://fa-chatbot-prod-e418.azurewebsites.net/api/GetPropertyBlob/Settings-42E2A753-060C-4D22-99CE-850D7770A9DF",
+    "url_template": "https://fa-chatbot-prod-e418.azurewebsites.net/api/GetPropertyBlob/Settings-42E2A753-060C-4D22-99CE-850D7770A9DF",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.westonplaceapartments.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.westonplaceapartments.com",
+        "url": "https://fa-chatbot-prod-e418.azurewebsites.net/api/GetPropertyBlob/Settings-42E2A753-060C-4D22-99CE-850D7770A9DF"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "application/json": 1
+    },
+    "body_size_median": 20566
+  },
+  {
+    "key": "GET https://www.woodmanpark.com/floorplans",
+    "url_template": "https://www.woodmanpark.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.woodmanpark.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.woodmanpark.com",
+        "url": "https://www.woodmanpark.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 201841
+  },
+  {
+    "key": "GET https://www.wyandotteliving.com/floorplans",
+    "url_template": "https://www.wyandotteliving.com/floorplans",
+    "method": "GET",
+    "n_properties": 1,
+    "property_examples": [
+      "www.wyandotteliving.com"
+    ],
+    "url_examples": [
+      {
+        "property": "www.wyandotteliving.com",
+        "url": "https://www.wyandotteliving.com/floorplans"
+      }
+    ],
+    "known_adapter": null,
+    "novel": true,
+    "sample_query_values": {},
+    "content_types": {
+      "text/html": 1
+    },
+    "body_size_median": 179667
+  }
+]

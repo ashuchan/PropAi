@@ -1,0 +1,15 @@
+# www.chapelmanor.com
+
+**Verdict:** `weak_signal`  
+**Adapter hint:** `needs_chrome_probe`  
+**Total responses:** 86  
+**Candidates with unit-signal:** 1  
+**Blocked responses:** 3  
+**PMS markers detected:** entrata, wordpress  
+
+## Top scoring responses
+
+### 1. score=2 status=200 mime=`application/json` len=1,479
+  URL: `https://www.chapelmanor.com/Apartments/module/widgets/`
+  Signals: rent×0 bed×0 bath×0 sqft×0 json_keys×1 jsonld×0 co_signal=0
+  PMS: entrata
