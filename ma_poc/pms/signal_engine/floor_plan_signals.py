@@ -208,6 +208,17 @@ FIELD_ALIASES: dict[str, str] = {
     "squarefeet_min":     "sqft",
     # Schema.org Apartment.floorSize (after lowercase normalisation).
     "floorsize":          "sqft",
+    # 2026-05-22 — additional vendor sqft spellings observed in LLM_API
+    # fallbacks (Brookfield WP middleware uses minimumSQFT acronym; the
+    # RentDynamics-style /ajax/api/plansandpricing/ feed used by Hazel and
+    # other custom WP marketing sites uses MinSqFt/MaxSqFt). Without these
+    # aliases the narrow generic parser silently misses sqft and ships
+    # rows with a NULL physical dimension, which the planner correctly
+    # escalates to LLM_API.
+    "minimumsqft":        "sqft",
+    "maximumsqft":        "sqft",
+    "minsqft":            "sqft",
+    "maxsqft":            "sqft",
     # ── Floor-plan name / ID ──────────────────────────────────────────────
     "floorplan_name":     "floor_plan_name",
     "floorplanname":      "floor_plan_name",
@@ -260,6 +271,31 @@ FIELD_ALIASES: dict[str, str] = {
     "availabledate":      "available_date",
     "availableon":        "available_date",
     "availablecount":     "unit_count",
+    # 2026-05-22 — additional vendor availability spellings observed in
+    # LLM_API fallbacks. Brookfield ships ``availableUnitsCount`` and a
+    # property-level ``availableDate`` per floorplan; the RentDynamics
+    # /ajax/api/plansandpricing/ feed uses ``UnitsAvailable`` /
+    # ``TotalUnitsAvailable`` for the count and ``EarliestUnitAvailable``
+    # for the date. These aliases let the narrow signal qualifier
+    # recognise the floorplan as unit-shaped without the LLM detour.
+    "availableunitscount": "unit_count",
+    "unitsavailable":      "unit_count",
+    "totalunitsavailable": "unit_count",
+    "earliestunitavailable": "available_date",
+    # ``date_available`` is the Nestio v2/listings/all spelling (snake_case
+    # variant of availableDate). Without the alias the narrow qualifier
+    # missed a canonical availability signal and the row failed the
+    # ≥2-signals gate when it had only price + layout + date_available.
+    "date_available":      "available_date",
+    "dateavailable":       "available_date",
+    # ── Per-unit asking rent (RentDynamics-style feeds) ──────────────────
+    # ``UnitMinPrice`` / ``UnitMaxPrice`` are the effective per-unit rent
+    # range on plansandpricing-style payloads; ``MinPrice`` / ``MaxPrice``
+    # are the floorplan ASKING (list) range. Mapping both to min_rent /
+    # max_rent keeps the narrow signal qualifier happy; the host-specific
+    # parser is what discriminates market vs effective.
+    "unitminprice":        "min_rent",
+    "unitmaxprice":        "max_rent",
 }
 
 

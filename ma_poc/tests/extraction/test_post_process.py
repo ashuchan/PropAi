@@ -267,3 +267,62 @@ class TestPostProcessResultAPI:
         assert result.n_rejected == 1
         assert result.n_unit_level == 1
         assert result.n_plan_level == 1
+
+
+# ── 2026-05-22 Phase 1 — pp.admitted semantic change ─────────────────────────
+
+
+class TestAdmittedSemantics:
+    """``pp.admitted`` returns ONLY ``pp.units`` (not ``units + plan_summaries``).
+
+    The pre-2026-05-22 semantics combined both partitions, but every adapter
+    that consumed ``pp.admitted`` ALSO set ``result.plan_summaries =
+    pp.plan_summaries`` separately, double-counting plan-level rows the
+    moment a parser emitted any. The local canary on PID 271966 hit this
+    regression — ``inferred_*`` rows showed up in both ``units`` AND
+    ``floor_plans``. New contract: ``admitted`` is a unit-only alias.
+    """
+
+    def test_admitted_returns_units_only_no_plan_summaries(self):
+        items = [
+            {"unit_id": "101", "beds": 1, "baths": 1, "area": 700, "rent_low": 1500},
+            # plan-level row (no unit_id, no available_date)
+            {"beds": 2, "baths": 2, "area": 1100, "rent_low": 2000},
+        ]
+        result = post_process(items, property_id="P1")
+        assert result.n_unit_level == 1
+        assert result.n_plan_level == 1
+        # New semantics: admitted == units (1), NOT units + plan_summaries (2).
+        assert len(result.admitted) == 1
+        assert result.admitted == list(result.units)
+        # The plan-level row is still reachable via plan_summaries.
+        assert len(result.plan_summaries) == 1
+
+    def test_admitted_is_a_copy_not_a_view(self):
+        """``admitted`` must not allow callers to mutate ``self.units``."""
+        items = [{"unit_id": "1", "beds": 1, "baths": 1, "area": 700, "rent_low": 1500}]
+        result = post_process(items, property_id="P1")
+        ad = result.admitted
+        ad.append({"injected": True})
+        assert "injected" not in result.units[0]
+        assert len(result.units) == 1
+
+    def test_dup_invariant_when_adapter_pattern_replayed(self):
+        """The adapter-wiring pattern ``result.units = pp.admitted`` +
+        ``result.plan_summaries = pp.plan_summaries`` must NOT produce
+        plan rows in both result.units and result.plan_summaries.
+        """
+        items = [
+            {"unit_id": "A1", "beds": 1, "baths": 1, "area": 700, "rent_low": 1500,
+             "floor_plan_name": "Studio"},
+            {"beds": 2, "baths": 2, "area": 1100, "rent_low": 2000,
+             "floor_plan_name": "Two Bed"},
+        ]
+        pp = post_process(items, property_id="P1")
+        # Simulate adapter wiring.
+        result_units = pp.admitted
+        result_plan_summaries = pp.plan_summaries
+        unit_floor_plan_names = {u.get("floor_plan_name") for u in result_units}
+        plan_floor_plan_names = {p.get("floor_plan_name") for p in result_plan_summaries}
+        # No overlap → no duplication between units and plan_summaries.
+        assert unit_floor_plan_names.isdisjoint(plan_floor_plan_names)

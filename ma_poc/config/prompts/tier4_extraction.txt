@@ -37,6 +37,7 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
       "market_rent_low": number_or_null,
       "market_rent_high": number_or_null,
       "available_date": "YYYY-MM-DD or null",
+      "available_date_raw": "verbatim availability text from page (e.g. 'Available Now', 'Available 7/24', 'Now Leasing'); null when nothing shown",
       "availability_status": "AVAILABLE|UNAVAILABLE|WAITLIST|UNKNOWN",
       "availability_count": number_or_null,
       "lease_term": number_or_null,
@@ -122,10 +123,30 @@ market_rent_low / market_rent_high  (number | null)
   DON'T: Include security deposits, application fees, or per-bedroom prices.
 
 available_date  (YYYY-MM-DD or null)
-  WHAT:  Date the unit becomes available.
-  DO:    Use the literal date from the page when shown.
-         "Available now" / "Now" / "Immediate" → today's date.
-  DON'T: Default to today when the page says nothing — leave null.
+  WHAT:  Concrete calendar date in YYYY-MM-DD form. Two paths to a value:
+  DO:    (a) Parse printed dates to ISO: "6/12/2026" / "2026/06/18" /
+             "06.12.26" / "6/12" (no year → next future occurrence) /
+             "7/24" / "June 12, 2026" / "12 Jun 2026".
+         (b) Set to TODAY's date for now-phrases that semantically mean
+             "available today": "Available Now", "Available" (bare),
+             "Now Available", "Now Leasing", "Move-in Today",
+             "Move-in Ready", "Immediate", "Available Immediately".
+         ALWAYS also copy the literal page text into available_date_raw.
+  DON'T: Default to today for FUTURE-INDETERMINATE phrases ("Coming
+         Soon", "Pre-Leasing", "Inquire", "Waitlist") — those have no
+         pinned date. Set available_date=null AND put the phrase in
+         available_date_raw.
+
+available_date_raw  (string | null)
+  WHAT:  Verbatim availability text from the page (audit trail for the
+         derived available_date). Whitespace-collapsed, case preserved.
+  DO:    Copy the whole availability segment: "Available Now", "Available
+         7/24", "Now Leasing", "Move-in Today", "available 2026/06/18",
+         "Coming Soon", "Pre-Leasing", "Inquire for availability", etc.
+         Required when availability_status == AVAILABLE OR any
+         availability text is visible.
+  DON'T: Invent text. When the row has neither a date nor any
+         availability indicator, set both fields to null.
 
 availability_status  (enum)
   AVAILABLE | UNAVAILABLE | WAITLIST | UNKNOWN. Default UNKNOWN when the page

@@ -553,6 +553,94 @@ async def _fetch_via_page(page: Any, url: str) -> _PageFetchResp:
     return _PageFetchResp(int(result.get("status", 0) or 0), str(result.get("text", "") or ""))
 
 
+# 2026-05-22 Fix 2 — silent-empty / CF-challenge-interstitial detection.
+#
+# `page.evaluate(fetch(url, {credentials:'include'}))` inherits the
+# property-scoped CF clearance from the homepage. When CF rotates cookies
+# per-path on Nestin sites, the in-browser fetch can return:
+#   * status=200 with the CF challenge interstitial HTML (small body, no
+#     unit-row markup, "challenge-platform" / "__cf_chl_" markers visible)
+#   * status=200 with an empty body
+#   * a 403/429/503
+# In the FIRST case the existing CF_BLOCK_STATUSES check misses the
+# failure entirely — the loop happily passes the interstitial HTML to
+# the parser which then returns 0 units silently.
+#
+# These markers identify the SSR unit-row shapes the parser knows how
+# to read (one of these MUST appear on a real Nestin detail page).
+# Absence of all three is treated as "no extractable signal" → fall
+# back to `probe_get` which uses fresh chrome120 impersonation without
+# the path-stale cf_clearance cookie.
+_NESTIN_UNIT_ROW_SIGNALS: tuple[str, ...] = (
+    "applyGAClick(",         # Layout A3 (Stonewater shape)
+    "data-label=\"Apartment",  # Layout A1 (Nestin table; dbl-quote)
+    "data-label='Apartment",   # Layout A1 (Nestin table; single-quote)
+    "Apartment: #",            # Layout A2 (card text)
+    "Apartment :#",            # Layout A2 variant (spaced colon)
+)
+
+
+def _detail_body_has_unit_signals(body: str) -> bool:
+    """True when *body* contains at least one Nestin unit-row marker."""
+    if not body:
+        return False
+    return any(sig in body for sig in _NESTIN_UNIT_ROW_SIGNALS)
+
+
+def _body_is_cf_challenge_shell(body: str) -> bool:
+    """True when *body* looks like a CF challenge interstitial.
+
+    CF challenge interstitials are typically <15KB and contain known
+    markers (``challenge-platform``, ``__cf_chl_``, etc.). The shape
+    check defers to :mod:`_adapter_telemetry` so the marker list stays
+    in one place across adapters.
+    """
+    if not body:
+        return False
+    try:
+        from ma_poc.pms.adapters._adapter_telemetry import CF_CHALLENGE_MARKERS
+    except ImportError:
+        return False
+    if len(body) > 30000:
+        # Large bodies that happen to mention "challenge-platform" (e.g.
+        # marketing copy, embedded analytics) are not interstitials.
+        return False
+    return any(m in body for m in CF_CHALLENGE_MARKERS)
+
+
+async def _probe_detail_url_fresh(url: str) -> _PageFetchResp:
+    """Fetch *url* via probe_get with the property's CF clearance cookies
+    cleared, so curl_cffi mints a fresh per-path challenge clearance.
+
+    The docstring on the public function explains the asymmetry; this
+    helper centralises the cookie-clear + restore lifecycle so both the
+    fallback path and the default static-fetch path share it.
+
+    Returns a ``_PageFetchResp`` shim so callers can use a uniform
+    ``status_code`` / ``text`` interface.
+    """
+    try:
+        from ma_poc.pms.adapters._probe import (
+            probe_get,
+            reset_clearance_cookies,
+            set_clearance_cookies,
+        )
+    except ImportError:
+        return _PageFetchResp(0, "")
+    _clr_tok = set_clearance_cookies(None)
+    try:
+        r = probe_get(url, timeout=20)
+    except Exception as exc:
+        log.debug("nestin probe_get fallback failed url=%s err=%s", url, exc)
+        reset_clearance_cookies(_clr_tok)
+        return _PageFetchResp(0, "")
+    reset_clearance_cookies(_clr_tok)
+    return _PageFetchResp(
+        int(getattr(r, "status_code", 0) or 0),
+        str(getattr(r, "text", "") or ""),
+    )
+
+
 async def recover_rentcafe_nestin_per_plan(
     landing_html: str,
     base_url: str,
@@ -560,6 +648,7 @@ async def recover_rentcafe_nestin_per_plan(
     fetcher: Any = None,  # callable(url) -> object with .status_code + .text
     page: Any = None,     # Playwright Page; when provided, used in preference
                           # to fetcher for ALL fetches so CF clearance carries
+    pid_for_log: str = "",  # 2026-05-22: property id for per-URL telemetry.
 ) -> tuple[list[dict[str, Any]], str]:
     """Run the Nestin per-plan recovery against the property's marketing site.
 
@@ -580,6 +669,11 @@ async def recover_rentcafe_nestin_per_plan(
             fetch(...))`` so they inherit the browser's Cloudflare
             clearance cookies. ``probe_get``'s static cf_clearance is
             insufficient for many Nestin sites (CF rotates per-path).
+        pid_for_log: canonical property id used as the ``property_id``
+            on per-URL ``extract.tier_attempted`` events. Empty string
+            suppresses telemetry (back-compat default for unit tests
+            that don't pass an id). See §20.4/§20.12 of the playbook
+            (silent-empty parser diagnostic, Q15).
 
     Returns:
         ``(units, source_url)`` where ``units`` is the list of unit dicts
@@ -589,6 +683,20 @@ async def recover_rentcafe_nestin_per_plan(
         Returns ``([], "")`` when the property isn't Nestin-shaped or no
         detail pages yielded units.
     """
+    # 2026-05-22 Fix 1: per-detail-page telemetry. Defer the import so the
+    # module can be unit-tested without the observability stack.
+    if pid_for_log:
+        try:
+            from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+        except ImportError:
+            log_adapter_stage = None  # type: ignore[assignment]
+    else:
+        log_adapter_stage = None  # type: ignore[assignment]
+
+    def _log_detail(stage: str, outcome: str, **extra: Any) -> None:
+        if log_adapter_stage is None:
+            return
+        log_adapter_stage("rentcafe", pid_for_log, stage, outcome, **extra)
     if not is_nestin_template(landing_html or ""):
         return [], ""
 
@@ -643,11 +751,63 @@ async def recover_rentcafe_nestin_per_plan(
             resp = await _do_fetch(floorplans_url)
         except Exception as exc:
             log.debug("nestin /floorplans fetch failed: %s", exc)
+            _log_detail(
+                "nestin_index_probe",
+                f"exception:{type(exc).__name__}",
+                reason=f"url={floorplans_url[:120]} {str(exc)[:80]}",
+            )
             return [], ""
-        if getattr(resp, "status_code", 0) != 200:
-            return [], ""
+        status = getattr(resp, "status_code", 0) or 0
         index_html = getattr(resp, "text", "") or ""
+        # 2026-05-22 Fix 2 (index variant) — the in-browser fetch can
+        # return 200 + CF challenge shell on /floorplans too. When the
+        # body has no detail anchors AND looks like a challenge shell,
+        # retry with cleared clearance cookies via probe_get.
+        if (
+            page is not None
+            and status == 200
+            and "/floorplans/" not in index_html
+            and (_body_is_cf_challenge_shell(index_html) or len(index_html) < 5000)
+        ):
+            _log_detail(
+                "nestin_index_probe",
+                "cf_shell_via_page",
+                reason=(
+                    f"url={floorplans_url[:120]} status=200 len={len(index_html)} "
+                    f"no_anchors retry_via_probe"
+                ),
+                cf_shell=True,
+            )
+            try:
+                resp = await _probe_detail_url_fresh(floorplans_url)
+            except Exception as exc:
+                log.debug("nestin /floorplans probe_get retry failed: %s", exc)
+                _log_detail(
+                    "nestin_index_probe",
+                    f"probe_retry_exception:{type(exc).__name__}",
+                    reason=f"url={floorplans_url[:120]} {str(exc)[:80]}",
+                )
+                return [], ""
+            status = getattr(resp, "status_code", 0) or 0
+            index_html = getattr(resp, "text", "") or ""
+        if status != 200:
+            _log_detail(
+                "nestin_index_probe",
+                f"status_{status}",
+                reason=f"url={floorplans_url[:120]} len={len(index_html)}",
+                http_status=status,
+            )
+            return [], ""
         detail_urls = _find_floorplan_detail_urls(index_html, origin)
+        _log_detail(
+            "nestin_index_probe",
+            "ok" if detail_urls else "no_detail_anchors",
+            reason=(
+                f"url={floorplans_url[:120]} len={len(index_html)} "
+                f"anchors_found={len(detail_urls)}"
+            ),
+            detail_anchors_found=len(detail_urls),
+        )
 
     if not detail_urls:
         return [], ""
@@ -666,10 +826,67 @@ async def recover_rentcafe_nestin_per_plan(
             resp = await _do_fetch(detail_url)
         except Exception as exc:
             log.debug("nestin detail-page fetch failed url=%s err=%s", detail_url, exc)
+            _log_detail(
+                "nestin_detail_fetch",
+                f"exception:{type(exc).__name__}",
+                reason=f"url={detail_url[:120]} {str(exc)[:80]}",
+                detail_url=detail_url,
+            )
             continue
         status = getattr(resp, "status_code", 0) or 0
+        body = getattr(resp, "text", "") or ""
+
+        # 2026-05-22 Fix 2 — CF challenge interstitial detection. When the
+        # in-browser fetch returns 200 + a small body that LOOKS like a
+        # CF challenge shell (no unit-row markers; has CF interstitial
+        # markers), retry via probe_get with cleared clearance cookies
+        # — that path is known to mint a fresh per-path challenge on
+        # Nestin sites. Only applies when we used `page` (the static
+        # `probe_get` default path is already fresh-cookie).
+        was_page_fetch = page is not None
+        if (
+            was_page_fetch
+            and status == 200
+            and not _detail_body_has_unit_signals(body)
+            and (_body_is_cf_challenge_shell(body) or len(body) < 5000)
+        ):
+            _log_detail(
+                "nestin_detail_fetch",
+                "cf_shell_via_page",
+                reason=(
+                    f"url={detail_url[:120]} status=200 len={len(body)} "
+                    f"no_unit_signals retry_via_probe"
+                ),
+                detail_url=detail_url,
+                cf_shell=True,
+            )
+            # Fall through to a fresh-cookie probe_get for THIS URL only.
+            try:
+                resp = await _probe_detail_url_fresh(detail_url)
+            except Exception as exc:
+                log.debug(
+                    "nestin probe_get retry failed url=%s err=%s",
+                    detail_url, exc,
+                )
+                _log_detail(
+                    "nestin_detail_fetch",
+                    f"probe_retry_exception:{type(exc).__name__}",
+                    reason=f"url={detail_url[:120]} {str(exc)[:80]}",
+                    detail_url=detail_url,
+                )
+                continue
+            status = getattr(resp, "status_code", 0) or 0
+            body = getattr(resp, "text", "") or ""
+
         if status in _CF_BLOCK_STATUSES:
             consecutive_block_count += 1
+            _log_detail(
+                "nestin_detail_fetch",
+                f"blocked_status_{status}",
+                reason=f"url={detail_url[:120]} len={len(body)}",
+                detail_url=detail_url,
+                http_status=status,
+            )
             # After 3 consecutive CF blocks with no successes yet, the site
             # is CF-walled on detail URLs — bail out. Saves ~25-60s on a
             # 13-plan property like Stonewater.
@@ -679,16 +896,45 @@ async def recover_rentcafe_nestin_per_plan(
                     "(origin=%s) — site requires live browser session",
                     consecutive_block_count, origin,
                 )
+                _log_detail(
+                    "nestin_recovery",
+                    "abort_cf_walled",
+                    reason=f"consecutive_blocks={consecutive_block_count} origin={origin[:80]}",
+                )
                 break
             continue
         consecutive_block_count = 0
         if status != 200:
+            _log_detail(
+                "nestin_detail_fetch",
+                f"status_{status}",
+                reason=f"url={detail_url[:120]} len={len(body)}",
+                detail_url=detail_url,
+                http_status=status,
+            )
             continue
-        detail_html = getattr(resp, "text", "") or ""
-        if not detail_html:
+        if not body:
+            _log_detail(
+                "nestin_detail_fetch",
+                "empty_body",
+                reason=f"url={detail_url[:120]} status=200 len=0",
+                detail_url=detail_url,
+            )
             continue
-        plan_name = _section_heading_for_plan(detail_html)
-        units = parse_nestin_detail_page(detail_html, detail_url, plan_name)
+        plan_name = _section_heading_for_plan(body)
+        units = parse_nestin_detail_page(body, detail_url, plan_name)
         all_units.extend(units)
+        outcome = "ok" if units else "parser_silent_empty"
+        _log_detail(
+            "nestin_detail_fetch",
+            outcome,
+            units=len(units),
+            reason=(
+                f"url={detail_url[:120]} status=200 len={len(body)} "
+                f"applyga={body.count('applyGAClick(')} "
+                f"data_label_apt={body.lower().count('data-label=\"apartment')}"
+            ),
+            detail_url=detail_url,
+        )
 
     return all_units, floorplans_url

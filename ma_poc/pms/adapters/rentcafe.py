@@ -700,6 +700,7 @@ class RentCafeAdapter:
                         _rc_html,
                         str(getattr(ctx, "base_url", "") or ""),
                         page=page,
+                        pid_for_log=pid,
                     )
                     _log_rc(
                         pid,

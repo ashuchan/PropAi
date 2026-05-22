@@ -1,0 +1,53 @@
+[
+  {
+    "floorplanName": "1B Renovation 3",
+    "beds": "1",
+    "baths": "1",
+    "minimumSQFT": "845",
+    "maximumSQFT": "845",
+    "minimumRent": "1922.00",
+    "maximumRent": "2558.00",
+    "originalMinRent": "1835.00",
+    "originalMaxRent": "2471.00",
+    "availableUnitsCount": "12",
+    "availableDate": "2026-04-28",
+    "hasSpecials": "1",
+    "propertyName": "Turtle Cove",
+    "floorplanCode": "",
+    "availabilityURL": "https://liveturtlecove.securecafe.com/onlineleasing/turtle-cove-4/availableunits.aspx?myOlePropertyId=1807803&floorPlans=5450938"
+  },
+  {
+    "floorplanName": "2B Renovation 3",
+    "beds": "2",
+    "baths": "2",
+    "minimumSQFT": "1160",
+    "maximumSQFT": "1160",
+    "minimumRent": "2227.00",
+    "maximumRent": "3316.00",
+    "originalMinRent": "2140.00",
+    "originalMaxRent": "3229.00",
+    "availableUnitsCount": "15",
+    "availableDate": "2026-05-22",
+    "hasSpecials": "1",
+    "propertyName": "Turtle Cove",
+    "floorplanCode": "",
+    "availabilityURL": "https://liveturtlecove.securecafe.com/onlineleasing/turtle-cove-4/availableunits.aspx?myOlePropertyId=1807803&floorPlans=5450941"
+  },
+  {
+    "floorplanName": "1A Renovation 3",
+    "beds": "1",
+    "baths": "1",
+    "minimumSQFT": "665",
+    "maximumSQFT": "665",
+    "minimumRent": "1697.00",
+    "maximumRent": "2231.00",
+    "originalMinRent": "1610.00",
+    "originalMaxRent": "2144.00",
+    "availableUnitsCount": "8",
+    "availableDate": "2026-04-01",
+    "hasSpecials": "1",
+    "propertyName": "Turtle Cove",
+    "floorplanCode": "",
+    "availabilityURL": "https://liveturtlecove.securecafe.com/onlineleasing/turtle-cove-4/availableunits.aspx?myOlePropertyId=1807803&floorPlans=5873708"
+  }
+]

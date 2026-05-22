@@ -39,18 +39,28 @@ Results land in two Postgres tables (alembic 0008):
 
 Re-running with the same `--run-id` replaces results for that run.
 
+After the DB rows are written, the script renders a markdown report from
+them (via ``scripts.reports.floor_plan_comparison.build_report``) and
+emails it to ``REPORT_RECIPIENTS`` (or ``--email-recipients``). Pass
+``--no-email`` to skip the report+email step.
+
 Usage:
     python -m ma_poc.scripts.floor_plans.compare \\
         --csv ma_poc/config/Floorplan-comparisons.csv
 
     python -m ma_poc.scripts.floor_plans.compare \\
         --csv path/to.csv --run-id 2026-05-02-manual --buffer 50
+
+    # DB-only run, no email:
+    python -m ma_poc.scripts.floor_plans.compare \\
+        --csv path/to.csv --no-email
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -71,6 +81,13 @@ if str(_MA_POC_ROOT) not in sys.path:
     sys.path.insert(0, str(_MA_POC_ROOT))
 
 load_dotenv(_MA_POC_ROOT / ".env")
+
+# DATABASE_URL in .env may carry the asyncpg driver because the FastAPI
+# service is async. This script is sync — swap to pg8000 before any
+# data_provider import reads the env var.
+_db_url = os.environ.get("DATABASE_URL", "")
+if "+asyncpg" in _db_url:
+    os.environ["DATABASE_URL"] = _db_url.replace("+asyncpg", "+pg8000")
 
 from data_provider.sql.engine import make_engine, make_session_factory  # noqa: E402
 from data_provider.sql.models import (  # noqa: E402

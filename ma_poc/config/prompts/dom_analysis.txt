@@ -34,7 +34,8 @@ OUTPUT FORMAT — respond with ONLY a JSON object, no markdown fences:
       "sqft": number_or_null,
       "market_rent_low": number_or_null,
       "market_rent_high": number_or_null,
-      "available_date": "YYYY-MM-DD or null",
+      "available_date": "YYYY-MM-DD or null (parse printed dates; 'Available Now'/'Available'/'Now Leasing' → today; 'Coming Soon'/'Pre-Leasing'/'Inquire' → null)",
+      "available_date_raw": "verbatim availability text from the page (REQUIRED when unit is AVAILABLE)",
       "availability_status": "AVAILABLE|UNAVAILABLE|WAITLIST|UNKNOWN",
       "availability_count": number_or_null,
       "lease_term": number_or_null,
@@ -99,7 +100,82 @@ market_rent_low / market_rent_high  (numbers)
   For "$1,200 - $1,500" set low=1200, high=1500. Flat rent → both equal.
 
 available_date  (YYYY-MM-DD or null)
-  Use the literal date when shown. "Available now" → today. Silent → null.
+  A concrete calendar date in YYYY-MM-DD form, derived from the page.
+  TWO valid sources count as a date:
+
+  (1) Page shows a printed date in any of these shapes — parse to ISO:
+        "6/12/2026"        → 2026-06-12   (US slash, MM/DD/YYYY)
+        "06/12/2026"
+        "2026/06/18"       → 2026-06-18   (year-first slash)
+        "2026-06-18"
+        "6/12"             → 2026-06-12   (no year — use the next future
+                                            occurrence: current year if
+                                            the month/day is in the
+                                            future, else next year)
+        "7/24"             → 2026-07-24
+        "June 12, 2026"    → 2026-06-12
+        "Jun 12 2026"      → 2026-06-12
+        "12 June 2026"     → 2026-06-12   (international ordering)
+        "06.12.26"         → 2026-06-12   (dotted, two-digit year → 20xx)
+
+  (2) Page shows a NOW-phrase that semantically means TODAY — set
+      available_date to today's date AND copy the literal phrase to
+      available_date_raw:
+        "Available Now"         → today
+        "Available"             → today  (bare badge — implies now)
+        "Now Available"         → today
+        "Now Leasing"           → today
+        "Move-in Today"         → today
+        "Move-in Ready"         → today
+        "Immediate"             → today
+        "Available Immediately" → today
+
+  (3) Page shows a FUTURE-INDETERMINATE phrase that does NOT pin a date —
+      set available_date to NULL and copy the phrase to
+      available_date_raw:
+        "Coming Soon"
+        "Pre-Leasing"
+        "Inquire" / "Inquire for availability"
+        "Waitlist"
+        "Contact for date"
+
+  (4) Page shows no availability text or date at all → both fields null.
+
+  Critical: never invent text in available_date_raw — only copy what the
+  page actually shows. But available_date IS allowed to be derived
+  (today's date for now-phrases, parsed ISO for printed dates).
+
+available_date_raw  (string, REQUIRED when status is AVAILABLE OR when
+                     any availability text is visible on the row)
+  VERBATIM availability text COPIED FROM THE PAGE. Whitespace-collapsed,
+  punctuation preserved. This is the AUDIT TRAIL for available_date —
+  it tells downstream what the page actually said vs. what the model
+  derived.
+  Examples (all valid):
+    "Available Now"            → available_date=today,  raw="Available Now"
+    "Available"                → available_date=today,  raw="Available"
+    "Now Available"            → available_date=today,  raw="Now Available"
+    "Now Leasing"              → available_date=today,  raw="Now Leasing"
+    "Move-in Today"            → available_date=today,  raw="Move-in Today"
+    "Move-in Ready"            → available_date=today,  raw="Move-in Ready"
+    "Coming Soon"              → available_date=null,   raw="Coming Soon"
+    "Pre-Leasing"              → available_date=null,   raw="Pre-Leasing"
+    "Inquire for availability" → available_date=null,   raw="Inquire for availability"
+    "Available 6/12"           → available_date=2026-06-12,  raw="Available 6/12"
+    "Available 7/24"           → available_date=2026-07-24,  raw="Available 7/24"
+    "available 2026/06/18"     → available_date=2026-06-18,  raw="available 2026/06/18"
+    "Available June 12, 2026"  → available_date=2026-06-12,  raw="Available June 12, 2026"
+    "6/12/2026"                → available_date=2026-06-12,  raw="6/12/2026"
+  Rules:
+    1. Copy the WHOLE availability text segment as it appears on the
+       page — the verb + the date if both are present.
+    2. Preserve the page's original casing.
+    3. Whitespace-collapse only (single spaces between words).
+    4. Strip surrounding tag chrome (≪Available≫ → "Available").
+    5. Never invent text. If the row has zero availability indication
+       AND no concrete date, set raw to null.
+  Use this field to PROVE provenance: any downstream auditor can see
+  whether the date came from a printed date, a now-phrase, or a guess.
 
 availability_status, availability_count
   As elsewhere. Use availability_count when the page shows "5 available"

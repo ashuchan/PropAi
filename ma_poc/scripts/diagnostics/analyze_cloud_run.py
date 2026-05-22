@@ -99,6 +99,22 @@ PLATFORM_TIERS = {
 # NO_DATA = page loaded but every tier failed.
 TERMINAL_FAILURE_VERDICTS = {"FAILED_NO_DATA", "FAILED_UNREACHABLE"}
 
+# Named-fix telemetry — codenames that map to the (event_kind, predicate)
+# patterns we expect to see when a known fix is exercised. Values are
+# human-readable descriptions; the matching logic lives in
+# ``_record_named_fix_event``. Add a new entry whenever a fix lands so the
+# next day's diff makes the dead-code state visible (e.g. Bug 9 Entrata
+# probe shipped 2026-05-09 but never fired in the 2026-05-10 run because
+# ``page=None`` in the production runner — invisible without this).
+NAMED_FIX_PATTERNS: dict[str, str] = {
+    "entrata_probe_won": "Bug 9: Entrata direct-endpoint probe won the extraction (TIER_1_API_ENTRATA_PROBE)",
+    "rate_limited_proxy_escalation": "Bug 6: forced proxy after RATE_LIMITED on direct connection",
+    "rescue_skipped_captcha": "F1.2: rescue gate short-circuited on captcha-detected body",
+    "rescue_gate_onesite": "F1.3: rescue allow-list extended to onesite (new attempts on this adapter)",
+    "rescue_gate_amli": "F1.3: rescue allow-list extended to amli (new attempts on this adapter)",
+    "appfolio_detail_won": "Bug 7: AppFolio detail-page parser won (TIER_1_DOM_APPFOLIO_DETAIL)",
+}
+
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -136,10 +152,24 @@ class PropertyOutcome:
     entry_bot_blocked: bool = False
     llm_rescue_attempted: bool = False
     llm_rescue_succeeded: bool = False
+    llm_rescue_source_adapter: str | None = None  # which adapter the rescue gate was opened for
+    llm_gate_relaxed_reason: str | None = None  # reason from extract.llm_gate_relaxed event
     llm_cost: float = 0.0
     link_hops_attempted: int = 0
     link_hops_recovered: int = 0
     issue_codes: list[str] = field(default_factory=list)
+
+    # Body characterisation signals from extract.html_characterized — used
+    # by is_marketing_shell() to flag pages that loaded fine but have no
+    # parseable rent data (large body, low text, no rent/jsonld signals).
+    text_bytes: int | None = None
+    rent_signal_count: int | None = None
+    jsonld_types: list[str] = field(default_factory=list)
+    fingerprints_matched: list[str] = field(default_factory=list)
+    # Per-tier attempt outcomes (tier_key → outcome string) from
+    # extract.tier_attempted events. Used to reconstruct the cascade path
+    # for forensic property reports.
+    tier_attempts: dict[str, str] = field(default_factory=dict)
 
     # T2 (2026-05-20): date-gap sub-cause classification inputs. Populated
     # from extract.date_presence_summary OR (when that's absent — pre-T2
@@ -215,6 +245,16 @@ class RunStats:
     tier_distribution: Counter = field(default_factory=Counter)
     fetch_signatures: Counter = field(default_factory=Counter)
     failure_terminal_tiers: Counter = field(default_factory=Counter)
+    # Per-adapter LLM rescue effectiveness — gates rescue ROI debates after
+    # the 2026-05-09 → 2026-05-10 regression where the relaxed rescue gate
+    # tripled attempts but only added 12 successes ($4 cost, ~0 gain).
+    rescue_attempted_by_adapter: Counter = field(default_factory=Counter)
+    rescue_succeeded_by_adapter: Counter = field(default_factory=Counter)
+    rescue_total_cost: float = 0.0
+    # Named-fix telemetry — count of "this fix path actually fired" events
+    # so we can detect dead-code fixes (the Bug 9 Entrata probe shipped but
+    # never executes because page=None in the production runner).
+    named_fix_events: Counter = field(default_factory=Counter)
 
     # PR 3 (2026-05-10) — Persistence health (self-learning loop SLO).
     # Counted from events.jsonl across all shards. The dashboard section
@@ -293,30 +333,13 @@ def load_json(path: Path) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 
-def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, Any] | None, dict[str, Any]]:
-    """Return (per-property outcomes, run-summary dict-or-None, persistence-health counters) for a shard.
-
-    PR 3 (2026-05-10): the third return value is a small dict aggregating the
-    self-learning-loop SLO events so ``aggregate_run`` can merge them into
-    ``RunStats``. The events themselves are property-scoped, but the dashboard
-    cares about run-wide totals.
-    """
+def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, Any] | None]:
+    """Return (per-property outcomes, run-summary dict-or-None) for a shard."""
     events = load_jsonl(shard_dir / "events.jsonl")
     issues = load_jsonl(shard_dir / "issues.jsonl")
     report = load_json(shard_dir / "report.json")
 
     outcomes: dict[str, PropertyOutcome] = {}
-    persistence_health: dict[str, Any] = {
-        "mapping_save_dropped": Counter(),  # reason → count
-        "profile_update_failed": 0,
-        "startup_probe_ok": 0,
-        "startup_probe_failed": 0,
-        "profile_replay_hits": 0,
-        "profile_replay_miss_with_saved": 0,
-        "field_patch_hits": 0,
-        "field_patch_drift": 0,
-        "llm_gate_relaxed": 0,
-    }
 
     def get(pid: str) -> PropertyOutcome:
         if pid not in outcomes:
@@ -324,29 +347,6 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
         return outcomes[pid]
 
     for ev in events:
-        kind = ev.get("kind")
-        # Persistence-health events are run-scoped (shard-level counters).
-        # Some don't even carry a property_id (startup events). Count them
-        # before the property-id gate below.
-        if kind == "mapping.save_dropped":
-            persistence_health["mapping_save_dropped"][ev.get("reason") or "unknown"] += 1
-        elif kind == "profile.update_failed":
-            persistence_health["profile_update_failed"] += 1
-        elif kind == "startup.probe_ok":
-            persistence_health["startup_probe_ok"] += 1
-        elif kind == "startup.probe_failed":
-            persistence_health["startup_probe_failed"] += 1
-        elif kind == "profile.replay_hit":
-            persistence_health["profile_replay_hits"] += 1
-        elif kind == "profile.replay_miss_with_saved":
-            persistence_health["profile_replay_miss_with_saved"] += 1
-        elif kind == "field_patch.hit":
-            persistence_health["field_patch_hits"] += 1
-        elif kind == "field_patch.drift":
-            persistence_health["field_patch_drift"] += 1
-        elif kind == "extract.llm_gate_relaxed":
-            persistence_health["llm_gate_relaxed"] += 1
-
         pid = str(ev.get("property_id") or "")
         if not pid:
             continue
@@ -378,14 +378,31 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
             o.bot_blocked = True
         elif kind == "fetch.captcha_detected":
             o.captcha_detected = True
+        elif kind == "extract.detector_signals":
+            fps = ev.get("fingerprints_matched")
+            if isinstance(fps, list):
+                o.fingerprints_matched = list(fps)
+        elif kind == "extract.html_characterized":
+            tb = ev.get("text_bytes")
+            if isinstance(tb, int):
+                o.text_bytes = tb
+            rs = ev.get("rent_signal_count")
+            if isinstance(rs, int):
+                o.rent_signal_count = rs
+            jt = ev.get("jsonld_types")
+            if isinstance(jt, list):
+                # Dedupe but preserve order so the marketing-shell pattern
+                # (ApartmentComplex with no Apartment/Offer siblings) stays
+                # distinguishable from properties whose JSON-LD has both.
+                seen: set[str] = set()
+                o.jsonld_types = [
+                    t for t in jt
+                    if isinstance(t, str) and not (t in seen or seen.add(t))
+                ]
         elif kind == "extract.pms_detected":
             o.pms_detected = ev.get("pms")
         elif kind == "extract.adapter_selected":
-            # Bug #3 fix (2026-05-16): orchestrator emits with key
-            # ``adapter_name`` (pms/scraper.py:_emit_adapter_selected); the
-            # old ``adapter`` key was never written. Accept either for
-            # backward compatibility with older event logs.
-            o.adapter_selected = ev.get("adapter_name") or ev.get("adapter")
+            o.adapter_selected = ev.get("adapter")
         elif kind == "extract.tier_won":
             o.terminal_tier = ev.get("tier_used")
         elif kind == "extract.tier_failed":
@@ -397,6 +414,10 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
             o.link_hops_recovered += 1
         elif kind == "extract.llm_rescue_attempted":
             o.llm_rescue_attempted = True
+            # F2 rescue gate emits ``source_adapter`` so we can attribute
+            # cost to the resolved adapter, not the (often demoted) PMS.
+            if ev.get("source_adapter"):
+                o.llm_rescue_source_adapter = ev["source_adapter"]
         elif kind == "extract.llm_rescue_succeeded":
             o.llm_rescue_succeeded = True
             o.llm_cost += float(ev.get("cost") or 0.0)
@@ -452,7 +473,7 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
         if pid in outcomes and issue.get("code"):
             outcomes[pid].issue_codes.append(issue["code"])
 
-    return outcomes, report, persistence_health
+    return outcomes, report
 
 
 # ---------------------------------------------------------------------------
@@ -470,19 +491,8 @@ def aggregate_run(run_dir: Path, run_date: str, expected_shards: int = 20) -> tu
     all_outcomes: dict[str, PropertyOutcome] = {}
 
     for shard_dir in shard_dirs:
-        outcomes, report, persistence_health = parse_shard(shard_dir)
+        outcomes, report = parse_shard(shard_dir)
         all_outcomes.update(outcomes)
-        # Merge persistence-health counters across shards.
-        for reason, n in persistence_health["mapping_save_dropped"].items():
-            stats.mapping_save_dropped[reason] += n
-        stats.profile_update_failed += persistence_health["profile_update_failed"]
-        stats.startup_probe_ok += persistence_health["startup_probe_ok"]
-        stats.startup_probe_failed += persistence_health["startup_probe_failed"]
-        stats.profile_replay_hits += persistence_health["profile_replay_hits"]
-        stats.profile_replay_miss_with_saved += persistence_health["profile_replay_miss_with_saved"]
-        stats.field_patch_hits += persistence_health["field_patch_hits"]
-        stats.field_patch_drift += persistence_health["field_patch_drift"]
-        stats.llm_gate_relaxed += persistence_health["llm_gate_relaxed"]
         if report:
             totals = report.get("totals") or {}
             stats.properties_total += int(totals.get("properties") or 0)
@@ -553,6 +563,15 @@ def aggregate_run(run_dir: Path, run_date: str, expected_shards: int = 20) -> tu
         elif o.failed and not o.terminal_tier:
             # Fully unreachable — never made it to extraction.
             stats.failure_terminal_tiers["__no_extraction__"] += 1
+        # Rescue effectiveness — keyed on the gate's resolved adapter so we
+        # can detect when expanding the allow-list (F1.3 onesite/amli on
+        # 2026-05-09) inflates attempts without producing successes.
+        if o.llm_rescue_attempted:
+            adapter_key = o.llm_rescue_source_adapter or "unknown"
+            stats.rescue_attempted_by_adapter[adapter_key] += 1
+            if o.llm_rescue_succeeded:
+                stats.rescue_succeeded_by_adapter[adapter_key] += 1
+            stats.rescue_total_cost += o.llm_cost
 
     return stats, all_outcomes
 
@@ -743,6 +762,40 @@ def _render_date_gap_subcause_section(outcomes: dict[str, PropertyOutcome]) -> l
 # ---------------------------------------------------------------------------
 # Pattern categorisation
 # ---------------------------------------------------------------------------
+
+
+def is_marketing_shell(o: PropertyOutcome) -> bool:
+    """Detect the "marketing-shell" failure class observed in the 2026-05-10 run.
+
+    Pattern: substantial body bytes, low text bytes, ApartmentComplex
+    JSON-LD present without sibling Apartment/Offer/FloorPlan, zero or one
+    rent-token signals. These are property pages whose actual unit data
+    lives behind a leasing portal (Entrata module, OneSite portal, etc.)
+    that we never load — the homepage is just a marketing wrapper.
+
+    Concrete examples from 2026-05-10: 1701arch.com → livethearch.com,
+    22slate.com, liveatmountainview.com, ashfordcasaserena.com — all four
+    have ApartmentComplex JSON-LD with only ImageObject siblings and no
+    Apartment/Offer/FloorPlan. They all fail at TIER_1_API_ENTRATA today.
+
+    Counts as marketing-shell when ALL of:
+      - body_bytes > 50 KB but text_bytes < 10 KB (mostly script/style)
+      - rent_signal_count <= 1
+      - jsonld_types includes "ApartmentComplex" but NOT
+        Apartment/Offer/FloorPlan/RentalOffer
+    """
+    if not o.body_bytes or not o.text_bytes:
+        return False
+    if o.body_bytes < 50_000 or o.text_bytes >= 10_000:
+        return False
+    if (o.rent_signal_count or 0) > 1:
+        return False
+    if "ApartmentComplex" not in o.jsonld_types:
+        return False
+    real_unit_schemas = {"Apartment", "Offer", "FloorPlan", "RentalOffer"}
+    if any(t in real_unit_schemas for t in o.jsonld_types):
+        return False
+    return True
 
 
 def categorise_failure(o: PropertyOutcome) -> tuple[str, str]:
@@ -1064,6 +1117,51 @@ def render_summary_md(stats: RunStats, outcomes: dict[str, PropertyOutcome]) -> 
     # property with date-fill < 50% as A/B/C/D/E (see playbook §19).
     lines += _render_date_gap_subcause_section(outcomes)
 
+    # LLM rescue effectiveness — surfaces ROI per source adapter so a
+    # gate-widening change (e.g. F1.3 adding onesite/amli) is visible the
+    # next morning rather than only in the LLM-cost line.
+    if stats.rescue_attempted_by_adapter:
+        total_attempts = sum(stats.rescue_attempted_by_adapter.values())
+        total_succ = sum(stats.rescue_succeeded_by_adapter.values())
+        roi_pct = 100.0 * total_succ / total_attempts if total_attempts else 0.0
+        lines += [
+            "## LLM rescue effectiveness (F2 gate)",
+            "",
+            f"Total attempts **{total_attempts}** · successes **{total_succ}** · "
+            f"ROI **{roi_pct:.1f}%** · spent **${stats.rescue_total_cost:.2f}**",
+            "",
+            "| Source adapter | Attempts | Successes | ROI |",
+            "|---|---|---|---|",
+        ]
+        for adapter in sorted(
+            stats.rescue_attempted_by_adapter,
+            key=lambda a: -stats.rescue_attempted_by_adapter[a],
+        ):
+            att = stats.rescue_attempted_by_adapter[adapter]
+            succ = stats.rescue_succeeded_by_adapter.get(adapter, 0)
+            r = 100.0 * succ / att if att else 0.0
+            lines.append(f"| `{adapter}` | {att} | {succ} | {r:.1f}% |")
+        lines.append("")
+
+    # Named-fix telemetry — count of "claimed fix actually fired" events.
+    # Zero in any cell means the fix code path is dead in production —
+    # treat that as a regression even when the headline numbers look fine.
+    if NAMED_FIX_PATTERNS:
+        lines += [
+            "## Named-fix exercise counts",
+            "",
+            "Each row is a known fix path with the count of events showing it actually fired this run. "
+            "**Zero** = dead code (fix shipped but never executes); compare day-over-day to detect regressions.",
+            "",
+            "| Fix codename | Description | Fired |",
+            "|---|---|---|",
+        ]
+        for codename, desc in NAMED_FIX_PATTERNS.items():
+            n = stats.named_fix_events.get(codename, 0)
+            marker = " :warning:" if n == 0 else ""
+            lines.append(f"| `{codename}` | {desc} | {n}{marker} |")
+        lines.append("")
+
     if stats.slo_breaches:
         lines += [
             "## SLO breaches",
@@ -1104,6 +1202,41 @@ def render_summary_md(stats: RunStats, outcomes: dict[str, PropertyOutcome]) -> 
         ]
         for plat, n in sub.most_common():
             lines.append(f"| {plat} | {n} |")
+        lines.append("")
+
+    # Marketing-shell pattern — the dominant 2026-05-10 P4 cluster. Pages
+    # that have an ApartmentComplex JSON-LD + heavy script payload but no
+    # extractable unit data on the entry URL itself.
+    shells = [o for o in failed if is_marketing_shell(o)]
+    if shells:
+        terminal_breakdown: Counter = Counter(o.terminal_tier or "(none)" for o in shells)
+        # Did the LLM tiers actually fire on these, or were they gated off?
+        # Distinguishes "we tried LLM and it returned empty" from "LLM was
+        # blocked by the gate" — different fixes apply to each.
+        llm_ran = sum(
+            1 for o in shells
+            if o.tier_attempts.get("generic:llm") == "ran_empty"
+            or o.tier_attempts.get("generic:llm_dom_targeted") == "ran_empty"
+        )
+        llm_skipped_gate = sum(
+            1 for o in shells
+            if o.tier_attempts.get("generic:llm") == "skipped"
+            or o.tier_attempts.get("generic:llm_dom_targeted") == "skipped"
+        )
+        lines += [
+            f"## Marketing-shell pattern (Entrata-class regression): {len(shells)} properties",
+            "",
+            "ApartmentComplex JSON-LD + heavy script + 0–1 rent tokens. Entry URL is a "
+            "marketing wrapper; real unit data lives on a leasing portal we never load.",
+            "",
+            f"- LLM tier ran but returned empty: **{llm_ran}** (need a probe / sub-page strategy, not more LLM)",
+            f"- LLM tier was gated off: **{llm_skipped_gate}** (need to relax the gate for this signature)",
+            "",
+            "| Terminal tier | Count |",
+            "|---|---|",
+        ]
+        for tier, n in terminal_breakdown.most_common():
+            lines.append(f"| `{tier}` | {n} |")
         lines.append("")
 
     # P10 quality warnings — these are signals on successful properties too.
@@ -1156,12 +1289,21 @@ def render_failures_csv(outcomes: dict[str, PropertyOutcome], out_path: Path) ->
             "entry_bot_blocked": o.entry_bot_blocked,
             "llm_rescue_attempted": o.llm_rescue_attempted,
             "llm_rescue_succeeded": o.llm_rescue_succeeded,
+            "llm_rescue_source_adapter": o.llm_rescue_source_adapter or "",
             "llm_cost": round(o.llm_cost, 5),
             "link_hops_attempted": o.link_hops_attempted,
             "link_hops_recovered": o.link_hops_recovered,
             "issue_codes": "|".join(o.issue_codes),
             "pattern_id": pattern_id,
             "pattern_sub": sub,
+            "marketing_shell": is_marketing_shell(o),
+            "text_bytes": o.text_bytes or 0,
+            "rent_signal_count": o.rent_signal_count if o.rent_signal_count is not None else "",
+            "jsonld_types": "|".join(o.jsonld_types),
+            "fingerprints_matched": "|".join(o.fingerprints_matched),
+            "llm_tier_outcome": o.tier_attempts.get("generic:llm", ""),
+            "llm_dom_tier_outcome": o.tier_attempts.get("generic:llm_dom_targeted", ""),
+            "llm_gate_relaxed_reason": o.llm_gate_relaxed_reason or "",
             "final_url": o.final_url or "",
         })
     rows.sort(key=lambda r: (r["pattern_id"], r["domain"], r["property_id"]))
@@ -1430,6 +1572,10 @@ def write_outputs(
             {"outcome": k[0], "signature": k[1], "count": v}
             for k, v in stats.fetch_signatures.items()
         ],
+        "rescue_attempted_by_adapter": dict(stats.rescue_attempted_by_adapter),
+        "rescue_succeeded_by_adapter": dict(stats.rescue_succeeded_by_adapter),
+        "rescue_total_cost": round(stats.rescue_total_cost, 4),
+        "named_fix_events": dict(stats.named_fix_events),
         "slo_breaches": stats.slo_breaches,
         # PR 3 (2026-05-10): persistence-health metrics for downstream
         # alerting / dashboards. Same numbers the markdown table renders;

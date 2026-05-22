@@ -2,8 +2,9 @@
 
 **Working directory for every command:** `ma_poc/`
 **Audience:** Claude Code (or any engineer) debugging extraction failures after a cloud run.
-**Updated:** 2026-05-20. Last campaign reviewed: 2026-05-20 cloud run (4,982 properties, RentCafe + AppFolio data-quality audit); concession capture pipeline shipped 2026-05-20/21.
-**This update (2026-05-20):** new §19 RentCafe / AppFolio data-quality gaps with 11 sub-sections — §19.1 avail-date-only-gap sub-cause split (5 sub-causes A-E with fix paths F7a-d), §19.2 RentCafe `fp-container` data-attr extractor (F2 + F3), §19.3 RentCafe Interactive Property Map (F5, best-effort), §19.4 AppFolio SSR `_ADDRESS_RE` regex break (F1), §19.5 SecureCafe portal demote (F8a), §19.6 OneSite DOM `data-availability` augmentation (F7d), §19.7 MAA embedded-JSON price aliases (F6, best-effort), §19.8 telemetry shipped (T1/T2/T3/T4/T5/F8b), §19.9 State Diff fix (F4), §19.10 new anti-pattern #17 (urllib lies on JS-hydrated PMS), §19.11 next-week priorities (10 items, M/should/nice-to-have).
+**Updated:** 2026-05-22. Last campaign reviewed: 2026-05-21 cloud run (4,982 properties, post-merge audit + per-adapter telemetry shipment).
+**This update (2026-05-22):** new §20 *Cross-origin proxy gap + platform-wide adapter telemetry*. Twelve sub-sections covering: §20.1 the discovery (0 SecureCafe wins on 1,885 RentCafe-detected props vs 259 wins on the proxy-enabled canary), §20.2 the proof (probe-experiment from a real Cloud Run egress: 20/20 SC URLs `blocked_403` from AS396982 vs 200 + AvailUnitRow rows from any residential IP), §20.3 the cross-origin clearance asymmetry that explains why Cortland/Irvine/AvalonBay succeed but SecureCafe fails over the same egress, §20.4 the `_adapter_telemetry.py` shared module + the platform-wide `adapter_exit` event at `scraper.py:933+`, §20.5 the per-adapter stages reference (`xhr_capture`, `urn_pick`, `sc_probe`, `prospectportal_probe`, `cascade_exit`, `_diag`), §20.6 SecureCafe new-template regex relaxation (PIDs 72944/24561/6550/40584/67750 lost units silently for weeks), §20.7 G5 deterministic URN picker (Cloudinary CDN anchor — replaces the broken `max(matches, key=len)`), §20.8 OneSite negative gate (`static2.apts247.info` + `doorway.knck.io` competing-CDN demotion), §20.9 Entrata ProspectPortal probe restored from git history (commit 8b1bfa4 was reverted by 4c9dbf8), §20.10 the RentCafe→SightMap misroute hypothesis we DISPROVED by live verification (the co-occurrence rule was a no-op), §20.11 new anti-patterns #18-20 (trust-the-agent / cross-host-clearance / order-of-detector-branches), §20.12 the diagnostic-from-events.jsonl workflow that yesterday's bugs would have taken 5 minutes to find.
+**Prior update (2026-05-20):** new §19 RentCafe / AppFolio data-quality gaps with 11 sub-sections — §19.1 avail-date-only-gap sub-cause split (5 sub-causes A-E with fix paths F7a-d), §19.2 RentCafe `fp-container` data-attr extractor (F2 + F3), §19.3 RentCafe Interactive Property Map (F5, best-effort), §19.4 AppFolio SSR `_ADDRESS_RE` regex break (F1), §19.5 SecureCafe portal demote (F8a), §19.6 OneSite DOM `data-availability` augmentation (F7d), §19.7 MAA embedded-JSON price aliases (F6, best-effort), §19.8 telemetry shipped (T1/T2/T3/T4/T5/F8b), §19.9 State Diff fix (F4), §19.10 new anti-pattern #17 (urllib lies on JS-hydrated PMS), §19.11 next-week priorities (10 items, M/should/nice-to-have).
 **Prior update (2026-05-21):** new §18 Concession data debugging (full debugging instructions, symptom decoder, Q14-Q17 checklist, 7 fixes implemented, telemetry SQL queries, known-good tradeoffs, file reference, decision tree); §15 file reference appended with 2026-05-21 concession additions block; §16 closing checklist gains item #10 concession-pipeline audit; glossary gains Preserve-and-flag invariant + `_concession_quality` + `concessions_structured` + `stealth_probe` + `HOP_CAPTCHA_DETECTED` + `CONCESSION_PROBE_RESULT`.
 **Prior update (2026-05-17):** new §0 anti-patterns 14-16 (verdict-vs-unit-count, cascade-overwrite misdiagnosis, internal-vs-v2-shape); new Q13 in §3 (unit-fidelity check); §5 verdict decoder gains SUCCESS_PARTIAL row + analyzer-label-leak note; new §8.18-§8.22 extraction gaps (plan_summaries dropped at v2 formatter, hop plan_summaries not propagated, AVAILABLE+rent classification, cross-host per-plan URL discovery, wedge-rescue captcha guard); §15 file reference appended with 2026-05-17 additions; glossary gains SUCCESS_PARTIAL + plan_summaries.
 
@@ -16,10 +17,16 @@
 2. Open                  data/reports/cloud_run_<date>/{summary.md, comparison_with_<yesterday>.md, failures.csv}
 3. Read the top-N        terminal_tier histogram from summary.md
 4. For each top bucket   sample 3 PIDs; run the §3 9-question checklist on ONE before forming a hypothesis
-5. Decide               (a) code fix, (b) data fix (CSV stale URL), (c) infra fix (CF/proxy)
+5. Adapter-level signal  Filter events.jsonl by tier_key starting with "<pms>:"
+                         The platform-wide ``adapter_exit`` event (scraper.py:933+) fires for
+                         every adapter dispatch — diagnose without per-adapter telemetry.
+                         See §20.5 for the per-adapter stage reference.
+6. Decide               (a) code fix, (b) data fix (CSV stale URL), (c) infra fix (CF/proxy)
 ```
 
 **If a fix is "supposed to be deployed but the number didn't move":** do not assume it didn't deploy. Investigate whether the fix actually fires by tracing events.jsonl for ONE specific PID. The fix may be a stub against a missing upstream field — see §4 Verification protocols and §10 Architecture invariants.
+
+**If a PMS adapter shows 0 wins on a non-zero detection count** (e.g. 0/1,885 SecureCafe, 0/155 G5): suspect either (a) a silent failure mode with no telemetry — check §20.4 for the adapter-telemetry shape, or (b) `PROBE_PROXY_URL` is not set in the production env but the adapter probes a cross-origin host that's CF-fronted (§20.3 cross-origin clearance asymmetry). The `via_proxy` boolean on every adapter event tells you the env state in one query.
 
 ---
 
@@ -46,6 +53,9 @@ Be explicit with yourself when you catch yourself doing any of these. Most "obvi
 | **Diagnosing unit-loss as cascade overwrite when post_process classification is the real culprit** (2026-05-17) | For PID 53592 livethearch, traced `dom_scan ran_units=26` + `llm_dom_targeted ran_units=1` → emit 1 unit. First diagnosed as "cascade overwrites earlier larger result". Wrong — `_merge_into_result_units` at `generic.py:2717` ALREADY merges (26 + 1 → 27 in test harness). The real drop was `post_process.classify()` partitioning 27 rows into `units=0` + `plan_summaries=27`, then the v2 formatter dropping plan_summaries silently (§8.18). | When a unit-loss bug looks like "cascade overwrites", reproduce the post_process pipeline in isolation against the raw extractor output before blaming the cascade. `extraction/post_process.post_process(units, property_id=...)` is pure — give it the LLM/dom_scan output and inspect `r.units` vs `r.plan_summaries`. The split tells you the real drop site. |
 | **Reading the internal unit dict expecting v2-formatted fields** (2026-05-17) | Wrote a cross-host per-plan discovery helper that read `u.get("floor_plan_name")` to extract plan names. Test passed in isolation; live canary fired the function but `plan_names_for_match` was always empty. The internal unit dict at link-hop time has `floor_plan_name=""` for RentCafe / SecureCafe extractions — the human-readable name is only materialised LATER by `floorplan_snap` on the v2 output path. | Don't assume the internal in-flight unit dict matches v2 output. Either (a) match by URL SHAPE rather than name (the eventual fix), or (b) use the canonical alias resolver `get_str(u, FP_NAME_KEYS)` AND check the value against `""` (empty string is the common no-name placeholder). Best — log `sorted(unit.keys())[:25]` once when a downstream lookup returns empty so the shape surfaces. |
 | **`urllib` lies about JS-hydrated PMS sites** (2026-05-20) | Concluded "no rent on this page" from a `urllib.request.urlopen` of `1105townbrookhaven-apts.com/floorplans` and reported the property as SecureCafe-CF-gated. User pushed back; Playwright render showed 19 `.fp-container` cards with `data-floorplan-price="1660-2199"` plain attrs. The page IS public — our extractor missed the data attrs. | Any "page has no X" claim that drives a fix MUST use Playwright (`networkidle` + scroll), not urllib. RentCafe / G5 / modern PMS sites are JS-hydrated; urllib gets the shell only. AND grep for `data-*` attributes alongside visible text — modern PMS templates push canonical values into data attributes for analytics tracking. See §19.10 + §19.2. |
+| **Trusting an agent's proposed fix without live verification** (2026-05-22) | Earlier agent proposed a "RentCafe + SightMap co-occurrence demote" detector rule to fix the 385 RentCafe→SightMap misroute. Would have shipped a no-op. Live-fetched 6 sample misroute PIDs: 6/6 have rentcafe portal marker in entry HTML, **0/6** have any SightMap signal in entry HTML — SightMap is discovered only at link-hop depth ≥2. The proposed rule would have fired on zero of the 385 properties. | After any agent proposes a detector rule, fetch ≥5 sample PIDs with `curl_cffi` chrome120 and grep for the proposed signals **before** writing the code. If 5/5 are missing the signal, the rule won't fire — investigate why before shipping. See §20.10. |
+| **Cross-host clearance asymmetry** (2026-05-22) | Assumed Cortland/Irvine/AvalonBay adapters succeeding from GCP meant `probe_get` works for any host from GCP. Reality: those adapters reuse the patchright CF clearance for the property's *own* origin via `_with_clearance` at `_probe.py:73-86`. Cross-origin probes (SecureCafe, ProspectPortal) get no clearance and CF-403 every time from GCP. Production had 0 SecureCafe wins on 1,885 detected props because of this asymmetry. | Any adapter probing a host different from the property's marketing origin needs `PROBE_PROXY_URL` set in production. Mark proxy-dependent adapters in the file docstring. The platform-wide `adapter_exit` event carries a `via_proxy` boolean so this is queryable from events.jsonl in one filter. See §20.3. |
+| **Detector branch order — fall-through reaches the wrong adapter** (2026-05-22) | Wrote an OneSite negative gate that SKIPPED the OneSite return when a Knock-doorway-loader was present, expecting the page to fall through to the Knock branch later in `_detect_html_markers`. But the RealPage OLL branch lives BETWEEN OneSite and Knock in source order — the page fell into RealPage OLL and shipped 0 units. Canary caught PID 19245 regressing from `TIER_4_LLM` 4 units → `TIER_1_API_REALPAGE_OLL` 0 units. | When introducing a negative gate that demotes one PMS in favor of another, EXPLICITLY `return` the intended PMS literal from inside the gate. Don't rely on source-order fall-through — the order is fragile and any future detector branch insertion can silently rewire your gate. See §20.8 + §20.11. |
 
 ---
 
@@ -104,8 +114,10 @@ For EVERY FAILED_NO_DATA PID you investigate, answer all 9 in order before formi
 | **Q11** | Entry-page redirect host vs CSV host | `fetch_result.final_url` vs `base_url` | When hosts differ, anchors on the page point at the LANDED host (cross-domain). The CSV-host filter in `_rank_internal_links` drops them. → §8.9 redirect-aware landed_url. Diagnostic command: live-fetch the CSV URL with `urllib.request.urlopen(...)`; if `resp.geturl()` returns a different host, that host owns the inventory. |
 | **Q12** | Listing structure vs fp_signals | `has_listing_structure(html)` against entry/hop HTML | fp_signals ≥ 2 BUT `count_listing_structural_signals == 0` → marketing aggregate copy (priceRange in LocalBusiness JSON-LD, "Choose from 1, 2, 3-bedroom"), not real listings. Classify as STUB_AGGREGATE_COPY rather than chasing extraction. → §8.10. |
 | **Q13** | Unit-fidelity: extractor `units_found` vs emitted `units` | sum of `extract.tier_attempted.units_found` (only `ran_units`) vs `output.property_emitted.units` | Extractor reported N, emit shows M < N → the gap is the unit-loss bug class (§8.18-8.20). Categorize: M=0 with N≥1 → §8.18 plan_summaries dropped at v2 OR §8.19 hop plan_summaries not propagated. M < N/2 with `verdict=SUCCESS` → §8.20 AVAILABLE+rent classification (rows demoted to plan_summaries). M < N with `verdict=PARTIAL` → validation-majority-rejected, real units gate-failed (data-quality issue, not a code bug). Run THIS before declaring an "IMPROVED" delta a real fix — the verdict can go SUCCESS while losing two-thirds of the units. |
+| **Q14** | Per-adapter stage history (added 2026-05-22) | `extract.tier_attempted` events where `tier_key` starts with `<adapter>:` (e.g. `rentcafe:sc_probe`, `g5:urn_pick`, `entrata:prospectportal_probe`) | Tells you **which stage of the adapter cascade actually fired and what outcome each produced**. Pre-2026-05-22 PMS adapters returned silently — this telemetry filled the gap. Look for: (1) the `outcome` field — `ok`/`status_403`/`cf_challenge_shell`/`parse_returned_empty`/`exception:X`; (2) the `via_proxy` boolean — when `False` on cross-origin probes (sc_probe, prospectportal_probe, wp_probe), the env is missing `PROBE_PROXY_URL`; (3) the platform-wide `<adapter>:adapter_exit` event — fires once per dispatch with the final `tier_used` + `units` + error summary. See §20.4 / §20.5 for the per-adapter stage reference. |
+| **Q15** | Silent-empty parser diagnostic (added 2026-05-22) | `extract.tier_attempted` events with `tier_key=<adapter>:<stage>_diag` and `outcome=parser_silent_empty` | When a stage parsed `0` rows despite the body containing visible inventory markup, the `_diag` companion event carries `signal_caption_samples`, `signal_heading_samples`, `signal_data_label_inventory`, `signal_first_row_ctx`, `signal_vendor_markers`, `signal_cf_marker_counts`. Cluster across PIDs to detect new template variants without re-fetching pages. The 2026-05-22 SecureCafe regex bug would have surfaced in one jq query against `signal_caption_samples`. See §20.4 + §20.12. |
 
-When you finish Q1–Q13, the root cause is almost always one of: § ENV_MISMATCH (CF-blocked locally only), §6 profile poisoning, §8 extraction gap, §10 architectural invariant violation, §11 STUB_URL.
+When you finish Q1–Q15, the root cause is almost always one of: § ENV_MISMATCH (CF-blocked locally only), §6 profile poisoning, §8 extraction gap, §10 architectural invariant violation, §11 STUB_URL, **§20.3 cross-origin clearance asymmetry (missing PROBE_PROXY_URL in prod env)**.
 
 ---
 
@@ -1400,6 +1412,251 @@ canary cycle (in priority order):
 
 ---
 
+## Phase 20 — Cross-origin proxy gap + platform-wide adapter telemetry (2026-05-22)
+
+The 2026-05-21 post-merge audit surfaced one structural failure mode that ate almost every benefit of the May-13 feature-branch merge to main, plus three concrete adapter-level fixes whose root causes had been invisible for weeks. The investigation also produced the first **platform-wide per-adapter telemetry** — events.jsonl now carries an `adapter_exit` event for every PMS adapter dispatch, regardless of which adapter was selected, so future failures of this class can be diagnosed in 5 minutes instead of 4 hours.
+
+### 20.1 The discovery — same code, 4.5× different outcome by env var
+
+The May-13 feature branch ported a RentCafe SecureCafe-portal drill-down (`_try_rentcafe_securecafe_probe` at [rentcafe.py:903+](../pms/adapters/rentcafe.py#L903)) that was supposed to recover ~1,000 of the 1,738 RentCafe-detected properties currently falling through to the LLM_DOM cascade. Post-merge, the cloud run on 2026-05-21 showed **0** `TIER_1_API_RENTCAFE_SECURECAFE` wins across 1,885 RentCafe-detected properties, vs **259** wins on a proxy-enabled canary (`jugnu-canary-failedstrict-6b30f18`) running an *older* image on a *harder* property basket. Same code shape. Same adapter. Same scrape pipeline. The only difference between the two runs:
+
+| Job | `PROBE_PROXY_URL` | SecureCafe wins | RentCafe-Nestin wins |
+|---|---|---:|---:|
+| `jugnu-adhoc-production` | **not set** | 0 / 1885 | 319 |
+| `jugnu-canary-failedstrict-6b30f18` | set (BrightData secret) | 259 / 2561 | 124 |
+
+The Nestin path stayed working in both because it uses `page.evaluate(fetch())` from the patchright browser session (which already cleared CF on the property's *own* origin). The SecureCafe / WP / Hosted probes all use `curl_cffi` via `_probe.py:probe_get` which goes through `PROBE_PROXY_URL` when set, or direct from the Cloud Run egress IP when not. Direct GCP-egress requests to `*.securecafe.com` get a CF challenge interstitial 100% of the time.
+
+### 20.2 The proof — Test A / A2 / C probe-experiment from a real Cloud Run egress
+
+I shipped `ma_poc/scripts/diagnostics/asn_ipv6_probe.py` and overrode the `canary-introspect` Cloud Run job to run it inside the same egress path as `jugnu-adhoc-production`. The probe ran 20 SecureCafe URLs that succeed locally with curl_cffi + chrome120 impersonation, plus 5 control URLs (Cortland/Irvine/AvalonBay/Apts247/Google), plus an IPv6 lookup on every SC hostname.
+
+**Egress identity confirmed**: IPv4 `136.124.32.68`, ASN `AS396982 Google LLC`, ISP "Google Cloud (us-central1)".
+
+| Test | Result | Interpretation |
+|---|---|---|
+| **A** — 20 SC URLs over IPv4 from GCP | **20/20 `blocked_403`** | uniform 6,207-6,293 byte body, 12 CF challenge markers per row, `server: cloudflare` on every response, latency p50=88.5 ms (consistent with CF edge POP, not origin) |
+| **A2** — 5 control URLs from GCP | google.com 200, avalonbay.com 200, cortland.com 200, **irvinecompanyapartments.com 403**, apts247.com timeout | proves the probe stack works against most hosts; irvine's homepage is also CF-blocked from GCP but the brand adapter doesn't hit the homepage — see §20.3 |
+| **C** — IPv6 reachability | **0/20 hosts have AAAA records** | no v6 escape hatch on the SecureCafe tenant |
+
+Tightness of the 6.2KB body distribution + sub-100ms latencies + uniform CF marker counts → the blocks are happening at CF's edge based on IP-or-ASN reputation, not at the origin Yardi server. Closing details in `c:/tmp/probe_test_a.jsonl` (preserved at `gs://jugnu-canary/diagnostics/asn_ipv6_probe/test-a-2026-05-22/results.jsonl`).
+
+### 20.3 The cross-origin clearance asymmetry — why Cortland/Irvine succeed but SecureCafe fails over the SAME GCP egress
+
+This is the single most-important insight from the investigation, and it directly explains why the platform's "GCP IPs are blocked" surface narrative is wrong:
+
+The brand-API adapters (Cortland, Irvine, AvalonBay, MAAC, Apts247) succeed from GCP **not** because their hosts treat GCP IPs better, but because they reuse the CF clearance cookies that patchright already minted during the property's entry-page fetch. The Irvine adapter at [irvine.py:202](../pms/adapters/irvine.py#L202) calls `probe_get(base, ...)` against the community page on the *property's own marketing origin*, then `probe_post(_RANK_URL, ...)` against `search.irvinecompanyapartments.com` — and the `_with_clearance` helper at [_probe.py:73-86](../pms/adapters/_probe.py#L73-L86) automatically attaches the cookies the patchright render established.
+
+The SecureCafe drill hits `<sub>.securecafe.com/onlineleasing/<slug>/availableunits.aspx` — a **different CF zone** from the property's marketing site. The clearance cookies minted by patchright for `www.theblackhawkapartments.com` don't apply to `theblackhawkapartments.securecafe.com`. The probe arrives unauthenticated against Yardi's CF zone and gets the 403 interstitial.
+
+This is the same reason the **Entrata ProspectPortal probe** needs a residential proxy: `havenatsouthmountainapts.com` (marketing site) and `havenatsouthmountain.prospectportal.com` (data origin) are separate CF zones; the clearance doesn't transfer.
+
+**Rule of thumb**: any adapter that probes a **cross-origin** endpoint via `probe_get`/`probe_post` from production needs `PROBE_PROXY_URL` set. Any adapter that stays on the property's own origin or sub-paths works without it.
+
+### 20.4 The fix — `_adapter_telemetry.py` shared module + platform-wide `adapter_exit`
+
+Pre-2026-05-22, every PMS adapter returned silently on failure. `events.jsonl` carried zero `extract.tier_attempted` events from inside the adapter, so an `_log_attempt("rentcafe:sc_probe", "ok")` event looked indistinguishable from "the SecureCafe probe never fired" or "fired and CF-blocked it" or "fired and parser dropped the units." Diagnosing the 2026-05-22 regex bug took 4+ hours of manual fetching. With the new telemetry, the same bug would be ONE jq query against a future run.
+
+Three building blocks at [`ma_poc/pms/adapters/_adapter_telemetry.py`](../pms/adapters/_adapter_telemetry.py):
+
+| Helper | Purpose | Emit shape |
+|---|---|---|
+| `log_adapter_stage(adapter, pid, stage, outcome, **kw)` | Per-stage event. Fires once per recovery path attempted. | `extract.tier_attempted` with `tier_key=<adapter>:<stage>`, plus `via_proxy`, `via_unlocker` env-derived booleans, `ran_units`, `reason`. |
+| `log_adapter_diag(adapter, pid, stage, body, **extra_signals)` | Raw structural signal dump on silent-empty parser failures. | Same envelope, `tier_key=<adapter>:<stage>_diag`, payload carries `signal_caption_samples`, `signal_heading_samples`, `signal_table_ids`, `signal_data_label_inventory`, `signal_floorplan_ids_seen`, `signal_first_row_ctx`, `signal_vendor_markers`, `signal_cf_marker_counts`. |
+| `classify_probe_body(status, body, success_marker=...)` | Categorises probe responses into `ok` / `cf_challenge_shell` / `blocked_status_403/429/503` / `no_success_marker` / `status_NNN`. | Returns `(outcome, reason)` tuple; callers pass to `log_adapter_stage`. |
+
+Platform-wide `adapter_exit` lives in [`scraper.py:933+`](../pms/scraper.py#L933) at the adapter-dispatch site. Every adapter — instrumented or not — emits one `adapter_exit` event per dispatch with `tier_used`, `units`, `plan_summaries`, `confidence`, and a one-line error summary. New adapters get this for free without writing any telemetry code.
+
+### 20.5 Per-adapter stage reference — what events.jsonl now carries
+
+After 2026-05-22 the playbook's diagnostic workflow (§3 Q-questions) gains a new tier_attempted event-type set. Adapters with per-stage instrumentation (as of 2026-05-22):
+
+| Adapter | Stages | Notes |
+|---|---|---|
+| `rentcafe` | `xhr_capture`, `wp_property_id`, `wp_probe`, `wp_parse`, `sc_search`, `sc_homepage_refetch`, `sc_probe`, `sc_parse`, `hosted_dom`, `nestin_recover`, `cascade_exit` | + `*_diag` variants on parser-silent-empty paths |
+| `g5` | `urn_pick`, `graphql_fetch`, `apollo_fallback`, `cascade_exit` | `urn_pick` carries `urn_picked` (chosen URN literal), `urn_cdn_anchored` (boolean — did the deterministic anchor fire), `urn_total`/`urn_distinct` (candidate universe) |
+| `onesite` | `xhr_capture`, `cascade_exit` | `floorplans_matched` + `units_matched` counts + `realpage_property_id` |
+| `realpage_oll` | `xhr_capture` | `n_workflow_matched`, `n_floorplans_matched`, `n_units_matched` |
+| `entrata` | `prospectportal_probe` | One event per link-hop iteration; `outcome=ran_empty` when PP iframe missing OR probe returned 0 rows |
+| `sightmap` | `xhr_capture` | `total_raw_units` + `join_dropped` (for the partial-join SLO check) |
+| `apts247` | `origin_resolve`, `api_key_resolve`, `api_fetch` | `key_source` indicates `static_body` vs `homepage_refetch` |
+| `appfolio` | `xhr_capture` | `matched_shape` count |
+| `knock` | `ids_search` | `has_static_init` boolean |
+
+**Diagnostic-first query**: filter `events.jsonl` for the `tier_key` field starting with `<adapter>:`. Each event has `via_proxy` and `via_unlocker` booleans — the single most-actionable signal added in this update.
+
+### 20.6 SecureCafe new-template regex relaxation (5 PIDs lost units silently for weeks)
+
+Live-verified 2026-05-22 on PIDs 72944 / 24561 / 6550 / 40584 / 67750 — each `availableunits.aspx` page had 4-17 `AvailUnitRow` rows but ZERO header matches under the old `_SECURECAFE_FP_HDR_RE` regex. The newer SecureCafe template wraps the floor-plan grouping in:
+
+```
+<caption class="sr-only">Apartment Details and Selection for Floor Plan: 2 Bed - 1 Bath - 2 Bedrooms, 1 Bathroom</caption>
+```
+
+The visual-name segment `2 Bed - 1 Bath` contains literal dashes, which the previous `[^<\-]` character class rejected. Fix at [rentcafe.py:790-808](../pms/adapters/rentcafe.py#L790-L808) is a one-character relaxation: `[^<\-]` → `[^<]`. The trailing `- N Bedroom[s], N.N Bathroom` anchor still bounds the non-greedy capture so the regex can't slide past the bed/bath suffix.
+
+PID 119798 (829garfield) — which previously parsed 0 units locally — now parses **13**. The 5 sample PIDs each have 2-25 floor-plan group headers under the new regex.
+
+### 20.7 G5 deterministic URN picker — Cloudinary CDN anchor replaces `max(matches, key=len)`
+
+The G5 adapter's URN selector at [g5.py:92+](../pms/adapters/g5.py#L92) shipped wrong-property data for 5/5 live-verified sample PIDs because the old `max(matches, key=len)` heuristic picks parent-company switcher URNs or sibling-property URNs in preference to the property's own URN. Live evidence:
+
+| Property | Old (longest) | Live API result |
+|---|---|---|
+| Anson Burlingame CA | `…-anson-gaithersburg-md` | shipped MD data for a CA property |
+| Central Park Park Forest IL | `…-saint-petersburg-fl` | wrong sibling |
+| Brook Hollow Wichita Falls TX | `g5-clw-h59cwfh0t6-brook-hollow-eb883a…` | 404 — `g5-clw-` variant is a parent-company switcher, not an inventory URN |
+| Ten68 West | `g5-clw-gqgzrdf1jy-ten68-west-…` | 404 |
+| Westgate Village | `g5-clw-6pncm85-first-montgomery-…-hash` | 404 |
+
+**Deterministic anchor**: G5's CMS routes every asset upload to the tenant's company+property folder under `/g5/g5-c-<companyId>/g5-cl-<propertyUrn>/uploads/`. The favicon / og:image / apple-touch-icon URLs all reference THIS property's folder; sibling URNs in switcher menus live under their own `g5-c-…` folder. Pattern at [g5.py:98-103](../pms/adapters/g5.py#L98-L103):
+
+```python
+_G5_CDN_PROPERTY_RE = re.compile(
+    r"/g5/g5-c[a-z]?-[a-z0-9]+/(g5-cl[a-z]?-[a-z0-9-]+?)/uploads/",
+    re.IGNORECASE,
+)
+```
+
+Three-step picker at [g5.py:105-160](../pms/adapters/g5.py#L105-L160): (1) Cloudinary CDN regex, (2) frequency tie-break inside CDN matches, (3) fallback to most-frequent `g5-cl-*` anywhere on the page. Live-verified 5/5 correct on the same sample where `max(len)` was 0/5.
+
+**Open question from the 2026-05-22 canary**: `urn_cdn_anchored=False` on all 3 canary G5 PIDs — meaning the CDN regex didn't fire in the patchright-rendered HTML, but the most-frequent fallback still picked the right URN. The CDN anchor probably needs a tweak to handle the rendered DOM (Cloudinary URL is in a `<link rel="icon">` tag that may not survive Vue/React hydration into patchright's content snapshot). Tracked as nice-to-have follow-up.
+
+The adapter also gains **rendered-HTML access** at [g5.py:264-284](../pms/adapters/g5.py#L264-L284) — was reading only `ctx.fetch_result.body` (static SSR), now pulls `page.content()` first via the same `_get_page_html` helper GenericAdapter uses. This fixes the case where the URN is JS-injected and absent from SSR.
+
+### 20.8 OneSite negative gate — `static2.apts247.info` / `doorway.knck.io` competing CDNs
+
+The OneSite STRONG-marker detector branch at [detector.py:500+](../pms/detector.py#L500) fired on any page containing the bare substring `onlineleasing.realpage.com`, routing 80/312 OneSite-detected production properties to TIER_4_LLM_DOM because many Apts247 / apartments247.com / Knock-fronted sites carry a stale "Apply Now" anchor pointing at `*.onlineleasing.realpage.com` from a previous platform.
+
+Live-verified 2026-05-22 on 3 misroute + 3 real-OneSite PIDs + 3 validation PIDs: `static2.apts247.info` (the Apts247 widget JS CDN) is present 22/22/22 times on misroutes and 0/0/0 on real OneSite. Same separation for `apartments247_api.min.js`. The Apts247 widget cannot legitimately appear on a real RealPage portal page; it only loads on apartments247.com-template sites.
+
+```python
+# detector.py — inside the existing "if 'onlineleasing.realpage.com' in h" block
+_has_apts247_widget = "static2.apts247.info" in h or "apartments247_api.min.js" in h
+_has_knock_loader   = "doorway.knck.io" in h or "knockdoorway" in h
+_has_competing_primary_for_knock = (".securecafe.com" in h or ...)
+
+if _has_knock_loader and not _has_competing_primary_for_knock:
+    return "knock", 0.85, [...]                       # short-circuit Knock
+if not (_has_apts247_widget or _has_knock_loader):
+    return "onesite", 0.85, [...]                     # real OneSite
+# apts247-widget case falls through to the apts247 branch downstream
+```
+
+**One gotcha caught mid-canary**: simply skipping the OneSite return for the Knock-loader case lets the page fall through to the `realpage_oll` branch (which lives ABOVE the Knock branch in source order). PID 19245 (tenzenapartments.com) demonstrated this — went from production's `TIER_4_LLM` (4 units) to canary's `TIER_1_API_REALPAGE_OLL` (0 units). The fix is to EXPLICITLY return `"knock"` from inside the OneSite block when the Knock loader is present, not just skip the OneSite return. Captured in test `test_onesite_negative_gate_knock_doorway_routes_to_knock` and companion `test_onesite_knock_demotion_yields_when_competing_primary_pms`.
+
+### 20.9 Entrata ProspectPortal probe — restored from git history (8b1bfa4 → reverted in 4c9dbf8)
+
+The `_probe_prospectportal` helper + its call site existed at commit `8b1bfa4` (2026-05-18 springriver canary) but was lost in the regression-revert `4c9dbf8`. The parser (`parse_prospectportal_unit_spaces` at [entrata.py:360](../pms/adapters/entrata.py#L360)) and the URL-component regexes (`_PP_HOST_RE`, `_PP_PROPID_RE`, `_PP_FPID_RE` at [entrata.py:342-349](../pms/adapters/entrata.py#L342-L349)) survived the revert — only the orchestrator method went missing.
+
+Live-verified 2026-05-22 on 5 sample PIDs (19939, 243704, 30775, 34777, 297737): every marketing page embeds exactly one `*.prospectportal.com` iframe whose `src` carries `property[id]={pid}` baked into the query string. The iframe alone yields `(host, property_id)` deterministically — no slug needed. Probe URL family:
+
+```
+landing:   https://{host}/?module=check_availability&is_secure=1
+per-fp:    https://{host}/?module=check_availability&is_secure=1
+           &property[id]={pid}&action=view_unit_spaces
+           &property_floorplan[id]={fpid}&move_in_date={today}
+           &occupancy_type=conventional
+```
+
+Restored at [entrata.py:614-687](../pms/adapters/entrata.py#L614-L687), wired into `extract()` at line 540 with per-stage `prospectportal_probe` telemetry emitted on every call (whether it found rows or not — `via_proxy` flag tells you whether CF blocked it).
+
+**Cloudflare-fronted** — requires `PROBE_PROXY_URL=brightdata` to bypass. Without it, the probe emits `outcome=ran_empty via_proxy=False` events that surface the gate explicitly in events.jsonl.
+
+### 20.10 The RentCafe→SightMap misroute hypothesis — DISPROVED by live verification
+
+A prior agent investigation proposed a detector co-occurrence rule for the 385 RentCafe→SightMap misroutes: when entry HTML has BOTH `securecafe.com/onlineleasing` AND a SightMap embed/api URL, demote to sightmap (mirroring the existing entrata→sightmap rule at [detector.py:540-557](../pms/detector.py#L540-L557)).
+
+**Live-verified 2026-05-22 on 6 sample misroute PIDs (118750, 119144, 1994, 217358, 21589, 218580): 6/6 have the RentCafe portal marker in entry HTML. 0/6 have any SightMap signal in entry HTML.** SightMap is discovered only at link-hop depth ≥ 2-3 — per earlier event-log analysis on PID 1994, SightMap's API body arrives at hop_index=3, well after the detector's confirm_detection cycle completes.
+
+A co-occurrence detector rule would fire on **zero** of these 385 properties. The proposal was a no-op disguised as a fix.
+
+**What WOULD work**: hop-aware re-detection — re-run `detect_pms` on each link-hopped HTML body and re-classify if a stronger marker appears later in the cascade. This is a structural change to the scrape lifecycle, not a 15-line detector rule. **Deferred.** The telemetry added in §20.4 (specifically the platform-wide `adapter_exit` events + the `signal_vendor_markers` field in diagnostics) will capture this pattern in production from the next run, giving us the data to design the re-detection properly when we pick it back up.
+
+### 20.11 New anti-patterns (#18 - #20)
+
+| # | Anti-pattern | What I did wrong | What to do instead |
+|---|---|---|---|
+| **18** | **Trusting an agent's proposed fix without live verification** | Believed the earlier agent's "co-occurrence rule will fix the 385 misroutes" claim. Would have shipped a no-op. Live-fetched 6 sample PIDs and found 0 of them had the SightMap signal in entry HTML. | After any agent proposes a detector rule, fetch ≥5 sample PIDs with curl_cffi chrome120 and grep for the proposed signals BEFORE writing the code. If 5/5 are missing, the rule won't fire — investigate why before shipping. |
+| **19** | **Cross-host clearance asymmetry** | Assumed brand-API adapters working from GCP meant probe_get works for any host from GCP. Reality: brand adapters reuse patchright clearance for the property's *own* origin; cross-origin probes (SecureCafe, ProspectPortal) get no clearance and CF-403. | Any adapter that probes a host different from the property's marketing origin needs `PROBE_PROXY_URL` set in production. Check by URL host comparison — if probe URL host ≠ marketing-site host, mark the adapter "proxy-dependent" in the file docstring. |
+| **20** | **Detector branch ordering — fall-through reaches the wrong adapter** | Wrote a negative gate that SKIPPED the OneSite return when a Knock-loader was present, expecting the page to fall through to the Knock branch later in `_detect_html_markers`. But the RealPage OLL branch (line 512) lives BETWEEN OneSite (line 500) and Knock (line 655), so the page fell into RealPage OLL and stopped. | When introducing a negative gate that demotes one PMS in favor of another, EXPLICITLY return the intended PMS literal from inside the gate. Don't rely on source-order fall-through; the order is fragile and unreviewable. The fix: `if _has_knock_loader: return "knock", 0.85, [...]` instead of `pass`. |
+
+### 20.12 The diagnostic-from-events.jsonl workflow
+
+The 2026-05-22 SecureCafe regex bug took 4+ hours to find: had to live-fetch 5 PIDs, dump HTML, eyeball the new template, hand-write a regex. With the new platform-wide telemetry, the same bug would surface as the following query against the NEXT run's events.jsonl:
+
+```python
+# 1. Find rentcafe-detected props where sc_parse silently returned empty
+import json
+from pathlib import Path
+parse_fails = []
+for shard in sorted(Path("c:/tmp/run-2026-05-22").iterdir()):
+    ev = shard / "events.jsonl"
+    if not ev.exists(): continue
+    for line in ev.read_text(encoding="utf-8", errors="ignore").splitlines():
+        try: e = json.loads(line)
+        except: continue
+        if e.get("kind") != "extract.tier_attempted": continue
+        if e.get("tier_key") != "rentcafe:sc_parse": continue
+        if e.get("outcome") != "parse_returned_empty": continue
+        parse_fails.append(e)
+print(f"{len(parse_fails)} sc_parse silent empties — clustering by signals")
+
+# 2. For each one, the SUBSEQUENT event with tier_key=rentcafe:sc_parse_diag
+#    has the raw signals. Cluster by signal_caption_samples regex shape.
+from collections import Counter
+caption_shapes = Counter()
+for shard in sorted(Path("c:/tmp/run-2026-05-22").iterdir()):
+    ev = shard / "events.jsonl"
+    for line in ev.read_text(encoding="utf-8", errors="ignore").splitlines():
+        try: e = json.loads(line)
+        except: continue
+        if e.get("tier_key") != "rentcafe:sc_parse_diag": continue
+        captions = e.get("signal_caption_samples") or []
+        for c in captions:
+            # Normalise to a shape — replace specifics with placeholders
+            shape = c[:50]  # first 50 chars usually contain "Floor Plan:" or not
+            caption_shapes[shape] += 1
+print("Top 10 caption shapes across silent-empty cohort:")
+for shape, n in caption_shapes.most_common(10):
+    print(f"  {n:>4}  {shape!r}")
+```
+
+Two queries against events.jsonl would have surfaced the new SecureCafe caption format (`Apartment Details and Selection for Floor Plan: ...`) within minutes of the first cloud run after the template change shipped. No live-fetches, no manual eyeballing — the signal is in the events.
+
+**This is the diagnostic capability the playbook now provides.** Every silent-empty adapter failure carries enough structural signal in events.jsonl to:
+1. Identify which stage in which adapter failed (`tier_key=<pms>:<stage>` + `outcome`)
+2. Detect environmental gates (`via_proxy`, `via_unlocker` booleans)
+3. Diff between template variants (`signal_caption_samples`, `signal_data_label_inventory`, `signal_table_ids`, `signal_first_row_ctx`)
+4. Detect cross-PMS misroutes (`signal_vendor_markers` shows whether another PMS's CDN is also on the page)
+5. Distinguish CF challenges from genuine empty responses (`classify_probe_body` + `signal_cf_marker_counts`)
+
+### 20.13 Files touched 2026-05-22 (for future reference)
+
+| File | Change |
+|---|---|
+| `ma_poc/pms/adapters/_adapter_telemetry.py` | NEW — 219 LOC shared module |
+| `ma_poc/pms/adapters/rentcafe.py` | regex fix + diagnostic + refactor to shared module (~289 LOC modified) |
+| `ma_poc/pms/adapters/g5.py` | deterministic URN picker + rendered HTML access + per-stage telemetry |
+| `ma_poc/pms/adapters/onesite.py` | xhr_capture + cascade_exit telemetry |
+| `ma_poc/pms/adapters/entrata.py` | restored `_probe_prospectportal` (from git ref `8b1bfa4`) + prospectportal_probe telemetry |
+| `ma_poc/pms/adapters/sightmap.py` | xhr_capture telemetry + join-dropped count |
+| `ma_poc/pms/adapters/apts247.py` | origin_resolve + api_key_resolve + api_fetch stages |
+| `ma_poc/pms/adapters/appfolio.py` | xhr_capture telemetry |
+| `ma_poc/pms/adapters/knock.py` | ids_search telemetry |
+| `ma_poc/pms/adapters/realpage_oll.py` | xhr_capture telemetry with shape-match counts |
+| `ma_poc/pms/detector.py` | OneSite negative gate + Knock explicit demotion |
+| `ma_poc/pms/scraper.py` | platform-wide adapter_exit telemetry at line 933+ |
+| `ma_poc/scripts/diagnostics/asn_ipv6_probe.py` | NEW — egress-probe diagnostic |
+| `.github/workflows/probe-experiment.yml` | NEW — Cloud Run job override workflow |
+| `ma_poc/tests/pms/test_detector.py` | +5 OneSite gate regression tests |
+| `ma_poc/tests/pms/adapters/test_rentcafe.py` | +7 SC parser + diagnostic tests |
+| `ma_poc/tests/pms/adapters/test_g5_marketing_cloud_synth.py` | +5 deterministic URN tests |
+
+Test result: **1,676 pass / 2 skipped / 0 fail** in `ma_poc/tests/pms/`.
+
+---
+
 ## Phase 16 — Closing checklist before shipping a fix
 
 1. **Code change** has file:line citations in the commit message.
@@ -1441,3 +1698,10 @@ canary cycle (in priority order):
 - **stealth_probe** (2026-05-21) — adapter-side HTTP probe helper at `fetch/probe.py`. Applies `IdentityPool.pick(sticky_key=property_id)` + `chrome_header_set(cold_visit=True)` + `looks_like_captcha`. Used when the L1 `fetch()` entry point can't be reached (custom request headers, non-GET method, or fire-and-forget probe outside the L1 retry loop). Sticky identity ensures a property's entry-page fetch and every adapter-side probe present the same Chrome identity to the bot-management edge.
 - **HOP_CAPTCHA_DETECTED** (2026-05-21) — new event kind at `observability/events.py`. Fires when a hop (concession `/specials` probe, RealPage CWS probe, Beacon AJAX probe) hits a captcha. Payload `context` distinguishes the hop class without URL-pattern regex. Distinct from the noisier entry-page `FETCH_CAPTCHA_DETECTED`.
 - **CONCESSION_PROBE_RESULT** (2026-05-21) — per-property terminal outcome of `_probe_specials_pages`. `outcome` is `found` / `exhausted` / `all_blocked`. `all_blocked` is the canonical signal that a domain needs a stealth-tier escalation.
+- **`adapter_exit` event** (2026-05-22) — platform-wide telemetry emitted at `pms/scraper.py:933+` after every adapter dispatch, regardless of which adapter ran or whether it has any internal instrumentation. `tier_key=<pms>:adapter_exit`, payload has `outcome=<tier_used>`, `ran_units`, `plan_summaries`, `confidence`. Use as a guaranteed floor — diagnose any adapter's behaviour without per-adapter code changes. See §20.4.
+- **Per-adapter stage event** (2026-05-22) — `extract.tier_attempted` with `tier_key=<pms>:<stage>`. Stages are adapter-specific; reference table at §20.5. Common ones: `xhr_capture` (how many network responses matched the adapter's shape), `cascade_exit` (final outcome of the adapter's internal cascade), probe-stage events (`sc_probe`, `wp_probe`, `prospectportal_probe`, `urn_pick`, etc.).
+- **`via_proxy` / `via_unlocker` booleans** (2026-05-22) — every adapter-stage event carries these read from `PROBE_PROXY_URL` and `WEB_UNLOCKER_KEY` env. `False` on a cross-origin probe (sc_probe, prospectportal_probe, wp_probe) explains a CF-403 in one query — see §20.3 cross-origin clearance asymmetry.
+- **`*_diag` event** (2026-05-22) — companion event fired alongside a stage event when the parent stage emitted a silent-empty outcome (parse returned 0 despite visible markup). Payload carries raw structural signals (`signal_caption_samples`, `signal_heading_samples`, `signal_data_label_inventory`, `signal_table_ids`, `signal_floorplan_ids_seen`, `signal_first_row_ctx`, `signal_vendor_markers`, `signal_cf_marker_counts`). Cluster across PIDs to identify template variants without re-fetching pages. See §20.4 + §20.12.
+- **Cross-origin clearance asymmetry** (2026-05-22) — explained in §20.3. Adapters that probe a host different from the property's marketing origin (e.g. SecureCafe drill, ProspectPortal probe, RentCafe WP probe) cannot reuse the patchright CF clearance cookies; they need `PROBE_PROXY_URL=brightdata` set in production env. Adapters that stay on the property's own origin (Cortland, Irvine, AvalonBay) succeed from GCP without proxy because `_with_clearance` at `_probe.py:73-86` automatically attaches the patchright-minted cookies for the same origin.
+- **G5 deterministic URN picker** (2026-05-22) — `find_g5_urn_for_property(html, base_url)` at `g5.py:105+`. Replaces the broken `max(matches, key=len)`. Anchors on the Cloudinary asset-folder path `/g5/g5-c-<companyId>/g5-cl-<propertyUrn>/uploads/` (G5's CMS guarantees property-specific folders per tenant). Fallback: most-frequent `g5-cl-*` on the page. Live-verified 5/5 correct on samples where `max(len)` was 0/5 (Anson Maryland-sibling-for-California, etc.).
+- **OneSite negative gate** (2026-05-22) — `static2.apts247.info` / `apartments247_api.min.js` / `doorway.knck.io` competing-CDN demotion in the OneSite STRONG-marker branch at `detector.py:500+`. Returns `knock` directly when the Knock loader is present (avoiding the `realpage_oll` branch that lives between OneSite and Knock in source order). See §20.8 + §20.11.

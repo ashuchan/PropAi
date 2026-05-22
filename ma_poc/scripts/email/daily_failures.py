@@ -398,15 +398,15 @@ def _fetch_scraped_units_from_sql(
                 "website": website,
                 "verdict": verdict,
                 "tier_used": tier,
-                "unit_id": u.get("unit_id") or "",
-                "floor_plan_name": u.get("floor_plan_name") or "",
-                "beds": u.get("beds"),
-                "baths": u.get("baths"),
-                "area": u.get("area"),
-                "rent_low": u.get("rent_low"),
-                "rent_high": u.get("rent_high"),
-                "available_date": u.get("available_date") or "",
-                "lease_term": u.get("lease_term"),
+                "unit_id": _unit_field(u, "unit_id") or "",
+                "floor_plan_name": _unit_field(u, "floor_plan_name") or "",
+                "beds": _unit_field(u, "beds"),
+                "baths": _unit_field(u, "baths"),
+                "area": _unit_field(u, "area"),
+                "rent_low": _unit_field(u, "rent_low"),
+                "rent_high": _unit_field(u, "rent_high"),
+                "available_date": _unit_field(u, "available_date") or "",
+                "lease_term": _unit_field(u, "lease_term"),
                 "concession_text": _stringify_concessions(conc_text),
                 "concession_text_clean": _stringify_concessions(conc_clean),
                 "_concession_quality": conc_quality,
@@ -417,6 +417,46 @@ def _fetch_scraped_units_from_sql(
             row.update(enrich_fields)
             out.append(row)
     return out
+
+
+_UNIT_FIELD_SOURCES: dict[str, tuple[str, ...]] = {
+    # Read the typed/normalised column first; on null-or-empty, fall back
+    # through the producer's raw companions. Mirrors the V2 upsert source
+    # map in ``data_provider.sql.stores.SqlUnitStateStore._SNAPSHOT_SOURCES``
+    # so the email surfaces whatever the website actually said even when
+    # the normaliser couldn't coerce it (e.g. ``available_date`` null but
+    # ``available_date_raw="Late August"``).
+    "unit_id": ("unit_id", "unit_number", "_unit_number"),
+    "floor_plan_name": ("floor_plan_name", "floorplan_name", "_floor_plan"),
+    "beds": ("beds", "bedrooms", "_bedrooms"),
+    "baths": ("baths", "bathrooms", "_bathrooms"),
+    "area": ("area", "sqft", "_sqft"),
+    "rent_low": ("rent_low", "market_rent_low", "asking_rent"),
+    "rent_high": ("rent_high", "market_rent_high", "asking_rent"),
+    "available_date": ("available_date", "available_date_raw", "_date_placeholder"),
+    "lease_term": ("lease_term", "_lease_term"),
+}
+
+
+def _unit_field(u: dict[str, Any], field: str) -> Any:
+    """Return the first non-empty value for *field* from a unit dict.
+
+    The V2 transform normalises producer values into typed columns, but
+    a non-trivial slice of units still ship null on a quality column
+    while the producer's raw companion is populated (the canonical
+    example is ``available_date`` null + ``available_date_raw=
+    "Available 7/24"`` — year missing, can't ISO-normalise). Falling
+    back through the chain in ``_UNIT_FIELD_SOURCES`` recovers those
+    values without re-deriving them.
+    """
+    for key in _UNIT_FIELD_SOURCES.get(field, (field,)):
+        val = u.get(key)
+        if val is None:
+            continue
+        if isinstance(val, str) and not val.strip():
+            continue
+        return val
+    return None
 
 
 def _stringify_concessions(value: Any) -> str:
@@ -786,15 +826,15 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
             else:
                 enrich_fields = prop_enrich_fields
             row.update({
-                "unit_id": u.get("unit_id") or "",
-                "floor_plan_name": u.get("floor_plan_name") or "",
-                "beds": u.get("beds"),
-                "baths": u.get("baths"),
-                "area": u.get("area"),
-                "rent_low": u.get("rent_low"),
-                "rent_high": u.get("rent_high"),
-                "available_date": u.get("available_date") or "",
-                "lease_term": u.get("lease_term"),
+                "unit_id": _unit_field(u, "unit_id") or "",
+                "floor_plan_name": _unit_field(u, "floor_plan_name") or "",
+                "beds": _unit_field(u, "beds"),
+                "baths": _unit_field(u, "baths"),
+                "area": _unit_field(u, "area"),
+                "rent_low": _unit_field(u, "rent_low"),
+                "rent_high": _unit_field(u, "rent_high"),
+                "available_date": _unit_field(u, "available_date") or "",
+                "lease_term": _unit_field(u, "lease_term"),
                 "concession_text": _stringify_concessions(conc_text),
                 "concession_text_clean": _stringify_concessions(conc_clean),
                 "_concession_quality": conc_quality,

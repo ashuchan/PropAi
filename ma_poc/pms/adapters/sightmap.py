@@ -114,30 +114,42 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
     Joins data.units[] to data.floor_plans[] by floor_plan_id so each unit
     gets name/beds/baths from its floor plan plus price/sqft/availability.
 
-    Returns a (units, dropped_count) tuple. ``dropped_count`` is the number of
-    raw units that could not be joined to a floor plan and were silently
-    skipped — the caller raises ``SIGHTMAP_PARTIAL_JOIN`` when this exceeds
-    20% of the input. Surfacing this prevents the 04-20 failure mode where
-    "successful" SightMap scrapes silently lost the majority of inventory due
-    to a floor_plan_id key drift on the SightMap side.
+    2026-05-22 Phase 2a: also surfaces floor_plans with no available units
+    as plan-only rows (``unit_number=""``) so the floor plan identity
+    appears in the property's ``floor_plans[]`` output. Pre-fix, plans
+    with zero available units silently vanished — only the units list
+    drove the output, and SightMap properties often have plans where the
+    inventory is fully leased while the plan itself is still advertised
+    on the marketing site.
+
+    Returns a (rows, dropped_count) tuple. ``rows`` mixes unit-level and
+    plan-level rows; ``post_process.classify()`` partitions them via the
+    ``unit_number`` field. ``dropped_count`` is the number of raw units
+    that could not be joined to a floor plan and were silently skipped —
+    the caller raises ``SIGHTMAP_PARTIAL_JOIN`` when this exceeds 20% of
+    the input.
 
     Ported from scripts/entrata.py:433.
     """
-    units_out: list[dict[str, str]] = []
+    rows_out: list[dict[str, str]] = []
     dropped = 0
     data = body.get("data") if isinstance(body, dict) else None
     if not isinstance(data, dict):
-        return units_out, dropped
+        return rows_out, dropped
 
     raw_units = data.get("units") or []
     raw_fps = data.get("floor_plans") or []
-    if not isinstance(raw_units, list) or not raw_units:
-        return units_out, dropped
+    if not isinstance(raw_units, list):
+        raw_units = []
 
     fp_by_id: dict[str, dict[str, Any]] = {}
     for fp in raw_fps if isinstance(raw_fps, list) else []:
         if isinstance(fp, dict) and fp.get("id") is not None:
             fp_by_id[str(fp["id"])] = fp
+
+    # Track which floor plans contributed at least one emitted unit row.
+    # Plans absent from this set become plan-only rows (Phase 2a).
+    covered_fp_ids: set[str] = set()
 
     for u in raw_units:
         if not isinstance(u, dict):
@@ -169,7 +181,7 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
         baths = fp.get("bathroom_count")
         name = fp.get("name") or fp.get("filter_label") or ""
 
-        units_out.append(
+        rows_out.append(
             make_unit_dict(
                 floor_plan_name=str(name),
                 bed_label=bed_label_from(beds, str(name)),
@@ -188,7 +200,64 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
                 extraction_tier=_TIER_BASE,
             )
         )
-    return units_out, dropped
+        covered_fp_ids.add(fp_id)
+
+    # 2026-05-22 Phase 2a — plans-without-units → plan_summary rows.
+    # SightMap floor_plan objects carry plan-level price/area summaries that
+    # the marketing site renders even when zero units are available. Surface
+    # them so ``floor_plans[]`` reflects the full plan inventory rather than
+    # just the available-now subset.
+    for fp_id, fp in fp_by_id.items():
+        if fp_id in covered_fp_ids:
+            continue  # dup-prevention: plan covered by a unit row already
+        name = fp.get("name") or fp.get("filter_label") or ""
+        beds = fp.get("bedroom_count")
+        baths = fp.get("bathroom_count")
+
+        # Plan-level rent — SightMap exposes ``lowest_rent`` / ``highest_rent``
+        # on the floor_plan object (verified against captured bodies); fall
+        # through to display_price when only the range string is present.
+        rent_lo: int | None = None
+        rent_hi: int | None = None
+        if isinstance(fp.get("lowest_rent"), (int, float)) and fp["lowest_rent"] > 0:
+            rent_lo = int(fp["lowest_rent"])
+        else:
+            rent_lo = money_to_int(str(fp.get("display_lowest_rent") or ""))
+        if isinstance(fp.get("highest_rent"), (int, float)) and fp["highest_rent"] > 0:
+            rent_hi = int(fp["highest_rent"])
+        else:
+            rent_hi = money_to_int(str(fp.get("display_highest_rent") or "")) or rent_lo
+
+        # Plan-level sqft — ``area_min`` / ``area_max`` ints, or the
+        # ``display_area`` range string.
+        sqft_lo_raw = fp.get("area_min") or fp.get("min_area")
+        sqft_hi_raw = fp.get("area_max") or fp.get("max_area")
+        if (isinstance(sqft_lo_raw, (int, float)) and sqft_lo_raw > 0):
+            if (isinstance(sqft_hi_raw, (int, float)) and sqft_hi_raw > 0
+                    and int(sqft_hi_raw) != int(sqft_lo_raw)):
+                sqft = f"{int(sqft_lo_raw)}-{int(sqft_hi_raw)}"
+            else:
+                sqft = str(int(sqft_lo_raw))
+        else:
+            sqft = str(fp.get("display_area") or "").strip()
+
+        rows_out.append(
+            make_unit_dict(
+                floor_plan_name=str(name),
+                bed_label=bed_label_from(beds, str(name)),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft=sqft,
+                unit_number="",  # empty → post_process routes to plan_summaries
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                availability_status="UNKNOWN",
+                source_api_url=url,
+                extraction_tier=_TIER_BASE,
+            )
+        )
+
+    return rows_out, dropped
 
 
 def _is_sightmap_response(body: Any) -> bool:

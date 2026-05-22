@@ -55,7 +55,6 @@ from ma_poc.extraction.canonical import (
     UID_KEYS,
     get_numeric,
     get_str,
-    is_present,
 )
 from ma_poc.extraction.classify import classify
 from ma_poc.extraction.infer import infer
@@ -204,16 +203,29 @@ class PostProcessResult:
 
     @property
     def admitted(self) -> list[dict[str, Any]]:
-        """All admitted rows — unit-level followed by plan-level.
+        """Admitted unit-level rows only (alias for ``self.units``).
 
-        Convenience accessor for adapter wire-ins that need to populate
-        ``AdapterResult.units`` with the combined set (back-compat with
-        pre-Stage-2 downstream consumers that haven't yet learned to
-        distinguish ``units`` from ``plan_summaries``). Stage 2 V2 schema
-        integration (deferred) lifts ``plan_summaries`` into a separate
-        ``floor_plans[]`` field on the V2 property record.
+        Semantics change 2026-05-22: previously returned ``units +
+        plan_summaries`` as a convenience for pre-Stage-2 callers. Every
+        such caller in the codebase ALSO sets
+        ``result.plan_summaries = pp.plan_summaries`` separately — making
+        the combined accessor a footgun that double-counts every
+        plan-level row the moment any parser emits one. The local canary
+        on PID 271966 hit this regression after the APTS247 plan-summary
+        fix landed: rows partitioned as ``plan`` by ``classify()`` showed
+        up as ``inferred_*`` units AND as floor_plans in the v2 output.
+
+        The v2 schema formatter has lifted ``plan_summaries`` into
+        ``floor_plans[]`` since Stage 2 (see
+        ``ma_poc/scripts/runners/jugnu.py:1784``), so callers that need
+        the combined list should call ``pp.units + pp.plan_summaries``
+        explicitly. Keeping the name + property shape preserves
+        backward compat for the 12 adapters using ``result.units =
+        pp.admitted`` — they all unintentionally relied on the
+        unit-only semantics anyway because they ran their parsers
+        before plan-level emission was a thing.
         """
-        return list(self.units) + list(self.plan_summaries)
+        return list(self.units)
 
     def to_meta(self) -> dict[str, int]:
         """D16: telemetry payload for ``AdapterResult._post_process_meta``.

@@ -77,23 +77,50 @@ _FUNNEL_URL_MARKERS = ("nestiolistings.com/api/", "nestiostaging.com/api/")
 # included for the listing-level envelope where each listing object carries
 # a nested ``rentals`` list — but that's unwrapped at the listing layer, not
 # the root, so callers should handle both modes explicitly.
-_FUNNEL_DICT_LIST_KEYS = ("listings", "results", "data", "rentals")
+#
+# 2026-05-22: ``items`` added for the ``/api/v2/listings/all`` endpoint
+# (Dermot Co + other NYC operators). That endpoint wraps a richer per-unit
+# payload (snake_case keys: price / date_available / layout / square_footage)
+# under ``{items: [...]}`` rather than the documented residential/rentals/
+# envelope. Without the alias the wrapper was rejected and an LLM_API call
+# was burned to extract data that the adapter could read deterministically.
+_FUNNEL_DICT_LIST_KEYS = ("listings", "results", "data", "rentals", "items")
 
 # Rental-level (flat) keys that identify a Funnel rental row.
+#
+# Two shapes are observed in production:
+#   * documented camelCase: marketRent / availabilityDate / floorPlanName /
+#     squareFeet / unit / listingId  (residential/rentals/ endpoint)
+#   * v2 listings/all snake_case: price / date_available / layout /
+#     square_footage / unit_number / min_lease_term / incentives
+# Both ship from nestiolistings.com so the URL gate alone admits them; the
+# rental-key set has to recognise both to pass the body-shape check (which
+# acts as the safety net against unrelated list-at-root payloads).
 _FUNNEL_RENTAL_KEYS = {
+    # camelCase / residential rentals endpoint
     "marketRent",
     "marketrent",
     "availabilityDate",
     "availabilitydate",
     "floorPlanName",
     "floorplanname",
-    "bedrooms",
-    "bathrooms",
     "squareFeet",
     "squarefeet",
     "unit",
     "listingId",
     "listingid",
+    # snake_case / v2 listings/all endpoint (Dermot, 2026-05-22 PID 262799)
+    "date_available",
+    "square_footage",
+    "unit_number",
+    "min_lease_term",
+    "max_lease_term",
+    "layout",
+    "price",
+    "incentives",
+    # shared
+    "bedrooms",
+    "bathrooms",
 }
 
 # Listing-level keys that identify a Funnel listing (the outer envelope).
@@ -206,15 +233,41 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
         if not isinstance(row, dict):
             continue
 
-        unit_id = _pick(row, "unit", "listingId", "listingid")
-        building = _pick(row, "buildingName", "buildingname", "building")
+        # Unit id: ``unit_number`` (v2/listings/all) → ``unit`` (residential
+        # rentals) → ``listingId`` fallback. v2 also exposes a numeric ``id``
+        # but that's a Nestio-internal listing identifier, not the human
+        # apartment number — only used as a last-resort dedup key.
+        unit_id = _pick(row, "unit_number", "unit", "listingId", "listingid")
+        building_raw = _pick(row, "buildingName", "buildingname", "building")
+        # v2/listings/all ships ``building`` as a nested dict (id + name +
+        # address + neighborhood + community + …). Extract the
+        # human-readable name when given a dict — without this guard the
+        # stringification ships the whole dict literal as the building
+        # field.
+        if isinstance(building_raw, dict):
+            building_name = building_raw.get("name") or building_raw.get(
+                "street_address"
+            ) or ""
+            building = building_name if isinstance(building_name, str) else ""
+        else:
+            building = building_raw
         if unit_id and building and unit_id != building:
             unit_number = f"{unit_id}"
         else:
             unit_number = str(unit_id or "")
 
+        # ``layout`` is the v2/listings/all plan-name field (e.g. "Studio",
+        # "2 Bedroom"). The documented residential rentals endpoint uses
+        # ``floorPlanName``.
         floor_plan_name = str(
-            _pick(row, "floorPlanName", "floorplanname", "floor_plan_name", "floorPlan", "name") or ""
+            _pick(
+                row,
+                "floorPlanName", "floorplanname", "floor_plan_name",
+                "floorPlan", "name",
+                "layout",  # v2/listings/all
+                "unit_type",
+            )
+            or ""
         )
 
         beds_raw = _pick(row, "bedrooms", "beds")
@@ -225,17 +278,27 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
 
         baths_raw = _pick(row, "bathrooms", "baths")
         try:
-            baths = int(float(baths_raw)) if baths_raw is not None else None
+            # v2/listings/all bathrooms are floats (e.g. 1.5); preserve when
+            # not an integer so the unit dict ships "1.5" rather than "1".
+            baths_val: float | None = (
+                float(baths_raw) if baths_raw is not None else None
+            )
         except (TypeError, ValueError):
-            baths = None
+            baths_val = None
 
-        sqft_raw = _pick(row, "squareFeet", "squarefeet", "sqft", "sqftTotal")
+        sqft_raw = _pick(
+            row,
+            "squareFeet", "squarefeet", "sqft", "sqftTotal",
+            "square_footage",  # v2/listings/all
+        )
         sqft = str(int(float(sqft_raw))) if sqft_raw not in (None, "", "0") else ""
 
         # Rent: prefer explicit low/high pair, otherwise use marketRent flat.
-        rent_lo_raw = _pick(row, "marketRentLow", "marketrentlow", "rentLow")
-        rent_hi_raw = _pick(row, "marketRentHigh", "marketrenthigh", "rentHigh")
-        rent_flat = _pick(row, "marketRent", "marketrent", "rent")
+        # ``price`` is the v2/listings/all per-unit asking rent (single value,
+        # may be a string with cents like "5395.00").
+        rent_lo_raw = _pick(row, "marketRentLow", "marketrentlow", "rentLow", "min_price")
+        rent_hi_raw = _pick(row, "marketRentHigh", "marketrenthigh", "rentHigh", "max_price")
+        rent_flat = _pick(row, "marketRent", "marketrent", "rent", "price")
         rent_lo: int | None = None
         rent_hi: int | None = None
         if rent_lo_raw is not None:
@@ -246,15 +309,84 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
             rent_lo = money_to_int(str(rent_flat))
             rent_hi = rent_lo
 
-        avail_date = str(_pick(row, "availabilityDate", "availabilitydate", "available_on") or "")
+        # Availability date: ``date_available`` (v2/listings/all) ships ISO
+        # already; the documented endpoint uses ``availabilityDate``.
+        avail_date = str(
+            _pick(
+                row,
+                "availabilityDate", "availabilitydate",
+                "available_on",
+                "date_available",  # v2/listings/all
+            )
+            or ""
+        )
+        # Trim ISO timestamp to date portion when present.
+        if avail_date and "T" in avail_date:
+            avail_date = avail_date.split("T")[0]
+
         floor = str(_pick(row, "floor", "floorNumber") or "")
+
+        # Concession: the v2 listings/all endpoint surfaces marketing
+        # incentives in an ``incentives`` field (string or list of dicts);
+        # the documented endpoint occasionally ships ``concession`` directly.
+        concession_raw = _pick(row, "incentives", "concession", "specials")
+        concession: str = ""
+        if isinstance(concession_raw, str):
+            concession = concession_raw.strip()
+        elif isinstance(concession_raw, list) and concession_raw:
+            # Flatten a list of incentive dicts to the first non-empty text.
+            for entry in concession_raw:
+                if isinstance(entry, dict):
+                    txt = entry.get("description") or entry.get("text") or entry.get("title")
+                    if isinstance(txt, str) and txt.strip():
+                        concession = txt.strip()
+                        break
+                elif isinstance(entry, str) and entry.strip():
+                    concession = entry.strip()
+                    break
+
+        # Lease term: v2/listings/all uses ``min_lease_term`` (int months);
+        # surface when present so day-on-market analytics can adjust.
+        lease_term_raw = _pick(row, "min_lease_term", "minLeaseTerm")
+        lease_term = ""
+        if lease_term_raw is not None:
+            try:
+                lt = int(float(lease_term_raw))
+                if lt > 0:
+                    lease_term = str(lt)
+            except (TypeError, ValueError):
+                pass
+
+        # Per-row availability status: v2/listings/all ships a textual
+        # ``status`` (e.g. "Available", "Off-Market"). Map "Available" /
+        # truthy to AVAILABLE; everything else → UNKNOWN so we don't drop
+        # the row.
+        status_raw = _pick(row, "status", "availability_status")
+        if isinstance(status_raw, str) and status_raw.strip():
+            status_l = status_raw.strip().lower()
+            if status_l in ("available", "active", "rentable", "open"):
+                avail_status = "AVAILABLE"
+            elif status_l in ("unavailable", "off-market", "rented", "leased"):
+                avail_status = "UNAVAILABLE"
+            else:
+                avail_status = "UNKNOWN"
+        else:
+            # No explicit status field — default to AVAILABLE (consistent with
+            # pre-2026-05-22 behaviour).
+            avail_status = "AVAILABLE"
+
+        baths_str = (
+            str(int(baths_val))
+            if baths_val is not None and baths_val == int(baths_val)
+            else (str(baths_val) if baths_val is not None else "")
+        )
 
         units.append(
             make_unit_dict(
                 floor_plan_name=floor_plan_name,
                 bed_label=bed_label_from(beds, floor_plan_name),
                 bedrooms=str(beds) if beds is not None else "",
-                bathrooms=str(baths) if baths is not None else "",
+                bathrooms=baths_str,
                 sqft=sqft,
                 unit_number=unit_number,
                 floor=floor,
@@ -262,9 +394,11 @@ def parse_funnel_listings(body: Any, url: str) -> list[dict[str, str]]:
                 rent_range=format_rent_range(rent_lo, rent_hi),
                 rent_low=rent_lo,
                 rent_high=rent_hi,
-                availability_status="AVAILABLE" if avail_date else "AVAILABLE",
+                availability_status=avail_status,
                 available_units="1",
                 availability_date=avail_date,
+                lease_term=lease_term,
+                concession=concession,
                 source_api_url=url,
                 extraction_tier=_TIER_BASE,
             )

@@ -208,11 +208,13 @@ async def test_by_domain_resolver_happy_path(monkeypatch: pytest.MonkeyPatch) ->
     )
     _patch_async_client(monkeypatch, fake)
 
-    pid, units = await _fetch_knock_units_by_domain(
+    pid, units, plans = await _fetch_knock_units_by_domain(
         "https://www.aspensquare.com/apartments/nebraska/papillion/adley-at-72nd"
     )
     assert pid == "2007584"
     assert len(units) == 2
+    # No layouts in this fixture (units payload only) → no plan_summaries.
+    assert plans == []
     # Verify shape: real unit numbers, real rents, AVAILABLE status
     names = sorted(u["unit_number"] for u in units)
     assert names == ["D119", "F306"]
@@ -232,9 +234,10 @@ async def test_by_domain_resolver_profile_404(monkeypatch: pytest.MonkeyPatch) -
     )
     _patch_async_client(monkeypatch, fake)
 
-    pid, units = await _fetch_knock_units_by_domain("https://x.com")
+    pid, units, plans = await _fetch_knock_units_by_domain("https://x.com")
     assert pid is None
     assert units == []
+    assert plans == []
 
 
 @pytest.mark.asyncio
@@ -252,9 +255,10 @@ async def test_by_domain_resolver_profile_returns_no_property_id(
     )
     _patch_async_client(monkeypatch, fake)
 
-    pid, units = await _fetch_knock_units_by_domain("https://x.com")
+    pid, units, plans = await _fetch_knock_units_by_domain("https://x.com")
     assert pid is None
     assert units == []
+    assert plans == []
 
 
 @pytest.mark.asyncio
@@ -276,9 +280,10 @@ async def test_by_domain_resolver_units_endpoint_500(
     )
     _patch_async_client(monkeypatch, fake)
 
-    pid, units = await _fetch_knock_units_by_domain("https://x.com")
+    pid, units, plans = await _fetch_knock_units_by_domain("https://x.com")
     assert pid == "999999"
     assert units == []
+    assert plans == []
 
 
 @pytest.mark.asyncio
@@ -299,9 +304,10 @@ async def test_by_domain_resolver_handles_network_exception(
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **kw: _RaisingClient())
 
-    pid, units = await _fetch_knock_units_by_domain("https://x.com")
+    pid, units, plans = await _fetch_knock_units_by_domain("https://x.com")
     assert pid is None
     assert units == []
+    assert plans == []
 
 
 # ── KnockAdapter.extract() — fallback wiring ────────────────────────────────
@@ -364,31 +370,39 @@ async def test_adapter_prefers_init_call_when_present(
 ) -> None:
     """If knockDoorway.init() IS in the HTML, the existing community-
     keyed path runs and the by-domain fallback is never invoked."""
-    # Mock the community-keyed path to return one unit.
-    async def _fake_fetch_units(comm_id: str, kind: str = "community") -> list[dict[str, Any]]:
-        return [
-            {
-                "unit_number": "101",
-                "floor_plan_name": "A1",
-                "bedrooms": "1",
-                "bathrooms": "1",
-                "sqft": "750",
-                "market_rent_low": 1500,
-                "market_rent_high": 1500,
-                "availability_status": "AVAILABLE",
-                "availability_date": "2026-06-01",
-                "extraction_tier": "TIER_1_KNOCK_API",
-            }
-        ]
+    # Mock the community-keyed path to return one unit + zero plan_summaries.
+    # 2026-05-22: _fetch_knock_units now returns (units, plan_summaries).
+    async def _fake_fetch_units(
+        comm_id: str, kind: str = "community",
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        return (
+            [
+                {
+                    "unit_number": "101",
+                    "floor_plan_name": "A1",
+                    "bedrooms": "1",
+                    "bathrooms": "1",
+                    "sqft": "750",
+                    "market_rent_low": 1500,
+                    "market_rent_high": 1500,
+                    "availability_status": "AVAILABLE",
+                    "availability_date": "2026-06-01",
+                    "extraction_tier": "TIER_1_KNOCK_API",
+                }
+            ],
+            [],
+        )
 
     monkeypatch.setattr(knock_mod, "_fetch_knock_units", _fake_fetch_units)
 
     # By-domain path must NOT fire — fail if it does.
     by_domain_calls: list[str] = []
 
-    async def _no_by_domain(base_url: str) -> tuple[str | None, list[dict[str, Any]]]:
+    async def _no_by_domain(
+        base_url: str,
+    ) -> tuple[str | None, list[dict[str, Any]], list[dict[str, Any]]]:
         by_domain_calls.append(base_url)
-        return None, []
+        return None, [], []
 
     monkeypatch.setattr(knock_mod, "_fetch_knock_units_by_domain", _no_by_domain)
 
@@ -414,9 +428,11 @@ async def test_adapter_no_init_no_signal_returns_empty(
     fires, adapter returns empty + error message."""
     by_domain_calls: list[str] = []
 
-    async def _no_call(base_url: str) -> tuple[str | None, list[dict[str, Any]]]:
+    async def _no_call(
+        base_url: str,
+    ) -> tuple[str | None, list[dict[str, Any]], list[dict[str, Any]]]:
         by_domain_calls.append(base_url)
-        return None, []
+        return None, [], []
 
     monkeypatch.setattr(knock_mod, "_fetch_knock_units_by_domain", _no_call)
 
@@ -537,12 +553,13 @@ async def test_community_hash_path_wins_when_html_carries_hash(
         '"community","enabled":true,"propertyId":"58e4333ca711ea57",'
         '"apiToken":"7319ad04f51311e9abf012b98e995a24"'
     )
-    pid, units = await _fetch_knock_units_by_domain(
+    pid, units, plans = await _fetch_knock_units_by_domain(
         "https://www.aspensquare.com/apartments/nebraska/papillion/adley-72nd",
         html_with_hash,
     )
     assert pid == "2007584"
     assert len(units) == 2
+    assert plans == []
 
     # Profile endpoint should NOT be called when community path wins.
     assert not any("/v1/profile" in u for u in fake.calls), (
@@ -573,11 +590,12 @@ async def test_community_hash_fallback_to_profile_when_bootstrap_404(
     _patch_async_client(monkeypatch, fake)
 
     html_with_stale_hash = '"propertyId":"deadhash00000000"'
-    pid, units = await _fetch_knock_units_by_domain(
+    pid, units, plans = await _fetch_knock_units_by_domain(
         "https://x.com", html_with_stale_hash
     )
     assert pid == "9999999"
     assert len(units) == 2
+    assert plans == []
 
 
 @pytest.mark.asyncio
@@ -598,8 +616,9 @@ async def test_community_hash_path_handles_empty_html_gracefully(
     )
     _patch_async_client(monkeypatch, fake)
 
-    pid, units = await _fetch_knock_units_by_domain("https://x.com", "")
+    pid, units, plans = await _fetch_knock_units_by_domain("https://x.com", "")
     assert pid == "2007584"
     assert len(units) == 2
+    assert plans == []
     # No community call attempted when html is empty.
     assert not any("/v1/property/community/" in u for u in fake.calls)

@@ -241,3 +241,5 @@ infra/terraform/.terraform/providers/registry.terraform.io/hashicorp/google-beta
 ma_poc/.claude/worktrees/
 =2.7.0
 .claude/scheduled_tasks.lock
+.claude/settings.json.before-fewer-prompts.bak
+.gcloudignore

@@ -78,16 +78,33 @@ def find_apts247_api_key(html: str) -> str | None:
 def parse_apts247_floorplans(
     data: dict[str, Any], source_url: str
 ) -> list[dict[str, Any]]:
-    """Apts247 ``/api/v1/floorplans/`` envelope → unit-level dicts.
+    """Apts247 ``/api/v1/floorplans/`` envelope → list of canonical rows.
 
-    One row per available Unit (real unit ``id`` + concrete rent).
-    Falls back to a plan-level row (floorplan ``rent``) when a plan has
-    no available units but advertises a rent.
+    Emits at most one row per plan-without-units AND one row per
+    available unit. Returned list contains a mix of unit-level and
+    plan-level rows; ``post_process`` partitions them downstream into
+    ``units`` / ``plan_summaries`` using the row's ``unit_number``
+    (unit-level rows have a concrete identifier; plan-only rows are
+    emitted with ``unit_number=""``).
+
+    Rules (2026-05-22 — fix the no-units-and-no-rent silent drop):
+
+    * Plan has ≥1 unit in its ``units`` list → emit one row per unit
+      (per-unit rent + identifier). The plan's parent identity is
+      represented in the unit rows via ``floor_plan_name``; no
+      separate plan_summary is added — that would duplicate.
+    * Plan has 0 units but ``rent`` ("$1,234") is present on the plan
+      → emit a single plan-level row carrying the plan rent.
+    * Plan has 0 units AND no plan rent → STILL emit a plan-level row
+      (rent left ``None``) so the floor plan appears in the property's
+      ``floor_plans[]`` output. Pre-2026-05-22 these were dropped
+      silently; PID 271966 (Windswept Gardens) was the canonical case
+      where 4 advertised floor plans surfaced as 0 in our output.
     """
     objects = data.get("objects")
     if not isinstance(objects, list):
         return []
-    units: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for plan in objects:
         if not isinstance(plan, dict):
             continue
@@ -114,7 +131,7 @@ def parse_apts247_floorplans(
                 unum = str(u.get("number") or "").strip()
                 if not unum and u.get("id") is not None:
                     unum = f"apt-{u.get('id')}"
-                units.append(
+                rows.append(
                     make_unit_dict(
                         floor_plan_name=plan_name,
                         bed_label=str(plan.get("display_bed") or ""),
@@ -135,15 +152,21 @@ def parse_apts247_floorplans(
                         extraction_tier=_TIER,
                     )
                 )
-        elif plan_rent is not None:
-            units.append(
+            # Plan with units → unit rows already cover identity. Do NOT
+            # also emit a plan-level row (would duplicate per the
+            # no-dup invariant).
+        else:
+            # 2026-05-22 Fix 4: no-units → plan-only row. Previously this
+            # branch required ``plan_rent`` to be set; plans with neither
+            # units nor plan rent were silently dropped.
+            rows.append(
                 make_unit_dict(
                     floor_plan_name=plan_name,
                     bed_label=str(plan.get("display_bed") or ""),
                     bedrooms=beds,
                     bathrooms=baths_s,
                     sqft=plan_sqft,
-                    unit_number="",
+                    unit_number="",  # empty → post_process classifies as plan
                     rent_low=plan_rent,
                     rent_high=plan_rent,
                     availability_status="UNKNOWN",
@@ -151,7 +174,7 @@ def parse_apts247_floorplans(
                     extraction_tier=_TIER,
                 )
             )
-    return units
+    return rows
 
 
 def _origin_of(url: str) -> str:
@@ -284,7 +307,15 @@ class Apts247Adapter:
 
         pp = post_process(raw_units, property_id=getattr(ctx, "property_id", None))
         if pp.n_admitted > 0:
-            result.units = pp.admitted
+            # 2026-05-22 dup-prevention: ``pp.admitted`` returns
+            # ``units + plan_summaries`` for legacy callers, but our
+            # downstream v2 formatter already lifts ``plan_summaries``
+            # into a separate ``floor_plans[]`` field. Using ``pp.admitted``
+            # here would cause every plan-only row to land in BOTH the
+            # ``units`` list (with an ``inferred_`` unit_id) and the
+            # ``floor_plans`` list — the no-dup invariant violation.
+            # Use the unit-only partition for ``result.units``.
+            result.units = pp.units
             result.plan_summaries = pp.plan_summaries
             result.winning_url = api_url
             result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)

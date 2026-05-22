@@ -90,10 +90,42 @@ def find_knock_ids(html: str) -> tuple[str | None, str | None, str | None]:
 
 
 def parse_knock_units(units_payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Convert Knock's ``units_data.units`` array into standard unit dicts.
+    """Backward-compat wrapper — returns only the unit-level rows.
 
-    Skips units flagged ``hidden`` / ``leased`` / ``reserved`` (no useful
-    rent), and filters out any record without a price in the $200-$50K range.
+    Equivalent to ``parse_knock_payload(...)[0]``. Existing callers that
+    only need unit rows (e.g. internal tests, third-party consumers) keep
+    working unchanged. New code should call :func:`parse_knock_payload`
+    so it also receives plan-level summaries for layouts with no
+    available units.
+    """
+    units, _plans = parse_knock_payload(units_payload)
+    return units
+
+
+def parse_knock_payload(
+    units_payload: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Convert Knock's ``units_data`` envelope into (units, plan_summaries).
+
+    Two outputs:
+
+    * ``units`` — one per available unit. Skips units flagged
+      ``hidden`` / ``leased`` / ``reserved`` (no useful rent) and filters
+      out records without a price in the $200-$50K range.
+    * ``plan_summaries`` — one per ``layout`` (floor plan) that did NOT
+      contribute any unit to the ``units`` list. Layouts with at least
+      one surviving unit row are skipped — preserving the "no duplicate
+      between unit and floor-plan rows" invariant. Rows have no
+      ``unit_number`` so the post-process classifier (or downstream v2
+      formatter) routes them under ``floor_plans[]``.
+
+    The Knock community-API returns BOTH a per-unit ``units`` array and
+    a parent ``layouts`` array describing every advertised floor plan.
+    Pre-2026-05-22 only ``units`` was surfaced; layouts with zero
+    available units (or whose units were all filtered as
+    hidden/leased/reserved/no-rent) silently disappeared from the
+    output. Sierra Vista (PID 77913) was the canonical case: 5 layouts,
+    1 unit emitted, 0 floor_plans surfaced.
     """
     units: list[dict[str, Any]] = []
     units_data = units_payload.get("units_data", {})
@@ -102,6 +134,9 @@ def parse_knock_units(units_payload: dict[str, Any]) -> list[dict[str, Any]]:
     layouts: dict[Any, dict[str, Any]] = {
         layout.get("id"): layout for layout in layouts_list if isinstance(layout, dict)
     }
+    # Track which layout ids end up represented by an emitted unit row,
+    # so the plan_summaries pass can skip them (no duplication).
+    covered_layout_ids: set[Any] = set()
 
     for u in raw_units:
         if not isinstance(u, dict):
@@ -180,7 +215,76 @@ def parse_knock_units(units_payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "extraction_tier": "TIER_1_KNOCK_API",
             }
         )
-    return units
+        if layout_id is not None:
+            covered_layout_ids.add(layout_id)
+
+    # 2026-05-22 Fix 3 — layouts without an emitted unit become plan_summaries.
+    # Iterate the original list (not the dict) so source order is preserved.
+    plan_summaries: list[dict[str, Any]] = []
+    for layout in layouts_list:
+        if not isinstance(layout, dict):
+            continue
+        lid = layout.get("id")
+        if lid is None or lid in covered_layout_ids:
+            continue
+
+        # Layout rent: Knock returns various shapes — minPrice / maxPrice
+        # on the layout, or marketRent / askingPrice. Defensive: fall back
+        # to None when nothing parses (the row is still useful as a
+        # plan_summary without rent — the website lists the floor plan).
+        layout_rent_low = (
+            _to_int(layout.get("minPrice"))
+            or _to_int(layout.get("min_price"))
+            or _to_int(layout.get("price"))
+            or _to_int(layout.get("marketRent"))
+            or _to_int(layout.get("askingPrice"))
+        )
+        layout_rent_high = (
+            _to_int(layout.get("maxPrice"))
+            or _to_int(layout.get("max_price"))
+            or layout_rent_low
+        )
+        # Reject obviously bogus rents (same gate as the unit path).
+        if layout_rent_low is not None and not (200 <= layout_rent_low <= 50_000):
+            layout_rent_low = None
+        if layout_rent_high is not None and not (200 <= layout_rent_high <= 50_000):
+            layout_rent_high = None
+
+        layout_sqft = (
+            _to_int(layout.get("area"))
+            or _to_int(layout.get("square_feet"))
+            or _to_int(layout.get("sqft"))
+        )
+        layout_beds = layout.get("bedrooms")
+        layout_baths = layout.get("bathrooms")
+        plan_summaries.append(
+            {
+                "unit_number": "",  # required: empty → classify() returns "plan"
+                "floor_plan_name": str(layout.get("name") or ""),
+                "bedrooms": str(layout_beds) if layout_beds is not None else "",
+                "bathrooms": str(layout_baths) if layout_baths is not None else "",
+                "sqft": str(layout_sqft) if layout_sqft else "",
+                "market_rent_low": layout_rent_low,
+                "market_rent_high": layout_rent_high,
+                "rent_range": (
+                    str(layout_rent_low)
+                    if layout_rent_low and layout_rent_low == layout_rent_high
+                    else (
+                        f"{layout_rent_low}-{layout_rent_high}"
+                        if layout_rent_low and layout_rent_high
+                        else ""
+                    )
+                ),
+                "availability_status": "UNKNOWN",
+                "availability_date": "",
+                "building": "",
+                "concession": "",
+                "extraction_tier": "TIER_1_KNOCK_API",
+                "floor_plan_id": str(lid),
+            }
+        )
+
+    return units, plan_summaries
 
 
 class KnockAdapter:
@@ -256,16 +360,26 @@ class KnockAdapter:
         )
         if public_key and comm_id:
             try:
-                units = await _fetch_knock_units(comm_id, kind or "community")
+                units, plan_summaries = await _fetch_knock_units(
+                    comm_id, kind or "community"
+                )
             except Exception as exc:
                 result.errors.append(f"knock-api-error: {exc}")
-                units = []
-            if units:
+                units, plan_summaries = [], []
+            # 2026-05-22 Fix 3: emit even when ``units`` is empty, provided
+            # plan_summaries contains floor-plan-only rows. Knock returns
+            # ``layouts`` (advertised floor plans) alongside ``units``; a
+            # property with 0 currently-available units but ≥1 layout is
+            # still a successful extraction at the plan-summary granularity.
+            if units or plan_summaries:
                 result.units = units
+                result.plan_summaries = plan_summaries
                 result.winning_url = (
                     f"https://doorway-api.knockrentals.com/v1/property/community/{comm_id}"
                 )
-                result.confidence = min(0.9, 0.6 + 0.02 * len(units))
+                result.confidence = min(
+                    0.9, 0.6 + 0.02 * (len(units) + 0.5 * len(plan_summaries))
+                )
                 return result
             result.errors.append("knock-adapter: Doorway API returned no units for community_id")
 
@@ -277,25 +391,30 @@ class KnockAdapter:
         base_url = str(getattr(ctx, "base_url", "") or "")
         if base_url and _should_try_knock_by_domain(html, base_url):
             try:
-                pid, units = await _fetch_knock_units_by_domain(base_url, html)
+                pid, units, plan_summaries = await _fetch_knock_units_by_domain(
+                    base_url, html
+                )
             except Exception as exc:
                 result.errors.append(
                     f"knock-by-domain-error: {type(exc).__name__}: {str(exc)[:120]}"
                 )
-                pid, units = None, []
-            if pid and units:
+                pid, units, plan_summaries = None, [], []
+            if pid and (units or plan_summaries):
                 result.units = units
+                result.plan_summaries = plan_summaries
                 result.winning_url = (
                     f"https://doorway-api.knockrentals.com/v1/property/{pid}/units"
                 )
                 result.tier_used = "TIER_1_KNOCK_API_BY_DOMAIN"
-                result.confidence = min(0.9, 0.6 + 0.02 * len(units))
+                result.confidence = min(
+                    0.9, 0.6 + 0.02 * (len(units) + 0.5 * len(plan_summaries))
+                )
                 return result
             if pid is None:
                 result.errors.append(
                     "knock-by-domain: /v1/profile resolver returned no property_id"
                 )
-            elif not units:
+            elif not units and not plan_summaries:
                 result.errors.append(
                     f"knock-by-domain: property_id={pid} /units returned no units"
                 )
@@ -305,8 +424,12 @@ class KnockAdapter:
         return result
 
 
-async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict[str, Any]]:
+async def _fetch_knock_units(
+    comm_id: str, kind: str = "community",
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Two-step Doorway API fetch: community → numeric_id → units.
+
+    Returns ``(units, plan_summaries)`` — see :func:`parse_knock_payload`.
 
     This is its own coroutine so the adapter ``extract`` method stays
     focused on orchestration.
@@ -330,33 +453,33 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
             r = await c.get(units_url, headers=headers)
             if r.status_code != 200:
-                return []
+                return [], []
             try:
-                return parse_knock_units(r.json())
+                return parse_knock_payload(r.json())
             except Exception:
-                return []
+                return [], []
 
     # Community-keyed: fetch property meta first.
     community_url = f"{base}/community/{comm_id}"
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
         r = await c.get(community_url, headers=headers)
         if r.status_code != 200:
-            return []
+            return [], []
         try:
             prop_data = r.json().get("property") or {}
         except Exception:
-            return []
+            return [], []
         numeric_id = prop_data.get("id")
         if not numeric_id:
-            return []
+            return [], []
         units_url = f"{base}/{numeric_id}/units"
         r2 = await c.get(units_url, headers=headers)
         if r2.status_code != 200:
-            return []
+            return [], []
         try:
-            return parse_knock_units(r2.json())
+            return parse_knock_payload(r2.json())
         except Exception:
-            return []
+            return [], []
 
 
 # 2026-05-20: Knock-by-domain fallback signal detection.
@@ -449,7 +572,7 @@ def _should_try_knock_by_domain(html: str, base_url: str) -> bool:
 async def _fetch_knock_units_by_domain(
     base_url: str,
     html: str = "",
-) -> tuple[str | None, list[dict[str, Any]]]:
+) -> tuple[str | None, list[dict[str, Any]], list[dict[str, Any]]]:
     """Resolve property_id from marketing-site URL via Knock Doorway,
     then fetch units.
 
@@ -493,15 +616,17 @@ async def _fetch_knock_units_by_domain(
         "Accept": "application/json",
     }
 
-    async def _fetch_units(c: httpx.AsyncClient, pid_str: str) -> list[dict[str, Any]]:
+    async def _fetch_units(
+        c: httpx.AsyncClient, pid_str: str,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         units_url = f"https://doorway-api.knockrentals.com/v1/property/{pid_str}/units"
         ur = await c.get(units_url, headers=headers)
         if ur.status_code != 200:
-            return []
+            return [], []
         try:
-            return parse_knock_units(ur.json())
+            return parse_knock_payload(ur.json())
         except Exception:
-            return []
+            return [], []
 
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
@@ -521,7 +646,8 @@ async def _fetch_knock_units_by_domain(
                     pid = (boot_body.get("property") or {}).get("id")
                     if pid:
                         pid_str = str(pid)
-                        return pid_str, await _fetch_units(c, pid_str)
+                        units, plans = await _fetch_units(c, pid_str)
+                        return pid_str, units, plans
 
             # Path 2: legacy /v1/profile?domain= resolver.
             profile_url = (
@@ -530,15 +656,16 @@ async def _fetch_knock_units_by_domain(
             )
             pr = await c.get(profile_url, headers=headers)
             if pr.status_code != 200:
-                return None, []
+                return None, [], []
             try:
                 profile_body = pr.json()
             except Exception:
-                return None, []
+                return None, [], []
             pid = (profile_body.get("profile") or {}).get("property")
             if not pid:
-                return None, []
+                return None, [], []
             pid_str = str(pid)
-            return pid_str, await _fetch_units(c, pid_str)
+            units, plans = await _fetch_units(c, pid_str)
+            return pid_str, units, plans
     except Exception:
-        return None, []
+        return None, [], []

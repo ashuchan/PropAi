@@ -440,6 +440,54 @@ class TestNormalizeFieldKey:
     def test_unknown_key_with_hyphen(self) -> None:
         assert normalize_field_key("custom-field") == "custom_field"
 
+    # ── 2026-05-22 vendor variants observed in LLM_API fallbacks ────────
+    # Brookfield WP middleware uses ``minimumSQFT`` / ``maximumSQFT`` (sqft
+    # acronym instead of squareFeet). RentDynamics-style plansandpricing
+    # feeds use ``MinSqFt`` / ``MaxSqFt`` (PascalCase). Without these
+    # aliases the narrow qualifier missed the sqft signal and the row
+    # failed the ≥2-canonical-signals gate. See cloud run 2026-05-22
+    # API_ANALYSIS audit.
+    @pytest.mark.parametrize("key,expected", [
+        ("minimumsqft",  "sqft"),
+        ("maximumsqft",  "sqft"),
+        ("minsqft",      "sqft"),
+        ("maxsqft",      "sqft"),
+        # PascalCase / camelCase variants must also work via lowercase
+        # normalisation before alias lookup.
+        ("MinSqFt",      "sqft"),
+        ("MaxSqFt",      "sqft"),
+        ("minimumSQFT",  "sqft"),
+        ("maximumSQFT",  "sqft"),
+    ])
+    def test_2026_05_22_sqft_acronym_aliases(self, key: str, expected: str) -> None:
+        assert normalize_field_key(key) == expected
+
+    @pytest.mark.parametrize("key,expected", [
+        ("availableunitscount",    "unit_count"),
+        ("unitsavailable",         "unit_count"),
+        ("totalunitsavailable",    "unit_count"),
+        ("earliestunitavailable",  "available_date"),
+        ("date_available",         "available_date"),
+        ("dateavailable",          "available_date"),
+        # PascalCase / camelCase still works post-lowercase.
+        ("AvailableUnitsCount",    "unit_count"),
+        ("UnitsAvailable",         "unit_count"),
+        ("EarliestUnitAvailable",  "available_date"),
+        ("date_available",         "available_date"),
+    ])
+    def test_2026_05_22_availability_aliases(self, key: str, expected: str) -> None:
+        assert normalize_field_key(key) == expected
+
+    @pytest.mark.parametrize("key,expected", [
+        ("unitminprice", "min_rent"),
+        ("unitmaxprice", "max_rent"),
+        # PascalCase variant from plansandpricing payloads.
+        ("UnitMinPrice", "min_rent"),
+        ("UnitMaxPrice", "max_rent"),
+    ])
+    def test_2026_05_22_per_unit_price_aliases(self, key: str, expected: str) -> None:
+        assert normalize_field_key(key) == expected
+
 
 # ── normalize_field_keys ────────────────────────────────────────────────────
 

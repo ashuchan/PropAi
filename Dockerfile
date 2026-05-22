@@ -58,6 +58,13 @@ RUN python -m ma_poc.scripts.checks.csv_mapping \
  && chown pwuser:pwuser /app/ma_poc/config/csv_floorplan_mapping.json \
  && python -m ma_poc.scripts.checks.deployment
 
+# Pre-create the profiles directory so the runtime profile_store mkdir
+# doesn't trip on a parent-dir ownership mismatch when running as pwuser.
+# (.dockerignore excludes config/profiles/, so without this step the dir
+# is missing at runtime and the mkdir lands on a root-owned parent.)
+RUN mkdir -p /app/ma_poc/config/profiles \
+ && chown -R pwuser:pwuser /app/ma_poc/config
+
 USER pwuser
 
 # No CMD — ENTRYPOINT is provided per-job by Cloud Run (container command override).

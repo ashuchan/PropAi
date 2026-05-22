@@ -264,7 +264,8 @@ class AspenSquareAdapter:
 
             pp = post_process(units, property_id=getattr(ctx, "property_id", None))
             if pp.n_admitted > 0:
-                result.units = pp.admitted
+                # 2026-05-22 dup-prevention: see comment in apts247.py.
+                result.units = pp.units
                 result.plan_summaries = pp.plan_summaries
                 result.winning_url = self._winning_url(page, ctx)
                 result.confidence = min(0.95, 0.7 + 0.04 * pp.n_admitted)
@@ -325,27 +326,39 @@ class AspenSquareAdapter:
         if not find_knock_community_hash(html):
             return None
         try:
-            pid, units = await _fetch_knock_units_by_domain(base_url, html)
+            pid, units, knock_plans = await _fetch_knock_units_by_domain(
+                base_url, html
+            )
         except Exception as exc:
             result.errors.append(
                 f"aspensquare-knock-fallback-error: {type(exc).__name__}: "
                 f"{str(exc)[:120]}"
             )
             return None
-        if not pid or not units:
+        if not pid or (not units and not knock_plans):
             return None
         from ma_poc.extraction.post_process import post_process
 
         pp = post_process(units, property_id=getattr(ctx, "property_id", None))
-        if pp.n_admitted == 0:
+        # 2026-05-22 Fix 3 (downstream): merge Knock's layout-level
+        # plan_summaries with any plan rows the post_process classifier
+        # routed. The post_process pass only sees the unit rows here so
+        # its plan_summaries list is empty; the Knock-derived
+        # plan_summaries cover floor plans with no available units.
+        merged_plans = list(pp.plan_summaries) + list(knock_plans)
+        if pp.n_admitted == 0 and not merged_plans:
             return None
-        result.units = pp.admitted
-        result.plan_summaries = pp.plan_summaries
+        # 2026-05-22 dup-prevention: see comment in apts247.py.
+        result.units = pp.units
+        result.plan_summaries = merged_plans
         result.tier_used = "TIER_1_API_ASPENSQUARE_KNOCK"
         result.winning_url = (
             f"https://doorway-api.knockrentals.com/v1/property/{pid}/units"
         )
-        result.confidence = min(0.92, 0.65 + 0.04 * pp.n_admitted)
+        # Slight confidence boost when plan_summaries are present even
+        # without admitted units (we DID extract something useful).
+        score_basis = pp.n_admitted + 0.5 * len(merged_plans)
+        result.confidence = min(0.92, 0.65 + 0.04 * score_basis)
         return result
 
     def static_fingerprints(self) -> list[str]:

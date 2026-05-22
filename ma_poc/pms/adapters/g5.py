@@ -232,17 +232,33 @@ def _g5_specials_to_str(val: Any) -> str:
 
 
 def parse_g5_apartments(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Convert G5's ``apartmentComplex.apartments`` list into unit dicts."""
+    """Convert G5's ``apartmentComplex.apartments`` + ``floorplans`` lists.
+
+    Emits both unit-level rows (one per apartment with a valid rent) and
+    plan-only rows for floorplans that have no apartment representation
+    (Phase 2b — 2026-05-22). Plan-only rows carry ``unit_number=""`` so
+    ``post_process.classify()`` routes them to ``plan_summaries``;
+    floorplans already represented by an emitted apartment are skipped
+    to preserve the no-dup invariant.
+    """
     ac = (payload.get("data") or {}).get("apartmentComplex") or {}
     apts = ac.get("apartments") or []
-    # Map floorplanId -> concession text (HAR-confirmed schema path).
+    floorplans = ac.get("floorplans") or []
+    # Map floorplanId -> concession text + floorplan dict (HAR-confirmed schema).
     _fp_spec: dict[Any, str] = {}
-    for _fp in ac.get("floorplans") or []:
+    _fp_by_id: dict[Any, dict[str, Any]] = {}
+    for _fp in floorplans:
         if isinstance(_fp, dict):
+            fp_id = _fp.get("id")
+            if fp_id is not None:
+                _fp_by_id[fp_id] = _fp
             _s = _g5_specials_to_str(_fp.get("floorplanSpecials"))
             if _s:
-                _fp_spec[_fp.get("id")] = _s
+                _fp_spec[fp_id] = _s
+
     out: list[dict[str, Any]] = []
+    covered_fp_ids: set[Any] = set()
+
     for a in apts:
         if not isinstance(a, dict):
             continue
@@ -270,6 +286,59 @@ def parse_g5_apartments(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "building": str(a.get("building") or ""),
                 "concession": _fp_spec.get(fp.get("id"), ""),
                 "extraction_tier": _TIER_BASE,
+            }
+        )
+        if fp.get("id") is not None:
+            covered_fp_ids.add(fp.get("id"))
+
+    # 2026-05-22 Phase 2b — plan_summary emission for floorplans without
+    # apartments. The G5 marketing site renders every floorplan card
+    # regardless of live inventory; surface them as plan-level rows so
+    # ``floor_plans[]`` reflects the full plan catalog.
+    for fp_id, fp in _fp_by_id.items():
+        if fp_id in covered_fp_ids:
+            continue  # plan already covered by an apartment row
+        name = fp.get("name") or ""
+        beds = fp.get("beds")
+        baths = fp.get("baths")
+        sqft = _sqft_to_int(fp.get("sqft"))
+        # G5 floorplan objects carry plan-level rent on minPrice/maxPrice
+        # OR startingRate/endingRate (Apollo-shape variant). Defensive
+        # against both.
+        rent_lo = (
+            _price_to_int(fp.get("minPrice"))
+            or _price_to_int(fp.get("startingRate"))
+        )
+        rent_hi = (
+            _price_to_int(fp.get("maxPrice"))
+            or _price_to_int(fp.get("endingRate"))
+            or rent_lo
+        )
+        # Bound check identical to the unit path.
+        if rent_lo is not None and not (200 <= rent_lo <= 50_000):
+            rent_lo = None
+        if rent_hi is not None and not (200 <= rent_hi <= 50_000):
+            rent_hi = None
+
+        out.append(
+            {
+                "unit_number": "",  # → post_process routes to plan_summaries
+                "floor_plan_name": str(name),
+                "bedrooms": str(beds) if beds is not None else "",
+                "bathrooms": str(baths) if baths is not None else "",
+                "sqft": str(sqft) if sqft else "",
+                "market_rent_low": rent_lo,
+                "market_rent_high": rent_hi,
+                "rent_range": (
+                    f"{rent_lo}-{rent_hi}" if rent_lo and rent_hi and rent_lo != rent_hi
+                    else (str(rent_lo) if rent_lo else "")
+                ),
+                "availability_status": "UNKNOWN",
+                "availability_date": "",
+                "building": "",
+                "concession": _fp_spec.get(fp_id, ""),
+                "extraction_tier": _TIER_BASE,
+                "floor_plan_id": str(fp_id),
             }
         )
     return out

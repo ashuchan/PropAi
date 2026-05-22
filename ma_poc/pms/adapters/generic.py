@@ -33,11 +33,17 @@ from datetime import datetime, timezone as _timezone
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.extraction.canonical import FP_ID_KEYS, get_str
+from ma_poc.pms.adapters._brookfield_parser import (
+    try_parse_brookfield as _try_parse_brookfield,
+)
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_api_responses as _dr_parse_api_responses,
 )
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_sightmap_payload as _dr_parse_sightmap,
+)
+from ma_poc.pms.adapters._plansandpricing_parser import (
+    try_parse_plansandpricing as _try_parse_plansandpricing,
 )
 from ma_poc.models.scrape_profile import FieldSelectorMap as _FieldSelectorMap
 from ma_poc.pms.adapters._html_extract import (
@@ -1820,12 +1826,68 @@ class GenericAdapter:
                 except Exception:
                     pass
 
+        # Sub-tier 1a: host-specific deterministic API parsers ------------
+        # 2026-05-22: parsers that own a stable, well-named JSON contract
+        # for a known operator/CMS family. Run BEFORE the generic narrow
+        # parser so we never lose name/sqft to the case-sensitive get_field
+        # in parse_generic_api (which then ships partial rows that the
+        # planner correctly escalates to LLM). When matched, the parser
+        # produces a complete unit projection; the matched response is
+        # added to ``host_specific_consumed`` so api_narrow doesn't
+        # re-parse it and emit duplicates with weaker field coverage.
+        t0 = _time.monotonic()
+        host_specific_attempts: list[tuple[str, int]] = []
+        host_specific_consumed: set[int] = set()
+        for resp in api_responses:
+            host_units: list[dict[str, str]] = []
+            host_label = ""
+            # Brookfield Properties REIT — rent.brookfieldproperties.com WP
+            # middleware. 8 properties on 2026-05-22 paid LLM tax for a
+            # schema we now read deterministically.
+            try:
+                b_units, b_matched = _try_parse_brookfield(resp)
+                if b_matched:
+                    host_units = b_units
+                    host_label = "brookfield"
+            except Exception as exc:  # defensive — never break the run
+                result.errors.append(f"brookfield-parse-error: {exc}")
+            # WP /ajax/api/plansandpricing/ AJAX route (RentDynamics-style
+            # payload). Hazel at National Landing canonical; gated on path
+            # so any property using this route benefits.
+            if not host_units:
+                try:
+                    p_units, p_matched = _try_parse_plansandpricing(resp)
+                    if p_matched:
+                        host_units = p_units
+                        host_label = "plansandpricing"
+                except Exception as exc:  # defensive — never break the run
+                    result.errors.append(f"plansandpricing-parse-error: {exc}")
+            if host_units:
+                all_units.extend(host_units)
+                result.api_responses.append(resp)
+                host_specific_attempts.append((host_label, len(host_units)))
+                host_specific_consumed.add(id(resp))
+        if host_specific_attempts:
+            _log_attempt(
+                "generic:api_host_specific",
+                "ran_units",
+                units=len(all_units),
+                reason=",".join(f"{lbl}={n}" for lbl, n in host_specific_attempts),
+                duration_ms=int((_time.monotonic() - t0) * 1000),
+            )
+
         # Sub-tier 1: narrow generic API parser -----------------------------
         # Phase 4: _api_signal_qualifies() is the single gate — SourceQualifier
         # when the signal engine is available, has_unit_signals() otherwise.
         # This replaces the Phase 1 dual-run and removes the lazy import.
         t0 = _time.monotonic()
+        narrow_units_added = 0
         for resp in api_responses:
+            # Skip responses already claimed by a host-specific parser; the
+            # generic narrow path would re-emit weaker rows for the same
+            # underlying data and the planner would see inflated counts.
+            if id(resp) in host_specific_consumed:
+                continue
             body = resp.get("body")
             items = _find_unit_list(body)
             url = resp.get("url", "")
@@ -1834,16 +1896,37 @@ class GenericAdapter:
             units = parse_generic_api(items, url)
             if units:
                 all_units.extend(units)
+                narrow_units_added += len(units)
                 result.api_responses.append(resp)
         _narrow_ms = int((_time.monotonic() - t0) * 1000)
         if api_responses:
-            _log_attempt(
-                "generic:api_narrow",
-                "ran_units" if all_units else "ran_empty",
-                units=len(all_units),
-                reason="" if all_units else "no items matched unit-signal heuristic",
-                duration_ms=_narrow_ms,
-            )
+            # Log api_narrow's specific contribution (not all_units, which
+            # may include rows already emitted by host-specific parsers).
+            # When narrow found nothing AND host-specific found nothing, the
+            # "no items matched" reason still applies. When host-specific
+            # claimed all responses, narrow has nothing to do — surfaced as
+            # ran_empty with a clarifying reason.
+            if narrow_units_added:
+                _log_attempt(
+                    "generic:api_narrow",
+                    "ran_units",
+                    units=narrow_units_added,
+                    reason="",
+                    duration_ms=_narrow_ms,
+                )
+            else:
+                _reason = (
+                    "all responses consumed by host-specific parser"
+                    if host_specific_consumed and len(host_specific_consumed) == len(api_responses)
+                    else "no items matched unit-signal heuristic"
+                )
+                _log_attempt(
+                    "generic:api_narrow",
+                    "ran_empty",
+                    units=0,
+                    reason=_reason,
+                    duration_ms=_narrow_ms,
+                )
         else:
             _log_attempt("generic:api_narrow", "skipped", reason="no captured API responses", duration_ms=0)
 
@@ -1853,7 +1936,7 @@ class GenericAdapter:
             for resp in api_responses:
                 url = resp.get("url") or ""
                 body = resp.get("body")
-                host_units: list[dict[str, str]] = []
+                host_units = []
                 if body is not None and "sightmap.com" in url.lower():
                     try:
                         host_units = _dr_parse_sightmap(body, url) or []

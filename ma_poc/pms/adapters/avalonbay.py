@@ -130,6 +130,11 @@ class AvalonBayAdapter:
         """
         result = AdapterResult(tier_used="TIER_1_API_AVALONBAY")
         all_units: list[dict[str, str]] = []
+        # 2026-05-22 Phase 2c: collect the latest unitsSummary seen across
+        # responses so plan_summary emission below can iterate
+        # ``totalPricesStartingAt`` for bedroom buckets that have no live
+        # unit rows.
+        latest_summary: dict[str, Any] | None = None
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
         for resp in api_responses:
@@ -140,6 +145,8 @@ class AvalonBayAdapter:
             # AvalonBay-specific: look for units + unitsSummary together
             units_list = body.get("units")
             summary = body.get("unitsSummary")
+            if isinstance(summary, dict):
+                latest_summary = summary
             if isinstance(units_list, list) and units_list and isinstance(units_list[0], dict):
                 # Check for AvalonBay-specific keys
                 first = units_list[0]
@@ -176,6 +183,61 @@ class AvalonBayAdapter:
                 if units:
                     all_units.extend(units)
                     result.api_responses.append(resp)
+
+        # 2026-05-22 Phase 2c — bedroom buckets in unitsSummary with no live
+        # unit rows become plan_summary rows. AvalonBay's
+        # ``totalPricesStartingAt`` keys are bedroom counts ("0", "1", "2",
+        # "3"); each represents a coarse floor-plan grouping visible on
+        # the marketing site as "Studios from $1,500", "1BR from $1,800".
+        # Plans without an emitted unit silently disappeared pre-fix.
+        if latest_summary:
+            covered_beds: set[int] = set()
+            for u in all_units:
+                beds_str = u.get("bedrooms")
+                if beds_str:
+                    try:
+                        covered_beds.add(int(beds_str))
+                    except (TypeError, ValueError):
+                        pass
+            prices = (
+                latest_summary.get("totalPricesStartingAt")
+                or latest_summary.get("netEffectivePricesStartingAt")
+                or {}
+            )
+            if isinstance(prices, dict):
+                for bed_key, price_obj in prices.items():
+                    try:
+                        beds_int = int(bed_key)
+                    except (TypeError, ValueError):
+                        continue
+                    if beds_int in covered_beds:
+                        continue  # dup-prevention: bucket has a live unit row
+                    if not isinstance(price_obj, dict):
+                        continue
+                    rent_val = price_obj.get("unfurnished") or price_obj.get("furnished")
+                    if not isinstance(rent_val, (int, float)) or rent_val <= 0:
+                        continue
+                    all_units.append(
+                        make_unit_dict(
+                            floor_plan_name=(
+                                "Studio" if beds_int == 0 else f"{beds_int} Bedroom"
+                            ),
+                            bed_label=bed_label_from(beds_int, ""),
+                            bedrooms=str(beds_int),
+                            bathrooms="",
+                            sqft="",
+                            unit_number="",  # → post_process routes to plan_summaries
+                            rent_low=int(rent_val),
+                            rent_high=int(rent_val),
+                            availability_status="UNKNOWN",
+                            availability_date="",
+                            source_api_url=(
+                                result.api_responses[0].get("url", "")
+                                if result.api_responses else ""
+                            ),
+                            extraction_tier="TIER_1_API_AVALONBAY",
+                        )
+                    )
 
         if all_units:
             from ma_poc.extraction.post_process import post_process
