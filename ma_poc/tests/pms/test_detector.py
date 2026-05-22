@@ -518,6 +518,67 @@ def test_bare_appfolio_marketing_link_does_not_promote() -> None:
 
 
 # ---------------------------------------------------------------------------
+# RealPage hosted-portal markers must outrank a co-resident chat widget.
+# 2026-05-22 bucket-B grind: the 9-property RealPage-OLL SPA cohort all
+# misrouted to funnel/knock/g5 — those chat widgets fire at 0.90 and beat
+# the RealPage markers' old 0.85. Boosted to 0.92.
+# ---------------------------------------------------------------------------
+
+
+def test_realpage_oll_portal_beats_coresident_knock_widget() -> None:
+    """onlineleasing.realpage.com + a Knock chat widget must route to the
+    RealPage portal (onesite), not Knock."""
+    html = (
+        "<html><body>"
+        '<a href="https://9216254.onlineleasing.realpage.com/">Apply Now</a>'
+        '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+        '<script>knockDoorway.init("a","community","b");</script>'
+        "</body></html>"
+    )
+    r = detect_pms("https://x.example/", page_html=html)
+    assert r.pms == "onesite", f"expected onesite, got {r.pms}"
+
+
+def test_realpage_oll_wizard_beats_coresident_funnel_widget() -> None:
+    """The OLL leasing-wizard marker must beat a co-resident Funnel widget."""
+    html = (
+        "<html><body>"
+        '<div class="rp-leasing-widget"></div>'
+        '<img src="https://assets.nestiostatic.com/logo.jpg">'
+        '<button data-property-id="42">Apply</button>'
+        "</body></html>"
+    )
+    r = detect_pms("https://y.example/", page_html=html)
+    assert r.pms == "realpage_oll", f"expected realpage_oll, got {r.pms}"
+
+
+def test_realpage_cws_widget_beats_coresident_funnel() -> None:
+    """The CWS RPFP widget must beat a co-resident Funnel widget."""
+    html = (
+        "<html><body>"
+        '<script src="https://cs-cdn.realpage.com/CWS/123/app.js"></script>'
+        '<img src="https://assets.nestiostatic.com/x.jpg">'
+        '<button data-property-id="9">Apply</button>'
+        "</body></html>"
+    )
+    r = detect_pms("https://z.example/", page_html=html)
+    assert r.pms == "realpage_cws", f"expected realpage_cws, got {r.pms}"
+
+
+def test_realpage_markers_yield_strong_confidence() -> None:
+    """All three RealPage hosted-portal markers must yield >= 0.92 so they
+    outrank co-resident chat widgets (0.90)."""
+    for html, pms in [
+        ('<a href="https://1.onlineleasing.realpage.com/">x</a>', "onesite"),
+        ('<div class="rp-leasing-widget"></div>', "realpage_oll"),
+        ('<script src="https://cs-cdn.realpage.com/CWS/1/a.js"></script>',
+         "realpage_cws"),
+    ]:
+        confs = [c for p, c, _ in _iter_html_markers(html) if p == pms]
+        assert confs and max(confs) >= 0.92, f"{pms}: {confs}"
+
+
+# ---------------------------------------------------------------------------
 # Change 2 — confirm_detection (router invariant)
 # ---------------------------------------------------------------------------
 
@@ -1072,8 +1133,10 @@ def test_detect_html_markers_picks_highest_confidence_yielded() -> None:
 
     # Co-resident multi-PMS case (the bug this fix addresses). Real-world:
     # solesteseaside.com/floorplans/ has OneSite portal marker AND a
-    # SightMap embed iframe. Pre-fix, OneSite at 0.85 won; post-fix,
-    # SightMap at 0.90 must win.
+    # SightMap embed iframe. The SightMap embed carries the unit data
+    # directly, so it must win — its marker (0.93) stays above the
+    # RealPage hosted-portal markers (0.92, raised 2026-05-22 so they beat
+    # co-resident chat widgets).
     co_resident_html = (
         "<html><body>"
         '<a href="https://onlineleasing.realpage.com/foo">portal</a>'
@@ -1083,10 +1146,10 @@ def test_detect_html_markers_picks_highest_confidence_yielded() -> None:
     chosen = _detect_html_markers(co_resident_html)
     assert chosen is not None
     assert chosen[0] == "sightmap", (
-        f"co-resident OneSite+SightMap: SightMap (0.90) must beat OneSite (0.85). "
-        f"got {chosen!r}"
+        f"co-resident OneSite+SightMap: SightMap embed must beat the OneSite "
+        f"portal link. got {chosen!r}"
     )
-    assert chosen[1] == 0.90
+    assert chosen[1] == 0.93
 
 
 def test_iter_html_markers_preserves_yield_order_for_retry() -> None:

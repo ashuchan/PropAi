@@ -537,8 +537,15 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # Wix/Squarespace shells because a real leasing path is the source of
     # truth even when the surrounding marketing site is built on a no-PMS
     # platform.
+    # 2026-05-22 bucket-B grind: yielded STRONG (0.92) — ``onlineleasing
+    # .realpage.com`` is the definitive OneSite leasing portal and cannot be
+    # incidental. It must outrank a co-resident funnel/knock/g5 CHAT widget
+    # (those fire at 0.90): the 9-property RealPage-OLL SPA cohort all
+    # misrouted to funnel/g5/knock/onesite because the chat widget won.
+    # Same rationale as the AppFolio tenant-portal and Repli360 strong-host
+    # fixes.
     if "onlineleasing.realpage.com" in h:
-        yield "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
+        yield "onesite", 0.92, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
     # RealPage OLL (Online Leasing) wizard — the "Category-D" cluster
     # (~187 props). Vanity marketing sites hop to ``leasing.realpage.com``
     # / embed an ``rp-leasing-widget`` / link ``<property>/content/apply#k=``
@@ -555,7 +562,10 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     ):
         yield (
             "realpage_oll",
-            0.85,
+            # STRONG (0.92) — definitive leasing-wizard markers, must beat a
+            # co-resident chat widget (funnel/knock at 0.90). See the
+            # onlineleasing.realpage.com note above.
+            0.92,
             ["RealPage OLL wizard marker in HTML (leasing.realpage.com / "
              "rp-leasing-widget / RP.Leasing.AppService / /content/apply#k=)"],
         )
@@ -594,7 +604,11 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     if _has_sightmap_embed and _has_entrata_widget:
         yield (
             "sightmap",
-            0.90,
+            # 0.93 (2026-05-22): the SightMap embed iframe is the definitive
+            # unit-data widget and must remain the strongest content marker —
+            # above the RealPage hosted-portal markers (0.92), which carry a
+            # *link* to a portal rather than the data itself.
+            0.93,
             [
                 "SightMap embed iframe + Entrata widget both present — "
                 "SightMap carries unit data, routed there"
@@ -603,7 +617,7 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     if _has_sightmap_embed:
         yield (
             "sightmap",
-            0.90,
+            0.93,
             ["SightMap embed iframe in HTML (sightmap.com/embed/)"],
         )
     # 2026-05-20: Engrain widget signal. RealPage's interactive-map vendor
@@ -1112,7 +1126,9 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     ):
         yield (
             "realpage_cws",
-            0.85,
+            # STRONG (0.92) — the CWS RPFP widget is definitive; must beat a
+            # co-resident chat widget (funnel/knock at 0.90).
+            0.92,
             ["RealPage CWS RPFP widget marker in HTML "
              "(cs-cdn.realpage.com/CWS/ OR .rpfp-container + .rpfp-card)"],
         )
