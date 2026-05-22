@@ -22,7 +22,7 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     from ..models.scrape_profile import ScrapeProfile
 
-from ..config.feature_flags import ENABLE_TIER_ESCALATION
+from ..config.feature_flags import ENABLE_TIER_ESCALATION, ENABLE_UNLOCKER_TIER
 from ..discovery.contracts import CrawlTask
 from ..observability.events import EventKind, emit
 from .browser_pool import BrowserContextPool
@@ -454,6 +454,39 @@ class Fetcher:
 
         return last_result
 
+    async def _try_unlocker_fallback(
+        self, task: CrawlTask, start_ms: int
+    ) -> FetchResult | None:
+        """Last-resort Web Unlocker fetch for a RENDER task blocked by CF.
+
+        Returns the FetchResult on a successful unlock, or None when the
+        Unlocker tier is unavailable or itself fails. Never raises — a
+        failure here just leaves the original BOT_BLOCKED result standing.
+        """
+        try:
+            from .providers.unlocker import UnlockerProvider
+
+            provider = UnlockerProvider()
+        except Exception as exc:
+            log.warning("unlocker fallback unavailable: %s", exc)
+            return None
+        try:
+            # UnlockerProvider ignores the profile arg on every transport
+            # path; None is safe and avoids threading a profile this deep.
+            result = await provider.fetch(task, None)  # type: ignore[arg-type]
+            emit(
+                EventKind.FETCH_TIER_ESCALATED,
+                task.property_id,
+                tier="UNLOCKER",
+                reason="render_bot_blocked",
+            )
+            return result
+        except Exception as exc:
+            log.warning(
+                "unlocker fallback failed for %s: %s", task.property_id, exc
+            )
+            return None
+
     async def _do_request(
         self,
         task: CrawlTask,
@@ -479,7 +512,29 @@ class Fetcher:
             FetchResult for this attempt.
         """
         if task.render_mode == RenderMode.RENDER:
-            return await self._do_render(task, identity, proxy, attempt, start_ms)
+            render_result = await self._do_render(
+                task, identity, proxy, attempt, start_ms
+            )
+            # RENDER tasks bypass the tier escalator (commit 0e85fbf — the
+            # escalator's plain-GET lower tiers serve un-rendered HTML for
+            # SPA pages, which broke 50/50 controls). But a Cloudflare
+            # bot-fight block has no rendering remedy — patchright simply
+            # gets 403'd. The Web Unlocker is the only escape: it returns
+            # SOLVED, real HTML, which is sufficient for server-rendered
+            # pages (e.g. Entrata /conventional/ — data is in the initial
+            # HTML). When a RENDER task is BOT_BLOCKED and the Unlocker
+            # tier is enabled, fall back to JUST the Unlocker. This does
+            # NOT re-introduce 0e85fbf's regression — the plain-GET lower
+            # tiers (DIRECT/DC_PROXY) are never engaged here.
+            if (
+                render_result.outcome == FetchOutcome.BOT_BLOCKED
+                and ENABLE_TIER_ESCALATION
+                and ENABLE_UNLOCKER_TIER
+            ):
+                unlocked = await self._try_unlocker_fallback(task, start_ms)
+                if unlocked is not None and unlocked.outcome == FetchOutcome.OK:
+                    return unlocked
+            return render_result
 
         # HEAD or GET via tier-aware HTTP client (S2/S3/S4).
         # This path is only reached when ENABLE_TIER_ESCALATION is False;
