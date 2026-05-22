@@ -352,13 +352,18 @@ class AppFolioAdapter:
              TENANT_OFFBOARDED so the run report distinguishes "tenant gone"
              from a real fetch failure.
         """
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+
+        pid_for_log = str(getattr(ctx, "property_id", "") or "unknown")
         result = AdapterResult(tier_used="TIER_1_API_APPFOLIO")
         all_units: list[dict[str, str]] = []
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
+        n_matched_shape = 0
         for resp in api_responses:
             body = resp.get("body")
             if _is_appfolio_response(body):
+                n_matched_shape += 1
                 url = resp.get("url", "")
                 items: list[dict[str, Any]] = []
                 if isinstance(body, dict):
@@ -369,6 +374,17 @@ class AppFolioAdapter:
                 if units:
                     all_units.extend(units)
                     result.api_responses.append(resp)
+
+        log_adapter_stage(
+            "appfolio",
+            pid_for_log,
+            "xhr_capture",
+            "ok" if all_units else "no_shape_match" if api_responses else "no_api_responses",
+            units=len(all_units),
+            reason=f"network_responses={len(api_responses)} matched={n_matched_shape}",
+            n_responses=len(api_responses),
+            matched_shape=n_matched_shape,
+        )
 
         if all_units:
             # Stage 1 validity gate — drops dim-less rows.

@@ -224,6 +224,9 @@ class KnockAdapter:
         The ``page`` argument is unused — Knock units come from a public
         JSON API, no rendering is required.
         """
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+
+        pid_for_log = str(getattr(ctx, "property_id", "") or "unknown")
         result = AdapterResult(tier_used="TIER_1_KNOCK_API")
 
         # Pull HTML from the L1 fetch result.
@@ -240,6 +243,17 @@ class KnockAdapter:
 
         # Path 1: knockDoorway.init() in static HTML.
         public_key, kind, comm_id = find_knock_ids(html) if html else (None, None, None)
+        log_adapter_stage(
+            "knock",
+            pid_for_log,
+            "ids_search",
+            "found_static" if (public_key and comm_id) else "no_static_ids",
+            reason=(
+                f"public_key={'set' if public_key else 'none'} "
+                f"comm_id={comm_id!r} kind={kind!r} body_len={len(html)}"
+            ),
+            has_static_init=bool(public_key and comm_id),
+        )
         if public_key and comm_id:
             try:
                 units = await _fetch_knock_units(comm_id, kind or "community")

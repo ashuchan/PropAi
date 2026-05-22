@@ -15,7 +15,7 @@ export function MapPopup({ property }: { property: ApiPropertySummary }) {
         <div><p className="font-mono font-medium text-slate-900">{formatCurrency(property.avgAskingRent)}</p><p className="text-slate-500">Avg Rent</p></div>
         <div><p className="font-mono font-medium text-slate-900">{formatPercent(property.availabilityRate)}</p><p className="text-slate-500">Avail</p></div>
       </div>
-      {property.activeConcession && <div className="mt-2"><ConcessionTag text={property.activeConcession} /></div>}
+      {(property.concessionBanner || property.activeConcession) && <div className="mt-2"><ConcessionTag banner={property.concessionBanner} raw={property.activeConcession} /></div>}
       <Link to={`/properties/${property.id}`} className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-rent-400 hover:text-rent-600">View detail <ExternalLink size={10} /></Link>
     </div>
   );

@@ -497,8 +497,66 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # Wix/Squarespace shells because a real leasing path is the source of
     # truth even when the surrounding marketing site is built on a no-PMS
     # platform.
+    # 2026-05-22 (post-5/21 cloud-run audit): negative gate on competing
+    # widget CDNs. The bare ``onlineleasing.realpage.com`` substring over-
+    # routed 80/312 OneSite-detected props to TIER_4_LLM_DOM because many
+    # Apts247 (apartments247.com) and Knock-fronted sites carry a stale
+    # "Apply Now" anchor pointing at ``*.onlineleasing.realpage.com`` from
+    # a previous platform.
+    #
+    # ``static2.apts247.info`` is the Apts247 widget JS CDN — it cannot
+    # legitimately appear on a real RealPage portal page; it only loads
+    # when the site is structurally Apts247. Live verified 2026-05-22
+    # (3 misroute + 3 real PIDs + 3 validation PIDs): 22 hits on
+    # misroutes, 0 hits on real OneSite — perfect separation.
+    #
+    # ``doorway.knck.io`` is the Knock widget loader — same separation
+    # pattern. The Knock-target branch lives later in this function (in
+    # Pass 1 STRONG markers, after OneSite/RealPage OLL), so if we just
+    # ``pass`` here the page would fall through to ``realpage_oll`` before
+    # reaching Knock (verified 2026-05-22 canary on PID 19245
+    # tenzenapartments.com — fell through to realpage_oll and shipped 0
+    # units instead of getting Knock's 4 units). Return ``knock`` directly
+    # to short-circuit ahead of the realpage_oll branch.
     if "onlineleasing.realpage.com" in h:
-        return "onesite", 0.85, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
+        _has_apts247_widget = (
+            "static2.apts247.info" in h
+            or "apartments247_api.min.js" in h
+        )
+        _has_knock_loader = (
+            "doorway.knck.io" in h
+            or "knockdoorway" in h
+        )
+        # Mirror of the competing-primary-pms guard the Knock branch uses
+        # at detector.py:645-654 — keeps the rentcafe/resman family from
+        # being misrouted to knock by an incidental knock-doorway script.
+        _has_competing_primary_for_knock = (
+            ".securecafe.com" in h
+            or "securecafe.com/onlineleasing" in h
+            or "rentcafe.com/onlineleasing" in h
+            or "rentcafe.com/apartments" in h
+            or "widgets.rentcafe.com" in h
+            or "rentcafeapi.com" in h
+            or "myresman.com" in h
+            or "/portal/applicants/availability" in h
+        )
+        if _has_knock_loader and not _has_competing_primary_for_knock:
+            return (
+                "knock",
+                0.85,
+                [
+                    "Knock widget loader (doorway.knck.io / knockDoorway) + "
+                    "stale RealPage marker — demoted from onesite to knock "
+                    "to skip the realpage_oll branch"
+                ],
+            )
+        if not (_has_apts247_widget or _has_knock_loader):
+            return (
+                "onesite",
+                0.85,
+                ["OneSite portal marker in HTML (onlineleasing.realpage.com)"],
+            )
+        # apts247-widget case: yield to the apts247 branch downstream.
 
     # 2026-05-13 port: RealPage OLL (Online Leasing) wizard -- the
     # "Category-D" cluster (~187 props). Vanity sites hop to

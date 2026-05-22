@@ -938,6 +938,34 @@ async def scrape(
             return result
         adapter_result = AdapterResult(errors=[str(exc)])
 
+    # 2026-05-22: platform-wide cascade-exit telemetry. Every PMS adapter
+    # emits one ``<pms>:adapter_exit`` event regardless of internal
+    # instrumentation. Captures the adapter's final ``tier_used`` and
+    # unit count so the analyzer can build an exit-outcome histogram per
+    # PMS without each adapter having to add its own emit. Adapters that
+    # ALREADY emit a richer ``cascade_exit`` event (rentcafe, g5, onesite)
+    # also keep emitting theirs — the two coexist; the platform-wide
+    # ``adapter_exit`` is a guaranteed floor.
+    try:
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage as _log_stg
+
+        _log_stg(
+            adapter_name or "unknown",
+            ctx.property_id or "unknown",
+            "adapter_exit",
+            adapter_result.tier_used or "no_tier_set",
+            units=len(adapter_result.units),
+            reason=(
+                f"errors={'|'.join(str(e)[:60] for e in adapter_result.errors[:2])[:140]}"
+                if adapter_result.errors else
+                f"plan_summaries={len(getattr(adapter_result, 'plan_summaries', None) or [])}"
+            ),
+            plan_summaries=len(getattr(adapter_result, "plan_summaries", None) or []),
+            confidence=getattr(adapter_result, "confidence", 0.0),
+        )
+    except Exception:
+        pass  # telemetry never breaks scraping
+
     # --- F2: LLM rescue for Tier-1 API adapters --------------------------------
     # When the adapter captures API responses but produces no substantive units,
     # hand the bodies to the LLM rescue service. Adapters never import this module.

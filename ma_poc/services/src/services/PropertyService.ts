@@ -17,6 +17,7 @@ import type {
   MarketMetrics, PropertyMedia, FloorPlanImage, SchemaVersion,
 } from '../types/property.js';
 import { resolveAvailabilityStatus } from '../utils/availability.js';
+import { buildConcessionFields } from '../utils/concession.js';
 
 // ── Raw row shapes — v1 and v2 ───────────────────────────────────────────────
 
@@ -309,7 +310,7 @@ export class PropertyService implements IPropertyService {
       propertyStatus: 'ACTIVE',
       yearBuilt: null,
       stories: null,
-      activeConcession: r.concessions ?? null,
+      ...buildConcessionFields(r.concessions ?? null),
       lastScrapeTimestamp: r.lastSeenAt ?? '',
       carryForwardDays: 0,
       imageUrl: null,
@@ -391,7 +392,7 @@ export class PropertyService implements IPropertyService {
       propertyStatus: this.mapPropertyStatus(raw['Property Status']),
       yearBuilt: raw['Year Built'],
       stories: raw['Stories'],
-      activeConcession: concessions[0] || null,
+      ...buildConcessionFields(concessions[0] || null),
       lastScrapeTimestamp: state?.lastSeenAt || raw['Update Date'] || '',
       carryForwardDays: ledgerEntry?.carry_forward_used ? 1 : 0,
       imageUrl: raw['Property Image URL'] || null,
@@ -454,7 +455,7 @@ export class PropertyService implements IPropertyService {
       propertyStatus: 'ACTIVE',
       yearBuilt: null,
       stories: null,
-      activeConcession: raw.concessions || null,
+      ...buildConcessionFields(raw.concessions || null),
       lastScrapeTimestamp: units[0]?.date_captured || state?.lastSeenAt || '',
       carryForwardDays: ledgerEntry?.carry_forward_used ? 1 : 0,
       imageUrl: null,
@@ -583,7 +584,7 @@ export class PropertyService implements IPropertyService {
       propertyStatus: 'ACTIVE',
       yearBuilt: null,
       stories: null,
-      activeConcession: typeof state.concessions === 'string' ? state.concessions : null,
+      ...buildConcessionFields(typeof state.concessions === 'string' ? state.concessions : null),
       lastScrapeTimestamp: state.lastSeenAt ?? '',
       carryForwardDays: 0,
       imageUrl: null,

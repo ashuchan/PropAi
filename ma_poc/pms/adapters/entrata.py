@@ -536,6 +536,64 @@ class EntrataAdapter:
                     f"failed unit_validity (no numeric dimension)"
                 )
 
+        # 2026-05-22 (restore from 8b1bfa4, reverted in 4c9dbf8): the
+        # ``view_unit_spaces`` ProspectPortal probe. Many Entrata-detected
+        # properties embed a ``<iframe src="https://<sub>.prospectportal.com/
+        # ?module=guest_card&...&property[id]=<pid>">`` on the marketing
+        # page. The iframe alone gives us (host, property_id)
+        # deterministically — bare host root + module=check_availability
+        # then lists every floorplan id. Per-fp ``view_unit_spaces`` GETs
+        # return the unit table the parser at line 360 already knows how
+        # to read. Cloudflare-fronted → probe_get's WU escalation.
+        #
+        # Live-verified 2026-05-22 on 5 sample PIDs (19939, 243704, 30775,
+        # 34777, 297737) — every page had exactly one PP iframe with
+        # property[id] baked in. WITHOUT a residential proxy this returns
+        # CF challenge bodies; the path still emits telemetry so
+        # production runs without PROBE_PROXY_URL surface the gate
+        # explicitly.
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+
+        _pid = str(getattr(ctx, "property_id", "") or "unknown")
+        try:
+            pp_units = await self._probe_prospectportal(ctx)
+        except Exception as _pp_exc:
+            log_adapter_stage(
+                "entrata",
+                _pid,
+                "prospectportal_probe",
+                f"exception:{type(_pp_exc).__name__}",
+                reason=str(_pp_exc)[:140],
+            )
+            pp_units = []
+        if pp_units:
+            from ma_poc.extraction.post_process import post_process
+
+            _pp = post_process(pp_units, property_id=getattr(ctx, "property_id", None))
+            log_adapter_stage(
+                "entrata",
+                _pid,
+                "prospectportal_probe",
+                "ok" if _pp.n_admitted > 0 else "validity_rejected",
+                units=_pp.n_admitted,
+                reason=f"parsed={len(pp_units)}",
+            )
+            if _pp.n_admitted > 0:
+                result.units = list(_pp.units)
+                result.plan_summaries = list(_pp.plan_summaries)
+                result.post_process_meta = _pp.to_meta()
+                result.tier_used = "TIER_1_API_ENTRATA_PROSPECTPORTAL"
+                result.confidence = min(0.93, 0.7 + 0.04 * _pp.n_admitted)
+                return result
+        else:
+            log_adapter_stage(
+                "entrata",
+                _pid,
+                "prospectportal_probe",
+                "ran_empty",
+                reason="no prospectportal iframe or probe returned 0 rows",
+            )
+
         result.confidence = 0.0
         result.errors.append("No Entrata floorplan data found in captured API responses")
 
@@ -554,6 +612,82 @@ class EntrataAdapter:
 
     def static_fingerprints(self) -> list[str]:
         return list(self._fingerprints)
+
+    async def _probe_prospectportal(self, ctx: AdapterContext) -> list[dict[str, str]]:
+        """Restore from 8b1bfa4 (reverted by 4c9dbf8). When the marketing
+        page embeds an ``<iframe src="https://<sub>.prospectportal.com/
+        ?module=guest_card&action=create_guest_card&property[id]=<pid>...">``,
+        the iframe alone yields (host, property_id) deterministically.
+
+        Flow:
+          1. Extract ``<sub>.prospectportal.com`` host from the entry HTML
+             or ``ctx.base_url`` via ``_PP_HOST_RE``.
+          2. Fetch ``https://<host>/?module=check_availability&is_secure=1``
+             via curl_cffi (probe_get). This lists every floorplan id.
+          3. Harvest ``property[id]`` (``_PP_PROPID_RE``) and all
+             ``property_floorplan[id]`` / ``data-floorplan`` ids
+             (``_PP_FPID_RE``).
+          4. For each fp_id (up to 30), GET
+             ``view_unit_spaces`` and parse the unit table via the
+             already-existing ``parse_prospectportal_unit_spaces``.
+
+        Never raises — [] when not a PP site or every probe fails. Cloudflare
+        is fronted; ``probe_get`` auto-escalates to BrightData Web Unlocker
+        when ``WEB_UNLOCKER_KEY`` is set on the cloud env.
+        """
+        fr = getattr(ctx, "fetch_result", None)
+        body = getattr(fr, "body", None) if fr is not None else None
+        if isinstance(body, bytes):
+            try:
+                body = body.decode("utf-8", errors="replace")
+            except Exception:
+                body = ""
+        seed = body if isinstance(body, str) else ""
+        seed = (seed or "") + " " + (getattr(ctx, "base_url", "") or "")
+        mh = _PP_HOST_RE.search(seed)
+        if not mh:
+            return []
+        portal = f"https://{mh.group(1)}.prospectportal.com"
+
+        landing = ""
+        try:
+            r = await _entrata_static_fetch(
+                portal + "/?module=check_availability&is_secure=1"
+            )
+            landing = r or ""
+        except Exception:
+            landing = ""
+        hay = landing or seed
+        mp = _PP_PROPID_RE.search(hay)
+        if not mp:
+            return []
+        prop_id = mp.group(1)
+        fp_ids: list[str] = []
+        for m in _PP_FPID_RE.finditer(hay):
+            fid = m.group(1)
+            if fid and fid not in fp_ids:
+                fp_ids.append(fid)
+        if not fp_ids:
+            return []
+
+        from datetime import date
+
+        movein = date.today().isoformat()
+        out: list[dict[str, str]] = []
+        # Cap at 30 floorplans per property to bound proxy bandwidth.
+        for fid in fp_ids[:30]:
+            u = (
+                f"{portal}/?module=check_availability&is_secure=1"
+                f"&property[id]={prop_id}&action=view_unit_spaces"
+                f"&property_floorplan[id]={fid}"
+                f"&move_in_date={movein}&occupancy_type=conventional"
+            )
+            try:
+                h = await _entrata_static_fetch(u)
+            except Exception:
+                continue
+            out.extend(parse_prospectportal_unit_spaces(h, u))
+        return out
 
     @staticmethod
     def _origin_from_ctx(page: Page, ctx: AdapterContext) -> str:

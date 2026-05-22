@@ -10,6 +10,7 @@ import { createRunRoutes } from './routes/runs.js';
 import { createDiffRoutes } from './routes/diff.js';
 import { createHealthRoutes } from './routes/health.js';
 import { createFloorPlanComparisonRoutes } from './routes/floorPlanComparisons.js';
+import { createAdminRoutes } from './routes/admin.js';
 
 async function startServer() {
   const { createServices } = await import('../../../services/src/factory.js');
@@ -35,6 +36,9 @@ async function startServer() {
     '/api/floor-plan-comparisons',
     createFloorPlanComparisonRoutes(services.floorPlanComparisons),
   );
+  // Admin endpoints — operator-triggered scripts (email reports, etc.).
+  // No auth on this route group; gate at the deployment / VPC layer.
+  app.use('/api/admin', createAdminRoutes());
 
   // SPA serving — single-container Cloud Run deploy. Mounted AFTER /api/* so
   // route ordering can never shadow an API path. The catch-all SPA fallback

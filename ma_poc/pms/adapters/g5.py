@@ -89,25 +89,78 @@ _TIER_API_ERROR = f"{_TIER_BASE}_API_ERROR"
 _TIER_EMPTY = f"{_TIER_BASE}_EMPTY"
 
 
-def find_g5_urn(html: str) -> str | None:
-    """Return the longest ``g5-cl-...`` / ``g5-cl<x>-...`` slug in *html*,
-    or ``None``.
+# 2026-05-22: Cloudinary asset-folder regex. G5 hosts every site's images
+# under ``/g5/g5-c-<companyId>/g5-cl-<propertyUrn>/uploads/...`` — the
+# property's favicon, og:image, and apple-touch-icon all point at THIS
+# property's folder, never a sibling's. Anchoring URN selection on this
+# CDN path eliminates the ambiguity that broke ``max(matches, key=len)``
+# (live-verified 5/5 on Anson, Central Park, Brook Hollow, Ten68 West,
+# Westgate Village 2026-05-22). The bare longest-match heuristic shipped
+# sibling URNs for 5/5 of the same sample, including Maryland data for
+# a California property.
+_G5_CDN_PROPERTY_RE = re.compile(
+    r"/g5/g5-c[a-z]?-[a-z0-9]+/(g5-cl[a-z]?-[a-z0-9-]+?)/uploads/",
+    re.IGNORECASE,
+)
 
-    Longest match wins because the same property might have both the bare
-    ``g5-cl-<id>`` and the full ``g5-cl-<id>-<name-slug>`` form; the
-    GraphQL API accepts either but the longer form is unambiguous.
 
-    2026-05-21 port: ``"g5-cl"`` substring (without trailing dash) is the
-    early-out gate so we also match the ``g5-clw-`` property-level
-    variant (e.g. ``g5-clw-guhjplm75w-villas-willow-glen-...``). The
-    regex itself enforces the ``g5-cl<x?>-<id>`` shape.
+def find_g5_urn_for_property(html: str, base_url: str = "") -> str | None:
+    """Pick the URN belonging to THIS property — never a sibling.
+
+    Three-step deterministic ranking:
+
+    1. **Cloudinary CDN anchor** (primary). Match
+       ``/g5/g5-c-<companyId>/g5-cl-<propertyUrn>/uploads/``. G5's CMS
+       routes every asset upload to the tenant's company+property folder,
+       so the favicon / og:image / apple-touch-icon URLs all reference
+       the correct URN. Sibling property URNs that appear elsewhere on
+       the page (switcher menus, parent-company hub links) live under
+       their own ``g5-c-...`` folder and therefore never collide.
+    2. **CDN-path frequency tie-break** when step 1 matches multiple
+       URNs (rare; happens when an og:image and a favicon point at
+       different image variants of the same property — both still belong
+       to the property under inspection).
+    3. **Most-frequent g5-cl-* anywhere on the page** (fallback). When
+       step 1 misses entirely (theoretical: a G5 page with no
+       Cloudinary-served favicon), the URN appearing most often wins.
+       Sibling URNs on a switcher menu appear exactly once; the
+       property's own URN appears 50-150+ times in the live samples.
+
+    ``max(matches, key=len)`` is explicitly **NOT** used — it picks
+    parent-company switcher URNs ("g5-cl-...-{property}-client-marketing")
+    or ``g5-clw-`` property-scoped variants which return HTTP 404 from
+    the GraphQL inventory endpoint. Verified 0/5 correct on live samples.
+
+    ``base_url`` is accepted for forward compatibility (e.g. a future
+    fallback that matches the property's URL slug against the URN body)
+    but is not currently used.
     """
+    del base_url  # reserved for future slug-match fallback
     if not html or "g5-cl" not in html.lower():
         return None
-    matches = {m.group(0).lower() for m in _G5_URN_RE.finditer(html)}
-    if not matches:
+    # Step 1+2 — Cloudinary CDN paths. Frequency-rank in case the page
+    # has multiple property-folder references.
+    cdn_hits = [m.group(1).lower() for m in _G5_CDN_PROPERTY_RE.finditer(html)]
+    if cdn_hits:
+        from collections import Counter
+        return Counter(cdn_hits).most_common(1)[0][0]
+    # Step 3 — fallback: most-frequent g5-cl-* on the page.
+    all_urns = [m.group(0).lower() for m in _G5_URN_RE.finditer(html)]
+    if not all_urns:
         return None
-    return max(matches, key=len)
+    from collections import Counter
+    return Counter(all_urns).most_common(1)[0][0]
+
+
+# Backward-compat alias — existing tests call ``find_g5_urn``.
+# Routes to the new deterministic implementation.
+def find_g5_urn(html: str) -> str | None:
+    """Deprecated alias for :func:`find_g5_urn_for_property`. Retained so
+    older tests keep importing the old name; new callers should use the
+    new function (which accepts an optional ``base_url`` for the future
+    slug-match fallback).
+    """
+    return find_g5_urn_for_property(html, "")
 
 
 def _price_to_int(prices: Any) -> int | None:
@@ -240,32 +293,101 @@ class G5Adapter:
     ]
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
-        """Discover URN → fetch units → emit AdapterResult."""
+        """Discover URN → fetch units → emit AdapterResult.
+
+        2026-05-22: two structural fixes that together unblock the 0-win
+        G5 cohort:
+
+        1. **Rendered HTML access**. Previously only ``ctx.fetch_result.body``
+           was read. The G5 detector signals (g5-cl-* tokens) often live
+           in JS-injected DOM that's absent from the SSR snapshot. Pull
+           ``page.content()`` first (via the same helper GenericAdapter
+           uses) and fall back to fetch_result.body if Playwright is
+           unavailable. Mirror of the pattern at
+           ``ma_poc/pms/adapters/generic.py:_get_page_html``.
+        2. **Deterministic URN selection** (see ``find_g5_urn_for_property``).
+        """
+        from ma_poc.pms.adapters._adapter_telemetry import (
+            log_adapter_diag,
+            log_adapter_stage,
+        )
+
+        pid = str(getattr(ctx, "property_id", "") or "unknown")
         result = AdapterResult(tier_used=_TIER_BASE)
 
-        fr = getattr(ctx, "fetch_result", None)
-        body = getattr(fr, "body", None) if fr is not None else None
+        # Pull rendered HTML when available (fixes G5 root cause #2 —
+        # static body often lacks the URN, but the rendered DOM has it).
         html = ""
-        if isinstance(body, bytes):
-            try:
-                html = body.decode("utf-8", errors="replace")
-            except Exception:
-                html = ""
-        elif isinstance(body, str):
-            html = body
+        try:
+            from ma_poc.pms.adapters.generic import _get_page_html
 
-        urn = find_g5_urn(html) if html else None
+            html = await _get_page_html(page, ctx)
+        except Exception:
+            html = ""
+        # Fallback to fetch_result.body when the page lifecycle is gone
+        # (test harnesses, fetch-only mode).
+        if not html:
+            fr = getattr(ctx, "fetch_result", None)
+            body = getattr(fr, "body", None) if fr is not None else None
+            if isinstance(body, bytes):
+                try:
+                    html = body.decode("utf-8", errors="replace")
+                except Exception:
+                    html = ""
+            elif isinstance(body, str):
+                html = body
+
+        base_url = str(getattr(ctx, "base_url", "") or "")
+        # Normalise html to "" so per-stage telemetry below never trips
+        # on None (some test harnesses pass an empty/None body).
+        html = html or ""
+        urn = find_g5_urn_for_property(html, base_url) if html else None
+
+        # Per-stage telemetry: URN selection outcome.
+        cdn_hits = len(list(_G5_CDN_PROPERTY_RE.finditer(html)))
+        urn_total = len(list(_G5_URN_RE.finditer(html)))
+        urn_distinct = len({m.group(0).lower() for m in _G5_URN_RE.finditer(html)})
+        log_adapter_stage(
+            "g5",
+            pid,
+            "urn_pick",
+            "ok" if urn else "no_urn_found",
+            reason=f"urn={urn!r} body_len={len(html)} cdn_hits={cdn_hits} total={urn_total} distinct={urn_distinct}",
+            urn_picked=urn,
+            urn_cdn_anchored=cdn_hits > 0,
+            urn_total=urn_total,
+            urn_distinct=urn_distinct,
+        )
+
         if not urn:
+            # When the page contains g5-cl-* tokens but ranking returned
+            # None (shouldn't happen with the new algorithm — but emit a
+            # diag event anyway in case of unusual page shapes).
+            if "g5-cl" in (html or "").lower():
+                log_adapter_diag(
+                    "g5",
+                    pid,
+                    "urn_pick",
+                    html,
+                    reason="g5-cl tokens present but no URN picked",
+                )
             result.tier_used = _TIER_NO_URN
             result.errors.append("g5-adapter: no g5-cl-... URN in rendered HTML")
             return result
 
+        # GraphQL fetch — telemetry on both error + empty paths.
         try:
-            payload = await _fetch_g5_units(
-                urn, base_url=str(getattr(ctx, "base_url", "") or "")
-            )
+            payload = await _fetch_g5_units(urn, base_url=base_url)
         except Exception as exc:
+            log_adapter_stage(
+                "g5",
+                pid,
+                "graphql_fetch",
+                f"exception:{type(exc).__name__}",
+                reason=f"urn={urn!r} {str(exc)[:120]}",
+            )
             if await self._try_apollo(page, ctx, result):
+                log_adapter_stage("g5", pid, "apollo_fallback", "ok", units=len(result.units))
                 return result
             result.tier_used = _TIER_API_ERROR
             result.errors.append(
@@ -274,15 +396,32 @@ class G5Adapter:
             return result
 
         if not payload:
+            log_adapter_stage(
+                "g5",
+                pid,
+                "graphql_fetch",
+                "empty_response",
+                reason=f"urn={urn!r} (api 200 but empty data)",
+            )
             if await self._try_apollo(page, ctx, result):
+                log_adapter_stage("g5", pid, "apollo_fallback", "ok", units=len(result.units))
                 return result
             result.tier_used = _TIER_API_ERROR
             result.errors.append(f"g5-api: empty response for urn={urn!r}")
             return result
 
         units = parse_g5_apartments(payload)
+        log_adapter_stage(
+            "g5",
+            pid,
+            "graphql_fetch",
+            "ok" if units else "parse_returned_empty",
+            units=len(units),
+            reason=f"urn={urn!r}",
+        )
         if not units:
             if await self._try_apollo(page, ctx, result):
+                log_adapter_stage("g5", pid, "apollo_fallback", "ok", units=len(result.units))
                 return result
             result.tier_used = _TIER_EMPTY
             result.errors.append(
@@ -294,6 +433,7 @@ class G5Adapter:
         result.units = units
         result.winning_url = f"{_G5_ENDPOINT} (urn={urn})"
         result.confidence = min(0.95, 0.7 + 0.02 * len(units))
+        log_adapter_stage("g5", pid, "cascade_exit", "won_graphql", units=len(units))
         return result
 
     def static_fingerprints(self) -> list[str]:

@@ -731,3 +731,190 @@ def test_nestin_and_hosted_table_modules_import_cleanly():
     # Both modules expose at least one callable.
     assert hasattr(_rentcafe_nestin, "__name__")
     assert hasattr(_rentcafe_hosted_table, "__name__")
+
+
+# ── 2026-05-22 — SecureCafe new-template parser fix ─────────────────────
+#
+# Live diagnostic against 5 RentCafe-detected production PIDs (72944,
+# 24561, 6550, 40584, 67750) showed each securecafe ``availableunits.aspx``
+# page had ≥4 AvailUnitRow rows but the old ``_SECURECAFE_FP_HDR_RE`` regex
+# matched zero floor-plan headers — silently returning ``[]`` from
+# ``parse_securecafe_availableunits`` and dropping the units. The newer
+# SecureCafe template's caption format is
+# ``Floor Plan: 2 Bed - 1 Bath - 2 Bedrooms, 1 Bathroom`` (the visual-name
+# segment ``2 Bed - 1 Bath`` contains literal dashes), which the old
+# character class ``[^<\-]`` excluded.
+
+
+def test_securecafe_hdr_regex_matches_old_template() -> None:
+    """Pre-2026-05-22 template (PID 1084 / theblackhawkapartments family)."""
+    from ma_poc.pms.adapters.rentcafe import _SECURECAFE_FP_HDR_RE
+
+    m = _SECURECAFE_FP_HDR_RE.search(
+        "Floor Plan: A1 One Bedroom / One Bath - 1 Bedroom, 1.0 Bathroom"
+    )
+    assert m is not None
+    assert m.group("name").strip() == "A1 One Bedroom / One Bath"
+    assert m.group("bedtxt").strip() == "1 Bedroom"
+    assert m.group("bathtxt") == "1.0"
+
+
+def test_securecafe_hdr_regex_matches_new_template_with_dashed_name() -> None:
+    """Post-2026-05-22 template (PID 6550 / scottsdalevintageapts family).
+
+    The caption format is wrapped under ``<caption class="sr-only">…</caption>``
+    so the regex sees the full text inline. The previous ``[^<\\-]`` character
+    class blocked the dash inside ``2 Bed - 1 Bath``.
+    """
+    from ma_poc.pms.adapters.rentcafe import _SECURECAFE_FP_HDR_RE
+
+    new_template_caption = (
+        "Apartment Details and Selection for Floor Plan: "
+        "2 Bed - 1 Bath - 2 Bedrooms, 1 Bathroom"
+    )
+    m = _SECURECAFE_FP_HDR_RE.search(new_template_caption)
+    assert m is not None
+    assert m.group("name").strip() == "2 Bed - 1 Bath"
+    assert m.group("bedtxt").strip() == "2 Bedrooms"
+    assert m.group("bathtxt") == "1"
+
+
+def test_securecafe_hdr_regex_studio_still_matches() -> None:
+    """Studio flag preserved across regex relaxation."""
+    from ma_poc.pms.adapters.rentcafe import _SECURECAFE_FP_HDR_RE
+
+    m = _SECURECAFE_FP_HDR_RE.search(
+        "Floor Plan: Studio Loft - Studio, 1 Bathroom"
+    )
+    assert m is not None
+    assert m.group("bedtxt").strip() == "Studio"
+
+
+def test_capture_body_diagnostics_extracts_structural_signals() -> None:
+    """The diagnostic helper mines the body for structural signals so a
+    future regex bug is debuggable from events.jsonl alone.
+
+    Acceptance: the same HTML fragment the SecureCafe parser failed on
+    yields a non-empty signal payload that includes (a) the caption text
+    (so the new ``Floor Plan: 2 Bed - 1 Bath`` form is visible), (b) the
+    data-label inventory (so column changes are detectable), and (c) the
+    first-row context window.
+    """
+    from ma_poc.pms.adapters.rentcafe import _capture_body_diagnostics
+
+    body = (
+        "<html><body>"
+        "<h1>Floor Plans</h1>"
+        "<table id='divFPH_2247999' class='availableUnits'>"
+        "<caption class='sr-only'>Apartment Details and Selection for Floor Plan: "
+        "2 Bed - 1 Bath - 2 Bedrooms, 1 Bathroom</caption>"
+        "<thead><tr><th data-label='Apartment'>Apartment</th>"
+        "<th data-label='Sq.Ft.'>Sq.Ft.</th>"
+        "<th data-label='Rent'>Rent</th></tr></thead>"
+        "<tbody>"
+        "<tr class='AvailUnitRow' data-selenium-id='urow1'>"
+        "<th data-label='Apartment'>#207</th>"
+        "<td data-label='Sq.Ft.'>850</td>"
+        "<td data-label='Rent'>$1,249</td>"
+        "<td><a onclick=\"SetTermsUrl('rentaloptions.aspx?UnitID=1&FloorPlanID=2247999&myOlePropertyid=584155')\">Sel</a></td>"
+        "</tr>"
+        "</tbody></table>"
+        "</body></html>"
+    )
+    signals = _capture_body_diagnostics(body)
+    # Body length always reported
+    assert signals["body_len"] == len(body)
+    # Caption text recovered intact — this is the signal that would have
+    # surfaced the new SecureCafe template format in the original bug.
+    assert "caption_samples" in signals
+    assert any("Floor Plan: 2 Bed - 1 Bath" in c for c in signals["caption_samples"])
+    # Heading text recovered
+    assert "heading_samples" in signals
+    assert "Floor Plans" in signals["heading_samples"]
+    # Table id (divFPH_<FloorPlanID>) recovered
+    assert "table_ids" in signals
+    assert "divFPH_2247999" in signals["table_ids"]
+    # data-label inventory captured — the column-shape change between
+    # old and new SecureCafe templates is detectable from this list.
+    assert "data_label_inventory" in signals
+    assert "Apartment" in signals["data_label_inventory"]
+    assert "Rent" in signals["data_label_inventory"]
+    # FloorPlanID seen via the onclick handler
+    assert "floorplan_ids_seen" in signals
+    assert "2247999" in signals["floorplan_ids_seen"]
+    # First-row context — 350 char window BEFORE the AvailUnitRow start
+    assert "first_row_ctx" in signals
+    assert "<tbody>" in signals["first_row_ctx"]
+
+
+def test_capture_body_diagnostics_handles_empty_body() -> None:
+    """Empty / None bodies must not raise — diagnostics are best-effort."""
+    from ma_poc.pms.adapters.rentcafe import _capture_body_diagnostics
+
+    assert _capture_body_diagnostics("") == {"body_len": 0}
+    assert _capture_body_diagnostics(None) == {"body_len": 0}  # type: ignore[arg-type]
+
+
+def test_capture_body_diagnostics_caps_oversized_lists() -> None:
+    """Each signal-kind list is capped so total payload stays under ~3KB
+    even on a multi-megabyte SecureCafe page."""
+    from ma_poc.pms.adapters.rentcafe import _capture_body_diagnostics
+
+    # 100 captions, 100 headings, 100 table ids
+    parts = []
+    for i in range(100):
+        parts.append(f"<caption>Floor Plan: P{i} - 1 Bedroom, 1 Bathroom</caption>")
+        parts.append(f"<h2>Heading {i}</h2>")
+        parts.append(f"<div id='divFPH_{1000 + i}'></div>")
+    body = "".join(parts)
+    signals = _capture_body_diagnostics(body, max_per_kind=5)
+    assert len(signals["caption_samples"]) == 5
+    assert len(signals["heading_samples"]) == 5
+    assert len(signals["table_ids"]) == 5
+
+
+def test_securecafe_parse_matches_units_under_new_template() -> None:
+    """End-to-end: parse a minimal new-template snippet and assert units
+    are extracted with floor-plan name + beds + baths populated.
+    """
+    from ma_poc.pms.adapters.rentcafe import parse_securecafe_availableunits
+
+    # Minimal new-template fragment captured from live PID 6550 (one
+    # caption + two AvailUnitRow rows). Live SC HTML uses single-quoted
+    # attribute markup throughout — the existing row-matcher regex is
+    # hard-anchored on ``class='AvailUnitRow'`` (single quotes), so the
+    # fixture mirrors that. If/when we relax the row regex to accept
+    # double-quoted markup, this fixture should be expanded with both
+    # variants.
+    new_template_html = (
+        "<table id='divFPH_2247999' class='availableUnits'>"
+        "<caption class='sr-only'>Apartment Details and Selection for Floor Plan: "
+        "2 Bed - 1 Bath - 2 Bedrooms, 1 Bathroom</caption>"
+        "<thead><tr><th data-label='Apartment'>Apartment</th></tr></thead>"
+        "<tbody>"
+        "<tr class='AvailUnitRow' data-selenium-id='urow1' id='unitrow_9609624'>"
+        "<th data-label='Apartment'>#207</th>"
+        "<td data-label='Sq.Ft.'>850</td>"
+        "<td data-label='Rent'>$1,249</td>"
+        "</tr>"
+        "<tr class='AvailUnitRow' data-selenium-id='urow2' id='unitrow_9609647'>"
+        "<th data-label='Apartment'>#230</th>"
+        "<td data-label='Sq.Ft.'>850</td>"
+        "<td data-label='Rent'>$1,279</td>"
+        "</tr>"
+        "</tbody></table>"
+    )
+    units = parse_securecafe_availableunits(new_template_html, "https://example/")
+    assert len(units) == 2, f"got {len(units)} units; expected 2"
+    # The unit-dict shape comes from ``make_unit_dict`` in _parsing.py — assert
+    # only the fields the SecureCafe parser sets explicitly. Other fields may
+    # be promoted/renamed (e.g. rent_low → market_rent_low) by the unit_dict
+    # factory; this test guards the SC parser, not the post-process pipeline.
+    fp_names = {u.get("floor_plan_name") for u in units}
+    apt_nums = {u.get("unit_number") for u in units}
+    assert fp_names == {"2 Bed - 1 Bath"}, fp_names
+    assert apt_nums == {"207", "230"}, apt_nums
+    # Bedrooms parsed from the "2 Bedrooms" suffix (not the short-form
+    # "2 Bed" prefix).
+    assert all(u.get("bedrooms") == "2" for u in units)
+    assert all(u.get("bathrooms") in ("1", "1.0") for u in units)

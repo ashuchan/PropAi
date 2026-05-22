@@ -161,6 +161,9 @@ class OneSiteAdapter:
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units from RealPage API responses captured during page load."""
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+
+        pid = str(getattr(ctx, "property_id", "") or "unknown")
         result = AdapterResult(tier_used="TIER_1_API_ONESITE")
         all_units: list[dict[str, str]] = []
 
@@ -174,10 +177,13 @@ class OneSiteAdapter:
         # not /units; all 9 shipped null availability_date.
         realpage_property_id: str | None = None
         units_captured = False
+        n_floorplans_resp = 0
+        n_units_resp = 0
         for resp in api_responses:
             body = resp.get("body")
             url = resp.get("url", "")
             if _is_realpage_response(body) and isinstance(body, dict):
+                n_floorplans_resp += 1
                 units = parse_realpage_floorplans(body, url)
                 if units:
                     all_units.extend(units)
@@ -190,6 +196,7 @@ class OneSiteAdapter:
                     if m:
                         realpage_property_id = m.group(1)
             elif _is_realpage_units_response(body, url):
+                n_units_resp += 1
                 units_captured = True
                 # RealPage /units endpoint — body may be null/[]/{response:[...]}
                 try:
@@ -200,6 +207,27 @@ class OneSiteAdapter:
                 if units:
                     all_units.extend(units)
                     result.api_responses.append(resp)
+
+        # XHR-capture telemetry — diagnoses "captured API noise but no
+        # RealPage shape" vs "no captures at all" vs "captured but parser
+        # rejected". This was the single most-asked-for signal in the
+        # 2026-05-21 OneSite cluster investigation.
+        log_adapter_stage(
+            "onesite",
+            pid,
+            "xhr_capture",
+            "ok" if all_units else "no_realpage_shape" if api_responses else "no_api_responses",
+            units=len(all_units),
+            reason=(
+                f"network_responses={len(api_responses)} "
+                f"floorplans_matched={n_floorplans_resp} units_matched={n_units_resp} "
+                f"realpage_property_id={realpage_property_id}"
+            ),
+            n_responses=len(api_responses),
+            floorplans_matched=n_floorplans_resp,
+            units_matched=n_units_resp,
+            realpage_property_id=realpage_property_id,
+        )
 
         # F7a (2026-05-20): when /floorplans was captured but /units wasn't,
         # probe /units explicitly. The URL pattern is deterministic; if it
@@ -278,6 +306,17 @@ class OneSiteAdapter:
             result.confidence = 0.0
             result.errors.append("No RealPage/OneSite floorplan data found in captured API responses")
 
+        log_adapter_stage(
+            "onesite",
+            pid,
+            "cascade_exit",
+            result.tier_used or "unknown",
+            units=len(result.units),
+            reason=(
+                f"errors={'|'.join(str(e)[:60] for e in result.errors[:2])[:160]}"
+                if result.errors else ""
+            ),
+        )
         return result
 
     def static_fingerprints(self) -> list[str]:

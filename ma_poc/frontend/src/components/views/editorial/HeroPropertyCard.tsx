@@ -21,7 +21,7 @@ export function HeroPropertyCard({ property }: { property: ApiPropertySummary })
             </div>
             <TierBadge tier={property.extractionTier} />
           </div>
-          {property.activeConcession && <div className="mt-3"><ConcessionTag text={property.activeConcession} /></div>}
+          {(property.concessionBanner || property.activeConcession) && <div className="mt-3"><ConcessionTag banner={property.concessionBanner} raw={property.activeConcession} /></div>}
           <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <MetricCard label="Units" value={property.totalUnits} />
             <MetricCard label="Avg Rent" value={formatCurrency(property.avgAskingRent)} />

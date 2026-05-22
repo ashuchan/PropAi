@@ -144,6 +144,7 @@ from data_provider.sql.models import (  # noqa: E402
     ScrapeEventRow,
 )
 from data_provider.sql.provider import SqlDataProvider  # noqa: E402
+from ma_poc.core.concession_enrich import Enrichment, enrich_concession  # noqa: E402
 from reporting.verdict import _SUCCESS_VERDICTS, verdict_is_success  # noqa: E402
 from scripts.email.daily import (  # noqa: E402
     _open_provider,
@@ -315,9 +316,27 @@ def _fetch_scraped_units_from_sql(
             extract = payload.get("_extract_result") or {}
             tier = extract.get("tier_used") or ""
 
+        # Property-level concession (captured from homepage banner or
+        # /specials probe). Per §18 of the playbook the V2 emit puts the
+        # property-wide concession at `concessions` / `concessions_clean`
+        # / `_concessions_quality`; per-unit `concession_text` is only set
+        # when the adapter parsed an explicit per-row offer. When a unit
+        # has nothing, fall back to the property banner so xlsx rows for
+        # whole-site concessions surface the offer.
+        prop_conc_text = payload.get("concessions") or ""
+        prop_conc_clean = payload.get("concessions_clean") or ""
+        prop_conc_quality = payload.get("_concessions_quality") or ""
+
+        # Run the deterministic enrichment ONCE per property — the
+        # property-level banner is reused across every unit row that
+        # inherits from it, so we don't pay the regex cost N times.
+        prop_enrich_fields = _concession_enrichment_fields(
+            prop_conc_text or prop_conc_clean
+        )
+
         units = payload.get("units") or []
         if not units:
-            out.append({
+            row = {
                 "canonical_id": cid,
                 "property_name": prop_name,
                 "city": city,
@@ -336,17 +355,40 @@ def _fetch_scraped_units_from_sql(
                 "rent_high": None,
                 "available_date": "",
                 "lease_term": None,
-                # 2026-05-21 fix: emit all three V2 concession fields,
-                # not the legacy single "concessions" cell.
-                "concession_text": "",
-                "concession_text_clean": "",
-                "_concession_quality": "",
-                "concessions": "",  # kept for non-xlsx consumers; harmless null
-            })
+                # Surface the property-level banner even when the property
+                # has no units — a no-unit hit is still a place where the
+                # operator wants to see whether a concession was advertised.
+                "concession_text": _stringify_concessions(prop_conc_text),
+                "concession_text_clean": _stringify_concessions(prop_conc_clean),
+                "_concession_quality": prop_conc_quality,
+                "concessions": _stringify_concessions(
+                    prop_conc_clean or prop_conc_text
+                ),
+            }
+            row.update(prop_enrich_fields)
+            out.append(row)
             continue
 
         for u in units:
-            out.append({
+            # Unit-level fields win when present; otherwise inherit the
+            # property-level banner. `concession` (singular) is the legacy
+            # per-row key some adapters still emit alongside the V2
+            # `concession_text` — keep both in the read chain.
+            u_text = u.get("concession_text") or u.get("concession") or ""
+            u_clean = u.get("concession_text_clean") or ""
+            u_quality = u.get("_concession_quality") or ""
+            conc_text = u_text or prop_conc_text
+            conc_clean = u_clean or prop_conc_clean
+            conc_quality = u_quality or prop_conc_quality
+            # When the unit emitted its own per-row concession we re-run
+            # the enricher (the producer text differs from the property
+            # banner). Otherwise we reuse the property-level enrichment
+            # so the per-row cost stays O(1).
+            if u_text and u_text != prop_conc_text:
+                enrich_fields = _concession_enrichment_fields(u_text)
+            else:
+                enrich_fields = prop_enrich_fields
+            row = {
                 "canonical_id": cid,
                 "property_name": prop_name,
                 "city": city,
@@ -365,22 +407,15 @@ def _fetch_scraped_units_from_sql(
                 "rent_high": u.get("rent_high"),
                 "available_date": u.get("available_date") or "",
                 "lease_term": u.get("lease_term"),
-                # 2026-05-21 fix: pre-fix collapsed the three V2 concession
-                # fields into a single "concessions" cell via the cleaned
-                # || raw || legacy fallback. That hid the raw producer
-                # string when only the dirty variant existed and made
-                # data-quality triage impossible. Emit each field
-                # separately. The legacy `concessions` key is retained
-                # for backward compatibility with non-xlsx consumers.
-                "concession_text": _stringify_concessions(u.get("concession_text")),
-                "concession_text_clean": _stringify_concessions(u.get("concession_text_clean")),
-                "_concession_quality": u.get("_concession_quality") or "",
+                "concession_text": _stringify_concessions(conc_text),
+                "concession_text_clean": _stringify_concessions(conc_clean),
+                "_concession_quality": conc_quality,
                 "concessions": _stringify_concessions(
-                    u.get("concession_text_clean")
-                    or u.get("concession_text")
-                    or u.get("concessions")
+                    conc_clean or conc_text or u.get("concessions")
                 ),
-            })
+            }
+            row.update(enrich_fields)
+            out.append(row)
     return out
 
 
@@ -394,6 +429,60 @@ def _stringify_concessions(value: Any) -> str:
         return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     except (TypeError, ValueError):
         return str(value)
+
+
+def _concession_enrichment_fields(raw_text: str) -> dict[str, str]:
+    """Run the deterministic enricher on *raw_text* and return the
+    xlsx-shaped fields the new columns consume.
+
+    Empty input → empty fields. Never raises.
+
+    The returned dict carries the five enrichment columns:
+
+      * ``concession_banner``      — one-line human summary (~140 chars)
+      * ``concession_offer_type``  — canonical taxonomy of the primary
+                                     atom (``free_rent`` / ``dollar_off`` / ...)
+      * ``concession_target``      — what the discount is APPLIED to
+                                     (``rent`` / ``app_fee`` / ``move_in_cost``)
+      * ``concession_value``       — short magnitude string (``2 months``,
+                                     ``$500``, ``10%``)
+      * ``concession_conditions``  — semicolon-joined ``kind:value`` pairs
+                                     (``deadline:5/31; lease_length:12+ months;
+                                     unit_scope:select``) so a reviewer
+                                     can sort/filter by any single signal
+    """
+    if not raw_text:
+        return _empty_enrichment_fields()
+    e = enrich_concession(raw_text)
+    return _enrichment_to_fields(e)
+
+
+def _empty_enrichment_fields() -> dict[str, str]:
+    return {
+        "concession_banner": "",
+        "concession_offer_type": "",
+        "concession_target": "",
+        "concession_value": "",
+        "concession_conditions": "",
+    }
+
+
+def _enrichment_to_fields(e: Enrichment) -> dict[str, str]:
+    out = _empty_enrichment_fields()
+    if e.primary_atom:
+        out["concession_offer_type"] = e.primary_atom.offer_type
+        out["concession_target"] = e.primary_atom.target
+        out["concession_value"] = e.primary_atom.value
+    if e.conditions:
+        parts = []
+        for c in e.conditions:
+            if c.value:
+                parts.append(f"{c.kind}:{c.value}")
+            else:
+                parts.append(c.kind)
+        out["concession_conditions"] = "; ".join(parts)
+    out["concession_banner"] = e.banner or ""
+    return out
 
 
 def _fetch_failed_properties_from_sql(
@@ -594,6 +683,12 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
 
     Mirrors ``_fetch_scraped_units_from_sql`` so the schema is identical
     no matter which source produced the rows.
+
+    Handles both:
+      * V1 legacy keys: ``Unique ID`` / ``Property Name`` / ``City`` / ...
+      * V2 internal keys (Jugnu per-shard properties.json): ``apartment_id`` /
+        ``proj_name`` / ``city`` / ``state`` / ``zip_code`` / ``pmc`` /
+        ``website`` — and ``_meta.canonical_id`` for the canonical id.
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -606,22 +701,51 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
     for prop in data:
         if not isinstance(prop, dict):
             continue
-        cid = prop.get("Unique ID") or prop.get("canonical_id") or ""
-        prop_name = prop.get("Property Name") or prop.get("proj_name") or ""
         meta_block = prop.get("_meta") or {}
+        # V2 emits canonical_id only under _meta; V1/CSV legacy emit under
+        # "Unique ID" / "canonical_id"; apartment_id is the integer alias
+        # the v2 formatter writes at top level.
+        cid = (
+            meta_block.get("canonical_id")
+            or prop.get("Unique ID")
+            or prop.get("canonical_id")
+            or prop.get("apartment_id")
+            or ""
+        )
+        cid = str(cid) if cid not in (None, "") else ""
+        prop_name = (
+            prop.get("Property Name")
+            or prop.get("proj_name")
+            or prop.get("name")
+            or ""
+        )
         verdict = meta_block.get("verdict") or ""
         tier = meta_block.get("scrape_tier_used") or ""
         if not tier:
             tier = (prop.get("_extract_result") or {}).get("tier_used") or ""
 
+        # Read property-level concessions (V2 emit: `concessions`,
+        # `concessions_clean`, `_concessions_quality`, ...). These hold the
+        # banner copy captured from the homepage / /specials probe and apply
+        # to every unit unless the unit emitted its own per-row concession.
+        prop_conc_text = prop.get("concessions") or ""
+        prop_conc_clean = prop.get("concessions_clean") or ""
+        prop_conc_quality = prop.get("_concessions_quality") or ""
+
+        # Property-level enrichment computed once, reused per unit row
+        # that inherits the parent banner.
+        prop_enrich_fields = _concession_enrichment_fields(
+            prop_conc_text or prop_conc_clean
+        )
+
         common = {
             "canonical_id": cid,
             "property_name": prop_name,
-            "city": prop.get("City", ""),
-            "state": prop.get("State", ""),
-            "zip_code": prop.get("ZIP Code", ""),
-            "pmc": prop.get("Management Company", ""),
-            "website": prop.get("Website", ""),
+            "city": prop.get("City") or prop.get("city") or "",
+            "state": prop.get("State") or prop.get("state") or "",
+            "zip_code": prop.get("ZIP Code") or prop.get("zip_code") or "",
+            "pmc": prop.get("Management Company") or prop.get("pmc") or "",
+            "website": prop.get("Website") or prop.get("website") or "",
             "verdict": verdict,
             "tier_used": tier,
         }
@@ -633,15 +757,34 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
                 "beds": None, "baths": None, "area": None,
                 "rent_low": None, "rent_high": None,
                 "available_date": "", "lease_term": None,
-                # 2026-05-21 fix: emit all three V2 concession fields.
-                "concession_text": "", "concession_text_clean": "",
-                "_concession_quality": "",
-                "concessions": "",  # legacy key
+                # Property-level concession on a unit-less property still
+                # belongs in the row so empty-units sites surface their
+                # banner.
+                "concession_text": _stringify_concessions(prop_conc_text),
+                "concession_text_clean": _stringify_concessions(prop_conc_clean),
+                "_concession_quality": prop_conc_quality,
+                "concessions": _stringify_concessions(
+                    prop_conc_clean or prop_conc_text
+                ),
             })
+            placeholder.update(prop_enrich_fields)
             out.append(placeholder)
             continue
         for u in units:
             row = dict(common)
+            # Unit-level concession (V2 emit: `concession_text` etc.) takes
+            # precedence; fall back to the property-level banner so xlsx rows
+            # for properties with whole-site concessions surface the offer.
+            u_text = u.get("concession_text") or u.get("concession") or ""
+            u_clean = u.get("concession_text_clean") or ""
+            u_quality = u.get("_concession_quality") or ""
+            conc_text = u_text or prop_conc_text
+            conc_clean = u_clean or prop_conc_clean
+            conc_quality = u_quality or prop_conc_quality
+            if u_text and u_text != prop_conc_text:
+                enrich_fields = _concession_enrichment_fields(u_text)
+            else:
+                enrich_fields = prop_enrich_fields
             row.update({
                 "unit_id": u.get("unit_id") or "",
                 "floor_plan_name": u.get("floor_plan_name") or "",
@@ -652,18 +795,175 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
                 "rent_high": u.get("rent_high"),
                 "available_date": u.get("available_date") or "",
                 "lease_term": u.get("lease_term"),
-                # 2026-05-21 fix: emit all three V2 concession fields.
-                "concession_text": _stringify_concessions(u.get("concession_text")),
-                "concession_text_clean": _stringify_concessions(u.get("concession_text_clean")),
-                "_concession_quality": u.get("_concession_quality") or "",
+                "concession_text": _stringify_concessions(conc_text),
+                "concession_text_clean": _stringify_concessions(conc_clean),
+                "_concession_quality": conc_quality,
                 "concessions": _stringify_concessions(
-                    u.get("concession_text_clean")
-                    or u.get("concession_text")
-                    or u.get("concessions")
+                    conc_clean or conc_text or u.get("concessions")
                 ),
             })
+            row.update(enrich_fields)
             out.append(row)
     return out
+
+
+def _fetch_run_from_local_dir(
+    run_dir: Path,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Rebuild scraped-units + failed-properties rows from a local mirror.
+
+    Mirrors :func:`_fetch_run_from_gcs` but skips the GCS download step
+    — points directly at an already-downloaded run dir such as
+    ``C:/tmp/run-2026-05-21/`` with ``shard_*`` subdirectories. The
+    layout is identical to what the runner uploads to GCS; see Phase 1
+    of ``docs/failed_no_data_debugging_playbook.md``.
+
+    For the failed-rows construction, the local artifacts give us
+    ``_meta.verdict`` in ``properties.json`` plus the structured
+    ``issues.jsonl``. There is no ``scrape_events`` / ``run_ledger``
+    file on disk, so ``scrape_outcome`` / ``failure_reason`` /
+    ``page_load_ms`` are derived from ``_meta`` and from the issue
+    codes themselves. This is enough for the operator drill-down the
+    email targets — the verdict + the issue codes localise the bug
+    bucket; the latest ``scrape_events`` row would only add a
+    timestamp and a one-line failure reason.
+    """
+    if not run_dir.exists() or not run_dir.is_dir():
+        raise RuntimeError(
+            f"Local run directory does not exist or is not a directory: {run_dir}"
+        )
+
+    shard_dirs = sorted(
+        p for p in run_dir.iterdir()
+        if p.is_dir() and p.name.startswith("shard_")
+    )
+    if not shard_dirs:
+        # Sometimes the operator points the flag directly at a shard dir
+        # (e.g. a one-property smoke test). Tolerate that by treating the
+        # run_dir itself as a single shard.
+        if (run_dir / "properties.json").exists():
+            shard_dirs = [run_dir]
+        else:
+            raise RuntimeError(
+                f"No shard_* subdirectories under {run_dir} and no "
+                f"properties.json directly in it either. Verify the path."
+            )
+
+    log.info("Reading %d shard(s) from local mirror %s", len(shard_dirs), run_dir)
+
+    scraped: list[dict[str, Any]] = []
+    failed_by_cid: dict[str, dict[str, Any]] = {}
+
+    for shard_dir in shard_dirs:
+        props_file = shard_dir / "properties.json"
+        if not props_file.exists():
+            continue
+
+        # Flatten units (same helper used by the GCS path so V1 + V2 key
+        # variants are handled identically — see _flatten_properties_json).
+        shard_rows = _flatten_properties_json(props_file)
+        scraped.extend(shard_rows)
+
+        # Failed rows: read properties.json directly to consult `_meta`.
+        try:
+            data = json.loads(props_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            log.warning("Could not parse %s for failures: %s", props_file, exc)
+            data = []
+        if not isinstance(data, list):
+            data = []
+
+        for prop in data:
+            if not isinstance(prop, dict):
+                continue
+            meta = prop.get("_meta") or {}
+            verdict = (meta.get("verdict") or "").upper()
+            if not verdict or verdict_is_success(verdict):
+                continue
+            cid = (
+                str(meta.get("canonical_id") or "")
+                or str(prop.get("apartment_id") or "")
+                or str(prop.get("Unique ID") or "")
+            )
+            if not cid:
+                continue
+            reason = meta.get("verdict_reason") or ""
+            errors = meta.get("scrape_errors") or []
+            if isinstance(errors, list) and errors:
+                reason = reason or "; ".join(str(e) for e in errors[:3])
+            failed_by_cid[cid] = {
+                "canonical_id": cid,
+                "property_name": (
+                    prop.get("Property Name")
+                    or prop.get("proj_name")
+                    or ""
+                ),
+                "city": prop.get("City") or prop.get("city") or "",
+                "state": prop.get("State") or prop.get("state") or "",
+                "website": (
+                    prop.get("Website") or prop.get("website") or ""
+                ),
+                "pmc": (
+                    prop.get("Management Company") or prop.get("pmc") or ""
+                ),
+                "ledger_status": verdict,
+                "carry_forward_used": bool(meta.get("carry_forward_used")),
+                "scrape_failed": True,
+                "units_count": len(prop.get("units") or []),
+                "error_count": 0,
+                "warning_count": 0,
+                "issue_codes": "",
+                "issue_messages": "",
+                # No scrape_events on disk — surface what we have from
+                # `_meta` instead so the row isn't empty.
+                "scrape_outcome": (
+                    meta.get("scrape_tier_used") or ""
+                ).upper() or "FAILED",
+                "failure_reason": _truncate(reason, 800),
+                "extraction_tier": None,
+                "page_load_ms": None,
+                "last_event_at": "",
+            }
+
+        issues_file = shard_dir / "issues.jsonl"
+        if issues_file.exists():
+            codes_by_cid: dict[str, list[str]] = defaultdict(list)
+            messages_by_cid: dict[str, list[str]] = defaultdict(list)
+            err_counts: dict[str, int] = defaultdict(int)
+            warn_counts: dict[str, int] = defaultdict(int)
+            seen: dict[str, set[str]] = defaultdict(set)
+            for issue in _read_jsonl(issues_file):
+                cid = issue.get("canonical_id") or ""
+                if not cid:
+                    continue
+                sev = (issue.get("severity") or "").upper()
+                if sev == "ERROR":
+                    err_counts[cid] += 1
+                elif sev == "WARNING":
+                    warn_counts[cid] += 1
+                code = issue.get("code") or "UNKNOWN"
+                if code not in seen[cid]:
+                    seen[cid].add(code)
+                    codes_by_cid[cid].append(code)
+                msg = issue.get("message") or ""
+                if msg:
+                    messages_by_cid[cid].append(_truncate(msg, 240))
+            for cid, row in failed_by_cid.items():
+                if cid in codes_by_cid:
+                    row["issue_codes"] = ", ".join(codes_by_cid[cid])
+                if cid in messages_by_cid:
+                    row["issue_messages"] = " | ".join(messages_by_cid[cid][:3])
+                if cid in err_counts:
+                    row["error_count"] = err_counts[cid]
+                if cid in warn_counts:
+                    row["warning_count"] = warn_counts[cid]
+
+    failed = list(failed_by_cid.values())
+    log.info(
+        "Local mirror produced %d scraped unit rows, %d failed properties",
+        len(scraped), len(failed),
+    )
+    return scraped, failed
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -717,6 +1017,15 @@ _SCRAPED_COLUMNS: list[tuple[str, str]] = [
     ("concession_text", "Concession (Raw)"),
     ("concession_text_clean", "Concession (Cleaned)"),
     ("_concession_quality", "Concession Quality"),
+    # 2026-05-22 enrichment: deterministic per-cell signals so reviewers
+    # don't have to skim free-form text to figure out what the offer is.
+    # Banner is the one-line human render; the other four columns are
+    # filter/pivot targets in Sheets.
+    ("concession_banner", "Concession (Banner)"),
+    ("concession_offer_type", "Offer Type"),
+    ("concession_target", "Offer Target"),
+    ("concession_value", "Offer Value"),
+    ("concession_conditions", "Offer Conditions"),
 ]
 
 _FAILED_COLUMNS: list[tuple[str, str]] = [
@@ -1001,6 +1310,11 @@ def main(argv: list[str] | None = None) -> int:
                              "Defaults to ma_poc/data/runs/{run_date}/.")
     parser.add_argument("--use-gcs", action="store_true",
                         help="Force the GCS fallback even when Cloud SQL has rows.")
+    parser.add_argument("--local-dir", default=None,
+                        help="Read shard artifacts from a local mirror dir "
+                             "(e.g. C:/tmp/run-2026-05-21/). Skips Cloud SQL "
+                             "and GCS entirely. Per the playbook §Phase 1 — "
+                             "use when the run is already downloaded locally.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Write the XLSX files + print HTML; do not send.")
     parser.add_argument("--database-url", default=None,
@@ -1017,6 +1331,42 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     sender_name = os.getenv("REPORT_SENDER_NAME") or "PropAi Daily Reports"
+
+    # Local-mirror short-circuit: when --local-dir is given, skip both
+    # Cloud SQL and GCS entirely. The playbook (§Phase 1) recommends this
+    # mode when the run has already been mirrored to c:/tmp/run-<date>/.
+    if args.local_dir:
+        local_dir = Path(args.local_dir)
+        # Derive run_date from --run-date if given, else infer from the
+        # directory name (`run-YYYY-MM-DD` convention). Last resort: today.
+        if args.run_date:
+            run_date = args.run_date
+        else:
+            name = local_dir.name
+            if name.startswith("run-") and len(name) >= 14:
+                run_date = name[4:14]
+            else:
+                run_date = datetime.now(timezone.utc).date().isoformat()
+                log.warning(
+                    "Could not derive run_date from %s; defaulting to %s. "
+                    "Pass --run-date explicitly to override.",
+                    local_dir, run_date,
+                )
+        log.info("Local mirror mode: dir=%s run_date=%s", local_dir, run_date)
+        scraped, failed = _fetch_run_from_local_dir(local_dir)
+        source_label = f"Local mirror ({local_dir})"
+        gcs_present = False
+        return _finish_and_send(
+            run_date=run_date,
+            source_label=source_label,
+            gcs_present=gcs_present,
+            scraped=scraped,
+            failed=failed,
+            recipients=recipients,
+            sender_name=sender_name,
+            out_dir_arg=args.out_dir,
+            dry_run=args.dry_run,
+        )
 
     provider = _open_provider(args.database_url)
     log.info("Data provider: %s · BUCKET_NAME=%s", provider.name, bucket or "(unset)")
@@ -1071,9 +1421,39 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         provider.close()
 
-    # ── Write the two XLSX attachments ──
-    if args.out_dir:
-        out_dir = Path(args.out_dir)
+    return _finish_and_send(
+        run_date=run_date,
+        source_label=source_label,
+        gcs_present=gcs_present,
+        scraped=scraped,
+        failed=failed,
+        recipients=recipients,
+        sender_name=sender_name,
+        out_dir_arg=args.out_dir,
+        dry_run=args.dry_run,
+    )
+
+
+def _finish_and_send(
+    *,
+    run_date: str,
+    source_label: str,
+    gcs_present: bool,
+    scraped: list[dict[str, Any]],
+    failed: list[dict[str, Any]],
+    recipients: list[str] | None,
+    sender_name: str,
+    out_dir_arg: str | None,
+    dry_run: bool,
+) -> int:
+    """Write the two XLSX attachments and send the email.
+
+    Shared tail between the Cloud SQL / GCS path and the --local-dir path
+    so the rendered HTML, file naming, and send-or-dry-run semantics
+    stay identical no matter how the rows were sourced.
+    """
+    if out_dir_arg:
+        out_dir = Path(out_dir_arg)
     else:
         out_dir = _MA_POC_ROOT / "data" / "runs" / run_date
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1104,7 +1484,7 @@ def main(argv: list[str] | None = None) -> int:
             recipients=recipients or None,
             sender_name=sender_name,
             attachments=[scraped_path, failed_path],
-            dry_run=args.dry_run,
+            dry_run=dry_run,
         )
     except Exception as exc:
         log.exception("Send failed: %s", exc)

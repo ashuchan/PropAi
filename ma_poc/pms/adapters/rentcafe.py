@@ -33,6 +33,7 @@ Key findings:
 
 from __future__ import annotations
 
+import os
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -44,6 +45,82 @@ from ma_poc.pms.adapters._parsing import (
 )
 from ma_poc.pms.adapters._rentcafe_hosted_table import parse_rentcafe_hosted_table
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-22: Per-stage telemetry for RentCafe recovery paths. Shared
+# helpers live in ``_adapter_telemetry`` — every PMS adapter calls into
+# the same helpers so the analyzer's tier_attempted aggregation picks
+# up signals uniformly.
+# ─────────────────────────────────────────────────────────────────────
+
+
+from ma_poc.pms.adapters._adapter_telemetry import (  # noqa: E402  (import-after-docs)
+    CF_CHALLENGE_MARKERS as _CF_CHALLENGE_MARKERS,
+    log_adapter_diag as _log_adapter_diag,
+    log_adapter_stage as _log_adapter_stage,
+)
+
+
+def _log_rc(
+    property_id: str,
+    stage: str,
+    outcome: str,
+    *,
+    units: int = 0,
+    reason: str = "",
+    **extra: Any,
+) -> None:
+    """Thin wrapper over :func:`log_adapter_stage` so the existing
+    rentcafe callsites don't have to change. Routes to the shared helper.
+    """
+    _log_adapter_stage(
+        "rentcafe",
+        property_id,
+        stage,
+        outcome,
+        units=units,
+        reason=reason,
+        **extra,
+    )
+
+
+# Backward-compat shims for the in-rentcafe-namespace names used by tests
+# elsewhere. The implementations live in ``_adapter_telemetry``.
+
+from ma_poc.pms.adapters._adapter_telemetry import (  # noqa: E402  (import-after-docs)
+    capture_body_diagnostics as _capture_body_diagnostics,
+)
+
+
+def _log_rc_diag(property_id: str, stage: str, body: str, *, reason: str = "") -> None:
+    """Thin wrapper so the existing rentcafe callsites don't have to change."""
+    _log_adapter_diag("rentcafe", property_id, stage, body, reason=reason)
+
+
+def _classify_probe_body(status: int, body: str) -> tuple[str, str]:
+    """Categorise a probe response into (outcome, reason).
+
+    Distinguishes CF challenge shells from genuine 200-OK empty bodies
+    from real success — the three look identical to ``status==200`` but
+    are very different diagnostically.
+    """
+    body = body or ""
+    body_len = len(body)
+    if status != 200:
+        # Surface CF/anti-bot status codes distinctly.
+        if status in (403, 429, 503):
+            return (f"blocked_status_{status}", f"len={body_len}")
+        return (f"status_{status}", f"len={body_len}")
+    # 200 with a CF challenge shell — body is small (<10KB) and contains
+    # a CF-platform marker. The drill treats this as failure but main's
+    # silent ``return []`` made it indistinguishable from "no data".
+    cf_hit = any(m in body for m in _CF_CHALLENGE_MARKERS)
+    if cf_hit and body_len < 15000:
+        return ("cf_challenge_shell", f"len={body_len} markers_seen=True")
+    if "AvailUnitRow" in body:
+        return ("ok", f"len={body_len} avail_rows={body.count('AvailUnitRow')}")
+    return ("no_avail_row", f"len={body_len} cf_markers={cf_hit}")
 
 # Note: ``ma_poc.extraction.post_process`` is imported lazily inside ``extract``
 # below to break the import cycle. The full chain would otherwise be:
@@ -387,14 +464,22 @@ class RentCafeAdapter:
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units from RentCafe API responses captured during page load."""
+        pid = getattr(ctx, "property_id", "") or "unknown"
         result = AdapterResult(tier_used=_TIER_BASE)
         all_units: list[dict[str, str]] = []
 
+        # XHR-capture stage telemetry: how many of the network_log responses
+        # matched our RentCafe-shape predicate. The single most common cause
+        # of "all_units empty" is "captured 0 rentcafe-shape responses" —
+        # surface that distinctly from "captured many but parser dropped all".
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
+        n_total_resp = len(api_responses)
+        n_matched_shape = 0
         for resp in api_responses:
             body = resp.get("body")
             if not _is_rentcafe_response(body):
                 continue
+            n_matched_shape += 1
             items = _unwrap_rentcafe_list(body)
             if not items:
                 continue
@@ -403,6 +488,17 @@ class RentCafeAdapter:
             if units:
                 all_units.extend(units)
                 result.api_responses.append(resp)
+
+        _log_rc(
+            pid,
+            "xhr_capture",
+            "ok" if all_units else (
+                "shape_matched_no_units" if n_matched_shape else
+                "no_rentcafe_shape_responses"
+            ),
+            units=len(all_units),
+            reason=f"network_responses={n_total_resp} matched_shape={n_matched_shape}",
+        )
 
         if all_units:
             # Stage 1 validity gate: every emitted unit must carry at least
@@ -442,6 +538,10 @@ class RentCafeAdapter:
                             result.confidence = min(
                                 0.92, 0.7 + 0.04 * sc_pp.n_admitted
                             )
+                            _log_rc(
+                                pid, "cascade_exit", "won_securecafe_from_xhr_plan_only",
+                                units=len(result.units),
+                            )
                             return result
                 # Stage 2: surface unit-level AND plan-level lists. The
                 # runner promotes ``plan_summaries`` into the V2 record's
@@ -459,6 +559,7 @@ class RentCafeAdapter:
                 )
                 result.confidence = min(0.95, 0.7 + 0.05 * pp.n_admitted)
                 result.tier_used = _TIER_BASE
+                _log_rc(pid, "cascade_exit", "won_xhr_capture", units=len(result.units))
                 return result
             # All parsed units failed validity — record and fall through
             # to the failure-classification path so the run-report
@@ -493,6 +594,7 @@ class RentCafeAdapter:
                 # includes the WP_PROBE label.
                 result.tier_used = f"{_TIER_BASE}_WP_PROBE"
                 result.confidence = min(0.90, 0.65 + 0.05 * pp.n_admitted)
+                _log_rc(pid, "cascade_exit", "won_wp_probe", units=len(result.units))
                 return result
 
         # 2026-05-21 (port from feature-branch fix/resolver-path-patterns-may13):
@@ -513,6 +615,7 @@ class RentCafeAdapter:
                 result.post_process_meta = pp.to_meta()
                 result.tier_used = f"{_TIER_BASE}_SECURECAFE"
                 result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
+                _log_rc(pid, "cascade_exit", "won_securecafe_drill", units=len(result.units))
                 return result
 
         # 2026-05-21 (port): RentCafe-HOSTED SSR unit table fallback.
@@ -527,12 +630,32 @@ class RentCafeAdapter:
             _rc_html = await _get_page_html(page, ctx)
         except Exception:
             _rc_html = ""
-        if _rc_html and "fp-unit" in _rc_html:
+        _has_fp_unit = bool(_rc_html and "fp-unit" in _rc_html)
+        if _has_fp_unit:
             from ma_poc.extraction.post_process import post_process
 
             hosted = parse_rentcafe_hosted_table(
                 _rc_html, str(getattr(ctx, "base_url", "") or "")
             )
+            _log_rc(
+                pid,
+                "hosted_dom",
+                "ok" if hosted else "fp_unit_present_parser_empty",
+                units=len(hosted),
+                reason=f"fp_unit_count={_rc_html.count('fp-unit')}",
+            )
+            # 2026-05-22 diagnostic: when fp-unit markup is present but
+            # the hosted-table parser produced 0 rows, the row attribute
+            # inventory is the most useful signal (the parser keys on
+            # specific data-* attribute names; if Yardi has reshuffled
+            # those, the parse silently drops).
+            if not hosted:
+                _log_rc_diag(
+                    pid,
+                    "hosted_dom",
+                    _rc_html,
+                    reason=f"fp_unit_count={_rc_html.count('fp-unit')}",
+                )
             if hosted:
                 pp = post_process(
                     hosted, property_id=getattr(ctx, "property_id", None)
@@ -543,7 +666,15 @@ class RentCafeAdapter:
                     result.post_process_meta = pp.to_meta()
                     result.tier_used = "TIER_1_DOM_RENTCAFE_HOSTED"
                     result.confidence = min(0.92, 0.7 + 0.04 * pp.n_admitted)
+                    _log_rc(pid, "cascade_exit", "won_hosted_dom", units=len(result.units))
                     return result
+        elif _rc_html:
+            _log_rc(
+                pid,
+                "hosted_dom",
+                "skipped_no_fp_unit",
+                reason=f"rc_html_len={len(_rc_html)}",
+            )
 
         # 2026-05-21 (port): RentCafe-Nestin per-plan DOM recovery. The
         # 35-prop JSON-LD probe (project_jsonld_recovery_2026-05-20.md)
@@ -561,7 +692,8 @@ class RentCafeAdapter:
                     recover_rentcafe_nestin_per_plan,
                 )
 
-                if is_nestin_template(_rc_html):
+                _is_nestin = is_nestin_template(_rc_html)
+                if _is_nestin:
                     from ma_poc.extraction.post_process import post_process
 
                     nestin_units, nestin_source = await recover_rentcafe_nestin_per_plan(
@@ -569,6 +701,29 @@ class RentCafeAdapter:
                         str(getattr(ctx, "base_url", "") or ""),
                         page=page,
                     )
+                    _log_rc(
+                        pid,
+                        "nestin_recover",
+                        "ok" if nestin_units else "template_matched_no_units",
+                        units=len(nestin_units),
+                        reason=f"source={nestin_source[:120] if nestin_source else 'None'}",
+                    )
+                    # 2026-05-22 diagnostic: Nestin recovery is the
+                    # last-resort RentCafe path; when it matches the
+                    # template but extracts 0 units the failure mode
+                    # is invariably a per-plan-page parser miss (the
+                    # /floorplans/{slug} layout changed) — capture
+                    # signals so we can pin the new layout.
+                    if not nestin_units:
+                        _log_rc_diag(
+                            pid,
+                            "nestin_recover",
+                            _rc_html,
+                            reason=(
+                                f"source={nestin_source[:80] if nestin_source else 'None'} "
+                                f"rc_html_len={len(_rc_html)}"
+                            ),
+                        )
                     if nestin_units:
                         pp = post_process(
                             nestin_units, property_id=getattr(ctx, "property_id", None)
@@ -581,8 +736,25 @@ class RentCafeAdapter:
                             if nestin_source:
                                 result.winning_url = nestin_source
                             result.confidence = min(0.90, 0.65 + 0.04 * pp.n_admitted)
+                            _log_rc(
+                                pid, "cascade_exit", "won_nestin",
+                                units=len(result.units),
+                            )
                             return result
+                else:
+                    _log_rc(
+                        pid,
+                        "nestin_recover",
+                        "skipped_not_nestin_template",
+                        reason=f"rc_html_len={len(_rc_html)}",
+                    )
             except Exception as nestin_exc:
+                _log_rc(
+                    pid,
+                    "nestin_recover",
+                    f"exception:{type(nestin_exc).__name__}",
+                    reason=str(nestin_exc)[:140],
+                )
                 # Recovery must never block scrape — log + fall through to
                 # failure classification.
                 result.errors.append(
@@ -596,6 +768,12 @@ class RentCafeAdapter:
         result.tier_used = tier_code
         result.confidence = 0.0
         result.errors.append(err_msg)
+        _log_rc(
+            pid,
+            "cascade_exit",
+            "all_paths_empty",
+            reason=f"terminal_tier={tier_code} errors={'|'.join(result.errors[:3])[:160]}",
+        )
         return result
 
     def static_fingerprints(self) -> list[str]:
@@ -695,6 +873,8 @@ async def _try_rentcafe_wp_probe(
     add a call site once the curl_cffi-based SecureCafe probe is ready
     to land alongside it.
     """
+    pid = getattr(ctx, "property_id", "") or "unknown"
+
     html = ""
     fr = getattr(ctx, "fetch_result", None)
     body = getattr(fr, "body", None) if fr is not None else None
@@ -706,14 +886,18 @@ async def _try_rentcafe_wp_probe(
     elif isinstance(body, str):
         html = body
     if not html:
+        _log_rc(pid, "wp_property_id", "skipped_no_html", reason="no fetch_result.body")
         return []
 
     prop_id = _find_rentcafe_property_id(html)
     if not prop_id:
+        _log_rc(pid, "wp_property_id", "not_found", reason=f"body_len={len(html)}")
         return []
+    _log_rc(pid, "wp_property_id", "found", reason=f"prop_id={prop_id}")
 
     origin = _origin_from_ctx(ctx)
     if not origin:
+        _log_rc(pid, "wp_probe", "skipped_no_origin", reason="no origin discoverable")
         return []
 
     api_url = f"{origin}/wp-json/middleware/v1/getFloorplans/?propertyId[]={prop_id}"
@@ -730,12 +914,32 @@ async def _try_rentcafe_wp_probe(
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
             r = await c.get(api_url, headers=headers)
         if r.status_code != 200:
+            _log_rc(
+                pid,
+                "wp_probe",
+                f"status_{r.status_code}",
+                reason=f"url={api_url[:120]}",
+                http_status=r.status_code,
+            )
             return []
         try:
             payload = r.json()
         except (ValueError, Exception):
+            _log_rc(
+                pid,
+                "wp_probe",
+                "non_json_body",
+                reason=f"len={len(r.text or '')}",
+                http_status=r.status_code,
+            )
             return []
     except Exception as exc:
+        _log_rc(
+            pid,
+            "wp_probe",
+            f"exception:{type(exc).__name__}",
+            reason=f"{str(exc)[:120]} prop_id={prop_id}",
+        )
         result.errors.append(
             f"rentcafe-wp-probe-error: prop_id={prop_id!r} "
             f"{type(exc).__name__}: {str(exc)[:120]}"
@@ -744,8 +948,49 @@ async def _try_rentcafe_wp_probe(
 
     items = _unwrap_rentcafe_list(payload)
     if not items:
+        # Capture top-level payload structure so we can diagnose unwrap
+        # failures (new envelope shapes, wrapper keys, etc.) from events
+        # without re-replaying the probe.
+        payload_shape: dict[str, Any] = {"payload_type": type(payload).__name__}
+        if isinstance(payload, dict):
+            payload_shape["top_keys"] = sorted(list(payload.keys()))[:20]
+        elif isinstance(payload, list):
+            payload_shape["list_len"] = len(payload)
+            if payload and isinstance(payload[0], dict):
+                payload_shape["first_item_keys"] = sorted(list(payload[0].keys()))[:20]
+        _log_rc(
+            pid,
+            "wp_parse",
+            "no_items_unwrapped",
+            reason=f"payload_type={type(payload).__name__}",
+            **{f"signal_{k}": v for k, v in payload_shape.items()},
+        )
         return []
     units = parse_rentcafe_floorplans(items, api_url)
+    # When the WP probe returned a non-empty items list but parse_*
+    # produced 0 units, the per-item shape is the missing signal — log
+    # the keys of the first item so we can see what new template
+    # variant fired without re-fetching.
+    if not units and isinstance(items, list) and items:
+        first = items[0] if isinstance(items[0], dict) else {}
+        first_keys = sorted(list(first.keys()))[:25] if first else []
+        _log_rc(
+            pid,
+            "wp_parse",
+            "parse_returned_empty",
+            units=0,
+            reason=f"items={len(items)} first_keys={first_keys[:8]}",
+            signal_items_len=len(items),
+            signal_first_item_keys=first_keys,
+        )
+    else:
+        _log_rc(
+            pid,
+            "wp_parse",
+            "ok" if units else "parse_returned_empty",
+            units=len(units),
+            reason=f"items={len(items) if isinstance(items, list) else '?'}",
+        )
     if units:
         result.api_responses.append(
             {"url": api_url, "status": 200, "body": payload, "via": "wp_probe"}
@@ -778,8 +1023,21 @@ _SECURECAFE_URL_RE = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 
+# 2026-05-22: relaxed to allow `-` inside the visual-name segment. The newer
+# SecureCafe template wraps each floorplan-grouping table in a
+# ``<caption class="sr-only">Apartment Details and Selection for Floor Plan:
+# 2 Bed - 1 Bath - 2 Bedrooms, 1 Bathroom</caption>``. The visual name
+# (``"2 Bed - 1 Bath"``) contains literal dash characters, which the
+# previous ``[^<\-]`` character class rejected, dropping the header to 0
+# matches and returning ``[]`` from parse_securecafe_availableunits. The
+# tail still anchors on ``- <N> Bedroom[s], <N.N> Bathroom`` so the
+# non-greedy name capture cannot run past the bed/bath suffix.
+#
+# Diagnosed 2026-05-22 against 5 live PIDs (72944, 24561, 6550, 40584,
+# 67750) — all had ≥4 AvailUnitRow rows with the new caption format and
+# zero header matches under the old regex. Old fixtures still pass.
 _SECURECAFE_FP_HDR_RE = re.compile(
-    r"Floor\s+Plan:\s*(?P<name>[^<\-]{1,80}?)\s*-\s*"
+    r"Floor\s+Plan:\s*(?P<name>[^<]{1,150}?)\s*-\s*"
     r"(?P<bedtxt>Studio|\d+\s*Bedroom[s]?)\s*,\s*"
     r"(?P<bathtxt>\d+(?:\.\d+)?)\s*Bathroom",
     re.IGNORECASE,
@@ -908,7 +1166,13 @@ async def _try_rentcafe_securecafe_probe(
 
     Returns parsed unit dicts on success, ``[]`` on any failure.
     Never raises -- exceptions append to ``result.errors``.
+
+    Emits ``rentcafe:sc_search`` / ``sc_homepage_refetch`` / ``sc_probe`` /
+    ``sc_parse`` events so production failures are diagnosable (see
+    ``_log_rc`` module-level docstring).
     """
+    pid = getattr(ctx, "property_id", "") or "unknown"
+
     html = ""
     fr = getattr(ctx, "fetch_result", None)
     body = getattr(fr, "body", None) if fr is not None else None
@@ -923,9 +1187,12 @@ async def _try_rentcafe_securecafe_probe(
     try:
         from ma_poc.pms.adapters._probe import probe_get
     except ImportError:
+        _log_rc(pid, "sc_search", "skipped_no_curl_cffi", reason="curl_cffi import failed")
         return []
 
     base = _find_securecafe_base(html, ctx)
+    if base:
+        _log_rc(pid, "sc_search", "found_in_body", reason=base[:140])
     if not base:
         # Patchright-rendered body sometimes lacks the securecafe link in
         # a regex-matchable form (link injected post-render or behind a
@@ -933,32 +1200,96 @@ async def _try_rentcafe_securecafe_probe(
         # Re-fetch the property's homepage via curl_cffi (bypasses CF +
         # raw server HTML) and scan that for the securecafe base.
         origin = _origin_from_ctx(ctx)
-        if origin:
-            try:
-                _hr = probe_get(origin, timeout=20)
-                if _hr.status_code == 200 and _hr.text:
-                    base = _find_securecafe_base(_hr.text, ctx)
-            except Exception:
-                # Best-effort recovery — silently fall through. The
-                # failure-classification path emits the canonical
-                # RENTCAFE_* error code; this probe should not pollute
-                # result.errors with mid-cascade debug noise.
-                pass
+        if not origin:
+            _log_rc(pid, "sc_search", "not_in_body_no_origin", reason="no origin to refetch")
+            return []
+        try:
+            _hr = probe_get(origin, timeout=20)
+            _hr_len = len(getattr(_hr, "text", "") or "")
+            if _hr.status_code == 200 and _hr.text:
+                base = _find_securecafe_base(_hr.text, ctx)
+                _log_rc(
+                    pid,
+                    "sc_homepage_refetch",
+                    "found_via_refetch" if base else "no_sc_url_in_refetch",
+                    reason=f"len={_hr_len} base={base[:120] if base else 'None'}",
+                    homepage_status=_hr.status_code,
+                )
+            else:
+                _log_rc(
+                    pid,
+                    "sc_homepage_refetch",
+                    f"status_{_hr.status_code}",
+                    reason=f"len={_hr_len}",
+                    homepage_status=_hr.status_code,
+                )
+        except Exception as exc:
+            _log_rc(
+                pid,
+                "sc_homepage_refetch",
+                f"exception:{type(exc).__name__}",
+                reason=str(exc)[:140],
+            )
+            # Preserve main's silent-failure contract for now — emitting
+            # is enough; do not append to result.errors.
     if not base:
+        _log_rc(pid, "sc_probe", "skipped_no_base", reason="no securecafe URL discoverable")
         return []
     au_url = f"{base}/availableunits.aspx"
 
     try:
         r = probe_get(au_url, timeout=25)
-    except Exception:
+    except Exception as exc:
+        _log_rc(
+            pid,
+            "sc_probe",
+            f"exception:{type(exc).__name__}",
+            reason=f"{str(exc)[:120]} url={au_url[:80]}",
+        )
         return []
+
+    page_html = r.text or ""
+    outcome, reason = _classify_probe_body(r.status_code, page_html)
+    _log_rc(
+        pid,
+        "sc_probe",
+        outcome,
+        reason=reason,
+        au_url=au_url[:140],
+        http_status=r.status_code,
+    )
     if r.status_code != 200:
         return []
-    page_html = r.text or ""
     # CF challenge shell is tiny and carries no unit rows.
     if "AvailUnitRow" not in page_html:
         return []
     units = parse_securecafe_availableunits(page_html, au_url)
+    # Parser-stage telemetry: headers vs. row count is the most useful
+    # diagnostic when AvailUnitRow exists but units == []. The 2026-05-22
+    # local sample shows 25% of failures here (newer SecureCafe template
+    # lacks the "Floor Plan: A1 - 1 Bedroom" header the regex expects).
+    headers_seen = len(list(_SECURECAFE_FP_HDR_RE.finditer(page_html)))
+    avail_rows = page_html.count("AvailUnitRow")
+    _log_rc(
+        pid,
+        "sc_parse",
+        "ok" if units else "parse_returned_empty",
+        units=len(units),
+        reason=f"headers={headers_seen} avail_rows={avail_rows}",
+        headers_matched=headers_seen,
+        avail_rows=avail_rows,
+    )
+    # 2026-05-22 diagnostic capture: on silent-empty (avail rows visible
+    # but parser produced 0 units), dump structural signals so future
+    # regex bugs are debuggable from events.jsonl alone. See
+    # _capture_body_diagnostics for the field schema.
+    if not units and avail_rows > 0:
+        _log_rc_diag(
+            pid,
+            "sc_parse",
+            page_html,
+            reason=f"au_url={au_url[:100]} headers={headers_seen} avail_rows={avail_rows}",
+        )
     if units:
         result.api_responses.append(
             {"url": au_url, "status": 200, "body": "<securecafe-html>", "via": "securecafe_probe"}

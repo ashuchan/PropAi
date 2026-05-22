@@ -31,7 +31,57 @@ reporting can count them and the cleaner can still emit something usable.
 
 from __future__ import annotations
 
+import html
 import re
+
+# ─────────────────────────────────────────────────────────────────────
+# HTML entity decoding
+# ─────────────────────────────────────────────────────────────────────
+#
+# Raw concession text is scraped from page HTML AFTER tag stripping. The
+# stripper leaves character-reference entities untouched (``&amp;`` /
+# ``&nbsp;`` / ``&#39;`` / ``&quot;`` / ``&lt;`` / ``&gt;`` ...) because
+# they're valid text — the bug is that downstream consumers render
+# them verbatim. 696 of 2,081 captured concessions in the 2026-05-21
+# run carried at least one entity; the most common literal display
+# bug was ``May &amp; June`` instead of ``May & June``.
+#
+# Decoding happens at the cleaner so every downstream consumer — xlsx,
+# vision-banner LLM, structured normalizer — operates on un-escaped
+# literals. ``html.unescape`` is the stdlib reference implementation and
+# handles named + numeric (decimal AND hex) entities uniformly.
+#
+# We also collapse a small set of zero-width / non-breaking whitespace
+# characters that ``html.unescape("&nbsp;")`` produces (U+00A0). Left
+# raw, they survive the whitespace-normalise pass below and render as
+# weird-looking gaps in xlsx cells.
+
+_NBSP_AND_FRIENDS = {
+    " ": " ",  # non-breaking space (&nbsp;)
+    "​": "",   # zero-width space
+    "‌": "",   # zero-width non-joiner
+    "‍": "",   # zero-width joiner
+    "﻿": "",   # byte-order mark
+    " ": " ",  # thin space
+    " ": " ",  # narrow no-break space
+}
+
+
+def _decode_html_entities(text: str) -> str:
+    """Decode HTML/XML character-reference entities to plain text.
+
+    Wraps :func:`html.unescape` plus a small normalisation step for the
+    non-breaking-space characters that ``&nbsp;`` and friends decode
+    into. Idempotent — running twice yields the same string.
+    """
+    if not text:
+        return text
+    decoded = html.unescape(text)
+    for ch, repl in _NBSP_AND_FRIENDS.items():
+        if ch in decoded:
+            decoded = decoded.replace(ch, repl)
+    return decoded
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Quality classification
@@ -231,6 +281,12 @@ def clean_concession_text(text: str | None) -> str:
     """
     if not text or not isinstance(text, str) or not text.strip():
         return ""
+
+    # Decode HTML entities first so window-extraction and offer-phrase
+    # matching see unescaped literals (``&amp;`` → ``&``, ``&nbsp;`` → `` ``
+    # → space). Downstream consumers — xlsx, banner renderer, normalizer —
+    # then operate on plain text without per-call unescape boilerplate.
+    text = _decode_html_entities(text)
 
     quality = classify_concession_quality(text)
     if quality in ("clean", "empty"):

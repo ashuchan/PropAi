@@ -8,6 +8,7 @@ import { MetricCard } from '@/components/shared/MetricCard';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { SendDailyFailuresButton } from '@/components/reports/SendDailyFailuresButton';
 import { formatPercent, formatNumber, formatDuration, formatDate } from '@/utils/formatters';
 
 export function ReportsPage() {
@@ -33,6 +34,13 @@ export function ReportsPage() {
         <FileText size={22} className="text-rent-400" />
         <h1 className="text-[22px] font-medium text-slate-900 dark:text-slate-100">Property Reports</h1>
         <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-mono text-slate-600 dark:bg-slate-800 dark:text-slate-400">{history.length} runs</span>
+        {/* Operator control — spawns scripts/email/daily_failures.py
+            against the currently-selected run. The button manages its
+            own state (sending / succeeded / failed) and polls the
+            backend job endpoint every 2s. */}
+        <div className="ml-auto">
+          <SendDailyFailuresButton runDate={selectedDate} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">

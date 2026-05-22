@@ -188,6 +188,12 @@ class Apts247Adapter:
         return False
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
+        from ma_poc.pms.adapters._adapter_telemetry import (
+            classify_probe_body,
+            log_adapter_stage,
+        )
+
+        pid_for_log = str(getattr(ctx, "property_id", "") or "unknown")
         result = AdapterResult(tier_used=_TIER)
 
         html = ""
@@ -203,11 +209,14 @@ class Apts247Adapter:
             origin = _origin_of(str(getattr(fr, "final_url", "") or ""))
         origin = origin or _origin_of(getattr(ctx, "base_url", "") or "")
         if not origin:
+            log_adapter_stage("apts247", pid_for_log, "origin_resolve", "no_origin",
+                              reason="neither final_url nor base_url resolved")
             result.tier_used = f"{_TIER}_NO_ORIGIN"
             result.errors.append("APTS247: no resolvable origin")
             return result
 
         key = find_apts247_api_key(html)
+        key_source = "static_body" if key else None
         if not key:
             # Key not in the captured body — refetch the homepage.
             try:
@@ -215,6 +224,16 @@ class Apts247Adapter:
             except Exception:
                 hh = ""
             key = find_apts247_api_key(hh)
+            if key:
+                key_source = "homepage_refetch"
+        log_adapter_stage(
+            "apts247",
+            pid_for_log,
+            "api_key_resolve",
+            "found" if key else "not_found",
+            reason=f"source={key_source}",
+            key_source=key_source,
+        )
         if not key:
             result.tier_used = f"{_TIER}_NO_KEY"
             result.confidence = 0.0
@@ -225,11 +244,24 @@ class Apts247Adapter:
         try:
             raw = await _fetch(api_url)
         except Exception as exc:
+            log_adapter_stage(
+                "apts247", pid_for_log, "api_fetch",
+                f"exception:{type(exc).__name__}",
+                reason=f"{str(exc)[:120]} url={api_url[:100]}",
+            )
             result.tier_used = f"{_TIER}_FETCH_ERROR"
             result.errors.append(
                 f"apts247-fetch-error: {type(exc).__name__}: {str(exc)[:120]}"
             )
             return result
+
+        # Probe-body classification: distinguish CF-shell from genuine
+        # empty from real success.
+        outcome, reason = classify_probe_body(200 if raw else 0, raw)
+        log_adapter_stage(
+            "apts247", pid_for_log, "api_fetch", outcome,
+            reason=f"{reason} url={api_url[:100]}",
+        )
 
         import json
 

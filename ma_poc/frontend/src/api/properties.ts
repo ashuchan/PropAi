@@ -9,7 +9,20 @@ export interface ApiPropertySummary {
   availabilityRate: number; availableUnits: number;
   extractionTier: string; scrapeStatus: string; propertyStatus: string;
   yearBuilt: number | null; stories: number | null;
-  activeConcession: string | null; lastScrapeTimestamp: string;
+  activeConcession: string | null;
+  /** Short scan-friendly summary of ``activeConcession`` produced by
+   *  the deterministic enricher in the services layer. Null when the
+   *  raw text didn't parse into a recognised offer — frontend falls
+   *  back to ``activeConcession`` in that case. */
+  concessionBanner?: string | null;
+  /** Canonical offer-type taxonomy of the primary atom
+   *  (``free_rent`` / ``dollar_off`` / ``waived_fee`` / etc).
+   *  Filterable in dashboards; null when un-parseable. */
+  concessionOfferType?: string | null;
+  /** What the discount is applied to (``rent`` / ``app_fee`` /
+   *  ``move_in_cost`` / etc); null when not classified. */
+  concessionTarget?: string | null;
+  lastScrapeTimestamp: string;
   carryForwardDays: number; imageUrl: string | null; galleryUrls?: string[]; websiteUrl: string;
   llmCostUsd: number; llmCallCount: number; llmTokensTotal: number;
 }

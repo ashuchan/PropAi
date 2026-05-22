@@ -165,3 +165,107 @@ class TestG5PortalAllowlistEntry:
             None,
         )
         assert matched == "g5_marketing_cloud"
+
+
+# ── 2026-05-22 — deterministic URN selection regression tests ──────────
+#
+# Pre-2026-05-22 ``find_g5_urn`` used ``max(matches, key=len)`` — picked
+# the longest URN string, which on multi-property operators is reliably
+# the parent-company switcher URN or a sibling property's URN (verified
+# live 5/5 wrong on Anson, Central Park, Brook Hollow, Ten68 West,
+# Westgate Village). The new ``find_g5_urn_for_property`` anchors on the
+# Cloudinary asset-folder path ``/g5/g5-c-<co>/g5-cl-<prop>/uploads/``
+# which is guaranteed unique-to-property by G5's CMS, and falls back to
+# most-frequent g5-cl-* when the CDN regex misses. Below are minimal
+# fixtures that exercise both code paths.
+
+
+class TestG5DeterministicUrnSelection:
+    """Regression tests for the 2026-05-22 deterministic URN picker."""
+
+    def test_cdn_anchor_picks_property_urn_over_siblings(self):
+        """The favicon CDN path always points at the property's own
+        folder; sibling URNs in nav menus must NOT win even when they
+        appear in more places overall. Mirrors live evidence on
+        Anson Apartments (5 sibling URN refs vs 1 favicon ref)."""
+        from ma_poc.pms.adapters.g5 import find_g5_urn_for_property
+
+        html = (
+            '<html><head>'
+            # Favicon CDN path points at the property's own folder.
+            '<link rel="shortcut icon" href="'
+            'https://g5-assets-cld-res.cloudinary.com/image/upload/g5/'
+            'g5-c-ifo7vzy-anson-residential-llc/'
+            'g5-cl-1n33lxfrno-anson-burlingame-ca/uploads/anson-fav.png">'
+            '</head><body>'
+            # Sibling switcher menu — 5 different URNs, all wrong.
+            '<a href="/properties/g5-cl-1mr81ug5ko-anson-gaithersburg-md">MD</a>'
+            '<a href="/properties/g5-cl-2abc-anson-austin-tx">TX</a>'
+            '<a href="/properties/g5-cl-3def-anson-portland-or">OR</a>'
+            '<a href="/properties/g5-cl-4ghi-anson-denver-co">CO</a>'
+            '<a href="/properties/g5-cl-5jkl-anson-seattle-wa">WA</a>'
+            '</body></html>'
+        )
+        result = find_g5_urn_for_property(html, "https://ansonburlingame.com/")
+        assert result == "g5-cl-1n33lxfrno-anson-burlingame-ca", (
+            f"Expected CDN-anchored URN; got {result!r}. The longest "
+            "match heuristic would have picked one of the siblings."
+        )
+
+    def test_cdn_anchor_resists_longest_match_trap(self):
+        """The favicon URN is shorter than the parent-company switcher
+        URN. The CDN anchor MUST win over length-based selection.
+        """
+        from ma_poc.pms.adapters.g5 import find_g5_urn_for_property
+
+        html = (
+            '<head><link rel="icon" href="https://res.cloudinary.com/'
+            'g5/g5-c-foo/g5-cl-short-prop/uploads/icon.png"></head>'
+            '<body>'
+            # Way longer URN that doesn't belong to this property
+            '<a href="/g5-cl-1longerthantheproperty-parent-company-marketing-hub-corporate-portal">Hub</a>'
+            '</body>'
+        )
+        result = find_g5_urn_for_property(html, "")
+        assert result == "g5-cl-short-prop"
+
+    def test_fallback_to_most_frequent_when_no_cdn_anchor(self):
+        """When the favicon doesn't render to the property's Cloudinary
+        folder (uncommon but possible — pages with custom favicon
+        configuration), fall back to most-frequent g5-cl-* on the page.
+        On a real property page, the property's own URN appears 50-150+
+        times (in templates, scripts, CSS class names); siblings appear
+        once each in a switcher menu.
+        """
+        from ma_poc.pms.adapters.g5 import find_g5_urn_for_property
+
+        html = (
+            '<html><body>'
+            # The property's URN appears many times (templated content)
+            + '<div class="g5-cl-myproperty-fl">x</div>' * 50
+            # Sibling URNs appear once each (switcher menu)
+            + '<a href="/g5-cl-sibling1-ny">NY</a>'
+            + '<a href="/g5-cl-sibling2-tx">TX</a>'
+            '</body></html>'
+        )
+        result = find_g5_urn_for_property(html, "")
+        assert result == "g5-cl-myproperty-fl"
+
+    def test_backward_compat_find_g5_urn_routes_to_new_impl(self):
+        """The old function name still works (legacy imports) — same
+        deterministic behaviour as the new function.
+        """
+        from ma_poc.pms.adapters.g5 import find_g5_urn
+
+        html = (
+            '<head><link rel="icon" href="https://cdn/g5/g5-c-test/'
+            'g5-cl-correct-prop/uploads/icon.png"></head>'
+            '<a href="/g5-cl-1nlongerthantheproperty-sibling-far-away">x</a>'
+        )
+        assert find_g5_urn(html) == "g5-cl-correct-prop"
+
+    def test_returns_none_on_empty_or_no_g5_markers(self):
+        from ma_poc.pms.adapters.g5 import find_g5_urn_for_property
+
+        assert find_g5_urn_for_property("", "") is None
+        assert find_g5_urn_for_property("<html>nothing here</html>", "") is None
