@@ -204,6 +204,62 @@ class TestRankMatches:
         inc = self._sig(uid="x")
         assert rank_matches("RZZZ", ex, inc) is False
 
+    # ── uid-veto on physical-attribute (R1*) ranks ─────────────────────────
+    # Distinct explicit unit numbers must never collapse via a beds/baths/
+    # sqft match — an apartment building has many units per floor plan.
+
+    def test_R1b_vetoed_when_both_uids_present_and_differ(self):
+        """Two real units, same plan, different unit numbers must NOT match."""
+        ex = self._sig(uid="101", beds=1, baths=1.0, sqft=750)
+        inc = self._sig(uid="205", beds=1, baths=1.0, sqft=750)
+        assert rank_matches("R1b", ex, inc) is False
+
+    def test_R1a_vetoed_when_both_uids_present_and_differ(self):
+        ex = self._sig(uid="101", fp_name="1br", beds=1, baths=1.0, sqft=750)
+        inc = self._sig(uid="205", fp_name="1br", beds=1, baths=1.0, sqft=750)
+        assert rank_matches("R1a", ex, inc) is False
+
+    def test_R1_ranks_all_vetoed_on_distinct_uids(self):
+        for rank in ("R1a", "R1b", "R1c", "R1d", "R1e", "R1f"):
+            ex = self._sig(uid="A1", fp_name="studio", beds=1, baths=1.0, sqft=600)
+            inc = self._sig(uid="A2", fp_name="studio", beds=1, baths=1.0, sqft=600)
+            assert rank_matches(rank, ex, inc) is False, rank
+
+    def test_R1b_still_matches_when_one_uid_missing(self):
+        """Cross-source merge of the same unit (one source lacks uid) still works."""
+        ex = self._sig(uid="101", beds=1, baths=1.0, sqft=750)
+        inc = self._sig(uid="", beds=1, baths=1.0, sqft=750)
+        assert rank_matches("R1b", ex, inc) is True
+
+    def test_R0a_not_vetoed_exact_uid_identity_rank(self):
+        """R0a is an exact-identity rank — equal uids still match."""
+        ex = self._sig(uid="101", beds=1, baths=1.0, sqft=750)
+        inc = self._sig(uid="101", beds=1, baths=1.0, sqft=750)
+        assert rank_matches("R0a", ex, inc) is True
+
+
+class TestMergeNoCollapseAcrossDistinctUnitNumbers:
+    """Regression: a property whose units share a floor plan but carry
+    distinct unit numbers must NOT collapse to one record per plan.
+    Pre-fix, R1b merged 461 units / 3 plans down to 3 records."""
+
+    def test_roster_with_identical_plan_does_not_collapse(self):
+        units = [
+            {"unit_number": str(100 + i), "beds": 1, "baths": 1.0, "sqft": 750,
+             "floor_plan_name": "A1"}
+            for i in range(50)
+        ]
+        merged = merge_into_result_units([units[0]], units[1:], property_id="P")
+        assert len(merged) == 50, f"expected 50 distinct units, got {len(merged)}"
+
+    def test_same_unit_two_sources_still_merges(self):
+        """The legitimate case — same unit, one source missing its number —
+        must still merge so the fix doesn't over-count."""
+        existing = [{"unit_number": "101", "beds": 1, "baths": 1.0, "sqft": 750}]
+        incoming = [{"beds": 1, "baths": 1.0, "sqft": 750, "rent_range": "$1,500"}]
+        merged = merge_into_result_units(existing, incoming, property_id="P")
+        assert len(merged) == 1
+
 
 # ── merge_field_values ─────────────────────────────────────────────────────────
 

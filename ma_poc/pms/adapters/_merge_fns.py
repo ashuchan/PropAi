@@ -143,6 +143,22 @@ def merge_rank_signature(unit: dict[str, Any]) -> dict[str, Any]:
 
 def rank_matches(rank: str, ex_sig: dict[str, Any], inc_sig: dict[str, Any]) -> bool:
     """Return True when the incoming signature matches existing at ``rank``."""
+    # Distinct explicit unit identifiers veto any physical-attribute (R1*)
+    # merge. Two units that BOTH carry a unit number / unit id which differ
+    # are definitively different units, however identical their
+    # beds/baths/sqft — an apartment building has many units sharing one
+    # floor plan. Without this guard the R1a-R1f ranks (which compare only
+    # physical attributes) collapse an entire property's roster into one
+    # record per floor plan: e.g. 461 units / 3 plans -> 3 records.
+    # R0 (fp_id equality) and R0a (uid equality) are exact-identity ranks
+    # and are intentionally exempt. The guard only fires when BOTH sides
+    # have a uid — a record missing its uid can still merge on physical
+    # attributes (legitimate cross-source merge of the same unit).
+    if rank in AMBIGUITY_RANKS:
+        ex_uid = ex_sig["uid"]
+        inc_uid = inc_sig["uid"]
+        if ex_uid and inc_uid and ex_uid != inc_uid:
+            return False
     if rank == "R0":
         return bool(ex_sig["fp_id"]) and ex_sig["fp_id"] == inc_sig["fp_id"]
     if rank == "R0a":

@@ -300,6 +300,16 @@ _RENTCAFE_PROPERTY_ID_RE = re.compile(r"propertyId(?:\[\])?=(\d+)", re.IGNORECAS
 _ENTRATA_PROPERTY_ID_RE = re.compile(r"property\[id\]=(\d+)|/Apartments/(\d+)/", re.IGNORECASE)
 _SIGHTMAP_CLIENT_KEY_RE = re.compile(r"sightmap\.com/app/api/v1/([a-z0-9_-]+)/", re.IGNORECASE)
 _APPFOLIO_SUBDOMAIN_RE = re.compile(r"https?://([a-z0-9-]+)\.appfolio\.com", re.IGNORECASE)
+# A non-www AppFolio tenant subdomain followed by a leasing-system path
+# (``{slug}.appfolio.com/listings`` | ``/connect`` | ``/apply``) is a
+# definitive signal that AppFolio is the property's leasing backend — as
+# opposed to the bare ``appfolio.com`` marketing domain. Used to outrank a
+# co-resident marketing widget (apts247 / knock chat) that would otherwise
+# win routing at 0.90.
+_APPFOLIO_TENANT_PATH_RE = re.compile(
+    r"([a-z0-9][a-z0-9-]*)\.appfolio\.com/(?:listings|connect|apply)",
+    re.IGNORECASE,
+)
 _AVALONBAY_SLUG_RE = re.compile(r"avaloncommunities\.com/[a-z]{2}/[^/]+/([a-z0-9-]+)", re.IGNORECASE)
 
 
@@ -639,13 +649,37 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
                 ".prospectportal.com)"
             ],
         )
-    # AppFolio embedded as an iframe to the tenant subdomain
-    # (``{tenant}.appfolio.com/listings``) is a definitive leasing path —
+    # AppFolio tenant subdomain + leasing-system path
+    # (``{tenant}.appfolio.com/listings`` | ``/connect`` | ``/apply``) is a
+    # definitive signal that AppFolio is the property's leasing backend —
     # commonly embedded one nav-hop deep on a Wix/Squarespace marketing
-    # shell. Strong marker so it beats the Wix/Squarespace pass-2 demotion
-    # (same rationale as onlineleasing.realpage.com / commoncf.entrata.com
-    # above). Bare ``appfolio.com`` stays a pass-3 weak marker.
-    if ".appfolio.com/listings" in h:
+    # shell, or alongside a co-resident marketing widget. Yielded STRONG
+    # (0.92) so it beats both the Wix/Squarespace pass-2 demotion AND a
+    # co-resident widget marker (apts247 / knock chat) that fires at 0.90
+    # earlier in this function — same rationale as the Repli360 strong-host
+    # fix above. 2026-05-22 probe: watermillpark / highlandpark (real
+    # ``investorsmgmt.appfolio.com`` portal + an apts247 widget overlay),
+    # maplegardens (``gcmultifamily.appfolio.com``) and legacyridge
+    # (``cornerstoneresmgmt.appfolio.com``) all carried a genuine AppFolio
+    # tenant portal yet misrouted to the overlay widget / a fallback DOM
+    # tier and lost ~300 units each. Bare ``appfolio.com`` /
+    # ``www.appfolio.com`` (the marketing domain, not a tenant instance)
+    # stays a pass-3 weak 0.80 marker.
+    _appfolio_tenant_slugs = {
+        s for s in _APPFOLIO_TENANT_PATH_RE.findall(h) if s and s != "www"
+    }
+    if _appfolio_tenant_slugs:
+        yield (
+            "appfolio",
+            0.92,
+            [
+                "AppFolio tenant-portal marker in HTML "
+                f"({sorted(_appfolio_tenant_slugs)[0]}.appfolio.com/"
+                "{listings,connect,apply} — definitive leasing backend, "
+                "outranks co-resident marketing widgets)"
+            ],
+        )
+    elif ".appfolio.com/listings" in h:
         yield (
             "appfolio",
             0.85,

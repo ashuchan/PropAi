@@ -459,6 +459,65 @@ def test_squarespace_with_appfolio_marketing_link_stays_squarespace() -> None:
 
 
 # ---------------------------------------------------------------------------
+# AppFolio tenant-portal marker outranks co-resident marketing widgets.
+# 2026-05-22 probe: vanity sites that link to a real {slug}.appfolio.com
+# leasing portal but ALSO embed an apts247 marketing widget were misrouting
+# to apts247 (0.90 > appfolio's pass-3 weak 0.80) and losing ~300 units.
+# ---------------------------------------------------------------------------
+
+
+def test_appfolio_tenant_connect_path_outranks_apts247_widget() -> None:
+    """A real {tenant}.appfolio.com/connect portal beats a co-resident
+    apts247 widget marker."""
+    html = (
+        "<html><body>"
+        '<script src="https://static2.apts247.info/widget.js"></script>'
+        '<a href="https://investorsmgmt.appfolio.com/connect/users/sign_in">'
+        "Resident Login</a>"
+        "</body></html>"
+    )
+    r = detect_pms("https://www.watermillpark.com/", page_html=html)
+    assert r.pms == "appfolio", f"expected appfolio, got {r.pms}"
+
+
+def test_appfolio_tenant_apply_path_detected() -> None:
+    html = (
+        "<html><body>"
+        '<a href="https://gcmultifamily.appfolio.com/apply/abc-123/start">'
+        "Apply Now</a>"
+        "</body></html>"
+    )
+    r = detect_pms("https://www.maplegardensapthomes.com/", page_html=html)
+    assert r.pms == "appfolio"
+
+
+def test_pure_apts247_site_stays_apts247() -> None:
+    """A site with an apts247 widget and NO appfolio tenant portal must
+    still route to apts247 — the fix must not over-promote AppFolio."""
+    html = (
+        "<html><body>"
+        '<script src="https://static2.apts247.info/widget.js"></script>'
+        '<img src="https://media.apts247.info/logo.png">'
+        "</body></html>"
+    )
+    r = detect_pms("https://www.waskomodern.com/", page_html=html)
+    assert r.pms == "apts247"
+
+
+def test_bare_appfolio_marketing_link_does_not_promote() -> None:
+    """www.appfolio.com/blog is the marketing domain, not a tenant
+    instance — it must NOT trip the strong tenant-portal marker."""
+    markers = dict(
+        (pms, conf)
+        for pms, conf, _ in _iter_html_markers(
+            '<a href="https://www.appfolio.com/blog">Powered by AppFolio</a>'
+        )
+    )
+    # Only the weak pass-3 marker (0.80) may fire — never the 0.92 strong one.
+    assert markers.get("appfolio", 0.0) <= 0.80
+
+
+# ---------------------------------------------------------------------------
 # Change 2 — confirm_detection (router invariant)
 # ---------------------------------------------------------------------------
 
