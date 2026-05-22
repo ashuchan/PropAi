@@ -24,7 +24,7 @@ export function GridPropertyCard({ property }: { property: ApiPropertySummary })
             <div className="flex items-center justify-between"><span className="text-slate-500 dark:text-slate-400">Status</span><StatusDot status={property.scrapeStatus === 'SUCCESS' ? 'available' : property.scrapeStatus === 'FAILED' ? 'failed' : 'unknown'} label={property.scrapeStatus} /></div>
             {property.llmCallCount > 0 && <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">LLM Cost</span><span className="font-mono text-amber-600 dark:text-amber-400" title={`${property.llmCallCount} calls · ${property.llmTokensTotal.toLocaleString()} tokens`}>{formatCostUsd(property.llmCostUsd)}</span></div>}
           </div>
-          {property.activeConcession && <div className="mt-2"><ConcessionTag text={property.activeConcession} /></div>}
+          {(property.concessionBanner || property.activeConcession) && <div className="mt-2"><ConcessionTag banner={property.concessionBanner} raw={property.activeConcession} /></div>}
         </div>
       </Link>
     </motion.div>

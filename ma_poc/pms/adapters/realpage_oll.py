@@ -316,8 +316,14 @@ class RealPageOllAdapter:
         split ``/units`` endpoint. Returns an :class:`AdapterResult`;
         confidence is 0.0 with an error string when nothing parses.
         """
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+
+        pid_for_log = str(getattr(ctx, "property_id", "") or "unknown")
         result = AdapterResult(tier_used=OLL_TIER)
         all_units: list[dict[str, Any]] = []
+        n_workflow = 0
+        n_floorplans = 0
+        n_units_endpoint = 0
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
         for resp in api_responses:
@@ -326,6 +332,7 @@ class RealPageOllAdapter:
 
             # (a) OLL appstate Workflow PUT response — the Category-D path.
             if _is_oll_workflow_response(body, url):
+                n_workflow += 1
                 try:
                     units = parse_realpage_oll_workflow(body, url) if isinstance(body, dict) else []
                 except Exception as exc:
@@ -342,6 +349,7 @@ class RealPageOllAdapter:
                 and isinstance(body.get("response"), dict)
                 and "floorplans" in body["response"]
             ):
+                n_floorplans += 1
                 fp_units = parse_realpage_floorplans(body, url)
                 if fp_units:
                     for u in fp_units:
@@ -351,6 +359,7 @@ class RealPageOllAdapter:
 
             # (c) Split /units endpoint (null / [] / {response:[...]}).
             elif _is_realpage_units_response(body, url):
+                n_units_endpoint += 1
                 try:
                     u_units = _dr_realpage_units(body, url) or []
                 except Exception as exc:
@@ -361,6 +370,24 @@ class RealPageOllAdapter:
                         u["extraction_tier"] = OLL_TIER
                     all_units.extend(u_units)
                     result.api_responses.append(resp)
+
+        log_adapter_stage(
+            "realpage_oll",
+            pid_for_log,
+            "xhr_capture",
+            "ok" if all_units else (
+                "no_shape_match" if api_responses else "no_api_responses"
+            ),
+            units=len(all_units),
+            reason=(
+                f"network_responses={len(api_responses)} workflow={n_workflow} "
+                f"floorplans={n_floorplans} units_endpoint={n_units_endpoint}"
+            ),
+            n_responses=len(api_responses),
+            n_workflow_matched=n_workflow,
+            n_floorplans_matched=n_floorplans,
+            n_units_matched=n_units_endpoint,
+        )
 
         if all_units:
             result.units = all_units

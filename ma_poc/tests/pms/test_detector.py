@@ -679,3 +679,119 @@ def test_new_pms_names_in_pmsname_literal_and_strategy_map() -> None:
     _STRATEGY_BY_PMS so detect_pms() never KeyErrors on them."""
     for name in ("g5", "knock", "encoreskyline_template"):
         assert name in _STRATEGY_BY_PMS, f"{name} missing from _STRATEGY_BY_PMS"
+
+
+# ── 2026-05-22 — OneSite negative-gate regression tests ────────────────
+#
+# Pre-2026-05-22 the OneSite STRONG marker at detector.py:500 fired on
+# any page containing the bare substring ``onlineleasing.realpage.com``,
+# routing 80/312 OneSite-detected props to TIER_4_LLM_DOM because many
+# Apts247 (apartments247.com) and Knock-fronted sites carry a stale
+# RealPage "Apply Now" link. Live-verified 2026-05-22 on 3 misroute + 3
+# real-OneSite PIDs that ``static2.apts247.info`` and
+# ``doorway.knck.io`` are perfect negative-evidence markers (22/22/22 vs
+# 0/0/0 on the two cohorts).
+
+
+def test_onesite_negative_gate_apts247_widget_demotes() -> None:
+    """A page that wears an OneSite-shaped "Apply Now" link AND carries
+    the Apts247 widget JS CDN must NOT detect as onesite — the page is
+    structurally Apts247 with a vestigial link. Mirrors live PIDs 11327
+    (planoparktownhomes.com) and 11495 (palisadesbearcreek.com).
+    """
+    html = (
+        '<html>'
+        '<script src="https://static2.apts247.info/js/apartments247_api.min.js"></script>'
+        '<a class="ql-link" href="https://8180525.onlineleasing.realpage.com/#k=94921" '
+        'target="_blank">Apply</a>'
+        '</html>'
+    )
+    r = detect_pms("https://planoparktownhomes.com/", page_html=html)
+    # The OneSite branch must NOT short-circuit; the page is structurally
+    # Apts247 and the downstream Apts247 branch must reach it.
+    assert r.pms != "onesite", (
+        f"expected non-onesite (Apts247 widget present); got {r.pms!r}. "
+        "If this fails, the negative-gate at detector.py:500 was removed "
+        "or the apts247 marker check is too narrow."
+    )
+
+
+def test_onesite_negative_gate_apartments247_api_demotes() -> None:
+    """Same negative-gate as above, but trigger via the
+    ``apartments247_api.min.js`` filename literal (covers tenants that
+    proxy the JS through a non-static2 path).
+    """
+    html = (
+        '<html>'
+        '<script>fetch("/static/apartments247_api.min.js");</script>'
+        '<a href="https://8180525.onlineleasing.realpage.com/#k=94921">Apply</a>'
+        '</html>'
+    )
+    r = detect_pms("https://example.com/", page_html=html)
+    assert r.pms != "onesite"
+
+
+def test_onesite_negative_gate_knock_doorway_routes_to_knock() -> None:
+    """Knock-fronted vanity sites (e.g. PID 19245 tenzenapartments.com)
+    carry a stale OneSite anchor (``*.onlineleasing.realpage.com``) AND
+    the live Knock loader (``doorway.knck.io``). 2026-05-22 canary
+    revealed that simply skipping the OneSite return let the page fall
+    through to the realpage_oll branch (which lives ABOVE the Knock
+    branch in detector source order). The fix must explicitly return
+    ``knock`` from inside the OneSite block when the Knock loader is
+    present, so the page reaches the right adapter without the
+    realpage_oll detour.
+    """
+    html = (
+        '<html>'
+        '<script src="https://doorway.knck.io/embed.js"></script>'
+        '<a href="https://onlineleasing.realpage.com/123#k=abc">Apply</a>'
+        '</html>'
+    )
+    r = detect_pms("https://tenzenapartments.com/", page_html=html)
+    assert r.pms == "knock", (
+        f"expected knock (knock-loader + stale onesite); got {r.pms!r}. "
+        "If this fails, the realpage_oll branch is shadowing knock — "
+        "see detector.py post-OneSite-block fix."
+    )
+
+
+def test_onesite_knock_demotion_yields_when_competing_primary_pms() -> None:
+    """Defensive: when the Knock-loader appears on a page that ALSO has
+    a primary PMS (RentCafe/SecureCafe/ResMan portal path), don't promote
+    to Knock — the page is one of those families with an incidental
+    Knock chat widget. Mirrors the existing
+    ``_has_competing_primary_pms_for_knock`` guard at detector.py:645.
+    """
+    html = (
+        '<html>'
+        '<script src="https://doorway.knck.io/embed.js"></script>'
+        '<a href="https://acme.securecafe.com/onlineleasing/foo">Apply</a>'
+        '<a href="https://www.onlineleasing.realpage.com/whatever">Apply2</a>'
+        '</html>'
+    )
+    r = detect_pms("https://example.com/", page_html=html)
+    # We tolerate any non-onesite result here — the explicit guarantee is
+    # the OneSite branch did NOT win, and the page wasn't incorrectly
+    # promoted to knock either (rentcafe/securecafe should win or it falls
+    # through to a downstream branch).
+    assert r.pms != "onesite"
+    assert r.pms != "knock"
+
+
+def test_onesite_real_marker_still_detects() -> None:
+    """Real OneSite pages must continue to detect as onesite — the
+    negative-gate must not regress the working 36/312 wins. A page with
+    the bare OneSite marker and no competing-PMS CDN must route to
+    onesite at confidence 0.85 (mirrors live PIDs 11317
+    dixonatstonegate.com, 2114 townesuniversity.com).
+    """
+    html = (
+        '<html>'
+        '<iframe src="https://8160242.onlineleasing.realpage.com/"></iframe>'
+        '<script>var RPFP_config = { target: "#rpfloorplans" };</script>'
+        '</html>'
+    )
+    r = detect_pms("https://dixonatstonegate.com/", page_html=html)
+    assert r.pms == "onesite"
+    assert r.confidence >= 0.85

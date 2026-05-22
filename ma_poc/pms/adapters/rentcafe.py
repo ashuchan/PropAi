@@ -48,25 +48,18 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 
 # ─────────────────────────────────────────────────────────────────────
-# 2026-05-22: Per-stage telemetry for RentCafe recovery paths.
-#
-# The RentCafe adapter has 5 recovery paths (XHR capture → WP middleware
-# probe → SecureCafe drill → Hosted SSR → Nestin per-plan). Pre-2026-05-22
-# none of them emitted ``tier_attempted`` events, so production failures
-# were invisible: a silent ``return []`` from ``_try_rentcafe_securecafe_probe``
-# looked identical to "drill never ran".
-#
-# Diagnosed cause of 2026-05-21 production: ``PROBE_PROXY_URL`` not set on
-# ``jugnu-adhoc-production`` → ``probe_get`` fires direct from GCP egress
-# → ``*.securecafe.com`` CF-blocks GCP-IP range → 0 SecureCafe wins on
-# 1,885 RentCafe-detected properties (vs. 259 wins on the proxy-enabled
-# canary). Without per-stage events we couldn't distinguish CF-block from
-# parser-mismatch from URL-not-found.
-#
-# Events emitted under tier_key ``rentcafe:<stage>`` so the analyzer's
-# tier_attempted aggregation already covers them. Costs ~5-8 events per
-# RentCafe-detected property (~10K events / 4982-property production run).
+# 2026-05-22: Per-stage telemetry for RentCafe recovery paths. Shared
+# helpers live in ``_adapter_telemetry`` — every PMS adapter calls into
+# the same helpers so the analyzer's tier_attempted aggregation picks
+# up signals uniformly.
 # ─────────────────────────────────────────────────────────────────────
+
+
+from ma_poc.pms.adapters._adapter_telemetry import (  # noqa: E402  (import-after-docs)
+    CF_CHALLENGE_MARKERS as _CF_CHALLENGE_MARKERS,
+    log_adapter_diag as _log_adapter_diag,
+    log_adapter_stage as _log_adapter_stage,
+)
 
 
 def _log_rc(
@@ -78,47 +71,31 @@ def _log_rc(
     reason: str = "",
     **extra: Any,
 ) -> None:
-    """Emit ``extract.tier_attempted`` for a RentCafe recovery stage.
-
-    Stages: ``xhr_capture``, ``wp_property_id``, ``wp_probe``, ``wp_parse``,
-    ``sc_search``, ``sc_homepage_refetch``, ``sc_probe``, ``sc_parse``,
-    ``hosted_dom``, ``nestin_recover``, ``cascade_exit``.
-
-    Outcomes are stage-specific; common ones: ``ok``, ``skipped_*``,
-    ``status_NNN``, ``cf_challenge_shell``, ``exception:<ExcName>``,
-    ``parse_returned_empty``, ``no_avail_row``.
-
-    Never raises (observability is best-effort).
+    """Thin wrapper over :func:`log_adapter_stage` so the existing
+    rentcafe callsites don't have to change. Routes to the shared helper.
     """
-    try:
-        from ma_poc.observability.events import EventKind, emit
-
-        # Reason payload truncated to 200 chars to keep events.jsonl sane
-        # under the ~5K events/property worst case.
-        emit(
-            EventKind.TIER_ATTEMPTED,
-            property_id or "unknown",
-            tier_key=f"rentcafe:{stage}",
-            outcome=str(outcome)[:80],
-            ran_units=int(units or 0),
-            reason=str(reason)[:200],
-            via_proxy=bool(os.getenv("PROBE_PROXY_URL", "").strip()),
-            via_unlocker=bool(os.getenv("WEB_UNLOCKER_KEY", "").strip()),
-            **{k: v for k, v in extra.items() if v is not None},
-        )
-    except Exception:
-        # Telemetry must never break scraping.
-        pass
+    _log_adapter_stage(
+        "rentcafe",
+        property_id,
+        stage,
+        outcome,
+        units=units,
+        reason=reason,
+        **extra,
+    )
 
 
-_CF_CHALLENGE_MARKERS = (
-    "challenge-platform",
-    "cf-mitigated",
-    "__cf_chl_",
-    "cf-please-wait",
-    "_cf_chl_opt",
-    "/cdn-cgi/challenge-platform",
+# Backward-compat shims for the in-rentcafe-namespace names used by tests
+# elsewhere. The implementations live in ``_adapter_telemetry``.
+
+from ma_poc.pms.adapters._adapter_telemetry import (  # noqa: E402  (import-after-docs)
+    capture_body_diagnostics as _capture_body_diagnostics,
 )
+
+
+def _log_rc_diag(property_id: str, stage: str, body: str, *, reason: str = "") -> None:
+    """Thin wrapper so the existing rentcafe callsites don't have to change."""
+    _log_adapter_diag("rentcafe", property_id, stage, body, reason=reason)
 
 
 def _classify_probe_body(status: int, body: str) -> tuple[str, str]:
@@ -667,6 +644,18 @@ class RentCafeAdapter:
                 units=len(hosted),
                 reason=f"fp_unit_count={_rc_html.count('fp-unit')}",
             )
+            # 2026-05-22 diagnostic: when fp-unit markup is present but
+            # the hosted-table parser produced 0 rows, the row attribute
+            # inventory is the most useful signal (the parser keys on
+            # specific data-* attribute names; if Yardi has reshuffled
+            # those, the parse silently drops).
+            if not hosted:
+                _log_rc_diag(
+                    pid,
+                    "hosted_dom",
+                    _rc_html,
+                    reason=f"fp_unit_count={_rc_html.count('fp-unit')}",
+                )
             if hosted:
                 pp = post_process(
                     hosted, property_id=getattr(ctx, "property_id", None)
@@ -719,6 +708,22 @@ class RentCafeAdapter:
                         units=len(nestin_units),
                         reason=f"source={nestin_source[:120] if nestin_source else 'None'}",
                     )
+                    # 2026-05-22 diagnostic: Nestin recovery is the
+                    # last-resort RentCafe path; when it matches the
+                    # template but extracts 0 units the failure mode
+                    # is invariably a per-plan-page parser miss (the
+                    # /floorplans/{slug} layout changed) — capture
+                    # signals so we can pin the new layout.
+                    if not nestin_units:
+                        _log_rc_diag(
+                            pid,
+                            "nestin_recover",
+                            _rc_html,
+                            reason=(
+                                f"source={nestin_source[:80] if nestin_source else 'None'} "
+                                f"rc_html_len={len(_rc_html)}"
+                            ),
+                        )
                     if nestin_units:
                         pp = post_process(
                             nestin_units, property_id=getattr(ctx, "property_id", None)
@@ -943,21 +948,49 @@ async def _try_rentcafe_wp_probe(
 
     items = _unwrap_rentcafe_list(payload)
     if not items:
+        # Capture top-level payload structure so we can diagnose unwrap
+        # failures (new envelope shapes, wrapper keys, etc.) from events
+        # without re-replaying the probe.
+        payload_shape: dict[str, Any] = {"payload_type": type(payload).__name__}
+        if isinstance(payload, dict):
+            payload_shape["top_keys"] = sorted(list(payload.keys()))[:20]
+        elif isinstance(payload, list):
+            payload_shape["list_len"] = len(payload)
+            if payload and isinstance(payload[0], dict):
+                payload_shape["first_item_keys"] = sorted(list(payload[0].keys()))[:20]
         _log_rc(
             pid,
             "wp_parse",
             "no_items_unwrapped",
             reason=f"payload_type={type(payload).__name__}",
+            **{f"signal_{k}": v for k, v in payload_shape.items()},
         )
         return []
     units = parse_rentcafe_floorplans(items, api_url)
-    _log_rc(
-        pid,
-        "wp_parse",
-        "ok" if units else "parse_returned_empty",
-        units=len(units),
-        reason=f"items={len(items) if isinstance(items, list) else '?'}",
-    )
+    # When the WP probe returned a non-empty items list but parse_*
+    # produced 0 units, the per-item shape is the missing signal — log
+    # the keys of the first item so we can see what new template
+    # variant fired without re-fetching.
+    if not units and isinstance(items, list) and items:
+        first = items[0] if isinstance(items[0], dict) else {}
+        first_keys = sorted(list(first.keys()))[:25] if first else []
+        _log_rc(
+            pid,
+            "wp_parse",
+            "parse_returned_empty",
+            units=0,
+            reason=f"items={len(items)} first_keys={first_keys[:8]}",
+            signal_items_len=len(items),
+            signal_first_item_keys=first_keys,
+        )
+    else:
+        _log_rc(
+            pid,
+            "wp_parse",
+            "ok" if units else "parse_returned_empty",
+            units=len(units),
+            reason=f"items={len(items) if isinstance(items, list) else '?'}",
+        )
     if units:
         result.api_responses.append(
             {"url": api_url, "status": 200, "body": payload, "via": "wp_probe"}
@@ -990,8 +1023,21 @@ _SECURECAFE_URL_RE = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 
+# 2026-05-22: relaxed to allow `-` inside the visual-name segment. The newer
+# SecureCafe template wraps each floorplan-grouping table in a
+# ``<caption class="sr-only">Apartment Details and Selection for Floor Plan:
+# 2 Bed - 1 Bath - 2 Bedrooms, 1 Bathroom</caption>``. The visual name
+# (``"2 Bed - 1 Bath"``) contains literal dash characters, which the
+# previous ``[^<\-]`` character class rejected, dropping the header to 0
+# matches and returning ``[]`` from parse_securecafe_availableunits. The
+# tail still anchors on ``- <N> Bedroom[s], <N.N> Bathroom`` so the
+# non-greedy name capture cannot run past the bed/bath suffix.
+#
+# Diagnosed 2026-05-22 against 5 live PIDs (72944, 24561, 6550, 40584,
+# 67750) — all had ≥4 AvailUnitRow rows with the new caption format and
+# zero header matches under the old regex. Old fixtures still pass.
 _SECURECAFE_FP_HDR_RE = re.compile(
-    r"Floor\s+Plan:\s*(?P<name>[^<\-]{1,80}?)\s*-\s*"
+    r"Floor\s+Plan:\s*(?P<name>[^<]{1,150}?)\s*-\s*"
     r"(?P<bedtxt>Studio|\d+\s*Bedroom[s]?)\s*,\s*"
     r"(?P<bathtxt>\d+(?:\.\d+)?)\s*Bathroom",
     re.IGNORECASE,
@@ -1233,6 +1279,17 @@ async def _try_rentcafe_securecafe_probe(
         headers_matched=headers_seen,
         avail_rows=avail_rows,
     )
+    # 2026-05-22 diagnostic capture: on silent-empty (avail rows visible
+    # but parser produced 0 units), dump structural signals so future
+    # regex bugs are debuggable from events.jsonl alone. See
+    # _capture_body_diagnostics for the field schema.
+    if not units and avail_rows > 0:
+        _log_rc_diag(
+            pid,
+            "sc_parse",
+            page_html,
+            reason=f"au_url={au_url[:100]} headers={headers_seen} avail_rows={avail_rows}",
+        )
     if units:
         result.api_responses.append(
             {"url": au_url, "status": 200, "body": "<securecafe-html>", "via": "securecafe_probe"}

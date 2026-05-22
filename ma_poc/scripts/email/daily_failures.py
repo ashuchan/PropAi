@@ -144,6 +144,7 @@ from data_provider.sql.models import (  # noqa: E402
     ScrapeEventRow,
 )
 from data_provider.sql.provider import SqlDataProvider  # noqa: E402
+from ma_poc.core.concession_enrich import Enrichment, enrich_concession  # noqa: E402
 from reporting.verdict import _SUCCESS_VERDICTS, verdict_is_success  # noqa: E402
 from scripts.email.daily import (  # noqa: E402
     _open_provider,
@@ -326,9 +327,16 @@ def _fetch_scraped_units_from_sql(
         prop_conc_clean = payload.get("concessions_clean") or ""
         prop_conc_quality = payload.get("_concessions_quality") or ""
 
+        # Run the deterministic enrichment ONCE per property — the
+        # property-level banner is reused across every unit row that
+        # inherits from it, so we don't pay the regex cost N times.
+        prop_enrich_fields = _concession_enrichment_fields(
+            prop_conc_text or prop_conc_clean
+        )
+
         units = payload.get("units") or []
         if not units:
-            out.append({
+            row = {
                 "canonical_id": cid,
                 "property_name": prop_name,
                 "city": city,
@@ -356,7 +364,9 @@ def _fetch_scraped_units_from_sql(
                 "concessions": _stringify_concessions(
                     prop_conc_clean or prop_conc_text
                 ),
-            })
+            }
+            row.update(prop_enrich_fields)
+            out.append(row)
             continue
 
         for u in units:
@@ -370,7 +380,15 @@ def _fetch_scraped_units_from_sql(
             conc_text = u_text or prop_conc_text
             conc_clean = u_clean or prop_conc_clean
             conc_quality = u_quality or prop_conc_quality
-            out.append({
+            # When the unit emitted its own per-row concession we re-run
+            # the enricher (the producer text differs from the property
+            # banner). Otherwise we reuse the property-level enrichment
+            # so the per-row cost stays O(1).
+            if u_text and u_text != prop_conc_text:
+                enrich_fields = _concession_enrichment_fields(u_text)
+            else:
+                enrich_fields = prop_enrich_fields
+            row = {
                 "canonical_id": cid,
                 "property_name": prop_name,
                 "city": city,
@@ -395,7 +413,9 @@ def _fetch_scraped_units_from_sql(
                 "concessions": _stringify_concessions(
                     conc_clean or conc_text or u.get("concessions")
                 ),
-            })
+            }
+            row.update(enrich_fields)
+            out.append(row)
     return out
 
 
@@ -409,6 +429,60 @@ def _stringify_concessions(value: Any) -> str:
         return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     except (TypeError, ValueError):
         return str(value)
+
+
+def _concession_enrichment_fields(raw_text: str) -> dict[str, str]:
+    """Run the deterministic enricher on *raw_text* and return the
+    xlsx-shaped fields the new columns consume.
+
+    Empty input → empty fields. Never raises.
+
+    The returned dict carries the five enrichment columns:
+
+      * ``concession_banner``      — one-line human summary (~140 chars)
+      * ``concession_offer_type``  — canonical taxonomy of the primary
+                                     atom (``free_rent`` / ``dollar_off`` / ...)
+      * ``concession_target``      — what the discount is APPLIED to
+                                     (``rent`` / ``app_fee`` / ``move_in_cost``)
+      * ``concession_value``       — short magnitude string (``2 months``,
+                                     ``$500``, ``10%``)
+      * ``concession_conditions``  — semicolon-joined ``kind:value`` pairs
+                                     (``deadline:5/31; lease_length:12+ months;
+                                     unit_scope:select``) so a reviewer
+                                     can sort/filter by any single signal
+    """
+    if not raw_text:
+        return _empty_enrichment_fields()
+    e = enrich_concession(raw_text)
+    return _enrichment_to_fields(e)
+
+
+def _empty_enrichment_fields() -> dict[str, str]:
+    return {
+        "concession_banner": "",
+        "concession_offer_type": "",
+        "concession_target": "",
+        "concession_value": "",
+        "concession_conditions": "",
+    }
+
+
+def _enrichment_to_fields(e: Enrichment) -> dict[str, str]:
+    out = _empty_enrichment_fields()
+    if e.primary_atom:
+        out["concession_offer_type"] = e.primary_atom.offer_type
+        out["concession_target"] = e.primary_atom.target
+        out["concession_value"] = e.primary_atom.value
+    if e.conditions:
+        parts = []
+        for c in e.conditions:
+            if c.value:
+                parts.append(f"{c.kind}:{c.value}")
+            else:
+                parts.append(c.kind)
+        out["concession_conditions"] = "; ".join(parts)
+    out["concession_banner"] = e.banner or ""
+    return out
 
 
 def _fetch_failed_properties_from_sql(
@@ -658,6 +732,12 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
         prop_conc_clean = prop.get("concessions_clean") or ""
         prop_conc_quality = prop.get("_concessions_quality") or ""
 
+        # Property-level enrichment computed once, reused per unit row
+        # that inherits the parent banner.
+        prop_enrich_fields = _concession_enrichment_fields(
+            prop_conc_text or prop_conc_clean
+        )
+
         common = {
             "canonical_id": cid,
             "property_name": prop_name,
@@ -687,6 +767,7 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
                     prop_conc_clean or prop_conc_text
                 ),
             })
+            placeholder.update(prop_enrich_fields)
             out.append(placeholder)
             continue
         for u in units:
@@ -700,6 +781,10 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
             conc_text = u_text or prop_conc_text
             conc_clean = u_clean or prop_conc_clean
             conc_quality = u_quality or prop_conc_quality
+            if u_text and u_text != prop_conc_text:
+                enrich_fields = _concession_enrichment_fields(u_text)
+            else:
+                enrich_fields = prop_enrich_fields
             row.update({
                 "unit_id": u.get("unit_id") or "",
                 "floor_plan_name": u.get("floor_plan_name") or "",
@@ -717,6 +802,7 @@ def _flatten_properties_json(path: Path) -> list[dict[str, Any]]:
                     conc_clean or conc_text or u.get("concessions")
                 ),
             })
+            row.update(enrich_fields)
             out.append(row)
     return out
 
@@ -931,6 +1017,15 @@ _SCRAPED_COLUMNS: list[tuple[str, str]] = [
     ("concession_text", "Concession (Raw)"),
     ("concession_text_clean", "Concession (Cleaned)"),
     ("_concession_quality", "Concession Quality"),
+    # 2026-05-22 enrichment: deterministic per-cell signals so reviewers
+    # don't have to skim free-form text to figure out what the offer is.
+    # Banner is the one-line human render; the other four columns are
+    # filter/pivot targets in Sheets.
+    ("concession_banner", "Concession (Banner)"),
+    ("concession_offer_type", "Offer Type"),
+    ("concession_target", "Offer Target"),
+    ("concession_value", "Offer Value"),
+    ("concession_conditions", "Offer Conditions"),
 ]
 
 _FAILED_COLUMNS: list[tuple[str, str]] = [

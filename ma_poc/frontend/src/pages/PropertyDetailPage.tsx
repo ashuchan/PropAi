@@ -43,7 +43,7 @@ export function PropertyDetailPage() {
               <StatusDot status={property.scrapeStatus === 'SUCCESS' ? 'available' : property.scrapeStatus === 'FAILED' ? 'failed' : 'unknown'} label={property.scrapeStatus} />
             </div>
           </div>
-          {property.activeConcession && <div className="mt-3"><ConcessionTag text={property.activeConcession} /></div>}
+          {(property.concessionBanner || property.activeConcession) && <div className="mt-3"><ConcessionTag banner={property.concessionBanner} raw={property.activeConcession} /></div>}
           <div className="mt-4 grid grid-cols-2 gap-2 text-[12px] text-slate-600 dark:text-slate-400">
             {!isV2 && <div>Year Built: <span className="font-mono text-slate-900 dark:text-slate-100">{property.yearBuilt || '—'}</span></div>}
             {!isV2 && <div>Stories: <span className="font-mono text-slate-900 dark:text-slate-100">{property.stories || '—'}</span></div>}

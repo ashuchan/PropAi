@@ -233,12 +233,16 @@ class SightMapAdapter:
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units from SightMap API responses captured during page load."""
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+
+        pid_for_log = str(getattr(ctx, "property_id", "") or "unknown")
         result = AdapterResult(tier_used=_TIER_BASE)
         all_units: list[dict[str, str]] = []
         # Aggregate across all matched responses so the partial-join check
         # is computed against the run as a whole rather than per-response.
         total_raw_units = 0
         total_dropped = 0
+        n_matched_shape = 0
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
         for resp in api_responses:
@@ -248,6 +252,7 @@ class SightMapAdapter:
                 continue
             if not _is_sightmap_response(body):
                 continue
+            n_matched_shape += 1
             data = body.get("data") or {}
             raw_units_list = data.get("units") if isinstance(data, dict) else None
             if isinstance(raw_units_list, list):
@@ -257,6 +262,22 @@ class SightMapAdapter:
             if units:
                 all_units.extend(units)
                 result.api_responses.append(resp)
+
+        log_adapter_stage(
+            "sightmap",
+            pid_for_log,
+            "xhr_capture",
+            "ok" if all_units else "no_shape_match" if api_responses else "no_api_responses",
+            units=len(all_units),
+            reason=(
+                f"network_responses={len(api_responses)} matched_shape={n_matched_shape} "
+                f"total_raw_units={total_raw_units} dropped={total_dropped}"
+            ),
+            n_responses=len(api_responses),
+            matched_shape=n_matched_shape,
+            total_raw_units=total_raw_units,
+            join_dropped=total_dropped,
+        )
 
         if all_units:
             # Stage 1 validity gate — drops dim-less rows before they leak

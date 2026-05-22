@@ -10,6 +10,7 @@ import type { PaginatedResult, PropertyFilters, SortOptions, ExtractionTier, Scr
 import { isSuccessVerdict } from '../../types/common.js';
 import type { PropertySummary, Property, PropertyAggregates, Unit, FloorPlan, MarketMetrics, PropertyMedia, FloorPlanImage, SchemaVersion } from '../../types/property.js';
 import { resolveAvailabilityStatus } from '../../utils/availability.js';
+import { buildConcessionFields } from '../../utils/concession.js';
 import { readJsonFile, readJsonlFile, readTextFile, getLatestRunDate, getRunDates, runPath, statePath } from './dataLoader.js';
 
 /** Raw property format from backend properties.json */
@@ -230,7 +231,7 @@ export class JsonFilePropertyService implements IPropertyService {
       propertyStatus: this.mapPropertyStatus(raw['Property Status']),
       yearBuilt: raw['Year Built'],
       stories: raw['Stories'],
-      activeConcession: concessions[0] || null,
+      ...buildConcessionFields(concessions[0] || null),
       lastScrapeTimestamp: indexEntry?.last_seen_at || raw['Update Date'] || '',
       carryForwardDays: ledgerEntry?.carry_forward_used ? 1 : 0,
       imageUrl: raw['Property Image URL'] || null,
@@ -292,7 +293,7 @@ export class JsonFilePropertyService implements IPropertyService {
       propertyStatus: 'ACTIVE',
       yearBuilt: null,
       stories: null,
-      activeConcession: raw.concessions || null,
+      ...buildConcessionFields(raw.concessions || null),
       lastScrapeTimestamp: units[0]?.date_captured || indexEntry?.last_seen_at || '',
       carryForwardDays: ledgerEntry?.carry_forward_used ? 1 : 0,
       imageUrl: null,

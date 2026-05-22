@@ -17,7 +17,7 @@ export function SidebarPropertyCard({ property }: { property: ApiPropertySummary
           <span className="text-slate-500 dark:text-slate-400">{property.totalUnits} units</span>
           <span className="text-slate-500 dark:text-slate-400">{property.availableUnits} avail</span>
         </div>
-        {property.activeConcession && <div className="mt-1.5"><ConcessionTag text={property.activeConcession} /></div>}
+        {(property.concessionBanner || property.activeConcession) && <div className="mt-1.5"><ConcessionTag banner={property.concessionBanner} raw={property.activeConcession} /></div>}
       </div>
     </Link>
   );

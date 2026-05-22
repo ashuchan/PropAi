@@ -27,6 +27,20 @@ export interface PropertySummary {
   yearBuilt: number | null;
   stories: number | null;
   activeConcession: string | null;
+  /** Short scan-friendly summary of ``activeConcession`` produced by
+   *  the deterministic enricher (``utils/concession.ts``). Set
+   *  when the raw text parsed into a recognised offer shape (free
+   *  rent / dollar off / waived fee / etc); ``null`` otherwise.
+   *  Frontend prefers this for display; falls back to
+   *  ``activeConcession`` when the banner is null. */
+  concessionBanner: string | null;
+  /** Canonical offer-type taxonomy of the primary atom, e.g.
+   *  ``"free_rent"``, ``"dollar_off"``, ``"waived_fee"``. Filterable
+   *  in dashboards; null when the raw text didn't parse. */
+  concessionOfferType: string | null;
+  /** What the discount applies TO — ``"rent"``, ``"app_fee"``,
+   *  ``"move_in_cost"``, etc. null when not classified. */
+  concessionTarget: string | null;
   lastScrapeTimestamp: string;
   carryForwardDays: number;
   imageUrl: string | null;
