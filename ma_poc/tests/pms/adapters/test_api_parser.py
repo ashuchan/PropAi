@@ -401,3 +401,73 @@ class TestConstants:
         assert "minRent" in _RENT_KEYS
         assert "rent" in _RENT_KEYS
         assert "price" in _RENT_KEYS
+
+
+# ── plan/unit foreign-key join (ported from main, 2026-05-22) ───────────────
+# When an API response holds BOTH a plan list and a unit list joined by a
+# foreign key (layoutId / floorPlanId / etc.), the unit list is authoritative
+# (per-unit rent + availability) but lacks sqft — sqft lives on the plan. The
+# "largest list wins" rule emits units with empty sqft / floor_plan_name.
+# The FK detector joins them so each unit inherits its plan's area + name.
+
+
+class TestPlanUnitForeignKeyJoin:
+    _BODY = {
+        "layouts": [
+            {"id": 1, "area": 850, "beds": 1, "baths": 1, "name": "The Oak"},
+            {"id": 2, "area": 1100, "beds": 2, "baths": 2, "name": "The Maple"},
+            {"id": 3, "area": 1300, "beds": 3, "baths": 2, "name": "The Birch"},
+            {"id": 4, "area": 600, "beds": 0, "baths": 1, "name": "The Studio"},
+        ],
+        "units": [
+            {"layoutId": 1, "unitNumber": "101", "displayPrice": 1500,
+             "availableOn": "2026-06-01"},
+            {"layoutId": 2, "unitNumber": "205", "displayPrice": 2100,
+             "availableOn": "2026-06-15"},
+        ],
+    }
+
+    def test_units_inherit_plan_sqft_via_fk(self):
+        """Each unit must inherit area + floor-plan name from its FK plan."""
+        units = parse_api_responses(
+            [{"url": "https://x.test/api/inventory", "body": self._BODY}]
+        )
+        assert len(units) == 2, f"expected 2 units, got {len(units)}"
+        by_num = {u["unit_number"]: u for u in units}
+        u101 = by_num["101"]
+        assert str(u101.get("sqft")) == "850", f"unit 101 sqft: {u101.get('sqft')!r}"
+        assert u101["floor_plan_name"] == "The Oak"
+        assert u101["rent_range"] == "$1,500"
+        u205 = by_num["205"]
+        assert str(u205.get("sqft")) == "1100"
+        assert u205["floor_plan_name"] == "The Maple"
+
+    def test_unit_fields_win_over_plan_on_conflict(self):
+        """Per-unit data is authoritative — a unit's own value overrides
+        the plan's on any overlapping key."""
+        body = {
+            "layouts": [{"id": 1, "area": 850, "beds": 1, "baths": 1,
+                         "name": "Plan A", "displayPrice": 999}],
+            "units": [
+                {"layoutId": 1, "unitNumber": "1A", "displayPrice": 1700,
+                 "availableOn": "2026-07-01"},
+                {"layoutId": 1, "unitNumber": "1B", "displayPrice": 1750,
+                 "availableOn": "2026-07-05"},
+            ],
+        }
+        units = parse_api_responses([{"url": "https://x.test/api", "body": body}])
+        assert len(units) == 2
+        rents = sorted(u["rent_range"] for u in units)
+        # the unit's displayPrice (1700/1750) wins, not the plan's 999
+        assert rents == ["$1,700", "$1,750"]
+
+    def test_no_fk_pair_falls_back_to_largest(self):
+        """A response with no plan/unit FK pair must still parse via the
+        existing 'largest list wins' path — the join is additive only."""
+        body = {"units": [
+            {"floorPlanName": "1BR", "minRent": 1500, "beds": "1", "sqft": "750"},
+            {"floorPlanName": "2BR", "minRent": 2000, "beds": "2", "sqft": "1000"},
+        ]}
+        units = parse_api_responses([{"url": "https://x.test/api", "body": body}])
+        assert len(units) == 2
+        assert {u["floor_plan_name"] for u in units} == {"1BR", "2BR"}

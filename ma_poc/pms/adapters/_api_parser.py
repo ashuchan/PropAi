@@ -758,6 +758,208 @@ def _emit_signal_inspection(
         pass  # never let telemetry mask extraction
 
 
+# ── plan/unit foreign-key join ──────────────────────────────────────────────
+# Ported from main (ashuchan, 2026-05-19 Knock-shape fix) on 2026-05-22 after
+# the branch comparison: our walker picked the longer list ("largest wins"),
+# so on a {layouts:[N plans], units:[M instances]} response it shipped units
+# with empty sqft / floor_plan_name (sqft lives on the plan). The FK detector
+# joins them so each unit inherits its referenced plan's area + name.
+
+#: Foreign-key field names on a UNIT row that reference a sibling PLAN
+#: row's primary key. When a candidate list's items carry one of these
+#: fields AND there's another sibling list whose ``id`` values match,
+#: the FK-bearing list is the authoritative unit list and the referenced
+#: list provides plan-level enrichment. Origin: Knock RentManager API
+#: (PID 253774 on 2026-05-18) returns ``{layouts: [60 plans], units: [30
+#: instances]}`` where only ``units`` carry ``displayPrice`` and
+#: ``availableOn``. Adding a new vendor's FK key here extends the pair
+#: detector automatically.
+_PLAN_FK_KEYS: tuple[str, ...] = (
+    "layoutId", "layout_id", "layoutid",
+    "floorPlanId", "floor_plan_id", "floorplanid", "floorplanId",
+    "planId", "plan_id",
+    "fpId", "fp_id",
+    "unitTypeId", "unit_type_id", "unittypeid",
+    "modelId", "model_id",
+    "templateId", "template_id",
+)
+
+#: Per-unit signal keys that mark a list as the AUTHORITATIVE unit list
+#: (rather than a plan-summary list). A list whose items carry any of
+#: these keys has per-apartment data the plan-list doesn't have.
+_PER_UNIT_SIGNAL_KEYS: tuple[str, ...] = (
+    # availability date / status
+    "available_date", "availableOn", "available_on", "availableDate",
+    "moveInDate", "move_in_date", "readyDate", "ready_date",
+    "available", "leased", "occupied", "reserved", "noticeGiven",
+    # per-unit rent (vs plan-level rent range)
+    "displayPrice", "display_price", "price", "monthlyRent",
+    "monthly_rent", "askingRent", "asking_rent",
+    # per-unit identity
+    "unitNumber", "unit_number", "unitId", "unit_id",
+)
+
+
+def _collect_dict_lists(blob: Any, _depth: int = 0) -> list[list[dict]]:
+    """Recursively collect every list whose items are dicts.
+
+    Unfiltered on purpose — unlike :func:`find_unit_arrays` (which gates
+    on >=2 unit-signal keys and so drops plan-summary lists), this
+    surfaces BOTH the unit list and the plan list. The FK-pair detector
+    applies its own plan-shape / unit-shape logic, so over-collecting
+    here is safe — a list that is neither simply never pairs.
+    """
+    out: list[list[dict]] = []
+    if _depth > 8:
+        return out
+    if isinstance(blob, list):
+        dicts = [x for x in blob if isinstance(x, dict)]
+        if len(dicts) >= 1:
+            out.append(dicts)
+        for x in blob:
+            out.extend(_collect_dict_lists(x, _depth + 1))
+    elif isinstance(blob, dict):
+        for v in blob.values():
+            out.extend(_collect_dict_lists(v, _depth + 1))
+    return out
+
+
+def _list_item_keys(items: list, sample: int = 5) -> set[str]:
+    """Union of dict-keys across the first ``sample`` items of ``items``.
+
+    Used by the FK-pair detector to decide which list is plan-shaped vs
+    unit-shaped without scanning the entire list. 5 items is enough to
+    surface vendor key patterns; vendor APIs are uniform within a
+    response.
+    """
+    keys: set[str] = set()
+    for item in items[:sample]:
+        if isinstance(item, dict):
+            keys.update(k for k in item.keys() if isinstance(k, str))
+    return keys
+
+
+def _detect_plan_unit_pair(
+    walker_lists: list[list[dict]],
+) -> tuple[list[dict], list[dict], str] | None:
+    """Detect a plan-list / unit-list pair joined by foreign key.
+
+    A unit-list is identified by:
+        - items carry one of :data:`_PLAN_FK_KEYS` (foreign-key reference)
+        - items carry at least one :data:`_PER_UNIT_SIGNAL_KEYS` field
+          (per-unit data the plan-list can't have)
+
+    A plan-list is identified by:
+        - items have an ``id`` field whose values match the unit-list's
+          FK values for >=2 distinct references (avoids accidental match
+          on unrelated lists that happen to have ``id``)
+
+    Returns ``(plan_list, unit_list, fk_key)`` on detection, ``None``
+    otherwise. When multiple unit-list / plan-list candidates exist,
+    picks the pair with the highest match-count.
+    """
+    if len(walker_lists) < 2:
+        return None
+
+    candidates_as_unit: list[tuple[list[dict], str]] = []
+    candidates_as_plan: list[tuple[list[dict], set]] = []
+
+    for lst in walker_lists:
+        if not lst:
+            continue
+        keys = _list_item_keys(lst)
+        # Unit-shape: has an FK key AND a per-unit signal.
+        fk_key = next((k for k in _PLAN_FK_KEYS if k in keys), None)
+        if fk_key and any(k in keys for k in _PER_UNIT_SIGNAL_KEYS):
+            candidates_as_unit.append((lst, fk_key))
+        # Plan-shape: items have an ``id`` field. Permissive here — the
+        # cross-reference count filters false positives below.
+        if "id" in keys:
+            ids = {
+                it.get("id") for it in lst
+                if isinstance(it, dict) and it.get("id") is not None
+            }
+            if ids:
+                candidates_as_plan.append((lst, ids))
+
+    if not candidates_as_unit or not candidates_as_plan:
+        return None
+
+    # For each (unit, plan) combination, count how many unit FKs resolve
+    # to a plan id. Best-scoring pair wins. Require >=2 matches so we
+    # don't false-positive on a single-row coincidence.
+    best: tuple[int, list[dict], list[dict], str] | None = None
+    for unit_list, fk_key in candidates_as_unit:
+        for plan_list, plan_ids in candidates_as_plan:
+            if plan_list is unit_list:
+                continue
+            match_count = 0
+            for u in unit_list:
+                if not isinstance(u, dict):
+                    continue
+                fk_val = u.get(fk_key)
+                if fk_val is not None and fk_val in plan_ids:
+                    match_count += 1
+            if match_count >= 2 and (best is None or match_count > best[0]):
+                best = (match_count, plan_list, unit_list, fk_key)
+
+    if best is None:
+        return None
+    _, plan_list, unit_list, fk_key = best
+    return plan_list, unit_list, fk_key
+
+
+def _merge_units_with_plans(
+    unit_list: list[dict],
+    plan_list: list[dict],
+    fk_key: str,
+) -> list[dict]:
+    """Enrich each unit dict with fields from its referenced plan.
+
+    Unit-side fields ALWAYS win (per-unit data is authoritative). The
+    plan supplies values only for keys missing or empty on the unit.
+    Returns a new list — the input dicts are not mutated.
+    """
+    plan_index: dict[Any, dict] = {
+        p["id"]: p for p in plan_list
+        if isinstance(p, dict) and p.get("id") is not None
+    }
+    out: list[dict] = []
+    for u in unit_list:
+        if not isinstance(u, dict):
+            continue
+        fk_val = u.get(fk_key)
+        plan = plan_index.get(fk_val) if fk_val is not None else None
+        if not plan:
+            out.append(dict(u))
+            continue
+        # plan first, unit second so the unit's value overrides on
+        # overlapping keys. Skip the plan's ``id`` (FK from the unit's
+        # perspective) and bookkeeping fields that would just be noise.
+        merged = dict(plan)
+        merged.pop("id", None)
+        for skip in ("createdAt", "modifiedAt", "deletedAt", "deletedByVendor",
+                     "integrationId", "images", "description"):
+            merged.pop(skip, None)
+        # Promote the plan's ``name`` into ``planName`` BEFORE the unit
+        # overlay — the unit's own ``name`` (if any) is the unit number,
+        # which would otherwise clobber the plan's floor-plan name.
+        plan_name_seed = plan.get("name") if isinstance(plan, dict) else None
+        if plan_name_seed and "planName" not in merged:
+            merged["planName"] = plan_name_seed
+        for k, v in u.items():
+            if v not in (None, ""):
+                merged[k] = v
+        # When a unit row has an FK + a ``name`` field, ``name`` is the
+        # per-apartment unit number, not the floor-plan name. Promote it
+        # to the canonical ``unit_number`` key.
+        unit_name = u.get("name") if isinstance(u, dict) else None
+        if unit_name not in (None, "") and "unit_number" not in u:
+            merged["unit_number"] = unit_name
+        out.append(merged)
+    return out
+
+
 def parse_api_responses(
     api_responses: list[dict],
     *,
@@ -830,6 +1032,26 @@ def parse_api_responses(
                 # would also pass the signal gate.
                 walker_lists.sort(key=len, reverse=True)
                 candidates = walker_lists[0]
+
+        # Plan/unit FK join — runs even when the keyed walker above already
+        # found a list. ``_find_list`` returns ONE list (often the unit
+        # list, e.g. on a {layouts:[...], units:[...]} body), so the sibling
+        # plan list that carries sqft / floor-plan name is never seen. When
+        # a genuine FK pair exists in the response, the joined unit list
+        # (units enriched with their plan's area + name) takes precedence.
+        # The detector requires >=2 FK matches, so it only fires on a real
+        # pair and is a no-op otherwise.
+        if isinstance(data, (dict, list)):
+            try:
+                _all_lists = _collect_dict_lists(data)
+                _pair = _detect_plan_unit_pair(_all_lists)
+            except Exception:
+                _pair = None
+            if _pair is not None:
+                _plan_list, _unit_list, _fk_key = _pair
+                candidates = _merge_units_with_plans(
+                    _unit_list, _plan_list, _fk_key
+                )
 
         # RC-TRACE (2026-05-15 PM): sampled trace event for offline alias
         # analysis. Emits keys_observed + keys_matched + keys_unmatched_unit_shape
