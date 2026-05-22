@@ -2281,8 +2281,17 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
     ".unit-row",
     ".unit-item",
     ".unitContainer",
+    # 2026-05-22 bucket-B grind: ``.apartment-info-block`` — semantic
+    # per-floor-plan card (Red Oak Properties-style CMS). Verified on
+    # sunset-ridge-apartments: 7 blocks, each "Price Range $X ~ $Y BR N
+    # ... SqFt Z ...". Placed before the generic ``.apartment``.
+    ".apartment-info-block",
     ".floorplan",
     ".floor-plan",
+    # underscore variant ``.floor_plan`` — a custom-CMS theme (verified
+    # on creekviewapthomes.com: 7 rent+sqft floor-plan containers); the
+    # hyphen / no-separator variants above miss the underscore spelling.
+    ".floor_plan",
     ".floorplan-card",
     ".floor-plan-card",
     ".floorplan-row",
@@ -2335,7 +2344,12 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
 )
 
 _RENT_PATTERN = re.compile(
-    r"\$\s*(\d{1,3}(?:,\d{3})*|\d{3,5})(?:\.\d{2})?",
+    # First alt REQUIRES >=1 comma group (``+``) so a comma-less 4-digit
+    # price ("$1700", "$2087") falls through to the second alt and is
+    # captured whole. The old ``*`` let alt-1 match just the leading 3
+    # digits of "$1700" -> "170" (a long-standing truncation bug surfaced
+    # by the 2026-05-22 bucket-B grind).
+    r"\$\s*(\d{1,3}(?:,\d{3})+|\d{3,6})(?:\.\d{2})?",
 )
 # Captures bare numbers following price-range / pricing labels.
 # Handles "Price Range: 1,200 - 1,500 /mo", "From 1,350/month", etc.
@@ -2349,15 +2363,42 @@ _PRICE_RANGE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _SQFT_PATTERN = re.compile(
-    r"(\d{2,5})\s*(?:sq\.?\s*ft\.?|sqft|square\s*feet)",
+    # number-first: "750 sq ft", "750 sqft", "750 ft²". The
+    # ``(?<![\$\d,])`` lookbehind stops a price number from being read as
+    # sqft — "Deposit: $200 Square Feet: 980" was matching "200" because
+    # the deposit amount sits right before the "Square Feet" label.
+    r"(?<![\$\d,])(\d{2,5})\s*(?:sq\.?\s*ft\.?|sqft|square\s*feet|ft²|ft2)",
     re.IGNORECASE,
 )
+# label-first: "SqFt 833", "Square Feet: 980", "Sq. Ft. 700"
+_SQFT_LABEL_PATTERN = re.compile(
+    r"(?:sq\.?\s*ft\.?|sqft|square\s*feet)\s*:?\s*(\d{2,5})",
+    re.IGNORECASE,
+)
+# 2026-05-22 bucket-B grind: the ``(?<![\$\d,])`` lookbehind stops a
+# price number from being read as beds/baths — "$2087 BR 2" was matching
+# "2087" as bedrooms because the rent number sits right before "BR".
 _BEDS_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?)\s*(?:bed|br\b|bedroom)",
+    r"(?<![\$\d,])(\d+(?:\.\d+)?)\s*(?:bed|br\b|bedroom)",
     re.IGNORECASE,
 )
 _BATHS_PATTERN = re.compile(
-    r"(\d+(?:\.\d+)?)\s*(?:bath|ba\b|bathroom)",
+    r"(?<![\$\d,])(\d+(?:\.\d+)?)\s*(?:bath|ba\b|bathroom)",
+    re.IGNORECASE,
+)
+# label-first: "BR 2", "Beds: 1", "Bath 1.5", "Baths: 2"
+_BEDS_LABEL_PATTERN = re.compile(
+    r"(?:bedrooms?|beds?|br)\s*:?\s*(\d+(?:\.\d+)?)\b",
+    re.IGNORECASE,
+)
+_BATHS_LABEL_PATTERN = re.compile(
+    r"(?:bathrooms?|baths?|ba)\s*:?\s*(\d+(?:\.\d+)?)\b",
+    re.IGNORECASE,
+)
+# Dollar amounts labelled as a deposit / fee — excluded from rent.
+_DEPOSIT_NEAR_RE = re.compile(
+    r"(?:deposit|admin(?:istrative)?\s*fee|application\s*fee|app\s*fee|"
+    r"amenity\s*fee|pet\s*fee)\s*:?\s*\$?\s*[\d,]{2,}",
     re.IGNORECASE,
 )
 _STUDIO_RE = re.compile(r"\bstudio\b", re.IGNORECASE)
@@ -2471,17 +2512,40 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
         m for m in _SQFT_PATTERN.finditer(text) if _sqft_match_is_valid(text, m)
     ]
     m_sqft = max(valid_sqft_matches, key=lambda m: int(m.group(1).replace(",", "")), default=None)
+    # 2026-05-22 bucket-B grind: label-first sqft fallback ("SqFt 833",
+    # "Square Feet: 980") — the number-first pattern above misses these.
+    sqft_label_val = ""
+    if m_sqft is None:
+        lm = _SQFT_LABEL_PATTERN.search(text)
+        if lm:
+            sqft_label_val = lm.group(1)
 
     m_beds = _BEDS_PATTERN.search(text)
     m_baths = _BATHS_PATTERN.search(text)
     m_unit = _UNIT_NUM_PATTERN.search(text)
     is_studio = bool(_STUDIO_RE.search(text))
+    # label-first beds/baths fallback ("BR 2", "Baths: 1").
+    if m_beds is None:
+        m_beds = _BEDS_LABEL_PATTERN.search(text)
+    if m_baths is None:
+        m_baths = _BATHS_LABEL_PATTERN.search(text)
 
     # --- rent (optional) ---
+    # Exclude dollar amounts labelled as a deposit / fee — they would
+    # otherwise contaminate the rent range ("Rent: $808 Deposit: $300"
+    # was yielding rent 300-808).
+    deposit_spans = [m.span() for m in _DEPOSIT_NEAR_RE.finditer(text)]
+
+    def _in_deposit_span(pos: int) -> bool:
+        return any(lo <= pos < hi for lo, hi in deposit_spans)
+
     rent_ints: list[int] = []
-    dollar_rents = _RENT_PATTERN.findall(text)
-    if dollar_rents:
-        rent_ints = [r for r in (_rent_to_int(x) for x in dollar_rents) if r is not None]
+    for m in _RENT_PATTERN.finditer(text):
+        if _in_deposit_span(m.start()):
+            continue
+        v = _rent_to_int(m.group(1))
+        if v is not None:
+            rent_ints.append(v)
 
     if not rent_ints:
         # Fallback: price-range labels without explicit $ prefix.
@@ -2502,7 +2566,7 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
 
     beds_val = m_beds.group(1) if m_beds else ("0" if is_studio else "")
     baths_val = m_baths.group(1) if m_baths else ""
-    sqft_val = m_sqft.group(1) if m_sqft else ""
+    sqft_val = m_sqft.group(1) if m_sqft else sqft_label_val
     unit_num_raw = m_unit.group(1) if m_unit else ""
     unit_num = unit_num_raw if _is_valid_unit_number(unit_num_raw) else ""
 

@@ -498,3 +498,91 @@ def test_dom_container_selectors_includes_tr_patterns() -> None:
         s.startswith("tr.") or s.startswith("tr[")
         for s in _DOM_CONTAINER_SELECTORS
     ), "DOM cascade must include TR-row selectors for custom-CMS unit tables"
+
+
+# ── bucket-B grind (2026-05-22): container text-format parser fixes ──────────
+# The reached-but-empty cohort failed because _container_yields_unit
+# mis-parsed three common container text formats. Pin each fix.
+
+
+class TestContainerTextFormatFixes:
+    def _u(self, text):
+        from ma_poc.pms.adapters._html_extract import _container_yields_unit
+        return _container_yields_unit(text)
+
+    def test_rent_pattern_no_truncate_4digit_no_comma(self) -> None:
+        """$2087 must parse as 2087, not 208 (alternation-order bug)."""
+        u = self._u("2 Bed 2 Bath 900 sqft $2087")
+        assert u is not None
+        assert u["market_rent_low"] == 2087
+
+    def test_tilde_range_and_label_first_beds_sqft(self) -> None:
+        """'Price Range $1891 ~ $2087 BR 2 ... SqFt 833' — beds must be 2
+        (not the rent number), sqft 833, rent the real range."""
+        u = self._u("Price Range $1891 ~ $2087 BR 2 Utly None SqFt 833 Avail 7/2/2026")
+        assert u is not None
+        assert u["bedrooms"] == "2"
+        assert u["sqft"] == "833"
+        assert u["market_rent_low"] == 1891
+        assert u["market_rent_high"] == 2087
+
+    def test_deposit_excluded_from_rent(self) -> None:
+        """'Rent: $808 Deposit: $300' — rent is 808, deposit is not a range."""
+        u = self._u("1 bed 1 bath 655 ft² Rent: $808 Deposit: $300")
+        assert u is not None
+        assert u["market_rent_low"] == 808
+        assert u["market_rent_high"] == 808
+
+    def test_deposit_before_sqft_label_not_read_as_sqft(self) -> None:
+        """'Deposit: $200 Square Feet: 980' — sqft is 980, not the $200."""
+        u = self._u("2 Bedroom / 2 Bath Price: $1290-$1295 Deposit: $200 Square Feet: 980")
+        assert u is not None
+        assert u["sqft"] == "980"
+        assert u["market_rent_low"] == 1290
+
+    def test_ft_superscript_sqft(self) -> None:
+        """'655 ft²' must register as sqft 655."""
+        u = self._u("1 bed 1 bath 655 ft² $900")
+        assert u is not None
+        assert u["sqft"] == "655"
+
+    def test_existing_number_first_formats_still_work(self) -> None:
+        """Regression guard: the canonical '1 BR / 1 BA – 611 sq ft – $605'
+        number-first format must still parse exactly as before."""
+        u = self._u("1 BR / 1 BA – 611 sq ft – $605")
+        assert u is not None
+        assert u["bedrooms"] == "1"
+        assert u["bathrooms"] == "1"
+        assert u["sqft"] == "611"
+        assert u["market_rent_low"] == 605
+
+
+class TestBucketBDomFixtures:
+    """End-to-end: the two saved bucket-B fixtures extract clean units."""
+
+    def _fixture(self, name):
+        from pathlib import Path
+        p = Path(__file__).parents[2] / "fixtures" / "bucketb" / name
+        return p.read_text(encoding="utf-8")
+
+    def test_apartment_info_block_redoak(self) -> None:
+        from ma_poc.pms.adapters._html_extract import extract_units_from_dom
+        units, _ = extract_units_from_dom(
+            self._fixture("apartment_info_block_redoak.html"), "https://x.test/"
+        )
+        assert len(units) >= 5
+        priced = [u for u in units if u.get("sqft") and u.get("market_rent_low")]
+        assert len(priced) >= 5
+        # no garbage: bedrooms must be a small int, never a rent number
+        for u in units:
+            if u.get("bedrooms"):
+                assert int(float(u["bedrooms"])) <= 6, f"bad beds: {u['bedrooms']}"
+
+    def test_floor_plan_creekview(self) -> None:
+        from ma_poc.pms.adapters._html_extract import extract_units_from_dom
+        units, _ = extract_units_from_dom(
+            self._fixture("floor_plan_creekview.html"), "https://x.test/"
+        )
+        assert len(units) >= 6
+        priced = [u for u in units if u.get("sqft") and u.get("market_rent_low")]
+        assert len(priced) >= 5
