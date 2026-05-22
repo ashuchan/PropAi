@@ -559,6 +559,14 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
         or "rp-leasing-widget" in h
         or "rp.leasing.appservice" in h
         or "/content/apply#k=" in h
+        # 2026-05-22 bucket-B grind: the OLL widget's static assets load
+        # from ``cs-cdn.realpage.com/OLL/``. On G5-Marketing-Cloud-built
+        # marketing sites the only RealPage signal in the HTML is this
+        # asset host (verified on fmgnj.com/.../westgate-village — a G5
+        # CMS site whose actual leasing system is RealPage OLL). Without
+        # it the detector picked g5 (the marketing layer) and the G5
+        # GraphQL inventory call 404'd because G5 is not the PMS here.
+        or "cs-cdn.realpage.com/oll" in h
     ):
         yield (
             "realpage_oll",

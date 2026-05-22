@@ -58,8 +58,14 @@ _TPL_RENDER = "https://app.repli360.com/admin/template-render"
 # The per-property repli360 embed script — present in the property's
 # STATIC HTML (no render needed): src=".../admin/rrac-website-script/
 # <encrypted-token>". Fetching it yields ``var site_id = '<id>'``.
+# 2026-05-22 bucket-B grind: the live URL is
+# ``app.repli360.com/public/admin/rrac-website-script/<token>`` — the
+# ``/public/`` path segment was absent from the original regex, so
+# find_repli360_script_url returned '' and the adapter exited
+# REPLI360_NO_FLOORPLANS on every current-variant property.
 _SCRIPT_RE = re.compile(
-    r"https?://app\.repli360\.com/admin/rrac-website-script/[A-Za-z0-9=_./+-]+",
+    r"https?://app\.repli360\.com/(?:public/)?admin/rrac-website-script/"
+    r"[A-Za-z0-9=_./+-]+",
     re.IGNORECASE,
 )
 _SITEID_RE = re.compile(

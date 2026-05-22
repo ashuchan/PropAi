@@ -565,6 +565,23 @@ def test_realpage_cws_widget_beats_coresident_funnel() -> None:
     assert r.pms == "realpage_cws", f"expected realpage_cws, got {r.pms}"
 
 
+def test_realpage_oll_cs_cdn_asset_beats_g5_marketing_layer() -> None:
+    """A G5-Marketing-Cloud site whose leasing system is RealPage OLL —
+    the only RealPage signal is the cs-cdn.realpage.com/OLL/ asset host.
+    Must route to realpage_oll, not g5 (the marketing layer)."""
+    html = (
+        "<html><body>"
+        '<link href="https://widgets.g5dxm.com/widget.js">'
+        '<img src="https://cs-cdn.realpage.com/OLL/prod/oll/images/apply.svg">'
+        "</body></html>"
+    )
+    r = detect_pms(
+        "https://www.fmgnj.com/apartments/pa/malvern/westgate-village/floor-plans",
+        page_html=html,
+    )
+    assert r.pms == "realpage_oll", f"expected realpage_oll, got {r.pms}"
+
+
 def test_realpage_markers_yield_strong_confidence() -> None:
     """All three RealPage hosted-portal markers must yield >= 0.92 so they
     outrank co-resident chat widgets (0.90)."""

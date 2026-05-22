@@ -42,6 +42,24 @@ def test_find_script_url_absent() -> None:
     assert find_repli360_script_url('<a href="https://repli360.com">x</a>') == ""
 
 
+def test_find_script_url_public_path_variant() -> None:
+    """2026-05-22 bucket-B grind: the live embed-script URL carries a
+    ``/public/`` path segment — app.repli360.com/public/admin/rrac-website-
+    script/<token>. The regex must match this current variant; without it
+    the adapter exited REPLI360_NO_FLOORPLANS on every repli360 property
+    (verified live on marquisonevans.com — site_id 1649, 9 floorplans)."""
+    tok = "eyJpdiI6Iml4T1Ric2JlT3hBNmhQb3loVXFKQVE9PSJ9"
+    html = (
+        "<html><body>"
+        f'<script src="https://app.repli360.com/public/admin/'
+        f'rrac-website-script/{tok}"></script></body></html>'
+    )
+    url = find_repli360_script_url(html)
+    assert url == (
+        f"https://app.repli360.com/public/admin/rrac-website-script/{tok}"
+    )
+
+
 def test_template_render_html_parses_via_onclick_reuse() -> None:
     # fetch_repli360_floorplans feeds the template-render HTML through
     # find_repli360_floorplans; verify that reuse parses the bootstrap
