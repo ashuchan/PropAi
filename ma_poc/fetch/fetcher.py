@@ -246,7 +246,28 @@ class Fetcher:
             )
 
         identity = self._identities.pick(sticky_key=task.property_id)
-        proxy = self._proxy_pool.pick(sticky_key=task.property_id)
+        # 2026-05-23 production incident fix: the L1 fetcher used to call
+        # ``self._proxy_pool.pick(...)`` here, which meant that **every**
+        # entry-URL fetch routed through whatever was in ``PROXY_POOL_URLS``
+        # — even when the property would have succeeded direct from GCP
+        # egress. With a cheap third-party proxy (geo.g-w.info trial)
+        # configured, ~90% of properties failed ProxyError/timeout/HTTP_424
+        # and the run dropped to 14% success.
+        #
+        # New contract — *direct first, escalate on CF*. The L1 entry
+        # attempt is always direct (``proxy=None``); if the direct attempt
+        # returns BOT_BLOCKED (CF challenge / WAF), the retry loop below
+        # consults :func:`proxy_gate.decide_l1_escalate` and, if admitted,
+        # picks a proxy from the pool for attempt 2. This restores the
+        # operator's intent ("use proxy only when direct fetch fails with
+        # cf_blocked error AND it's a high-potential source") without
+        # taking the gate off-line.
+        proxy: str | None = None
+        # Per-task L1 escalation counter. Independent of any per-property
+        # AdapterContext budget — counts hops burned *during this specific
+        # fetch task* so the cap is per-(property, retry-loop) and a
+        # property revisited later starts fresh.
+        l1_proxy_hops_used: int = 0
 
         emit(
             EventKind.FETCH_STARTED,
@@ -440,6 +461,57 @@ class Fetcher:
 
             if result.outcome == FetchOutcome.BOT_BLOCKED:
                 emit(EventKind.FETCH_BOT_BLOCKED, task.property_id, url=task.url, attempt=attempt)
+
+                # 6a. L1 CF-escalation (2026-05-23). The direct attempt
+                # got CF/WAF-walled. RetryPolicy.decide(BOT_BLOCKED, ...)
+                # returns should_retry=False (see retry_policy.py:76-85)
+                # because retrying with the same egress is pointless. The
+                # escalation IS the recovery: pick a proxy from the pool
+                # and retry, bypassing the retry-policy "no" verdict.
+                #
+                # Gated through ``proxy_gate.decide_l1_escalate`` so the
+                # admit/deny policy lives in one place (host allowlist,
+                # hop budget, "no proxy configured" — all centralised).
+                # The decision *authorises* escalation; the L1 ProxyPool
+                # *resources* it (proxy URL comes from PROXY_POOL_URLS,
+                # not PROBE_PROXY_URL — those are two separate pools by
+                # design — see proxy_gate module docstring).
+                if proxy is None and len(self._proxy_pool) > 0:
+                    from ma_poc.fetch.proxy_gate import decide_l1_escalate
+
+                    l1_decision = decide_l1_escalate(
+                        task.url,
+                        prior_outcome=result.outcome.value,
+                        proxy_hops_used=l1_proxy_hops_used,
+                        pool_has_proxies=True,
+                    )
+                    if l1_decision.allow:
+                        escalation_proxy = self._proxy_pool.pick(
+                            sticky_key=task.property_id,
+                        )
+                        # Pool may return None if every URL has dropped
+                        # below the health quarantine threshold — in
+                        # that case skip escalation and fall through to
+                        # the retry-policy break (FAILED_UNREACHABLE).
+                        if escalation_proxy is not None and attempt < self._retry._max_attempts:
+                            proxy = escalation_proxy
+                            l1_proxy_hops_used += 1
+                            emit(
+                                EventKind.FETCH_ROTATED_IDENTITY,
+                                task.property_id,
+                                reason="l1_cf_escalation_to_proxy",
+                                proxy_decision_reason=l1_decision.reason.value,
+                                attempt=attempt,
+                            )
+                            # Small jitter before the retry — gives any
+                            # CF clearance issued mid-handshake a moment
+                            # to land. 500ms matches the existing rate-
+                            # limit escalation feel (line 549-550).
+                            await asyncio.sleep(0.5)
+                            # Force the retry by skipping the rest of
+                            # this loop iteration (incl. the retry-policy
+                            # check that would otherwise break).
+                            continue
 
             # 7. Retry decision
             retry_after = result.headers.get("retry-after")

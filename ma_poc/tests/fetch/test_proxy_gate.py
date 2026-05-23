@@ -19,11 +19,13 @@ import pytest
 
 from ma_poc.fetch import proxy_gate
 from ma_poc.fetch.proxy_gate import (
+    DEFAULT_L1_MAX_ESCALATION_HOPS,
     DEFAULT_MAX_PROXY_BYTES,
     DEFAULT_MAX_PROXY_HOPS,
     ProxyDecisionReason,
     ProxyGateDecision,
     decide,
+    decide_l1_escalate,
     mark_host_needs_proxy,
     record_use,
 )
@@ -463,3 +465,150 @@ def test_non_eligible_stages_blocked(proxy_env: str, stage: str) -> None:
     d = decide("https://random-cross-origin.host/", ctx, stage)
     assert d.allow is False
     assert d.reason == ProxyDecisionReason.STAGE_NOT_PROXY_ELIGIBLE
+
+
+# ─── decide_l1_escalate — L1 entry-fetch CF-escalation gate ──────────────
+#
+# Distinct surface from ``decide``. The L1 escalation gate has different
+# semantics (escalation-only, no same-origin denial, caller-supplied
+# proxy URL). Tests below pin every branch in the decision tree.
+
+
+def test_l1_escalate_admits_on_bot_blocked_with_pool() -> None:
+    """Happy path: prior direct attempt was BOT_BLOCKED AND the pool has
+    a proxy AND budget remains → escalation admitted."""
+    d = decide_l1_escalate(
+        "https://www.hunterscourtapts.com/",
+        prior_outcome="BOT_BLOCKED",
+        proxy_hops_used=0,
+        pool_has_proxies=True,
+    )
+    assert d.allow is True
+    assert d.reason == ProxyDecisionReason.L1_CF_ESCALATION_ADMITTED
+    # Proxy URL is supplied by the caller's ProxyPool, not the gate —
+    # the decision is policy-only, the pool is the resource.
+    assert d.proxy_url is None
+    assert d.host == "www.hunterscourtapts.com"
+
+
+def test_l1_escalate_denies_on_transient_outcome() -> None:
+    """TRANSIENT failures (DNS flake, TCP RST, SSL handshake) have their
+    own retry path. They must NOT trigger CF-escalation — that would
+    burn proxy bandwidth on flakes the next direct attempt would
+    recover."""
+    d = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome="TRANSIENT",
+        proxy_hops_used=0,
+        pool_has_proxies=True,
+    )
+    assert d.allow is False
+    assert d.reason == ProxyDecisionReason.L1_PRIOR_OUTCOME_NOT_BLOCKED
+
+
+def test_l1_escalate_denies_on_ok_outcome() -> None:
+    """Sanity guard — OK should never trigger escalation. If it does,
+    the caller is invoking the gate from the wrong place."""
+    d = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome="OK",
+        proxy_hops_used=0,
+        pool_has_proxies=True,
+    )
+    assert d.allow is False
+    assert d.reason == ProxyDecisionReason.L1_PRIOR_OUTCOME_NOT_BLOCKED
+
+
+def test_l1_escalate_denies_on_rate_limited() -> None:
+    """RATE_LIMITED has its own escalation path inside the fetcher
+    retry loop (line 530-547). The L1 CF gate must not double-fire."""
+    d = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome="RATE_LIMITED",
+        proxy_hops_used=0,
+        pool_has_proxies=True,
+    )
+    assert d.allow is False
+    assert d.reason == ProxyDecisionReason.L1_PRIOR_OUTCOME_NOT_BLOCKED
+
+
+def test_l1_escalate_denies_with_empty_pool() -> None:
+    """Operator hasn't set ``PROXY_POOL_URLS``. There's nothing to
+    escalate to — gate returns NO_PROXY_CONFIGURED."""
+    d = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome="BOT_BLOCKED",
+        proxy_hops_used=0,
+        pool_has_proxies=False,
+    )
+    assert d.allow is False
+    assert d.reason == ProxyDecisionReason.NO_PROXY_CONFIGURED
+
+
+def test_l1_escalate_denies_when_hop_budget_exhausted() -> None:
+    """One CF-escalation per fetch task. A second escalation is almost
+    never useful (the proxy was ALSO CF-blocked → third attempt won't
+    recover) and burning another hop just inflates the proxy bill."""
+    d = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome="BOT_BLOCKED",
+        proxy_hops_used=DEFAULT_L1_MAX_ESCALATION_HOPS,
+        pool_has_proxies=True,
+    )
+    assert d.allow is False
+    assert d.reason == ProxyDecisionReason.L1_HOP_BUDGET_EXHAUSTED
+
+
+def test_l1_escalate_admits_case_insensitive_outcome() -> None:
+    """Defensive — caller might pass lowercase ``"bot_blocked"`` from
+    a string-formatted enum. The gate should match either way."""
+    d = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome="bot_blocked",
+        proxy_hops_used=0,
+        pool_has_proxies=True,
+    )
+    assert d.allow is True
+    assert d.reason == ProxyDecisionReason.L1_CF_ESCALATION_ADMITTED
+
+
+def test_l1_escalate_denies_on_none_outcome() -> None:
+    """None prior_outcome (e.g. caller hasn't actually seen a fetch
+    result yet) must fail-closed — no escalation without evidence of
+    a CF block."""
+    d = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome=None,
+        proxy_hops_used=0,
+        pool_has_proxies=True,
+    )
+    assert d.allow is False
+    assert d.reason == ProxyDecisionReason.L1_PRIOR_OUTCOME_NOT_BLOCKED
+
+
+def test_l1_escalate_custom_max_hops_override() -> None:
+    """Tests can raise the cap to verify higher-budget scenarios. The
+    cap is per-call so unit tests don't have to monkeypatch a module
+    constant to exercise hop-3 paths."""
+    d = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome="BOT_BLOCKED",
+        proxy_hops_used=2,
+        max_hops=3,
+        pool_has_proxies=True,
+    )
+    assert d.allow is True
+    assert d.reason == ProxyDecisionReason.L1_CF_ESCALATION_ADMITTED
+
+
+def test_l1_escalate_decision_immutable() -> None:
+    """ProxyGateDecision is frozen — assigning ``allow`` post-decision
+    must raise. Pins the strict-allow contract."""
+    d = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome="BOT_BLOCKED",
+        proxy_hops_used=0,
+        pool_has_proxies=True,
+    )
+    with pytest.raises(Exception):  # dataclasses.FrozenInstanceError
+        d.allow = False  # type: ignore[misc]

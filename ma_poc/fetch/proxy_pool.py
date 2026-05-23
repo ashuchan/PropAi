@@ -108,6 +108,13 @@ class ProxyPool:
                 p.consecutive_failures,
             )
 
+    def __len__(self) -> int:
+        # Number of configured proxy URLs (healthy + quarantined combined).
+        # Lets callers ask ``len(pool) > 0`` before consulting ``pick()`` —
+        # used by the L1 fetcher's CF-escalation gate so we don't burn a
+        # gate-decision call when no proxy URL is configured at all.
+        return len(self._proxies)
+
     def health_snapshot(self) -> list[dict[str, object]]:
         """Return a snapshot of all proxy health states for dashboards.
 

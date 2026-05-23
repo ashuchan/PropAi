@@ -133,6 +133,13 @@ DEFAULT_MAX_PROXY_HOPS: int = 3
 #: where a single property pulls 100 MB through the proxy.
 DEFAULT_MAX_PROXY_BYTES: int = 1_500_000   # 1.5 MB
 
+#: Per-property cap on L1 entry-URL escalation hops. Held tight (1)
+#: because the L1 escalation fires from inside the fetcher retry loop —
+#: each escalation is one extra paid-egress hop and the second escalation
+#: (proxy also bot-blocked) is virtually never useful. Independent of
+#: ``DEFAULT_MAX_PROXY_HOPS`` which governs the cross-origin probe path.
+DEFAULT_L1_MAX_ESCALATION_HOPS: int = 1
+
 
 # ─── Public types ──────────────────────────────────────────────────────
 
@@ -158,6 +165,15 @@ class ProxyDecisionReason(str, Enum):
     DETECTION_CONFIDENCE_BELOW_THRESHOLD = "detection_confidence_below_threshold"
     MISSING_CTX_OR_STAGE = "missing_ctx_or_stage"
     DEFAULT_DENY = "default_deny"
+    # ── L1 entry-fetch CF-escalation reasons (added 2026-05-23) ──
+    # These cover the L1 fetcher's *entry-URL* escalation decision —
+    # distinct from the cross-origin probe path because at L1 the URL
+    # IS the property's marketing origin (so same-eTLD+1 doesn't apply)
+    # and the proxy is supplied from the L1 ProxyPool rather than from
+    # ``PROBE_PROXY_URL``. See :func:`decide_l1_escalate`.
+    L1_PRIOR_OUTCOME_NOT_BLOCKED = "l1_prior_outcome_not_blocked"
+    L1_HOP_BUDGET_EXHAUSTED = "l1_hop_budget_exhausted"
+    L1_CF_ESCALATION_ADMITTED = "l1_cf_escalation_admitted"
 
 
 @dataclass(frozen=True)
@@ -408,6 +424,116 @@ def decide(
     )
 
 
+def decide_l1_escalate(
+    url: str,
+    prior_outcome: str | None,
+    *,
+    proxy_hops_used: int = 0,
+    max_hops: int = DEFAULT_L1_MAX_ESCALATION_HOPS,
+    pool_has_proxies: bool = False,
+) -> ProxyGateDecision:
+    """Gate for L1 entry-URL proxy escalation after a direct-fetch CF block.
+
+    Distinct from :func:`decide` in three important ways:
+
+    1. **Trigger semantics.** This gate is *escalation-only* — it
+       returns ``allow=True`` exclusively when the prior direct fetch
+       attempt returned ``BOT_BLOCKED`` (CF challenge, WAF wall, etc.).
+       It is not a general "should this request use proxy?" gate. Any
+       other prior outcome (OK, TRANSIENT, HARD_FAIL, RATE_LIMITED,
+       DEAD_URL) fails-closed — those have their own retry paths
+       (RetryPolicy + the existing rate-limit escalation at
+       :file:`fetcher.py`).
+
+    2. **Same-origin is NOT a denial.** The cross-origin probe gate
+       fails-closed on same-eTLD+1 because patchright clearance covers
+       the marketing host. At L1 the URL IS the marketing host — the
+       whole point of the escalation is "the marketing host CF-walled
+       us; route through a different egress".
+
+    3. **Proxy URL is supplied by caller, not the gate.** The L1
+       fetcher draws from its own :class:`ProxyPool` (configured via
+       ``PROXY_POOL_URLS``), separate from ``PROBE_PROXY_URL`` which
+       the cross-origin gate consumes. ``proxy_url`` on the returned
+       decision is therefore always ``None`` — callers ignore that
+       field and use their pool's :meth:`ProxyPool.pick` instead.
+
+    Parameters
+    ----------
+    url:
+        The L1 entry URL that was just attempted directly.
+    prior_outcome:
+        The :class:`FetchOutcome` value (as a string) from the direct
+        attempt. Only ``"BOT_BLOCKED"`` admits escalation; anything
+        else fails-closed with
+        :attr:`ProxyDecisionReason.L1_PRIOR_OUTCOME_NOT_BLOCKED`.
+    proxy_hops_used:
+        Number of L1 escalation hops already burned for this property
+        in this fetch task. Caller maintains the counter so each
+        fetch() invocation gets its own budget — multiple properties
+        don't share the cap.
+    max_hops:
+        Per-fetch-task escalation cap. Defaults to
+        :data:`DEFAULT_L1_MAX_ESCALATION_HOPS` (1) — a second
+        escalation is virtually never useful (if the proxy ALSO got
+        CF-blocked, the third attempt won't recover) and burning
+        another hop just inflates the proxy bill.
+    pool_has_proxies:
+        ``True`` iff the caller's :class:`ProxyPool` has ≥1 configured
+        URL (call sites typically pass ``bool(len(proxy_pool))``).
+        Saves a wasted gate-decision call when no proxy is configured.
+
+    Returns
+    -------
+    A :class:`ProxyGateDecision`. ``allow=True`` only when **all** of
+    the gates pass:
+      * prior outcome was BOT_BLOCKED
+      * caller has ≥1 proxy in their pool
+      * per-task hop budget not exhausted
+
+    The decision's ``reason`` field tells telemetry / logs exactly why
+    this call admitted or denied — important for diagnosing why the
+    proxy bill spiked or didn't.
+    """
+    host = (urlparse(url).hostname or "").lower()
+    # 1. Trigger gate. Only direct-attempt BOT_BLOCKED admits escalation.
+    #    Compare upper-cased so a caller can pass an enum value or string.
+    if (prior_outcome or "").upper() != "BOT_BLOCKED":
+        return ProxyGateDecision(
+            allow=False,
+            reason=ProxyDecisionReason.L1_PRIOR_OUTCOME_NOT_BLOCKED,
+            host=host,
+        )
+    # 2. No proxy URL configured in the L1 pool → no escalation possible.
+    #    Reuse the existing NO_PROXY_CONFIGURED reason because the
+    #    operator-visible effect is identical to the cross-origin gate
+    #    saying "no proxy available."
+    if not pool_has_proxies:
+        return ProxyGateDecision(
+            allow=False,
+            reason=ProxyDecisionReason.NO_PROXY_CONFIGURED,
+            host=host,
+        )
+    # 3. Per-task hop budget. Independent of the cross-origin
+    #    PROPERTY_HOP_BUDGET so a property that's exhausted its
+    #    probe budget still gets one L1 escalation.
+    if proxy_hops_used >= max_hops:
+        return ProxyGateDecision(
+            allow=False,
+            reason=ProxyDecisionReason.L1_HOP_BUDGET_EXHAUSTED,
+            host=host,
+        )
+    # Admit. ``proxy_url`` deliberately stays None — the L1 fetcher's
+    # ProxyPool supplies the actual URL via pick(). The decision is the
+    # *policy* decision; the pool is the *resource*.
+    return ProxyGateDecision(
+        allow=True,
+        reason=ProxyDecisionReason.L1_CF_ESCALATION_ADMITTED,
+        proxy_url=None,
+        host=host,
+    )
+
+
 def record_use(
     ctx: Any,
     decision: ProxyGateDecision,
@@ -487,7 +613,9 @@ __all__ = [
     "ProxyGateDecision",
     "DEFAULT_MAX_PROXY_HOPS",
     "DEFAULT_MAX_PROXY_BYTES",
+    "DEFAULT_L1_MAX_ESCALATION_HOPS",
     "decide",
+    "decide_l1_escalate",
     "record_use",
     "mark_host_needs_proxy",
 ]
