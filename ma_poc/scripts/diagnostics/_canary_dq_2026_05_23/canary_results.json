@@ -1,0 +1,819 @@
+{
+  "10496": {
+    "pid": "10496",
+    "url": "https://liveatgraysonpark.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 2,
+    "shipped_n_floor_plans": 5,
+    "t1a_date_changes": [
+      {
+        "idx": 0,
+        "fpn": "Longhorn",
+        "raw": "Longhorn",
+        "shipped": "Longhorn",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      },
+      {
+        "idx": 1,
+        "fpn": "2BD/1.5BR-2",
+        "raw": "Palmwood",
+        "shipped": "Palmwood",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      }
+    ],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "C"
+  },
+  "10629": {
+    "pid": "10629",
+    "url": "https://livebh.com/apartments/the-oakley-apartment-homes/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 1,
+    "shipped_n_floor_plans": 2,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": {
+      "n_units": 3,
+      "units": [
+        {
+          "floor_plan_name": "B1",
+          "bed_label": "",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1040",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-1.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        },
+        {
+          "floor_plan_name": "C1",
+          "bed_label": "",
+          "bedrooms": "2",
+          "bathrooms": "3",
+          "sqft": "1310",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-1.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        },
+        {
+          "floor_plan_name": "A1",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "700",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-1.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        }
+      ]
+    },
+    "fp_slide_result": {
+      "n_units": 3,
+      "mode": "default"
+    },
+    "category": "SENT"
+  },
+  "11727": {
+    "pid": "11727",
+    "url": "https://www.risebedfordlake.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 0,
+    "shipped_n_floor_plans": 13,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "B"
+  },
+  "11762": {
+    "pid": "11762",
+    "url": "https://www.estellecreek.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 4,
+    "shipped_n_floor_plans": 1,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "A"
+  },
+  "11797": {
+    "pid": "11797",
+    "url": "https://www.wraynorthdallas.com/wray-north-dallas-tx/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 3,
+    "shipped_n_floor_plans": 0,
+    "t1a_date_changes": [
+      {
+        "idx": 0,
+        "fpn": "A3",
+        "raw": "Only 2 Vacant Apartments Left!",
+        "shipped": "Only 2 Vacant Apartments Left!",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      },
+      {
+        "idx": 1,
+        "fpn": "B3",
+        "raw": "Only 1 Vacant Apartment Left!",
+        "shipped": "Only 1 Vacant Apartment Left!",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      }
+    ],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "C"
+  },
+  "12133": {
+    "pid": "12133",
+    "url": "https://livebh.com/apartments/ashford/?utm_source=vanity&utm_medium=redirect&utm_campaign=liveatashford&original_referrer=liveatashford.com",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 1,
+    "shipped_n_floor_plans": 7,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": {
+      "n_units": 8,
+      "units": [
+        {
+          "floor_plan_name": "Tanglewood - Carport",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "656",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-2.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        },
+        {
+          "floor_plan_name": "Oakmont - Direct Access Garage or Garage Located Below",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "2",
+          "sqft": "964",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-2.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        },
+        {
+          "floor_plan_name": "Pinehurst - Direct Access Garage or Garage Located Below",
+          "bed_label": "",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1061",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-2.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        },
+        {
+          "floor_plan_name": "Cypress Point Townhome - Direct Access Garage & Carport Located Below",
+          "bed_label": "",
+          "bedrooms": "2.5",
+          "bathrooms": "2",
+          "sqft": "1317",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-2.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        },
+        {
+          "floor_plan_name": "Westchase - Carport or Garage Located Below",
+          "bed_label": "",
+          "bedrooms": "1",
+          "bathrooms": "1",
+          "sqft": "751",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-2.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        },
+        {
+          "floor_plan_name": "Inverness Townhome- Direct Access Garage",
+          "bed_label": "",
+          "bedrooms": "1.5",
+          "bathrooms": "1",
+          "sqft": "997",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-2.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        },
+        {
+          "floor_plan_name": "Doral - Direct Access Garage or Garage Located Below",
+          "bed_label": "",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1114",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-2.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        },
+        {
+          "floor_plan_name": "Kingston - Direct Access Garage or Double Garage Located Below",
+          "bed_label": "",
+          "bedrooms": "2",
+          "bathrooms": "2",
+          "sqft": "1286",
+          "unit_number": "",
+          "floor": "",
+          "building": "",
+          "rent_range": "",
+          "market_rent_low": null,
+          "market_rent_high": null,
+          "deposit": "",
+          "concession": "",
+          "availability_status": "",
+          "available_units": "",
+          "availability_date": "",
+          "lease_term": "",
+          "move_in_date": "",
+          "source_api_url": "https://livebh.com/livebh-2.html",
+          "extraction_tier": "TIER_2_JSONLD"
+        }
+      ]
+    },
+    "fp_slide_result": {
+      "n_units": 8,
+      "mode": "default"
+    },
+    "category": "SENT"
+  },
+  "12318": {
+    "pid": "12318",
+    "url": "https://www.enclaveatstonebrook.net",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 7,
+    "shipped_n_floor_plans": 6,
+    "t1a_date_changes": [
+      {
+        "idx": 3,
+        "fpn": "Shelbourne",
+        "raw": "to",
+        "shipped": "to",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      },
+      {
+        "idx": 4,
+        "fpn": "Availability",
+        "raw": "to",
+        "shipped": "to",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      },
+      {
+        "idx": 5,
+        "fpn": "Availability",
+        "raw": "to",
+        "shipped": "to",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      }
+    ],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "C"
+  },
+  "15541": {
+    "pid": "15541",
+    "url": "https://livebh.com/apartments/the-palms-at-clear-lake-apartments/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 1,
+    "shipped_n_floor_plans": 4,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "SENT"
+  },
+  "19535": {
+    "pid": "19535",
+    "url": "https://www.livewindsorcourt.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 6,
+    "shipped_n_floor_plans": 5,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "C"
+  },
+  "1973": {
+    "pid": "1973",
+    "url": "http://www.rosslynheights.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 16,
+    "shipped_n_floor_plans": 0,
+    "t1a_date_changes": [
+      {
+        "idx": 9,
+        "fpn": "Cosmopolitan",
+        "raw": "Open for Application on ____",
+        "shipped": "Open for Application on ____",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      }
+    ],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "C"
+  },
+  "20736": {
+    "pid": "20736",
+    "url": "https://washington.weidner.com/apartments/wa/mountlake-terrace/lakeside-apartments-11/?utm_source=local&utm_medium=organic&utm_content=gmb",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 38,
+    "shipped_n_floor_plans": 6,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "SENT"
+  },
+  "20943": {
+    "pid": "20943",
+    "url": "https://www.bremertonparkapts.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 3,
+    "shipped_n_floor_plans": 6,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "C"
+  },
+  "220976": {
+    "pid": "220976",
+    "url": "http://riveryparkapts.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 5,
+    "shipped_n_floor_plans": 0,
+    "t1a_date_changes": [
+      {
+        "idx": 0,
+        "fpn": "B2",
+        "raw": "Only 2 Vacant Apartments Left!",
+        "shipped": "Only 2 Vacant Apartments Left!",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      },
+      {
+        "idx": 2,
+        "fpn": "C1",
+        "raw": "Sign Waitlist",
+        "shipped": "Sign Waitlist",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      },
+      {
+        "idx": 3,
+        "fpn": "B1",
+        "raw": "Available",
+        "shipped": "Available",
+        "proposed": null,
+        "reason": "raw_rejected_not_date_shape"
+      }
+    ],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [
+      {
+        "idx": 2,
+        "shipped": "WAITLIST",
+        "proposed_status": "UNAVAILABLE",
+        "proposed_subtype": "WAITLIST"
+      }
+    ],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "D"
+  },
+  "22187": {
+    "pid": "22187",
+    "url": "http://www.mckinley.com/apartments/michigan/ypsilanti/golfside-lake-apartments#.VeDC7flVhBc",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 15,
+    "shipped_n_floor_plans": 74,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "B"
+  },
+  "226980": {
+    "pid": "226980",
+    "url": "https://modaatthehill.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 3,
+    "shipped_n_floor_plans": 7,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "A"
+  },
+  "227054": {
+    "pid": "227054",
+    "error": "not_found_in_run",
+    "category": "SENT"
+  },
+  "229736": {
+    "pid": "229736",
+    "url": "http://www.beachwoodparkapts.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 17,
+    "shipped_n_floor_plans": 13,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": [],
+      "reason": "rent_above_floor"
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "A"
+  },
+  "229986": {
+    "pid": "229986",
+    "url": "https://www.theadleylife.com?utm_source=realpage&utm_medium=referral&utm_campaign=cta",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 11,
+    "shipped_n_floor_plans": 0,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [
+      {
+        "idx": 0,
+        "uid": "A1",
+        "fpn": "A1"
+      },
+      {
+        "idx": 1,
+        "uid": "A3",
+        "fpn": "A3"
+      },
+      {
+        "idx": 3,
+        "uid": "A2",
+        "fpn": "A2"
+      },
+      {
+        "idx": 5,
+        "uid": "C1",
+        "fpn": "C1"
+      },
+      {
+        "idx": 6,
+        "uid": "B2",
+        "fpn": "B2"
+      }
+    ],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "E"
+  },
+  "232788": {
+    "pid": "232788",
+    "url": "https://www.sussexmanorapts.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 13,
+    "shipped_n_floor_plans": 1,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": true,
+      "demote": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "rent_value": 300.0
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "A"
+  },
+  "232870": {
+    "pid": "232870",
+    "url": "www.SorrentoApartmentsfl.com",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 6,
+    "shipped_n_floor_plans": 1,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": true,
+      "demote": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "rent_value": 250.0
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "A,B"
+  },
+  "254187": {
+    "pid": "254187",
+    "url": "https://www.residecrosbyhill.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 5,
+    "shipped_n_floor_plans": 2,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": []
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [
+      {
+        "idx": 0,
+        "uid": "SCH1",
+        "fpn": "SCH1"
+      },
+      {
+        "idx": 1,
+        "uid": "SCH2",
+        "fpn": "SCH2"
+      },
+      {
+        "idx": 2,
+        "uid": "SCH3",
+        "fpn": "SCH3"
+      },
+      {
+        "idx": 3,
+        "uid": "SCH4",
+        "fpn": "SCH4"
+      },
+      {
+        "idx": 4,
+        "uid": "SCH4.1",
+        "fpn": "SCH4.1"
+      }
+    ],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "E"
+  },
+  "266792": {
+    "pid": "266792",
+    "url": "https://bellaire.appianwayapthomes.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 3,
+    "shipped_n_floor_plans": 1,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": true,
+      "demote": [
+        0,
+        1,
+        2
+      ],
+      "rent_value": 780.0
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "B"
+  },
+  "282648": {
+    "pid": "282648",
+    "url": "https://www.apolloridgeapts.com/",
+    "shipped_tier": "TIER_4_LLM_DOM",
+    "shipped_n_units": 3,
+    "shipped_n_floor_plans": 0,
+    "t1a_date_changes": [],
+    "t1c_same_rent": {
+      "trigger": false,
+      "demote": [],
+      "reason": "has_real_unit_ids"
+    },
+    "t1d_status_changes": [],
+    "t1e_uid_equals_fpn": [],
+    "pass5_jsonld_result": null,
+    "fp_slide_result": null,
+    "category": "B,SENT"
+  }
+}

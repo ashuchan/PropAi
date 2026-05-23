@@ -64,6 +64,20 @@ class AdapterContext:
     # 13+ Entrata properties on 2026-05-16 cloud run carry comms.entrata
     # iframe markers that landed here.
     candidate_portal_urls: list[str] = field(default_factory=list)
+    # ── Proxy budget (2026-05-23) ──────────────────────────────────────────
+    # Per-property accounting for paid-egress hops (residential proxy +
+    # Web Unlocker combined). Read and bumped by ``fetch.proxy_gate.decide``
+    # / ``proxy_gate.record_use``. Hard cap at ``proxy_max_hops`` keeps a
+    # single property from monopolising the proxy budget. Bytes counter
+    # is belt-and-braces against a runaway multi-MB response loop.
+    #
+    # NEVER read PROBE_PROXY_URL directly off this struct or anywhere
+    # else — go through ``fetch.proxy_gate.decide`` to keep the strict-
+    # allow invariant.
+    proxy_hops_used: int = 0
+    proxy_bytes_used: int = 0
+    proxy_max_hops: int = 3        # see fetch.proxy_gate.DEFAULT_MAX_PROXY_HOPS
+    proxy_max_bytes: int = 1_500_000   # 1.5 MB / property
 
 
 @dataclass

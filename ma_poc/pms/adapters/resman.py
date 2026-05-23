@@ -166,10 +166,16 @@ def find_resman_availability_url(html: str) -> str | None:
     return m.group(0) if m else None
 
 
-async def _fetch(url: str) -> str:
+async def _fetch(url: str, ctx: Any = None, stage: str = "resman_fetch") -> str:
+    """ResMan portal probe. ctx + stage thread the proxy gate.
+
+    ResMan availability portals are on ``myresman.com/portal/...``
+    which is cross-origin to most marketing sites; Layer 4 considers
+    via detection confidence + per-property hop budget.
+    """
     from ma_poc.pms.adapters._probe import probe_get
 
-    r = probe_get(url, timeout=25)
+    r = probe_get(url, ctx=ctx, stage=stage, timeout=25)
     if r.status_code != 200:
         return ""
     # Auth-redirect (no public availability) → empty.
@@ -231,7 +237,7 @@ class ResManAdapter:
                     base = f"{p.scheme}://{p.netloc}"
                     for cand in (base + "/floorplans/", base + "/", base + "/floor-plans/"):
                         try:
-                            hh = await _fetch(cand)
+                            hh = await _fetch(cand, ctx=ctx, stage="resman_portal_discover")
                         except Exception:
                             hh = ""
                         avail = find_resman_availability_url(hh)
@@ -245,7 +251,7 @@ class ResManAdapter:
             return result
 
         try:
-            ahtml = await _fetch(avail)
+            ahtml = await _fetch(avail, ctx=ctx, stage="resman_availability")
         except Exception as exc:
             result.tier_used = f"{_TIER}_FETCH_ERROR"
             result.errors.append(f"resman-fetch-error: {type(exc).__name__}: {str(exc)[:120]}")

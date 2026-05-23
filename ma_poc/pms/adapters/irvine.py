@@ -199,7 +199,10 @@ async def _community_html(page: Page | None, ctx: AdapterContext) -> str:
         try:
             from ma_poc.pms.adapters._probe import probe_get
 
-            r = probe_get(base, timeout=20)
+            # base == ctx.base_url → same-origin per the gate; proxy
+            # declined. Direct fetch with patchright clearance is the
+            # right path here (Irvine community pages work from GCP).
+            r = probe_get(base, ctx=ctx, stage="irvine_community", timeout=20)
             if getattr(r, "status_code", 0) == 200 and r.text:
                 return str(r.text)
         except Exception:
@@ -232,8 +235,15 @@ async def _active_fetch_irvine(
     try:
         from ma_poc.pms.adapters._probe import probe_post
 
+        # _RANK_URL is on search.irvinecompanyapartments.com which is
+        # cross-origin to the property's marketing site; in practice
+        # this works from GCP today so the gate's Layer 4 (high-conf
+        # cross-origin) admits or declines based on detection
+        # confidence + per-property hop budget.
         r = probe_post(
             _RANK_URL,
+            ctx=ctx,
+            stage="irvine_rank",
             json=payload,
             timeout=20,
             headers={

@@ -240,7 +240,10 @@ async def test_cf_shell_response_triggers_probe_get_retry(
 
     probe_calls: list[str] = []
 
-    async def _fake_probe_fresh(url: str):  # type: ignore[no-untyped-def]
+    # ``*_args, **_kw`` swallow the ``ctx=`` kwarg the production caller
+    # passes after the 2026-05-23 proxy_gate threading. The fake doesn't
+    # need ctx to satisfy the URL-list assertion.
+    async def _fake_probe_fresh(url: str, *_args, **_kw):  # type: ignore[no-untyped-def]
         probe_calls.append(url)
         from ma_poc.pms.adapters._rentcafe_nestin import _PageFetchResp
         return _PageFetchResp(200, _nestin_detail("The Linden", "410", rent_lo=1791))

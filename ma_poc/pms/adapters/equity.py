@@ -167,7 +167,9 @@ def _html_for(ctx: AdapterContext, page: Page | None) -> tuple[str, str]:
         try:
             from ma_poc.pms.adapters._probe import probe_get
 
-            r = probe_get(base, timeout=20)
+            # Same-origin (base is ctx.base_url) — Equity property pages
+            # live on equityapartments.com/... — gate Layer 1 declines proxy.
+            r = probe_get(base, ctx=ctx, stage="equity_property", timeout=20)
             if getattr(r, "status_code", 0) == 200 and r.text:
                 return str(r.text), base
         except Exception:

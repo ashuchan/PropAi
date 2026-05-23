@@ -3,7 +3,8 @@
 **Working directory for every command:** `ma_poc/`
 **Audience:** Claude Code (or any engineer) debugging extraction failures after a cloud run.
 **Updated:** 2026-05-22. Last campaign reviewed: 2026-05-21 cloud run (4,982 properties, post-merge audit + per-adapter telemetry shipment).
-**This update (2026-05-22):** new §20 *Cross-origin proxy gap + platform-wide adapter telemetry*. Twelve sub-sections covering: §20.1 the discovery (0 SecureCafe wins on 1,885 RentCafe-detected props vs 259 wins on the proxy-enabled canary), §20.2 the proof (probe-experiment from a real Cloud Run egress: 20/20 SC URLs `blocked_403` from AS396982 vs 200 + AvailUnitRow rows from any residential IP), §20.3 the cross-origin clearance asymmetry that explains why Cortland/Irvine/AvalonBay succeed but SecureCafe fails over the same egress, §20.4 the `_adapter_telemetry.py` shared module + the platform-wide `adapter_exit` event at `scraper.py:933+`, §20.5 the per-adapter stages reference (`xhr_capture`, `urn_pick`, `sc_probe`, `prospectportal_probe`, `cascade_exit`, `_diag`), §20.6 SecureCafe new-template regex relaxation (PIDs 72944/24561/6550/40584/67750 lost units silently for weeks), §20.7 G5 deterministic URN picker (Cloudinary CDN anchor — replaces the broken `max(matches, key=len)`), §20.8 OneSite negative gate (`static2.apts247.info` + `doorway.knck.io` competing-CDN demotion), §20.9 Entrata ProspectPortal probe restored from git history (commit 8b1bfa4 was reverted by 4c9dbf8), §20.10 the RentCafe→SightMap misroute hypothesis we DISPROVED by live verification (the co-occurrence rule was a no-op), §20.11 new anti-patterns #18-20 (trust-the-agent / cross-host-clearance / order-of-detector-branches), §20.12 the diagnostic-from-events.jsonl workflow that yesterday's bugs would have taken 5 minutes to find.
+**This update (2026-05-22, later):** new §12b *Cloud canary workflow on `canary-introspect`* — end-to-end recipe for validating a code change against the production-equivalent GCP egress (different ASN, BrightData proxy wired, no residential-IP CF clearance). Covers the 6-step build/spec/execute/pull lifecycle, the `.gcloudignore` + `_SimpleProfileStore.mkdir` Dockerfile gotcha I hit on the 2026-05-22 Plan-Summary fixes canary, the analyze script shape, when to use cloud-vs-local, and the cohort-selection guidance (cloud canary is most valuable when the fix targets CF / cross-origin / proxy-dependent paths — residential IP can't validate those).
+**Prior update (2026-05-22):** new §20 *Cross-origin proxy gap + platform-wide adapter telemetry*. Twelve sub-sections covering: §20.1 the discovery (0 SecureCafe wins on 1,885 RentCafe-detected props vs 259 wins on the proxy-enabled canary), §20.2 the proof (probe-experiment from a real Cloud Run egress: 20/20 SC URLs `blocked_403` from AS396982 vs 200 + AvailUnitRow rows from any residential IP), §20.3 the cross-origin clearance asymmetry that explains why Cortland/Irvine/AvalonBay succeed but SecureCafe fails over the same egress, §20.4 the `_adapter_telemetry.py` shared module + the platform-wide `adapter_exit` event at `scraper.py:933+`, §20.5 the per-adapter stages reference (`xhr_capture`, `urn_pick`, `sc_probe`, `prospectportal_probe`, `cascade_exit`, `_diag`), §20.6 SecureCafe new-template regex relaxation (PIDs 72944/24561/6550/40584/67750 lost units silently for weeks), §20.7 G5 deterministic URN picker (Cloudinary CDN anchor — replaces the broken `max(matches, key=len)`), §20.8 OneSite negative gate (`static2.apts247.info` + `doorway.knck.io` competing-CDN demotion), §20.9 Entrata ProspectPortal probe restored from git history (commit 8b1bfa4 was reverted by 4c9dbf8), §20.10 the RentCafe→SightMap misroute hypothesis we DISPROVED by live verification (the co-occurrence rule was a no-op), §20.11 new anti-patterns #18-20 (trust-the-agent / cross-host-clearance / order-of-detector-branches), §20.12 the diagnostic-from-events.jsonl workflow that yesterday's bugs would have taken 5 minutes to find.
 **Prior update (2026-05-20):** new §19 RentCafe / AppFolio data-quality gaps with 11 sub-sections — §19.1 avail-date-only-gap sub-cause split (5 sub-causes A-E with fix paths F7a-d), §19.2 RentCafe `fp-container` data-attr extractor (F2 + F3), §19.3 RentCafe Interactive Property Map (F5, best-effort), §19.4 AppFolio SSR `_ADDRESS_RE` regex break (F1), §19.5 SecureCafe portal demote (F8a), §19.6 OneSite DOM `data-availability` augmentation (F7d), §19.7 MAA embedded-JSON price aliases (F6, best-effort), §19.8 telemetry shipped (T1/T2/T3/T4/T5/F8b), §19.9 State Diff fix (F4), §19.10 new anti-pattern #17 (urllib lies on JS-hydrated PMS), §19.11 next-week priorities (10 items, M/should/nice-to-have).
 **Prior update (2026-05-21):** new §18 Concession data debugging (full debugging instructions, symptom decoder, Q14-Q17 checklist, 7 fixes implemented, telemetry SQL queries, known-good tradeoffs, file reference, decision tree); §15 file reference appended with 2026-05-21 concession additions block; §16 closing checklist gains item #10 concession-pipeline audit; glossary gains Preserve-and-flag invariant + `_concession_quality` + `concessions_structured` + `stealth_probe` + `HOP_CAPTCHA_DETECTED` + `CONCESSION_PROBE_RESULT`.
 **Prior update (2026-05-17):** new §0 anti-patterns 14-16 (verdict-vs-unit-count, cascade-overwrite misdiagnosis, internal-vs-v2-shape); new Q13 in §3 (unit-fidelity check); §5 verdict decoder gains SUCCESS_PARTIAL row + analyzer-label-leak note; new §8.18-§8.22 extraction gaps (plan_summaries dropped at v2 formatter, hop plan_summaries not propagated, AVAILABLE+rent classification, cross-host per-plan URL discovery, wedge-rescue captcha guard); §15 file reference appended with 2026-05-17 additions; glossary gains SUCCESS_PARTIAL + plan_summaries.
@@ -610,6 +611,263 @@ The canary tool reads `events.jsonl` from `v2/runs/<date>/` when `SCHEMA_VERSION
 | ENV_MISMATCH (CF/bot-block locally; works in cloud) | Not a code regression | Acceptable, document |
 
 A pass rate of 40-50% IMPROVED on a representative bucket sample is good. 100% is unrealistic — some properties are genuinely STUB_URL or behind anti-bot infra.
+
+---
+
+## Phase 12b — Cloud canary workflow (`canary-introspect`)
+
+The local canary (§12) exercises the extraction code path but runs from a residential IP — CF and most PMS hosts behave very differently for GCP egress (AS396982). For fixes that touch any of the following, the local result alone is **not** sufficient evidence the change works in production:
+
+- Cloudflare / per-path challenge clearance behaviour
+- Cross-origin proxy paths (`PROBE_PROXY_URL`, `_with_clearance`)
+- Any adapter whose probe target is not the property's own origin (SecureCafe, ProspectPortal, Knock Doorway, AppFolio iframe, RealPage OLL portal)
+- Anything gated by `via_proxy` in the platform-wide `adapter_exit` telemetry (§20.4)
+
+For those changes, run a cloud canary on the **`canary-introspect`** Cloud Run job before declaring the fix done. The job is intentionally re-spec'd each run (the prior `gcloud run jobs replace`-from-stdin pattern in `.github/workflows/probe-experiment.yml`) so you can swap in any entry-point + image without affecting production jobs.
+
+### 12b.1 When cloud canary is mandatory
+
+| Change class | Local canary sufficient? | Cloud canary required? |
+|---|---|---|
+| Pure parser logic (regex / JSON walker / DOM selector) | ✅ Yes | Optional |
+| Plan-summary emission, post_process semantics | ✅ Yes | Optional (no infra dependency) |
+| CF-shell detection, `probe_get` fallback, cross-origin probe | ❌ No — local IP clears CF | **YES** |
+| `PROBE_PROXY_URL`-dependent paths (SecureCafe / ProspectPortal / Knock by-domain) | ❌ No | **YES** |
+| New Dockerfile / entrypoint / runtime env wiring | ❌ No | **YES** |
+| Detector-branch reordering with infra side effects | ❌ No — local routing may differ | **YES** |
+| Telemetry-only changes (new `tier_attempted` shape) | ✅ Yes (unit tests + local canary verify emit shape) | Optional, but recommended if the new events guide a production diagnosis |
+
+### 12b.2 Pre-requisites (one-time)
+
+```bash
+gcloud auth list                           # ASCII '*' on the right account
+gcloud config get-value project            # → jugnu-494013
+gcloud run jobs describe canary-introspect --region=us-central1   # job exists
+gcloud storage ls gs://jugnu-canary/        # write access
+```
+
+Optional: confirm Cloud Build quota (the build is the slow step — typically 3–5 min cold, ~1 min cached).
+
+### 12b.3 The 6-step lifecycle
+
+```
+1. Build canary CSV    (5 properties is typical; cohort guidance below)
+2. Upload CSV to GCS   gs://jugnu-canary/canary/<run-tag>.csv
+3. Build image         gcloud builds submit --tag jugnu:<canary-tag>
+4. Re-spec the job     gcloud run jobs replace canary-introspect-spec.yaml
+5. Execute + wait      gcloud run jobs execute canary-introspect --wait
+6. Pull artifacts      gcloud storage rsync gs://jugnu-canary/runs/<run-date>/shard_0/
+```
+
+#### Step 1 — Build the CSV
+
+Same shape as production: `apartmentid,name,address,city,state,zip,website`. Sourcing from a recent cloud run's `properties.json` keeps the metadata production-equivalent:
+
+```python
+# c:/tmp/canary_<topic>/build_csv.py
+import json, csv, os
+TARGETS = ["232316", "77913", "264329", "271966", "5295"]   # your cohort
+out = {}
+for i in range(100):
+    fp = f"c:/tmp/run-<YYYY-MM-DD>/shard_{i}/properties.json"
+    if not os.path.exists(fp): break
+    for p in json.load(open(fp, encoding="utf-8")):
+        pid = str(p.get("apartment_id") or "")
+        if pid in TARGETS and pid not in out:
+            out[pid] = {k: p.get(k, "") for k in
+                ("apartment_id","proj_name","address","city","state","zip_code","website")}
+# Write with the renames jugnu expects.
+with open("c:/tmp/canary_<topic>/canary.csv", "w", encoding="utf-8", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(["apartmentid","name","address","city","state","zip","website"])
+    for pid in TARGETS:
+        r = out[pid]
+        w.writerow([r["apartment_id"], r["proj_name"], r["address"],
+                    r["city"], r["state"], r["zip_code"], r["website"]])
+```
+
+#### Step 2 — Upload to the canary bucket
+
+```bash
+gcloud storage cp c:/tmp/canary_<topic>/canary.csv \
+  gs://jugnu-canary/canary/<YYYY-MM-DD>-<topic>.csv
+```
+
+#### Step 3 — Build the image via Cloud Build
+
+```bash
+SHORT_SHA=$(git rev-parse --short=12 HEAD)
+CANARY_TAG="canary-<topic>-$(date +%Y%m%d-%H%M)-${SHORT_SHA}"
+IMAGE_URI="us-central1-docker.pkg.dev/jugnu-494013/jugnu-images/jugnu:${CANARY_TAG}"
+gcloud builds submit --tag "${IMAGE_URI}" \
+  --timeout=1800s --machine-type=e2-highcpu-8 --project=jugnu-494013
+```
+
+You need a `.gcloudignore` at the repo root that excludes `node_modules/`, `*.venv/`, frontend build artifacts, etc. — otherwise the upload is ~300 MB (mostly `frontend/node_modules`). **Critical:** do NOT exclude `ma_poc/services/` (it's a Python package the image imports at build time via `ma_poc.scripts.checks.deployment`). The earlier mistake of writing `ma_poc/services/` instead of `ma_poc/services/coverage/` failed the build with:
+
+```
+DEPLOYMENT VALIDATION FAILED
+  - FloorplanCatalog import failed: No module named 'ma_poc.services'
+```
+
+**Also critical (§12b.5):** if `.gcloudignore` excludes `ma_poc/config/profiles/`, the runtime `ProfileStore.__init__` will fail with `PermissionError: '/app/ma_poc/config/profiles'` because the dir doesn't exist and parent ownership is ambiguous post-build. Either include the dir in the upload context, OR add a Dockerfile step that pre-creates it with the right ownership.
+
+#### Step 4 — Re-spec `canary-introspect`
+
+Save the following as `canary-introspect-spec.yaml` (substitute `__IMAGE_URI_PLACEHOLDER__`). The env block mirrors `jugnu-scrape-canary` so behaviour matches the production canary as closely as possible:
+
+```yaml
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: canary-introspect
+  labels:
+    cloud.googleapis.com/location: us-central1
+spec:
+  template:
+    spec:
+      parallelism: 1
+      taskCount: 1
+      template:
+        spec:
+          containers:
+          - command: [python]
+            args: [ma_poc/scripts/runners/shard_entry.py]
+            env:
+            - {name: BROWSERS_PER_TASK,  value: '5'}
+            - {name: CSV_GCS_URI,        value: gs://jugnu-canary/canary/<YYYY-MM-DD>-<topic>.csv}
+            - {name: BUCKET_NAME,        value: jugnu-canary}
+            - {name: DATA_PROVIDER,      value: filesystem}     # no PG writes
+            - {name: SCHEMA_VERSION,     value: v2}
+            - {name: LLM_PROVIDER,       value: gemini}
+            - {name: SHARD_SOURCE,       value: csv}
+            - {name: RUN_DATE,           value: <YYYY-MM-DD>-<topic>}
+            - {name: CURL_CFFI_FOR_DIRECT, value: '1'}
+            - name: OPENROUTER_API_KEY
+              valueFrom: {secretKeyRef: {name: openrouter-api-key-production, key: latest}}
+            - name: ANTHROPIC_API_KEY
+              valueFrom: {secretKeyRef: {name: anthropic-api-key-production, key: latest}}
+            - name: GEMINI_API_KEY
+              valueFrom: {secretKeyRef: {name: gemini-api-key-canary, key: latest}}
+            - name: PROXY_POOL_URLS
+              valueFrom: {secretKeyRef: {name: proxy-credentials-production, key: latest}}
+            - name: PROBE_PROXY_URL
+              valueFrom: {secretKeyRef: {name: brightdata-probe-proxy, key: latest}}
+            - name: WEB_UNLOCKER_KEY
+              valueFrom: {secretKeyRef: {name: web-unlocker-key-canary, key: latest}}
+            image: __IMAGE_URI_PLACEHOLDER__
+            resources: {limits: {cpu: '2', memory: 4Gi}}
+          maxRetries: 0
+          serviceAccountName: jugnu-worker-production@jugnu-494013.iam.gserviceaccount.com
+          timeoutSeconds: '1800'
+```
+
+```bash
+sed "s|__IMAGE_URI_PLACEHOLDER__|${IMAGE_URI}|g" canary-introspect-spec.yaml \
+    > canary-introspect-spec.resolved.yaml
+gcloud run jobs replace canary-introspect-spec.resolved.yaml \
+    --region=us-central1 --project=jugnu-494013
+```
+
+**Do NOT set `DATABASE_URL`** in the canary spec — its presence triggers the production PG sync in `shard_entry._sync_to_postgres` and would pollute the `properties` / `units` tables with canary data.
+
+#### Step 5 — Execute + wait
+
+```bash
+gcloud run jobs execute canary-introspect \
+    --region=us-central1 --project=jugnu-494013 --wait
+```
+
+Typical wallclock: 5–10 min for 5 properties (3–5 min provisioning + 2–5 min scrape).
+
+If the job fails, pull the full container log to find the root cause — exit reasons are often hidden behind the `gcloud` "Executing job failed" line:
+
+```bash
+gcloud logging read \
+  'resource.type="cloud_run_job"
+   AND resource.labels.job_name="canary-introspect"
+   AND labels."run.googleapis.com/execution_name"="<execution-name>"' \
+  --limit=50 --order=asc --format='value(textPayload)' \
+  --project=jugnu-494013 | tail -60
+```
+
+The execution name appears in the `gcloud run jobs execute` failure output: `gcloud run jobs executions describe canary-introspect-<5-char-hash>`.
+
+#### Step 6 — Pull artifacts + analyze
+
+```bash
+gcloud storage rsync -r \
+  gs://jugnu-canary/runs/<YYYY-MM-DD>-<topic>/shard_0/ \
+  c:/tmp/canary_<topic>/cloud_results/ \
+  --project=jugnu-494013
+```
+
+Per-property verification script — adapt to the fix under test. Skeleton:
+
+```python
+# c:/tmp/canary_<topic>/analyze.py
+import json
+from pathlib import Path
+RUN = next(Path("c:/tmp/canary_<topic>/cloud_results").glob("**/properties.json")).parent
+TARGETS = {"232316": ("Panton Mill", 5),  # PID → (name, expected_units)
+           "77913":  ("Sierra Vista", 1),
+           ...}
+props = json.load(open(RUN / "properties.json", encoding="utf-8"))
+print(f"{'PID':>7} | {'name':25} | tier | units | plans | verdict")
+for p in props:
+    pid = str(p.get("apartment_id") or "")
+    if pid not in TARGETS: continue
+    units, plans = p.get("units") or [], p.get("floor_plans") or []
+    er, meta = p.get("_extract_result") or {}, p.get("_meta") or {}
+    name, expected = TARGETS[pid]
+    print(f"{pid:>7} | {name:25} | {er.get('tier_used','?')[:25]:25} "
+          f"| {len(units):>5} | {len(plans):>5} | {meta.get('verdict','')}")
+# Fix-specific assertions live below — e.g. for telemetry checks:
+events = (RUN / "events.jsonl").read_text(encoding="utf-8").splitlines()
+for line in events:
+    e = json.loads(line)
+    if e.get("tier_key", "").startswith("rentcafe:nestin_") \
+            and str(e.get("property_id")) in TARGETS:
+        print(e["tier_key"], e["outcome"], e.get("reason", "")[:80])
+```
+
+### 12b.4 Cohort-selection guidance
+
+5 properties is the right size for a fix-specific canary — large enough to cover the targeted code path on diverse PMS shapes, small enough to fit in <15 min wallclock.
+
+| Fix type | Cohort composition |
+|---|---|
+| Adapter parser change (Knock, APTS247, SightMap, …) | 2 PIDs known to exercise the new code path + 1 sentinel from the same PMS that already worked (no-regression guard) |
+| CF / cross-origin clearance change | 2 PIDs with known cross-origin probe targets + 2 PIDs where the same adapter wins via same-origin (regression guard) + 1 wildcard from a different PMS |
+| Telemetry / diagnostic event change | Pick PIDs where the new events SHOULD fire based on yesterday's `events.jsonl` filter |
+| post_process / partition semantic | Pick at least one PID per partition class: pure unit-level (e.g. AvalonBay), pure plan-level (RentVision), mixed (Knock layouts + units) |
+
+Sourcing PIDs from yesterday's `failures.csv` / `successes.csv` (per §1, §2) is preferred over hand-picking — production traffic shape is more representative than memory.
+
+### 12b.5 Gotchas that bit me (and how to avoid)
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| `DEPLOYMENT VALIDATION FAILED: No module named 'ma_poc.services'` during Cloud Build | `.gcloudignore` excluded `ma_poc/services/` (intended to skip a Node.js artifact dir but caught the Python package too) | Use precise paths in `.gcloudignore`: `ma_poc/services/coverage/`, `ma_poc/services/node_modules/`, NOT `ma_poc/services/`. |
+| `PermissionError: '/app/ma_poc/config/profiles'` at runtime in canary, while production runs fine | `.dockerignore` excludes `ma_poc/config/profiles/`. Production GitHub-Actions build still leaves `/app/ma_poc/config` pwuser-writable; Cloud Build layer interaction does not. | Two options: (a) include the dir in build context, or (b) add a defensive Dockerfile step: `RUN mkdir -p /app/ma_poc/config/profiles && chown -R pwuser:pwuser /app/ma_poc/config` before `USER pwuser`. Option (b) is the safer defensive hardening. |
+| Cloud canary scrapes succeed but the fix you wanted to test never fires | The fix's code path requires a precondition that your cohort doesn't actually trigger (e.g. RentCafe Nestin recovery only fires after a SecureCafe probe fails; if your cohort's SecureCafe probe succeeds the Nestin recovery never runs) | Pre-verify by reading the entry-page detector signals for each PID — the cohort's `pms_detected` + first-tier outcomes must match the fix's preconditions. |
+| `gcloud run jobs execute … --wait` exits 0 but `properties.json` is missing in the bucket | `shard_entry.py` upload is in a `try/finally`, but `_resolve_run_dir` reads the wrong path when `SCHEMA_VERSION=v2` and the runner crashed before writing | Check both `runs/<date>/` and `v2/runs/<date>/` in the bucket. Pull whichever exists; both contain `events.jsonl` for diagnosis. |
+| Canary scrapes all properties but `DATA_PROVIDER` was unset | Defaults to `postgres` in some code paths; canary writes to prod DB | Always set `DATA_PROVIDER=filesystem` explicitly in the canary spec. |
+| Canary scrapes everything but `floor_plans[]` is always 0 even though the fix should have surfaced them | The image's `config/profiles/{pid}.json` is missing, so the property runs cold-profile every time. Some plan-summary emission paths depend on `winning_page_url` from the profile to know which hop to scrape. | Pre-seed profiles into the canary CSV bucket OR confirm the fix doesn't depend on profile state by reading the parser directly. |
+| Same image works in `gcloud run jobs execute` interactive but fails when launched from `jugnu-scrape-canary` | The two jobs have different env blocks. The canary-introspect spec we re-spec'd may have dropped a secret. | Always diff `gcloud run jobs describe canary-introspect --format=yaml` against `gcloud run jobs describe jugnu-scrape-canary --format=yaml` before executing. |
+
+### 12b.6 Cleanup
+
+The `canary-introspect` job stays re-spec'd to your last command until someone else re-runs `probe-experiment.yml` or a follow-up canary. That's fine for diagnosis but means another engineer's "where is canary-introspect pointing today?" answer is unpredictable. Document the current spec in your fix's PR description so reviewers can reproduce the exact state.
+
+Image tags accumulate in Artifact Registry — there's no per-engineer cleanup automation today. Tag with a unique discriminator (e.g. `canary-<topic>-<sha>`) so other engineers can identify yours, and don't reuse tags between unrelated investigations.
+
+### 12b.7 Anti-patterns specific to cloud canary
+
+- **Treating cloud canary as a substitute for unit tests.** The cloud cycle is 10+ min per iteration. If you're still debugging the parser, iterate locally with pytest first. Use cloud only when local can't prove the change works (CF, proxy, infra paths).
+- **Running the cloud canary on a stale image.** Always check the build output's image digest and confirm the spec's `image:` field matches; the temptation to re-execute the previous job with a different env to "save the build" routinely produces wrong-image confusion.
+- **Assuming "local 5/5 succeeded" means "cloud 5/5 will succeed".** My 2026-05-22 Plan-Summary canary: local got 5 units on PID 232316; cloud got 0 (entry-page CF-blocked before the fix could even run). Local validates the parser; cloud validates the environment around it. Both are needed.
+- **Not checking `via_proxy` on the adapter_exit event.** Every PMS adapter now emits `via_proxy: bool` on the platform-wide `adapter_exit` event (§20.4). When the cloud canary shows your fix didn't fire as expected, `via_proxy=false` in the event tells you `PROBE_PROXY_URL` wasn't in the env — the most common cause of "fix didn't run".
 
 ---
 

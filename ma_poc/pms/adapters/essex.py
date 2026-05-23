@@ -182,7 +182,9 @@ async def _active_fetch_essex_bulk(
             try:
                 from ma_poc.pms.adapters._probe import probe_get
 
-                rr = probe_get(base, timeout=20)
+                # Same-origin (base is ctx.base_url) — gate Layer 1
+                # declines proxy.
+                rr = probe_get(base, ctx=ctx, stage="essex_property", timeout=20)
                 if getattr(rr, "status_code", 0) == 200 and rr.text:
                     html = str(rr.text)
             except Exception:
@@ -205,8 +207,15 @@ async def _active_fetch_essex_bulk(
     try:
         from ma_poc.pms.adapters._probe import probe_get
 
+        # essexapartmenthomes.com/api — same-origin with most Essex
+        # tenants (they live on essexapartmenthomes.com/properties/...);
+        # gate Layer 1 declines proxy. The HTTP_429 cluster on 2026-05-22
+        # (26 PIDs) is a per-domain rate-limit, not CF, so proxy wouldn't
+        # have helped anyway.
         r = probe_get(
             url,
+            ctx=ctx,
+            stage="essex_availability",
             timeout=20,
             headers={
                 "accept": "application/json, text/plain, */*",

@@ -16,6 +16,7 @@ from ma_poc.extraction.dates import (
     DATE_NOW_TOKENS,
     DATE_PREFIX_RE,
     format_loose_date,
+    looks_date_like,
 )
 
 # Pin the "today" anchor so the "Available Now" / month-day-without-year
@@ -225,3 +226,171 @@ def test_jugnu_wrapper_delegates() -> None:
     ]
     for c in cases:
         assert _format_date_str(c, today=_TODAY) == format_loose_date(c, today=_TODAY)
+
+
+# ── looks_date_like predicate (T1.A — DOM-quality fallback gate) ─────────────
+
+
+def test_looks_date_like_rejects_plan_names() -> None:
+    """Plan names that leaked into available_date from PIDs 10496, 19535,
+    etc. (canary 2026-05-23). Must all return False — these are not
+    date-shaped and shouldn't have shipped under the pre-T1.A fallback."""
+    for v in (
+        "Longhorn", "Palmwood", "Cosmopolitan", "Hastings", "Carlisle",
+        "Cathedral", "Berra", "The Grant",
+    ):
+        assert looks_date_like(v) is False, f"plan name {v!r} should be rejected"
+
+
+def test_looks_date_like_rejects_pure_junk_fragments() -> None:
+    """Pure marketing / UI fragments with no availability or date
+    signal. ``Sign Waitlist`` is in DATE_ABSENT_TOKENS; ``to`` / ``/
+    month`` have no date-shaped signal at all."""
+    for v in (
+        "Sign Waitlist",
+        "to",
+        "/ month",
+    ):
+        assert looks_date_like(v) is False, f"junk fragment {v!r} should be rejected"
+
+
+def test_looks_date_like_accepts_only_n_available_shape() -> None:
+    """2026-05-23 semantic update: "Only N {vacant|available|left|...}"
+    is an explicit availability assertion with a count — the producer
+    is saying units ARE available NOW. Predicate accepts; parser
+    resolves to today. User explicitly called this out:
+        > "same concept with Only 2 Vacant Apartments Left!"
+    """
+    for v in (
+        "Only 1 Vacant Apartment Left!",
+        "Only 2 Vacant Apartments Left!",
+        "Only 3 Available",
+        "Only 1 Open Unit",
+        "Only 5 Left",
+    ):
+        assert looks_date_like(v) is True, f"only-N availability {v!r} should pass"
+
+
+def test_looks_date_like_accepts_bare_availability_tokens() -> None:
+    """2026-05-23 semantic update: bare ``Available`` / ``Vacant`` /
+    ``Open`` carry availability semantics (resolve to today via the
+    extended DATE_NOW_TOKENS). Pre-2026-05-23 these were rejected as
+    ambiguous, but the user pointed out that the producer IS asserting
+    "available now" by emitting that token in the date field — the
+    right behaviour is to ship today's date + status=AVAILABLE.
+
+        User direction: "available default to availability date of today"
+    """
+    assert looks_date_like("Available") is True
+    assert looks_date_like("Vacant") is True
+    assert looks_date_like("Open") is True
+    assert looks_date_like("NOW") is True
+    assert looks_date_like("Now") is True
+    assert looks_date_like("Today") is True
+
+
+def test_looks_date_like_rejects_negative_availability() -> None:
+    """``Not Available`` / ``No Vacancy`` / ``Coming Soon`` /
+    ``Never Open`` etc. are negative-context strings — they assert
+    NOT-AVAILABLE. The predicate rejects them so the v2 fallback
+    ships available_date=None and status inference does NOT fire
+    AVAILABLE. Negative signals flow through DATE_ABSENT_TOKENS to
+    return None across the board.
+    """
+    for v in (
+        "Not Available",
+        "Coming Soon",
+        "No Vacancy",
+        "Never Available",
+        "Cannot Open",
+        "Won't Be Available",
+    ):
+        assert looks_date_like(v) is False, f"negative {v!r} should be rejected"
+
+
+def test_looks_date_like_accepts_now_with_qualifier() -> None:
+    """A now-class token paired with another word is also accepted
+    (parser handles these via the existing DATE_NOW_TOKENS multi-word
+    entries OR via prefix-stripping)."""
+    assert looks_date_like("Available Now") is True
+    assert looks_date_like("Available Today") is True
+    assert looks_date_like("Available Soon") is True
+    assert looks_date_like("Ready Now") is True
+    assert looks_date_like("Move-in Today") is True
+    assert looks_date_like("Date: Available") is True     # 2 tokens, no negative
+
+
+def test_looks_date_like_accepts_month_names() -> None:
+    """Any string containing a month name (full or abbreviated) is
+    date-shaped enough to preserve as the raw fallback."""
+    for v in (
+        "Late August", "Mid June", "Early 2027",  # season/relative + year — relative wins
+        "Spring 2026",                            # season + year
+        "Available June 1",
+        "June 1, 2026", "Jun 03", "Dec. 2",
+        "Available May 30",
+    ):
+        assert looks_date_like(v) is True, f"month-name string {v!r} should pass"
+
+
+def test_looks_date_like_accepts_numeric_date_shapes() -> None:
+    """Numeric m/d / m-d / m/d/Y patterns — covers the year-less
+    SecureCafe / RentCafe variants the parser doesn't yet handle but
+    we still want to preserve as raw fallback."""
+    for v in (
+        "6/15", "07/24", "12/31",
+        "2026/05/28", "6/7/26", "2026-05-22",
+        "Available 6/15", "Available 07/24", "Move-in 8/21/26",
+    ):
+        assert looks_date_like(v) is True, f"numeric date {v!r} should pass"
+
+
+def test_looks_date_like_accepts_relative_dates() -> None:
+    """Relative-date words ("end of month", "next week") are date-shaped
+    even when the parser can't normalise them."""
+    for v in (
+        "end of month", "Available end of month", "end of the year",
+        "this week", "this weekend", "next week", "next month",
+        "starting May 1st", "Available starting May 1st",
+    ):
+        assert looks_date_like(v) is True, f"relative-date {v!r} should pass"
+
+
+def test_looks_date_like_handles_edge_inputs() -> None:
+    """Empty / None / whitespace must all return False without raising."""
+    assert looks_date_like(None) is False
+    assert looks_date_like("") is False
+    assert looks_date_like("   ") is False
+
+
+def test_looks_date_like_rejects_bare_integer() -> None:
+    """Bare integers without separators are not date-shaped. ``"123"``
+    has no slash/dash; ``"2024"`` is a year alone but not a date shape."""
+    assert looks_date_like(123) is False
+    assert looks_date_like("123") is False
+    assert looks_date_like("2024") is False
+
+
+def test_looks_date_like_is_symmetric_with_parser() -> None:
+    """Every shape that ``format_loose_date`` successfully parses must
+    also pass ``looks_date_like``. The predicate is a strict superset
+    of what the parser knows how to handle — when this invariant
+    breaks, the v2 fallback gate may reject a value the parser would
+    have accepted (silent data loss).
+
+    Conversely: ``looks_date_like`` may pass values the parser doesn't
+    yet know how to normalise (that's the whole point — preserve them
+    as raw producer literals).
+    """
+    cases_parser_handles = [
+        "2026-05-22", "Available Now", "Available 7/4/26",
+        "Move-in 8/21/26", "Available May 21", "Jul 4, 2026",
+        "Tuesday June 23 2026", "Available 5/29/26",
+    ]
+    for v in cases_parser_handles:
+        parsed = format_loose_date(v, today=_TODAY)
+        assert parsed is not None, f"parser failed unexpectedly on {v!r}"
+        assert looks_date_like(v) is True, (
+            f"predicate must pass everything the parser handles — {v!r} "
+            f"parsed to {parsed!r} but failed looks_date_like"
+        )

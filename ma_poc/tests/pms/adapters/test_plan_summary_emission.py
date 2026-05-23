@@ -235,7 +235,11 @@ def test_apts247_adapter_keeps_plan_summary_out_of_units(
     api_key = "deadbeef" * 4
     home_html = f'<script>var api_key="{api_key}";</script>'
 
-    async def _fake_fetch(url: str) -> str:
+    # ``**_kw`` swallows the production adapter's ``ctx=`` / ``stage=``
+    # kwargs (added 2026-05-23 for the proxy_gate). The fake doesn't
+    # need them to satisfy the test assertion — accepting and ignoring
+    # them keeps the test resilient to future fetch-helper additions.
+    async def _fake_fetch(url: str, *_args, **_kw) -> str:
         if "/api/v1/floorplans/" in url:
             return _json.dumps(payload)
         return home_html

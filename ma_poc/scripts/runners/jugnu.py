@@ -1786,7 +1786,194 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "_meta": meta,
         "_extract_result": _extract_result_summary(result),
     }
+    # T2 (2026-05-23): DQ telemetry sweep — emit raw-signal events for
+    # offline pattern learning. Sampled to once per property per defect
+    # class. Never raises. See
+    # docs/dom_quality_and_llm_reduction_playbook.md T2 + the EventKind
+    # definitions in observability/events.py for the cohort design.
+    _emit_t2_dq_telemetry(prop, _v2_property_id_for_unit(meta, apartment_id))
     return prop
+
+
+def _emit_t2_dq_telemetry(prop: dict[str, Any], property_id: str) -> None:
+    """Per-property T2 raw-signal emission for offline DQ + LLM-reduction work.
+
+    Walks the already-formatted v2 ``prop["units"]`` and emits at most ONE
+    event per defect class:
+
+      * ``SAME_RENT_PROPERTY_OBSERVED`` — ≥3 unit rows share rent_low AND
+        none has a real unit_id (concession/deposit-leak signature).
+      * ``CONCESSION_TO_RENT_LEAK`` — first unit whose rent_low literal
+        appears in the property-level ``concessions`` text.
+      * ``UNIT_ID_EQUALS_PLAN_NAME`` — first unit where unit_id
+        case-insensitively equals floor_plan_name.
+      * ``FLOOR_PLAN_NAME_LONG`` — first unit whose fpn is > 35 chars
+        AND has ≥2 " - " separators.
+      * ``BEDS_ZERO_NON_STUDIO`` — first unit with beds=0 and no
+        studio/efficiency/sro/loft token in the fpn.
+
+    All payloads carry the truncated offending raw value so the weekly
+    aggregator can cluster by template without re-fetching pages.
+
+    Never raises — every emit is wrapped in try/except per the L5
+    observability contract. Sampling prevents a 300-unit property from
+    flooding the ledger with the same defect 300 times.
+    """
+    try:
+        from ma_poc.observability.events import EventKind, emit
+    except Exception:
+        return
+
+    units = prop.get("units") or []
+    if not isinstance(units, list) or not units:
+        return
+
+    pid = property_id or ""
+
+    # ── T2.D: same-rent + no-real-unit-ids ────────────────────────────────
+    try:
+        rent_vals: list[float] = []
+        unit_id_real_count = 0
+        for u in units:
+            if not isinstance(u, dict):
+                continue
+            r = u.get("rent_low")
+            try:
+                rv = float(r) if r is not None else None
+            except (TypeError, ValueError):
+                rv = None
+            if rv is not None:
+                rent_vals.append(rv)
+            uid = u.get("unit_id")
+            if uid and not str(uid).startswith("inferred_"):
+                unit_id_real_count += 1
+        if len(rent_vals) >= 3:
+            from collections import Counter as _Counter
+            most_common_rent, count = _Counter(rent_vals).most_common(1)[0]
+            # Gate: only emit when ≥3 rows share rent AND no real
+            # unit_ids exist on the property. Real unit_ids on
+            # uniformly-priced rows is legitimate (apolloridge sentinel
+            # PID 282648 — 3 units at $720 with real "4518-C"/"4516-G"/
+            # "4518-L"). Without this gate the event floods the ledger
+            # on every new-build property with cookie-cutter pricing.
+            if count >= 3 and unit_id_real_count == 0:
+                # Sample fpn set (first 3 distinct names where rent matches)
+                fpn_samples: list[str] = []
+                for u in units:
+                    if not isinstance(u, dict):
+                        continue
+                    try:
+                        rv = float(u.get("rent_low")) if u.get("rent_low") is not None else None
+                    except (TypeError, ValueError):
+                        rv = None
+                    if rv != most_common_rent:
+                        continue
+                    fpn = u.get("floor_plan_name")
+                    if fpn and fpn not in fpn_samples:
+                        fpn_samples.append(str(fpn)[:60])
+                    if len(fpn_samples) >= 3:
+                        break
+                emit(
+                    EventKind.SAME_RENT_PROPERTY_OBSERVED,
+                    pid,
+                    rent_value=most_common_rent,
+                    n_same_rent_units=count,
+                    has_real_unit_ids=False,
+                    fpn_set=fpn_samples,
+                )
+    except Exception:
+        pass
+
+    # ── T2.F: concession-to-rent leak ─────────────────────────────────────
+    try:
+        concession_text = prop.get("concessions") or prop.get("concession_text") or ""
+        if isinstance(concession_text, str) and concession_text:
+            ct_lower = concession_text.lower()
+            for u in units:
+                if not isinstance(u, dict):
+                    continue
+                r = u.get("rent_low")
+                try:
+                    rv = int(float(r)) if r is not None else None
+                except (TypeError, ValueError):
+                    rv = None
+                if rv is None or rv < 100:
+                    continue
+                # Look for "$NNN" / "$N,NNN" / "from $NNN" / "starting at $NNN"
+                # — any literal occurrence of the rent integer in the
+                # concession text. Match with thousands separators too.
+                rv_strs = (f"${rv}", f"${rv:,}", f"{rv}", f"{rv:,}")
+                if any(s.lower() in ct_lower for s in rv_strs):
+                    emit(
+                        EventKind.CONCESSION_TO_RENT_LEAK,
+                        pid,
+                        rent_value=rv,
+                        concession_excerpt=concession_text[:120],
+                    )
+                    break  # one event per property
+    except Exception:
+        pass
+
+    # ── T2.E: unit_id == floor_plan_name ──────────────────────────────────
+    try:
+        for u in units:
+            if not isinstance(u, dict):
+                continue
+            uid = u.get("unit_id")
+            fpn = u.get("floor_plan_name")
+            if not uid or not fpn:
+                continue
+            if str(uid).strip().lower() == str(fpn).strip().lower():
+                emit(
+                    EventKind.UNIT_ID_EQUALS_PLAN_NAME,
+                    pid,
+                    unit_id=str(uid)[:40],
+                    floor_plan_name=str(fpn)[:80],
+                )
+                break  # one event per property
+    except Exception:
+        pass
+
+    # ── T2.B: floor_plan_name long + joined ───────────────────────────────
+    try:
+        for u in units:
+            if not isinstance(u, dict):
+                continue
+            fpn = u.get("floor_plan_name")
+            if not isinstance(fpn, str):
+                continue
+            if len(fpn) > 35 and fpn.count(" - ") >= 2:
+                emit(
+                    EventKind.FLOOR_PLAN_NAME_LONG,
+                    pid,
+                    floor_plan_name=fpn[:140],
+                )
+                break  # one event per property
+    except Exception:
+        pass
+
+    # ── T2.C: beds=0 + non-studio fpn ─────────────────────────────────────
+    try:
+        _STUDIO_TOKENS = ("studio", "efficiency", "efficency", "sro", "loft")
+        for u in units:
+            if not isinstance(u, dict):
+                continue
+            beds = u.get("beds")
+            if beds not in (0, "0"):
+                continue
+            fpn = u.get("floor_plan_name") or ""
+            fpn_lower = str(fpn).lower()
+            if any(tok in fpn_lower for tok in _STUDIO_TOKENS):
+                continue
+            emit(
+                EventKind.BEDS_ZERO_NON_STUDIO,
+                pid,
+                floor_plan_name=str(fpn)[:80],
+                unit_id_hint=str(u.get("unit_id") or "")[:40],
+            )
+            break  # one event per property
+    except Exception:
+        pass
 
 
 def _v2_property_id_for_unit(meta: dict[str, Any], apartment_id: int | None) -> str:
@@ -2034,12 +2221,43 @@ def _format_v2_unit(
     # always the verbatim producer string) or pattern-match ISO via
     # regex. The DB column is VARCHAR(32); strings longer than that are
     # clipped by ``_clip_to_column_limits`` at the storage boundary.
+    #
+    # T1.A (2026-05-23): gate the fallback by ``looks_date_like()``. The
+    # pre-T1.A code accepted ANY non-empty producer string, which leaked
+    # 142 rows of junk into ``available_date`` per cloud run 2026-05-22 —
+    # plan names ("Longhorn"/"Palmwood"), marketing copy ("Only 2 Vacant
+    # Apartments Left!"/"Sign Waitlist"), UI fragments ("to"/"/ month"),
+    # and bare "Available" tokens (34 rows on the 2026-05-23 canary). The
+    # predicate accepts the date-shaped cases we want to preserve ("Late
+    # August"/"Spring 2026"/"07/24"/"Mid June"/"end of month") while
+    # rejecting the junk classes. Rejected values emit DATE_UNPARSED_SHAPE
+    # for future variant collection. See
+    # docs/dom_quality_and_llm_reduction_playbook.md T1.A for evidence +
+    # the 39-case unit-test catalog.
     if avail_date_norm is None and raw_available_date:
         fallback = _normalize_raw_date(raw_available_date)
         if fallback:
-            # Clip to the typed column width so the storage clipper
-            # doesn't have to truncate mid-word in the warning path.
-            avail_date_norm = fallback[:32]
+            from ma_poc.extraction.dates import looks_date_like as _looks_date_like
+            if _looks_date_like(fallback):
+                # Clip to the typed column width so the storage clipper
+                # doesn't have to truncate mid-word in the warning path.
+                avail_date_norm = fallback[:32]
+            else:
+                # Junk producer string — don't ship it. Emit telemetry so
+                # weekly aggregation can either confirm the value really
+                # was junk OR surface a new date-shape variant the
+                # predicate should learn.
+                try:
+                    from ma_poc.observability.events import EventKind as _EK_UPS
+                    from ma_poc.observability.events import emit as _emit_ups
+                    _emit_ups(
+                        _EK_UPS.DATE_UNPARSED_SHAPE,
+                        str(_v2_property_id_for_unit(meta, apartment_id) or ""),
+                        sample_value=str(fallback)[:80],
+                        unit_id_hint=str(unit.get("unit_id") or unit.get("unit_number") or "")[:40],
+                    )
+                except Exception:
+                    pass
 
     # T5 (2026-05-20): emit DATE_EXTRACTION_DROP when the AVAIL_DATE_KEYS
     # alias chain resolved to None BUT the unit dict carries a string value
@@ -2964,6 +3182,32 @@ def _normalize_availability_status(
             if avail >= scrape_ts.date():
                 return "AVAILABLE"
         except (ValueError, TypeError):
+            pass
+
+    # 2026-05-23: raw-date date-shape inference. When the producer
+    # emitted a date-shaped string that we PRESERVED as raw (because
+    # we couldn't normalise it to ISO) — e.g. "Late August", "Spring
+    # 2026", "Mid June" — the producer IS asserting an upcoming
+    # availability even when the date is imprecise. Infer AVAILABLE
+    # so the unit isn't classified as UNKNOWN when the raw value is
+    # date-shaped. Sits between the parsed-future check (step 3) and
+    # the rent-presence inference (step 5).
+    #
+    # Gate: only fire when ``normalized_available_date`` is None — if
+    # the parser DID produce an ISO date, step 3 above already decided
+    # AVAILABLE/none based on past-vs-future. Without this gate we'd
+    # incorrectly infer AVAILABLE on a parsed past date (regression
+    # caught by test_status_not_inferred_from_past_date). Live
+    # evidence: 34 rows of "Late August" / "Spring 2026" shapes on
+    # the 2026-05-22 canary that lost AVAILABLE because none of the
+    # prior rules fired. See docs/dom_quality_and_llm_reduction_playbook.md
+    # T1.A.
+    if raw_available_date and not normalized_available_date:
+        try:
+            from ma_poc.extraction.dates import looks_date_like as _looks_date_like
+            if _looks_date_like(str(raw_available_date)):
+                return "AVAILABLE"
+        except Exception:
             pass
 
     # 2026-05-21: rent-presence inference. A unit that reached the v2

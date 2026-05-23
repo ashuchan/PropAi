@@ -379,19 +379,94 @@ def test_v2_unit_falls_back_to_date_placeholder_for_raw() -> None:
     said. The strict ISO column lives at ``available_date_raw`` — wait,
     no — ``available_date_raw`` IS the raw column; ``available_date`` is
     "best effort": ISO when parseable, raw otherwise.
+
+    2026-05-23 contract update (user direction): ``Available 7/24``
+    now PARSES to ``2026-07-24`` (current year + roll-forward) rather
+    than falling back to raw. Same with bare ``Available`` / ``Vacant``
+    /``Only N Vacant`` — they parse to today. Only truly-unparseable
+    but date-shaped strings (e.g. ``"Late August"``, ``"Spring 2026"``)
+    flow through the raw fallback now. This test pins a string the
+    parser now handles.
     """
     unit = {
         "unit_id": "9821",
         "bedrooms": 1, "bathrooms": 1.0, "sqft": 650,
         "market_rent_low": 1800,
         "available_date": None,
-        "_date_placeholder": "Available 7/24",  # year ambiguous — parser returns None
+        # 2026-05-23 — "Late August" is the canonical "parser-returns-None,
+        # raw-fallback-preserved" case. The string is date-shaped (looks_date_like
+        # passes via month-name) but cannot be normalised to ISO since the
+        # producer didn't specify a day. The v2 column ships the raw literal.
+        "_date_placeholder": "Late August",
     }
     out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
-    # Parser still can't infer a year, so the typed column falls back
-    # to the producer literal rather than null.
-    assert out["available_date"] == "Available 7/24"
-    assert out["available_date_raw"] == "Available 7/24"
+    assert out["available_date"] == "Late August"
+    assert out["available_date_raw"] == "Late August"
+
+
+def test_v2_unit_available_n_slash_d_parses_to_current_year() -> None:
+    """2026-05-23 — ``Available 7/24`` / ``07/24`` / ``6/15`` always
+    mean current year (roll-forward to next year if past). User
+    direction: "07/24 will always mean current year july 24"."""
+    unit = {
+        "unit_id": "9822",
+        "bedrooms": 1, "bathrooms": 1.0, "sqft": 650,
+        "market_rent_low": 1800,
+        "_date_placeholder": "Available 7/24",
+    }
+    out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
+    # _SCRAPE_TS = 2026-05-19; "7/24" is in-future → 2026-07-24
+    assert out["available_date"] == "2026-07-24"
+    assert out["availability_status"] == "AVAILABLE"
+
+
+def test_v2_unit_bare_available_resolves_to_today() -> None:
+    """2026-05-23 — bare ``Available`` (no separate date) is an
+    explicit availability assertion. Resolves to today + status
+    AVAILABLE.
+
+    Note: ``_format_date_str`` uses ``datetime.now().date()`` as the
+    "today" anchor (not ``scrape_ts``), so this test asserts against
+    the wallclock date rather than ``_SCRAPE_TS``.
+    """
+    from datetime import date as _date_today_class
+
+    today_iso = _date_today_class.today().strftime("%Y-%m-%d")
+    for raw in ("Available", "Vacant", "Open", "Only 2 Vacant Apartments Left!"):
+        unit = {
+            "unit_id": f"U-{raw[:5]}",
+            "bedrooms": 1, "bathrooms": 1.0, "sqft": 650,
+            "market_rent_low": 1800,
+            "_date_placeholder": raw,
+        }
+        out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
+        assert out["available_date"] == today_iso, (
+            f"{raw!r} should resolve to today's date ({today_iso}), got {out['available_date']!r}"
+        )
+        assert out["availability_status"] == "AVAILABLE", (
+            f"{raw!r} should infer status=AVAILABLE"
+        )
+
+
+def test_v2_unit_imprecise_date_shape_preserves_raw_infers_available() -> None:
+    """2026-05-23 — imprecise date shapes (``Late August``, ``Spring
+    2026``, ``Mid June``, ``end of month``) preserve as raw in
+    available_date AND infer status=AVAILABLE via the new
+    looks_date_like-based inference rule. User direction: "still
+    implies a date" → status should be AVAILABLE even though we
+    can't normalise to ISO."""
+    for raw in ("Late August", "Spring 2026", "Mid June", "end of month"):
+        unit = {
+            "unit_id": f"U-{raw[:5]}",
+            "bedrooms": 1, "bathrooms": 1.0, "sqft": 650,
+            "market_rent_low": 1800,
+            "_date_placeholder": raw,
+        }
+        out = _format_v2_unit(unit, _SCRAPE_TS, property_id="67736")
+        assert out["available_date"] == raw, f"{raw!r} should preserve as raw"
+        assert out["availability_status"] == "AVAILABLE", (
+            f"{raw!r} (date-shape preserved as raw) should infer AVAILABLE"
+        )
 
 
 def test_v2_unit_truly_no_data_yields_null_date() -> None:

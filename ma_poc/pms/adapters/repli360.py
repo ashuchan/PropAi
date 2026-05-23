@@ -127,16 +127,24 @@ def find_repli360_script_url(html: str) -> str:
     return m.group(0) if m else ""
 
 
-def fetch_repli360_site_id(script_url: str, referer: str = "") -> str:
+def fetch_repli360_site_id(
+    script_url: str,
+    referer: str = "",
+    *,
+    ctx: Any = None,
+) -> str:
     """GET the embed script, return its ``var site_id = '<id>'``, or ''.
 
-    No auth, no bot wall (verified). Best-effort: any failure → ''.
+    No auth, no bot wall (verified — app.repli360.com works direct from
+    GCP). ctx threads the proxy gate; Layer 4 declines unless detection
+    confidence is high AND repli360_script is added to eligible stages.
+    Best-effort: any failure → ''.
     """
     if not script_url:
         return ""
     try:
         hdrs = {"Referer": referer} if referer else {}
-        r = probe_get(script_url, headers=hdrs, timeout=20)
+        r = probe_get(script_url, ctx=ctx, stage="repli360_script", headers=hdrs, timeout=20)
     except Exception:
         return ""
     if getattr(r, "status_code", 0) != 200:
@@ -146,7 +154,7 @@ def fetch_repli360_site_id(script_url: str, referer: str = "") -> str:
 
 
 def fetch_repli360_floorplans(
-    site_id: str, referer: str = ""
+    site_id: str, referer: str = "", *, ctx: Any = None,
 ) -> list[tuple[str, str]]:
     """POST ``/admin/template-render`` → the floorplan list.
 
@@ -162,6 +170,8 @@ def fetch_repli360_floorplans(
         hdrs = {"Referer": referer or "", "Origin": origin}
         r = probe_post(
             _TPL_RENDER,
+            ctx=ctx,
+            stage="repli360_template_render",
             data={
                 "site_id": site_id,
                 "template_type": "2",
@@ -276,9 +286,9 @@ class Repli360Adapter:
         fps: list[tuple[str, str]] = []
         script_url = find_repli360_script_url(html)
         if script_url:
-            site_id = fetch_repli360_site_id(script_url, referer)
+            site_id = fetch_repli360_site_id(script_url, referer, ctx=ctx)
             if site_id:
-                fps = fetch_repli360_floorplans(site_id, referer)
+                fps = fetch_repli360_floorplans(site_id, referer, ctx=ctx)
 
         # FALLBACK: if the static chain didn't resolve (no script tag, or
         # template-render empty), use JS-rendered onclick attrs if the
@@ -314,7 +324,16 @@ class Repli360Adapter:
             }
             headers = {"Referer": origin + "/" if origin else "", "Origin": origin}
             try:
-                resp = probe_post(_API, data=data, headers=headers, timeout=25)
+                # Cross-origin to app.repli360.com — Layer 4 considers
+                # via detection confidence + per-property hop budget.
+                resp = probe_post(
+                    _API,
+                    ctx=ctx,
+                    stage="repli360_unit_list",
+                    data=data,
+                    headers=headers,
+                    timeout=25,
+                )
             except Exception as exc:  # noqa: BLE001 — never raise from an adapter
                 result.errors.append(
                     f"repli360-fetch-error[{fpid}]: "

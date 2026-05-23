@@ -184,10 +184,21 @@ def _origin_of(url: str) -> str:
     return f"{p.scheme}://{p.netloc}" if p.scheme and p.netloc else ""
 
 
-async def _fetch(url: str) -> str:
+async def _fetch(
+    url: str,
+    ctx: AdapterContext | None = None,
+    stage: str = "apts247_fetch",
+) -> str:
+    """Apts247 same-origin probe. ctx + stage thread the proxy gate.
+
+    All Apts247 probes target the property's marketing origin (the
+    rentdynamics ``/api/v1/floorplans/`` endpoint and the homepage
+    refetch), so Layer 1 (same_origin) will decline proxy in the
+    common case. Cross-tenant cases (rare) fall through to Layer 4.
+    """
     from ma_poc.pms.adapters._probe import probe_get
 
-    r = probe_get(url, timeout=25)
+    r = probe_get(url, ctx=ctx, stage=stage, timeout=25)
     if r.status_code != 200:
         return ""
     return r.text or ""
@@ -243,7 +254,7 @@ class Apts247Adapter:
         if not key:
             # Key not in the captured body — refetch the homepage.
             try:
-                hh = await _fetch(origin + "/")
+                hh = await _fetch(origin + "/", ctx=ctx, stage="apts247_homepage_refetch")
             except Exception:
                 hh = ""
             key = find_apts247_api_key(hh)
@@ -265,7 +276,7 @@ class Apts247Adapter:
 
         api_url = f"{origin}/api/v1/floorplans/?api_key={key}"
         try:
-            raw = await _fetch(api_url)
+            raw = await _fetch(api_url, ctx=ctx, stage="apts247_api_fetch")
         except Exception as exc:
             log_adapter_stage(
                 "apts247", pid_for_log, "api_fetch",

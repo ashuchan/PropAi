@@ -473,6 +473,15 @@ _PRIORITY_LISTING_SELECTORS: tuple[str, ...] = (
     "#showPricingTable", ".availability-table", ".pricing-availability-table",
     # RentCafe option-row (PID 5822 The Izzy — 58 rows per per-plan page)
     ".option-row",
+    # 2026-05-23 (Opp 2): RentCafe / Splide vanity ".floorplan-slide" card.
+    # 32 livebh.com properties + similar Splide-driven sites. Cards carry
+    # canonical "N Bed | N Bath  $LO - $HI  N sq. ft.  available units: N"
+    # text that the dom_scan tier extracts deterministically via
+    # `_extract_floorplan_slide_card` in `_html_extract.py`.
+    ".floorplan-slide",
+    ".splide-floorplans",
+    # F2 (2026-05-20): RentCafe vanity ".fp-container" plan card.
+    ".fp-container",
     # Cortland-style inventory grid (PID 2982 — 79 data-unit-id cards)
     "[data-js-hook='apartment']", ".apartments-list", ".apartments__list",
     ".apartments__card",

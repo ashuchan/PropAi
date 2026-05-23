@@ -171,7 +171,11 @@ async def _fetch_available_html(page: Page | None, ctx: AdapterContext) -> tuple
         try:
             from ma_poc.pms.adapters._probe import probe_get
 
-            r = probe_get(target, timeout=20)
+            # ctx + stage thread through the proxy gate. Cortland's
+            # /available-apartments/ is same-origin with ctx.base_url,
+            # so the gate's Layer 1 (same_origin) declines proxy and
+            # this stays on the cheap direct path with clearance cookies.
+            r = probe_get(target, ctx=ctx, stage="cortland_api", timeout=20)
             if getattr(r, "status_code", 0) == 200 and r.text and '"floorplans"' in r.text:
                 return str(r.text), target
         except Exception:

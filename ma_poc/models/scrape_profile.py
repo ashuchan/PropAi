@@ -206,6 +206,11 @@ class ApiHints(BaseModel):
     field_patches: list[FieldPatch] = Field(default_factory=list)
     # Phase 11
     source_observations: list[SourceObservation] = Field(default_factory=list)
+    # 2026-05-23 — Layer 3 of fetch.proxy_gate. Hosts where a prior run
+    # got a CF challenge on a direct fetch; the next run goes straight
+    # through proxy without re-confirming the block. Capped at 30 entries
+    # to bound the profile payload size.
+    proxy_required_hosts: list[str] = Field(default_factory=list)
     # F6 (rentcafe_direct) — cached RentCafe propertyId. Set by the
     # profile_updater after a successful direct-path fetch; read by
     # jugnu_runner to skip the resolver call on subsequent runs (H6

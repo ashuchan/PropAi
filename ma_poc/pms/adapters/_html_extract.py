@@ -526,6 +526,159 @@ def _extract_product_floorplans_as_units(
     return units
 
 
+def _extract_accommodation_floorplans_as_units(
+    data: Any, source_url: str
+) -> list[dict[str, Any]]:
+    """Pass 5: emit plan-level units from ``ApartmentComplex.accommodationFloorPlan[]``.
+
+    RentCafe-vanity and several other CMSes serialise the per-plan inventory as
+    a Schema.org ``ApartmentComplex`` node carrying an ``accommodationFloorPlan``
+    array of ``FloorPlan`` nodes. The schema looks like::
+
+        {"@type": "ApartmentComplex",
+         "accommodationFloorPlan": [
+           {"@type": "FloorPlan",
+            "name": "B1",
+            "numberOfBedrooms": "2",
+            "numberOfBathroomsTotal": "2",
+            "floorSize": "1040",
+            "numberOfAvailableAccommodationUnits": "4",
+            "url": "https://.../B1"}
+         ]}
+
+    Pass 1 (``_walk_jsonld``) WOULD match the inner FloorPlan nodes via
+    ``TARGET_JSONLD_TYPES``, BUT ``_jsonld_item_has_unit_signal`` rejects them
+    when they ship only physical attributes (no offers, no price) — the
+    phantom-shell guard at line 619 in this file then drops them with
+    ``not (has_price or has_name)``. The result: livebh-style RentCafe vanity
+    sites with full per-plan beds/baths/sqft + ``numberOfAvailableAccommodationUnits``
+    fall through to TIER_4_LLM_DOM and burn ~$2.80/run on the qwen3-235b API.
+
+    Rent is usually absent from this schema (lives in DOM), so each emitted
+    unit ships ``rent_range=""`` / ``market_rent_low=None``. The plan-level
+    rows still carry beds/baths/sqft/name + the per-plan available-unit count,
+    which is the canonical data this schema is designed to carry.
+
+    Distinguishing-fields guard mirrors Passes 2-4: require ≥2 distinct
+    FloorPlan entries before emitting. A single FloorPlan in
+    ``accommodationFloorPlan`` is usually metadata for the dominant plan
+    (one-bed-one-bath default) and not real inventory.
+
+    Live-verified 2026-05-23 against [livebh.com/apartments/the-oakley-apartment-homes/]
+    (3 FloorPlan items) and [livebh.com/apartments/ashford/] (8 FloorPlan items).
+    """
+    floorplans: list[dict[str, Any]] = []
+
+    def _walk(node: Any) -> None:
+        if isinstance(node, dict):
+            t = node.get("@type")
+            t_list: list[str] = []
+            if isinstance(t, str):
+                t_list = [t]
+            elif isinstance(t, list):
+                t_list = [x for x in t if isinstance(x, str)]
+            if "ApartmentComplex" in t_list:
+                # Both camelCase ("accommodationFloorPlan") and PascalCase
+                # ("AccommodationFloorPlan") observed in the wild.
+                for key in ("accommodationFloorPlan", "AccommodationFloorPlan"):
+                    arr = node.get(key)
+                    if isinstance(arr, list):
+                        for fp in arr:
+                            if isinstance(fp, dict):
+                                floorplans.append(fp)
+                # Continue walking — there may be multiple ApartmentComplex
+                # nodes (livebh.com lists 24 sibling communities) and we only
+                # want the ones with accommodationFloorPlan populated.
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                _walk(v)
+
+    _walk(data)
+    if len(floorplans) < 2:
+        return []
+
+    # Distinguishing-fields guard: require ≥2 distinct names or sqfts. This
+    # rejects single-floor-plan-replicated arrays that would otherwise inflate
+    # the unit count.
+    names = {str(f.get("name") or "").strip() for f in floorplans if f.get("name")}
+    sizes = {_jsonld_floor_size(f) for f in floorplans}
+    sizes.discard("")
+    if len(names) < 2 and len(sizes) < 2:
+        return []
+
+    units: list[dict[str, Any]] = []
+    for fp in floorplans:
+        name = fp.get("name") or ""
+        if not isinstance(name, str):
+            name = str(name)
+
+        # Schema.org canonical keys for FloorPlan dimensions.
+        def _read_num(v: Any) -> str:
+            if v is None:
+                return ""
+            if isinstance(v, dict):
+                v = v.get("value", "")
+            return str(v) if v not in (None, "") else ""
+
+        bedrooms = (
+            _read_num(fp.get("numberOfBedrooms"))
+            or _read_num(fp.get("numberOfRooms"))
+        )
+        bathrooms = _read_num(
+            fp.get("numberOfBathroomsTotal")
+            or fp.get("numberOfFullBathrooms")
+            or fp.get("numberOfBathrooms")
+        )
+        sqft = _jsonld_floor_size(fp)
+
+        # Per-plan available unit count — carried in
+        # ``numberOfAvailableAccommodationUnits`` (Schema.org canonical).
+        available_units_raw = (
+            fp.get("numberOfAvailableAccommodationUnits")
+            or fp.get("numberOfAccommodationUnits")
+        )
+        available_units = _read_num(available_units_raw)
+
+        # Some FloorPlan nodes carry a per-plan URL we can use as
+        # source_api_url so downstream merging can attribute the row.
+        fp_url = fp.get("url") if isinstance(fp.get("url"), str) else source_url
+
+        # Emit only when we have at least a name or one dimension. A FloorPlan
+        # with zero usable fields is metadata; emitting it would create a
+        # phantom unit row and trip the same phantom-shell guard pattern.
+        has_any = bool(name or bedrooms or bathrooms or sqft)
+        if not has_any:
+            continue
+
+        units.append(
+            {
+                "floor_plan_name": name,
+                "bed_label": "",
+                "bedrooms": bedrooms,
+                "bathrooms": bathrooms,
+                "sqft": sqft,
+                "unit_number": "",
+                "floor": "",
+                "building": "",
+                "rent_range": "",
+                "market_rent_low": None,
+                "market_rent_high": None,
+                "deposit": "",
+                "concession": "",
+                "availability_status": "",
+                "available_units": available_units,
+                "availability_date": "",
+                "lease_term": "",
+                "move_in_date": "",
+                "source_api_url": fp_url,
+                "extraction_tier": "TIER_2_JSONLD",
+            }
+        )
+    return units
+
+
 def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]:
     """Extract unit records from ``<script type="application/ld+json">`` blocks.
 
@@ -597,9 +750,71 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
             # case handled in pass 2 (_extract_offers_as_units). Emitting
             # ApartmentComplex from pass 1 would compress the array into a
             # single fake aggregate unit AND block pass 2 from running.
+            #
+            # 2026-05-23: ALSO skip ApartmentComplex when it carries an
+            # ``accommodationFloorPlan`` array — that's the Pass 5 case
+            # (_extract_accommodation_floorplans_as_units). Without this skip,
+            # Pass 1 emits the container as a phantom "1 unit" because the
+            # ``name`` field is non-empty, AND Pass 5 never gets to run (only
+            # fires when ``units`` is empty).
+            #
+            # 2026-05-23: ALSO skip ApartmentComplex that has neither offers
+            # NOR accommodationFloorPlan NOR any per-unit dimension. Sibling
+            # property-listing nodes (e.g. 24 ApartmentComplex entries on
+            # livebh.com homepage, one per related community) only carry
+            # ``name``+``address``+``image``+``telephone`` — they're property
+            # metadata for sister communities, NOT units. Emitting them as
+            # phantom units yields garbage rows like
+            # ``floor_plan_name="The Arbors on Forest Ridge"`` with no
+            # bed/bath/rent/sqft. Hard-rejecting them here closes a long-
+            # standing data-quality leak surfaced 2026-05-22 during the
+            # tier4_llm_dom audit.
             if "ApartmentComplex" in t_list:
                 offers_field = item.get("offers")
                 if isinstance(offers_field, list) and len(offers_field) >= 2:
+                    continue
+                accom_fp = (
+                    item.get("accommodationFloorPlan")
+                    or item.get("AccommodationFloorPlan")
+                )
+                if isinstance(accom_fp, list) and len(accom_fp) >= 1:
+                    # Defer to Pass 5; do not emit ApartmentComplex as a unit.
+                    continue
+                # Bare property-metadata ApartmentComplex (no offers, no
+                # accommodationFloorPlan, no unit-shaped dimensions). Skip.
+                #
+                # Also reject ApartmentComplex whose ``numberOfBedrooms`` is a
+                # QuantitativeValue range (``{minValue, maxValue}``) or whose
+                # ``floorSize`` is similarly a range. These are PROPERTY-LEVEL
+                # SUMMARY values ("this community has 1-2 bedroom apartments")
+                # not per-unit fields; emitting them as units yields phantom
+                # rows with only ``floor_plan_name`` set to the property name.
+                # Canonical case: livebh.com homepage lists 24 sibling
+                # ApartmentComplex nodes (one per related community), each
+                # carrying ``numberOfBedrooms: {@type: QuantitativeValue,
+                # minValue: 1, maxValue: 2}``. Per playbook §0 anti-pattern #15.
+                def _is_unit_scalar(v: Any) -> bool:
+                    if v in (None, ""):
+                        return False
+                    if isinstance(v, dict):
+                        # QuantitativeValue {value: N} is per-unit;
+                        # {minValue/maxValue} is a property-level range.
+                        return bool(v.get("value")) and not (
+                            v.get("minValue") is not None
+                            or v.get("maxValue") is not None
+                        )
+                    return True
+
+                has_unit_dim = any(
+                    _is_unit_scalar(item.get(k))
+                    for k in (
+                        "floorSize",
+                        "numberOfRooms",
+                        "numberOfBedrooms",
+                        "numberOfBathroomsTotal",
+                    )
+                )
+                if not has_unit_dim:
                     continue
             if not _jsonld_item_has_unit_signal(item):
                 continue
@@ -737,6 +952,19 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
     if not units:
         for data in parsed_blocks:
             units.extend(_extract_standalone_offers(data, source_url))
+
+    # Pass 5 (2026-05-23): ApartmentComplex.accommodationFloorPlan[] arrays.
+    # RentCafe vanity sites (livebh.com canonical) ship FloorPlan inventory
+    # via this Schema.org property — beds/baths/sqft + per-plan available
+    # unit count, but NO rent (rent lives in DOM, e.g. ``.floorplan-slide``).
+    # See _extract_accommodation_floorplans_as_units for the schema shape +
+    # cohort evidence. ~841 RentCafe-detected properties currently fall
+    # through to TIER_4_LLM_DOM; this pass absorbs the ones with the schema.
+    if not units:
+        for data in parsed_blocks:
+            units.extend(
+                _extract_accommodation_floorplans_as_units(data, source_url)
+            )
 
     return units
 
@@ -1665,6 +1893,12 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
     # plan card. Routed to `_extract_rentcafe_ipm_card`. Conservative
     # extractor — requires a parseable rent value to admit the row.
     ".nu-floor-plan",
+    # 2026-05-23 (Opp 2): RentCafe / Splide vanity ".floorplan-slide" plan
+    # card. Used by livebh.com (32 props) + similar Splide-driven RentCafe
+    # vanity templates. Card text shape is regex-parseable; routed to
+    # `_extract_floorplan_slide_card` via `_COMPACT_ROW_EXTRACTORS`.
+    ".floorplan-slide",
+    ".splide-floorplans .splide__slide",
     # Cortland-style apartment grid (PID 2982): 79 anchors with
     # data-js-hook="apartment" + data-unit-id / data-apartment-id attrs.
     "a[data-js-hook='apartment']",
@@ -2534,6 +2768,175 @@ def _extract_rentcafe_ipm_card(
     return unit
 
 
+# 2026-05-23 (Opp 2): RentCafe / Splide-based "floorplan-slide" card. Used
+# by livebh.com (32 properties) + every other site that drives the Splide
+# carousel library with the canonical RentCafe vanity template. Each card's
+# rendered text is highly structured:
+#
+#   "2 Bed | 2 Bath  $1,193 - $1,416  plus fees  1040 sq. ft.  available units: 4"
+#   "1 Bed | 1 Bath  Call for info | 700 sq. ft.  available units: call for info"
+#
+# Regex-parseable with the existing _RENT_PATTERN / _BEDS_PATTERN /
+# _BATHS_PATTERN / _SQFT_PATTERN. The "available units: N" suffix gives
+# per-plan inventory count — emitted as ``available_units`` (the same field
+# Pass 5 of extract_jsonld_from_html populates).
+#
+# Live-verified 2026-05-23: livebh.com/apartments/the-oakley-apartment-homes/
+# (3 cards) + livebh.com/apartments/ashford/ (8 cards). Pure-DOM cohort beyond
+# JSON-LD; complements Pass 5 by attaching rent values the JSON-LD lacks.
+_FLOORPLAN_SLIDE_BED_BATH_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*Bed\b\s*\|\s*(\d+(?:\.\d+)?)\s*Bath\b",
+    re.IGNORECASE,
+)
+_FLOORPLAN_SLIDE_RENT_RANGE_RE = re.compile(
+    r"\$\s*(\d{1,3}(?:,\d{3})*|\d{3,5})\s*-\s*\$?\s*(\d{1,3}(?:,\d{3})*|\d{3,5})",
+)
+_FLOORPLAN_SLIDE_RENT_SINGLE_RE = re.compile(
+    r"\$\s*(\d{1,3}(?:,\d{3})*|\d{3,5})"
+)
+_FLOORPLAN_SLIDE_SQFT_RE = re.compile(
+    r"(\d{2,5})\s*sq\.?\s*ft\.?",
+    re.IGNORECASE,
+)
+_FLOORPLAN_SLIDE_AVAIL_COUNT_RE = re.compile(
+    r"available\s+units?\s*:\s*(\d+|call\s+for\s+info|n/?a|none)",
+    re.IGNORECASE,
+)
+
+
+def _extract_floorplan_slide_card(
+    node: Any, page_ctx: dict[str, Any], source_url: str
+) -> dict[str, Any] | None:
+    """RentCafe / Splide ``.floorplan-slide`` plan card.
+
+    Reads the card's visible text and runs four regexes:
+      * ``N Bed | N Bath`` → beds/baths (decimals allowed for half-baths)
+      * ``$LO - $HI`` or ``$X`` → rent_low / rent_high (range or single)
+      * ``N sq. ft.`` → sqft
+      * ``available units: N`` → per-plan available count
+
+    Plan name is taken from the page_ctx fp_name when present (set upstream
+    by the page-header walker on RentCafe vanity templates), else falls
+    back to the first ``<h2>`` / ``<h3>`` text inside the card.
+
+    Returns None when the card has no beds AND no rent — both signals that
+    the slide is a non-listing decoration. ``"Call for info"`` rent is
+    preserved as ``rent_range="Call for info"`` (string) so the row isn't
+    dropped by the rent-required gate downstream.
+
+    See [livebh.com/apartments/the-oakley-apartment-homes/] live-fetch
+    2026-05-23 for the canonical 3-card sample; same shape across 32 livebh
+    properties currently in TIER_4_LLM_DOM.
+    """
+    try:
+        text = node.get_text(" ", strip=True)
+    except Exception:
+        return None
+    if not text or len(text) < 10:
+        return None
+
+    beds_s: str = ""
+    baths_s: str = ""
+    bb = _FLOORPLAN_SLIDE_BED_BATH_RE.search(text)
+    if bb:
+        beds_s = bb.group(1)
+        baths_s = bb.group(2)
+
+    rent_lo: int | None = None
+    rent_hi: int | None = None
+    rent_text: str = ""
+    rng = _FLOORPLAN_SLIDE_RENT_RANGE_RE.search(text)
+    if rng:
+        try:
+            lo = int(rng.group(1).replace(",", ""))
+            hi = int(rng.group(2).replace(",", ""))
+            if _RENT_LO_BOUND <= lo <= _RENT_HI_BOUND:
+                rent_lo = lo
+            if _RENT_LO_BOUND <= hi <= _RENT_HI_BOUND:
+                rent_hi = hi
+        except (ValueError, TypeError):
+            pass
+    elif "call for info" in text.lower() or "contact for pricing" in text.lower():
+        rent_text = "Call for info"
+    else:
+        # Single $ value — common on properties with one rent per plan.
+        single = _FLOORPLAN_SLIDE_RENT_SINGLE_RE.search(text)
+        if single:
+            try:
+                v = int(single.group(1).replace(",", ""))
+                if _RENT_LO_BOUND <= v <= _RENT_HI_BOUND:
+                    rent_lo = v
+                    rent_hi = v
+            except (ValueError, TypeError):
+                pass
+
+    sqft_s: str = ""
+    sm = _FLOORPLAN_SLIDE_SQFT_RE.search(text)
+    if sm:
+        try:
+            sq = int(sm.group(1).replace(",", ""))
+            if _SQFT_MIN <= sq <= 10_000:
+                sqft_s = str(sq)
+        except (ValueError, TypeError):
+            pass
+
+    avail_count: str = ""
+    am = _FLOORPLAN_SLIDE_AVAIL_COUNT_RE.search(text)
+    if am:
+        raw = am.group(1).strip()
+        if raw.isdigit():
+            avail_count = raw
+
+    # Plan name: prefer the page-context plan name when present; else look
+    # for a heading inside the card.
+    fp_name = page_ctx.get("fp_name", "") if page_ctx else ""
+    if not fp_name:
+        try:
+            heading = (
+                node.find(["h2", "h3", "h4", "h5"])
+                or node.find(attrs={"class": re.compile(r"\b(floor[- ]?plan|name|title)\b", re.IGNORECASE)})
+            )
+            if heading:
+                fp_name = heading.get_text(" ", strip=True)
+                # Strip "X Bed | Y Bath" header content from heading text.
+                fp_name = _FLOORPLAN_SLIDE_BED_BATH_RE.sub("", fp_name).strip(" |-")
+        except Exception:
+            pass
+
+    # Reject cards with no inventory signal (no beds AND no rent AND no sqft).
+    if not (beds_s or rent_lo is not None or rent_text or sqft_s):
+        return None
+
+    unit = _empty_unit_with_ctx(
+        page_ctx, source="dom:floorplan-slide", source_url=source_url
+    )
+    if fp_name:
+        unit["floor_plan_name"] = fp_name
+    if beds_s:
+        try:
+            beds_i = int(float(beds_s))
+            unit["bedrooms"] = str(beds_i) if beds_i > 0 else "0"
+            unit["bed_label"] = "Studio" if beds_i == 0 else f"{beds_i}BR"
+        except (ValueError, TypeError):
+            unit["bedrooms"] = beds_s
+    if baths_s:
+        unit["bathrooms"] = baths_s
+    if sqft_s:
+        unit["sqft"] = sqft_s
+    if rent_lo is not None:
+        unit["market_rent_low"] = rent_lo
+        unit["market_rent_high"] = rent_hi if rent_hi is not None else rent_lo
+        if rent_hi is not None and rent_hi != rent_lo:
+            unit["rent_range"] = f"${rent_lo:,} - ${rent_hi:,}"
+        else:
+            unit["rent_range"] = f"${rent_lo:,}"
+    elif rent_text:
+        unit["rent_range"] = rent_text
+    if avail_count:
+        unit["available_units"] = avail_count
+    return unit
+
+
 # Selectors mapped to specialised extractors. When the DOM container loop
 # matches one of these selectors, the matching extractor is used INSTEAD of
 # `_container_yields_unit`. This bypasses the ≥2 structural-signal gate that
@@ -2558,6 +2961,11 @@ _COMPACT_ROW_EXTRACTORS: tuple[tuple[str, Any], ...] = (
     # (requires a parseable rent value) prevents false positives if the
     # class names appear incidentally.
     (".nu-floor-plan", _extract_rentcafe_ipm_card),
+    # 2026-05-23 (Opp 2): RentCafe / Splide ".floorplan-slide" plan card.
+    # Used by livebh.com + every other site driving Splide with the canonical
+    # RentCafe vanity template. See _extract_floorplan_slide_card above.
+    (".floorplan-slide", _extract_floorplan_slide_card),
+    (".splide-floorplans .splide__slide", _extract_floorplan_slide_card),
 )
 _COMPACT_ROW_SELECTOR_SET = frozenset(sel for sel, _ in _COMPACT_ROW_EXTRACTORS)
 

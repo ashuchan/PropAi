@@ -608,7 +608,7 @@ def _body_is_cf_challenge_shell(body: str) -> bool:
     return any(m in body for m in CF_CHALLENGE_MARKERS)
 
 
-async def _probe_detail_url_fresh(url: str) -> _PageFetchResp:
+async def _probe_detail_url_fresh(url: str, ctx: Any = None) -> _PageFetchResp:
     """Fetch *url* via probe_get with the property's CF clearance cookies
     cleared, so curl_cffi mints a fresh per-path challenge clearance.
 
@@ -618,6 +618,10 @@ async def _probe_detail_url_fresh(url: str) -> _PageFetchResp:
 
     Returns a ``_PageFetchResp`` shim so callers can use a uniform
     ``status_code`` / ``text`` interface.
+
+    ``ctx`` (added 2026-05-23) threads the proxy gate. Without it the
+    gate fail-closes to direct — preserves the original behaviour for
+    unit tests that pass ``ctx=None``.
     """
     try:
         from ma_poc.pms.adapters._probe import (
@@ -629,7 +633,7 @@ async def _probe_detail_url_fresh(url: str) -> _PageFetchResp:
         return _PageFetchResp(0, "")
     _clr_tok = set_clearance_cookies(None)
     try:
-        r = probe_get(url, timeout=20)
+        r = probe_get(url, ctx=ctx, stage="nestin_detail_fetch", timeout=20)
     except Exception as exc:
         log.debug("nestin probe_get fallback failed url=%s err=%s", url, exc)
         reset_clearance_cookies(_clr_tok)
@@ -649,6 +653,9 @@ async def recover_rentcafe_nestin_per_plan(
     page: Any = None,     # Playwright Page; when provided, used in preference
                           # to fetcher for ALL fetches so CF clearance carries
     pid_for_log: str = "",  # 2026-05-22: property id for per-URL telemetry.
+    ctx: Any = None,      # 2026-05-23: threads the proxy gate for the
+                          # default probe_get path. None → gate fail-closes
+                          # to direct (preserves unit-test back-compat).
 ) -> tuple[list[dict[str, Any]], str]:
     """Run the Nestin per-plan recovery against the property's marketing site.
 
@@ -737,7 +744,7 @@ async def recover_rentcafe_nestin_per_plan(
             return _PageFetchResp(0, "")
         _clr_tok = set_clearance_cookies(None)
         try:
-            return probe_get(url, timeout=20)
+            return probe_get(url, ctx=ctx, stage="nestin_detail_fetch", timeout=20)
         finally:
             reset_clearance_cookies(_clr_tok)
 
@@ -779,7 +786,7 @@ async def recover_rentcafe_nestin_per_plan(
                 cf_shell=True,
             )
             try:
-                resp = await _probe_detail_url_fresh(floorplans_url)
+                resp = await _probe_detail_url_fresh(floorplans_url, ctx=ctx)
             except Exception as exc:
                 log.debug("nestin /floorplans probe_get retry failed: %s", exc)
                 _log_detail(
@@ -862,7 +869,7 @@ async def recover_rentcafe_nestin_per_plan(
             )
             # Fall through to a fresh-cookie probe_get for THIS URL only.
             try:
-                resp = await _probe_detail_url_fresh(detail_url)
+                resp = await _probe_detail_url_fresh(detail_url, ctx=ctx)
             except Exception as exc:
                 log.debug(
                     "nestin probe_get retry failed url=%s err=%s",

@@ -701,6 +701,7 @@ class RentCafeAdapter:
                         str(getattr(ctx, "base_url", "") or ""),
                         page=page,
                         pid_for_log=pid,
+                        ctx=ctx,
                     )
                     _log_rc(
                         pid,
@@ -1205,7 +1206,10 @@ async def _try_rentcafe_securecafe_probe(
             _log_rc(pid, "sc_search", "not_in_body_no_origin", reason="no origin to refetch")
             return []
         try:
-            _hr = probe_get(origin, timeout=20)
+            # Marketing-site refetch — same-origin with ctx.base_url, so
+            # the proxy gate's Layer 1 declines proxy here. We only need
+            # the raw HTML body to scan for the SecureCafe URL.
+            _hr = probe_get(origin, ctx=ctx, stage="sc_homepage_refetch", timeout=20)
             _hr_len = len(getattr(_hr, "text", "") or "")
             if _hr.status_code == 200 and _hr.text:
                 base = _find_securecafe_base(_hr.text, ctx)
@@ -1239,7 +1243,11 @@ async def _try_rentcafe_securecafe_probe(
     au_url = f"{base}/availableunits.aspx"
 
     try:
-        r = probe_get(au_url, timeout=25)
+        # SecureCafe drill — *.securecafe.com is the canonical
+        # cross-origin CF-walled host. proxy_gate Layer 2 (host
+        # allowlist) admits the proxy here, subject to the per-
+        # property hop budget (default 3 paid-egress hops per pid).
+        r = probe_get(au_url, ctx=ctx, stage="sc_probe", timeout=25)
     except Exception as exc:
         _log_rc(
             pid,

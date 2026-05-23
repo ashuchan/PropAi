@@ -184,7 +184,10 @@ class RentManagerAdapter:
                 )
         if search_url:
             try:
-                r = probe_get(search_url, timeout=30)
+                # search_url targets *.ua.rentmanager.com — cross-origin to
+                # most marketing sites. Layer 4 considers via detection
+                # confidence + per-property hop budget.
+                r = probe_get(search_url, ctx=ctx, stage="rentmanager_search", timeout=30)
             except Exception as exc:  # noqa: BLE001 — never raise from an adapter
                 result.errors.append(
                     f"rentmanager-fetch-error: {type(exc).__name__}: {str(exc)[:100]}"

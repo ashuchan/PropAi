@@ -206,7 +206,8 @@ async def _community_html(page: Page | None, ctx: AdapterContext) -> str:
         try:
             from ma_poc.pms.adapters._probe import probe_get
 
-            r = probe_get(base, timeout=20)
+            # Same-origin (base is ctx.base_url) — gate Layer 1 declines proxy.
+            r = probe_get(base, ctx=ctx, stage="maac_community", timeout=20)
             if getattr(r, "status_code", 0) == 200 and r.text:
                 return str(r.text)
         except Exception:
@@ -238,8 +239,14 @@ async def _active_fetch_maac(page: Page | None, ctx: AdapterContext) -> list[dic
     try:
         from ma_poc.pms.adapters._probe import probe_get
 
+        # url is www.maac.com/api/... — typically same-eTLD+1 with the
+        # property's marketing host (maac.com tenants live on maac.com/...).
+        # Gate Layer 1 (same_origin) declines proxy in the common case.
+        # Cross-tenant edge cases (rare) fall through to Layer 4.
         r = probe_get(
             url,
+            ctx=ctx,
+            stage="maac_units",
             timeout=20,
             headers={"accept": "application/json, text/plain, */*"},
         )
