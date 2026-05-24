@@ -326,38 +326,223 @@ async def recover_generic_floorplans(
     """Discover repeated plan-card containers + parse them. Returns (units,
     winning_path). Returns ``([], '')`` when no plan grid is discoverable
     (so vendor-specific paths aren't shadowed).
+
+    Two-track strategy (2026-05-24):
+      * Track A (live DOM): when ``page.evaluate`` is available, scan the
+        rendered DOM via the canonical JS extractor. This catches
+        post-JS-injected unit cards (Engrain / SightMap iframes etc.).
+      * Track B (static HTML): when Playwright is not available (the
+        fetcher is in plain-curl mode after today's GET-path auto-
+        escalation), scan the fetched body + sub-paths with BeautifulSoup.
+        Catches the TIER_3_DOM P1 cohort properties where prod scanned
+        the static HTML but canary's curl_cffi body was never handed to
+        any DOM-aware recovery.
+
+    Both tracks delegate to the shared ``parse_generic_floorplan_cards``
+    for the per-card text → unit conversion.
     """
     evaluate = getattr(page, "evaluate", None)
-    if not callable(evaluate):
-        return [], ""
-    try:
-        scan = await evaluate(_GENERIC_DOM_JS)
-    except Exception as exc:
-        log.debug("generic-dom scan failed err=%s", exc)
-        return [], ""
-    # Tolerate string-JSON or dict.
-    if isinstance(scan, str):
+    if callable(evaluate):
         try:
-            scan = json.loads(scan)
-        except json.JSONDecodeError:
-            return [], ""
-    if not isinstance(scan, dict):
+            scan = await evaluate(_GENERIC_DOM_JS)
+        except Exception as exc:
+            log.debug("generic-dom scan failed err=%s", exc)
+            scan = None
+        # Tolerate string-JSON or dict.
+        if isinstance(scan, str):
+            try:
+                scan = json.loads(scan)
+            except json.JSONDecodeError:
+                scan = None
+        if isinstance(scan, dict):
+            cards = scan.get("cards") or []
+            winning_path = str(scan.get("winningPath") or "")
+            if isinstance(cards, list) and len(cards) >= 2:
+                # Build a provenance URL from page.url + the winning sub-path.
+                win_url = ""
+                try:
+                    from urllib.parse import urlparse, urlunparse
+
+                    p = urlparse(page.url or getattr(ctx, "base_url", "") or "")
+                    if p.scheme and p.netloc:
+                        win_url = urlunparse(
+                            (p.scheme, p.netloc, winning_path or p.path, "", "", "")
+                        )
+                except Exception:
+                    win_url = ""
+
+                units = parse_generic_floorplan_cards(cards, win_url)
+                if units:
+                    return units, winning_path
+
+    # Track B — static HTML fallback (no Playwright required)
+    return await _recover_generic_floorplans_static(ctx)
+
+
+async def _recover_generic_floorplans_static(
+    ctx: AdapterContext,
+) -> tuple[list[dict[str, str]], str]:
+    """Pure-HTML version of the floor-plan card scanner.
+
+    Used when ``page.evaluate`` isn't available — typically when today's
+    fetcher GET-path auto-escalation delivers a curl_cffi-fetched body
+    that never had a Playwright session attached.
+
+    Algorithm mirrors the JS extractor:
+      1. Pick the HTML to scan: prefer ``ctx.fetch_result.body``; if
+         that has no plan-like containers, probe the same sub-paths the
+         JS scanner walks (``/floorplans``, ``/floor-plans``, etc.)
+         and take the first sub-path that yields ≥2 candidate
+         containers.
+      2. Filter containers by class name (``plan|floorplan|fp-|unit|
+         listing|card|model|tile|item``), text length (<800 chars),
+         and signal count (≥2 of bed/bath/sqft/rent).
+      3. Build dicts in the same shape as the JS extractor's output
+         and delegate to ``parse_generic_floorplan_cards``.
+
+    Returns ``([], '')`` on any failure — caller treats as a graceful
+    no-op (vendor-specific paths still get tried elsewhere).
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is None:
         return [], ""
-    cards = scan.get("cards") or []
-    winning_path = str(scan.get("winningPath") or "")
-    if not isinstance(cards, list) or len(cards) < 2:
+    raw = getattr(fr, "body", None)
+    body = ""
+    if isinstance(raw, bytes):
+        try:
+            body = raw.decode("utf-8", "replace")
+        except Exception:
+            body = ""
+    elif isinstance(raw, str):
+        body = raw
+    if not body:
+        return [], ""
+
+    # Resolve a base URL up-front so the provenance is correct whether
+    # we extract from the homepage body or a probed sub-path.
+    base_url = (
+        str(getattr(fr, "final_url", "") or "")
+        or str(getattr(ctx, "base_url", "") or "")
+    )
+
+    # Try the homepage body first.
+    cards = _scan_static_html_for_cards(body)
+    winning_path = ""
+
+    # If homepage didn't yield enough, probe known sub-paths.
+    if len(cards) < 2:
+        try:
+            from urllib.parse import urlparse
+
+            from ma_poc.pms.adapters._probe import probe_get
+
+            p = urlparse(base_url)
+            if not (p.scheme and p.netloc):
+                return [], ""
+            origin = f"{p.scheme}://{p.netloc}"
+
+            sub_found = False
+            for sub in _FLOORPLAN_SUBPATHS:
+                try:
+                    r = probe_get(origin + sub, timeout=12)
+                except Exception:
+                    continue
+                if getattr(r, "status_code", 0) != 200:
+                    continue
+                sub_body = getattr(r, "text", None) or ""
+                if not sub_body:
+                    continue
+                sub_cards = _scan_static_html_for_cards(sub_body)
+                if len(sub_cards) >= 2:
+                    cards = sub_cards
+                    winning_path = sub
+                    base_url = origin + sub
+                    sub_found = True
+                    break
+            if not sub_found:
+                return [], ""
+        except Exception as exc:
+            log.debug("generic-dom static sub-probe failed err=%s", exc)
+            return [], ""
+
+    if len(cards) < 2:
         return [], winning_path
 
-    # Build a provenance URL from page.url + the winning sub-path.
-    win_url = ""
-    try:
-        from urllib.parse import urlparse, urlunparse
-
-        p = urlparse(page.url or getattr(ctx, "base_url", "") or "")
-        if p.scheme and p.netloc:
-            win_url = urlunparse((p.scheme, p.netloc, winning_path or p.path, "", "", ""))
-    except Exception:
-        win_url = ""
-
-    units = parse_generic_floorplan_cards(cards, win_url)
+    units = parse_generic_floorplan_cards(cards, base_url)
     return units, winning_path
+
+
+def _scan_static_html_for_cards(html: str) -> list[dict[str, Any]]:
+    """Scan ``html`` for repeated plan-card-shaped containers.
+
+    Returns a list of dicts in the same shape the JS extractor produces:
+        ``[{"text": <container text>, "name": <heading text>}, ...]``
+
+    Empty list when the page has no qualifying containers — caller
+    treats as no-op.
+    """
+    # Guard against trivially small bodies (CF challenge stub is ~5KB
+    # but classified as BOT_BLOCKED before reaching us; pure 404/empty
+    # bodies are well under 50 chars). 50 is small enough to admit any
+    # real plan-card HTML even with minimal chrome.
+    if not html or len(html) < 50:
+        return []
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        return []
+
+    # Walk every element with a class attribute and bucket by the
+    # full class string — the JS scanner does the same (looks for
+    # repeated *classes*, not repeated tags). This works because
+    # plan-card-shaped containers tend to share a common class
+    # name across siblings.
+    by_class: dict[str, list[Any]] = {}
+    for el in soup.find_all(class_=True):
+        classes = el.get("class") or []
+        if not classes:
+            continue
+        class_key = " ".join(classes)
+        # Filter: at least one class word must hint "plan-like".
+        joined_lower = class_key.lower()
+        if not any(w in joined_lower for w in _PLAN_CLASS_WORDS):
+            continue
+        by_class.setdefault(class_key, []).append(el)
+
+    # Pick the class with the highest count in the 2..50 range.
+    # Multiple class strings can match — choose the one whose
+    # containers yield the most qualifying cards.
+    best_cards: list[dict[str, Any]] = []
+    for class_key, elements in by_class.items():
+        if not (2 <= len(elements) <= 50):
+            continue
+        cards: list[dict[str, Any]] = []
+        for el in elements:
+            text = el.get_text(separator=" ", strip=True)
+            if not text or len(text) > 800:
+                continue
+            # Skip empty containers — must have at least 2 signals
+            # (bed/bath/sqft/rent) per the JS scanner's quality gate.
+            signals = (
+                (1 if _RE_BED.search(text) or _RE_STUDIO.search(text) else 0)
+                + (1 if _RE_BATH.search(text) else 0)
+                + (1 if _RE_SQFT.search(text) else 0)
+                + (1 if _RE_RENT.search(text) else 0)
+            )
+            if signals < 2:
+                continue
+            # Heading for the name field.
+            name_el = el.find(["h1", "h2", "h3", "h4", "h5"])
+            if not name_el:
+                # Fall back to .name / .title class
+                name_el = el.find(class_=re.compile(r"\bname\b|\btitle\b", re.IGNORECASE))
+            name = name_el.get_text(" ", strip=True) if name_el else ""
+            cards.append({"text": text, "name": name})
+        if len(cards) > len(best_cards):
+            best_cards = cards
+
+    return best_cards

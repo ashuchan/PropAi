@@ -242,3 +242,195 @@ async def test_recover_accepts_brand_cms_winning_path() -> None:
         "fairways5.com/apartments/tx/san-antonio/floor-plans" in (u.get("source_api_url") or "")
         for u in units
     )
+
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-24 static-HTML fallback — fires when page.evaluate isn't
+# available (e.g. after today's fetcher GET-path auto-escalation has
+# delivered a curl_cffi body without spinning up Playwright).
+# Closes ~15-20 of the TIER_3_DOM P1 cohort where prod's static-HTML
+# scan worked but canary never got DOM tooling.
+# ─────────────────────────────────────────────────────────────────────
+
+from unittest.mock import MagicMock, patch
+from ma_poc.pms.adapters._generic_dom_floorplans import (
+    _recover_generic_floorplans_static,
+    _scan_static_html_for_cards,
+)
+
+
+def _ctx_with_body(body: str, final_url: str = "https://example.com/"):
+    import dataclasses
+    @dataclasses.dataclass
+    class _FR:
+        body: bytes | None
+        final_url: str
+    ctx = MagicMock()
+    ctx.fetch_result = _FR(body=body.encode() if isinstance(body, str) else body, final_url=final_url)
+    ctx.base_url = final_url
+    return ctx
+
+
+# ── static scanner: positive cases ────────────────────────────────────
+
+def test_static_scanner_finds_repeated_plan_cards() -> None:
+    """Three div.fp-card siblings with bd/ba/sqft/rent → 3 cards."""
+    html = """<html><body>
+        <div class="fp-card"><h3>The Birch</h3><p>1 Bed 1 Bath 850 sqft \,179</p></div>
+        <div class="fp-card"><h3>Schooner Cove</h3><p>2 Bed 1 Bath 950 sqft \,746</p></div>
+        <div class="fp-card"><h3>Studio Loft</h3><p>Studio 1 Bath 500 sqft \</p></div>
+    </body></html>"""
+    cards = _scan_static_html_for_cards(html)
+    assert len(cards) == 3
+    assert cards[0]["name"] == "The Birch"
+    assert "1 Bed" in cards[0]["text"]
+
+
+def test_static_scanner_filters_below_threshold_signals() -> None:
+    """A container with only \\$ but no bd/ba/sqft → rejected (<2 signals)."""
+    html = """<html><body>
+        <div class="fp-card"> deposit only</div>
+        <div class="fp-card">Another fee notice </div>
+    </body></html>"""
+    cards = _scan_static_html_for_cards(html)
+    # No card has ≥2 signals → empty
+    assert cards == []
+
+
+def test_static_scanner_picks_best_class_when_multiple_match() -> None:
+    """Two plan-like classes coexist; the one with more qualifying
+    containers wins."""
+    html = """<html><body>
+        <div class="nav-item">1 Bed apartments coming soon </div>
+        <div class="plan-card"><h3>A1</h3>1 Bed 1 Bath 700 sqft ,200</div>
+        <div class="plan-card"><h3>B1</h3>2 Bed 2 Bath 950 sqft ,800</div>
+        <div class="plan-card"><h3>C1</h3>3 Bed 2 Bath 1200 sqft ,400</div>
+    </body></html>"""
+    cards = _scan_static_html_for_cards(html)
+    # plan-card class wins (3 cards) over nav-item (1 below-threshold)
+    assert len(cards) == 3
+    names = {c["name"] for c in cards}
+    assert names == {"A1", "B1", "C1"}
+
+
+def test_static_scanner_drops_overlong_containers() -> None:
+    """A container whose text exceeds 800 chars is treated as boilerplate
+    (footer / blog / description block) — must NOT pollute the card list."""
+    long_text = "description " * 100  # >800 chars
+    html = f"""<html><body>
+        <div class="fp-card"><h3>A1</h3>1 Bed 1 Bath 700 sqft ,200 {long_text}</div>
+        <div class="fp-card"><h3>B1</h3>2 Bed 2 Bath 950 sqft ,800</div>
+        <div class="fp-card"><h3>C1</h3>3 Bed 2 Bath 1200 sqft ,400</div>
+    </body></html>"""
+    cards = _scan_static_html_for_cards(html)
+    # A1 is overlong (filtered), B1 + C1 remain
+    assert len(cards) == 2
+    assert {c["name"] for c in cards} == {"B1", "C1"}
+
+
+def test_static_scanner_empty_html_returns_empty() -> None:
+    assert _scan_static_html_for_cards("") == []
+    assert _scan_static_html_for_cards("<html></html>") == []
+
+
+def test_static_scanner_caps_class_size_at_50() -> None:
+    """A class with 51+ matching elements is treated as a navigation
+    template (every nav-link wrapped in .fp-card) — reject."""
+    cells = "".join(
+        f"""<div class="fp-card"><h3>P{i}</h3>1 Bed 1 Bath 700 sqft ,200</div>"""
+        for i in range(55)
+    )
+    html = f"<html><body>{cells}</body></html>"
+    cards = _scan_static_html_for_cards(html)
+    assert cards == []  # 55 > 50 cap
+
+
+def test_static_scanner_requires_plan_class_word() -> None:
+    """A container without one of the plan/floorplan/fp-/unit/listing/
+    card/model/tile/item words in its class attribute is ignored."""
+    html = """<html><body>
+        <div class="section"><h3>A1</h3>1 Bed 1 Bath 700 sqft ,200</div>
+        <div class="section"><h3>B1</h3>2 Bed 2 Bath 950 sqft ,800</div>
+    </body></html>"""
+    cards = _scan_static_html_for_cards(html)
+    assert cards == []
+
+
+# ── recover_generic_floorplans_static integration ────────────────────
+
+@pytest.mark.asyncio
+async def test_static_recover_no_body_returns_empty() -> None:
+    ctx = _ctx_with_body("")
+    units, _ = await _recover_generic_floorplans_static(ctx)
+    assert units == []
+
+
+@pytest.mark.asyncio
+async def test_static_recover_homepage_cards_succeed() -> None:
+    """Homepage body itself has plan cards → no subpage probe needed."""
+    html = """<html><body>
+        <div class="fp-card"><h3>The Birch</h3>1 Bed 1 Bath 850 sqft ,179 - ,349 Available Now</div>
+        <div class="fp-card"><h3>Schooner</h3>2 Bed 1 Bath 950 sqft ,746 Available Jun 1</div>
+    </body></html>"""
+    ctx = _ctx_with_body(html)
+    units, _ = await _recover_generic_floorplans_static(ctx)
+    assert len(units) == 2
+    assert any(u["floor_plan_name"] == "The Birch" for u in units)
+
+
+@pytest.mark.asyncio
+async def test_static_recover_probes_subpaths_when_homepage_empty() -> None:
+    """Homepage has no plan grid → probe /floorplans, /floor-plans etc.
+    First subpath returning ≥2 cards wins."""
+    homepage = "<html><body><nav>no plans here</nav></body></html>"
+    fp_html = """<html><body>
+        <div class="fp-card"><h3>A1</h3>1 Bed 1 Bath 700 sqft ,200</div>
+        <div class="fp-card"><h3>B1</h3>2 Bed 2 Bath 950 sqft ,800</div>
+    </body></html>"""
+
+    def fake_probe(url, **kw):
+        r = MagicMock()
+        if url.endswith("/floor-plans") or url.endswith("/floorplans"):
+            r.status_code = 200; r.text = fp_html
+        else:
+            r.status_code = 404; r.text = ""
+        return r
+
+    ctx = _ctx_with_body(homepage)
+    with patch("ma_poc.pms.adapters._generic_dom_floorplans.probe_get" if False else "ma_poc.pms.adapters._probe.probe_get", side_effect=fake_probe):
+        units, path = await _recover_generic_floorplans_static(ctx)
+    assert len(units) == 2
+    assert path in ("/floorplans", "/floor-plans", "/floorplans/", "/floor-plans/")
+
+
+@pytest.mark.asyncio
+async def test_static_recover_returns_empty_when_no_subpath_yields_cards() -> None:
+    homepage = "<html><body>nothing</body></html>"
+    def fake_probe(url, **kw):
+        r = MagicMock(); r.status_code = 404; r.text = ""
+        return r
+    ctx = _ctx_with_body(homepage)
+    with patch("ma_poc.pms.adapters._probe.probe_get", side_effect=fake_probe):
+        units, _ = await _recover_generic_floorplans_static(ctx)
+    assert units == []
+
+
+# ── full recover_generic_floorplans falls back to static when no page.evaluate ──
+
+@pytest.mark.asyncio
+async def test_recover_full_falls_back_to_static_when_no_page_evaluate() -> None:
+    """When the page has no evaluate (curl-mode fetcher), the JS scan
+    is skipped and the static-HTML fallback runs."""
+    homepage = """<html><body>
+        <div class="fp-card"><h3>X</h3>1 Bed 1 Bath 700 sqft ,200</div>
+        <div class="fp-card"><h3>Y</h3>2 Bed 2 Bath 950 sqft ,800</div>
+    </body></html>"""
+
+    class _NoEvalPage:
+        url = "https://example.com/"
+        # No evaluate attr at all
+
+    ctx = _ctx_with_body(homepage)
+    units, _ = await recover_generic_floorplans(_NoEvalPage(), ctx)
+    assert len(units) == 2
