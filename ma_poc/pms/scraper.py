@@ -222,8 +222,14 @@ _CW_NUM = (
     r"eleven|twelve)"
 )
 _PROPERTY_CONCESSION_RE = re.compile(
+    # NUMBER weeks/months [of] [base|effective|monthly|total|select|premium]
+    # [rent] free|complimentary|on us
+    # 2026-05-24: added the qualifier-word slot so phrasing like
+    # "10 Weeks Base Rent Free" (theblakeoptimistpark.com), "6 months
+    # effective rent free", "12 weeks monthly rent waived" match.
     rf"\b{_CW_NUM}[\s-]*(?:full[\s-]+)?(?:weeks?|months?)['’]?s?[\s-]*"
-    r"(?:of[\s-]+)?(?:rent[\s-]+)?(?:free|complimentary|on\s+us)\b"
+    r"(?:of[\s-]+)?(?:(?:base|effective|monthly|total|select|premium|"
+    r"market)[\s-]+)?(?:rent[\s-]+)?(?:free|complimentary|on\s+us|waived)\b"
     rf"|\b(?:rent[\s-]?)?free\s+(?:for\s+)?(?:{_CW_NUM}\s+)?(?:full\s+)?"
     r"(?:weeks?|months?)\b"
     rf"|\b(?:first|1st)\s+(?:{_CW_NUM}\s+)?(?:full\s+)?months?\b"
@@ -240,7 +246,13 @@ _PROPERTY_CONCESSION_RE = re.compile(
     r"|\blimited[- ]time\s+(?:offer|special|savings|deal)\b"
     r"|\breduced\s+deposit\b"
     r"|\bwaived\s+(?:application|admin(?:istration)?|amenity|"
-    r"move[- ]?in|deposit)\s*fees?\b",
+    r"move[- ]?in|deposit)\s*fees?\b"
+    # 2026-05-24 (post-blakeoptimistpark verification): "Exclusive Offer"
+    # is a common header phrase used to introduce concessions. Standalone
+    # match captures the offer context even when the rest of the phrase
+    # uses unusual phrasing the other branches don't reach.
+    r"|\bexclusive\s+offer\b"
+    r"|\b(?:special|exclusive)\s+(?:lease|move[- ]in)\s+offer\b",
     re.IGNORECASE,
 )
 

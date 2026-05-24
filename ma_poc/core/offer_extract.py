@@ -74,8 +74,10 @@ _OFFER_TYPE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     # free_rent — "N weeks/months free" or "free rent for N months"
     # Anchored on the explicit "rent" qualifier OR a duration+free pair to
     # avoid grabbing "free WiFi" / "free parking". The duration→free
-    # alternation tolerates a short connective ("of", "of free") so phrases
-    # like "8 weeks of complimentary rent on us" still match.
+    # alternation tolerates a short connective ("of", "of free") and a
+    # qualifier word ("base", "effective", "monthly") between the duration
+    # and "rent free" so phrases like "10 Weeks Base Rent Free"
+    # (theblakeoptimistpark.com 2026-05-24) match.
     ("free_rent", re.compile(
         r"(?:\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|"
         r"eleven|twelve)\s+(?:weeks?|months?)\s+(?:of\s+)?(?:free|"
@@ -83,7 +85,13 @@ _OFFER_TYPE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         r"|\bfree\s+rent\b"
         r"|\b(?:rent[- ]?)?free\s+(?:for\s+)?(?:\d+\s+)?(?:weeks?|months?)\b"
         r"|\bfirst\s+(?:\d+\s+|full\s+)?months?\b[^.!?]{0,30}\bfree\b"
-        r"|\b\d+\s+months?\s+free\s+(?:base\s+)?rent\b)",
+        r"|\b\d+\s+months?\s+free\s+(?:base\s+)?rent\b"
+        # NEW 2026-05-24: "N weeks/months [base|effective|monthly|total|
+        # select|premium|market] rent free|waived|complimentary"
+        r"|\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|"
+        r"eleven|twelve)\s+(?:weeks?|months?)\s+(?:of\s+)?"
+        r"(?:base|effective|monthly|total|select|premium|market)\s+"
+        r"rent\s+(?:free|waived|complimentary)\b)",
         re.IGNORECASE,
     )),
     # reduced_rate — special pricing on rent (low priority; catches anything

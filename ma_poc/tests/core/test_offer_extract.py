@@ -425,3 +425,60 @@ def test_extract_offer_empty_input_all_none() -> None:
     for inp in ("", "   ", None):
         out = extract_offer(inp)
         assert all(v is None for v in out.values())
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-24 user-found gap: "N weeks BASE rent free" phrasing
+# (theblakeoptimistpark.com — "Exclusive Offer: 10 Weeks Base Rent Free")
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_blake_optimist_banner_extracted() -> None:
+    """Real banner from theblakeoptimistpark.com (verified live
+    2026-05-24). Pre-fix the regex missed because 'Base' between
+    'Weeks' and 'Rent' broke the chain."""
+    text = "Exclusive Offer: 10 Weeks Base Rent Free"
+    out = extract_offer(text)
+    assert out["offer_type"] == "free_rent"
+    assert out["offer_value"] == "10 weeks"
+
+
+def test_long_form_blake_banner_extracted() -> None:
+    """The full body copy with descriptive lead-in."""
+    text = (
+        "Upgrade your lifestyle with our limited-time special—get "
+        "10 weeks of base rent free on select apartments. Hurry—ends soon!"
+    )
+    out = extract_offer(text)
+    assert out["offer_type"] == "free_rent"
+    assert out["offer_value"] == "10 weeks"
+
+
+def test_qualifier_words_supported_in_free_rent() -> None:
+    """Various qualifier words between duration and 'rent free' should
+    all match (base / effective / monthly / total / select / premium / market)."""
+    cases = [
+        ("6 weeks base rent free", "6 weeks"),
+        ("8 months effective rent free", "8 months"),
+        ("12 weeks monthly rent free", "12 weeks"),
+        ("4 weeks total rent free", "4 weeks"),
+        ("3 months select rent free", "3 months"),
+        ("2 months market rent free", "2 months"),
+    ]
+    for text, expected_value in cases:
+        out = extract_offer(text)
+        assert out["offer_type"] == "free_rent", (
+            f"failed for {text!r}: got {out}"
+        )
+        assert out["offer_value"] == expected_value, (
+            f"failed for {text!r}: got value={out['offer_value']}"
+        )
+
+
+def test_rent_waived_synonym() -> None:
+    """'waived' is a synonym for 'free' in this context (operator's
+    terminology varies — 'waived' is RealPage/Yardi standard)."""
+    text = "8 months base rent waived"
+    out = extract_offer(text)
+    assert out["offer_type"] == "free_rent"
+    assert out["offer_value"] == "8 months"
