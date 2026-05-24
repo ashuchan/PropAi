@@ -737,6 +737,35 @@ class Fetcher:
             if resp.cookies:
                 jar.update_from_response(host, resp.cookies)
 
+            # 2026-05-24: DIRECT-tier httpx → curl_cffi auto-escalation on
+            # BOT_BLOCKED. The plain httpx client lacks TLS-fingerprint
+            # impersonation, so Cloudflare- and Imperva-fronted vanity
+            # sites return 403 even when curl_cffi chrome120 works.
+            # Random-sample probe 2026-05-24 on 50 FAILED_UNREACHABLE
+            # props in the focused-3886351 canary showed httpx 9/10 = 90%
+            # 403 vs curl_cffi 10/10 = 100% 200 OK — with 29/50 being
+            # Entrata Prospect Portal sites our Template A/B/C adapters
+            # would extract from immediately.
+            #
+            # Trigger conditions:
+            #   * tier is DIRECT (proxy is None)
+            #   * method is GET (not HEAD — we want the body)
+            #   * outcome is BOT_BLOCKED (the failure mode we know
+            #     curl_cffi bypasses; TRANSIENT/HARD_FAIL DNS/SSL
+            #     failures aren't TLS-fingerprint related)
+            #
+            # Cost: one extra round-trip per BOT_BLOCKED, only on
+            # failures. Healthy sites are unaffected.
+            if (
+                method == "GET"
+                and outcome == FetchOutcome.BOT_BLOCKED
+                and tier == FetchTier.DIRECT
+                and proxy is None
+            ):
+                cffi_result = await self._try_curl_cffi_fallback(task, start_ms)
+                if cffi_result is not None and cffi_result.outcome == FetchOutcome.OK:
+                    return cffi_result
+
             return FetchResult(
                 url=task.url,
                 outcome=outcome,
@@ -754,6 +783,23 @@ class Fetcher:
             )
         except Exception as exc:
             outcome, sig = classify(None, {}, None, exception=exc)
+            # 2026-05-24: same auto-escalation on transient httpx
+            # failures (TLS handshake aborts, HTTP/2 protocol errors,
+            # connection resets). curl_cffi often succeeds where httpx
+            # raises because its chrome120 TLS fingerprint passes
+            # cloud-WAF protocol-level gates that httpx triggers.
+            if (
+                method == "GET"
+                and outcome in (FetchOutcome.BOT_BLOCKED, FetchOutcome.HARD_FAIL)
+                and tier == FetchTier.DIRECT
+                and proxy is None
+            ):
+                try:
+                    cffi_result = await self._try_curl_cffi_fallback(task, start_ms)
+                    if cffi_result is not None and cffi_result.outcome == FetchOutcome.OK:
+                        return cffi_result
+                except Exception:
+                    pass
             return FetchResult(
                 url=task.url,
                 outcome=outcome,
