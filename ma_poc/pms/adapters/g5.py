@@ -399,6 +399,17 @@ class G5Adapter:
         result.units = units
         result.winning_url = f"{_G5_ENDPOINT} (urn={winning_urn})"
         result.confidence = min(0.95, 0.7 + 0.02 * len(units))
+        # 2026-05-24: expose the GraphQL response so scraper.py's
+        # Step 9b (api_concession_extract on adapter_result.api_responses)
+        # can pull floorplanSpecials / hasFloorplanSpecials out of the
+        # payload. Without this, the adapter consumes the payload locally
+        # and discards it — concession capture misses for every G5 site.
+        result.api_responses.append({
+            "url": f"{_G5_ENDPOINT}?urn={winning_urn}",
+            "status": 200,
+            "body": winning_payload,
+            "via": "g5_graphql_direct",
+        })
         return result
 
     def static_fingerprints(self) -> list[str]:

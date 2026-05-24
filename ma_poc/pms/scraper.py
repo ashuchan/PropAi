@@ -1785,6 +1785,57 @@ async def scrape(
     # Surface full {url, body} records and the winning URL so downstream
     # (profile_updater, reporting) can learn from what worked.
     result["_raw_api_responses"] = list(adapter_result.api_responses)
+
+    # --- Step 9b: API-concession rescan on adapter-initiated responses ---
+    # Step 3b (above) scanned ctx._api_responses — the responses the
+    # Playwright route interceptor caught during the initial page render.
+    # Adapters that make their OWN follow-up API calls (G5 _fetch_g5_units
+    # POST, Knock direct doorway-api GET, SightMap /sightmaps/{id} fetch,
+    # etc.) put those responses in adapter_result.api_responses, NOT in
+    # ctx._api_responses — so Step 3b missed them.
+    #
+    # This pass re-runs the same extractor over the adapter's own captures.
+    # Only overwrites concessions_text when:
+    #   - Step 3 (HTML banner) found nothing AND
+    #   - Step 3b (intercepted XHR) found nothing AND
+    #   - the adapter's API response has a meaningful concession field
+    # Capture-first: the marketing-page banner is authoritative when
+    # present; this is a last-resort source for API-first cohorts.
+    if not result.get("concessions_text") and adapter_result.api_responses:
+        try:
+            from ma_poc.core.api_concession_extract import (
+                extract_api_concession,
+            )
+
+            _best: str | None = None
+            for _resp in adapter_result.api_responses:
+                if not isinstance(_resp, dict):
+                    continue
+                _body = _resp.get("body")
+                if _body is None:
+                    continue
+                _parsed: object | None = None
+                if isinstance(_body, (dict, list)):
+                    _parsed = _body
+                elif isinstance(_body, (str, bytes)):
+                    try:
+                        import json as _json_9b
+                        _txt = (
+                            _body.decode("utf-8", "replace")
+                            if isinstance(_body, bytes) else _body
+                        )
+                        _parsed = _json_9b.loads(_txt)
+                    except Exception:
+                        _parsed = None
+                if _parsed is None:
+                    continue
+                _c = extract_api_concession(_parsed)
+                if _c and (_best is None or len(_c) > len(_best)):
+                    _best = _c
+            if _best:
+                result["concessions_text"] = _best[:300]
+        except Exception:
+            pass
     if adapter_result.winning_url:
         result["_winning_page_url"] = adapter_result.winning_url
     result["_fallback_chain"] = fallback_chain
