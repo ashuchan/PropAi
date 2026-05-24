@@ -92,3 +92,42 @@ Remaining 2-3pp gap = 100-150 more props. Achievable via:
 - Template D + remaining cohort fixes (+50-100 props from RentManager, AppFolio, RealPage_CWS, MarketApts, etc.)
 
 Each remaining cohort is small (<10 props each in HAR sample) — diminishing returns per commit. The 92% target is **on track** but the last 2-3pp will require many small adapter fixes rather than one big lift.
+
+## OneSite final validation (15-prop sample, 2026-05-24)
+
+User push-back on "60% lift" estimate → expanded validation:
+
+  Sample size:           15 properties from ONESITE_NO_RESPONSE cohort
+  Standard subdomain:    14/15 (1 had no OneSite marker = edge case)
+  Affordable housing:     0/15 (only 1 in whole 45-prop cohort)
+  Probe SUCCESS:         13/14 = **92%** (1 empty Floorplans = operator-data-gap)
+  Units extracted:       136 strict-pass across 13 properties
+
+Full cohort projection (45 props):
+  Standard subdomain props: 42 (verified by cohort sweep)
+  Expected lifts at 92%:    ~39 properties
+  Expected strict-pass units: ~390 (avg 10/prop, range 2-60)
+
+Standout: vistaspalmettobay → 60 units, livelifeatspringlake → 15 units,
+modera-style sites consistently >5 units.
+
+The 1 affordable property (copperpointe, `9131096aff.onlineleasing.realpage.com`)
+needs AHOL workflow — not blocking, separate chip task.
+
+## Updated session projection
+
+Combined deep-probed + verified-live lifts:
+  Entrata Templates A/B/C:      ~80 props
+  GenericPlanText static body:  ~45 props
+  Subpage rent enrichment:      ~10 props
+  WP Entrata theme:              ~1-3 props
+  OneSite (verified live):       ~39 props (+ ~390 units)
+  Mechanical fixes:              unmeasurable
+
+  Total: ~175 props lifted
+  Baseline 78% + 175/4982 = 3.5pp = **~81.5% strict projected**
+
+Still short of 92% target but materially higher than my prior pessimistic
+projection. The next biggest lever is fixing the SightMap JS-rendered
+embed problem (would need Chrome MCP / Playwright), then more vendor
+adapters (RentManager direct probe, etc.).
