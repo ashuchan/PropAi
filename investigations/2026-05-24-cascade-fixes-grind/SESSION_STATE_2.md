@@ -64,12 +64,22 @@ Cross-referenced with the focused-3886351 canary's 953 failed-strict properties:
 ### Other cohorts identified but not investigated
 | Cluster | HAR-matched count | Notes |
 |---|---:|---|
-| TIER_1_API_SIGHTMAP_SHAPE_REJECTED | 7 | Not investigated |
+| **TIER_1_API_SIGHTMAP_SHAPE_REJECTED** | **7** | **5/7 have rich JSON at `sightmap.com/app/api/v1/{TOKEN}/sightmaps/{ID}` (48-77KB, units + floor_plans + total_display_full_price). Adapter uses `u.get("price")` — needs `total_display_full_price` fallback. Chip task spawned.** |
 | TIER_1_API_RENTMANAGER | 6 | Not investigated |
 | TIER_1_KNOCK_API | 6 | 3/6 have rich HAR responses (`/v1/property/{ID}/units`); 3/6 are Knock-detector false-positives. Splittable into 2 sub-fixes. |
 | SYNDICATION_ONLY_WIX | 5 | Not investigated |
 | TIER_1_API generic | 18 | 1/18 has extractable JSON (Knock-related). Most are operator-doesn't-publish-via-API. |
 | ENTRATA_EMPTY residue | 7 | The 7/47 untemplated still failing — likely Template D (different operator) or operator-data-gap |
+| GENERIC_PLAN_TEXT residue | 5 | 1/5 (livealexanderpointefl) has a per-unit leasing table pattern: `"Apt # 1603 $1,478.00 /mo* | 10 months $1,415.00 Base rent"`. The other 4 (rooftop252, morrowapartments, olivboulder, autumnaugust) have substantial body but no rent visible — likely JS-rendered widget or true operator gap. |
+
+### no_body_short_circuit (136 cohort, 33 HAR-matched)
+Did NOT re-validate this session. HAR sweep showed:
+- 24/33 first-HTML response = 200 OK with ≥100KB body
+- 8/33 = 404 (truly dead URLs — should be DEAD_URL not no_body)
+- 1/33 = 301 redirect
+- **18/33 have floorplan + rent data somewhere in their HARs** — recoverable
+
+The 8 404s suggest a possible improvement to the DEAD_URL classifier. The shipped `a303462` (curl_cffi direct-first) should catch many of the 18 recoverable ones; the 302149b URL-encoding fix removes another failure mode. Worth re-validating in a fresh canary.
 
 ## Cost note — Web Unlocker test
 
