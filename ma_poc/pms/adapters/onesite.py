@@ -110,22 +110,13 @@ def _extract_onesite_site_ids(body: str, base_url: str) -> list[str]:
         if sid and sid not in ids:
             ids.append(sid)
 
-    # Path B: marketing page links to {prefix}.onlineleasing.realpage.com
-    # — the numeric prefix is NOT always the SiteId (workflowstartup
-    # SiteId is a different number derived from the OLL site config), so
-    # only use it as a weak fallback when widgetLoader-derived ids are
-    # absent. The probe will try each candidate in order; harmless to
-    # include a non-working candidate since workflowstartup returns
-    # explicit failure when given a bad SiteId.
-    if not ids:
-        for m in _ONESITE_SUBDOMAIN_RE.finditer(body):
-            prefix = m.group(1)
-            sid = re.sub(r"\D", "", prefix)
-            if sid and sid not in ids:
-                ids.append(sid)
-            if len(ids) >= 2:  # cap to keep the probe budget bounded
-                break
-
+    # Path B (DISABLED 2026-05-24 after live validation showed it's
+    # unreliable): the subdomain prefix (e.g. ``9131096aff`` in
+    # ``9131096aff.onlineleasing.realpage.com``) is NOT the SiteId
+    # workflowstartup expects. The actual SiteId is published only in
+    # the leasing subdomain's HTML via widgetLoader.js?siteId=...
+    # (see Path C below — called from _probe_onesite_workflowstartup,
+    # not from _extract_onesite_site_ids since it requires HTTP).
     return ids
 
 
@@ -178,12 +169,21 @@ def _onesite_workflowstartup_url(site_id: str) -> str:
 _XYZ_CHARGEN_POOL = (
     string.ascii_uppercase + string.ascii_lowercase + string.digits
 )
-# Stable Windows Chrome UA — must match what BD or the impersonator
-# sends, otherwise the server might match against a different one.
+# Chrome 116 UA — chosen for DataDome bypass. Live validation
+# 2026-05-24 across all curl_cffi impersonations: chrome120/119/124
+# get blocked by DataDome (403), but chrome116/110/107/104/101 plus
+# edge99/101 plus safari17/15 all return 200 OK. RealPage's OneSite
+# OLL accepts the xyz token regardless of the TLS fingerprint —
+# DataDome's blocklist is what filters specific recent Chrome ja3
+# hashes. Stick with chrome116 to consistently bypass.
 _XYZ_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+    "(KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"
 )
+# curl_cffi impersonation chain — try in order, stop on first 200.
+# All entries verified 2026-05-24 to bypass DataDome on
+# leasing.realpage.com when the xyz token is otherwise valid.
+_XYZ_IMPERSONATE_CHAIN = ("chrome116", "edge99", "safari17_0", "chrome110")
 
 
 def _xyz_char_gen(n: int) -> str:
@@ -417,7 +417,15 @@ async def _probe_onesite_workflowstartup(
     except Exception:
         origin_host = ""
 
-    from ma_poc.pms.adapters._probe import probe_get, web_unlocker_get
+    # Need raw curl_cffi to set impersonate per call — probe_get
+    # hardcodes chrome120 which DataDome blocks. Import lazily.
+    try:
+        from curl_cffi import requests as _cc
+    except ImportError:
+        from ma_poc.pms.adapters._probe import probe_get, web_unlocker_get  # noqa: F401
+
+        _cc = None
+    from ma_poc.pms.adapters._probe import web_unlocker_get
 
     for sid in site_ids[:3]:  # cap at 3 to avoid excess probing
         url = _onesite_workflowstartup_url(sid)
@@ -438,17 +446,61 @@ async def _probe_onesite_workflowstartup(
             "X-AuthToken": "",
             "X-Phased": "",
         }
-        # First try direct curl_cffi.
+        # Walk the impersonation chain — chrome116 first because it
+        # consistently bypasses DataDome on the leasing.realpage.com
+        # path. Fall through on transport error or 403/datadome; stop
+        # on first 200 with parseable Workflow.
         body_text = ""
-        try:
-            r = probe_get(url, timeout=15, headers=headers)
+        for imp in _XYZ_IMPERSONATE_CHAIN if _cc is not None else ():
+            try:
+                r = _cc.get(
+                    url,
+                    headers=headers,
+                    timeout=15,
+                    impersonate=imp,
+                )
+            except Exception as exc:
+                log.debug(
+                    "onesite workflowstartup imp=%s err: %s", imp, exc
+                )
+                continue
             if r.status_code == 200 and r.text:
+                # Quick sanity check: server returns 200 with
+                # ``"Workflow":null`` when SiteId is unknown.  Skip
+                # silently so we try the next impersonation / SiteId.
+                if '"Workflow":null' in r.text[:120]:
+                    log.debug(
+                        "onesite.workflow.siteid_unknown sid=%s imp=%s",
+                        sid,
+                        imp,
+                    )
+                    continue
                 body_text = r.text
-            elif r.status_code == 403 and "datadome" in (r.text or "").lower():
-                # DataDome blocked the direct call. Escalate to Web
-                # Unlocker which solves DataDome interstitials. The
-                # cap (WEB_UNLOCKER_MAX_CALLS_PER_JOB, commit 64d313c)
-                # protects spend.
+                break
+            if (
+                r.status_code == 403
+                and "datadome" in (r.text or "").lower()[:600]
+            ):
+                # This impersonation gets DD'd; try the next.
+                log.debug(
+                    "onesite.workflow.datadome_block imp=%s sid=%s",
+                    imp,
+                    sid,
+                )
+                continue
+            # Some other status — log and move on
+            log.debug(
+                "onesite.workflow.unexpected_status sid=%s imp=%s status=%d",
+                sid,
+                imp,
+                r.status_code,
+            )
+
+        # Last-resort: Web Unlocker. Only fires when every TLS
+        # fingerprint got blocked. Cap-protected via
+        # WEB_UNLOCKER_MAX_CALLS_PER_JOB.
+        if not body_text:
+            try:
                 _wu = web_unlocker_get(url, timeout=30)
                 if _wu.status_code == 200 and _wu.text:
                     body_text = _wu.text
@@ -457,9 +509,11 @@ async def _probe_onesite_workflowstartup(
                         sid,
                         url[:80],
                     )
-        except Exception as exc:
-            log.debug("onesite workflowstartup err sid=%s: %s", sid, exc)
-            continue
+            except Exception as exc:
+                log.debug(
+                    "onesite workflowstartup WU err sid=%s: %s", sid, exc
+                )
+
         if not body_text:
             continue
         try:
