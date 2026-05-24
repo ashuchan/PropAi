@@ -383,6 +383,44 @@ def _unescape_js_entities(s: str) -> str:
     return s
 
 
+def _bodytext_from_fetch_result(ctx: AdapterContext) -> str:
+    """Synthesise the equivalent of ``document.body.innerText`` from the
+    L1 fetch_result body.
+
+    Used by the static-body fallback in ``GenericPlanTextAdapter.extract``
+    when the orchestrator dispatches the adapter without a live
+    Playwright page (Phase 6 stub case). Mirrors the transform the
+    subpage-fallback already applies so both paths feed the same regex
+    pipeline. Returns ``""`` when there's no usable body.
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    raw = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(raw, bytes):
+        try:
+            raw_str = raw.decode("utf-8", errors="replace")
+        except Exception:
+            return ""
+    elif isinstance(raw, str):
+        raw_str = raw
+    else:
+        return ""
+    if not raw_str:
+        return ""
+    # Drop <script> and <style> blocks first — innerText leaves them out
+    # too, and they otherwise pollute the rent/plan regex with code that
+    # mentions floor-plan SKUs (e.g. ``var plans = [...]``).
+    raw_str = re.sub(
+        r"<script\b[^>]*>.*?</script>", " ", raw_str, flags=re.DOTALL | re.IGNORECASE
+    )
+    raw_str = re.sub(
+        r"<style\b[^>]*>.*?</style>", " ", raw_str, flags=re.DOTALL | re.IGNORECASE
+    )
+    flat = _unescape_js_entities(raw_str)
+    flat = re.sub(r"<[^>]+>", " ", flat)
+    flat = re.sub(r"\s+", " ", flat).strip()
+    return flat
+
+
 def parse_generic_plan_text(body: str, url: str) -> list[dict]:
     """Extract plan-level rows from page body text. Returns [] when no
     rows pass the ≥2-plan / has-rent guards."""
@@ -1080,21 +1118,47 @@ class GenericPlanTextAdapter:
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used="TIER_1_DOM_GENERIC_PLAN_TEXT")
+        body = ""
+
+        # 2026-05-24: prior implementation hard-required a live Playwright
+        # page (page.evaluate to harvest document.body innerText). Phase
+        # 6 of the canary scraper dispatches this adapter with a stub
+        # page (no evaluate callable), so all 67 props bucketed as
+        # TIER_1_DOM_GENERIC_PLAN_TEXT in focused-3886351 logged the
+        # same single error "generic_plan_text: no live page" without
+        # ever exercising the parser — even though their captured
+        # fetch_result.body carried 6-23 rent signals each.
+        #
+        # Fix: when page.evaluate isn't available, derive bodyText from
+        # ctx.fetch_result.body by mirroring the existing subpage-fallback
+        # transform (HTML-entity unescape, drop <script>/<style>, strip
+        # tags, collapse whitespace). The DOM-JS path stays the
+        # preferred source when live — same regex pipeline downstream.
         evaluate = getattr(page, "evaluate", None)
-        if not callable(evaluate):
-            result.confidence = 0.0
-            result.errors.append("generic_plan_text: no live page")
-            return result
-        try:
-            payload = await evaluate(_GENERIC_DOM_JS)
-        except Exception as exc:
-            log.debug("generic_plan_text evaluate failed err=%s", exc)
-            payload = None
-        if not isinstance(payload, dict):
-            result.confidence = 0.0
-            result.errors.append("generic_plan_text: DOM JS returned non-dict")
-            return result
-        body = str(payload.get("bodyText") or "")
+        if callable(evaluate):
+            try:
+                payload = await evaluate(_GENERIC_DOM_JS)
+            except Exception as exc:
+                log.debug("generic_plan_text evaluate failed err=%s", exc)
+                payload = None
+            if isinstance(payload, dict):
+                body = str(payload.get("bodyText") or "")
+            else:
+                result.errors.append(
+                    "generic_plan_text: DOM JS returned non-dict"
+                )
+
+        if not body:
+            # Static fallback — read the L1 fetch_result.body and
+            # synthesise the same bodyText shape document.body.innerText
+            # would yield. Cheap, deterministic, no extra fetch.
+            body = _bodytext_from_fetch_result(ctx)
+            if body:
+                result.errors.append(
+                    "generic_plan_text: static-body fallback "
+                    "(no live page evaluate)"
+                )
+
         if not body:
             result.confidence = 0.0
             result.errors.append("generic_plan_text: empty body")
