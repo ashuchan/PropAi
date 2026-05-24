@@ -932,14 +932,23 @@ async def recover_rentcafe_nestin_per_plan(
         units = parse_nestin_detail_page(body, detail_url, plan_name)
         all_units.extend(units)
         outcome = "ok" if units else "parser_silent_empty"
+        # Factor the count calls out of the f-string. Python 3.11 (the cloud
+        # runtime) rejects backslash-escaped quotes inside f-string expression
+        # parts (`SyntaxError: f-string expression part cannot include a
+        # backslash`); Python 3.12+ accepts them under PEP 701. The local
+        # dev environment is 3.12 so this bug was invisible until cloud
+        # telemetry surfaced 16,633 exception events across 1,975 PIDs on
+        # run 2026-05-23. Keeping the count locals plain ASCII makes the
+        # log line portable across both runtimes.
+        applyga_count = body.count("applyGAClick(")
+        data_label_apt_count = body.lower().count('data-label="apartment')
         _log_detail(
             "nestin_detail_fetch",
             outcome,
             units=len(units),
             reason=(
                 f"url={detail_url[:120]} status=200 len={len(body)} "
-                f"applyga={body.count('applyGAClick(')} "
-                f"data_label_apt={body.lower().count('data-label=\"apartment')}"
+                f"applyga={applyga_count} data_label_apt={data_label_apt_count}"
             ),
             detail_url=detail_url,
         )

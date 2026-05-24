@@ -447,6 +447,33 @@ def parse_prospectportal_unit_spaces(html: str, url: str) -> list[dict[str, str]
     return out
 
 
+async def _entrata_static_fetch(url: str) -> str:
+    """Same-origin curl_cffi fetch for Entrata-side probes.
+
+    Restored 2026-05-24 — this helper existed in commit 8b1bfa4 but was
+    removed in a later commit while leaving its callers in place. The
+    references at ``_probe_prospectportal`` (lines 704, 736) and the new
+    ``_probe_sitemap_conventional`` (lines 885, 927) became silent
+    NameErrors swallowed by their surrounding ``try/except`` — turning
+    both probes into no-ops in production. Restoring keeps them
+    behaviour-equivalent to the original 8b1bfa4 design: a thin wrapper
+    around the existing ``probe_get`` (curl_cffi + chrome120 + proxy gate)
+    that returns the response text on 200 and an empty string otherwise.
+
+    Best-effort — any exception yields ``""`` so callers can chain probes
+    without a try/except cascade.
+    """
+    try:
+        from ma_poc.pms.adapters._probe import probe_get
+    except ImportError:
+        return ""
+    try:
+        r = probe_get(url, timeout=20)
+    except Exception:
+        return ""
+    return (r.text or "") if getattr(r, "status_code", 0) == 200 else ""
+
+
 class EntrataAdapter:
     """Entrata PMS adapter. Parses /Apartments/module/widgets/ API responses."""
 
@@ -535,6 +562,40 @@ class EntrataAdapter:
                     f"ENTRATA_PROBE_VALIDITY_REJECTED: {len(probe_units)} probed rows "
                     f"failed unit_validity (no numeric dimension)"
                 )
+
+        # 2026-05-24: Sitemap-driven vanity-host discovery. Many Entrata
+        # "ProspectPortal CMS" deployments live on a vanity domain
+        # (rivierawestvillage.com, chopakaapartments.com, briarwoodapartments.com)
+        # with the floor-plan listing on a path like
+        # ``/<city-state-apartments>/<property-slug>/conventional/``. The
+        # marketing root has no JSON-LD; ``_probe_known_endpoints`` returns
+        # 200-HTML SPA shells for /Apartments/module/widgets etc. (not JSON);
+        # and ``_probe_prospectportal`` correctly bails because there is no
+        # prospectportal.com iframe. The discoverable signal is sitemap.xml
+        # which lists the ``/conventional/`` URL on every Entrata-CMS
+        # property scrutinised so far. The conventional page ships a full
+        # ``ApartmentComplex.accommodationFloorPlan[]`` JSON-LD block that
+        # the existing extract_jsonld_from_html parser (Pass 5) decodes
+        # into plan-level unit dicts.
+        #
+        # Live-verified 2026-05-24 against Riviera (PID 12064 — 6 plans),
+        # Chopaka (19540 — 4 plans), Briarwood (19650 — 6+ plans), Royale
+        # (21092 — 10 plans, direct prospectportal.com host).
+        if not result.units:
+            sm_units = await self._probe_sitemap_conventional(page, ctx)
+            if sm_units:
+                from ma_poc.extraction.post_process import post_process
+
+                _pp_sm = post_process(
+                    sm_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _pp_sm.n_admitted > 0:
+                    result.units = list(_pp_sm.units)
+                    result.plan_summaries = list(_pp_sm.plan_summaries)
+                    result.post_process_meta = _pp_sm.to_meta()
+                    result.tier_used = "TIER_2_JSONLD_ENTRATA_CMS"
+                    result.confidence = min(0.88, 0.6 + 0.04 * _pp_sm.n_admitted)
+                    return result
 
         # 2026-05-22 (restore from 8b1bfa4, reverted in 4c9dbf8): the
         # ``view_unit_spaces`` ProspectPortal probe. Many Entrata-detected
@@ -646,6 +707,22 @@ class EntrataAdapter:
         seed = (seed or "") + " " + (getattr(ctx, "base_url", "") or "")
         mh = _PP_HOST_RE.search(seed)
         if not mh:
+            # Telemetry split (2026-05-24): distinguish "gate didn't match,
+            # no network fired" from "probe ran but returned 0 rows". The
+            # caller emits ``ran_empty`` on an empty return — but for the
+            # gate-skipped path (no prospectportal URL in seed), nothing
+            # was fetched. The ``ran_empty`` label is misleading in that
+            # case ("probe failed" reads like a real defect). Emit
+            # ``gate_skipped`` here so the caller's ``ran_empty`` only
+            # fires when the probe genuinely attempted a fetch.
+            from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+            log_adapter_stage(
+                "entrata",
+                str(getattr(ctx, "property_id", "") or "unknown"),
+                "prospectportal_probe",
+                "gate_skipped",
+                reason="no prospectportal.com URL in entry HTML or base_url",
+            )
             return []
         portal = f"https://{mh.group(1)}.prospectportal.com"
 
@@ -793,3 +870,116 @@ class EntrataAdapter:
                 log.debug("Entrata probe parse failed url=%s err=%s", url, exc)
                 continue
         return []
+
+    async def _probe_sitemap_conventional(
+        self,
+        page: "Page | None",
+        ctx: AdapterContext,
+    ) -> list[dict[str, Any]]:
+        """Discover the ``/<area>/<property>/conventional/`` page via
+        ``sitemap.xml`` and parse its JSON-LD ``accommodationFloorPlan``.
+
+        This is the canonical fallback for Entrata "ProspectPortal CMS"
+        deployments on vanity domains where:
+          - the marketing root has no JSON-LD
+          - ``_probe_known_endpoints`` returns SPA shells (not JSON)
+          - ``_probe_prospectportal`` correctly bails (no prospectportal
+            iframe — the marketing host IS the CMS host)
+
+        Never raises. Returns ``[]`` on any failure (no sitemap, no
+        conventional URL, CF block, JSON-LD parse fail).
+        """
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+        from ma_poc.pms.adapters._html_extract import extract_jsonld_from_html
+
+        _pid = str(getattr(ctx, "property_id", "") or "unknown")
+        origin = self._origin_from_ctx(page, ctx) if page is not None else ""
+        if not origin:
+            # Same-origin fall-back from ctx.base_url alone.
+            base = getattr(ctx, "base_url", "") or ""
+            try:
+                p = urlparse(base)
+                if p.scheme and p.netloc:
+                    origin = urlunparse((p.scheme, p.netloc, "", "", "", ""))
+            except Exception:
+                origin = ""
+        if not origin:
+            return []
+
+        sitemap_url = origin.rstrip("/") + "/sitemap.xml"
+        sitemap_xml: str = ""
+        try:
+            sitemap_xml = await _entrata_static_fetch(sitemap_url)
+        except Exception as exc:
+            log_adapter_stage(
+                "entrata",
+                _pid,
+                "sitemap_fetch",
+                f"exception:{type(exc).__name__}",
+                reason=str(exc)[:120],
+            )
+            return []
+        if not sitemap_xml or "<loc>" not in sitemap_xml:
+            log_adapter_stage(
+                "entrata", _pid, "sitemap_fetch", "empty_or_no_loc",
+                reason=f"len={len(sitemap_xml or '')}",
+            )
+            return []
+
+        # Pick the *exact* ``/<area>/<property>/conventional/`` URL — not
+        # the per-floorplan-detail URLs (which match
+        # ``/conventional/`` too but are far slower to parse N times).
+        conventional_re = re.compile(
+            r"<loc>([^<]+/conventional/?)</loc>", re.IGNORECASE
+        )
+        candidates: list[str] = []
+        for m in conventional_re.finditer(sitemap_xml):
+            u = m.group(1).strip()
+            # Reject per-floorplan-detail URLs like ``/floorplans/<slug>/.../conventional/``.
+            # The canonical plan-listing URL doesn't have ``/floorplans/`` in its path.
+            if "/floorplans/" in u.lower():
+                continue
+            candidates.append(u)
+        if not candidates:
+            log_adapter_stage(
+                "entrata", _pid, "sitemap_conventional", "no_conventional_url",
+                reason=f"sitemap_urls={sitemap_xml.count('<loc>')}",
+            )
+            return []
+        # Prefer shorter URLs (canonical plan listing) over deeper paths.
+        candidates.sort(key=len)
+        conv_url = candidates[0]
+
+        try:
+            conv_html = await _entrata_static_fetch(conv_url)
+        except Exception as exc:
+            log_adapter_stage(
+                "entrata", _pid, "sitemap_conventional",
+                f"exception:{type(exc).__name__}",
+                reason=str(exc)[:120],
+            )
+            return []
+        if not conv_html:
+            log_adapter_stage(
+                "entrata", _pid, "sitemap_conventional", "empty_body",
+                reason=f"url={conv_url[:120]}",
+            )
+            return []
+
+        try:
+            units = extract_jsonld_from_html(conv_html, conv_url)
+        except Exception as exc:
+            log_adapter_stage(
+                "entrata", _pid, "sitemap_conventional",
+                f"jsonld_parse_exception:{type(exc).__name__}",
+                reason=str(exc)[:120],
+            )
+            return []
+
+        log_adapter_stage(
+            "entrata", _pid, "sitemap_conventional",
+            "ok" if units else "jsonld_empty",
+            units=len(units),
+            reason=f"url={conv_url[:120]} body_len={len(conv_html)}",
+        )
+        return units

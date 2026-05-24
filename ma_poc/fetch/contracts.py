@@ -100,6 +100,15 @@ class FetchResult:
     # pms/scraper.py can short-circuit instead of feeding interstitial HTML
     # into the LLM. Default False so all pre-F1.2 callers stay valid.
     captcha_detected: bool = False
+    # Cookie-mint reuse (option b, 2026-05-18). Subset of cookies harvested
+    # from the post-render Playwright context whose names match the
+    # bot-wall clearance set (cf_clearance, __cf_bm, datadome, __ddg*,
+    # incap_ses*, visid_incap*, nlbi_*). The orchestrator installs these
+    # via ``ma_poc.pms.adapters._probe.set_clearance_cookies`` for the
+    # duration of one property's adapter dispatch so the cheap curl_cffi
+    # probes auto-attach them and skip re-solving the wall. Empty by
+    # default ⇒ no behaviour change off the cookie-mint path.
+    clearance_cookies: dict[str, str] = field(default_factory=dict)
 
     def ok(self) -> bool:
         """True when fetch succeeded with a 2xx response."""

@@ -135,6 +135,86 @@ _DATE_MD_NO_YEAR_RE: re.Pattern[str] = re.compile(
     r"^\s*(?P<month>\d{1,2})[/-](?P<day>\d{1,2})\s*$"
 )
 
+#: "Mid/Late/Early <Month> [YYYY]" — vague-shape dates producers use when
+#: an exact day is unknown but the rough timing is. Resolution: Early = 5th,
+#: Mid = 15th, Late = 25th. Year is optional; back-fills current year and
+#: rolls forward when past. Phase 4.5 (2026-05-24) — Run 2026-05-23 had
+#: 142 rows shipping unparseable "Late August" / "Mid June" strings that
+#: looks_date_like accepts but format_loose_date previously couldn't
+#: resolve, leaving the raw string clipped to 32 chars in the typed
+#: column. Now resolves to a concrete ISO date.
+_DATE_VAGUE_MONTH_RE: re.Pattern[str] = re.compile(
+    r"^\s*(?P<modifier>early|mid|late)\s+"
+    r"(?P<month>"
+    r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    r"jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|"
+    r"nov(?:ember)?|dec(?:ember)?"
+    r")"
+    r"(?:\s+(?P<year>\d{4}))?\s*$",
+    re.IGNORECASE,
+)
+
+#: Season-name + optional year → mid-season anchor. Phase 4.5: producers
+#: increasingly publish "Spring 2026" / "Summer 2027" rather than a
+#: specific date when pre-leasing far ahead. Resolves to:
+#:   Spring → Mar 15
+#:   Summer → Jul 15
+#:   Fall/Autumn → Oct 15
+#:   Winter → Jan 15 (next year)
+#: Year is optional; back-fills current year and rolls forward when past.
+_DATE_SEASON_YEAR_RE: re.Pattern[str] = re.compile(
+    r"^\s*(?P<season>spring|summer|fall|autumn|winter)"
+    r"(?:\s+(?P<year>\d{4}))?\s*$",
+    re.IGNORECASE,
+)
+
+#: "end of [the] {month|year|week}" — vague-shape relative date.
+#: Resolves to the LAST day of the current month/year/week.
+_DATE_END_OF_RE: re.Pattern[str] = re.compile(
+    r"^\s*end\s+of(?:\s+the)?\s+(?P<period>month|year|week)\s*$",
+    re.IGNORECASE,
+)
+
+#: Year-only — "Early 2027", "2027" — Phase 4.5: when the producer
+#: publishes only a year for pre-leasing, resolve to Jan 1 of that year
+#: (or mid-Jan if "Early <year>"). Bounded to 4-digit year in plausible
+#: range so accidental zip codes / phone fragments don't parse.
+_DATE_YEAR_ONLY_RE: re.Pattern[str] = re.compile(
+    r"^\s*(?:(?P<modifier>early|mid|late)\s+)?(?P<year>20\d{2})\s*$",
+    re.IGNORECASE,
+)
+
+#: Month name → month number — used by the vague-month and season
+#: branches. Built from the month tokens regex to keep one source of
+#: truth.
+_MONTH_NAME_TO_NUM: dict[str, int] = {
+    "jan": 1, "january": 1,
+    "feb": 2, "february": 2,
+    "mar": 3, "march": 3,
+    "apr": 4, "april": 4,
+    "may": 5,
+    "jun": 6, "june": 6,
+    "jul": 7, "july": 7,
+    "aug": 8, "august": 8,
+    "sep": 9, "sept": 9, "september": 9,
+    "oct": 10, "october": 10,
+    "nov": 11, "november": 11,
+    "dec": 12, "december": 12,
+}
+
+#: Modifier → day-of-month for vague shapes. Empirical anchors —
+#: producer-side "Mid June" means roughly the 15th in property listings.
+_MODIFIER_TO_DAY: dict[str, int] = {"early": 5, "mid": 15, "late": 25}
+
+#: Season → (month, day) mid-season anchor.
+_SEASON_TO_ANCHOR: dict[str, tuple[int, int]] = {
+    "spring": (3, 15),
+    "summer": (7, 15),
+    "fall": (10, 15),
+    "autumn": (10, 15),
+    "winter": (1, 15),  # next-year roll-forward handled below
+}
+
 
 def format_loose_date(val: Any, *, today: date | None = None) -> str | None:
     """Normalise a producer date string to YYYY-MM-DD. None if unparseable.
@@ -255,6 +335,94 @@ def format_loose_date(val: Any, *, today: date | None = None) -> str | None:
                 parsed = date(anchor.year, mo, da)
                 if parsed < anchor:
                     parsed = parsed.replace(year=anchor.year + 1)
+                return parsed.strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            pass
+
+    # 2026-05-24 Phase 4.5 — Vague month: "Mid June", "Late August 2026",
+    # "Early March". Resolves to a concrete day (5/15/25) of the named
+    # month. Year optional; back-fills + rolls forward.
+    m = _DATE_VAGUE_MONTH_RE.match(s)
+    if m:
+        try:
+            modifier = m.group("modifier").lower()
+            month_token = m.group("month").lower()
+            year_token = m.group("year")
+            mo = _MONTH_NAME_TO_NUM.get(month_token)
+            da = _MODIFIER_TO_DAY.get(modifier)
+            if mo and da:
+                anchor = today if today is not None else datetime.now().date()
+                year = int(year_token) if year_token else anchor.year
+                parsed = date(year, mo, da)
+                # Only roll-forward when year was inferred (not explicit).
+                if year_token is None and parsed < anchor:
+                    parsed = parsed.replace(year=anchor.year + 1)
+                return parsed.strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            pass
+
+    # 2026-05-24 Phase 4.5 — Season + optional year: "Spring 2026",
+    # "Late Summer", "Fall". Resolves to mid-season anchor.
+    m = _DATE_SEASON_YEAR_RE.match(s)
+    if m:
+        try:
+            season = m.group("season").lower()
+            year_token = m.group("year")
+            anchor_md = _SEASON_TO_ANCHOR.get(season)
+            if anchor_md:
+                anchor = today if today is not None else datetime.now().date()
+                year = int(year_token) if year_token else anchor.year
+                mo, da = anchor_md
+                parsed = date(year, mo, da)
+                # Only roll-forward when year was inferred.
+                if year_token is None and parsed < anchor:
+                    parsed = parsed.replace(year=anchor.year + 1)
+                return parsed.strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            pass
+
+    # 2026-05-24 Phase 4.5 — "end of [the] {month|year|week}".
+    # Resolves to the LAST day of the current period.
+    m = _DATE_END_OF_RE.match(s)
+    if m:
+        try:
+            period = m.group("period").lower()
+            anchor = today if today is not None else datetime.now().date()
+            if period == "month":
+                # Last day of current month: jump to first of next month, subtract 1 day.
+                if anchor.month == 12:
+                    nxt = date(anchor.year + 1, 1, 1)
+                else:
+                    nxt = date(anchor.year, anchor.month + 1, 1)
+                from datetime import timedelta
+                parsed = nxt - timedelta(days=1)
+            elif period == "year":
+                parsed = date(anchor.year, 12, 31)
+            elif period == "week":
+                # Last day of current week (Sunday — week starts Monday).
+                from datetime import timedelta
+                # anchor.weekday(): Mon=0, Sun=6
+                days_until_sun = (6 - anchor.weekday()) % 7
+                parsed = anchor + timedelta(days=days_until_sun)
+            else:
+                parsed = None
+            if parsed is not None:
+                return parsed.strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            pass
+
+    # 2026-05-24 Phase 4.5 — Year-only ("2027", "Early 2027"). Resolves to
+    # Jan 5/15/25 of the year for early/mid/late modifiers, or Jan 1
+    # otherwise. The 4-digit-year guard prevents zip codes / phone
+    # fragments from accidentally parsing.
+    m = _DATE_YEAR_ONLY_RE.match(s)
+    if m:
+        try:
+            year = int(m.group("year"))
+            modifier = (m.group("modifier") or "").lower()
+            if 2024 <= year <= 2050:
+                day = _MODIFIER_TO_DAY.get(modifier, 1)
+                parsed = date(year, 1, day)
                 return parsed.strftime("%Y-%m-%d")
         except (ValueError, TypeError):
             pass

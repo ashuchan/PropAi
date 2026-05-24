@@ -63,6 +63,55 @@ BLOCK_SIGNATURES: Final[list[tuple[str, list[bytes]]]] = [
 ]
 
 
+# HTTP-200 block bodies (2026-05-19). DataDome/Akamai routinely serve a
+# 200 interstitial/"access denied" page that the status-gated classifier
+# counted as OK → false success + self-reinforcing misroute. These
+# literals are HIGH PRECISION (block-page-only) — deliberately NOT the
+# bare b"datadome"/b"_abck" tokens used in the 403 table, since those can
+# appear in legit analytics/cookies and a false positive here would flip
+# a real page to BOT_BLOCKED (drops genuine data).
+_DD_200_MARKERS: Final[list[bytes]] = [
+    b"var dd={", b"var dd ={", b"var dd = {",
+    b"geo.captcha-delivery.com", b"ct.captcha-delivery.com",
+]
+_AKAMAI_200_MARKERS: Final[list[bytes]] = [
+    b"Pardon Our Interruption",
+    b"/_sec/cp_challenge", b"_sec/verify",
+]
+
+
+def looks_like_200_block(
+    body: bytes | None,
+    headers: dict[str, str] | None = None,
+) -> str | None:
+    """Detect a bot-block/challenge served with a 2xx status.
+
+    Returns a BLOCK_SIGNATURES-vocabulary name ("datadome" | "akamai_bm")
+    or None. High precision by design (see marker rationale above): only
+    canonical interstitial/denial literals, the Akamai "Access Denied"
+    page ONLY with its "Reference #..." co-marker, and an invalid-`_abck`
+    Set-Cookie tail (must-re-solve state). Never raises.
+    """
+    try:
+        scan = (body or b"")[:65536]
+        if any(p in scan for p in _DD_200_MARKERS):
+            return "datadome"
+        if any(p in scan for p in _AKAMAI_200_MARKERS):
+            return "akamai_bm"
+        if b"Access Denied" in scan and (b"Reference #" in scan or b"reference #" in scan):
+            return "akamai_bm"
+        sc = ""
+        for k, v in (headers or {}).items():
+            if k.lower() == "set-cookie":
+                sc = v
+                break
+        if "_abck=" in sc and ("~-1~-1" in sc or "-1~-1~" in sc):
+            return "akamai_bm"
+        return None
+    except Exception:
+        return None
+
+
 def match_block_signature(
     body: bytes | None,
     headers: dict[str, str] | None,
@@ -82,6 +131,15 @@ def match_block_signature(
         Signature name string or None.
     """
     try:
+        # 2026-05-19: 2xx bot-block/challenge bodies (DataDome/Akamai
+        # interstitials served with 200) — status-independent, high
+        # precision. Must run before the 403/challenge gate so a 200
+        # block gets a real signature label (feeds profile.
+        # last_block_signature + Phase-E4 tier-skip) instead of None.
+        if 200 <= status_code < 300:
+            _s200 = looks_like_200_block(body, headers)
+            if _s200:
+                return _s200
         if status_code != 403 and not _looks_like_challenge_page(body, status_code):
             return None
 

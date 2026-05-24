@@ -561,7 +561,19 @@ def _jsonld_type_matches(item: dict) -> bool:
 def _jsonld_floor_size(item: dict) -> str:
     fs = item.get("floorSize")
     if isinstance(fs, dict):
+        # Schema.org QuantitativeValue: ``{"@type":"QuantitativeValue",
+        # "minValue":910,"maxValue":910,"unitCode":"SQFT"}``. Pick min
+        # (single-value plans have min==max). Observed on Entrata
+        # "ProspectPortal CMS" deployments — Riviera at West Village
+        # (PID 12064), Royale (PID 21092), and on prospectportal.com
+        # direct-host properties more broadly. Before this, _read_num
+        # returned ``""`` and every Entrata-CMS plan-level extract
+        # shipped sqft=0.
         v = fs.get("value", "")
+        if v in (None, ""):
+            v = fs.get("minValue", "")
+        if v in (None, ""):
+            v = fs.get("maxValue", "")
         return str(v) if v not in (None, "") else ""
     if fs in (None, ""):
         return ""

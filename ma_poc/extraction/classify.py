@@ -35,6 +35,7 @@ from ma_poc.extraction.canonical import (
     AVAIL_STATUS_KEYS,
     RENT_HI_KEYS,
     RENT_LO_KEYS,
+    SQFT_KEYS,
     UID_KEYS,
     get_numeric,
     get_str,
@@ -155,6 +156,30 @@ def _has_per_unit_signal(unit: dict[str, Any]) -> bool:
     is a plan-level rent range). We require ``availability_status`` to
     be explicitly AVAILABLE — that lifts the row from "this plan exists
     at these prices" to "an apartment at this price is available".
+
+    2026-05-24 — Phase 0.2 extension (run 2026-05-23 forensic). The LLM
+    defaults ``availability_status`` to ``UNKNOWN`` when a per-plan page
+    shows rent + sqft + beds but no explicit "Available now" badge. On
+    66% of TIER_4_LLM_DOM ``units=1`` SUCCESS ships, the raw LLM
+    response carried 4-8 valid plans with rent + sqft + beds but
+    ``UNKNOWN`` status. Pre-fix, all 4-8 got demoted to plan_summaries
+    and only 1 inferred-id row survived to ``units``. Live-verified on
+    PIDs 12133 (livebh ashford, 8 plans), 10979 (thehudson, 4 plans),
+    47669 (harbor canterbury, 3 plans), 8738 (theentro, 15 plans).
+
+    The new clause: a row that carries CONCRETE physical dimensions
+    (rent_low AND sqft both non-null) is a per-unit signal even when
+    status is UNKNOWN. The gate is intentionally narrow:
+
+      * Requires BOTH rent_low and sqft. A rent-only row is still
+        plan-level (the "$1500-$2000" range guard from 2026-05-17).
+      * Stub rows (no rent, no sqft, just a plan code) still fail.
+      * The exact-three-plans-same-rent pattern (concession-leak; PID
+        11727 "from $675") is caught downstream by the
+        ``detect_same_rent_leak`` post-process in ``dq_guards``.
+
+    Recovery estimate at landing: ~400 TIER_4_LLM_DOM properties move
+    from 1 unit to 3-8 units shipped.
     """
     for k in _UNIT_LEVEL_SIGNAL_KEYS:
         if is_present(unit.get(k)):
@@ -162,7 +187,35 @@ def _has_per_unit_signal(unit: dict[str, Any]) -> bool:
     # Rent-bearing AVAILABLE row — see docstring.
     if _is_available_with_rent(unit):
         return True
+    # 2026-05-24 Phase 0.2: rent + sqft both present → promote even when
+    # availability_status is UNKNOWN. See docstring for evidence.
+    if _has_rent_and_sqft(unit):
+        return True
     return False
+
+
+def _has_rent_and_sqft(unit: dict[str, Any]) -> bool:
+    """``True`` iff *unit* carries both a numeric rent (low or high) AND
+    a numeric sqft. Used by :func:`_has_per_unit_signal` to promote
+    rent-bearing rows with concrete dimensions to unit-level even when
+    ``availability_status`` is UNKNOWN.
+
+    The combination of rent + sqft is the canonical "this is a real
+    apartment on inventory" signal: marketing pages advertise ranges
+    ("$1500-$2000") without sqft, and plan-summary cards carry sqft
+    without rent. Both together indicates a specific priced unit.
+
+    Reads via the canonical alias tables so producer field-name
+    variants (``market_rent_low``, ``asking_rent``, ``area``,
+    ``minimumsqft``, …) all hit the same predicate.
+    """
+    has_rent = (
+        get_numeric(unit, RENT_LO_KEYS) is not None
+        or get_numeric(unit, RENT_HI_KEYS) is not None
+    )
+    if not has_rent:
+        return False
+    return get_numeric(unit, SQFT_KEYS) is not None
 
 
 #: Status-string values that mean "this floor plan has at least one
