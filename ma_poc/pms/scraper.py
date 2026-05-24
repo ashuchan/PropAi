@@ -760,8 +760,8 @@ async def scrape(
         }
         if profile is not None:
             try:
-                from ma_poc.services.source_planner import compute_budget
                 from ma_poc.models.scrape_profile import ProfileMaturity
+                from ma_poc.services.source_planner import compute_budget
                 is_cold = profile.confidence.maturity == ProfileMaturity.COLD
                 budget = compute_budget(profile, is_cold=is_cold)
             except Exception:
@@ -945,7 +945,11 @@ async def scrape(
         from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
         from ma_poc.validation.schema_gate import (
             property_has_area_signal as _retry_area_signal,
+        )
+        from ma_poc.validation.schema_gate import (
             property_has_rent_signal as _retry_rent_signal,
+        )
+        from ma_poc.validation.schema_gate import (
             property_passes_quality_gate as _retry_quality_gate,
         )
 
@@ -957,7 +961,7 @@ async def scrape(
             _retry_os.environ.get("PATH_B_MAX_RETRIES", "2")
         )
 
-        def _retry_trigger_reason(res: "AdapterResult") -> str | None:
+        def _retry_trigger_reason(res: AdapterResult) -> str | None:
             """Return ``"empty_exit"`` / ``"quality_gate"`` / ``"no_rent"``
             / ``"no_area"`` / None. None means the adapter is fine."""
             if is_empty_exit(res.tier_used) and not res.units:
@@ -971,7 +975,7 @@ async def scrape(
                     return "no_area"
             return None
 
-        def _retry_win_condition(res: "AdapterResult") -> bool:
+        def _retry_win_condition(res: AdapterResult) -> bool:
             """A retry winner must have units AND pass dimension gate AND
             have a rent signal. Same-or-worse quality is not promoted."""
             return bool(
@@ -984,7 +988,7 @@ async def scrape(
         # data isn't lost if all retries fail. Only relevant when the
         # baseline HAS units — for empty_exit triggers there's nothing
         # to preserve.
-        _baseline_result: "AdapterResult | None" = (
+        _baseline_result: AdapterResult | None = (
             adapter_result if adapter_result.units else None
         )
         _baseline_adapter_name = adapter_name
@@ -1103,6 +1107,130 @@ async def scrape(
             result["_plan_level_reason"] = _initial_trigger_reason
     except Exception:  # pragma: no cover — Path B/C must never block scrape
         pass
+
+    # --- F1.5: Subpage rent enrichment (2026-05-24) ---------------------------
+    # Pre-LLM cheap pass: when the cascade winner emitted plan-level units
+    # with area + beds + baths but no rent, probe known marketing subpages
+    # (/floorplans, /floor-plans, /apartments, /pricing) for rent values and
+    # merge them into the existing units by floor_plan_name match. This
+    # rescues the TIER_3_DOM SUBPAGE_HAS_RENT cohort (9 props in focused-
+    # 3886351 canary — Greenarch, Village Square, Rustic Woods, Polo Downs,
+    # The Vue, Telfair Lofts, Avon Commons, Solana Mar, Graystone — all
+    # with rent at /floorplans deep path that TIER_3_DOM stops short of).
+    # Costs nothing when units already have rent (early-skip).
+    try:
+        from ma_poc.pms.adapters._probe import probe_get as _enrich_probe
+        from ma_poc.pms.adapters.generic_plan_text import (
+            _bodytext_from_fetch_result,
+            parse_generic_plan_text,
+        )
+
+        units_now = adapter_result.units or []
+        if units_now:
+            n_with_rent = sum(
+                1 for u in units_now
+                if u.get("market_rent_low") or u.get("market_rent_high")
+                or u.get("rent_low") or u.get("rent_high")
+            )
+            n_with_area = sum(
+                1 for u in units_now
+                if u.get("sqft") or u.get("area")
+            )
+            # Trigger: have units, none have rent, ≥1 has area (plan-level
+            # confirmed). Skip if all units already have rent.
+            if n_with_rent == 0 and n_with_area > 0:
+                from urllib.parse import urlparse as _enrich_urlparse
+
+                _enrich_origin = ""
+                _enrich_fr = getattr(ctx, "fetch_result", None)
+                if _enrich_fr is not None:
+                    _enrich_origin = str(getattr(_enrich_fr, "final_url", "") or "")
+                _enrich_origin = _enrich_origin or getattr(ctx, "base_url", "") or ""
+                _ep = _enrich_urlparse(_enrich_origin)
+                _enrich_base = (
+                    f"{_ep.scheme}://{_ep.netloc}" if _ep.scheme and _ep.netloc else ""
+                )
+
+                if _enrich_base:
+                    # Probe common subpages, parse rent rows out, build a
+                    # {name → (rent_low, rent_high)} map.
+                    _name_rent_map: dict[str, tuple[int | None, int | None]] = {}
+                    for _path in (
+                        "/floorplans/", "/floorplans",
+                        "/floor-plans/", "/floor-plans",
+                        "/availability/", "/availability",
+                        "/apartments/", "/apartments",
+                        "/pricing/", "/pricing",
+                    ):
+                        if _name_rent_map:
+                            break  # got something, stop probing
+                        try:
+                            _r = _enrich_probe(_enrich_base + _path, timeout=12)
+                        except Exception:
+                            continue
+                        if _r.status_code != 200 or not _r.text:
+                            continue
+                        _sub_text = _r.text
+                        # Synthesise bodyText (script/style strip + tag drop)
+                        class _StubCtx:
+                            pass
+                        _stub = _StubCtx()
+                        _stub.fetch_result = type("_FR", (), {"body": _sub_text.encode("utf-8", "replace")})()
+                        _body_text = _bodytext_from_fetch_result(_stub)  # type: ignore[arg-type]
+                        if not _body_text:
+                            continue
+                        _sub_rows = parse_generic_plan_text(
+                            _body_text, _enrich_base + _path
+                        )
+                        for _row in _sub_rows:
+                            _rname = (_row.get("floor_plan_name") or "").strip().lower()
+                            _rlo = _row.get("market_rent_low") or _row.get("rent_low")
+                            _rhi = _row.get("market_rent_high") or _row.get("rent_high")
+                            if _rname and (_rlo or _rhi):
+                                _name_rent_map[_rname] = (
+                                    int(_rlo) if _rlo else None,
+                                    int(_rhi) if _rhi else None,
+                                )
+
+                    # Merge by exact-name OR substring match (floor plan
+                    # names often vary slightly between primary tier and
+                    # subpage e.g. "Sedona" vs "The Sedona")
+                    if _name_rent_map:
+                        _merged = 0
+                        for _u in units_now:
+                            if _u.get("market_rent_low") or _u.get("rent_low"):
+                                continue
+                            _uname = str(_u.get("floor_plan_name") or "").strip().lower()
+                            if not _uname:
+                                continue
+                            _hit = _name_rent_map.get(_uname)
+                            if not _hit:
+                                # Substring match either direction
+                                for _k, _v in _name_rent_map.items():
+                                    if _uname in _k or _k in _uname:
+                                        _hit = _v
+                                        break
+                            if _hit:
+                                _rlo, _rhi = _hit
+                                if _rlo is not None:
+                                    _u["market_rent_low"] = _rlo
+                                    _u["rent_low"] = _rlo
+                                if _rhi is not None:
+                                    _u["market_rent_high"] = _rhi
+                                    _u["rent_high"] = _rhi
+                                _merged += 1
+                        if _merged:
+                            adapter_result.errors.append(
+                                f"subpage-rent-enrichment: merged rent into "
+                                f"{_merged}/{len(units_now)} units from subpage "
+                                f"probe ({len(_name_rent_map)} plans found)"
+                            )
+    except Exception as _enrich_exc:  # noqa: BLE001 — never block scraping
+        log.debug(
+            "Subpage rent enrichment failed for %s: %s",
+            property_id,
+            _enrich_exc,
+        )
 
     # --- F2: LLM rescue for Tier-1 API adapters --------------------------------
     # When the adapter captures API responses but produces no substantive units,
@@ -1709,15 +1837,29 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
 # Phase 2: scoring constants imported from signal_engine.defaults — single
 # source of truth. Aliases preserved here so existing code at call sites
 # compiles without changes until Phase 4 cleanup removes the definitions.
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_ANCHOR_KEYWORDS as _LINK_ANCHOR_KEYWORDS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_HOST_KEYWORDS as _LINK_HOST_KEYWORDS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_PATH_KEYWORDS as _LINK_PATH_KEYWORDS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_PMS_PRIORS as _PMS_SUB_PATH_PRIORS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_UNIVERSAL_PRIORS as _UNIVERSAL_SUB_PATH_PRIORS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    EMBEDDED_PORTAL_SCORE as _EMBEDDED_PORTAL_SCORE,
+)
 from ma_poc.pms.signal_engine.defaults import (  # noqa: E402
     LLM_HINT_SCORE as _LLM_HINT_SCORE,
-    EMBEDDED_PORTAL_SCORE as _EMBEDDED_PORTAL_SCORE,
+)
+from ma_poc.pms.signal_engine.defaults import (
     PMS_PRIOR_SCORE as _PMS_PRIOR_SCORE,
-    DEFAULT_ANCHOR_KEYWORDS as _LINK_ANCHOR_KEYWORDS,
-    DEFAULT_PATH_KEYWORDS as _LINK_PATH_KEYWORDS,
-    DEFAULT_HOST_KEYWORDS as _LINK_HOST_KEYWORDS,
-    DEFAULT_PMS_PRIORS as _PMS_SUB_PATH_PRIORS,
-    DEFAULT_UNIVERSAL_PRIORS as _UNIVERSAL_SUB_PATH_PRIORS,
 )
 
 _LLM_HINT_ANCHOR_PREFIX = "llm-hint:"
@@ -2176,7 +2318,8 @@ async def _try_link_hop(
     # this makes SourceRanker the canonical ordering authority.
     try:
         from ma_poc.pms.signal_engine.defaults import create_default_ranker as _mk_ranker
-        from ma_poc.pms.signal_engine.models import SourceKind as _SK, SourceSignal as _SS
+        from ma_poc.pms.signal_engine.models import SourceKind as _SK
+        from ma_poc.pms.signal_engine.models import SourceSignal as _SS
 
         def _anchor_to_kind(anchor: str) -> _SK:
             a = anchor.lower()
@@ -2827,8 +2970,8 @@ async def scrape_jugnu(
     }
     if profile is not None:
         try:
-            from ma_poc.services.source_planner import compute_budget as _cb
             from ma_poc.models.scrape_profile import ProfileMaturity as _PM
+            from ma_poc.services.source_planner import compute_budget as _cb
             _jugnu_budget = _cb(profile, is_cold=profile.confidence.maturity == _PM.COLD)
         except Exception:
             pass
@@ -3032,8 +3175,8 @@ async def scrape_jugnu(
         else:
             # Phase G2: consult planner when main has units
             try:
-                from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
                 from ma_poc.models.source import SourceId, from_legacy_unit
+                from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
                 _pu = [
                     from_legacy_unit(u, SourceId.API_GENERIC_NARROW, base_url, "", 0.85)
                     for u in (result.get("units") or [])
