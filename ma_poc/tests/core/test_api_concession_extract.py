@@ -280,6 +280,74 @@ def test_junk_yardi_placeholder_filtered() -> None:
     assert extract_api_concession(body) is None
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-24 post-scan additions: fields found in new HAR archives
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_promo_description_extracted() -> None:
+    """Real shape from laramadaapartments.com HAR (Repli-style API)."""
+    body = {
+        "promo_description": "$400 OFF MOVE IN! Call for details.",
+        "promo_description_expiration": "2026-06-01",
+    }
+    assert extract_api_concession(body) == "$400 OFF MOVE IN! Call for details."
+
+
+def test_offer_menu_title_extracted() -> None:
+    """Real shape from ovationattempe.com HAR — CMS offer banner."""
+    body = {"offer_menu_title": "Don't Miss Out! Limited time spring special"}
+    result = extract_api_concession(body)
+    assert result is not None
+    assert "Don't Miss Out" in result
+
+
+def test_offer_title_extracted() -> None:
+    """Generic CMS offer object with separate title + subtitle."""
+    body = {
+        "offer_title": "Save $1000",
+        "offer_subtitle": "First month rent",
+    }
+    # Should pick the longer one (subtitle here) per the longest-wins rule
+    result = extract_api_concession(body)
+    assert result is not None
+    assert result in ("Save $1000", "First month rent")
+
+
+def test_special_title_extracted() -> None:
+    body = {"specialTitle": "Limited time move-in special"}
+    assert extract_api_concession(body) == "Limited time move-in special"
+
+
+def test_leasing_info_is_active_flag() -> None:
+    """Real shape from chaseheritageapartments.com HAR (7 HARs)."""
+    body = {"leasingInfoIsActive": True}
+    assert has_concession_flag(body) is True
+    assert extract_api_concession(body) is None  # no text, just flag
+
+
+def test_concession_automation_enabled_flag() -> None:
+    """Real shape from ovationattempe.com HAR."""
+    body = {"concession_automation_enabled": True}
+    assert has_concession_flag(body) is True
+
+
+def test_has_promotions_flag() -> None:
+    body = {"hasPromotions": True}
+    assert has_concession_flag(body) is True
+
+
+def test_promo_description_with_expiration_paired() -> None:
+    """Some APIs pair the text with an expiration date — both should
+    flow through naturally (text wins for primary extraction)."""
+    body = {
+        "promo_description": "$500 off rent",
+        "promo_description_expiration": "2026-06-30",
+    }
+    text = extract_api_concession(body)
+    assert text == "$500 off rent"
+
+
 def test_real_text_with_junk_marker_still_extracted() -> None:
     """A real concession that HAPPENS to contain 'special features' (>80
     chars) is NOT filtered — only short consent strings are."""

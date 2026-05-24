@@ -63,6 +63,20 @@ _TEXT_FIELDS: frozenset[str] = frozenset({
     "floorplanspecial", "floorplanspecials", "apartmentspecial",
     "apartmentspecials", "unitspecial", "unitspecials", "specials",
     "promotions", "incentives",
+    # 2026-05-24 (post-scan of HAR_FILES / T4_* archives): additional
+    # field shapes found in the wild.
+    #   promo_description       — laramadaapartments.com Repli-style API
+    #   promo_description_short — same family, shorter variant
+    #   promotext               — RentManager-style
+    #   offermenutitle          — ovationattempe.com
+    #   offertitle              — generic CMS
+    #   offersubtitle           — generic CMS
+    "promodescription", "promodescriptionshort", "promodescriptionlong",
+    "offermenutitle", "offertitle", "offersubtitle",
+    "offerheader", "offerheading",
+    "specialtitle", "specialheader", "specialheading",
+    "promotitle", "promoheader",
+    "leasingspecialtitle", "leasingspecialbanner",
 })
 
 # Inner keys to extract text from when a concession field is a dict/object
@@ -79,6 +93,12 @@ _FLAG_FIELDS: frozenset[str] = frozenset({
     "leasingspecialisactive", "leasingspecialactive",
     "floorplanspecialsenabled", "floor_plan_specials_enabled",
     "hasspecialsenabled", "hasleasespecial",
+    # 2026-05-24 (post-scan): additional boolean flag shapes
+    "leasinginfoisactive", "leasing_info_is_active",
+    "concessionautomationenabled", "concession_automation_enabled",
+    "haspromotions", "haspromo", "haspromotion",
+    "hasconcession", "hasconcessions", "hasincentive",
+    "hasoffer", "hasoffers",
 })
 
 # Substrings that ALMOST CERTAINLY mean GDPR/cookie consent UI, not
