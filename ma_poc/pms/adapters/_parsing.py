@@ -441,6 +441,123 @@ def _unwrap_name_blob(val: Any) -> str:
     return s
 
 
+def enrich_unit_concession_fields(
+    unit: dict[str, Any],
+    *,
+    property_concession_text: str | None = None,
+) -> dict[str, Any]:
+    """Backfill canonical concession + offer fields on any unit dict.
+
+    Idempotent. Safe to call on units produced by:
+      * ``make_unit_dict`` (already populated — this is a no-op)
+      * Raw-dict adapters that bypass ``make_unit_dict`` (e.g.
+        ``_api_parser.py``, ``_html_extract.py``, ``knock.py``,
+        ``_air_communities.py``, ``_amli.py``)
+
+    Reads source text in this priority:
+      1. ``unit['concession_text']`` (canonical, already set)
+      2. ``unit['concession']`` (legacy, set by adapters that pass
+         ``concession=`` to make_unit_dict OR build raw dicts)
+      3. ``property_concession_text`` (caller-provided fallback —
+         typically ``result['concessions_text']`` from scraper.py's
+         property-level banner capture)
+
+    Whatever source wins, populates these canonical fields in-place:
+      * concession_text       — raw text (canonical key)
+      * concession            — legacy mirror for back-compat readers
+      * concession_text_clean — de-leaked variant (clean_concession_text)
+      * _concession_quality   — classifier label (clean/leak/empty)
+      * concession_value      — numeric value (normalize_concession)
+      * concession_source     — preserved if already set, else None
+      * offer_banner          — short offer phrase
+      * offer_type            — categorical (free_rent/dollar_off/...)
+      * offer_target          — rent/deposit/app_fee/...
+      * offer_value           — formatted string with unit ("6 weeks")
+      * offer_conditions      — semicolon-delimited key:value pairs
+
+    Returns the same dict (for chaining). Never raises — all extraction
+    failures swallow silently and leave the canonical fields as None.
+    """
+    # Determine the source text (capture-first priority)
+    text: str | None = None
+    for key in ("concession_text", "concession"):
+        v = unit.get(key)
+        if isinstance(v, str) and v.strip():
+            text = v
+            break
+    if text is None and property_concession_text:
+        if isinstance(property_concession_text, str) and property_concession_text.strip():
+            text = property_concession_text
+
+    # Always populate the canonical keys (None when no source)
+    cleaned = None
+    quality = None
+    derived_value = None
+    if text:
+        try:
+            from ma_poc.core.concession_clean import (
+                classify_concession_quality,
+                clean_concession_text,
+            )
+
+            cleaned = clean_concession_text(text)
+            quality = classify_concession_quality(text)
+        except Exception:
+            cleaned = text
+            quality = None
+        # Derive value only when caller hasn't set it
+        if not unit.get("concession_value"):
+            try:
+                from ma_poc.core.concession_normalize import normalize_concession
+
+                obj = normalize_concession(text)
+                if isinstance(obj, dict):
+                    inner = obj.get("obj") or {}
+                    if isinstance(inner, dict):
+                        for slot in ("free", "rr"):
+                            v = inner.get(slot)
+                            if isinstance(v, dict) and v.get("dollarsLow"):
+                                derived_value = float(v["dollarsLow"])
+                                break
+            except Exception:
+                pass
+
+    # Offer taxonomy (5 fields)
+    offer_fields: dict[str, Any] = {
+        "offer_banner": None,
+        "offer_type": None,
+        "offer_target": None,
+        "offer_value": None,
+        "offer_conditions": None,
+    }
+    if text:
+        try:
+            from ma_poc.core.offer_extract import extract_offer
+
+            offer_fields = extract_offer(text)
+        except Exception:
+            pass
+
+    # Stamp the canonical keys (only set when not already populated by adapter)
+    unit["concession"] = text or unit.get("concession") or ""
+    unit["concession_text"] = text
+    if "concession_text_clean" not in unit or unit.get("concession_text_clean") is None:
+        unit["concession_text_clean"] = cleaned
+    if "_concession_quality" not in unit or unit.get("_concession_quality") is None:
+        unit["_concession_quality"] = quality
+    if not unit.get("concession_value") and derived_value is not None:
+        unit["concession_value"] = derived_value
+    elif "concession_value" not in unit:
+        unit["concession_value"] = None
+    if "concession_source" not in unit:
+        unit["concession_source"] = None
+    # Offer fields — only set when not already populated
+    for k, v in offer_fields.items():
+        if unit.get(k) in (None, ""):
+            unit[k] = v
+    return unit
+
+
 def make_unit_dict(
     *,
     floor_plan_name: str = "",

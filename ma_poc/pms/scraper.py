@@ -1836,6 +1836,34 @@ async def scrape(
                 result["concessions_text"] = _best[:300]
         except Exception:
             pass
+
+    # --- Step 9c: backfill canonical concession + offer fields on EVERY unit ---
+    # Catches raw-dict adapters that bypass make_unit_dict:
+    #   * _api_parser.py (3 raw-dict sites)
+    #   * _html_extract.py (6 raw-dict sites — all emit "concession": "")
+    #   * knock.py, _air_communities.py, _amli.py, _funnel.py,
+    #     _nestio_widget.py, _realpage_leasing.py
+    # All emit the legacy ``concession`` field but miss the canonical
+    # canonical fields (concession_text/concession_text_clean/
+    # _concession_quality/concession_value/concession_source) AND the
+    # offer_* taxonomy. This pass walks every unit and backfills via
+    # the unified helper, using the property-level ``concessions_text``
+    # (now populated by Step 3 / 3b / 9b) as fallback source.
+    try:
+        from ma_poc.pms.adapters._parsing import enrich_unit_concession_fields
+
+        _property_text = result.get("concessions_text")
+        for _u in result.get("units") or []:
+            if isinstance(_u, dict):
+                enrich_unit_concession_fields(
+                    _u, property_concession_text=_property_text
+                )
+    except Exception as _enrich_exc:  # pragma: no cover — defensive
+        log.debug(
+            "Unit concession enrichment failed for %s: %s",
+            property_id, _enrich_exc,
+        )
+
     if adapter_result.winning_url:
         result["_winning_page_url"] = adapter_result.winning_url
     result["_fallback_chain"] = fallback_chain
