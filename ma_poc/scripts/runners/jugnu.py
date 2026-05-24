@@ -3312,11 +3312,32 @@ def _format_area(val: Any) -> int:
         - Range strings ``"850 - 950 sqft"`` — takes the LOW end, mirroring
           the rent-range handling so unit-level analytics get a
           consistent "smallest claimable" value.
+
+    2026-05-24 Phase 4.4 — Reject unit-id-shaped inputs BEFORE digit-strip.
+    Verified canonical: PID 44309 (abquptownapts.com) shipped Area=5314
+    for unit "Apartment: #E-5314" because the digit-strip captured the
+    unit-number digits when the saved-profile selector mismatch sent the
+    sqft lookup down a fallback path. Real page sqft was 856 in
+    ``<td class="td-card-sqft">856</td>``. Scope at landing: 247 rows /
+    52 props across TIER_3_DOM + TIER_4_LLM_DOM. The shape rejection
+    catches "Apartment: #X-NNNN", "Unit NNNN", "Suite NNNN", "#NNNN"
+    patterns. Pure digit input ("850") still passes because no
+    unit-id token is present.
     """
     if val is None or val == -1:
         return -1
     s = str(val).strip()
     if not s or s == "-1":
+        return -1
+
+    # Phase 4.4 — Reject unit-id-shaped inputs (delegated to dq_guards so
+    # the rule stays in one place). The check looks for the unit/apt/
+    # suite/#/[A-Z]-\d pattern in the raw text BEFORE we strip non-digits.
+    # ``is_valid_sqft`` returns False for unit-id-shaped sources; that's
+    # the signal to coerce to -1 instead of leaking the digit-strip
+    # result.
+    from ma_poc.extraction.dq_guards import _UNIT_ID_SHAPE_RE as _UID_SHAPE_RE
+    if _UID_SHAPE_RE.search(s):
         return -1
 
     s = _AREA_SUFFIX_RE.sub("", s).strip()

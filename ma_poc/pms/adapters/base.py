@@ -108,6 +108,81 @@ class AdapterResult:
     confidence: float = 0.0
 
 
+@dataclass(frozen=True)
+class AdapterDomResult:
+    """Result returned by the optional ``PmsAdapter.try_dom`` hook.
+
+    Phase 1 (2026-05-24) — every PMS adapter that wants to participate
+    in deterministic DOM extraction implements ``try_dom`` and returns
+    an ``AdapterDomResult``. The cascade in ``pms.scraper`` calls this
+    AFTER the adapter's API path returns empty and BEFORE any generic
+    DOM scan or LLM rescue. A non-empty result short-circuits the LLM
+    gate; an empty result lets the cascade continue.
+
+    Frozen so adapters can't accidentally mutate a shared result.
+    Use ``AdapterDomResult.empty(tier)`` to build the no-units sentinel.
+
+    Field semantics:
+      * ``units``: per-apartment dicts that survived the adapter's DQ
+        gates. Each MUST have been routed through
+        ``ma_poc.extraction.dq_guards.apply_unit_guards`` before
+        returning.
+      * ``plan_summaries``: floor-plan-level rows (no per-unit identity)
+        from the same DOM scan. Surfaced in the V2 ``floor_plans`` list.
+      * ``tier_used``: granular tier label, e.g.
+        ``"TIER_3_DOM_RENTCAFE_VANITY"`` or
+        ``"TIER_3_DOM_AVALONBAY_SSR"``. The scraper's tier-distribution
+        telemetry reads this verbatim.
+      * ``selector_signature``: a short string identifying which CSS
+        selector / regex variant matched. Used by ``profile_updater``
+        to learn the working selector for future replay. Example:
+        ``"fp-container[data-floorplan-price]"``.
+      * ``confidence``: 0.0-1.0. ≥0.7 means "trust this; skip LLM"; <0.7
+        means "adapter saw something but uncertain — let the cascade
+        decide whether to LLM-rescue." Adapters that have stable
+        deterministic selectors should return 1.0.
+      * ``debug``: free-form dict for adapter-specific telemetry —
+        container counts, regex hit counts, skipped-row reasons, etc.
+        Threaded into ``extract.adapter_dom_hit`` event payload.
+
+    Failure modes — adapter ``try_dom`` should NEVER raise. Any
+    exception path returns ``AdapterDomResult.empty(reason)`` and the
+    cascade continues unimpeded.
+    """
+    units: list[dict[str, Any]] = field(default_factory=list)
+    plan_summaries: list[dict[str, Any]] = field(default_factory=list)
+    tier_used: str = "TIER_3_DOM_EMPTY"
+    selector_signature: str = ""
+    confidence: float = 0.0
+    debug: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def empty(cls, tier: str = "TIER_3_DOM_EMPTY", reason: str = "") -> AdapterDomResult:
+        """Sentinel for "tried but didn't extract anything." The cascade
+        proceeds to its next fallback. ``reason`` is stamped into the
+        ``debug`` dict for the ``extract.adapter_dom_empty`` event.
+        """
+        return cls(
+            units=[], plan_summaries=[],
+            tier_used=tier, selector_signature="",
+            confidence=0.0, debug={"reason": reason} if reason else {},
+        )
+
+    @property
+    def has_units(self) -> bool:
+        """True iff at least one per-unit dict was extracted."""
+        return bool(self.units)
+
+    @property
+    def is_high_confidence(self) -> bool:
+        """True iff the adapter believes the cascade should skip LLM.
+
+        Threshold matches ``ExtractionResult.succeeded`` in Phase A
+        models (confidence >= 0.7).
+        """
+        return self.confidence >= 0.7 and self.has_units
+
+
 @runtime_checkable
 class PmsAdapter(Protocol):
     pms_name: str
@@ -130,4 +205,45 @@ class PmsAdapter(Protocol):
     #         intact for them (this is the correct behaviour for DOM-only
     #         adapters like TouchTour where inventory is server-rendered
     #         rather than fetched via XHR)."""
+    #         ...
+    #
+    # Optional — Phase 1 (2026-05-24): deterministic DOM hook called by the
+    # cascade after the adapter's API path returns empty AND before any
+    # generic DOM scan or LLM rescue. Adapters with a known marketing-page
+    # DOM shape implement this; adapters that already extract DOM inline
+    # via ``extract`` can either keep that path or refactor into ``try_dom``.
+    # The Protocol stays runtime-checkable backward-compatible because the
+    # method is checked via ``hasattr(adapter, "try_dom")`` at the dispatch
+    # site, not declared on the Protocol body.
+    #
+    #     async def try_dom(
+    #         self,
+    #         page: Page,
+    #         html: str,
+    #         ctx: AdapterContext,
+    #     ) -> AdapterDomResult:
+    #         """Deterministic DOM extraction for this PMS's marketing pages.
+    #
+    #         Args:
+    #             page: Live Playwright Page (may be a stub when caller
+    #                 only has captured HTML; adapters should prefer html
+    #                 when both are available).
+    #             html: The captured HTML body. Adapters should treat this
+    #                 as authoritative — it's what the scraper actually
+    #                 fetched and is what gets retained for replay/debug.
+    #             ctx: Standard adapter context (property metadata, budget,
+    #                 etc.).
+    #
+    #         Returns:
+    #             ``AdapterDomResult`` — empty when the adapter's selectors
+    #             don't match this page's shape; non-empty when units were
+    #             extracted. ``is_high_confidence`` short-circuits the LLM
+    #             gate.
+    #
+    #         MUST NEVER RAISE. Catch all exceptions and return
+    #         ``AdapterDomResult.empty(tier, reason="exception:...")``.
+    #         Every extracted unit MUST be routed through
+    #         ``ma_poc.extraction.dq_guards.apply_unit_guards`` before
+    #         inclusion in the result.
+    #         """
     #         ...

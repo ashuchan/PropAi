@@ -633,6 +633,52 @@ def _extract_accommodation_floorplans_as_units(
         )
         sqft = _jsonld_floor_size(fp)
 
+        # 2026-05-24: pull rent out of Schema.org ``additionalProperty``
+        # array when present. Entrata "ProspectPortal CMS" deployments
+        # ship rent as:
+        #   "additionalProperty": [
+        #       {"@type": "PropertyValue",
+        #        "name": "Monthly Rent",
+        #        "minValue": 1325, "maxValue": 1495, "unitText": "USD"}]
+        # or as a single PropertyValue dict (not wrapped in a list).
+        # Without this, every Entrata-CMS plan ships rent_range="" and
+        # gets routed to the "empty rent" downgrade path.
+        rent_low: int | None = None
+        rent_high: int | None = None
+        ap = fp.get("additionalProperty")
+        ap_list = ap if isinstance(ap, list) else ([ap] if isinstance(ap, dict) else [])
+        for pv in ap_list:
+            if not isinstance(pv, dict):
+                continue
+            pv_name = str(pv.get("name", "") or "").lower()
+            if "rent" not in pv_name and "price" not in pv_name:
+                continue
+            for key, slot in (("minValue", "low"), ("maxValue", "high")):
+                v = pv.get(key)
+                if v in (None, ""):
+                    continue
+                try:
+                    n = int(float(v))
+                except (TypeError, ValueError):
+                    continue
+                if slot == "low":
+                    rent_low = n
+                else:
+                    rent_high = n
+            # Pick the first rent-like PropertyValue and stop.
+            if rent_low is not None or rent_high is not None:
+                break
+        rent_range = ""
+        if rent_low is not None and rent_high is not None:
+            rent_range = (
+                f"${rent_low:,}" if rent_low == rent_high
+                else f"${rent_low:,}-${rent_high:,}"
+            )
+        elif rent_low is not None:
+            rent_range = f"${rent_low:,}"
+        elif rent_high is not None:
+            rent_range = f"${rent_high:,}"
+
         # Per-plan available unit count — carried in
         # ``numberOfAvailableAccommodationUnits`` (Schema.org canonical).
         available_units_raw = (
@@ -662,9 +708,9 @@ def _extract_accommodation_floorplans_as_units(
                 "unit_number": "",
                 "floor": "",
                 "building": "",
-                "rent_range": "",
-                "market_rent_low": None,
-                "market_rent_high": None,
+                "rent_range": rent_range,
+                "market_rent_low": rent_low,
+                "market_rent_high": rent_high,
                 "deposit": "",
                 "concession": "",
                 "availability_status": "",
@@ -861,10 +907,46 @@ def extract_jsonld_from_html(html: str, source_url: str) -> list[dict[str, Any]]
 
             lo_i = _money_to_int(lo_raw)
             hi_i = _money_to_int(hi_raw)
+
+            # 2026-05-24: when ``offers`` is missing, fall back to
+            # Schema.org ``additionalProperty`` PropertyValue carrying
+            # ``Monthly Rent`` minValue/maxValue. Common on Entrata
+            # "ProspectPortal CMS" FloorPlan nodes (Riviera at West Village,
+            # Royale, etc.) — without this, Pass 1 emits sqft/beds but
+            # rent_range="" and the v2 transform drops the row downstream.
+            if lo_i is None and hi_i is None:
+                ap = item.get("additionalProperty")
+                ap_list = (
+                    ap if isinstance(ap, list)
+                    else ([ap] if isinstance(ap, dict) else [])
+                )
+                for pv in ap_list:
+                    if not isinstance(pv, dict):
+                        continue
+                    pv_name = str(pv.get("name", "") or "").lower()
+                    if "rent" not in pv_name and "price" not in pv_name:
+                        continue
+                    mn = pv.get("minValue")
+                    mx = pv.get("maxValue")
+                    if mn not in (None, ""):
+                        try:
+                            lo_i = int(float(mn))
+                        except (TypeError, ValueError):
+                            pass
+                    if mx not in (None, ""):
+                        try:
+                            hi_i = int(float(mx))
+                        except (TypeError, ValueError):
+                            pass
+                    if lo_i is not None or hi_i is not None:
+                        break
+
             if lo_i is not None and hi_i is not None and lo_i != hi_i:
                 rent_range = f"${lo_i:,} - ${hi_i:,}"
             elif lo_i is not None:
                 rent_range = f"${lo_i:,}"
+            elif hi_i is not None:
+                rent_range = f"${hi_i:,}"
             else:
                 rent_range = ""
 

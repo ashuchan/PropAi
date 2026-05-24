@@ -1019,11 +1019,66 @@ async def _try_rentcafe_wp_probe(
 _SECURECAFE_URL_RE = re.compile(
     r"""https?://
         (?P<sub>[a-z0-9][a-z0-9-]*)\.securecafe\.com
-        /(?:onlineleasing|residentservices)/
+        /(?P<path>onlineleasing|residentservices)/
         (?P<slug>[a-z0-9][a-z0-9-]*)
     """,
     re.IGNORECASE | re.VERBOSE,
 )
+
+
+def _identity_slug_candidates(ctx: AdapterContext) -> list[str]:
+    """Property-identity tokens used to score multi-community SC matches.
+
+    Multi-community RentCafe sites (e.g. landcoapartments.com lists 8
+    communities) embed SecureCafe links for every property in the
+    portfolio. Picking the first match is a 1-in-N coin flip. Tokens
+    sourced from property_name + base_url path so the right SC link
+    can be selected. Lowercased + a-z0-9-only.
+    """
+    out: list[str] = []
+    name = (getattr(ctx, "property_name", "") or "").lower()
+    if name:
+        cleaned = re.sub(r"[^a-z0-9]+", "", name)
+        if cleaned:
+            out.append(cleaned)
+    base_url = getattr(ctx, "base_url", "") or ""
+    from urllib.parse import urlparse as _urlparse_for_scoring
+    try:
+        path = _urlparse_for_scoring(base_url).path.lower()
+    except Exception:
+        path = ""
+    for seg in re.split(r"[/_-]+", path):
+        seg_clean = re.sub(r"[^a-z0-9]+", "", seg)
+        if len(seg_clean) >= 5 and seg_clean not in ("apartments", "homes", "community", "communities", "rental", "rentals", "leasing"):
+            out.append(seg_clean)
+    return list(dict.fromkeys(out))
+
+
+def _score_securecafe_match(m: re.Match[str], identity_tokens: list[str]) -> int:
+    """Score a SecureCafe URL match: higher = better fit for this property.
+
+    Scoring:
+    +10 if the URL path is ``onlineleasing`` (per-property leasing portal).
+         The ``residentservices`` path is a portfolio-wide resident login
+         where the sub-domain is the marketing-host slug — never the
+         per-property slug we need.
+    +5  per identity-token substring hit against the SC subdomain.
+    +5  per identity-token substring hit against the SC URL slug.
+    """
+    score = 0
+    path = (m.group("path") or "").lower()
+    if path == "onlineleasing":
+        score += 10
+    sub = (m.group("sub") or "").lower()
+    slug = (m.group("slug") or "").lower()
+    for tok in identity_tokens:
+        if not tok:
+            continue
+        if tok in sub:
+            score += 5
+        if tok in slug:
+            score += 5
+    return score
 
 # 2026-05-22: relaxed to allow `-` inside the visual-name segment. The newer
 # SecureCafe template wraps each floorplan-grouping table in a
@@ -1063,6 +1118,57 @@ _SC_DATE_RE = re.compile(
 )
 
 
+# 2026-05-24 — legacy RentCafe direct-hosting path. A subset of older
+# RentCafe deployments (Hampshire Village / Southern Management portfolio
+# was the canonical case, PID 220581) does NOT publish a *.securecafe.com
+# subdomain at all. The leasing portal lives on the shared
+# ``www.rentcafe.com/onlineleasing/<slug>/`` host instead. The page
+# markup is identical (same Yardi RentCafe template, same
+# ``AvailUnitRow`` rows on ``availableunits.aspx``), so the existing
+# ``parse_securecafe_availableunits`` parser handles it verbatim — only
+# the URL discovery is different.
+_RENTCAFE_LEGACY_URL_RE = re.compile(
+    r"""https?://
+        (?:www\.)?rentcafe\.com
+        /onlineleasing/
+        (?P<slug>[a-z0-9][a-z0-9-]*)
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _find_rentcafe_legacy_base(html: str, ctx: AdapterContext) -> str | None:
+    """Return ``https://www.rentcafe.com/onlineleasing/<slug>`` or None.
+
+    Fires only when the marketing page exposes a legacy direct-hosted
+    RentCafe URL. The slug is taken verbatim — there's no subdomain
+    synthesis to get wrong (one shared host). Identity scoring is only
+    used to disambiguate when a portfolio page lists multiple legacy
+    URLs (rare but possible for management-company landing pages).
+    """
+    identity = _identity_slug_candidates(ctx)
+    if not html:
+        return None
+    best_slug: str | None = None
+    best_score: int = -1
+    seen_slugs: set[str] = set()
+    for m in _RENTCAFE_LEGACY_URL_RE.finditer(html):
+        slug = (m.group("slug") or "").lower()
+        if not slug or slug in seen_slugs:
+            continue
+        seen_slugs.add(slug)
+        score = 5  # legacy URL is always +5 for being well-formed
+        for tok in identity:
+            if tok and tok in slug:
+                score += 5
+        if score > best_score:
+            best_score = score
+            best_slug = slug
+    if best_slug:
+        return f"https://www.rentcafe.com/onlineleasing/{best_slug}"
+    return None
+
+
 def _find_securecafe_base(html: str, ctx: AdapterContext) -> str | None:
     """Return ``https://<sub>.securecafe.com/onlineleasing/<slug>`` or None.
 
@@ -1070,26 +1176,59 @@ def _find_securecafe_base(html: str, ctx: AdapterContext) -> str | None:
     securecafe portal), then falls back to captured response URLs in
     ``ctx._api_responses`` (link-hop discovered URLs surface here), and
     finally the property's own host when it *is* a securecafe portal.
+
+    Multi-community fix (2026-05-24): when the marketing page exposes
+    SecureCafe links for several communities (landcoapartments.com hosts
+    8 communities; eight different ``*.securecafe.com`` subdomains visible
+    on the same DOM), pre-fix code picked the FIRST regex match — usually
+    the portfolio-wide ``residentservices/apartmentsforrent/userlogin.aspx``
+    link which uses the *marketing-host* slug as subdomain (e.g.
+    ``landcoapartments.securecafe.com``) — never the per-property slug
+    we actually need (``cooperslandingapts.securecafe.com``). The result
+    was a 404 on every multi-community property. Scoring now prefers
+    ``onlineleasing`` paths over ``residentservices`` and tie-breaks by
+    similarity to property identity (property_name + base_url path).
     """
+    identity = _identity_slug_candidates(ctx)
+
+    def _best_match(text: str) -> re.Match[str] | None:
+        best: re.Match[str] | None = None
+        best_score: int = -1
+        for m in _SECURECAFE_URL_RE.finditer(text):
+            s = _score_securecafe_match(m, identity)
+            if s > best_score:
+                best = m
+                best_score = s
+        # Require at least one positive signal (``onlineleasing`` path
+        # scored +10, OR an identity-token hit). All-zero matches mean
+        # we only saw resident-services links — defer to the next
+        # source (api_responses, refetch) rather than constructing a
+        # known-wrong URL.
+        if best is None or best_score < 5:
+            return None
+        return best
+
     if html:
-        m = _SECURECAFE_URL_RE.search(html)
+        m = _best_match(html)
         if m:
             return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
     # Scan captured response URLs (link-hop often surfaces a securecafe
     # portal request like guestlogin.aspx / floorplans there even when
     # the rendered body lost the marketing-site anchor).
-    for resp in getattr(ctx, "_api_responses", []) or []:
-        u = str(resp.get("url", "") or "")
-        if "securecafe.com/onlineleasing/" not in u.lower():
-            continue
-        m = _SECURECAFE_URL_RE.search(u)
+    sc_response_urls = "\n".join(
+        str(resp.get("url", "") or "")
+        for resp in (getattr(ctx, "_api_responses", []) or [])
+        if "securecafe.com/onlineleasing/" in str(resp.get("url", "") or "").lower()
+    )
+    if sc_response_urls:
+        m = _best_match(sc_response_urls)
         if m:
             return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
     origin = _origin_from_ctx(ctx)
     if "securecafe.com" in origin:
         fr = getattr(ctx, "fetch_result", None)
         final = str(getattr(fr, "final_url", "") or "") if fr else ""
-        m = _SECURECAFE_URL_RE.search(final or origin)
+        m = _best_match(final or origin)
         if m:
             return f"https://{m.group('sub')}.securecafe.com/onlineleasing/{m.group('slug')}"
     return None
@@ -1193,9 +1332,19 @@ async def _try_rentcafe_securecafe_probe(
         return []
 
     base = _find_securecafe_base(html, ctx)
+    # 2026-05-24 — legacy direct-host fallback. Some RentCafe properties
+    # (Southern Management / Hampshire Village portfolio) skip the
+    # ``*.securecafe.com`` subdomain entirely and host their leasing
+    # portal directly on ``www.rentcafe.com/onlineleasing/<slug>/``. The
+    # page format is identical, so the existing parser handles it; only
+    # discovery is new. Searched alongside the SC base — if both exist,
+    # SC wins (it's the canonical post-2024 host).
+    legacy_base = _find_rentcafe_legacy_base(html, ctx) if not base else None
     if base:
         _log_rc(pid, "sc_search", "found_in_body", reason=base[:140])
-    if not base:
+    elif legacy_base:
+        _log_rc(pid, "sc_search", "found_legacy_in_body", reason=legacy_base[:140])
+    if not base and not legacy_base:
         # Patchright-rendered body sometimes lacks the securecafe link in
         # a regex-matchable form (link injected post-render or behind a
         # menu), and securecafe direct fetches CF-403 even with cookies.
@@ -1213,11 +1362,13 @@ async def _try_rentcafe_securecafe_probe(
             _hr_len = len(getattr(_hr, "text", "") or "")
             if _hr.status_code == 200 and _hr.text:
                 base = _find_securecafe_base(_hr.text, ctx)
+                if not base:
+                    legacy_base = _find_rentcafe_legacy_base(_hr.text, ctx)
                 _log_rc(
                     pid,
                     "sc_homepage_refetch",
-                    "found_via_refetch" if base else "no_sc_url_in_refetch",
-                    reason=f"len={_hr_len} base={base[:120] if base else 'None'}",
+                    "found_via_refetch" if base else ("found_legacy_via_refetch" if legacy_base else "no_sc_url_in_refetch"),
+                    reason=f"len={_hr_len} base={(base or legacy_base or 'None')[:120]}",
                     homepage_status=_hr.status_code,
                 )
             else:
@@ -1237,6 +1388,10 @@ async def _try_rentcafe_securecafe_probe(
             )
             # Preserve main's silent-failure contract for now — emitting
             # is enough; do not append to result.errors.
+    # Promote legacy_base if SC didn't resolve. After this line, ``base``
+    # is the URL to probe (SC if available, else legacy).
+    if not base and legacy_base:
+        base = legacy_base
     if not base:
         _log_rc(pid, "sc_probe", "skipped_no_base", reason="no securecafe URL discoverable")
         return []

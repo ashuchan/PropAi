@@ -29,6 +29,10 @@ class EventKind(StrEnum):
     FETCH_ROTATED_IDENTITY = "fetch.rotated_identity"
     FETCH_BOT_BLOCKED = "fetch.bot_blocked"
     FETCH_CAPTCHA_DETECTED = "fetch.captcha_detected"
+    # Per-fetch transfer-byte circuit-breaker tripped. Body bytes counted
+    # via response Content-Length exceeded ``MAX_FETCH_BYTES`` (default 16 MB).
+    # Captures runaway-bandwidth events on proxied runs.
+    FETCH_BYTE_CAP_EXCEEDED = "fetch.byte_cap_exceeded"
 
     # Discovery (L2)
     TASK_ENQUEUED = "discovery.task_enqueued"

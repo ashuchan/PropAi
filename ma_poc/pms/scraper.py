@@ -4492,16 +4492,35 @@ async def scrape_jugnu(
 
     # Delta 4: emit PMS detection event — forward fetch_result so adapters
     # can work from fetch_result.body when no live page is available.
-    result = await scrape(
-        base_url=base_url,
-        profile=profile,
-        expected_total_units=expected_total_units,
-        page=page,
-        fetch_result=fetch_result,
-        csv_row=csv_row,
-        property_id=property_id,
-        shared_budget=_jugnu_budget,
+    #
+    # Cookie-mint reuse (option b, 2026-05-18). When the L1 render solved a
+    # CF/DataDome challenge it harvested the clearance cookies onto
+    # ``fetch_result.clearance_cookies``. Install them on the contextvar so
+    # the cheap curl_cffi probes invoked by adapters auto-attach them and
+    # skip re-solving the wall. Reset in a finally so concurrent property
+    # scrapes never share clearance. Empty harvest ⇒ behaves identically
+    # to pre-option-b.
+    from ma_poc.pms.adapters._probe import (
+        reset_clearance_cookies,
+        set_clearance_cookies,
     )
+
+    _clr_tok = set_clearance_cookies(
+        getattr(fetch_result, "clearance_cookies", None)
+    )
+    try:
+        result = await scrape(
+            base_url=base_url,
+            profile=profile,
+            expected_total_units=expected_total_units,
+            page=page,
+            fetch_result=fetch_result,
+            csv_row=csv_row,
+            property_id=property_id,
+            shared_budget=_jugnu_budget,
+        )
+    finally:
+        reset_clearance_cookies(_clr_tok)
     result["_property_id"] = property_id
 
     # RC-PARTIAL (2026-05-15 PM): mirror the entry-page result's units to

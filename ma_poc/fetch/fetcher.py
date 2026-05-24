@@ -122,18 +122,65 @@ def _classify_fetch_outcome(
     bytes) — the underlying classifier only inspects the head.
     """
     head: bytes | None
+    body_size: int | None
     if isinstance(body, bytes):
         head = body[:4096]
+        body_size = len(body)
     elif isinstance(body, str):
         head = body[:4096].encode("utf-8", errors="replace")
+        body_size = len(body)
     else:
         head = None
-    return classify(status_code, headers or {}, head, exception=error)
+        body_size = None
+    return classify(
+        status_code, headers or {}, head, exception=error, body_size=body_size
+    )
 
 _MA_POC_ROOT = Path(__file__).resolve().parent.parent  # ma_poc/
 _DEFAULT_DATA_DIR = str(_MA_POC_ROOT / "data")
 
+# Safety: hard per-fetch transfer cap. Independent of resource blocking
+# at the route handler — this is a runaway-bandwidth circuit-breaker
+# that matters most on a proxied fleet run ($/GB residential egress).
+# Once cumulative response bytes for a single render exceed the cap,
+# all further requests are aborted (the page keeps whatever it already
+# loaded, so extraction still proceeds on the captured DOM/network_log).
+# Generous default (16 MB) so it only trips on pathological sites,
+# never normal ones. ``MAX_FETCH_BYTES=0`` disables the cap.
+_MAX_FETCH_BYTES = int(os.getenv("MAX_FETCH_BYTES", str(16_000_000)))
+
 log = logging.getLogger(__name__)
+
+# Cookie-mint reuse (option b): exact names + prefixes of the bot-wall
+# clearance cookies worth reusing. cf_clearance/__cf_bm = Cloudflare,
+# datadome/__ddg* = DataDome, incap_ses*/visid_incap* = Imperva/Incapsula.
+# Anything else from the context is session noise we deliberately drop
+# (smaller jar, no cross-property identity bleed).
+_CLEARANCE_EXACT = {"cf_clearance", "__cf_bm", "datadome"}
+_CLEARANCE_PREFIX = ("__ddg", "incap_ses", "visid_incap", "nlbi_")
+
+
+async def _harvest_clearance_cookies(page: Any) -> dict[str, str]:
+    """Return ``{name: value}`` of bot-wall clearance cookies from *page*.
+
+    Reads the live Playwright browser context (post-challenge). Returns
+    only the CF/DataDome/Incapsula clearance cookies — never the full
+    cookie set — so reuse can't leak a session/identity cookie into the
+    cheap curl_cffi probe. Best-effort: any error yields ``{}`` (callers
+    then behave exactly as before option b).
+    """
+    try:
+        cookies = await page.context.cookies()
+    except Exception:
+        return {}
+    out: dict[str, str] = {}
+    for c in cookies or []:
+        name = c.get("name") or ""
+        if name in _CLEARANCE_EXACT or name.startswith(_CLEARANCE_PREFIX):
+            val = c.get("value")
+            if val:
+                out[name] = val
+    return out
 
 
 class Fetcher:
@@ -699,8 +746,11 @@ class Fetcher:
             resp_headers = resp.headers
             body = resp.content if method == "GET" else None
             body_head = body[:4096] if body else None
+            body_size = len(body) if body else None
 
-            outcome, sig = classify(resp.status_code, resp_headers, body_head)
+            outcome, sig = classify(
+                resp.status_code, resp_headers, body_head, body_size=body_size
+            )
 
             # RC5: HTTP GET 200 with an empty or trivially-small body (< 16 bytes).
             # classify() returns OK for 200, but a body this small cannot contain
@@ -776,11 +826,58 @@ class Fetcher:
         else:
             page = await self._browsers.acquire(identity, proxy)
         network_log: list[dict[str, Any]] = []
+        # Per-fetch transfer-byte circuit breaker (see _MAX_FETCH_BYTES).
+        _xfer: dict[str, Any] = {"bytes": 0, "tripped": False}
+
+        async def _abort_all(route: Any) -> None:
+            try:
+                await route.abort()
+            except Exception:
+                ...
 
         try:
             # Intercept network requests
             async def _on_response(response: Any) -> None:
                 try:
+                    # Bandwidth circuit breaker — count every response's
+                    # transfer size (content-length is free; no .body()
+                    # needed and it covers JS/CSS/binary too). Once over
+                    # the cap, abort all further requests so a runaway /
+                    # proxied site can't burn $/GB. Best-effort; the
+                    # already-captured DOM + network_log still extract.
+                    if _MAX_FETCH_BYTES and not _xfer["tripped"]:
+                        try:
+                            _cl = response.headers.get("content-length")
+                            _xfer["bytes"] += int(_cl) if _cl and _cl.isdigit() else 0
+                        except Exception:
+                            ...
+                        if _xfer["bytes"] >= _MAX_FETCH_BYTES:
+                            _xfer["tripped"] = True
+                            try:
+                                await page.route("**/*", _abort_all)
+                            except Exception:
+                                ...
+                            log.warning(
+                                "fetch.byte_cap_exceeded url=%s bytes=%d cap=%d "
+                                "proxy=%s — aborting further requests",
+                                task.url, _xfer["bytes"], _MAX_FETCH_BYTES,
+                                bool(proxy),
+                            )
+                            # Structured event so a (proxied) fleet run can
+                            # quantify cap hits + $/GB impact from
+                            # events.jsonl, not just grep logs.
+                            try:
+                                emit(
+                                    EventKind.FETCH_BYTE_CAP_EXCEEDED,
+                                    task.property_id,
+                                    url=task.url,
+                                    bytes=_xfer["bytes"],
+                                    cap=_MAX_FETCH_BYTES,
+                                    proxied=bool(proxy),
+                                    attempt=attempt,
+                                )
+                            except Exception:
+                                ...
                     url = response.url
                     content_type = response.headers.get("content-type", "")
                     if any(t in content_type for t in ["json", "xml", "html", "text"]):
@@ -812,7 +909,10 @@ class Fetcher:
                         entry_captcha = False
                         if body:
                             try:
-                                detected, _ = looks_like_captcha(body[:8192])
+                                # body[:8192] is a slice — pass the FULL body
+                                # size so the widget-dual-use fingerprints
+                                # (g-recaptcha etc.) skip large content pages.
+                                detected, _ = looks_like_captcha(body[:8192], body_size=len(body))
                                 entry_captcha = bool(detected)
                             except Exception:
                                 entry_captcha = False
@@ -1386,7 +1486,11 @@ class Fetcher:
                 # network_log; tag the signature so reports can distinguish
                 # salvage from clean.
                 try:
-                    is_captcha, provider = looks_like_captcha(body_head)
+                    # body_head is body[:4096] (a slice) — pass full body
+                    # size so the widget-dual-use guard suppresses false
+                    # positives on real apartment pages that embed captcha
+                    # contact-form widgets (>30 KB bodies).
+                    is_captcha, provider = looks_like_captcha(body_head, body_size=len(body))
                 except Exception:
                     is_captcha, provider = False, None
                 status = resp.status if resp else 200
@@ -1402,8 +1506,21 @@ class Fetcher:
                     sig = "TIMEOUT_SALVAGED"
             else:
                 status = resp.status if resp else 200
-                outcome, sig = classify(status, resp_headers, body_head)
+                outcome, sig = classify(
+                    status, resp_headers, body_head, body_size=len(body)
+                )
 
+            # Cookie-mint harvest (option b, 2026-05-18). Pull CF/DataDome/
+            # Incapsula clearance cookies from the post-render context so
+            # the orchestrator can install them via
+            # ``_probe.set_clearance_cookies`` and let downstream curl_cffi
+            # probes skip re-solving the wall. Best-effort: returns {} on
+            # any error and never blocks the FetchResult.
+            _clearance: dict[str, str] = {}
+            try:
+                _clearance = await _harvest_clearance_cookies(page)
+            except Exception:
+                _clearance = {}
             return FetchResult(
                 url=task.url,
                 outcome=outcome,
@@ -1419,6 +1536,7 @@ class Fetcher:
                 last_modified=resp_headers.get("last-modified"),
                 error_signature=sig,
                 proxy_used=_redact_proxy(proxy),
+                clearance_cookies=_clearance,
             )
         except Exception as exc:
             outcome, sig = classify(None, {}, None, exception=exc)

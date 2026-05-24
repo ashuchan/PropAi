@@ -69,6 +69,45 @@ def _resolve_int_env(name: str, default_ms: int) -> int:
 DEFAULT_PAGE_TIMEOUT_MS = _resolve_int_env("PLAYWRIGHT_PAGE_TIMEOUT_MS", 60_000)
 DEFAULT_NAV_TIMEOUT_MS = _resolve_int_env("PLAYWRIGHT_NAV_TIMEOUT_MS", 45_000)
 
+
+def _parse_blocked_types(val: str | None) -> frozenset[str]:
+    """Parse ``BLOCK_RESOURCE_TYPES`` into a set of Playwright resource types.
+
+    ``None`` (unset) → the default block set. An explicit empty string
+    disables blocking entirely. Otherwise a comma list, whitespace-stripped
+    and lowercased.
+    """
+    if val is None:
+        return frozenset({"image", "font", "media"})
+    return frozenset(t.strip().lower() for t in val.split(",") if t.strip())
+
+
+# Resource types aborted on every render. image/font/media carry the bulk
+# of page weight but are never needed for unit/availability extraction
+# (we read DOM + XHR/fetch/JSON). Blocking them slashes per-page bandwidth
+# — directly material to residential-proxy (per-GB) cost — and speeds
+# renders. document/script/xhr/fetch/stylesheet pass through untouched so
+# SSR data, API interception, and layout-dependent JS are unaffected.
+# Evaluated at import so reload() picks up env overrides.
+_BLOCKED_RESOURCE_TYPES = _parse_blocked_types(os.getenv("BLOCK_RESOURCE_TYPES"))
+
+
+async def _resource_block_route(route: object) -> None:
+    """page.route("**/*") handler: abort blocked resource types, pass rest."""
+    try:
+        rtype = route.request.resource_type  # type: ignore[attr-defined]
+    except Exception:
+        rtype = ""
+    try:
+        if rtype in _BLOCKED_RESOURCE_TYPES:
+            await route.abort()  # type: ignore[attr-defined]
+        else:
+            await route.continue_()  # type: ignore[attr-defined]
+    except Exception:
+        # A route-already-handled race or a torn-down context must never
+        # propagate out of the network layer and fail the navigation.
+        pass
+
 # Shard_10 fix (2026-05-17): wrap every awaitable inside ``acquire()`` in a
 # host-level ``asyncio.wait_for`` so a wedged Chromium IPC cannot park the
 # caller for the full per-property 600s wallclock. The shard_84 fix from
@@ -274,6 +313,14 @@ class BrowserContextPool:
                     pass
                 raise
 
+            if _BLOCKED_RESOURCE_TYPES:
+                try:
+                    await page.route("**/*", _resource_block_route)
+                except Exception as exc:
+                    # A route-install hiccup must never abort page acquisition
+                    # — degrade to an unfiltered (costlier) render, not a
+                    # failed one.
+                    log.warning("resource-block route install failed: %s", exc)
             page.set_default_timeout(DEFAULT_PAGE_TIMEOUT_MS)
             page.set_default_navigation_timeout(DEFAULT_NAV_TIMEOUT_MS)
             return page

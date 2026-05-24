@@ -15,7 +15,7 @@ import ssl
 from collections.abc import Mapping
 from socket import gaierror
 
-from .block_signatures import match_block_signature
+from .block_signatures import looks_like_200_block, match_block_signature
 from .captcha_detect import looks_like_captcha
 from .contracts import FetchOutcome
 
@@ -129,6 +129,7 @@ def classify(
     headers: dict[str, str],
     body_head: bytes | None,
     exception: Exception | None = None,
+    body_size: int | None = None,
 ) -> tuple[FetchOutcome, str | None]:
     """Classify an HTTP response into a FetchOutcome.
 
@@ -137,6 +138,11 @@ def classify(
         headers: Response headers with lowercased keys.
         body_head: First ~4KB of the response body.
         exception: Exception raised during the request, if any.
+        body_size: Total response body size in bytes (NOT len(body_head)).
+            Forwarded to ``looks_like_captcha`` so the widget-dual-use
+            fingerprints (``g-recaptcha`` etc.) are skipped on large
+            bodies — real apartment pages that embed captcha widgets
+            should not flip to BOT_BLOCKED.
 
     Returns:
         Tuple of (FetchOutcome, error_signature_or_none).
@@ -186,7 +192,7 @@ def classify(
         return FetchOutcome.RATE_LIMITED, "HTTP_429"
 
     if status == 403:
-        is_captcha, provider = looks_like_captcha(body_head or b"")
+        is_captcha, provider = looks_like_captcha(body_head or b"", body_size=body_size)
         if is_captcha:
             sig = "CF_CHALLENGE" if provider == "cloudflare" else f"CAPTCHA_{(provider or 'unknown').upper()}"
             return FetchOutcome.BOT_BLOCKED, sig
@@ -213,6 +219,26 @@ def classify(
         # the success-rate denominator and route them to re-discovery.
         if body_head and _is_parked_domain(body_head):
             return FetchOutcome.DEAD_URL, "PARKED_DOMAIN"
+        # 2026-05-19: bot-block/challenge served WITH a 2xx status.
+        # Previously this branch returned OK unconditionally — a
+        # DataDome/Akamai 200 interstitial was counted as a successful
+        # fetch, flowed into extraction as junk, became the
+        # ``unit_count>1`` "success" that self-reinforced a misroute,
+        # and the profile never learned it was blocked. High-precision
+        # checks only (block-page-only literals) so a legit 200 page is
+        # never flipped to BOT_BLOCKED.
+        if body_head:
+            _cap, _prov = looks_like_captcha(body_head, body_size=body_size)
+            if _cap:
+                _sig = (
+                    "CF_CHALLENGE"
+                    if _prov == "cloudflare"
+                    else f"CAPTCHA_{(_prov or 'unknown').upper()}"
+                )
+                return FetchOutcome.BOT_BLOCKED, _sig
+        _b200 = looks_like_200_block(body_head, headers)
+        if _b200:
+            return FetchOutcome.BOT_BLOCKED, f"{_b200.upper()}_200"
         return FetchOutcome.OK, None
 
     # Stage 3 (2026-05-12): explicit "this resource is gone" statuses are
