@@ -255,11 +255,18 @@ def test_pattern_specificity_realpage_oll_outranks_generic() -> None:
 
 
 @pytest.mark.asyncio
-async def test_portal_hint_survives_full_scrape_chain() -> None:
+async def test_portal_hint_survives_full_scrape_chain(monkeypatch) -> None:
     """Verify the attribute propagates: generic adapter SET → AdapterResult →
     scrape() surfacing → result dict key. This is the exact path that was
     breaking in the live run despite the unit test passing.
+
+    2026-05-24: suppresses the SightMap direct probe (shipped same
+    day; default-on for canary) so the test fixture's mocked LLM
+    path runs as designed. Without the suppress, the probe would
+    try to fetch the synthetic SightMap embed URL — likely returning
+    real data — and preempt the cascade before generic + LLM run.
     """
+    monkeypatch.setenv("DISABLE_SIGHTMAP_DIRECT_PROBE", "1")
     from ma_poc.pms.adapters.base import AdapterContext
     from ma_poc.pms.adapters.generic import GenericAdapter
     from ma_poc.pms.scraper import scrape

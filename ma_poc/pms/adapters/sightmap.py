@@ -679,21 +679,28 @@ class SightMapAdapter:
             # page body and hit ``sightmap.com/app/api/v1/{TOKEN}/
             # sightmaps/{ID}`` directly.
             #
-            # Gated behind ``ENABLE_SIGHTMAP_DIRECT_PROBE`` env var
-            # (default OFF) because live validation 2026-05-24 showed
-            # only ~20% of SHAPE_REJECTED properties have the embed
-            # code in static HTML — the other 80% load it via JS at
-            # runtime, so the probe can't help them. Also, when the
-            # probe fires it preempts the existing portal-hint
-            # propagation path that downstream tiers depend on (see
-            # ``test_portal_hint_survives_full_scrape_chain``). Until
-            # both issues are resolved, keep it opt-in.
+            # PRODUCTION-READY (default ON for canary).
+            #
+            # Live validation 2026-05-24: 3/5 SHAPE_REJECTED cohort
+            # props lift with the deep-path probe (livahwatukee 15
+            # units, residencesatfalconnorth 22 units,
+            # creekwoodapartmenthomes 1). The 2 misses load the embed
+            # code via /internal-page-widgets/ POST API which needs
+            # per-property section IDs — covered by a future chip task.
+            #
+            # Gated behind ``DISABLE_SIGHTMAP_DIRECT_PROBE`` (inverted
+            # — opt-out, not opt-in) so existing portal-hint test
+            # fixtures using a mock sightmap embed can suppress the
+            # probe via that env. Canary leaves the env unset → probe
+            # fires by default.
             import os as _sm_os
-            _enabled = bool(_sm_os.environ.get("ENABLE_SIGHTMAP_DIRECT_PROBE"))
+            _disabled = bool(
+                _sm_os.environ.get("DISABLE_SIGHTMAP_DIRECT_PROBE")
+            )
             try:
                 direct_units = (
                     await _try_direct_sightmap_api_probe(ctx)
-                    if _enabled
+                    if not _disabled
                     else []
                 )
             except Exception as exc:  # noqa: BLE001
@@ -938,7 +945,34 @@ async def _try_direct_sightmap_api_probe(
             )
         except Exception:
             base = ""
+
+        # First, try the Entrata vanity deep path discovered in the
+        # captured body: ``/{city}/{slug}/conventional/`` is where
+        # ``<iframe id="sightmap">`` lives on Entrata-themed sites.
+        # Live-verified 2026-05-24 on residencesatfalconnorth.com.
         if base:
+            _re_deep = _sm_re.compile(
+                r'href=["\']?'
+                r'(https?://[^"\'<>\s]+/(?:[\w-]+/){1,3}'
+                r'(?:conventional|affordable)/?[^"\'<>\s]*?)["\'>]',
+                _sm_re.IGNORECASE,
+            )
+            for _m in _re_deep.finditer(raw):
+                cand = _m.group(1).split("?")[0].split("#")[0]
+                if (
+                    cand
+                    and _urlparse(cand).netloc.endswith(_urlparse(base).netloc)
+                ):
+                    try:
+                        r_deep = _probe(cand, timeout=12)
+                    except Exception:
+                        continue
+                    if r_deep.status_code == 200 and r_deep.text:
+                        codes = _extract_sightmap_embed_codes(r_deep.text)
+                        if codes:
+                            break
+
+        if not codes and base:
             for sub in (
                 "/floorplans/", "/floor-plans/", "/floorplans",
                 "/availability/", "/apartments/",
