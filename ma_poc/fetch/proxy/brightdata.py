@@ -79,7 +79,23 @@ class BrightDataProvider:
         tier: ProxyTier,
         canonical_id: str,
         country: str = "us",
+        session_salt: int = 0,
     ) -> ProxyConfig:
+        """Build a per-request ProxyConfig.
+
+        Args:
+            tier: Which BrightData zone to use (DC, RESIDENTIAL).
+            canonical_id: Stable per-property identifier; folded into
+                the session-id so retries on the same property hit the
+                same exit IP within the BrightData session TTL.
+            country: ISO 3166-1 alpha-2 country hint for IP geo.
+            session_salt: Bump to force BrightData to issue a fresh
+                exit IP for ``canonical_id``. Salt 0 (default) is the
+                original sticky behavior; a positive salt produces a
+                different session-id and thus a different IP. Wire
+                this up via ``SessionBurnTracker.next_salt(canonical_id)``
+                when the previous session is known to be burned.
+        """
         if tier == ProxyTier.DIRECT:
             return ProxyConfig(tier=ProxyTier.DIRECT)
 
@@ -89,7 +105,7 @@ class BrightDataProvider:
             )
 
         zone = self.zones[tier]
-        session_id = self._session_id(canonical_id)
+        session_id = self._session_id(canonical_id, session_salt=session_salt)
         username = self._build_username(zone.zone_name, country, session_id)
         return ProxyConfig(
             tier=tier,
@@ -99,10 +115,27 @@ class BrightDataProvider:
             session_id=session_id,
         )
 
-    def _session_id(self, canonical_id: str) -> str:
-        # Stable short hash: retries on the same property stick to the same IP
-        # up to the provider's session TTL. hashlib, never built-in hash().
-        digest = hashlib.sha256(canonical_id.encode()).hexdigest()
+    def _session_id(self, canonical_id: str, *, session_salt: int = 0) -> str:
+        """Derive a BrightData session-id from a canonical-id + salt.
+
+        Salt 0 reproduces the historical session-id for ``canonical_id``
+        verbatim, so existing properties keep their sticky exit IP. Any
+        positive salt produces a distinct session-id — the
+        ``-{salt}`` suffix is folded into the hash input, NOT
+        concatenated to the output, so adjacent salts produce session-ids
+        that are not trivially adjacent in BrightData's pool space.
+
+        hashlib, never built-in hash().
+        """
+        if session_salt < 0:
+            raise ValueError(
+                f"session_salt must be >= 0, got {session_salt}"
+            )
+        if session_salt == 0:
+            hash_input = canonical_id
+        else:
+            hash_input = f"{canonical_id}#salt={session_salt}"
+        digest = hashlib.sha256(hash_input.encode()).hexdigest()
         return f"s{digest[:10]}"
 
     def _build_username(self, zone: str, country: str, session_id: str) -> str:
