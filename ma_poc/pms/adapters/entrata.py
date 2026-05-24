@@ -82,6 +82,76 @@ _NOISE_WIDGET_TYPES = {
 # Regex to extract property_id from fee_calculator URLs.
 _PROPERTY_ID_RE = re.compile(r"property\[id\]=(\d+)")
 
+# 2026-05-24 R5 — fee_calculator → view_unit_spaces URL synthesis.
+# Real-world fee_calc URL shape from PID 257301 sonalofts widget body:
+#   .../?module=check_availability&is_secure=1
+#       &property[id]=1165501
+#       &action=view_rent_calculator
+#       &property_floorplan[id]=820322 ...
+# Swap ``action=*`` to ``view_unit_spaces`` and add move_in_date /
+# occupancy_type if missing. Returns None when the input URL doesn't
+# carry both property[id] and property_floorplan[id] (the two keys the
+# view_unit_spaces endpoint requires).
+_VUS_ACTION_KEYS = (
+    "view_rent_calculator",
+    "view_floorplan",
+    "rent_calculator",
+    "fees_calculator",
+    "fee_calculator",
+)
+_VUS_ACTION_RE = re.compile(
+    r"action=(?:" + "|".join(_VUS_ACTION_KEYS) + r")\b",
+    re.IGNORECASE,
+)
+
+
+def _synthesize_view_unit_spaces_url(
+    fee_calc_url: str,
+    move_in: str | None = None,
+) -> str | None:
+    """Rewrite a fee_calculator URL into a view_unit_spaces URL.
+
+    Returns None when the URL doesn't carry both ``property[id]`` and
+    ``property_floorplan[id]`` (or some encoding variant). Callers that
+    get None fall back to keeping the plan-level row.
+
+    Live-verified against PID 257301 sonalofts (widget body line 230 of
+    the per-property report): the swap produces the same URL shape that
+    ``_probe_prospectportal`` already uses internally — meaning the
+    existing ``parse_prospectportal_unit_spaces`` parser can decode the
+    response without any changes.
+    """
+    if not fee_calc_url:
+        return None
+    lower = fee_calc_url.lower()
+    # Require both property[id] and property_floorplan[id] (URL-encoded
+    # variants also accepted via the lowercase substring check).
+    has_prop = ("property[id]" in lower) or ("property%5bid%5d" in lower)
+    has_fp = (
+        "property_floorplan[id]" in lower
+        or "property_floorplan%5bid%5d" in lower
+    )
+    if not (has_prop and has_fp):
+        return None
+
+    if "action=view_unit_spaces" in lower:
+        new_url = fee_calc_url  # already the right action
+    elif _VUS_ACTION_RE.search(fee_calc_url):
+        new_url = _VUS_ACTION_RE.sub("action=view_unit_spaces", fee_calc_url)
+    else:
+        # No recognisable action — refuse rather than risk a wrong URL.
+        return None
+
+    if "move_in_date" not in new_url.lower():
+        from datetime import date as _date
+        movein = move_in or _date.today().isoformat()
+        joiner = "&" if "?" in new_url else "?"
+        new_url = f"{new_url}{joiner}move_in_date={movein}"
+    if "occupancy_type" not in new_url.lower():
+        joiner = "&" if "?" in new_url else "?"
+        new_url = f"{new_url}{joiner}occupancy_type=conventional"
+    return new_url
+
 
 def _filter_widget_response(body: dict[str, Any]) -> dict[str, Any] | None:
     """Filter Entrata widget responses. Returns body if it has unit data, else None."""
@@ -447,7 +517,12 @@ def parse_prospectportal_unit_spaces(html: str, url: str) -> list[dict[str, str]
     return out
 
 
-async def _entrata_static_fetch(url: str) -> str:
+async def _entrata_static_fetch(
+    url: str,
+    *,
+    ctx: Any | None = None,
+    stage: str | None = None,
+) -> str:
     """Same-origin curl_cffi fetch for Entrata-side probes.
 
     Restored 2026-05-24 — this helper existed in commit 8b1bfa4 but was
@@ -460,6 +535,14 @@ async def _entrata_static_fetch(url: str) -> str:
     around the existing ``probe_get`` (curl_cffi + chrome120 + proxy gate)
     that returns the response text on 200 and an empty string otherwise.
 
+    2026-05-24 R5 fix: thread ``ctx`` + ``stage`` through to ``probe_get``.
+    Previously the bare ``probe_get(url, timeout=20)`` call dropped both,
+    which made ``proxy_gate.decide`` fail-closed at Layer 0a (reason
+    ``no_proxy_configured`` / ``unknown_stage``) for every Entrata probe
+    in production. With ctx + stage, the gate consults the static host
+    allowlist (which includes ``prospectportal.com``) and Web Unlocker
+    escalation can fire on 403 / 429 / 503.
+
     Best-effort — any exception yields ``""`` so callers can chain probes
     without a try/except cascade.
     """
@@ -468,7 +551,7 @@ async def _entrata_static_fetch(url: str) -> str:
     except ImportError:
         return ""
     try:
-        r = probe_get(url, timeout=20)
+        r = probe_get(url, ctx=ctx, stage=stage, timeout=20)
     except Exception:
         return ""
     return (r.text or "") if getattr(r, "status_code", 0) == 200 else ""
@@ -489,6 +572,13 @@ class EntrataAdapter:
         """
         result = AdapterResult(tier_used="TIER_1_API_ENTRATA")
         all_units: list[dict[str, str]] = []
+        # 2026-05-24 R5 — collect every parsed floorplan item from the
+        # captured widget bodies so ``_expand_view_unit_spaces`` can
+        # synthesize view_unit_spaces URLs from the fee_calculator field.
+        # Run-2026-05-24 measurement: 71 winners average 6.4 plan rows
+        # each. The expansion converts each plan row into ~5-20 per-unit
+        # rows, lifting the median from 6.4 to 30-100 units / property.
+        plan_items_for_vus: list[dict[str, Any]] = []
 
         api_responses: list[dict[str, Any]] = getattr(ctx, "_api_responses", [])
         for resp in api_responses:
@@ -501,6 +591,9 @@ class EntrataAdapter:
                 if any(k in first for k in ("floorplan-name", "no_of_bedroom", "square_footage")):
                     units = parse_entrata_floorplans(body, url)
                     all_units.extend(units)
+                    plan_items_for_vus.extend(
+                        i for i in body if isinstance(i, dict)
+                    )
                     result.api_responses.append(resp)
                     continue
 
@@ -512,7 +605,38 @@ class EntrataAdapter:
                 units = parse_entrata_widget_envelope(body, url)
                 if units:
                     all_units.extend(units)
+                    # Mirror the widget-envelope unwrap in
+                    # ``parse_entrata_widget_envelope`` so the VUS chain
+                    # sees the same fp_list the parser consumed.
+                    _wd = body.get("widget_data", {}) if isinstance(body, dict) else {}
+                    _content = _wd.get("content", {}) if isinstance(_wd, dict) else {}
+                    _fp_section = _content.get("floor_plans", {}) if isinstance(_content, dict) else {}
+                    if isinstance(_fp_section, dict):
+                        _fp_list = _fp_section.get("floor_plans", [])
+                        if isinstance(_fp_list, list):
+                            plan_items_for_vus.extend(
+                                i for i in _fp_list if isinstance(i, dict)
+                            )
                     result.api_responses.append(resp)
+
+        # 2026-05-24 R5: VUS expansion. Runs ONLY after we already have
+        # plan-level rows from the XHR-capture path — same-budget cost
+        # (one extra static fetch per fp), additive yield. Skip when
+        # ``ENABLE_ENTRATA_VUS_EXPANSION=false`` (operators can flip off
+        # if the chain causes regressions).
+        import os as _os_vus
+        _vus_enabled = _os_vus.getenv(
+            "ENABLE_ENTRATA_VUS_EXPANSION", "true"
+        ).lower() in ("1", "true", "yes")
+        if plan_items_for_vus and _vus_enabled:
+            try:
+                vus_units = await self._expand_view_unit_spaces(
+                    plan_items_for_vus, ctx
+                )
+            except Exception:
+                vus_units = []
+            if vus_units:
+                all_units.extend(vus_units)
 
         if all_units:
             # Stage 1 validity gate — drops dim-less rows.
@@ -562,6 +686,30 @@ class EntrataAdapter:
                     f"ENTRATA_PROBE_VALIDITY_REJECTED: {len(probe_units)} probed rows "
                     f"failed unit_validity (no numeric dimension)"
                 )
+
+        # 2026-05-24 R5 — TIER_1_DOM_ENTRATA_WP wiring. The
+        # ``parse_entrata_available_units`` + ``find_entrata_fp_detail_links``
+        # pair has shipped since 2026-05-13 but was dead code in
+        # ``extract`` (the only caller was a test). The pair handles
+        # Entrata-WordPress sites that server-render an
+        # ``available_units`` JSON blob inside each ``/floorplan/<slug>/``
+        # page — per-unit data (real ``id`` + apartment ``name`` +
+        # ``available_on`` + rent) without needing the widget API.
+        if not result.units:
+            wp_units = await self._probe_entrata_wp(page, ctx)
+            if wp_units:
+                from ma_poc.extraction.post_process import post_process
+
+                _pp_wp = post_process(
+                    wp_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _pp_wp.n_admitted > 0:
+                    result.units = list(_pp_wp.units)
+                    result.plan_summaries = list(_pp_wp.plan_summaries)
+                    result.post_process_meta = _pp_wp.to_meta()
+                    result.tier_used = "TIER_1_DOM_ENTRATA_WP"
+                    result.confidence = min(0.92, 0.7 + 0.04 * _pp_wp.n_admitted)
+                    return result
 
         # 2026-05-24: Sitemap-driven vanity-host discovery. Many Entrata
         # "ProspectPortal CMS" deployments live on a vanity domain
@@ -729,7 +877,9 @@ class EntrataAdapter:
         landing = ""
         try:
             r = await _entrata_static_fetch(
-                portal + "/?module=check_availability&is_secure=1"
+                portal + "/?module=check_availability&is_secure=1",
+                ctx=ctx,
+                stage="prospectportal_probe",
             )
             landing = r or ""
         except Exception:
@@ -760,10 +910,235 @@ class EntrataAdapter:
                 f"&move_in_date={movein}&occupancy_type=conventional"
             )
             try:
-                h = await _entrata_static_fetch(u)
+                h = await _entrata_static_fetch(
+                    u, ctx=ctx, stage="prospectportal_probe"
+                )
             except Exception:
                 continue
             out.extend(parse_prospectportal_unit_spaces(h, u))
+        return out
+
+    async def _expand_view_unit_spaces(
+        self,
+        plan_items: list[dict[str, Any]],
+        ctx: AdapterContext,
+    ) -> list[dict[str, str]]:
+        """2026-05-24 R5 — convert plan-level winners into unit-level winners.
+
+        For each item in *plan_items* with a ``fee_calculator`` URL,
+        synthesize the corresponding ``view_unit_spaces`` URL and fetch it.
+        Parse the response via the existing
+        :func:`parse_prospectportal_unit_spaces` parser (which handles the
+        ``<a class="unit-button" data-*>`` row shape).
+
+        Bound the work at 30 floorplans per property to cap proxy
+        bandwidth (matching ``_probe_prospectportal``'s cap).
+
+        Never raises. Emits per-floorplan + summary telemetry so the
+        analyzer can see WHY a property's expansion came back empty
+        (no fee_calc URL / URL not synthesizable / CF block / parser
+        miss). Stage name ``entrata_view_unit_spaces`` so the proxy
+        gate can route the request through the Brightdata pool when
+        ``PROBE_PROXY_URL`` is configured.
+
+        Returns the flat list of unit-level rows from all successful
+        fetches. An empty return leaves the caller's plan-level rows
+        in place — partial progress (e.g. 12 of 30 fp's expand) is
+        additive: the caller appends our rows to its existing list and
+        post_process partitions them correctly.
+        """
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+        from datetime import date as _date
+
+        _pid = str(getattr(ctx, "property_id", "") or "unknown")
+        if not plan_items:
+            return []
+
+        # De-dup fee_calc URLs by ``property_floorplan[id]`` so a widget
+        # body that carries multiple references to the same fp doesn't
+        # double-fetch.
+        fp_id_seen: set[str] = set()
+        targets: list[tuple[str, dict[str, Any]]] = []
+        for item in plan_items:
+            if not isinstance(item, dict):
+                continue
+            fee_calc = str(item.get("fee_calculator") or "")
+            if not fee_calc:
+                continue
+            m_fp = re.search(r"property_floorplan\[id\]=(\d+)", fee_calc, re.IGNORECASE)
+            fp_id = m_fp.group(1) if m_fp else ""
+            if fp_id and fp_id in fp_id_seen:
+                continue
+            if fp_id:
+                fp_id_seen.add(fp_id)
+            vus_url = _synthesize_view_unit_spaces_url(
+                fee_calc, _date.today().isoformat()
+            )
+            if not vus_url:
+                continue
+            targets.append((vus_url, item))
+
+        if not targets:
+            log_adapter_stage(
+                "entrata", _pid, "view_unit_spaces",
+                "skipped_no_fee_calc",
+                reason=f"plan_items={len(plan_items)} no synthesizable fee_calc URLs",
+            )
+            return []
+
+        out: list[dict[str, str]] = []
+        ok_count = 0
+        for vus_url, item in targets[:30]:
+            try:
+                html = await _entrata_static_fetch(
+                    vus_url, ctx=ctx, stage="entrata_view_unit_spaces"
+                )
+            except Exception:
+                html = ""
+            if not html:
+                continue
+            unit_rows = parse_prospectportal_unit_spaces(html, vus_url)
+            if not unit_rows:
+                continue
+            # Bind floor_plan_name / sqft / beds / baths from the source
+            # plan item when the parsed unit row lacks them. The
+            # view_unit_spaces fragment header carries the plan name but
+            # the per-unit data-* attrs don't always include bedrooms /
+            # bathrooms when the fp is single-bed.
+            plan_name = str(
+                item.get("floorplan-name") or item.get("floorplan_name") or ""
+            )
+            for u in unit_rows:
+                if plan_name and not u.get("floor_plan_name"):
+                    u["floor_plan_name"] = plan_name
+                # Don't overwrite per-unit beds/baths from the parser;
+                # only fill when blank.
+                if not u.get("bedrooms"):
+                    beds_raw = item.get("no_of_bedroom")
+                    if beds_raw is not None:
+                        u["bedrooms"] = str(beds_raw)
+                if not u.get("bathrooms"):
+                    baths_raw = item.get("no_of_bathroom")
+                    if baths_raw is not None:
+                        u["bathrooms"] = str(baths_raw)
+                # Stamp the extraction tier on every row so downstream
+                # analytics can attribute unit yield to the VUS chain.
+                u["extraction_tier"] = "TIER_1_API_ENTRATA_VUS"
+            out.extend(unit_rows)
+            ok_count += 1
+
+        log_adapter_stage(
+            "entrata", _pid, "view_unit_spaces",
+            "ok" if out else "all_empty",
+            units=len(out),
+            reason=(
+                f"targets={len(targets)} attempted={min(len(targets), 30)} "
+                f"ok={ok_count} units={len(out)}"
+            ),
+        )
+        return out
+
+    async def _probe_entrata_wp(
+        self,
+        page: "Page | None",
+        ctx: AdapterContext,
+    ) -> list[dict[str, str]]:
+        """2026-05-24 R5 — Entrata-WordPress per-plan detail crawl.
+
+        Wire-up of the previously-dead :func:`parse_entrata_available_units`
+        + :func:`find_entrata_fp_detail_links` pair. Many Entrata-on-WP
+        sites server-render an ``"available_units":[...]`` JSON blob on
+        each ``/floorplan/<slug>/`` detail page; the parser already exists
+        but had no orchestrator wiring (the only call site was a test).
+
+        Flow:
+          1. Pull the entry HTML from ``ctx.fetch_result.body``.
+          2. ``find_entrata_fp_detail_links`` discovers per-plan URLs
+             from the entry page (no extra network).
+          3. For each URL (capped at 30), fetch via
+             ``_entrata_static_fetch`` with stage ``entrata_wp_probe``
+             so the proxy gate fires for CF-fronted origins.
+          4. Parse each detail page with
+             ``parse_entrata_available_units`` → per-unit rows with
+             real ``id`` + ``name`` (apartment number) + rent.
+
+        Never raises. Returns ``[]`` when:
+          * No entry HTML
+          * No origin resolvable
+          * No ``/floorplan/`` links on the entry page
+          * All fetched detail pages parsed empty
+        """
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+
+        _pid = str(getattr(ctx, "property_id", "") or "unknown")
+
+        fr = getattr(ctx, "fetch_result", None)
+        body = getattr(fr, "body", None) if fr is not None else None
+        if isinstance(body, bytes):
+            try:
+                body = body.decode("utf-8", errors="replace")
+            except Exception:
+                body = ""
+        entry_html = body if isinstance(body, str) else ""
+        if not entry_html:
+            log_adapter_stage(
+                "entrata", _pid, "wp_probe",
+                "skipped_no_entry_html",
+                reason="no ctx.fetch_result.body",
+            )
+            return []
+
+        origin = self._origin_from_ctx(page, ctx) if page is not None else ""
+        if not origin:
+            base = getattr(ctx, "base_url", "") or ""
+            try:
+                _p = urlparse(base)
+                if _p.scheme and _p.netloc:
+                    origin = f"{_p.scheme}://{_p.netloc}"
+            except Exception:
+                origin = ""
+        if not origin:
+            log_adapter_stage(
+                "entrata", _pid, "wp_probe",
+                "skipped_no_origin",
+                reason="cannot derive origin from page.url or ctx.base_url",
+            )
+            return []
+
+        fp_urls = find_entrata_fp_detail_links(entry_html, origin)
+        if not fp_urls:
+            log_adapter_stage(
+                "entrata", _pid, "wp_probe",
+                "no_fp_links",
+                reason=f"entry_html_len={len(entry_html)} no /floorplan/ links",
+            )
+            return []
+
+        out: list[dict[str, str]] = []
+        ok_pages = 0
+        for fp_url in fp_urls[:30]:
+            try:
+                fp_html = await _entrata_static_fetch(
+                    fp_url, ctx=ctx, stage="entrata_wp_probe"
+                )
+            except Exception:
+                fp_html = ""
+            if not fp_html:
+                continue
+            page_units = parse_entrata_available_units(fp_html, fp_url)
+            if page_units:
+                out.extend(page_units)
+                ok_pages += 1
+
+        log_adapter_stage(
+            "entrata", _pid, "wp_probe",
+            "ok" if out else "all_pages_empty",
+            units=len(out),
+            reason=(
+                f"fp_urls={len(fp_urls)} attempted={min(len(fp_urls), 30)} "
+                f"ok_pages={ok_pages}"
+            ),
+        )
         return out
 
     @staticmethod
@@ -909,7 +1284,9 @@ class EntrataAdapter:
         sitemap_url = origin.rstrip("/") + "/sitemap.xml"
         sitemap_xml: str = ""
         try:
-            sitemap_xml = await _entrata_static_fetch(sitemap_url)
+            sitemap_xml = await _entrata_static_fetch(
+                sitemap_url, ctx=ctx, stage="sitemap_fetch"
+            )
         except Exception as exc:
             log_adapter_stage(
                 "entrata",
@@ -926,32 +1303,90 @@ class EntrataAdapter:
             )
             return []
 
-        # Pick the *exact* ``/<area>/<property>/conventional/`` URL — not
-        # the per-floorplan-detail URLs (which match
-        # ``/conventional/`` too but are far slower to parse N times).
-        conventional_re = re.compile(
-            r"<loc>([^<]+/conventional/?)</loc>", re.IGNORECASE
+        # 2026-05-24 R5 widened: accept any of the canonical Entrata-CMS
+        # listing-page terminal segments. The pre-fix pattern matched
+        # ``/conventional/`` only — fitting Riviera (12064), Chopaka
+        # (19540), Briarwood (19650), Royale (21092) but ZERO properties
+        # in run 2026-05-24 (399 `no_conventional_url` skips). Real
+        # Entrata-vanity sitemaps use ``/floorplans/`` or
+        # ``/availability/`` for the listing index too.
+        #
+        # 2026-05-24 (post-canary fix): the original widening shipped two
+        # bugs the user caught on PIDs 257570 + 262539:
+        #
+        #   (A) Per-floorplan-detail URLs of the shape
+        #       ``/{area}/{property}/floorplans/{plan-slug}/fp_name/
+        #       occupancy_type/conventional/`` end in ``/conventional/``
+        #       too — they slipped past the terminal-keyword guard. Modera
+        #       sitemaps carry ~40 of these per property. The
+        #       ``/fp_name/`` + ``/occupancy_type/`` markers reliably
+        #       identify them as per-plan pages (not canonical inventory).
+        #
+        #   (B) Sort-by-length picked ``/floor-plans`` (SPA wrapper, 29
+        #       chars) over ``/{area}/{property}/conventional/`` (canonical
+        #       inventory, 76 chars). The SPA wrapper has zero JSON-LD
+        #       unit data; the canonical page has the full
+        #       ``ApartmentComplex.accommodationFloorPlan[]`` block with
+        #       41-47 units / property. We need keyword-priority ordering
+        #       (conventional > availability > floorplans index) before
+        #       falling back to length.
+        listing_re = re.compile(
+            r"<loc>([^<]+/(?:conventional|floorplans?|floor-plans?|availability)/?)</loc>",
+            re.IGNORECASE,
         )
-        candidates: list[str] = []
-        for m in conventional_re.finditer(sitemap_xml):
+        _TERMINAL_KEYWORDS = {
+            "conventional", "floorplans", "floorplan",
+            "floor-plans", "floor-plan", "availability",
+        }
+        # Keyword priority (lower = better). The Entrata "canonical
+        # inventory" page is always ``/conventional/`` — when present it
+        # carries the entire plan list in JSON-LD. ``/availability/`` is
+        # the equivalent on non-Entrata CMS sites. ``/floorplans/`` and
+        # ``/floor-plans/`` are usually SPA wrappers that load data via
+        # XHR after JS — last resort.
+        _KEYWORD_PRIORITY = {
+            "conventional": 0,
+            "availability": 1,
+            "floorplans": 2,
+            "floorplan": 2,
+            "floor-plans": 2,
+            "floor-plan": 2,
+        }
+        candidates: list[tuple[int, str]] = []
+        for m in listing_re.finditer(sitemap_xml):
             u = m.group(1).strip()
-            # Reject per-floorplan-detail URLs like ``/floorplans/<slug>/.../conventional/``.
-            # The canonical plan-listing URL doesn't have ``/floorplans/`` in its path.
-            if "/floorplans/" in u.lower():
+            stripped = u.rstrip("/").lower()
+            # Terminal-segment guard: the last path component must be the
+            # keyword itself. Reject ``/floorplans/{slug}/`` etc.
+            terminal = stripped.rsplit("/", 1)[-1] if "/" in stripped else stripped
+            if terminal not in _TERMINAL_KEYWORDS:
                 continue
-            candidates.append(u)
+            # (A) Reject Entrata per-floorplan detail URLs. The
+            # ``/fp_name/`` and ``/occupancy_type/`` segments are
+            # Entrata-specific markers that appear ONLY on per-plan
+            # pages, never on the canonical inventory page.
+            if "/fp_name/" in stripped or "/occupancy_type/" in stripped:
+                continue
+            priority = _KEYWORD_PRIORITY.get(terminal, 99)
+            candidates.append((priority, u))
         if not candidates:
             log_adapter_stage(
                 "entrata", _pid, "sitemap_conventional", "no_conventional_url",
                 reason=f"sitemap_urls={sitemap_xml.count('<loc>')}",
             )
             return []
-        # Prefer shorter URLs (canonical plan listing) over deeper paths.
-        candidates.sort(key=len)
-        conv_url = candidates[0]
+        # Sort by (keyword priority asc, URL length asc): the canonical
+        # ``/conventional/`` page wins over the SPA ``/floor-plans``
+        # wrapper even when the wrapper is shorter. Within the same
+        # keyword tier, prefer shorter URLs (the canonical index is
+        # always shorter than nested per-area variants).
+        candidates.sort(key=lambda t: (t[0], len(t[1])))
+        conv_url = candidates[0][1]
 
         try:
-            conv_html = await _entrata_static_fetch(conv_url)
+            conv_html = await _entrata_static_fetch(
+                conv_url, ctx=ctx, stage="sitemap_conventional"
+            )
         except Exception as exc:
             log_adapter_stage(
                 "entrata", _pid, "sitemap_conventional",

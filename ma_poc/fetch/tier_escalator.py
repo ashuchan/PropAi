@@ -133,7 +133,7 @@ def _make_provider(tier: FetchTier) -> "FetchProvider":
 
 async def fetch_with_escalation(
     task: "CrawlTask",
-    profile: "ScrapeProfile",
+    profile: "ScrapeProfile | None" = None,
 ) -> FetchResult:
     """Fetch *task* with automatic tier escalation on BOT_BLOCKED.
 
@@ -144,6 +144,12 @@ async def fetch_with_escalation(
     Args:
         task: The crawl task to fetch.
         profile: ScrapeProfile for this property (read: fetch.tier_floor).
+            When None (the common case — the top-level ``fetch/__init__``
+            entry point doesn't thread a profile through), a default
+            ScrapeProfile is constructed with tier_floor=DIRECT so the
+            ladder still runs. The default profile is per-call and not
+            persisted, so demotion-probe state doesn't accumulate across
+            calls — this is intentional for the stateless entry-point case.
 
     Returns:
         The FetchResult from the highest tier that was attempted.
@@ -153,6 +159,18 @@ async def fetch_with_escalation(
     if not ENABLE_TIER_ESCALATION:
         from ma_poc.fetch.providers.direct import DirectProvider
         return await DirectProvider().fetch(task, profile)
+
+    # 2026-05-24 — synthesize a default profile when the caller didn't
+    # thread one through. Required for the production entry-point case
+    # (``fetch/__init__.py:fetch(task)`` passes no profile, so the gate at
+    # ``Fetcher.fetch`` would otherwise skip the escalator entirely).
+    # The default profile gets tier_floor=DIRECT and no demotion-probe
+    # history, so the ladder starts at the lowest tier and walks up on
+    # BOT_BLOCKED — exactly the expected "follow tier escalation" semantic.
+    if profile is None:
+        from ma_poc.models.scrape_profile import ScrapeProfile  # noqa: I001
+        canonical = getattr(task, "property_id", None) or "unknown"
+        profile = ScrapeProfile(canonical_id=str(canonical))
 
     floor = profile.fetch.tier_floor
     all_attempts: list[int] = []

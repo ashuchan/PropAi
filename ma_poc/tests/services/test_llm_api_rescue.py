@@ -177,7 +177,7 @@ def test_rescue_filter_drops_foreign_host_responses() -> None:
 
 
 def test_rescue_filter_keeps_known_pms_hosts() -> None:
-    responses = [{"url": "https://entrata.com/api/units", "body": {"units": [{"id": 1}]}}]
+    responses = [{"url": "https://entrata.com/api/units", "body": {"units": [{"id": 1, "bedrooms": 1, "rent": 1200}]}}]
     kept = _filter_candidates(responses, None)
     assert len(kept) == 1
 
@@ -228,7 +228,7 @@ def test_f1_1_filter_drops_noise_via_signal_engine() -> None:
     Klaviyo (analytics CDN) is classified as noise; a generic /api/units path is not."""
     responses = [
         {"url": "https://klaviyo.com/api/track", "body": {"x": 1}},
-        {"url": "https://example.com/api/units", "body": {"units": [{"id": 1}]}},
+        {"url": "https://example.com/api/units", "body": {"units": [{"id": 1, "bedrooms": 1, "rent": 1200}]}},
     ]
     kept = _filter_candidates(responses, None)
     assert [r["url"] for r in kept] == ["https://example.com/api/units"]
@@ -249,12 +249,12 @@ def test_f1_2_filter_drops_captcha_detected_responses() -> None:
     responses = [
         {
             "url": "https://example.com/api/units",
-            "body": {"units": [{"id": 1}]},
+            "body": {"units": [{"id": 1, "bedrooms": 1, "rent": 1200}]},
             "captcha_detected": True,
         },
         {
             "url": "https://example.com/api/units2",
-            "body": {"units": [{"id": 2}]},
+            "body": {"units": [{"id": 2, "bedrooms": 2, "rent": 1500}]},
         },
     ]
     kept = _filter_candidates(responses, None)
@@ -266,7 +266,7 @@ def test_f1_2_filter_captcha_detected_false_keeps_response() -> None:
     responses = [
         {
             "url": "https://example.com/api/units",
-            "body": {"units": [{"id": 1}]},
+            "body": {"units": [{"id": 1, "bedrooms": 1, "rent": 1200}]},
             "captcha_detected": False,
         },
     ]
@@ -418,7 +418,7 @@ async def test_rescue_blocks_url_when_llm_returns_empty_body() -> None:
     with patch("ma_poc.services.llm_api_rescue._call_llm", side_effect=empty_body):
         result = await rescue_from_api_responses(
             _inp(api_responses=[
-                {"url": "https://amli.com/api/empty?cursor=1", "body": {"units": [{"x": 1}]}},
+                {"url": "https://amli.com/api/empty?cursor=1", "body": {"units": [{"bedrooms": 1, "rent": 1200}]}},
             ])
         )
 
@@ -440,8 +440,8 @@ async def test_rescue_empty_body_blocklist_collapses_query_variants() -> None:
         return {}, 0.0, ""
 
     responses = [
-        {"url": "https://amli.com/api/units?cursor=1", "body": {"units": [{"x": 1}]}},
-        {"url": "https://amli.com/api/units?cursor=2", "body": {"units": [{"x": 2}]}},
+        {"url": "https://amli.com/api/units?cursor=1", "body": {"units": [{"bedrooms": 1, "rent": 1200}]}},
+        {"url": "https://amli.com/api/units?cursor=2", "body": {"units": [{"bedrooms": 2, "rent": 1500}]}},
     ]
     with patch("ma_poc.services.llm_api_rescue._call_llm", side_effect=empty_body):
         result = await rescue_from_api_responses(_inp(api_responses=responses))
@@ -610,3 +610,149 @@ def test_rescue_url_to_pattern_strips_query_string() -> None:
     pattern = _url_to_pattern(url)
     assert "token" not in pattern
     assert "page" not in pattern
+
+
+# ── Score-floor gate (2026-05-24) ───────────────────────────────────────────
+
+
+class TestRescueScoreFloor:
+    """The score-floor gate drops candidates whose ``_score()`` is below
+    ``RESCUE_MIN_SCORE`` (default 1.5). Pair with ``ENABLE_F2_RESCUE``
+    master switch in pms/scraper.py.
+
+    Motivated by run 2026-05-24: 2,696 rescue attempts, ≈0% ROI, $5.06
+    burned. The gate gives the rescue a safe re-entry path — bodies with
+    key-name-only signals (score=0.5) historically convert 0% of the
+    time; only bodies that show non-null unit-key values (score≥1.5)
+    have any real chance.
+    """
+
+    def test_default_min_score_is_one_point_five(self) -> None:
+        from ma_poc.services.llm_api_rescue import (
+            DEFAULT_RESCUE_MIN_SCORE,
+            _rescue_min_score,
+        )
+        assert DEFAULT_RESCUE_MIN_SCORE == 1.5
+        assert _rescue_min_score() == 1.5
+
+    def test_min_score_env_override(self, monkeypatch) -> None:
+        from ma_poc.services.llm_api_rescue import _rescue_min_score
+        monkeypatch.setenv("RESCUE_MIN_SCORE", "3.0")
+        assert _rescue_min_score() == 3.0
+
+    def test_min_score_env_garbage_falls_back(self, monkeypatch) -> None:
+        from ma_poc.services.llm_api_rescue import (
+            DEFAULT_RESCUE_MIN_SCORE,
+            _rescue_min_score,
+        )
+        monkeypatch.setenv("RESCUE_MIN_SCORE", "not-a-float")
+        assert _rescue_min_score() == DEFAULT_RESCUE_MIN_SCORE
+
+    def test_min_score_zero_disables_floor(self, monkeypatch) -> None:
+        # RESCUE_MIN_SCORE=0 should let everything through (back-compat).
+        monkeypatch.setenv("RESCUE_MIN_SCORE", "0")
+        responses = [
+            # body has unit-key names ("bedrooms") but every value null.
+            # Score ~ 0.5, would normally be dropped at floor 1.5.
+            {
+                "url": "https://example.com/api/units",
+                "body": {"units": [{"bedrooms": None, "rent": None}]},
+            },
+        ]
+        kept = _filter_candidates(responses, None)
+        assert len(kept) == 1
+
+    def test_key_names_only_dropped_at_default_floor(self) -> None:
+        """Body has unit-key names but all values null → score=0.5 → dropped."""
+        responses = [
+            {
+                "url": "https://example.com/api/units",
+                "body": {"units": [{"bedrooms": None, "rent": None, "sqft": None}]},
+            },
+        ]
+        kept = _filter_candidates(responses, None)
+        assert kept == []
+
+    def test_real_unit_data_passes_floor(self) -> None:
+        """Body has unit keys with real values → score ≥ 1.5 → kept."""
+        responses = [
+            {
+                "url": "https://example.com/api/units",
+                "body": {
+                    "units": [
+                        {"bedrooms": 1, "rent": 1200, "sqft": 750},
+                        {"bedrooms": 2, "rent": 1800, "sqft": 950},
+                    ],
+                },
+            },
+        ]
+        kept = _filter_candidates(responses, None)
+        assert len(kept) == 1
+
+    def test_floor_combines_with_other_gates(self) -> None:
+        """Score floor runs AFTER noise / captcha / blocked-endpoint gates.
+        A noise URL doesn't reach the floor (already dropped earlier)."""
+        responses = [
+            # Noise host — gated out by signal_engine, never sees the floor.
+            {"url": "https://www.googletagmanager.com/gtag/js", "body": {"x": 1}},
+            # Score=0.5 candidate (key names only).
+            {
+                "url": "https://example.com/api/units",
+                "body": {"units": [{"bedrooms": None}]},
+            },
+            # Score ≥ 1.5 candidate.
+            {
+                "url": "https://example.com/api/floorplans",
+                "body": {"plans": [{"bedrooms": 2, "rent": 1500}]},
+            },
+        ]
+        kept = _filter_candidates(responses, None)
+        urls = [r["url"] for r in kept]
+        assert "https://www.googletagmanager.com/gtag/js" not in urls
+        assert "https://example.com/api/units" not in urls
+        assert "https://example.com/api/floorplans" in urls
+
+
+# ── ENABLE_F2_RESCUE master switch (2026-05-24) ─────────────────────────────
+
+
+class TestF2MasterSwitch:
+    """Source-level guardrails for the ENABLE_F2_RESCUE env gate inside
+    ``pms.scraper.scrape``. A full integration test would need a stub
+    AdapterContext, Adapter, FetchResult, etc.; pin the call site at
+    source level instead.
+    """
+
+    def test_scraper_gate_reads_enable_f2_rescue(self) -> None:
+        import inspect
+        from ma_poc.pms import scraper as _scraper
+        src = inspect.getsource(_scraper)
+        assert 'ENABLE_F2_RESCUE' in src, (
+            "F2 master switch missing. The rescue gate must read "
+            "ENABLE_F2_RESCUE so operators can flip it without code changes."
+        )
+
+    def test_scraper_gate_includes_disabled_in_needs_rescue(self) -> None:
+        import inspect
+        import re
+        from ma_poc.pms import scraper as _scraper
+        src = inspect.getsource(_scraper)
+        # The `needs_rescue` boolean must start with the _f2_enabled gate
+        # (or contain it) so disabling-by-env actually prevents the call.
+        match = re.search(
+            r"needs_rescue\s*=\s*\(\s*_f2_enabled",
+            src,
+        )
+        assert match, (
+            "The needs_rescue boolean must include _f2_enabled in its "
+            "AND chain so the master switch actually disables the gate."
+        )
+
+    def test_scraper_emits_disabled_by_env_skip_reason(self) -> None:
+        import inspect
+        from ma_poc.pms import scraper as _scraper
+        src = inspect.getsource(_scraper)
+        # The analyzer needs to bucket disabled-by-env skips separately
+        # from captcha / plan-summary skips. Without a stable reason
+        # string the rescue cohort disappears from the failure analysis.
+        assert 'disabled_by_env' in src

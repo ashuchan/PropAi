@@ -361,7 +361,7 @@ class KnockAdapter:
         if public_key and comm_id:
             try:
                 units, plan_summaries = await _fetch_knock_units(
-                    comm_id, kind or "community"
+                    comm_id, kind or "community", ctx=ctx
                 )
             except Exception as exc:
                 result.errors.append(f"knock-api-error: {exc}")
@@ -392,7 +392,7 @@ class KnockAdapter:
         if base_url and _should_try_knock_by_domain(html, base_url):
             try:
                 pid, units, plan_summaries = await _fetch_knock_units_by_domain(
-                    base_url, html
+                    base_url, html, ctx=ctx
                 )
             except Exception as exc:
                 result.errors.append(
@@ -425,16 +425,22 @@ class KnockAdapter:
 
 
 async def _fetch_knock_units(
-    comm_id: str, kind: str = "community",
+    comm_id: str,
+    kind: str = "community",
+    ctx: Any | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Two-step Doorway API fetch: community → numeric_id → units.
 
     Returns ``(units, plan_summaries)`` — see :func:`parse_knock_payload`.
 
-    This is its own coroutine so the adapter ``extract`` method stays
-    focused on orchestration.
+    2026-05-24 R1 sweep fix: route through ``probe_get(ctx=ctx,
+    stage="knock_probe")`` instead of bare ``httpx.AsyncClient``. The
+    doorway-api.knockrentals.com host is CF-fronted; bare-httpx requests
+    from cloud-run egress IPs are rate-limited / occasionally blocked.
+    Routing through the gate lets ``PROBE_PROXY_URL`` + Web-Unlocker
+    escalation handle the CF challenge transparently.
     """
-    import httpx
+    from ma_poc.pms.adapters._probe import probe_get
 
     headers = {
         "User-Agent": (
@@ -450,36 +456,52 @@ async def _fetch_knock_units(
         # Community API was already short-circuited to a numeric id by the
         # caller; hit /units directly.
         units_url = f"{base}/{comm_id}/units"
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-            r = await c.get(units_url, headers=headers)
-            if r.status_code != 200:
-                return [], []
-            try:
-                return parse_knock_payload(r.json())
-            except Exception:
-                return [], []
+        try:
+            r = probe_get(
+                units_url, ctx=ctx, stage="knock_probe",
+                headers=headers, timeout=15,
+            )
+        except Exception:
+            return [], []
+        if getattr(r, "status_code", None) != 200:
+            return [], []
+        try:
+            return parse_knock_payload(r.json())
+        except Exception:
+            return [], []
 
     # Community-keyed: fetch property meta first.
     community_url = f"{base}/community/{comm_id}"
-    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-        r = await c.get(community_url, headers=headers)
-        if r.status_code != 200:
-            return [], []
-        try:
-            prop_data = r.json().get("property") or {}
-        except Exception:
-            return [], []
-        numeric_id = prop_data.get("id")
-        if not numeric_id:
-            return [], []
-        units_url = f"{base}/{numeric_id}/units"
-        r2 = await c.get(units_url, headers=headers)
-        if r2.status_code != 200:
-            return [], []
-        try:
-            return parse_knock_payload(r2.json())
-        except Exception:
-            return [], []
+    try:
+        r = probe_get(
+            community_url, ctx=ctx, stage="knock_probe",
+            headers=headers, timeout=15,
+        )
+    except Exception:
+        return [], []
+    if getattr(r, "status_code", None) != 200:
+        return [], []
+    try:
+        prop_data = r.json().get("property") or {}
+    except Exception:
+        return [], []
+    numeric_id = prop_data.get("id")
+    if not numeric_id:
+        return [], []
+    units_url = f"{base}/{numeric_id}/units"
+    try:
+        r2 = probe_get(
+            units_url, ctx=ctx, stage="knock_probe",
+            headers=headers, timeout=15,
+        )
+    except Exception:
+        return [], []
+    if getattr(r2, "status_code", None) != 200:
+        return [], []
+    try:
+        return parse_knock_payload(r2.json())
+    except Exception:
+        return [], []
 
 
 # 2026-05-20: Knock-by-domain fallback signal detection.
@@ -572,6 +594,7 @@ def _should_try_knock_by_domain(html: str, base_url: str) -> bool:
 async def _fetch_knock_units_by_domain(
     base_url: str,
     html: str = "",
+    ctx: Any | None = None,
 ) -> tuple[str | None, list[dict[str, Any]], list[dict[str, Any]]]:
     """Resolve property_id from marketing-site URL via Knock Doorway,
     then fetch units.
@@ -602,9 +625,12 @@ async def _fetch_knock_units_by_domain(
 
     Never raises — exceptions return ``(None, [])``.
     """
+    # 2026-05-24 R1 sweep fix: route every Knock Doorway call through
+    # ``probe_get(ctx, stage="knock_probe")`` so the proxy gate fires
+    # uniformly across the community-hash and profile-by-domain paths.
     from urllib.parse import quote
 
-    import httpx
+    from ma_poc.pms.adapters._probe import probe_get
 
     headers = {
         "User-Agent": (
@@ -616,12 +642,16 @@ async def _fetch_knock_units_by_domain(
         "Accept": "application/json",
     }
 
-    async def _fetch_units(
-        c: httpx.AsyncClient, pid_str: str,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    def _fetch_units(pid_str: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         units_url = f"https://doorway-api.knockrentals.com/v1/property/{pid_str}/units"
-        ur = await c.get(units_url, headers=headers)
-        if ur.status_code != 200:
+        try:
+            ur = probe_get(
+                units_url, ctx=ctx, stage="knock_probe",
+                headers=headers, timeout=15,
+            )
+        except Exception:
+            return [], []
+        if getattr(ur, "status_code", None) != 200:
             return [], []
         try:
             return parse_knock_payload(ur.json())
@@ -629,43 +659,54 @@ async def _fetch_knock_units_by_domain(
             return [], []
 
     try:
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-            # Path 1: community-hash from SSR-embedded JSON config.
-            community_hash = find_knock_community_hash(html) if html else None
-            if community_hash:
-                boot_url = (
-                    f"https://doorway-api.knockrentals.com/v1/property/"
-                    f"community/{community_hash}"
-                )
-                br = await c.get(boot_url, headers=headers)
-                if br.status_code == 200:
-                    try:
-                        boot_body = br.json()
-                    except Exception:
-                        boot_body = {}
-                    pid = (boot_body.get("property") or {}).get("id")
-                    if pid:
-                        pid_str = str(pid)
-                        units, plans = await _fetch_units(c, pid_str)
-                        return pid_str, units, plans
-
-            # Path 2: legacy /v1/profile?domain= resolver.
-            profile_url = (
-                "https://doorway-api.knockrentals.com/v1/profile"
-                f"?code=w&domain={quote(base_url, safe='')}&refresh=true"
+        # Path 1: community-hash from SSR-embedded JSON config.
+        community_hash = find_knock_community_hash(html) if html else None
+        if community_hash:
+            boot_url = (
+                f"https://doorway-api.knockrentals.com/v1/property/"
+                f"community/{community_hash}"
             )
-            pr = await c.get(profile_url, headers=headers)
-            if pr.status_code != 200:
-                return None, [], []
             try:
-                profile_body = pr.json()
+                br = probe_get(
+                    boot_url, ctx=ctx, stage="knock_probe",
+                    headers=headers, timeout=15,
+                )
             except Exception:
-                return None, [], []
-            pid = (profile_body.get("profile") or {}).get("property")
-            if not pid:
-                return None, [], []
-            pid_str = str(pid)
-            units, plans = await _fetch_units(c, pid_str)
-            return pid_str, units, plans
+                br = None
+            if br is not None and getattr(br, "status_code", None) == 200:
+                try:
+                    boot_body = br.json()
+                except Exception:
+                    boot_body = {}
+                pid = (boot_body.get("property") or {}).get("id")
+                if pid:
+                    pid_str = str(pid)
+                    units, plans = _fetch_units(pid_str)
+                    return pid_str, units, plans
+
+        # Path 2: legacy /v1/profile?domain= resolver.
+        profile_url = (
+            "https://doorway-api.knockrentals.com/v1/profile"
+            f"?code=w&domain={quote(base_url, safe='')}&refresh=true"
+        )
+        try:
+            pr = probe_get(
+                profile_url, ctx=ctx, stage="knock_probe",
+                headers=headers, timeout=15,
+            )
+        except Exception:
+            return None, [], []
+        if getattr(pr, "status_code", None) != 200:
+            return None, [], []
+        try:
+            profile_body = pr.json()
+        except Exception:
+            return None, [], []
+        pid = (profile_body.get("profile") or {}).get("property")
+        if not pid:
+            return None, [], []
+        pid_str = str(pid)
+        units, plans = _fetch_units(pid_str)
+        return pid_str, units, plans
     except Exception:
         return None, [], []

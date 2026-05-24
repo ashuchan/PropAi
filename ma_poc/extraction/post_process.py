@@ -61,7 +61,12 @@ from ma_poc.extraction.infer import infer
 from ma_poc.extraction.sanity import sanity_bound
 from ma_poc.extraction.unit_identity import canonical_unit_key, merge_units
 from ma_poc.extraction.unit_number import extract_unit_number, normalize_unit_number
-from ma_poc.validation.unit_validity import absence_reasons, is_valid_unit
+from ma_poc.validation.unit_validity import (
+    absence_reasons,
+    is_substantive_plan,
+    is_valid_unit,
+    plan_rejection_reason,
+)
 
 
 def _cross_page_rank(unit: dict[str, Any]) -> int:
@@ -466,5 +471,25 @@ def post_process(
     out.units = kept_units
     out.plan_summaries.extend(moved_to_plans)
     out.inverse_b4_rerouted = n_moved
+
+    # ── Substantive-plan quality gate (2026-05-24) ────────────────────────
+    #
+    # ``is_valid_unit`` admits any row with at least one numeric dimension,
+    # which is correct for the unit-level path. For plan_summaries the bar
+    # is too low: a row with only ``beds=1`` (or beds=0 for an inferred
+    # studio) and ``area=-1, rent=None, floor_plan_name=None`` ships as a
+    # "plan summary" and triggers ``SUCCESS_PLAN_LEVEL`` downstream.
+    #
+    # Run 2026-05-24 measured 252 such properties — verdict says SUCCESS,
+    # output has 0 units and only junk floor_plans. See
+    # ``docs/dom_quality_and_llm_reduction_playbook.md``.
+    if out.plan_summaries:
+        substantive: list[dict[str, Any]] = []
+        for plan in out.plan_summaries:
+            if is_substantive_plan(plan):
+                substantive.append(plan)
+            else:
+                out.rejected.append((plan, [plan_rejection_reason(plan)]))
+        out.plan_summaries = substantive
 
     return out

@@ -65,6 +65,19 @@ module "cloud_run_jobs" {
   email_transport              = var.email_transport
   report_recipients            = var.report_recipients
   report_sender_name           = var.report_sender_name
+  # Tier-escalation + BrightData / Web Unlocker (2026-05-24). All-off
+  # by default; per-env tfvars opt in.
+  enable_tier_escalation             = var.enable_tier_escalation
+  enable_dc_proxy_tier               = var.enable_dc_proxy_tier
+  enable_residential_tier            = var.enable_residential_tier
+  enable_unlocker_tier               = var.enable_unlocker_tier
+  probe_proxy_secret_id              = var.probe_proxy_secret_id
+  web_unlocker_key_secret_id         = var.web_unlocker_key_secret_id
+  brightdata_customer_id_secret_id   = var.brightdata_customer_id_secret_id
+  brightdata_resi_zone_secret_id     = var.brightdata_resi_zone_secret_id
+  brightdata_resi_password_secret_id = var.brightdata_resi_password_secret_id
+  brightdata_dc_zone_secret_id       = var.brightdata_dc_zone_secret_id
+  brightdata_dc_password_secret_id   = var.brightdata_dc_password_secret_id
 }
 
 module "scheduler" {

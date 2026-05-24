@@ -351,6 +351,7 @@ def parse_shard(shard_dir: Path) -> tuple[dict[str, PropertyOutcome], dict[str, 
         if not pid:
             continue
         o = get(pid)
+        kind = ev.get("kind")
 
         if kind == "fetch.started":
             # First fetch_started is the initial entry-URL fetch.

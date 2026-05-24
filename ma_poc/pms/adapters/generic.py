@@ -239,6 +239,70 @@ def _api_signal_qualifies(resp: "dict[str, Any]", items: "list[Any]") -> bool:
 
 
 
+def _count_quality_units(units: list[dict[str, Any]]) -> int:
+    """Count units carrying at least one strong signal (2026-05-24).
+
+    "Strong signal" = real unit_id (not ``inferred_*``), OR real rent
+    (``rent_low > 100``), OR real area (positive, not ABSENT sentinel),
+    OR an availability date.
+
+    Used by the LLM short-circuit gate at the entry of ``generic:llm_dom``
+    and ``generic:llm`` — if N prior tiers already produced this many
+    quality units, the LLM call has near-zero marginal value. Run
+    2026-05-24 motivation: 72% of LLM spend went to LLM_DOM calls that
+    fired on top of already-populated ``result.units`` from JSON-LD,
+    DOM scan, or embedded-JSON tiers, and the merge tier-label
+    overwrite hid the duplicate work.
+    """
+    if not units:
+        return 0
+    try:
+        from ma_poc.extraction.canonical import (
+            AVAIL_DATE_KEYS,
+            RENT_LO_KEYS,
+            SQFT_KEYS,
+            UID_KEYS,
+            get_numeric,
+            get_str,
+        )
+    except Exception:
+        return 0
+    count = 0
+    for u in units:
+        if not isinstance(u, dict):
+            continue
+        uid = get_str(u, UID_KEYS)
+        if uid and not uid.startswith("inferred_") and u.get("_inferred_id") is not True:
+            count += 1
+            continue
+        rent = get_numeric(u, RENT_LO_KEYS)
+        if rent is not None and rent > 100:
+            count += 1
+            continue
+        sqft = get_numeric(u, SQFT_KEYS)
+        if sqft is not None and sqft > 0:
+            count += 1
+            continue
+        if get_str(u, AVAIL_DATE_KEYS):
+            count += 1
+    return count
+
+
+def _llm_short_circuit_threshold() -> int:
+    """Minimum prior-tier quality-unit count above which the LLM tier
+    is short-circuited. Configurable via env (``LLM_SHORT_CIRCUIT_MIN_UNITS``).
+    Default 3 — matches the threshold the playbook proposed
+    (``dom_quality_and_llm_reduction_playbook.md`` § "recommended next actions").
+    """
+    import os as _os_sc
+    raw = _os_sc.getenv("LLM_SHORT_CIRCUIT_MIN_UNITS", "3")
+    try:
+        v = int(raw)
+        return v if v > 0 else 3
+    except Exception:
+        return 3
+
+
 def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
     """Return True when units carry identity + physical (≥2 fields) + transactional.
 
@@ -2993,6 +3057,26 @@ class GenericAdapter:
         _high_signal_page_dom = (
             int(getattr(ctx, "floor_plan_signal_count", 0) or 0) >= _SIGNAL_THRESHOLD_HIGH
         )
+        # 2026-05-24 short-circuit: skip the LLM_DOM call when prior tiers
+        # (jsonld, dom_scan, embedded_json, generic api) already produced
+        # ≥ threshold quality units. The LLM_DOM merge at result.units
+        # below would have stamped tier_used=TIER_4_LLM_DOM and billed
+        # ~$0.005 for what is usually duplicate work. Threshold defaults
+        # to 3, overridable via env LLM_SHORT_CIRCUIT_MIN_UNITS.
+        _short_circuit_n = _llm_short_circuit_threshold()
+        _prior_quality_units = _count_quality_units(result.units)
+        _llm_dom_short_circuited = _prior_quality_units >= _short_circuit_n
+        if _llm_dom_short_circuited and not dom_units and dom_section_html:
+            _log_attempt(
+                "generic:llm_dom_targeted",
+                "skipped",
+                units=0,
+                reason=(
+                    f"short_circuit_prior_units={_prior_quality_units}"
+                    f">={_short_circuit_n}"
+                ),
+                duration_ms=0,
+            )
         if (
             not dom_units
             and dom_section_html
@@ -3004,6 +3088,7 @@ class GenericAdapter:
             # property earlier in this function.
             and (int(_budget.get("llm_dom_calls", 0)) > 0 or _high_signal_page_dom)
             and not _llm_cost_exceeded()
+            and not _llm_dom_short_circuited
         ):
             t0 = _time.monotonic()
             if not _high_signal_page_dom:
@@ -3329,9 +3414,26 @@ class GenericAdapter:
         # the ultimate brake so a pathological case can't blow the budget.
         # _high_signal_page_dom was computed alongside _stub_aggregate_copy
         # above; reuse it here so both call sites apply the same threshold.
+        # 2026-05-24 short-circuit: same gate as the LLM_DOM call site
+        # above. When prior tiers already produced ≥ threshold quality
+        # units, the monolithic LLM call adds near-zero value AND burns
+        # ~$0.015/call (the most expensive tier — full HTML + APIs).
+        _mono_short_circuited = _count_quality_units(result.units) >= _llm_short_circuit_threshold()
+        if _mono_short_circuited:
+            _log_attempt(
+                "generic:llm",
+                "skipped",
+                units=0,
+                reason=(
+                    f"short_circuit_prior_units={_count_quality_units(result.units)}"
+                    f">={_llm_short_circuit_threshold()}"
+                ),
+                duration_ms=0,
+            )
         if (
             not _rc3_deferred
             and not _stub_aggregate_copy
+            and not _mono_short_circuited
             and (int(_budget.get("llm_monolithic", 0)) > 0 or _high_signal_page_dom)
             and not _llm_cost_exceeded()
         ):

@@ -108,6 +108,21 @@ class TestURLShapeScoring:
             ("/contact/", "anti_signal_non_inventory"),
             ("/sitemap", "anti_signal_non_inventory"),
             ("/news/2026/01-launch", "anti_signal_non_inventory"),
+            # 2026-05-24 additions — low-value paths previously missed.
+            ("/community/", "anti_signal_non_inventory"),
+            ("/lifestyle/", "anti_signal_non_inventory"),
+            ("/location/", "anti_signal_non_inventory"),
+            ("/directions/", "anti_signal_non_inventory"),
+            ("/map/", "anti_signal_non_inventory"),
+            ("/pets/", "anti_signal_non_inventory"),
+            ("/specials/", "anti_signal_non_inventory"),
+            # Nested anti-signals — the canonical run 2026-05-24 case
+            # (PID 257570 moderacherrycreek) had a property-slugged
+            # amenities path.
+            (
+                "/denver-co-apartments/modera-cherry-creek/amenities/",
+                "anti_signal_non_inventory",
+            ),
         ],
     )
     def test_anti_signal_paths(self, path: str, expected_label: str) -> None:
@@ -262,3 +277,83 @@ class TestSecureCafeDirectHrefPreference:
         assert url is not None
         assert "thebrookatcolumbia.securecafe.com" in url
         assert "/onlineleasing/the-brook-at-columbia/floorplans.aspx" in url
+
+
+# ── R3 (2026-05-24) — anti-signal lift-leak fix ─────────────────────────────
+
+
+class TestAntiSignalLiftLeak:
+    """The PMS_PRIOR floor-lift previously used ``url_shape < 3_000`` as its
+    upper gate, which accidentally matched anti-signal URLs whose shape
+    score is ``-2_000``. A ``/amenities/`` link with anchor text "Apartments"
+    (anchor_score=60) would land at 5_100 despite the explicit -2_000
+    penalty. Run 2026-05-24 PID 257570 moderacherrycreek hopped to an
+    amenities page through this leak; dom_scan then extracted a marketing
+    tagline as a floor_plan_name.
+
+    The fix gates the lift on ``0 <= url_shape < 3_000`` so anti-signal
+    URLs cannot be lifted.
+    """
+
+    def test_amenities_link_with_apartment_anchor_does_not_lift(self) -> None:
+        """The canonical run 2026-05-24 case. A property-slugged amenities
+        URL with an anchor containing "apartment" must NOT outrank a
+        floor-plan link on the same page."""
+        from ma_poc.pms.scraper import _rank_internal_links
+        html = """
+        <html><body>
+          <a href="/denver-co-apartments/modera-cherry-creek/amenities/">Amenities at Modera Apartment Homes</a>
+          <a href="/floor-plans/">Floor Plans</a>
+        </body></html>
+        """
+        ranked = _rank_internal_links(html, "https://www.moderacherrycreek.com/", limit=10)
+        # Floor-plans link must rank first; amenities must either be
+        # filtered out entirely (score <= 0) or rank strictly below.
+        if not ranked:
+            # All filtered — anti-signal worked, no false-positive admission.
+            return
+        top_url = ranked[0][0]
+        assert "amenities" not in top_url, (
+            f"Anti-signal lift leak regression: amenities ranked first. "
+            f"ranked={ranked}"
+        )
+
+    def test_anti_signal_url_below_universal_prior(self) -> None:
+        """An amenities link that survives the score>0 filter must rank
+        below ``_UNIVERSAL_PRIOR`` (4500). Anchor-text bonuses must not
+        be allowed to lift it past the floor-lift gate."""
+        from ma_poc.pms.scraper import _rank_internal_links
+        # Anchor "Tour Our Apartments" — gets anchor_score from "tour" (40)
+        # and "apartment" (60) — sum 100. Path matches "/apartments" path
+        # keyword (80) AND triggers anti_signal_non_inventory (-2_000).
+        html = """
+        <html><body>
+          <a href="/our-apartments/amenities/">Tour Our Apartments</a>
+        </body></html>
+        """
+        ranked = _rank_internal_links(html, "https://example.com/", limit=10)
+        for url, score, _anchor in ranked:
+            if "amenities" in url:
+                assert score < 4_500, (
+                    f"Anti-signal URL {url} got score {score}, above "
+                    f"_UNIVERSAL_PRIOR=4500. Lift-leak regression."
+                )
+
+    def test_legit_floor_plan_still_lifts_above_universal(self) -> None:
+        """Sanity check: the lift still fires for legitimate floor-plan
+        URLs that have anchor+path keywords but no detail-class shape."""
+        from ma_poc.pms.scraper import _rank_internal_links
+        html = """
+        <html><body>
+          <a href="/floorplans/">View Our Floor Plans</a>
+        </body></html>
+        """
+        ranked = _rank_internal_links(html, "https://example.com/", limit=10)
+        assert ranked, "Floor-plans link should rank, not be filtered out"
+        top_url, top_score, _ = ranked[0]
+        assert "floorplans" in top_url
+        # Bare index gets url_shape=1_500 (not anti-signal, not detail);
+        # with anchor+path keywords the lift should bring it to >= 5_100.
+        assert top_score >= 5_000, (
+            f"Legitimate floor-plan index lost its lift. score={top_score}"
+        )

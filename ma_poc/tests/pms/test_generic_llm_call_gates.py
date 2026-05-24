@@ -133,3 +133,119 @@ def test_signal_threshold_high_is_strictly_above_structural() -> None:
         SIGNAL_THRESHOLD_STRUCTURAL,
     )
     assert SIGNAL_THRESHOLD_HIGH > SIGNAL_THRESHOLD_STRUCTURAL
+
+
+# ── Prior-tier short-circuit gate (2026-05-24) ──────────────────────────────
+
+
+class TestLlmShortCircuit:
+    """When prior tiers (jsonld, dom_scan, embedded_json, api parsers) have
+    already produced N quality units, the LLM_DOM and monolithic LLM calls
+    are skipped — they would have produced near-duplicate output at
+    ~$0.005-$0.015/call. The merge tier-label overwrite at the LLM_DOM
+    branch made the duplicate work invisible until the
+    ``dom_quality_and_llm_reduction_playbook`` § 2026-05-24 analysis.
+    """
+
+    def test_threshold_defaults_to_three(self) -> None:
+        from ma_poc.pms.adapters.generic import _llm_short_circuit_threshold
+        assert _llm_short_circuit_threshold() == 3
+
+    def test_threshold_env_override(self, monkeypatch) -> None:
+        from ma_poc.pms.adapters.generic import _llm_short_circuit_threshold
+        monkeypatch.setenv("LLM_SHORT_CIRCUIT_MIN_UNITS", "7")
+        assert _llm_short_circuit_threshold() == 7
+
+    def test_threshold_env_garbage_falls_back_to_three(self, monkeypatch) -> None:
+        from ma_poc.pms.adapters.generic import _llm_short_circuit_threshold
+        monkeypatch.setenv("LLM_SHORT_CIRCUIT_MIN_UNITS", "not-a-number")
+        assert _llm_short_circuit_threshold() == 3
+
+    def test_threshold_env_nonpositive_falls_back_to_three(self, monkeypatch) -> None:
+        from ma_poc.pms.adapters.generic import _llm_short_circuit_threshold
+        monkeypatch.setenv("LLM_SHORT_CIRCUIT_MIN_UNITS", "0")
+        assert _llm_short_circuit_threshold() == 3
+
+    def test_count_quality_units_empty(self) -> None:
+        from ma_poc.pms.adapters.generic import _count_quality_units
+        assert _count_quality_units([]) == 0
+        assert _count_quality_units(None) == 0  # type: ignore[arg-type]
+
+    def test_count_quality_units_inferred_only_excluded(self) -> None:
+        # Inferred-id rows with no rent / area / availability are weak —
+        # the LLM might do better. Don't count them.
+        from ma_poc.pms.adapters.generic import _count_quality_units
+        units = [
+            {"unit_id": "inferred_abc"},
+            {"unit_id": "inferred_def", "_inferred_id": True},
+        ]
+        assert _count_quality_units(units) == 0
+
+    def test_count_quality_units_real_uid(self) -> None:
+        from ma_poc.pms.adapters.generic import _count_quality_units
+        units = [{"unit_id": "101"}, {"unit_id": "202"}, {"unit_id": "inferred_x"}]
+        assert _count_quality_units(units) == 2
+
+    def test_count_quality_units_real_rent(self) -> None:
+        from ma_poc.pms.adapters.generic import _count_quality_units
+        units = [{"rent_low": 1500}, {"rent_low": 50}, {"rent_low": 2200}]
+        # rent==50 below floor — likely deposit/fee leak.
+        assert _count_quality_units(units) == 2
+
+    def test_count_quality_units_real_area(self) -> None:
+        from ma_poc.extraction.canonical import ABSENT
+        from ma_poc.pms.adapters.generic import _count_quality_units
+        units = [{"area": 750}, {"area": ABSENT}, {"area": 900}]
+        assert _count_quality_units(units) == 2
+
+    def test_count_quality_units_availability_date(self) -> None:
+        from ma_poc.pms.adapters.generic import _count_quality_units
+        units = [{"available_date": "2026-06-01"}, {"available_date": "Now"}]
+        assert _count_quality_units(units) == 2
+
+    def test_count_quality_units_mixed_signals(self) -> None:
+        # Each row counts at most once even with multiple signals.
+        from ma_poc.pms.adapters.generic import _count_quality_units
+        units = [
+            {"unit_id": "inferred_a", "rent_low": 1500},  # rent qualifies
+            {"area": 750, "beds": 1},
+            {"available_date": "2026-06-01", "baths": 1},
+            {"unit_id": "101"},
+        ]
+        assert _count_quality_units(units) == 4
+
+    def test_dom_targeted_call_site_checks_short_circuit(self) -> None:
+        """The DOM-targeted LLM gate must include the short-circuit check
+        in its conditions. Without it the call still fires on top of an
+        already-populated ``result.units`` from prior tiers — duplicate
+        work + ~$7/run wasted (run 2026-05-24 measurement). Source-level
+        match: ``dom_section_html`` and ``not _llm_dom_short_circuited``
+        appear in the same gate block within a few hundred chars."""
+        # Find the dom_section_html gate block and confirm the short-circuit
+        # token sits inside it (multi-line gate with internal parens
+        # defeats a simple bracketed regex).
+        for m in re.finditer(r"and dom_section_html", _SRC):
+            window = _SRC[m.start(): m.start() + 800]
+            if "not _llm_dom_short_circuited" in window:
+                return
+        raise AssertionError(
+            "Regression: the LLM_DOM call site no longer respects the "
+            "short-circuit gate (_llm_dom_short_circuited). See "
+            "generic.py near the dom-targeted LLM gate."
+        )
+
+    def test_monolithic_call_site_checks_short_circuit(self) -> None:
+        match = re.search(
+            r"if\s*\([^)]*?_rc3_deferred[^)]*?not\s+_mono_short_circuited",
+            _SRC,
+            re.DOTALL,
+        )
+        assert match, (
+            "Regression: the monolithic LLM call site no longer respects "
+            "the short-circuit gate (_mono_short_circuited)."
+        )
+
+    def test_short_circuit_skip_has_distinct_reason(self) -> None:
+        """The skip event's reason must mention ``short_circuit_prior_units``
+        so the analyzer can bucket it separately from budget / signal skips."""
+        assert "short_circuit_prior_units" in _SRC

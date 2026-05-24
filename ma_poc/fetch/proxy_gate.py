@@ -110,12 +110,33 @@ _PROXY_ELIGIBLE_STAGES: frozenset[str] = frozenset({
     "wp_probe",
     # Entrata ProspectPortal probe — restored 2026-05-22
     "prospectportal_probe",
+    # 2026-05-24 R5 — Entrata sitemap-driven discovery (vanity hosts).
+    # ``sitemap_fetch`` pulls ``/sitemap.xml`` to discover the listing URL;
+    # ``sitemap_conventional`` fetches that listing URL for JSON-LD.
+    # Both run from the adapter via ``_entrata_static_fetch``.
+    "sitemap_fetch",
+    "sitemap_conventional",
+    # 2026-05-24 R5 — Entrata view_unit_spaces expansion. After the
+    # XHR-capture path parses N plan rows, the adapter synthesizes
+    # view_unit_spaces URLs from each plan's fee_calculator field and
+    # fetches them per-fp. CF-fronted on most vanity-host deployments.
+    "entrata_view_unit_spaces",
+    # 2026-05-24 R5 — Entrata-WordPress per-plan detail page crawl.
+    # Reads ``available_units`` JSON from ``/floorplan/<slug>/`` pages.
+    "entrata_wp_probe",
     # RentManager search probe — sometimes on a third-party host
     "rentmanager_search",
     # RealPage / OneSite cross-origin probes
     "realpage_cws",     # cross-host RealPage CWS API (generic adapter)
     # Nestin per-plan detail page fetch when same-host clearance fails
     "nestin_detail_fetch",
+    # 2026-05-24 raw-httpx sweep — stages newly threaded through
+    # ``probe_get`` from the AppFolio / G5 / Knock / SightMap adapters.
+    # All three external API hosts are CF-protected in production.
+    "appfolio_api_probe",
+    "g5_probe",
+    "knock_probe",
+    "sightmap_probe",
 })
 
 #: Detection-confidence floor for Layer 4. Detections at 0.70 or lower

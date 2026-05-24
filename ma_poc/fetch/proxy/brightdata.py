@@ -38,29 +38,40 @@ class BrightDataZone:
     password: str
 
 
+_ENV_KEYS_BY_TIER: dict[ProxyTier, tuple[str, str]] = {
+    ProxyTier.DATACENTER: ("BRIGHTDATA_DC_ZONE", "BRIGHTDATA_DC_PASSWORD"),
+    ProxyTier.RESIDENTIAL: ("BRIGHTDATA_RESI_ZONE", "BRIGHTDATA_RESI_PASSWORD"),
+}
+
+
 class BrightDataProvider:
     """Provider that constructs per-request proxy configs for Bright Data.
 
-    Required env vars:
+    Required env var (always):
         BRIGHTDATA_CUSTOMER_ID
-        BRIGHTDATA_DC_ZONE, BRIGHTDATA_DC_PASSWORD
-        BRIGHTDATA_RESI_ZONE, BRIGHTDATA_RESI_PASSWORD
 
-    UNBLOCKER is a future handoff and raises NotImplementedError.
+    Tier-specific env vars (resolved lazily on first use of the tier):
+        DATACENTER  -> BRIGHTDATA_DC_ZONE, BRIGHTDATA_DC_PASSWORD
+        RESIDENTIAL -> BRIGHTDATA_RESI_ZONE, BRIGHTDATA_RESI_PASSWORD
+
+    Construction only verifies CUSTOMER_ID is present. Tier zones are
+    materialised on first ``get_config(tier=...)`` call (2026-05-24 —
+    previously both DC + RESI zones were eagerly required at __init__,
+    which crashed the residential-only deployment scenario where DC
+    zone/password secrets are not provisioned).
+
+    UNBLOCKER tier raises NotImplementedError — Web Unlocker has its
+    own provider (``fetch/providers/unlocker.py``) that does not use
+    BrightDataProvider at all.
     """
 
     def __init__(self) -> None:
         self.customer_id = self._require("BRIGHTDATA_CUSTOMER_ID")
-        self.zones: dict[ProxyTier, BrightDataZone] = {
-            ProxyTier.DATACENTER: BrightDataZone(
-                zone_name=self._require("BRIGHTDATA_DC_ZONE"),
-                password=self._require("BRIGHTDATA_DC_PASSWORD"),
-            ),
-            ProxyTier.RESIDENTIAL: BrightDataZone(
-                zone_name=self._require("BRIGHTDATA_RESI_ZONE"),
-                password=self._require("BRIGHTDATA_RESI_PASSWORD"),
-            ),
-        }
+        # Lazy zone cache — populated on first ``get_config`` call for
+        # each tier. Tiers whose env vars are missing surface a clear
+        # RuntimeError at the call site (not at construction) so
+        # deployments wired for only one tier don't crash at startup.
+        self._zones: dict[ProxyTier, BrightDataZone] = {}
 
     @staticmethod
     def _require(key: str) -> str:
@@ -72,6 +83,28 @@ class BrightDataProvider:
                 "See BRIGHT_DATA_SETUP.md for credential sourcing."
             )
         return val
+
+    def _zone_for(self, tier: ProxyTier) -> BrightDataZone:
+        """Resolve the zone+password for *tier*, caching on first hit.
+
+        Raises ``RuntimeError`` with a tier-named message when the env
+        vars for that specific tier are missing. The error fires only
+        when the tier is actually used — not at provider construction —
+        so a deployment that enables only RESIDENTIAL doesn't need the
+        DC zone secrets, and vice versa.
+        """
+        cached = self._zones.get(tier)
+        if cached is not None:
+            return cached
+        if tier not in _ENV_KEYS_BY_TIER:
+            raise RuntimeError(f"No env-key mapping for ProxyTier {tier!r}")
+        zone_env, pwd_env = _ENV_KEYS_BY_TIER[tier]
+        zone = BrightDataZone(
+            zone_name=self._require(zone_env),
+            password=self._require(pwd_env),
+        )
+        self._zones[tier] = zone
+        return zone
 
     def get_config(
         self,
@@ -85,10 +118,11 @@ class BrightDataProvider:
 
         if tier == ProxyTier.UNBLOCKER:
             raise NotImplementedError(
-                "UNBLOCKER tier requires Web Unlocker integration — future handoff"
+                "UNBLOCKER tier is handled by fetch/providers/unlocker.py — "
+                "BrightDataProvider does not own it"
             )
 
-        zone = self.zones[tier]
+        zone = self._zone_for(tier)
         session_id = self._session_id(canonical_id)
         username = self._build_username(zone.zone_name, country, session_id)
         return ProxyConfig(

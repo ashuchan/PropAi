@@ -30,6 +30,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from ma_poc.pms.adapters._merge_fns import _UNIT_SIGNAL_KEYS as _MERGE_UNIT_SIGNAL_KEYS
 from ma_poc.pms.adapters._parsing import (
@@ -541,6 +542,52 @@ class AppFolioAdapter:
                     result.confidence = 0.85
                     return result
 
+        # 2026-05-24 R2 direct-probe: when XHR capture + SSR + detail page all
+        # missed, fall back to a same-tenant direct fetch via
+        # ``probe_get`` (curl_cffi + chrome120 + proxy gate + Web Unlocker
+        # escalation). The motivating cohort: 174 AppFolio properties on
+        # vanity domains that don't fire ``/listings`` XHR during entry
+        # render (XHR matcher saw 0 of 4-26 responses for PIDs 220763
+        # northwoodsapts, 1509 parkplacetampa, 43183 grandbayapts in
+        # run 2026-05-24). The tenant slug discovered in the page HTML
+        # gives us ``{slug}.appfolio.com/listings`` deterministically;
+        # ``probe_get`` handles the proxy decision, clearance cookies,
+        # and 403 → Web Unlocker escalation without any adapter logic.
+        #
+        # 2026-05-24 extension: probe MULTIPLE URL shapes per tenant.
+        # AppFolio exposes two reachable endpoints for listings data:
+        #   * ``/listings`` — SSR HTML with ``data-listing-id`` cards
+        #   * ``/2/api/property_units`` — JSON envelope (more durable;
+        #     parsed via the existing ``parse_appfolio_listings`` helper
+        #     used by the XHR-capture path)
+        # We try HTML first (existing behaviour), then fall back to JSON.
+        if page_html:
+            slug = find_appfolio_slug(page_html)
+            if slug:
+                origin_host = ""
+                try:
+                    if fetch_result is not None:
+                        origin_host = (
+                            urlparse(getattr(fetch_result, "final_url", "") or "").hostname or ""
+                        ).lower()
+                    if not origin_host:
+                        origin_host = (
+                            urlparse(getattr(ctx, "base_url", "") or "").hostname or ""
+                        ).lower()
+                except Exception:
+                    origin_host = ""
+                # Only probe when the slug points at a tenant subdomain we
+                # haven't already loaded as the entry. If the entry IS
+                # ``{slug}.appfolio.com``, the XHR-capture path already had
+                # its shot.
+                slug_host = f"{slug}.appfolio.com"
+                if slug_host != origin_host:
+                    probe_result = await self._appfolio_probe_tenant(
+                        slug, slug_host, ctx, pid_for_log, result
+                    )
+                    if probe_result is not None:
+                        return probe_result
+
         # 2026-05-13 port (Commit 14 wiring): cross-origin embed-recovery.
         # When the page being scraped is a Wix/Squarespace marketing shell
         # with a cross-origin iframe to ``{tenant}.appfolio.com/listings``,
@@ -567,6 +614,139 @@ class AppFolioAdapter:
         result.confidence = 0.0
         result.errors.append("No AppFolio unit data found in captured API responses or SSR DOM")
         return result
+
+    async def _appfolio_probe_tenant(
+        self,
+        slug: str,
+        slug_host: str,
+        ctx: AdapterContext,
+        pid_for_log: str,
+        result: AdapterResult,
+    ) -> AdapterResult | None:
+        """2026-05-24 R2: probe an AppFolio tenant subdomain via two URL
+        shapes (SSR HTML then JSON API) using ``probe_get`` so the proxy
+        gate routes the request through the residential pool when
+        ``PROBE_PROXY_URL`` is configured.
+
+        Returns the populated AdapterResult on success, ``None`` when both
+        shapes failed (caller falls through to the embed-recovery path).
+
+        URL shapes:
+          1. ``https://{slug}.appfolio.com/listings`` — SSR HTML
+             (existing pre-extension behaviour; parsed via
+             ``parse_appfolio_listings_ssr``).
+          2. ``https://{slug}.appfolio.com/2/api/property_units`` — JSON
+             envelope; parsed via ``parse_appfolio_listings`` (the same
+             helper the XHR-capture path uses, so the field mapping is
+             identical).
+        """
+        from ma_poc.pms.adapters._adapter_telemetry import log_adapter_stage
+        from ma_poc.pms.adapters._probe import probe_get
+
+        # Shape 1: SSR HTML
+        probe_url = f"https://{slug_host}/listings"
+        probe_text = ""
+        probe_status: int | None = None
+        try:
+            resp = probe_get(
+                probe_url,
+                ctx=ctx,
+                stage="appfolio_api_probe",
+                timeout=20,
+            )
+            probe_text = getattr(resp, "text", "") or ""
+            probe_status = getattr(resp, "status_code", None)
+        except Exception as exc:
+            result.errors.append(
+                f"appfolio-direct-probe-error: {type(exc).__name__}: "
+                f"{str(exc)[:120]}"
+            )
+        log_adapter_stage(
+            "appfolio", pid_for_log, "appfolio_api_probe",
+            f"status_{probe_status}" if probe_status else "no_response",
+            units=0,
+            reason=f"shape=listings_ssr url={probe_url[:120]} body_len={len(probe_text)}",
+        )
+        if probe_status == 200 and "data-listing-id=" in probe_text:
+            ssr_units = parse_appfolio_listings_ssr(probe_text, probe_url)
+            if ssr_units:
+                result.units = ssr_units
+                result.tier_used = "TIER_1_DOM_APPFOLIO_PROBE"
+                result.winning_url = probe_url
+                result.confidence = min(0.92, 0.7 + 0.04 * len(ssr_units))
+                log_adapter_stage(
+                    "appfolio", pid_for_log, "appfolio_api_probe",
+                    "ok", units=len(ssr_units),
+                    reason=f"shape=listings_ssr slug={slug}",
+                )
+                return result
+
+        # Shape 2: JSON API fallback.
+        # 2026-05-24 extension. Mirrors the rescue service's
+        # _AVAILABILITY_URL_SIGNALS catalogue — ``/2/api/property_units``
+        # is the documented JSON-emitting endpoint that AppFolio's marketing
+        # iframe consumes. Worth trying when /listings either returns a
+        # non-200 (CF) or returns 200 with no card-shaped HTML (some
+        # tenants serve a sign-in interstitial on /listings).
+        json_url = f"https://{slug_host}/2/api/property_units"
+        json_body: Any = None
+        json_status: int | None = None
+        try:
+            resp = probe_get(
+                json_url, ctx=ctx, stage="appfolio_api_probe", timeout=20,
+            )
+            json_status = getattr(resp, "status_code", None)
+            if json_status == 200:
+                try:
+                    json_body = resp.json()
+                except Exception:
+                    json_body = None
+        except Exception as exc:
+            result.errors.append(
+                f"appfolio-json-probe-error: {type(exc).__name__}: "
+                f"{str(exc)[:120]}"
+            )
+        log_adapter_stage(
+            "appfolio", pid_for_log, "appfolio_api_probe",
+            f"status_{json_status}" if json_status else "no_response",
+            units=0,
+            reason=f"shape=property_units_json url={json_url[:120]} parsed={json_body is not None}",
+        )
+        if json_status == 200 and json_body is not None:
+            items: list[dict[str, Any]] = []
+            if isinstance(json_body, dict):
+                items = (
+                    json_body.get("objects")
+                    or json_body.get("results")
+                    or json_body.get("listings")
+                    or json_body.get("property_units")
+                    or []
+                )
+            elif isinstance(json_body, list):
+                items = json_body
+            json_units = parse_appfolio_listings(items, json_url) if items else []
+            if json_units:
+                # Stage 1 validity gate (mirroring the XHR-capture path).
+                from ma_poc.extraction.post_process import post_process
+
+                _pp = post_process(
+                    json_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _pp.n_admitted > 0:
+                    result.units = list(_pp.units)
+                    result.plan_summaries = list(_pp.plan_summaries)
+                    result.post_process_meta = _pp.to_meta()
+                    result.tier_used = "TIER_1_API_APPFOLIO_PROBE"
+                    result.winning_url = json_url
+                    result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
+                    log_adapter_stage(
+                        "appfolio", pid_for_log, "appfolio_api_probe",
+                        "ok",
+                        units=_pp.n_admitted,
+                        reason=f"shape=property_units_json slug={slug}",
+                    )
+                    return result
+        return None
 
     def static_fingerprints(self) -> list[str]:
         return list(self._fingerprints)

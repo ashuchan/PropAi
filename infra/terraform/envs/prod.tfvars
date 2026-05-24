@@ -39,6 +39,37 @@ email_transport        = "gmail_api"
 report_recipients      = "ashu@surgexdigital.com"
 report_sender_name     = "PropAi Daily Reports"
 
+# ── Tier-escalation + BrightData / Web Unlocker (2026-05-24) ────────────────
+#
+# Production switches off the legacy PROXY_POOL_URLS-based inline L1
+# escalation (still wired so flipping enable_tier_escalation back to false
+# is a one-tfvar revert) and onto the fetch/tier_escalator.py ladder:
+#
+#   DIRECT → RESIDENTIAL (BrightData) → UNLOCKER (Web Unlocker REST API)
+#
+# DC tier deliberately left off — no BRIGHTDATA_DC_* secrets are
+# provisioned, and the BrightDataProvider 2026-05-24 lazy refactor would
+# raise RuntimeError on first DC dispatch. Adding DC is a future PR that
+# mints brightdata-dc-zone + brightdata-dc-password secrets first, then
+# flips enable_dc_proxy_tier to true.
+#
+# Adapter cross-origin probes (sc_probe, prospectportal_probe, ...) read
+# probe_proxy_secret_id via fetch/proxy_gate.py.
+# Web Unlocker is used by both pms/adapters/_probe.py (sc_probe_unlocker
+# fallback) AND the L1 UnlockerProvider's api-transport mode (no
+# brightdata-unlocker-zone/password secrets needed for REST).
+enable_tier_escalation             = true
+enable_dc_proxy_tier               = false
+enable_residential_tier            = true
+enable_unlocker_tier               = true
+probe_proxy_secret_id              = "brightdata-probe-proxy"
+web_unlocker_key_secret_id         = "web-unlocker-key-canary"
+brightdata_customer_id_secret_id   = "brightdata-customer-id"
+brightdata_resi_zone_secret_id     = "brightdata-resi-zone"
+brightdata_resi_password_secret_id = "brightdata-resi-password"
+# brightdata_dc_zone_secret_id     = ""   # leave unset until DC zone secret minted
+# brightdata_dc_password_secret_id = ""   # leave unset until DC password secret minted
+
 # ── propai-frontend (UI + API) ──────────────────────────────────────────────
 # Initial tag is "bootstrap" — only used if someone runs `terraform apply`
 # directly without going through .github/workflows/deploy-frontend.yml. The
