@@ -578,6 +578,62 @@ async def scrape(
         except Exception:
             pass
 
+    # --- Step 3b: API-response concession capture (2026-05-24) ----------------
+    # The page-HTML banner regex (Step 3 above) catches the dominant 80%+
+    # case where the offer is displayed on the property's marketing page.
+    # The 3-17% remainder lives in API JSON responses captured by
+    # adapters (Knock leasingSpecial, G5 marketing-center
+    # specialDisplayText, RentCafe bannerText/offer_description, Wix
+    # promotion, Yardi SecureCafe bannerText, etc.).
+    #
+    # extract_api_concession() knows ALL the PMS-specific field name
+    # variations and filters out GDPR/cookie consent UI strings,
+    # Wix branding placeholders, and Yardi empty-state copy. Walks the
+    # captured API responses, returns the longest meaningful text found.
+    #
+    # Only runs when the HTML banner produced nothing (capture-first:
+    # the page banner is usually more authoritative than the API field
+    # because it reflects what end-users see).
+    if not result.get("concessions_text"):
+        try:
+            from ma_poc.core.api_concession_extract import (
+                extract_api_concession,
+            )
+
+            _captured = getattr(ctx, "_api_responses", []) or []
+            _api_conc: str | None = None
+            for _resp in _captured:
+                if not isinstance(_resp, dict):
+                    continue
+                _body = _resp.get("body")
+                if _body is None:
+                    continue
+                # Body may be a dict (already-parsed JSON) or string
+                _parsed: object | None = None
+                if isinstance(_body, (dict, list)):
+                    _parsed = _body
+                elif isinstance(_body, (str, bytes)):
+                    try:
+                        import json as _json_a
+                        _txt = (
+                            _body.decode("utf-8", "replace")
+                            if isinstance(_body, bytes) else _body
+                        )
+                        _parsed = _json_a.loads(_txt)
+                    except Exception:
+                        _parsed = None
+                if _parsed is None:
+                    continue
+                _candidate = extract_api_concession(_parsed)
+                if _candidate and (
+                    _api_conc is None or len(_candidate) > len(_api_conc)
+                ):
+                    _api_conc = _candidate
+            if _api_conc:
+                result["concessions_text"] = _api_conc[:300]
+        except Exception:
+            pass
+
     # --- Step 4: Re-detect with page HTML if available ---
     if page_html:
         html_detection = detect_pms(_effective_url, csv_row=csv_row, page_html=page_html)
