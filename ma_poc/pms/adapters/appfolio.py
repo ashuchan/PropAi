@@ -156,7 +156,95 @@ _RENT_RE = re.compile(r'js-listing-blurb-rent[^>]*>([^<]+)<', re.IGNORECASE)
 _BED_BATH_RE = re.compile(r'js-listing-blurb-bed-bath[^>]*>([^<]+)<', re.IGNORECASE)
 _SQFT_RE = re.compile(r'js-listing-square-feet[^>]*>([^<]+)<', re.IGNORECASE)
 _AVAIL_RE = re.compile(r'js-listing-available[^>]*>([^<]+)<', re.IGNORECASE)
-_ADDRESS_RE = re.compile(r'js-listing-address[^>]*>\s*<[^>]+>([^<]+)<', re.IGNORECASE)
+# 2026-05-24 (audit xlsx 2026-05-23): the prior regex
+#   js-listing-address[^>]*>\s*<[^>]+>([^<]+)<
+# required an inner ``<a>``/``<i>`` tag between the span and the address
+# text. Several tenants (e.g. kelseymanagement / Brantley Pines I,
+# americancapitalrealty / Citadel Village) emit the address text DIRECTLY
+# inside the span with no inner tag, so address capture failed and
+# ``floor_plan_name`` collapsed to the literal ``AppFolio listing
+# {listing_id}`` fallback. That made the audit fail with
+# ``didn't find this unit`` because we had no real address shown AND
+# the unit_number was the internal listing_id (see fix below).
+# Make the inner-tag group optional so both shapes match.
+_ADDRESS_RE = re.compile(
+    r'js-listing-address[^>]*>(?:\s*<[^>]+>)?\s*([^<]+)',
+    re.IGNORECASE,
+)
+
+# 2026-05-24 (audit xlsx 2026-05-23): the production AppFolio SSR adapter
+# stored ``unit_number = listing_id`` — AppFolio's INTERNAL listing id
+# (e.g. ``760``, ``5599``). The audit flagged 9 properties with
+# "Fail - didn't find this unit" because the website displays the
+# apartment number that sits INSIDE the address suffix (e.g.
+# ``1422 Som Center Road #810`` → unit ``#810``, not 760).
+# This module extracts the unit number from the address string, trying
+# the common suffix shapes in priority order. Returns "" when the
+# address looks like a single-family / townhouse with no apartment
+# unit (e.g. ``355 Monument Road, Jacksonville, FL``).
+_UNIT_FROM_ADDR_PATTERNS = [
+    # Pattern 1 — hash-prefixed: '#810', '#2D', '#1O', '#3H'
+    # Most common — Carlton, Becovic.
+    re.compile(r"#\s*([A-Za-z0-9]+(?:-[A-Za-z0-9]+)?)\b"),
+    # Pattern 2 — Apt/Apartment/Apt.: 'Apt 429', 'Apartment 8'
+    # kelseymanagement (Brantley Pines I shape).
+    re.compile(
+        r"\bApt(?:\.|artment)?\s+([A-Za-z0-9]+(?:-[A-Za-z0-9]+)?)\b",
+        re.IGNORECASE,
+    ),
+    # Pattern 3 — Suite/Unit/Ste: 'Suite 12', 'Unit 5', 'Ste 200'
+    re.compile(
+        r"\b(?:Suite|Unit|Ste)\s+([A-Za-z0-9]+(?:-[A-Za-z0-9]+)?)\b",
+        re.IGNORECASE,
+    ),
+    # Pattern 4 — dash-separated suffix before comma: '- V024,',
+    # '- 3050-302,', '- 1116,'. bargeprops (Quail Creek) +
+    # becovic. Captures the token between '- ' and ',' — handles
+    # internal hyphens in the unit id like '3050-302'.
+    re.compile(r"-\s+([A-Za-z0-9]+(?:-[A-Za-z0-9]+)?)\s*,"),
+    # Pattern 5 — trailing numeric/alphanumeric before first comma:
+    # '301 W. Hawkins Parkway 1116, Longview' → '1116'. Must start
+    # with a digit OR be letter+digit (e.g. 'G1-47') to avoid matching
+    # the street name itself. bargeprops (Quail Creek shape 2).
+    re.compile(
+        r"\s+(\d+[A-Za-z0-9\-]*|[A-Za-z]\d[A-Za-z0-9\-]*)\s*,"
+    ),
+    # Pattern 6 — inter-comma alphanumeric token: '4121 San Antonio
+    # St, 614, Odessa' → '614', '1349 Redmond Circle, G1-47, Rome' →
+    # 'G1-47'. americancapitalrealty (Citadel) + Riverside North.
+    re.compile(
+        r",\s*(\d+[A-Za-z0-9\-]*|[A-Za-z]+\d[A-Za-z0-9\-]*)\s*,"
+    ),
+]
+
+
+def _extract_unit_from_address(addr: str) -> str:
+    """Extract the apartment/unit number from a full street address.
+
+    Returns ``""`` (not the listing_id) when no unit suffix is found —
+    the caller decides what to do with that signal. Single-family /
+    townhouse addresses (e.g. ``355 Monument Road, Jacksonville, FL``)
+    correctly yield empty.
+
+    Verified against live-fetched address shapes from 5 AppFolio
+    tenants on 2026-05-24 (Carlton, Becovic, Bargeprops, Citadel,
+    Kelseymanagement) — see tests for the parametric coverage.
+    """
+    if not addr:
+        return ""
+    for pat in _UNIT_FROM_ADDR_PATTERNS:
+        m = pat.search(addr)
+        if m:
+            candidate = m.group(1).strip()
+            # Sanity — unit must contain at least one digit OR be a
+            # bare letter (e.g. 'D' for building-letter notation).
+            # Filters out cases where the regex backtracks onto a
+            # city name token like 'Naples' or 'Tampa'.
+            if any(c.isdigit() for c in candidate) or (
+                len(candidate) == 1 and candidate.isalpha()
+            ):
+                return candidate
+    return ""
 # Verified against pablogroup.appfolio.com on 2026-05-05: the redirect lands
 # on https://www.appfolio.com/page-not-found-sub which renders a page whose
 # <title> includes "AppFolio - Page Not Found" alongside the canonical URL.
@@ -230,6 +318,15 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
         avail_raw = avail_m.group(1).strip() if avail_m else ""
         address = addr_m.group(1).strip() if addr_m else ""
 
+        # 2026-05-24 (audit xlsx 2026-05-23): prefer the apartment
+        # suffix parsed out of the address (the value the website
+        # actually displays). Fall back to listing_id ONLY when the
+        # address has no recognisable unit suffix AND we don't want
+        # to lose row identity. Preserve listing_id in source_ids for
+        # downstream provenance regardless.
+        unit_from_addr = _extract_unit_from_address(address)
+        unit_number_display = unit_from_addr or listing_id
+
         units.append(
             make_unit_dict(
                 floor_plan_name=address or f"AppFolio listing {listing_id}",
@@ -237,7 +334,7 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
                 bedrooms=str(beds) if beds is not None else "",
                 bathrooms=str(baths) if baths is not None else "",
                 sqft=sqft,
-                unit_number=listing_id,
+                unit_number=unit_number_display,
                 rent_range=format_rent_range(rent_val, rent_val),
                 availability_status="AVAILABLE",
                 availability_date=avail_raw or "",
