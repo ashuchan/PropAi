@@ -13,6 +13,7 @@ from __future__ import annotations
 import ma_poc.pms.adapters  # noqa: F401  # populate adapter registry
 from ma_poc.pms.adapters.essex import (
     EssexAdapter,
+    build_unit_id_to_name_map,
     parse_essex_availability,
 )
 from ma_poc.pms.adapters.registry import get_adapter
@@ -117,3 +118,93 @@ def test_adapter_registered_and_body_check() -> None:
     assert a.matches_response_body(_REAL)
     assert not a.matches_response_body({"success": True})
     assert not a.matches_response_body("not a dict")
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-24 — per-unit fallback hardening: use the bulk-response's
+# unit_id → name map so the per-unit /availability endpoint doesn't
+# ship the 7-digit internal unit_id as unit_number.
+#
+# Live-verified across 10 Essex properties (pid 491713/510844/510849/
+# 510892/510898/513997/514248/514264/514272/547482): bulk SPA response
+# carries name='G104'/'B303'/'099'/'PH-E' etc. The per-unit endpoint
+# only carries unit_id=6302046 (internal). Map keeps the displayed
+# value flowing even on fallback.
+# ─────────────────────────────────────────────────────────────────────
+
+
+_BULK_WITH_NAMES = {
+    "success": True,
+    "result": {
+        "floorplans": [
+            {
+                "floorplan_id": 2101784,
+                "name": "A1",
+                "units": [
+                    {"unit_id": 6302379, "name": "G104", "minimum_rent": 2487},
+                    {"unit_id": 6302046, "name": "B303", "minimum_rent": 2137},
+                    {"unit_id": 6301713, "name": "099", "minimum_rent": 2277},
+                ],
+            }
+        ]
+    },
+}
+
+
+def test_build_unit_id_to_name_map_walks_floorplans_units() -> None:
+    m = build_unit_id_to_name_map(_BULK_WITH_NAMES)
+    assert m == {
+        "6302379": "G104",
+        "6302046": "B303",
+        "6301713": "099",
+    }
+
+
+def test_build_unit_id_to_name_map_handles_malformed() -> None:
+    assert build_unit_id_to_name_map(None) == {}
+    assert build_unit_id_to_name_map({}) == {}
+    assert build_unit_id_to_name_map({"result": "notadict"}) == {}
+    assert build_unit_id_to_name_map({"result": {"floorplans": "notalist"}}) == {}
+    assert build_unit_id_to_name_map({"result": {"floorplans": [None, 42]}}) == {}
+    assert build_unit_id_to_name_map(
+        {"result": {"floorplans": [{"units": "notalist"}]}}
+    ) == {}
+    assert build_unit_id_to_name_map(
+        {"result": {"floorplans": [{"units": [{"unit_id": 1}]}]}}
+    ) == {}  # missing name → skipped
+
+
+def test_per_unit_fallback_uses_bulk_map_when_provided() -> None:
+    """The audit-prevention case: per-unit /availability response
+    only has unit_id=6302379, but bulk_map says it's 'G104'.
+    parse_essex_availability MUST ship 'G104' as unit_number."""
+    units = parse_essex_availability(
+        _REAL,
+        "https://essex/x/units/6302379/availability",
+        unit_id_to_name={"6302379": "G104"},
+    )
+    assert len(units) == 1
+    assert units[0]["unit_number"] == "G104", (
+        f"per-unit fallback should resolve via bulk map; got "
+        f"{units[0]['unit_number']!r} — the unit_id leak is back."
+    )
+
+
+def test_per_unit_fallback_falls_back_to_unit_id_when_map_missing() -> None:
+    """When no map is supplied (legacy callers / no bulk available),
+    preserve the prior behaviour of shipping the internal unit_id."""
+    units = parse_essex_availability(_REAL, "x")
+    assert units[0]["unit_number"] == "6302379"  # legacy fallback
+
+
+def test_per_unit_fallback_falls_back_to_unit_id_when_map_lacks_id() -> None:
+    """Map present but doesn't include this unit_id → fall back to id."""
+    units = parse_essex_availability(
+        _REAL, "x", unit_id_to_name={"9999999": "OTHER"}
+    )
+    assert units[0]["unit_number"] == "6302379"
+
+
+def test_per_unit_fallback_handles_empty_map() -> None:
+    units = parse_essex_availability(_REAL, "x", unit_id_to_name={})
+    assert units[0]["unit_number"] == "6302379"
