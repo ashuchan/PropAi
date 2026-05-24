@@ -1926,6 +1926,67 @@ class GenericAdapter:
                         return result
                     skip_llm = False
 
+            # ── Sub-tier 2.78 (2026-05-24): WordPress Entrata-theme REST.
+            # WordPress sites with the Entrata-branded theme expose
+            # ``wp-json/theme/entrata/v1/floor-plans`` returning rich
+            # per-unit data (rent + sqft + unit_number + availability
+            # date) in a single 400KB+ JSON. HAR-verified on
+            # olivboulder.com (38 floorplans, 48 units). Marker:
+            # ``wp-json/theme/entrata`` or ``wp-content/themes/entrata``
+            # anywhere in the body.
+            if not result.units:
+                try:
+                    from ma_poc.pms.adapters._wp_entrata import (
+                        _has_wp_entrata_marker,
+                        probe_wp_entrata,
+                    )
+
+                    if _has_wp_entrata_marker(html):
+                        t0 = _time.monotonic()
+                        wpe_units: list[dict[str, Any]] = []
+                        try:
+                            wpe_units = await probe_wp_entrata(ctx)
+                        except Exception as _wpe_exc:
+                            result.errors.append(
+                                f"wp_entrata-error: "
+                                f"{type(_wpe_exc).__name__}: {str(_wpe_exc)[:80]}"
+                            )
+                        _log_attempt(
+                            "generic:wp_entrata",
+                            "ran_units" if wpe_units else "ran_empty",
+                            units=len(wpe_units),
+                            reason="" if wpe_units else (
+                                "wp-json/theme/entrata marker present but "
+                                "probe returned no units"
+                            ),
+                            duration_ms=int((_time.monotonic() - t0) * 1000),
+                        )
+                        if wpe_units:
+                            result.units = _merge_into_result_units(
+                                result.units, wpe_units, property_id=ctx.property_id
+                            )
+                            result.tier_used = "TIER_1_API_WP_ENTRATA"
+                            if wpe_units:
+                                result.winning_url = wpe_units[0].get(
+                                    "source_api_url", ""
+                                )
+                            result.confidence = min(
+                                0.94, 0.75 + 0.02 * len(result.units)
+                            )
+                            from ma_poc.models.source import SourceId as _SI_WPE
+                            sources_already_run.add(_SI_WPE.API_GENERIC_NARROW)
+                            _wped = _assess_and_decide(
+                                result.units, sources_already_run, ctx, decision_log
+                            )
+                            if _wped is None or _wped.action == "STOP":
+                                result._decision_log = decision_log  # type: ignore[attr-defined]
+                                return result
+                            skip_llm = False
+                except Exception as _wpe_outer:
+                    result.errors.append(
+                        f"wp_entrata-outer-error: {type(_wpe_outer).__name__}"
+                    )
+
             # ── Sub-tier 2.75 (2026-05-23): apts247 / Vergence Multifamily.
             # Yardi's small-property tenant exposes a public REST endpoint
             # at ``{host}/api/v1/floorplans/?api_key=<HEX40>`` that returns
