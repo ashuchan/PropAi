@@ -1108,16 +1108,24 @@ async def scrape(
     except Exception:  # pragma: no cover — Path B/C must never block scrape
         pass
 
-    # --- F1.5: Subpage rent enrichment (2026-05-24) ---------------------------
+    # --- F1.5: Bi-directional subpage cross-page enrichment (2026-05-24) ----
     # Pre-LLM cheap pass: when the cascade winner emitted plan-level units
-    # with area + beds + baths but no rent, probe known marketing subpages
-    # (/floorplans, /floor-plans, /apartments, /pricing) for rent values and
-    # merge them into the existing units by floor_plan_name match. This
-    # rescues the TIER_3_DOM SUBPAGE_HAS_RENT cohort (9 props in focused-
-    # 3886351 canary — Greenarch, Village Square, Rustic Woods, Polo Downs,
-    # The Vue, Telfair Lofts, Avon Commons, Solana Mar, Graystone — all
-    # with rent at /floorplans deep path that TIER_3_DOM stops short of).
-    # Costs nothing when units already have rent (early-skip).
+    # that are missing EITHER rent OR sqft, probe known marketing subpages
+    # (/floorplans, /floor-plans, /apartments, /pricing) for the missing
+    # dimension and merge by floor_plan_name match.
+    #
+    # Two directions:
+    #   1. area→rent (original 2026-05-23 case): TIER_3_DOM stops at
+    #      plan-level with area+beds but no rent; subpage has prices.
+    #      Cohort: Greenarch, Village Square, Rustic Woods, etc.
+    #   2. rent→sqft (NEW 2026-05-24): plan-level adapters (Repli360,
+    #      RentCafe SecureCafe, SightMap, AppFolio SSR) emit rent but
+    #      no sqft; subpage has sqft. Cohort: 13 of 32 P1 TIER_MERGED
+    #      props (Repli360 6, RentCafe SecureCafe 4, SightMap 2,
+    #      AppFolio 1) carry plan-level rent that needs sqft enrichment
+    #      to clear strict-pass.
+    #
+    # Costs nothing when units already have both dimensions (early-skip).
     try:
         from ma_poc.pms.adapters._probe import probe_get as _enrich_probe
         from ma_poc.pms.adapters.generic_plan_text import (
@@ -1136,9 +1144,28 @@ async def scrape(
                 1 for u in units_now
                 if u.get("sqft") or u.get("area")
             )
-            # Trigger: have units, none have rent, ≥1 has area (plan-level
-            # confirmed). Skip if all units already have rent.
+            # Decide which dimension to enrich. Skip when units already
+            # have both (no benefit) or have neither (the F1.5 sub-
+            # probe can't synthesize fields from nothing).
+            _missing: str | None = None
             if n_with_rent == 0 and n_with_area > 0:
+                _missing = "rent"
+            elif n_with_area == 0 and n_with_rent > 0:
+                _missing = "sqft"
+            # Also enrich the partial case: SOME have one dim, others
+            # have the other. Trigger when fewer than half have both.
+            elif n_with_rent > 0 and n_with_area > 0:
+                _both = sum(
+                    1 for u in units_now
+                    if (u.get("market_rent_low") or u.get("rent_low"))
+                    and (u.get("sqft") or u.get("area"))
+                )
+                if _both < len(units_now) * 0.5:
+                    # Pick the dimension fewer units have — that's the
+                    # one most worth probing for.
+                    _missing = "sqft" if n_with_area < n_with_rent else "rent"
+
+            if _missing:
                 from urllib.parse import urlparse as _enrich_urlparse
 
                 _enrich_origin = ""
@@ -1152,9 +1179,13 @@ async def scrape(
                 )
 
                 if _enrich_base:
-                    # Probe common subpages, parse rent rows out, build a
-                    # {name → (rent_low, rent_high)} map.
-                    _name_rent_map: dict[str, tuple[int | None, int | None]] = {}
+                    # Probe common subpages and build a per-name map of
+                    # the MISSING dimension. The map value tuple holds
+                    # (rent_low, rent_high, sqft) — only the slot we
+                    # actually need is consulted at merge time.
+                    _name_map: dict[
+                        str, tuple[int | None, int | None, str | None]
+                    ] = {}
                     for _path in (
                         "/floorplans/", "/floorplans",
                         "/floor-plans/", "/floor-plans",
@@ -1162,7 +1193,7 @@ async def scrape(
                         "/apartments/", "/apartments",
                         "/pricing/", "/pricing",
                     ):
-                        if _name_rent_map:
+                        if _name_map:
                             break  # got something, stop probing
                         try:
                             _r = _enrich_probe(_enrich_base + _path, timeout=12)
@@ -1184,34 +1215,53 @@ async def scrape(
                         )
                         for _row in _sub_rows:
                             _rname = (_row.get("floor_plan_name") or "").strip().lower()
+                            if not _rname:
+                                continue
                             _rlo = _row.get("market_rent_low") or _row.get("rent_low")
                             _rhi = _row.get("market_rent_high") or _row.get("rent_high")
-                            if _rname and (_rlo or _rhi):
-                                _name_rent_map[_rname] = (
+                            _rsq = _row.get("sqft") or _row.get("area")
+                            # Only record when this row carries the
+                            # dimension we're trying to enrich; avoids
+                            # polluting the map with no-info entries.
+                            if _missing == "rent" and (_rlo or _rhi):
+                                _name_map[_rname] = (
                                     int(_rlo) if _rlo else None,
                                     int(_rhi) if _rhi else None,
+                                    None,
+                                )
+                            elif _missing == "sqft" and _rsq:
+                                _name_map[_rname] = (
+                                    None, None, str(_rsq).strip(),
                                 )
 
                     # Merge by exact-name OR substring match (floor plan
                     # names often vary slightly between primary tier and
-                    # subpage e.g. "Sedona" vs "The Sedona")
-                    if _name_rent_map:
+                    # subpage e.g. "Sedona" vs "The Sedona").
+                    if _name_map:
                         _merged = 0
                         for _u in units_now:
-                            if _u.get("market_rent_low") or _u.get("rent_low"):
+                            # Skip units that already have the dim we'd merge.
+                            if _missing == "rent" and (
+                                _u.get("market_rent_low") or _u.get("rent_low")
+                            ):
+                                continue
+                            if _missing == "sqft" and (
+                                _u.get("sqft") or _u.get("area")
+                            ):
                                 continue
                             _uname = str(_u.get("floor_plan_name") or "").strip().lower()
                             if not _uname:
                                 continue
-                            _hit = _name_rent_map.get(_uname)
+                            _hit = _name_map.get(_uname)
                             if not _hit:
-                                # Substring match either direction
-                                for _k, _v in _name_rent_map.items():
+                                for _k, _v in _name_map.items():
                                     if _uname in _k or _k in _uname:
                                         _hit = _v
                                         break
-                            if _hit:
-                                _rlo, _rhi = _hit
+                            if not _hit:
+                                continue
+                            _rlo, _rhi, _rsq = _hit
+                            if _missing == "rent":
                                 if _rlo is not None:
                                     _u["market_rent_low"] = _rlo
                                     _u["rent_low"] = _rlo
@@ -1219,15 +1269,21 @@ async def scrape(
                                     _u["market_rent_high"] = _rhi
                                     _u["rent_high"] = _rhi
                                 _merged += 1
+                            elif _missing == "sqft" and _rsq:
+                                _u["sqft"] = _rsq
+                                if "area" not in _u or not _u.get("area"):
+                                    _u["area"] = _rsq
+                                _merged += 1
                         if _merged:
                             adapter_result.errors.append(
-                                f"subpage-rent-enrichment: merged rent into "
-                                f"{_merged}/{len(units_now)} units from subpage "
-                                f"probe ({len(_name_rent_map)} plans found)"
+                                f"subpage-{_missing}-enrichment: merged "
+                                f"{_missing} into {_merged}/{len(units_now)} "
+                                f"units from subpage probe "
+                                f"({len(_name_map)} plans found)"
                             )
     except Exception as _enrich_exc:  # noqa: BLE001 — never block scraping
         log.debug(
-            "Subpage rent enrichment failed for %s: %s",
+            "Subpage cross-page enrichment failed for %s: %s",
             property_id,
             _enrich_exc,
         )

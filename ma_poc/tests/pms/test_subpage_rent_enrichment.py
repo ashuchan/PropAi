@@ -70,32 +70,67 @@ def test_enrichment_skips_when_units_already_have_rent() -> None:
     assert n_with_rent == 2  # would skip enrichment
 
 
-def test_enrichment_triggers_only_when_no_rent_but_area_present() -> None:
-    """The trigger predicate: n_with_rent==0 AND n_with_area>0.
-    Excludes empty-units cases (need_rescue handles those) and rent-
-    already-present cases (already strict-pass)."""
-    cases = [
-        # (units, should_trigger)
-        ([], False),  # no units at all
-        ([{"floor_plan_name": "A", "sqft": 700}], True),
-        ([{"floor_plan_name": "A", "area": 700}], True),  # raw field name
-        ([{"floor_plan_name": "A", "sqft": 700, "market_rent_low": 1500}], False),
-        ([{"floor_plan_name": "A", "rent_low": 1500}], False),  # has rent, no area
-        ([{"floor_plan_name": "A"}], False),  # name only
-    ]
-    for units, expect in cases:
+def test_enrichment_triggers_bidirectionally() -> None:
+    """Trigger predicate (2026-05-24 bi-directional rewrite):
+
+    Direction A (area → rent): n_with_rent==0 AND n_with_area>0
+      → probe subpage for rent (Greenarch/Village Square cohort)
+    Direction B (rent → sqft): n_with_area==0 AND n_with_rent>0
+      → probe subpage for sqft (Repli360/RentCafe SecureCafe/SightMap
+      PLAN_LEVEL cohort — TIER_MERGED_CROSS_PAGE P1 props)
+    Partial: BOTH dims present but fewer than half of units have both
+      → probe for the dim with fewer hits
+    No-op when units have both dims OR when units are empty.
+    """
+    def _classify(units):
         n_with_rent = sum(
             1 for u in units
             if u.get("market_rent_low") or u.get("market_rent_high")
             or u.get("rent_low") or u.get("rent_high")
         )
         n_with_area = sum(
-            1 for u in units
-            if u.get("sqft") or u.get("area")
+            1 for u in units if u.get("sqft") or u.get("area")
         )
-        trigger = n_with_rent == 0 and n_with_area > 0
-        assert trigger == expect, (
-            f"units={units}: expected trigger={expect}, got {trigger}"
+        if not units:
+            return None
+        if n_with_rent == 0 and n_with_area > 0:
+            return "rent"
+        if n_with_area == 0 and n_with_rent > 0:
+            return "sqft"
+        if n_with_rent > 0 and n_with_area > 0:
+            both = sum(
+                1 for u in units
+                if (u.get("market_rent_low") or u.get("rent_low"))
+                and (u.get("sqft") or u.get("area"))
+            )
+            if both < len(units) * 0.5:
+                return "sqft" if n_with_area < n_with_rent else "rent"
+        return None
+
+    cases = [
+        # (units, expected_missing_dim)
+        ([], None),
+        ([{"floor_plan_name": "A", "sqft": 700}], "rent"),
+        ([{"floor_plan_name": "A", "area": 700}], "rent"),
+        # NEW direction: has rent, no area → enrich sqft
+        ([{"floor_plan_name": "A", "rent_low": 1500}], "sqft"),
+        ([{"floor_plan_name": "A", "market_rent_low": 1500}], "sqft"),
+        # Both dims → no trigger
+        ([{"floor_plan_name": "A", "sqft": 700, "market_rent_low": 1500}], None),
+        # Name-only → no trigger
+        ([{"floor_plan_name": "A"}], None),
+        # Partial: 1 of 4 has both, 3 missing sqft → trigger sqft
+        ([
+            {"floor_plan_name": "A", "rent_low": 1500, "sqft": 700},
+            {"floor_plan_name": "B", "rent_low": 1600},
+            {"floor_plan_name": "C", "rent_low": 1700},
+            {"floor_plan_name": "D", "rent_low": 1800},
+        ], "sqft"),
+    ]
+    for units, expect in cases:
+        got = _classify(units)
+        assert got == expect, (
+            f"units={units}: expected missing={expect!r}, got {got!r}"
         )
 
 
