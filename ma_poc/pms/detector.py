@@ -86,6 +86,21 @@ PmsName = Literal[
     # floorplan-level. Deterministic Tier-1 via no-auth POST
     # app.repli360.com/admin/getUnitListByFloor.
     "repli360",
+    # 2026-05-24 port (parity Commit): 6 adapters from feature branch
+    # fix/resolver-path-patterns-may13 that close the long tail of the
+    # 1,333-PID gap analysis (see project_main_vs_feature_branch_parity_gap
+    # memory). Each lives in its own file under ma_poc/pms/adapters/.
+    "marketapts",
+    "rentcafe_layout_tab",
+    "rentcafe_unit_roster",
+    "wix_floor_plans",
+    "imt_spaces",
+    "generic_plan_text",
+    # 2026-05-24 (follow-up): RealPage CWS (Community Website Solution).
+    # RPFP (RealPage Floor Plans) widget rendered client-side; detector
+    # gates on cs-cdn.realpage.com/CWS CDN marker. Verified live on
+    # thebeachapts.com (PID 30472 — was misrouting to g5).
+    "realpage_cws",
     "squarespace_nopms",
     "wix_nopms",
     "custom",
@@ -141,6 +156,17 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "aspensquare": "dom_first",
     # 2026-05-21 port (Fix 5c): Repli360 / rrac — no-auth POST API adapter.
     "repli360": "api_first",
+    # 2026-05-24 port (parity Commit): each new adapter is DOM-driven
+    # (server-rendered floor plans / unit tables — no XHR), so cascade
+    # them dom_first to avoid burning the generic-API tier on pages with
+    # nothing for it to capture.
+    "marketapts": "dom_first",
+    "rentcafe_layout_tab": "dom_first",
+    "rentcafe_unit_roster": "dom_first",
+    "wix_floor_plans": "dom_first",
+    "imt_spaces": "dom_first",
+    "generic_plan_text": "dom_first",
+    "realpage_cws": "dom_first",
     "squarespace_nopms": "syndication_only",
     "wix_nopms": "syndication_only",
     "custom": "cascade",
@@ -809,6 +835,29 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
              "(rentvision.com / powered by RentVision)"],
         )
 
+    # 2026-05-24 (follow-up): RealPage CWS (Community Website Solution)
+    # ships the RPFP widget that renders plan cards client-side. Detector
+    # gates on the CDN marker (``cs-cdn.realpage.com/cws``) or the
+    # rendered RPFP container/cards. 2026-05-24 canary on PIDs 30472,
+    # 99001, 99002 showed: all three pages match BOTH g5 fingerprint
+    # (an embedded analytics/CDN beacon) AND the strict
+    # cs-cdn.realpage.com/cws marker. Placed BEFORE the g5 branch so the
+    # real PMS wins over a co-resident vendor tag. Confidence 0.92
+    # (above g5's 0.85). Adapter ships its own XHR probe to
+    # /CmsSiteManager/callback.aspx?act=Proxy/GetFloorPlans for the
+    # plan-level JSON.
+    if (
+        "cs-cdn.realpage.com/cws" in h
+        or ("rpfp-container" in h and "rpfp-card" in h)
+        or ("floorplans-widget" in h and "rpfp-" in h)
+    ):
+        return (
+            "realpage_cws",
+            0.92,
+            ["RealPage CWS RPFP widget marker in HTML "
+             "(cs-cdn.realpage.com/CWS/ OR .rpfp-container + .rpfp-card)"],
+        )
+
     # 2026-05-13 port: G5 Marketing Cloud (multifamily CMS used by Morgan
     # Properties, Aimco, Bell Partners, ZRS, JMG, BH). Strong fingerprints
     # are ``inventory.g5marketingcloud`` (the GraphQL endpoint) and
@@ -853,6 +902,17 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
     # Pass 2 -- Wix/Squarespace platform giveaway scripts. These are strong
     # "not-a-PMS" signals when no strong PMS marker appeared in pass 1.
     if "static.parastorage.com" in h or "wix.com" in h:
+        # 2026-05-24 port (parity): some Wix multifamily sites embed
+        # plan-level data via the "Starting at $X" pattern. Route to
+        # WixFloorPlansAdapter at 0.88 (above the bare wix_nopms 0.85)
+        # so the dedicated extractor runs instead of the
+        # syndication-only fallback. Verified live on liveatarcos.com.
+        if "starting at $" in h:
+            return (
+                "wix_floor_plans",
+                0.88,
+                ["Wix host marker + 'Starting at $' plan-card text pattern"],
+            )
         return "wix_nopms", 0.85, ["Wix script/platform marker in HTML"]
     if "squarespace.com" in h:
         return "squarespace_nopms", 0.85, ["Squarespace script/platform marker in HTML"]
@@ -909,6 +969,41 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
              "(myresman.com / Portal/Applicants/Availability)"],
         )
 
+    # (RealPage CWS branch moved upstream — see comment at the cs-cdn /
+    # rpfp-container check above the g5 branch.)
+
+    # 2026-05-24 port (parity): RentCafe "modern" theme — inline unit
+    # roster (no portal-hop). Verified HAR: ``.floorplan-block`` +
+    # ``.par-units`` + ``.unit-container`` co-occurrence is high-precision
+    # (sample: thebeachapts.com, somaresidences.com — 6 plans, 9 units).
+    # Routed to RentCafeUnitRosterAdapter at 0.85, ABOVE the weak
+    # ``rentcafe`` substring (0.80) so it wins when both match.
+    if (
+        "floorplan-block" in h
+        and "par-units" in h
+        and "unit-container" in h
+    ):
+        return (
+            "rentcafe_unit_roster",
+            0.85,
+            ["RentCafe modern-theme marker in HTML "
+             "(.floorplan-block + .par-units + .unit-container all present)"],
+        )
+    # 2026-05-24 port (parity): RentCafe "layout-tab" theme — bedroom-tab
+    # listing on /floorplans with per-plan drill at /floorplans/{slug}.
+    # Verified on tudorplaceapts.com and campobassoapts.com. Higher
+    # priority than the weak rentcafe substring so RentCafeLayoutTabAdapter
+    # owns these sites instead of the generic cascade.
+    if (
+        "page-content-floorplans" in h
+        and "floorplans-layout-tab" in h
+    ):
+        return (
+            "rentcafe_layout_tab",
+            0.86,
+            ["RentCafe layout-tab theme marker in HTML "
+             "(.page-content-floorplans + .floorplans-layout-tab)"],
+        )
     if (
         ".securecafe.com" in h
         or "rentcafe.com/onlineleasing" in h
@@ -931,6 +1026,57 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         return "appfolio", 0.80, ["AppFolio marker in HTML"]
     if "liveovation.com" in h:
         return "touchtour", 0.80, ["Ovation portfolio marker in HTML (liveovation.com)"]
+
+    # 2026-05-24 port (parity) — six new adapter routes. Placed AFTER all
+    # established strong PMS markers (so they don't pre-empt a real PMS
+    # portal embed) but BEFORE the bare ``return None`` fallthrough.
+
+    # (Wix multifamily ``wix_floor_plans`` route lives in the earlier
+    # ``static.parastorage.com / wix.com`` branch above so it can pre-empt
+    # the ``wix_nopms`` syndication-only fallback. See 2026-05-24 port note.)
+
+    # IMT Residential "Spaces" CMS — host + custom-class + data-attr
+    # triple-gated for precision. Misroute risk = 0 in the sample
+    # (imtresidential.com is a single-portfolio host).
+    if (
+        ("imtresidential.com" in h or "spaces-community-" in h)
+        and "spaces-plan" in h
+        and "data-spaces-plan" in h
+    ):
+        return (
+            "imt_spaces",
+            0.85,
+            ["IMT 'Spaces' theme marker in HTML "
+             "(imtresidential.com host or spaces-community-* class) + "
+             "article.spaces-plan with data-spaces-plan attr"],
+        )
+    # Market Apartments CMS (canonical host signal only — the weaker
+    # ``marketapts.com/iframes/`` + co-occurring-template-selector variant
+    # is deferred; that branch's template-selector list ships with the
+    # MarketAptsAdapter and can be added in a follow-up).
+    if (
+        "assets.marketapts.com" in h
+        or "api.marketapts.com" in h
+        or "marketapts.com/js/schedule" in h
+        or "powered by marketapts" in h
+    ):
+        return (
+            "marketapts",
+            0.80,
+            ["Market Apartments CMS marker in HTML "
+             "(assets.marketapts.com / api.marketapts.com / "
+             "marketapts.com/js/schedule / Powered by MarketApts)"],
+        )
+    # Last-resort plan-level extractor. Confidence 0.55 — every recognised
+    # PMS/CMS signal above beats it. The adapter's own ≥2-distinct-rows
+    # guard kills single-noise false-fires (amenity blurbs, etc.).
+    if re.search(r"\d+\s*(?:bedroom|bdrm)\w*", h, re.IGNORECASE) and "$" in h:
+        return (
+            "generic_plan_text",
+            0.55,
+            ["bedroom/bath + $ text pattern present in body "
+             "(last-resort plan-level extractor; gated by ≥2-row parser threshold)"],
+        )
     return None
 
 

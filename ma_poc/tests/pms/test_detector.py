@@ -99,6 +99,132 @@ def test_detect_wix_nopms_from_html() -> None:
     assert result.pms == "wix_nopms"
 
 
+# ── 2026-05-24 port (parity Commit): guard tests for 6 new adapter
+#    detection branches. The audit on 2026-05-24 (see project
+#    project_main_vs_feature_branch_parity_gap memory) flagged 3 latent
+#    regression risks: substring matches without test coverage. These
+#    tests pin the triple-gate semantics so a future refactor can't
+#    accidentally widen the match and start false-firing on non-target
+#    sites.
+
+
+def test_detect_rentcafe_unit_roster_triple_gate_fires() -> None:
+    """Triple-gate co-occurrence (``.floorplan-block`` + ``.par-units`` +
+    ``.unit-container``) routes to ``rentcafe_unit_roster``."""
+    html = (
+        '<div class="floorplan-block">'
+        '<div class="par-units"><div class="unit-container">Unit 101</div></div>'
+        "</div>"
+    )
+    result = detect_pms("https://somaresidences.com/", page_html=html)
+    assert result.pms == "rentcafe_unit_roster"
+    assert result.confidence == 0.85
+
+
+def test_detect_rentcafe_unit_roster_partial_match_falls_through() -> None:
+    """Only ``.floorplan-block`` present (no `.par-units` / `.unit-container`)
+    must NOT fire rentcafe_unit_roster — the dominant rentcafe substring
+    match should still own the route. Pins the gate so we don't relax
+    the triple co-occurrence into a single-substring match."""
+    html = '<div class="floorplan-block">just a styled block, no units</div>'
+    # No rentcafe host, no other PMS markers → unknown is fine.
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms != "rentcafe_unit_roster"
+
+
+def test_detect_rentcafe_layout_tab_co_occurrence_required() -> None:
+    """Both `.page-content-floorplans` AND `.floorplans-layout-tab`
+    classes must be present to route to rentcafe_layout_tab."""
+    # Both present → layout-tab fires.
+    html_both = '<div class="page-content-floorplans floorplans-layout-tab"></div>'
+    r = detect_pms("https://tudorplaceapts.com/", page_html=html_both)
+    assert r.pms == "rentcafe_layout_tab"
+    # Only one of the two → must NOT fire.
+    html_partial = '<div class="page-content-floorplans"></div>'
+    r2 = detect_pms("https://example.com/", page_html=html_partial)
+    assert r2.pms != "rentcafe_layout_tab"
+
+
+def test_detect_imt_spaces_triple_gate_fires() -> None:
+    """(``imtresidential.com`` host OR ``spaces-community-*`` class) AND
+    ``spaces-plan`` AND ``data-spaces-plan`` together → ``imt_spaces``."""
+    # Host-based variant.
+    html_host = (
+        'imtresidential.com <article class="spaces-plan" data-spaces-plan="x"></article>'
+    )
+    r = detect_pms("https://www.imtresidential.com/properties/foo/", page_html=html_host)
+    assert r.pms == "imt_spaces"
+    assert r.confidence == 0.85
+    # Class-based variant (no imtresidential.com host).
+    html_class = (
+        '<body data-cls="spaces-community-acme">'
+        '<article class="spaces-plan" data-spaces-plan="y"></article></body>'
+    )
+    r2 = detect_pms("https://other-host.com/", page_html=html_class)
+    assert r2.pms == "imt_spaces"
+
+
+def test_detect_imt_spaces_partial_match_does_not_fire() -> None:
+    """Any of the three gate components missing → no imt_spaces routing.
+    Guards against ``spaces-plan`` token alone causing false positives
+    on unrelated sites that happen to mention "spaces" in HTML."""
+    html_only_spaces_plan = (
+        '<article class="spaces-plan">Just spaces-plan, no data-attr, no host</article>'
+    )
+    r = detect_pms("https://generic-apartments.com/", page_html=html_only_spaces_plan)
+    assert r.pms != "imt_spaces"
+
+
+def test_detect_wix_floor_plans_starting_at_promotes_above_nopms() -> None:
+    """A Wix-hosted multifamily site with ``Starting at $`` text routes
+    to wix_floor_plans (0.88), NOT the syndication-only wix_nopms
+    fallback (0.85). Without this preemption, the WixFloorPlansAdapter
+    would never be selected on these sites."""
+    html_with_starting = (
+        '<script src="https://static.parastorage.com/x.js"></script>'
+        "Plans Starting at $1500"
+    )
+    r = detect_pms("https://liveatarcos.com/", page_html=html_with_starting)
+    assert r.pms == "wix_floor_plans"
+    assert r.confidence == 0.88
+    # Without "starting at $" → must fall back to wix_nopms (preserves
+    # the existing test_detect_wix_nopms_from_html behaviour).
+    html_no_starting = '<script src="https://static.parastorage.com/x.js"></script>'
+    r2 = detect_pms("https://just-a-wix-site.com/", page_html=html_no_starting)
+    assert r2.pms == "wix_nopms"
+
+
+def test_detect_marketapts_canonical_signals() -> None:
+    """Any of the four canonical Market Apartments CMS markers route
+    to marketapts at 0.80."""
+    for marker in (
+        '<script src="https://assets.marketapts.com/widget.js">',
+        '<script src="https://api.marketapts.com/config">',
+        '<a href="https://marketapts.com/js/schedule">',
+        "Powered by MarketApts",
+    ):
+        r = detect_pms("https://example-marketapts-site.com/", page_html=marker)
+        assert r.pms == "marketapts", f"marker={marker!r}"
+
+
+def test_detect_generic_plan_text_lowest_priority() -> None:
+    """generic_plan_text is the last-resort fallback (confidence 0.55).
+    Any stronger PMS signal must win even when the bedroom+$ pattern is
+    also present. Pins the cascade ordering."""
+    html_pms_plus_text = (
+        '<a href="https://foo.securecafe.com/onlineleasing/bar">portal</a>'
+        " 2 bedroom apartments $1,500"
+    )
+    r = detect_pms("https://example.com/", page_html=html_pms_plus_text)
+    # SecureCafe portal beats generic_plan_text by ~30 confidence points.
+    assert r.pms == "rentcafe"
+    # Bare bedroom + $ with NO PMS marker → routes to generic_plan_text.
+    html_text_only = "<p>2 bedroom apartments starting at $1,500</p>"
+    r2 = detect_pms("https://bespoke-apts.com/", page_html=html_text_only)
+    assert r2.pms == "generic_plan_text"
+    assert r2.confidence == 0.55
+
+
 def test_detect_unknown_returns_cascade_strategy() -> None:
     result = detect_pms("https://totally-unknown-apartment-site.example/")
     assert result.pms == "unknown"
