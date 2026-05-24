@@ -124,6 +124,51 @@ def _looks_like_cookie_banner(text: str) -> bool:
     return hits >= 2
 
 
+# 2026-05-24 (post-1000-prop-sweep verification): 49 of 164 Step 3c lift
+# captures (~30 %) had ``document.body.innerText``-hydrated accessibility
+# / navigation prefixes glued to the front of the offer text — e.g.
+# ``"Skip to main content\n2 Months Free + 2 Months Free Parking!"``.
+# The match is correct; only the leading window is polluted. Strip a
+# small whitelist of well-known nav prefixes before returning the
+# sentence-window so downstream display sees clean offer copy.
+_LEADING_NAV_JUNK_RE = re.compile(
+    r"^(?:"
+    # Accessibility skip-links — the dominant pattern (29 of 49)
+    r"Skip\s+to\s+(?:main\s+)?(?:content|footer|navigation)|"
+    r"Skip\s+Navigation|Skip\s+Header|Skip\s+Main|"
+    # Markdown HR artefacts that some site generators emit at the
+    # top of innerText
+    r"_{3,}|-{3,}|={3,}|"
+    # Menu toggles
+    r"Open\s+menu|Close\s+menu|Toggle\s+(?:navigation|menu)|"
+    r"Main\s+menu|MENU|"
+    # Accessibility-widget controls (Userway, accessiBe, etc.)
+    r"Enable\s+Accessibility|Accessibility\s+(?:menu|widget|tools)|"
+    # "New window" link-target annotations
+    r"New\s+window|"
+    # Cookie consent decisions that bled into innerText before the
+    # cookie filter could fire (rare — defensive)
+    r"Accept\s+(?:All\s+)?Cookies|Reject\s+(?:All\s+)?Cookies"
+    r")[\s:•·|\-]*",
+    re.IGNORECASE,
+)
+
+
+def _strip_leading_nav_junk(text: str) -> str:
+    """Repeatedly strip accessibility / navigation prefixes from the
+    front of a rendered-text snippet. Applies up to 5 passes to handle
+    stacked junk like ``"Skip to main content Skip to Footer ___"``.
+    """
+    if not text:
+        return text
+    for _ in range(5):
+        stripped = _LEADING_NAV_JUNK_RE.sub("", text).lstrip(" \t\n\r·•|–—-")
+        if stripped == text:
+            break
+        text = stripped
+    return text
+
+
 def extract_concession_window(text: str, match: re.Match[str]) -> str:
     """Build a 300-char sentence-window around a concession-regex match.
 
@@ -154,6 +199,10 @@ def extract_concession_window(text: str, match: re.Match[str]) -> str:
             seg = candidate
     else:
         seg = win
+    # 2026-05-24: strip leading accessibility / nav prefixes that
+    # ``document.body.innerText`` hydrates as the first node (the 30 %
+    # quality issue surfaced in the 1000-prop sweep).
+    seg = _strip_leading_nav_junk(seg.strip())
     return seg.strip()[:300]
 
 

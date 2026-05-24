@@ -252,9 +252,19 @@ _PROPERTY_CONCESSION_RE = re.compile(
     r"|\$\s?\d{2,5}\s+(?:welcome\s+)?bonus\b"
     r"|\breduced\s+rents?\b|\brent\s+as\s+low\s+as\s+\$"
     r"|\blook[\s-]*(?:and|&|\+|n)?[\s-]*lease\b"
-    r"|\b(?:move[- ]?in|mi)\s+special\b"
-    r"|\b(?:rent|lease|deposit|move[- ]?in)\s+special\b"
-    r"|\blimited[- ]time\s+(?:offer|special|savings|deal)\b"
+    # 2026-05-24 (post-1000-prop-sweep blind-spot probe): pluralize the
+    # 'special' anchors so 'move-in specials' / 'current specials' /
+    # 'leasing specials' match — Abberly Centerpointe ships
+    # "Select apartment homes are now offering move-in specials" as
+    # a banner and the prior \bspecial\b failed the s-suffix.
+    r"|\b(?:move[- ]?in|mi)\s+specials?\b"
+    r"|\b(?:rent|lease|deposit|move[- ]?in)\s+specials?\b"
+    r"|\b(?:current|new|featured|limited[- ]time|leasing)\s+specials?\b"
+    # 2026-05-24: 'N Month/Months/Week/Weeks Off' (no $ prefix) — the
+    # Shea Apartments pattern "Up to 1 Month Off" / "1 Month Off"
+    # used as a header callout. Distinct from $N off (already covered).
+    r"|\b(?:up\s+to\s+)?\d+\s*(?:weeks?|months?)\s+off\b"
+    r"|\blimited[- ]time\s+(?:offer|special|savings|deal)s?\b"
     r"|\breduced\s+deposit\b"
     r"|\bwaived\s+(?:application|admin(?:istration)?|amenity|"
     r"move[- ]?in|deposit)\s*fees?\b"

@@ -28,6 +28,7 @@ import pytest
 from ma_poc.core.rendered_dom_concession import (
     RENDERED_DOM_PROBE_JS,
     _looks_like_cookie_banner,
+    _strip_leading_nav_junk,
     extract_concession_window,
     find_concession_in_blocks,
     scan_rendered_dom_for_concession,
@@ -382,6 +383,123 @@ async def test_scan_rendered_dom_uses_body_text_fallback() -> None:
 # ─────────────────────────────────────────────────────────────────────
 # 6) Wiring sanity check — Step 3c lives in scraper.py
 # ─────────────────────────────────────────────────────────────────────
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 7) Nav-junk prefix stripping (post-1000-prop-sweep quality fix)
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("dirty, clean", [
+    # Real shapes from the 1000-prop sweep
+    (
+        "Skip to main content\n2 Months Free + 2 Months Free Parking!",
+        "2 Months Free + 2 Months Free Parking!",
+    ),
+    (
+        "Skip to main content Move-In Special! One Month Free on Select Units!",
+        "Move-In Special! One Month Free on Select Units!",
+    ),
+    (
+        "Skip to main content $500 Off Rent! Receive $500 off your first month.",
+        "$500 Off Rent! Receive $500 off your first month.",
+    ),
+    (
+        "___\nSkip to main content\nNow offering 6 weeks free base rent on select homes!",
+        "Now offering 6 weeks free base rent on select homes!",
+    ),
+    (
+        "___ Skip to main content Live Up to 8-Weeks Free Base Rent",
+        "Live Up to 8-Weeks Free Base Rent",
+    ),
+    (
+        "Skip to Main Content Skip to Footer Enable Accessibility *$600 OFF",
+        "*$600 OFF",
+    ),
+    # Menu toggles
+    (
+        "MENU $1000 Off if you apply within 48 hours",
+        "$1000 Off if you apply within 48 hours",
+    ),
+    (
+        "Open menu — Special Offer: 2 weeks free",
+        "Special Offer: 2 weeks free",
+    ),
+    # Mixed case + accessibility widget
+    (
+        "Accessibility menu Skip Navigation 1 Month Free!",
+        "1 Month Free!",
+    ),
+    # No prefix — passthrough unchanged
+    (
+        "Limited Time Special! Up to 2 Months Free.",
+        "Limited Time Special! Up to 2 Months Free.",
+    ),
+    # Empty input
+    ("", ""),
+    # Only junk — stays empty
+    ("Skip to main content", ""),
+    ("___", ""),
+])
+def test_strip_leading_nav_junk_matrix(dirty: str, clean: str) -> None:
+    """Pin every nav-junk shape we observed in the 1000-prop sweep.
+    49/164 lift captures (~30 %) had at least one of these prefixes."""
+    assert _strip_leading_nav_junk(dirty) == clean
+
+
+def test_extract_concession_window_strips_skip_to_main_content() -> None:
+    """End-to-end: a real rendered-DOM text with 'Skip to main content'
+    glued to the front should return a clean offer window."""
+    # Exact shape from sweep pid 62782 (Cortland Alameda Station)
+    rendered = (
+        "Skip to main content\n2 Months Free + 2 Months Free Parking! "
+        "Two months of free rent & two months of free parking on select homes."
+    )
+    from ma_poc.pms.scraper import _PROPERTY_CONCESSION_RE
+    m = _PROPERTY_CONCESSION_RE.search(rendered)
+    assert m is not None
+    out = extract_concession_window(rendered, m)
+    assert not out.lower().startswith("skip to"), (
+        f"nav junk leaked through: {out!r}"
+    )
+    assert "2 Months Free" in out
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 8) Regex blind-spot fixes from 1000-prop "many-blocks-no-match"
+#    Chrome MCP probing on 2026-05-24. The probes surfaced 2 systematic
+#    regex misses across the 89-prop sample.
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("text, expected_substr", [
+    # Plural 'specials' — Abberly Centerpointe banner.
+    # The prior \bspecial\b required a non-word boundary AFTER 'special'
+    # which 'specials' (s is word-char) violated.
+    (
+        "Select apartment homes are now offering move-in specials. "
+        "Don't miss out—apply today and make your move!",
+        "move-in specials",
+    ),
+    ("Check out our current specials this month!", "current specials"),
+    ("Limited-Time Specials on select homes", "Limited-Time Specials"),
+    ("Featured Specials — see leasing office for details", "Featured Specials"),
+    ("New Leasing Specials for May!", "Leasing Specials"),
+    # 'N Month/Months/Week/Weeks Off' WITHOUT $ prefix — Shea Apartments
+    # ('Up to 1 Month Off' header callout on York on City Park /
+    # City Lights at Town Center). The pre-fix regex required $.
+    ("Up to 1 Month Off — apply by 5/31!", "1 Month Off"),
+    ("Get 2 Months Off your first year", "2 Months Off"),
+    ("3 Weeks Off select apartments", "3 Weeks Off"),
+])
+def test_regex_catches_new_blind_spots(text: str, expected_substr: str) -> None:
+    """Pin the post-1000-prop-sweep regex extensions: plural 'specials'
+    + 'N Month/Week Off' without $."""
+    from ma_poc.pms.scraper import _PROPERTY_CONCESSION_RE
+    m = _PROPERTY_CONCESSION_RE.search(text)
+    assert m is not None, (
+        f"regex failed to match {text!r}; expected anchor {expected_substr!r}"
+    )
 
 
 def test_scraper_has_step_3c_invocation() -> None:
