@@ -357,6 +357,16 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         ),
         "concession_value": _safe_float(unit.get("concession_value")),
         "concession_source": unit.get("concession_source") or None,
+        # 2026-05-24 offer-taxonomy fields (xlsx reference schema parity).
+        # All 5 are populated by make_unit_dict via ma_poc/core/offer_extract.py
+        # when concession text is present. None when no offer signal.
+        # See ma_poc/tests/core/test_offer_extract.py for the regression
+        # oracle anchored on real xlsx rows.
+        "offer_banner": unit.get("offer_banner") or None,
+        "offer_type": unit.get("offer_type") or None,
+        "offer_target": unit.get("offer_target") or None,
+        "offer_value": unit.get("offer_value") or None,
+        "offer_conditions": unit.get("offer_conditions") or None,
         # 2026-05-20 (canary-output surfacing): PMS-native identifiers
         # the adapters populate via ``source_ids={...}`` in make_unit_dict
         # — used as JOIN keys against external sources (RealPage, SurgeX,

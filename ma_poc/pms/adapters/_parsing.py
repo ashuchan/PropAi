@@ -567,6 +567,30 @@ def make_unit_dict(
     if final_concession_value is None and derived_concession_value is not None:
         final_concession_value = derived_concession_value
 
+    # ── Offer-taxonomy extraction (2026-05-24) ───────────────────────
+    # Matches the 8-column reference xlsx schema:
+    #   offer_banner       (short offer-only phrase, ~20-100 chars)
+    #   offer_type         (free_rent / dollar_off / waived_fee / ...)
+    #   offer_target       (rent / deposit / app_fee / amenity_fee / ...)
+    #   offer_value        ("6 weeks" / "$400" / "50%" / "1 month")
+    #   offer_conditions   ("deadline:May 31st; unit_scope:select; ...")
+    # All 5 keys always present (None when no signal).
+    offer_fields: dict[str, Any] = {
+        "offer_banner": None,
+        "offer_type": None,
+        "offer_target": None,
+        "offer_value": None,
+        "offer_conditions": None,
+    }
+    if raw_concession_text:
+        try:
+            from ma_poc.core.offer_extract import extract_offer
+
+            offer_fields = extract_offer(raw_concession_text)
+        except Exception:
+            # Offer extraction is best-effort; never block unit emission.
+            pass
+
     return {
         "floor_plan_name": floor_plan_name,
         "bed_label": bed_label,
@@ -589,6 +613,12 @@ def make_unit_dict(
         "_concession_quality": concession_quality,
         "concession_value": final_concession_value,
         "concession_source": concession_source,
+        # ── Offer taxonomy (2026-05-24, matches xlsx schema) ─────────
+        "offer_banner": offer_fields["offer_banner"],
+        "offer_type": offer_fields["offer_type"],
+        "offer_target": offer_fields["offer_target"],
+        "offer_value": offer_fields["offer_value"],
+        "offer_conditions": offer_fields["offer_conditions"],
         "availability_status": availability_status,
         "available_units": available_units,
         # Bug 2026-05-13: the v2 schema reader (core/schema_v2.py:242) looks
