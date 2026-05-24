@@ -456,6 +456,9 @@ def make_unit_dict(
     rent_high: int | None = None,
     deposit: str = "",
     concession: str = "",
+    concession_text: str | None = None,
+    concession_value: float | None = None,
+    concession_source: str | None = None,
     availability_status: str = "AVAILABLE",
     available_units: str = "",
     availability_date: str = "",
@@ -496,6 +499,74 @@ def make_unit_dict(
     # without changing per-adapter signatures.
     floor_plan_name = _unwrap_name_blob(floor_plan_name)
 
+    # ── Centralised concession normalization (2026-05-24) ────────────────
+    # Pre-fix: adapters emitted only the legacy ``concession`` string and
+    # the cleanup (core/concession_clean + core/concession_normalize) only
+    # ran at v2-output time. Cross-tier merges in _merge_fns.py preserve
+    # ``concession_text``/``_value``/``_source`` (canonical) but not
+    # ``concession`` (legacy) — silently dropping the offer at merge time.
+    #
+    # Post-fix: any text on either input (legacy ``concession=`` or
+    # canonical ``concession_text=``) flows through the cleanup pipeline
+    # here, so all adapters get:
+    #   * ``concession`` — raw input preserved verbatim (back-compat)
+    #   * ``concession_text`` — same raw text in the canonical key the
+    #     merge / schema_v2 / observation report consume
+    #   * ``concession_text_clean`` — de-leaked variant (JS/CSS prefix
+    #     stripped); always present when source text was present
+    #   * ``_concession_quality`` — classifier label (clean / partial_leak
+    #     / heavy_leak / no_signal) for triage
+    #   * ``concession_value`` — numeric value parsed by normalize_concession
+    #     when present; preserved unchanged when caller supplied it
+    #   * ``concession_source`` — caller-supplied or None
+    # Caller-supplied canonical fields take precedence over derived values
+    # (capture-first; never overwrite what the parser explicitly knows).
+    raw_concession_text: str | None = None
+    if isinstance(concession_text, str) and concession_text.strip():
+        raw_concession_text = concession_text
+    elif isinstance(concession, str) and concession.strip():
+        raw_concession_text = concession
+
+    cleaned_concession: str | None = None
+    concession_quality: str | None = None
+    derived_concession_value: float | None = None
+    if raw_concession_text:
+        try:
+            from ma_poc.core.concession_clean import (
+                classify_concession_quality,
+                clean_concession_text,
+            )
+
+            cleaned_concession = clean_concession_text(raw_concession_text)
+            concession_quality = classify_concession_quality(raw_concession_text)
+        except Exception:
+            # Cleanup is best-effort — never block unit emission.
+            cleaned_concession = raw_concession_text
+            concession_quality = None
+        # Caller-supplied concession_value wins; only derive when absent.
+        if concession_value is None:
+            try:
+                from ma_poc.core.concession_normalize import normalize_concession
+
+                _obj = normalize_concession(raw_concession_text)
+                if isinstance(_obj, dict):
+                    # The canonical RealPage shape carries dollar value at
+                    # ``obj.free.dollarsLow`` or ``obj.rr.dollarsLow``. Either
+                    # surfaces as the numeric concession_value at unit level.
+                    _inner = _obj.get("obj") or {}
+                    if isinstance(_inner, dict):
+                        for _slot in ("free", "rr"):
+                            _v = (_inner.get(_slot) or {})
+                            if isinstance(_v, dict) and _v.get("dollarsLow"):
+                                derived_concession_value = float(_v["dollarsLow"])
+                                break
+            except Exception:
+                pass
+
+    final_concession_value = concession_value
+    if final_concession_value is None and derived_concession_value is not None:
+        final_concession_value = derived_concession_value
+
     return {
         "floor_plan_name": floor_plan_name,
         "bed_label": bed_label,
@@ -509,7 +580,15 @@ def make_unit_dict(
         "market_rent_low": rent_low,
         "market_rent_high": rent_high,
         "deposit": deposit,
-        "concession": concession,
+        # Legacy + canonical concession fields. All populated from the
+        # same source text so downstream code can read either; the merge
+        # in _merge_fns.py preserves the canonical ones explicitly.
+        "concession": raw_concession_text or "",
+        "concession_text": raw_concession_text,
+        "concession_text_clean": cleaned_concession,
+        "_concession_quality": concession_quality,
+        "concession_value": final_concession_value,
+        "concession_source": concession_source,
         "availability_status": availability_status,
         "available_units": available_units,
         # Bug 2026-05-13: the v2 schema reader (core/schema_v2.py:242) looks
