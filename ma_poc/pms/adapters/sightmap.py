@@ -677,11 +677,25 @@ class SightMapAdapter:
             # were captured (NO_RESPONSE or SHAPE_REJECTED), try
             # discovering the sightmap embed code from the marketing
             # page body and hit ``sightmap.com/app/api/v1/{TOKEN}/
-            # sightmaps/{ID}`` directly. HARs from 7 SHAPE_REJECTED
-            # canary props confirmed 100% have the embed code +
-            # canonical API URL accessible via direct curl_cffi.
+            # sightmaps/{ID}`` directly.
+            #
+            # Gated behind ``ENABLE_SIGHTMAP_DIRECT_PROBE`` env var
+            # (default OFF) because live validation 2026-05-24 showed
+            # only ~20% of SHAPE_REJECTED properties have the embed
+            # code in static HTML — the other 80% load it via JS at
+            # runtime, so the probe can't help them. Also, when the
+            # probe fires it preempts the existing portal-hint
+            # propagation path that downstream tiers depend on (see
+            # ``test_portal_hint_survives_full_scrape_chain``). Until
+            # both issues are resolved, keep it opt-in.
+            import os as _sm_os
+            _enabled = bool(_sm_os.environ.get("ENABLE_SIGHTMAP_DIRECT_PROBE"))
             try:
-                direct_units = await _try_direct_sightmap_api_probe(ctx)
+                direct_units = (
+                    await _try_direct_sightmap_api_probe(ctx)
+                    if _enabled
+                    else []
+                )
             except Exception as exc:  # noqa: BLE001
                 direct_units = []
                 result.errors.append(
