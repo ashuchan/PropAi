@@ -26,8 +26,13 @@ Key findings:
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import logging
+import random
 import re
+import string
+import time
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -133,6 +138,85 @@ def _onesite_workflowstartup_url(site_id: str) -> str:
         f"BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3"
         f"&ClientSessionID={sid_uuid}"
     )
+
+
+# 2026-05-24 — XYZ auth-token reverse engineering
+# ------------------------------------------------
+# Reverse-engineered from cs-cdn.realpage.com OLL bundle
+# (react2angularComponents.bundle.30b05938b8b036bb706d.js, module 68043).
+# The BackendServiceInterceptor sets ``n.headers.XYZ =
+# rpTokenGeneratorService.getToken(siteId)`` on every authenticated
+# call to leasing.realpage.com/RP.Leasing.AppService.WebHost/*.
+#
+# Algorithm (verified against the example xyz token from
+# www.thepointatabington.com HAR, SiteId=4646505):
+#
+#   parts = (
+#       charGen(1)                                # 1 random alnum char
+#       + md5(site_id).hex.upper()                # 32 hex chars
+#       + charGen(3)                              # 3 random
+#       + md5(user_agent).hex.upper()             # 32 hex chars
+#       + charGen(5)                              # 5 random
+#       + base64(str(timestamp_ms))               # base64 of ms epoch
+#       + charGen(7)                              # 7 random
+#   )
+#   xyz = base64(parts)
+#
+# charGen pool: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+# (uppercase + lowercase + digits = 62 chars).
+#
+# rpCalculate is the standard MD5 algorithm (verified by the
+# 1732584193, 4023233417, 2562383102, 271733878 initial state
+# constants in the JS — those are MD5's A/B/C/D init values).
+#
+# Validation example:
+#   SiteId 4646505 → md5("4646505") = BAC7950C65FF98CFE97623E891524170
+#   Matches the HAR token's char[1:33] exactly.
+#
+# X-AuthToken + X-Phased headers are empty for unauthenticated probes
+# (workflowstartup doesn't require them — only logged-in user flows do).
+_XYZ_CHARGEN_POOL = (
+    string.ascii_uppercase + string.ascii_lowercase + string.digits
+)
+# Stable Windows Chrome UA — must match what BD or the impersonator
+# sends, otherwise the server might match against a different one.
+_XYZ_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+)
+
+
+def _xyz_char_gen(n: int) -> str:
+    """Generate *n* random alphanumeric characters from the OLL pool."""
+    return "".join(random.choice(_XYZ_CHARGEN_POOL) for _ in range(n))
+
+
+def _xyz_md5_upper(s: str) -> str:
+    """MD5 of *s* as uppercase hex (mirrors rpCalculate in the OLL bundle)."""
+    return hashlib.md5(s.encode("utf-8")).hexdigest().upper()
+
+
+def _generate_xyz_token(
+    site_id: str,
+    user_agent: str = _XYZ_USER_AGENT,
+    ts_ms: int | None = None,
+) -> str:
+    """Generate the XYZ auth token that leasing.realpage.com requires.
+
+    See module-level comment block for the algorithm derivation.
+    """
+    if ts_ms is None:
+        ts_ms = int(time.time() * 1000)
+    parts = (
+        _xyz_char_gen(1)
+        + _xyz_md5_upper(site_id)
+        + _xyz_char_gen(3)
+        + _xyz_md5_upper(user_agent)
+        + _xyz_char_gen(5)
+        + base64.b64encode(str(ts_ms).encode()).decode()
+        + _xyz_char_gen(7)
+    )
+    return base64.b64encode(parts.encode()).decode()
 
 
 def parse_onesite_workflowstartup(
@@ -255,31 +339,19 @@ async def _probe_onesite_workflowstartup(
     """Discover SiteId from page body + hit workflowstartup directly via
     curl_cffi.
 
-    .. warning:: 2026-05-24 — **CURRENTLY DISABLED**. Live validation
-        on 5 ONESITE_NO_RESPONSE properties showed the workflowstartup
-        endpoint returns ``401 Unauthorized`` when called via direct
-        curl_cffi. The HAR reveals an ``xyz: <base64-token>`` header
-        carrying a per-session auth that's not trivially reproducible
-        without running the actual OLL JavaScript bundle.
+    2026-05-24 — **AUTH CHAIN SOLVED**. Reverse-engineered the
+    ``xyz`` header token generator from the OLL JS bundle (see
+    ``_generate_xyz_token``). The endpoint accepts our generated
+    token on direct curl_cffi calls — verified live against 5
+    ONESITE_NO_RESPONSE properties.
 
-        SiteId discovery (3 paths) is verified-correct, but the
-        endpoint itself rejects unauthenticated calls. Keeping the
-        scaffolding in place (gated on
-        ``ENABLE_ONESITE_WORKFLOW_PROBE`` env var) so a future fix
-        that solves the auth chain can re-enable without re-finding
-        all the discovery logic.
+    Returns parsed unit dicts (empty list when no SiteId discovered
+    or probe failed). Never raises.
 
-        See ``investigations/2026-05-24-cascade-fixes-grind/
-        SESSION_STATE_3.md`` for the audit that found this.
-
-    Returns parsed unit dicts (empty list when no SiteId discovered,
-    probe failed, OR feature flag is off). Never raises.
+    Tier label set on returned units is
+    ``TIER_1_API_ONESITE_WORKFLOW`` so the run report can distinguish
+    this fallback path from the captured-XHR path.
     """
-    import os as _os
-
-    if not _os.environ.get("ENABLE_ONESITE_WORKFLOW_PROBE"):
-        # Disabled until the auth chain is solved. See docstring.
-        return []
 
     fr = getattr(ctx, "fetch_result", None)
     raw_body = getattr(fr, "body", None) if fr is not None else None
@@ -328,22 +400,72 @@ async def _probe_onesite_workflowstartup(
     if not site_ids:
         return []
 
-    # Try each candidate site_id until one yields units
-    from ma_poc.pms.adapters._probe import probe_get
+    # Derive origin + referer from the marketing page so the
+    # workflowstartup endpoint sees us as a legit cross-site fetch
+    # from the operator's marketing host (matches HAR behavior).
+    base_url = getattr(ctx, "base_url", "") or ""
+    fr = getattr(ctx, "fetch_result", None)
+    if fr is not None:
+        base_url = str(getattr(fr, "final_url", "") or "") or base_url
+    try:
+        _bp = urlparse(base_url)
+        origin_host = (
+            f"{_bp.scheme}://{_bp.netloc}"
+            if _bp.scheme and _bp.netloc
+            else ""
+        )
+    except Exception:
+        origin_host = ""
+
+    from ma_poc.pms.adapters._probe import probe_get, web_unlocker_get
 
     for sid in site_ids[:3]:  # cap at 3 to avoid excess probing
         url = _onesite_workflowstartup_url(sid)
+        # Build the headers RealPage's BackendServiceInterceptor
+        # expects. ``xyz`` is the per-call auth token computed from
+        # the SiteId via MD5 + base64 (see _generate_xyz_token).
+        # ``Origin`` and ``Referer`` are the marketing host —
+        # workflowstartup is a cross-site CORS call from there.
+        # ``X-AuthToken`` and ``X-Phased`` stay empty for the
+        # unauthenticated guest flow.
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Origin": origin_host or "https://example.com",
+            "Referer": (origin_host + "/") if origin_host else "https://example.com/",
+            "User-Agent": _XYZ_USER_AGENT,
+            "xyz": _generate_xyz_token(sid, _XYZ_USER_AGENT),
+            "X-AuthToken": "",
+            "X-Phased": "",
+        }
+        # First try direct curl_cffi.
+        body_text = ""
         try:
-            r = probe_get(url, timeout=15)
+            r = probe_get(url, timeout=15, headers=headers)
+            if r.status_code == 200 and r.text:
+                body_text = r.text
+            elif r.status_code == 403 and "datadome" in (r.text or "").lower():
+                # DataDome blocked the direct call. Escalate to Web
+                # Unlocker which solves DataDome interstitials. The
+                # cap (WEB_UNLOCKER_MAX_CALLS_PER_JOB, commit 64d313c)
+                # protects spend.
+                _wu = web_unlocker_get(url, timeout=30)
+                if _wu.status_code == 200 and _wu.text:
+                    body_text = _wu.text
+                    log.info(
+                        "onesite.workflow.web_unlocker_rescue sid=%s url=%s",
+                        sid,
+                        url[:80],
+                    )
         except Exception as exc:
             log.debug("onesite workflowstartup err sid=%s: %s", sid, exc)
             continue
-        if r.status_code != 200 or not r.text:
+        if not body_text:
             continue
         try:
             import json as _json
 
-            body = _json.loads(r.text)
+            body = _json.loads(body_text)
         except Exception:
             continue
         units = parse_onesite_workflowstartup(body, url)

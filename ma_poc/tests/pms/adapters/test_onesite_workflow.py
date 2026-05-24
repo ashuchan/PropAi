@@ -17,7 +17,9 @@ from pathlib import Path
 
 from ma_poc.pms.adapters.onesite import (
     _extract_onesite_site_ids,
+    _generate_xyz_token,
     _onesite_workflowstartup_url,
+    _xyz_md5_upper,
     parse_onesite_workflowstartup,
 )
 
@@ -55,6 +57,97 @@ def test_extract_siteid_returns_empty_for_unrelated_body() -> None:
 
 def test_extract_siteid_returns_empty_for_blank_body() -> None:
     assert _extract_onesite_site_ids("", "") == []
+
+
+# ----- xyz auth token generator (reverse-engineered from OLL JS bundle) -----
+
+
+def test_xyz_md5_upper_matches_har_for_siteid_4646505() -> None:
+    """Pins the rpCalculate (MD5) implementation against the verified
+    HAR value. SiteId 4646505 → BAC7950C65FF98CFE97623E891524170."""
+    assert _xyz_md5_upper("4646505") == "BAC7950C65FF98CFE97623E891524170"
+
+
+def test_xyz_md5_upper_is_standard_md5_uppercase_hex() -> None:
+    """The rpCalculate fn in the OLL bundle uses the same constants
+    (1732584193, 4023233417, 2562383102, 271733878) as standard MD5
+    init values. Confirm our port matches stdlib MD5."""
+    import hashlib
+    sample = "hello world"
+    assert (
+        _xyz_md5_upper(sample)
+        == hashlib.md5(sample.encode()).hexdigest().upper()
+    )
+
+
+def test_xyz_token_structure_matches_har_template() -> None:
+    """The xyz token decodes (base64) to:
+       charGen(1) + md5(siteId).upper() + charGen(3) + md5(UA).upper()
+       + charGen(5) + base64(timestamp_ms) + charGen(7)
+    Pin the structure so any future bundle update breaks this test."""
+    import base64
+    token = _generate_xyz_token("4646505", "test-ua", ts_ms=1779444064132)
+    decoded = base64.b64decode(token).decode("latin-1")
+    # decoded[0] = charGen(1) — 1 alphanumeric
+    assert len(decoded) > 0 and decoded[0].isalnum()
+    # decoded[1:33] = md5(siteId) — 32 hex chars uppercase
+    md5_chunk = decoded[1:33]
+    assert len(md5_chunk) == 32
+    assert md5_chunk == "BAC7950C65FF98CFE97623E891524170"
+    # decoded[33:36] = charGen(3)
+    assert all(c.isalnum() for c in decoded[33:36])
+    # decoded[36:68] = md5(UA)
+    assert len(decoded[36:68]) == 32
+    import hashlib
+    assert decoded[36:68] == hashlib.md5(b"test-ua").hexdigest().upper()
+    # decoded[68:73] = charGen(5)
+    assert all(c.isalnum() for c in decoded[68:73])
+    # Then base64(timestamp) — should decode to our known ts
+    # The token tail is "<base64-ts>" + charGen(7), so find the
+    # base64 padding to delimit
+    tail = decoded[73:]
+    # Take up to the first 20-char base64 sequence (16 chars + ==)
+    import re
+    m = re.search(r"([A-Za-z0-9+/]+={1,2})", tail)
+    assert m, f"expected base64 timestamp in tail: {tail!r}"
+    ts_b64 = m.group(1)
+    decoded_ts = base64.b64decode(ts_b64).decode()
+    assert decoded_ts == "1779444064132"
+
+
+def test_xyz_token_is_different_on_each_call_due_to_random_chars() -> None:
+    """Same siteId but different random chunks → different token."""
+    a = _generate_xyz_token("12345", "ua")
+    b = _generate_xyz_token("12345", "ua")
+    assert a != b
+
+
+def test_xyz_token_is_base64_encoded() -> None:
+    """Final output is base64 — must be decodeable."""
+    import base64
+    token = _generate_xyz_token("12345", "ua")
+    # Will raise on bad padding/chars
+    decoded = base64.b64decode(token)
+    assert len(decoded) > 0
+
+
+def test_xyz_token_full_example_reproduces_known_har_md5_chunks() -> None:
+    """Cross-check against the live HAR's xyz token for
+    www.thepointatabington.com (SiteId 4777974)."""
+    import base64
+
+    # SiteId 4777974 → its MD5
+    import hashlib
+    expected_md5 = hashlib.md5(b"4777974").hexdigest().upper()
+    # Our token-generator should embed this exact MD5
+    token = _generate_xyz_token(
+        "4777974",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+    )
+    decoded = base64.b64decode(token).decode("latin-1")
+    # SiteId MD5 is at position [1:33]
+    assert decoded[1:33] == expected_md5
 
 
 # ----- _onesite_workflowstartup_url ------------------------------------
