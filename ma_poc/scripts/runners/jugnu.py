@@ -1213,6 +1213,40 @@ async def _process_property(
             if drift_detected:
                 profile = apply_drift_demotion(profile, reasons)
 
+            # 2026-05-24 — profile-learned proxy hint (follow-up #3 from
+            # canary v1 verdict). When the fetcher succeeded ONLY after
+            # L1 proxy escalation, persist the host so next-run uses
+            # proxy on the first attempt. The fetcher stamps
+            # ``fetch_result.recovered_via_proxy=True`` whenever the OK
+            # outcome came with ``l1_proxy_hops_used > 0``; we read it
+            # here (in the same place profile is owned) and call the
+            # shared writer. ``mark_host_needs_proxy`` is idempotent,
+            # caps the list at 30 hosts, and writes into the same
+            # ``profile.api_hints.proxy_required_hosts`` field the
+            # cross-origin probe gate already reads.
+            #
+            # Canary v2 evidence: PID 238171 (live230ash.com) went
+            # 0 units direct → 12 units via L1 proxy escalation. With
+            # this hint, the next run picks proxy on attempt 1 and
+            # avoids the wasted direct attempt + 0.5s jitter.
+            if (
+                fetch_result is not None
+                and getattr(fetch_result, "recovered_via_proxy", False)
+            ):
+                try:
+                    from urllib.parse import urlparse as _urlparse
+                    from ma_poc.fetch.proxy_gate import mark_host_needs_proxy
+
+                    _ctx = type("_HintCtx", (), {"profile": profile})()
+                    _host = (_urlparse(task.url).hostname or "").lower()
+                    if _host:
+                        mark_host_needs_proxy(_ctx, _host)
+                except Exception as _hint_exc:
+                    log.debug(
+                        "profile proxy-hint write failed for %s: %s",
+                        task.property_id, _hint_exc,
+                    )
+
             # PR 2 (2026-05-10): Channel 4 — null-field-recovery + FieldPatch
             # persistence. Before this PR, recovery ran in the OUTER
             # _process_one AFTER the profile was already saved here, so

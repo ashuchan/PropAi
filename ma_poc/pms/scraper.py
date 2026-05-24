@@ -21,7 +21,7 @@ import urllib.parse
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.base import AdapterContext, AdapterDomResult, AdapterResult
 from ma_poc.pms.adapters.registry import get_adapter
 from ma_poc.pms.detector import (
     DetectedPMS,
@@ -154,6 +154,111 @@ def _capture_concession_from_html(page_html: str) -> str | None:
         seg = win
 
     return seg.strip()[:300] or None
+
+
+async def _maybe_try_dom(
+    adapter: Any,
+    page: Any,
+    html: str,
+    ctx: AdapterContext,
+    property_id: str,
+) -> AdapterDomResult | None:
+    """Phase 1 cascade dispatcher — invoke optional ``adapter.try_dom``.
+
+    Called by ``scrape()`` AFTER the adapter's API path returns empty AND
+    BEFORE F2 LLM rescue or Step 8 generic fallback. Adapters that
+    implement ``try_dom`` (matches the existing optional-method pattern
+    documented at ``base.py:111-200``) participate in deterministic DOM
+    extraction without going through the LLM.
+
+    Returns:
+        - ``AdapterDomResult`` (possibly empty) when the adapter has a
+          ``try_dom`` method
+        - ``None`` when the adapter doesn't implement ``try_dom`` (the
+          cascade proceeds to its next step unchanged)
+
+    NEVER RAISES — every exception path emits ``ADAPTER_DOM_EMPTY`` and
+    returns an empty result, letting the cascade continue.
+    """
+    try_dom_fn = getattr(adapter, "try_dom", None)
+    if try_dom_fn is None:
+        return None
+
+    pms_label = getattr(adapter, "pms_name", "unknown")
+    try:
+        from ma_poc.observability.events import EventKind, emit
+        try:
+            emit(
+                EventKind.ADAPTER_DOM_ATTEMPT,
+                property_id,
+                pms=pms_label,
+                html_len=len(html or ""),
+            )
+        except Exception:
+            pass  # telemetry never breaks scraping
+
+        try:
+            res = await try_dom_fn(page, html or "", ctx)
+        except Exception as e:
+            try:
+                emit(
+                    EventKind.ADAPTER_DOM_EMPTY,
+                    property_id,
+                    pms=pms_label,
+                    reason=f"exception:{type(e).__name__}",
+                )
+            except Exception:
+                pass
+            log.warning("adapter.try_dom failed for %s pms=%s: %s", property_id, pms_label, e)
+            return AdapterDomResult.empty(reason=f"exception:{type(e).__name__}")
+
+        # Contract guard — adapter returned something that isn't an
+        # AdapterDomResult. Defensive coercion + telemetry so a buggy
+        # adapter return value can't poison the cascade.
+        if not isinstance(res, AdapterDomResult):
+            try:
+                emit(
+                    EventKind.ADAPTER_DOM_EMPTY,
+                    property_id,
+                    pms=pms_label,
+                    reason=f"contract_violation:{type(res).__name__}",
+                )
+            except Exception:
+                pass
+            return AdapterDomResult.empty(reason="contract_violation")
+
+        if res.has_units:
+            try:
+                emit(
+                    EventKind.ADAPTER_DOM_HIT,
+                    property_id,
+                    pms=pms_label,
+                    units=len(res.units),
+                    plan_summaries=len(res.plan_summaries),
+                    tier=res.tier_used,
+                    confidence=res.confidence,
+                    selector_signature=res.selector_signature,
+                    is_high_confidence=res.is_high_confidence,
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                emit(
+                    EventKind.ADAPTER_DOM_EMPTY,
+                    property_id,
+                    pms=pms_label,
+                    reason=res.debug.get("reason", "empty") if isinstance(res.debug, dict) else "empty",
+                )
+            except Exception:
+                pass
+
+        return res
+    except Exception as outer_exc:
+        # Belt-and-suspenders: even the telemetry dispatch itself must
+        # never break the cascade.
+        log.warning("_maybe_try_dom outer-guard caught: %s", outer_exc)
+        return AdapterDomResult.empty(reason="dispatcher_exception")
 
 
 # Telemetry keys whose values are list-typed and concatenate across the
@@ -1021,6 +1126,41 @@ async def scrape(
             )
             result["_rescue_skipped_reason"] = "captcha_detected"
 
+        # 2026-05-24 Phase 1 cascade — try the adapter's deterministic
+        # ``try_dom`` hook BEFORE F2 LLM rescue. Adapters that opt in via
+        # the optional Protocol method get first crack at extracting
+        # units from the captured HTML without paying for LLM. A
+        # high-confidence hit short-circuits rescue entirely; an empty
+        # result lets the cascade continue to the LLM path unchanged.
+        # Pre-conditions match the LLM rescue gate: only fires when
+        # the adapter has no units AND no plan-aggregate rows yet AND
+        # the page is reachable and not captcha-blocked.
+        adapter_dom_won = False
+        if (
+            needs_rescue or (not adapter_result.units and not adapter_found_plan_rows
+                             and not page_unreachable and not captcha_detected)
+        ):
+            dom_res = await _maybe_try_dom(
+                adapter, page, page_html or "", ctx, ctx.property_id
+            )
+            if dom_res is not None and dom_res.is_high_confidence:
+                # Adapter's deterministic DOM path won — adopt its result
+                # and skip LLM rescue.
+                adapter_result.units = list(dom_res.units)
+                if dom_res.plan_summaries:
+                    adapter_result.plan_summaries = list(
+                        (adapter_result.plan_summaries or []) + dom_res.plan_summaries
+                    )
+                adapter_result.tier_used = dom_res.tier_used or adapter_result.tier_used
+                adapter_result.confidence = max(
+                    getattr(adapter_result, "confidence", 0.0), dom_res.confidence
+                )
+                adapter_dom_won = True
+                needs_rescue = False
+                result["_adapter_dom_won"] = True
+                result["_adapter_dom_tier"] = dom_res.tier_used
+                result["_adapter_dom_selector_signature"] = dom_res.selector_signature
+
         if needs_rescue:
             from ma_poc.services.llm_api_rescue import RescueInput, rescue_from_api_responses
 
@@ -1128,6 +1268,154 @@ async def scrape(
     except Exception as _rescue_exc:
         log.warning("F2 rescue orchestration failed for %s: %s", property_id, _rescue_exc)
 
+    # --- Step 7.5: Cascade secondary-adapter fallback (2026-05-24) ---
+    #
+    # When the PRIMARY detected adapter returns empty, BEFORE handing off
+    # to the generic adapter, try OTHER PMS adapters whose fingerprints
+    # also matched in the HTML. Generic mechanism — driven by
+    # ``_detector_signals.fingerprints_matched`` so any property that
+    # has multiple PMS markers (e.g. imtresidential.com with a SightMap
+    # embed iframe) gets a second chance at a dedicated adapter before
+    # falling to the generic + LLM cascade.
+    #
+    # Canonical case from canary v2 (2026-05-24): PIDs 14332 + 41185
+    # imtresidential.com pages have ``sightmap`` fingerprint matched
+    # (the page embeds a SightMap iframe). SightMap adapter wins
+    # detection (line 642 of detector.py), runs, returns 0 units. The
+    # cascade then needs to try ``imt_spaces`` BEFORE generic — the
+    # IMT adapter's ``try_dom`` is the right path for those properties.
+    #
+    # The fallback walks candidates in detection-confidence order:
+    # 1. Identify matched fingerprints from ``_detector_signals``
+    # 2. Map labels → adapter names (some 1:1, some via _LABEL_TO_PMS)
+    # 3. Skip the primary adapter (already tried)
+    # 4. Skip adapters not registered in the registry
+    # 5. Try each in order; first non-empty result wins
+    #
+    # Each candidate gets a small ``try_dom``-style invocation (NOT a
+    # full extract dispatch — that would re-fetch). The HTML body is
+    # already in hand from the primary fetch.
+    _adapter_has_plan_rows = bool(getattr(adapter_result, "plan_summaries", None))
+    if (
+        not adapter_result.units
+        and not _adapter_has_plan_rows
+        and not page_unreachable
+        and not captcha_detected
+        and adapter_name != "generic"
+    ):
+        try:
+            _detector_signals = result.get("_detector_signals") or {}
+            _fingerprints_matched: list[str] = list(
+                _detector_signals.get("fingerprints_matched") or []
+            )
+            # Label → PMS adapter name. Some labels map 1:1 to a PMS
+            # name (entrata, rentcafe, appfolio, sightmap, onesite,
+            # avalonbay, amli, funnel, touchtour). Others (marketing_*,
+            # g5, realpage) need explicit translation. The IMT case
+            # uses the host-only branch added 2026-05-24; its
+            # fingerprint label doesn't exist in _HTML_FINGERPRINTS yet,
+            # so we add a host-pattern fallback below.
+            _LABEL_TO_PMS = {
+                "entrata": "entrata",
+                "rentcafe": "rentcafe",
+                "sightmap": "sightmap",
+                "appfolio": "appfolio",
+                "onesite": "onesite",
+                "wix": "wix_floor_plans",
+                "avalonbay": "avalonbay",
+                "amli": "amli",
+                "funnel": "funnel",
+                "touchtour": "touchtour",
+                "marketing_knock": "knock",
+                "marketing_marketapts": "marketapts",
+                "g5": "g5",
+                "realpage": "realpage_oll",
+            }
+            _candidate_pms: list[str] = []
+            for label in _fingerprints_matched:
+                pms = _LABEL_TO_PMS.get(label)
+                if pms and pms != adapter_name and pms not in _candidate_pms:
+                    _candidate_pms.append(pms)
+
+            # Host-pattern candidates not exposed via _HTML_FINGERPRINTS
+            # (the IMT case). Single-portfolio hosts that have dedicated
+            # adapters but weren't in the fingerprint table at detection
+            # time. Keep this list TINY — only single-portfolio hosts
+            # whose adapter is registered.
+            _host_lower = (urllib.parse.urlparse(resolved.resolved_url).hostname or "").lower()
+            _HOST_TO_PMS = {
+                "imtresidential.com": "imt_spaces",
+                "www.imtresidential.com": "imt_spaces",
+            }
+            for _host_pat, _host_pms in _HOST_TO_PMS.items():
+                if (
+                    _host_pat in _host_lower
+                    and _host_pms != adapter_name
+                    and _host_pms not in _candidate_pms
+                ):
+                    _candidate_pms.append(_host_pms)
+
+            if _candidate_pms:
+                for _cand_pms in _candidate_pms:
+                    try:
+                        _cand_adapter = get_adapter(_cand_pms)
+                    except KeyError:
+                        continue
+                    _cand_name = getattr(_cand_adapter, "pms_name", "")
+                    if _cand_name == adapter_name:
+                        continue
+                    fallback_chain.append(_cand_name)
+                    # Try the candidate adapter's try_dom hook (cheap,
+                    # operates on captured HTML). NOT a full extract
+                    # dispatch — that would re-fetch and re-detect.
+                    _cand_dom = await _maybe_try_dom(
+                        _cand_adapter, page, page_html or "", ctx, ctx.property_id
+                    )
+                    if (
+                        _cand_dom is not None
+                        and _cand_dom.is_high_confidence
+                    ):
+                        # Candidate adapter recovered. Adopt its result
+                        # and skip the generic fallback.
+                        adapter_result.units = list(_cand_dom.units)
+                        if _cand_dom.plan_summaries:
+                            adapter_result.plan_summaries = list(
+                                (adapter_result.plan_summaries or [])
+                                + _cand_dom.plan_summaries
+                            )
+                        adapter_result.tier_used = (
+                            _cand_dom.tier_used or adapter_result.tier_used
+                        )
+                        adapter_result.confidence = max(
+                            getattr(adapter_result, "confidence", 0.0),
+                            _cand_dom.confidence,
+                        )
+                        _adapter_has_plan_rows = bool(
+                            getattr(adapter_result, "plan_summaries", None)
+                        )
+                        result["_cascade_fallback_won"] = _cand_name
+                        result["_cascade_fallback_tier"] = _cand_dom.tier_used
+                        try:
+                            from ma_poc.observability.events import EventKind, emit
+                            emit(
+                                EventKind.ADAPTER_DOM_HIT,
+                                ctx.property_id,
+                                pms=_cand_name,
+                                tier=_cand_dom.tier_used,
+                                units=len(_cand_dom.units),
+                                confidence=_cand_dom.confidence,
+                                cascade_fallback=True,
+                                primary_pms=adapter_name,
+                            )
+                        except Exception:
+                            pass
+                        break
+        except Exception as _cascade_exc:
+            log.warning(
+                "cascade-fallback dispatch failed for %s: %s",
+                ctx.property_id, _cascade_exc,
+            )
+
     # --- Step 8: Fallback to generic if adapter returned empty ---
     # D16 post-partition guard: ``plan_summaries`` carries successfully-
     # extracted plan-aggregate rows. Treat them as "adapter found something"
@@ -1135,6 +1423,43 @@ async def scrape(
     # same page when the dedicated adapter already classified the available
     # rows. Plan-only sites legitimately have no unit-level inventory.
     _adapter_has_plan_rows = bool(getattr(adapter_result, "plan_summaries", None))
+
+    # 2026-05-24 Phase 1 cascade — last chance for the detected adapter
+    # before we hand off to the generic fallback. Only fires when the
+    # F2 rescue gate above didn't run try_dom (e.g. SUPPORTED_ADAPTERS
+    # gating skipped this adapter for rescue but it may still have a
+    # try_dom path that works). Adapters already covered by the rescue
+    # branch above set ``adapter_dom_won`` — skip duplicate dispatch.
+    if (
+        not adapter_dom_won
+        and not adapter_result.units
+        and not _adapter_has_plan_rows
+        and pms_name != "unknown"
+        and adapter_name != "generic"
+    ):
+        try:
+            dom_res = await _maybe_try_dom(
+                adapter, page, page_html or "", ctx, ctx.property_id
+            )
+        except Exception as _e:
+            log.warning("Step 8 try_dom dispatch failed for %s: %s", ctx.property_id, _e)
+            dom_res = None
+        if dom_res is not None and dom_res.is_high_confidence:
+            adapter_result.units = list(dom_res.units)
+            if dom_res.plan_summaries:
+                adapter_result.plan_summaries = list(
+                    (adapter_result.plan_summaries or []) + dom_res.plan_summaries
+                )
+            adapter_result.tier_used = dom_res.tier_used or adapter_result.tier_used
+            adapter_result.confidence = max(
+                getattr(adapter_result, "confidence", 0.0), dom_res.confidence
+            )
+            adapter_dom_won = True
+            _adapter_has_plan_rows = bool(getattr(adapter_result, "plan_summaries", None))
+            result["_adapter_dom_won"] = True
+            result["_adapter_dom_tier"] = dom_res.tier_used
+            result["_adapter_dom_selector_signature"] = dom_res.selector_signature
+
     if (
         not adapter_result.units
         and not _adapter_has_plan_rows
@@ -4242,6 +4567,66 @@ async def _try_link_hop(
                 "hop_count_total": _hop_count_total,
                 "hop_count_bot_blocked": _hop_count_bot_blocked,
             }
+            # 2026-05-24 Phase 4.1 — DON'T short-circuit when this hop's URL
+            # matches a per-plan shape AND the queue still has unfollowed
+            # sibling per-plan URLs. Pre-fix, the BFS returned the FIRST
+            # successful per-plan hop's units and dropped 4-8 sibling
+            # `/floorplans/{slug}` URLs at score 10000 (the
+            # `profile:availability_link` candidates injected from the
+            # entry-page discovery). Forensic on PIDs 64911, 247477,
+            # 243995, 282768, 18723 confirmed this on run 2026-05-23 — 15
+            # of 17 LOW-unit (units=1 SUCCESS) properties had ≥1 per-plan
+            # URL at score 10000 in the queue that never got fetched.
+            #
+            # The fix: when the just-fetched URL is shaped like a per-plan
+            # detail page AND the remaining queue has more per-plan
+            # siblings, enter accumulation mode and continue. The
+            # accumulation cap at ``_MAX_FLOORPLAN_ACCUM_PAGES`` still
+            # bounds the crawl.
+            try:
+                _sub_path = urllib.parse.urlparse(sub_url).path.lower()
+                _, _sub_shape_label = _url_shape_score(_sub_path)
+                _per_plan_shapes = (
+                    "rentcafe_per_plan", "slugged_plan_detail", "per_unit_detail",
+                )
+                _queue_has_more_per_plan = False
+                if _sub_shape_label in _per_plan_shapes:
+                    for _qu, _qs, _qa in queue[queue_idx:]:
+                        try:
+                            _qpath = urllib.parse.urlparse(_qu).path.lower()
+                            _, _qshape = _url_shape_score(_qpath)
+                        except Exception:
+                            continue
+                        if _qshape in _per_plan_shapes:
+                            _queue_has_more_per_plan = True
+                            break
+                if (
+                    _sub_shape_label in _per_plan_shapes
+                    and _queue_has_more_per_plan
+                    and not _in_floorplan_accumulation
+                ):
+                    log.debug(
+                        "Phase 4.1: entering per-plan accumulation from %s "
+                        "(shape=%s, queue_has_siblings=True)",
+                        sub_url[:100], _sub_shape_label,
+                    )
+                    _in_floorplan_accumulation = True
+                    _first_successful_result = sub_result
+                    _accumulated_units = list(sub_result.get("units") or [])
+                    _accumulated_plan_summaries.extend(
+                        sub_result.get("plan_summaries") or []
+                    )
+                    _accum_pages_fetched += 1
+                    # Don't return — let the BFS continue draining
+                    # remaining per-plan siblings into the accumulator.
+                    continue
+            except Exception as _accum_err:
+                log.debug(
+                    "Phase 4.1 per-plan accumulation gate failed (%s) — "
+                    "falling through to legacy short-circuit",
+                    _accum_err,
+                )
+
             return sub_result
 
         # Dynamic discovery: a sub-fetch may itself have surfaced

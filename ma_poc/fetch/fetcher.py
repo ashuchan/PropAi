@@ -497,68 +497,140 @@ class Fetcher:
             last_result = result
 
             # 6. Check if we got a good result
-            # EMPTY_BODY is terminal like HARD_FAIL — no retry, the server
-            # deliberately returned nothing and a second request won't help.
             if result.outcome in (
                 FetchOutcome.OK, FetchOutcome.NOT_MODIFIED,
-                FetchOutcome.HARD_FAIL, FetchOutcome.EMPTY_BODY,
                 FetchOutcome.DEAD_URL,
             ):
+                # 2026-05-24 — profile-learned proxy hint (follow-up #3
+                # from canary v1 verdict). When the SUCCESS came AFTER
+                # one or more L1 proxy escalations, stamp the FetchResult
+                # so the downstream profile_updater can call
+                # ``mark_host_needs_proxy`` and the NEXT run picks proxy
+                # on the first attempt instead of burning a direct
+                # attempt + escalation hop again.
+                #
+                # We stamp here (where l1_proxy_hops_used is visible) and
+                # let the scraper / profile_updater consume the flag.
+                # The fetcher has no profile access — CrawlTask is frozen
+                # and doesn't carry profile state.
+                #
+                # Recovers PIDs like 238171 (canary 2026-05-24: 0 units
+                # direct → 12 units via proxy after L1 escalation) so
+                # their next-run direct attempt is skipped.
+                if l1_proxy_hops_used > 0:
+                    try:
+                        result = dataclasses.replace(
+                            result, recovered_via_proxy=True,
+                        )
+                    except Exception as _stamp_exc:
+                        log.debug(
+                            "recovered_via_proxy stamp failed %s: %s",
+                            task.property_id, _stamp_exc,
+                        )
+                    emit(
+                        EventKind.FETCH_ROTATED_IDENTITY,
+                        task.property_id,
+                        reason="profile_marked_needs_proxy",
+                        host=host,
+                        l1_proxy_hops_used=l1_proxy_hops_used,
+                    )
+                    last_result = result
                 break
 
+            # 6a. L1 proxy escalation (2026-05-23, extended 2026-05-24).
+            # The direct attempt got CF/WAF-walled OR returned an empty
+            # body OR failed with a connection-level error — RetryPolicy
+            # returns should_retry=False for all three because retrying
+            # with the same egress is pointless. The escalation IS the
+            # recovery: pick a proxy from the pool and retry from a
+            # different egress.
+            #
+            # Three trigger paths (all gated through
+            # :func:`proxy_gate.decide_l1_escalate`):
+            #   * BOT_BLOCKED — CF/WAF challenge body (original 2026-05-23)
+            #   * EMPTY_BODY — stealth bot-block (200 with <16 bytes); PID
+            #     238171 canary 2026-05-24 missed it without this branch
+            #   * HARD_FAIL with connection-level error_signature
+            #     (CONNECTION_REFUSED / TIMED_OUT / RESET / etc.); PID
+            #     13314 canary 2026-05-24 missed it without this branch.
+            #     DNS-fail / SSL-fail signatures are terminal — the gate
+            #     denies with DNS_FAIL_NOT_ADMITTED / SSL_FAIL_NOT_ADMITTED.
+            #
+            # NOTE: TRANSIENT intentionally NOT in the trigger list — it
+            # has its own retry-policy path (RetryPolicy.decide returns
+            # should_retry=True for TRANSIENT up to max_attempts).
+            # Escalating on first TRANSIENT would burn proxy budget on
+            # network flake. The test
+            # ``test_fetch_does_not_escalate_on_transient`` pins this
+            # invariant. If a property persistently hits TRANSIENT it
+            # exits the loop via retry-policy exhaustion, then ships as
+            # FAILED_UNREACHABLE — at that point a NEXT-RUN profile-
+            # learned proxy hint (mark_host_needs_proxy) is the right
+            # recovery, not in-loop escalation.
+            #
+            # The admit/deny policy + signature filtering lives in
+            # proxy_gate.decide_l1_escalate; this site only calls it.
+            _escalate_trigger = result.outcome in (
+                FetchOutcome.BOT_BLOCKED,
+                FetchOutcome.EMPTY_BODY,
+                FetchOutcome.HARD_FAIL,
+            )
             if result.outcome == FetchOutcome.BOT_BLOCKED:
                 emit(EventKind.FETCH_BOT_BLOCKED, task.property_id, url=task.url, attempt=attempt)
+            if _escalate_trigger and proxy is None and len(self._proxy_pool) > 0:
+                from ma_poc.fetch.proxy_gate import decide_l1_escalate
 
-                # 6a. L1 CF-escalation (2026-05-23). The direct attempt
-                # got CF/WAF-walled. RetryPolicy.decide(BOT_BLOCKED, ...)
-                # returns should_retry=False (see retry_policy.py:76-85)
-                # because retrying with the same egress is pointless. The
-                # escalation IS the recovery: pick a proxy from the pool
-                # and retry, bypassing the retry-policy "no" verdict.
-                #
-                # Gated through ``proxy_gate.decide_l1_escalate`` so the
-                # admit/deny policy lives in one place (host allowlist,
-                # hop budget, "no proxy configured" — all centralised).
-                # The decision *authorises* escalation; the L1 ProxyPool
-                # *resources* it (proxy URL comes from PROXY_POOL_URLS,
-                # not PROBE_PROXY_URL — those are two separate pools by
-                # design — see proxy_gate module docstring).
-                if proxy is None and len(self._proxy_pool) > 0:
-                    from ma_poc.fetch.proxy_gate import decide_l1_escalate
-
-                    l1_decision = decide_l1_escalate(
-                        task.url,
-                        prior_outcome=result.outcome.value,
-                        proxy_hops_used=l1_proxy_hops_used,
-                        pool_has_proxies=True,
+                l1_decision = decide_l1_escalate(
+                    task.url,
+                    prior_outcome=result.outcome.value,
+                    proxy_hops_used=l1_proxy_hops_used,
+                    pool_has_proxies=True,
+                    error_signature=getattr(result, "error_signature", None),
+                )
+                if l1_decision.allow:
+                    escalation_proxy = self._proxy_pool.pick(
+                        sticky_key=task.property_id,
                     )
-                    if l1_decision.allow:
-                        escalation_proxy = self._proxy_pool.pick(
-                            sticky_key=task.property_id,
+                    # Pool may return None if every URL has dropped
+                    # below the health quarantine threshold — in that
+                    # case skip escalation and fall through to the
+                    # retry-policy break.
+                    if escalation_proxy is not None and attempt < self._retry._max_attempts:
+                        proxy = escalation_proxy
+                        l1_proxy_hops_used += 1
+                        emit(
+                            EventKind.FETCH_ROTATED_IDENTITY,
+                            task.property_id,
+                            # ``reason`` stays "l1_cf_escalation_to_proxy"
+                            # for back-compat with existing analyzer
+                            # queries; the specific admission path
+                            # (CF / EMPTY_BODY / UNREACHABLE) is on
+                            # ``proxy_decision_reason``.
+                            reason="l1_cf_escalation_to_proxy",
+                            proxy_decision_reason=l1_decision.reason.value,
+                            attempt=attempt,
+                            prior_outcome=result.outcome.value,
+                            error_signature=getattr(result, "error_signature", None),
                         )
-                        # Pool may return None if every URL has dropped
-                        # below the health quarantine threshold — in
-                        # that case skip escalation and fall through to
-                        # the retry-policy break (FAILED_UNREACHABLE).
-                        if escalation_proxy is not None and attempt < self._retry._max_attempts:
-                            proxy = escalation_proxy
-                            l1_proxy_hops_used += 1
-                            emit(
-                                EventKind.FETCH_ROTATED_IDENTITY,
-                                task.property_id,
-                                reason="l1_cf_escalation_to_proxy",
-                                proxy_decision_reason=l1_decision.reason.value,
-                                attempt=attempt,
-                            )
-                            # Small jitter before the retry — gives any
-                            # CF clearance issued mid-handshake a moment
-                            # to land. 500ms matches the existing rate-
-                            # limit escalation feel (line 549-550).
-                            await asyncio.sleep(0.5)
-                            # Force the retry by skipping the rest of
-                            # this loop iteration (incl. the retry-policy
-                            # check that would otherwise break).
-                            continue
+                        # Small jitter before the retry — gives any CF
+                        # clearance issued mid-handshake a moment to
+                        # land. 500ms matches the existing rate-limit
+                        # escalation feel.
+                        await asyncio.sleep(0.5)
+                        # Force the retry by skipping the rest of this
+                        # loop iteration (incl. the retry-policy check
+                        # that would otherwise break).
+                        continue
+
+            # 6b. Terminal break for outcomes that survived L1 escalation
+            # gate. EMPTY_BODY / HARD_FAIL are terminal when proxy escalation
+            # was denied OR when proxy pool is empty — original behavior
+            # preserved exactly for back-compat with the retry-policy
+            # contract.
+            if result.outcome in (
+                FetchOutcome.HARD_FAIL, FetchOutcome.EMPTY_BODY,
+            ):
+                break
 
             # 7. Retry decision
             retry_after = result.headers.get("retry-after")

@@ -544,9 +544,14 @@ def emit_beds_zero_no_studio(
         return False
     try:
         from ma_poc.observability.events import EventKind, emit
-        if hasattr(EventKind, "BEDS_ZERO_NO_STUDIO"):
+        # NOTE: the canonical enum is BEDS_ZERO_NON_STUDIO (existing in
+        # events.py line 135), not _NO_STUDIO. Keep both names supported
+        # so the guard is resilient to either spelling at the call site.
+        kind = getattr(EventKind, "BEDS_ZERO_NON_STUDIO", None) or \
+               getattr(EventKind, "BEDS_ZERO_NO_STUDIO", None)
+        if kind is not None:
             emit(
-                EventKind.BEDS_ZERO_NO_STUDIO,
+                kind,
                 str(property_id),
                 fpn=fpn[:80],
                 unit_id_hint=str(unit.get("unit_id") or "")[:40],

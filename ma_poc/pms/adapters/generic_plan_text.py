@@ -176,6 +176,91 @@ class GenericPlanTextAdapter:
     pms_name: str = "generic_plan_text"
     _fingerprints: list[str] = []  # no host-specific fingerprints
 
+    async def try_dom(self, page, html: str, ctx: AdapterContext):
+        """2026-05-24 Phase 1 cascade hook — last-resort plan-text extractor.
+
+        Wraps ``parse_generic_plan_text``. Returns LOWER confidence (0.6)
+        because this adapter is by-design a fallback: the parser only
+        looks at body text without HTML structure, so its precision is
+        weaker than per-PMS adapters. The cascade should still try
+        higher-fidelity options first.
+
+        Empty-marker check: the parser requires ≥2 plan lines AND each
+        line must have a real rent above $400. The cheap pre-check
+        looks for at least one ``$`` followed by digits — pages without
+        any dollar amount can't yield a plan-text row.
+        """
+        from ma_poc.pms.adapters.base import AdapterDomResult
+
+        if not html or "$" not in html:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_GENERIC_PLAN_TEXT",
+                reason="no_dollar_marker",
+            )
+        # The parser walks body TEXT — strip script/style up front to
+        # mirror what page.evaluate(document.body.innerText) would give.
+        try:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html, "lxml")
+            # Drop script/style blocks so their content doesn't pollute
+            # the text walker (CMS-functions/PropLeadSource leak).
+            for s in soup(["script", "style", "noscript"]):
+                s.decompose()
+            body_text = soup.get_text(" ", strip=True)
+        except Exception:
+            # Fallback: regex-strip script/style + tag-flatten — mirror
+            # the playbook recipe in _capture_concession_from_html.
+            import re as _re
+            no_code = _re.sub(
+                r"<(script|style|noscript)\b[^>]*>.*?</\1>",
+                " ", html, flags=_re.IGNORECASE | _re.DOTALL,
+            )
+            body_text = _re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", " ", no_code))
+        if not body_text:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_GENERIC_PLAN_TEXT",
+                reason="empty_text",
+            )
+        url = getattr(ctx, "base_url", "") or ""
+        try:
+            raw_units = parse_generic_plan_text(body_text, url)
+        except Exception as e:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_GENERIC_PLAN_TEXT",
+                reason=f"parse_exception:{type(e).__name__}",
+            )
+        if not raw_units:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_GENERIC_PLAN_TEXT",
+                reason="parser_silent_empty",
+            )
+        try:
+            from ma_poc.extraction.dq_guards import apply_unit_guards
+            guarded = apply_unit_guards(
+                raw_units,
+                property_id=getattr(ctx, "property_id", ""),
+                source_html=html,
+                detect_same_rent=True,
+            )
+        except Exception:
+            guarded = raw_units
+        if not guarded:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_GENERIC_PLAN_TEXT",
+                reason="dq_guards_rejected_all",
+            )
+        # Lower confidence than per-PMS adapters — this is a fallback.
+        # ``is_high_confidence`` requires ≥0.7; returning 0.6 means the
+        # cascade WILL still try other paths (LLM_DOM as backup).
+        return AdapterDomResult(
+            units=guarded,
+            plan_summaries=[],
+            tier_used="TIER_3_DOM_GENERIC_PLAN_TEXT",
+            selector_signature="plan-text-line-regex",
+            confidence=0.6,
+            debug={"raw_count": len(raw_units), "guarded_count": len(guarded)},
+        )
+
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used="TIER_1_DOM_GENERIC_PLAN_TEXT")
 

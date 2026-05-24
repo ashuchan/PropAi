@@ -139,6 +139,25 @@ class EventKind(StrEnum):
     # from "rent not in DB because extractor missed it." Without this
     # split, all null-rent SUCCESS properties look the same in dashboards.
     RENT_GATED_BY_PORTAL = "extract.rent_gated_by_portal"
+    # 2026-05-24 Phase 1 cascade — adapter ``try_dom`` deterministic DOM
+    # hook telemetry. ATTEMPT fires before every try_dom dispatch;
+    # HIT fires when units were extracted (with confidence + selector
+    # signature payload); EMPTY fires when try_dom returned empty
+    # (with reason — selector_mismatch / gate_failed / exception:XYZ).
+    # The HIT/EMPTY split lets analyzers compute per-PMS try_dom hit-rate
+    # against the LLM-DOM-replacement metric (target ≥70%/PMS on the
+    # adapter's API-empty subset). Pair with extract.tier_attempted to
+    # see when try_dom replaced LLM_DOM.
+    ADAPTER_DOM_ATTEMPT = "extract.adapter_dom_attempt"
+    ADAPTER_DOM_HIT = "extract.adapter_dom_hit"
+    ADAPTER_DOM_EMPTY = "extract.adapter_dom_empty"
+    # 2026-05-24 dq_guards Phase 4 telemetry — emitted by
+    # canonicalize_status (via emit_status_non_canonical) when a producer
+    # availability-status string falls outside the canonical 3-value enum
+    # AND is not in the recognised subtype map. Surfaces new variants
+    # the enum should learn from real data (today's map covers WAITLIST,
+    # COMING_SOON, LEASED, MODEL, OFF_MARKET, PENDING, RESERVED).
+    STATUS_NON_CANONICAL = "extract.status_non_canonical"
     # 2026-05-23 — emitted once per probe entry through ``_probe.probe_get``
     # / ``_probe.probe_post``. Carries the proxy_gate.decide result for
     # downstream cost attribution. Payload: ``url`` (redacted to host+

@@ -2041,6 +2041,146 @@ _DOM_CONTAINER_SELECTORS: tuple[str, ...] = (
     "div.listing",
 )
 
+
+# ── Phase 2.3 (2026-05-24) — Per-PMS DOM container dispatch ────────────────
+#
+# The flat ``_DOM_CONTAINER_SELECTORS`` tuple above is the GENERIC fallback
+# — used when no PMS is detected or when the detected PMS doesn't yet
+# have a dedicated subset. Per-PMS selector subsets below let
+# ``extract_units_from_dom`` dispatch on ``ctx.detected.pms`` and try
+# the high-specificity selectors FIRST, avoiding cross-talk where a
+# generic ``.unit-card`` matches a RentCafe vanity page that should
+# have been routed to ``.fp-container`` instead.
+#
+# Memory: `project_run_2026_05_23_dom_capture_synthesis` showed 203 of
+# 344 TIER_3_DOM wins (59%) flow through the generic fallback even
+# though their PMS is detected. The per-PMS dispatch tightens this so
+# detected-PMS properties get their PMS-specific selectors first.
+
+_PMS_DOM_SELECTORS: dict[str, tuple[str, ...]] = {
+    # RentCafe family — hosted, vanity, IPM, Splide, modern theme. Top-tier
+    # leverage cohort per the playbook (1,110 of 1,677 TIER_4_LLM_DOM
+    # properties are rentcafe-detected).
+    "rentcafe": (
+        "tr.fp-unit",                                # hosted table (data-unit-*)
+        ".par-units .unit-container",                # rentcafe_unit_roster theme
+        ".floorplan-block",                          # rentcafe_unit_roster gate
+        "div.option-row", ".option-row",             # D4 per-plan availability rows
+        ".fp-container", "[id^='fp-container-']",    # F2 vanity-site data-attrs
+        ".nu-floor-plan",                            # F5 IPM card
+        ".floorplan-slide",                          # 2026-05-23 Splide
+        ".splide-floorplans .splide__slide",
+    ),
+    # Entrata — Tier-1 API wins for most cases; DOM fallback uses unit-row
+    # selectors that prospect_portal/widget HTML emits.
+    "entrata": (
+        ".unit-row",
+        ".unit-card",
+        ".entrata-unit-row",
+        "[data-unit]",
+        "[data-availability]",
+    ),
+    # AppFolio — SSR `data-listing-id` is canonical. Plus tenant-specific
+    # variants observed across the 5-tenant cohort.
+    "appfolio": (
+        "[data-listing-id]",
+        ".js-listing-card",
+        ".js-listing-blurb-rent",  # blurb cell — used by some tenants only
+        ".listing-unit-detail-table",
+    ),
+    # Knock — when init creds absent and Knock falls to its DOM widget.
+    "knock": (
+        ".floorplan-card",
+        "[data-knock-unit]",
+        ".knock-floorplan",
+    ),
+    # SightMap rarely uses DOM fallback (API is canonical), but the embed
+    # iframe occasionally renders unit tiles inline.
+    "sightmap": (
+        "[data-sightmap-unit]",
+        ".sightmap-unit",
+    ),
+    # G5 Apollo Apartments theme — Apollo cache + URN-templated GraphQL.
+    # DOM-only path when the Apollo state is partial.
+    "g5": (
+        "[data-floor-plan-id]",
+        ".g5-fp-card",
+        ".floor-plan-row",
+    ),
+    # OneSite / RealPage augmentation — when API returns plan-only and
+    # per-unit data lives in the page.
+    "onesite": (
+        ".unit-row",
+        "[data-onesite-unit]",
+        "[data-realpage-unit]",
+        ".rpfp-card",
+    ),
+    # Equity Residential — ea5-unit blocks (canonical) + unit-tile.
+    "equity": (
+        ".unit-availability-tile",
+        "[data-availability]",
+        "div[class*='availability-tile']",
+        "div[class*='unit-tile']",
+    ),
+    # Cortland — apartment grid + data-js-hook.
+    "cortland": (
+        "a[data-js-hook='apartment']",
+        ".apartments__card",
+        ".apartment-card",
+    ),
+    # Wix-hosted — "Starting at $X" cards via div/section/article/li walk.
+    "wix_floor_plans": (
+        ".plan-card",
+        "[data-plan]",
+        "article",
+    ),
+    # IMT Spaces theme — article.spaces-plan.
+    "imt_spaces": (
+        "article.spaces-plan",
+        "[data-spaces-plan-id]",
+    ),
+    # RealPage CWS rpfp widget.
+    "realpage_cws": (
+        ".rpfp-container .rpfp-card",
+        ".rpfp-card",
+        ".floorplans-widget .card",
+    ),
+}
+
+
+def get_container_selectors(pms: str | None) -> tuple[str, ...]:
+    """Return the ordered DOM container selectors to try for *pms*.
+
+    Falls back to the flat generic ``_DOM_CONTAINER_SELECTORS`` when
+    ``pms`` is ``None`` / ``"unknown"`` / unrecognised. When a PMS has
+    a dedicated subset, the PMS-specific selectors are tried FIRST,
+    then the generic tuple is appended as fallback. This ordering
+    means a detected RentCafe site tries ``.fp-container`` (its
+    canonical vanity-card shape) before the generic ``.unit-card``
+    that would risk cross-matching marketing-card noise.
+
+    Caller pattern::
+
+        selectors = get_container_selectors(ctx.detected.pms)
+        for selector in selectors:
+            ...
+    """
+    if not pms or pms in {"unknown", ""}:
+        return _DOM_CONTAINER_SELECTORS
+    pms_subset = _PMS_DOM_SELECTORS.get(pms)
+    if pms_subset is None:
+        return _DOM_CONTAINER_SELECTORS
+    # PMS-specific selectors first, then generic fallback (deduped).
+    seen: set[str] = set()
+    out: list[str] = []
+    for s in pms_subset + _DOM_CONTAINER_SELECTORS:
+        if s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return tuple(out)
+
+
 _RENT_PATTERN = re.compile(
     r"\$\s*(\d{1,3}(?:,\d{3})*|\d{3,5})(?:\.\d{2})?",
 )
@@ -2237,10 +2377,34 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
     is_studio = bool(_STUDIO_RE.search(text))
 
     # --- rent (optional) ---
+    # 2026-05-24 Phase 2.4: filter out dollar amounts that appear in
+    # fee/deposit context. udr.com cluster (forensic on PID 40989 savoye)
+    # shipped 21 of 33 units with $200-$500 because the generic dom_scan
+    # picked numbers from a "Fees & Deposits" panel adjacent to the unit
+    # card. dq_guards.is_rent_in_fee_context inspects the 60-char window
+    # before each dollar match for fee-context terms (deposit, fee,
+    # admin, application, pet, move-in, amenity, parking, utility,
+    # security, etc.). Pre-filter the $ matches BEFORE coercing to int
+    # so the rent_lo/rent_hi calculation doesn't see the fee numbers.
     rent_ints: list[int] = []
-    dollar_rents = _RENT_PATTERN.findall(text)
-    if dollar_rents:
-        rent_ints = [r for r in (_rent_to_int(x) for x in dollar_rents) if r is not None]
+    try:
+        from ma_poc.extraction.dq_guards import is_rent_in_fee_context
+    except Exception:  # defensive — should never fail
+        is_rent_in_fee_context = None  # type: ignore[assignment]
+    dollar_rents_raw = _RENT_PATTERN.findall(text)
+    if dollar_rents_raw:
+        for raw_val in dollar_rents_raw:
+            v = _rent_to_int(raw_val)
+            if v is None:
+                continue
+            # Phase 2.4 guard — reject when context indicates fee/deposit.
+            if is_rent_in_fee_context is not None:
+                try:
+                    if is_rent_in_fee_context(v, text):
+                        continue
+                except Exception:
+                    pass  # never let the guard break extraction
+            rent_ints.append(v)
 
     if not rent_ints:
         # Fallback: price-range labels without explicit $ prefix.
@@ -2250,6 +2414,13 @@ def _container_yields_unit(text: str) -> dict[str, Any] | None:
                 if grp:
                     v = _rent_to_int(grp)
                     if v is not None:
+                        # Same fee-context guard on the range-label fallback path.
+                        if is_rent_in_fee_context is not None:
+                            try:
+                                if is_rent_in_fee_context(v, text):
+                                    continue
+                            except Exception:
+                                pass
                         rent_ints.append(v)
 
     rent_lo: int | None = min(rent_ints) if rent_ints else None
@@ -3056,6 +3227,7 @@ def extract_units_from_dom(
     html: str,
     source_url: str,
     hints: Any | None = None,
+    detected_pms: str | None = None,
 ) -> tuple[list[dict[str, Any]], str]:
     """Extract units by scanning common container selectors for rent signals.
 
@@ -3066,6 +3238,13 @@ def extract_units_from_dom(
     Phase 8: when ``hints`` (a FieldSelectorMap) is provided with a non-empty
     ``container``, that selector is tried FIRST. On miss, falls back to the
     default cascade.
+
+    Phase 2.3 (2026-05-24): when ``detected_pms`` is set to a recognised
+    PMS name, the per-PMS selector subset is tried BEFORE the generic
+    selector list. ``get_container_selectors(detected_pms)`` returns the
+    deduplicated PMS-specific + generic tuple. Passing ``None`` /
+    ``"unknown"`` keeps the original generic-only behavior — fully
+    backward-compatible for callers that don't yet thread PMS detection.
 
     Returns (units, hit_mode) where hit_mode is one of:
       "hints"   — profile hint selectors fired
@@ -3099,7 +3278,10 @@ def extract_units_from_dom(
     _page_ctx = _extract_page_ctx(soup)
     # Lookup map for compact-row selectors → extractor function.
     _compact_extractor_map = dict(_COMPACT_ROW_EXTRACTORS)
-    for selector in _DOM_CONTAINER_SELECTORS:
+    # Phase 2.3 — per-PMS dispatch. Unknown / None falls through to the
+    # generic flat tuple (same as before).
+    selectors_to_try = get_container_selectors(detected_pms)
+    for selector in selectors_to_try:
         try:
             nodes = soup.select(selector)
         except Exception:

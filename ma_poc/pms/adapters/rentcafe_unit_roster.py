@@ -377,6 +377,60 @@ class RentCafeUnitRosterAdapter:
         "floorplan-block",
     ]
 
+    async def try_dom(self, page: Any, html: str, ctx: AdapterContext) -> Any:
+        """2026-05-24 Phase 1 cascade hook — deterministic DOM extraction
+        for the RentCafe ``par-units`` + ``floorplan-block`` modern-theme
+        shape. Wraps the existing ``parse_rentcafe_unit_roster_html``
+        path and routes units through shared dq_guards.
+
+        Adapter-specific guard: requires BOTH ``par-units`` AND
+        ``floorplan-block`` markers in the HTML — Market Apartments
+        Template A has floorplan-block alone and should not route here.
+        """
+        from ma_poc.pms.adapters.base import AdapterDomResult
+
+        if not html or "par-units" not in html or "floorplan-block" not in html:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_RENTCAFE_UR",
+                reason="no_par_units_floorplan_block_markers",
+            )
+        try:
+            url = getattr(ctx, "base_url", "") or ""
+            raw_units = parse_rentcafe_unit_roster_html(html, url)
+        except Exception as e:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_RENTCAFE_UR",
+                reason=f"parse_exception:{type(e).__name__}",
+            )
+        if not raw_units:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_RENTCAFE_UR",
+                reason="parser_silent_empty",
+            )
+        try:
+            from ma_poc.extraction.dq_guards import apply_unit_guards
+            guarded = apply_unit_guards(
+                raw_units,
+                property_id=getattr(ctx, "property_id", ""),
+                source_html=html,
+                detect_same_rent=True,
+            )
+        except Exception:
+            guarded = raw_units
+        if not guarded:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_RENTCAFE_UR",
+                reason="dq_guards_rejected_all",
+            )
+        return AdapterDomResult(
+            units=guarded,
+            plan_summaries=[],
+            tier_used="TIER_3_DOM_RENTCAFE_UR",
+            selector_signature="par-units+floorplan-block",
+            confidence=0.9 if len(guarded) >= 3 else 0.75,
+            debug={"raw_count": len(raw_units), "guarded_count": len(guarded)},
+        )
+
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used="TIER_1_DOM_RENTCAFE_UR")
         # 2026-05-24: page.evaluate when a live page is available, else

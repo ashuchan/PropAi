@@ -109,6 +109,15 @@ class FetchResult:
     # probes auto-attach them and skip re-solving the wall. Empty by
     # default ⇒ no behaviour change off the cookie-mint path.
     clearance_cookies: dict[str, str] = field(default_factory=dict)
+    # 2026-05-24 — set to True by fetcher when the OK outcome was
+    # achieved AFTER at least one L1 proxy escalation hop (i.e. the
+    # direct attempt failed and the BrightData / proxy-pool retry
+    # recovered). Read by ``services.profile_updater.update_profile_after_extraction``
+    # to call ``proxy_gate.mark_host_needs_proxy`` so the NEXT run
+    # picks the proxy on the first attempt instead of burning a direct
+    # attempt + escalation. Default False ⇒ pre-2026-05-24 callers
+    # see no behaviour change.
+    recovered_via_proxy: bool = False
 
     def ok(self) -> bool:
         """True when fetch succeeded with a 2xx response."""

@@ -174,6 +174,35 @@ class ProxyDecisionReason(str, Enum):
     L1_PRIOR_OUTCOME_NOT_BLOCKED = "l1_prior_outcome_not_blocked"
     L1_HOP_BUDGET_EXHAUSTED = "l1_hop_budget_exhausted"
     L1_CF_ESCALATION_ADMITTED = "l1_cf_escalation_admitted"
+    # 2026-05-24 canary fix — extended L1 escalation triggers for two
+    # stealth-block signatures the original BOT_BLOCKED gate missed:
+    #
+    # * EMPTY_BODY (200 with <16 byte response): the canary observed PID
+    #   238171 (live230ash.com) — `LLM_GATE_NO_BODY` verdict from a 200
+    #   with empty body. Origin returned an empty page rather than the
+    #   CF challenge HTML, which is the stealth-bot-block signature
+    #   some operators use. Proxy retry from a different egress
+    #   commonly recovers these.
+    #
+    # * UNREACHABLE with connection-level error_signature: PID 13314
+    #   (imt-woodland-meadows) was `FAILED_UNREACHABLE`. Connection
+    #   refused / timeout / reset are often IP-based rate-limit or
+    #   geo-block patterns. Proxy retry MAY recover; we admit when the
+    #   error_signature suggests a network-tier block, NOT when DNS
+    #   resolution failed (NXDOMAIN is terminal for proxies too).
+    L1_EMPTY_BODY_ADMITTED = "l1_empty_body_admitted"
+    L1_UNREACHABLE_ADMITTED = "l1_unreachable_admitted"
+    L1_DNS_FAIL_NOT_ADMITTED = "l1_dns_fail_not_admitted"
+    L1_SSL_FAIL_NOT_ADMITTED = "l1_ssl_fail_not_admitted"
+    # 2026-05-24 — added after user feedback "high confidence signals
+    # only, not everything which is bot blocked and unreachable".
+    # Bare HTTP_403 / BOT_BLOCKED can be misclassified auth-required
+    # responses; bare TIMED_OUT can be network flake. We need a
+    # SPECIFIC bot-block provider signature (cloudflare/datadome/etc.)
+    # OR a tight connection-error pattern. Low-confidence signals get
+    # denied with these reasons so telemetry can see what was filtered.
+    L1_BOT_BLOCKED_LOW_CONFIDENCE = "l1_bot_blocked_low_confidence"
+    L1_UNREACHABLE_LOW_CONFIDENCE = "l1_unreachable_low_confidence"
 
 
 @dataclass(frozen=True)
@@ -424,6 +453,96 @@ def decide(
     )
 
 
+#: 2026-05-24 canary fix — connection-level error signatures that
+#: SUGGEST an IP-based block (worth proxy retry) vs ones that are
+#: terminal (DNS failure, SSL/cert mismatch — proxy can't fix these).
+#:
+#: ``error_signature`` is populated by ``response_classifier.classify``
+#: on TRANSIENT / HARD_FAIL outcomes (see fetch/contracts.py). The
+#: classifier uses Chromium / curl_cffi error codes verbatim.
+#:
+#: 2026-05-24 update — tightened after user feedback "high confidence
+#: signals only". Removed broader patterns like NETWORK_ACCESS_DENIED,
+#: TUNNEL_CONNECTION_FAILED, and bare TIMEOUT (which can match flake)
+#: in favour of the 3 patterns that ALMOST ALWAYS indicate an IP-tier
+#: block. The narrower set reduces false-positives (network flake
+#: incorrectly admitted) at the cost of missing some genuine IP blocks
+#: that surface under broader signatures — those will exit the loop
+#: via retry-policy exhaustion → mark_host_needs_proxy → next-run
+#: profile-learned admission instead.
+_PROXY_WORTH_RETRY_SIGS: frozenset[str] = frozenset({
+    # Chromium net errors that consistently indicate IP-based block.
+    # CONNECTION_TIMED_OUT alone often = flake; we keep it because
+    # the 3-attempt retry-policy already filters single-occurrence
+    # flake (TRANSIENT path), so by the time fetcher.py emits
+    # HARD_FAIL with TIMED_OUT, the IP block hypothesis is strong.
+    "ERR_CONNECTION_REFUSED",
+    "ERR_CONNECTION_TIMED_OUT",
+    "ERR_CONNECTION_RESET",
+})
+
+#: Signatures that are terminal regardless of egress — DNS authority
+#: rejected the name, or TLS handshake failed in a way the proxy can't
+#: rescue. Distinct from the worth-retry list so the gate's reason
+#: field tells operators exactly why the escalation was denied.
+_PROXY_TERMINAL_SIGS: frozenset[str] = frozenset({
+    "ERR_NAME_NOT_RESOLVED",
+    "NS_ERROR_UNKNOWN_HOST",
+    "DNS_PROBE_FINISHED_NXDOMAIN",
+    "ERR_SSL_PROTOCOL_ERROR",
+    "ERR_CERT_AUTHORITY_INVALID",
+    "ERR_CERT_DATE_INVALID",
+    "ERR_CERT_COMMON_NAME_INVALID",
+})
+
+#: 2026-05-24 — HIGH-CONFIDENCE bot-block signatures.
+#:
+#: response_classifier.classify emits a ``sig`` (signature) string alongside
+#: the BOT_BLOCKED outcome. We only admit proxy escalation when the sig
+#: identifies a SPECIFIC bot-block provider — CF / datadome / akamai /
+#: imperva / perimeterx. Bare ``HTTP_403`` and ``BOT_BLOCKED`` (no
+#: provider identified) are LOW-confidence: a bare 403 can be auth-
+#: required, IP-allowlist mismatch, or any number of non-egress causes
+#: that proxy retry can't fix.
+#:
+#: Tokens are matched case-insensitively as SUBSTRINGS of the signature
+#: string. This catches both the upper-case enum-style sigs the
+#: classifier emits (CF_CHALLENGE, CAPTCHA_CLOUDFLARE, DATADOME_200,
+#: AKAMAI_BM_200, etc.) AND the lower-case provider names emitted by
+#: block_signatures.match_block_signature (cloudflare, datadome,
+#: akamai_bm, perimeterx, imperva).
+_HIGH_CONFIDENCE_BOT_BLOCK_TOKENS: frozenset[str] = frozenset({
+    "cloudflare",
+    "cf_challenge",
+    "cf_chal",
+    "captcha_cloudflare",
+    "captcha_recaptcha",
+    "captcha_hcaptcha",
+    "captcha_turnstile",
+    "datadome",
+    "akamai",
+    "perimeterx",
+    "px_block",
+    "imperva",
+    "incapsula",
+})
+
+
+def _is_high_confidence_bot_block(sig: str | None) -> bool:
+    """``True`` iff *sig* matches a known bot-block provider (CF /
+    datadome / akamai / imperva / perimeterx). Bare ``HTTP_403`` and
+    ``BOT_BLOCKED`` return False — those are LOW confidence and the
+    cascade should NOT spend proxy budget on them.
+
+    Case-insensitive substring match against
+    :data:`_HIGH_CONFIDENCE_BOT_BLOCK_TOKENS`.
+    """
+    if not sig:
+        return False
+    s = sig.lower()
+    return any(token in s for token in _HIGH_CONFIDENCE_BOT_BLOCK_TOKENS)
+
+
 def decide_l1_escalate(
     url: str,
     prior_outcome: str | None,
@@ -431,6 +550,7 @@ def decide_l1_escalate(
     proxy_hops_used: int = 0,
     max_hops: int = DEFAULT_L1_MAX_ESCALATION_HOPS,
     pool_has_proxies: bool = False,
+    error_signature: str | None = None,
 ) -> ProxyGateDecision:
     """Gate for L1 entry-URL proxy escalation after a direct-fetch CF block.
 
@@ -496,9 +616,87 @@ def decide_l1_escalate(
     proxy bill spiked or didn't.
     """
     host = (urlparse(url).hostname or "").lower()
-    # 1. Trigger gate. Only direct-attempt BOT_BLOCKED admits escalation.
-    #    Compare upper-cased so a caller can pass an enum value or string.
-    if (prior_outcome or "").upper() != "BOT_BLOCKED":
+    # 1. Trigger gate — admission requires HIGH-CONFIDENCE evidence the
+    #    failure is egress-related (vs auth-required / network flake /
+    #    DNS / SSL). Proxy retry is expensive ($ + wall-time + risk of
+    #    burning a healthy proxy on a doomed retry), so admission is
+    #    intentionally narrow:
+    #
+    #    (a) BOT_BLOCKED — admit ONLY when the response_classifier
+    #        identified a specific bot-block provider (Cloudflare /
+    #        datadome / akamai / imperva / perimeterx) in the response
+    #        body or headers. Bare ``HTTP_403`` and bare ``BOT_BLOCKED``
+    #        DENY — those low-confidence signatures could be
+    #        auth-required, IP-allowlist mismatch, or any non-egress
+    #        cause that proxy retry can't fix.
+    #
+    #    (b) EMPTY_BODY — 200 with <16-byte body; high-confidence on its
+    #        own because the response_classifier already filtered this
+    #        from normal responses. The signature IS the high-confidence
+    #        signal — no further gate needed.
+    #
+    #    (c) HARD_FAIL with TIGHT connection-error signature
+    #        (CONNECTION_REFUSED / TIMED_OUT / RESET only — not the
+    #        broader set we initially considered). Combined with the
+    #        upstream retry-policy filter (TRANSIENT path absorbs flake
+    #        before promoting to HARD_FAIL), this gives high confidence
+    #        the failure is an IP-tier block.
+    #
+    #    DNS failure and SSL/cert errors are TERMINAL — proxy can't fix
+    #    them. Fail-closed with the DNS_FAIL_NOT_ADMITTED /
+    #    SSL_FAIL_NOT_ADMITTED reasons so the operator sees exactly why.
+    #
+    #    Low-confidence signals (bare 403, bare BOT_BLOCKED, unknown
+    #    signature) deny with L1_BOT_BLOCKED_LOW_CONFIDENCE /
+    #    L1_UNREACHABLE_LOW_CONFIDENCE so the analyzer can measure how
+    #    often we filter low-confidence signals (the next-run profile
+    #    learning catches recurring low-confidence failures separately).
+    outcome_upper = (prior_outcome or "").upper()
+    sig_upper = (error_signature or "").upper()
+    admit_reason: ProxyDecisionReason | None = None
+    if outcome_upper == "BOT_BLOCKED":
+        # High-confidence check: signature must name a specific
+        # bot-block provider. Bare BOT_BLOCKED / HTTP_403 deny.
+        if _is_high_confidence_bot_block(error_signature):
+            admit_reason = ProxyDecisionReason.L1_CF_ESCALATION_ADMITTED
+        else:
+            return ProxyGateDecision(
+                allow=False,
+                reason=ProxyDecisionReason.L1_BOT_BLOCKED_LOW_CONFIDENCE,
+                host=host,
+            )
+    elif outcome_upper == "EMPTY_BODY":
+        # EMPTY_BODY is itself a high-confidence signal (200 with
+        # <16 bytes is a very specific bot-block fingerprint that
+        # the classifier already filtered).
+        admit_reason = ProxyDecisionReason.L1_EMPTY_BODY_ADMITTED
+    elif outcome_upper in {"TRANSIENT", "HARD_FAIL"}:
+        # Connection-level signatures the proxy might rescue.
+        if any(s in sig_upper for s in _PROXY_WORTH_RETRY_SIGS):
+            admit_reason = ProxyDecisionReason.L1_UNREACHABLE_ADMITTED
+        elif any(s in sig_upper for s in _PROXY_TERMINAL_SIGS):
+            # Surface DNS vs SSL distinctly so telemetry can split them.
+            if "RESOLV" in sig_upper or "NXDOMAIN" in sig_upper or "UNKNOWN_HOST" in sig_upper:
+                return ProxyGateDecision(
+                    allow=False,
+                    reason=ProxyDecisionReason.L1_DNS_FAIL_NOT_ADMITTED,
+                    host=host,
+                )
+            return ProxyGateDecision(
+                allow=False,
+                reason=ProxyDecisionReason.L1_SSL_FAIL_NOT_ADMITTED,
+                host=host,
+            )
+        else:
+            # Unknown / missing signature on TRANSIENT / HARD_FAIL is
+            # LOW-confidence — caller didn't populate it OR it's a new
+            # variant. Don't burn proxy on it; surface the deny reason.
+            return ProxyGateDecision(
+                allow=False,
+                reason=ProxyDecisionReason.L1_UNREACHABLE_LOW_CONFIDENCE,
+                host=host,
+            )
+    if admit_reason is None:
         return ProxyGateDecision(
             allow=False,
             reason=ProxyDecisionReason.L1_PRIOR_OUTCOME_NOT_BLOCKED,
@@ -526,9 +724,13 @@ def decide_l1_escalate(
     # Admit. ``proxy_url`` deliberately stays None — the L1 fetcher's
     # ProxyPool supplies the actual URL via pick(). The decision is the
     # *policy* decision; the pool is the *resource*.
+    #
+    # 2026-05-24: the reason carries the specific admission path
+    # (CF_ESCALATION / EMPTY_BODY / UNREACHABLE) so the analyzer can
+    # split escalation effectiveness by trigger.
     return ProxyGateDecision(
         allow=True,
-        reason=ProxyDecisionReason.L1_CF_ESCALATION_ADMITTED,
+        reason=admit_reason,
         proxy_url=None,
         host=host,
     )

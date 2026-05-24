@@ -203,6 +203,59 @@ class ImtSpacesAdapter:
         "data-spaces-",
     ]
 
+    async def try_dom(self, page: Any, html: str, ctx: AdapterContext) -> Any:
+        """2026-05-24 Phase 1 cascade hook — deterministic DOM extraction
+        for IMT 'Spaces' theme. Wraps ``parse_imt_spaces_html`` (BS4 over
+        ``article.spaces-plan`` ``data-spaces-*`` attributes) and routes
+        units through dq_guards.
+
+        IMT is plan-only by design — emitted to ``plan_summaries``
+        rather than ``units`` so the partition contract is preserved.
+        """
+        from ma_poc.pms.adapters.base import AdapterDomResult
+
+        if not html or "spaces-plan" not in html:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_IMT_SPACES",
+                reason="no_spaces_plan_marker",
+            )
+        try:
+            url = getattr(ctx, "base_url", "") or ""
+            raw_units = parse_imt_spaces_html(html, url)
+        except Exception as e:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_IMT_SPACES",
+                reason=f"parse_exception:{type(e).__name__}",
+            )
+        if not raw_units:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_IMT_SPACES",
+                reason="parser_silent_empty",
+            )
+        try:
+            from ma_poc.extraction.dq_guards import apply_unit_guards
+            guarded = apply_unit_guards(
+                raw_units,
+                property_id=getattr(ctx, "property_id", ""),
+                source_html=html,
+                detect_same_rent=True,
+            )
+        except Exception:
+            guarded = raw_units
+        if not guarded:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_IMT_SPACES",
+                reason="dq_guards_rejected_all",
+            )
+        return AdapterDomResult(
+            units=guarded,
+            plan_summaries=[],
+            tier_used="TIER_3_DOM_IMT_SPACES",
+            selector_signature="article.spaces-plan[data-spaces-*]",
+            confidence=0.85 if len(guarded) >= 3 else 0.7,
+            debug={"raw_count": len(raw_units), "guarded_count": len(guarded)},
+        )
+
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used="TIER_1_DOM_IMT_SPACES")
         # 2026-05-24: page.evaluate when a live page is available, else

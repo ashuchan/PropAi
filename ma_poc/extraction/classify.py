@@ -33,6 +33,7 @@ from typing import Any, Final, Literal
 
 from ma_poc.extraction.canonical import (
     AVAIL_STATUS_KEYS,
+    FP_ID_KEYS,
     RENT_HI_KEYS,
     RENT_LO_KEYS,
     SQFT_KEYS,
@@ -196,19 +197,40 @@ def _has_per_unit_signal(unit: dict[str, Any]) -> bool:
 
 def _has_rent_and_sqft(unit: dict[str, Any]) -> bool:
     """``True`` iff *unit* carries both a numeric rent (low or high) AND
-    a numeric sqft. Used by :func:`_has_per_unit_signal` to promote
-    rent-bearing rows with concrete dimensions to unit-level even when
-    ``availability_status`` is UNKNOWN.
+    a numeric sqft, AND is not explicitly tagged as a plan aggregate
+    (``floor_plan_id`` set).
 
-    The combination of rent + sqft is the canonical "this is a real
-    apartment on inventory" signal: marketing pages advertise ranges
-    ("$1500-$2000") without sqft, and plan-summary cards carry sqft
-    without rent. Both together indicates a specific priced unit.
+    Used by :func:`_has_per_unit_signal` to promote rent-bearing rows
+    with concrete dimensions to unit-level even when
+    ``availability_status`` is UNKNOWN. The combination of rent + sqft
+    is the canonical "this is a real apartment on inventory" signal:
+    marketing pages advertise ranges ("$1500-$2000") without sqft, and
+    plan-summary cards carry sqft without rent. Both together indicates
+    a specific priced unit.
+
+    Guard against the D16 partition contract: a row that carries an
+    explicit ``floor_plan_id`` is the producer's signal "this is a
+    plan-aggregate row, not a specific apartment". Even if rent+sqft
+    are populated (which they typically are on plan-aggregate JSON-LD
+    output), the row stays at plan level. The B4 invariant test
+    (``test_d16_b4_invariant``) pins this contract — pre-guard, the
+    rent+sqft branch promoted plan rows that had a sibling unit row
+    sharing the same ``floor_plan_id``, breaking partition.
+
+    LLM-emitted plans (PID 12133 livebh ashford, the canonical
+    Phase 0.2 cohort) carry ``floor_plan_name`` but NOT
+    ``floor_plan_id`` — the LLM prompts ask for the display name only.
+    So the guard catches the partition case without blocking the
+    intended LLM-promotion cohort.
 
     Reads via the canonical alias tables so producer field-name
     variants (``market_rent_low``, ``asking_rent``, ``area``,
     ``minimumsqft``, …) all hit the same predicate.
     """
+    # Partition guard: explicit plan_id → row is plan-aggregate by
+    # producer intent. Don't promote regardless of dimensions.
+    if get_str(unit, FP_ID_KEYS):
+        return False
     has_rent = (
         get_numeric(unit, RENT_LO_KEYS) is not None
         or get_numeric(unit, RENT_HI_KEYS) is not None

@@ -337,6 +337,75 @@ class AppFolioAdapter:
     pms_name: str = "appfolio"
     _fingerprints: list[str] = ["appfolio.com"]
 
+    async def try_dom(self, page: Any, html: str, ctx: AdapterContext) -> Any:
+        """2026-05-24 Phase 1 cascade hook — deterministic DOM extraction
+        for AppFolio SSR listings pages.
+
+        Wraps the existing ``parse_appfolio_listings_ssr`` SSR regex
+        path (the reference implementation for the deterministic-DOM
+        contract — regex on stable ``js-listing-*`` class names, no
+        BS4, ~449 units recovered across 5-tenant production sample).
+        Units are then routed through ``dq_guards.apply_unit_guards``
+        for unified DQ checks (status canonicalization, unit-id
+        normalisation, sqft sanity, fee-context rent rejection).
+
+        Returns ``AdapterDomResult.empty(...)`` when:
+          - ``html`` is empty / lacks ``data-listing-id`` markers
+          - parser returns 0 candidates
+          - any exception fires (defensive — never raises)
+
+        Returns a high-confidence result (0.95) when SSR markers were
+        present AND ≥1 unit survived the DQ guards. SSR markers are
+        the unambiguous signal that AppFolio renders unit data inline.
+        """
+        from ma_poc.pms.adapters.base import AdapterDomResult
+
+        if not html or "data-listing-id" not in html:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_APPFOLIO_SSR",
+                reason="no_data_listing_id_marker",
+            )
+        try:
+            url = getattr(ctx, "base_url", "") or ""
+            raw_units = parse_appfolio_listings_ssr(html, url)
+        except Exception as e:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_APPFOLIO_SSR",
+                reason=f"parse_exception:{type(e).__name__}",
+            )
+        if not raw_units:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_APPFOLIO_SSR",
+                reason="parser_silent_empty",
+            )
+        # Route through shared DQ guards. source_html=html lets the
+        # fee-context rent guard see the full page so it can reject
+        # any deposit/fee dollar amount that leaked into rent_low.
+        try:
+            from ma_poc.extraction.dq_guards import apply_unit_guards
+            guarded = apply_unit_guards(
+                raw_units,
+                property_id=getattr(ctx, "property_id", ""),
+                source_html=html,
+                detect_same_rent=True,
+            )
+        except Exception as e:
+            log.warning("AppFolio try_dom dq_guards failed: %s", e)
+            guarded = raw_units  # defensive: ship un-guarded rather than drop
+        if not guarded:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_APPFOLIO_SSR",
+                reason="dq_guards_rejected_all",
+            )
+        return AdapterDomResult(
+            units=guarded,
+            plan_summaries=[],
+            tier_used="TIER_3_DOM_APPFOLIO_SSR",
+            selector_signature="[data-listing-id]+js-listing-*",
+            confidence=0.95,
+            debug={"raw_count": len(raw_units), "guarded_count": len(guarded)},
+        )
+
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units from AppFolio API or fall back to SSR DOM parse.
 

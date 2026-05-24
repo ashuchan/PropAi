@@ -201,6 +201,62 @@ class EquityAdapter:
     pms_name: str = "equity"
     _fingerprints: list[str] = ["equityapartments.com", "ea5-unit"]
 
+    async def try_dom(self, page: Any, html: str, ctx: AdapterContext) -> Any:
+        """2026-05-24 Phase 1 cascade hook — deterministic DOM extraction
+        for Equity Residential ``<ea5-unit>`` blocks.
+
+        Wraps the existing ``parse_equity_units`` regex path (~31
+        properties on a shared Angular template, regex over HTML
+        comments + ea5-unit segment). Units are routed through the
+        shared dq_guards before return.
+
+        Returns ``AdapterDomResult.empty(...)`` when the HTML lacks
+        ``ea5-unit`` markers OR the parser returns 0 candidates.
+        """
+        from ma_poc.pms.adapters.base import AdapterDomResult
+
+        if not html or "ea5-unit" not in html:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_EQUITY",
+                reason="no_ea5_unit_marker",
+            )
+        try:
+            url = getattr(ctx, "base_url", "") or ""
+            raw_units = parse_equity_units(html, url)
+        except Exception as e:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_EQUITY",
+                reason=f"parse_exception:{type(e).__name__}",
+            )
+        if not raw_units:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_EQUITY",
+                reason="parser_silent_empty",
+            )
+        try:
+            from ma_poc.extraction.dq_guards import apply_unit_guards
+            guarded = apply_unit_guards(
+                raw_units,
+                property_id=getattr(ctx, "property_id", ""),
+                source_html=html,
+                detect_same_rent=True,
+            )
+        except Exception:
+            guarded = raw_units
+        if not guarded:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_EQUITY",
+                reason="dq_guards_rejected_all",
+            )
+        return AdapterDomResult(
+            units=guarded,
+            plan_summaries=[],
+            tier_used="TIER_3_DOM_EQUITY",
+            selector_signature="ea5-unit+ledgerId-comment",
+            confidence=0.95,
+            debug={"raw_count": len(raw_units), "guarded_count": len(guarded)},
+        )
+
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used=OLL_TIER)
         html, url = _html_for(ctx, page)

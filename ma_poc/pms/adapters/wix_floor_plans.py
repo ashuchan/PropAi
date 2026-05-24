@@ -215,6 +215,59 @@ def parse_wix_floor_plans(cards: list[dict], url: str) -> list[dict]:
     return out
 
 
+async def _wix_try_dom(adapter_self, page, html: str, ctx):
+    """2026-05-24 Phase 1 cascade hook for WixFloorPlansAdapter.
+
+    Wraps ``parse_wix_floor_plans_html`` (BS4 walk over div/section/
+    article/li for cards matching "Starting at $X" + bed|bath|sq
+    pattern) and routes through dq_guards. Cheap "Starting at $"
+    pre-check avoids invoking BS4 on pages that obviously don't match.
+    """
+    from ma_poc.pms.adapters.base import AdapterDomResult
+
+    if not html or "Starting" not in html:
+        return AdapterDomResult.empty(
+            tier="TIER_3_DOM_WIX_FLOOR_PLANS",
+            reason="no_starting_at_marker",
+        )
+    try:
+        url = getattr(ctx, "base_url", "") or ""
+        raw_units = parse_wix_floor_plans_html(html, url)
+    except Exception as e:
+        return AdapterDomResult.empty(
+            tier="TIER_3_DOM_WIX_FLOOR_PLANS",
+            reason=f"parse_exception:{type(e).__name__}",
+        )
+    if not raw_units:
+        return AdapterDomResult.empty(
+            tier="TIER_3_DOM_WIX_FLOOR_PLANS",
+            reason="parser_silent_empty",
+        )
+    try:
+        from ma_poc.extraction.dq_guards import apply_unit_guards
+        guarded = apply_unit_guards(
+            raw_units,
+            property_id=getattr(ctx, "property_id", ""),
+            source_html=html,
+            detect_same_rent=True,
+        )
+    except Exception:
+        guarded = raw_units
+    if not guarded:
+        return AdapterDomResult.empty(
+            tier="TIER_3_DOM_WIX_FLOOR_PLANS",
+            reason="dq_guards_rejected_all",
+        )
+    return AdapterDomResult(
+        units=guarded,
+        plan_summaries=[],
+        tier_used="TIER_3_DOM_WIX_FLOOR_PLANS",
+        selector_signature="starting-at+bed|bath|sq-card",
+        confidence=0.85 if len(guarded) >= 3 else 0.7,
+        debug={"raw_count": len(raw_units), "guarded_count": len(guarded)},
+    )
+
+
 class WixFloorPlansAdapter:
     """Wix-hosted multifamily site with the "Starting at $X" plan-card
     text pattern. Plan-level only."""
@@ -225,6 +278,9 @@ class WixFloorPlansAdapter:
         "wix.com",
         "wixstatic.com",
     ]
+
+    async def try_dom(self, page, html: str, ctx: AdapterContext):
+        return await _wix_try_dom(self, page, html, ctx)
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used="TIER_1_DOM_WIX_FLOOR_PLANS")

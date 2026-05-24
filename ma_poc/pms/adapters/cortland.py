@@ -205,6 +205,67 @@ class CortlandAdapter:
     pms_name: str = "cortland"
     _fingerprints: list[str] = ["cortland.com", "available-apartments"]
 
+    async def try_dom(self, page: Any, html: str, ctx: AdapterContext) -> Any:
+        """2026-05-24 Phase 1 cascade hook — DOM fallback when the main
+        ``extract`` path missed.
+
+        Cortland sites embed unit data inline as ``preload = {...}`` JSON
+        in the HTML (HTML-entity-encoded, the existing
+        ``_extract_floorplans`` brace-matches it). This is a true
+        DOM-fallback: the data IS in the captured HTML body, even when
+        the live-page Playwright path failed (page.evaluate timeout, JS
+        error, etc.). We wrap the existing parser against the captured
+        body and route units through dq_guards.
+
+        Live-verified: PIDs 13898 + 78693 fixtures (cortland.com/
+        cortland-peachtree-corners + cortland-west-houston, 2026-05-24)
+        both have ``preload = {`` blob in 600KB+ captured HTML.
+        """
+        from ma_poc.pms.adapters.base import AdapterDomResult
+
+        if not html or "preload" not in html or "availprice" not in html:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_CORTLAND_PRELOAD",
+                reason="no_preload_availprice_markers",
+            )
+        try:
+            url = getattr(ctx, "base_url", "") or ""
+            floorplans = _extract_floorplans(html)
+            raw_units = parse_cortland_units(floorplans, url) if floorplans else []
+        except Exception as e:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_CORTLAND_PRELOAD",
+                reason=f"parse_exception:{type(e).__name__}",
+            )
+        if not raw_units:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_CORTLAND_PRELOAD",
+                reason="parser_silent_empty",
+            )
+        try:
+            from ma_poc.extraction.dq_guards import apply_unit_guards
+            guarded = apply_unit_guards(
+                raw_units,
+                property_id=getattr(ctx, "property_id", ""),
+                source_html=html,
+                detect_same_rent=True,
+            )
+        except Exception:
+            guarded = raw_units
+        if not guarded:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_CORTLAND_PRELOAD",
+                reason="dq_guards_rejected_all",
+            )
+        return AdapterDomResult(
+            units=guarded,
+            plan_summaries=[],
+            tier_used="TIER_3_DOM_CORTLAND_PRELOAD",
+            selector_signature="preload-floorplans-availprice",
+            confidence=0.9 if len(guarded) >= 3 else 0.75,
+            debug={"raw_count": len(raw_units), "guarded_count": len(guarded)},
+        )
+
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used=OLL_TIER)
 

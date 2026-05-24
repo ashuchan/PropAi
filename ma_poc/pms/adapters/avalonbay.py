@@ -115,11 +115,182 @@ def parse_avalonbay_units(
     return units
 
 
+import re as _re_dom
+
+# 2026-05-24 Phase 1 cascade — AvalonBay DOM fallback.
+#
+# AvalonBay marketing pages SSR-render unit listings into ``.unit-item``
+# cards. Each card carries inline text in the canonical AvalonBay format:
+#
+#   "[Special|Virtual tour] <unit_id> <community_name> "
+#   "<beds> bed · <baths> bath · <sqft> sqft · Available "
+#   "[<package_name>] Base rent starting at $ <rent> / <term> mo. lease "
+#   "[Furnished starting at $ <furn_rent>] Available starting <date>"
+#
+# Live-verified on PID 1918 (eaves West Windsor — 6 .unit-item cards) and
+# PID 36964 (Avalon Meydenbauer — 6 .unit-item cards) on 2026-05-24. The
+# selector `.unit-item` appears 70-80x per page (including child markup);
+# the parent containers ARE the unit rows. Filter by structural content
+# check to avoid sub-element noise.
+#
+# This is the ``try_dom`` companion to the JSON-API path in ``extract``;
+# kicks in when the API path doesn't return units (capture missed,
+# bot-blocked, or schema drift).
+
+_AVB_UNIT_ID_RE = _re_dom.compile(r"\b(\d{3}-\w+|\d{2}[A-Z]-\d+)\b")
+# Match either "<N> bed" / "<N> beds" OR a bare "Studio" / "studio" token.
+# AvalonBay text "Studio · 1 bath · 506 sqft" has no "bed" suffix after
+# "Studio" so the prior regex requiring "<n> bed" missed studios entirely.
+_AVB_BEDS_RE = _re_dom.compile(
+    r"\b(\d+)\s*beds?\b|\b(studio)\b",
+    _re_dom.IGNORECASE,
+)
+_AVB_BATHS_RE = _re_dom.compile(r"\b(\d+(?:\.\d+)?)\s*bath\b", _re_dom.IGNORECASE)
+_AVB_SQFT_RE = _re_dom.compile(r"\b(\d{2,5})\s*sqft\b", _re_dom.IGNORECASE)
+_AVB_RENT_RE = _re_dom.compile(
+    r"Base\s+rent\s+starting\s+at\s*\$\s*([\d,]+)",
+    _re_dom.IGNORECASE,
+)
+_AVB_AVAIL_RE = _re_dom.compile(
+    r"Available\s+starting\s+([A-Z][a-z]{2}\s+\d{1,2}(?:,\s*\d{4})?)",
+)
+
+
+def parse_avalonbay_dom_units(html: str, url: str) -> list[dict[str, str]]:
+    """Parse AvalonBay SSR ``.unit-item`` cards from rendered HTML.
+
+    Returns the same unit-dict shape as ``parse_avalonbay_units`` so the
+    downstream cascade treats them identically. Skips elements that
+    don't carry the canonical "Base rent starting at $" sentinel — the
+    ``.unit-item`` class is reused on parent containers + image
+    wrappers that we don't want to emit.
+    """
+    if not html or "unit-item" not in html:
+        return []
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+        except Exception:
+            return []
+    units: list[dict[str, str]] = []
+    seen_ids: set[str] = set()
+    for node in soup.select(".unit-item"):
+        text = node.get_text(" ", strip=True)
+        if not text or "Base rent starting at" not in text:
+            continue
+        rent_m = _AVB_RENT_RE.search(text)
+        if not rent_m:
+            continue
+        rent_val = money_to_int(rent_m.group(1))
+        if rent_val is None:
+            continue
+        unit_id_m = _AVB_UNIT_ID_RE.search(text)
+        unit_id = unit_id_m.group(1) if unit_id_m else ""
+        if unit_id and unit_id in seen_ids:
+            continue
+        if unit_id:
+            seen_ids.add(unit_id)
+        beds_m = _AVB_BEDS_RE.search(text)
+        beds: int | None = None
+        if beds_m:
+            # Group 1 = numeric beds, group 2 = "studio" sentinel.
+            num_v = beds_m.group(1)
+            studio_v = beds_m.group(2)
+            if studio_v:
+                beds = 0
+            elif num_v:
+                try:
+                    beds = int(num_v)
+                except (ValueError, TypeError):
+                    beds = None
+        baths_m = _AVB_BATHS_RE.search(text)
+        baths: float | None = float(baths_m.group(1)) if baths_m else None
+        sqft_m = _AVB_SQFT_RE.search(text)
+        sqft = sqft_m.group(1) if sqft_m else ""
+        avail_m = _AVB_AVAIL_RE.search(text)
+        avail_raw = avail_m.group(1) if avail_m else ""
+        units.append(
+            make_unit_dict(
+                floor_plan_name="",
+                bed_label=bed_label_from(beds, ""),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(int(baths) if baths and baths == int(baths) else baths) if baths is not None else "",
+                sqft=sqft,
+                unit_number=unit_id,
+                rent_range=format_rent_range(rent_val, rent_val),
+                availability_status="AVAILABLE",
+                availability_date=avail_raw,
+                source_api_url=url,
+                extraction_tier="TIER_3_DOM_AVALONBAY_SSR",
+            )
+        )
+    return units
+
+
 class AvalonBayAdapter:
     """AvalonBay Communities PMS adapter."""
 
     pms_name: str = "avalonbay"
     _fingerprints: list[str] = ["avaloncommunities.com"]
+
+    async def try_dom(self, page: Any, html: str, ctx: AdapterContext) -> Any:
+        """2026-05-24 Phase 1 cascade hook — DOM fallback for AvalonBay
+        when the API capture missed or returned empty.
+
+        Wraps ``parse_avalonbay_dom_units`` which extracts ``.unit-item``
+        cards from SSR HTML. Routes units through shared dq_guards.
+        Live-verified on PID 1918 (6 units) + PID 36964 (6 units) —
+        canonical AvalonBay marketing page shape on 2026-05-24.
+        """
+        from ma_poc.pms.adapters.base import AdapterDomResult
+
+        if not html or ".unit-item" not in html and "unit-item" not in html:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_AVALONBAY_SSR",
+                reason="no_unit_item_marker",
+            )
+        try:
+            url = getattr(ctx, "base_url", "") or ""
+            raw_units = parse_avalonbay_dom_units(html, url)
+        except Exception as e:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_AVALONBAY_SSR",
+                reason=f"parse_exception:{type(e).__name__}",
+            )
+        if not raw_units:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_AVALONBAY_SSR",
+                reason="parser_silent_empty",
+            )
+        try:
+            from ma_poc.extraction.dq_guards import apply_unit_guards
+            guarded = apply_unit_guards(
+                raw_units,
+                property_id=getattr(ctx, "property_id", ""),
+                source_html=html,
+                detect_same_rent=True,
+            )
+        except Exception:
+            guarded = raw_units
+        if not guarded:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_AVALONBAY_SSR",
+                reason="dq_guards_rejected_all",
+            )
+        return AdapterDomResult(
+            units=guarded,
+            plan_summaries=[],
+            tier_used="TIER_3_DOM_AVALONBAY_SSR",
+            selector_signature=".unit-item+Base-rent-starting-at",
+            confidence=0.9 if len(guarded) >= 3 else 0.75,
+            debug={"raw_count": len(raw_units), "guarded_count": len(guarded)},
+        )
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units from AvalonBay API responses captured during page load.

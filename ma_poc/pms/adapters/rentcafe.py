@@ -462,6 +462,66 @@ class RentCafeAdapter:
     pms_name: str = "rentcafe"
     _fingerprints: list[str] = ["rentcafe.com"]
 
+    async def try_dom(self, page: Any, html: str, ctx: AdapterContext) -> Any:
+        """2026-05-24 Phase 1 cascade hook — deterministic DOM extraction
+        for RentCafe hosted-table marketing pages (the ``.fp-unit`` /
+        ``data-unit-name`` shape served by the canonical hosted
+        RentCafe layout).
+
+        The nestin per-plan crawl is intentionally NOT invoked here —
+        it needs live navigation across sub-pages which is the
+        responsibility of the cascade-level link-hop. ``try_dom`` is
+        focused on extracting units from the captured HTML body.
+
+        Returns ``AdapterDomResult.empty(...)`` when the HTML doesn't
+        contain the ``.fp-unit`` markers OR the parser returns no
+        candidates. Returns a high-confidence result when the hosted
+        table is recognised.
+        """
+        from ma_poc.pms.adapters.base import AdapterDomResult
+
+        if not html or "fp-unit" not in html:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_RENTCAFE_HOSTED",
+                reason="no_fp_unit_marker",
+            )
+        try:
+            url = getattr(ctx, "base_url", "") or ""
+            raw_units = parse_rentcafe_hosted_table(html, url)
+        except Exception as e:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_RENTCAFE_HOSTED",
+                reason=f"parse_exception:{type(e).__name__}",
+            )
+        if not raw_units:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_RENTCAFE_HOSTED",
+                reason="parser_silent_empty",
+            )
+        try:
+            from ma_poc.extraction.dq_guards import apply_unit_guards
+            guarded = apply_unit_guards(
+                raw_units,
+                property_id=getattr(ctx, "property_id", ""),
+                source_html=html,
+                detect_same_rent=True,
+            )
+        except Exception:
+            guarded = raw_units
+        if not guarded:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_RENTCAFE_HOSTED",
+                reason="dq_guards_rejected_all",
+            )
+        return AdapterDomResult(
+            units=guarded,
+            plan_summaries=[],
+            tier_used="TIER_3_DOM_RENTCAFE_HOSTED",
+            selector_signature="tr.fp-unit[data-unit-name]",
+            confidence=0.95,
+            debug={"raw_count": len(raw_units), "guarded_count": len(guarded)},
+        )
+
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         """Extract units from RentCafe API responses captured during page load."""
         pid = getattr(ctx, "property_id", "") or "unknown"

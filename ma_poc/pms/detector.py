@@ -771,6 +771,42 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
              "(irvinecompanyapartments.com / communityIdAEM)"],
         )
 
+    # 2026-05-24 canary fix — IMT Residential host-only branch.
+    # The strong ``imt_spaces`` triple-gate (host + spaces-plan +
+    # data-spaces-plan, ~line 1041) misses IMT properties whose static
+    # HTML hasn't JS-rendered the ``spaces-plan`` markup. Verified live
+    # 2026-05-24: PID 14332 ``imtresidential.com/imtdesertpalmvillage/``
+    # returns 9.8 MB HTML with imtresidential.com host but NO
+    # ``spaces-plan``/``data-spaces-plan`` substrings until JS hydrates.
+    #
+    # This branch pre-empts the APTS247 / RentDynamics check below
+    # (rentdynamics.com appears in IMT's lead-form scripts and was
+    # misrouting 14332 / 41185 to TIER_1_API_APTS247_NO_KEY in the
+    # 2026-05-24 canary). Confidence 0.75 — lower than the triple-gate
+    # 0.85 to indicate this is a host-only detection.
+    #
+    # GUARD: defer to the triple-gate at line ~1041 when the page DOES
+    # carry the spaces-plan + data-spaces-plan markup. Otherwise we'd
+    # downgrade strong-evidence detection from 0.85 → 0.75. Only fire
+    # host-only when those JS-rendered markers are absent.
+    #
+    # FALLBACK NOTE: if the IMT adapter's try_dom / extract returns
+    # empty (e.g. urllib-fetched HTML has no rendered articles), the
+    # cascade falls through to the secondary-adapter fallback (Step
+    # 7.5 in scraper.py, added 2026-05-24) then generic + LLM rescue.
+    if (
+        "imtresidential.com" in h
+        and not ("spaces-plan" in h and "data-spaces-plan" in h)
+    ):
+        return (
+            "imt_spaces",
+            0.75,
+            ["IMT Residential host marker (imtresidential.com) — "
+             "host-only branch placed before APTS247 to avoid "
+             "rentdynamics.com misroute; defers to triple-gate when "
+             "spaces-plan + data-spaces-plan also present"],
+        )
+
     # 2026-05-13 port (Commit 12): Apts247 / RentDynamics. Same-origin
     # ``/api/v1/floorplans/?api_key=<hex>`` with the key embedded in
     # static HTML. ≥4-site cluster observed 2026-05-17.
@@ -794,6 +830,16 @@ def _detect_html_markers(page_html: str) -> tuple[PmsName, float, list[str]] | N
         or ".appfolio.com/connect" in h
         or "sightmap.com/embed/" in h
         or "sightmap.com/app/api" in h
+        # 2026-05-24 canary fix: IMT Residential's "Spaces" CMS
+        # publishes rentdynamics.com lead-form scripts on its property
+        # pages (verified live PIDs 14332 / 41185 — 9.8MB of HTML each,
+        # no "apts247" substring but ``rentdynamics.com`` triggers
+        # APTS247 here). Without this guard the cascade misrouted IMT
+        # to TIER_1_API_APTS247_NO_KEY and the new ImtSpaces try_dom
+        # never had a chance. ``imtresidential.com`` is single-portfolio
+        # so adding it as a competing-host is safe (cannot pre-empt a
+        # real APTS247 site).
+        or "imtresidential.com" in h
     )
     if ("apts247" in h or "rentdynamics.com" in h) and not _has_competing_pms_for_apts247:
         return (

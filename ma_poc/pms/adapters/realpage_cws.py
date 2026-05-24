@@ -326,6 +326,55 @@ class RealPageCwsAdapter:
         "floorplans-widget",
     ]
 
+    async def try_dom(self, page: Any, html: str, ctx: AdapterContext) -> Any:
+        """2026-05-24 Phase 1 cascade hook — deterministic DOM extraction
+        for RealPage CWS ``.rpfp-card`` widget. Wraps
+        ``parse_realpage_cws_html`` and routes units through dq_guards.
+        """
+        from ma_poc.pms.adapters.base import AdapterDomResult
+
+        if not html or "rpfp-card" not in html:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_REALPAGE_CWS",
+                reason="no_rpfp_card_marker",
+            )
+        try:
+            url = getattr(ctx, "base_url", "") or ""
+            raw_units = parse_realpage_cws_html(html, url)
+        except Exception as e:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_REALPAGE_CWS",
+                reason=f"parse_exception:{type(e).__name__}",
+            )
+        if not raw_units:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_REALPAGE_CWS",
+                reason="parser_silent_empty",
+            )
+        try:
+            from ma_poc.extraction.dq_guards import apply_unit_guards
+            guarded = apply_unit_guards(
+                raw_units,
+                property_id=getattr(ctx, "property_id", ""),
+                source_html=html,
+                detect_same_rent=True,
+            )
+        except Exception:
+            guarded = raw_units
+        if not guarded:
+            return AdapterDomResult.empty(
+                tier="TIER_3_DOM_REALPAGE_CWS",
+                reason="dq_guards_rejected_all",
+            )
+        return AdapterDomResult(
+            units=guarded,
+            plan_summaries=[],
+            tier_used="TIER_3_DOM_REALPAGE_CWS",
+            selector_signature="rpfp-container>rpfp-card",
+            confidence=0.85 if len(guarded) >= 3 else 0.7,
+            debug={"raw_count": len(raw_units), "guarded_count": len(guarded)},
+        )
+
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used="TIER_1_API_REALPAGE_CWS")
 

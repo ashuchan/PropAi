@@ -342,7 +342,36 @@ def plan_next_action(
         )
 
     # STOP
-    if report.pct_complete >= floor_pct_complete and report.pct_with_transactional >= floor_pct_trans:
+    # 2026-05-24 Phase 4.2: require N>=3 distinct units before allowing
+    # STOP. The pre-fix rule fired STOP as soon as ONE field-complete
+    # unit was found — premature for properties with many apartments
+    # behind a link-hop. Forensic on run 2026-05-23: HIGH-unit cohort
+    # (units>20) avg 8.1 hops; LOW-unit cohort (units=1 SUCCESS) avg
+    # 2.8 hops. The STOP gate fired on the very first per-plan hit and
+    # dropped 4-8 sibling URLs. With this guard, the cascade continues
+    # hopping when there's still link-hop budget AND <3 units captured.
+    # When budget is exhausted, fall through to the existing STOP path
+    # below (the action="STOP" return at the end of the function).
+    _MIN_UNITS_TO_STOP = 3
+    _stop_completeness_satisfied = (
+        report.pct_complete >= floor_pct_complete
+        and report.pct_with_transactional >= floor_pct_trans
+    )
+    if _stop_completeness_satisfied and report.n_units < _MIN_UNITS_TO_STOP:
+        # Don't stop yet — try one more hop if budget allows. Most
+        # properties have ≥3 units; the N<3 case is almost always "we
+        # found the first plan and would have walked away from the rest".
+        if budget_remaining.get("link_hop", 0) > 0:
+            return Decision(
+                action="ESCALATE_LINK_HOP",
+                target_field_group="identity",
+                rationale=(
+                    f"completeness OK but only {report.n_units} distinct units "
+                    f"(< {_MIN_UNITS_TO_STOP}); hop budget remaining"
+                ),
+            )
+        # No budget left — fall through to STOP below.
+    if _stop_completeness_satisfied:
         return Decision(
             action="STOP",
             rationale=f"complete={report.pct_complete:.2f}>={floor_pct_complete:.2f}",

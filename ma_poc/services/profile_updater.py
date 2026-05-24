@@ -31,6 +31,136 @@ from ma_poc.services.profile_store import ProfileStore
 log = logging.getLogger(__name__)
 
 
+# ── Phase 2.5 — DOM selector structural-consistency validator ──────────────
+#
+# Catches saved css_selectors whose ``container`` is structurally a
+# SIBLING (not a parent) of the per-field selectors. Canonical failure:
+# PID 44309 abquptownapts.com saved ``container=td.td-card-name`` and
+# ``sqft=td.td-card-sqft``. Both are ``<td>`` cells under the same
+# ``<tr>`` — siblings. At replay the sqft lookup against
+# ``node.select_one("td.td-card-sqft")`` returned None (sqft-cell isn't a
+# descendant of name-cell) and the cascade fell through to a digit-strip
+# fallback that picked the unit-id digits ("E-5314" → 5314 sqft). 247
+# rows / 52 props leaked on run 2026-05-23.
+#
+# The validator is heuristic. Without HTML at save time we can only
+# inspect the selector strings themselves. The two heuristics that catch
+# the canonical bug with low false-positive risk:
+#
+#   1. Leaf-tag siblings: container is a leaf-cell tag (td/span/a/li/img)
+#      AND any per-field selector starts with the SAME leaf-cell tag.
+#      Leaf cells rarely contain other leaf cells of the same type.
+#   2. Same-class no-descendant: container and per-field selectors are
+#      "same depth" by whitespace count (no descendant combinator) AND
+#      the per-field selector doesn't textually include the container's
+#      tag/class prefix.
+#
+# False-positive risk is bounded by clamping quality_score to 0.4 (not
+# rejecting the save outright). The first replay miss then evicts the
+# hint via the existing 1-strike policy for quality<0.8 selectors.
+
+_LEAF_CELL_TAGS: frozenset[str] = frozenset({
+    "td", "th", "span", "a", "li", "dt", "dd", "img", "input", "label",
+    "i", "b", "em", "strong", "small", "code",
+})
+
+# Per-field slots we should check against container structure. We skip
+# ``amenities`` and ``concession`` because they're frequently free-text
+# spans that can validly be siblings of the per-unit row anchor.
+_STRUCTURAL_FIELDS: tuple[str, ...] = (
+    "rent", "sqft", "bedrooms", "bathrooms",
+    "availability_date", "availability_status",
+    "unit_id", "floor_plan_name",
+)
+
+
+def _leading_tag(selector: str) -> str:
+    """Return the leading HTML tag from a CSS selector, lowercased.
+
+    Examples:
+        "td.td-card-name"           -> "td"
+        "tr.unit-row td.rent"       -> "tr"
+        ".rent-cell"                -> ""    (class-only — no tag)
+        "[data-rent]"               -> ""    (attribute-only — no tag)
+        "div > span.value"          -> "div"
+    """
+    if not selector:
+        return ""
+    # Drop combinators ``>``, ``+``, ``~`` from the start (rare but defensive).
+    s = selector.strip().lstrip(">+~ ").strip()
+    if not s:
+        return ""
+    # Read alpha characters at the start until we hit a class/id/attr/combinator.
+    out = []
+    for ch in s:
+        if ch.isalpha() or ch == "-":
+            out.append(ch.lower())
+        else:
+            break
+    return "".join(out)
+
+
+def _validate_selector_structure(css: dict[str, Any]) -> tuple[bool, str]:
+    """Heuristic structural check for saved css_selectors.
+
+    Returns ``(ok, reason)`` where ``ok`` is False when the structure
+    looks suspicious. Callers should clamp quality_score down (not
+    reject the save outright) when ``ok`` is False, so the first replay
+    miss evicts via the existing quality-tiered policy.
+
+    Heuristics (any one tripping returns False):
+
+      H1 — Container is a leaf-cell tag AND a per-field selector starts
+           with the same leaf-cell tag. Leaf cells rarely contain other
+           leaf cells of the same type; this is the PID 44309 shape.
+      H2 — Container has zero descendant combinators (whitespace, `>`)
+           AND a per-field selector starts with the SAME tag but a
+           DIFFERENT class. Same-depth siblings.
+
+    Note: this is intentionally narrow. A class-only container (no
+    leading tag) passes — those are usually valid. Selectors using
+    descendant combinators (with whitespace) pass — those are
+    explicitly parent-child.
+    """
+    container_sel = (css.get("container") or "").strip()
+    if not container_sel:
+        return True, ""  # no container, nothing to validate
+
+    container_tag = _leading_tag(container_sel)
+    container_has_descendant = bool(
+        " " in container_sel.strip() or ">" in container_sel
+    )
+
+    for field in _STRUCTURAL_FIELDS:
+        field_sel = (css.get(field) or "").strip()
+        if not field_sel:
+            continue
+        field_tag = _leading_tag(field_sel)
+        field_has_descendant = bool(
+            " " in field_sel.strip() or ">" in field_sel
+        )
+
+        # H1 — both are leaf cells of the same tag.
+        if (
+            container_tag in _LEAF_CELL_TAGS
+            and field_tag == container_tag
+            and not field_has_descendant
+        ):
+            return False, f"leaf_sibling:{field}:{container_tag}"
+
+        # H2 — same tag, no descendant combinator on either side.
+        if (
+            container_tag
+            and container_tag == field_tag
+            and not container_has_descendant
+            and not field_has_descendant
+            and container_sel != field_sel  # not literally identical
+        ):
+            return False, f"same_depth_sibling:{field}:{container_tag}"
+
+    return True, ""
+
+
 # ── DOM-hint quality thresholds ────────────────────────────────────────────
 # Single source of truth for the 0.4 / 0.8 / 0.05 magic numbers that wire
 # together (a) the LLM_DOM save-time self-validation gate in
@@ -705,11 +835,19 @@ def update_profile_after_extraction(
         # DOM hints from LLM
         css = llm_hints.get("css_selectors") or {}
         if css.get("container"):
-            # Persist every selector slot the FieldSelectorMap model
-            # exposes. Earlier this dropped floor_plan_name + availability_status
-            # (the LLM returns them, the model has the fields, the writer
-            # forgot to pass them through). amenities + concession are new
-            # slots — DOM analysis prompts ask for them, so save them too.
+            # 2026-05-24 Phase 2.5: validate that the container selector
+            # is structurally consistent with the per-field selectors
+            # (canonical bug: PID 44309 abquptownapts.com saved
+            # ``container=td.td-card-name`` and ``sqft=td.td-card-sqft``
+            # — both are `<td>` SIBLINGS, not parent-child. At replay,
+            # the sqft lookup returned nothing and fell through to a
+            # path that digit-stripped the unit-id, leaking ``Area=5314``
+            # for unit "Apartment: #E-5314"). When the heuristic flags
+            # the structure as suspicious, downgrade quality_score so
+            # replay only soft-trusts these selectors (the existing
+            # consecutive-miss eviction at ~line 980 then clears them
+            # on first-miss per the degraded-save policy).
+            structure_ok, structure_reason = _validate_selector_structure(css)
             dom_hints_saved_this_run = True
             profile.dom_hints.field_selectors = FieldSelectorMap(
                 container=css.get("container"),
@@ -740,6 +878,28 @@ def update_profile_after_extraction(
                 )
             else:
                 profile.dom_hints.field_selectors_quality = 1.0
+            # Phase 2.5 — clamp quality_score when structure check fails.
+            # Replay tier reads field_selectors_quality and treats <0.8
+            # as soft-trust + first-miss eviction (per
+            # project_dom_hint_quality_tiered_eviction memory). Clamping
+            # to 0.4 here means replay still admits these selectors once
+            # (so we measure their real validity) but evicts immediately
+            # if they miss — instead of the 3-strike resilience that
+            # high-quality selectors get.
+            if not structure_ok:
+                profile.dom_hints.field_selectors_quality = min(
+                    profile.dom_hints.field_selectors_quality, 0.4,
+                )
+                try:
+                    from ma_poc.observability.events import EventKind, emit as _emit_struct
+                    _emit_struct(
+                        EventKind.DOM_HINTS_DEGRADED_SAVED,
+                        profile.canonical_id,
+                        reason=f"selector_structure:{structure_reason}",
+                        container=str(css.get("container") or "")[:120],
+                    )
+                except Exception:
+                    pass
 
         if llm_hints.get("platform_guess"):
             profile.dom_hints.platform_detected = llm_hints["platform_guess"]

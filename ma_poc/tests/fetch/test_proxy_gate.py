@@ -475,13 +475,21 @@ def test_non_eligible_stages_blocked(proxy_env: str, stage: str) -> None:
 
 
 def test_l1_escalate_admits_on_bot_blocked_with_pool() -> None:
-    """Happy path: prior direct attempt was BOT_BLOCKED AND the pool has
-    a proxy AND budget remains → escalation admitted."""
+    """Happy path: prior direct attempt was BOT_BLOCKED with a
+    HIGH-CONFIDENCE provider signature (CF_CHALLENGE) AND the pool has
+    a proxy AND budget remains → escalation admitted.
+
+    2026-05-24 update: the gate now requires a specific bot-block
+    provider signature (cloudflare / datadome / akamai / etc.) — bare
+    BOT_BLOCKED denies as L1_BOT_BLOCKED_LOW_CONFIDENCE. See the
+    ``_is_high_confidence_bot_block`` helper.
+    """
     d = decide_l1_escalate(
         "https://www.hunterscourtapts.com/",
         prior_outcome="BOT_BLOCKED",
         proxy_hops_used=0,
         pool_has_proxies=True,
+        error_signature="CF_CHALLENGE",
     )
     assert d.allow is True
     assert d.reason == ProxyDecisionReason.L1_CF_ESCALATION_ADMITTED
@@ -491,11 +499,38 @@ def test_l1_escalate_admits_on_bot_blocked_with_pool() -> None:
     assert d.host == "www.hunterscourtapts.com"
 
 
+def test_l1_escalate_denies_on_bot_blocked_without_provider_signature() -> None:
+    """2026-05-24 — high-confidence requirement. Bare BOT_BLOCKED
+    (no provider sig in error_signature) denies as
+    L1_BOT_BLOCKED_LOW_CONFIDENCE. Same for bare HTTP_403."""
+    d = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome="BOT_BLOCKED",
+        proxy_hops_used=0,
+        pool_has_proxies=True,
+        error_signature=None,
+    )
+    assert d.allow is False
+    assert d.reason == ProxyDecisionReason.L1_BOT_BLOCKED_LOW_CONFIDENCE
+    d2 = decide_l1_escalate(
+        "https://www.example.com/",
+        prior_outcome="BOT_BLOCKED",
+        proxy_hops_used=0,
+        pool_has_proxies=True,
+        error_signature="HTTP_403",
+    )
+    assert d2.allow is False
+    assert d2.reason == ProxyDecisionReason.L1_BOT_BLOCKED_LOW_CONFIDENCE
+
+
 def test_l1_escalate_denies_on_transient_outcome() -> None:
     """TRANSIENT failures (DNS flake, TCP RST, SSL handshake) have their
-    own retry path. They must NOT trigger CF-escalation — that would
-    burn proxy bandwidth on flakes the next direct attempt would
-    recover."""
+    own retry path at the fetcher. The fetcher excludes TRANSIENT from
+    its escalation trigger via ``_escalate_trigger`` so the gate is
+    never called with TRANSIENT from production. (Tests may still call
+    it directly — and when they do without a signature, the gate denies
+    as L1_UNREACHABLE_LOW_CONFIDENCE rather than running.)
+    """
     d = decide_l1_escalate(
         "https://www.example.com/",
         prior_outcome="TRANSIENT",
@@ -503,7 +538,8 @@ def test_l1_escalate_denies_on_transient_outcome() -> None:
         pool_has_proxies=True,
     )
     assert d.allow is False
-    assert d.reason == ProxyDecisionReason.L1_PRIOR_OUTCOME_NOT_BLOCKED
+    # Bare TRANSIENT with no signature → low-confidence deny.
+    assert d.reason == ProxyDecisionReason.L1_UNREACHABLE_LOW_CONFIDENCE
 
 
 def test_l1_escalate_denies_on_ok_outcome() -> None:
@@ -534,12 +570,17 @@ def test_l1_escalate_denies_on_rate_limited() -> None:
 
 def test_l1_escalate_denies_with_empty_pool() -> None:
     """Operator hasn't set ``PROXY_POOL_URLS``. There's nothing to
-    escalate to — gate returns NO_PROXY_CONFIGURED."""
+    escalate to — gate returns NO_PROXY_CONFIGURED.
+
+    2026-05-24: must pass a high-confidence sig so the BOT_BLOCKED
+    admission path runs and we reach the pool check.
+    """
     d = decide_l1_escalate(
         "https://www.example.com/",
         prior_outcome="BOT_BLOCKED",
         proxy_hops_used=0,
         pool_has_proxies=False,
+        error_signature="CF_CHALLENGE",
     )
     assert d.allow is False
     assert d.reason == ProxyDecisionReason.NO_PROXY_CONFIGURED
@@ -548,12 +589,16 @@ def test_l1_escalate_denies_with_empty_pool() -> None:
 def test_l1_escalate_denies_when_hop_budget_exhausted() -> None:
     """One CF-escalation per fetch task. A second escalation is almost
     never useful (the proxy was ALSO CF-blocked → third attempt won't
-    recover) and burning another hop just inflates the proxy bill."""
+    recover) and burning another hop just inflates the proxy bill.
+
+    2026-05-24: high-confidence sig required so we reach the budget check.
+    """
     d = decide_l1_escalate(
         "https://www.example.com/",
         prior_outcome="BOT_BLOCKED",
         proxy_hops_used=DEFAULT_L1_MAX_ESCALATION_HOPS,
         pool_has_proxies=True,
+        error_signature="CF_CHALLENGE",
     )
     assert d.allow is False
     assert d.reason == ProxyDecisionReason.L1_HOP_BUDGET_EXHAUSTED
@@ -567,6 +612,7 @@ def test_l1_escalate_admits_case_insensitive_outcome() -> None:
         prior_outcome="bot_blocked",
         proxy_hops_used=0,
         pool_has_proxies=True,
+        error_signature="CF_CHALLENGE",
     )
     assert d.allow is True
     assert d.reason == ProxyDecisionReason.L1_CF_ESCALATION_ADMITTED
@@ -589,13 +635,17 @@ def test_l1_escalate_denies_on_none_outcome() -> None:
 def test_l1_escalate_custom_max_hops_override() -> None:
     """Tests can raise the cap to verify higher-budget scenarios. The
     cap is per-call so unit tests don't have to monkeypatch a module
-    constant to exercise hop-3 paths."""
+    constant to exercise hop-3 paths.
+
+    2026-05-24: high-confidence sig required.
+    """
     d = decide_l1_escalate(
         "https://www.example.com/",
         prior_outcome="BOT_BLOCKED",
         proxy_hops_used=2,
         max_hops=3,
         pool_has_proxies=True,
+        error_signature="CF_CHALLENGE",
     )
     assert d.allow is True
     assert d.reason == ProxyDecisionReason.L1_CF_ESCALATION_ADMITTED
