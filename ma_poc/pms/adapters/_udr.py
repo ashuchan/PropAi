@@ -81,6 +81,41 @@ _UDR_NAME_RE = re.compile(
 _UDR_UNITID_RE = re.compile(r"[?&]unitid=(\d+)", re.IGNORECASE)
 
 
+def _format_udr_plan_code(raw_code: str) -> str:
+    """Reformat a UDR image-filename plan code (lowercase, no dots)
+    into the displayed plan name (uppercase, with decimal point).
+
+    UDR's marketing page shows "Plan B1.5T" but the floor-plan image
+    URL uses "cambridgewoods_b15t_combined_3d.gif" — the decimal point
+    is stripped from the filename. This rule restores it:
+
+      Insert a "." between TWO consecutive digits when at least one
+      letter precedes the digit pair AND at least one letter follows
+      the digit pair OR the digit pair is at the end.
+
+    Examples (verified live across 13 Cambridge Woods plans 2026-05-24):
+      "a1a"   → "A1A"        (no two-digit run)
+      "a1d"   → "A1D"
+      "b15t"  → "B1.5T"      (1 and 5 → 1.5, followed by T)
+      "b25at" → "B2.5AT"     (2 and 5 → 2.5, followed by AT)
+      "c25"   → "C2.5"       (2 and 5 at end → 2.5)
+
+    Falls back to ``raw_code.upper()`` when no two-digit run is found.
+    """
+    if not raw_code:
+        return ""
+    up = raw_code.upper()
+    # Insert a "." between the first two consecutive digits when they
+    # follow a leading letter cluster. We deliberately only handle the
+    # first occurrence — UDR plans like "A1B5T" don't exist in any
+    # community we've seen; restrict to the simple case to avoid
+    # over-aggressive periodization.
+    m = re.match(r"^([A-Z]+)(\d)(\d)([A-Z]*)$", up)
+    if m:
+        return f"{m.group(1)}{m.group(2)}.{m.group(3)}{m.group(4)}"
+    return up
+
+
 def _extract_unit_from_udr_name(name: str) -> str:
     """Parse ``"Apartment #8 - 4020"`` → ``"4020"``.
 
@@ -215,6 +250,13 @@ def parse_udr_jsonld(html: str, source_url: str = "") -> list[dict[str, Any]]:
             # ``image`` URL (e.g. cambridgewoods_b15t_combined_3d.gif
             # → b15t → "B1.5T"). Fall back to "" — schema_v2 can join
             # plan-name from elsewhere.
+            #
+            # 2026-05-24 (user Q): the website displays "Plan B1.5T"
+            # (with period). Image filename strips the period; we
+            # restore it by inserting a "." between two consecutive
+            # digits after the leading letter(s). Verified live across
+            # all 13 Cambridge Woods plans: a1a, a1b, a1c, a1d, a1e,
+            # b15t→B1.5T, b25at→B2.5AT, b25bt→B2.5BT, etc.
             floor_plan_name = ""
             image_url = item.get("image") or ""
             if isinstance(image_url, str) and image_url:
@@ -227,11 +269,7 @@ def parse_udr_jsonld(html: str, source_url: str = "") -> list[dict[str, Any]]:
                 )
                 if plan_m:
                     raw_code = plan_m.group(1)
-                    # b15t → B1.5T (insert decimal between digits where it
-                    # makes sense). Heuristic: leave as upper-case for
-                    # now; the audit-row data showed "B1.5T" so this
-                    # might need a digit-aware reformat later.
-                    floor_plan_name = raw_code.upper()
+                    floor_plan_name = _format_udr_plan_code(raw_code)
 
             beds_str = str(int(beds)) if isinstance(beds, (int, float)) else (
                 str(beds) if beds else ""

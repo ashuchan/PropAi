@@ -16,6 +16,7 @@ import pytest
 
 from ma_poc.pms.adapters._udr import (
     _extract_unit_from_udr_name,
+    _format_udr_plan_code,
     parse_udr_jsonld,
 )
 
@@ -142,10 +143,36 @@ def test_parse_udr_jsonld_uses_displayed_name_not_internal_unitid() -> None:
 
 def test_parse_udr_jsonld_extracts_floor_plan_from_image_filename() -> None:
     """UDR doesn't ship a clean plan name in JSON-LD; derive from the
-    image URL: cambridgewoods_b15t_combined_3d.gif → 'B15T'."""
+    image URL: cambridgewoods_b15t_combined_3d.gif → 'B1.5T' (decimal
+    restored from the filename — user QQ 2026-05-24)."""
     units = parse_udr_jsonld(_CAMBRIDGE_WOODS_FRAGMENT, source_url="x")
-    assert units[0]["floor_plan_name"] == "B15T"
+    assert units[0]["floor_plan_name"] == "B1.5T"
     assert units[1]["floor_plan_name"] == "A1D"
+
+
+@pytest.mark.parametrize("raw, expected", [
+    # Live shapes from Cambridge Woods 2026-05-24
+    ("a1a", "A1A"),
+    ("a1b", "A1B"),
+    ("a1c", "A1C"),
+    ("a1d", "A1D"),
+    ("a1e", "A1E"),
+    ("b15t", "B1.5T"),       # decimal restored
+    ("b25at", "B2.5AT"),     # decimal restored, trailing letters preserved
+    ("b25bt", "B2.5BT"),
+    ("b25ct", "B2.5CT"),
+    ("b25dt", "B2.5DT"),
+    # Edge cases
+    ("", ""),
+    ("c25", "C2.5"),         # trailing digits at end
+    ("simple", "SIMPLE"),    # no digits at all → uppercase only
+    ("a1", "A1"),            # only one digit
+])
+def test_format_udr_plan_code_inserts_decimal(raw: str, expected: str) -> None:
+    """The decimal-insert rule: '<letters><digit><digit><letters?>' →
+    '<letters><digit>.<digit><letters?>'. Verified live on all 13
+    Cambridge Woods plans."""
+    assert _format_udr_plan_code(raw) == expected
 
 
 def test_parse_udr_jsonld_returns_empty_when_no_itemlist() -> None:
