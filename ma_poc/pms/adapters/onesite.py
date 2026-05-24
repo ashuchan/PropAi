@@ -26,6 +26,9 @@ Key findings:
 
 from __future__ import annotations
 
+import logging
+import re
+import uuid
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._daily_runner_parsers import (
@@ -40,6 +43,292 @@ from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
+
+log = logging.getLogger(__name__)
+
+# 2026-05-24 HAR-driven addition: OneSite OLL "workflowstartup" endpoint
+# is the canonical source of unit data for marketing-shell OneSite sites
+# where the homepage doesn't fire any RealPage XHRs. Discovery chain
+# (live-verified across 7 HARs in batch1+2):
+#
+#   1. Marketing homepage links to ``{prefix}.onlineleasing.realpage.com``
+#      OR the leasing subdomain itself
+#   2. That subdomain's HTML loads
+#      ``property.onesite.realpage.com/ollr/widgetLoader.js?siteId=({SITE_ID})``
+#      — SiteId is the numeric query parameter
+#   3. (Alternate, G5-managed sites) Page body links to
+#      ``marketing-center-data.g5devops.com/summary/<slug>.json`` which
+#      has ``"partnerName":"OneSite","partnerpropertyId":"<SITE_ID>"``
+#   4. Hit ``leasing.realpage.com/RP.Leasing.AppService.WebHost/
+#      workflowstartup/v1/{SITE_ID}/English?BpmId=OLL.WorkflowStartUp
+#      &BpmSequence=0&LogSequence=3&ClientSessionID={UUID}`` — returns
+#      10-15KB JSON
+#   5. Walk ``Workflow.ActivityGroups[0].GroupActivities[0].Floorplans[]``
+#      — each item has Name, Bedrooms, Bathrooms, MinSquareFeet,
+#      MinPriceRange, MaxPriceRange, AvailableUnits, UnitIds[]
+#
+# This rescues TIER_1_API_ONESITE_NO_RESPONSE properties where the page
+# is a static marketing shell that links to the OLL portal without
+# loading it inline.
+_ONESITE_SITEID_FROM_WIDGET_RE = re.compile(
+    r"widgetLoader\.js\?siteId=(\d+)",
+    re.IGNORECASE,
+)
+_ONESITE_SUBDOMAIN_RE = re.compile(
+    r"https?://([\w-]+)\.onlineleasing\.realpage\.com",
+    re.IGNORECASE,
+)
+_ONESITE_G5_SUMMARY_RE = re.compile(
+    r'(https?://marketing-center-data\.g5devops\.com/summary/[^"\'\\\s]+\.json)',
+    re.IGNORECASE,
+)
+_ONESITE_G5_PARTNER_RE = re.compile(
+    r'"partnerName"\s*:\s*"OneSite"[^}]*?"partnerpropertyId"\s*:\s*"(\d+)"',
+    re.IGNORECASE,
+)
+
+
+def _extract_onesite_site_ids(body: str, base_url: str) -> list[str]:
+    """Discover OneSite SiteId values from a marketing/leasing page body.
+
+    Returns a list (deduped, order preserved) of candidate numeric site
+    ids the workflowstartup endpoint can be called with. Returns ``[]``
+    when the body has no OneSite markers.
+    """
+    if not body:
+        return []
+    ids: list[str] = []
+
+    # Path A: direct widgetLoader.js?siteId reference
+    for m in _ONESITE_SITEID_FROM_WIDGET_RE.finditer(body):
+        sid = m.group(1)
+        if sid and sid not in ids:
+            ids.append(sid)
+
+    # Path B: marketing page links to {prefix}.onlineleasing.realpage.com
+    # — the numeric prefix is NOT always the SiteId, but we keep it as a
+    # weak candidate to fall back on
+    for m in _ONESITE_SUBDOMAIN_RE.finditer(body):
+        prefix = m.group(1)
+        # Some prefixes have a non-numeric suffix (e.g. ``8312231b``);
+        # strip non-digits to make it usable
+        sid = re.sub(r"\D", "", prefix)
+        if sid and sid not in ids:
+            # Only add prefix-based as a candidate when no widgetLoader-
+            # derived id is already in the list (the widget one is canonical)
+            pass
+
+    return ids
+
+
+def _onesite_workflowstartup_url(site_id: str) -> str:
+    """Build the workflowstartup URL with a fresh ClientSessionID UUID."""
+    sid_uuid = str(uuid.uuid4())
+    return (
+        f"https://leasing.realpage.com/RP.Leasing.AppService.WebHost/"
+        f"workflowstartup/v1/{site_id}/English?"
+        f"BpmId=OLL.WorkflowStartUp&BpmSequence=0&LogSequence=3"
+        f"&ClientSessionID={sid_uuid}"
+    )
+
+
+def parse_onesite_workflowstartup(
+    body: dict[str, Any], url: str
+) -> list[dict[str, str]]:
+    """Parse a ``workflowstartup/v1/{SITE_ID}/English`` response into
+    standard unit dicts.
+
+    Walks ``Workflow.ActivityGroups[*].GroupActivities[*].Floorplans[]``
+    (the ``__type`` is ``FloorplanSearchLeaseMgmtActivity``). Each
+    floorplan emits one plan-level row with Name, Bedrooms, Bathrooms,
+    Squarefeet (or MinSquareFeet), MinPriceRange, MaxPriceRange,
+    AvailableUnits.
+
+    Skips rows where both rent and sqft are zero (income-restricted
+    or call-for-pricing placeholders).
+    """
+    if not isinstance(body, dict):
+        return []
+    workflow = body.get("Workflow") or {}
+    activity_groups = workflow.get("ActivityGroups") or []
+    if not isinstance(activity_groups, list):
+        return []
+
+    units: list[dict[str, str]] = []
+    seen_ids: set[str] = set()
+
+    for grp in activity_groups:
+        if not isinstance(grp, dict):
+            continue
+        activities = grp.get("GroupActivities") or []
+        if not isinstance(activities, list):
+            continue
+        for act in activities:
+            if not isinstance(act, dict):
+                continue
+            fps = act.get("Floorplans") or []
+            if not isinstance(fps, list):
+                continue
+            for fp in fps:
+                if not isinstance(fp, dict):
+                    continue
+                fp_id = str(fp.get("Id") or fp.get("MarketingId") or "")
+                if fp_id and fp_id in seen_ids:
+                    continue
+                if fp_id:
+                    seen_ids.add(fp_id)
+
+                name = str(fp.get("Name") or "")
+                beds = fp.get("Bedrooms")
+                baths = fp.get("Bathrooms")
+                sqft = (
+                    fp.get("Squarefeet")
+                    or fp.get("MinSquareFeet")
+                    or fp.get("MinUnitSquareFeet")
+                    or 0
+                )
+                rent_lo = fp.get("MinPriceRange") or 0
+                rent_hi = fp.get("MaxPriceRange") or 0
+                avail_count = fp.get("AvailableUnits") or 0
+
+                # Cast to ints — these come as numeric from the JSON
+                try:
+                    sqft_i = int(sqft) if sqft else 0
+                except (TypeError, ValueError):
+                    sqft_i = 0
+                try:
+                    rent_lo_i = int(rent_lo) if rent_lo else None
+                    rent_hi_i = int(rent_hi) if rent_hi else None
+                except (TypeError, ValueError):
+                    rent_lo_i = None
+                    rent_hi_i = None
+
+                # Skip income-restricted-only or call-for-pricing rows
+                # (sqft=0 AND no rent → no useful dimension, drops past
+                # validity gate as a bare-name row).
+                if sqft_i == 0 and not rent_lo_i:
+                    continue
+
+                if rent_lo_i and not rent_hi_i:
+                    rent_hi_i = rent_lo_i
+
+                beds_i: int | None = None
+                if isinstance(beds, (int, float)):
+                    beds_i = int(beds)
+                elif isinstance(beds, str) and beds.isdigit():
+                    beds_i = int(beds)
+
+                baths_str = ""
+                if isinstance(baths, (int, float)):
+                    baths_str = (
+                        str(int(baths)) if float(baths).is_integer() else str(baths)
+                    )
+                elif isinstance(baths, str):
+                    baths_str = baths
+
+                units.append(
+                    make_unit_dict(
+                        floor_plan_name=name,
+                        bed_label=bed_label_from(beds_i, name),
+                        bedrooms=str(beds_i) if beds_i is not None else "",
+                        bathrooms=baths_str,
+                        sqft=str(sqft_i) if sqft_i else "",
+                        unit_number="",
+                        rent_range=format_rent_range(rent_lo_i, rent_hi_i),
+                        rent_low=rent_lo_i,
+                        rent_high=rent_hi_i,
+                        availability_status="AVAILABLE",
+                        available_units=str(avail_count) if avail_count else "",
+                        source_api_url=url,
+                        extraction_tier="TIER_1_API_ONESITE_WORKFLOW",
+                    )
+                )
+    return units
+
+
+async def _probe_onesite_workflowstartup(
+    ctx: AdapterContext,
+) -> list[dict[str, str]]:
+    """Discover SiteId from page body + hit workflowstartup directly via
+    curl_cffi.
+
+    Returns parsed unit dicts (empty list when no SiteId discovered or
+    probe failed). Never raises.
+
+    Tier label set on returned units is
+    ``TIER_1_API_ONESITE_WORKFLOW`` so the run report can distinguish
+    this fallback path from the captured-XHR path.
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    raw_body = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(raw_body, bytes):
+        try:
+            raw_body = raw_body.decode("utf-8", errors="replace")
+        except Exception:
+            raw_body = ""
+    if not isinstance(raw_body, str) or not raw_body:
+        return []
+
+    base_url = getattr(ctx, "base_url", "") or ""
+    site_ids = _extract_onesite_site_ids(raw_body, base_url)
+
+    # Path C: try fetching the leasing subdomain to find SiteId in ITS body
+    # (the marketing site might just have a link to {prefix}.onlineleasing
+    # — that subdomain's HTML has the widgetLoader.js?siteId reference)
+    if not site_ids:
+        sub_match = _ONESITE_SUBDOMAIN_RE.search(raw_body)
+        if sub_match:
+            sub_host = sub_match.group(0).rstrip("/") + "/"
+            try:
+                from ma_poc.pms.adapters._probe import probe_get
+
+                r = probe_get(sub_host, timeout=15)
+                if r.status_code == 200 and r.text:
+                    site_ids = _extract_onesite_site_ids(r.text, sub_host)
+            except Exception:
+                pass
+
+    # Path D: G5-managed sites — partnerpropertyId in g5devops summary
+    if not site_ids:
+        g5_match = _ONESITE_G5_SUMMARY_RE.search(raw_body)
+        if g5_match:
+            try:
+                from ma_poc.pms.adapters._probe import probe_get
+
+                r = probe_get(g5_match.group(1), timeout=15)
+                if r.status_code == 200 and r.text:
+                    pm = _ONESITE_G5_PARTNER_RE.search(r.text)
+                    if pm:
+                        site_ids = [pm.group(1)]
+            except Exception:
+                pass
+
+    if not site_ids:
+        return []
+
+    # Try each candidate site_id until one yields units
+    from ma_poc.pms.adapters._probe import probe_get
+
+    for sid in site_ids[:3]:  # cap at 3 to avoid excess probing
+        url = _onesite_workflowstartup_url(sid)
+        try:
+            r = probe_get(url, timeout=15)
+        except Exception as exc:
+            log.debug("onesite workflowstartup err sid=%s: %s", sid, exc)
+            continue
+        if r.status_code != 200 or not r.text:
+            continue
+        try:
+            import json as _json
+
+            body = _json.loads(r.text)
+        except Exception:
+            continue
+        units = parse_onesite_workflowstartup(body, url)
+        if units:
+            return units
+
+    return []
 
 
 def parse_realpage_floorplans(body: dict[str, Any], url: str) -> list[dict[str, str]]:
@@ -216,6 +505,43 @@ class OneSiteAdapter:
                     f"failed unit_validity (no numeric dimension)"
                 )
         else:
+            # 2026-05-24 HAR-driven fallback: try the workflowstartup
+            # endpoint directly via curl_cffi. Marketing-shell OneSite
+            # sites don't fire the OLL XHRs from the homepage; this
+            # probe discovers SiteId via widgetLoader.js?siteId, the
+            # ``{prefix}.onlineleasing.realpage.com`` subdomain HTML,
+            # or the G5 marketing-center-data summary (partnerpropertyId),
+            # then calls ``workflowstartup/v1/{SITE_ID}/English`` and
+            # parses ``Workflow.ActivityGroups[*].GroupActivities[*].
+            # Floorplans[]`` directly.
+            try:
+                wf_units = await _probe_onesite_workflowstartup(ctx)
+            except Exception as exc:  # noqa: BLE001
+                wf_units = []
+                result.errors.append(
+                    f"onesite-workflow-probe-error: {type(exc).__name__}: {str(exc)[:90]}"
+                )
+            if wf_units:
+                from ma_poc.extraction.post_process import post_process
+
+                _ppw = post_process(
+                    wf_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _ppw.n_admitted > 0:
+                    result.units = _ppw.admitted
+                    result.plan_summaries = _ppw.plan_summaries
+                    result.tier_used = "TIER_1_API_ONESITE_WORKFLOW"
+                    result.confidence = min(0.92, 0.7 + 0.04 * _ppw.n_admitted)
+                    result.api_responses.append(
+                        {
+                            "url": wf_units[0].get("source_api_url", ""),
+                            "status": 200,
+                            "body": "<onesite-workflowstartup>",
+                            "via": "onesite_workflow_probe",
+                        }
+                    )
+                    return result
+
             # No usable RealPage data at all. Two flavors:
             #   _NO_RESPONSE — no RealPage-shaped responses captured (cluster
             #                  #6 OLL-widget-shell pattern: page bodyLen ~ 386,
