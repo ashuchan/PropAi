@@ -534,6 +534,32 @@ def _format_area(val: Any) -> int:
     return -1
 
 
+# 2026-05-24 (user follow-up to Q1): "apply now / apply" should also be
+# considered AVAILABLE. The prior fixed-string set missed common operator
+# CTA-style phrasings. This regex matches any phrase where the operator
+# is plausibly saying "available now" — including "Apply Now", "Lease
+# Today", "Move-In Immediately", "Currently Vacant", "Call For Details"
+# (operator-gated date = available now). The status field is the
+# authoritative signal anyway; the date-text recognizer just rescues
+# rows where the operator wrote a phrase instead of a date.
+_AVAILABLE_NOW_RE = re.compile(
+    r"\bavail"                                   # available / availability / availabilities
+    r"|\bapply\s+(?:now|today|by)\b"             # CTAs in date field
+    r"|\blease\s+(?:now|today|by)\b"
+    r"|\bmove[\s-]?in"                           # Move-in / Move In / Movein
+    r"|\bmoves?[\s-]?in\b"                       # Move In Now / Moves In
+    r"|\bready\b"
+    r"|\bvacant\b"
+    r"|\bcurrently\b"                            # "Currently Vacant" / "Currently Leasing"
+    r"|\b(?:now|today|immediate|immediately)\b"  # standalone time tokens
+    r"|\bcall\s+(?:for|us|today|now)\b"          # "Call For Details" — operator-gated
+    r"|\b(?:tba|tbd)\b"                          # to be announced / determined
+    r"|\bto\s+be\s+(?:announced|determined|set)\b"
+    r"|\binquire\b",                             # "Inquire For Details" — operator-gated
+    re.IGNORECASE,
+)
+
+
 def _resolve_available_date(
     parsed_date: str | None,
     status: str | None,
@@ -579,7 +605,8 @@ def _format_date(val: Any) -> str | None:
     """
     if val is None or val == "":
         return None
-    s = str(val).strip()
+    s_orig = str(val).strip()
+    s = s_orig
     # Already ISO format (unchanged)
     if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
         return s
@@ -593,22 +620,6 @@ def _format_date(val: Any) -> str | None:
     ).strip()
     if not s:
         # Pure text like "Available" with no date ⇒ available now.
-        return datetime.now(UTC).strftime("%Y-%m-%d")
-    low = s.lower()
-    if low in (
-        "now", "today", "immediate", "immediately", "available",
-        "available now", "now available", "ready now",
-        # 2026-05-24: widen for the AVAILABLE-no-date class —
-        # operators ship these as alternative ways of saying
-        # "available immediately, move in today" with no specific
-        # date attached (RentCafe / mark-taylor / various
-        # securecafe + AppFolio one-offs).
-        "ready", "move-in ready", "move in ready", "vacant",
-        "move-in", "move in", "moves in",
-        # AVAILABLE-text variants without explicit "now"
-        "available immediately", "available today",
-        "tba", "tbd", "to be announced", "to be determined",
-    ):
         return datetime.now(UTC).strftime("%Y-%m-%d")
     # Try common formats — 4-digit-year set unchanged; 2-digit-year and
     # month-name forms added.
@@ -640,6 +651,18 @@ def _format_date(val: Any) -> str | None:
             )
         except ValueError:
             continue
+    # 2026-05-24 (user follow-up): final fallback — run the AVAILABLE-NOW
+    # regex on the ORIGINAL string (before prefix strip) so phrasings
+    # like "Available 24/7" (strips to "24/7" which isn't a date) still
+    # resolve to today. The regex uses fuzzy anchors (\\bavail / apply
+    # \\s+(?:now|today) / lease \\s+(?:now|today) / move[\\s-]?in /
+    # ready / vacant / call \\s+(?:for|us|today|now) / inquire / tba /
+    # tbd / currently / standalone now/today/immediate) so any operator
+    # CTA-style phrasing intent ⇒ available now. Runs LAST so real
+    # date strings always win (e.g. "Available 6/25/26" parses 6/25/26
+    # via earlier date-format pass, never reaches here).
+    if _AVAILABLE_NOW_RE.search(s_orig.lower()):
+        return datetime.now(UTC).strftime("%Y-%m-%d")
     return None
 
 

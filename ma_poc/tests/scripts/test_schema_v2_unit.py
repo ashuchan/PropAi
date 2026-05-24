@@ -331,6 +331,7 @@ def test_no_status_with_empty_date_stays_none() -> None:
 
 
 @pytest.mark.parametrize("text", [
+    # Existing widened phrasings (proven 2026-05-24 morning fixed-list)
     "ready",
     "Move-in Ready",
     "MOVE IN READY",
@@ -340,17 +341,72 @@ def test_no_status_with_empty_date_stays_none() -> None:
     "TBA",
     "TBD",
     "to be announced",
+    # 2026-05-24 (user follow-up): regex-based recognizer adds these
+    # CTA-style phrasings operators put in the date field instead of
+    # a real date. "Apply Now" / "Apply Today" / "Lease Today" / etc.
+    "Apply Now",
+    "Apply Today",
+    "Apply By",
+    "Lease Now",
+    "Lease Today",
+    "Currently Available",
+    "Currently Vacant",
+    "Currently Leasing",
+    "Now Available",
+    "Available 24/7",
+    "Immediately",
+    "Move In",
+    "MOVE-IN",
+    "Move-In Now",
+    "Inquire",
+    "Inquire For Details",
+    "Call For Details",
+    "Call Today",
+    "Call Now",
+    "Call Us",
+    "to be determined",
+    "to be set",
 ])
 def test_format_date_widened_text_recognizer(text: str) -> None:
-    """The text-recognizer also widened: operator-specific phrasings
-    that mean 'available now' now resolve to scrape date instead of
-    None. Catches Mark-Taylor 'vacant', RentCafe 'TBA', etc."""
+    """The text-recognizer is regex-based (not fixed-string): operator-
+    specific phrasings that mean 'available now' resolve to scrape
+    date instead of None. Catches Mark-Taylor 'vacant', RentCafe 'TBA',
+    AppFolio 'Apply Now', 'Lease Today', 'Call For Details', etc.
+    """
     from datetime import UTC, datetime
 
     from ma_poc.core.schema_v2 import _format_date
     out = _format_date(text)
     assert out == datetime.now(UTC).strftime("%Y-%m-%d"), (
         f"{text!r} should resolve to today; got {out!r}"
+    )
+
+
+@pytest.mark.parametrize("text", [
+    # These look date-ish or placeholder-ish but should NOT resolve
+    # to today — they're real future dates or unparseable placeholders.
+    # Negative cases to prove the regex isn't too aggressive.
+    "Spring 2026",       # season placeholder, not "available now"
+    "Q3 2026",           # quarter placeholder
+    "End of June",       # vague date reference, no apply/avail anchor
+    "Pending",           # status word, not availability
+    "Sold",              # final state, not available
+    "Reserved",          # not available
+    "Off-Market",        # not available
+])
+def test_format_date_recognizer_does_not_overmatch(text: str) -> None:
+    """Negative cases: phrases that look date-ish but DON'T claim
+    'available now' should NOT default to today. Prevents the regex
+    from being too aggressive."""
+    from datetime import UTC, datetime
+
+    from ma_poc.core.schema_v2 import _format_date
+
+    out = _format_date(text)
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    assert out != today, (
+        f"{text!r} should NOT default to today (no available/apply intent); "
+        f"got {out!r}"
     )
 
 
