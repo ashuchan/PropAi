@@ -504,6 +504,299 @@ def parse_prospectportal_unit_spaces(
     return out
 
 
+# ----------------------------------------------------------------------
+# Prospect Portal SSR HTML extraction (2026-05-24)
+#
+# Background
+# ----------
+# Entrata Prospect Portal vanity sites (e.g. www.triomke.com,
+# www.thebellemeade.com) server-side-render the floor-plan grid into HTML
+# at the canonical ``/{city}/{slug}/conventional/`` path. No XHRs fire
+# for unit data — the page is static. Pre-this-fix the only consumers of
+# this body looked for ``available_units`` (HTML-entity JSON) or
+# ``<unit-button>`` markers (the ProspectPortal ``view_unit_spaces``
+# fragment); neither matches the SSR card/group templates below, so the
+# adapter dead-ended in ``TIER_1_API_ENTRATA_EMPTY`` despite the link-hop
+# correctly fetching the right URL.
+#
+# Two SSR templates exist in production (live-verified 2026-05-24):
+#
+# Template A — ``.fp-card`` (older PP):
+#   <div class="fp-card">
+#     <div class="fp-title">The Chilton</div>
+#     <div class="dynamic-text-before">1 Bed / 1 Bath</div>
+#     <div class="dynamic-text-after">1,006 sq. ft</div>
+#     <span class="fee-transparency-text">From $2,664 per month</span>
+#     <span class="lease-term-name">15mo lease</span>
+#     <span class="availability">1 Units Available</span>
+#   </div>
+# Live sample: thebellemeade.com (pid 38509) → 4 plans, all rent+sqft.
+#
+# Template B — ``li.fp-group-item`` with ``.fp-col`` blocks (newer PP):
+#   <li class="fp-group-item">
+#     <span class="fp-name">Bruce</span>
+#     <div class="fp-col bed-bath">
+#       <span class="fp-col-title">Beds / Baths</span>
+#       <span class="fp-col-text">Studio / 1 ba</span></div>
+#     <div class="fp-col rent">
+#       <span class="fp-col-title">Rent</span>
+#       <div class="fp-col-text fee-transparency-wrapper">
+#         <span class="fee-transparency-text">$1,298 per month</span></div></div>
+#     <div class="fp-col sq-feet">
+#       <span class="fp-col-title">Sq. Ft</span>
+#       <span class="fp-col-text">540</span></div>
+#     <div class="fp-col action">Only One Left! Details</div>
+#   </li>
+# Live sample: triomke.com (pid 65287) → 10 plans, 2/10 rent+sqft (rest
+# show "—" rent placeholder; sqft still extracts cleanly).
+# ----------------------------------------------------------------------
+
+_PP_BED_RE = re.compile(r"(\d+(?:\.\d+)?)\s*b(?:ed|d)\b", re.IGNORECASE)
+_PP_BATH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*b(?:ath|a)\b", re.IGNORECASE)
+_PP_SQFT_NUM_RE = re.compile(r"([\d,]+)")
+_PP_AVAIL_COUNT_RE = re.compile(r"(\d+)\s*units?\s*available", re.IGNORECASE)
+_PP_AVAIL_DATE_RE = re.compile(
+    r"available\s+([a-z]{3,9}\s+\d{1,2},?\s*\d{4})", re.IGNORECASE
+)
+
+
+def _pp_money_low_high(rent_text: str) -> tuple[int | None, int | None]:
+    """Extract (low, high) ints from a rent display string.
+
+    Returns (None, None) for the em-dash / blank placeholder used when an
+    operator hides the published rent (~80% of plans on some triomke-style
+    sites). Without this guard the dash was being captured as ``$``,
+    yielding a 0 rent and tripping the validity gate.
+    """
+    if not rent_text:
+        return (None, None)
+    if "—" in rent_text or "--" in rent_text:
+        return (None, None)
+    matches = re.findall(r"\$\s*([\d,]+)(?:\.\d{2})?", rent_text)
+    if not matches:
+        return (None, None)
+    lo = money_to_int(matches[0])
+    hi = money_to_int(matches[-1])
+    return (lo, hi)
+
+
+def _pp_beds_baths(bedbath_text: str) -> tuple[int | None, str]:
+    """Parse 'Studio / 1 ba', '1 bd / 1 ba', '2 Bed / 2.5 Bath' → (beds, baths)."""
+    if not bedbath_text:
+        return (None, "")
+    beds: int | None = None
+    bed_m = _PP_BED_RE.search(bedbath_text)
+    if bed_m:
+        try:
+            beds = int(float(bed_m.group(1)))
+        except (TypeError, ValueError):
+            beds = None
+    elif re.search(r"\bstudio\b", bedbath_text, re.IGNORECASE):
+        beds = 0
+    bath_m = _PP_BATH_RE.search(bedbath_text)
+    baths = bath_m.group(1) if bath_m else ""
+    return (beds, baths)
+
+
+def _pp_txt(el: Any) -> str:
+    return el.get_text(" ", strip=True) if el else ""
+
+
+def parse_entrata_prospectportal_html(
+    html: str, url: str
+) -> list[dict[str, str]]:
+    """Parse Entrata Prospect Portal SSR HTML — both ``.fp-card`` (older
+    template, ``dynamic-text-before/after`` siblings) and
+    ``li.fp-group-item`` (newer template, ``.fp-col`` blocks with
+    ``.fp-col-title`` labels) layouts.
+
+    Plan-level output (one row per floorplan name) — these pages render
+    a plan grid, not a per-apartment unit roster. Returns ``[]`` when
+    neither template matches; the caller (see ``EntrataAdapter.extract``)
+    falls through to the next recovery rung.
+
+    Live-verified 2026-05-24 against pid 38509 (Template A, 4/4 strict-
+    pass) and pid 65287 (Template B, 2/10 strict-pass). Critical for the
+    ``TIER_1_API_ENTRATA_EMPTY`` cluster — pre-fix the static fallback
+    only looked for ``available_units`` HTML-entity JSON and the
+    ``view_unit_spaces`` unit-button fragment, neither of which matches
+    the vanity-host SSR grid.
+    """
+    if not html:
+        return []
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "lxml")
+
+    cards = soup.select(".fp-card")
+    if cards:
+        return _parse_pp_fp_card(cards, url)
+
+    items = soup.select("li.fp-group-item")
+    if items:
+        return _parse_pp_fp_group_item(items, url)
+
+    return []
+
+
+def _parse_pp_fp_card(
+    cards: list[Any], url: str
+) -> list[dict[str, str]]:
+    """Template A: ``.fp-card`` with ``dynamic-text-before/after`` siblings."""
+    units: list[dict[str, str]] = []
+    for card in cards:
+        name = _pp_txt(card.select_one(".fp-title")) or _pp_txt(
+            card.select_one(".fp-name")
+        )
+        bedbath = _pp_txt(card.select_one(".dynamic-text-before"))
+        sqft_raw = _pp_txt(card.select_one(".dynamic-text-after"))
+        rent_raw = _pp_txt(card.select_one(".fee-transparency-text"))
+        avail_raw = _pp_txt(card.select_one(".availability"))
+        lease_raw = _pp_txt(card.select_one(".lease-term-name"))
+        special_raw = _pp_txt(
+            card.select_one(".fp-special-main-text")
+        ) or _pp_txt(card.select_one(".fp-special-text"))
+
+        beds, baths = _pp_beds_baths(bedbath)
+        sqft_m = _PP_SQFT_NUM_RE.search(sqft_raw)
+        sqft = sqft_m.group(1).replace(",", "") if sqft_m else ""
+        rent_lo, rent_hi = _pp_money_low_high(rent_raw)
+
+        count_m = _PP_AVAIL_COUNT_RE.search(avail_raw)
+        avail_units = count_m.group(1) if count_m else ""
+        status = "AVAILABLE"
+        if re.search(r"waitlist", avail_raw, re.IGNORECASE):
+            status = "UNAVAILABLE"
+            avail_units = avail_units or "0"
+        avail_date = ""
+        if not count_m:
+            date_m = _PP_AVAIL_DATE_RE.search(avail_raw)
+            if date_m:
+                avail_date = date_m.group(1)
+
+        # Skip empty rows — name and at least one numeric dimension needed
+        if not (name or bedbath) or not (rent_lo or rent_hi or sqft):
+            continue
+
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths),
+                sqft=sqft,
+                unit_number="",
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                concession=special_raw,
+                availability_status=status,
+                available_units=avail_units,
+                availability_date=avail_date,
+                lease_term=lease_raw,
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_ENTRATA_PP_FPCARD",
+            )
+        )
+    return units
+
+
+def _parse_pp_fp_group_item(
+    items: list[Any], url: str
+) -> list[dict[str, str]]:
+    """Template B: ``li.fp-group-item`` with title-labelled ``.fp-col`` blocks."""
+    units: list[dict[str, str]] = []
+    for item in items:
+        name = _pp_txt(
+            item.select_one(".fp-name-link, .fp-name, .fp-title")
+        )
+
+        # Walk every .fp-col block; index by .fp-col-title text + by
+        # class hint (bed-bath / rent / sq-feet / deposit / action).
+        # Class-hint lookup keeps us robust to title text changes ("Sq.
+        # Ft" vs "Sq Ft" vs "Sqft") and missing-title columns.
+        cols: dict[str, str] = {}
+        for col in item.select(".fp-col"):
+            value = (
+                _pp_txt(col.select_one(".fee-transparency-text"))
+                or _pp_txt(col.select_one(".fp-col-text"))
+                or _pp_txt(col)
+            )
+            classes = " ".join(col.get("class") or [])
+            for hint in (
+                "bed-bath",
+                "rent",
+                "sq-feet",
+                "sqft",
+                "deposit",
+                "action",
+            ):
+                if hint in classes:
+                    cols.setdefault(hint, value)
+                    break
+            title = _pp_txt(col.select_one(".fp-col-title"))
+            if title:
+                cols.setdefault(
+                    title.lower().strip().rstrip(":"), value
+                )
+
+        bedbath = cols.get("bed-bath") or cols.get("beds / baths") or ""
+        rent_raw = cols.get("rent", "")
+        sqft_raw = (
+            cols.get("sq-feet")
+            or cols.get("sqft")
+            or cols.get("sq. ft")
+            or cols.get("sq ft")
+            or ""
+        )
+        action_raw = cols.get("action", "")
+        deposit_raw = cols.get("deposit", "")
+
+        beds, baths = _pp_beds_baths(bedbath)
+        sqft_m = _PP_SQFT_NUM_RE.search(sqft_raw)
+        sqft = sqft_m.group(1).replace(",", "") if sqft_m else ""
+        rent_lo, rent_hi = _pp_money_low_high(rent_raw)
+
+        avail_units = ""
+        avail_date = ""
+        count_m = _PP_AVAIL_COUNT_RE.search(action_raw)
+        if count_m:
+            avail_units = count_m.group(1)
+        elif re.search(r"only\s+one\b", action_raw, re.IGNORECASE):
+            avail_units = "1"
+        date_m = _PP_AVAIL_DATE_RE.search(action_raw)
+        if date_m:
+            avail_date = date_m.group(1)
+        status = "AVAILABLE"
+        if re.search(r"waitlist", action_raw, re.IGNORECASE):
+            status = "UNAVAILABLE"
+
+        # Skip empty rows — need a name and at least one numeric dimension
+        if not (name or bedbath) or not (rent_lo or rent_hi or sqft):
+            continue
+
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths),
+                sqft=sqft,
+                unit_number="",
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                deposit=deposit_raw if deposit_raw and deposit_raw != "—" else "",
+                availability_status=status,
+                available_units=avail_units,
+                availability_date=avail_date,
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_ENTRATA_PP_FPGROUP",
+            )
+        )
+    return units
+
+
 def find_entrata_fp_detail_links(index_html: str, origin: str) -> list[str]:
     """Absolute ``/floorplan/<slug>/`` detail URLs from an index page."""
     if not index_html:
@@ -703,6 +996,119 @@ class EntrataAdapter:
             base = f"{p.scheme}://{p.netloc}" if p.scheme and p.netloc else ""
         except Exception:
             base = ""
+
+        # ProspectPortal SSR-grid fallback (2026-05-24). Vanity-host
+        # Entrata sites render the floor-plan grid into HTML at
+        # ``/{city}/{slug}/conventional/`` with no XHR backing it.
+        # Pre-this-fix the cascade had no parser for that grid — the
+        # adapter dead-ended in ``ENTRATA_EMPTY`` despite the link-hop
+        # correctly fetching the right URL. Live-verified on pid 38509
+        # (4 units) and 65287 (10 units) — see
+        # ``parse_entrata_prospectportal_html`` doctring for template
+        # details.
+        if base:
+            pp_ssr_units: list[dict[str, str]] = []
+            fr_body_check = (
+                getattr(fr, "body", None) if fr is not None else None
+            )
+            if isinstance(fr_body_check, bytes):
+                fr_body_check = fr_body_check.decode("utf-8", "replace")
+
+            # Step 1: parse the captured body in case the homepage
+            # already IS the SSR grid (some PP vanity hosts redirect
+            # ``/`` → ``/{city}/{slug}/conventional/``).
+            if isinstance(fr_body_check, str) and fr_body_check and (
+                "fp-card" in fr_body_check
+                or "fp-group-item" in fr_body_check
+            ):
+                pp_ssr_units.extend(
+                    parse_entrata_prospectportal_html(
+                        fr_body_check,
+                        str(getattr(fr, "final_url", "") or base),
+                    )
+                )
+
+            # Step 2: discover deep ``/{city}/{slug}/(conventional|affordable)/``
+            # candidates from the captured body, plus shallow guesses that
+            # PP servers commonly 302 to the canonical deep path.
+            deep_candidates: list[str] = []
+            if isinstance(fr_body_check, str) and fr_body_check:
+                _base_host = urlparse(base).netloc
+                _re_deep = re.compile(
+                    r'href=["\']'
+                    r'(https?://[^"\']+/(?:[^/"\']+/){2,}'
+                    r'(?:conventional|affordable)/?[^"\'?#]*?)["\']',
+                    re.IGNORECASE,
+                )
+                for _m in _re_deep.finditer(fr_body_check):
+                    cand = _m.group(1).split("?")[0].split("#")[0]
+                    if (
+                        cand
+                        and urlparse(cand).netloc.endswith(_base_host)
+                        and cand not in deep_candidates
+                    ):
+                        deep_candidates.append(cand)
+                    if len(deep_candidates) >= 3:
+                        break
+
+            for path in (
+                "/conventional/",
+                "/floorplans/",
+                "/floor-plans/",
+            ):
+                deep_candidates.append(base + path)
+
+            # Step 3: fetch and try the PP SSR parser. Stop on first
+            # body that admits at least one validity-gated row.
+            for cand_url in dict.fromkeys(deep_candidates):
+                if pp_ssr_units:
+                    break  # already got the homepage body
+                try:
+                    cand_html = await _entrata_static_fetch(cand_url)
+                except Exception:
+                    cand_html = ""
+                if not cand_html:
+                    continue
+                if (
+                    "fp-card" not in cand_html
+                    and "fp-group-item" not in cand_html
+                ):
+                    continue
+                pp_ssr_units.extend(
+                    parse_entrata_prospectportal_html(cand_html, cand_url)
+                )
+
+            if pp_ssr_units:
+                from ma_poc.extraction.post_process import post_process
+
+                _pps = post_process(
+                    pp_ssr_units,
+                    property_id=getattr(ctx, "property_id", None),
+                )
+                if _pps.n_admitted > 0:
+                    result.units = _pps.admitted
+                    result.plan_summaries = _pps.plan_summaries
+                    result.winning_url = (
+                        deep_candidates[0] if deep_candidates else base
+                    )
+                    result.tier_used = "TIER_1_DOM_ENTRATA_PP_SSR"
+                    result.confidence = min(
+                        0.92, 0.7 + 0.04 * _pps.n_admitted
+                    )
+                    result.api_responses.append(
+                        {
+                            "url": result.winning_url or base,
+                            "status": 200,
+                            "body": "<entrata-pp-ssr-grid>",
+                            "via": "entrata_pp_ssr",
+                        }
+                    )
+                    return result
+                result.errors.append(
+                    f"ENTRATA_PP_SSR_VALIDITY_REJECTED: "
+                    f"{len(pp_ssr_units)} parsed rows failed unit_validity"
+                )
+
         if base:
             wp_units: list[dict[str, str]] = []
             # The captured fetch body may itself be a /floorplan/ detail
