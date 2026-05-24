@@ -177,6 +177,45 @@ fixes: **~290 additional properties** (on top of the ~1,000 Q1 lift).
 - Connection runbook below
 - This document
 
+## 2026-05-24 UPDATE — SightMap variant port investigation
+
+User asked to chase the SightMap variant lift. Deeper investigation
+reframes the finding entirely:
+
+**Live-verified our `parse_sightmap_payload` against all 6 affected
+URLs** (Copper Terrace, Kinwood NY, Hoboken Point, WM Canterbury, Hydro,
+Morgan Avon): 102 units across them, **ZERO missing fields**. The
+adapter ALREADY handles the `data` envelope (sightmap.py line 140).
+The 362 field_patches are misguided runtime LLM artifacts.
+
+**The real finding**: Morgan Avon's xlsx tier was `TIER_4_LLM_DOM`,
+not `TIER_1_API_SIGHTMAP`. The xlsx covers 30+ Morgan Properties
+sites — all 29 routed to RentCafe SecureCafe, only 1 (Morgan Avon)
+went to LLM_DOM. The SightMap endpoint in prod's fingerprint was
+never even attempted by our detector for that property.
+
+**Architectural learning** (this is the actually-useful one):
+
+  prod's `scrape_profiles.api_hints.known_endpoints` is effectively
+  a learned detector cache. We currently re-derive routing on every
+  scrape from the marketing site's DOM markers. For ~168 not-full
+  properties, prod has discovered better endpoints than the detector
+  finds on a single fetch — these get baked into the per-property
+  fingerprint over time.
+
+The bigger win isn't porting field_patches — it's plumbing the
+prod fingerprint into the scrape orchestrator as a per-property
+routing hint. When the detector returns unknown OR a non-API tier
+falls through with empty/partial data, consult the fingerprint's
+known_endpoints and try each registered URL.
+
+This is a substantial architectural change (load fingerprints at
+scrape start, modify routing). Documented for follow-up; deferred
+from today's grind. Realistic lift: the ~150 multi-provider props
+(Learning #2 above) + the ~50 properties currently using LLM tier
+that have a Tier-1 API endpoint registered in fingerprint = ~200
+property lift potential.
+
 ## Connection runbook (for future analysis)
 
 ```bash
