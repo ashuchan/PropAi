@@ -491,27 +491,64 @@ class Fetcher:
             log.warning("curl_cffi fallback unavailable: %s", exc)
             return None
 
+        # 2026-05-24 (post-canary diagnosis): try DIRECT first, then
+        # fall back to proxied. Canary 2026-05-23-focused-3886351 result:
+        # 0/141 BOT_BLOCKED residue recovered when PROBE_PROXY_URL was
+        # set (BrightData residential). Direct re-probe on 5/5 random
+        # residue → 5/5 returned 200 OK. The BrightData IP pool is
+        # burned on these CF-fronted vanity hosts; direct works because
+        # the GCP worker IP isn't on the operator's CF blocklist.
+        # Priority chain:
+        #   1. Direct (no proxy) — works for ~95% of CF-walled sites
+        #   2. Proxied (PROBE_PROXY_URL) — only useful for Yardi
+        #      SecureCafe tenancy where GCP IPs are explicitly blocked
+        r = None
+        used_proxy = False
         try:
-            r = probe_get(task.url, timeout=20)
+            # Force-disable proxy on this call regardless of PROBE_PROXY_URL.
+            r = probe_get(task.url, timeout=20, proxies={}, verify=True)
         except Exception as exc:
             log.warning(
-                "curl_cffi fallback fetch failed for %s: %s",
+                "curl_cffi direct fallback fetch failed for %s: %s",
                 task.property_id, exc,
             )
-            return None
 
-        status = getattr(r, "status_code", 0)
-        body = getattr(r, "text", "") or ""
+        status = getattr(r, "status_code", 0) if r is not None else 0
+        body = getattr(r, "text", "") or "" if r is not None else ""
+
+        # If direct didn't bypass AND a residential proxy is configured,
+        # try the proxied path as a second attempt (handles Yardi/CF
+        # tenancy that blocks GCP IPs).
+        if (status != 200 or len(body) < 1024) and os.environ.get(
+            "PROBE_PROXY_URL", ""
+        ).strip():
+            try:
+                r2 = probe_get(task.url, timeout=20)
+            except Exception as exc:
+                log.warning(
+                    "curl_cffi proxied fallback fetch failed for %s: %s",
+                    task.property_id, exc,
+                )
+                r2 = None
+            if r2 is not None:
+                status2 = getattr(r2, "status_code", 0)
+                body2 = getattr(r2, "text", "") or ""
+                if status2 == 200 and len(body2) >= 1024:
+                    r = r2
+                    status = status2
+                    body = body2
+                    used_proxy = True
+
         # 1KB floor weeds out residual CF "Just a moment" stubs (~7KB
         # but flagged by patchright); honest content is always larger.
         # We accept 200 OK with reasonable body size.
-        if status != 200 or len(body) < 1024:
+        if r is None or status != 200 or len(body) < 1024:
             return None
 
         emit(
             EventKind.FETCH_TIER_ESCALATED,
             task.property_id,
-            tier="CURL_CFFI_CHROME120",
+            tier="CURL_CFFI_CHROME120_PROXIED" if used_proxy else "CURL_CFFI_CHROME120",
             reason="render_bot_blocked",
         )
         # Construct an OK FetchResult that the rest of the pipeline

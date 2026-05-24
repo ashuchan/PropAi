@@ -219,6 +219,92 @@ async def test_try_curl_cffi_fallback_returns_none_when_probe_unavailable() -> N
 
 
 @pytest.mark.asyncio
+async def test_try_curl_cffi_fallback_always_calls_direct_first() -> None:
+    """2026-05-24 post-canary fix: the L1 fallback must ALWAYS try a
+    direct (proxies={}) curl_cffi probe first, regardless of whether
+    PROBE_PROXY_URL is set. Canary 2026-05-23-focused-3886351 showed
+    0/141 BOT_BLOCKED residue recovered when the fallback went through
+    BrightData — direct re-probe recovered 5/5 of the same set.
+
+    Verify probe_get is called with proxies={} on the first attempt."""
+    fetcher = _make_fetcher()
+    captured = []
+    big_html = "<html>" + "y" * 5000 + "</html>"
+
+    def fake_probe_get(url, **kw):
+        captured.append({"url": url, "proxies": kw.get("proxies"), "verify": kw.get("verify")})
+        return _make_probe_response(200, big_html)
+
+    with patch("ma_poc.pms.adapters._probe.probe_get", side_effect=fake_probe_get):
+        out = await fetcher._try_curl_cffi_fallback(_render_task(), 0)
+
+    assert out is not None
+    assert out.outcome == FetchOutcome.OK
+    # First call must be direct (proxies={})
+    assert captured, "probe_get was not called"
+    assert captured[0]["proxies"] == {}, (
+        f"First curl_cffi call must be direct, got proxies={captured[0]['proxies']}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_try_curl_cffi_fallback_falls_through_to_proxy_when_direct_fails() -> None:
+    """When direct curl_cffi returns 403 AND PROBE_PROXY_URL is set
+    (Yardi/CF tenancy that blocks GCP IPs), retry through the proxy.
+    Validated 5/5 direct success on canary residue, but for Yardi
+    SecureCafe properties the proxy is the only path."""
+    import os as _os
+    fetcher = _make_fetcher()
+    big_html = "<html>" + "z" * 5000 + "</html>"
+    calls = []
+
+    def fake_probe_get(url, **kw):
+        calls.append(kw.get("proxies"))
+        # First call: direct (proxies={}) — return 403
+        if kw.get("proxies") == {}:
+            return _make_probe_response(403, "blocked")
+        # Second call: proxied — return 200
+        return _make_probe_response(200, big_html)
+
+    with (
+        patch.dict(_os.environ, {"PROBE_PROXY_URL": "http://user:pass@host:port"}),
+        patch("ma_poc.pms.adapters._probe.probe_get", side_effect=fake_probe_get),
+    ):
+        out = await fetcher._try_curl_cffi_fallback(_render_task(), 0)
+
+    assert out is not None
+    assert out.outcome == FetchOutcome.OK
+    assert b"z" * 100 in out.body
+    assert len(calls) == 2, f"expected 2 probe_get calls (direct then proxied), got {len(calls)}"
+    assert calls[0] == {}, "first call must be direct"
+    assert calls[1] is None or calls[1] != {}, "second call must use the default proxy"
+
+
+@pytest.mark.asyncio
+async def test_try_curl_cffi_fallback_no_retry_when_no_proxy_env() -> None:
+    """When direct fails AND PROBE_PROXY_URL is empty/unset, do NOT
+    retry — there's no proxy to try. Just return None."""
+    import os as _os
+    fetcher = _make_fetcher()
+    calls = []
+
+    def fake_probe_get(url, **kw):
+        calls.append(kw.get("proxies"))
+        return _make_probe_response(403, "blocked")
+
+    # Clear the env var explicitly
+    env = {k: v for k, v in _os.environ.items() if k != "PROBE_PROXY_URL"}
+    with (
+        patch.dict(_os.environ, env, clear=True),
+        patch("ma_poc.pms.adapters._probe.probe_get", side_effect=fake_probe_get),
+    ):
+        out = await fetcher._try_curl_cffi_fallback(_render_task(), 0)
+
+    assert out is None
+    assert len(calls) == 1, "should not retry when no proxy configured"
+
+
+@pytest.mark.asyncio
 async def test_try_curl_cffi_fallback_constructs_ok_fetchresult() -> None:
     """When curl_cffi returns 200 + big body, the helper returns a
     well-formed FetchResult that downstream layers can consume."""
