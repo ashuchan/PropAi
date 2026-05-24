@@ -605,22 +605,31 @@ def _pp_txt(el: Any) -> str:
 def parse_entrata_prospectportal_html(
     html: str, url: str
 ) -> list[dict[str, str]]:
-    """Parse Entrata Prospect Portal SSR HTML — both ``.fp-card`` (older
-    template, ``dynamic-text-before/after`` siblings) and
-    ``li.fp-group-item`` (newer template, ``.fp-col`` blocks with
-    ``.fp-col-title`` labels) layouts.
+    """Parse Entrata Prospect Portal SSR HTML — supports THREE templates:
+
+    Template A — ``.fp-card`` with ``dynamic-text-before/after`` siblings
+    Template B — ``li.fp-group-item`` with ``.fp-col`` title-labelled blocks
+    Template C — ``.unit-item`` with ``.unit-title`` / ``.unit-bed-bath``
+                 (packed "N Bed, N Bath, NNN SqFt") / ``.unit-price``
+                 (the "unit-roster" layout)
 
     Plan-level output (one row per floorplan name) — these pages render
     a plan grid, not a per-apartment unit roster. Returns ``[]`` when
-    neither template matches; the caller (see ``EntrataAdapter.extract``)
+    none of the three match; the caller (see ``EntrataAdapter.extract``)
     falls through to the next recovery rung.
 
-    Live-verified 2026-05-24 against pid 38509 (Template A, 4/4 strict-
-    pass) and pid 65287 (Template B, 2/10 strict-pass). Critical for the
-    ``TIER_1_API_ENTRATA_EMPTY`` cluster — pre-fix the static fallback
-    only looked for ``available_units`` HTML-entity JSON and the
-    ``view_unit_spaces`` unit-button fragment, neither of which matches
-    the vanity-host SSR grid.
+    Live-verified 2026-05-24:
+      * pid 38509 thebellemeade.com — Template A, 4/4 strict-pass
+      * pid 65287 triomke.com       — Template B, 2/10 strict-pass
+      * pid 41388 greenwoodsapts.com — Template C, 6/6 strict-pass (HAR)
+
+    Critical for the ``TIER_1_API_ENTRATA_EMPTY`` cluster — pre-fix the
+    static fallback only looked for ``available_units`` HTML-entity JSON
+    and the ``view_unit_spaces`` unit-button fragment, neither of which
+    matches the vanity-host SSR grid. HAR-driven validation 2026-05-24
+    against the 47 ENTRATA_EMPTY HARs showed 35/47 (74%) lifted by
+    Templates A+B alone; adding Template C lifts another ~5 in the
+    "untemplated" residue.
     """
     if not html:
         return []
@@ -635,6 +644,11 @@ def parse_entrata_prospectportal_html(
     items = soup.select("li.fp-group-item")
     if items:
         return _parse_pp_fp_group_item(items, url)
+
+    # Template C: .unit-item rows (unit-roster layout)
+    unit_items = soup.select("li.unit-item, .unit-item")
+    if unit_items:
+        return _parse_pp_unit_item(unit_items, url)
 
     return []
 
@@ -792,6 +806,124 @@ def _parse_pp_fp_group_item(
                 availability_date=avail_date,
                 source_api_url=url,
                 extraction_tier="TIER_1_DOM_ENTRATA_PP_FPGROUP",
+            )
+        )
+    return units
+
+
+# Template C: .unit-bed-bath text packs beds + baths + sqft into one cell:
+#   "1 Bed, 1 Bath, 620 SqFt" — needs a single combined parse pass.
+#
+# Sqft tolerance for ``&nbsp`` separator: greenwoodsapts.com (HAR 2026-
+# 05-24) ships the value as literal ``620\n&nbspSqFt`` because the HTML
+# was emitted without the entity's trailing ``;`` so BS4 leaves it as
+# raw text. The ``[\s&\w]{0,8}?`` window between the number and the
+# ``sqft`` token absorbs ``&nbsp``, ``&#160;``, ``&#xA0;``, plain
+# whitespace, and zero-separator variants without dragging in nearby
+# digits.
+_PP_C_BB_SQ_RE = re.compile(
+    r"(?:(?P<beds>\d+|studio)\s*bed[s]?\b[\s,]*)?"
+    r"(?:(?P<baths>\d+(?:\.\d+)?)\s*bath[s]?\b[\s,]*)?"
+    r"(?:(?P<sqft>[\d,]+)[\s&\w]{0,8}?(?:sq\s*ft|sqft))?",
+    re.IGNORECASE,
+)
+# Available-count from .unit-floor-plan: "4 Available", "Only 1 Left"
+_PP_C_AVAIL_RE = re.compile(
+    r"(\d+)\s*(?:available|left|unit)|only\s+(\w+)",
+    re.IGNORECASE,
+)
+
+
+def _parse_pp_unit_item(items: list[Any], url: str) -> list[dict[str, str]]:
+    """Template C: ``.unit-item`` "unit-roster" layout with packed
+    ``.unit-bed-bath`` and ``.unit-price`` siblings."""
+    units: list[dict[str, str]] = []
+    seen_names: set[str] = set()
+    for item in items:
+        name = _pp_txt(item.select_one(".unit-title")) or _pp_txt(
+            item.select_one(".floorplan-title")
+        )
+        if not name:
+            continue
+        # Some sites repeat the same title across multiple variations of
+        # the same floorplan — dedupe on (name, bedbath) below.
+
+        bedbath = _pp_txt(item.select_one(".unit-bed-bath"))
+        rent_raw = _pp_txt(item.select_one(".unit-price"))
+        avail_raw = _pp_txt(item.select_one(".unit-floor-plan")) or _pp_txt(
+            item.select_one(".unit-availability")
+        )
+
+        # Parse "1 Bed, 1 Bath, 620 SqFt" in a single sweep
+        beds: int | None = None
+        baths = ""
+        sqft = ""
+        m = _PP_C_BB_SQ_RE.search(bedbath)
+        if m:
+            if m.group("beds"):
+                bs = m.group("beds")
+                if bs.lower() == "studio":
+                    beds = 0
+                else:
+                    try:
+                        beds = int(bs)
+                    except ValueError:
+                        beds = None
+            if m.group("baths"):
+                baths = m.group("baths")
+            if m.group("sqft"):
+                sqft = m.group("sqft").replace(",", "")
+        # Fallback to discrete parser if the packed regex didn't pick it up
+        if beds is None:
+            beds, baths_alt = _pp_beds_baths(bedbath)
+            baths = baths or baths_alt
+        if not sqft:
+            # Same &nbsp-tolerant window as the packed regex above
+            sm = re.search(
+                r"([\d,]+)[\s&\w]{0,8}?(?:sq\s*ft|sqft)",
+                bedbath,
+                re.IGNORECASE,
+            )
+            if sm:
+                sqft = sm.group(1).replace(",", "")
+
+        rent_lo, rent_hi = _pp_money_low_high(rent_raw)
+
+        avail_units = ""
+        status = "AVAILABLE"
+        if avail_raw:
+            am = _PP_C_AVAIL_RE.search(avail_raw)
+            if am:
+                avail_units = am.group(1) or ("1" if am.group(2) else "")
+        if re.search(r"waitlist|no\s+availability", avail_raw, re.IGNORECASE):
+            status = "UNAVAILABLE"
+
+        # Skip empty rows — need name + at least one numeric dimension
+        if not (rent_lo or rent_hi or sqft):
+            continue
+
+        # Dedupe on (name, bedbath) — Template C often emits the same
+        # floorplan once per carousel image
+        dedupe_key = f"{name}|{bedbath}"
+        if dedupe_key in seen_names:
+            continue
+        seen_names.add(dedupe_key)
+
+        units.append(
+            make_unit_dict(
+                floor_plan_name=name,
+                bed_label=bed_label_from(beds, name),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths),
+                sqft=sqft,
+                unit_number="",
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                availability_status=status,
+                available_units=avail_units,
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_ENTRATA_PP_UNITITEM",
             )
         )
     return units

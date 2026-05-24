@@ -169,6 +169,112 @@ def test_pp_ssr_skips_rows_with_no_dimension() -> None:
     assert units == []
 
 
+def test_pp_ssr_unit_item_template_c_greenwoods() -> None:
+    """Template C — live greenwoodsapts.com HAR (2026-05-24). 3 floor
+    plans rendered as ``.unit-item`` with packed ``.unit-bed-bath``
+    text ("1 Bed, 1 Bath, 620 SqFt") and ``.unit-price``."""
+    html = (FIXTURES / "prospectportal_unit_item_greenwoods.html").read_text()
+    units = parse_entrata_prospectportal_html(
+        html, "https://www.greenwoodsapts.com/"
+    )
+    # 3 distinct floor plans (1 / 2 / 3 bedroom)
+    assert len(units) == 3, f"expected 3 plans, got {len(units)}: {[u.get('floor_plan_name') for u in units]}"
+
+    names = {u["floor_plan_name"] for u in units}
+    assert names == {"1 Bedroom", "2 Bedroom", "3 Bedroom"}
+
+    # All tagged with the Template-C extraction tier
+    for u in units:
+        assert u["extraction_tier"] == "TIER_1_DOM_ENTRATA_PP_UNITITEM"
+
+    one_bed = next(u for u in units if u["floor_plan_name"] == "1 Bedroom")
+    assert one_bed["bedrooms"] == "1"
+    assert one_bed["bathrooms"] == "1"
+    assert one_bed["sqft"] == "620"
+    assert int(one_bed["market_rent_low"]) == 2050
+
+    two_bed = next(u for u in units if u["floor_plan_name"] == "2 Bedroom")
+    assert two_bed["sqft"] == "896"
+    assert int(two_bed["market_rent_low"]) == 2552
+
+    # 3 Bedroom row has sqft + name but no published rent — should still
+    # be admitted (sqft alone clears the validity guard for downstream
+    # cross-tier rent merge)
+    three_bed = next(u for u in units if u["floor_plan_name"] == "3 Bedroom")
+    assert three_bed["sqft"] == "1077"
+
+
+def test_pp_ssr_unit_item_nbsp_sqft_separator() -> None:
+    """Real-world bug from the greenwoods HAR: the SqFt token is
+    separated from the digit by an UNTERMINATED HTML entity
+    (``620\\n&nbspSqFt`` — no ``;``), so BS4 leaves ``&nbsp`` as raw
+    text. Parser must still find the 620."""
+    html = """
+    <html><body>
+      <li class="unit-item">
+        <span class="unit-title">A1</span>
+        <div class="unit-bed-bath">1 Bed,
+1 Bath,
+620
+&nbspSqFt</div>
+        <div class="unit-price">From $1,500 per month</div>
+        <div class="unit-floor-plan">2 Available</div>
+      </li>
+    </body></html>
+    """
+    units = parse_entrata_prospectportal_html(html, "u")
+    assert len(units) == 1
+    assert units[0]["sqft"] == "620"
+    assert units[0]["bedrooms"] == "1"
+    assert int(units[0]["market_rent_low"]) == 1500
+    assert units[0]["available_units"] == "2"
+
+
+def test_pp_ssr_unit_item_dedupes_carousel_repeats() -> None:
+    """Template C often repeats the same .unit-item once per carousel
+    image. Dedupe on (name, bedbath) so we don't emit phantom plans."""
+    html = """
+    <html><body>
+      <li class="unit-item">
+        <span class="unit-title">A1</span>
+        <div class="unit-bed-bath">1 Bed, 1 Bath, 700 SqFt</div>
+        <div class="unit-price">$1,500</div>
+      </li>
+      <li class="unit-item">
+        <span class="unit-title">A1</span>
+        <div class="unit-bed-bath">1 Bed, 1 Bath, 700 SqFt</div>
+        <div class="unit-price">$1,500</div>
+      </li>
+      <li class="unit-item">
+        <span class="unit-title">A1</span>
+        <div class="unit-bed-bath">1 Bed, 1 Bath, 700 SqFt</div>
+        <div class="unit-price">$1,500</div>
+      </li>
+    </body></html>
+    """
+    units = parse_entrata_prospectportal_html(html, "u")
+    assert len(units) == 1, (
+        f"expected dedupe to 1 plan, got {len(units)}"
+    )
+
+
+def test_pp_ssr_unit_item_only_one_left_phrase() -> None:
+    """The 'Only One Left!' availability phrase should parse to count=1."""
+    html = """
+    <html><body>
+      <li class="unit-item">
+        <span class="unit-title">B1</span>
+        <div class="unit-bed-bath">2 Bed, 2 Bath, 950 SqFt</div>
+        <div class="unit-price">$2,200</div>
+        <div class="unit-floor-plan">Only One Left</div>
+      </li>
+    </body></html>
+    """
+    units = parse_entrata_prospectportal_html(html, "u")
+    assert len(units) == 1
+    assert units[0]["available_units"] == "1"
+
+
 def test_pp_ssr_fp_group_item_waitlist_status() -> None:
     """Waitlist marker in the action column flips availability_status."""
     html = """
