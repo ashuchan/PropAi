@@ -1376,9 +1376,26 @@ async def scrape(
                         if _r.status_code == 200 and "sightmap.com" in (_r.text or "").lower():
                             # Splice sub-page HTML in so SightMapAdapter's
                             # _entry_html_from_ctx picks up the embed code.
+                            # 2026-05-24: FetchResult is a frozen dataclass —
+                            # direct ``_fr2.body = ...`` raises
+                            # ``cannot assign to field 'body'``. Use
+                            # ``dataclasses.replace`` to mint a new immutable
+                            # record and swap it onto the (mutable) ctx. Also
+                            # encode str→bytes because the contract types
+                            # ``body`` as ``bytes | None`` and downstream
+                            # ``_entry_html_from_ctx`` decodes either way.
                             _fr2 = getattr(ctx, "fetch_result", None)
                             if _fr2 is not None:
-                                _fr2.body = _r.text  # type: ignore[attr-defined]
+                                import dataclasses as _dc
+
+                                _new_body = (
+                                    _r.text.encode("utf-8", "replace")
+                                    if isinstance(_r.text, str)
+                                    else (_r.text or b"")
+                                )
+                                ctx.fetch_result = _dc.replace(
+                                    _fr2, body=_new_body
+                                )
                             sm_signal = True
                             fallback_chain.append("entrata:fp_subpage_fetched")
                     except Exception as _sub_exc:  # pragma: no cover
