@@ -187,6 +187,80 @@ variable "report_sender_name" {
   description = "Display name in the email From header."
 }
 
+# ── Tier-escalation + BrightData / Web Unlocker (2026-05-24) ────────────────
+#
+# Root-level pass-throughs for the new fetch/tier_escalator wiring in
+# modules/cloud_run_jobs. See that module's variables.tf for full per-var
+# semantics. Defaults are off / unset so existing deploys (staging, any
+# new env) keep their legacy behaviour until tfvars opt in explicitly.
+
+variable "enable_tier_escalation" {
+  type        = bool
+  default     = false
+  description = "Master switch: route Fetcher.fetch() through fetch/tier_escalator.py instead of the legacy inline L1 escalation. Set true in prod after the per-tier flags + brightdata_* secret ids below are wired."
+}
+
+variable "enable_dc_proxy_tier" {
+  type        = bool
+  default     = false
+  description = "Adds DC_PROXY to the tier ladder. Requires brightdata_dc_zone_secret_id + brightdata_dc_password_secret_id."
+}
+
+variable "enable_residential_tier" {
+  type        = bool
+  default     = false
+  description = "Adds RESIDENTIAL to the tier ladder. Requires brightdata_customer_id_secret_id + brightdata_resi_zone_secret_id + brightdata_resi_password_secret_id."
+}
+
+variable "enable_unlocker_tier" {
+  type        = bool
+  default     = false
+  description = "Adds UNLOCKER to the tier ladder. UnlockerProvider auto-picks REST-API mode when only web_unlocker_key_secret_id is set."
+}
+
+variable "probe_proxy_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for PROBE_PROXY_URL (residential proxy URL for adapter cross-origin probes). Empty = don't wire."
+}
+
+variable "web_unlocker_key_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for WEB_UNLOCKER_KEY (BrightData Web Unlocker REST-API token). Empty = don't wire."
+}
+
+variable "brightdata_customer_id_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for BRIGHTDATA_CUSTOMER_ID."
+}
+
+variable "brightdata_resi_zone_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for BRIGHTDATA_RESI_ZONE."
+}
+
+variable "brightdata_resi_password_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for BRIGHTDATA_RESI_PASSWORD."
+}
+
+variable "brightdata_dc_zone_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for BRIGHTDATA_DC_ZONE."
+}
+
+variable "brightdata_dc_password_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for BRIGHTDATA_DC_PASSWORD."
+}
+
+
 # ── propai-frontend (UI + API) Cloud Run service ────────────────────────────
 # A separate image_tag from the scrape image is intentional: UI and scraper
 # release on different cadences, and pinning them together would couple a

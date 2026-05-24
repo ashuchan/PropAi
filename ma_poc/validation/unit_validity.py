@@ -32,13 +32,18 @@ See docs/2026_05_11_regressions_fix_design.md for the design.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ma_poc.extraction.canonical import (
     BATHS_KEYS,
     BEDS_KEYS,
+    FP_NAME_KEYS,
+    RENT_HI_KEYS,
+    RENT_LO_KEYS,
     SQFT_KEYS,
     get_numeric,
+    get_str,
 )
 
 # ── Diagnostic constants ─────────────────────────────────────────────────────
@@ -48,6 +53,34 @@ from ma_poc.extraction.canonical import (
 REASON_NO_BEDS: str = "NO_BEDS"
 REASON_NO_BATHS: str = "NO_BATHS"
 REASON_NO_SQFT: str = "NO_SQFT"
+
+#: Returned by ``plan_rejection_reason`` for plans dropped at the
+#: substantive-plan gate (2026-05-24 cohort). Stable strings so the
+#: telemetry/analyzer can group rejections by cause.
+REASON_PLAN_NO_DIMENSIONS: str = "PLAN_NO_DIMENSIONS"
+REASON_PLAN_MARKETING_TAGLINE: str = "PLAN_MARKETING_TAGLINE"
+REASON_PLAN_NAME_ONLY: str = "PLAN_NAME_ONLY"
+
+# Floor-plan names that are clearly marketing taglines, not plan identifiers.
+# Real plan names are short codes ("A1", "B2", "Studio Plan A", "Lofts",
+# "Mountain View"); marketing taglines enumerate multiple bedroom counts in
+# one string ("Studio, 1-, 2-, and 3-bedroom homes with loft layouts").
+# Run 2026-05-24 canonical case: PID 257570 moderacherrycreek.
+_MARKETING_TAGLINE_MAX_LEN: int = 50
+# Counts distinct "N bed[room]" or "N-bedroom" tokens. A name enumerating
+# 2+ bedroom counts ("Studio, 1-, 2-, and 3-bedroom homes") is marketing
+# copy, not a plan identifier.
+_BED_COUNT_TOKEN_RE = re.compile(
+    r"\b(\d+)\s*[-\s]\s*(?:bed|br|bedroom)s?\b",
+    re.IGNORECASE,
+)
+# "Studio" or "efficiency" also counts as a distinct bedroom-class token
+# — co-occurring with a digit-bed token signals enumeration.
+_STUDIO_TOKEN_RE = re.compile(r"\b(?:studio|efficiency)\b", re.IGNORECASE)
+_MARKETING_PHRASE_RE = re.compile(
+    r"\b(?:choose\s+from|various|multiple\s+(?:floor|plan)|available\s+(?:in|as))\b",
+    re.IGNORECASE,
+)
 
 
 # ── Public predicates ────────────────────────────────────────────────────────
@@ -85,6 +118,121 @@ def is_valid_unit(unit: dict[str, Any]) -> bool:
     if not isinstance(unit, dict):
         return False
     return has_dimension(unit)
+
+
+def _looks_like_marketing_tagline(name: str) -> bool:
+    """``True`` if *name* looks like marketing copy rather than a plan identifier.
+
+    Real floor-plan names are short codes or short labels: "A1", "B2",
+    "Studio Plan A", "Lofts", "1BR/1BA", "Mountain View". Marketing
+    taglines enumerate multiple bedroom counts ("1, 2, 3-bedroom homes")
+    or use sales phrases ("Choose from various floor plans").
+
+    Used by ``is_substantive_plan`` to reject the canonical case from run
+    2026-05-24 PID 257570 moderacherrycreek where dom_scan extracted
+    ``"Studio, 1-, 2-, and 3-bedroom homes with loft layouts"`` as a
+    floor_plan_name from a page-level aggregate.
+    """
+    if not isinstance(name, str):
+        return False
+    s = name.strip()
+    if not s:
+        return False
+    if len(s) > _MARKETING_TAGLINE_MAX_LEN:
+        return True
+    if _MARKETING_PHRASE_RE.search(s):
+        return True
+    # Count distinct bedroom-class tokens. ≥2 means the name enumerates
+    # multiple plan types, which is marketing copy not a plan identifier.
+    n_bed_tokens = len(_BED_COUNT_TOKEN_RE.findall(s))
+    if _STUDIO_TOKEN_RE.search(s):
+        n_bed_tokens += 1
+    if n_bed_tokens >= 2:
+        return True
+    return False
+
+
+def is_substantive_plan(plan: dict[str, Any]) -> bool:
+    """A plan-level row qualifies as substantive iff it carries real evidence.
+
+    Stricter than ``is_valid_unit``. A row with only ``beds=1`` and every
+    other field absent / sentinel passes ``is_valid_unit`` (one dimension
+    is enough for unit-level validity), but we don't want to ship that as
+    a floor_plan summary — it's a near-empty row.
+
+    A plan is substantive iff ANY of:
+
+      * It has a real rent (rent_low or rent_high present and > 100). Real
+        rent is the strongest evidence the row came from listing data.
+      * It has a real area (sqft present and not the ABSENT sentinel).
+      * It has BOTH beds AND baths together (a real plan class even
+        without rent / area / name — e.g. APTS247 emits "1 bed / 1 bath"
+        plans with no dimensions because the per-unit data is on a
+        detail page the entry pass didn't load).
+      * It has one of beds/baths AND a defensible floor_plan_name
+        (not a marketing tagline, not empty).
+
+    Pre-condition: ``infer()`` and ``sanity_bound()`` have already run, so
+    the area=-1 sentinel and rent==None are already canonicalised.
+
+    Run 2026-05-24 motivation: 252 SUCCESS_PLAN_LEVEL properties shipped
+    plan rows with ``area=-1, rent_low=None, floor_plan_name=None`` (or a
+    marketing tagline) — all admitted because ``is_valid_unit`` accepted
+    them on the beds dimension alone. See playbook
+    ``docs/dom_quality_and_llm_reduction_playbook.md``.
+    """
+    if not isinstance(plan, dict):
+        return False
+
+    # Strongest signal: real rent.
+    for key_tuple in (RENT_LO_KEYS, RENT_HI_KEYS):
+        rent = get_numeric(plan, key_tuple)
+        if rent is not None and rent > 100:
+            return True
+
+    # Strong signal: real area (sentinel ABSENT already rejected by get_numeric).
+    sqft = get_numeric(plan, SQFT_KEYS)
+    if sqft is not None and sqft > 0:
+        return True
+
+    beds = get_numeric(plan, BEDS_KEYS)
+    baths = get_numeric(plan, BATHS_KEYS)
+    name = get_str(plan, FP_NAME_KEYS)
+    name_ok = bool(name) and not _looks_like_marketing_tagline(name)
+
+    # Moderate signal: beds AND baths together. Reject when the name is
+    # a known marketing tagline even if beds+baths are present — the row
+    # almost certainly came from a page-level aggregate, not a per-plan
+    # card.
+    if beds is not None and baths is not None:
+        if name and _looks_like_marketing_tagline(name):
+            return False
+        return True
+
+    # Weakest signal: one dimension + a defensible name.
+    if (beds is not None or baths is not None) and name_ok:
+        return True
+
+    return False
+
+
+def plan_rejection_reason(plan: dict[str, Any]) -> str:
+    """Diagnostic reason code for a plan rejected by ``is_substantive_plan``.
+
+    Returns a stable ``REASON_PLAN_*`` string so telemetry / canary diff
+    can group rejections. Callers must only invoke this when
+    ``is_substantive_plan(plan)`` is False.
+    """
+    if not isinstance(plan, dict):
+        return REASON_PLAN_NO_DIMENSIONS
+    name = get_str(plan, FP_NAME_KEYS)
+    if name and _looks_like_marketing_tagline(name):
+        return REASON_PLAN_MARKETING_TAGLINE
+    beds = get_numeric(plan, BEDS_KEYS)
+    sqft = get_numeric(plan, SQFT_KEYS)
+    if beds is None and sqft is None:
+        return REASON_PLAN_NO_DIMENSIONS
+    return REASON_PLAN_NAME_ONLY
 
 
 def absence_reasons(unit: dict[str, Any]) -> list[str]:

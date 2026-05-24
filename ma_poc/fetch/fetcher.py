@@ -253,7 +253,16 @@ class Fetcher:
         Returns:
             A FetchResult. Never raises.
         """
-        if ENABLE_TIER_ESCALATION and profile is not None:
+        # 2026-05-24 — drop the ``profile is not None`` gate. The top-level
+        # ``fetch/__init__.py:fetch(task)`` entry point (the public API the
+        # scraper actually calls) does NOT thread a profile through, so the
+        # legacy gate caused ENABLE_TIER_ESCALATION=true to be silently
+        # inert in production. ``fetch_with_escalation`` defensively builds
+        # a default ScrapeProfile when called with profile=None, so callers
+        # without profile context still get the tier ladder. Callers WITH
+        # profile context (e.g. retry-failures jobs that load the profile
+        # explicitly) still benefit from per-property tier_floor state.
+        if ENABLE_TIER_ESCALATION:
             from .tier_escalator import fetch_with_escalation
             return await fetch_with_escalation(task, profile)
         start_ms = _now_ms()

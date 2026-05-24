@@ -1,3 +1,46 @@
+# ── Locals: tier-escalation + BrightData proxy env block ─────────────────────
+#
+# Defined once and iterated via dynamic blocks in each of the three job
+# containers (scrape, retry, adhoc) so the wiring stays in sync. Adding a
+# new flag or secret here lands in all three jobs on the next apply.
+#
+# The "static" list carries name/value env vars (the ENABLE_*_TIER flags).
+# Every entry is always emitted; the value reflects the per-tier tfvar.
+# The runtime reads each flag via os.environ.get(name, "<default>").
+#
+# The "secret" list carries name/secret_id env vars. Each entry is emitted
+# only when its secret_id is non-empty — empty string drops the env var
+# entirely, which is the cue for the runtime to take the no-proxy /
+# api-mode-fallback path. See pms/adapters/_probe.py + fetch/proxy_gate.py
+# + fetch/proxy/brightdata.py for the consumer-side contract.
+
+locals {
+  proxy_env_static = [
+    { name = "ENABLE_TIER_ESCALATION", value = tostring(var.enable_tier_escalation) },
+    { name = "ENABLE_DC_PROXY_TIER", value = tostring(var.enable_dc_proxy_tier) },
+    { name = "ENABLE_RESIDENTIAL_TIER", value = tostring(var.enable_residential_tier) },
+    { name = "ENABLE_UNLOCKER_TIER", value = tostring(var.enable_unlocker_tier) },
+  ]
+
+  proxy_env_secret = [
+    { name = "PROBE_PROXY_URL", secret_id = var.probe_proxy_secret_id },
+    { name = "WEB_UNLOCKER_KEY", secret_id = var.web_unlocker_key_secret_id },
+    { name = "BRIGHTDATA_CUSTOMER_ID", secret_id = var.brightdata_customer_id_secret_id },
+    { name = "BRIGHTDATA_RESI_ZONE", secret_id = var.brightdata_resi_zone_secret_id },
+    { name = "BRIGHTDATA_RESI_PASSWORD", secret_id = var.brightdata_resi_password_secret_id },
+    { name = "BRIGHTDATA_DC_ZONE", secret_id = var.brightdata_dc_zone_secret_id },
+    { name = "BRIGHTDATA_DC_PASSWORD", secret_id = var.brightdata_dc_password_secret_id },
+  ]
+
+  # Drop secret-backed entries whose secret_id is empty — Terraform's
+  # dynamic block iterates over what we hand it, so filtering here keeps
+  # the apply free of empty-secret references that would 404 at create.
+  proxy_env_secret_wired = [
+    for s in local.proxy_env_secret : s if s.secret_id != ""
+  ]
+}
+
+
 # ── Scrape job ────────────────────────────────────────────────────────────────
 
 resource "google_cloud_run_v2_job" "jugnu_scrape" {
@@ -134,12 +177,39 @@ resource "google_cloud_run_v2_job" "jugnu_scrape" {
         # secret's string value is injected verbatim, so pre-format it
         # that way with ``gcloud secrets versions add`` (one URL, or
         # comma-separated for a pool).
+        #
+        # Becomes dead code when ENABLE_TIER_ESCALATION=true — the L1
+        # fetcher delegates to fetch_with_escalation() which uses the
+        # tier-provider env vars below. Kept wired so disabling
+        # tier_escalation in tfvars cleanly falls back without an env
+        # gap.
         env {
           name = "PROXY_POOL_URLS"
           value_source {
             secret_key_ref {
               secret  = var.proxy_credentials_secret_id
               version = "latest"
+            }
+          }
+        }
+        # ── Tier-escalation flags (always emitted; value reflects tfvar) ─
+        dynamic "env" {
+          for_each = local.proxy_env_static
+          content {
+            name  = env.value.name
+            value = env.value.value
+          }
+        }
+        # ── Proxy / Web Unlocker secrets (only emitted when secret_id set) ─
+        dynamic "env" {
+          for_each = local.proxy_env_secret_wired
+          content {
+            name = env.value.name
+            value_source {
+              secret_key_ref {
+                secret  = env.value.secret_id
+                version = "latest"
+              }
             }
           }
         }
@@ -269,6 +339,28 @@ resource "google_cloud_run_v2_job" "jugnu_retry" {
             secret_key_ref {
               secret  = var.proxy_credentials_secret_id
               version = "latest"
+            }
+          }
+        }
+        # Tier-escalation flags + BrightData/Unlocker secret env vars.
+        # Defined once in locals.proxy_env_static / proxy_env_secret_wired
+        # so all three jobs (scrape, retry, adhoc) stay aligned.
+        dynamic "env" {
+          for_each = local.proxy_env_static
+          content {
+            name  = env.value.name
+            value = env.value.value
+          }
+        }
+        dynamic "env" {
+          for_each = local.proxy_env_secret_wired
+          content {
+            name = env.value.name
+            value_source {
+              secret_key_ref {
+                secret  = env.value.secret_id
+                version = "latest"
+              }
             }
           }
         }
@@ -447,6 +539,33 @@ resource "google_cloud_run_v2_job" "jugnu_adhoc" {
         env {
           name  = "REPORT_SENDER_NAME"
           value = var.report_sender_name
+        }
+        # Tier-escalation flags + BrightData/Unlocker secret env vars.
+        # Same shape as the scrape + retry jobs so an operator running a
+        # scrape-equivalent script via dispatcher (e.g. one-off backfill)
+        # gets the same proxy ladder. Placed at the END of the env list
+        # so terraform's positional-diff doesn't show spurious "rename"
+        # updates against the pre-existing EMAIL_TRANSPORT block — env
+        # vars in Cloud Run are name-keyed so order is cosmetic, but the
+        # diff is much cleaner when additions land at the tail.
+        dynamic "env" {
+          for_each = local.proxy_env_static
+          content {
+            name  = env.value.name
+            value = env.value.value
+          }
+        }
+        dynamic "env" {
+          for_each = local.proxy_env_secret_wired
+          content {
+            name = env.value.name
+            value_source {
+              secret_key_ref {
+                secret  = env.value.secret_id
+                version = "latest"
+              }
+            }
+          }
         }
       }
     }

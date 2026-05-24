@@ -266,3 +266,83 @@ def test_merge_attempts_preserves_all_fields() -> None:
 
 def test_max_escalations_constant() -> None:
     assert MAX_ESCALATIONS_PER_RUN == 3
+
+
+# ── profile=None defensive default (2026-05-24) ───────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_fetch_with_escalation_handles_profile_none() -> None:
+    """The top-level ``fetch/__init__.py:fetch(task)`` entry point does
+    NOT thread a profile through. Before 2026-05-24, this caused
+    ``Fetcher.fetch`` to skip the escalator entirely (gate at fetcher.py:256
+    required ``profile is not None``), making ENABLE_TIER_ESCALATION=true
+    silently inert in production.
+
+    The fix: ``fetch_with_escalation`` defensively synthesizes a default
+    ``ScrapeProfile`` when called with profile=None, so the ladder still
+    runs from the lowest tier (DIRECT) and escalates on BOT_BLOCKED.
+    """
+    task = _make_task()
+    direct_mock = AsyncMock(return_value=_make_result(FetchOutcome.OK, tier=0))
+
+    with (
+        patch("ma_poc.fetch.tier_escalator.ENABLE_TIER_ESCALATION", True),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_DC_PROXY_TIER", False),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_RESIDENTIAL_TIER", False),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_UNLOCKER_TIER", False),
+        patch(
+            "ma_poc.fetch.providers.direct.DirectProvider.fetch",
+            direct_mock,
+        ),
+    ):
+        # Call with profile=None — the production-entry-point shape.
+        result = await fetch_with_escalation(task, profile=None)
+
+    # DirectProvider must have been awaited (escalator ran the ladder)
+    # even though no profile was passed in.
+    direct_mock.assert_awaited_once()
+    assert result.outcome == FetchOutcome.OK
+
+
+@pytest.mark.asyncio
+async def test_fetch_with_escalation_escalates_from_default_profile() -> None:
+    """profile=None synthesised default starts at tier_floor=DIRECT and
+    walks the full ladder on repeated BOT_BLOCKED. Verifies the
+    escalation semantic actually fires through the synthesised profile,
+    not just that the entry-point doesn't crash.
+    """
+    task = _make_task()
+    direct_mock = AsyncMock(
+        return_value=_make_result(FetchOutcome.BOT_BLOCKED, tier=0)
+    )
+    resi_mock = AsyncMock(
+        return_value=_make_result(FetchOutcome.OK, tier=3)
+    )
+
+    with (
+        patch("ma_poc.fetch.tier_escalator.ENABLE_TIER_ESCALATION", True),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_DC_PROXY_TIER", False),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_RESIDENTIAL_TIER", True),
+        patch("ma_poc.fetch.tier_escalator.ENABLE_UNLOCKER_TIER", False),
+        patch(
+            "ma_poc.fetch.providers.direct.DirectProvider.fetch",
+            direct_mock,
+        ),
+        patch(
+            "ma_poc.fetch.providers.residential.ResidentialProvider.fetch",
+            resi_mock,
+        ),
+        # Skip BrightDataProvider construction inside ResidentialProvider —
+        # we're mocking ResidentialProvider.fetch directly.
+        patch(
+            "ma_poc.fetch.providers.residential.BrightDataProvider.__init__",
+            return_value=None,
+        ),
+    ):
+        result = await fetch_with_escalation(task, profile=None)
+
+    # DIRECT BOT_BLOCKED → escalate to RESIDENTIAL → OK
+    direct_mock.assert_awaited_once()
+    resi_mock.assert_awaited_once()
+    assert result.outcome == FetchOutcome.OK

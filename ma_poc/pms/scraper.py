@@ -1104,8 +1104,24 @@ async def scrape(
         # something" — skip rescue, otherwise we re-run the LLM on the same
         # API bodies the adapter already classified as plan-aggregate.
         adapter_found_plan_rows = bool(getattr(adapter_result, "plan_summaries", None))
+
+        # 2026-05-24 master switch: F2 burned $5.06 across 2,696 attempts
+        # in run 2026-05-24 (≈52% of total LLM spend) with effectively zero
+        # ROI — the adapter has already classified the captured API bodies,
+        # so what's left is marketing widgets / chatbot configs / static
+        # assets. Default OFF; flip via ``ENABLE_F2_RESCUE=true`` to
+        # re-enable. The companion score-floor gate inside
+        # ``llm_api_rescue._filter_candidates`` provides the safe re-entry
+        # path. See docs/dom_quality_and_llm_reduction_playbook.md §
+        # "F2 rescue gate".
+        import os as _os_f2
+        _f2_enabled = _os_f2.getenv("ENABLE_F2_RESCUE", "false").lower() in (
+            "1", "true", "yes",
+        )
+
         needs_rescue = (
-            not property_passes_quality_gate(adapter_result.units)
+            _f2_enabled
+            and not property_passes_quality_gate(adapter_result.units)
             and not adapter_found_plan_rows
             and bool(raw_api_responses)
             and adapter_name in SUPPORTED_ADAPTERS
@@ -1113,6 +1129,19 @@ async def scrape(
             and not page_unreachable
             and not captcha_detected
         )
+
+        if not _f2_enabled and bool(raw_api_responses) and adapter_name in SUPPORTED_ADAPTERS:
+            # Visible diagnostic so the analyzer can tell "disabled by env"
+            # apart from "skipped because plan_summaries existed" / "skipped
+            # because captcha". Without this the rescue cohort silently
+            # disappears and we can't distinguish A from B.
+            emit(
+                EventKind.LLM_RESCUE_SKIPPED,
+                ctx.property_id,
+                source_adapter=adapter_name,
+                reason="disabled_by_env",
+            )
+            result["_rescue_skipped_reason"] = "disabled_by_env"
 
         if not needs_rescue and captcha_detected and bool(raw_api_responses):
             # F1.2: surface the bot-block separately from FAILED_NO_DATA so
@@ -2892,7 +2921,18 @@ _URL_SHAPE_PATTERNS: tuple[tuple[re.Pattern[str], int, str], ...] = (
             r"(?:^|/)(?:schedule[-_]?(?:a[-_]?)?tour|tour|gallery|photos?|amenities?|"
             r"neighborhood|reviews?|about|contact|faq|policies?|residents?|"
             r"news|blog|events?|sitemap|careers?|privacy|terms|accessibility|"
-            r"login|sign[-_]?(?:up|in)|register|application|apply|applies|account)(?:/|$)",
+            r"login|sign[-_]?(?:up|in)|register|application|apply|applies|account|"
+            # 2026-05-24 expansion: low-value paths seen on the zero-unit
+            # cohort but not previously penalised. ``/community/`` /
+            # ``/lifestyle/`` / ``/location/`` / ``/map/`` are common
+            # marketing pages on Greystar / Mill Creek / Modera sites.
+            # ``/pets?/`` is a pet-policy page. ``/floor[-_]?plan-detail/``
+            # WITHOUT a trailing slug is the index, not the data page —
+            # ``slugged_plan_detail`` requires the slug; the bare path is
+            # NOT inventory. ``/specials?/`` is marketing concessions copy
+            # (banner-shaped, not unit-shaped).
+            r"community|lifestyle|location|directions?|map|pets?|specials?|"
+            r"floorplan[-_]?detail|floor[-_]?plan[-_]?detail)(?:/|$)",
             re.IGNORECASE,
         ),
         -2_000,
@@ -3198,9 +3238,25 @@ def _rank_internal_links(
         # so it still beats `_UNIVERSAL_PRIOR=4_500`. Detail-class shapes
         # (≥3_000 url_shape) are already on their own additive trajectory
         # (typical: 4000 base + 3000 shape + 800 ctx = 7_800).
-        if anchor_score > 0 and path_score > 0 and url_shape < 3_000:
+        #
+        # 2026-05-24 RC3 fix: the lift conditions previously used
+        # ``url_shape < 3_000`` as the upper gate, which accidentally
+        # matched anti-signal URLs (``url_shape = -2_000``). A
+        # ``/community/amenities/`` link with anchor text containing
+        # "apartment" (anchor_score=60) would have been lifted to 5_100,
+        # completely erasing the anti-signal penalty. Add the
+        # ``url_shape >= 0`` lower gate so anti-signal URLs (gallery /
+        # amenities / about / contact / etc.) cannot be lifted.
+        # Run 2026-05-24 canonical case: PID 257570 moderacherrycreek
+        # hopped to ``/amenities/`` because of this leak; dom_scan then
+        # extracted a marketing tagline as a floor_plan_name.
+        if (
+            anchor_score > 0
+            and path_score > 0
+            and 0 <= url_shape < 3_000
+        ):
             score = max(score, _PMS_PRIOR_SCORE + 100)
-        elif anchor_score > 50 and url_shape < 3_000:
+        elif anchor_score > 50 and 0 <= url_shape < 3_000:
             score = max(score, _PMS_PRIOR_SCORE + 100)
 
         # Annotate anchor with shape label so telemetry shows WHY the link

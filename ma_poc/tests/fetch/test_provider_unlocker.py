@@ -107,6 +107,66 @@ async def test_unlocker_redacts_proxy_in_result() -> None:
     assert "secret" not in (result.proxy_used or "")
 
 
+# ── API-token fallback path (WEB_UNLOCKER_KEY, no proxy-zone creds) ─────────
+# Many deployments provision only WEB_UNLOCKER_KEY (the REST-API token), not
+# the BRIGHTDATA_UNLOCKER_ZONE/_PASSWORD proxy-zone creds. UnlockerProvider
+# must fall back to the api.brightdata.com/request path instead of crashing.
+
+
+@pytest.mark.asyncio
+async def test_unlocker_api_mode_when_only_web_unlocker_key() -> None:
+    """With only WEB_UNLOCKER_KEY set, the provider builds in 'api' mode
+    (no RuntimeError) and fetches via the REST API."""
+    import importlib
+
+    with patch.dict("os.environ", {"WEB_UNLOCKER_KEY": "tok-abc"}, clear=True):
+        import ma_poc.fetch.providers.unlocker as _mod
+        importlib.reload(_mod)
+        provider = _mod.UnlockerProvider()
+        assert provider._mode == "api"
+        with patch.object(
+            _mod, "_web_unlocker_api_fetch",
+            return_value=(200, b"<html><div class='fp-card'>$1,500</div></html>"),
+        ):
+            result = await provider.fetch(_make_task(), _make_profile())
+
+    assert result.outcome == FetchOutcome.OK
+    assert result.fetch_tier_used == int(FetchTier.UNLOCKER)
+    assert result.body and b"fp-card" in result.body
+    assert "tok-abc" not in (result.proxy_used or "")
+    importlib.reload(_mod)  # restore module state for other tests
+
+
+@pytest.mark.asyncio
+async def test_unlocker_api_mode_failed_unlock_is_not_ok() -> None:
+    """A failed unlock (status 0) must surface as a non-OK outcome so the
+    escalator does not treat it as success."""
+    import importlib
+
+    with patch.dict("os.environ", {"WEB_UNLOCKER_KEY": "tok-abc"}, clear=True):
+        import ma_poc.fetch.providers.unlocker as _mod
+        importlib.reload(_mod)
+        provider = _mod.UnlockerProvider()
+        with patch.object(_mod, "_web_unlocker_api_fetch", return_value=(0, b"")):
+            result = await provider.fetch(_make_task(), _make_profile())
+
+    assert result.outcome != FetchOutcome.OK
+    importlib.reload(_mod)
+
+
+@pytest.mark.asyncio
+async def test_unlocker_raises_only_when_no_creds_at_all() -> None:
+    """RuntimeError only when NEITHER proxy-zone creds NOR WEB_UNLOCKER_KEY
+    are present."""
+    import importlib
+
+    with patch.dict("os.environ", {}, clear=True):
+        with pytest.raises(RuntimeError):
+            import ma_poc.fetch.providers.unlocker as _mod
+            importlib.reload(_mod)
+            _mod.UnlockerProvider()
+
+
 @pytest.mark.asyncio
 async def test_unlocker_in_escalation_ladder() -> None:
     """With ENABLE_UNLOCKER_TIER=True, ladder must include UNLOCKER."""

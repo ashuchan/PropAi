@@ -39,14 +39,23 @@ class TestPostProcessBasics:
 
     def test_non_dict_entries_rejected_not_raised(self):
         """Defensive: malformed payloads with non-dict entries get logged
-        in rejected, not raise."""
+        in rejected, not raise.
+
+        Note (2026-05-24): the lone ``{"beds": 2}`` row is now rejected by
+        the substantive-plan gate — beds alone with no baths / area / rent
+        / name is insufficient evidence for a plan summary. The two
+        ``beds + baths`` dicts still admit.
+        """
         items = [{"beds": 1, "baths": 1}, None, "bogus", 42, {"beds": 2}]
         result = post_process(items, property_id="P1")
-        assert result.n_admitted == 2  # the two dicts with beds
-        assert result.n_rejected == 3
-        # Each non-dict rejection carries "NOT_A_DICT" reason
-        for unit, reasons in result.rejected:
-            assert "NOT_A_DICT" in reasons
+        assert result.n_admitted == 1  # only the beds+baths dict
+        assert result.n_rejected == 4
+        # Non-dict rejections carry "NOT_A_DICT"; the beds-only dict carries
+        # the new PLAN_NAME_ONLY reason.
+        not_a_dict = [r for u, r in result.rejected if "NOT_A_DICT" in r]
+        plan_only = [r for u, r in result.rejected if "PLAN_NAME_ONLY" in r]
+        assert len(not_a_dict) == 3
+        assert len(plan_only) == 1
 
 
 # ── End-to-end pipeline correctness ──────────────────────────────────────────

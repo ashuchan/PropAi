@@ -918,3 +918,175 @@ def test_securecafe_parse_matches_units_under_new_template() -> None:
     # "2 Bed" prefix).
     assert all(u.get("bedrooms") == "2" for u in units)
     assert all(u.get("bathrooms") in ("1", "1.0") for u in units)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-24 — SecureCafe ``floorplans.aspx`` plan-summary parser.
+# Companion to ``parse_securecafe_availableunits`` for the empty-
+# inventory case. PID 52725 thenorthpointeapts canonical: the
+# ``availableunits.aspx`` page rendered 200 OK with 0 real
+# ``<tr class='AvailUnitRow'>`` rows (only 2 JS-block mentions). The
+# sibling ``floorplans.aspx`` exposes plan-level data with rent + bed/
+# bath + sqft but no per-apartment identity. Live HTML fixture captured
+# from PID 253339 shannoncreekapt (which the production canary parsed
+# correctly via ``availableunits`` after the PROBE_PROXY_URL wiring fix
+# and serves as a known-good baseline for the floorplans template).
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _sc_floorplans_row(
+    selenium_idx: int,
+    name: str,
+    beds: str,
+    baths: str,
+    sqft: str,
+    rent: str,
+) -> str:
+    """Build one ``tRow{N}_1`` row matching live SecureCafe markup.
+
+    The Yardi template wraps every value in a sr-only span for screen-
+    reader accessibility; the regex tolerates either presence or absence.
+    """
+    return (
+        f"<tr data-selenium-id='tRow{selenium_idx}_1' scope='row'>"
+        f"<td data-label='Floor Plan' data-selenium-id='FloorPlanName_{selenium_idx}'>"
+        f"<span class='sr-only'>Floor Plan</span>{name}</td>"
+        f"<td data-label='Beds' data-selenium-id='Bed_Bath_{selenium_idx}'>"
+        f"<span class='sr-only'>Bed/Bath</span>{beds} / {baths} </td>"
+        f"<td data-label= Sq.Ft. >{sqft}<span class='sr-only'>Square Foot</span></td>"
+        f"<td data-label='Rent' data-selenium-id='Rent_{selenium_idx}'>"
+        f"<span class='sr-only'> Rent</span>{rent}</td>"
+        f"<td data-label='Availability'><button>Availability</button></td>"
+        f"</tr>"
+    )
+
+
+def test_parse_securecafe_floorplans_happy_path_two_plans() -> None:
+    """Two plan rows with rent ranges; assert all 4 fields parsed and
+    ``unit_number=''`` so post_process routes to plan_summaries.
+    """
+    from ma_poc.pms.adapters.rentcafe import parse_securecafe_floorplans
+
+    html = (
+        "<div id='floorplanlist'>"
+        "<table><thead class='floorplan-headings'><tr></tr></thead>"
+        "<tbody class='floorplan-details'>"
+        + _sc_floorplans_row(1, "A1", "1", "1", "650", "$1,135 -<span class='sr-only'>to</span> $1,978")
+        + _sc_floorplans_row(2, "B1", "2", "2", "1055", "$1,614 -<span class='sr-only'>to</span> $2,892")
+        + "</tbody></table></div>"
+    )
+    plans = parse_securecafe_floorplans(
+        html, "https://example.securecafe.com/onlineleasing/x/floorplans.aspx"
+    )
+    assert len(plans) == 2, f"got {len(plans)} plans; expected 2"
+    by_name = {p["floor_plan_name"]: p for p in plans}
+    assert set(by_name) == {"A1", "B1"}
+    assert by_name["A1"]["bedrooms"] == "1"
+    assert by_name["A1"]["bathrooms"] == "1"
+    assert by_name["A1"]["sqft"] == "650"
+    assert by_name["A1"]["market_rent_low"] == 1135
+    assert by_name["A1"]["market_rent_high"] == 1978
+    assert by_name["B1"]["market_rent_low"] == 1614
+    assert by_name["B1"]["market_rent_high"] == 2892
+    # Plan-summary contract: empty unit_number routes via
+    # ``extraction.post_process.classify`` into plan_summaries (playbook
+    # §8.20 promotion rule does not fire because status is UNKNOWN).
+    assert all(p["unit_number"] == "" for p in plans)
+    assert all(p["availability_status"] == "UNKNOWN" for p in plans)
+    assert all(p["extraction_tier"] == "TIER_1_API_RENTCAFE_SECURECAFE_PLANS" for p in plans)
+
+
+def test_parse_securecafe_floorplans_single_rent_no_range() -> None:
+    """Some tenants emit ``$1,135`` only (no range). Both rent_low and
+    rent_high should be 1135 (mirrors the availableunits behaviour).
+    """
+    from ma_poc.pms.adapters.rentcafe import parse_securecafe_floorplans
+
+    html = (
+        "<tbody class='floorplan-details'>"
+        + _sc_floorplans_row(1, "A1", "1", "1.5", "650", "$1,135")
+        + "</tbody>"
+    )
+    plans = parse_securecafe_floorplans(html, "https://example/")
+    assert len(plans) == 1
+    assert plans[0]["market_rent_low"] == 1135
+    assert plans[0]["market_rent_high"] == 1135
+    # Half-bath parses as float-style "1.5".
+    assert plans[0]["bathrooms"] == "1.5"
+
+
+def test_parse_securecafe_floorplans_empty_inputs_safe() -> None:
+    """No HTML, missing floorplan-details marker, or empty body all
+    short-circuit to ``[]`` without raising.
+    """
+    from ma_poc.pms.adapters.rentcafe import parse_securecafe_floorplans
+
+    assert parse_securecafe_floorplans("", "https://example/") == []
+    assert parse_securecafe_floorplans(
+        "<html><body>marketing page</body></html>", "https://example/"
+    ) == []
+    # Has the floorplan-details marker but no tRow_1 rows — also safe.
+    assert (
+        parse_securecafe_floorplans(
+            "<tbody class='floorplan-details'></tbody>", "https://example/"
+        )
+        == []
+    )
+
+
+def test_parse_securecafe_floorplans_skips_tRow_2_3_4_subrows() -> None:
+    """Only ``tRow{N}_1`` is the primary plan row. The ``_2`` (description),
+    ``_3`` and ``_4`` (specials) sub-rows live alongside but contain no
+    plan name — the parser must skip them silently, not double-count.
+    """
+    from ma_poc.pms.adapters.rentcafe import parse_securecafe_floorplans
+
+    html = (
+        "<tbody class='floorplan-details'>"
+        + _sc_floorplans_row(1, "A1", "1", "1", "650", "$1,135")
+        + "<tr valign='top' style='display:none' data-selenium-id='tRow1_2'>"
+        "<td class='floorplan-desc' colspan='4'>plan description blob</td>"
+        "</tr>"
+        "<tr class='specials-holder' style='display:none' data-selenium-id='tRow1_3'>"
+        "<td colspan='8' class='alert specials'>specials text</td>"
+        "</tr>"
+        "<tr class='specials-holder' style='display:none' data-selenium-id='tRow1_4'>"
+        "<td colspan='8'>more specials</td>"
+        "</tr>"
+        + _sc_floorplans_row(2, "B1", "2", "2", "1055", "$1,614")
+        + "</tbody>"
+    )
+    plans = parse_securecafe_floorplans(html, "https://example/")
+    assert len(plans) == 2, f"got {len(plans)}; tRow_2/_3/_4 sub-rows must not double-count"
+    assert {p["floor_plan_name"] for p in plans} == {"A1", "B1"}
+
+
+def test_parse_securecafe_floorplans_live_fixture_pid_253339() -> None:
+    """End-to-end against the live ``floorplans.aspx`` HTML captured
+    2026-05-24 from PID 253339 shannoncreekapt — 6 plans (A1-A4, B1-B2).
+    Pinned to catch any future regex regression that drops live data.
+    """
+    from ma_poc.pms.adapters.rentcafe import parse_securecafe_floorplans
+
+    fixture = (
+        Path(__file__).parent / "fixtures" / "rentcafe" / "securecafe_floorplans_253339.html"
+    )
+    if not fixture.exists():
+        pytest.skip(f"fixture not present: {fixture}")
+    html = fixture.read_text(encoding="utf-8")
+    plans = parse_securecafe_floorplans(
+        html,
+        "https://shannoncreekapt.securecafe.com/onlineleasing/shannon-creek-apartments/floorplans.aspx",
+    )
+    assert len(plans) == 6
+    names = {p["floor_plan_name"] for p in plans}
+    assert names == {"A1", "A2", "A3", "A4", "B1", "B2"}
+    a1 = next(p for p in plans if p["floor_plan_name"] == "A1")
+    assert a1["bedrooms"] == "1"
+    assert a1["bathrooms"] == "1"
+    assert a1["sqft"] == "650"
+    assert a1["market_rent_low"] == 1135
+    assert a1["market_rent_high"] == 1978
+    b2 = next(p for p in plans if p["floor_plan_name"] == "B2")
+    assert b2["bedrooms"] == "2"
+    assert b2["market_rent_high"] == 3224

@@ -16,9 +16,14 @@ from ma_poc.validation.unit_validity import (
     REASON_NO_BATHS,
     REASON_NO_BEDS,
     REASON_NO_SQFT,
+    REASON_PLAN_MARKETING_TAGLINE,
+    REASON_PLAN_NAME_ONLY,
+    REASON_PLAN_NO_DIMENSIONS,
     absence_reasons,
     has_dimension,
+    is_substantive_plan,
     is_valid_unit,
+    plan_rejection_reason,
 )
 
 # ── Basic dimension presence ──────────────────────────────────────────────────
@@ -251,3 +256,94 @@ class TestBoundaryCases:
     )
     def test_all_dims_absent_rejected(self, unit):
         assert is_valid_unit(unit) is False
+
+
+# ── Substantive-plan quality gate (2026-05-24) ──────────────────────────────
+
+
+class TestIsSubstantivePlan:
+    """Plan-level rows admitted by ``is_valid_unit`` must also pass a
+    stronger quality bar before being shipped as ``floor_plans``.
+
+    Motivated by run 2026-05-24: 252 properties shipped
+    ``SUCCESS_PLAN_LEVEL`` with junk plan rows (area=-1, rent=None,
+    floor_plan_name=None or a marketing tagline).
+    """
+
+    def test_real_rent_passes(self):
+        assert is_substantive_plan({"rent_low": 1450}) is True
+
+    def test_real_rent_high_passes(self):
+        assert is_substantive_plan({"rent_high": 2000}) is True
+
+    def test_absent_rent_below_floor_rejected(self):
+        # rent==1 is in-bounds for sanity but well below the substantive
+        # floor — treat as deposit/fee leak, not real rent.
+        assert is_substantive_plan({"rent_low": 1}) is False
+
+    def test_real_area_passes(self):
+        assert is_substantive_plan({"area": 750}) is True
+
+    def test_absent_area_sentinel_rejected(self):
+        # ABSENT (-1) is the explicit "we looked, nothing there" sentinel.
+        assert is_substantive_plan({"area": ABSENT}) is False
+
+    def test_beds_plus_real_plan_name_passes(self):
+        assert is_substantive_plan({"beds": 2, "floor_plan_name": "A1"}) is True
+
+    def test_beds_zero_studio_name_passes(self):
+        # Studio = real plan type even with beds=0.
+        assert is_substantive_plan({"beds": 0, "floor_plan_name": "Studio"}) is True
+
+    def test_beds_only_no_name_rejected(self):
+        # Run 2026-05-24 PID 1509 parkplacetampa shape: beds=1, area=-1,
+        # rent=None, floor_plan_name=None — should not ship as a plan.
+        assert is_substantive_plan({"beds": 1, "area": ABSENT}) is False
+
+    def test_marketing_tagline_rejected(self):
+        # Run 2026-05-24 PID 257570 moderacherrycreek canonical case.
+        plan = {
+            "beds": 0,
+            "floor_plan_name": "Studio, 1-, 2-, and 3-bedroom homes with loft layouts",
+        }
+        assert is_substantive_plan(plan) is False
+
+    def test_marketing_tagline_long_phrase_rejected(self):
+        plan = {
+            "beds": 1,
+            "floor_plan_name": "Choose from various spacious 1 and 2 bedroom layouts",
+        }
+        assert is_substantive_plan(plan) is False
+
+    def test_short_plan_name_with_slash_passes(self):
+        # "1BR/1BA" is a legitimate compact plan label, not a tagline.
+        assert is_substantive_plan({"beds": 1, "floor_plan_name": "1BR/1BA"}) is True
+
+    def test_empty_dict_rejected(self):
+        assert is_substantive_plan({}) is False
+
+    def test_non_dict_rejected(self):
+        assert is_substantive_plan(None) is False  # type: ignore[arg-type]
+        assert is_substantive_plan("plan") is False  # type: ignore[arg-type]
+
+    def test_real_rent_overrides_missing_name(self):
+        # Real rent alone is enough — name is nice-to-have.
+        assert is_substantive_plan({"rent_low": 1200, "area": ABSENT}) is True
+
+
+class TestPlanRejectionReason:
+    def test_marketing_tagline_reason(self):
+        plan = {
+            "beds": 0,
+            "floor_plan_name": "Studio, 1-, and 2-bedroom homes available now",
+        }
+        assert plan_rejection_reason(plan) == REASON_PLAN_MARKETING_TAGLINE
+
+    def test_name_only_reason(self):
+        # Has beds but no name, no area, no rent.
+        plan = {"beds": 1, "area": ABSENT}
+        assert plan_rejection_reason(plan) == REASON_PLAN_NAME_ONLY
+
+    def test_no_dimensions_reason(self):
+        # Empty / completely absent row.
+        assert plan_rejection_reason({}) == REASON_PLAN_NO_DIMENSIONS

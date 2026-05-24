@@ -136,7 +136,34 @@ class _FakeClient:
 
 
 def _patch_async_client(monkeypatch: pytest.MonkeyPatch, fake: _FakeClient) -> None:
-    monkeypatch.setattr(httpx, "AsyncClient", lambda *a, **kw: fake)
+    """2026-05-24 R1 sweep: knock.py no longer uses httpx.AsyncClient —
+    everything routes through ``probe_get`` from ``_probe.py``. The
+    existing _FakeClient.get(url, **kw) signature is compatible with
+    ``probe_get(url, ctx=..., stage=..., **kw)`` modulo the call style
+    (probe_get is sync; _FakeClient.get is async). We patch the symbol
+    at the call site (``ma_poc.pms.adapters._probe.probe_get``) with a
+    sync shim that forwards to fake's mapping. Tests keep their existing
+    URL-based fixtures.
+    """
+    def _sync_probe_get(url: str, **_kw: object) -> _FakeResp:
+        fake.calls.append(url)
+        best: tuple[str, _FakeResp] | None = None
+        for prefix, resp in fake._responses.items():
+            if url.startswith(prefix):
+                if best is None or len(prefix) > len(best[0]):
+                    best = (prefix, resp)
+        if best:
+            return best[1]
+        return _FakeResp(404, {})
+    # Patch the symbol where knock.py imports it from. Both
+    # ``_fetch_knock_units`` and ``_fetch_knock_units_by_domain`` use
+    # a local ``from ma_poc.pms.adapters._probe import probe_get`` so
+    # the resolution happens at call time — patching the source module
+    # wins.
+    import ma_poc.pms.adapters._probe as _probe_mod
+    monkeypatch.setattr(_probe_mod, "probe_get", _sync_probe_get)
+    # Also patch text on _FakeResp instances if any test relies on .text
+    # (none today, but defensive).
 
 
 def _aspen_units_payload() -> dict[str, Any]:
@@ -372,8 +399,9 @@ async def test_adapter_prefers_init_call_when_present(
     keyed path runs and the by-domain fallback is never invoked."""
     # Mock the community-keyed path to return one unit + zero plan_summaries.
     # 2026-05-22: _fetch_knock_units now returns (units, plan_summaries).
+    # 2026-05-24: _fetch_knock_units also accepts ctx for proxy gate routing.
     async def _fake_fetch_units(
-        comm_id: str, kind: str = "community",
+        comm_id: str, kind: str = "community", ctx: Any = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         return (
             [
@@ -399,7 +427,7 @@ async def test_adapter_prefers_init_call_when_present(
     by_domain_calls: list[str] = []
 
     async def _no_by_domain(
-        base_url: str,
+        base_url: str, html: str = "", ctx: Any = None,
     ) -> tuple[str | None, list[dict[str, Any]], list[dict[str, Any]]]:
         by_domain_calls.append(base_url)
         return None, [], []

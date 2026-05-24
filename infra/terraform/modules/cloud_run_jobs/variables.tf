@@ -162,3 +162,85 @@ variable "report_sender_name" {
   default     = "PropAi Daily Reports"
   description = "Display name in the email From header."
 }
+
+# ── Tier-escalation + BrightData / Web Unlocker wiring (2026-05-24) ─────────
+#
+# The scrape, retry, and adhoc jobs share the same proxy env block. Every
+# variable below is emitted into all three container specs uniformly via
+# the locals.proxy_env_* lists in main.tf.
+#
+# When enable_tier_escalation = true the L1 fetcher routes through
+# fetch/tier_escalator.py instead of the legacy inline path. The tier
+# ladder is gated by the per-tier enable_*_tier flags below.
+#
+# Secret-id variables default to empty string. main.tf's dynamic blocks
+# interpret empty string as "don't wire this env var" — letting a deploy
+# enable only the tiers whose secrets are provisioned without crashing
+# providers that would have eagerly loaded missing creds (the
+# BrightDataProvider 2026-05-24 refactor is lazy per-tier).
+
+variable "enable_tier_escalation" {
+  type        = bool
+  default     = false
+  description = "Master switch for fetch/tier_escalator.py. When true, ENABLE_TIER_ESCALATION=true is wired and Fetcher.fetch() routes through the tier ladder instead of the legacy inline L1 escalation. Set per-env via tfvars."
+}
+
+variable "enable_dc_proxy_tier" {
+  type        = bool
+  default     = false
+  description = "Adds DC_PROXY to the tier ladder. Requires brightdata_dc_zone_secret_id + brightdata_dc_password_secret_id to also be set, otherwise BrightDataProvider._zone_for raises at first use of the tier."
+}
+
+variable "enable_residential_tier" {
+  type        = bool
+  default     = false
+  description = "Adds RESIDENTIAL to the tier ladder. Requires brightdata_customer_id_secret_id + brightdata_resi_zone_secret_id + brightdata_resi_password_secret_id."
+}
+
+variable "enable_unlocker_tier" {
+  type        = bool
+  default     = false
+  description = "Adds UNLOCKER (BrightData Web Unlocker) to the tier ladder. UnlockerProvider auto-selects 'api' transport when only web_unlocker_key_secret_id is set (no brightdata_unlocker_zone/password secrets needed). Set the latter pair only if you specifically need proxy-mode."
+}
+
+variable "probe_proxy_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for the residential proxy URL the adapter cross-origin probes use (read by fetch/proxy_gate.py via PROBE_PROXY_URL). Empty = don't wire."
+}
+
+variable "web_unlocker_key_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for the BrightData Web Unlocker REST-API token (read by pms/adapters/_probe.py and the UnlockerProvider's api transport mode). Empty = don't wire."
+}
+
+variable "brightdata_customer_id_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for the BrightData customer id. Required when enable_dc_proxy_tier or enable_residential_tier is true."
+}
+
+variable "brightdata_resi_zone_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for the BrightData residential zone name."
+}
+
+variable "brightdata_resi_password_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for the BrightData residential zone password."
+}
+
+variable "brightdata_dc_zone_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for the BrightData datacenter zone name."
+}
+
+variable "brightdata_dc_password_secret_id" {
+  type        = string
+  default     = ""
+  description = "GCP Secret Manager id for the BrightData datacenter zone password."
+}

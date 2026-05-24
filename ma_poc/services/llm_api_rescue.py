@@ -66,6 +66,33 @@ MAX_BODY_TOKENS = 12_000
 MAX_BODY_ARRAY_ITEMS = 200
 MAX_CANDIDATES = 3
 
+# 2026-05-24 score floor: minimum ``_score()`` a candidate must reach to
+# survive ``_filter_candidates``. The scoring tiers are:
+#   0.5  — body has unit-key names (e.g. "bedrooms") but every value null
+#   1.5  — body has ≥1 unit key with a non-null value (early sign of real data)
+#   3.0  — body passes the full ``has_unit_signals`` gate (strong evidence)
+# At 1.5 we admit "early-sign" responses + skip "key-name-only" noise. The
+# adapter has already failed on these bodies — sending stronger signal
+# bodies (≥1.5) to the LLM has marginal upside; sending key-name-only
+# bodies has historically returned 0 units 100% of the time. Override via
+# env ``RESCUE_MIN_SCORE`` (float). Pair with ``ENABLE_F2_RESCUE`` master
+# switch in pms/scraper.py. See playbook §"F2 rescue gate".
+DEFAULT_RESCUE_MIN_SCORE: float = 1.5
+
+
+def _rescue_min_score() -> float:
+    """Return the minimum ``_score()`` a candidate must reach to survive
+    filtering. Overridable via ``RESCUE_MIN_SCORE`` env (float)."""
+    import os as _os_rs
+    raw = _os_rs.getenv("RESCUE_MIN_SCORE")
+    if not raw:
+        return DEFAULT_RESCUE_MIN_SCORE
+    try:
+        v = float(raw)
+        return v if v >= 0 else DEFAULT_RESCUE_MIN_SCORE
+    except Exception:
+        return DEFAULT_RESCUE_MIN_SCORE
+
 # Adapter names the rescue path knows how to handle. This frozenset is
 # the **single source of truth** for the rescue allow-list: scraper.py's
 # inline gate at the ``needs_rescue`` boolean imports this same constant
@@ -247,10 +274,74 @@ def _filter_candidates(
 
         kept.append(r)
 
+    # 2026-05-24 score floor (Gate 6): drop candidates whose
+    # ``_semantic_score()`` is below ``RESCUE_MIN_SCORE`` (default 1.5).
+    # The adapter already failed on every kept body; anything left below
+    # the floor is key-name noise — historically returns 0 units 100% of
+    # the time and burns LLM cost. Bodies AT OR ABOVE the floor have at
+    # least one unit key carrying a non-null value (Tier 2 in
+    # ``_semantic_score``) — the minimum evidence threshold the rescue
+    # has any chance of converting. We score on the semantic sub-score
+    # (not the full ``_score()``) because URL / text-content / overlap
+    # bonuses skew the "did the body have real values" signal — those
+    # bonuses are useful for ranking but not for admission.
+    min_score = _rescue_min_score()
+    if min_score > 0 and kept:
+        kept = [r for r in kept if _semantic_score(r) >= min_score]
+
     return kept
 
 
 # ── Candidate ranking ─────────────────────────────────────────────────────────
+
+
+def _semantic_score(r: dict) -> float:
+    """Body-semantic-only sub-score used by the rescue score-floor gate.
+
+    Returns only the progressive Tier 1/2/3 contribution from ``_score()``
+    (key-names-present / non-null-values / has_unit_signals). EXCLUDES
+    URL-path bonuses, body-text bonuses, and key-overlap bonuses — those
+    are useful for *ranking* candidates but skew the "did the body have
+    real values" signal that gates rescue admission.
+
+    Returned values are stable: 0.0 (no signal), 0.5 (key names only),
+    1.5 (at least one non-null unit value), 3.0 (full has_unit_signals
+    pass). The 2026-05-24 default floor of 1.5 thus means "the body had
+    at least one bed/rent/sqft value the adapter couldn't parse" —
+    the minimum evidence the LLM has any chance of converting.
+    """
+    body = r.get("body")
+    _arr: list | None = None
+    if isinstance(body, list) and body and isinstance(body[0], dict):
+        _arr = body
+    elif isinstance(body, dict):
+        _arr = _find_units_array(body)
+    if _arr is None:
+        return 0.0
+    score = 0.0
+    try:
+        from ma_poc.pms.adapters._merge_fns import (
+            has_unit_signals as _hus,
+            _UNIT_SIGNAL_KEYS as _USK,
+        )
+        sample = _arr[:5]
+        has_any_key = any(
+            k in _USK for item in sample if isinstance(item, dict) for k in item
+        )
+        if has_any_key:
+            score += 0.5
+        has_any_value = any(
+            item.get(k) not in (None, "", 0)
+            for item in sample if isinstance(item, dict)
+            for k in (item.keys() & _USK)
+        )
+        if has_any_value:
+            score += 1.0
+        if _hus(_arr):
+            score += 1.5
+    except Exception:
+        pass
+    return score
 
 
 def _score(r: dict) -> float:

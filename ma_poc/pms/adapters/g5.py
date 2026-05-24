@@ -27,6 +27,7 @@ Key findings (2026-05-13)
 """
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -446,7 +447,7 @@ class G5Adapter:
 
         # GraphQL fetch — telemetry on both error + empty paths.
         try:
-            payload = await _fetch_g5_units(urn, base_url=base_url)
+            payload = await _fetch_g5_units(urn, base_url=base_url, ctx=ctx)
         except Exception as exc:
             log_adapter_stage(
                 "g5",
@@ -554,7 +555,11 @@ class G5Adapter:
         return False
 
 
-async def _fetch_g5_units(urn: str, base_url: str = "") -> dict[str, Any] | None:
+async def _fetch_g5_units(
+    urn: str,
+    base_url: str = "",
+    ctx: Any | None = None,
+) -> dict[str, Any] | None:
     """Hit the G5 GraphQL endpoint with our units query.
 
     2026-05-21 port: G5's inventory endpoint returns 404 for requests
@@ -562,9 +567,17 @@ async def _fetch_g5_units(urn: str, base_url: str = "") -> dict[str, Any] | None
     — same payload, different headers, different outcome). Adding the
     property site as Origin/Referer makes the request indistinguishable
     from the browser's in-page POST and the server returns the data shape.
-    """
-    import httpx
 
+    2026-05-24 R1 sweep fix: route through ``probe_post(ctx=ctx,
+    stage="g5_probe")`` instead of bare ``httpx.AsyncClient``. The
+    bare-client variant bypassed:
+      1. ``proxy_gate.decide`` — so g5 requests always went direct from
+         the cloud-run egress IP. The cf-fronted G5 endpoint blocks DC
+         ASNs even when the request shape is otherwise correct.
+      2. ``_with_clearance`` cookie merge — the L1 patchright render
+         harvested CF clearance cookies onto the per-task contextvar;
+         without those the G5 endpoint sometimes returns CF interstitials.
+    """
     origin = ""
     referer = ""
     if base_url:
@@ -591,14 +604,24 @@ async def _fetch_g5_units(urn: str, base_url: str = "") -> dict[str, Any] | None
     if referer:
         headers["Referer"] = referer
     payload = {"query": _G5_UNITS_QUERY, "variables": {"urn": urn}}
-    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-        r = await c.post(_G5_ENDPOINT, json=payload, headers=headers)
-        if r.status_code != 200:
-            return None
-        try:
-            return r.json()
-        except Exception:
-            return None
+    try:
+        from ma_poc.pms.adapters._probe import probe_post
+        r = probe_post(
+            _G5_ENDPOINT,
+            data=json.dumps(payload),
+            ctx=ctx,
+            stage="g5_probe",
+            headers=headers,
+            timeout=15,
+        )
+    except Exception:
+        return None
+    if getattr(r, "status_code", None) != 200:
+        return None
+    try:
+        return r.json()
+    except Exception:
+        return None
 
 
 # ── Apollo-cache fallback helpers (2026-05-19) ───────────────────────────────

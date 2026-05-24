@@ -951,6 +951,18 @@ async def _try_rentcafe_wp_probe(
         _log_rc(pid, "wp_property_id", "skipped_no_html", reason="no fetch_result.body")
         return []
 
+    # 2026-05-24 R1b fix: WordPress-signal gate. Previously the probe fired
+    # on any page where the property_id regex matched — including SightMap-on-
+    # WP (e.g. PID 272802 watersquareresidences extracted prop_id=1890627
+    # from a SightMap embed; the wp-json route doesn't exist on that origin).
+    # Of 3,711 wp_probe attempts in run 2026-05-24, ~599 returned 404 because
+    # the host had no wp-json route at all. Gate on a WordPress signal to
+    # skip cross-namespace prop_id contamination.
+    if not any(sig in html for sig in ("wp-content", "wp-json", "wpRouter", "wp-includes")):
+        _log_rc(pid, "wp_property_id", "skipped_no_wordpress_signal",
+                reason=f"body_len={len(html)} no wp-content|wp-json|wpRouter|wp-includes")
+        return []
+
     prop_id = _find_rentcafe_property_id(html)
     if not prop_id:
         _log_rc(pid, "wp_property_id", "not_found", reason=f"body_len={len(html)}")
@@ -963,8 +975,24 @@ async def _try_rentcafe_wp_probe(
         return []
 
     api_url = f"{origin}/wp-json/middleware/v1/getFloorplans/?propertyId[]={prop_id}"
+    # 2026-05-24 R1b fix: route through ``probe_get(ctx, stage=)`` so the
+    # proxy gate fires + clearance cookies harvested from the L1 patchright
+    # render are auto-attached. Previously this used a bare
+    # ``httpx.AsyncClient`` which:
+    #   1. Bypassed ``proxy_gate.decide`` entirely (no chance of routing
+    #      through ``PROBE_PROXY_URL`` even on hosts in the static allowlist).
+    #   2. Didn't see the per-task ``_clearance_cookies`` contextvar that
+    #      ``scraper.py:4938`` installs after a successful CF challenge —
+    #      so the second request to a CF-fronted RC-on-WP origin always
+    #      faced the wall again.
+    #   3. Couldn't escalate to the Web Unlocker on 403/429/503.
+    # Production stats motivating the fix: 3,711 wp_probe attempts /
+    # 0 status_200s (per R1b investigation 2026-05-24).
+    #
+    # Adds ``Referer`` / ``Origin`` headers so the wp-json middleware
+    # accepts the request as a legitimate same-site call.
     try:
-        import httpx
+        from ma_poc.pms.adapters._probe import probe_get
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -972,16 +1000,24 @@ async def _try_rentcafe_wp_probe(
                 "Chrome/124.0.0.0 Safari/537.36"
             ),
             "Accept": "application/json",
+            "Referer": origin + "/",
+            "Origin": origin,
         }
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-            r = await c.get(api_url, headers=headers)
-        if r.status_code != 200:
+        r = probe_get(
+            api_url,
+            ctx=ctx,
+            stage="wp_probe",
+            timeout=15,
+            headers=headers,
+        )
+        status_code = getattr(r, "status_code", None)
+        if status_code != 200:
             _log_rc(
                 pid,
                 "wp_probe",
-                f"status_{r.status_code}",
+                f"status_{status_code}",
                 reason=f"url={api_url[:120]}",
-                http_status=r.status_code,
+                http_status=status_code,
             )
             return []
         try:
@@ -991,8 +1027,8 @@ async def _try_rentcafe_wp_probe(
                 pid,
                 "wp_probe",
                 "non_json_body",
-                reason=f"len={len(r.text or '')}",
-                http_status=r.status_code,
+                reason=f"len={len(getattr(r, 'text', '') or '')}",
+                http_status=status_code,
             )
             return []
     except Exception as exc:
@@ -1178,6 +1214,56 @@ _SC_DATE_RE = re.compile(
 )
 
 
+# 2026-05-24 — SecureCafe floorplans.aspx plan-summary parser. Companion
+# to ``parse_securecafe_availableunits`` for the case where
+# ``availableunits.aspx`` is the empty-inventory shell (zero
+# ``<tr class='AvailUnitRow'>`` rows; PID 52725 thenorthpointeapts canonical).
+# The sibling ``floorplans.aspx`` page exposes plan-level rows with rent
+# range + bed/bath + sqft but NO per-apartment identity. Each plan row is
+# anchored by ``data-selenium-id="tRow{N}_1"`` (the primary row per plan;
+# tRow{N}_2..4 are description/specials sub-rows wrapped in
+# ``style="display:none"`` containers). Cells use ``data-label`` markup
+# consistent with the availableunits template family.
+_SC_FP_PLAN_ROW_RE = re.compile(
+    r"<tr\s+data-selenium-id=['\"]tRow\d+_1['\"][^>]*>(?P<row>.*?)</tr>",
+    re.IGNORECASE | re.DOTALL,
+)
+# ``data-label="Floor Plan"`` cell — wraps a sr-only span then the plan
+# name (e.g. ``A1``). Accept ``-`` / space / dot inside the name so
+# tenants with names like ``A1-Loft`` or ``Plan B.2`` parse correctly.
+_SC_FP_NAME_RE = re.compile(
+    r"data-label=['\"]?Floor\s*Plan['\"]?[^>]*>"
+    r"(?:\s*<span[^>]*>[^<]*</span>)?"
+    r"\s*([A-Za-z0-9][A-Za-z0-9 .\-_/]{0,80}?)\s*</td>",
+    re.IGNORECASE | re.DOTALL,
+)
+# ``data-label="Beds"`` cell — value is ``N / M`` (e.g. ``1 / 1`` or ``2 / 1.5``).
+# Tolerates the sr-only span Yardi injects for accessibility.
+_SC_FP_BEDBATH_RE = re.compile(
+    r"data-label=['\"]?Beds?['\"]?[^>]*>"
+    r"(?:\s*<span[^>]*>[^<]*</span>)?"
+    r"\s*(?P<beds>\d+)\s*/\s*(?P<baths>\d+(?:\.\d+)?)",
+    re.IGNORECASE | re.DOTALL,
+)
+# ``data-label=Sq.Ft.`` cell — live HTML has an unquoted attribute and
+# variable whitespace (``data-label= Sq.Ft. >650<span...``); pre-quote
+# variant also valid for older tenants. Accept both.
+_SC_FP_SQFT_RE = re.compile(
+    r"data-label=\s*['\"]?\s*Sq\.?\s*Ft\.?\s*['\"]?\s*[^>]*>\s*([\d,]+)",
+    re.IGNORECASE,
+)
+# ``data-label="Rent"`` cell — wraps a sr-only " Rent" span then the rent
+# range. Range emits as ``$1,135 -<span class='sr-only'>to</span> $1,978``
+# in live HTML; single-value tenants emit ``$1,135`` only. Both supported.
+_SC_FP_RENT_RE = re.compile(
+    r"data-label=['\"]?Rent['\"]?[^>]*>"
+    r"(?:\s*<span[^>]*>[^<]*</span>)?"
+    r"\s*\$?\s*([\d,]+)"
+    r"(?:\s*-\s*(?:<span[^>]*>[^<]*</span>)?\s*\$?\s*([\d,]+))?",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
 # 2026-05-24 — legacy RentCafe direct-hosting path. A subset of older
 # RentCafe deployments (Hampshire Village / Southern Management portfolio
 # was the canonical case, PID 220581) does NOT publish a *.securecafe.com
@@ -1359,6 +1445,74 @@ def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str
     return units
 
 
+def parse_securecafe_floorplans(html: str, source_url: str) -> list[dict[str, Any]]:
+    """Parse a SecureCafe ``floorplans.aspx`` page into plan-level dicts.
+
+    Companion to :func:`parse_securecafe_availableunits` for the case where
+    ``availableunits.aspx`` is the empty-inventory shell (zero
+    ``<tr class='AvailUnitRow'>`` rows). The sibling ``floorplans.aspx``
+    page lists every floor plan with rent range, bed/bath, sqft — but
+    crucially NO per-apartment identity. Each returned dict has
+    ``unit_number=""`` so ``extraction.post_process.classify`` routes
+    them to the plan_summaries partition (shipped under ``floor_plans``
+    in v2 output, see playbook §8.18).
+
+    Returns ``[]`` on a CF challenge shell, an empty page, or any other
+    template variant where no ``tRow{N}_1`` rows are present.
+    """
+    if not html:
+        return []
+    # Cheap gate: the floorplans.aspx template always embeds the
+    # ``floorplan-details`` tbody class. Bail before running the per-row
+    # regex on pages that obviously aren't this template.
+    if "floorplan-details" not in html.lower():
+        return []
+    plans: list[dict[str, Any]] = []
+    for m in _SC_FP_PLAN_ROW_RE.finditer(html):
+        row = m.group("row")
+        name_m = _SC_FP_NAME_RE.search(row)
+        if not name_m:
+            # No plan name = not a real plan row (defensive — e.g. a
+            # template variant with a different cell order).
+            continue
+        fp_name = re.sub(r"\s+", " ", name_m.group(1)).strip()
+        bb_m = _SC_FP_BEDBATH_RE.search(row)
+        bedrooms = bb_m.group("beds") if bb_m else ""
+        bathrooms = bb_m.group("baths") if bb_m else ""
+        sqft_m = _SC_FP_SQFT_RE.search(row)
+        sqft = sqft_m.group(1).replace(",", "") if sqft_m else ""
+        rent_low: int | None = None
+        rent_high: int | None = None
+        rent_m = _SC_FP_RENT_RE.search(row)
+        if rent_m:
+            rent_low = money_to_int(rent_m.group(1))
+            rent_high = money_to_int(rent_m.group(2)) if rent_m.group(2) else rent_low
+        plans.append(
+            make_unit_dict(
+                floor_plan_name=fp_name,
+                bedrooms=bedrooms,
+                bathrooms=bathrooms,
+                sqft=sqft,
+                # unit_number="" intentionally — plan-level only, no
+                # per-apartment identity. classify._has_per_unit_signal
+                # routes to plan_summaries when this and floor/building/
+                # available_date are all empty (playbook §8.20 promotion
+                # rule does NOT fire here because availability_status is
+                # UNKNOWN, not AVAILABLE).
+                unit_number="",
+                rent_low=rent_low,
+                rent_high=rent_high,
+                # UNKNOWN: floorplans.aspx lists plans whether or not any
+                # apartment is currently vacant; availability is not
+                # encoded at the plan level.
+                availability_status="UNKNOWN",
+                source_api_url=source_url,
+                extraction_tier="TIER_1_API_RENTCAFE_SECURECAFE_PLANS",
+            )
+        )
+    return plans
+
+
 async def _try_rentcafe_securecafe_probe(
     ctx: AdapterContext, result: AdapterResult
 ) -> list[dict[str, Any]]:
@@ -1484,9 +1638,12 @@ async def _try_rentcafe_securecafe_probe(
     )
     if r.status_code != 200:
         return []
-    # CF challenge shell is tiny and carries no unit rows.
-    if "AvailUnitRow" not in page_html:
-        return []
+    # NOTE: ``parse_securecafe_availableunits`` already short-circuits to
+    # ``[]`` when ``AvailUnitRow`` is absent — letting the call proceed
+    # is intentional so the empty-page case falls through to the
+    # ``floorplans.aspx`` fallback below (PID 52725 thenorthpointeapts:
+    # ``availableunits.aspx`` ships the empty-inventory shell with 0
+    # real ``<tr class='AvailUnitRow'>`` rows, only JS-block mentions).
     units = parse_securecafe_availableunits(page_html, au_url)
     # Parser-stage telemetry: headers vs. row count is the most useful
     # diagnostic when AvailUnitRow exists but units == []. The 2026-05-22
@@ -1519,4 +1676,109 @@ async def _try_rentcafe_securecafe_probe(
             {"url": au_url, "status": 200, "body": "<securecafe-html>", "via": "securecafe_probe"}
         )
         result.winning_url = au_url
-    return units
+        return units
+
+    # 2026-05-24 — SecureCafe floorplans.aspx plan-summary fallback.
+    # PID 52725 thenorthpointeapts canonical: ``availableunits.aspx``
+    # returns the empty-inventory shell (the page renders but contains
+    # zero real ``<tr class='AvailUnitRow'>`` rows — only JS-block
+    # mentions surface in body.count). Without this fallback the
+    # property emits FAILED_NO_DATA even though the sibling
+    # ``floorplans.aspx`` exposes 1-N plan rows with rent + bed/bath
+    # + sqft (no per-apartment identity → ships as plan_summaries).
+    #
+    # Gate: only run when availableunits returned no units AND status was
+    # 200 (CF-walled / non-200 already returned above). Reuses the same
+    # ``base`` URL already validated — no new discovery work.
+    try:
+        fp_url = f"{base}/floorplans.aspx"
+        try:
+            fp_r = probe_get(fp_url, ctx=ctx, stage="sc_floorplans_probe", timeout=25)
+        except Exception as exc:
+            _log_rc(
+                pid,
+                "sc_floorplans_probe",
+                f"exception:{type(exc).__name__}",
+                reason=f"{str(exc)[:120]} url={fp_url[:80]}",
+            )
+            return []
+        fp_html = fp_r.text or ""
+        fp_body_len = len(fp_html)
+        # Custom outcome classifier — _classify_probe_body keys on
+        # ``AvailUnitRow`` which is the availableunits marker, not the
+        # floorplans-page marker.
+        if fp_r.status_code in (403, 429, 503):
+            fp_outcome, fp_reason = (
+                f"blocked_status_{fp_r.status_code}",
+                f"len={fp_body_len}",
+            )
+        elif fp_r.status_code != 200:
+            fp_outcome, fp_reason = (
+                f"status_{fp_r.status_code}",
+                f"len={fp_body_len}",
+            )
+        else:
+            cf_hit = any(m in fp_html for m in _CF_CHALLENGE_MARKERS)
+            if cf_hit and fp_body_len < 15000:
+                fp_outcome, fp_reason = (
+                    "cf_challenge_shell",
+                    f"len={fp_body_len} markers_seen=True",
+                )
+            elif "floorplan-details" in fp_html.lower():
+                fp_outcome, fp_reason = (
+                    "ok",
+                    f"len={fp_body_len} has_floorplan_details=True",
+                )
+            else:
+                fp_outcome, fp_reason = (
+                    "no_floorplan_details",
+                    f"len={fp_body_len} cf_markers={cf_hit}",
+                )
+        _log_rc(
+            pid,
+            "sc_floorplans_probe",
+            fp_outcome,
+            reason=fp_reason,
+            fp_url=fp_url[:140],
+            http_status=fp_r.status_code,
+        )
+        if fp_outcome != "ok":
+            return []
+        plans = parse_securecafe_floorplans(fp_html, fp_url)
+        plan_rows_seen = len(list(_SC_FP_PLAN_ROW_RE.finditer(fp_html)))
+        _log_rc(
+            pid,
+            "sc_floorplans_parse",
+            "ok" if plans else "parse_returned_empty",
+            units=len(plans),
+            reason=f"plan_rows={plan_rows_seen}",
+            plan_rows_matched=plan_rows_seen,
+        )
+        if not plans and plan_rows_seen > 0:
+            _log_rc_diag(
+                pid,
+                "sc_floorplans_parse",
+                fp_html,
+                reason=f"fp_url={fp_url[:100]} plan_rows={plan_rows_seen}",
+            )
+        if plans:
+            result.api_responses.append(
+                {
+                    "url": fp_url,
+                    "status": 200,
+                    "body": "<securecafe-floorplans-html>",
+                    "via": "securecafe_floorplans_probe",
+                }
+            )
+            result.winning_url = fp_url
+        return plans
+    except Exception as exc:
+        # Defensive — never let the floorplans fallback turn a clean
+        # availableunits=empty into a hard adapter exception.
+        _log_rc(
+            pid,
+            "sc_floorplans_probe",
+            f"exception:{type(exc).__name__}",
+            reason=str(exc)[:140],
+        )
+        return []

@@ -616,35 +616,44 @@ async def _try_sightmap_iframe_fallback(
         "Accept": "text/html,application/json,*/*;q=0.8",
     }
 
+    # 2026-05-24 R1 sweep fix: both direct-API and embed-iframe fallback
+    # paths now route through ``probe_get(ctx, stage="sightmap_probe")``
+    # instead of bare ``httpx.AsyncClient``. sightmap.com itself isn't
+    # CF-fronted today, so this is primarily a consistency / future-proofing
+    # change — but it also lets the gate enforce per-property budget caps
+    # and feeds proxy-decision telemetry into the analyzer.
+    from ma_poc.pms.adapters._probe import probe_get
+
     # Pass 1: direct API URLs inline in HTML.
     direct_urls = find_sightmap_direct_api_urls(html)
     if direct_urls:
         try:
-            import httpx
-            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-                for api_url in direct_urls[:3]:
-                    try:
-                        ar = await c.get(api_url, headers=headers)
-                    except Exception:
-                        continue
-                    if ar.status_code != 200:
-                        continue
-                    try:
-                        body = ar.json()
-                    except (json.JSONDecodeError, ValueError):
-                        continue
-                    if not isinstance(body, dict) or not _is_sightmap_response(body):
-                        continue
-                    units, _dropped = parse_sightmap_payload(body, api_url)
-                    if units:
-                        result.api_responses.append({
-                            "url": api_url,
-                            "status": 200,
-                            "body": body,
-                            "via": "direct_api_fallback",
-                        })
-                        result.winning_url = api_url
-                        return units
+            for api_url in direct_urls[:3]:
+                try:
+                    ar = probe_get(
+                        api_url, ctx=ctx, stage="sightmap_probe",
+                        headers=headers, timeout=15,
+                    )
+                except Exception:
+                    continue
+                if getattr(ar, "status_code", None) != 200:
+                    continue
+                try:
+                    body = ar.json()
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                if not isinstance(body, dict) or not _is_sightmap_response(body):
+                    continue
+                units, _dropped = parse_sightmap_payload(body, api_url)
+                if units:
+                    result.api_responses.append({
+                        "url": api_url,
+                        "status": 200,
+                        "body": body,
+                        "via": "direct_api_fallback",
+                    })
+                    result.winning_url = api_url
+                    return units
         except Exception as exc:
             result.errors.append(
                 f"sightmap-direct-api-fallback-error: "
@@ -657,22 +666,32 @@ async def _try_sightmap_iframe_fallback(
         return []
     embed_code = codes[0]
     try:
-        import httpx
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-            embed_url = f"https://sightmap.com/embed/{embed_code}"
-            er = await c.get(embed_url, headers=headers)
-            if er.status_code != 200 or not er.text:
-                return []
-            api_url = extract_sightmap_api_url(er.text)
-            if not api_url:
-                return []
-            ar = await c.get(api_url, headers=headers)
-            if ar.status_code != 200:
-                return []
-            try:
-                body = ar.json()
-            except (json.JSONDecodeError, ValueError):
-                return []
+        embed_url = f"https://sightmap.com/embed/{embed_code}"
+        try:
+            er = probe_get(
+                embed_url, ctx=ctx, stage="sightmap_probe",
+                headers=headers, timeout=15,
+            )
+        except Exception:
+            return []
+        if getattr(er, "status_code", None) != 200 or not getattr(er, "text", ""):
+            return []
+        api_url = extract_sightmap_api_url(er.text)
+        if not api_url:
+            return []
+        try:
+            ar = probe_get(
+                api_url, ctx=ctx, stage="sightmap_probe",
+                headers=headers, timeout=15,
+            )
+        except Exception:
+            return []
+        if getattr(ar, "status_code", None) != 200:
+            return []
+        try:
+            body = ar.json()
+        except (json.JSONDecodeError, ValueError):
+            return []
         if not isinstance(body, dict) or not _is_sightmap_response(body):
             return []
         units, _dropped = parse_sightmap_payload(body, api_url)

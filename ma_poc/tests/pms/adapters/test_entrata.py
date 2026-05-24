@@ -582,3 +582,157 @@ class TestProspectPortalUnitSpaces:
         out = parse_prospectportal_unit_spaces(html, "https://x.prospectportal.com/")
         # Two rows with same unit_number=101 -> deduped to 1.
         assert len(out) == 1
+
+
+# ── Sitemap URL selection — post-canary fix 2026-05-24 ──────────────────────
+
+
+class TestSitemapUrlSelection:
+    """End-to-end behaviour tests for ``_probe_sitemap_conventional`` URL
+    selection. Modera-class sitemaps (PIDs 257570, 262539) shipped two
+    bugs that caused the canary to pick a SPA wrapper over the canonical
+    inventory page:
+
+    1. Per-floorplan-detail URLs ending in ``/conventional/`` slipped
+       past the terminal-keyword guard.
+    2. Sort-by-length picked ``/floor-plans`` (29 chars, SPA shell) over
+       the proper ``/{area}/{property}/conventional/`` URL (76 chars).
+
+    These tests reproduce the modera sitemap shape and pin the fix.
+    """
+
+    @pytest.mark.asyncio
+    async def test_picks_conventional_over_floor_plans_wrapper(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Modera-style sitemap with both the canonical
+        ``/{city}/{slug}/conventional/`` AND a short ``/floor-plans`` SPA
+        wrapper. The fix must pick the canonical URL."""
+        from dataclasses import dataclass, field as _field
+        from ma_poc.pms.adapters import entrata as _e
+
+        sitemap = """<?xml version="1.0"?><urlset>
+  <url><loc>https://example.com/area/property/conventional/</loc></url>
+  <url><loc>https://example.com/floor-plans</loc></url>
+</urlset>"""
+        fetched_urls: list[str] = []
+
+        async def _fake_fetch(url: str, *, ctx=None, stage=None) -> str:
+            fetched_urls.append(url)
+            if url.endswith("/sitemap.xml"):
+                return sitemap
+            return ""
+
+        monkeypatch.setattr(_e, "_entrata_static_fetch", _fake_fetch)
+
+        @dataclass
+        class _Ctx:
+            base_url: str = "https://example.com/"
+            property_id: str = "test-1"
+            fetch_result: object = None
+            _api_responses: list = _field(default_factory=list)
+
+        adapter = EntrataAdapter()
+        await adapter._probe_sitemap_conventional(None, _Ctx())  # type: ignore[arg-type]
+
+        assert fetched_urls[0].endswith("/sitemap.xml")
+        assert len(fetched_urls) >= 2, (
+            "Adapter should have followed sitemap to fetch the canonical URL"
+        )
+        assert "/conventional" in fetched_urls[1], (
+            f"Expected the canonical /conventional/ URL to be picked, got "
+            f"{fetched_urls[1]!r}. Sort-by-length leak: SPA wrapper won."
+        )
+        assert "/floor-plans" not in fetched_urls[1], (
+            f"SPA wrapper /floor-plans was selected over canonical "
+            f"inventory page: {fetched_urls[1]!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_rejects_per_floorplan_detail_urls(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The Modera-style sitemap also carries ~40 per-fp detail URLs
+        of shape ``.../floorplans/{slug}-{id}/fp_name/occupancy_type/
+        conventional/``. Each ends in ``/conventional/`` so the terminal
+        guard alone admits them. The ``/fp_name/`` + ``/occupancy_type/``
+        interior-segment filter must reject them."""
+        from dataclasses import dataclass, field as _field
+        from ma_poc.pms.adapters import entrata as _e
+
+        sitemap = """<?xml version="1.0"?><urlset>
+  <url><loc>https://example.com/area/property/conventional/</loc></url>
+  <url><loc>https://example.com/area/property/floorplans/a01-1234/fp_name/occupancy_type/conventional/</loc></url>
+  <url><loc>https://example.com/area/property/floorplans/b14-5678/fp_name/occupancy_type/conventional/</loc></url>
+  <url><loc>https://example.com/area/property/floorplans/c02-9999/fp_name/occupancy_type/conventional/</loc></url>
+</urlset>"""
+        fetched_urls: list[str] = []
+
+        async def _fake_fetch(url: str, *, ctx=None, stage=None) -> str:
+            fetched_urls.append(url)
+            if url.endswith("/sitemap.xml"):
+                return sitemap
+            return ""
+
+        monkeypatch.setattr(_e, "_entrata_static_fetch", _fake_fetch)
+
+        @dataclass
+        class _Ctx:
+            base_url: str = "https://example.com/"
+            property_id: str = "test-2"
+            fetch_result: object = None
+            _api_responses: list = _field(default_factory=list)
+
+        adapter = EntrataAdapter()
+        await adapter._probe_sitemap_conventional(None, _Ctx())  # type: ignore[arg-type]
+
+        assert len(fetched_urls) >= 2
+        chosen = fetched_urls[1]
+        assert "/fp_name/" not in chosen, (
+            f"Per-fp detail URL was selected: {chosen!r}"
+        )
+        assert "/occupancy_type/" not in chosen, (
+            f"Per-fp detail URL was selected: {chosen!r}"
+        )
+        assert chosen.endswith("/conventional/"), (
+            f"Expected the bare canonical URL, got {chosen!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_floor_plans_when_no_conventional(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """When the sitemap has NO ``/conventional/`` URL (non-Entrata-CMS
+        sites widened in by R5), the bare ``/floor-plans`` index is the
+        best signal we have. Verify the fallback still picks it."""
+        from dataclasses import dataclass, field as _field
+        from ma_poc.pms.adapters import entrata as _e
+
+        sitemap = """<?xml version="1.0"?><urlset>
+  <url><loc>https://example.com/floor-plans/</loc></url>
+  <url><loc>https://example.com/about/</loc></url>
+</urlset>"""
+        fetched_urls: list[str] = []
+
+        async def _fake_fetch(url: str, *, ctx=None, stage=None) -> str:
+            fetched_urls.append(url)
+            if url.endswith("/sitemap.xml"):
+                return sitemap
+            return ""
+
+        monkeypatch.setattr(_e, "_entrata_static_fetch", _fake_fetch)
+
+        @dataclass
+        class _Ctx:
+            base_url: str = "https://example.com/"
+            property_id: str = "test-3"
+            fetch_result: object = None
+            _api_responses: list = _field(default_factory=list)
+
+        adapter = EntrataAdapter()
+        await adapter._probe_sitemap_conventional(None, _Ctx())  # type: ignore[arg-type]
+
+        assert len(fetched_urls) >= 2
+        assert "/floor-plans" in fetched_urls[1], (
+            f"Fallback to /floor-plans broken: {fetched_urls[1]!r}"
+        )
