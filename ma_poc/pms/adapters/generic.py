@@ -1926,6 +1926,70 @@ class GenericAdapter:
                         return result
                     skip_llm = False
 
+            # ── Sub-tier 2.79 (2026-05-24): RentManager-vanity SSR.
+            # Marketing sites under `*.twa.rentmanager.com` operator
+            # use the ``.suite-group`` SSR layout — one container per
+            # floorplan with ``.suite-group-rate``,
+            # ``.suite-group-bath``, ``.suite-group-sqft``,
+            # ``.suite-group-availability`` siblings, plus inner
+            # ``.suite-group-suites`` per-unit rows.
+            #
+            # Live-verified on wilmingtonpointe.com (30 suite-groups,
+            # rate ranges like "From: $790 - $860"). HAR-driven cohort
+            # of 31 TIER_1_API_RENTMANAGER failing-strict props.
+            if not result.units:
+                try:
+                    from ma_poc.pms.adapters._rentmanager_vanity import (
+                        _has_rm_marker,
+                        parse_rentmanager_vanity_html,
+                    )
+
+                    if _has_rm_marker(html):
+                        t0 = _time.monotonic()
+                        rmv_units: list[dict[str, Any]] = []
+                        try:
+                            rmv_units = parse_rentmanager_vanity_html(
+                                html, ctx.base_url
+                            )
+                        except Exception as _rmv_exc:
+                            result.errors.append(
+                                f"rentmanager_vanity-error: "
+                                f"{type(_rmv_exc).__name__}: {str(_rmv_exc)[:80]}"
+                            )
+                        _log_attempt(
+                            "generic:rentmanager_vanity",
+                            "ran_units" if rmv_units else "ran_empty",
+                            units=len(rmv_units),
+                            reason="" if rmv_units else (
+                                ".suite-group marker present but parse "
+                                "returned 0 admitted plans"
+                            ),
+                            duration_ms=int((_time.monotonic() - t0) * 1000),
+                        )
+                        if rmv_units:
+                            result.units = _merge_into_result_units(
+                                result.units, rmv_units, property_id=ctx.property_id
+                            )
+                            result.tier_used = "TIER_1_DOM_RENTMANAGER_VANITY"
+                            result.winning_url = ctx.base_url
+                            result.confidence = min(
+                                0.92, 0.7 + 0.03 * len(result.units)
+                            )
+                            from ma_poc.models.source import SourceId as _SI_RMV
+                            sources_already_run.add(_SI_RMV.DOM_CASCADE)
+                            _rmvd = _assess_and_decide(
+                                result.units, sources_already_run, ctx, decision_log
+                            )
+                            if _rmvd is None or _rmvd.action == "STOP":
+                                result._decision_log = decision_log  # type: ignore[attr-defined]
+                                return result
+                            skip_llm = False
+                except Exception as _rmv_outer:
+                    result.errors.append(
+                        f"rentmanager_vanity-outer-error: "
+                        f"{type(_rmv_outer).__name__}"
+                    )
+
             # ── Sub-tier 2.78 (2026-05-24): WordPress Entrata-theme REST.
             # WordPress sites with the Entrata-branded theme expose
             # ``wp-json/theme/entrata/v1/floor-plans`` returning rich
