@@ -255,13 +255,32 @@ async def _probe_onesite_workflowstartup(
     """Discover SiteId from page body + hit workflowstartup directly via
     curl_cffi.
 
-    Returns parsed unit dicts (empty list when no SiteId discovered or
-    probe failed). Never raises.
+    .. warning:: 2026-05-24 — **CURRENTLY DISABLED**. Live validation
+        on 5 ONESITE_NO_RESPONSE properties showed the workflowstartup
+        endpoint returns ``401 Unauthorized`` when called via direct
+        curl_cffi. The HAR reveals an ``xyz: <base64-token>`` header
+        carrying a per-session auth that's not trivially reproducible
+        without running the actual OLL JavaScript bundle.
 
-    Tier label set on returned units is
-    ``TIER_1_API_ONESITE_WORKFLOW`` so the run report can distinguish
-    this fallback path from the captured-XHR path.
+        SiteId discovery (3 paths) is verified-correct, but the
+        endpoint itself rejects unauthenticated calls. Keeping the
+        scaffolding in place (gated on
+        ``ENABLE_ONESITE_WORKFLOW_PROBE`` env var) so a future fix
+        that solves the auth chain can re-enable without re-finding
+        all the discovery logic.
+
+        See ``investigations/2026-05-24-cascade-fixes-grind/
+        SESSION_STATE_3.md`` for the audit that found this.
+
+    Returns parsed unit dicts (empty list when no SiteId discovered,
+    probe failed, OR feature flag is off). Never raises.
     """
+    import os as _os
+
+    if not _os.environ.get("ENABLE_ONESITE_WORKFLOW_PROBE"):
+        # Disabled until the auth chain is solved. See docstring.
+        return []
+
     fr = getattr(ctx, "fetch_result", None)
     raw_body = getattr(fr, "body", None) if fr is not None else None
     if isinstance(raw_body, bytes):

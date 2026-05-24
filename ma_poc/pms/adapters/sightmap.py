@@ -840,15 +840,21 @@ _SM_EMBED_RE = _sm_re.compile(
     r"(?:https?:)?//sightmap\.com/(?:embed|app/embed)/([a-z0-9]+)",
     _sm_re.IGNORECASE,
 )
-_SM_EMBED_DATA_RE = _sm_re.compile(
-    r'data-sightmap[a-z-]*?["\']\s*[:=]\s*["\']([a-z0-9]+)',
-    _sm_re.IGNORECASE,
-)
+# Reserved infra path segments — ``embed/api.js`` is the loader,
+# ``embed/app`` and ``embed/admin`` are infra paths. None of these are
+# property-specific embed codes; skip them so they don't pollute the
+# probe candidate list. Matches the filter the existing
+# ``find_sightmap_embed_codes`` already applies (see line 65-74 of
+# sightmap.py docstring).
+_SM_RESERVED_CODES = {"api", "app", "admin", "embed", "v1", "v2"}
 
 
 def _extract_sightmap_embed_codes(body: str) -> list[str]:
     """Find SightMap embed codes (the short alphanumeric token from
     ``sightmap.com/embed/{TOKEN}``) anywhere in *body*.
+
+    Filters reserved infra paths (``embed/api.js``, ``embed/app`` etc.)
+    that look like embed codes but aren't.
 
     Returns a list of distinct codes in document order. Empty list if
     no markers found.
@@ -858,11 +864,13 @@ def _extract_sightmap_embed_codes(body: str) -> list[str]:
     out: list[str] = []
     for m in _SM_EMBED_RE.finditer(body):
         code = m.group(1)
-        if code and code not in out:
-            out.append(code)
-    for m in _SM_EMBED_DATA_RE.finditer(body):
-        code = m.group(1)
-        if code and code not in out:
+        if not code or code.lower() in _SM_RESERVED_CODES:
+            continue
+        # An embed code is alphanumeric, at least 5 chars, includes a
+        # mix of digits + letters (heuristic to weed out non-codes)
+        if len(code) < 5:
+            continue
+        if code not in out:
             out.append(code)
     return out
 
@@ -888,7 +896,49 @@ async def _try_direct_sightmap_api_probe(
             return []
     if not isinstance(raw, str) or not raw:
         return []
+
     codes = _extract_sightmap_embed_codes(raw)
+
+    # The embed code often lives on a deep marketing path (e.g.
+    # ``/{city}/{slug}/conventional/`` for Entrata-themed SightMap
+    # sites). Live-verified 2026-05-24 on livahwatukee.com — homepage
+    # had only ``sightmap.com/embed/api.js`` (the JS loader), but
+    # ``/phoenix/liv-ahwatukee/conventional/`` had the actual embed
+    # code ``8xvrmoo6pjk``. Probe common deep paths when homepage came
+    # back empty.
+    if not codes:
+        from urllib.parse import urlparse as _urlparse
+
+        from ma_poc.pms.adapters._probe import probe_get as _probe
+
+        final_url = ""
+        if fr is not None:
+            final_url = str(getattr(fr, "final_url", "") or "")
+        final_url = final_url or getattr(ctx, "base_url", "") or ""
+        try:
+            p = _urlparse(final_url)
+            base = (
+                f"{p.scheme}://{p.netloc}"
+                if p.scheme and p.netloc
+                else ""
+            )
+        except Exception:
+            base = ""
+        if base:
+            for sub in (
+                "/floorplans/", "/floor-plans/", "/floorplans",
+                "/availability/", "/apartments/",
+            ):
+                try:
+                    r_sub = _probe(base + sub, timeout=12)
+                except Exception:
+                    continue
+                if r_sub.status_code != 200 or not r_sub.text:
+                    continue
+                codes = _extract_sightmap_embed_codes(r_sub.text)
+                if codes:
+                    break
+
     if not codes:
         return []
 
@@ -905,9 +955,16 @@ async def _try_direct_sightmap_api_probe(
             continue
         if r.status_code != 200 or not r.text:
             continue
-        # The embed HTML has the canonical /sightmaps/{ID} reference
+        # The embed HTML has the canonical /sightmaps/{ID} reference,
+        # but inside ``window.__APP_CONFIG__`` as JSON-encoded string
+        # with escaped slashes (``sightmap.com\/app\/api\/v1\/...``).
+        # Live-verified 2026-05-24 on creekwoodapartmenthomes embed
+        # ``gow3zg5zp2m``: only the escaped form appears in the HTML.
+        # Tolerate both literal ``/`` and escaped ``\/`` between
+        # segments.
         m_token = _sm_re.search(
-            r'sightmap\.com/app/api/v1/([a-z0-9]+)/sightmaps/(\d+)',
+            r'sightmap\.com(?:\\/|/)app(?:\\/|/)api(?:\\/|/)v1'
+            r'(?:\\/|/)([a-z0-9]+)(?:\\/|/)sightmaps(?:\\/|/)(\d+)',
             r.text,
             _sm_re.IGNORECASE,
         )
@@ -946,7 +1003,7 @@ async def _try_direct_sightmap_api_probe(
         if not _is_sightmap_response(body):
             continue
         # Reuse the existing join parser
-        units, _dropped = parse_sightmap_response(body, api_url)
+        units, _dropped = parse_sightmap_payload(body, api_url)
         if units:
             # Set the new tier label
             for u in units:
