@@ -973,21 +973,48 @@ async def _try_rentcafe_securecafe_probe(
     # Try each candidate base; first one with AvailUnitRow rows wins.
     # Cap at 3 to bound the request burst when a portfolio links many
     # siblings (always tries the first 3 — almost always enough).
+    #
+    # 2026-05-24 (post-canary diagnosis): for each candidate, try
+    # DIRECT (proxies={}) FIRST, then fall back to PROXIED. Same root
+    # cause as the no_body residue (commit a303462) — BrightData's
+    # residential IP pool gets blocked on a meaningful subset of
+    # SecureCafe hosts (~40% of the SHAPE_REJECTED cohort: probed
+    # 5 sample drill URLs, direct = 3/5 with AvailUnitRow, proxied =
+    # only 2/5). Direct works because GCP worker IP isn't on the
+    # operator's per-IP blocklist for the SC subdomain (different from
+    # the marketing-vanity-host blocklist that catches GCP — Yardi's
+    # securecafe.com tenant has its own IP rules).
     au_url = ""
     page_html = ""
+    import os as _os
+    proxy_available = bool(_os.environ.get("PROBE_PROXY_URL", "").strip())
     for candidate_base in bases[:3]:
         candidate_au = f"{candidate_base}/availableunits.aspx"
+        body_text = ""
+        # Attempt 1: DIRECT (no proxy).
         try:
-            r = probe_get(candidate_au, timeout=25)
+            r = probe_get(candidate_au, timeout=25, proxies={}, verify=True)
+            if r.status_code == 200:
+                body_text = r.text or ""
         except Exception as exc:
             result.errors.append(
-                f"rentcafe-securecafe-fetch-error[{candidate_base}]: "
+                f"rentcafe-securecafe-direct-fetch-error[{candidate_base}]: "
                 f"{type(exc).__name__}: {str(exc)[:80]}"
             )
-            continue
-        if r.status_code != 200:
-            continue
-        body_text = r.text or ""
+        # Attempt 2: PROXIED (if direct didn't yield AvailUnitRow AND
+        # proxy is configured). Some Yardi tenants explicitly block GCP
+        # ranges on the SC subdomain — the residential proxy is the only
+        # path for those.
+        if "AvailUnitRow" not in body_text and proxy_available:
+            try:
+                r = probe_get(candidate_au, timeout=25)
+                if r.status_code == 200:
+                    body_text = r.text or ""
+            except Exception as exc:
+                result.errors.append(
+                    f"rentcafe-securecafe-proxied-fetch-error[{candidate_base}]: "
+                    f"{type(exc).__name__}: {str(exc)[:80]}"
+                )
         if "AvailUnitRow" not in body_text:
             continue
         # Found one with actual unit rows.
