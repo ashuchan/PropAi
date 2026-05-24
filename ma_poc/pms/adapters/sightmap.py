@@ -672,6 +672,43 @@ class SightMapAdapter:
             for r in api_responses
             if isinstance(r.get("body"), dict) and _is_sightmap_response(r.get("body"))
         ]
+        if not api_responses or not sightmap_responses:
+            # 2026-05-24 HAR-driven probe: when no SightMap responses
+            # were captured (NO_RESPONSE or SHAPE_REJECTED), try
+            # discovering the sightmap embed code from the marketing
+            # page body and hit ``sightmap.com/app/api/v1/{TOKEN}/
+            # sightmaps/{ID}`` directly. HARs from 7 SHAPE_REJECTED
+            # canary props confirmed 100% have the embed code +
+            # canonical API URL accessible via direct curl_cffi.
+            try:
+                direct_units = await _try_direct_sightmap_api_probe(ctx)
+            except Exception as exc:  # noqa: BLE001
+                direct_units = []
+                result.errors.append(
+                    f"sightmap-direct-probe-error: "
+                    f"{type(exc).__name__}: {str(exc)[:80]}"
+                )
+            if direct_units:
+                from ma_poc.extraction.post_process import post_process
+
+                _ppd = post_process(
+                    direct_units, property_id=getattr(ctx, "property_id", None)
+                )
+                if _ppd.n_admitted > 0:
+                    result.units = _ppd.admitted
+                    result.plan_summaries = _ppd.plan_summaries
+                    result.tier_used = "TIER_1_API_SIGHTMAP_DIRECT"
+                    result.confidence = min(
+                        0.92, 0.7 + 0.04 * _ppd.n_admitted
+                    )
+                    result.api_responses.append({
+                        "url": direct_units[0].get("source_api_url", ""),
+                        "status": 200,
+                        "body": "<sightmap-direct-probe>",
+                        "via": "sightmap_direct_probe",
+                    })
+                    return result
+
         if not api_responses:
             result.tier_used = _TIER_NO_RESPONSE
             result.errors.append("SIGHTMAP_NO_RESPONSE: no network responses captured during page load")
@@ -784,6 +821,139 @@ def find_sightmap_embed_codes(html: str) -> list[str]:
         seen.add(code)
         codes.append(code)
     return codes
+
+
+# ----------------------------------------------------------------------
+# 2026-05-24 HAR-driven addition: direct sightmap.com/app/api/v1/ probe
+# ----------------------------------------------------------------------
+# Some SightMap-fronted properties don't fire the SightMap XHR during
+# the canary's network capture window (iframe lazy-loads or operator
+# unhides on user interaction). The marketing page body still contains
+# the embed code, which lets us reconstruct the canonical API URL and
+# fetch it via direct curl_cffi. HAR-verified across 7 SHAPE_REJECTED
+# props (livahwatukee, traditionapthomes, residencesatfalconnorth,
+# creekwoodapartmenthomes, livegreenview).
+
+import re as _sm_re  # noqa: E402 — local to keep this section self-contained
+
+_SM_EMBED_RE = _sm_re.compile(
+    r"(?:https?:)?//sightmap\.com/(?:embed|app/embed)/([a-z0-9]+)",
+    _sm_re.IGNORECASE,
+)
+_SM_EMBED_DATA_RE = _sm_re.compile(
+    r'data-sightmap[a-z-]*?["\']\s*[:=]\s*["\']([a-z0-9]+)',
+    _sm_re.IGNORECASE,
+)
+
+
+def _extract_sightmap_embed_codes(body: str) -> list[str]:
+    """Find SightMap embed codes (the short alphanumeric token from
+    ``sightmap.com/embed/{TOKEN}``) anywhere in *body*.
+
+    Returns a list of distinct codes in document order. Empty list if
+    no markers found.
+    """
+    if not body:
+        return []
+    out: list[str] = []
+    for m in _SM_EMBED_RE.finditer(body):
+        code = m.group(1)
+        if code and code not in out:
+            out.append(code)
+    for m in _SM_EMBED_DATA_RE.finditer(body):
+        code = m.group(1)
+        if code and code not in out:
+            out.append(code)
+    return out
+
+
+async def _try_direct_sightmap_api_probe(
+    ctx: AdapterContext,
+) -> list[dict[str, str]]:
+    """Discover sightmap embed codes from the captured page body, hit
+    the embed-redirect endpoint to learn the {TOKEN}/{ID} pairing,
+    then fetch ``sightmap.com/app/api/v1/{TOKEN}/sightmaps/{ID}`` for
+    the actual unit data. Returns parsed units (empty list when no
+    embed found, probe failed, or response was amenities-only).
+
+    Never raises — the caller's outer try/except is for defensive
+    measure only.
+    """
+    fr = getattr(ctx, "fetch_result", None)
+    raw = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(raw, bytes):
+        try:
+            raw = raw.decode("utf-8", errors="replace")
+        except Exception:
+            return []
+    if not isinstance(raw, str) or not raw:
+        return []
+    codes = _extract_sightmap_embed_codes(raw)
+    if not codes:
+        return []
+
+    from ma_poc.pms.adapters._probe import probe_get
+
+    for code in codes[:3]:  # cap probing budget
+        # Step 1: fetch the embed page to discover the sightmap_id
+        embed_url = (
+            f"https://sightmap.com/embed/{code}?enable_api=1"
+        )
+        try:
+            r = probe_get(embed_url, timeout=15)
+        except Exception:
+            continue
+        if r.status_code != 200 or not r.text:
+            continue
+        # The embed HTML has the canonical /sightmaps/{ID} reference
+        m_token = _sm_re.search(
+            r'sightmap\.com/app/api/v1/([a-z0-9]+)/sightmaps/(\d+)',
+            r.text,
+            _sm_re.IGNORECASE,
+        )
+        if not m_token:
+            # Some pages embed only the bare /sightmaps/{ID} in JSON
+            m_token = _sm_re.search(
+                r'"sightmap_id"\s*:\s*"?(\d+)',
+                r.text,
+                _sm_re.IGNORECASE,
+            )
+            if m_token:
+                # Use the same embed code as the token portion (the canonical
+                # URL uses a different short-code that we can't recover
+                # without the JS context). Skip this branch — without both
+                # halves we can't construct the URL.
+                continue
+            continue
+        api_token, sightmap_id = m_token.group(1), m_token.group(2)
+
+        # Step 2: fetch the canonical API
+        api_url = (
+            f"https://sightmap.com/app/api/v1/{api_token}/sightmaps/{sightmap_id}"
+        )
+        try:
+            r2 = probe_get(api_url, timeout=20)
+        except Exception:
+            continue
+        if r2.status_code != 200 or not r2.text:
+            continue
+        try:
+            import json as _sm_json
+
+            body = _sm_json.loads(r2.text)
+        except Exception:
+            continue
+        if not _is_sightmap_response(body):
+            continue
+        # Reuse the existing join parser
+        units, _dropped = parse_sightmap_response(body, api_url)
+        if units:
+            # Set the new tier label
+            for u in units:
+                u["extraction_tier"] = "TIER_1_API_SIGHTMAP_DIRECT"
+            return units
+
+    return []
 
 
 def extract_sightmap_api_url(embed_html: str) -> str | None:
