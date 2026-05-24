@@ -30,6 +30,7 @@ Recipe (fully deterministic, no render strictly required):
 
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -271,6 +272,98 @@ async def _active_fetch_maac(page: Page | None, ctx: AdapterContext) -> list[dic
     return out
 
 
+# ─── HTML-direct units fallback (2026-05-23, Wade Park diagnosis) ──────
+
+# MAA's Next.js community pages SSR the entire ``units`` array inline,
+# same shape as the ``/api/properties/{ULID}/units/available/`` response
+# (verified live 2026-05-23: maa-wade-park has 122-item ``"units":[{...
+# minimumRent: 1277, maximumRent: 2315, ...}]`` blob in HTML). When the
+# active API fetch fails in production (network blip, geo-block, etc.),
+# this fallback extracts the same data from HTML — no second round-trip.
+#
+# Why we need it: the canary's 26-of-31 MAA properties stamped TIER_1_5_
+# EMBEDDED + SUCCESS_PLAN_LEVEL show GenericAdapter's embedded_json tier
+# winning AFTER MAACAdapter returned empty (likely active fetch dropped
+# in prod). Generic's parser doesn't know the MAA field names
+# (minimumRent/maximumRent), so units extract with sqft + unit_id but
+# rent stays null → no_rent_signal verdict downgrade. Wiring this
+# fallback inside MaacAdapter restores rent before cascade falls through.
+# Just match "units":[{ — we'll verify MAA-shape AFTER parsing the array
+# (the unit has nested objects like floorPlanImage:{...} between the
+# opening { and "minimumRent", so a [^}]*-style lookahead would fail).
+_MAAC_UNITS_ARRAY_RE = re.compile(r'"units"\s*:\s*\[\s*\{', re.DOTALL)
+
+
+def _extract_balanced_array(html: str, start: int) -> str:
+    """Return the substring from html[start] (which must be '[') up to
+    the matching ']', respecting nested {}/[] and JSON string literals.
+    Returns '' if no balanced close is found.
+    """
+    if start >= len(html) or html[start] != "[":
+        return ""
+    depth = 0
+    i = start
+    in_str = False
+    esc = False
+    while i < len(html):
+        c = html[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+        else:
+            if c == '"':
+                in_str = True
+            elif c == "[":
+                depth += 1
+            elif c == "]":
+                depth -= 1
+                if depth == 0:
+                    return html[start : i + 1]
+        i += 1
+    return ""
+
+
+def parse_maac_html(html: str, url: str) -> list[dict[str, str]]:
+    """Extract MAA units from a community page's embedded ``"units":[…]``
+    array. Returns ``[]`` when the marker isn't present or parsing fails.
+
+    Gate is anchored on BOTH the ``units`` key AND a MAA-specific
+    ``minimumRent`` field so this cannot misfire on a non-MAA page that
+    happens to carry a ``"units":[…]`` array (RentCafe, SightMap embed,
+    etc. all use the same key name).
+    """
+    if not html or "minimumRent" not in html:
+        return []
+    # Iterate all "units":[{ occurrences — a page may have multiple
+    # arrays (e.g. amenities + units), and only the MAA one will have
+    # minimumRent on its first member.
+    for m in _MAAC_UNITS_ARRAY_RE.finditer(html):
+        arr_open = html.rfind("[", m.start(), m.end())
+        if arr_open < 0:
+            continue
+        arr_str = _extract_balanced_array(html, arr_open)
+        if not arr_str:
+            continue
+        try:
+            items = json.loads(arr_str)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(items, list):
+            continue
+        # Post-filter MAA shape: at least one item must carry the
+        # ``minimumRent`` key — guards against misfiring on a non-MAA
+        # ``"units":[…]`` array (RentCafe / SightMap / Engrain etc.).
+        maa_items = [it for it in items if isinstance(it, dict)]
+        if not any("minimumRent" in it for it in maa_items):
+            continue
+        return parse_maac_units(maa_items, url)
+    return []
+
+
 class MaacAdapter:
     """Mid-America Apartment Communities (MAAC) PMS adapter."""
 
@@ -301,6 +394,42 @@ class MaacAdapter:
             if parsed:
                 all_units.extend(parsed)
                 result.api_responses.append(src)
+
+        # 2026-05-23: HTML-embedded units fallback. MAA's Next.js SSR
+        # ships the same units array inline in HTML — if the active API
+        # path failed (production canary shows 26 of 31 MAA properties
+        # falling through to GenericAdapter's TIER_1_5_EMBEDDED with
+        # SUCCESS_PLAN_LEVEL because Generic doesn't know the MAA field
+        # names), parse it from HTML directly. Same shape, same fields,
+        # no second round-trip. Live-verified 2026-05-23: maa-wade-park
+        # 122/122 units with rent ($1,277-$2,315 range, 616-1500sqft).
+        if not all_units:
+            html = ""
+            fr = getattr(ctx, "fetch_result", None)
+            body = getattr(fr, "body", None) if fr is not None else None
+            if isinstance(body, bytes):
+                html = body.decode("utf-8", errors="replace")
+            elif isinstance(body, str):
+                html = body
+            base_url = str(getattr(ctx, "base_url", "") or "")
+            if html:
+                html_units = parse_maac_html(html, base_url)
+                if html_units:
+                    all_units.extend(html_units)
+                    # Stamp the HTML source distinct from the API path
+                    # so reports can split the two recovery paths.
+                    for u in all_units:
+                        if u.get("extraction_tier") == OLL_TIER:
+                            u["extraction_tier"] = f"{OLL_TIER}_HTML"
+                    result.tier_used = f"{OLL_TIER}_HTML"
+                    result.api_responses.append(
+                        {
+                            "url": base_url,
+                            "status": 200,
+                            "body": "<maac-embedded-html>",
+                            "via": "html_embedded_nextjs",
+                        }
+                    )
 
         if all_units:
             from ma_poc.extraction.post_process import post_process

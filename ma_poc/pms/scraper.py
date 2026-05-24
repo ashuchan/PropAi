@@ -1590,6 +1590,15 @@ async def scrape(
     if prop_amen:
         result["property_amenities"] = list(prop_amen)
 
+    # 2026-05-23: propagate the operator-no-availability flag the
+    # generic adapter sets when the page carries an explicit "no units
+    # available" statement (krcapartments cohort). The runner reads
+    # ``result["_operator_no_availability"]`` and passes it to
+    # ``compute_verdict`` so the property is classified
+    # SUCCESS_NO_AVAILABILITY instead of FAILED_NO_DATA.
+    if getattr(adapter_result, "_operator_no_availability", False):
+        result["_operator_no_availability"] = True
+
     reset_clearance_cookies(_clr_token)
     return result
 

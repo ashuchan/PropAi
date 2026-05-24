@@ -896,12 +896,18 @@ async def _process_property(
     #   - explicit marker → SUCCESS_PLAN_LEVEL
     #   - all-inferred_* UIDs OR no-rent-signal → SUCCESS_PLAN_LEVEL
     # See ma_poc/reporting/verdict.py:compute() for the downgrade rules.
+    # 2026-05-23: pass the operator-no-availability signal — adapters
+    # set ``result["_operator_no_availability"] = True`` when the page
+    # carries an explicit "no units available" statement
+    # (krcapartments-class cohort). The verdict layer routes those to
+    # SUCCESS_NO_AVAILABILITY instead of FAILED_NO_DATA.
     verdict = compute_verdict(
         fetch_outcome=outcome_val,
         extract_result=extract_result,
         carry_forward_applied=result.get("_meta", {}).get("carry_forward_used", False),
         verdict_quality_override=result.get("_verdict_quality"),
         units=result.get("units"),
+        operator_no_availability=bool(result.get("_operator_no_availability")),
     )
     meta = result.setdefault("_meta", {})
     meta["canonical_id"] = task.property_id

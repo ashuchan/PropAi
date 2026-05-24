@@ -1,0 +1,1862 @@
+[
+ {
+  "property_id": "76138",
+  "name": "Covey Chase",
+  "city": "Cullman",
+  "state": "AL",
+  "url": "https://morrowapartments.net/wdk-listing/covey-chase-apartments/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "270766",
+  "name": "Hue97",
+  "city": "Mesa",
+  "state": "AZ",
+  "url": "https://www.hue97.com/#",
+  "their_tier": "TIER_1_API",
+  "their_units": 17,
+  "status": "pending"
+ },
+ {
+  "property_id": "36536",
+  "name": "Icon at Park",
+  "city": "Emeryville",
+  "state": "CA",
+  "url": "https://prometheusapartments.com/ca/emeryville-apartments/icon-at-park",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "12927",
+  "name": "Wyvernwood Garden",
+  "city": "Los Angeles",
+  "state": "CA",
+  "url": "http://www.wyvernwoodla.com",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "43520",
+  "name": "Park at Blanding",
+  "city": "Orange Park",
+  "state": "FL",
+  "url": "http://www.parkatblanding.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 16,
+  "status": "pending"
+ },
+ {
+  "property_id": "269346",
+  "name": "Ashford Apartment Homes",
+  "city": "Conyers",
+  "state": "GA",
+  "url": "https://rjamesproperties.com/ashford-brook/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "245962",
+  "name": "Beacon Station",
+  "city": "Augusta",
+  "state": "GA",
+  "url": "https://www.beaconstationaugusta.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 22,
+  "status": "pending"
+ },
+ {
+  "property_id": "230132",
+  "name": "Bowman Station",
+  "city": "Macon",
+  "state": "GA",
+  "url": "https://www.bowmanstation.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 21,
+  "status": "pending"
+ },
+ {
+  "property_id": "301762",
+  "name": "Buffalo Ridge",
+  "city": "Andover",
+  "state": "KS",
+  "url": "https://buffaloridgeandover.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 27,
+  "status": "pending"
+ },
+ {
+  "property_id": "38298",
+  "name": "Courtyard",
+  "city": "Terrytown",
+  "state": "LA",
+  "url": "http://courtyardgretna.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "225389",
+  "name": "Evergreen at River Oaks I",
+  "city": "Lake Charles",
+  "state": "LA",
+  "url": "https://www.evergreenatriveroaks.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 23,
+  "status": "pending"
+ },
+ {
+  "property_id": "240743",
+  "name": "Evergreen at River Oaks II",
+  "city": "Lake Charles",
+  "state": "LA",
+  "url": "https://www.evergreenatriveroaks.com/?utm_source=bingPlaces&utm_medium=organic",
+  "their_tier": "TIER_1_API",
+  "their_units": 23,
+  "status": "pending"
+ },
+ {
+  "property_id": "47232",
+  "name": "Chapel Manor",
+  "city": "Nottingham",
+  "state": "MD",
+  "url": "https://aandgmanagement.com/apartments-for-rent/perry-hall-md/chapel-manor/7/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "52934",
+  "name": "Davis Creek",
+  "city": "Portage",
+  "state": "MI",
+  "url": "https://daviscreekapartments.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "235473",
+  "name": "Rooftop 252",
+  "city": "West St Paul",
+  "state": "MN",
+  "url": "http://www.rooftop252.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "39093",
+  "name": "Mark I Apartments",
+  "city": "Hattiesburg",
+  "state": "MS",
+  "url": "http://hattiesburgmarkapartments.com/mark1/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "221995",
+  "name": "Booker Creek Townhouse Apartments",
+  "city": "Chapel Hill",
+  "state": "NC",
+  "url": "http://www.gscapts.com/apartments/Chapel_Hill_NC/zip_27514/gsc/4508",
+  "their_tier": "TIER_1_API",
+  "their_units": 6,
+  "status": "pending"
+ },
+ {
+  "property_id": "220302",
+  "name": "The District",
+  "city": "Asheville",
+  "state": "NC",
+  "url": "https://www.thedistrictasheville.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 26,
+  "status": "pending"
+ },
+ {
+  "property_id": "33738",
+  "name": "Sagamore Court",
+  "city": "Portsmouth",
+  "state": "NH",
+  "url": "https://www.forestproperties.net/property/sagamore-court/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "240934",
+  "name": "Townhome Villas",
+  "city": "Las Vegas",
+  "state": "NV",
+  "url": "https://www.mytownhomevillasapartments.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "22964",
+  "name": "Tropicana Village Apartments",
+  "city": "Las Vegas",
+  "state": "NV",
+  "url": "https://www.tropicanavillageapartments.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "38677",
+  "name": "Tor View Village",
+  "city": "Garnerville",
+  "state": "NY",
+  "url": "www.torviewvillageapts.com",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "51921",
+  "name": "Deer Run",
+  "city": "Twinsburg",
+  "state": "OH",
+  "url": "https://www.liveatdeerrunapts.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "73733",
+  "name": "Bellevue Crossing",
+  "city": "Bend",
+  "state": "OR",
+  "url": "http://www.livebellevuecrossing.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "244705",
+  "name": "Devine District",
+  "city": "Columbia",
+  "state": "SC",
+  "url": "https://devinedistrict.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "62144",
+  "name": "South Ridge",
+  "city": "Greenville",
+  "state": "SC",
+  "url": "http://www.southridgeliving.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 25,
+  "status": "pending"
+ },
+ {
+  "property_id": "40733",
+  "name": "Country Club",
+  "city": "Knoxville",
+  "state": "TN",
+  "url": "https://www.smdproperty.com/resident-properties/country-club-apartments/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "35759",
+  "name": "Cortland La Villita",
+  "city": "Irving",
+  "state": "TX",
+  "url": "www.cortland.com/la-villita",
+  "their_tier": "TIER_1_API",
+  "their_units": 22,
+  "status": "pending"
+ },
+ {
+  "property_id": "25489",
+  "name": "Cortland North Dallas",
+  "city": "Dallas",
+  "state": "TX",
+  "url": "https://cortland.com/apartments/cortland-north-dallas/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "63486",
+  "name": "Haven Apartments at Eldridge",
+  "city": "Houston",
+  "state": "TX",
+  "url": "http://www.havenateldridgeapts.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 23,
+  "status": "pending"
+ },
+ {
+  "property_id": "281503",
+  "name": "Magnolia on Main",
+  "city": "Roanoke",
+  "state": "TX",
+  "url": "https://www.liveatmagnolia.com/homes/tx/fortworth/magnolia-on-main--8c41ac2869694/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "39198",
+  "name": "Vista De Palmas Apartments",
+  "city": "Edinburg",
+  "state": "TX",
+  "url": "http://www.vistadepalmasapartments.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "46336",
+  "name": "Westbury Square",
+  "city": "Portland",
+  "state": "TX",
+  "url": "https://www.westburyportlandtx.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "1971",
+  "name": "Park West End",
+  "city": "Richmond",
+  "state": "VA",
+  "url": "https://www.parkwestend.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 10,
+  "status": "pending"
+ },
+ {
+  "property_id": "15014",
+  "name": "Wildwood Park",
+  "city": "Arlington",
+  "state": "VA",
+  "url": "http://www.rentdittmar.com/apartment-communities/wildwood-park",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "253126",
+  "name": "Conklin Townhomes",
+  "city": "Spokane",
+  "state": "WA",
+  "url": "https://conklintowns.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "72631",
+  "name": "Linden Lane",
+  "city": "Puyallup",
+  "state": "WA",
+  "url": "http://www.lindenlaneapartmenthomes.com/",
+  "their_tier": "TIER_1_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "232905",
+  "name": "Stone Ridge Apartments",
+  "city": "Lawton",
+  "state": "OK",
+  "url": "https://www.stoneridgeoflawton.com/",
+  "their_tier": "TIER_1_API_APTS247",
+  "their_units": 3,
+  "status": "pending"
+ },
+ {
+  "property_id": "74109",
+  "name": "Country Villa Apartment Homes",
+  "city": "Castroville",
+  "state": "TX",
+  "url": "http://www.countryvillaapts.com/",
+  "their_tier": "TIER_1_API_APTS247",
+  "their_units": 6,
+  "status": "pending"
+ },
+ {
+  "property_id": "14325",
+  "name": "The Berkley",
+  "city": "Austin",
+  "state": "TX",
+  "url": "https://www.theberkleyatx.com/",
+  "their_tier": "TIER_1_API_APTS247",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "234945",
+  "name": "IMT Belasera at Superior",
+  "city": "Northridge",
+  "state": "CA",
+  "url": "https://www.imtresidential.com/imtbelaseraatsuperior/",
+  "their_tier": "TIER_1_API_APTS247_NO_KEY",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "217552",
+  "name": "Anson",
+  "city": "Burlingame",
+  "state": "CA",
+  "url": "https://www.ansonliving.com/",
+  "their_tier": "TIER_1_API_G5",
+  "their_units": 9,
+  "status": "pending"
+ },
+ {
+  "property_id": "17506",
+  "name": "Ten68 West",
+  "city": "Dallas",
+  "state": "GA",
+  "url": "https://www.ten68west.com/",
+  "their_tier": "TIER_1_API_G5",
+  "their_units": 13,
+  "status": "pending"
+ },
+ {
+  "property_id": "18389",
+  "name": "Westgate Village",
+  "city": "Malvern",
+  "state": "PA",
+  "url": "https://www.fmgnj.com/apartments/pa/malvern/westgate-village/",
+  "their_tier": "TIER_1_API_G5_API_ERROR",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "1767",
+  "name": "Waverly Place",
+  "city": "North Charleston",
+  "state": "SC",
+  "url": "http://www.waverlyplace-apts.com/",
+  "their_tier": "TIER_1_API_G5_NO_URN",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "60372",
+  "name": "Chelsea",
+  "city": "Beaumont",
+  "state": "TX",
+  "url": "https://www.thechelseaapartments.com",
+  "their_tier": "TIER_1_API_G5_NO_URN",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "70779",
+  "name": "The Kessler",
+  "city": "Prairie Village",
+  "state": "KS",
+  "url": "http://www.thekessler.com/",
+  "their_tier": "TIER_1_API_ONESITE",
+  "their_units": 19,
+  "status": "pending"
+ },
+ {
+  "property_id": "21367",
+  "name": "4001 Midtown",
+  "city": "Houston",
+  "state": "TX",
+  "url": "https://www.live4001midtown.com/",
+  "their_tier": "TIER_1_API_ONESITE",
+  "their_units": 15,
+  "status": "pending"
+ },
+ {
+  "property_id": "18194",
+  "name": "Parke Place Townhomes",
+  "city": "Seabrook",
+  "state": "NH",
+  "url": "https://www.forestproperties.net/property/availabilities/parke-place-village",
+  "their_tier": "TIER_1_API_REALPAGE_OLL",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "446",
+  "name": "Cottages @ Sanford",
+  "city": "Sanford",
+  "state": "FL",
+  "url": "https://www.cottagesatsanford.com/",
+  "their_tier": "TIER_1_API_RENTMANAGER",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "218187",
+  "name": "Lafayette Townhomes",
+  "city": "Niagara Falls",
+  "state": "NY",
+  "url": "https://apartmentsniagara.com/property-detail/?ID=46",
+  "their_tier": "TIER_1_API_RENTMANAGER",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "74364",
+  "name": "Wilmington Pointe",
+  "city": "Dayton",
+  "state": "OH",
+  "url": "www.wilmingtonpointe.com",
+  "their_tier": "TIER_1_API_RENTMANAGER",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "226383",
+  "name": "The Colony Apartments",
+  "city": "Corpus Christi",
+  "state": "TX",
+  "url": "http://availability.sparkleam.com/properties/?rmwebsvc_command=PropertyDetail&rmwebsvc_id=4&rmwebsvc_template=Properties",
+  "their_tier": "TIER_1_API_RENTMANAGER",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "225099",
+  "name": "Desert Horizon",
+  "city": "Scottsdale",
+  "state": "AZ",
+  "url": "https://arizona.weidner.com/apartments/az/scottsdale/desert-horizon/?utm_source=google&utm_medium=organic&utm_campaign=gmb",
+  "their_tier": "TIER_1_API_REPLI360",
+  "their_units": 32,
+  "status": "pending"
+ },
+ {
+  "property_id": "54758",
+  "name": "Marquis on Evans",
+  "city": "San Antonio",
+  "state": "TX",
+  "url": "https://www.cwsapartments.com/apartments/tx/san-antonio/marquis-on-evans/",
+  "their_tier": "TIER_1_API_REPLI360",
+  "their_units": 48,
+  "status": "pending"
+ },
+ {
+  "property_id": "68702",
+  "name": "Regalia Bella Terra I",
+  "city": "Katy",
+  "state": "TX",
+  "url": "https://www.regaliabellaterra.com/",
+  "their_tier": "TIER_1_API_RESMAN",
+  "their_units": 24,
+  "status": "pending"
+ },
+ {
+  "property_id": "75158",
+  "name": "The Glen at Oldtown",
+  "city": "Scottsdale",
+  "state": "AZ",
+  "url": "https://www.theglenatoldtown.com/?utm_source=GoogleLocalListing&utm_medium=organic#",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 20,
+  "status": "pending"
+ },
+ {
+  "property_id": "13883",
+  "name": "Verano Townhome Rentals",
+  "city": "Phoenix",
+  "state": "AZ",
+  "url": "https://www.veranoapartmenthomes.com/?utm_source=GoogleLocalListing&utm_medium=organic#",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 26,
+  "status": "pending"
+ },
+ {
+  "property_id": "68318",
+  "name": "Broadway",
+  "city": "Oakland",
+  "state": "CA",
+  "url": "https://www.livethebroadway.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 18,
+  "status": "pending"
+ },
+ {
+  "property_id": "24392",
+  "name": "Willow Creek",
+  "city": "San Jose",
+  "state": "CA",
+  "url": "http://willowcreeksanjose.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 5,
+  "status": "pending"
+ },
+ {
+  "property_id": "5355",
+  "name": "Winthrop West",
+  "city": "Riverview",
+  "state": "FL",
+  "url": "https://cortland.com/apartments/winthrop-west/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 19,
+  "status": "pending"
+ },
+ {
+  "property_id": "269985",
+  "name": "Resia Tributary",
+  "city": "Douglasville",
+  "state": "GA",
+  "url": "https://www.resiatributary.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 124,
+  "status": "pending"
+ },
+ {
+  "property_id": "252534",
+  "name": "The Mark at Fishers District",
+  "city": "Fishers",
+  "state": "IN",
+  "url": "https://www.themarkatfishersdistrict.com/the-mark-at-fishers-district-fishers-in/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 22,
+  "status": "pending"
+ },
+ {
+  "property_id": "230598",
+  "name": "The Ridge",
+  "city": "Hagerstown",
+  "state": "MD",
+  "url": "https://www.theridgehagerstown.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 48,
+  "status": "pending"
+ },
+ {
+  "property_id": "15168",
+  "name": "Yorkshire",
+  "city": "Silver Spring",
+  "state": "MD",
+  "url": "www.yorkshireapts.com",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 20,
+  "status": "pending"
+ },
+ {
+  "property_id": "52347",
+  "name": "Aspen Court",
+  "city": "Piscataway",
+  "state": "NJ",
+  "url": "www.liveaspencourt.com",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 9,
+  "status": "pending"
+ },
+ {
+  "property_id": "272287",
+  "name": "Parc at Roxbury",
+  "city": "Roxbury Township",
+  "state": "NJ",
+  "url": "https://www.parcatroxbury.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 13,
+  "status": "pending"
+ },
+ {
+  "property_id": "60353",
+  "name": "The George",
+  "city": "New Brunswick",
+  "state": "NJ",
+  "url": "https://www.thegeorgenewbrunswick.com/?utm_source=GBP&utm_medium=organic&utm_campaign=appointment",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 12,
+  "status": "pending"
+ },
+ {
+  "property_id": "6274",
+  "name": "The Village at Voorhees",
+  "city": "Voorhees Township",
+  "state": "NJ",
+  "url": "https://www.fmgnj.com/apartments/nj/voorhees/the-village-apartments/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 107,
+  "status": "pending"
+ },
+ {
+  "property_id": "97536",
+  "name": "The Sheldon at Suffern Station",
+  "city": "Suffern",
+  "state": "NY",
+  "url": "http://thesheldonatsuffern.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 3,
+  "status": "pending"
+ },
+ {
+  "property_id": "72766",
+  "name": "Fox Ridge",
+  "city": "Royersford",
+  "state": "PA",
+  "url": "https://www.liveatfoxridge.com/?utm_source=GBP&utm_medium=organic&utm_knock=gbp",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 7,
+  "status": "pending"
+ },
+ {
+  "property_id": "97837",
+  "name": "Five Points Northshore",
+  "city": "Chattanooga",
+  "state": "TN",
+  "url": "https://www.missionrockresidential.com/apartments/tn/chattanooga/5-points-northshore/?utm_source=GBP&utm_medium=organic",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 12,
+  "status": "pending"
+ },
+ {
+  "property_id": "41008",
+  "name": "Pearl Midlane River Oaks",
+  "city": "Houston",
+  "state": "TX",
+  "url": "https://pearlmidlane.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 34,
+  "status": "pending"
+ },
+ {
+  "property_id": "267554",
+  "name": "Perch at Dawson's Ramble",
+  "city": "Austin",
+  "state": "TX",
+  "url": "https://perchapartments.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 44,
+  "status": "pending"
+ },
+ {
+  "property_id": "251167",
+  "name": "Metro at Fireclay II",
+  "city": "Murray",
+  "state": "UT",
+  "url": "http://www.metroatfireclay.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 33,
+  "status": "pending"
+ },
+ {
+  "property_id": "71747",
+  "name": "The Atlas",
+  "city": "Herriman",
+  "state": "UT",
+  "url": "http://www.copperwoodut.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "their_units": 51,
+  "status": "pending"
+ },
+ {
+  "property_id": "262310",
+  "name": "Stevens Creek Villas",
+  "city": "Lincoln",
+  "state": "NE",
+  "url": "https://concordemgmt.com/apartments/",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "their_units": 80,
+  "status": "pending"
+ },
+ {
+  "property_id": "97506",
+  "name": "Roebling Lofts I",
+  "city": "Trenton",
+  "state": "NJ",
+  "url": "http://roeblinglofts.com/",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "their_units": 4,
+  "status": "pending"
+ },
+ {
+  "property_id": "276548",
+  "name": "Villas at Sandy Creek",
+  "city": "Sandusky",
+  "state": "OH",
+  "url": "https://villasatsandycreek.com/",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "their_units": 5,
+  "status": "pending"
+ },
+ {
+  "property_id": "296794",
+  "name": "Willow Creek",
+  "city": "Johnson City",
+  "state": "TN",
+  "url": "https://www.homesteadpropertiestn.com/directory/willow-creek/",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "their_units": 14,
+  "status": "pending"
+ },
+ {
+  "property_id": "6395",
+  "name": "Serena Woods",
+  "city": "Spring",
+  "state": "TX",
+  "url": "https://www.villaserenacommunities.com/serena-woods",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "their_units": 16,
+  "status": "pending"
+ },
+ {
+  "property_id": "57947",
+  "name": "The Catherine",
+  "city": "Austin",
+  "state": "TX",
+  "url": "www.thecatherineaustin.com",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "their_units": 33,
+  "status": "pending"
+ },
+ {
+  "property_id": "274198",
+  "name": "Legacy Ridge",
+  "city": "St. George",
+  "state": "UT",
+  "url": "www.legacyridgestgeorge.com",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "their_units": 51,
+  "status": "pending"
+ },
+ {
+  "property_id": "277576",
+  "name": "The Gardens on 40th",
+  "city": "South Ogden",
+  "state": "UT",
+  "url": "https://www.gardenson40th.com/",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "their_units": 8,
+  "status": "pending"
+ },
+ {
+  "property_id": "294795",
+  "name": "Emerson 2537",
+  "city": "Minneapolis",
+  "state": "MN",
+  "url": "https://krcapartments.com/property-detail/?propid=632&propname=2537%20Emerson",
+  "their_tier": "TIER_1_DOM_RENTMANAGER_ILOVELEASING",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "25063",
+  "name": "Highgrove at Big Bend",
+  "city": "Manchester",
+  "state": "MO",
+  "url": "https://www.highgroveatbigbend.com",
+  "their_tier": "TIER_1_KNOCK_API",
+  "their_units": 5,
+  "status": "pending"
+ },
+ {
+  "property_id": "37157",
+  "name": "Chamberlain I & II",
+  "city": "Dayton",
+  "state": "OH",
+  "url": "https://www.chamberlainapt.com/",
+  "their_tier": "TIER_1_KNOCK_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "46133",
+  "name": "Alameda Pointe",
+  "city": "Norman",
+  "state": "OK",
+  "url": "https://alamedapointe.com/",
+  "their_tier": "TIER_1_KNOCK_API",
+  "their_units": 20,
+  "status": "pending"
+ },
+ {
+  "property_id": "75128",
+  "name": "Impressions Apartments",
+  "city": "Newport News",
+  "state": "VA",
+  "url": "https://www.impressionsapts.com/",
+  "their_tier": "TIER_1_KNOCK_API",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "76982",
+  "name": "The Pointe at Texarkana",
+  "city": "Texarkana",
+  "state": "AR",
+  "url": "http://www.pointetexarkana.com/",
+  "their_tier": "TIER_1_PROFILE_MAPPING",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "13072",
+  "name": "Boynton Place",
+  "city": "Boynton Beach",
+  "state": "FL",
+  "url": "https://www.robbinspropertyllc.com/apartments/fl/boynton-beach/boynton-place-apartments/",
+  "their_tier": "TIER_1_PROFILE_MAPPING",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "50379",
+  "name": "Millbrook Pointe",
+  "city": "Millbrook",
+  "state": "AL",
+  "url": "http://www.millbrookpointeapartments.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "23963",
+  "name": "Luna Bear Arcos",
+  "city": "Phoenix",
+  "state": "AZ",
+  "url": "http://www.arcosphx.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "16788",
+  "name": "Beach House",
+  "city": "Newport Beach",
+  "state": "CA",
+  "url": "www.rentthebeachhouseapts.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "24910",
+  "name": "Bella Vista Apartments",
+  "city": "Santa Clara",
+  "state": "CA",
+  "url": "www.bellavista-apartments.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "27574",
+  "name": "Belle Fontaine Apartments",
+  "city": "Marina Del Rey",
+  "state": "CA",
+  "url": "https://www.equityapartments.com/los-angeles/marina-del-rey/belle-fontaine-apartments?propertyid=4035&s_kwcid=TC|4015|marina%20del%20rey%20apartments||S|e|15154714153",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "41185",
+  "name": "Gallery 421",
+  "city": "Long Beach",
+  "state": "CA",
+  "url": "https://www.imtresidential.com/imtgallery421/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "8389",
+  "name": "IMT Stevenson Ranch",
+  "city": "Stevenson Ranch",
+  "state": "CA",
+  "url": "https://www.imtresidential.com/imtstevensonranch/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 7,
+  "status": "pending"
+ },
+ {
+  "property_id": "75521",
+  "name": "Juniper Apartments",
+  "city": "Sacramento",
+  "state": "CA",
+  "url": "https://www.liveatthejuniper.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "287001",
+  "name": "Park Terrace",
+  "city": "Santa Clara",
+  "state": "CA",
+  "url": "https://park-terrace-apts.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 11,
+  "status": "pending"
+ },
+ {
+  "property_id": "13379",
+  "name": "Verde Apartments",
+  "city": "San Jose",
+  "state": "CA",
+  "url": "http://www.equityapartments.com/california/san-francisco-bay-apartments/san-jose/verde-apartments.aspx",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 3,
+  "status": "pending"
+ },
+ {
+  "property_id": "23306",
+  "name": "Villas Willow Glen",
+  "city": "San Jose",
+  "state": "CA",
+  "url": "www.villaswillowglen.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "302701",
+  "name": "Ascent At Fitzsimons",
+  "city": "Aurora",
+  "state": "CO",
+  "url": "https://ascentfitzsimons.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "242344",
+  "name": "Franklin Flats",
+  "city": "Greeley",
+  "state": "CO",
+  "url": "www.franklinflatsapts.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "252497",
+  "name": "Oliv Boulder",
+  "city": "Boulder",
+  "state": "CO",
+  "url": "http://olivboulder.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "2382",
+  "name": "Quincy Ridge",
+  "city": "Aurora",
+  "state": "CO",
+  "url": "https://quincyridgeapts.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 4,
+  "status": "pending"
+ },
+ {
+  "property_id": "36925",
+  "name": "View 14",
+  "city": "Washington",
+  "state": "DC",
+  "url": "http://www.view14.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 19,
+  "status": "pending"
+ },
+ {
+  "property_id": "46690",
+  "name": "Aqua at Windmeadows",
+  "city": "Gainesville",
+  "state": "FL",
+  "url": "https://goaquaapartments.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "95594",
+  "name": "Highline",
+  "city": "Melbourne",
+  "state": "FL",
+  "url": "https://highline321.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "274954",
+  "name": "Hurston",
+  "city": "Jacksonville",
+  "state": "FL",
+  "url": "https://www.hurstonjacksonville.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "53773",
+  "name": "Mallard Cove",
+  "city": "Jacksonville",
+  "state": "FL",
+  "url": "http://mallardcove.org/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "22763",
+  "name": "Summerset at International Crossing",
+  "city": "Orlando",
+  "state": "FL",
+  "url": "http://www.jfmanagementgroup.com/summerset/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 6,
+  "status": "pending"
+ },
+ {
+  "property_id": "251562",
+  "name": "The Carlton of West Melbourne",
+  "city": "West Melbourne",
+  "state": "FL",
+  "url": "https://www.thecarltonofwestmelbourne.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 10,
+  "status": "pending"
+ },
+ {
+  "property_id": "1765",
+  "name": "Annaberg",
+  "city": "Augusta",
+  "state": "GA",
+  "url": "https://www.augustarentalhomes.net/_system/listings/56/2905-Arrowhead-Drive---D3-Augusta-GA-30909-US",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "236586",
+  "name": "Colton Creek Apartments",
+  "city": "McDonough",
+  "state": "GA",
+  "url": "www.ColtonCreekApartments.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "292977",
+  "name": "LEO at Cartersville",
+  "city": "Cartersville",
+  "state": "GA",
+  "url": "https://www.leocartersville.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "273790",
+  "name": "Pointe Grand Augusta",
+  "city": "Augusta",
+  "state": "GA",
+  "url": "https://www.pointegrandaugusta.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "273828",
+  "name": "Pointe Grand Southlake",
+  "city": "Morrow",
+  "state": "GA",
+  "url": "https://www.pointegrandsouthlake.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "274886",
+  "name": "Aster Village Two",
+  "city": "Tiffin",
+  "state": "IA",
+  "url": "https://parkplace380.com/listings/aster-village-two/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "258343",
+  "name": "Keystone on 8th",
+  "city": "West Des Moines",
+  "state": "IA",
+  "url": "https://www.keystoneon8th.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "54104",
+  "name": "Aspen Hills",
+  "city": "Meridian",
+  "state": "ID",
+  "url": "https://www.squareone.properties/property-detail/?pid=20&location=1",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 3,
+  "status": "pending"
+ },
+ {
+  "property_id": "23396",
+  "name": "6151 Winthrop Apartments",
+  "city": "Chicago",
+  "state": "IL",
+  "url": "https://www.6151winthrop.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "74528",
+  "name": "Grand Oaks",
+  "city": "Indianapolis",
+  "state": "IN",
+  "url": "https://grandoaks-apartments.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 3,
+  "status": "pending"
+ },
+ {
+  "property_id": "236914",
+  "name": "Woodbridge",
+  "city": "Fort Wayne",
+  "state": "IN",
+  "url": "https://gowoodbridgefortwayne.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "68960",
+  "name": "Colonial Gardens",
+  "city": "Overland Park",
+  "state": "KS",
+  "url": "www.rentcolonialgardens.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "42662",
+  "name": "Highlands North",
+  "city": "Overland Park",
+  "state": "KS",
+  "url": "http://www.thehighlandsapartments.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 4,
+  "status": "pending"
+ },
+ {
+  "property_id": "46581",
+  "name": "Villas on rock",
+  "city": "Wichita",
+  "state": "KS",
+  "url": "https://www.villasonrock.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "298586",
+  "name": "Gateway Lofts Lexington",
+  "city": "Lexington",
+  "state": "KY",
+  "url": "https://gatewayloftslexington.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "56903",
+  "name": "The Landmark",
+  "city": "Braintree",
+  "state": "MA",
+  "url": "https://www.fxmessina.com/the-landmark?rq=The%20Landmark",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 8,
+  "status": "pending"
+ },
+ {
+  "property_id": "58319",
+  "name": "Fountainview Townhomes",
+  "city": "Hagerstown",
+  "state": "MD",
+  "url": "https://www.shaoolmgt.com/property/fountainview-townhomes/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "235372",
+  "name": "Marley Manor I & II",
+  "city": "Salisbury",
+  "state": "MD",
+  "url": "https://livemarleymanor.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "22459",
+  "name": "Colonial Court",
+  "city": "Birmingham",
+  "state": "MI",
+  "url": "http://www.colonialcourtapts.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "23494",
+  "name": "Indian Village",
+  "city": "Lincoln Park",
+  "state": "MI",
+  "url": "https://indianvillageapt.wixsite.com/home/apartments",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "52182",
+  "name": "Woodside Village Apartments",
+  "city": "Rockwood",
+  "state": "MI",
+  "url": "http://www.woodsideapartments.net",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 3,
+  "status": "pending"
+ },
+ {
+  "property_id": "26527",
+  "name": "Aquila Park",
+  "city": "St Louis Park",
+  "state": "MN",
+  "url": "https://finelivingapts.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 15,
+  "status": "pending"
+ },
+ {
+  "property_id": "37930",
+  "name": "Autumn Oaks",
+  "city": "Manchester",
+  "state": "MO",
+  "url": "www.autumnoaksapt.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "32097",
+  "name": "Clemmons Trace Village",
+  "city": "Clemmons",
+  "state": "NC",
+  "url": "http://www.clemmonstracevillage.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "32134",
+  "name": "Crowders View Townhomes",
+  "city": "Gastonia",
+  "state": "NC",
+  "url": "https://crowdersviewtownhomes.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "36782",
+  "name": "Harbor Station Townhomes",
+  "city": "Wilmington",
+  "state": "NC",
+  "url": "https://www.harborstationtownhomes.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "268954",
+  "name": "The Villages at Sunnybrook",
+  "city": "Raleigh",
+  "state": "NC",
+  "url": "https://www.thevillagesatsunnybrook.com/?utm_source=GoogleLocalListing&utm_medium=ogranic&utm_campaign=GMB",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "41328",
+  "name": "Sunset Ridge Apartments",
+  "city": "Manchester",
+  "state": "NH",
+  "url": "https://redoakproperties.com/apartments/properties/sunset-ridge-apartments",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 13,
+  "status": "pending"
+ },
+ {
+  "property_id": "16509",
+  "name": "Brooklawn Gardens",
+  "city": "Parlin",
+  "state": "NJ",
+  "url": "http://brooklawngardensapts.com/property/brooklawn/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "16982",
+  "name": "Pleasant View Gardens",
+  "city": "Piscataway",
+  "state": "NJ",
+  "url": "http://www.pleasantviewgardensnj.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "18752",
+  "name": "Brookstone Apartments",
+  "city": "Las Vegas",
+  "state": "NV",
+  "url": "https://www.liveatbrookstoneapartments.com/?utm_source=GMB&utm_medium=organic",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "277582",
+  "name": "Frontera at Pioneer Meadows",
+  "city": "Sparks",
+  "state": "NV",
+  "url": "https://leasefrontera.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 6,
+  "status": "pending"
+ },
+ {
+  "property_id": "261580",
+  "name": "1515 Park Place",
+  "city": "Brooklyn",
+  "state": "NY",
+  "url": "https://www.1515parkplace.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 8,
+  "status": "pending"
+ },
+ {
+  "property_id": "64618",
+  "name": "70 Pine",
+  "city": "New York",
+  "state": "NY",
+  "url": "http://www.70pine.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 19,
+  "status": "pending"
+ },
+ {
+  "property_id": "245993",
+  "name": "Alberta Square",
+  "city": "Buffalo",
+  "state": "NY",
+  "url": "https://www.glendalecommunities.com/property/alberta-square/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "246351",
+  "name": "Chatsworth Village Townhomes",
+  "city": "Buffalo",
+  "state": "NY",
+  "url": "https://www.glendalecommunities.com/property/chatsworth-townhouses/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "36268",
+  "name": "Stoney Creek",
+  "city": "Rochester",
+  "state": "NY",
+  "url": "http://www.stoneycreekapthomes.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 7,
+  "status": "pending"
+ },
+ {
+  "property_id": "262964",
+  "name": "The Bellagio",
+  "city": "Rochester",
+  "state": "NY",
+  "url": "https://www.bellagio1384.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 4,
+  "status": "pending"
+ },
+ {
+  "property_id": "67546",
+  "name": "223 E Town",
+  "city": "Columbus",
+  "state": "OH",
+  "url": "https://223etown.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 14,
+  "status": "pending"
+ },
+ {
+  "property_id": "52854",
+  "name": "Parkside",
+  "city": "Toledo",
+  "state": "OH",
+  "url": "https://parksideaptsliving.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "1845",
+  "name": "Sterling Place",
+  "city": "Columbus",
+  "state": "OH",
+  "url": "https://sterlingplaceapartments.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "58311",
+  "name": "Winchester Park",
+  "city": "Groveport",
+  "state": "OH",
+  "url": "https://gowinchesterparkapts.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "50114",
+  "name": "Woodgrove Point",
+  "city": "Cincinnati",
+  "state": "OH",
+  "url": "https://rookwoodproperties.com/details/?propID=1&rmwebsvc_id=1&rmwebsvc_command=PropertyDetail.aspx&rmwebsvc_corpid=rookwood&rmwebsvc_location=1&rmwebsvc_mode=javascript&rmwebsvc_AvailabilityDate=8/21/2019&rmwebsvc_template=proplist",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 4,
+  "status": "pending"
+ },
+ {
+  "property_id": "282696",
+  "name": "Allen Ranch Estates",
+  "city": "Grants Pass",
+  "state": "OR",
+  "url": "https://www.ishranchestates.com/allen-ranch",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "2198",
+  "name": "Lincoln Green",
+  "city": "Philadelphia",
+  "state": "PA",
+  "url": "www.lincolngreenapartments.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "266940",
+  "name": "Riverfront Lofts I",
+  "city": "Allentown",
+  "state": "PA",
+  "url": "https://riverfrontloftsallentown.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 25,
+  "status": "pending"
+ },
+ {
+  "property_id": "46954",
+  "name": "The Willows Apartments",
+  "city": "Spartanburg",
+  "state": "SC",
+  "url": "https://gothewillows.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "292317",
+  "name": "Alders Grove",
+  "city": "Jonesborough",
+  "state": "TN",
+  "url": "https://aldersgroveliving.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 3,
+  "status": "pending"
+ },
+ {
+  "property_id": "274971",
+  "name": "Bordeaux",
+  "city": "Kingsville",
+  "state": "TX",
+  "url": "https://www.bordeauxapts.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "8923",
+  "name": "Chisholm Trail Townhomes",
+  "city": "Fort Worth",
+  "state": "TX",
+  "url": "https://npmainc.com/listing/chisholm-trail-townhomes/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "69368",
+  "name": "Creekview",
+  "city": "Sherman",
+  "state": "TX",
+  "url": "https://www.creekviewapthomes.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "257905",
+  "name": "Cypress Lofts",
+  "city": "Sherman",
+  "state": "TX",
+  "url": "https://cypresslofts.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 3,
+  "status": "pending"
+ },
+ {
+  "property_id": "68375",
+  "name": "Haven at Highland Knolls",
+  "city": "Katy",
+  "state": "TX",
+  "url": "http://www.havenhighlandknolls.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "226174",
+  "name": "Lakeview Townhomes and Villas",
+  "city": "Wichita Falls",
+  "state": "TX",
+  "url": "https://npmainc.com/listing/lakeview-townhomes/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 4,
+  "status": "pending"
+ },
+ {
+  "property_id": "12959",
+  "name": "Oak Bend",
+  "city": "Tomball",
+  "state": "TX",
+  "url": "https://www.oakbendapt.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "254556",
+  "name": "Park Place",
+  "city": "Greenville",
+  "state": "TX",
+  "url": "https://www.parkplacegreenville.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "40989",
+  "name": "Savoye",
+  "city": "Addison",
+  "state": "TX",
+  "url": "http://www.savoyeaddison.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 11,
+  "status": "pending"
+ },
+ {
+  "property_id": "9473",
+  "name": "The Village Cliffs",
+  "city": "Dallas",
+  "state": "TX",
+  "url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 5,
+  "status": "pending"
+ },
+ {
+  "property_id": "230081",
+  "name": "Vitruvian West II",
+  "city": "Addison",
+  "state": "TX",
+  "url": "www.vitruvianwest.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 14,
+  "status": "pending"
+ },
+ {
+  "property_id": "46986",
+  "name": "Mountain Ridge Manor",
+  "city": "Ogden",
+  "state": "UT",
+  "url": "http://www.mountainridgemanor.com",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "69928",
+  "name": "The Azlee",
+  "city": "Salt Lake City",
+  "state": "UT",
+  "url": "https://www.theazleeapartments.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "67150",
+  "name": "Harbor Vista at Crawford Street",
+  "city": "Portsmouth",
+  "state": "VA",
+  "url": "https://www.liveharborvista.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "223864",
+  "name": "Kendall Square",
+  "city": "Lynchburg",
+  "state": "VA",
+  "url": "http://www.stewartlangleyproperties.com/kendall-square/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "38378",
+  "name": "Park Northside",
+  "city": "Richmond",
+  "state": "VA",
+  "url": "https://www.parknorthsiderva.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "42940",
+  "name": "Park Vue Place",
+  "city": "Richmond",
+  "state": "VA",
+  "url": "https://www.parkvueplace.com/",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 1,
+  "status": "pending"
+ },
+ {
+  "property_id": "13341",
+  "name": "Heritage Ridge Apartments",
+  "city": "Lynnwood",
+  "state": "WA",
+  "url": "http://www.equityapartments.com/washington/seattle-apartments/lynnwood/heritage-ridge-apartments.aspx",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "284175",
+  "name": "SCS Athens",
+  "city": "Athens",
+  "state": "WI",
+  "url": "https://www.livescs.com/property/scs-athens",
+  "their_tier": "TIER_3_DOM",
+  "their_units": 24,
+  "status": "pending"
+ },
+ {
+  "property_id": "40515",
+  "name": "Forge Homestead",
+  "city": "Cupertino",
+  "state": "CA",
+  "url": "https://www.deanzaproperties.com/south-bay-area/forge-homestead-apartments",
+  "their_tier": "TIER_MERGED_CROSS_PAGE",
+  "their_units": 12,
+  "status": "pending"
+ },
+ {
+  "property_id": "290807",
+  "name": "Meri Palm Bay",
+  "city": "Palm Bay",
+  "state": "FL",
+  "url": "https://www.meripalmbay.com/",
+  "their_tier": "TIER_MERGED_CROSS_PAGE",
+  "their_units": 5,
+  "status": "pending"
+ },
+ {
+  "property_id": "2132",
+  "name": "Sherwood Acres",
+  "city": "Baton Rouge",
+  "state": "LA",
+  "url": "www.sherwoodacresapts.com",
+  "their_tier": "TIER_MERGED_CROSS_PAGE",
+  "their_units": 4,
+  "status": "pending"
+ },
+ {
+  "property_id": "72732",
+  "name": "The Willows",
+  "city": "Clifton Heights",
+  "state": "PA",
+  "url": "http://www.centralmngt.com/Search?Community=15",
+  "their_tier": "TIER_MERGED_CROSS_PAGE",
+  "their_units": 4,
+  "status": "pending"
+ },
+ {
+  "property_id": "9128",
+  "name": "Kingswood",
+  "city": "Denton",
+  "state": "TX",
+  "url": "https://www.kingswoodenton.com/",
+  "their_tier": "TIER_MERGED_CROSS_PAGE",
+  "their_units": 2,
+  "status": "pending"
+ },
+ {
+  "property_id": "68703",
+  "name": "Waterford Trails",
+  "city": "Spring",
+  "state": "TX",
+  "url": "https://www.alapts.com/apartments/tx/spring/waterford-trails/",
+  "their_tier": "TIER_MERGED_CROSS_PAGE",
+  "their_units": 3,
+  "status": "pending"
+ }
+]

@@ -1,0 +1,84 @@
+{
+ "imt_property_quick_search": {
+  "selector_hint": ".property-quick-search__select / .property-quick-search__wrap",
+  "props": [
+   "234945",
+   "41185",
+   "8389"
+  ],
+  "operator": "IMT Residential",
+  "note": "imt_spaces.py adapter exists \u2014 detector/routing miss, not missing adapter"
+ },
+ "apt_starting_price": {
+  "selector_hint": ".apt-starting-price / .apt-rent-amount / .apt-starting-price-li",
+  "props": [
+   "230081",
+   "+2"
+  ],
+  "note": "semantic floorplan-price template \u2014 clean selector set"
+ },
+ "apartments_pricing_info": {
+  "selector_hint": ".apartments-pricing-info (under .content>.copy)",
+  "props": [
+   "3 props"
+  ],
+  "note": "semantic class \u2014 clean"
+ },
+ "community_tile_v1": {
+  "selector_hint": ".community-tile-v1>.caption>.info (swiper)",
+  "props": [
+   "36925",
+   "40989",
+   "+1"
+  ],
+  "note": "portfolio-tile template"
+ },
+ "uikit_pointegrand": {
+  "selector_hint": ".uk-grid-item-match>.uk-panel>.uk-h4",
+  "props": [
+   "273790",
+   "273828"
+  ],
+  "operator": "PointeGrand",
+  "note": "UIkit operator template"
+ },
+ "rentmanager_suite": {
+  "selector_hint": ".suite-group-suites>.suite>.suite-rate",
+  "props": [
+   "74364"
+  ],
+  "note": "RentManager suite roster \u2014 190 unit nodes in static HTML"
+ },
+ "floor_plan_flexbox": {
+  "selector_hint": ".floor_plan>.flexbox>.rent",
+  "props": [
+   "69368"
+  ],
+  "note": "25 rent nodes \u2014 clean .floor_plan/.rent classes"
+ },
+ "apartment_info_block": {
+  "selector_hint": ".apartment-info-block",
+  "props": [
+   "41328"
+  ],
+  "note": "7 rent nodes"
+ },
+ "bricks_builder": {
+  "selector_hint": ".brxe-* (Bricks Builder WP)",
+  "props": [
+   "226174",
+   "8923"
+  ],
+  "note": "page-builder \u2014 selectors are hashed, less reliable"
+ },
+ "elementor_generic": {
+  "selector_hint": ".elementor-widget-container",
+  "props": [
+   "32134",
+   "36782",
+   "446",
+   "+3"
+  ],
+  "note": "TOO GENERIC \u2014 needs text-anchored extraction, not selector"
+ }
+}

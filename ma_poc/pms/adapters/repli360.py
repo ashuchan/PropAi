@@ -84,6 +84,40 @@ _MARK_RE = re.compile(
 )
 _MONEY_RE = re.compile(r"[\d,]+")
 
+# Plan-meta extraction (the /admin/template-render HTML carries plan
+# name, beds, baths, sqft right next to each getUnitListByFloor onclick;
+# the per-unit getUnitListByFloor response has rent + unit_number but
+# NO sqft. Walking the template-render HTML once and joining to each
+# floorPlanID lifts repli360 from rent-only to rent+sqft+beds — the
+# Surgex ≥1-unit-with-rent+sqft success bar).
+_WORD_TO_DIGIT = {
+    "studio": "0",
+    "one": "1",
+    "two": "2",
+    "three": "3",
+    "four": "4",
+    "five": "5",
+    "six": "6",
+}
+_H2_RE = re.compile(r"<h2[^>]*>\s*([^<]+?)\s*</h2>", re.IGNORECASE)
+# "<span>670</span> sq.ft." / "<span>670</span> sqft" etc.
+_SQFT_META_RE = re.compile(
+    r"<span[^>]*>\s*(\d{2,5})\s*</span>\s*sq\.?\s*ft", re.IGNORECASE
+)
+# "1 Bath" / "2 Bathrooms" / "1.5 Baths"
+_BATHS_META_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*Bath(?:room)?s?", re.IGNORECASE
+)
+# "One Bedroom" / "Two Bedrooms" / "1 Bedroom" / "Studio Bedroom" (rare)
+_BEDS_META_RE = re.compile(
+    r"\b(Studio|One|Two|Three|Four|Five|Six|\d+)\s+Bed(?:room)?s?",
+    re.IGNORECASE,
+)
+# Standalone "Studio | 1 Bath" — no "Bedroom" word.
+_STUDIO_META_RE = re.compile(
+    r"\bStudio\b\s*\|\s*\d+(?:\.\d+)?\s*Bath", re.IGNORECASE
+)
+
 
 def _origin_of(url: str) -> str:
     p = urlparse(url)
@@ -151,18 +185,19 @@ def fetch_repli360_site_id(script_url: str, referer: str = "") -> str:
     return m.group(1) if m else ""
 
 
-def fetch_repli360_floorplans(
-    site_id: str, referer: str = ""
-) -> list[tuple[str, str]]:
-    """POST ``/admin/template-render`` → the floorplan list.
+def fetch_repli360_template_render(site_id: str, referer: str = "") -> str:
+    """POST ``/admin/template-render`` → raw bootstrap widget HTML, or ''.
 
-    The bootstrap widget HTML it returns embeds every
-    ``getUnitListByFloor(this,'<fp>',<tt>,<sid>)`` onclick — i.e. the
-    full floorplan list — render-free. Reuses :func:`find_repli360_
-    floorplans` to parse those attrs. No auth / no bot wall (verified).
+    The HTML body carries BOTH the per-floorplan ``getUnitListByFloor``
+    onclick attrs AND the plan-level metadata (plan name in ``<h2>``,
+    "X Bedroom | Y Bath | <span>SQFT</span> sq.ft." spans). One fetch
+    serves both :func:`find_repli360_floorplans` and
+    :func:`parse_repli360_plan_meta` — avoiding a second round trip.
+
+    No auth / no bot wall (verified). Best-effort: any failure → ''.
     """
     if not site_id:
-        return []
+        return ""
     try:
         origin = _origin_of(referer)
         hdrs = {"Referer": referer or "", "Origin": origin}
@@ -181,11 +216,97 @@ def fetch_repli360_floorplans(
             timeout=25,
         )
     except Exception:
-        return []
+        return ""
     if getattr(r, "status_code", 0) != 200:
+        return ""
+    return r.text or ""
+
+
+def fetch_repli360_floorplans(
+    site_id: str, referer: str = ""
+) -> list[tuple[str, str]]:
+    """POST ``/admin/template-render`` → the floorplan list.
+
+    Thin wrapper around :func:`fetch_repli360_template_render` →
+    :func:`find_repli360_floorplans`. Kept for back-compat; the adapter
+    itself now calls the template-render helper directly so it can also
+    extract plan metadata from the same HTML (one fetch, two parses).
+    """
+    html = fetch_repli360_template_render(site_id, referer)
+    if not html:
         return []
-    _sid, fps = find_repli360_floorplans(r.text or "")
+    _sid, fps = find_repli360_floorplans(html)
     return fps
+
+
+def parse_repli360_plan_meta(html: str) -> dict[str, dict[str, str]]:
+    """Return ``{floorPlanID: {floor_plan_name, bedrooms, bathrooms, sqft}}``.
+
+    Walks each ``getUnitListByFloor(this,'<fpid>',...)`` onclick in
+    ``html``; for each onclick, scans the preceding ~1500 chars for:
+      - last ``<h2>`` (plan name, e.g. "1A")
+      - last "X Bed[room]s" phrase (or standalone "Studio | … Bath")
+      - last "N Bath[room]s" phrase
+      - last "<span>SQFT</span> sq.ft." span
+
+    The repli360 ``/admin/template-render`` HTML lays out each plan as:
+        <h2>1A</h2>
+        <p>One Bedroom | 1 Bath | <span>670</span> sq.ft. | <span>14</span>
+           Units Available</p>
+        ... <a onclick="getUnitListByFloor(this,'4832490',2,1649,'');">
+    so the metadata sits directly before the onclick — a backward window
+    join is robust to inter-plan markup variation. Per-floorPlan dedup
+    (first occurrence wins) since the same fpid can appear multiple times
+    (filter tabs, "View All", etc.) and the first is always the canonical
+    listing block.
+
+    Empty html → {}. Onclicks without resolvable meta still get an empty
+    dict (caller's ``.get(fpid, {})`` pattern then skips merging).
+    """
+    if not html:
+        return {}
+    out: dict[str, dict[str, str]] = {}
+    lookback = 1500
+    for m in _ONCLICK_RE.finditer(html):
+        fpid = m.group(1).strip()
+        if not fpid or fpid in out:
+            continue
+        start = max(0, m.start() - lookback)
+        chunk = html[start:m.start()]
+        meta: dict[str, str] = {}
+
+        # Find the LAST <h2> in the lookback chunk — this is the current
+        # plan's name. Narrow the chunk to "everything after that <h2>"
+        # so beds/baths/sqft from a previous plan card (which might still
+        # be inside the 1500-char lookback when cards are short) cannot
+        # leak in. Without this, the Studio case ("Studio | 1 Bath") on
+        # a tight layout picks up the previous card's "Two Bedrooms".
+        h2_matches = list(_H2_RE.finditer(chunk))
+        if h2_matches:
+            last_h2 = h2_matches[-1]
+            name = last_h2.group(1).strip()
+            if name:
+                meta["floor_plan_name"] = name
+            chunk = chunk[last_h2.end() :]
+
+        sqft_matches = list(_SQFT_META_RE.finditer(chunk))
+        if sqft_matches:
+            meta["sqft"] = sqft_matches[-1].group(1)
+
+        bath_matches = list(_BATHS_META_RE.finditer(chunk))
+        if bath_matches:
+            meta["bathrooms"] = bath_matches[-1].group(1)
+
+        bed_matches = list(_BEDS_META_RE.finditer(chunk))
+        if bed_matches:
+            word = bed_matches[-1].group(1).lower()
+            meta["bedrooms"] = _WORD_TO_DIGIT.get(word, word)
+        elif _STUDIO_META_RE.search(chunk):
+            # "Studio | 1 Bath | …" with no "Bedroom" word.
+            meta["bedrooms"] = "0"
+
+        out[fpid] = meta
+    return out
 
 
 def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
@@ -247,6 +368,30 @@ def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
     return out
 
 
+def merge_repli360_plan_meta(
+    units: list[dict[str, Any]], meta: dict[str, str]
+) -> None:
+    """Fill empty plan-level fields on each unit dict from ``meta``.
+
+    In-place mutation. Per-unit values (if already set) WIN; ``meta``
+    only ever fills gaps. Skips silently when ``meta`` is empty.
+
+    The getUnitListByFloor per-unit response carries rent + unit_number
+    + availability but NEVER sqft/beds/baths/plan_name; the template-
+    render HTML carries those on the plan card. This helper is the
+    join: one ``meta`` per floorplan, applied to all the units we got
+    back from that floorplan's getUnitListByFloor call.
+    """
+    if not meta:
+        return
+    fillable = ("floor_plan_name", "sqft", "bedrooms", "bathrooms")
+    for u in units:
+        for key in fillable:
+            v = meta.get(key)
+            if v and not u.get(key):
+                u[key] = v
+
+
 class Repli360Adapter:
     """Repli360 / rrac same-domain ``getUnitListByFloor`` extractor."""
 
@@ -278,21 +423,36 @@ class Repli360Adapter:
         # STATIC HTML → fetch it → site_id → /admin/template-render →
         # floorplan list. All server-side, no auth, no bot wall, no
         # browser. This is what lifts repli360 past the render cap.
+        #
+        # 2026-05-22: ONE fetch of /admin/template-render now serves two
+        # parses — floorplan list (find_repli360_floorplans) AND plan-
+        # level metadata (parse_repli360_plan_meta) for the rent+sqft
+        # success bar. The per-unit getUnitListByFloor response carries
+        # rent + unit_number but NO sqft/beds/baths/plan_name; without
+        # this merge every repli360 property is PLAN_LEVEL-only PARTIAL.
         site_id = ""
         fps: list[tuple[str, str]] = []
+        plan_meta: dict[str, dict[str, str]] = {}
         script_url = find_repli360_script_url(html)
         if script_url:
             site_id = fetch_repli360_site_id(script_url, referer)
             if site_id:
-                fps = fetch_repli360_floorplans(site_id, referer)
+                tpl_html = fetch_repli360_template_render(site_id, referer)
+                if tpl_html:
+                    _sid, fps = find_repli360_floorplans(tpl_html)
+                    plan_meta = parse_repli360_plan_meta(tpl_html)
 
         # FALLBACK: if the static chain didn't resolve (no script tag, or
         # template-render empty), use JS-rendered onclick attrs if the
-        # page happened to be rendered. Keeps the prior behaviour.
+        # page happened to be rendered. Keeps the prior behaviour; the
+        # rendered page also carries the same plan-meta layout so try
+        # parsing it too — costs nothing when there's no match.
         if not site_id or not fps:
             r_sid, r_fps = find_repli360_floorplans(html)
             site_id = site_id or r_sid
             fps = fps or r_fps
+            if not plan_meta:
+                plan_meta = parse_repli360_plan_meta(html)
 
         if not site_id or not fps:
             result.tier_used = f"{_TIER}_NO_FLOORPLANS"
@@ -333,7 +493,14 @@ class Repli360Adapter:
                 j = json.loads(resp.text or "{}")
             except (json.JSONDecodeError, ValueError):
                 continue
-            for u in parse_repli360_str(str(j.get("str") or ""), _API):
+            fp_units = parse_repli360_str(str(j.get("str") or ""), _API)
+            # Plan-meta join: getUnitListByFloor returns rent +
+            # unit_number + availability but NEVER sqft/beds/baths/
+            # plan_name. The template-render HTML carries those on the
+            # plan card next to the onclick — merge them in. Per-unit
+            # values (if any) win; meta only fills gaps.
+            merge_repli360_plan_meta(fp_units, plan_meta.get(fpid, {}))
+            for u in fp_units:
                 key = f"{u.get('unit_number')}|{u.get('building')}"
                 if key in seen_units:
                     continue

@@ -245,6 +245,232 @@ def _is_sightmap_response(body: Any) -> bool:
     return False
 
 
+def _try_subpage_sightmap_with_prices(
+    ctx: AdapterContext, result: AdapterResult
+) -> list[dict[str, str]]:
+    """Search property subpages for a SightMap embed that DOES publish
+    prices. Some operators run two SightMap embeds on the same property:
+    a "full map" on the homepage (all units, no prices — just for floor-
+    plan visualization) and a separate "availability" SightMap on
+    ``/availability/`` (only currently-leasable units, WITH prices).
+
+    Live-verified 2026-05-23 on roserawesmont.com:
+      - homepage embed ``n9w616yev71``: 295 units, 0 prices
+      - /availability/ embed ``r5v51x35wny``: 8 units, 8 with prices
+        (#3135 $2,420 / #3203 $2,560 — matches the operator UI)
+
+    Without this, the rent-gap flag would wrongly mark Rosera as
+    "operator doesn't publish rent" — when actually they do, just via
+    a second embed the homepage didn't link directly. Defensive: only
+    fires when the primary SightMap path returned no rent AND a
+    different embed code exists on a subpage.
+    """
+    from urllib.parse import urlparse
+
+    base_url = str(getattr(ctx, "base_url", "") or "")
+    if not base_url:
+        return []
+    parsed = urlparse(base_url)
+    if not parsed.scheme or not parsed.netloc:
+        return []
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+
+    # Collect the embed codes already seen via the primary path so the
+    # subpage hunt doesn't re-probe them.
+    seen_embeds: set[str] = set()
+    fr = getattr(ctx, "fetch_result", None)
+    body0 = getattr(fr, "body", None) if fr is not None else None
+    html0 = body0.decode("utf-8", errors="replace") if isinstance(body0, bytes) else str(body0 or "")
+    for m in _SIGHTMAP_EMBED_URL_RE.finditer(html0):
+        seen_embeds.add(m.group(1))
+
+    try:
+        from ma_poc.pms.adapters._probe import probe_get
+    except Exception:
+        return []
+
+    # Probe the conventional availability/apartments paths. Same paths
+    # used by the SecureCafe drill (proven discovery surface).
+    for path in ("/availability/", "/apartments/", "/availability"):
+        try:
+            r = probe_get(origin + path, timeout=15)
+        except Exception:
+            continue
+        if r.status_code != 200 or not r.text:
+            continue
+        # Find every SightMap embed on this page that wasn't already
+        # probed by the primary path.
+        new_codes: list[str] = []
+        for m in _SIGHTMAP_EMBED_URL_RE.finditer(r.text):
+            code = m.group(1)
+            if code not in seen_embeds:
+                seen_embeds.add(code)
+                new_codes.append(code)
+        if not new_codes:
+            continue
+        for code in new_codes:
+            try:
+                er = probe_get(f"https://sightmap.com/embed/{code}", timeout=12)
+                href_m = _SIGHTMAP_APP_CONFIG_HREF_RE.search(er.text or "")
+                if not href_m:
+                    continue
+                api_url = href_m.group(1).replace("\\/", "/")
+                ar = probe_get(api_url, timeout=15)
+                if ar.status_code != 200 or not ar.text:
+                    continue
+                body = json.loads(ar.text)
+            except Exception as exc:
+                result.errors.append(
+                    f"sightmap-subpage-probe-error[{code}]: "
+                    f"{type(exc).__name__}: {str(exc)[:80]}"
+                )
+                continue
+            sub_units, _ = parse_sightmap_payload(body, api_url)
+            # Only accept this subpage embed if it actually has rent —
+            # else we'd just be swapping one no-rent embed for another.
+            with_rent = sum(
+                1
+                for u in sub_units
+                if str(u.get("rent_range") or "").strip() not in {"", "$0", "0"}
+            )
+            if with_rent > 0:
+                result.errors.append(
+                    f"sightmap-subpage-override: found {with_rent}/"
+                    f"{len(sub_units)} units with rent at "
+                    f"{origin}{path} (embed {code}) — swapping in"
+                )
+                # Stash the discovery URL so the verdict layer reports it.
+                result.api_responses.append(
+                    {
+                        "url": api_url,
+                        "status": 200,
+                        "body": "<sightmap-subpage>",
+                        "via": "subpage_availability",
+                    }
+                )
+                result.winning_url = api_url
+                return sub_units
+    return []
+
+
+def _try_avalon_override_for_sightmap(
+    ctx: AdapterContext, result: AdapterResult
+) -> list[dict[str, Any]]:
+    """Avalon SHIPS rent in its own Fusion CMS blob, even when its
+    SightMap embed shows ``price: null``. wimberlyapthome.com is the
+    canonical example: SightMap detector fires first (sightmap.com
+    iframe present), SightMap API returns 372 units with null prices,
+    but the SAME homepage's Avalon Fusion JSON has rent + sqft on
+    every unit (verified live: 25 units, $1,150/662sqft for #236).
+
+    Before treating an all-null-price SightMap response as a genuine
+    operator-rent-gap, check the page HTML for Avalon's distinctive
+    ``"unitId":"AVB-`` marker. If present, run parse_avalonbay_html
+    and return those units instead. Returns ``[]`` when no Avalon
+    signal is found or parsing yielded nothing — the caller then
+    falls through to the rent-gap flag for genuinely non-Avalon
+    sites (Rosera, Vanguard, Decron portfolio, etc.).
+    """
+    html = ""
+    fr = getattr(ctx, "fetch_result", None)
+    body = getattr(fr, "body", None) if fr is not None else None
+    if isinstance(body, bytes):
+        html = body.decode("utf-8", errors="replace")
+    elif isinstance(body, str):
+        html = body
+    if not html or '"unitId":"AVB-' not in html.replace(" ", "").replace("\n", ""):
+        # Fast prefilter — only run the heavier parse_avalonbay_html when
+        # the Avalon signature is genuinely present. The .replace() guards
+        # against incidental whitespace in synthetic test fixtures.
+        if not html or "AVB-" not in html:
+            return []
+    try:
+        from ma_poc.pms.adapters.avalonbay import parse_avalonbay_html
+
+        base_url = str(getattr(ctx, "base_url", "") or "")
+        avalon_units = parse_avalonbay_html(html, base_url)
+    except Exception as exc:
+        result.errors.append(
+            f"sightmap-avalon-override-error: "
+            f"{type(exc).__name__}: {str(exc)[:100]}"
+        )
+        return []
+    return avalon_units
+
+
+def _flag_sightmap_units_operator_rent_gap(
+    units: list[dict[str, Any]], result: AdapterResult
+) -> int:
+    """Stamp ``data_gaps=["rent"]`` + ``data_quality_flag="RENT_NOT_
+    PUBLISHED"`` on each unit when the operator clearly does not
+    publish rent.
+
+    Gating — ALL of these must hold (defensive against over-flagging):
+      - ≥3 units in the result (single/duo units could be a parser
+        edge case, not a portfolio-wide policy)
+      - 100% of units have a positive area value (confirms the
+        adapter extracted real unit-level structure)
+      - 0 units carry any rent value (across rent_range and the
+        numeric market_rent_low/high fields)
+
+    schema_gate._has_rent honors the flag → no_rent retry doesn't
+    fire → tier stays _SIGHTMAP / _SIGHTMAP_IFRAME (not _PLAN_LEVEL),
+    verdict ships as SUCCESS not SUCCESS_PLAN_LEVEL. Returns the
+    number flagged for diagnostics; 0 when the gate is not met
+    (defensive no-op for properties that DO publish rent).
+    """
+    if not units or len(units) < 3:
+        return 0
+
+    def _unit_has_rent(u: dict[str, Any]) -> bool:
+        # rent_range non-empty/non-zero, or numeric market rents.
+        rr = str(u.get("rent_range") or "").strip()
+        if rr and rr not in {"", "$0", "0"}:
+            return True
+        for k in ("market_rent_low", "market_rent_high", "rent_low", "rent_high"):
+            v = u.get(k)
+            if isinstance(v, (int, float)) and v > 0:
+                return True
+        return False
+
+    def _unit_has_area(u: dict[str, Any]) -> bool:
+        for k in ("sqft", "area", "_sqft"):
+            v = u.get(k)
+            if isinstance(v, (int, float)) and v > 0:
+                return True
+            if isinstance(v, str):
+                s = v.strip().replace(",", "")
+                if s and s != "0":
+                    try:
+                        if float(s) > 0:
+                            return True
+                    except ValueError:
+                        pass
+        return False
+
+    if any(_unit_has_rent(u) for u in units):
+        return 0
+    if not all(_unit_has_area(u) for u in units):
+        return 0
+
+    flagged = 0
+    for u in units:
+        gaps = u.get("data_gaps") or []
+        if "rent" not in gaps:
+            gaps = list(gaps) + ["rent"]
+            u["data_gaps"] = gaps
+        if not u.get("data_quality_flag"):
+            u["data_quality_flag"] = "RENT_NOT_PUBLISHED"
+        flagged += 1
+    if flagged:
+        result.errors.append(
+            f"sightmap-rent-not-published: flagged {flagged} units — "
+            f"operator does not publish rent via SightMap (every unit "
+            f"price is null with full area + plan_name + unit_id)"
+        )
+    return flagged
+
+
 class SightMapAdapter:
     """SightMap PMS adapter. Parses sightmap.com API responses."""
 
@@ -294,6 +520,64 @@ class SightMapAdapter:
                 )
                 result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
                 result.tier_used = _TIER_BASE
+                # 2026-05-23: Avalon-override + operator-rent-gap flag.
+                # If 0 of the SightMap units have rent, FIRST check
+                # whether the page is actually Avalon-backed (its own
+                # Fusion CMS publishes rent even when SightMap shows
+                # null price — wimberlyapthome.com is the canonical
+                # case). If yes, swap in the Avalon-extracted units.
+                # If no Avalon signal, apply the rent-gap flag for
+                # genuinely non-Avalon operators (Rosera, Decron, etc.).
+                _has_any_rent = any(
+                    str(u.get("rent_range") or "").strip() not in {"", "$0", "0"}
+                    or any(
+                        isinstance(u.get(k), (int, float)) and u.get(k) > 0
+                        for k in ("market_rent_low", "market_rent_high")
+                    )
+                    for u in result.units
+                )
+                if not _has_any_rent:
+                    avalon_units = _try_avalon_override_for_sightmap(ctx, result)
+                    if avalon_units:
+                        _pp_av = post_process(
+                            avalon_units,
+                            property_id=getattr(ctx, "property_id", None),
+                        )
+                        if _pp_av.n_admitted > 0:
+                            result.units = _pp_av.admitted
+                            result.plan_summaries = _pp_av.plan_summaries
+                            result.tier_used = "TIER_1_HTML_AVALONBAY_FUSION_VIA_SIGHTMAP"
+                            result.confidence = min(
+                                0.92, 0.7 + 0.05 * _pp_av.n_admitted
+                            )
+                            result.errors.append(
+                                f"sightmap-avalon-override: SightMap had "
+                                f"{_pp.n_admitted} null-price units; "
+                                f"Avalon Fusion HTML has "
+                                f"{_pp_av.n_admitted} with real rent — "
+                                f"swapped in"
+                            )
+                            return result
+                    # Avalon override empty — try the subpage SightMap
+                    # discovery path (Rosera-style two-embed pattern).
+                    sub_units = _try_subpage_sightmap_with_prices(ctx, result)
+                    if sub_units:
+                        _pp_sub = post_process(
+                            sub_units,
+                            property_id=getattr(ctx, "property_id", None),
+                        )
+                        if _pp_sub.n_admitted > 0:
+                            result.units = _pp_sub.admitted
+                            result.plan_summaries = _pp_sub.plan_summaries
+                            result.tier_used = f"{_TIER_BASE}_SUBPAGE"
+                            result.confidence = min(
+                                0.92, 0.7 + 0.05 * _pp_sub.n_admitted
+                            )
+                            return result
+                    # No richer embed found anywhere — apply the
+                    # operator-rent-gap flag. Same evidence chain as
+                    # the byelon sqft fix.
+                    _flag_sightmap_units_operator_rent_gap(_pp.admitted, result)
                 # Even on success, surface silent unit-level loss when the
                 # SightMap-internal join rate drops below the 80% floor.
                 # ``total_raw_units`` / ``total_dropped`` track join-time
@@ -334,6 +618,50 @@ class SightMapAdapter:
                     result.plan_summaries = _pp.plan_summaries
                     result.tier_used = f"{_TIER_BASE}_IFRAME"
                     result.confidence = min(0.90, 0.65 + 0.05 * _pp.n_admitted)
+                    # Same Avalon-override + rent-gap flag chain for the
+                    # iframe path. Without this, wimberly-style sites
+                    # taking the iframe-fallback path would still get
+                    # wrongly flagged as rent-not-published.
+                    _has_any_rent = any(
+                        str(u.get("rent_range") or "").strip() not in {"", "$0", "0"}
+                        or any(
+                            isinstance(u.get(k), (int, float)) and u.get(k) > 0
+                            for k in ("market_rent_low", "market_rent_high")
+                        )
+                        for u in result.units
+                    )
+                    if not _has_any_rent:
+                        avalon_units = _try_avalon_override_for_sightmap(ctx, result)
+                        if avalon_units:
+                            _pp_av = post_process(
+                                avalon_units,
+                                property_id=getattr(ctx, "property_id", None),
+                            )
+                            if _pp_av.n_admitted > 0:
+                                result.units = _pp_av.admitted
+                                result.plan_summaries = _pp_av.plan_summaries
+                                result.tier_used = (
+                                    "TIER_1_HTML_AVALONBAY_FUSION_VIA_SIGHTMAP_IFRAME"
+                                )
+                                result.confidence = min(
+                                    0.92, 0.7 + 0.05 * _pp_av.n_admitted
+                                )
+                                return result
+                        sub_units = _try_subpage_sightmap_with_prices(ctx, result)
+                        if sub_units:
+                            _pp_sub = post_process(
+                                sub_units,
+                                property_id=getattr(ctx, "property_id", None),
+                            )
+                            if _pp_sub.n_admitted > 0:
+                                result.units = _pp_sub.admitted
+                                result.plan_summaries = _pp_sub.plan_summaries
+                                result.tier_used = f"{_TIER_BASE}_IFRAME_SUBPAGE"
+                                result.confidence = min(
+                                    0.92, 0.7 + 0.05 * _pp_sub.n_admitted
+                                )
+                                return result
+                        _flag_sightmap_units_operator_rent_gap(_pp.admitted, result)
                     return result
 
         # Failure path: classify via structured sub-codes mirroring the RentCafe

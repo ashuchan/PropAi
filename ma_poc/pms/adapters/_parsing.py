@@ -464,6 +464,8 @@ def make_unit_dict(
     source_api_url: str = "",
     extraction_tier: str = "",
     source_ids: dict[str, Any] | None = None,
+    data_gaps: list[str] | None = None,
+    data_quality_flag: str = "",
 ) -> dict[str, Any]:
     """Build a standard unit dict in the format expected by the pipeline.
 
@@ -534,4 +536,17 @@ def make_unit_dict(
         # behavior change; adapters populate per-PMS incrementally with
         # grounded field names (no signature churn thereafter).
         "source_ids": dict(source_ids) if source_ids else {},
+        # 2026-05-23: documented data gaps. An adapter that has verified
+        # (by exhausting all enrichment paths) that the OPERATOR does not
+        # publish a given field stamps it here, e.g. ``data_gaps=["sqft"]``
+        # + ``data_quality_flag="SQFT_NOT_PUBLISHED"``. Downstream then:
+        #   - validation.schema_gate._has_area treats a documented sqft
+        #     gap as "area-present" so the no_area retry trigger doesn't
+        #     fire on legitimately-incomplete-but-extracted units.
+        #   - reporting.verdict can distinguish "parser missed it" from
+        #     "operator data gap" instead of stamping SUCCESS_PLAN_LEVEL
+        #     across both. Empty list / empty string for adapters that
+        #     don't (yet) flag gaps — zero behavior change.
+        "data_gaps": list(data_gaps) if data_gaps else [],
+        "data_quality_flag": data_quality_flag,
     }

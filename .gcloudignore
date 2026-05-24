@@ -1,0 +1,41 @@
+# Cloud Build context exclusions — keeps the upload tarball small.
+# Without this, gcloud falls back to .gitignore which doesn't exclude
+# investigation HAR captures (4+ GB) or local data dirs.
+
+.git/
+.gitignore
+
+# Local-only large dirs
+investigations/
+data/
+.venv/
+venv/
+node_modules/
+.claude/
+.tox/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Test caches
+.mypy_cache/
+.ruff_cache/
+
+# Local HAR archive folders
+**/HAR FILES/
+**/raw/
+
+# Build artifacts
+*.egg-info/
+build/
+dist/
+
+# Logs
+*.log

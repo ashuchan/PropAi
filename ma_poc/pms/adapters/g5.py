@@ -53,6 +53,17 @@ _G5_ENDPOINT = "https://inventory.g5marketingcloud.com/graphql"
 # returned 200 from the GraphQL endpoint when passed as ``locationUrn``.
 _G5_URN_RE = re.compile(r"g5-cl[a-z]?-[a-z0-9]+(?:-[a-z0-9]+)*", re.IGNORECASE)
 
+# 2026-05-23: G5 dataLayer canonical property URN — the single source of
+# truth for which ``locationUrn`` the GraphQL API accepts. Always the
+# ``g5-cl-*`` (no ``w``) form. The ``g5-clw-*-{32-hex-suffix}`` URN
+# returns 404 from the inventory GraphQL endpoint (validated 21/21 on
+# the canary G5_API_ERROR cohort) but was being picked by the longest-
+# match heuristic, blocking unit extraction for the whole cohort.
+_G5_STORE_ID_RE = re.compile(
+    r'"G5_STORE_ID"\s*:\s*"(g5-cl-[a-z0-9-]+)"',
+    re.IGNORECASE,
+)
+
 # GraphQL query — returns the unit + floor-plan join in one round trip.
 # perPage:200 covers any normal property; pagination would need the API's
 # total-count hint (not currently used).
@@ -89,23 +100,45 @@ _TIER_EMPTY = f"{_TIER_BASE}_EMPTY"
 
 
 def find_g5_urn(html: str) -> str | None:
-    """Return the longest ``g5-cl-...`` / ``g5-cl<x>-...`` slug in *html*,
-    or ``None``.
+    """Return the canonical ``locationUrn`` for the property, or ``None``.
 
-    Longest match wins because the same property might have both the bare
-    ``g5-cl-<id>`` and the full ``g5-cl-<id>-<name-slug>`` form; the
-    GraphQL API accepts either but the longer form is unambiguous.
+    Selection priority (2026-05-23 fix — see canary G5_API_ERROR 21/21
+    failure cohort root cause):
+      1. ``G5_STORE_ID`` from the inline ``dataLayer`` script. This is
+         the SINGLE source of truth — the GraphQL API only accepts the
+         ``g5-cl-<id>-<slug>`` form found here. Always present on every
+         G5-hosted page (validated across 5+ Goldoller / Bayshore /
+         GK Management / single-property sites).
+      2. Longest ``g5-cl-*`` match (NOT ``g5-clw-*``) from the HTML —
+         fallback when the dataLayer script is missing or the URN was
+         stripped from it.
 
-    2026-05-20: ``"g5-cl"`` substring (without trailing dash) is the
-    early-out gate so we also match the ``g5-clw-`` property-level
-    variant (e.g. ``g5-clw-guhjplm75w-villas-willow-glen-...``). The
-    regex itself enforces the ``g5-cl<x?>-<id>`` shape.
+    The ``g5-clw-*-{32-hex}`` URN is the WEBSITE/wrapper URN, NOT a
+    valid GraphQL ``locationUrn``. The old longest-match heuristic
+    selected it because the 32-hex hash suffix made it longer than the
+    real ``g5-cl-*`` URN — that's the bug. Multi-property portfolios
+    (Goldoller, GK Management, Bayshore) also leak SIBLING ``g5-cl-*``
+    URNs onto the page (CDN image paths for menu thumbnails), so the
+    raw-longest fallback alone isn't safe either — the dataLayer is
+    what tells us which sibling THIS page belongs to.
     """
     if not html or "g5-cl" not in html.lower():
         return None
+    # Priority 1: canonical G5_STORE_ID from the dataLayer.
+    m = _G5_STORE_ID_RE.search(html)
+    if m:
+        return m.group(1).lower()
+    # Priority 2: longest g5-cl-* (explicitly EXCLUDING g5-clw-*) match.
+    # We separate the two namespaces and prefer the `g5-cl-` form even
+    # when shorter — the `g5-clw-*` URNs always 404 the inventory API.
     matches = {m.group(0).lower() for m in _G5_URN_RE.finditer(html)}
     if not matches:
         return None
+    g5_cl_only = {u for u in matches if u.startswith("g5-cl-")}
+    if g5_cl_only:
+        return max(g5_cl_only, key=len)
+    # Last-resort: the `g5-clw-*` URN (will likely 404, but better than
+    # None — at least the cascade can record the API error and move on).
     return max(matches, key=len)
 
 

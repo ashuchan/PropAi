@@ -51,6 +51,18 @@ from ma_poc.pms.adapters._amli import (
 from ma_poc.pms.adapters._amli import (
     parse_amli_trpc_blob as _parse_amli,
 )
+from ma_poc.pms.adapters._apts247 import (
+    build_floorplans_url as _apts247_build_url,
+)
+from ma_poc.pms.adapters._apts247 import (
+    detect_apts247 as _detect_apts247,
+)
+from ma_poc.pms.adapters._apts247 import (
+    extract_api_key as _apts247_api_key,
+)
+from ma_poc.pms.adapters._apts247 import (
+    parse_apts247_floorplans as _parse_apts247,
+)
 from ma_poc.pms.adapters._daily_runner_parsers import (
     parse_api_responses as _dr_parse_api_responses,
 )
@@ -69,12 +81,6 @@ from ma_poc.pms.adapters._funnel import (
 from ma_poc.pms.adapters._funnel import (
     parse_funnel_api_response as _parse_funnel,
 )
-from ma_poc.pms.adapters.g5 import (
-    is_g5_graphql_body as _is_g5_graphql_body,
-    is_g5_graphql_url as _is_g5_graphql_url,
-    parse_g5_response as _parse_g5_response,
-)
-from ma_poc.models.scrape_profile import FieldSelectorMap as _FieldSelectorMap
 from ma_poc.pms.adapters._html_extract import (
     extract_embedded_blobs_from_html,
     extract_jsonld_from_html,
@@ -82,6 +88,21 @@ from ma_poc.pms.adapters._html_extract import (
     extract_units_from_dom,
     extract_units_from_html_tables,
     extract_with_hints,
+)
+from ma_poc.pms.adapters._jetengine_repeater import (
+    detect_jetengine_repeater as _detect_jetengine,
+)
+from ma_poc.pms.adapters._jetengine_repeater import (
+    parse_jetengine_rows as _parse_jetengine,
+)
+from ma_poc.pms.adapters._mark_taylor import (
+    derive_floor_plans_url as _mt_derive_fp_url,
+)
+from ma_poc.pms.adapters._mark_taylor import (
+    detect_mark_taylor as _detect_mt,
+)
+from ma_poc.pms.adapters._mark_taylor import (
+    parse_mark_taylor_html as _parse_mt,
 )
 from ma_poc.pms.adapters._merge_fns import (
     aggregate_quality as _aggregate_quality,
@@ -112,6 +133,15 @@ from ma_poc.pms.adapters._parsing import (
     rent_in_sanity_range,
 )
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
+from ma_poc.pms.adapters.g5 import (
+    is_g5_graphql_body as _is_g5_graphql_body,
+)
+from ma_poc.pms.adapters.g5 import (
+    is_g5_graphql_url as _is_g5_graphql_url,
+)
+from ma_poc.pms.adapters.g5 import (
+    parse_g5_response as _parse_g5_response,
+)
 
 # F0.1: module-level logger. Previously the cost-cap-exceeded branch
 # referenced a bare ``log`` symbol that didn't exist, so a property that
@@ -276,6 +306,92 @@ _re_rent_loose = _re.compile(
     _re.IGNORECASE,
 )
 
+def _jsonld_gate_decision(units: list[dict[str, Any]], html: str) -> str:
+    """Decide whether JSON-LD extracted ``units`` should win this scrape.
+
+    Returns ``"accept"`` if the JSON-LD result should stand (current
+    cascade will stop here), or a short reason string describing why
+    the cascade should keep going — caller logs the reason and treats
+    the units as empty so subsequent sub-tiers run.
+
+    Rejection rules (any one fires):
+
+    1. **name-only**: no rent, no sqft, AND no (floor_plan + beds/
+       baths combo). Pure plan labels with nothing measurable. Falls
+       back to LLM/DOM/etc.
+
+    2. **no-rent + richer PMS present** *(2026-05-23 fix)*: JSON-LD
+       got plan-level data but no rent, AND the page carries signals
+       of a richer PMS source (SecureCafe, RentCafe XHR, Entrata,
+       SightMap, MAAC API). Live-verified on
+       mainstreetsquareapartments.com: JSON-LD won with 27 plan rows
+       (no rent), but SecureCafe drill has 22 units WITH real rent.
+       Without this rule, ~16 area-but-no-rent properties stamp
+       TIER_2_JSONLD and downgrade to SUCCESS_PLAN_LEVEL when their
+       PMS-specific adapter would have produced honest SUCCESS.
+
+    Otherwise → ``"accept"``. (The original logic accepts any output
+    carrying sqft OR a floor_plan+beds_or_baths combo. The new rule is
+    additive — never accepts MORE than the original, only declines
+    more aggressively when a PMS-specific path is likely to do better.)
+    """
+    if not units:
+        return "no_units"
+    has_rent = any(
+        u.get("market_rent_low") or u.get("market_rent_high") or u.get("rent_range")
+        for u in units
+    )
+    has_size = any(u.get("sqft") for u in units)
+    has_beds_or_baths = any(
+        u.get("bedrooms") or u.get("bathrooms") for u in units
+    )
+    has_floor_plan = any(u.get("floor_plan_name") for u in units)
+    is_name_only = (
+        not has_rent
+        and not has_size
+        and not (has_floor_plan and has_beds_or_baths)
+    )
+    if is_name_only:
+        return (
+            "JSON-LD had floor-plan names only (no rent/sqft/beds) — "
+            "falling through"
+        )
+    # 2026-05-23: reject when JSON-LD has neither rent nor sqft, even
+    # when beds+baths+floor_plan are present. Without this, 73 canary
+    # properties stamped TIER_2_JSONLD with `fp+beds+baths` only and
+    # never reached the deeper plan-text / embedded-JSON / subpage
+    # tiers that often DO carry rent+sqft on a /floor-plans/ subpage.
+    # Probe sample: 4/6 of these properties have full rent+sqft data
+    # one click deeper (frginc /apartments/, larsonapts /floorplans/,
+    # theclubsapt /floorplans/, rentchesapeakevillage /floor-plans/).
+    # At worst the cascade finds nothing more and the property ends
+    # up in the same partial bucket; at best we recover real rent+sqft.
+    if not has_rent and not has_size:
+        return (
+            "JSON-LD has beds/baths but neither rent nor sqft — "
+            "falling through to deeper tiers"
+        )
+    if not has_rent and html:
+        h = html.lower()
+        # Markers of a PMS-specific adapter that ships rent. Anchored
+        # phrases (e.g. ``rentcafe.com``, ``maac.com/api/``) to avoid
+        # incidental matches on logos or favicon paths.
+        richer_pms = (
+            "securecafe" in h
+            or "rentcafe.com" in h
+            or "entrata.com" in h
+            or "sightmap.com" in h
+            or "maac.com/api/" in h
+        )
+        if richer_pms:
+            return (
+                "JSON-LD has no rent and page has a richer PMS source "
+                "(securecafe/rentcafe/entrata/sightmap/maac) — "
+                "falling through"
+            )
+    return "accept"
+
+
 def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
     """Return True when units carry identity + physical (≥2 fields) + transactional.
 
@@ -293,6 +409,62 @@ def _looks_field_rich(units: list[dict[str, Any]]) -> bool:
         and any(has_field_group(u, "physical") for u in units)
         and any(has_field_group(u, "transactional") for u in units)
     )
+
+
+def _has_rent_sqft_pair(units: list[dict[str, Any]]) -> bool:
+    """True when at least one unit in *units* has BOTH rent and sqft.
+
+    2026-05-23 partial-cohort fix: the dominant failure mode at the
+    PARTIAL bucket level is a tier that accepted with rent OR sqft but
+    not both. Without this guard, the cascade STOPs at the first tier
+    that produced units, even when those units can't satisfy the
+    strict success bar (≥1 unit with rent+sqft).
+
+    With this guard wired into TIER_2_JSONLD / TIER_1_5_EMBEDDED /
+    TIER_3_DOM acceptance sites, the cascade continues to deeper
+    tiers when the current tier's output lacks the pair — often
+    flipping a property from FAILED/PARTIAL to SUCCESS once a deeper
+    tier (plan_text / subpage / dom_scan) finds the missing field.
+
+    Defensively tolerant: returns False on empty list / non-list input.
+    Tolerates the v2 schema (``market_rent_low`` + ``sqft``) and
+    legacy variants (``rent_range`` + ``area``).
+    """
+    if not units:
+        return False
+    for u in units:
+        if not isinstance(u, dict):
+            continue
+        rent = (
+            u.get("market_rent_low")
+            or u.get("market_rent_high")
+            or u.get("rent_low")
+            or u.get("rent_high")
+            or u.get("asking_rent")
+        )
+        # rent_range is a string like "$1,500 - $2,000" — only count
+        # when it contains an actual digit to avoid empty strings.
+        if not rent:
+            rr = u.get("rent_range") or ""
+            if isinstance(rr, str) and any(c.isdigit() for c in rr):
+                rent = rr
+        if not rent:
+            continue
+        sqft = u.get("sqft") or u.get("area") or u.get("_sqft")
+        if not sqft:
+            continue
+        # sqft can be -1 sentinel for "missing"
+        try:
+            if isinstance(sqft, str):
+                sqft_num = int("".join(c for c in sqft if c.isdigit()) or "0")
+            else:
+                sqft_num = int(sqft)
+        except (ValueError, TypeError):
+            continue
+        if sqft_num <= 0:
+            continue
+        return True
+    return False
 
 
 def _assess_and_decide(
@@ -1754,6 +1926,80 @@ class GenericAdapter:
                         return result
                     skip_llm = False
 
+            # ── Sub-tier 2.75 (2026-05-23): apts247 / Vergence Multifamily.
+            # Yardi's small-property tenant exposes a public REST endpoint
+            # at ``{host}/api/v1/floorplans/?api_key=<HEX40>`` that returns
+            # full unit-level data (rent, sqft, available_date, unit_number)
+            # for every floor plan. The api_key is published in plain JS as
+            # ``api_key = "<HEX40>"``. Validated 2026-05-23 on
+            # foxrundothan.com (Vergence portfolio) — 3 plans × 3 units, all
+            # carrying rent + sqft + availability date.
+            if not result.units and _detect_apts247(html):
+                t0 = _time.monotonic()
+                apts247_units: list[dict[str, Any]] = []
+                api_key = _apts247_api_key(html)
+                api_url = (
+                    _apts247_build_url(ctx.base_url, api_key) if api_key else None
+                )
+                if api_url:
+                    try:
+                        from ma_poc.pms.adapters._probe import probe_get
+                        resp = probe_get(api_url, headers={
+                            "Accept": "application/json",
+                            "Referer": ctx.base_url,
+                        })
+                        if resp is not None and getattr(resp, "status_code", 0) == 200:
+                            import json as _json
+                            try:
+                                data = _json.loads(resp.text)
+                                apts247_units = _parse_apts247(
+                                    data, source_url=api_url
+                                )
+                            except Exception as _ape:
+                                result.errors.append(
+                                    f"apts247-parse-error: {_ape}"
+                                )
+                        else:
+                            _status = (
+                                getattr(resp, "status_code", "?") if resp else "?"
+                            )
+                            result.errors.append(
+                                f"apts247-api-error: status={_status}"
+                            )
+                    except Exception as _ae:
+                        result.errors.append(
+                            f"apts247-api-error: {type(_ae).__name__}: "
+                            f"{str(_ae)[:120]}"
+                        )
+                _log_attempt(
+                    "generic:apts247",
+                    "ran_units" if apts247_units else "ran_empty",
+                    units=len(apts247_units),
+                    reason="" if apts247_units else (
+                        "apts247 detected but api_key extract / API fetch failed"
+                        if api_url else "apts247 marker but no api_key in HTML"
+                    ),
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if apts247_units:
+                    result.units = _merge_into_result_units(
+                        result.units, apts247_units, property_id=ctx.property_id
+                    )
+                    result.tier_used = "TIER_1_API_APTS247"
+                    result.winning_url = api_url
+                    result.confidence = min(
+                        0.92, 0.7 + 0.03 * len(result.units)
+                    )
+                    from ma_poc.models.source import SourceId as _SI_A247
+                    sources_already_run.add(_SI_A247.API_GENERIC_NARROW)
+                    _a247d = _assess_and_decide(
+                        result.units, sources_already_run, ctx, decision_log
+                    )
+                    if _a247d is None or _a247d.action == "STOP":
+                        result._decision_log = decision_log  # type: ignore[attr-defined]
+                        return result
+                    skip_llm = False
+
             # ── Sub-tier 2.7 (2026-05-21): Nestio contact-widget rendered DOM
             # Some Funnel/Nestio customers (Dermot Company; some non-Essex
             # customers) embed the contact widget
@@ -1811,27 +2057,13 @@ class GenericAdapter:
             # a valid partial record — the rent may load dynamically from
             # an iframe/portal (e.g. AMLI ProspectPortal).
             if jsonld_units:
-                has_rent = any(
-                    u.get("market_rent_low") or u.get("market_rent_high") or u.get("rent_range")
-                    for u in jsonld_units
-                )
-                has_size = any(u.get("sqft") for u in jsonld_units)
-                has_beds_or_baths = any(
-                    u.get("bedrooms") or u.get("bathrooms")
-                    for u in jsonld_units
-                )
-                has_floor_plan = any(u.get("floor_plan_name") for u in jsonld_units)
-                _is_name_only = (
-                    not has_rent
-                    and not has_size
-                    and not (has_floor_plan and has_beds_or_baths)
-                )
-                if _is_name_only:
+                _gate_outcome = _jsonld_gate_decision(jsonld_units, html or "")
+                if _gate_outcome != "accept":
                     _log_attempt(
                         "generic:jsonld",
                         "ran_empty",
                         units=len(jsonld_units),
-                        reason="JSON-LD had floor-plan names only (no rent/sqft/beds) — falling through",
+                        reason=_gate_outcome,
                         duration_ms=int((_time.monotonic() - t0) * 1000),
                     )
                     jsonld_units = []
@@ -1895,6 +2127,121 @@ class GenericAdapter:
                     except Exception as exc:
                         embedded_units = []
                         result.errors.append(f"embedded-parse-error: {exc}")
+
+            # Sub-tier 4b (2026-05-23): Mark-Taylor PRELOADED_STATE.
+            # mark-taylor.com properties (~10 in registry, ~50 total in the
+            # operator portfolio) embed their floor_plan_meta in a plain
+            # window.PRELOADED_STATE assignment that the generic
+            # embedded-JSON walker doesn't pick up (it scans for
+            # __NEXT_DATA__ / __NUXT__ / type="application/json" script
+            # tags only). Detect by host + global marker and emit one
+            # plan-level row per bedroom count when found. Honors the
+            # success bar (≥1 unit with rent+sqft) for the cohort
+            # previously mis-flagged as operator-data-gap.
+            if not embedded_units and _detect_mt(html, ctx.base_url):
+                try:
+                    mt_rows = _parse_mt(html, source_url=ctx.base_url)
+                except Exception as _mtx:
+                    mt_rows = []
+                    result.errors.append(f"mark-taylor-parse-error: {_mtx}")
+                if mt_rows:
+                    embedded_units = mt_rows
+                else:
+                    # Homepage didn't carry PRELOADED_STATE — surface the
+                    # /floor-plans/ subpage as a deterministic link-hop
+                    # hint so the orchestrator re-probes there.
+                    fp_url = _mt_derive_fp_url(ctx.base_url)
+                    if fp_url:
+                        existing_hints = (
+                            getattr(result, "_subpage_hints", None) or []
+                        )
+                        if fp_url not in existing_hints:
+                            result._subpage_hints = existing_hints + [fp_url]  # type: ignore[attr-defined]
+
+            # Sub-tier 4c (2026-05-23): JetEngine + RealPage-OLL DOM.
+            # Copperpoint-class WordPress sites render unit data inline
+            # in jet-listing-dynamic-repeater__item rows, with the
+            # RealPage propertyId embedded in
+            # data-unit-application-url. The 3-signal detector keeps
+            # us off plain JetEngine sites. Each row has rent + sqft +
+            # unit_number — no further HTTP fetch needed. Fires before
+            # the LLM tiers since we have a confident deterministic
+            # parse path.
+            if not embedded_units and _detect_jetengine(html, ctx.base_url):
+                try:
+                    jet_rows = _parse_jetengine(html, source_url=ctx.base_url)
+                except Exception as _jx:
+                    jet_rows = []
+                    result.errors.append(f"jetengine-parse-error: {_jx}")
+                if jet_rows:
+                    embedded_units = jet_rows
+
+            # Sub-tier 4d (2026-05-23): Wix HtmlComponent iframe →
+            # AppFolio tenant resolver. Many Wix-built operator sites
+            # (millenniumnw, liveallureva, etc.) embed an AppFolio
+            # listing widget inside a Wix HtmlComponent iframe whose
+            # src points at *.filesusr.com/html/<hex>.html. The vanity
+            # HTML alone never mentions appfolio.com — only the
+            # filesusr.com body does. We fetch each iframe, look for
+            # Appfolio.Listing({hostUrl: 'TENANT.appfolio.com'}), and
+            # surface https://{TENANT}.appfolio.com/listings as a
+            # portal hint. The orchestrator's link-hop then probes
+            # that URL and the existing _appfolio_embed parser handles
+            # the SSR listing-id grid.
+            if not embedded_units:
+                try:
+                    from ma_poc.pms.adapters._wix_iframe_walker import (
+                        build_appfolio_listings_url as _wix_af_url,
+                    )
+                    from ma_poc.pms.adapters._wix_iframe_walker import (
+                        detect_wix_html_iframes as _wix_iframes,
+                    )
+                    from ma_poc.pms.adapters._wix_iframe_walker import (
+                        extract_appfolio_tenant as _wix_af_tenant,
+                    )
+                    wix_iframes = _wix_iframes(html)
+                except Exception:
+                    wix_iframes = []
+                if wix_iframes:
+                    from ma_poc.pms.adapters._probe import probe_get
+                    af_hints: list[str] = []
+                    for iframe_url in wix_iframes[:5]:  # cap at 5
+                        try:
+                            iframe_resp = probe_get(iframe_url, headers={
+                                "Accept": "text/html,*/*",
+                                "Referer": ctx.base_url,
+                            })
+                        except Exception:
+                            iframe_resp = None
+                        if iframe_resp is None or getattr(
+                            iframe_resp, "status_code", 0
+                        ) != 200:
+                            continue
+                        tenant = _wix_af_tenant(iframe_resp.text)
+                        if not tenant:
+                            continue
+                        listings_url = _wix_af_url(tenant)
+                        if listings_url and listings_url not in af_hints:
+                            af_hints.append(listings_url)
+                    if af_hints:
+                        existing = (
+                            getattr(result, "_subpage_hints", None) or []
+                        )
+                        for u in af_hints:
+                            if u not in existing:
+                                existing = existing + [u]
+                        result._subpage_hints = existing  # type: ignore[attr-defined]
+                        _log_attempt(
+                            "generic:wix_iframe_appfolio",
+                            "ran_hint",
+                            units=0,
+                            reason=(
+                                f"resolved {len(af_hints)} AppFolio tenant(s) "
+                                f"from Wix iframe walk: "
+                                + ", ".join(af_hints[:3])
+                            ),
+                        )
+
             _log_attempt(
                 "generic:embedded_json",
                 "ran_units" if embedded_units else ("ran_empty" if embedded else "skipped"),
@@ -2028,10 +2375,18 @@ class GenericAdapter:
                 from ma_poc.models.source import SourceId as _SI3
                 sources_already_run.add(_SI3.EMBEDDED_JSON)
                 _ed = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
-                if _ed is None or _ed.action == "STOP":
+                # 2026-05-23: hard guard — never STOP at EMBEDDED tier
+                # if the units lack a rent+sqft pair. The planner can
+                # mis-classify "complete" when only one of the two
+                # fields is present. Forcing fall-through here lets
+                # plan-text / subpage / DOM tiers backfill the missing
+                # side. 43 canary properties currently stamp
+                # TIER_1_5_EMBEDDED with rent-only or sqft-only output.
+                has_pair = _has_rent_sqft_pair(result.units)
+                if has_pair and (_ed is None or _ed.action == "STOP"):
                     result._decision_log = decision_log  # type: ignore[attr-defined]
                     return result
-                skip_llm = False  # planner escalated — allow LLM
+                skip_llm = False  # planner escalated OR no rent+sqft pair
 
             # Sub-tier 4b: RealPage CWS credential probe ─────────────────────
             # RealPage LeaseStar CWS sites serve a JavaScript shell whose
@@ -2212,10 +2567,18 @@ class GenericAdapter:
                 from ma_poc.models.source import SourceId as _SI4
                 sources_already_run.add(_SI4.DOM_CASCADE)
                 _dd = _assess_and_decide(result.units, sources_already_run, ctx, decision_log)
-                if _dd is None or _dd.action == "STOP":
+                # 2026-05-23: hard guard — never STOP at DOM tier if
+                # units lack a rent+sqft pair. 67 canary properties
+                # currently stamp TIER_3_DOM with rent-only or sqft-
+                # only units (operator splits the fields across
+                # different page sections). Forcing fall-through lets
+                # subpage / embedded-JSON tiers backfill the missing
+                # side.
+                has_pair = _has_rent_sqft_pair(result.units)
+                if has_pair and (_dd is None or _dd.action == "STOP"):
                     result._decision_log = decision_log  # type: ignore[attr-defined]
                     return result
-                skip_llm = False  # planner escalated — allow LLM
+                skip_llm = False  # planner escalated OR no rent+sqft pair
         else:
             _log_attempt("generic:jsonld", "skipped", reason="no HTML body available")
             _log_attempt("generic:embedded_json", "skipped", reason="no HTML body available")
@@ -3160,6 +3523,48 @@ class GenericAdapter:
                     "generic:sightmap_iframe", "errored",
                     reason=str(_sm_exc)[:120],
                 )
+
+        # 2026-05-23: operator-published "no availability now" detector.
+        # Last resort BEFORE we declare the page extractionless. ~10
+        # krcapartments-class properties publish an explicit
+        # "Sorry, there are no available units at this time." string
+        # (and ~9 sibling phrases — see _no_availability.py). That's a
+        # genuine zero-inventory state, not a failure — the verdict
+        # layer routes it to SUCCESS_NO_AVAILABILITY when this flag is
+        # set. Fires ONLY when no other tier produced units, so it
+        # never overrides a real extraction.
+        if not result.units:
+            try:
+                from ma_poc.pms.adapters._no_availability import (
+                    build_no_availability_placeholder,
+                    detect_no_availability,
+                    matched_phrase,
+                )
+
+                if detect_no_availability(html):
+                    placeholder = build_no_availability_placeholder(
+                        source_url=ctx.base_url,
+                        property_name=getattr(ctx, "property_name", "")
+                        or "",
+                        matched_text=matched_phrase(html),
+                    )
+                    result.units = [placeholder]
+                    result.tier_used = "TIER_1_DOM_NO_AVAILABILITY"
+                    result.winning_url = ctx.base_url
+                    result.confidence = 0.65
+                    # Surface the flag for jugnu → compute_verdict.
+                    result._operator_no_availability = True  # type: ignore[attr-defined]
+                    _log_attempt(
+                        "generic:no_availability",
+                        "ran_units",
+                        units=1,
+                        reason="operator published explicit zero-availability state",
+                    )
+                    return result
+            except Exception as _na_exc:
+                # Detector must never crash the pipeline — log and
+                # continue to the final no-units return below.
+                result.errors.append(f"no-availability-error: {_na_exc}")
 
         result.confidence = 0.0
         result.errors.append("Generic parser found no units in captured API responses")

@@ -289,8 +289,10 @@ def test_find_g5_urn_g5_clw_substring_gate() -> None:
 
 
 def test_find_g5_urn_picks_longest_clw_form() -> None:
-    """When both bare ``g5-clw-<id>`` and full slug forms appear, prefer
-    the longer (fully-qualified) form just like the ``g5-cl-`` case."""
+    """When ONLY ``g5-clw-*`` URNs are present (no G5_STORE_ID, no
+    ``g5-cl-*``), the longest ``g5-clw-*`` form is returned as a
+    last-resort fallback. The API will likely 404 it but the cascade
+    needs SOMETHING to record."""
     html = (
         '<a href="https://x/g5-clw-guhjplm75w">x</a>'
         '<a href="https://x/g5-clw-guhjplm75w-villas-willow-glen-ccd198fe3a9da82ff16f099a096c1d91">y</a>'
@@ -300,6 +302,66 @@ def test_find_g5_urn_picks_longest_clw_form() -> None:
         "g5-clw-guhjplm75w-villas-willow-glen-"
         "ccd198fe3a9da82ff16f099a096c1d91"
     )
+
+
+# ── 2026-05-23: G5_STORE_ID dataLayer priority (G5_API_ERROR fix) ────
+
+
+def test_find_g5_urn_prefers_g5_store_id_over_g5_clw() -> None:
+    """The canonical fix for the canary G5_API_ERROR cohort (21
+    properties): when the page has both ``G5_STORE_ID`` in the inline
+    dataLayer AND a ``g5-clw-*-{hash}`` URN (the website wrapper that
+    returns 404 from the GraphQL API), prefer the ``G5_STORE_ID``.
+    Validated against parkviewapartmentliving.com et al — flipped 18
+    of 21 from API_ERROR to SUCCESS on the same canary cohort."""
+    html = (
+        '<script>'
+        'dataLayer.push({'
+        '"G5_CLIENT_ID":"g5-c-60jdsuatx-goldoller-management-services-llc",'
+        '"G5_STORE_ID":"g5-cl-1o9zp7jp8n-goldoller-management-services-llc-groveport-oh",'
+        '"G5_INDUSTRY_ID":"Apartments"'
+        '});'
+        '</script>'
+        '<img src="//cdn/g5-clw-gqrxx9trkl-winchester-park-7ea658a58541a41b7778182534fd46e7/x.png">'
+    )
+    urn = find_g5_urn(html)
+    assert urn == "g5-cl-1o9zp7jp8n-goldoller-management-services-llc-groveport-oh"
+
+
+def test_find_g5_urn_prefers_g5_cl_over_g5_clw_when_no_store_id() -> None:
+    """Fallback path: no dataLayer G5_STORE_ID, but both ``g5-cl-*`` and
+    ``g5-clw-*`` URNs are in the HTML. Pick the ``g5-cl-*`` form (the
+    real GraphQL-acceptable one) even though the ``g5-clw-*`` may be
+    longer."""
+    html = (
+        '<img src="//cdn/g5-clw-gqrxx9trkl-winchester-park-7ea658a58541a41b7778182534fd46e7/x.png">'
+        '<img src="//cdn/g5-cl-1o9zp7jp8n-goldoller-management-services-llc-groveport-oh/y.png">'
+    )
+    urn = find_g5_urn(html)
+    assert urn == "g5-cl-1o9zp7jp8n-goldoller-management-services-llc-groveport-oh"
+
+
+def test_find_g5_urn_g5_store_id_handles_double_quoted_value() -> None:
+    """G5 dataLayer always uses double-quotes (JSON-shaped)."""
+    html = '<script>{"G5_STORE_ID": "g5-cl-abc123-test-property"}</script>'
+    assert find_g5_urn(html) == "g5-cl-abc123-test-property"
+
+
+def test_find_g5_urn_g5_store_id_extracted_even_when_sibling_urls_leak() -> None:
+    """Multi-property G5 portfolios (Goldoller, Bayshore, GK Mgmt)
+    leak SIBLING ``g5-cl-*`` URNs into menu thumbnails / nav CDN paths.
+    G5_STORE_ID is the unique source of truth for THIS property."""
+    html = (
+        '<script>'
+        '"G5_STORE_ID":"g5-cl-1o9zooo9co-goldoller-management-services-llc-fort-wayne-in"'
+        '</script>'
+        # Sibling Goldoller properties leaking into menu nav
+        '<img src="//cdn/g5-cl-1oi63j752h-gk-management-co-inc-multi-livermore-ca/a.png">'
+        '<img src="//cdn/g5-cl-1o9zoo4yw0-goldoller-management-services-llc-westerville-oh/b.png">'
+    )
+    urn = find_g5_urn(html)
+    # Must select THIS property's URN, not a sibling
+    assert urn == "g5-cl-1o9zooo9co-goldoller-management-services-llc-fort-wayne-in"
 
 
 def test_g5_units_query_includes_floorplan_specials_subfields() -> None:
