@@ -972,6 +972,98 @@ async def _try_direct_sightmap_api_probe(
                         if codes:
                             break
 
+        # Try the Engrain `/internal-page-widgets/` POST API.
+        # Many Engrain-themed Entrata sites embed SightMap via a
+        # ``<article class="pp-section-placeholder ..." data-website-
+        # page-section="{N}" data-website-page-type-id="{M}"
+        # data-layout-type-id="{K}">`` element on the deep Entrata
+        # vanity path. The body for the iframe is fetched via a POST
+        # to ``{host}/internal-page-widgets/`` with the section params
+        # in form-encoded payload. Live-verified 2026-05-24 on
+        # traditionapthomes.com (section 774 → JSON with
+        # ``sightmap_url``).
+        if not codes and base:
+            _re_deep_attr = _sm_re.compile(
+                r'href=["\']?'
+                r'(https?://[^"\'<>\s]+/(?:[\w-]+/){1,3}'
+                r'(?:conventional|affordable)/?[^"\'<>\s]*?)["\'>]',
+                _sm_re.IGNORECASE,
+            )
+            _section_re = _sm_re.compile(
+                r'data-website-page-section=["\'](\d+)["\']'
+                r'\s+data-website-page-type-id=["\'](\d+)["\']'
+                r'\s+data-layout-type-id=["\'](\d+)["\']',
+                _sm_re.IGNORECASE,
+            )
+            for _m_link in _re_deep_attr.finditer(raw):
+                _deep_url = (
+                    _m_link.group(1).split("?")[0].split("#")[0]
+                )
+                if not _deep_url:
+                    continue
+                if not _urlparse(_deep_url).netloc.endswith(
+                    _urlparse(base).netloc
+                ):
+                    continue
+                try:
+                    _r_deep = _probe(_deep_url, timeout=12)
+                except Exception:
+                    continue
+                if _r_deep.status_code != 200 or not _r_deep.text:
+                    continue
+                _m_attrs = _section_re.search(_r_deep.text)
+                if not _m_attrs:
+                    continue
+                _section_id = _m_attrs.group(1)
+                _page_type_id = _m_attrs.group(2)
+                _layout_type_id = _m_attrs.group(3)
+                try:
+                    from curl_cffi import requests as _ipw_cc
+
+                    _ipw_resp = _ipw_cc.post(
+                        f"{base}/internal-page-widgets/",
+                        headers={
+                            "Accept": "*/*",
+                            "Content-Type": (
+                                "application/x-www-form-urlencoded; "
+                                "charset=UTF-8"
+                            ),
+                            "Origin": base,
+                            "Referer": _deep_url,
+                            "X-Requested-With": "XMLHttpRequest",
+                        },
+                        data={
+                            "internal_page_widgets[website_page_section]":
+                                _section_id,
+                            "internal_page_widgets[layout_type_id]":
+                                _layout_type_id,
+                            "internal_page_widgets[website_page_type_id]":
+                                _page_type_id,
+                        },
+                        timeout=15,
+                        impersonate="chrome120",
+                    )
+                except Exception:
+                    continue
+                if _ipw_resp.status_code != 200 or not _ipw_resp.text:
+                    continue
+                _sm_url_m = _sm_re.search(
+                    r'"sightmap_url"\s*:\s*"([^"]+)"',
+                    _ipw_resp.text,
+                )
+                if not _sm_url_m:
+                    continue
+                _sm_url = _sm_url_m.group(1).replace("\\/", "/")
+                _code_m = _sm_re.search(
+                    r'sightmap\.com/embed/([\w-]+)', _sm_url
+                )
+                if (
+                    _code_m
+                    and _code_m.group(1).lower() not in _SM_RESERVED_CODES
+                ):
+                    codes = [_code_m.group(1)]
+                    break
+
         if not codes and base:
             for sub in (
                 "/floorplans/", "/floor-plans/", "/floorplans",
