@@ -2,14 +2,13 @@
 and validation provenance flags. H16, H17 invariants."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from ma_poc.core.schema_v2 import _format_v2_unit, _normalize_amenities
 
-
-_TS = datetime(2026, 5, 5, 12, 0, 0, tzinfo=timezone.utc)
+_TS = datetime(2026, 5, 5, 12, 0, 0, tzinfo=UTC)
 
 
 def test_h16_v2_unit_schema_includes_new_keys() -> None:
@@ -267,6 +266,92 @@ def test_make_unit_dict_no_date_emits_empty_both_keys() -> None:
     unit = make_unit_dict(unit_number="101")
     assert unit["availability_date"] == ""
     assert unit["available_date"] == ""
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-24 — AVAILABLE-no-date handling (user Q)
+#
+# When an operator ships availability_status="AVAILABLE" but the date
+# field is empty / unparseable, downstream previously got
+# available_date=None which made the row look incomplete. The fix:
+# default to scrape_ts when status says AVAILABLE.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_available_no_date_defaults_to_scrape_date() -> None:
+    """The user-Q signature case: empty available_date + AVAILABLE
+    status → use scrape_ts as the date (unit IS available NOW)."""
+    unit = {
+        "unit_id": "u-avail-001",
+        "floor_plan_name": "A1",
+        "availability_status": "AVAILABLE",
+        "availability_date": "",  # empty — would have been None
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+    assert out["availability_status"] == "AVAILABLE"
+    # Raw preserved for forensics
+    assert out["_available_date_raw"] is None  # empty string → None passthrough
+
+
+def test_available_with_real_date_preserves_date() -> None:
+    """When BOTH date and AVAILABLE status are set, the date wins
+    (status fallback only fires when date is empty/None)."""
+    unit = {
+        "unit_id": "u-avail-002",
+        "floor_plan_name": "A1",
+        "availability_status": "AVAILABLE",
+        "availability_date": "2026-08-15",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == "2026-08-15"
+
+
+def test_unavailable_with_empty_date_stays_none() -> None:
+    """Only AVAILABLE status triggers the scrape-date fallback —
+    UNAVAILABLE / UNKNOWN / missing status preserves None."""
+    unit = {
+        "unit_id": "u-unavail",
+        "floor_plan_name": "A1",
+        "availability_status": "UNAVAILABLE",
+        "availability_date": "",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] is None
+    assert out["availability_status"] == "UNAVAILABLE"
+
+
+def test_no_status_with_empty_date_stays_none() -> None:
+    """Status field absent → no fallback (the prior 'genuinely unknown'
+    case stays unchanged)."""
+    unit = {"unit_id": "u-no-status", "floor_plan_name": "A1"}
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] is None
+    assert out["availability_status"] is None
+
+
+@pytest.mark.parametrize("text", [
+    "ready",
+    "Move-in Ready",
+    "MOVE IN READY",
+    "vacant",
+    "Available Immediately",
+    "Available Today",
+    "TBA",
+    "TBD",
+    "to be announced",
+])
+def test_format_date_widened_text_recognizer(text: str) -> None:
+    """The text-recognizer also widened: operator-specific phrasings
+    that mean 'available now' now resolve to scrape date instead of
+    None. Catches Mark-Taylor 'vacant', RentCafe 'TBA', etc."""
+    from datetime import UTC, datetime
+
+    from ma_poc.core.schema_v2 import _format_date
+    out = _format_date(text)
+    assert out == datetime.now(UTC).strftime("%Y-%m-%d"), (
+        f"{text!r} should resolve to today; got {out!r}"
+    )
 
 
 def test_make_unit_dict_then_format_v2_unit_integration() -> None:

@@ -298,9 +298,27 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         # ``adapters/_api_parser.py`` (SightMap line 305, RealPage line
         # 450, generic line 611) also emit the long form. Accept either
         # — ``available_date`` wins when both are populated.
-        "available_date": _format_date(_first(
-            unit, "available_date", "availability_date", "internalAvailableDate",
-            "availableDate", "date_available", "dateAvailable")),
+        # 2026-05-24: when availability_status="AVAILABLE" AND the
+        # date field is empty/unparseable, default to the scrape date
+        # (the unit IS available now — that's what the status says).
+        # Previously this case produced available_date=None which made
+        # the row look incomplete to downstream consumers even though
+        # the operator explicitly flagged it as available. Real cases:
+        # UDR JSON-LD ships available_date="" + status AVAILABLE; some
+        # Cortland / RentCafe rows ship the same combo when their API
+        # has no specific move-in date. _available_date_raw still
+        # preserves the original empty/odd string for forensics.
+        "available_date": _resolve_available_date(
+            _format_date(_first(
+                unit, "available_date", "availability_date",
+                "internalAvailableDate", "availableDate",
+                "date_available", "dateAvailable")),
+            _norm_status(
+                unit.get("availability_status")
+                or unit.get("_availability_status")
+            ),
+            scrape_ts,
+        ),
         # 2026-05-18 (capture-first): preserve the RAW availability string
         # even when _format_date can't normalize it (text/word/odd format).
         # Data has value; cleaning can be done later off the raw. Clean
@@ -516,6 +534,36 @@ def _format_area(val: Any) -> int:
     return -1
 
 
+def _resolve_available_date(
+    parsed_date: str | None,
+    status: str | None,
+    scrape_ts: datetime,
+) -> str | None:
+    """When the operator explicitly says the unit is AVAILABLE but
+    ships no parseable move-in date, default the date to the scrape
+    timestamp (i.e. "available today / now"). The status field is the
+    authoritative signal; an empty date string in that context means
+    "immediately" rather than "we don't know".
+
+    2026-05-24 (user Q): "if it does not show availability date but
+    says available, what do we do?". Prior behaviour was to ship
+    ``None`` which made the row look incomplete; consumers reading
+    just ``available_date`` would treat the unit as date-unknown.
+    The fix preserves the raw value in ``_available_date_raw`` so
+    forensic analysis can still distinguish the two cases.
+
+    Behaviour:
+      * parsed_date present (any status)            → parsed_date
+      * parsed_date None + status == "AVAILABLE"    → scrape date
+      * parsed_date None + status anything else     → None (unchanged)
+    """
+    if parsed_date:
+        return parsed_date
+    if status and status.upper() == "AVAILABLE":
+        return scrape_ts.strftime("%Y-%m-%d")
+    return parsed_date
+
+
 def _format_date(val: Any) -> str | None:
     """Normalize date to YYYY-MM-DD. Returns None if unparseable.
 
@@ -547,8 +595,20 @@ def _format_date(val: Any) -> str | None:
         # Pure text like "Available" with no date ⇒ available now.
         return datetime.now(UTC).strftime("%Y-%m-%d")
     low = s.lower()
-    if low in ("now", "today", "immediate", "immediately", "available",
-               "available now", "now available", "ready now"):
+    if low in (
+        "now", "today", "immediate", "immediately", "available",
+        "available now", "now available", "ready now",
+        # 2026-05-24: widen for the AVAILABLE-no-date class —
+        # operators ship these as alternative ways of saying
+        # "available immediately, move in today" with no specific
+        # date attached (RentCafe / mark-taylor / various
+        # securecafe + AppFolio one-offs).
+        "ready", "move-in ready", "move in ready", "vacant",
+        "move-in", "move in", "moves in",
+        # AVAILABLE-text variants without explicit "now"
+        "available immediately", "available today",
+        "tba", "tbd", "to be announced", "to be determined",
+    ):
         return datetime.now(UTC).strftime("%Y-%m-%d")
     # Try common formats — 4-digit-year set unchanged; 2-digit-year and
     # month-name forms added.
