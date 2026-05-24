@@ -227,7 +227,11 @@ _PROPERTY_CONCESSION_RE = re.compile(
     # 2026-05-24: added the qualifier-word slot so phrasing like
     # "10 Weeks Base Rent Free" (theblakeoptimistpark.com), "6 months
     # effective rent free", "12 weeks monthly rent waived" match.
-    rf"\b{_CW_NUM}[\s-]*(?:full[\s-]+)?(?:weeks?|months?)['’]?s?[\s-]*"
+    # 2026-05-24 (post-100-prop-vision audit): also allow a noise char
+    # between the unit ("weeks*"/"weeks†") and the FREE keyword —
+    # Austin Midtown ships "4 WEEKS* FREE" with the disclaimer asterisk
+    # directly attached, which the prior \s* gap did not match.
+    rf"\b{_CW_NUM}[\s-]*(?:full[\s-]+)?(?:weeks?|months?)['’*†‡]?s?[\s-]*"
     r"(?:of[\s-]+)?(?:(?:base|effective|monthly|total|select|premium|"
     r"market)[\s-]+)?(?:rent[\s-]+)?(?:free|complimentary|on\s+us|waived)\b"
     rf"|\b(?:rent[\s-]?)?free\s+(?:for\s+)?(?:{_CW_NUM}\s+)?(?:full\s+)?"
@@ -235,8 +239,15 @@ _PROPERTY_CONCESSION_RE = re.compile(
     rf"|\b(?:first|1st)\s+(?:{_CW_NUM}\s+)?(?:full\s+)?months?\b"
     r"[^.!?]{0,40}\bfree\b"
     r"|\bfree\s+rent\b|\bmonths?\s+on\s+us\b"
-    r"|\$\s?\d{1,3}(?:,\d{3})*\s*(?:off|gift\s*card|credit|cash|savings|"
-    r"welcome\s+bonus)\b"
+    # Dollar-amount concessions. 2026-05-24 (post-100-prop-vision audit):
+    # widened the digit class from \d{1,3}(?:,\d{3})* to also accept
+    # raw \d{4,5} — Jefferson Place ("$1000 Off") and similar omit the
+    # thousands comma. Also added "concession" + "rent concession" to
+    # the trailing keyword set: 42 West Apartments ships "$300 One-Time
+    # Rent Concession at Move-In" without "off"/"credit"/etc.
+    r"|\$\s?(?:\d{1,3}(?:,\d{3})*|\d{4,5})\s*(?:off|gift\s*card|credit|"
+    r"cash|savings|welcome\s+bonus|(?:one[\s-]+time\s+)?(?:rent[\s-]+)?"
+    r"concession)\b"
     r"|\bsave\s+(?:up\s+to\s+)?\$\s?\d"
     r"|\$\s?\d{2,5}\s+(?:welcome\s+)?bonus\b"
     r"|\breduced\s+rents?\b|\brent\s+as\s+low\s+as\s+\$"
@@ -643,6 +654,45 @@ async def scrape(
                     _api_conc = _candidate
             if _api_conc:
                 result["concessions_text"] = _api_conc[:300]
+        except Exception:
+            pass
+
+    # --- Step 3c: rendered-DOM popup/banner concession rescan (2026-05-24) ---
+    # Step 3 scans static HTML. Step 3b scans pre-captured API responses.
+    # The 100-prop VISION audit
+    # (investigations/2026-05-24-cascade-fixes-grind/CONCESSION_100PROP_VISION_VERIFICATION.md)
+    # found ~9% of random properties carry concession banners that are
+    # PHYSICALLY ABSENT from static HTML — React/Vue/Angular-hydrated
+    # popups, [role="dialog"] modals that fire on a JS timeout, banner
+    # divs that mount only after the bundle's fetch() resolves
+    # (Cortland Brier Creek, Blossoms at Brentwood, Austin Midtown,
+    # Colina Ranch Hill, Prose Riviana, Quarry Alamo Heights, Museum
+    # Terrace, Jefferson Place, 42 West Apartments — all confirmed by
+    # diffing curl_cffi vs Playwright-rendered DOM on 2026-05-24).
+    #
+    # When a Playwright session is already open AND Steps 3/3b returned
+    # no concession, scan the rendered DOM's popup/modal/banner elements
+    # (plus full body innerText as a recall fallback) and re-run the
+    # canonical _PROPERTY_CONCESSION_RE. Reuses the open browser context
+    # so the marginal cost is one page.evaluate() — near-zero on routes
+    # that already render. curl-only routes still see the static-only
+    # gap; closing that requires upgrading those routes to Playwright
+    # (separate ticket).
+    #
+    # Tag concession_source so downstream provenance can distinguish
+    # static-HTML vs rendered-DOM captures.
+    if page is not None and not result.get("concessions_text"):
+        try:
+            from ma_poc.core.rendered_dom_concession import (
+                scan_rendered_dom_for_concession,
+            )
+
+            _rendered = await scan_rendered_dom_for_concession(
+                page, _PROPERTY_CONCESSION_RE
+            )
+            if _rendered:
+                result["concessions_text"] = _rendered[:300]
+                result["concession_source"] = "DOM_POPUP_RENDERED"
         except Exception:
             pass
 
