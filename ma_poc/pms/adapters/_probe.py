@@ -115,6 +115,43 @@ class _WUResponse:
         self.url = url
 
 
+def _wu_safe_url(url: str) -> str:
+    """Percent-encode reserved characters that BrightData Web Unlocker's
+    URL validator rejects with HTTP 400.
+
+    2026-05-24 (jugnu-unlocker-test-3886351-fl9gv): 78 web_unlocker.error
+    occurrences, all on Entrata ProspectPortal ``view_unit_spaces``
+    URLs with un-encoded square brackets in the query
+    (``property[id]=1125701&property_floorplan[id]=1125372``). BD's
+    gateway returns ``HTTPError: HTTP Error 400: Bad Request`` for
+    these — billed or not, they burn the
+    ``_probe_prospectportal`` retry budget without ever clearing CF.
+
+    Fix: split the URL into components and percent-encode each piece
+    with a tight safe-set. ``[`` → ``%5B``, ``]`` → ``%5D`` while
+    standard query separators (``&``, ``=``, ``?``) and path slashes
+    stay literal. Idempotent — already-encoded URLs survive unchanged
+    because ``quote(...)`` with the right ``safe`` skips ``%``.
+    """
+    if not url:
+        return url
+    from urllib.parse import quote, urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    # Path: keep ``/`` plus the standard RFC 3986 pchar set; encode
+    # ``[`` ``]`` ``{`` ``}`` if they ever leak into a path.
+    safe_path = "/-._~!$&'()*+,;=:@%"
+    # Query: keep ``&`` ``=`` ``?`` ``+`` literal; encode brackets and
+    # other reserved gen-delims that the BD gateway is strict about.
+    safe_query = "=&?+-._~!$'()*,;:@/%"
+    new_path = quote(parts.path, safe=safe_path)
+    new_query = quote(parts.query, safe=safe_query)
+    new_fragment = quote(parts.fragment, safe=safe_query)
+    return urlunsplit(
+        (parts.scheme, parts.netloc, new_path, new_query, new_fragment)
+    )
+
+
 def web_unlocker_get(url: str, timeout: int = 120) -> _WUResponse:
     """Fetch *url* through the BrightData Web Unlocker API (raw HTML).
 
@@ -125,8 +162,9 @@ def web_unlocker_get(url: str, timeout: int = 120) -> _WUResponse:
     key = web_unlocker_key()
     if not key:
         return _WUResponse(0, "", url)
+    safe_url = _wu_safe_url(url)
     body = json.dumps(
-        {"zone": web_unlocker_zone(), "url": url, "format": "raw"}
+        {"zone": web_unlocker_zone(), "url": safe_url, "format": "raw"}
     ).encode()
     req = urllib.request.Request(
         _WU_API,
