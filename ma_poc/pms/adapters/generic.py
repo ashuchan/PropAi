@@ -107,6 +107,9 @@ from ma_poc.pms.adapters._mark_taylor import (
 from ma_poc.pms.adapters._merge_fns import (
     aggregate_quality as _aggregate_quality,
 )
+from ma_poc.pms.adapters._udr import (
+    parse_udr_jsonld as _parse_udr,
+)
 from ma_poc.pms.adapters._merge_fns import (
     find_unit_list as _find_unit_list,
 )
@@ -2227,7 +2230,27 @@ class GenericAdapter:
             embedded = extract_embedded_blobs_from_html(html)
             embedded_units: list[dict[str, Any]] = []
             amli_units: list[dict[str, Any]] = []
-            if embedded:
+
+            # ── Sub-tier 4a-pre (UDR, 2026-05-24): Schema.org JSON-LD
+            # ItemList of Apartment items. UDR (~16 properties) ships
+            # the canonical Apartment "name" field as "Apartment #<seq>
+            # - <unit_number>" — the part after the dash is the
+            # displayed unit number that auditors look for. The pre-fix
+            # generic DOM tier was extracting unitid=<8-digit> from the
+            # URL param (audit row #41 — Cambridge Woods unit
+            # "13664212"). Gated on udr.com domain to avoid polluting
+            # other Schema.org Apartment ItemLists. Try first so it
+            # wins over the generic embedded walker for UDR.
+            if "udr.com" in (ctx.base_url or "").lower():
+                try:
+                    udr_units = _parse_udr(html, source_url=ctx.base_url)
+                except Exception as _ux:
+                    udr_units = []
+                    result.errors.append(f"udr-parse-error: {_ux}")
+                if udr_units:
+                    embedded_units = udr_units
+
+            if embedded and not embedded_units:
                 # ── Sub-tier 4a (Phase 6 / AMLI, 2026-05-21): tRPC-aware
                 # extraction. AMLI Residential (76+ Next.js properties)
                 # embeds its full unit list inside __NEXT_DATA__ but
