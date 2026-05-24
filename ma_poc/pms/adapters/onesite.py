@@ -106,17 +106,20 @@ def _extract_onesite_site_ids(body: str, base_url: str) -> list[str]:
             ids.append(sid)
 
     # Path B: marketing page links to {prefix}.onlineleasing.realpage.com
-    # — the numeric prefix is NOT always the SiteId, but we keep it as a
-    # weak candidate to fall back on
-    for m in _ONESITE_SUBDOMAIN_RE.finditer(body):
-        prefix = m.group(1)
-        # Some prefixes have a non-numeric suffix (e.g. ``8312231b``);
-        # strip non-digits to make it usable
-        sid = re.sub(r"\D", "", prefix)
-        if sid and sid not in ids:
-            # Only add prefix-based as a candidate when no widgetLoader-
-            # derived id is already in the list (the widget one is canonical)
-            pass
+    # — the numeric prefix is NOT always the SiteId (workflowstartup
+    # SiteId is a different number derived from the OLL site config), so
+    # only use it as a weak fallback when widgetLoader-derived ids are
+    # absent. The probe will try each candidate in order; harmless to
+    # include a non-working candidate since workflowstartup returns
+    # explicit failure when given a bad SiteId.
+    if not ids:
+        for m in _ONESITE_SUBDOMAIN_RE.finditer(body):
+            prefix = m.group(1)
+            sid = re.sub(r"\D", "", prefix)
+            if sid and sid not in ids:
+                ids.append(sid)
+            if len(ids) >= 2:  # cap to keep the probe budget bounded
+                break
 
     return ids
 
