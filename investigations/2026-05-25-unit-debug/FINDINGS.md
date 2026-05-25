@@ -187,3 +187,43 @@ After 480 total probed props (51% of the 934-prop n_full=0 cohort), the same 5-6
 
 **Pattern convergence:** Wave 3 surfaces no NEW cluster types beyond Wave 2, confirming the canary's residue distribution. The remaining ~450 unprobed n_full=0 props will mostly fall into the same buckets — additional waves give marginal new signal.
 
+---
+
+# Wave-2 cluster #3 drill — Cloudflare + Entrata + SightMap (12 props)
+
+**Drill date:** 2026-05-25
+**Cohort source:** `.claude/worktrees/angry-murdock-c19e06/investigations/2026-05-25-unit-debug/artifacts/probe/n_full_zero_w2_results.jsonl` — `verdict=FLOORPLAN_INDEX_NO_UNITS` AND `5_fingerprints == {cloudflare, entrata, sightmap}` (12 properties).
+
+## Cluster thesis vs. reality
+
+The cohort name implies the failure mode is *"CF JS challenge blocks the SightMap iframe load."* Live-probing 4 of the 12 with Chrome MCP shows the thesis is wrong for the majority.
+
+| Property (pid) | Landing | CF challenge fired? | Real unit path | Verdict |
+|---|---|---|---|---|
+| High Grove (55299) | highgrovegeorgia.com | **Yes** (interstitial on `/conventional/`) | After CF clears, `/conventional/` has `fp-group-item` + `fp-name-link`; per-plan `/floorplans/.../{slug}-{fpid}-1/` renders `.unit-card` markup but every plan says "No Units available currently" | **(C)** Genuinely 0-unit (fully leased) |
+| Revive → The Lakes (42085) | reviveapartments.com → lakesatfife.com → thelakeslive.prospectportal.com | No | `/conventional/` exposes per-plan URLs; per-plan page has 5 `.unit-card` rows ($1,697 / 800 sqft / Available Now). Body has `fp-name-link` only — **no `fp-card` / `fp-group-item`** | **(D)** new-theme drill-gate bug |
+| 14Fifty Neo (258254) | 14fiftyapartments.com | No | `/kissimmee/14fifty-neocity/conventional/` uses new `beans-floorplans-map-tabs-wrapper` theme with `fp-name-link` only; per-plan page renders 5+ `.unit-card` rows with real availability | **(D)** new-theme drill-gate bug |
+| Brazos Ranch (35778) | brazosranch-apts.com | No | `/conventional/` has a real `<iframe src="https://sightmap.com/embed/n9w6m4lmv71">`; per-plan URLs use a different format and don't render `.unit-card` — units live in the SightMap iframe | **(A)** real SightMap iframe (existing sightmap.py adapter probes `/conventional/` for embed codes — should already cover) |
+
+## Why the static probe verdict is misleading
+- `5_fingerprints` `cloudflare` tag fires on `cf-ray` headers / `__cf_bm` cookies — i.e. any CF-fronted CDN, **not** an active JS challenge. Only 1 of 4 live-probed properties surfaced the actual interstitial.
+- `sightmap` fingerprint fires whenever any path contains `sightmap.com/...`. In 3 of 4 cases the only match was the static `embed/api.js` loader — no actual SightMap iframe.
+- The static recon probe only checks shallow paths (`/floorplans`, `/floor-plans`, `/availability` at root) plus WordPress endpoints. It never fetches the deep `/{city}/{slug}/conventional/` URL, so the verdict `FLOORPLAN_INDEX_NO_UNITS` is "no markers at the shallow index" — not "deep path is empty."
+
+## Real bug: Entrata PP unit-card drill gates out the new theme
+
+`ma_poc/pms/adapters/entrata.py` already ships a Prospect-Portal unit-card drill (commit c5642d2, canary 1ef1060 regr#9) that probes the captured body and deep `/conventional/`-style URLs, then iterates plan links via `find_entrata_pp_plan_links` and parses each per-plan body with `parse_entrata_pp_unit_cards`.
+
+**The step-1 (line 1507-1510) and step-3 (line 1570-1574) gates admit a body only when `fp-card` OR `fp-group-item` is present.** The newer PP theme `beans-floorplans-map-tabs-wrapper` (14Fifty Neo, The Lakes, likely several more in the cluster) uses `fp-name-link` only — bodies are silently dropped, the drill never iterates plan URLs, and the adapter emits 0 units.
+
+## Fix shipped (this commit)
+
+- **[ma_poc/pms/adapters/entrata.py](ma_poc/pms/adapters/entrata.py)** — broaden both gate predicates to also accept `fp-name-link`. `find_entrata_pp_plan_links` already lists `.fp-name-link` as its first selector (entrata.py:1219), so once the body is admitted, link discovery and per-plan parse work unmodified.
+- **[ma_poc/tests/pms/adapters/test_entrata_pp_unit_drill.py](ma_poc/tests/pms/adapters/test_entrata_pp_unit_drill.py)** — regression guard `test_find_pp_plan_links_beans_floorplans_map_theme` pins a synthetic 14Fifty-style body (no `fp-card`, no `fp-group-item`, no `unit-item`) and asserts plan URLs are still emitted.
+
+Test run: `pytest ma_poc/tests/pms/adapters/test_entrata*.py` → 64 passed, 1 skipped. `ruff check` clean.
+
+## What this fix does NOT cover
+- **High Grove (55299)** — CF JS challenge fires on `/conventional/`. The drill's `_entrata_static_fetch` is curl_cffi-based and won't pass the challenge. Moot here because the property is genuinely empty post-challenge anyway, but the cluster has a CF-walled subset that needs Web Unlocker or browser-level rendering.
+- **Brazos Ranch (35778)** — real SightMap iframe variant with a per-plan URL format that doesn't render `.unit-card`. Recovery lives in `sightmap.py` (already probes `/conventional/` for embed codes); needs separate verification that it fires for this property.
+- The remaining 8 cluster props haven't been individually probed — the fix should lift the new-theme cases among them; residue is either CF-walled (High Grove pattern) or real SightMap iframe (Brazos Ranch pattern).

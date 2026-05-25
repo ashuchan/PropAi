@@ -341,3 +341,50 @@ def test_find_pp_plan_links_empty_for_non_pp_html() -> None:
         "<html><body><a href='/about'>About</a></body></html>",
         "https://example.com",
     ) == []
+
+
+def test_find_pp_plan_links_beans_floorplans_map_theme() -> None:
+    """2026-05-25 (wave-2 cluster #3 CF+Entrata+SightMap, pid 258254 /
+    14fiftyapartments.com): the newer PP ``beans-floorplans-map-tab``
+    theme replaces the legacy ``li.fp-group-item`` / ``.fp-card``
+    wrappers with a tabbed layout that anchors plan links via
+    ``.fp-name-link`` ONLY. The drill's caller used to gate body
+    inclusion on ``fp-card`` / ``fp-group-item`` presence and silently
+    drop these bodies. find_entrata_pp_plan_links must still emit the
+    plan URLs from this body shape — that's the regression guard so
+    the broadened predicate (entrata.py step-1 / step-3 gates) can
+    rely on it."""
+    html = (
+        '<html><body>'
+        '<div class="beans-floorplans-map-tabs-wrapper">'
+        '<div class="beans-floorplans-map-tab-content active">'
+        '<a class="fp-name-link" '
+        'href="/floorplans/kissimmee-FL/14fifty-neocity/'
+        'a1-29819-1/">A1</a>'
+        '<a class="fp-name-link" '
+        'href="/floorplans/kissimmee-FL/14fifty-neocity/'
+        'a2-29821-1/">A2</a>'
+        '</div>'
+        '<div class="beans-floorplans-map-tab-content">'
+        '<a class="fp-name-link" '
+        'href="/floorplans/kissimmee-FL/14fifty-neocity/'
+        'b1-29823-1/">B1</a>'
+        '</div>'
+        '</div>'
+        '</body></html>'
+    )
+    # No fp-card / fp-group-item / unit-item markers exist in this body.
+    assert "fp-card" not in html
+    assert "fp-group-item" not in html
+    assert "unit-item" not in html
+    links = find_entrata_pp_plan_links(
+        html, "https://www.14fiftyapartments.com"
+    )
+    assert links == [
+        "https://www.14fiftyapartments.com/floorplans/kissimmee-FL/"
+        "14fifty-neocity/a1-29819-1/",
+        "https://www.14fiftyapartments.com/floorplans/kissimmee-FL/"
+        "14fifty-neocity/a2-29821-1/",
+        "https://www.14fiftyapartments.com/floorplans/kissimmee-FL/"
+        "14fifty-neocity/b1-29823-1/",
+    ]
