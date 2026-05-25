@@ -21,6 +21,7 @@ from ma_poc.pms.adapters.entrata import EntrataAdapter
 from ma_poc.pms.adapters.equity import EquityAdapter
 from ma_poc.pms.adapters.equity_apartments import EquityApartmentsAdapter
 from ma_poc.pms.adapters.essex import EssexAdapter
+from ma_poc.pms.adapters.fortresstech import FortressTechAdapter
 from ma_poc.pms.adapters.funnel import FunnelAdapter
 from ma_poc.pms.adapters.g5 import G5Adapter
 from ma_poc.pms.adapters.generic import GenericAdapter
@@ -92,6 +93,7 @@ def _bootstrap_registry() -> None:
         EdificeCmsAdapter,
         EquityAdapter,
         FunnelAdapter,
+        FortressTechAdapter,
         TouchTourAdapter,
         SpherexxAdapter,
         KnockAdapter,

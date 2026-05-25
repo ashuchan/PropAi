@@ -70,6 +70,7 @@ PmsName = Literal[
     "encoreskyline_template",
     "aspensquare",
     "edificecms",
+    "fortresstech",
     "marketapts",
     "rentcafe_unit_roster",
     "imt_spaces",
@@ -123,6 +124,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "encoreskyline_template": "dom_first",
     "aspensquare": "dom_first",
     "edificecms": "api_first",
+    "fortresstech": "dom_first",
     "marketapts": "dom_first",
     "rentcafe_unit_roster": "dom_first",
     "imt_spaces": "dom_first",
@@ -836,6 +838,28 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             ["RentalAddress.com CMS marker in HTML "
              "(rentaladdress.com host / .floor_plan_list container)"],
         )
+    # 2026-05-25 (canary 1ef1060 regr#14): FortressTech is a Next.js-based
+    # leasing-portal vendor that serves unit-level data via an iframe SSR
+    # hydration payload. Operator marketing sites are typically Squarespace
+    # shells (PRG Property Resources Group portfolio) that embed
+    # ``<iframe src=…(availability|embed).fortresstech.io/unit-availability/
+    # {orgId}/{propertyId}/…>``. The auth-only ``portal.fortresstech.io``
+    # subdomain is excluded — it never carries unit data. Detector fires on
+    # the iframe-host substring; the adapter then refetches the iframe URL
+    # and parses ``self.__next_f.push`` React-Query chunks.
+    if (
+        "availability.fortresstech.io/unit-availability" in h
+        or "embed.fortresstech.io/unit-availability" in h
+    ):
+        yield (
+            "fortresstech",
+            0.90,
+            [
+                "FortressTech unit-availability iframe marker in HTML "
+                "((availability|embed).fortresstech.io/unit-availability/"
+                "{orgId}/{propertyId}/)"
+            ],
+        )
     # Encoreskyline-template marketing family driven by the Jonah Digital /
     # MeetElise widget. Per-plan /floorplans/{slug}/ pages render real
     # apartment-level rows only after a Check-Availability JS click;
@@ -1409,6 +1433,10 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
         "assets.edificecms.com",
         "/edi-assets/",
         "builder_live",
+    ),
+    "fortresstech": (
+        "availability.fortresstech.io/unit-availability",
+        "embed.fortresstech.io/unit-availability",
     ),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
     "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
