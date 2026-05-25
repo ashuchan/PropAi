@@ -112,6 +112,15 @@ _TIER_NO_RESPONSE = f"{_TIER_BASE}_NO_RESPONSE"
 _TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
 _TIER_AMENITIES_ONLY = f"{_TIER_BASE}_AMENITIES_ONLY"
 _TIER_PARSE_FAILED = f"{_TIER_BASE}_PARSE_FAILED"
+# 2026-05-25: every raw unit had price=null + display_price=null +
+# available_on=null + display_available_on=null. The adapter used to emit
+# these as AVAILABLE rows with rent_range="" — verified via canary
+# deep-probe to be the largest single zero-rent cluster (2,605 rows over
+# 6 properties incl. Altis Blue Lake 318/318, EON Squared 476/476, Hyde
+# Park McKinney 285/285, 240 Park Avenue 204/204). New tier signals that
+# the adapter saw real units but the operator publishes neither rent nor
+# availability — dropped to prevent false-positive AVAILABLE rows.
+_TIER_OPERATOR_RENT_NOT_PUBLISHED = f"{_TIER_BASE}_OPERATOR_RENT_NOT_PUBLISHED"
 
 # Threshold above which a partial parse triggers a SIGHTMAP_PARTIAL_JOIN
 # warning even on a successful extract. 20% chosen because at ~64.9% missing-
@@ -398,6 +407,74 @@ def _try_avalon_override_for_sightmap(
     return avalon_units
 
 
+def _drop_zero_info_sightmap_units(
+    units: list[dict[str, Any]], result: AdapterResult
+) -> int:
+    """Drop units with no rent AND no availability date — operator-published
+    placeholder rows that should not surface as AVAILABLE inventory.
+
+    SightMap's ``data.units[]`` lists every leasable address on the property
+    map, even when the operator publishes no rent or turn date for that
+    unit (verified live 2026-05-25 on altisbluelake / eonflaglervillage /
+    hydeparkmckinney / 240parkave — every raw unit had ``price=None`` AND
+    ``display_price=None`` AND ``available_on=None`` AND
+    ``display_available_on=None``). ``parse_sightmap_payload`` was emitting
+    these with ``rent_range=""`` + ``availability_status="AVAILABLE"`` →
+    2,605 false-positive zero-rent rows in the canary report.
+
+    Filter gate (per unit):
+      - ``rent_range`` empty or in ``{"", "$0", "0"}``
+      - AND numeric ``market_rent_low``/``market_rent_high`` absent or zero
+      - AND ``availability_date`` empty or null-like
+
+    Mutates *units* in place. Returns the drop count. Appends a single
+    ``sightmap-zero-info-dropped`` line to ``result.errors`` so the count
+    is auditable per scrape.
+
+    Does NOT consider a unit's ``data_gaps`` / ``data_quality_flag`` — those
+    are caller-side flags set by ``_flag_sightmap_units_operator_rent_gap``
+    on the same condition, so the gates align by construction.
+    """
+    if not units:
+        return 0
+
+    def _has_rent(u: dict[str, Any]) -> bool:
+        rr = str(u.get("rent_range") or "").strip()
+        if rr and rr not in {"", "$0", "0"}:
+            return True
+        for k in ("market_rent_low", "market_rent_high"):
+            v = u.get(k)
+            if isinstance(v, (int, float)) and v > 0:
+                return True
+        return False
+
+    def _has_date(u: dict[str, Any]) -> bool:
+        for k in ("availability_date", "available_date"):
+            v = u.get(k)
+            if not v:
+                continue
+            s = str(v).strip().lower()
+            if s and s not in {"none", "null", "n/a", "-"}:
+                return True
+        return False
+
+    keep: list[dict[str, Any]] = []
+    dropped = 0
+    for u in units:
+        if _has_rent(u) or _has_date(u):
+            keep.append(u)
+        else:
+            dropped += 1
+    if dropped:
+        units[:] = keep
+        result.errors.append(
+            f"sightmap-zero-info-dropped: {dropped} unit(s) had no rent "
+            f"and no availability date (operator publishes neither for "
+            f"this unit) — skipped to prevent false-positive AVAILABLE rows"
+        )
+    return dropped
+
+
 def _flag_sightmap_units_operator_rent_gap(
     units: list[dict[str, Any]], result: AdapterResult
 ) -> int:
@@ -520,6 +597,21 @@ class SightMapAdapter:
                 )
                 result.confidence = min(0.95, 0.7 + 0.05 * _pp.n_admitted)
                 result.tier_used = _TIER_BASE
+                # 2026-05-25: drop units with NO rent + NO availability
+                # date. These are placeholder rows from SightMap (price
+                # null, available_on null) that previously emitted as
+                # AVAILABLE with empty rent — see canary deep-probe 2,605-
+                # row cluster verified on altisbluelake / eonflaglervillage
+                # / hydeparkmckinney / 240parkave. Runs BEFORE the
+                # Avalon/subpage rescue chain so the rescue paths still see
+                # an empty result.units and trigger correctly. Mixed-price
+                # properties also get cleaned (priced units kept, zero-
+                # info subset dropped).
+                _drop_zero_info_sightmap_units(result.units, result)
+                if result.units:
+                    # Re-tally confidence on the surviving subset (mixed-
+                    # price case may have shed a large fraction of rows).
+                    result.confidence = min(0.95, 0.7 + 0.05 * len(result.units))
                 # 2026-05-23: Avalon-override + operator-rent-gap flag.
                 # If 0 of the SightMap units have rent, FIRST check
                 # whether the page is actually Avalon-backed (its own
@@ -574,10 +666,27 @@ class SightMapAdapter:
                                 0.92, 0.7 + 0.05 * _pp_sub.n_admitted
                             )
                             return result
-                    # No richer embed found anywhere — apply the
-                    # operator-rent-gap flag. Same evidence chain as
-                    # the byelon sqft fix.
-                    _flag_sightmap_units_operator_rent_gap(_pp.admitted, result)
+                    # No rescue available. Two sub-cases:
+                    # (a) result.units is empty — the zero-info drop took
+                    #     out every row. Emit the new OPERATOR_RENT_NOT_
+                    #     PUBLISHED tier so the verdict layer does not
+                    #     ship this as SUCCESS.
+                    # (b) result.units still has rows — those carry a
+                    #     date but no rent. Apply the existing rent-gap
+                    #     flag so they ship as "dated-no-rent" rather
+                    #     than misclassified AVAILABLE.
+                    if not result.units:
+                        result.tier_used = _TIER_OPERATOR_RENT_NOT_PUBLISHED
+                        result.confidence = 0.0
+                        result.errors.append(
+                            f"SIGHTMAP_OPERATOR_RENT_NOT_PUBLISHED: "
+                            f"dropped all {_pp.n_admitted} admitted units "
+                            f"(no rent + no date on any unit, no Avalon "
+                            f"signal, no subpage rescue) — operator-wide "
+                            f"rent suppression confirmed"
+                        )
+                        return result
+                    _flag_sightmap_units_operator_rent_gap(result.units, result)
                 # Even on success, surface silent unit-level loss when the
                 # SightMap-internal join rate drops below the 80% floor.
                 # ``total_raw_units`` / ``total_dropped`` track join-time
@@ -618,6 +727,14 @@ class SightMapAdapter:
                     result.plan_summaries = _pp.plan_summaries
                     result.tier_used = f"{_TIER_BASE}_IFRAME"
                     result.confidence = min(0.90, 0.65 + 0.05 * _pp.n_admitted)
+                    # 2026-05-25: drop zero-info units before the Avalon /
+                    # subpage rescue chain (same rationale as the primary
+                    # path — keep priced units, shed the placeholders).
+                    _drop_zero_info_sightmap_units(result.units, result)
+                    if result.units:
+                        result.confidence = min(
+                            0.90, 0.65 + 0.05 * len(result.units)
+                        )
                     # Same Avalon-override + rent-gap flag chain for the
                     # iframe path. Without this, wimberly-style sites
                     # taking the iframe-fallback path would still get
@@ -661,7 +778,22 @@ class SightMapAdapter:
                                     0.92, 0.7 + 0.05 * _pp_sub.n_admitted
                                 )
                                 return result
-                        _flag_sightmap_units_operator_rent_gap(_pp.admitted, result)
+                        # No rescue. Empty-after-drop → new tier code;
+                        # remaining dated-no-rent rows → existing flag.
+                        if not result.units:
+                            result.tier_used = (
+                                f"{_TIER_OPERATOR_RENT_NOT_PUBLISHED}_IFRAME"
+                            )
+                            result.confidence = 0.0
+                            result.errors.append(
+                                f"SIGHTMAP_OPERATOR_RENT_NOT_PUBLISHED: "
+                                f"iframe-fallback dropped all "
+                                f"{_pp.n_admitted} admitted units (no "
+                                f"rent + no date on any unit, no rescue) "
+                                f"— operator-wide rent suppression"
+                            )
+                            return result
+                        _flag_sightmap_units_operator_rent_gap(result.units, result)
                     return result
 
         # Failure path: classify via structured sub-codes mirroring the RentCafe
@@ -722,6 +854,26 @@ class SightMapAdapter:
                     result.confidence = min(
                         0.92, 0.7 + 0.04 * _ppd.n_admitted
                     )
+                    # 2026-05-25: shed zero-info units from the direct
+                    # probe too. If everything dropped, surface the new
+                    # OPERATOR_RENT_NOT_PUBLISHED tier rather than ship
+                    # an empty SUCCESS.
+                    _drop_zero_info_sightmap_units(result.units, result)
+                    if not result.units:
+                        result.tier_used = (
+                            f"{_TIER_OPERATOR_RENT_NOT_PUBLISHED}_DIRECT"
+                        )
+                        result.confidence = 0.0
+                        result.errors.append(
+                            f"SIGHTMAP_OPERATOR_RENT_NOT_PUBLISHED: "
+                            f"direct probe returned {_ppd.n_admitted} "
+                            f"admitted units, all with no rent + no date "
+                            f"— operator-wide rent suppression"
+                        )
+                    else:
+                        result.confidence = min(
+                            0.92, 0.7 + 0.04 * len(result.units)
+                        )
                     result.api_responses.append({
                         "url": direct_units[0].get("source_api_url", ""),
                         "status": 200,
