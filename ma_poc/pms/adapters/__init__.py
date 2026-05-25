@@ -89,6 +89,7 @@ def _bootstrap_registry() -> None:
         IrvineAdapter,
         CortlandAdapter,
         ReinholdAdapter,
+        EdificeCmsAdapter,
         EquityAdapter,
         FunnelAdapter,
         TouchTourAdapter,
