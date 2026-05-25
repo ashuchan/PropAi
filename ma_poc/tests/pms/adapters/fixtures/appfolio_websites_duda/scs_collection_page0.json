@@ -1,0 +1,2330 @@
+{
+  "name": "appfolio-listings",
+  "values": [
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=715+Caroline+Street+Athens%2C+WI+54411&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=45.0405336,-90.0759117",
+        "address_latitude": 45.0305336,
+        "database_url": "https://scswiderski.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/scswiderski/images/ad005ded-d803-4fb5-a056-cccd11bc8b00/large.png",
+        "rental_application_url": "https://scswiderski.appfolio.com/listings/rental_applications/new?listable_uid=3a4d0026-defc-4cc1-a33b-d307e027c7dc&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "54455",
+        "full_address": "715 Caroline Street , #49, Athens, WI 54411",
+        "utilities": "Heat, Water & Sewer, High Speed Internet & Cable TV, Trash Removal, Snow Removal & Lawn Care",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/5a77ab4d-7410-4d08-9ec5-d0a53f0d2557/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/94ef957f-7d1f-484c-9759-c8fafb4fd33c/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/1c06f377-bde5-4432-b397-a7c072d13bae/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/4dcc686f-9207-44b6-a75a-7e4a07a4d130/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/db0d8886-f0f6-4323-8e58-0185259921cd/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/3314b5ea-0498-430c-9dd4-0f3c4ae8ffb0/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/323264a1-dbcb-4153-a7db-c7a25eac1d54/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/4dd51ef1-dc4c-4baf-96c6-f8ffda450ba7/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/93051043-a64f-4b66-b405-39275a731199/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/5b8a1305-109d-4d6d-83e3-122297a37693/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/66162287-0525-4260-b1a4-b2383264302d/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/a4ca3512-cbbe-4359-a9cf-07d4b85f8cda/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/cb13a1ef-6a9c-4c02-91c5-4150fa15b041/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/babe64f3-f21d-4373-aa6a-120d1ab56f77/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/cc52c090-da22-4bae-be9e-b884b05d25bf/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/16fc13dc-baac-46b1-9fa6-6afd3b886a03/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/4dbda5a1-e90b-4ebb-9ba3-345644215c33/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/af3396af-609a-40ef-80ff-c139760659ac/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/738c3cfc-9ca2-4e22-b72d-03a13c0e3399/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/56947c5d-2e48-4710-bc52-d7749dc7ff96/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/4418043c-65b3-494a-b71a-2f6bff74abf7/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/10d780d9-f461-4a7e-91d6-a666019bf158/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/44e623d6-6fb3-4d98-ba31-c80b061f3531/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/68648750-b320-43d2-b940-6de44e866329/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/537fb5ec-5ef7-4f41-aeae-bf442dfaca78/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/943733e8-a843-44ca-acbe-65244b03b03f/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/cebe5096-52ad-4d8f-9c36-8b6756f1bc29/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7c18c37b-a0c7-4da6-bf07-1ab0fc8570ee/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/459cd0c9-02ce-4bb7-beb1-24f68bb77e44/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f66cf22f-3180-4829-96b6-d169adab9658/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3600c10d-0ca5-4f3d-9a7f-b124f458807a/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/6b444ccf-635b-4fc1-b8e4-c008d1764bc0/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/336dd192-3641-49f4-9351-67dca84477c5/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/972993c2-4183-4d3f-ab16-4934daa5a5e6/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/29ce4d82-31e8-4719-9843-1a46f17a2856/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/a0a77bb7-a427-418a-a7bb-0770b82e13b3/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3dfcc1d5-02ef-4a98-b750-bb3d09dbbe2a/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3f20d336-a4bc-422d-971d-b1ba8d97f3d6/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7b0f49ed-3bdb-441d-9e08-a980cff711cc/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f5ad7d98-a071-4312-a88c-594bbfd6e3e9/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/4751867f-edd1-4591-b630-176f4f891992/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/c6ef2db3-1ab3-4ed4-a531-c93aefe3cfef/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7f6dd586-2caa-41ae-a5d6-c9eaec9db934/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/cc7f44ed-d480-4970-a566-1804ea0bbf57/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/a9aedd27-0fba-43f2-89ce-aedefdd4b56d/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7c2edd00-fc9b-4145-a603-d542a2fa7af2/original.jpeg"
+          }
+        ],
+        "portfolio_url": "www.scswiderski.com",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": "7d8abc2c-8e10-11ee-97bc-125442a9a26d",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "401 Ranger St ",
+            "city": "Mosinee",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          }
+        },
+        "square_feet": 1092.0,
+        "id": 3009,
+        "property_uid": "82",
+        "payee_account_number_token": "ac1e7396-4094-4e93-88ba-dbf7773bd764",
+        "posted_to_website_at": "2025-04-17T21:04:12.000Z",
+        "contact_phone_number": "(715) 873-9492",
+        "payee_routing_number": "075917937",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 92,
+            "name": "all"
+          },
+          {
+            "id": 95,
+            "name": "athens pm"
+          },
+          {
+            "id": 35,
+            "name": "construction warranty"
+          },
+          {
+            "id": 36,
+            "name": "multi family properties"
+          },
+          {
+            "id": 3,
+            "name": "northern"
+          },
+          {
+            "id": 90,
+            "name": "scs athens"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 2.0,
+        "address_address2": "#49",
+        "address_address1": "715 Caroline Street ",
+        "bedrooms": 3,
+        "meta_description": "SCS apartments offer inclusive rent*! Private entrances, garages, private patio or balcony. $1150-$1875. Pet Friendly.\r\n\r\n***$499/$799 SECURITY DEPOSIT SPECIAL***\r\n*LIMITED TIME ONLY\r\n*12 MONTH LEASE\r\n\r\n*Utilities included in your rent:\r\n\u2022 Heat\r\n\u2022 High Speed Internet & Cable TV\r\n\u2022 Water & sewer\r\n\u2022 Trash & recycling\r\n\u2022 Snow removal & lawn care\r\n\r\nCALL TO TOUR TODAY!\r\n\r\nLocated right off WI-97 and near downtown Athens, quick commute to Abbotsford, Colby, Dorchester.\r\n\r\nDogs & Cats welcome! Some restrictions apply.\r\n\r\nDogs & Cats welcome! Some restrictions apply.\r\n\r\n\r\nVirtual Tour: https://my.matterport.com/show/?m=YFDbfgzQZ6S\r\n\r\n",
+        "listable_uid": "3a4d0026-defc-4cc1-a33b-d307e027c7dc",
+        "portfolio_address2": "",
+        "portfolio_address1": "401 Ranger St ",
+        "contact_email_address": "cwierzba@scswiderski.com",
+        "deposit": 799.0,
+        "application_fee": 25.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Private Entry, In Unit Laundry, Lower End Unit, 1 Car Detached Garage",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 19519,
+        "portfolio_city": "Mosinee",
+        "appliances": "Stove, Refrigerator, Microwave, Dishwasher, Washer/Dryer",
+        "by_the_bed": false,
+        "address_state": "WI",
+        "created_at": "2025-04-17T21:29:54.000Z",
+        "marketing_title": "SCS Athens Apartment Community ",
+        "unit_template_name": "Fulton 3 BR Lower ",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/scswiderski/images/5a77ab4d-7410-4d08-9ec5-d0a53f0d2557/medium.jpg",
+        "updated_at": "2026-05-04T19:50:22.000Z",
+        "fee_label": "Background Check Fee",
+        "address_longitude": -90.0759117,
+        "property_type": "Multi-Family",
+        "market_rent": 1595.0,
+        "customization_uuid": "142b26f4096011ef956e3adde7d6d082",
+        "affordable": false,
+        "portfolio_phone_number": "(715) 693-9522",
+        "virtual_showing": false,
+        "posted_to_internet": 19520,
+        "database_name": "scswiderski",
+        "address_postal_code": "54411",
+        "address_country": "US",
+        "available_date": "2025-07-02",
+        "portfolio_name": "S.C. Swiderski, LLC",
+        "marketing_description": "SCS apartments offer inclusive rent*! Private entrances, garages, private patio or balcony. $1150-$1875. Pet Friendly.<br/><br/>***$499/$799 SECURITY DEPOSIT SPECIAL***<br/>*LIMITED TIME ONLY<br/>*12 MONTH LEASE<br/><br/>*Utilities included in your rent:<br/>\u2022 Heat<br/>\u2022 High Speed Internet & Cable TV<br/>\u2022 Water & sewer<br/>\u2022 Trash & recycling<br/>\u2022 Snow removal & lawn care<br/><br/>CALL TO TOUR TODAY!<br/><br/>Located right off WI-97 and near downtown Athens, quick commute to Abbotsford, Colby, Dorchester.<br/><br/>Dogs & Cats welcome! Some restrictions apply.<br/><br/>Dogs & Cats welcome! Some restrictions apply.<br/><br/><br/>Virtual Tour: https://my.matterport.com/show/?m=YFDbfgzQZ6S<br/><br/>",
+        "address_city": "Athens",
+        "property_year_built": 2023,
+        "room_template_id": null,
+        "rent_range": [
+          1595.0,
+          1595.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "WI",
+        "location": {
+          "address": {
+            "streetAddress": "715 Caroline Street , #49",
+            "city": "Athens",
+            "region": "WI",
+            "postalCode": "54411",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "45.0305336",
+            "longitude": "-90.0759117"
+          }
+        },
+        "schedule_showing_url": "https://scswiderski.appfolio.com/listings/showings/new?listable_uid=3a4d0026-defc-4cc1-a33b-d307e027c7dc"
+      },
+      "page_item_url": "3a4d0026-defc-4cc1-a33b-d307e027c7dc"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=715+Caroline+Street+Athens%2C+WI+54411&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=45.0405336,-90.0759117",
+        "address_latitude": 45.0305336,
+        "database_url": "https://scswiderski.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/scswiderski/images/ad005ded-d803-4fb5-a056-cccd11bc8b00/large.png",
+        "rental_application_url": "https://scswiderski.appfolio.com/listings/rental_applications/new?listable_uid=f2f0590c-c44d-4c00-bbf2-f651751a39df&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "54455",
+        "full_address": "715 Caroline Street, #50, Athens, WI 54411",
+        "utilities": "Heat, Water & Sewer, High Speed Internet & Cable TV, Trash Removal, Snow Removal & Lawn Care",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/b63185a5-c17b-4dd9-85fa-4a27570d184b/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/d3c5f1e1-3d05-43c5-ab35-1a1e4f01866a/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/c2ea2f8f-1427-4f7c-9cdf-a5b6a4ad65e8/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/02eeed4b-48a9-40b3-beaf-e54b51951db5/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/374d3978-0169-4d1d-8673-2b08eb105cec/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/de58b324-b7a5-47a9-8505-faa3b3f402c6/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/8646ad99-822d-4013-badb-c26ec4d98a43/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/a3306f45-454b-497e-a260-0c5ad36b1002/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/14255b27-46fd-49af-ae63-fc826a2b76c6/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/d32d8e11-f45d-4f37-8090-0335ebe126c8/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/63a323a1-df4a-4e8f-bb88-269c044d0590/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/3d417082-19bb-403e-ad1d-ec545ab453ee/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/9567ef76-91c9-4865-8bcb-886ff4735783/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/ef960f23-84c6-4c04-9536-c0fb438cc126/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/b3c92e34-4b4f-4aa6-afd9-f0c8a7abe046/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/03dee3d4-16f5-493c-9103-dcdc12ba5bfa/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/5243c36a-9dda-449f-9b41-47cd74091f5f/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/c8a8b82e-858e-407d-97a3-badcb55590d7/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/b9609820-e2e8-40c5-a83b-23bfa8a5cb03/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/87e0d3cd-3e1e-47d7-b440-ba5403f163b7/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/4bb854f2-01b0-407d-af41-f48c13b503ef/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/e2b1348b-b302-4278-b126-24be4d48896c/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/b62020fb-6c5b-42be-8bc6-fc084d26a82d/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/81a38913-a3a6-417d-ab68-9c71aa6f8a8a/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/87ac2cb3-7402-4458-b175-ccee5d02fc3d/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f32ea347-f73c-45c2-b9bb-a9a2e94a9f0c/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/5eed7888-6e40-4a00-b0a8-ded81c2267e5/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/bbb808b8-ea73-4474-9076-7330ea8da72d/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/1376bf61-0867-47b2-a448-1d7893da242e/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/4543e25e-fb2e-472f-a611-e8439f92dff2/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/e2acdfb1-a40f-44c3-9d32-7547b12fc1d0/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/b61469df-1b81-47e5-bb1f-9f9d0cf0dc9a/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/835c5712-9851-4738-9538-e6396b76286c/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/525e7059-0fd2-4030-8914-93c33389575b/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/79fde727-9fea-4689-8f5b-ffe774cc51ff/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/967c14f6-7df5-4cd8-8c76-abe36f82da32/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/abef4df2-44e5-4191-b2b8-c899c854324a/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f688fa06-4e1d-459f-8db9-e90c88293048/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/5bb59bf8-957f-400e-8a01-43a4f60801f9/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3d8ab25c-35ce-4e7f-8c78-c1871d0a6be5/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/1c4312b5-d719-4474-845c-c2cbd4fe17c1/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/be834708-47dc-4567-a329-5da42b3138ca/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f1934d9c-2011-40c3-953c-eedd640adfdd/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/d931cc2b-948b-43b9-a62d-ee4290ed6bc6/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/745f798c-299e-456e-8c6e-4143f4cdb8d0/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/88dab799-d2c9-48f5-b716-260440fb1abe/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/6b35ee88-fdee-47ab-99ca-52ea76e31fed/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/db1801ac-bd50-4d5c-9750-832d09d38007/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3dfcc1d5-02ef-4a98-b750-bb3d09dbbe2a/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3f20d336-a4bc-422d-971d-b1ba8d97f3d6/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7b0f49ed-3bdb-441d-9e08-a980cff711cc/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f5ad7d98-a071-4312-a88c-594bbfd6e3e9/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/4751867f-edd1-4591-b630-176f4f891992/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/c6ef2db3-1ab3-4ed4-a531-c93aefe3cfef/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7f6dd586-2caa-41ae-a5d6-c9eaec9db934/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/cc7f44ed-d480-4970-a566-1804ea0bbf57/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/a9aedd27-0fba-43f2-89ce-aedefdd4b56d/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7c2edd00-fc9b-4145-a603-d542a2fa7af2/original.jpeg"
+          }
+        ],
+        "portfolio_url": "www.scswiderski.com",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": "d2cd4a08-8e10-11ee-97bc-125442a9a26d",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "401 Ranger St ",
+            "city": "Mosinee",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          }
+        },
+        "square_feet": 1186.0,
+        "id": 3010,
+        "property_uid": "82",
+        "payee_account_number_token": "ac1e7396-4094-4e93-88ba-dbf7773bd764",
+        "posted_to_website_at": "2025-04-17T21:04:20.000Z",
+        "contact_phone_number": "(715) 873-9492",
+        "payee_routing_number": "075917937",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 92,
+            "name": "all"
+          },
+          {
+            "id": 95,
+            "name": "athens pm"
+          },
+          {
+            "id": 35,
+            "name": "construction warranty"
+          },
+          {
+            "id": 36,
+            "name": "multi family properties"
+          },
+          {
+            "id": 3,
+            "name": "northern"
+          },
+          {
+            "id": 90,
+            "name": "scs athens"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 2.0,
+        "address_address2": "#50",
+        "address_address1": "715 Caroline Street",
+        "bedrooms": 3,
+        "meta_description": "SCS apartments offer inclusive rent*! Private entrances, garages, private patio or balcony. $1150-$1875. Pet Friendly.\r\n\r\n***$499/$799 SECURITY DEPOSIT SPECIAL***\r\n*LIMITED TIME ONLY\r\n*12 MONTH LEASE\r\n\r\n*Utilities included in your rent:\r\n\u2022 Heat\r\n\u2022 High Speed Internet & Cable TV\r\n\u2022 Water & sewer\r\n\u2022 Trash & recycling\r\n\u2022 Snow removal & lawn care\r\n\r\nCALL TO TOUR TODAY! \r\n\r\nLocated right off WI-97 and near downtown Athens, quick commute to Abbotsford, Colby, Dorchester.\r\n\r\nDogs & Cats welcome! Some restrictions apply.\r\n\r\nVirtual Tour: https://my.matterport.com/show/?m=cn9fpmW4sUE\r\n\r\n",
+        "listable_uid": "f2f0590c-c44d-4c00-bbf2-f651751a39df",
+        "portfolio_address2": "",
+        "portfolio_address1": "401 Ranger St ",
+        "contact_email_address": "cwierzba@scswiderski.com",
+        "deposit": 799.0,
+        "application_fee": 25.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Private Entry, In Unit Laundry, Upper End Unit, 1 Car Detached Garage",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 19521,
+        "portfolio_city": "Mosinee",
+        "appliances": "Stove, Refrigerator, Microwave, Dishwasher, Washer/Dryer",
+        "by_the_bed": false,
+        "address_state": "WI",
+        "created_at": "2025-04-17T21:29:54.000Z",
+        "marketing_title": "SCS Athens Apartment Community ",
+        "unit_template_name": "Fulton 3 BR Upper ",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/scswiderski/images/b63185a5-c17b-4dd9-85fa-4a27570d184b/medium.jpg",
+        "updated_at": "2026-05-04T19:50:22.000Z",
+        "fee_label": "Background Check Fee",
+        "address_longitude": -90.0759117,
+        "property_type": "Multi-Family",
+        "market_rent": 1595.0,
+        "customization_uuid": "142b26f4096011ef956e3adde7d6d082",
+        "affordable": false,
+        "portfolio_phone_number": "(715) 693-9522",
+        "virtual_showing": false,
+        "posted_to_internet": 19522,
+        "database_name": "scswiderski",
+        "address_postal_code": "54411",
+        "address_country": "US",
+        "available_date": "2025-07-02",
+        "portfolio_name": "S.C. Swiderski, LLC",
+        "marketing_description": "SCS apartments offer inclusive rent*! Private entrances, garages, private patio or balcony. $1150-$1875. Pet Friendly.<br/><br/>***$499/$799 SECURITY DEPOSIT SPECIAL***<br/>*LIMITED TIME ONLY<br/>*12 MONTH LEASE<br/><br/>*Utilities included in your rent:<br/>\u2022 Heat<br/>\u2022 High Speed Internet & Cable TV<br/>\u2022 Water & sewer<br/>\u2022 Trash & recycling<br/>\u2022 Snow removal & lawn care<br/><br/>CALL TO TOUR TODAY! <br/><br/>Located right off WI-97 and near downtown Athens, quick commute to Abbotsford, Colby, Dorchester.<br/><br/>Dogs & Cats welcome! Some restrictions apply.<br/><br/>Virtual Tour: https://my.matterport.com/show/?m=cn9fpmW4sUE<br/><br/>",
+        "address_city": "Athens",
+        "property_year_built": 2023,
+        "room_template_id": null,
+        "rent_range": [
+          1595.0,
+          1595.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "WI",
+        "location": {
+          "address": {
+            "streetAddress": "715 Caroline Street, #50",
+            "city": "Athens",
+            "region": "WI",
+            "postalCode": "54411",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "45.0305336",
+            "longitude": "-90.0759117"
+          }
+        },
+        "schedule_showing_url": "https://scswiderski.appfolio.com/listings/showings/new?listable_uid=f2f0590c-c44d-4c00-bbf2-f651751a39df"
+      },
+      "page_item_url": "f2f0590c-c44d-4c00-bbf2-f651751a39df"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=715+Caroline+Street+Athens%2C+WI+54411&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=45.0405336,-90.0759117",
+        "address_latitude": 45.0305336,
+        "database_url": "https://scswiderski.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/scswiderski/images/ad005ded-d803-4fb5-a056-cccd11bc8b00/large.png",
+        "rental_application_url": "https://scswiderski.appfolio.com/listings/rental_applications/new?listable_uid=5e17d937-7b94-43da-9c79-617f7b2e14de&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "54455",
+        "full_address": "715 Caroline Street , #51, Athens, WI 54411",
+        "utilities": "Heat, Water & Sewer, High Speed Internet & Cable TV, Trash Removal, Snow Removal & Lawn Care",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/b63185a5-c17b-4dd9-85fa-4a27570d184b/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/d3c5f1e1-3d05-43c5-ab35-1a1e4f01866a/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/c2ea2f8f-1427-4f7c-9cdf-a5b6a4ad65e8/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/02eeed4b-48a9-40b3-beaf-e54b51951db5/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/374d3978-0169-4d1d-8673-2b08eb105cec/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/de58b324-b7a5-47a9-8505-faa3b3f402c6/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/8646ad99-822d-4013-badb-c26ec4d98a43/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/a3306f45-454b-497e-a260-0c5ad36b1002/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/14255b27-46fd-49af-ae63-fc826a2b76c6/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/d32d8e11-f45d-4f37-8090-0335ebe126c8/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/63a323a1-df4a-4e8f-bb88-269c044d0590/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/3d417082-19bb-403e-ad1d-ec545ab453ee/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/9567ef76-91c9-4865-8bcb-886ff4735783/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/ef960f23-84c6-4c04-9536-c0fb438cc126/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/b3c92e34-4b4f-4aa6-afd9-f0c8a7abe046/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/03dee3d4-16f5-493c-9103-dcdc12ba5bfa/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/5243c36a-9dda-449f-9b41-47cd74091f5f/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/c8a8b82e-858e-407d-97a3-badcb55590d7/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/b9609820-e2e8-40c5-a83b-23bfa8a5cb03/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/87e0d3cd-3e1e-47d7-b440-ba5403f163b7/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/4bb854f2-01b0-407d-af41-f48c13b503ef/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/e2b1348b-b302-4278-b126-24be4d48896c/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/b62020fb-6c5b-42be-8bc6-fc084d26a82d/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/81a38913-a3a6-417d-ab68-9c71aa6f8a8a/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/87ac2cb3-7402-4458-b175-ccee5d02fc3d/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f32ea347-f73c-45c2-b9bb-a9a2e94a9f0c/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/5eed7888-6e40-4a00-b0a8-ded81c2267e5/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/bbb808b8-ea73-4474-9076-7330ea8da72d/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/1376bf61-0867-47b2-a448-1d7893da242e/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/4543e25e-fb2e-472f-a611-e8439f92dff2/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/e2acdfb1-a40f-44c3-9d32-7547b12fc1d0/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/b61469df-1b81-47e5-bb1f-9f9d0cf0dc9a/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/835c5712-9851-4738-9538-e6396b76286c/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/525e7059-0fd2-4030-8914-93c33389575b/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/79fde727-9fea-4689-8f5b-ffe774cc51ff/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/967c14f6-7df5-4cd8-8c76-abe36f82da32/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/abef4df2-44e5-4191-b2b8-c899c854324a/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f688fa06-4e1d-459f-8db9-e90c88293048/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/5bb59bf8-957f-400e-8a01-43a4f60801f9/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3d8ab25c-35ce-4e7f-8c78-c1871d0a6be5/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/1c4312b5-d719-4474-845c-c2cbd4fe17c1/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/be834708-47dc-4567-a329-5da42b3138ca/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f1934d9c-2011-40c3-953c-eedd640adfdd/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/d931cc2b-948b-43b9-a62d-ee4290ed6bc6/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/745f798c-299e-456e-8c6e-4143f4cdb8d0/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/88dab799-d2c9-48f5-b716-260440fb1abe/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/6b35ee88-fdee-47ab-99ca-52ea76e31fed/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/db1801ac-bd50-4d5c-9750-832d09d38007/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3dfcc1d5-02ef-4a98-b750-bb3d09dbbe2a/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3f20d336-a4bc-422d-971d-b1ba8d97f3d6/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7b0f49ed-3bdb-441d-9e08-a980cff711cc/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f5ad7d98-a071-4312-a88c-594bbfd6e3e9/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/4751867f-edd1-4591-b630-176f4f891992/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/c6ef2db3-1ab3-4ed4-a531-c93aefe3cfef/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7f6dd586-2caa-41ae-a5d6-c9eaec9db934/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/cc7f44ed-d480-4970-a566-1804ea0bbf57/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/a9aedd27-0fba-43f2-89ce-aedefdd4b56d/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7c2edd00-fc9b-4145-a603-d542a2fa7af2/original.jpeg"
+          }
+        ],
+        "portfolio_url": "www.scswiderski.com",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": "d2cd4a08-8e10-11ee-97bc-125442a9a26d",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "401 Ranger St ",
+            "city": "Mosinee",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          }
+        },
+        "square_feet": 1186.0,
+        "id": 3011,
+        "property_uid": "82",
+        "payee_account_number_token": "ac1e7396-4094-4e93-88ba-dbf7773bd764",
+        "posted_to_website_at": "2026-05-08T17:43:38.000Z",
+        "contact_phone_number": "(715) 873-9492",
+        "payee_routing_number": "075917937",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 92,
+            "name": "all"
+          },
+          {
+            "id": 95,
+            "name": "athens pm"
+          },
+          {
+            "id": 35,
+            "name": "construction warranty"
+          },
+          {
+            "id": 36,
+            "name": "multi family properties"
+          },
+          {
+            "id": 3,
+            "name": "northern"
+          },
+          {
+            "id": 90,
+            "name": "scs athens"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 2.0,
+        "address_address2": "#51",
+        "address_address1": "715 Caroline Street ",
+        "bedrooms": 3,
+        "meta_description": "SCS apartments offer inclusive rent*! Private entrances, garages, private patio or balcony. $1150-$1875. Pet Friendly.\r\n\r\n***$499/$799 SECURITY DEPOSIT SPECIAL***\r\n*LIMITED TIME ONLY\r\n*12 MONTH LEASE\r\n\r\n*Utilities included in your rent:\r\n\u2022 Heat\r\n\u2022 High Speed Internet & Cable TV\r\n\u2022 Water & sewer\r\n\u2022 Trash & recycling\r\n\u2022 Snow removal & lawn care\r\n\r\nCALL TO TOUR TODAY! \r\n\r\nLocated right off WI-97 and near downtown Athens, quick commute to Abbotsford, Colby, Dorchester.\r\n\r\nDogs & Cats welcome! Some restrictions apply.\r\n\r\nVirtual Tour: https://my.matterport.com/show/?m=cn9fpmW4sUE\r\n\r\n",
+        "listable_uid": "5e17d937-7b94-43da-9c79-617f7b2e14de",
+        "portfolio_address2": "",
+        "portfolio_address1": "401 Ranger St ",
+        "contact_email_address": "athens@scswiderski.com",
+        "deposit": 799.0,
+        "application_fee": 25.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Private Entry, In Unit Laundry, Upper End Unit, 1 Car Detached Garage",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 24101,
+        "portfolio_city": "Mosinee",
+        "appliances": "Stove, Refrigerator, Microwave, Dishwasher, Washer/Dryer",
+        "by_the_bed": false,
+        "address_state": "WI",
+        "created_at": "2025-04-17T21:29:54.000Z",
+        "marketing_title": "SCS Athens Apartment Community ",
+        "unit_template_name": "Fulton 3 BR Upper ",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/scswiderski/images/b63185a5-c17b-4dd9-85fa-4a27570d184b/medium.jpg",
+        "updated_at": "2026-05-08T17:50:25.000Z",
+        "fee_label": "Background Check Fee",
+        "address_longitude": -90.0759117,
+        "property_type": "Multi-Family",
+        "market_rent": 1595.0,
+        "customization_uuid": "142b26f4096011ef956e3adde7d6d082",
+        "affordable": false,
+        "portfolio_phone_number": "(715) 693-9522",
+        "virtual_showing": false,
+        "posted_to_internet": 24102,
+        "database_name": "scswiderski",
+        "address_postal_code": "54411",
+        "address_country": "US",
+        "available_date": "2025-07-02",
+        "portfolio_name": "S.C. Swiderski, LLC",
+        "marketing_description": "SCS apartments offer inclusive rent*! Private entrances, garages, private patio or balcony. $1150-$1875. Pet Friendly.<br/><br/>***$499/$799 SECURITY DEPOSIT SPECIAL***<br/>*LIMITED TIME ONLY<br/>*12 MONTH LEASE<br/><br/>*Utilities included in your rent:<br/>\u2022 Heat<br/>\u2022 High Speed Internet & Cable TV<br/>\u2022 Water & sewer<br/>\u2022 Trash & recycling<br/>\u2022 Snow removal & lawn care<br/><br/>CALL TO TOUR TODAY! <br/><br/>Located right off WI-97 and near downtown Athens, quick commute to Abbotsford, Colby, Dorchester.<br/><br/>Dogs & Cats welcome! Some restrictions apply.<br/><br/>Virtual Tour: https://my.matterport.com/show/?m=cn9fpmW4sUE<br/><br/>",
+        "address_city": "Athens",
+        "property_year_built": 2023,
+        "room_template_id": null,
+        "rent_range": [
+          1595.0,
+          1595.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "WI",
+        "location": {
+          "address": {
+            "streetAddress": "715 Caroline Street , #51",
+            "city": "Athens",
+            "region": "WI",
+            "postalCode": "54411",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "45.0305336",
+            "longitude": "-90.0759117"
+          }
+        },
+        "schedule_showing_url": "https://scswiderski.appfolio.com/listings/showings/new?listable_uid=5e17d937-7b94-43da-9c79-617f7b2e14de"
+      },
+      "page_item_url": "5e17d937-7b94-43da-9c79-617f7b2e14de"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=715+Caroline+Street+Athens%2C+WI+54411&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=45.0405336,-90.0759117",
+        "address_latitude": 45.0305336,
+        "database_url": "https://scswiderski.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/scswiderski/images/ad005ded-d803-4fb5-a056-cccd11bc8b00/large.png",
+        "rental_application_url": "https://scswiderski.appfolio.com/listings/rental_applications/new?listable_uid=b98e17f4-2a74-4758-9d19-d7528b46cc1c&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "54455",
+        "full_address": "715 Caroline Street , #59, Athens, WI 54411",
+        "utilities": "Heat, Water & Sewer, High Speed Internet & Cable TV, Trash Removal, Snow Removal & Lawn Care",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/9e7a6133-4c27-4b7c-9642-78c0bc3038ac/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/11fae87d-f6f2-4bb1-9da3-0f61971419f6/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/0b33bed9-1792-424f-96d7-2b9a4e0b7934/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/fa83a19a-a54e-429e-aa83-cd8eeb2819cc/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/27fa4cc7-e504-46f2-b611-10b5f7b725c5/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/aae96358-1d00-45c6-a674-480a450c6ab9/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/73e73e32-6e4d-46a7-babb-b6e337059651/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/6b213043-2772-46c1-a6c0-db5eb3047de2/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/69e3f2c1-4b2d-4c50-8a7b-4c50e9356a19/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/e783fee7-15ec-4a91-9b5a-be1c8c27d54e/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/f9b0e67a-ddd9-4e33-8165-c8c0457c7a04/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/c7f31b5d-e37c-40c8-af81-4716ce971d20/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/3336829e-34cb-4d7c-a3f3-2c186a452d72/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/5a157225-b853-4cf9-b409-15fd64acc646/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/98b72c02-180e-42eb-b89d-d0b6cf3b04ae/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/80f303f1-212e-4c02-b300-de0c0596621c/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/04f19465-2c07-4cba-bdd2-8c5cbe6fbb0d/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/664b6079-3dcc-4cc4-98ec-0cd007132d8c/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/c5135295-fa82-428c-9169-6e8a3ea523b5/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/b1b1cc1e-7399-4271-8f36-0b93d832a0df/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3c8058c6-43bf-4227-9790-3bc6dcd4c477/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/9702da97-f9cf-4584-be37-c51e7f25d35e/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/e110fb5e-8a9b-4474-90d1-2acc6a60eda2/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/10b8016e-ca93-4755-8f0f-5dc69cd923fc/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/35d18dde-7094-449b-9bb2-68bff0e874ef/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/36bca469-744e-4f36-8c2d-627a48144adf/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/80e060ca-2522-494c-b2de-f0d6b5856140/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f18cb18a-9f06-4a57-98d9-a7a40e1dfaf0/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3dfcc1d5-02ef-4a98-b750-bb3d09dbbe2a/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3f20d336-a4bc-422d-971d-b1ba8d97f3d6/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7b0f49ed-3bdb-441d-9e08-a980cff711cc/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/f5ad7d98-a071-4312-a88c-594bbfd6e3e9/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/4751867f-edd1-4591-b630-176f4f891992/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/c6ef2db3-1ab3-4ed4-a531-c93aefe3cfef/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7f6dd586-2caa-41ae-a5d6-c9eaec9db934/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/cc7f44ed-d480-4970-a566-1804ea0bbf57/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/a9aedd27-0fba-43f2-89ce-aedefdd4b56d/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/7c2edd00-fc9b-4145-a603-d542a2fa7af2/original.jpeg"
+          }
+        ],
+        "portfolio_url": "www.scswiderski.com",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": "2d88f73a-8ef1-11ee-97bc-125442a9a26d",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "401 Ranger St ",
+            "city": "Mosinee",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          }
+        },
+        "square_feet": 805.0,
+        "id": 3018,
+        "property_uid": "82",
+        "payee_account_number_token": "ac1e7396-4094-4e93-88ba-dbf7773bd764",
+        "posted_to_website_at": "2026-05-08T17:44:24.000Z",
+        "contact_phone_number": "(715) 873-9492",
+        "payee_routing_number": "075917937",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 92,
+            "name": "all"
+          },
+          {
+            "id": 95,
+            "name": "athens pm"
+          },
+          {
+            "id": 35,
+            "name": "construction warranty"
+          },
+          {
+            "id": 36,
+            "name": "multi family properties"
+          },
+          {
+            "id": 3,
+            "name": "northern"
+          },
+          {
+            "id": 90,
+            "name": "scs athens"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 1.0,
+        "address_address2": "#59",
+        "address_address1": "715 Caroline Street ",
+        "bedrooms": 1,
+        "meta_description": "SCS apartments offer inclusive rent*! Private entrances, garages, private patio or balcony. $1150-$1875. Pet Friendly.\r\n\r\n***$499/$799 SECURITY DEPOSIT SPECIAL***\r\n*LIMITED TIME ONLY\r\n*12 MONTH LEASE\r\n\r\n*Utilities included in your rent:\r\n\u2022 Heat\r\n\u2022 High Speed Internet & Cable TV\r\n\u2022 Water & sewer\r\n\u2022 Trash & recycling\r\n\u2022 Snow removal & lawn care\r\n\r\nCALL TO TOUR TODAY!\r\n\r\nLocated right off WI-97 and near downtown Athens, quick commute to Abbotsford, Colby, Dorchester.\r\n\r\nDogs & Cats welcome! Some restrictions apply.\r\n\r\nVirtual Tour: https://my.matterport.com/show/?m=cAhZfFNrgb2\r\n\r\n",
+        "listable_uid": "b98e17f4-2a74-4758-9d19-d7528b46cc1c",
+        "portfolio_address2": "",
+        "portfolio_address1": "401 Ranger St ",
+        "contact_email_address": "athens@scswiderski.com",
+        "deposit": 499.0,
+        "application_fee": 25.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Private Entry, In Unit Laundry, Upper Middle Unit, 1 Car Detached Garage",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 24105,
+        "portfolio_city": "Mosinee",
+        "appliances": "Stove, Refrigerator, Microwave, Dishwasher, Washer/Dryer",
+        "by_the_bed": false,
+        "address_state": "WI",
+        "created_at": "2025-04-17T21:29:54.000Z",
+        "marketing_title": "SCS Athens Apartment Community ",
+        "unit_template_name": "Fulton 1 BR Upper ",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/scswiderski/images/9e7a6133-4c27-4b7c-9642-78c0bc3038ac/medium.jpg",
+        "updated_at": "2026-05-08T17:50:25.000Z",
+        "fee_label": "Background Check Fee",
+        "address_longitude": -90.0759117,
+        "property_type": "Multi-Family",
+        "market_rent": 1150.0,
+        "customization_uuid": "142b26f4096011ef956e3adde7d6d082",
+        "affordable": false,
+        "portfolio_phone_number": "(715) 693-9522",
+        "virtual_showing": false,
+        "posted_to_internet": 24106,
+        "database_name": "scswiderski",
+        "address_postal_code": "54411",
+        "address_country": "US",
+        "available_date": "2026-07-01",
+        "portfolio_name": "S.C. Swiderski, LLC",
+        "marketing_description": "SCS apartments offer inclusive rent*! Private entrances, garages, private patio or balcony. $1150-$1875. Pet Friendly.<br/><br/>***$499/$799 SECURITY DEPOSIT SPECIAL***<br/>*LIMITED TIME ONLY<br/>*12 MONTH LEASE<br/><br/>*Utilities included in your rent:<br/>\u2022 Heat<br/>\u2022 High Speed Internet & Cable TV<br/>\u2022 Water & sewer<br/>\u2022 Trash & recycling<br/>\u2022 Snow removal & lawn care<br/><br/>CALL TO TOUR TODAY!<br/><br/>Located right off WI-97 and near downtown Athens, quick commute to Abbotsford, Colby, Dorchester.<br/><br/>Dogs & Cats welcome! Some restrictions apply.<br/><br/>Virtual Tour: https://my.matterport.com/show/?m=cAhZfFNrgb2<br/><br/>",
+        "address_city": "Athens",
+        "property_year_built": 2023,
+        "room_template_id": null,
+        "rent_range": [
+          1150.0,
+          1150.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "WI",
+        "location": {
+          "address": {
+            "streetAddress": "715 Caroline Street , #59",
+            "city": "Athens",
+            "region": "WI",
+            "postalCode": "54411",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "45.0305336",
+            "longitude": "-90.0759117"
+          }
+        },
+        "schedule_showing_url": "https://scswiderski.appfolio.com/listings/showings/new?listable_uid=b98e17f4-2a74-4758-9d19-d7528b46cc1c"
+      },
+      "page_item_url": "b98e17f4-2a74-4758-9d19-d7528b46cc1c"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=540+Moon+Lake+Dr+Rice+Lake%2C+WI+54868&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=45.4812392,-91.7273868",
+        "address_latitude": 45.4712392,
+        "database_url": "https://scswiderski.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/scswiderski/images/ad005ded-d803-4fb5-a056-cccd11bc8b00/large.png",
+        "rental_application_url": "https://scswiderski.appfolio.com/listings/rental_applications/new?listable_uid=7a8ceff8-7e97-4f18-8436-422fd9ff3533&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "54455",
+        "full_address": "540 Moon Lake Dr, #11, Rice Lake, WI 54868",
+        "utilities": "Heat, Water & Sewer, Trash Removal, Snow Removal & Lawn Care",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/6a14b131-e633-45b6-bd70-7122549b9f1a/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/748163ac-5e02-4ef4-8927-b3cce5522dca/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/bcf98c5e-6fc2-425f-ad56-f342d0e6e233/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/1c4d936b-6adb-4e0b-b45c-51e71abfc4ca/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/a34e7150-ba7e-4248-a33f-3c5cb48338a8/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/965518e0-3e2c-4f00-9abc-cdaf503d5f1b/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/8a62809a-0b38-4ebe-84f2-473765fb532c/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/74ec5592-81e9-48fa-ba91-f5475af61066/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/7a3b0074-7a0d-4327-87ce-6df952557f5c/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/a4720e81-fe6d-4c79-91bc-0cfb25f45aaa/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/9a7c8d8c-3c77-49d8-baa1-3b6116f3ba5a/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/a54dfe3d-17a0-4729-a8ba-9b2e9c35c3ac/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/79e11d1a-86e4-4184-bad3-c7cfc5e98502/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/29c40576-e65c-43bd-adba-285a01d8d786/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/1f071ce4-9b7c-4fd8-a067-038ce6b73f37/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/618f1fd1-89d7-41e0-a0b2-40a1b5ce3351/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/b6451686-4244-48d3-9dda-388789469e7f/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/642886bc-3f68-4f7f-8e17-cb1269b550cd/original.png"
+          }
+        ],
+        "portfolio_url": "www.scswiderski.com",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": "8aed8600-45a4-11eb-acd5-028e63283250",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "401 Ranger St ",
+            "city": "Mosinee",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          }
+        },
+        "square_feet": 1265.0,
+        "id": 11,
+        "property_uid": "57",
+        "payee_account_number_token": "97dcccea-954a-40d5-9e36-7512d77dba02",
+        "posted_to_website_at": "2026-04-17T14:48:31.000Z",
+        "contact_phone_number": "(715) 997-2486",
+        "payee_routing_number": "075917937",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 92,
+            "name": "all"
+          },
+          {
+            "id": 27,
+            "name": "moon lake estates"
+          },
+          {
+            "id": 36,
+            "name": "multi family properties"
+          },
+          {
+            "id": 1,
+            "name": "western"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 2.0,
+        "address_address2": "#11",
+        "address_address1": "540 Moon Lake Dr",
+        "bedrooms": 3,
+        "meta_description": "SCS apartments offer inclusive rent*! Private entrances, garages, private patio or balcony. $1275-$1630. Pet Friendly.\r\n\r\n***SECURITY DEPOSIT SPECIAL!***\r\n*Limited time only. \r\n\r\n*Utilities included in your rent:\r\n\u2022 Heat\r\n\u2022 Water & sewer\r\n\u2022 Trash & recycling\r\n\u2022 Snow removal & lawn care\r\n\r\nCALL TO TOUR TODAY!\r\n\r\n1-, 2-, & 3-bedroom apartments near downtown Rice Lake, minutes from Hwy 53. \r\n\r\nDogs & Cats welcome! Some restrictions apply.\r\n\r\nVirtual Tour: https://my.matterport.com/show/?m=rUzRSehgkEy\r\n\r\n\r\n\r\n",
+        "listable_uid": "7a8ceff8-7e97-4f18-8436-422fd9ff3533",
+        "portfolio_address2": "",
+        "portfolio_address1": "401 Ranger St ",
+        "contact_email_address": "moonlake@scswiderski.com",
+        "deposit": 1620.0,
+        "application_fee": 25.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Private Entry, Lower, In Unit Laundry, 1 Car Detached Garage",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 23812,
+        "portfolio_city": "Mosinee",
+        "appliances": "Stove, Refrigerator, Dishwasher, Washer/Dryer",
+        "by_the_bed": false,
+        "address_state": "WI",
+        "created_at": "2018-12-17T20:40:56.000Z",
+        "marketing_title": "Moon Lake Estates Apartment Community ",
+        "unit_template_name": "Willow 3 BR Lower ",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/scswiderski/images/6a14b131-e633-45b6-bd70-7122549b9f1a/medium.jpg",
+        "updated_at": "2026-04-29T18:50:20.000Z",
+        "fee_label": "Background Check Fee",
+        "address_longitude": -91.7273868,
+        "property_type": "Multi-Family",
+        "market_rent": 1620.0,
+        "customization_uuid": "142b26f4096011ef956e3adde7d6d082",
+        "affordable": false,
+        "portfolio_phone_number": "(715) 693-9522",
+        "virtual_showing": false,
+        "posted_to_internet": 23813,
+        "database_name": "scswiderski",
+        "address_postal_code": "54868",
+        "address_country": "US",
+        "available_date": "2026-05-01",
+        "portfolio_name": "S.C. Swiderski, LLC",
+        "marketing_description": "SCS apartments offer inclusive rent*! Private entrances, garages, private patio or balcony. $1275-$1630. Pet Friendly.<br/><br/>***SECURITY DEPOSIT SPECIAL!***<br/>*Limited time only. <br/><br/>*Utilities included in your rent:<br/>\u2022 Heat<br/>\u2022 Water & sewer<br/>\u2022 Trash & recycling<br/>\u2022 Snow removal & lawn care<br/><br/>CALL TO TOUR TODAY!<br/><br/>1-, 2-, & 3-bedroom apartments near downtown Rice Lake, minutes from Hwy 53. <br/><br/>Dogs & Cats welcome! Some restrictions apply.<br/><br/>Virtual Tour: https://my.matterport.com/show/?m=rUzRSehgkEy<br/><br/><br/><br/>",
+        "address_city": "Rice Lake",
+        "property_year_built": 2015,
+        "room_template_id": null,
+        "rent_range": [
+          1620.0,
+          1620.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "WI",
+        "location": {
+          "address": {
+            "streetAddress": "540 Moon Lake Dr, #11",
+            "city": "Rice Lake",
+            "region": "WI",
+            "postalCode": "54868",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "45.4712392",
+            "longitude": "-91.7273868"
+          }
+        },
+        "schedule_showing_url": "https://scswiderski.appfolio.com/listings/showings/new?listable_uid=7a8ceff8-7e97-4f18-8436-422fd9ff3533"
+      },
+      "page_item_url": "7a8ceff8-7e97-4f18-8436-422fd9ff3533"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=445+S+Grant+Ave+Sturgeon+Bay%2C+WI+54235&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=44.8316493,-87.4156555",
+        "address_latitude": 44.8216493,
+        "database_url": "https://scswiderski.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/scswiderski/images/ad005ded-d803-4fb5-a056-cccd11bc8b00/large.png",
+        "rental_application_url": "https://scswiderski.appfolio.com/listings/rental_applications/new?listable_uid=55f09f99-deff-41db-b87c-be49aba59b0b&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "54455",
+        "full_address": "445 S Grant Ave, #1, Sturgeon Bay, WI 54235",
+        "utilities": "Heat, Water & Sewer, Trash Removal, Snow Removal & Lawn Care",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/0f6d3f90-5a1d-4d36-a6ad-aadabc3d85fd/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/3258a119-2317-4ae1-bf1c-173c4c190307/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/5b62047b-d3d2-4515-9098-091650ea6647/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/248e8645-3aa4-4e47-90e4-7fb5dd6b1f25/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/ff0efc5e-20b3-4935-bc94-6bd16cb2975e/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/c8d0fab4-a2e7-477f-bd3b-2a69a364955d/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/ba91c2a8-31c8-4f8b-bbd0-e19dcd201f79/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/9adcd2e9-b6c5-4e3b-8b2b-eaebeaad6ce8/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/d2bcec12-4488-4a23-b3f2-7c3ebe14309c/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/cf5febfb-4c6f-4ae9-b76a-53de3fdce91c/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/7d8dd8ac-d0d4-4b56-91f6-22c4bf3a6b2c/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/27c11261-6343-4aff-ba53-866144e9d39e/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/c5bc7ce1-f42e-4bdd-9548-fab6f86ad173/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/fe0b413e-47fc-4cc9-9076-928b63f63e06/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/0e40e7ce-07b9-483c-bb10-bf32af065547/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/5181381b-52b7-46be-b94b-45cd98e5446d/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3ee0fe24-10c7-4f0d-8299-e4bf5d584daf/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/2d6c7519-1c37-45a5-bde4-c65d6b63a96e/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/81543861-6cac-4b97-844d-5a6803033749/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/6a8e7674-a5c0-4b6e-96a4-655daf3c1925/original.png"
+          }
+        ],
+        "portfolio_url": "www.scswiderski.com",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": "8aeda122-45a4-11eb-acd5-028e63283250",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "401 Ranger St ",
+            "city": "Mosinee",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          }
+        },
+        "square_feet": 1105.0,
+        "id": 41,
+        "property_uid": "50",
+        "payee_account_number_token": "97dcccea-954a-40d5-9e36-7512d77dba02",
+        "posted_to_website_at": "2026-05-04T14:33:20.000Z",
+        "contact_phone_number": "(715) 814-5842",
+        "payee_routing_number": "075917937",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 92,
+            "name": "all"
+          },
+          {
+            "id": 37,
+            "name": "central maintenance groups"
+          },
+          {
+            "id": 2,
+            "name": "eastern"
+          },
+          {
+            "id": 36,
+            "name": "multi family properties"
+          },
+          {
+            "id": 74,
+            "name": "scs sturgeon bay"
+          },
+          {
+            "id": 56,
+            "name": "sturgeon bay-region"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 2.0,
+        "address_address2": "#1",
+        "address_address1": "445 S Grant Ave",
+        "bedrooms": 3,
+        "meta_description": "SCS apartments offer inclusive rent*! Private entrances, playground, garages, private patio or balcony. $1300-$1575. Pet Friendly.\r\n\r\nLimited Time Offer - $599 Security Deposit Special!\r\n\r\n*Utilities included in your rent:\r\n\u2022 Heat\r\n\u2022 Water & sewer\r\n\u2022 Trash & recycling\r\n\u2022 Snow removal & lawn care\r\n\r\nCALL TO SCHEDULE A TOUR!\r\n\r\nLocated right off WIS-42, 6-minutes downtown Sturgeon Bay. Near shopping, dining, & industry. Close to Door County Attractions & Lake Michigan.\r\n\r\nDogs & Cats welcome! Some restrictions apply.\r\n\r\nVirtual Tour: https://my.matterport.com/show/?m=jSMsBVXhiFm\r\n\r\n",
+        "listable_uid": "55f09f99-deff-41db-b87c-be49aba59b0b",
+        "portfolio_address2": "",
+        "portfolio_address1": "401 Ranger St ",
+        "contact_email_address": "sturgeonbay@scswiderski.com",
+        "deposit": 599.0,
+        "application_fee": 25.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Private Entry, Lower, In Unit Laundry, 1 Car Detached Garage",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 24000,
+        "portfolio_city": "Mosinee",
+        "appliances": "Refrigerator, Stove, Microwave, Dishwasher, Washer/Dryer",
+        "by_the_bed": false,
+        "address_state": "WI",
+        "created_at": "2018-12-17T23:31:11.000Z",
+        "marketing_title": "SCS Sturgeon Bay Estates Apartment Community ",
+        "unit_template_name": "Ranger 3 BR Lower ",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/scswiderski/images/0f6d3f90-5a1d-4d36-a6ad-aadabc3d85fd/medium.jpg",
+        "updated_at": "2026-05-07T16:50:27.000Z",
+        "fee_label": "Background Check Fee",
+        "address_longitude": -87.4156555,
+        "property_type": "Multi-Family",
+        "market_rent": 1575.0,
+        "customization_uuid": "142b26f4096011ef956e3adde7d6d082",
+        "affordable": false,
+        "portfolio_phone_number": "(715) 693-9522",
+        "virtual_showing": false,
+        "posted_to_internet": 24001,
+        "database_name": "scswiderski",
+        "address_postal_code": "54235",
+        "address_country": "US",
+        "available_date": "2026-06-01",
+        "portfolio_name": "S.C. Swiderski, LLC",
+        "marketing_description": "SCS apartments offer inclusive rent*! Private entrances, playground, garages, private patio or balcony. $1300-$1575. Pet Friendly.<br/><br/>Limited Time Offer - $599 Security Deposit Special!<br/><br/>*Utilities included in your rent:<br/>\u2022 Heat<br/>\u2022 Water & sewer<br/>\u2022 Trash & recycling<br/>\u2022 Snow removal & lawn care<br/><br/>CALL TO SCHEDULE A TOUR!<br/><br/>Located right off WIS-42, 6-minutes downtown Sturgeon Bay. Near shopping, dining, & industry. Close to Door County Attractions & Lake Michigan.<br/><br/>Dogs & Cats welcome! Some restrictions apply.<br/><br/>Virtual Tour: https://my.matterport.com/show/?m=jSMsBVXhiFm<br/><br/>",
+        "address_city": "Sturgeon Bay",
+        "property_year_built": 2018,
+        "room_template_id": null,
+        "rent_range": [
+          1575.0,
+          1575.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "WI",
+        "location": {
+          "address": {
+            "streetAddress": "445 S Grant Ave, #1",
+            "city": "Sturgeon Bay",
+            "region": "WI",
+            "postalCode": "54235",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "44.8216493",
+            "longitude": "-87.4156555"
+          }
+        },
+        "schedule_showing_url": "https://scswiderski.appfolio.com/listings/showings/new?listable_uid=55f09f99-deff-41db-b87c-be49aba59b0b"
+      },
+      "page_item_url": "55f09f99-deff-41db-b87c-be49aba59b0b"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=2923+George+Rd+Wisconsin+Rapids%2C+WI+54495&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=44.4066475,-89.8609379",
+        "address_latitude": 44.3966475,
+        "database_url": "https://scswiderski.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/scswiderski/images/ad005ded-d803-4fb5-a056-cccd11bc8b00/large.png",
+        "rental_application_url": "https://scswiderski.appfolio.com/listings/rental_applications/new?listable_uid=35ed4a07-5ab4-4c0b-ba51-0875013b15ad&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "54455",
+        "full_address": "2923 George Rd, #205, Wisconsin Rapids, WI 54495",
+        "utilities": "Heat, Water & Sewer, Trash Removal, Snow Removal & Lawn Care",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/bbc6e3d3-9f84-48d0-ac7e-ff389652b372/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/eda684d8-17de-4d5e-af70-76c780a18826/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/090d3f54-3c8d-426c-b0c7-523e1bdeecad/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/8c729b8e-a2c3-4755-82d0-74fa44212368/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/55820378-8ad4-4aa4-9669-89afd271c091/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/01c9d53d-59c2-4318-b47d-9cce20d45d21/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/504b2226-b329-4b10-9451-a88c31fd90a2/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/48942033-318c-4eb8-bbe0-dd57aae41035/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/e594e45e-1497-4470-abf7-a6a027a4381b/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/45bc3e79-e818-44b3-bce4-2a2ac4e3c8e1/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/f55c0bb7-26a3-4ab8-a0df-0911c707f129/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/854a2465-1262-4944-b2d2-b19eafd48456/original.png"
+          }
+        ],
+        "portfolio_url": "www.scswiderski.com",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": "8aed5999-45a4-11eb-acd5-028e63283250",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "401 Ranger St ",
+            "city": "Mosinee",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          }
+        },
+        "square_feet": 665.0,
+        "id": 104,
+        "property_uid": "41",
+        "payee_account_number_token": "ac1e7396-4094-4e93-88ba-dbf7773bd764",
+        "posted_to_website_at": "2026-05-08T14:36:53.000Z",
+        "contact_phone_number": "(715) 496-8109",
+        "payee_routing_number": "075917937",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 92,
+            "name": "all"
+          },
+          {
+            "id": 61,
+            "name": "birchwood apartments"
+          },
+          {
+            "id": 37,
+            "name": "central maintenance groups"
+          },
+          {
+            "id": 36,
+            "name": "multi family properties"
+          },
+          {
+            "id": 57,
+            "name": "rapids-region"
+          },
+          {
+            "id": 5,
+            "name": "sandra"
+          },
+          {
+            "id": 4,
+            "name": "southern"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 1.0,
+        "address_address2": "#205",
+        "address_address1": "2923 George Rd",
+        "bedrooms": 1,
+        "meta_description": "SCS apartments offer inclusive rent*! Secure entrances, garages, private patio or balcony. $940-$1080. Pet Friendly.\r\n\r\n*Utilities included in your rent:\r\n\u2022 Heat\r\n\u2022 Water & sewer\r\n\u2022 Trash & recycling\r\n\u2022 Snow removal & lawn care\r\n\r\nCALL TO TOUR TODAY!\r\n\r\nLocated right off Hwy 73, minutes from downtown Wisconsin Rapids. Easy commute to Nekoosa, Port Edwards, Plover. Near golf course, shopping, & industry. \r\n\r\nDogs & Cats welcome! Some restrictions apply.\r\n",
+        "listable_uid": "35ed4a07-5ab4-4c0b-ba51-0875013b15ad",
+        "portfolio_address2": "",
+        "portfolio_address1": "401 Ranger St ",
+        "contact_email_address": "rapids@scswiderski.com",
+        "deposit": 975.0,
+        "application_fee": 25.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Upper, In Unit Laundry, Secured Entrances with Intercom, 1 Car Detached Garage",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 24076,
+        "portfolio_city": "Mosinee",
+        "appliances": "Stove, Refrigerator, Dishwasher, Washer/Dryer",
+        "by_the_bed": false,
+        "address_state": "WI",
+        "created_at": "2019-01-02T19:16:07.000Z",
+        "marketing_title": "Birchwood Apartment Community ",
+        "unit_template_name": "Stone 1 BR Upper ",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/scswiderski/images/bbc6e3d3-9f84-48d0-ac7e-ff389652b372/medium.jpg",
+        "updated_at": "2026-05-15T18:50:17.000Z",
+        "fee_label": "Background Check Fee",
+        "address_longitude": -89.8609379,
+        "property_type": "Multi-Family",
+        "market_rent": 975.0,
+        "customization_uuid": "142b26f4096011ef956e3adde7d6d082",
+        "affordable": false,
+        "portfolio_phone_number": "(715) 693-9522",
+        "virtual_showing": false,
+        "posted_to_internet": 24077,
+        "database_name": "scswiderski",
+        "address_postal_code": "54495",
+        "address_country": "US",
+        "available_date": "2026-06-01",
+        "portfolio_name": "S.C. Swiderski, LLC",
+        "marketing_description": "SCS apartments offer inclusive rent*! Secure entrances, garages, private patio or balcony. $940-$1080. Pet Friendly.<br/><br/>*Utilities included in your rent:<br/>\u2022 Heat<br/>\u2022 Water & sewer<br/>\u2022 Trash & recycling<br/>\u2022 Snow removal & lawn care<br/><br/>CALL TO TOUR TODAY!<br/><br/>Located right off Hwy 73, minutes from downtown Wisconsin Rapids. Easy commute to Nekoosa, Port Edwards, Plover. Near golf course, shopping, & industry. <br/><br/>Dogs & Cats welcome! Some restrictions apply.<br/>",
+        "address_city": "Wisconsin Rapids",
+        "property_year_built": 2009,
+        "room_template_id": null,
+        "rent_range": [
+          975.0,
+          975.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "WI",
+        "location": {
+          "address": {
+            "streetAddress": "2923 George Rd, #205",
+            "city": "Wisconsin Rapids",
+            "region": "WI",
+            "postalCode": "54495",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "44.3966475",
+            "longitude": "-89.8609379"
+          }
+        },
+        "schedule_showing_url": "https://scswiderski.appfolio.com/listings/showings/new?listable_uid=35ed4a07-5ab4-4c0b-ba51-0875013b15ad"
+      },
+      "page_item_url": "35ed4a07-5ab4-4c0b-ba51-0875013b15ad"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=1622+Old+Hwy+51+Kronenwetter%2C+WI+54455&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=44.836565,-89.6656709",
+        "address_latitude": 44.826565,
+        "database_url": "https://scswiderski.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/scswiderski/images/ad005ded-d803-4fb5-a056-cccd11bc8b00/large.png",
+        "rental_application_url": "https://scswiderski.appfolio.com/listings/rental_applications/new?listable_uid=0076f9e9-b606-40c7-a4ec-4f628358cf3e&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "54455",
+        "full_address": "1622 Old Hwy 51, #6, Kronenwetter, WI 54455",
+        "utilities": "Heat, Water & Sewer, Trash Removal, Snow Removal & Lawn Care",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/c2c9f906-e44e-48ce-8797-11e837ca6b0f/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/05cd407e-f956-4852-9b0c-838bb129063f/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/868cd929-128e-4528-8c85-e1aeba098bb8/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/88826420-a076-49c9-a3b2-b5f2f82bac35/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/562a4ba7-cd30-4ea8-a7a8-02ab38d357e9/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/a3a141ad-10b9-47a5-92a4-4e6306eda052/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/4c8f55b5-21b0-4537-9653-6d611550f646/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/2f6b0264-0a41-463a-8051-acb41d735619/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/d1248ef8-269a-48ab-94c1-ba38388c8955/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/7c89e128-0973-40b5-bb2b-3ebb05e236a8/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/a4871c53-7780-4792-aed2-4719d5bb1d27/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/32cfa7f9-8768-408c-9432-34970dbd2b68/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/36e2e525-4d76-40cb-b7ca-0a5ff21c4cdc/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/52de2759-62a8-4813-99a0-73b0596eb013/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/e52bf565-664e-47fc-81ae-73192f2294e6/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/de3f7d4d-daa8-463d-9ed0-b47730b429a2/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/fa122851-e3ae-4493-b346-dff51d3a314c/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/349ed551-1b32-453c-9305-4bdf8f684ada/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/3ec002db-7d37-4b9d-899a-f9951e5064d3/original.png"
+          }
+        ],
+        "portfolio_url": "www.scswiderski.com",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": "8aed8f67-45a4-11eb-acd5-028e63283250",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "401 Ranger St ",
+            "city": "Mosinee",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          }
+        },
+        "square_feet": 1265.0,
+        "id": 105,
+        "property_uid": "48",
+        "payee_account_number_token": "ac1e7396-4094-4e93-88ba-dbf7773bd764",
+        "posted_to_website_at": "2026-04-17T13:06:53.000Z",
+        "contact_phone_number": "(715) 814-5845",
+        "payee_routing_number": "075917937",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 92,
+            "name": "all"
+          },
+          {
+            "id": 19,
+            "name": "central"
+          },
+          {
+            "id": 37,
+            "name": "central maintenance groups"
+          },
+          {
+            "id": 55,
+            "name": "kronenwetter-region"
+          },
+          {
+            "id": 36,
+            "name": "multi family properties"
+          },
+          {
+            "id": 62,
+            "name": "pine view estates"
+          },
+          {
+            "id": 96,
+            "name": "pine view pm"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 2.0,
+        "address_address2": "#6",
+        "address_address1": "1622 Old Hwy 51",
+        "bedrooms": 3,
+        "meta_description": "SCS apartments offer inclusive rent*! Playground, private entrances, garages, private patio or balcony. $1165-$1664. Pet Friendly.\r\n\r\n*Utilities included in your rent:\r\n\u2022 Heat\r\n\u2022 Water & sewer\r\n\u2022 Trash & recycling\r\n\u2022 Snow removal & lawn care\r\n\r\nCALL TO TOUR TODAY!\r\n\r\nMinutes from Hwy 51, located near Mosinee, Wausau, Kronenwetter, Rothschild. Close to shopping & dining.\r\n\r\nDogs & Cats welcome! Some restrictions apply.",
+        "listable_uid": "0076f9e9-b606-40c7-a4ec-4f628358cf3e",
+        "portfolio_address2": "",
+        "portfolio_address1": "401 Ranger St ",
+        "contact_email_address": "pineview@scswiderski.com",
+        "deposit": 1595.0,
+        "application_fee": 25.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Private Entry, Lower, In Unit Laundry, 1 Car Detached Garage",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 23788,
+        "portfolio_city": "Mosinee",
+        "appliances": "Stove, Refrigerator, Dishwasher, Washer/Dryer",
+        "by_the_bed": false,
+        "address_state": "WI",
+        "created_at": "2019-01-02T19:16:07.000Z",
+        "marketing_title": "Pine View Estates Apartment Community ",
+        "unit_template_name": "Willow 3 BR Lower ",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/scswiderski/images/c2c9f906-e44e-48ce-8797-11e837ca6b0f/medium.jpg",
+        "updated_at": "2026-05-22T20:50:16.000Z",
+        "fee_label": "Background Check Fee",
+        "address_longitude": -89.6656709,
+        "property_type": "Multi-Family",
+        "market_rent": 1595.0,
+        "customization_uuid": "142b26f4096011ef956e3adde7d6d082",
+        "affordable": false,
+        "portfolio_phone_number": "(715) 693-9522",
+        "virtual_showing": false,
+        "posted_to_internet": 23784,
+        "database_name": "scswiderski",
+        "address_postal_code": "54455",
+        "address_country": "US",
+        "available_date": "2026-06-06",
+        "portfolio_name": "S.C. Swiderski, LLC",
+        "marketing_description": "SCS apartments offer inclusive rent*! Playground, private entrances, garages, private patio or balcony. $1165-$1664. Pet Friendly.<br/><br/>*Utilities included in your rent:<br/>\u2022 Heat<br/>\u2022 Water & sewer<br/>\u2022 Trash & recycling<br/>\u2022 Snow removal & lawn care<br/><br/>CALL TO TOUR TODAY!<br/><br/>Minutes from Hwy 51, located near Mosinee, Wausau, Kronenwetter, Rothschild. Close to shopping & dining.<br/><br/>Dogs & Cats welcome! Some restrictions apply.",
+        "address_city": "Kronenwetter",
+        "property_year_built": 2015,
+        "room_template_id": null,
+        "rent_range": [
+          1595.0,
+          1595.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "WI",
+        "location": {
+          "address": {
+            "streetAddress": "1622 Old Hwy 51, #6",
+            "city": "Kronenwetter",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "44.826565",
+            "longitude": "-89.6656709"
+          }
+        },
+        "schedule_showing_url": "https://scswiderski.appfolio.com/listings/showings/new?listable_uid=0076f9e9-b606-40c7-a4ec-4f628358cf3e"
+      },
+      "page_item_url": "0076f9e9-b606-40c7-a4ec-4f628358cf3e"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=2401+W+Jackson+St+Merrill%2C+WI+54452&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=45.1839379,-89.7388327",
+        "address_latitude": 45.1739379,
+        "database_url": "https://scswiderski.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/scswiderski/images/ad005ded-d803-4fb5-a056-cccd11bc8b00/large.png",
+        "rental_application_url": "https://scswiderski.appfolio.com/listings/rental_applications/new?listable_uid=43293b92-51c6-4320-b0e0-967019140076&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "54455",
+        "full_address": "2401 W Jackson St , #61, Merrill, WI 54452",
+        "utilities": "Heat, Water & Sewer, Trash Removal, Snow Removal & Lawn Care",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/e50b65f0-3b7b-4ef0-9a89-d4ab69cb1087/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/261238aa-351c-433a-8913-f29c4e6a42ea/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/75bd3d71-eef9-4863-a9b6-6dfdd378b77c/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/1d9531e4-6f15-497d-baab-2135b633a877/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/76f9a9c1-9d1c-409c-9312-6d70c9aa95b4/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/6705c6ea-4ead-4523-801c-eb5e35df89e3/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/036ffc5e-82ef-408b-bd37-920bcde06820/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/fa7955cb-90d8-47ed-8b19-3eeb92ffd100/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/57a8cc30-0411-41c2-b586-095f61b828c4/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/0db1cce0-08b2-461d-9f38-3f972b4b3a10/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/b3c89cf8-96c1-49d3-83b4-e2682af89b5b/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/0f5e86e6-2046-4142-bcff-4bc23d015d80/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/ab9c1cd5-86f6-40d8-86f3-efa0d7e89291/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/f79ecf4e-f7fa-4e57-9556-5e9c62cefe8e/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/85cd82a4-8504-42a1-84f7-6353be0dad0a/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/564f922f-3a67-48b0-b604-e3efc00cc5c1/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/4010d52b-442b-4540-8b6d-f05ca3f7d3e2/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/2035e32f-580b-4e41-a74d-51538490fab3/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/6f86d02d-70a9-4726-90e2-84fa785a6e5b/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/4ced65f9-a8f3-4a63-9259-193db7b56feb/original.jpg"
+          }
+        ],
+        "portfolio_url": "www.scswiderski.com",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": "8aed66b7-45a4-11eb-acd5-028e63283250",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "401 Ranger St ",
+            "city": "Mosinee",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          }
+        },
+        "square_feet": 691.0,
+        "id": 120,
+        "property_uid": "46",
+        "payee_account_number_token": "ac1e7396-4094-4e93-88ba-dbf7773bd764",
+        "posted_to_website_at": "2025-08-05T15:54:47.000Z",
+        "contact_phone_number": "(715) 997-2491",
+        "payee_routing_number": "075917937",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 92,
+            "name": "all"
+          },
+          {
+            "id": 37,
+            "name": "central maintenance groups"
+          },
+          {
+            "id": 54,
+            "name": "merrill-region"
+          },
+          {
+            "id": 36,
+            "name": "multi family properties"
+          },
+          {
+            "id": 3,
+            "name": "northern"
+          },
+          {
+            "id": 72,
+            "name": "scs merrill"
+          },
+          {
+            "id": 87,
+            "name": "tanya - merrill properties"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 1.0,
+        "address_address2": "#61",
+        "address_address1": "2401 W Jackson St ",
+        "bedrooms": 1,
+        "meta_description": "SCS apartments offer inclusive rent*! Secure entrances, garages, private patio or balcony. $865-$1070. Pet Friendly.\r\n\r\n***1/2 OFF SECURITY DEPOSIT SPECIAL***\r\n*12-month lease only \r\n*Limited time offer\r\n\r\n*Utilities included in your rent:\r\n\u2022 Heat\r\n\u2022 Water & sewer\r\n\u2022 Trash & recycling\r\n\u2022 Snow removal & lawn care\r\n\r\nCALL TO TOUR TODAY!\r\n\r\nLocated near Hwy 64 & minutes from Hwy 51 North, minutes to downtown Merrill. 30 minutes to Wausau & Tomahawk. Close to the Wisconsin River. Near Church Mutual Insurance, Council Grounds State Park. \r\n\r\nDogs & Cats welcome! Some restrictions apply.\r\n\r\n\r\nVirtual Tour: https://my.matterport.com/show/?m=b5s8FjPsHUc\r\n\r\n\r\n\r\n",
+        "listable_uid": "43293b92-51c6-4320-b0e0-967019140076",
+        "portfolio_address2": "",
+        "portfolio_address1": "401 Ranger St ",
+        "contact_email_address": "Tanya.Kleinschmidt@scswiderski.com",
+        "deposit": 432.0,
+        "application_fee": 25.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Upper, 2 Car Detached Garage, On Site Laundry, Secure Entrances",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 21193,
+        "portfolio_city": "Mosinee",
+        "appliances": "Refrigerator, Dishwasher, Stove",
+        "by_the_bed": false,
+        "address_state": "WI",
+        "created_at": "2019-01-02T19:16:07.000Z",
+        "marketing_title": "SCS Merrill Apartment Community ",
+        "unit_template_name": "Season 1 BR Upper ",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/scswiderski/images/e50b65f0-3b7b-4ef0-9a89-d4ab69cb1087/medium.jpg",
+        "updated_at": "2026-05-11T22:17:16.000Z",
+        "fee_label": "Background Check Fee",
+        "address_longitude": -89.7388327,
+        "property_type": "Multi-Family",
+        "market_rent": 890.0,
+        "customization_uuid": "142b26f4096011ef956e3adde7d6d082",
+        "affordable": false,
+        "portfolio_phone_number": "(715) 693-9522",
+        "virtual_showing": false,
+        "posted_to_internet": 21194,
+        "database_name": "scswiderski",
+        "address_postal_code": "54452",
+        "address_country": "US",
+        "available_date": "2025-10-01",
+        "portfolio_name": "S.C. Swiderski, LLC",
+        "marketing_description": "SCS apartments offer inclusive rent*! Secure entrances, garages, private patio or balcony. $865-$1070. Pet Friendly.<br/><br/>***1/2 OFF SECURITY DEPOSIT SPECIAL***<br/>*12-month lease only <br/>*Limited time offer<br/><br/>*Utilities included in your rent:<br/>\u2022 Heat<br/>\u2022 Water & sewer<br/>\u2022 Trash & recycling<br/>\u2022 Snow removal & lawn care<br/><br/>CALL TO TOUR TODAY!<br/><br/>Located near Hwy 64 & minutes from Hwy 51 North, minutes to downtown Merrill. 30 minutes to Wausau & Tomahawk. Close to the Wisconsin River. Near Church Mutual Insurance, Council Grounds State Park. <br/><br/>Dogs & Cats welcome! Some restrictions apply.<br/><br/><br/>Virtual Tour: https://my.matterport.com/show/?m=b5s8FjPsHUc<br/><br/><br/><br/>",
+        "address_city": "Merrill",
+        "property_year_built": 2010,
+        "room_template_id": null,
+        "rent_range": [
+          890.0,
+          890.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "WI",
+        "location": {
+          "address": {
+            "streetAddress": "2401 W Jackson St , #61",
+            "city": "Merrill",
+            "region": "WI",
+            "postalCode": "54452",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "45.1739379",
+            "longitude": "-89.7388327"
+          }
+        },
+        "schedule_showing_url": "https://scswiderski.appfolio.com/listings/showings/new?listable_uid=43293b92-51c6-4320-b0e0-967019140076"
+      },
+      "page_item_url": "43293b92-51c6-4320-b0e0-967019140076"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=3530+Norton+St+Wisconsin+Rapids%2C+WI+54494&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=44.4076796,-89.7838813",
+        "address_latitude": 44.3976796,
+        "database_url": "https://scswiderski.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/scswiderski/images/ad005ded-d803-4fb5-a056-cccd11bc8b00/large.png",
+        "rental_application_url": "https://scswiderski.appfolio.com/listings/rental_applications/new?listable_uid=9b9d2103-3c84-441e-b1bd-6443547db070&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "54455",
+        "full_address": "3530 Norton St, #206, Wisconsin Rapids, WI 54494",
+        "utilities": "Heat, Water & Sewer, Trash Removal, Snow Removal & Lawn Care",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/7373eefc-c2f0-44c9-965c-db03c187998f/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/89dbc90f-8a47-49ea-a70b-ef67105dcbd7/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/451918e9-9c44-4c25-938e-d1ad3350f62c/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/d1689153-1e8e-45f6-b446-c8aa9848301c/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/c313b9ab-bc6d-4b97-83f1-921d755f3ca5/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/eeec3a61-845e-4ce8-b87c-d582aae76d98/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/0427b89f-6822-4089-a206-ea9449ad7e75/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/f706d5d0-f12c-41f8-9c60-d5f6b4975be5/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/e822577e-1d5b-4865-8228-8f815f0a4fb7/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/d4165239-0627-4ea7-aa08-47cc5334aaec/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/e38aaa8b-3724-4031-8d55-f3b6ddaee1a2/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/61045bfd-892c-4d20-9df4-99369d5e5fe6/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/f65cb246-979f-431f-bfd6-8d66b38f1e27/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/bdbbacf1-45b3-4aac-b260-cdaa45289720/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/866fb672-640b-407c-8b5b-a1c09a827b5f/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/images/16a8839c-49c6-4bec-9700-3c6d1136c829/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/34170a18-6e25-47fb-8cb1-fe7064073755/original.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/5d53b0ad-5a1c-428c-8a7d-1e4402da28c6/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/20112fee-b5c8-4be7-84be-6b65967faba0/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/468ae8f9-43f9-49c4-b031-8fe589dbb327/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/6af85f90-6118-47c9-a6fe-c1669137ad3a/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/5299fe71-efc3-47c0-89c3-67f6a5885b54/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/scswiderski/leads_marketing_photos/2815098a-39fa-4a5a-a0a4-eefbf1c92ba2/original.jpg"
+          }
+        ],
+        "portfolio_url": "www.scswiderski.com",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": "8aed698b-45a4-11eb-acd5-028e63283250",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "401 Ranger St ",
+            "city": "Mosinee",
+            "region": "WI",
+            "postalCode": "54455",
+            "country": "US"
+          }
+        },
+        "square_feet": 918.0,
+        "id": 131,
+        "property_uid": "53",
+        "payee_account_number_token": "ac1e7396-4094-4e93-88ba-dbf7773bd764",
+        "posted_to_website_at": "2026-05-22T18:08:54.000Z",
+        "contact_phone_number": "(715) 496-8109",
+        "payee_routing_number": "075917937",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 92,
+            "name": "all"
+          },
+          {
+            "id": 37,
+            "name": "central maintenance groups"
+          },
+          {
+            "id": 36,
+            "name": "multi family properties"
+          },
+          {
+            "id": 57,
+            "name": "rapids-region"
+          },
+          {
+            "id": 5,
+            "name": "sandra"
+          },
+          {
+            "id": 73,
+            "name": "scs rapids"
+          },
+          {
+            "id": 4,
+            "name": "southern"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 1.0,
+        "address_address2": "#206",
+        "address_address1": "3530 Norton St",
+        "bedrooms": 2,
+        "meta_description": "SCS apartments offer inclusive rent*! Secure entrances, garages, private patio or balcony. $865-$960. Pet Friendly.\r\n\r\n*** $499 SECURITY DEPOSIT SPECIAL***\r\n*Limited time only \r\n\r\n*Utilities included in your rent:\r\n\u2022 Heat\r\n\u2022 Water & sewer\r\n\u2022 Trash & recycling\r\n\u2022 Snow removal & lawn care\r\n\r\nCALL TO TOUR TODAY!\r\n\r\nLocated off HWY 54 and close to downtown Wisconsin Rapids. Easy commute to Plover, Port Edwards, Stevens Point. Near Ridges Golf Course, Mid State Technical College. \r\n\r\nDogs & Cats welcome! Some restrictions apply.",
+        "listable_uid": "9b9d2103-3c84-441e-b1bd-6443547db070",
+        "portfolio_address2": "",
+        "portfolio_address1": "401 Ranger St ",
+        "contact_email_address": "rapids@scswiderski.com",
+        "deposit": 499.0,
+        "application_fee": 25.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Upper, On Site Laundry, Secured Entrances with Intercom, 1 Car Detached Garage",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 24248,
+        "portfolio_city": "Mosinee",
+        "appliances": "Refrigerator, Stove, Dishwasher",
+        "by_the_bed": false,
+        "address_state": "WI",
+        "created_at": "2019-01-02T19:16:07.000Z",
+        "marketing_title": "SCS Rapids Apartment Community ",
+        "unit_template_name": "Season 2 BR Upper ",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/scswiderski/images/7373eefc-c2f0-44c9-965c-db03c187998f/medium.jpg",
+        "updated_at": "2026-05-22T18:50:17.000Z",
+        "fee_label": "Background Check Fee",
+        "address_longitude": -89.7838813,
+        "property_type": "Multi-Family",
+        "market_rent": 950.0,
+        "customization_uuid": "142b26f4096011ef956e3adde7d6d082",
+        "affordable": false,
+        "portfolio_phone_number": "(715) 693-9522",
+        "virtual_showing": false,
+        "posted_to_internet": 24249,
+        "database_name": "scswiderski",
+        "address_postal_code": "54494",
+        "address_country": "US",
+        "available_date": "2026-05-01",
+        "portfolio_name": "S.C. Swiderski, LLC",
+        "marketing_description": "SCS apartments offer inclusive rent*! Secure entrances, garages, private patio or balcony. $865-$960. Pet Friendly.<br/><br/>*** $499 SECURITY DEPOSIT SPECIAL***<br/>*Limited time only <br/><br/>*Utilities included in your rent:<br/>\u2022 Heat<br/>\u2022 Water & sewer<br/>\u2022 Trash & recycling<br/>\u2022 Snow removal & lawn care<br/><br/>CALL TO TOUR TODAY!<br/><br/>Located off HWY 54 and close to downtown Wisconsin Rapids. Easy commute to Plover, Port Edwards, Stevens Point. Near Ridges Golf Course, Mid State Technical College. <br/><br/>Dogs & Cats welcome! Some restrictions apply.",
+        "address_city": "Wisconsin Rapids",
+        "property_year_built": 2007,
+        "room_template_id": null,
+        "rent_range": [
+          950.0,
+          950.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "WI",
+        "location": {
+          "address": {
+            "streetAddress": "3530 Norton St, #206",
+            "city": "Wisconsin Rapids",
+            "region": "WI",
+            "postalCode": "54494",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "44.3976796",
+            "longitude": "-89.7838813"
+          }
+        },
+        "schedule_showing_url": "https://scswiderski.appfolio.com/listings/showings/new?listable_uid=9b9d2103-3c84-441e-b1bd-6443547db070"
+      },
+      "page_item_url": "9b9d2103-3c84-441e-b1bd-6443547db070"
+    }
+  ],
+  "fields": null,
+  "language": "ENGLISH",
+  "filters": null,
+  "page": {
+    "pageSize": 100,
+    "pageNumber": 0,
+    "totalPages": 1,
+    "totalItems": 10
+  },
+  "sortBy": [],
+  "search": null
+}

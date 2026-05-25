@@ -27,10 +27,20 @@ Key findings:
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from typing import TYPE_CHECKING, Any
 
+from ma_poc.pms.adapters._appfolio_websites_duda import (
+    collection_url,
+    extract_appfolio_websites_property_group,
+    extract_duda_site_id,
+    is_appfolio_websites_cms,
+    origin_from_url,
+    parse_collection_payload,
+)
+from ma_poc.pms.adapters._merge_fns import _UNIT_SIGNAL_KEYS as _MERGE_UNIT_SIGNAL_KEYS
 from ma_poc.pms.adapters._parsing import (
     bed_label_from,
     format_rent_range,
@@ -951,13 +961,7 @@ class AppFolioAdapter:
         # ``propertyGroup`` from the embed JS and append the
         # ``filters[property_list]={propertyGroup}`` query parameter to
         # the listings URL. Without this filter, multi-property PMC
-        # accounts (e.g. dlpcapital manages PROSPER Azalea City +
-        # ~10 other properties under one AppFolio account) cross-
-        # contaminate: PROSPER (Valdosta GA 31602) was getting 300
-        # units from St. Augustine FL 32086. With the filter:
-        # /listings?filters[property_list]=PM%20-%20PROSPER%20Azalea%20City
-        # returns just the 47 PROSPER units (all matching ZIP 31602).
-        # See ``find_appfolio_property_group`` above.
+        # accounts cross-contaminate. See ``find_appfolio_property_group``.
         if page_html:
             slug = find_appfolio_slug(page_html)
             if slug:
@@ -965,7 +969,6 @@ class AppFolioAdapter:
                 listings_url = f"https://{slug}.appfolio.com/listings"
                 if property_group:
                     from urllib.parse import quote
-                    # filters[property_list]={urlencoded_propertyGroup}
                     listings_url = (
                         f"{listings_url}?filters%5Bproperty_list%5D="
                         f"{quote(property_group)}"
@@ -988,11 +991,9 @@ class AppFolioAdapter:
                         vanity_units = parse_appfolio_listings_ssr(r.text, listings_url)
                         # 2026-05-25 (regr#11b): when chip #100's URL-level
                         # propertyGroup filter could not fire (PMC embed JS
-                        # has no ``propertyGroup`` — e.g. ``riedman`` /
-                        # Academy Place), the vanity response still leaks
-                        # the entire PMC. Drop listings whose address +
-                        # ZIP don't match the target property. See
-                        # ``filter_listings_by_property_address`` above.
+                        # has no ``propertyGroup``), the vanity response
+                        # still leaks the entire PMC. Drop listings whose
+                        # address + ZIP don't match the target property.
                         if vanity_units and not property_group:
                             ctx_address = getattr(ctx, "address", "") or ""
                             ctx_zip = getattr(ctx, "zip_code", "") or ""
@@ -1020,6 +1021,84 @@ class AppFolioAdapter:
                     result.errors.append(
                         f"appfolio-vanity-fetch-error: slug={slug!r} "
                         f"property_group={property_group!r} {type(exc).__name__}"
+                    )
+
+        # AppFolio Websites CMS (Duda-hosted) fallback (deep-probe 2026-05-25,
+        # chip #2). ~10% of sampled CSV rows publish their AppFolio listings
+        # through the ``AppFolio Websites`` product — a Duda marketing CMS
+        # that mirrors the listings into a Duda collection. The widget
+        # renders client-side from Duda's public collections REST API, so
+        # the /listings + SSR / slug-vanity paths above return 0. The
+        # collection endpoint serves the SAME AppFolio fields
+        # (market_rent, bedrooms, bathrooms, square_feet, available,
+        # available_date, full_address, listable_uid, property_lists).
+        # Verified live on livescs (256 listings), parkviewspringhill
+        # (37), beaumontcove (56), pearlinvestment/wind-chase (17),
+        # liveatthebiltmore (4), mall-apartments (3). See
+        # ``_appfolio_websites_duda`` for the helpers.
+        if page_html and is_appfolio_websites_cms(page_html):
+            duda_site_id = extract_duda_site_id(page_html)
+            duda_origin = origin_from_url(
+                getattr(ctx, "base_url", "")
+                or (getattr(getattr(ctx, "fetch_result", None), "final_url", "") or "")
+            )
+            if duda_site_id and duda_origin:
+                duda_property_group = extract_appfolio_websites_property_group(
+                    page_html
+                )
+                try:
+                    import httpx
+                    duda_headers = {
+                        "User-Agent": (
+                            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/124.0.0.0 Safari/537.36"
+                        ),
+                        "Accept": "application/json,*/*;q=0.8",
+                    }
+                    duda_units: list[dict[str, Any]] = []
+                    duda_winning_url: str | None = None
+                    async with httpx.AsyncClient(
+                        timeout=15.0, follow_redirects=True
+                    ) as c:
+                        page_number = 0
+                        total_pages = 1
+                        # Cap iterations defensively — the largest cohort
+                        # site we sampled has 3 pages; ten is plenty of
+                        # headroom and bounds the worst-case fetch fan-out.
+                        while page_number < total_pages and page_number < 10:
+                            duda_url = collection_url(
+                                duda_origin, duda_site_id, page_number
+                            )
+                            r = await c.get(duda_url, headers=duda_headers)
+                            if r.status_code != 200:
+                                break
+                            try:
+                                payload = r.json()
+                            except (json.JSONDecodeError, ValueError):
+                                break
+                            units, page_total = parse_collection_payload(
+                                payload, duda_url, duda_property_group
+                            )
+                            duda_units.extend(units)
+                            if duda_winning_url is None:
+                                duda_winning_url = duda_url
+                            if page_total <= 0:
+                                break
+                            total_pages = page_total
+                            page_number += 1
+                    if duda_units:
+                        result.units = duda_units
+                        result.tier_used = "TIER_1_API_APPFOLIO_DUDA"
+                        result.winning_url = duda_winning_url
+                        result.confidence = min(
+                            0.95, 0.7 + 0.05 * len(duda_units)
+                        )
+                        return result
+                except Exception as exc:
+                    result.errors.append(
+                        f"appfolio-websites-duda-error: site_id={duda_site_id!r} "
+                        f"property_group={duda_property_group!r} {type(exc).__name__}"
                     )
 
         result.confidence = 0.0
