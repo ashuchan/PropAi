@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import re
 from typing import Any
+from urllib.parse import parse_qs, unquote, urlsplit
 
 
 def money_to_int(s: str) -> int | None:
@@ -168,6 +169,40 @@ def is_junk_unit_number(val: Any) -> bool:
     return False
 
 
+# ── Canonical bath / sqft regexes (PR-Parsing-hardening 2026-05-25) ──────
+# Single source of truth used by adapters and the generic DOM scanner so
+# that fixes to the regex don't have to be propagated across files.
+#
+# Regression #13 (canary 1ef1060): "1 Bathroom" / "2 Bathrooms" text on
+# primeurbanproperties.com fell through the older `(?:bath|ba)\b`
+# pattern (the trailing \b after the alternation rejects "bath" when
+# followed by "room"). The canonical form below accepts "bath",
+# "baths", "bathroom", "bathrooms", and "BA" — case-insensitive.
+#
+# Regression #16: "1,200 ft²" / "950 ft2" on eaglepointestates.com
+# returned -1 because neither the unicode superscript nor the ASCII
+# "ft2" form was matched. The canonical form below adds those plus
+# "ft^2", "sf", and "square feet|foot|ft".
+BATH_RE = re.compile(
+    r"\b(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?|ba)\b",
+    re.IGNORECASE,
+)
+
+SQFT_RE = re.compile(
+    r"(\d[\d,]*)\s*(?:"
+    r"sq\.?\s?ft\.?|sqft|"
+    # "sf" alone is OK only when followed by a non-word boundary or end —
+    # without the lookahead a token like "sfgate" matches "sf".
+    r"s\.?f\.?(?=\b|\W|$)|"
+    # ft² / ft^2 / ft2 — the unicode superscript ² isn't a \w char so
+    # the trailing variants use explicit lookaheads instead of \b.
+    r"ft\s*(?:²|\^2|\b2\b|2(?=\W|$))|"
+    r"square\s*(?:feet|foot|ft)"
+    r")",
+    re.IGNORECASE,
+)
+
+
 # Patterns for inferring bed/bath count from a floor-plan / unit name.
 # Runs in declared order; first match wins. Patterns are designed to be
 # narrow enough that they don't false-positive on unrelated marketing
@@ -219,12 +254,12 @@ _WORD_BED_RE = re.compile(
     r"\b(one|two|three|four|five)\s*(?:bd|br|bed(?:room)?s?)\b",
     re.IGNORECASE,
 )
-# Standalone bath count: "1 Bath", "2.5 BA". Used only when bed was
-# already inferred by a separate pass — never seeds beds from a bath.
-_BATH_ONLY_RE = re.compile(
-    r"\b(\d(?:\.\d)?)\s*(?:ba|bath(?:room)?s?)\b",
-    re.IGNORECASE,
-)
+# Standalone bath count: "1 Bath", "2.5 BA", "1 Bathroom", "2 Bathrooms".
+# Used only when bed was already inferred by a separate pass — never
+# seeds beds from a bath. Aliases the canonical ``BATH_RE`` above; kept
+# as a separate name only to keep the existing infer_bed_bath callsite
+# independent of the public canonical regex.
+_BATH_ONLY_RE = BATH_RE
 _WORD_TO_INT = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
 
 
@@ -558,6 +593,141 @@ def enrich_unit_concession_fields(
     return unit
 
 
+# ── Floor-plan-name URL-slug fallback (regression #12, canary 1ef1060) ──
+# When extraction yields an empty / "~" / "Unknown" plan name AND the
+# source URL encodes the plan as a slug, derive a readable name. Observed
+# on lifeatalexis.com: `?floorplan=1-bed-1-bath-1992` produced
+# floor_plan_name="~" because no DOM element carried the plan text.
+#
+# Recognised slug locations (case-insensitive):
+#   - query param: ``?floorplan=…``, ``?floor_plan=…``, ``?plan=…``,
+#                  ``?fp=…``, ``?unit_gallery=…``
+#   - path segment AFTER ``/floorplans/`` or ``/floor-plans/`` (when
+#     the slug isn't the literal word "floorplans" again)
+_EMPTY_PLAN_NAME_TOKENS: frozenset[str] = frozenset({
+    "", "~", "-", "—", "n/a", "na", "none", "null", "unknown", "tbd",
+})
+
+_PLAN_SLUG_QUERY_KEYS: tuple[str, ...] = (
+    "floorplan", "floor_plan", "floorplan_name", "fp", "plan", "unit_gallery",
+)
+
+_PLAN_PATH_PREFIXES: tuple[str, ...] = (
+    "/floorplans/", "/floor-plans/", "/floorplan/", "/floor-plan/",
+)
+
+
+def _looks_empty_plan_name(name: Any) -> bool:
+    """True when ``name`` is the kind of value we want to backfill."""
+    if name is None:
+        return True
+    if not isinstance(name, str):
+        return False
+    return name.strip().lower() in _EMPTY_PLAN_NAME_TOKENS
+
+
+def _titleize_slug(slug: str, *, trim_trailing_id: bool = True) -> str:
+    """Convert ``"1-bed-1-bath-1992"`` -> ``"1 Bed 1 Bath"``.
+
+    Splits on hyphen / underscore, titlecases each token (digit tokens are
+    preserved as-is). When ``trim_trailing_id`` is True, a trailing
+    purely-numeric token of 3+ digits is dropped — that's almost always
+    the per-unit id concatenated to the plan slug, not part of the plan
+    name. ``"1-bed-1-bath-1992"`` -> ``"1 Bed 1 Bath"``; a 1- or 2-digit
+    trailing token (e.g. "the-aspen-2") stays put.
+    """
+    if not slug:
+        return ""
+    raw = unquote(slug).strip()
+    if not raw:
+        return ""
+    raw = raw.replace("_", "-")
+    parts = [p for p in raw.split("-") if p.strip()]
+    if not parts:
+        return ""
+    if trim_trailing_id and len(parts) > 1:
+        last = parts[-1]
+        if last.isdigit() and len(last) >= 3:
+            parts = parts[:-1]
+    out_tokens: list[str] = []
+    for p in parts:
+        if p.isdigit():
+            out_tokens.append(p)
+        else:
+            out_tokens.append(p[0].upper() + p[1:].lower())
+    return " ".join(out_tokens).strip()
+
+
+def derive_plan_name_from_url(url: str | None) -> str:
+    """Best-effort plan-name derivation from a floorplan URL.
+
+    Looks first in the query string for any of ``_PLAN_SLUG_QUERY_KEYS``
+    (``?floorplan=…`` is the canonical case). If nothing useful is there,
+    scans the path for a ``/floorplans/{slug}/`` segment and uses the
+    segment immediately after the prefix. Returns "" when neither yields
+    a slug — caller is responsible for not overwriting a real name.
+    """
+    if not url or not isinstance(url, str):
+        return ""
+    try:
+        parts = urlsplit(url)
+    except (ValueError, TypeError):
+        return ""
+    if parts.query:
+        try:
+            params = parse_qs(parts.query, keep_blank_values=False)
+        except (ValueError, TypeError):
+            params = {}
+        lc_params: dict[str, list[str]] = {k.lower(): v for k, v in params.items()}
+        for key in _PLAN_SLUG_QUERY_KEYS:
+            vals = lc_params.get(key)
+            if vals and vals[0].strip():
+                derived = _titleize_slug(vals[0])
+                if derived:
+                    return derived
+    path = (parts.path or "").lower()
+    for prefix in _PLAN_PATH_PREFIXES:
+        i = path.find(prefix)
+        if i < 0:
+            continue
+        tail = parts.path[i + len(prefix):]
+        first_seg = tail.split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
+        if first_seg and first_seg.lower() not in _PLAN_PATH_PREFIXES:
+            derived = _titleize_slug(first_seg)
+            if derived:
+                return derived
+    return ""
+
+
+# ── Unit-number sqft-leak guard (regression #17, canary 1ef1060) ────────
+# spearheadproperties.com renders a per-property table where the size cell
+# bleeds into the unit-id slot when a generic DOM scanner walks adjacent
+# <td> elements:
+#   <td>1</td><td>1</td><td>623 sq ft</td><td> 8/21/2026</td>
+# The scanner emits unit_number="623 sq ft" and sqft="" (the regex was
+# consumed). Defensive cleanup at make_unit_dict time:
+#   1. If unit_number contains a sqft signature, strip it.
+#   2. If what remains is empty / whitespace, clear unit_number — better
+#      to emit "" than a leaked sqft token.
+def clean_unit_number(val: str) -> str:
+    """Strip leaked sqft text from a unit-number string.
+
+    Returns the cleaned string. When the input contains nothing but sqft
+    text, returns "" — caller may emit the row anyway (sqft can be
+    recovered separately) but the bogus identifier won't ship.
+    """
+    if not val or not isinstance(val, str):
+        return val or ""
+    s = val.strip()
+    if not s:
+        return ""
+    if not SQFT_RE.search(s):
+        return s
+    cleaned = SQFT_RE.sub("", s).strip()
+    cleaned = re.sub(r"[\s,;|/\-]+", " ", cleaned).strip()
+    return cleaned
+
+
 def make_unit_dict(
     *,
     floor_plan_name: str = "",
@@ -615,6 +785,23 @@ def make_unit_dict(
     # MERGED_CROSS_PAGE (118). Normalising here means every adapter benefits
     # without changing per-adapter signatures.
     floor_plan_name = _unwrap_name_blob(floor_plan_name)
+
+    # Regression #12 (canary 1ef1060): adapter emitted "~" / empty plan
+    # names on lifeatalexis.com when the extractor found no plan label in
+    # the DOM but the URL slug encoded one (`?floorplan=1-bed-1-bath-1992`
+    # → "1 Bed 1 Bath"). Only triggers when the current name is junk AND a
+    # slug is available, so well-extracted names pass through unchanged.
+    if _looks_empty_plan_name(floor_plan_name):
+        derived = derive_plan_name_from_url(source_api_url)
+        if derived:
+            floor_plan_name = derived
+
+    # Regression #17 (canary 1ef1060): spearheadproperties.com generic DOM
+    # scan emitted unit_number="623 sq ft" because adjacent <td> cells
+    # (sqft column + unit column) collapsed during text extraction. Strip
+    # sqft-shaped substrings from unit_number; if nothing meaningful
+    # remains, clear it so we don't ship a fake identifier.
+    unit_number = clean_unit_number(unit_number)
 
     # ── Centralised concession normalization (2026-05-24) ────────────────
     # Pre-fix: adapters emitted only the legacy ``concession`` string and

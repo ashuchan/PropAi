@@ -42,6 +42,8 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
+    BATH_RE,
+    SQFT_RE,
     bed_label_from,
     format_rent_range,
     make_unit_dict,
@@ -85,10 +87,13 @@ _PLAN_CLASS_WORDS: tuple[str, ...] = (
 )
 
 # Semantic field regexes (operate on container text).
+# Bath/sqft delegate to the canonical patterns in _parsing.py so the
+# fixes for regressions #13 ("Bathroom" full word) and #16 (ft² / ft2)
+# from canary 1ef1060 propagate here without divergence.
 _RE_STUDIO = re.compile(r"\bstudio\b", re.IGNORECASE)
 _RE_BED = re.compile(r"(\d+)\s*(?:bed|bd|br)\b", re.IGNORECASE)
-_RE_BATH = re.compile(r"(\d+(?:\.\d+)?)\s*(?:bath|ba)\b", re.IGNORECASE)
-_RE_SQFT = re.compile(r"(\d[\d,]*)\s*(?:sq\.?\s?ft|sqft|s\.f\.|square\s*f(?:ee|oo)t)", re.IGNORECASE)
+_RE_BATH = BATH_RE
+_RE_SQFT = SQFT_RE
 # Rent: $1,234 [- $1,500]. Permissive capture; the post-parse filter
 # (value >= 100) rejects "$1 deposit"-style noise.
 _RE_RENT = re.compile(r"\$(\d[\d,]*)(?:\s*[-–]\s*\$?(\d[\d,]*))?")
