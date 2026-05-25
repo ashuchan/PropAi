@@ -1,0 +1,244 @@
+{
+  "status": true,
+  "msg": "Success",
+  "filter": {
+    "rent": [
+      "999",
+      "1340"
+    ],
+    "beds": [
+      1
+    ],
+    "baths": [
+      "1"
+    ]
+  },
+  "property": "Cobblestone Apartments",
+  "special_offer": {
+    "title": "",
+    "content": ""
+  },
+  "Availability": "https://lpp.myresman.com/Portal/Applicants/Availability?a=2071&p=b63cc3f8-3edf-4ec9-be58-8bf4a77455bf",
+  "NewGuestCard": "https://lpp.myresman.com/Portal/Prospects/NewGuestCard?a=2071&p=b63cc3f8-3edf-4ec9-be58-8bf4a77455bf",
+  "ApplicantRegistration": "https://lpp.myresman.com/Portal/Access/ApplicantRegistration?accountID=2071&propertyID=b63cc3f8-3edf-4ec9-be58-8bf4a77455bf",
+  "data": [
+    {
+      "Id": "A1-1X1-615",
+      "Name": "1X1",
+      "Comment": "-",
+      "UnitsAvailable": "9",
+      "UnitCount": "9",
+      "Bedroom": 1,
+      "Bathroom": "1",
+      "SquareFeet": 615,
+      "MarketRent": 1340,
+      "Rent-Min": 999,
+      "Rent-Max": 1340,
+      "Deposit": "300.00",
+      "TotalRent": 1340,
+      "TR_MIN": 999,
+      "TR_MAX": 1340,
+      "image_local_path": null,
+      "image_local_url": "https://assets.edificecms.com/uv-residential/b63cc3f8-3edf-4ec9-be58-8bf4a77455bf/397c8b82ca55a1f30a99a6189fa868c4.webp",
+      "File": {
+        "Floorplan": [
+          "https://assets.edificecms.com/uv-residential/b63cc3f8-3edf-4ec9-be58-8bf4a77455bf/397c8b82ca55a1f30a99a6189fa868c4.webp"
+        ],
+        "Photo": []
+      }
+    }
+  ],
+  "units": {
+    "A1-1X1-615": [
+      {
+        "UnitID": "1053",
+        "Id": "A1-1X1-615",
+        "Bedroom": 1,
+        "Bathroom": "1",
+        "SquareFeet": 615,
+        "MarketRent": "999.00",
+        "TotalRent": "999.00",
+        "UnitEconomicStatus": "residential",
+        "UnitOccupancyStatus": "vacant",
+        "UnitLeasedStatus": "available",
+        "Name": "1X1",
+        "BuildingID": "1",
+        "FloorLevel": "1",
+        "Deposit": "300.00",
+        "Availability": {
+          "VacateDate": "05/01/2026",
+          "MadeReadyDate": "05/07/2026"
+        },
+        "AvailDate": "Move in Today!"
+      },
+      {
+        "UnitID": "2004",
+        "Id": "A1-1X1-615",
+        "Bedroom": 1,
+        "Bathroom": "1",
+        "SquareFeet": 615,
+        "MarketRent": "999.00",
+        "TotalRent": "999.00",
+        "UnitEconomicStatus": "residential",
+        "UnitOccupancyStatus": "vacant",
+        "UnitLeasedStatus": "available",
+        "Name": "1X1",
+        "BuildingID": "1",
+        "FloorLevel": "1",
+        "Deposit": "300.00",
+        "Availability": {
+          "VacateDate": "03/24/2026",
+          "MadeReadyDate": "03/30/2026"
+        },
+        "AvailDate": "Move in Today!"
+      },
+      {
+        "UnitID": "2010",
+        "Id": "A1-1X1-615",
+        "Bedroom": 1,
+        "Bathroom": "1",
+        "SquareFeet": 615,
+        "MarketRent": "999.00",
+        "TotalRent": "999.00",
+        "UnitEconomicStatus": "residential",
+        "UnitOccupancyStatus": "vacant",
+        "UnitLeasedStatus": "available",
+        "Name": "1X1",
+        "BuildingID": "1",
+        "FloorLevel": "1",
+        "Deposit": "300.00",
+        "Availability": {
+          "VacateDate": "05/01/2026",
+          "MadeReadyDate": "05/07/2026"
+        },
+        "AvailDate": "Move in Today!"
+      },
+      {
+        "UnitID": "2058",
+        "Id": "A1-1X1-615",
+        "Bedroom": 1,
+        "Bathroom": "1",
+        "SquareFeet": 615,
+        "MarketRent": "999.00",
+        "TotalRent": "999.00",
+        "UnitEconomicStatus": "residential",
+        "UnitOccupancyStatus": "vacant",
+        "UnitLeasedStatus": "available",
+        "Name": "1X1",
+        "BuildingID": "1",
+        "FloorLevel": "1",
+        "Deposit": "300.00",
+        "Availability": {
+          "VacateDate": "05/19/2026",
+          "MadeReadyDate": "05/25/2026"
+        },
+        "AvailDate": "Move in Today!"
+      },
+      {
+        "UnitID": "2059",
+        "Id": "A1-1X1-615",
+        "Bedroom": 1,
+        "Bathroom": "1",
+        "SquareFeet": 615,
+        "MarketRent": "999.00",
+        "TotalRent": "999.00",
+        "UnitEconomicStatus": "residential",
+        "UnitOccupancyStatus": "vacant",
+        "UnitLeasedStatus": "available",
+        "Name": "1X1",
+        "BuildingID": "1",
+        "FloorLevel": "1",
+        "Deposit": "300.00",
+        "Availability": {
+          "VacateDate": "05/01/2026",
+          "MadeReadyDate": "05/07/2026"
+        },
+        "AvailDate": "Move in Today!"
+      },
+      {
+        "UnitID": "2068",
+        "Id": "A1-1X1-615",
+        "Bedroom": 1,
+        "Bathroom": "1",
+        "SquareFeet": 615,
+        "MarketRent": "1340.00",
+        "TotalRent": "1340.00",
+        "UnitEconomicStatus": "residential",
+        "UnitOccupancyStatus": "occupied",
+        "UnitLeasedStatus": "on_notice",
+        "Name": "1X1",
+        "BuildingID": "1",
+        "FloorLevel": "1",
+        "Deposit": "300.00",
+        "Availability": {
+          "VacateDate": "07/31/2026",
+          "MadeReadyDate": "08/06/2026"
+        },
+        "AvailDate": "08/06/2026"
+      },
+      {
+        "UnitID": "2083",
+        "Id": "A1-1X1-615",
+        "Bedroom": 1,
+        "Bathroom": "1",
+        "SquareFeet": 615,
+        "MarketRent": "999.00",
+        "TotalRent": "999.00",
+        "UnitEconomicStatus": "residential",
+        "UnitOccupancyStatus": "vacant",
+        "UnitLeasedStatus": "available",
+        "Name": "1X1",
+        "BuildingID": "1",
+        "FloorLevel": "1",
+        "Deposit": "300.00",
+        "Availability": {
+          "VacateDate": "04/04/2026",
+          "MadeReadyDate": "04/10/2026"
+        },
+        "AvailDate": "Move in Today!"
+      },
+      {
+        "UnitID": "2085",
+        "Id": "A1-1X1-615",
+        "Bedroom": 1,
+        "Bathroom": "1",
+        "SquareFeet": 615,
+        "MarketRent": "999.00",
+        "TotalRent": "999.00",
+        "UnitEconomicStatus": "residential",
+        "UnitOccupancyStatus": "vacant",
+        "UnitLeasedStatus": "available",
+        "Name": "1X1",
+        "BuildingID": "1",
+        "FloorLevel": "1",
+        "Deposit": "300.00",
+        "Availability": {
+          "VacateDate": "05/01/2026",
+          "MadeReadyDate": "05/07/2026"
+        },
+        "AvailDate": "Move in Today!"
+      },
+      {
+        "UnitID": "2087",
+        "Id": "A1-1X1-615",
+        "Bedroom": 1,
+        "Bathroom": "1",
+        "SquareFeet": 615,
+        "MarketRent": "999.00",
+        "TotalRent": "999.00",
+        "UnitEconomicStatus": "residential",
+        "UnitOccupancyStatus": "vacant",
+        "UnitLeasedStatus": "available",
+        "Name": "1X1",
+        "BuildingID": "1",
+        "FloorLevel": "1",
+        "Deposit": "300.00",
+        "Availability": {
+          "VacateDate": "04/07/2026",
+          "MadeReadyDate": "04/13/2026"
+        },
+        "AvailDate": "Move in Today!"
+      }
+    ]
+  }
+}
