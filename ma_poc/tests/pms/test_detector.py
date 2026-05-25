@@ -397,6 +397,109 @@ def test_onesite_strong_marker_beats_squarespace_shell() -> None:
     assert r.confidence >= 0.80
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-25 canary 1ef1060 regression #3 — Knock-vs-OneSite co-resident
+#
+# Bucket-B grind (commit c3d471e, 2026-05-22) elevated the OneSite
+# ``onlineleasing.realpage.com`` marker from 0.85 → 0.92 so it beat
+# co-resident Knock 0.90 on the 9-property RealPage-OLL SPA cohort.
+# This overcorrected on 62 Knock-powered properties (livethemaya.com,
+# parkwestfortworth.com, etc.) where ``onlineleasing.realpage.com``
+# is just an APPLY-link target, not the canonical leasing system.
+# Flipping these to OneSite dropped them from real per-unit Knock
+# Doorway API data (177 units on The Maya, 132 on Park West) to
+# plan-level ``inferred_*`` OneSite workflow rows (13 / 4 respectively),
+# losing 1,786 units across the cohort.
+#
+# Fix (this commit): demote OneSite to 0.85 when Knock fingerprint is
+# also present. The 9 RealPage-OLL SPA cohort the original elevation
+# fixed do NOT have Knock co-resident — they are pure RealPage sites
+# — so this gate doesn't regress them.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_knock_wins_when_co_resident_with_onesite_apply_link() -> None:
+    """The Maya signature — Knock IS the PMS; ``onlineleasing.realpage.com``
+    is just an apply-link href."""
+    html = (
+        '<html><head>'
+        '<script id="knock_script" data-src="https://doorway.knck.io/'
+        'latest/doorway.min.js" defer></script>'
+        '<script>knockDoorway.init("a8e311e98aee0ee4545fea9e01b06ac6",'
+        ' "community", "69e936e6567a11ef");</script>'
+        '</head><body>'
+        '<a class="apply-cta" href="https://8946105.onlineleasing.realpage.com/'
+        '#k=84971">Apply Now</a>'
+        '<a class="residents" href="https://property.onesite.realpage.com/'
+        'welcomehome?siteid=5061093">Residents</a>'
+        '</body></html>'
+    )
+    r = detect_pms("https://www.livethemaya.com/", page_html=html)
+    assert r.pms == "knock", (
+        f"co-resident Knock+OneSite must route to knock; got pms={r.pms!r} "
+        f"confidence={r.confidence}"
+    )
+
+
+def test_onesite_still_wins_when_no_knock_co_resident() -> None:
+    """The 9-property RealPage-OLL SPA cohort that motivated the
+    original 0.92 elevation. Pure OneSite sites with no Knock — the
+    original elevation behaviour must be preserved."""
+    html = (
+        '<html><head>'
+        '<script src="https://1234567.onlineleasing.realpage.com/static.js"></script>'
+        '</head><body>'
+        '<div id="leasing-app" data-pms="onlineleasing.realpage.com"></div>'
+        '</body></html>'
+    )
+    r = detect_pms("https://example-pure-onesite.com/", page_html=html)
+    assert r.pms == "onesite"
+    # Confidence stays at 0.92 (strong) when no Knock to gate against.
+    assert r.confidence >= 0.90
+
+
+def test_knock_wins_with_only_doorway_script_no_init_call() -> None:
+    """Knock can be co-resident with just the doorway script tag
+    (no inline knockDoorway.init() call) — that's still a Knock-PMS
+    signal that should beat the OneSite apply-link."""
+    html = (
+        '<html><head>'
+        '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+        '</head><body>'
+        '<a href="https://9876543.onlineleasing.realpage.com/">Apply</a>'
+        '</body></html>'
+    )
+    r = detect_pms("https://example-knock-only-script.com/", page_html=html)
+    assert r.pms == "knock"
+
+
+def test_knock_wins_with_knockdoorway_inline_only() -> None:
+    """Just ``knockDoorway`` symbol (lowercased in our matcher) without
+    the doorway.knck.io script src is still sufficient — covers SSR-
+    serialized Knock init payloads."""
+    html = (
+        '<html><body>'
+        '<script>window.knockDoorway.init("abc","community","def");</script>'
+        '<a href="https://5555555.onlineleasing.realpage.com/">Apply</a>'
+        '</body></html>'
+    )
+    r = detect_pms("https://example-knock-inline.com/", page_html=html)
+    assert r.pms == "knock"
+
+
+def test_pure_knock_no_onesite_still_knock() -> None:
+    """Sanity — a pure Knock property (no OneSite at all) routes to
+    knock. Confirms the new gate doesn't break the simple case."""
+    html = (
+        '<html><body>'
+        '<script src="https://doorway.knck.io/latest/doorway.min.js"></script>'
+        '<script>knockDoorway.init("abc","community","def");</script>'
+        '</body></html>'
+    )
+    r = detect_pms("https://example-pure-knock.com/", page_html=html)
+    assert r.pms == "knock"
+
+
 def test_commoncf_entrata_strong_marker_beats_squarespace_shell() -> None:
     # F0.3 regression test: ``commoncf.entrata.com`` was added to pass 1 as a
     # strong portal signal (it's an Entrata-served CDN host that only appears
@@ -526,8 +629,20 @@ def test_bare_appfolio_marketing_link_does_not_promote() -> None:
 
 
 def test_realpage_oll_portal_beats_coresident_knock_widget() -> None:
-    """onlineleasing.realpage.com + a Knock chat widget must route to the
-    RealPage portal (onesite), not Knock."""
+    """2026-05-25 (canary 1ef1060 regr#3): inverted from the original
+    bucket-B grind design. ``onlineleasing.realpage.com`` is normally
+    just an APPLY-link target from a Knock-powered property, NOT the
+    real leasing system. When Knock fingerprints are also present,
+    Knock wins.
+
+    Pre-canary: this test asserted OneSite wins. That ate 1,786 units
+    across 62 properties (livethemaya.com 177→13, parkwestfortworth.com
+    132→4, etc.) because Knock's per-unit Doorway API got skipped in
+    favour of OneSite's plan-level inference.
+
+    The 9-property RealPage-OLL SPA cohort the original elevation fixed
+    do NOT have Knock co-resident — verified by the new
+    test_onesite_still_wins_when_no_knock_co_resident test."""
     html = (
         "<html><body>"
         '<a href="https://9216254.onlineleasing.realpage.com/">Apply Now</a>'
@@ -536,7 +651,10 @@ def test_realpage_oll_portal_beats_coresident_knock_widget() -> None:
         "</body></html>"
     )
     r = detect_pms("https://x.example/", page_html=html)
-    assert r.pms == "onesite", f"expected onesite, got {r.pms}"
+    assert r.pms == "knock", (
+        f"co-resident Knock+OneSite must route to knock (the real PMS); "
+        f"got {r.pms}"
+    )
 
 
 def test_realpage_oll_wizard_beats_coresident_funnel_widget() -> None:

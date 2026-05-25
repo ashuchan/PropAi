@@ -544,8 +544,36 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # misrouted to funnel/g5/knock/onesite because the chat widget won.
     # Same rationale as the AppFolio tenant-portal and Repli360 strong-host
     # fixes.
+    #
+    # 2026-05-25 (canary 1ef1060 regr#3): Knock-gate the 0.92. The bucket-B
+    # elevation overcorrected on 62 Knock-PMS properties (e.g. The Maya
+    # at livethemaya.com, Park West at parkwestfortworth.com) where Knock
+    # IS the real leasing system and ``onlineleasing.realpage.com`` is
+    # just an APPLY link target (``<a href="https://8946105.onlineleasing
+    # .realpage.com/#k=84971">apply</a>``). Flipping these to OneSite
+    # dropped them from real per-unit data (Knock Doorway API: 177 units
+    # on The Maya, 132 on Park West) to plan-level inference (OneSite
+    # workflow: 13 / 4 ``inferred_*`` rows). 1,786 units total lost across
+    # the cohort.
+    #
+    # The discriminator: when ``doorway.knck.io`` or ``knockDoorway`` are
+    # also present, Knock is almost always the real PMS — those markers
+    # only ship from a working Knock-Doorway install. The 9 RealPage-OLL
+    # SPA cohort the elevation originally fixed do NOT have Knock
+    # fingerprints (RealPage-OLL is the real leasing system, no Knock
+    # co-resident). Demote OneSite to 0.85 (below Knock's 0.90) in the
+    # Knock+OneSite co-resident case so Knock wins the route.
+    _has_knock_marker = "doorway.knck.io" in h or "knockdoorway" in h
     if "onlineleasing.realpage.com" in h:
-        yield "onesite", 0.92, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
+        if _has_knock_marker:
+            yield (
+                "onesite",
+                0.85,
+                ["OneSite portal link present but Knock fingerprint co-resident "
+                 "— OneSite is the apply-link target, Knock is the real PMS"],
+            )
+        else:
+            yield "onesite", 0.92, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
     # RealPage OLL (Online Leasing) wizard — the "Category-D" cluster
     # (~187 props). Vanity marketing sites hop to ``leasing.realpage.com``
     # / embed an ``rp-leasing-widget`` / link ``<property>/content/apply#k=``
@@ -555,7 +583,17 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # above and does not regress it. Routed to ``realpage_oll`` whose
     # adapter intercepts the OLL.SearchFloorPlan PUT response.
     if (
-        "leasing.realpage.com" in h
+        # 2026-05-25 (canary 1ef1060 regr#3): the bare substring
+        # ``leasing.realpage.com`` ALSO matches ``onlineleasing
+        # .realpage.com`` (the OneSite portal subdomain), causing the
+        # realpage_oll matcher to fire on every OneSite property —
+        # including those with co-resident Knock fingerprints. URL
+        # boundary (``://leasing.realpage.com``) restricts to the
+        # standalone ``leasing.realpage.com`` host that realpage_oll
+        # actually targets. The 9 RealPage-OLL SPA cohort that motivated
+        # this matcher use ``leasing.realpage.com/`` as their actual
+        # leasing host — they keep matching via this stricter check.
+        "://leasing.realpage.com" in h
         or "rp-leasing-widget" in h
         or "rp.leasing.appservice" in h
         or "/content/apply#k=" in h
@@ -568,15 +606,28 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
         # GraphQL inventory call 404'd because G5 is not the PMS here.
         or "cs-cdn.realpage.com/oll" in h
     ):
-        yield (
-            "realpage_oll",
-            # STRONG (0.92) — definitive leasing-wizard markers, must beat a
-            # co-resident chat widget (funnel/knock at 0.90). See the
-            # onlineleasing.realpage.com note above.
-            0.92,
-            ["RealPage OLL wizard marker in HTML (leasing.realpage.com / "
-             "rp-leasing-widget / RP.Leasing.AppService / /content/apply#k=)"],
-        )
+        # 2026-05-25 (canary 1ef1060 regr#3): Knock-gate the 0.92 the
+        # same way as the OneSite matcher above. Knock fingerprints are
+        # rare on real RealPage-OLL pages, so a co-resident Knock signal
+        # almost always means Knock is the real PMS and RealPage OLL is
+        # the apply-flow target.
+        if _has_knock_marker:
+            yield (
+                "realpage_oll",
+                0.85,
+                ["RealPage OLL marker present but Knock fingerprint co-resident "
+                 "— Knock is the real PMS"],
+            )
+        else:
+            yield (
+                "realpage_oll",
+                # STRONG (0.92) — definitive leasing-wizard markers, must beat a
+                # co-resident chat widget (funnel/knock at 0.90). See the
+                # onlineleasing.realpage.com note above.
+                0.92,
+                ["RealPage OLL wizard marker in HTML (leasing.realpage.com / "
+                 "rp-leasing-widget / RP.Leasing.AppService / /content/apply#k=)"],
+            )
     # Entrata routing. ``/Apartments/module/`` alone is too broad — Entrata
     # exposes a generic tenant login form at
     # ``/Apartments/module/application_authentication/`` that many vanity
