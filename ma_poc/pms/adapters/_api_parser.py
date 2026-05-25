@@ -45,6 +45,17 @@ _UNIT_ID_KEYS: tuple[str, ...] = (
     "unit_number", "unitNumber", "UnitNumber",
     "unit_id", "unitId", "unit_name", "unitName",
     "label", "id", "ID",
+    # 2026-05-24 (prod fingerprint patches): Repli360 admin endpoint
+    # /admin/get_apartmentsync_data_for_floorplan_multi_template ships
+    # the per-unit identifier as "customlink". Safe-narrow alias —
+    # "customlink" is Repli360-specific and doesn't appear elsewhere
+    # in our sampled payloads. Affects ~17 not-full props.
+    "customlink", "customLink", "CustomLink",
+    # Spherexx /api/unit Pascal-case variant. "Number" alone is too
+    # generic to alias globally, but at the per-unit walker level
+    # it's safe — the candidate must already pass the unit-shape gate
+    # before this list is consulted.
+    "Number", "number",
 )
 
 _RENT_KEYS: frozenset[str] = frozenset({
@@ -52,6 +63,10 @@ _RENT_KEYS: frozenset[str] = frozenset({
     "minPrice", "startingPrice", "base_rent", "baseRent",
     "display_price", "displayPrice", "monthly_rent",
     "rentTerms", "pricing", "market_rent",
+    # 2026-05-24 (prod fingerprint patches):
+    # Spherexx /api/unit Pascal-case
+    "PriceMin", "PriceMax", "pricemin", "pricemax",
+    "PriceMinimum", "PriceMaximum",
 })
 
 # ── Low-level helpers ──────────────────────────────────────────────────────────
@@ -1085,23 +1100,31 @@ def parse_api_responses(
                 "startingPrice", "MinRent", "price", "base_rent",
                 "baseRent", "display_price", "displayPrice",
                 "monthlyRent", "monthly_rent",
+                # 2026-05-24 (prod fingerprint): Spherexx /api/unit
+                "PriceMin", "pricemin", "PriceMinimum", "priceminimum",
             )
             rent_hi = _get(item,
                 "maxRent", "rent_max", "max_rent", "maxAskingRent",
                 "endingAt", "MaxRent", "max_price", "maxPrice", "price_max",
+                # 2026-05-24 (prod fingerprint): Spherexx /api/unit
+                "PriceMax", "pricemax", "PriceMaximum", "pricemaximum",
             )
             beds = _get(item,
                 "bedrooms", "beds", "bedroom_count", "numBedrooms",
                 "bd", "Bedrooms", "BedroomCount", "bedroomCount",
                 "num_bedrooms", "no_of_bedroom", "no_of_bedrooms",
+                # 2026-05-24 (prod fingerprint): Spherexx /api/unit
+                "Bed", "bed",
             )
             baths = _get(item,
                 "bathrooms", "baths", "bathroom_count", "numBathrooms",
                 "ba", "Bathrooms", "BathroomCount", "bathroomCount",
+                # 2026-05-24 (prod fingerprint): Spherexx /api/unit
+                "Bath", "bath",
             )
             sqft = _get(item,
                 "sqft", "squareFeet", "square_feet", "minSqft", "size",
-                "SquareFeet", "Sqft", "sqftMin", "area", "square_footage",
+                "SquareFeet", "Sqft", "SqFt", "sqftMin", "area", "square_footage",
                 "squareFootage", "display_area", "displayArea",
             )
             sqft_max = _get(item, "maxSqft", "sqftMax", "squareFeetMax", "max_area")
@@ -1123,6 +1146,13 @@ def parse_api_responses(
             unit_num = _get(item,
                 "unitNumber", "unit_number", "unitId", "unit_id", "UnitNumber",
                 "label", "display_unit_number", "unitCode", "unit_code",
+                # 2026-05-24 (prod fingerprint): Spherexx /api/unit ships
+                # the Pascal-case "Number" field; Repli360 admin endpoint
+                # /admin/get_apartmentsync_data_for_floorplan_multi_template
+                # ships "customlink". Both narrow + safe. Placed AFTER
+                # the standard unit_number/unit_id but BEFORE the generic
+                # "id" fallback so they take priority when present.
+                "Number", "number", "customlink", "customLink", "CustomLink",
                 "id",
             )
             floor_num = _get(item, "floor", "floorNumber", "FloorNumber", "floor_id", "floorId")

@@ -224,6 +224,22 @@ FIELD_ALIASES: dict[str, str] = {
     "availabledate":      "available_date",
     "availableon":        "available_date",
     "availablecount":     "unit_count",
+    # 2026-05-24 (prod fingerprint LLM-discovered patches): the Spherexx
+    # presentation widget at presentation.spherexx.app/api/unit ships
+    # Pascal-case fields (PriceMin / PriceMax / Number / Bed). "bed" is
+    # already aliased above so the only adds we need are the Pascal-case
+    # price variants — these affect ~7 not-full props (Eagle Rock
+    # Properties, Chamberlain Apartments, Invitational Apartments).
+    "pricemin":           "min_rent",     # Spherexx /api/unit
+    "pricemax":           "max_rent",     # Spherexx /api/unit
+    "priceminimum":       "min_rent",
+    "pricemaximum":       "max_rent",
+    # Repli360 admin endpoint /admin/get_apartmentsync_data_for_floorplan_multi_template
+    # ships ``customlink`` as the per-unit identifier (Repli360-specific
+    # field name; safe to alias narrowly since "customlink" doesn't
+    # appear in other PMS payloads in our sample). Affects ~17
+    # not-full props (Olympus Properties, Velo on the Boulevard, etc.).
+    "customlink":         "unit_id",
 }
 
 
