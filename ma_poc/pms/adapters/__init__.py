@@ -13,6 +13,7 @@ from ma_poc.pms.adapters.aspensquare import AspenSquareAdapter
 from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
 from ma_poc.pms.adapters.cortland import CortlandAdapter
+from ma_poc.pms.adapters.edificecms import EdificeCmsAdapter
 from ma_poc.pms.adapters.encoreskyline_template import (
     EncoreSkylineTemplateAdapter,
 )
@@ -86,6 +87,7 @@ def _bootstrap_registry() -> None:
         MaacAdapter,
         IrvineAdapter,
         CortlandAdapter,
+        EdificeCmsAdapter,
         EquityAdapter,
         FunnelAdapter,
         TouchTourAdapter,
