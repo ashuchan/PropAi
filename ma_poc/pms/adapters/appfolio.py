@@ -79,6 +79,19 @@ _APPFOLIO_SKIP_SLUGS = frozenset({
 })
 
 
+# 2026-05-25 (canary 1ef1060 regr#11 follow-up): also recognise the
+# ``hostUrl: 'X.appfolio.com'`` embed-JS config form. PROSPER Azalea
+# City's /check-availability page sets ``hostUrl: 'dlpcapital.appfolio
+# .com'`` in the Appfolio.Listing widget config — no ``https://``
+# prefix, so the legacy slug regex above misses it entirely. This is
+# why the propertyGroup filter wasn't getting applied: we had the
+# propertyGroup but no slug → couldn't build the listings URL.
+_APPFOLIO_HOST_URL_RE = re.compile(
+    r"hostUrl\s*:\s*['\"]([a-z0-9-]+)\.appfolio\.com['\"]",
+    re.IGNORECASE,
+)
+
+
 def find_appfolio_slug(html: str) -> str | None:
     """Return the first AppFolio PMC slug in the HTML (or None).
 
@@ -86,14 +99,70 @@ def find_appfolio_slug(html: str) -> str | None:
     vanity-domain fallback path in :meth:`AppFolioAdapter.extract` when the
     page being scraped is the property's marketing site rather than an
     ``<slug>.appfolio.com`` subdomain.
+
+    2026-05-25 (regr#11 follow-up): tries TWO discovery paths so the
+    embed-JS config form is also recognised:
+      1. URL form ``https://<slug>.appfolio.com`` (legacy)
+      2. Config form ``hostUrl: '<slug>.appfolio.com'`` (new — Prosper
+         Azalea City + likely others use this without an https-prefixed
+         hostname elsewhere on the page).
     """
     if not html or "appfolio.com" not in html.lower():
         return None
+    # Path 1: URL form
     for m in _APPFOLIO_SLUG_RE.finditer(html):
         slug = m.group(1).lower()
         if slug and slug not in _APPFOLIO_SKIP_SLUGS:
             return slug
+    # Path 2: embed-JS config form (``hostUrl: 'X.appfolio.com'``)
+    host_m = _APPFOLIO_HOST_URL_RE.search(html)
+    if host_m:
+        slug = host_m.group(1).lower()
+        if slug and slug not in _APPFOLIO_SKIP_SLUGS:
+            return slug
     return None
+
+
+# 2026-05-25 (canary 1ef1060 user-flagged regr#11 CRITICAL):
+# When a PMC manages multiple properties under one AppFolio account, the
+# marketing site embeds the listings widget with a propertyGroup filter
+# to scope the listings to just this property:
+#
+#   Appfolio.Listing({
+#     hostUrl: 'dlpcapital.appfolio.com',
+#     propertyGroup: 'PM - PROSPER Azalea City',   // ← per-property filter
+#     ...
+#   })
+#
+# AppFolio's /listings endpoint accepts the filter via URL parameter
+# ``filters[property_list]={propertyGroup}``. Without it, our vanity
+# fallback was pulling ALL of the PMC's properties: PROSPER Azalea City
+# (Valdosta GA 31602) was getting 300 units from St. Augustine FL 32086
+# (a different property in the same PMC). Cohort: 239 AppFolio VANITY
+# properties — many on multi-property PMC accounts.
+#
+# The regex tolerates either ``'PG'`` or ``"PG"`` quotes and any
+# whitespace around the colon. Returns the value verbatim (preserves
+# spaces / dashes that operators include in their group names).
+_APPFOLIO_PROPERTY_GROUP_RE = re.compile(
+    r"propertyGroup\s*:\s*['\"]([^'\"]+)['\"]",
+)
+
+
+def find_appfolio_property_group(html: str) -> str | None:
+    """Return the ``propertyGroup`` filter from the AppFolio embed JS, or
+    None when the listings widget isn't scoped (single-property account).
+
+    The PMC-scoped filter appears in the marketing page's embed JS config
+    block, typically inside an ``Appfolio.Listing({...})`` call. When
+    present, it MUST be applied to the /listings URL via
+    ``filters[property_list]={value}`` or the adapter will pull ALL
+    properties under the PMC's account (cross-property contamination).
+    """
+    if not html or "propertyGroup" not in html:
+        return None
+    m = _APPFOLIO_PROPERTY_GROUP_RE.search(html)
+    return m.group(1) if m else None
 
 
 def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any]]:
@@ -564,10 +633,30 @@ class AppFolioAdapter:
         # ``<slug>.appfolio.com``. Discover the slug, fetch the SSR listings
         # page directly, and parse it with the existing SSR parser.
         # Source: 2026-04-30 failure-recovery (33/46 demonstrated).
+        #
+        # 2026-05-25 (canary 1ef1060 regr#11 CRITICAL): also extract
+        # ``propertyGroup`` from the embed JS and append the
+        # ``filters[property_list]={propertyGroup}`` query parameter to
+        # the listings URL. Without this filter, multi-property PMC
+        # accounts (e.g. dlpcapital manages PROSPER Azalea City +
+        # ~10 other properties under one AppFolio account) cross-
+        # contaminate: PROSPER (Valdosta GA 31602) was getting 300
+        # units from St. Augustine FL 32086. With the filter:
+        # /listings?filters[property_list]=PM%20-%20PROSPER%20Azalea%20City
+        # returns just the 47 PROSPER units (all matching ZIP 31602).
+        # See ``find_appfolio_property_group`` above.
         if page_html:
             slug = find_appfolio_slug(page_html)
             if slug:
+                property_group = find_appfolio_property_group(page_html)
                 listings_url = f"https://{slug}.appfolio.com/listings"
+                if property_group:
+                    from urllib.parse import quote
+                    # filters[property_list]={urlencoded_propertyGroup}
+                    listings_url = (
+                        f"{listings_url}?filters%5Bproperty_list%5D="
+                        f"{quote(property_group)}"
+                    )
                 try:
                     import httpx
                     headers = {
@@ -592,7 +681,8 @@ class AppFolioAdapter:
                             return result
                 except Exception as exc:
                     result.errors.append(
-                        f"appfolio-vanity-fetch-error: slug={slug!r} {type(exc).__name__}"
+                        f"appfolio-vanity-fetch-error: slug={slug!r} "
+                        f"property_group={property_group!r} {type(exc).__name__}"
                     )
 
         result.confidence = 0.0
