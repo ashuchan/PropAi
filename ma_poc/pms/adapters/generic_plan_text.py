@@ -155,7 +155,20 @@ _BACK_BOUNDARY_RE = re.compile(
     r"\d+(?:\.\d+)?\s*(?:bedroom|bdrm|bed|bd|br|bathroom|bath|bth|ba)s?\b|\bstudio\b",
     re.IGNORECASE,
 )
-_SQFT_RE = re.compile(r"(\d[\d,]{2,4})\s*sq\.?\s*(?:ft|feet)", re.IGNORECASE)
+# 2026-05-25 (sqft=-1 probe): widened to match "square feet" / "SQUARE
+# FEET" (Sandpiper, Alders Square subpages) + "square foot" + standalone
+# "sf" with word boundary (Stoneycreek and similar). Prior regex only
+# matched "sq ft" / "sq. ft." / "sqft" — silently dropping ~38% of
+# TIER_1_DOM_GENERIC_PLAN_TEXT sqft on /floorplans subpages.
+_SQFT_RE = re.compile(
+    r"(\d[\d,]{2,4})[-\s]*"               # allow hyphen separator: "1,128-square-foot"
+    r"(?:"
+    r"sq\.?\s*(?:ft|feet)"                # "sq ft" / "sq. ft." / "sqft"
+    r"|square[-\s]*f(?:ee|oo)t"          # "square feet" / "square-foot"
+    r"|sf\b"                              # bare "SF" (word-bounded)
+    r")",
+    re.IGNORECASE,
+)
 # Match either a single price (From $X / $X) OR a range ($X - $X).
 _PRICE_RE = re.compile(
     r"(?:from\s+)?\$\s*([\d,]+)(?:\s*-\s*\$?\s*([\d,]+))?",
@@ -1185,6 +1198,231 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
     return out
 
 
+# 2026-05-25 (sqft=-1 probe): "bed-token + sqft" proximity scanner used
+# by the sqft-chase helper. Matches the bed token first (so we know the
+# bed count for the lookup map), then walks up to ``_SQFT_PROX_WINDOW``
+# characters forward looking for the FIRST sqft hit. Wider than the main
+# parser's ``_REST_WINDOW=100`` because the chase targets
+# /floorplans-style description pages where sqft can be 200+ chars after
+# the bed token (e.g. Stoneycreek "1 Bedroom - 1 Bath Phase IV. You'll
+# love the huge storage closet and oversized patio in this 944 sq. ft.
+# apartment!"). Bath token is optional.
+_SQFT_PROX_BED_RE = re.compile(
+    r"(?:"
+    r"(?P<beds>\d+)\s*(?:bedroom|bdrm|bed|bd|br)s?\b"
+    r"|(?P<studio>\bstudio\b)"
+    r")",
+    re.IGNORECASE,
+)
+_SQFT_PROX_WINDOW = 350
+# Boundary regex — the NEXT bed token signals we've crossed into a new
+# plan's text. Used to stop the forward sqft scan before it picks up a
+# sibling plan's sqft.
+_SQFT_PROX_NEXT_BED_RE = re.compile(
+    r"\d+\s*(?:bedroom|bdrm|bed|bd|br)s?\b|\bstudio\b",
+    re.IGNORECASE,
+)
+
+
+def _scan_beds_to_sqft(body: str) -> dict[str, str]:
+    """Build a ``{beds: sqft}`` map from raw body text.
+
+    Walks every ``N Bedroom[s]`` token and grabs the first sqft hit
+    within ``_SQFT_PROX_WINDOW`` chars, stopping at the next bed token
+    boundary. Used by ``_enrich_sqft_from_floorplans`` when the standard
+    parse_generic_plan_text passes drop sqft because the bed token hit a
+    fallback pass (bed-only / bed-with-rent) that doesn't search sqft.
+
+    Returns ``{}`` for any input that has no usable signals — caller
+    treats as graceful no-op.
+    """
+    if not body:
+        return {}
+    out: dict[str, str] = {}
+    for m in _SQFT_PROX_BED_RE.finditer(body):
+        if m.group("studio"):
+            beds_str = "0"
+        else:
+            beds_str = (m.group("beds") or "").lower()
+        if not beds_str.isdigit():
+            continue
+        beds_int = int(beds_str)
+        if beds_int > 6:
+            continue
+        if beds_str in out:
+            continue  # first sqft for each bed count wins
+        rest = body[m.end():m.end() + _SQFT_PROX_WINDOW]
+        # Stop window at next bed token to avoid leaking sibling plan
+        # sqft. The current match itself already consumed the token, so
+        # we look in the remainder.
+        nxt = _SQFT_PROX_NEXT_BED_RE.search(rest)
+        if nxt:
+            rest = rest[: nxt.start()]
+        sq_m = _SQFT_RE.search(rest)
+        if not sq_m:
+            continue
+        sqft_v = sq_m.group(1).replace(",", "")
+        try:
+            sqft_i = int(sqft_v)
+        except ValueError:
+            continue
+        if not (150 <= sqft_i <= 10000):
+            continue  # implausible — ignore
+        out[beds_str] = sqft_v
+    return out
+
+
+def _enrich_sqft_from_floorplans(
+    rows: list[dict],
+    base_url: str,
+    homepage_body: str = "",
+) -> tuple[list[dict], str, int]:
+    """Probe /floorplans subpages and merge sqft into rows missing it.
+
+    2026-05-25 (sqft=-1 probe): 38% of TIER_1_DOM_GENERIC_PLAN_TEXT props
+    in the sqft=-1 cohort publish sqft on /floorplans or /floor-plans
+    subpages while the per-unit rent rows live on the landing page (or a
+    different region of the same DOM). The existing F1.5 cross-page
+    enrichment merges by exact ``floor_plan_name`` match, which fails
+    when landing rows use the generic "N Bedroom / M Bath" name produced
+    by ``_PLAN_LINE_RE`` while subpage rows use a real plan name (or
+    vice-versa).
+
+    Strategy:
+      1. Probe /floorplans, /floor-plans, /availability subpages.
+      2. On the first 200-OK response, run BOTH
+         ``parse_generic_plan_text`` (catches sqft from primary pass
+         rows) AND ``_scan_beds_to_sqft`` (a wider proximity scanner
+         that catches sqft missed by fallback passes).
+      3. If no subpage carried sqft, fall back to the homepage body
+         (handles Majestic-style sites where per-unit rows on the same
+         body lack sqft but plan-header rows have it).
+      4. Merge sqft by (beds, baths) match first, then beds-only.
+
+    Returns ``(updated_rows, source_path, n_enriched)``. Returns
+    ``(rows, "", 0)`` on any failure — never raises (callers depend on
+    this for graceful degradation).
+    """
+    if not rows or not base_url:
+        return rows, "", 0
+    try:
+        from urllib.parse import urlparse as _urlparse
+
+        from ma_poc.pms.adapters._probe import probe_get
+    except Exception:
+        return rows, "", 0
+    pu = _urlparse(base_url)
+    if not (pu.scheme and pu.netloc):
+        return rows, "", 0
+    origin = f"{pu.scheme}://{pu.netloc}"
+
+    if not any(not str(r.get("sqft") or "").strip() for r in rows):
+        return rows, "", 0  # every row already has sqft — nothing to do
+
+    sub_rows: list[dict] = []
+    beds_sqft_map: dict[str, str] = {}
+    winning_path = ""
+    for path in (
+        "/floorplans/", "/floor-plans/", "/floorplans", "/floor-plans",
+        "/availability/", "/availability",
+    ):
+        try:
+            r = probe_get(origin + path, timeout=12)
+        except Exception:
+            continue
+        if r.status_code != 200 or not r.text:
+            continue
+        sub_unesc = _unescape_js_entities(r.text)
+        sub_flat = re.sub(
+            r"<script\b[^>]*>.*?</script>", " ", sub_unesc,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        sub_flat = re.sub(
+            r"<style\b[^>]*>.*?</style>", " ", sub_flat,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        sub_flat = re.sub(r"<[^>]+>", " ", sub_flat)
+        sub_flat = re.sub(r"\s+", " ", sub_flat).strip()
+        candidate = parse_generic_plan_text(sub_flat, origin + path)
+        prox_map = _scan_beds_to_sqft(sub_flat)
+        if any(str(c.get("sqft") or "").strip() for c in candidate) or prox_map:
+            sub_rows = candidate
+            beds_sqft_map = prox_map
+            winning_path = path
+            break
+
+    # 2026-05-25 (sqft=-1 probe): Majestic-style fallback. Some sites
+    # publish sqft on the SAME landing-body the parser already consumed
+    # — but only in plan-header rows (not the per-unit rows that drive
+    # the per-row rent). When subpages don't exist OR don't help, scan
+    # the homepage body with the proximity scanner to catch those
+    # plan-header sqft entries and merge them by beds match.
+    if not sub_rows and not beds_sqft_map and homepage_body:
+        beds_sqft_map = _scan_beds_to_sqft(homepage_body)
+        if beds_sqft_map:
+            winning_path = "<homepage-body>"
+
+    if not sub_rows and not beds_sqft_map:
+        return rows, "", 0
+
+    # Build (beds, baths) → sqft map from any sub_rows that carry sqft.
+    by_bb: dict[tuple[str, str], list[dict]] = {}
+    for s in sub_rows:
+        sqft_v = str(s.get("sqft") or "").strip()
+        if not sqft_v:
+            continue
+        beds_v = str(s.get("bedrooms") or "").strip()
+        baths_v = str(s.get("bathrooms") or "").strip()
+        key = (beds_v, baths_v)
+        by_bb.setdefault(key, []).append(s)
+
+    # Beds-only fallback map — narrower (beds, baths) match always
+    # wins. Prefer sqft from sub_rows; fall back to proximity-scan map.
+    by_beds: dict[str, str] = {}
+    for s in sub_rows:
+        sqft_v = str(s.get("sqft") or "").strip()
+        if not sqft_v:
+            continue
+        beds_v = str(s.get("bedrooms") or "").strip()
+        by_beds.setdefault(beds_v, sqft_v)
+    for beds_k, sqft_v in beds_sqft_map.items():
+        by_beds.setdefault(beds_k, sqft_v)
+
+    n_enriched = 0
+    for r in rows:
+        if str(r.get("sqft") or "").strip():
+            continue
+        r_beds = str(r.get("bedrooms") or "").strip()
+        r_baths = str(r.get("bathrooms") or "").strip()
+        r_name = str(r.get("floor_plan_name") or "").strip().lower()
+        sqft_to_use = ""
+
+        # Tier 1: exact (beds, baths) match. If multiple matches, prefer
+        # one whose name has bidirectional substring overlap with r_name.
+        candidates = by_bb.get((r_beds, r_baths)) or []
+        if candidates:
+            chosen = candidates[0]
+            if r_name and len(candidates) > 1:
+                for c in candidates:
+                    c_name = str(c.get("floor_plan_name") or "").strip().lower()
+                    if c_name and (c_name in r_name or r_name in c_name):
+                        chosen = c
+                        break
+            sqft_to_use = str(chosen.get("sqft") or "").strip()
+
+        # Tier 2: beds-only match (acceptable when baths are missing on
+        # one side; per-unit landing rows often carry both, plan-header
+        # subpage rows sometimes drop bath count).
+        if not sqft_to_use and r_beds:
+            sqft_to_use = by_beds.get(r_beds, "")
+
+        if sqft_to_use:
+            r["sqft"] = sqft_to_use
+            n_enriched += 1
+
+    return rows, winning_path, n_enriched
+
+
 class GenericPlanTextAdapter:
     """Last-resort plan-level text extractor for bespoke custom-CMS sites.
 
@@ -1299,6 +1537,39 @@ class GenericPlanTextAdapter:
                 "(anti-noise threshold; falls to LLM)"
             )
             return result
+
+        # 2026-05-25 (sqft=-1 probe): when rows exist but most/all lack
+        # sqft, probe /floorplans subpages and merge sqft by (beds, baths)
+        # match. Distinct from the "if not rows" fallback above — that
+        # one swaps in subpage rows entirely; this one keeps the primary
+        # rows (which carry per-unit rent) and just enriches the sqft.
+        # Cohort: 96 props / 773 units flagged sqft=-1, of which ~38%
+        # publish sqft on a /floorplans subpage. Skipped when ≥50% of
+        # rows already carry sqft (the parser caught enough — no need
+        # to spend the network round-trip).
+        n_with_sqft = sum(
+            1 for r in rows if str(r.get("sqft") or "").strip()
+        )
+        if n_with_sqft < len(rows) * 0.5:
+            base_url_for_chase = (
+                self._winning_url(page, ctx)
+                or str(getattr(ctx, "base_url", "") or "")
+            )
+            try:
+                rows, sub_path, n_enriched = _enrich_sqft_from_floorplans(
+                    rows, base_url_for_chase, homepage_body=body,
+                )
+                if n_enriched:
+                    result.errors.append(
+                        f"generic_plan_text: sqft chase via {sub_path} "
+                        f"merged sqft into {n_enriched}/{len(rows)} rows"
+                    )
+            except Exception as exc:  # pragma: no cover — defensive
+                result.errors.append(
+                    f"generic_plan_text: sqft chase error: "
+                    f"{type(exc).__name__}"
+                )
+
         from ma_poc.extraction.post_process import post_process
 
         pp = post_process(rows, property_id=getattr(ctx, "property_id", None))

@@ -1504,9 +1504,19 @@ class EntrataAdapter:
             # Step 1: parse the captured body in case the homepage
             # already IS the SSR grid (some PP vanity hosts redirect
             # ``/`` → ``/{city}/{slug}/conventional/``).
+            #
+            # 2026-05-25 (wave-2 cluster #3 CF+Entrata+SightMap):
+            # ``fp-name-link`` is the most reliable PP plan-link
+            # selector and survives PP theme variants that omit the
+            # legacy ``fp-card`` / ``fp-group-item`` wrappers (e.g. the
+            # newer ``beans-floorplans-map-tab`` theme — live-verified
+            # on 14fiftyapartments.com pid 258254). Without it those
+            # bodies were silently dropped before the per-plan unit-
+            # card drill could see their plan links.
             if isinstance(fr_body_check, str) and fr_body_check and (
                 "fp-card" in fr_body_check
                 or "fp-group-item" in fr_body_check
+                or "fp-name-link" in fr_body_check
             ):
                 _cap_url = str(getattr(fr, "final_url", "") or base)
                 pp_ssr_units.extend(
@@ -1560,6 +1570,7 @@ class EntrataAdapter:
                 if (
                     "fp-card" not in cand_html
                     and "fp-group-item" not in cand_html
+                    and "fp-name-link" not in cand_html
                 ):
                     continue
                 pp_ssr_units.extend(
