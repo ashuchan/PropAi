@@ -62,6 +62,36 @@ _DETAIL_SQFT_RE = re.compile(
 _DETAIL_H1_RE = re.compile(
     r"<h1[^>]*>(?P<txt>[^<]{1,200})</h1>", re.IGNORECASE | re.DOTALL
 )
+
+# 2026-05-25 (deep-probe sqft=-1 cohort): AppFolio operators publish
+# non-housing listings (parking spaces, storage units, garages) into the
+# same /listings endpoint as actual apartments. These show up with
+# very-low rents ($200-$400) and addresses containing "Non-Resident
+# Parking", "Storage", "Garage", or "Locker". Skipping them removes
+# false-positive zero-sqft "units" + drops them from QC counts.
+# Sample signature: pid=54745 unit='05' fp='...Non-Resident Parking 05'
+# rent=$300.
+_NON_HOUSING_RE = re.compile(
+    r"\b(?:"
+    r"parking|garage|locker|storage|"
+    r"bike\s+(?:room|storage)|"
+    r"non[-\s]?resident|"
+    r"car\s*port"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _is_non_housing_listing(*text_fields: str) -> bool:
+    """Return True if any text_field contains a non-housing keyword.
+
+    Used to skip AppFolio listings for parking spaces, storage units, etc.
+    that share the /listings endpoint with actual apartment listings.
+    """
+    for t in text_fields:
+        if t and _NON_HOUSING_RE.search(t):
+            return True
+    return False
 _DETAIL_MAIN_RE = re.compile(
     r"<main[^>]*>(?P<inner>.*?)</main>", re.IGNORECASE | re.DOTALL
 )
@@ -630,6 +660,13 @@ def parse_appfolio_listings_ssr(html: str, url: str) -> list[dict[str, str]]:
         avail_raw = avail_m.group(1).strip() if avail_m else ""
         address = addr_m.group(1).strip() if addr_m else ""
 
+        # 2026-05-25: skip non-housing listings (parking, storage, etc.).
+        # These pollute the unit count + show up as low-rent zero-sqft
+        # rows. Address is the most reliable text field for the keyword
+        # check; the entire body is a safety net for variants.
+        if _is_non_housing_listing(address, body):
+            continue
+
         # 2026-05-24 (audit xlsx 2026-05-23): prefer the apartment
         # suffix parsed out of the address (the value the website
         # actually displays). Fall back to listing_id ONLY when the
@@ -669,6 +706,13 @@ def parse_appfolio_listings(items: list[dict[str, Any]], url: str) -> list[dict[
         if not isinstance(item, dict):
             continue
         name = get_field(item, "name", "listing_type", "property_type", "apartment_type")
+        # 2026-05-25: skip non-housing listings (parking spaces, storage,
+        # etc.) that share the AppFolio /listings endpoint. See the
+        # docstring of _is_non_housing_listing for the signature.
+        address_field = get_field(item, "address", "address_address1", "address_line1", "street")
+        listing_type = get_field(item, "listing_type", "type", "category")
+        if _is_non_housing_listing(name, address_field, listing_type):
+            continue
         beds_str = get_field(item, "bed", "bedrooms", "beds", "bedroom_count")
         baths_str = get_field(item, "bath", "bathrooms", "baths", "bathroom_count")
         beds = int(float(beds_str)) if beds_str else None
