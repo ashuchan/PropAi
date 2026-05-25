@@ -28,6 +28,9 @@ SKIP_TIERS = {
     "TIER_1_API_REPLI360_PLAN_LEVEL",         # shipped
 }
 
+# Wave 2 (2026-05-25 post-merge): triple the per-tier quota to cover
+# 120 fresh props from the remaining ~894 n_full=0 props. Same skip
+# logic — tiers owned by in-flight chips are excluded.
 # Target sample counts per tier (n_full=0 cohort, 40 total)
 N_FULL_ZERO_QUOTA = {
     "TIER_1_API": 5,
