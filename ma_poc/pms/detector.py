@@ -64,6 +64,7 @@ PmsName = Literal[
     "equity",
     "rentmanager",
     "rentvision",
+    "rentaladdress",
     "residentservices365",
     "encoreskyline_template",
     "aspensquare",
@@ -114,6 +115,7 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "equity": "api_first",
     "rentmanager": "api_first",
     "rentvision": "dom_first",
+    "rentaladdress": "dom_first",
     "residentservices365": "dom_first",
     "encoreskyline_template": "dom_first",
     "aspensquare": "dom_first",
@@ -798,6 +800,21 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             "rentvision",
             0.85,
             ["RentVision CMS marker in HTML (created/powered by RentVision / rentvision.com)"],
+        )
+    # 2026-05-25 (canary 1ef1060 regr#8): RentalAddress.com is a small-
+    # operator marketing CMS (cedarridgeapts.rentaladdress.com signature)
+    # serving SSR /floor_plans pages with deterministic ``.floor_plan_list``
+    # + ``.{field} value`` div pairs (square_feet, bedrooms, bathrooms,
+    # rent, deposit). Pre-fix the generic plan-text parser saw "598" sqft
+    # as part of the plan name string ("598 Bedroom / 1 Bath"). Fires on
+    # the canonical hostname; sister sites on the same platform recover
+    # for free.
+    if "rentaladdress.com" in h or "floor_plan_list" in h:
+        yield (
+            "rentaladdress",
+            0.88,
+            ["RentalAddress.com CMS marker in HTML "
+             "(rentaladdress.com host / .floor_plan_list container)"],
         )
     # Encoreskyline-template marketing family driven by the Jonah Digital /
     # MeetElise widget. Per-plan /floorplans/{slug}/ pages render real

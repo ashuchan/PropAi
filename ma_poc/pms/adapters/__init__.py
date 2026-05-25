@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from ma_poc.pms.adapters.amli import AmliAdapter
 from ma_poc.pms.adapters.appfolio import AppFolioAdapter
-from ma_poc.pms.adapters.aspensquare import AspenSquareAdapter
 from ma_poc.pms.adapters.apts247 import Apts247Adapter
+from ma_poc.pms.adapters.aspensquare import AspenSquareAdapter
 from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
 from ma_poc.pms.adapters.cortland import CortlandAdapter
@@ -33,6 +33,7 @@ from ma_poc.pms.adapters.onesite import OneSiteAdapter
 from ma_poc.pms.adapters.realpage_cws import RealPageCwsAdapter
 from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
+from ma_poc.pms.adapters.rentaladdress import RentalAddressAdapter
 from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
 from ma_poc.pms.adapters.rentcafe_layout_tab import RentCafeLayoutTabAdapter
 from ma_poc.pms.adapters.rentcafe_unit_roster import RentCafeUnitRosterAdapter
@@ -76,6 +77,7 @@ def _bootstrap_registry() -> None:
         Repli360Adapter,
         RentManagerAdapter,
         RentVisionAdapter,
+        RentalAddressAdapter,
         Residentservices365Adapter,
         AspenSquareAdapter,
         EssexAdapter,
