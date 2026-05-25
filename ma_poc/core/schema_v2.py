@@ -317,6 +317,24 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         # Note: rent_lo / rent_hi feed ``_format_rent`` separately below;
         # we re-run the same gate here so the date logic sees the same
         # truth as the rent columns will display.
+        #
+        # 2026-05-25 (user-flagged via Cedar Ridge + Pleasant View Gardens
+        # / JCM Living cohort): gate has_rent on a REAL unit identity.
+        # PLAN_LEVEL tiers (GENERIC_PLAN_TEXT_PLAN_LEVEL,
+        # APPFOLIO_VANITY_PLAN_LEVEL, REPLI360_PLAN_LEVEL, etc.) emit
+        # synthetic rows for plans where the operator advertises rent
+        # ranges + a "Check Availability" CTA button but DOES NOT
+        # publish per-unit availability. Each row gets an
+        # ``inferred_*`` fallback unit_id (via assign_fallback_unit_id
+        # downstream). Manufacturing an available_date on these rows
+        # would be incorrect — the operator never said any unit was
+        # actually available. Only fire has_rent fallback when the
+        # unit dict carries a real (non-empty, non-"null") identifier
+        # — Knock / G5 / etc. always do; plan-level summaries don't.
+        # Cohort impact: protects ~310 plan-level rows across 16 tier
+        # categories (TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL,
+        # TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL, etc.) from getting
+        # a fabricated scrape-date stamp.
         "available_date": _resolve_available_date(
             _format_date(_first(
                 unit, "available_date", "availability_date",
@@ -328,8 +346,11 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
             ),
             scrape_ts,
             has_rent=(
-                _format_rent(rent_lo) is not None
-                or _format_rent(rent_hi) is not None
+                (
+                    _format_rent(rent_lo) is not None
+                    or _format_rent(rent_hi) is not None
+                )
+                and uid not in (None, "", "null")
             ),
         ),
         # 2026-05-18 (capture-first): preserve the RAW availability string

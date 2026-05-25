@@ -502,6 +502,121 @@ def test_rent_present_status_available_still_wins() -> None:
     assert out["available_date"] == _TS.strftime("%Y-%m-%d")
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-25 user-flagged via Cedar Ridge + Pleasant View Gardens —
+# Phase 16 has_rent fallback PLAN_LEVEL guard.
+#
+# Pre-guard: ANY unit with positive rent + no date got
+# available_date=scrape_date. This over-fired on plan-level rows
+# emitted by TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL,
+# TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL, TIER_1_API_REPLI360_PLAN_LEVEL,
+# etc. where the operator publishes:
+#   * plan-level rent range ($1,475 1BR, $1,750 2BR)
+#   * a "Check Availability" CTA button (NOT a real availability list)
+# and our parser emits a synthetic row per plan with an ``inferred_*``
+# fallback unit_id. Manufacturing a date here is incorrect — the
+# operator never said any unit is actually available right now.
+#
+# Post-guard: require BOTH (a) rent published AND (b) a real
+# (non-empty, non-"null") unit_id on the source dict. Plan-level rows
+# always lack a real unit_id (rescue assigns ``inferred_*``), so they
+# now correctly stay with available_date=None.
+#
+# Knock / G5 / EMBEDDED / MERGED cohorts that motivated Phase 16 all
+# carry real unit_ids ("1833", "U-101", etc.) — unaffected by the
+# guard. The has_rent fallback still recovers their dates.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_plan_level_no_unit_id_does_not_get_date_manufactured() -> None:
+    """The Cedar Ridge / Pleasant View signature: plan-level row with
+    rent + no unit_id source. Must NOT get a manufactured date.
+
+    Pre-guard: would have produced available_date=scrape_date.
+    Post-guard: available_date stays None (operator hasn't published
+    per-unit availability)."""
+    unit = {
+        # NO unit_id, unit_number, or _unit_number — plan-level
+        "floor_plan_name": "1 Bedroom / 1 Bath",
+        "beds": 1,
+        "baths": 1,
+        "rent_low": 1475.0,
+        "rent_high": 1475.0,
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] is None, (
+        f"plan-level row (no unit_id source) must NOT get a "
+        f"manufactured date; got {out['available_date']!r}"
+    )
+    # Confirm the row IS otherwise valid (rent + plan name preserved)
+    assert out["rent_low"] == 1475.0
+    assert out["floor_plan_name"] == "1 Bedroom / 1 Bath"
+
+
+def test_plan_level_empty_string_unit_id_does_not_get_date() -> None:
+    """Empty-string unit_id is also plan-level (gets rescued to
+    inferred_* downstream). Same guard applies."""
+    unit = {
+        "unit_id": "",
+        "floor_plan_name": "2 Bedroom",
+        "rent_low": 1750.0,
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] is None
+
+
+def test_plan_level_null_string_unit_id_does_not_get_date() -> None:
+    """``unit_id="null"`` (string literal, observed in some adapters)
+    is also plan-level."""
+    unit = {
+        "unit_id": "null",
+        "floor_plan_name": "Studio",
+        "rent_low": 1200.0,
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] is None
+
+
+def test_real_unit_id_still_gets_has_rent_fallback() -> None:
+    """The Knock / G5 / EMBEDDED signature that motivated Phase 16:
+    REAL unit_id + rent + no date → date defaults to scrape date.
+    Guard MUST NOT regress this."""
+    unit = {
+        "unit_id": "1833",  # real per-apartment id
+        "floor_plan_name": "B1",
+        "rent_low": 1505.0,
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+
+
+def test_real_unit_number_also_satisfies_the_guard() -> None:
+    """Some adapters emit ``unit_number`` instead of ``unit_id``.
+    Both satisfy the real-identity check via the alias chain."""
+    unit = {
+        "unit_number": "Apt 101",  # alias for unit_id
+        "floor_plan_name": "B1",
+        "rent_low": 1500.0,
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+
+
+def test_plan_level_with_status_available_still_fires() -> None:
+    """The guard only affects the has_rent path. If the operator
+    explicitly says status=AVAILABLE, the original Q1 fallback still
+    fires regardless of unit_id presence (operator explicitly stated
+    availability — we trust that)."""
+    unit = {
+        # No unit_id, but status is explicit
+        "floor_plan_name": "1 Bedroom",
+        "rent_low": 1200.0,
+        "availability_status": "AVAILABLE",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+
+
 @pytest.mark.parametrize("text", [
     # Existing widened phrasings (proven 2026-05-24 morning fixed-list)
     "ready",
