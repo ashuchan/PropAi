@@ -47,9 +47,9 @@ PMS_MARKERS: dict[str, list[str]] = {
     "securecafe":        ["securecafe.com"],
     "entrata":           ["entrata.com", "prospectportal", "entrata-cdn"],
     "appfolio":          ["appfolio.com", "Appfolio.Listing"],
-    "knock":             ["knock-cdn", "knockrentals", "knock.app"],
+    "knock":             ["knock-cdn", "knockrentals", "knock.app", "knck.io", "doorway.knck"],
     "onesite":           ["onlineleasing.realpage.com", "onesite"],
-    "realpage_cws":      ["cws.realpage.com", "realpage-cws"],
+    "realpage_cws":      ["cws.realpage.com", "realpage-cws", "cs-cdn.realpage.com"],
     "g5":                ["g5dxm.com", "g5marketingcloud", "g5-c-"],
     "rentmanager":       ["rentmanager.com", "myresman.com"],
     "rentvision":        ["rentvision", "powered by rentvision"],
@@ -71,6 +71,7 @@ PMS_MARKERS: dict[str, list[str]] = {
     "sucuri":            ["sucuri.net", "sgcaptcha", "Access denied"],
     "datadome":          ["datadome", "_dd_"],
     "cloudflare":        ["cf-ray:", "cloudflare", "__cf_chl"],
+    "godaddy_builder":   ["img1.wsimg.com", "Go Daddy Website Builder", "Starfield Technologies"],
 }
 
 # JS bundle URL-constant patterns
@@ -167,22 +168,51 @@ def probe_property(prop: dict) -> dict:
 
     # Step 5: fingerprint scan (do early so we know which paths to try)
     fps = _signatures(landing_html)
+    # SiteGround sgcaptcha fast-path: 202 + ≤500-byte body + meta-refresh = anti-bot wall.
+    # Run against the raw s1_body (not landing_html) because landing_html is blanked on non-200.
+    if (
+        s1_status == 202
+        and len(s1_body) < 500
+        and 'meta http-equiv="refresh"' in s1_body.lower()
+    ):
+        fps.append("sgcaptcha_202")
     out["steps"]["5_fingerprints"] = fps
 
-    # Steps 2/3/4: alt URL probes
-    for slug, label in [("floorplans", "2_floorplans"), ("floor-plans", "3_floor-plans"), ("availability", "4_availability")]:
-        u = urljoin(origin + "/", slug)
-        st, body, _ = _fetch(u)
+    # Steps 2/3/4: alt URL probes. Each "step" sweeps the bare slug plus extension and
+    # underscore variants; the FIRST 200 response wins so downstream verdict logic is unchanged.
+    # Variants caught real-world misses on 2026-05-25: /floor-plans.aspx (66homer.com — Knock+RealPage),
+    # /availability.html (1515parkplace.com — EXR), /floor_plans (cedarridgeapts — RentalAddress).
+    SLUG_VARIANTS: dict[str, list[str]] = {
+        "floorplans":   ["floorplans", "floorplans.aspx", "floorplans.html", "floorplans.php"],
+        "floor-plans":  ["floor-plans", "floor-plans.aspx", "floor-plans.html", "floor-plans.php", "floor_plans"],
+        "availability": ["availability", "availability.aspx", "availability.html", "availability.php"],
+    }
+    for base_slug, label in [("floorplans", "2_floorplans"), ("floor-plans", "3_floor-plans"), ("availability", "4_availability")]:
+        chosen_url = ""
+        chosen_status = 0
+        chosen_body = ""
+        tried: list[dict] = []
+        for variant in SLUG_VARIANTS[base_slug]:
+            u = urljoin(origin + "/", variant)
+            st, body, _ = _fetch(u)
+            tried.append({"url": u, "status": st, "size": len(body)})
+            # First 200 wins; otherwise keep the best-status response so we still log something
+            if st == 200 and not body.startswith("__FETCH_ERROR__"):
+                chosen_url, chosen_status, chosen_body = u, st, body
+                break
+            if chosen_status == 0:
+                chosen_url, chosen_status, chosen_body = u, st, body
         # Mini-signal: how many floorplan/unit links does it carry?
-        links = _floorplan_link_candidates(body) if st == 200 else []
+        links = _floorplan_link_candidates(chosen_body) if chosen_status == 200 else []
         # Mini-signal: presence of any unit-row indicators
-        has_units = bool(body and any(k in body.lower() for k in ("unit_number", "unit-number", "data-unit", "apt-price", "apt-value", "rr-unit", "term-pricing-popup", "available_now", "monthly_rate", '"rent"', '"price"'))) if body else False
+        has_units = bool(chosen_body and any(k in chosen_body.lower() for k in ("unit_number", "unit-number", "data-unit", "apt-price", "apt-value", "rr-unit", "term-pricing-popup", "available_now", "monthly_rate", '"rent"', '"price"'))) if chosen_body else False
         out["steps"][label] = {
-            "url": u,
-            "status": st,
-            "size": len(body),
+            "url": chosen_url,
+            "status": chosen_status,
+            "size": len(chosen_body),
             "links_floorplans": len(links),
             "has_unit_markers": has_units,
+            "variants_tried": tried,
         }
 
     # Step 7: JS URL constants from landing
@@ -222,7 +252,7 @@ def _verdict(out: dict) -> str:
     if s["1_landing"]["status"] in (403, 401, 429, 503):
         return f"BLOCKED_HTTP_{s['1_landing']['status']}"
     fps = s.get("5_fingerprints", [])
-    if "sucuri" in fps or "datadome" in fps:
+    if "sucuri" in fps or "datadome" in fps or "sgcaptcha_202" in fps:
         return "ANTIBOT_WALL"
     # Look for unit-level markers across the 4 probed paths
     unit_paths = [k for k in ("2_floorplans", "3_floor-plans", "4_availability") if s.get(k, {}).get("has_unit_markers")]
