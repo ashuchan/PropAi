@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<link rel="pingback" href="https://shadyside-living.com/xmlrpc.php" />
+
+	<script type="text/javascript">
+		document.documentElement.className = 'js';
+	</script>
+	
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><style id="et-builder-googlefonts-cached-inline">/* Original: https://fonts.googleapis.com/css?family=Crimson+Text:regular,italic,600,600italic,700,700italic|Roboto:100,100italic,300,300italic,regular,italic,500,500italic,700,700italic,900,900italic&#038;subset=latin,cyrillic,cyrillic-ext,greek,greek-ext,latin-ext,vietnamese&#038;display=swap *//* User Agent: Mozilla/5.0 (Unknown; Linux x86_64) AppleWebKit/538.1 (KHTML, like Gecko) Safari/538.1 Daum/4.1 */@font-face {font-family: 'Crimson Text';font-style: italic;font-weight: 400;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlpogwHKFkZgtmSR3NB0oRJfaghW.ttf) format('truetype');}@font-face {font-family: 'Crimson Text';font-style: italic;font-weight: 600;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlprgwHKFkZgtmSR3NB0oRJfajCOD9NV.ttf) format('truetype');}@font-face {font-family: 'Crimson Text';font-style: italic;font-weight: 700;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlprgwHKFkZgtmSR3NB0oRJfajDqDtNV.ttf) format('truetype');}@font-face {font-family: 'Crimson Text';font-style: normal;font-weight: 400;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlp2gwHKFkZgtmSR3NB0oRJvaA.ttf) format('truetype');}@font-face {font-family: 'Crimson Text';font-style: normal;font-weight: 600;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlppgwHKFkZgtmSR3NB0oRJXsCx2Cw.ttf) format('truetype');}@font-face {font-family: 'Crimson Text';font-style: normal;font-weight: 700;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlppgwHKFkZgtmSR3NB0oRJX1C12Cw.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 100;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLoHRiA8.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 300;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLt_QiA8.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 400;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLoHQiA8.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 500;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLrPQiA8.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 700;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLmbXiA8.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 900;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLijXiA8.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 100;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbGmT.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 300;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuaabWmT.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 400;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbWmT.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 500;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWub2bWmT.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 700;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuYjammT.ttf) format('truetype');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 900;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuZtammT.ttf) format('truetype');}/* User Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:27.0) Gecko/20100101 Firefox/27.0 */@font-face {font-family: 'Crimson Text';font-style: italic;font-weight: 400;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlpogwHKFkZgtmSR3NB0oRJfaghV.woff) format('woff');}@font-face {font-family: 'Crimson Text';font-style: italic;font-weight: 600;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlprgwHKFkZgtmSR3NB0oRJfajCOD9NW.woff) format('woff');}@font-face {font-family: 'Crimson Text';font-style: italic;font-weight: 700;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlprgwHKFkZgtmSR3NB0oRJfajDqDtNW.woff) format('woff');}@font-face {font-family: 'Crimson Text';font-style: normal;font-weight: 400;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlp2gwHKFkZgtmSR3NB0oRJvaw.woff) format('woff');}@font-face {font-family: 'Crimson Text';font-style: normal;font-weight: 600;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlppgwHKFkZgtmSR3NB0oRJXsCx2CA.woff) format('woff');}@font-face {font-family: 'Crimson Text';font-style: normal;font-weight: 700;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlppgwHKFkZgtmSR3NB0oRJX1C12CA.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 100;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLoHRiAw.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 300;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLt_QiAw.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 400;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLoHQiAw.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 500;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLrPQiAw.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 700;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLmbXiAw.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 900;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLijXiAw.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 100;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbGmQ.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 300;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuaabWmQ.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 400;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbWmQ.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 500;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWub2bWmQ.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 700;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuYjammQ.woff) format('woff');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 900;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuZtammQ.woff) format('woff');}/* User Agent: Mozilla/5.0 (Windows NT 6.3; rv:39.0) Gecko/20100101 Firefox/39.0 */@font-face {font-family: 'Crimson Text';font-style: italic;font-weight: 400;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlpogwHKFkZgtmSR3NB0oRJfaghT.woff2) format('woff2');}@font-face {font-family: 'Crimson Text';font-style: italic;font-weight: 600;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlprgwHKFkZgtmSR3NB0oRJfajCOD9NQ.woff2) format('woff2');}@font-face {font-family: 'Crimson Text';font-style: italic;font-weight: 700;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlprgwHKFkZgtmSR3NB0oRJfajDqDtNQ.woff2) format('woff2');}@font-face {font-family: 'Crimson Text';font-style: normal;font-weight: 400;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlp2gwHKFkZgtmSR3NB0oRJvbQ.woff2) format('woff2');}@font-face {font-family: 'Crimson Text';font-style: normal;font-weight: 600;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlppgwHKFkZgtmSR3NB0oRJXsCx2Dg.woff2) format('woff2');}@font-face {font-family: 'Crimson Text';font-style: normal;font-weight: 700;font-display: swap;src: url(https://fonts.gstatic.com/s/crimsontext/v19/wlppgwHKFkZgtmSR3NB0oRJX1C12Dg.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 100;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLoHRiAo.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 300;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLt_QiAo.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 400;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLoHQiAo.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 500;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLrPQiAo.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 700;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLmbXiAo.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: italic;font-weight: 900;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOKCnqEu92Fr1Mu53ZEC9_Vu3r1gIhOszmOClHrs6ljXfMMLijXiAo.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 100;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbGmW.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 300;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuaabWmW.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 400;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbWmW.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 500;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWub2bWmW.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 700;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuYjammW.woff2) format('woff2');}@font-face {font-family: 'Roboto';font-style: normal;font-weight: 900;font-stretch: normal;font-display: swap;src: url(https://fonts.gstatic.com/s/roboto/v51/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuZtammW.woff2) format('woff2');}</style><meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />
+<script type="text/javascript">
+			let jqueryParams=[],jQuery=function(r){return jqueryParams=[...jqueryParams,r],jQuery},$=function(r){return jqueryParams=[...jqueryParams,r],$};window.jQuery=jQuery,window.$=jQuery;let customHeadScripts=!1;jQuery.fn=jQuery.prototype={},$.fn=jQuery.prototype={},jQuery.noConflict=function(r){if(window.jQuery)return jQuery=window.jQuery,$=window.jQuery,customHeadScripts=!0,jQuery.noConflict},jQuery.ready=function(r){jqueryParams=[...jqueryParams,r]},$.ready=function(r){jqueryParams=[...jqueryParams,r]},jQuery.load=function(r){jqueryParams=[...jqueryParams,r]},$.load=function(r){jqueryParams=[...jqueryParams,r]},jQuery.fn.ready=function(r){jqueryParams=[...jqueryParams,r]},$.fn.ready=function(r){jqueryParams=[...jqueryParams,r]};</script>
+	<!-- This site is optimized with the Yoast SEO plugin v27.1.1 - https://yoast.com/product/yoast-seo-wordpress/ -->
+	<title>Shadyside Commons | Shadyside Pittsburgh Apartments | Floor Plans</title>
+	<meta name="description" content="Explore our Shadyside Pittsburgh apartments. Check availability and view detailed floor plans. Schedule a tour with a leasing agent!" />
+	<link rel="canonical" href="https://shadyside-living.com/availability/" />
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:type" content="article" />
+	<meta property="og:title" content="Shadyside Commons | Shadyside Pittsburgh Apartments | Floor Plans" />
+	<meta property="og:description" content="Explore our Shadyside Pittsburgh apartments. Check availability and view detailed floor plans. Schedule a tour with a leasing agent!" />
+	<meta property="og:url" content="https://shadyside-living.com/availability/" />
+	<meta property="og:site_name" content="Shadyside Commons" />
+	<meta property="article:modified_time" content="2026-04-21T19:05:54+00:00" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:label1" content="Est. reading time" />
+	<meta name="twitter:data1" content="3 minutes" />
+	<script type="application/ld+json" class="yoast-schema-graph">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://shadyside-living.com/availability/","url":"https://shadyside-living.com/availability/","name":"Shadyside Commons | Shadyside Pittsburgh Apartments | Floor Plans","isPartOf":{"@id":"https://shadyside-living.com/#website"},"datePublished":"2017-12-01T18:46:37+00:00","dateModified":"2026-04-21T19:05:54+00:00","description":"Explore our Shadyside Pittsburgh apartments. Check availability and view detailed floor plans. Schedule a tour with a leasing agent!","breadcrumb":{"@id":"https://shadyside-living.com/availability/#breadcrumb"},"inLanguage":"en-US","potentialAction":[{"@type":"ReadAction","target":["https://shadyside-living.com/availability/"]}]},{"@type":"BreadcrumbList","@id":"https://shadyside-living.com/availability/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://shadyside-living.com/"},{"@type":"ListItem","position":2,"name":"Availability"}]},{"@type":"WebSite","@id":"https://shadyside-living.com/#website","url":"https://shadyside-living.com/","name":"Shadyside Commons","description":"Apartments in Pittsburgh PA","potentialAction":[{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https://shadyside-living.com/?s={search_term_string}"},"query-input":{"@type":"PropertyValueSpecification","valueRequired":true,"valueName":"search_term_string"}}],"inLanguage":"en-US"}]}</script>
+	<!-- / Yoast SEO plugin. -->
+
+
+<link rel="alternate" type="application/rss+xml" title="Shadyside Commons &raquo; Feed" href="https://shadyside-living.com/feed/" />
+<link rel="alternate" type="application/rss+xml" title="Shadyside Commons &raquo; Comments Feed" href="https://shadyside-living.com/comments/feed/" />
+<link rel="alternate" title="oEmbed (JSON)" type="application/json+oembed" href="https://shadyside-living.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fshadyside-living.com%2Favailability%2F" />
+<link rel="alternate" title="oEmbed (XML)" type="text/xml+oembed" href="https://shadyside-living.com/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fshadyside-living.com%2Favailability%2F&#038;format=xml" />
+<meta content="Divi Child Theme v.1.0" name="generator"/><link rel='stylesheet' id='wp-components-css' href='https://shadyside-living.com/wp-includes/css/dist/components/style.min.css' type='text/css' media='all' />
+<link rel='stylesheet' id='wp-preferences-css' href='https://shadyside-living.com/wp-includes/css/dist/preferences/style.min.css' type='text/css' media='all' />
+<link rel='stylesheet' id='wp-block-editor-css' href='https://shadyside-living.com/wp-includes/css/dist/block-editor/style.min.css' type='text/css' media='all' />
+<link rel='stylesheet' id='popup-maker-block-library-style-css' href='https://shadyside-living.com/wp-content/plugins/popup-maker/dist/packages/block-library-style.css' type='text/css' media='all' />
+<style id='global-styles-inline-css' type='text/css'>
+:root{--wp--preset--aspect-ratio--square: 1;--wp--preset--aspect-ratio--4-3: 4/3;--wp--preset--aspect-ratio--3-4: 3/4;--wp--preset--aspect-ratio--3-2: 3/2;--wp--preset--aspect-ratio--2-3: 2/3;--wp--preset--aspect-ratio--16-9: 16/9;--wp--preset--aspect-ratio--9-16: 9/16;--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgb(6,147,227) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgb(252,185,0) 0%,rgb(255,105,0) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgb(255,105,0) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6px 6px 0px -3px rgb(255, 255, 255), 6px 6px rgb(0, 0, 0);--wp--preset--shadow--crisp: 6px 6px 0px rgb(0, 0, 0);}:root { --wp--style--global--content-size: 823px;--wp--style--global--wide-size: 1080px; }:where(body) { margin: 0; }.wp-site-blocks > .alignleft { float: left; margin-right: 2em; }.wp-site-blocks > .alignright { float: right; margin-left: 2em; }.wp-site-blocks > .aligncenter { justify-content: center; margin-left: auto; margin-right: auto; }:where(.is-layout-flex){gap: 0.5em;}:where(.is-layout-grid){gap: 0.5em;}.is-layout-flow > .alignleft{float: left;margin-inline-start: 0;margin-inline-end: 2em;}.is-layout-flow > .alignright{float: right;margin-inline-start: 2em;margin-inline-end: 0;}.is-layout-flow > .aligncenter{margin-left: auto !important;margin-right: auto !important;}.is-layout-constrained > .alignleft{float: left;margin-inline-start: 0;margin-inline-end: 2em;}.is-layout-constrained > .alignright{float: right;margin-inline-start: 2em;margin-inline-end: 0;}.is-layout-constrained > .aligncenter{margin-left: auto !important;margin-right: auto !important;}.is-layout-constrained > :where(:not(.alignleft):not(.alignright):not(.alignfull)){max-width: var(--wp--style--global--content-size);margin-left: auto !important;margin-right: auto !important;}.is-layout-constrained > .alignwide{max-width: var(--wp--style--global--wide-size);}body .is-layout-flex{display: flex;}.is-layout-flex{flex-wrap: wrap;align-items: center;}.is-layout-flex > :is(*, div){margin: 0;}body .is-layout-grid{display: grid;}.is-layout-grid > :is(*, div){margin: 0;}body{padding-top: 0px;padding-right: 0px;padding-bottom: 0px;padding-left: 0px;}:root :where(.wp-element-button, .wp-block-button__link){background-color: #32373c;border-width: 0;color: #fff;font-family: inherit;font-size: inherit;font-style: inherit;font-weight: inherit;letter-spacing: inherit;line-height: inherit;padding-top: calc(0.667em + 2px);padding-right: calc(1.333em + 2px);padding-bottom: calc(0.667em + 2px);padding-left: calc(1.333em + 2px);text-decoration: none;text-transform: inherit;}.has-black-color{color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-color{color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-color{color: var(--wp--preset--color--white) !important;}.has-pale-pink-color{color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-color{color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-color{color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-color{color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-color{color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-color{color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-color{color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-color{color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-color{color: var(--wp--preset--color--vivid-purple) !important;}.has-black-background-color{background-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-background-color{background-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-background-color{background-color: var(--wp--preset--color--white) !important;}.has-pale-pink-background-color{background-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-background-color{background-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-background-color{background-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-background-color{background-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-background-color{background-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-background-color{background-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-background-color{background-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-background-color{background-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-background-color{background-color: var(--wp--preset--color--vivid-purple) !important;}.has-black-border-color{border-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-border-color{border-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-border-color{border-color: var(--wp--preset--color--white) !important;}.has-pale-pink-border-color{border-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-border-color{border-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-border-color{border-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-border-color{border-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-border-color{border-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-border-color{border-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-border-color{border-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-border-color{border-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-border-color{border-color: var(--wp--preset--color--vivid-purple) !important;}.has-vivid-cyan-blue-to-vivid-purple-gradient-background{background: var(--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple) !important;}.has-light-green-cyan-to-vivid-green-cyan-gradient-background{background: var(--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan) !important;}.has-luminous-vivid-amber-to-luminous-vivid-orange-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange) !important;}.has-luminous-vivid-orange-to-vivid-red-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-orange-to-vivid-red) !important;}.has-very-light-gray-to-cyan-bluish-gray-gradient-background{background: var(--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray) !important;}.has-cool-to-warm-spectrum-gradient-background{background: var(--wp--preset--gradient--cool-to-warm-spectrum) !important;}.has-blush-light-purple-gradient-background{background: var(--wp--preset--gradient--blush-light-purple) !important;}.has-blush-bordeaux-gradient-background{background: var(--wp--preset--gradient--blush-bordeaux) !important;}.has-luminous-dusk-gradient-background{background: var(--wp--preset--gradient--luminous-dusk) !important;}.has-pale-ocean-gradient-background{background: var(--wp--preset--gradient--pale-ocean) !important;}.has-electric-grass-gradient-background{background: var(--wp--preset--gradient--electric-grass) !important;}.has-midnight-gradient-background{background: var(--wp--preset--gradient--midnight) !important;}.has-small-font-size{font-size: var(--wp--preset--font-size--small) !important;}.has-medium-font-size{font-size: var(--wp--preset--font-size--medium) !important;}.has-large-font-size{font-size: var(--wp--preset--font-size--large) !important;}.has-x-large-font-size{font-size: var(--wp--preset--font-size--x-large) !important;}
+/*# sourceURL=global-styles-inline-css */
+</style>
+
+<link rel='stylesheet' id='contact-form-7-css' href='https://shadyside-living.com/wp-content/plugins/contact-form-7/includes/css/styles.css' type='text/css' media='all' />
+<link rel='stylesheet' id='dwd-map-extended-styles-css' href='https://shadyside-living.com/wp-content/plugins/dwd-map-extended/styles/style.min.css' type='text/css' media='all' />
+<link rel='stylesheet' id='popup-maker-site-css' href='//shadyside-living.com/wp-content/uploads/pum/pum-site-styles.css?generated=1740399168' type='text/css' media='all' />
+<link rel='stylesheet' id='divi-style-parent-css' href='https://shadyside-living.com/wp-content/themes/Divi/style-static.min.css' type='text/css' media='all' />
+<link rel='stylesheet' id='divi-style-pum-css' href='https://shadyside-living.com/wp-content/themes/Divi-child/style.css' type='text/css' media='all' />
+<link rel='stylesheet' id='DiviBars-main-css' href='https://shadyside-living.com/wp-content/plugins/divi-bars/assets/css/main.css' type='text/css' media='all' />
+<link rel="https://api.w.org/" href="https://shadyside-living.com/wp-json/" /><link rel="alternate" title="JSON" type="application/json" href="https://shadyside-living.com/wp-json/wp/v2/pages/110" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://shadyside-living.com/xmlrpc.php?rsd" />
+<meta name="generator" content="WordPress 6.9.4" />
+<link rel='shortlink' href='https://shadyside-living.com/?p=110' />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" /><link rel="shortcut icon" href="https://shadyside-living.com/wp-content/uploads/2018/01/favicon.png" />		<script type="text/javascript">
+		var ajax_url = 'https://shadyside-living.com/wp-admin/admin-ajax.php';
+		</script>
+		<style type="text/css" id="custom-background-css">
+body.custom-background { background-color: #562307; }
+</style>
+	<script src="/wp-content/themes/Divi-child/js/jquery.lettering.js"></script>
+<script>
+  	jQuery(document).ready(function() {
+			jQuery(".rr-index-intro h1").lettering("words");
+			jQuery(".rr-pricing-toggle h5").lettering("words");
+		});
+  </script>
+<script type="text/javascript">
+jQuery(document).ready(function(){
+jQuery(".rr-custom-header .et_pb_button_two").attr('target', '_new');
+});
+</script>
+
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-10829018-5"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-10829018-5');
+</script>
+
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-5M267FS');</script>
+<!-- End Google Tag Manager -->
+<meta name="google-site-verification" content="QBVzLM_X2PZVsRGjF1OK9RXwVt1KIhS9masy3Zi_XaU"><style id="et-divi-customizer-global-cached-inline-styles">body,.et_pb_column_1_2 .et_quote_content blockquote cite,.et_pb_column_1_2 .et_link_content a.et_link_main_url,.et_pb_column_1_3 .et_quote_content blockquote cite,.et_pb_column_3_8 .et_quote_content blockquote cite,.et_pb_column_1_4 .et_quote_content blockquote cite,.et_pb_blog_grid .et_quote_content blockquote cite,.et_pb_column_1_3 .et_link_content a.et_link_main_url,.et_pb_column_3_8 .et_link_content a.et_link_main_url,.et_pb_column_1_4 .et_link_content a.et_link_main_url,.et_pb_blog_grid .et_link_content a.et_link_main_url,body .et_pb_bg_layout_light .et_pb_post p,body .et_pb_bg_layout_dark .et_pb_post p{font-size:16px}.et_pb_slide_content,.et_pb_best_value{font-size:18px}#et_search_icon:hover,.mobile_menu_bar:before,.mobile_menu_bar:after,.et_toggle_slide_menu:after,.et-social-icon a:hover,.et_pb_sum,.et_pb_pricing li a,.et_pb_pricing_table_button,.et_overlay:before,.entry-summary p.price ins,.et_pb_member_social_links a:hover,.et_pb_widget li a:hover,.et_pb_filterable_portfolio .et_pb_portfolio_filters li a.active,.et_pb_filterable_portfolio .et_pb_portofolio_pagination ul li a.active,.et_pb_gallery .et_pb_gallery_pagination ul li a.active,.wp-pagenavi span.current,.wp-pagenavi a:hover,.nav-single a,.tagged_as a,.posted_in a{color:#562307}.et_pb_contact_submit,.et_password_protected_form .et_submit_button,.et_pb_bg_layout_light .et_pb_newsletter_button,.comment-reply-link,.form-submit .et_pb_button,.et_pb_bg_layout_light .et_pb_promo_button,.et_pb_bg_layout_light .et_pb_more_button,.et_pb_contact p input[type="checkbox"]:checked+label i:before,.et_pb_bg_layout_light.et_pb_module.et_pb_button{color:#562307}.footer-widget h4{color:#562307}.et-search-form,.nav li ul,.et_mobile_menu,.footer-widget li:before,.et_pb_pricing li:before,blockquote{border-color:#562307}.et_pb_counter_amount,.et_pb_featured_table .et_pb_pricing_heading,.et_quote_content,.et_link_content,.et_audio_content,.et_pb_post_slider.et_pb_bg_layout_dark,.et_slide_in_menu_container,.et_pb_contact p input[type="radio"]:checked+label i:before{background-color:#562307}a{color:#562307}#main-header,#main-header .nav li ul,.et-search-form,#main-header .et_mobile_menu{background-color:#562307}#main-header .nav li ul{background-color:#ffffff}.et_secondary_nav_enabled #page-container #top-header{background-color:#231f20!important}#et-secondary-nav li ul{background-color:#231f20}#et-secondary-nav li ul{background-color:#562307}.et_header_style_centered .mobile_nav .select_page,.et_header_style_split .mobile_nav .select_page,.et_nav_text_color_light #top-menu>li>a,.et_nav_text_color_dark #top-menu>li>a,#top-menu a,.et_mobile_menu li a,.et_nav_text_color_light .et_mobile_menu li a,.et_nav_text_color_dark .et_mobile_menu li a,#et_search_icon:before,.et_search_form_container input,span.et_close_search_field:after,#et-top-navigation .et-cart-info{color:#ffffff}.et_search_form_container input::-moz-placeholder{color:#ffffff}.et_search_form_container input::-webkit-input-placeholder{color:#ffffff}.et_search_form_container input:-ms-input-placeholder{color:#ffffff}#main-header .nav li ul a{color:#000000}#top-header,#top-header a,#et-secondary-nav li li a,#top-header .et-social-icon a:before{font-size:14px}#top-menu li a,.et_search_form_container input{font-weight:normal;font-style:normal;text-transform:uppercase;text-decoration:none}.et_search_form_container input::-moz-placeholder{font-weight:normal;font-style:normal;text-transform:uppercase;text-decoration:none}.et_search_form_container input::-webkit-input-placeholder{font-weight:normal;font-style:normal;text-transform:uppercase;text-decoration:none}.et_search_form_container input:-ms-input-placeholder{font-weight:normal;font-style:normal;text-transform:uppercase;text-decoration:none}#top-menu li.current-menu-ancestor>a,#top-menu li.current-menu-item>a,#top-menu li.current_page_item>a{color:#f7f7f5}#main-footer .footer-widget h4,#main-footer .widget_block h1,#main-footer .widget_block h2,#main-footer .widget_block h3,#main-footer .widget_block h4,#main-footer .widget_block h5,#main-footer .widget_block h6{color:#562307}.footer-widget li:before{border-color:#562307}.footer-widget .et_pb_widget div,.footer-widget .et_pb_widget ul,.footer-widget .et_pb_widget ol,.footer-widget .et_pb_widget label{line-height:1.7em}#footer-widgets .footer-widget li:before{top:10.6px}#et-footer-nav .bottom-nav li.current-menu-item a{color:#562307}body .et_pb_button{font-size:16px;background-color:#562307;border-color:#562307;border-radius:0px;font-weight:bold;font-style:normal;text-transform:uppercase;text-decoration:none;}body.et_pb_button_helper_class .et_pb_button,body.et_pb_button_helper_class .et_pb_module.et_pb_button{color:rgba(255,255,255,0.99)}body .et_pb_button:after{content:'E';font-size:16px}body .et_pb_bg_layout_light.et_pb_button:hover,body .et_pb_bg_layout_light .et_pb_button:hover,body .et_pb_button:hover{color:rgba(255,255,255,0.99)!important;background-color:#3a1703;border-color:#3a1703!important;border-radius:0px}@media only screen and (min-width:981px){.et_header_style_centered #logo{max-height:54%}.et_pb_svg_logo.et_header_style_centered #logo{height:54%}.et_header_style_centered.et_hide_primary_logo #main-header:not(.et-fixed-header) .logo_container,.et_header_style_centered.et_hide_fixed_logo #main-header.et-fixed-header .logo_container{height:11.88px}.et_fixed_nav #page-container .et-fixed-header#top-header{background-color:#231f20!important}.et_fixed_nav #page-container .et-fixed-header#top-header #et-secondary-nav li ul{background-color:#231f20}.et-fixed-header#main-header,.et-fixed-header#main-header .nav li ul,.et-fixed-header .et-search-form{background-color:#3a1703}.et-fixed-header #top-menu a,.et-fixed-header #et_search_icon:before,.et-fixed-header #et_top_search .et-search-form input,.et-fixed-header .et_search_form_container input,.et-fixed-header .et_close_search_field:after,.et-fixed-header #et-top-navigation .et-cart-info{color:#ffffff!important}.et-fixed-header .et_search_form_container input::-moz-placeholder{color:#ffffff!important}.et-fixed-header .et_search_form_container input::-webkit-input-placeholder{color:#ffffff!important}.et-fixed-header .et_search_form_container input:-ms-input-placeholder{color:#ffffff!important}.et-fixed-header #top-menu li.current-menu-ancestor>a,.et-fixed-header #top-menu li.current-menu-item>a,.et-fixed-header #top-menu li.current_page_item>a{color:#f7f7f5!important}}@media only screen and (min-width:1350px){.et_pb_row{padding:27px 0}.et_pb_section{padding:54px 0}.single.et_pb_pagebuilder_layout.et_full_width_page .et_post_meta_wrapper{padding-top:81px}.et_pb_fullwidth_section{padding:0}}@media only screen and (max-width:980px){.et_header_style_centered .mobile_nav .select_page,.et_header_style_split .mobile_nav .select_page,.et_mobile_menu li a,.mobile_menu_bar:before,.et_nav_text_color_light #top-menu>li>a,.et_nav_text_color_dark #top-menu>li>a,#top-menu a,.et_mobile_menu li a,#et_search_icon:before,#et_top_search .et-search-form input,.et_search_form_container input,#et-top-navigation .et-cart-info{color:rgba(255,255,255,0.99)}.et_close_search_field:after{color:rgba(255,255,255,0.99)!important}.et_search_form_container input::-moz-placeholder{color:rgba(255,255,255,0.99)}.et_search_form_container input::-webkit-input-placeholder{color:rgba(255,255,255,0.99)}.et_search_form_container input:-ms-input-placeholder{color:rgba(255,255,255,0.99)}}	h1,h2,h3,h4,h5,h6{font-family:'Crimson Text',Georgia,"Times New Roman",serif}body,input,textarea,select{font-family:'Roboto',Helvetica,Arial,Lucida,sans-serif}</style></head>
+<body data-rsssl=1 class="wp-singular page-template-default page page-id-110 custom-background wp-theme-Divi wp-child-theme-Divi-child et-tb-has-template et-tb-has-footer et_button_icon_visible et_button_custom_icon et_pb_button_helper_class et_fixed_nav et_show_nav et_hide_primary_logo et_hide_fixed_logo et_hide_mobile_logo et_secondary_nav_enabled et_primary_nav_dropdown_animation_flip et_secondary_nav_dropdown_animation_fade et_header_style_centered et_pb_svg_logo et_cover_background et_pb_gutter osx et_pb_gutters3 et_pb_pagebuilder_layout et_no_sidebar et_divi_theme et-db">
+	<script type="text/javascript">var divibars_settings = {};</script>					<script type="text/javascript">
+					var ajaxurl = "https://shadyside-living.com/wp-admin/admin-ajax.php"
+					, diviAjaxUrl = 'https://shadyside-living.com/wp-content/plugins/divi-bars/includes/ajax-handler-wp.php';
+					</script>
+					<div id="sidebar-divibar" class="hiddenMainDiviBarsContainer"></div><div id="page-container">
+<div id="et-boc" class="et-boc">
+			
+				<div id="top-header">
+		<div class="container clearfix">
+
+		
+			<div id="et-info">
+							<span id="et-info-phone"> <a href="tel:14126839101">412-683-9101</a></span>
+			
+			
+						</div>
+
+		
+			<div id="et-secondary-menu">
+						</div>
+
+		</div>
+	</div>
+
+
+	<header id="main-header" data-height-onload="66">
+		<div class="container clearfix et_menu_container">
+					<div class="logo_container">
+				<span class="logo_helper"></span>
+				<a href="https://shadyside-living.com/">
+				<img src="https://shadyside-living.com/wp-content/uploads/2017/12/logo-shadyside.svg" width="93" height="43" alt="Shadyside Commons" id="logo" data-height-percentage="54" />
+				</a>
+			</div>
+					<div id="et-top-navigation" data-height="66" data-fixed-height="40">
+									<nav id="top-menu-nav">
+					<ul id="top-menu" class="nav"><li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-home menu-item-118"><a href="https://shadyside-living.com/">Home</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-119"><a href="https://shadyside-living.com/amenities/">Amenities</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page current-menu-item page_item page-item-110 current_page_item menu-item-has-children menu-item-120"><a href="https://shadyside-living.com/availability/" aria-current="page">Availability</a>
+<ul class="sub-menu">
+	<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-215138"><a href="/wp-content/uploads/2024/03/Application-Requirements.March-2024.pdf">Lease Requirements</a></li>
+</ul>
+</li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-121"><a href="https://shadyside-living.com/gallery/">Gallery</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-214645"><a href="https://shadyside-living.com/virtual-tours/">Virtual Tours</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-122"><a href="https://shadyside-living.com/neighborhood/">Neighborhood</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-215047"><a href="https://shadyside-living.com/faq/">FAQ</a></li>
+<li class="menu-item menu-item-type-post_type menu-item-object-page menu-item-123"><a href="https://shadyside-living.com/contact/">Contact</a></li>
+</ul>					</nav>
+				
+				
+				
+				
+				<div id="et_mobile_nav_menu">
+				<div class="mobile_nav closed">
+					<span class="select_page">Select Page</span>
+					<span class="mobile_menu_bar mobile_menu_bar_toggle"></span>
+				</div>
+			</div>			</div> <!-- #et-top-navigation -->
+		</div> <!-- .container -->
+			</header> <!-- #main-header -->
+<div id="et-main-area">
+	
+<div id="main-content">
+
+
+			
+				<article id="post-110" class="post-110 page type-page status-publish hentry">
+
+				
+					<div class="entry-content">
+					<div class="et-l et-l--post">
+			<div class="et_builder_inner_content et_pb_gutters3">
+		<div class="et_pb_section et_pb_section_1 et_pb_fullwidth_section et_section_regular" >
+				
+				
+				
+				
+				
+				
+				<section class="et_pb_module et_pb_fullwidth_header et_pb_fullwidth_header_0 rr-custom-header et_pb_text_align_center et_pb_bg_layout_dark">
+				
+				
+				
+				
+				<div class="et_pb_fullwidth_header_container center">
+					<div class="header-content-container center">
+					<div class="header-content">
+						<img decoding="async" src="https://shadyside-living.com/wp-content/uploads/2017/12/logo-shadyside.svg" title="" alt="Shadyside Commons Pittsburgh PA Apartments" class="header-logo wp-image-4401" />
+						
+						
+						<div class="et_pb_header_content_wrapper"></div>
+						<a class="et_pb_button et_pb_more_button et_pb_button_one" href="/availability/" data-icon="&#x69;">Availability</a><a class="et_pb_button et_pb_more_button et_pb_button_two" href="https://www.rentcafe.com/residentservices/shadyside-commons/userlogin.aspx" data-icon="&#xe001;">Resident Login</a>
+					</div>
+				</div>
+					
+				</div>
+				<div class="et_pb_fullwidth_header_overlay"></div>
+				<div class="et_pb_fullwidth_header_scroll"></div>
+			</section>
+				
+				
+			</div><div class="et_pb_section et_pb_section_2 et_pb_with_background et_section_regular" >
+				
+				
+				
+				
+				
+				
+				<div class="et_pb_with_border et_pb_row et_pb_row_1 et_pb_gutters1">
+				<div class="et_pb_column et_pb_column_4_4 et_pb_column_1  et_pb_css_mix_blend_mode_passthrough et-last-child">
+				
+				
+				
+				
+				<div class="et_pb_module et_pb_text et_pb_text_0  et_pb_text_align_center et_pb_bg_layout_dark">
+				
+				
+				
+				
+				<div class="et_pb_text_inner"><h2>$500 off the 1st Month&#8217;s Rent</h2>
+<p>&nbsp;</p></div>
+			</div><div class="et_pb_module et_pb_text et_pb_text_1  et_pb_text_align_center et_pb_bg_layout_dark">
+				
+				
+				
+				
+				<div class="et_pb_text_inner" data-et-multi-view="{&quot;schema&quot;:{&quot;content&quot;:{&quot;desktop&quot;:&quot;&lt;p&gt;PLUS LEAVE DEPOSIT WITHIN 48 HOURS OF TOUR FOR WAIVED ADMIN FEE!!&lt;\/p&gt;&quot;,&quot;tablet&quot;:&quot;&lt;p&gt;Certain terms and conditions apply.&lt;\/p&gt;&quot;}},&quot;slug&quot;:&quot;et_pb_text&quot;}" data-et-multi-view-load-tablet-hidden="true"><p>PLUS LEAVE DEPOSIT WITHIN 48 HOURS OF TOUR FOR WAIVED ADMIN FEE!!</p></div>
+			</div>
+			</div>
+				
+				
+				
+				
+			</div>
+				
+				
+			</div><div class="et_pb_section et_pb_section_3 et_section_regular" >
+				
+				
+				
+				
+				
+				
+				<div class="et_pb_row et_pb_row_2">
+				<div class="et_pb_column et_pb_column_4_4 et_pb_column_2  et_pb_css_mix_blend_mode_passthrough et-last-child">
+				
+				
+				
+				
+				<div class="et_pb_module et_pb_cta_0 et_pb_promo  et_pb_text_align_center et_pb_bg_layout_light et_pb_no_bg">
+				
+				
+				
+				
+				<div class="et_pb_promo_description"><h1 class="et_pb_module_header">Upscale, Spacious Floor Plans  </h1><div><hr class="fancy-line" /></div></div>
+				
+			</div><div class="et_pb_module et_pb_text et_pb_text_2  et_pb_text_align_left et_pb_bg_layout_light">
+				
+				
+				
+				
+				<div class="et_pb_text_inner"><p style="text-align: center;">Our Shadyside Pittsburgh apartments at Shadyside Commons offer you luxury one- and two-bedroom floor plans in Pittsburgh’s East End. Our designs and construction methods are environmentally conscious. Our apartments provide ample closet space with adjustable shelving and custom storage, as well as an individual washer and dryer in every unit and <a href="https://shadyside-living.com/amenities/">amenities that deliver convenience and comfort</a>.</p>
+<p style="text-align: center;">Take a look at each available floor plan or view our <a href="https://shadyside-living.com/virtual-tours/">virtual apartment tour videos</a>. Read through our <a href="https://shadyside-living.com/faq/">Frequently Asked Questions</a> to learn more about living at Shadyside Commons and then contact a leasing agent to learn how to lease your new home today.</p>
+<p style="text-align: center;">If you don’t see an apartment for your time frame, please contact us for more information as we are accepting wait list applications.</p></div>
+			</div><div class="et_pb_button_module_wrapper et_pb_button_0_wrapper et_pb_button_alignment_center et_pb_module ">
+				<a class="et_pb_button et_pb_button_0 et_pb_bg_layout_light" href="/contact/">Schedule a Tour</a>
+			</div><div class="et_pb_module et_pb_text et_pb_text_3  et_pb_text_align_left et_pb_bg_layout_light">
+				
+				
+				
+				
+				<div class="et_pb_text_inner"><p><span><div class="et_pb_column et_pb_column_4_4  et_pb_column_8 et_pb_css_mix_blend_mode_passthrough et-last-child"><div class="et_pb_module et_pb_toggle rr-pricing-toggle et_pb_toggle_0 et_pb_toggle_item et_pb_text_align_left et_pb_toggle_close"><h5 class="et_pb_toggle_title" aria-label="1 Bedroom 564 - 908 SQ. FT. | FROM $1989.00"><span class="word1" aria-hidden="true">1</span> <span class="word2" aria-hidden="true">Bedroom</span> <span class="word3" aria-hidden="true">564 - 908</span> <span class="word4" aria-hidden="true">SQ.</span> <span class="word5" aria-hidden="true">FT.</span> <span class="word6" aria-hidden="true">|</span> <span class="word7" aria-hidden="true">FROM</span> <span class="word8" aria-hidden="true">$1989.00</span></h5><div class="et_pb_toggle_content clearfix" style="display: none;"><div class="rr-unit-block">
+						<div class="rr-unit-header">
+						<div class="rr-price-column">
+									Type
+								</div>
+						<div class="rr-price-column">
+									Floor Plan
+								</div>
+						<div class="rr-price-column">
+									Rent
+								</div>
+						<div class="rr-price-column">
+									Available
+								</div>
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1.5 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172543" target="_blank">482-0127</a>
+								</div>
+						<div class="rr-price-column">
+									$2211.00
+								</div>
+						<div class="rr-price-column">
+									Available Now
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172543/1360619" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1.5 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172523" target="_blank">482-0102</a>
+								</div>
+						<div class="rr-price-column">
+									$2303.00
+								</div>
+						<div class="rr-price-column">
+									Available Now
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172523/1360619" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1.5 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172535" target="_blank">482-0119</a>
+								</div>
+						<div class="rr-price-column">
+									$2271.00
+								</div>
+						<div class="rr-price-column">
+									05/30/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172535/1360619" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1.5 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172652" target="_blank">482-0334</a>
+								</div>
+						<div class="rr-price-column">
+									$2553.00
+								</div>
+						<div class="rr-price-column">
+									06/07/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172652/1360619" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1.5 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172564" target="_blank">482-0148</a>
+								</div>
+						<div class="rr-price-column">
+									$2453.00
+								</div>
+						<div class="rr-price-column">
+									06/14/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172564/1360619" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1.5 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172554" target="_blank">482-0138</a>
+								</div>
+						<div class="rr-price-column">
+									$2553.00
+								</div>
+						<div class="rr-price-column">
+									06/19/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172554/1360619" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1.5 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172542" target="_blank">482-0126</a>
+								</div>
+						<div class="rr-price-column">
+									$2418.00
+								</div>
+						<div class="rr-price-column">
+									06/23/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172542/1360619" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1.5 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172619" target="_blank">482-0301</a>
+								</div>
+						<div class="rr-price-column">
+									$2483.00
+								</div>
+						<div class="rr-price-column">
+									07/06/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172619/1360619" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1.5 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172556" target="_blank">482-0140</a>
+								</div>
+						<div class="rr-price-column">
+									$2523.00
+								</div>
+						<div class="rr-price-column">
+									07/15/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172556/1360619" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1.5 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172631" target="_blank">482-0313</a>
+								</div>
+						<div class="rr-price-column">
+									$2543.00
+								</div>
+						<div class="rr-price-column">
+									08/09/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172631/1360619" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1 Bath - Platform
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172605" target="_blank">482-0238</a>
+								</div>
+						<div class="rr-price-column">
+									$2169.00
+								</div>
+						<div class="rr-price-column">
+									Available Now
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172605/1360618" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1 Bath - Platform
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172590" target="_blank">482-0223</a>
+								</div>
+						<div class="rr-price-column">
+									$1989.00
+								</div>
+						<div class="rr-price-column">
+									Available Now
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172590/1360618" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1 Bath - Platform
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172609" target="_blank">482-0242</a>
+								</div>
+						<div class="rr-price-column">
+									$2308.00
+								</div>
+						<div class="rr-price-column">
+									Available Now
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172609/1360618" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1 Bath - Platform
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172593" target="_blank">482-0226</a>
+								</div>
+						<div class="rr-price-column">
+									$2153.00
+								</div>
+						<div class="rr-price-column">
+									06/03/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172593/1360618" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1 Bath - Platform
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172604" target="_blank">482-0237</a>
+								</div>
+						<div class="rr-price-column">
+									$2288.00
+								</div>
+						<div class="rr-price-column">
+									07/22/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172604/1360618" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									1 Bed 1 Bath - Platform
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172589" target="_blank">482-0222</a>
+								</div>
+						<div class="rr-price-column">
+									$2150.00
+								</div>
+						<div class="rr-price-column">
+									08/30/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172589/1360618" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div></div></div></div><div class="et_pb_module et_pb_toggle rr-pricing-toggle et_pb_toggle_0 et_pb_toggle_item et_pb_text_align_left et_pb_toggle_close"><h5 class="et_pb_toggle_title" aria-label="2 Bedrooms 971 - 1144 SQ. FT. | FROM $3153.00"><span class="word1" aria-hidden="true">2</span> <span class="word2" aria-hidden="true">Bedrooms</span> <span class="word3" aria-hidden="true">971 - 1144</span> <span class="word4" aria-hidden="true">SQ.</span> <span class="word5" aria-hidden="true">FT.</span> <span class="word6" aria-hidden="true">|</span> <span class="word7" aria-hidden="true">FROM</span> <span class="word8" aria-hidden="true">$3153.00</span></h5><div class="et_pb_toggle_content clearfix" style="display: none;"><div class="rr-unit-block">
+						<div class="rr-unit-header">
+						<div class="rr-price-column">
+									Type
+								</div>
+						<div class="rr-price-column">
+									Floor Plan
+								</div>
+						<div class="rr-price-column">
+									Rent
+								</div>
+						<div class="rr-price-column">
+									Available
+								</div>
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									2 Bed 2 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172560" target="_blank">482-0144</a>
+								</div>
+						<div class="rr-price-column">
+									$3363.00
+								</div>
+						<div class="rr-price-column">
+									07/05/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172560/1360621" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div><div class="rr-unit">
+						<div class="rr-price-column">
+									2 Bed 2 Bath - Loft
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.com/wp-content/themes/Divi-child/units-api.php?property=319097&ApartmentId=4172659" target="_blank">482-0341</a>
+								</div>
+						<div class="rr-price-column">
+									$3153.00
+								</div>
+						<div class="rr-price-column">
+									07/14/2026
+								</div>
+						<div class="rr-price-column">
+									<a href="https://shadyside-living.securecafeapplicant.com/onlineleasing/content3/access/shadyside-commons/rentaloptions/4172659/1360621" target="_blank">APPLY</a>
+								</div>
+						<p></p>
+				
+						</div></div></div></div><div class="et_pb_text et_pb_module et_pb_bg_layout_light et_pb_text_align_center  et_pb_text_3">
+			<div class="et_pb_text_inner">
+				<p>Pricing and availability subject to change at any time!</p>
+			</div>
+		</div> <!-- .et_pb_text --></div></span></p></div>
+			</div><div class="et_pb_module et_pb_text et_pb_text_4  et_pb_text_align_center et_pb_bg_layout_light">
+				
+				
+				
+				
+				<div class="et_pb_text_inner"><p><b><i>Advertised pricing and specials apply to new leases only.</i></b></p></div>
+			</div><div class="et_pb_module et_pb_text et_pb_text_5  et_pb_text_align_left et_pb_bg_layout_light">
+				
+				
+				
+				
+				<div class="et_pb_text_inner"><hr class="fancy-line" />
+<h2>Benefits for Residents at Shadyside Commons</h2>
+<p>At Shadyside Commons, all of our rentals are smoke-free and include convenient online resident services, package receiving services, 24-hour maintenance, a state-of-the-art fitness center.<br /> <a href="https://shadyside-living.com/gallery/">View our photo gallery</a>.</p>
+<h3>Join Our Wait List</h3>
+<p>If you don’t see an apartment when you need it, <a href="https://shadyside-living.com/future-availability-contact/">join our apartment waitlist</a> and our professional leasing staff will contact you when a new home is available.</p></div>
+			</div>
+			</div>
+				
+				
+				
+				
+			</div>
+				
+				
+			</div>		</div>
+	</div>
+						</div>
+
+				
+				</article>
+
+			
+
+</div>
+
+	<footer class="et-l et-l--footer">
+			<div class="et_builder_inner_content et_pb_gutters3"><div class="et_pb_section et_pb_section_0_tb_footer et_pb_with_background et_section_regular" >
+				
+				
+				
+				
+				
+				
+				<div class="et_pb_row et_pb_row_0_tb_footer et_pb_gutters2">
+				<div class="et_pb_column et_pb_column_4_4 et_pb_column_0_tb_footer  et_pb_css_mix_blend_mode_passthrough et-last-child">
+				
+				
+				
+				
+				<div class="et_pb_module et_pb_code et_pb_code_0_tb_footer  et_pb_text_align_center">
+				
+				
+				
+				
+				<div class="et_pb_code_inner"><button class="et_pb_button" id="text-us" onclick="respage_text_us_modal_open()">Text Us</button></div>
+			</div><div class="et_pb_module et_pb_text et_pb_text_0_tb_footer  et_pb_text_align_center et_pb_bg_layout_dark">
+				
+				
+				
+				
+				<div class="et_pb_text_inner">Shadyside Commons</div>
+			</div><div class="et_pb_module et_pb_text et_pb_text_1_tb_footer  et_pb_text_align_center et_pb_bg_layout_dark">
+				
+				
+				
+				
+				<div class="et_pb_text_inner"><p>
+Shadyside Commons offers newly renovated 1-bedroom and 2-bedroom luxury apartment homes in Shadyside Pittsburgh, PA.</p></div>
+			</div><div class="et_pb_module et_pb_text et_pb_text_2_tb_footer rr-reinhold-footer-address  et_pb_text_align_center et_pb_bg_layout_dark">
+				
+				
+				
+				
+				<div class="et_pb_text_inner"><ul>
+<li>401 Amberson Avenue</li>
+<li>Pittsburgh, PA 15232</li>
+<li><a style="color: white;" href="tel:+1-412-683-9101" data-wplink-edit="true">412-683-9101</a></li>
+</ul></div>
+			</div><div class="et_pb_module et_pb_text et_pb_text_3_tb_footer  et_pb_text_align_center et_pb_bg_layout_dark">
+				
+				
+				
+				
+				<div class="et_pb_text_inner"><a href="/accessibility-statement/">Accessibility Statement</a></div>
+			</div><ul class="et_pb_module et_pb_social_media_follow et_pb_social_media_follow_0_tb_footer clearfix  et_pb_text_align_center et_pb_bg_layout_light">
+				
+				
+				
+				
+				<li
+            class='et_pb_social_media_follow_network_0_tb_footer et_pb_social_icon et_pb_social_network_link  et-social-twitter'><a
+              href='https://twitter.com/reinholdres'
+              class='icon et_pb_with_border'
+              title='Follow on X'
+               target="_blank"><span
+                class='et_pb_social_media_follow_network_name'
+                aria-hidden='true'
+                >Follow</span></a></li><li
+            class='et_pb_social_media_follow_network_1_tb_footer et_pb_social_icon et_pb_social_network_link  et-social-facebook'><a
+              href='https://www.facebook.com/ReinholdResidential/'
+              class='icon et_pb_with_border'
+              title='Follow on Facebook'
+               target="_blank"><span
+                class='et_pb_social_media_follow_network_name'
+                aria-hidden='true'
+                >Follow</span></a></li><li
+            class='et_pb_social_media_follow_network_2_tb_footer et_pb_social_icon et_pb_social_network_link  et-social-instagram'><a
+              href='https://www.instagram.com/reinholdres/'
+              class='icon et_pb_with_border'
+              title='Follow on Instagram'
+               target="_blank"><span
+                class='et_pb_social_media_follow_network_name'
+                aria-hidden='true'
+                >Follow</span></a></li><li
+            class='et_pb_social_media_follow_network_3_tb_footer et_pb_social_icon et_pb_social_network_link  et-social-pinterest'><a
+              href='https://www.pinterest.com/reinres/'
+              class='icon et_pb_with_border'
+              title='Follow on Pinterest'
+               target="_blank"><span
+                class='et_pb_social_media_follow_network_name'
+                aria-hidden='true'
+                >Follow</span></a></li><li
+            class='et_pb_social_media_follow_network_4_tb_footer et_pb_social_icon et_pb_social_network_link  et-social-linkedin'><a
+              href='https://www.linkedin.com/company/reinhold-residential/'
+              class='icon et_pb_with_border'
+              title='Follow on LinkedIn'
+               target="_blank"><span
+                class='et_pb_social_media_follow_network_name'
+                aria-hidden='true'
+                >Follow</span></a></li><li
+            class='et_pb_social_media_follow_network_5_tb_footer et_pb_social_icon et_pb_social_network_link  et-social-youtube'><a
+              href='https://www.youtube.com/user/reinholdresidential'
+              class='icon et_pb_with_border'
+              title='Follow on Youtube'
+               target="_blank"><span
+                class='et_pb_social_media_follow_network_name'
+                aria-hidden='true'
+                >Follow</span></a></li>
+			</ul><div class="et_pb_module et_pb_image et_pb_image_0_tb_footer">
+				
+				
+				
+				
+				<a href="https://reinholdresidential.com/" target="_blank"><span class="et_pb_image_wrap "><img decoding="async" src="https://chocolateworks-living.com/wp-content/uploads/2017/12/reinhold-logo.svg" alt="Reinhold Residential Logo" title="reinhold-logo" /></span></a>
+			</div>
+			</div>
+				
+				
+				
+				
+			</div>
+				
+				
+			</div>		</div>
+	</footer>
+		</div>
+
+			
+		</div>
+		</div>
+
+			<script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/Divi-child/*","/wp-content/themes/Divi/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script>
+<div 
+	id="pum-4932" 
+	role="dialog" 
+	aria-modal="false"
+	class="pum pum-overlay pum-theme-4922 pum-theme-lightbox popmake-overlay click_open" 
+	data-popmake="{&quot;id&quot;:4932,&quot;slug&quot;:&quot;schedule-a-tour&quot;,&quot;theme_id&quot;:4922,&quot;cookies&quot;:[],&quot;triggers&quot;:[{&quot;type&quot;:&quot;click_open&quot;,&quot;settings&quot;:{&quot;extra_selectors&quot;:&quot;&quot;,&quot;cookie_name&quot;:null}}],&quot;mobile_disabled&quot;:null,&quot;tablet_disabled&quot;:null,&quot;meta&quot;:{&quot;display&quot;:{&quot;stackable&quot;:false,&quot;overlay_disabled&quot;:false,&quot;scrollable_content&quot;:false,&quot;disable_reposition&quot;:false,&quot;size&quot;:&quot;medium&quot;,&quot;responsive_min_width&quot;:&quot;0%&quot;,&quot;responsive_min_width_unit&quot;:false,&quot;responsive_max_width&quot;:&quot;100%&quot;,&quot;responsive_max_width_unit&quot;:false,&quot;custom_width&quot;:&quot;640px&quot;,&quot;custom_width_unit&quot;:false,&quot;custom_height&quot;:&quot;380px&quot;,&quot;custom_height_unit&quot;:false,&quot;custom_height_auto&quot;:false,&quot;location&quot;:&quot;center top&quot;,&quot;position_from_trigger&quot;:false,&quot;position_top&quot;:&quot;100&quot;,&quot;position_left&quot;:&quot;0&quot;,&quot;position_bottom&quot;:&quot;0&quot;,&quot;position_right&quot;:&quot;0&quot;,&quot;position_fixed&quot;:false,&quot;animation_type&quot;:&quot;fade&quot;,&quot;animation_speed&quot;:&quot;350&quot;,&quot;animation_origin&quot;:&quot;center top&quot;,&quot;overlay_zindex&quot;:false,&quot;zindex&quot;:&quot;1999999999&quot;},&quot;close&quot;:{&quot;text&quot;:&quot;&quot;,&quot;button_delay&quot;:&quot;0&quot;,&quot;overlay_click&quot;:false,&quot;esc_press&quot;:false,&quot;f4_press&quot;:false},&quot;click_open&quot;:[]}}">
+
+	<div id="popmake-4932" class="pum-container popmake theme-4922 pum-responsive pum-responsive-medium responsive size-medium">
+
+				
+				
+		
+				<div class="pum-content popmake-content" tabindex="0">
+			<div class="et_pb_section et_pb_section_0 et_section_regular" >
+				
+				
+				
+				
+				
+				
+				<div class="et_pb_row et_pb_row_0">
+				<div class="et_pb_column et_pb_column_4_4 et_pb_column_0  et_pb_css_mix_blend_mode_passthrough et-last-child">
+				
+				
+				
+				
+				<div class="et_pb_module et_pb_code et_pb_code_0">
+				
+				
+				
+				
+				<div class="et_pb_code_inner">
+<div class="wpcf7 no-js" id="wpcf7-f4433-o1" lang="en-US" dir="ltr" data-wpcf7-id="4433">
+<div class="screen-reader-response"><p role="status" aria-live="polite" aria-atomic="true"></p> <ul></ul></div>
+<form action="/availability/#wpcf7-f4433-o1" method="post" class="wpcf7-form init" id="myform2" aria-label="Contact form" novalidate="novalidate" data-status="init">
+<fieldset class="hidden-fields-container"><input type="hidden" name="_wpcf7" value="4433" /><input type="hidden" name="_wpcf7_version" value="6.1.5" /><input type="hidden" name="_wpcf7_locale" value="en_US" /><input type="hidden" name="_wpcf7_unit_tag" value="wpcf7-f4433-o1" /><input type="hidden" name="_wpcf7_container_post" value="0" /><input type="hidden" name="_wpcf7_posted_data_hash" value="" /><input type="hidden" name="_wpcf7_recaptcha_response" value="" />
+</fieldset>
+<p><label> Name (required)<br />
+<span class="wpcf7-form-control-wrap" data-name="your-name"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-text wpcf7-validates-as-required" id="name2" aria-required="true" aria-invalid="false" value="" type="text" name="your-name" /></span> </label>
+</p>
+<p><label> Email (required)<br />
+<span class="wpcf7-form-control-wrap" data-name="your-email"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-email wpcf7-validates-as-required wpcf7-text wpcf7-validates-as-email" id="email2" aria-required="true" aria-invalid="false" value="" type="email" name="your-email" /></span> </label>
+</p>
+<p><label> Phone (required)<br />
+<span class="wpcf7-form-control-wrap" data-name="your-phone"><input size="40" maxlength="400" class="wpcf7-form-control wpcf7-tel wpcf7-validates-as-required wpcf7-text wpcf7-validates-as-tel" id="phone2" aria-required="true" aria-invalid="false" value="" type="tel" name="your-phone" /></span> </label>
+</p>
+<p><label> Date Available<br />
+<span class="wpcf7-form-control-wrap" data-name="date-available"><input class="wpcf7-form-control wpcf7-date wpcf7-validates-as-required wpcf7-validates-as-date" aria-required="true" aria-invalid="false" value="" type="date" name="date-available" /></span> </label>
+</p>
+<p><label> Message<br />
+<span class="wpcf7-form-control-wrap" data-name="your-message"><textarea cols="40" rows="10" maxlength="2000" class="wpcf7-form-control wpcf7-textarea" id="message2" aria-invalid="false" name="your-message"></textarea></span> </label>
+</p>
+
+<p><input class="wpcf7-form-control wpcf7-submit has-spinner" id="form-submit2" type="submit" value="Submit" />
+</p><input type='hidden' class='wpcf7-pum' value='{"closepopup":false,"closedelay":0,"openpopup":false,"openpopup_id":0}' /><div class="wpcf7-response-output" aria-hidden="true"></div>
+</form>
+</div>
+</div>
+			</div>
+			</div>
+				
+				
+				
+				
+			</div>
+				
+				
+			</div>
+		</div>
+
+				
+							<button type="button" class="pum-close popmake-close" aria-label="Close">
+			×			</button>
+		
+	</div>
+
+</div>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5M267FS" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+<!-- Respage services embed script -->
+<link href="//app.respage.com/asset/css/webchat.css" rel="stylesheet" type="text/css">
+<script src="//app.respage.com/asset/js/webchat.js"></script>
+<script>respageBot_Load("7d44ae6427fe83c075c5dc2b249ddb23");</script><script type="text/javascript" src="https://shadyside-living.com/wp-includes/js/dist/hooks.min.js" id="wp-hooks-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-includes/js/dist/i18n.min.js" id="wp-i18n-js"></script>
+<script type="text/javascript" id="wp-i18n-js-after">
+/* <![CDATA[ */
+wp.i18n.setLocaleData( { 'text direction\u0004ltr': [ 'ltr' ] } );
+//# sourceURL=wp-i18n-js-after
+/* ]]> */
+</script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/plugins/contact-form-7/includes/swv/js/index.js" id="swv-js"></script>
+<script type="text/javascript" id="contact-form-7-js-before">
+/* <![CDATA[ */
+var wpcf7 = {
+    "api": {
+        "root": "https:\/\/shadyside-living.com\/wp-json\/",
+        "namespace": "contact-form-7\/v1"
+    }
+};
+var wpcf7 = {
+    "api": {
+        "root": "https:\/\/shadyside-living.com\/wp-json\/",
+        "namespace": "contact-form-7\/v1"
+    }
+};
+//# sourceURL=contact-form-7-js-before
+/* ]]> */
+</script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/plugins/contact-form-7/includes/js/index.js" id="contact-form-7-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-includes/js/jquery/jquery.min.js" id="jquery-core-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-includes/js/jquery/jquery-migrate.min.js" id="jquery-migrate-js"></script>
+<script type="text/javascript" id="jquery-js-after">
+/* <![CDATA[ */
+jqueryParams.length&&$.each(jqueryParams,function(e,r){if("function"==typeof r){var n=String(r);n.replace("$","jQuery");var a=new Function("return "+n)();$(document).ready(a)}});
+//# sourceURL=jquery-js-after
+/* ]]> */
+</script>
+<script type="text/javascript" id="divi-custom-script-js-extra">
+/* <![CDATA[ */
+var DIVI = {"item_count":"%d Item","items_count":"%d Items"};
+var et_builder_utils_params = {"condition":{"diviTheme":true,"extraTheme":false},"scrollLocations":["app","top"],"builderScrollLocations":{"desktop":"app","tablet":"app","phone":"app"},"onloadScrollLocation":"app","builderType":"fe"};
+var et_frontend_scripts = {"builderCssContainerPrefix":"#et-boc","builderCssLayoutPrefix":"#et-boc .et-l"};
+var et_pb_custom = {"ajaxurl":"https://shadyside-living.com/wp-admin/admin-ajax.php","images_uri":"https://shadyside-living.com/wp-content/themes/Divi/images","builder_images_uri":"https://shadyside-living.com/wp-content/themes/Divi/includes/builder/images","et_frontend_nonce":"9df9b5710b","subscription_failed":"Please, check the fields below to make sure you entered the correct information.","et_ab_log_nonce":"46f59101a8","fill_message":"Please, fill in the following fields:","contact_error_message":"Please, fix the following errors:","invalid":"Invalid email","captcha":"Captcha","prev":"Prev","previous":"Previous","next":"Next","wrong_captcha":"You entered the wrong number in captcha.","wrong_checkbox":"Checkbox","ignore_waypoints":"no","is_divi_theme_used":"1","widget_search_selector":".widget_search","ab_tests":[],"is_ab_testing_active":"","page_id":"110","unique_test_id":"","ab_bounce_rate":"5","is_cache_plugin_active":"no","is_shortcode_tracking":"","tinymce_uri":"https://shadyside-living.com/wp-content/themes/Divi/includes/builder/frontend-builder/assets/vendors","accent_color":"#562307","waypoints_options":{"context":[".pum-overlay"]}};
+var et_pb_box_shadow_elements = [];
+//# sourceURL=divi-custom-script-js-extra
+/* ]]> */
+</script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/themes/Divi/js/scripts.min.js" id="divi-custom-script-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/plugins/dwd-map-extended/scripts/frontend-bundle.min.js" id="dwd-map-extended-frontend-bundle-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-includes/js/jquery/ui/core.min.js" id="jquery-ui-core-js"></script>
+<script type="text/javascript" id="popup-maker-site-js-extra">
+/* <![CDATA[ */
+var pum_vars = {"version":"1.21.5","pm_dir_url":"https://shadyside-living.com/wp-content/plugins/popup-maker/","ajaxurl":"https://shadyside-living.com/wp-admin/admin-ajax.php","restapi":"https://shadyside-living.com/wp-json/pum/v1","rest_nonce":null,"default_theme":"4921","debug_mode":"","disable_tracking":"","home_url":"/","message_position":"top","core_sub_forms_enabled":"1","popups":[],"cookie_domain":"","analytics_enabled":"1","analytics_route":"analytics","analytics_api":"https://shadyside-living.com/wp-json/pum/v1"};
+var pum_sub_vars = {"ajaxurl":"https://shadyside-living.com/wp-admin/admin-ajax.php","message_position":"top"};
+var pum_popups = {"pum-4932":{"triggers":[],"cookies":[],"disable_on_mobile":false,"disable_on_tablet":false,"atc_promotion":null,"explain":null,"type_section":null,"theme_id":"4922","size":"medium","responsive_min_width":"0%","responsive_max_width":"100%","custom_width":"640px","custom_height_auto":false,"custom_height":"380px","scrollable_content":false,"animation_type":"fade","animation_speed":"350","animation_origin":"center top","open_sound":"none","custom_sound":"","location":"center top","position_top":"100","position_bottom":"0","position_left":"0","position_right":"0","position_from_trigger":false,"position_fixed":false,"overlay_disabled":false,"stackable":false,"disable_reposition":false,"zindex":"1999999999","close_button_delay":"0","fi_promotion":null,"close_on_form_submission":false,"close_on_form_submission_delay":0,"close_on_overlay_click":false,"close_on_esc_press":false,"close_on_f4_press":false,"disable_form_reopen":false,"disable_accessibility":false,"theme_slug":"lightbox","id":4932,"slug":"schedule-a-tour"}};
+//# sourceURL=popup-maker-site-js-extra
+/* ]]> */
+</script>
+<script type="text/javascript" src="//shadyside-living.com/wp-content/uploads/pum/pum-site-scripts.js?defer&amp;generated=1740399168" id="popup-maker-site-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/themes/Divi/core/admin/js/common.js" id="et-core-common-js"></script>
+<script type="text/javascript" src="https://www.google.com/recaptcha/api.js?render=6LcJuIcUAAAAAIQ7Vtj4oN8LKMSDiHldoP0OIUIU" id="google-recaptcha-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-includes/js/dist/vendor/wp-polyfill.min.js" id="wp-polyfill-js"></script>
+<script type="text/javascript" id="wpcf7-recaptcha-js-before">
+/* <![CDATA[ */
+var wpcf7_recaptcha = {
+    "sitekey": "6LcJuIcUAAAAAIQ7Vtj4oN8LKMSDiHldoP0OIUIU",
+    "actions": {
+        "homepage": "homepage",
+        "contactform": "contactform"
+    }
+};
+//# sourceURL=wpcf7-recaptcha-js-before
+/* ]]> */
+</script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/plugins/contact-form-7/modules/recaptcha/index.js" id="wpcf7-recaptcha-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/plugins/divi-bars/assets/js/main.js" id="DiviBars-main-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/plugins/divi-bars/assets/js/main.helper.js" id="DiviBars-main-helper-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/plugins/divi-bars/assets/js/actual.min.js" id="actual-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/plugins/divi-bars/assets/js/jquery.exitintent.min.js" id="exit-intent-js"></script>
+<script type="text/javascript" src="https://shadyside-living.com/wp-content/themes/Divi/includes/builder/feature/dynamic-assets/assets/js/jquery.fitvids.js" id="fitvids-js"></script>
+<style id="et-builder-module-design-tb-214998-deferred-110-cached-inline-styles">.et_pb_section_0.et_pb_section{padding-top:0px;padding-bottom:0px;margin-top:0px;margin-bottom:0px}.et_pb_fullwidth_header.et_pb_fullwidth_header_0{background-image:url(https://shadyside-living.com/wp-content/uploads/2018/11/Shadyside-Courtyard-1.jpg);background-color:rgba(255,255,255,0)}.et_pb_fullwidth_header_0{padding-top:175px;padding-bottom:175px}body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button,body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button{color:#ffffff!important;border-color:#ffffff;font-size:14px;text-transform:uppercase!important;padding-right:2em;padding-left:0.7em;background-color:rgba(255,255,255,0)}body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:hover:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:hover:after,body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:hover:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:hover:after{margin-left:.3em;left:auto;margin-left:.3em}body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:after,body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:after{color:#ffffff;line-height:inherit;font-size:inherit!important;opacity:1;margin-left:.3em;left:auto;display:inline-block;font-family:ETmodules!important;font-weight:400!important}.et_pb_fullwidth_header_0.et_pb_fullwidth_header .et_pb_fullwidth_header_overlay{background-color:rgba(0,0,0,0.45)}.et_pb_section_2.et_pb_section{padding-top:20px;padding-right:20px;padding-bottom:20px;padding-left:20px;background-color:#562307!important}.et_pb_row_1{border-width:1px;border-color:rgba(255,255,255,0.5)}.et_pb_row_1.et_pb_row{padding-top:40px!important;padding-right:40px!important;padding-bottom:40px!important;padding-left:40px!important;padding-top:40px;padding-right:40px;padding-bottom:40px;padding-left:40px}.et_pb_row_1,body #page-container .et-db #et-boc .et-l .et_pb_row_1.et_pb_row,body.et_pb_pagebuilder_layout.single #page-container #et-boc .et-l .et_pb_row_1.et_pb_row,body.et_pb_pagebuilder_layout.single.et_full_width_page #page-container #et-boc .et-l .et_pb_row_1.et_pb_row,.et_pb_row_1,body .pum-container .et-db #et-boc .et-l .et_pb_row_1.et_pb_row,body.et_pb_pagebuilder_layout.single #page-container #et-boc .et-l .et_pb_row_1.et_pb_row,body.et_pb_pagebuilder_layout.single.et_full_width_page #page-container #et-boc .et-l .et_pb_row_1.et_pb_row,.et_pb_row_1,body #page-container .et-db .pum .et-l .et_pb_row_1.et_pb_row,body.et_pb_pagebuilder_layout.single #page-container #et-boc .et-l .et_pb_row_1.et_pb_row,body.et_pb_pagebuilder_layout.single.et_full_width_page #page-container #et-boc .et-l .et_pb_row_1.et_pb_row,.et_pb_row_1,body .pum-container .et-db .pum .et-l .et_pb_row_1.et_pb_row,body.et_pb_pagebuilder_layout.single #page-container #et-boc .et-l .et_pb_row_1.et_pb_row,body.et_pb_pagebuilder_layout.single.et_full_width_page #page-container #et-boc .et-l .et_pb_row_1.et_pb_row{width:100%;max-width:100%}.et_pb_text_0 h2{font-family:'Roboto',Helvetica,Arial,Lucida,sans-serif;font-weight:300;text-transform:uppercase;font-size:36px;line-height:1.2em}.et_pb_text_1{line-height:1em;font-weight:300;font-size:20px;line-height:1em;margin-bottom:10px!important}.et_pb_row_2.et_pb_row{padding-bottom:0px!important;margin-bottom:0px!important;padding-bottom:0px}.et_pb_cta_0.et_pb_promo h2,.et_pb_cta_0.et_pb_promo h1.et_pb_module_header,.et_pb_cta_0.et_pb_promo h3.et_pb_module_header,.et_pb_cta_0.et_pb_promo h4.et_pb_module_header,.et_pb_cta_0.et_pb_promo h5.et_pb_module_header,.et_pb_cta_0.et_pb_promo h6.et_pb_module_header{font-weight:600!important;text-transform:uppercase!important;font-size:24px!important;text-align:center!important}.et_pb_cta_0.et_pb_promo .et_pb_promo_description,.et_pb_cta_0.et_pb_promo .et_pb_promo_description h2{padding-bottom:0}.et_pb_button_0,.et_pb_button_0:after{transition:all 300ms ease 0ms}.et_pb_text_3{padding-top:20px!important;text-align:center}.et_pb_text_3:after{content:"";display:table;clear:both}.et_pb_text_4{font-style:italic;font-size:14px;padding-top:5px!important;padding-bottom:5px!important}@media only screen and (max-width:980px){.et_pb_fullwidth_header_0{padding-top:100px;padding-bottom:100px}body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:after,body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:after{line-height:inherit;font-size:inherit!important;margin-left:.3em;left:auto;display:inline-block;opacity:1;content:attr(data-icon);font-family:ETmodules!important;font-weight:400!important}body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:before,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:before,body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:before,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:before{display:none}body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:hover:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:hover:after,body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:hover:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:hover:after{margin-left:.3em;left:auto;margin-left:.3em}.et_pb_section_2.et_pb_section{padding-top:20px;padding-right:20px;padding-bottom:20px;padding-left:20px}.et_pb_row_1.et_pb_row{padding-top:20px!important;padding-right:20px!important;padding-bottom:20px!important;padding-left:20px!important;padding-top:20px!important;padding-right:20px!important;padding-bottom:20px!important;padding-left:20px!important}.et_pb_text_0 h2{font-size:30px}.et_pb_text_1{line-height:1em}}@media only screen and (max-width:767px){.et_pb_fullwidth_header_0{padding-top:45px;padding-bottom:45px}body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:after,body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:after{line-height:inherit;font-size:inherit!important;margin-left:.3em;left:auto;display:inline-block;opacity:1;content:attr(data-icon);font-family:ETmodules!important;font-weight:400!important}body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:before,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:before,body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:before,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:before{display:none}body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:hover:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_one.et_pb_button:hover:after,body #page-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:hover:after,body .pum-container .et_pb_section .et_pb_fullwidth_header_0 .et_pb_button_two.et_pb_button:hover:after{margin-left:.3em;left:auto;margin-left:.3em}.et_pb_section_2.et_pb_section{padding-top:20px;padding-right:20px;padding-bottom:20px;padding-left:20px}.et_pb_row_1.et_pb_row{padding-top:20px!important;padding-bottom:20px!important;padding-top:20px!important;padding-bottom:20px!important}.et_pb_text_0 h2{font-size:28px}.et_pb_text_1{font-size:18px}}</style><style id="et-builder-module-design-tb-214998-110-cached-inline-styles">.et_pb_section_0_tb_footer.et_pb_section{padding-top:40px;padding-bottom:40px;background-color:#231f20!important}.et_pb_row_0_tb_footer.et_pb_row{padding-top:40px!important;padding-bottom:40px!important;padding-top:40px;padding-bottom:40px}.et_pb_code_0_tb_footer{margin-bottom:30px!important}.et_pb_text_0_tb_footer{font-weight:700;text-transform:uppercase;font-size:20px;letter-spacing:1px;margin-bottom:10px!important}.et_pb_text_1_tb_footer{font-size:14px;padding-right:25%!important;padding-left:25%!important;margin-bottom:20px!important}.et_pb_text_2_tb_footer{text-transform:uppercase;font-size:14px;margin-bottom:20px!important}.et_pb_text_2_tb_footer ul{list-style-type:none!important}.et_pb_text_3_tb_footer.et_pb_text a{color:#ffffff!important}.et_pb_text_3_tb_footer a{text-transform:uppercase;font-size:14px;letter-spacing:1px}ul.et_pb_social_media_follow_0_tb_footer{margin-top:25px!important;margin-bottom:25px!important}.et_pb_social_media_follow_0_tb_footer li.et_pb_social_icon a.icon:before{color:#e2cb95}.et_pb_image_0_tb_footer{text-align:center}.et_pb_image_0_tb_footer .et_pb_image_wrap{display:block}.et_pb_social_media_follow_network_4_tb_footer a.icon,.et_pb_social_media_follow_network_5_tb_footer a.icon,.et_pb_social_media_follow_network_3_tb_footer a.icon,.et_pb_social_media_follow_network_2_tb_footer a.icon,.et_pb_social_media_follow_network_1_tb_footer a.icon,.et_pb_social_media_follow_network_0_tb_footer a.icon{background-color:RGBA(0,0,0,0)!important}@media only screen and (max-width:980px){.et_pb_section_0_tb_footer.et_pb_section{padding-top:30px;padding-bottom:30px}.et_pb_row_0_tb_footer.et_pb_row{padding-top:30px!important;padding-bottom:30px!important;padding-top:30px!important;padding-bottom:30px!important}.et_pb_text_1_tb_footer{padding-right:15%!important;padding-left:15%!important}.et_pb_image_0_tb_footer .et_pb_image_wrap img{width:auto}}@media only screen and (max-width:767px){.et_pb_section_0_tb_footer.et_pb_section{padding-top:20px;padding-bottom:20px}.et_pb_row_0_tb_footer.et_pb_row{padding-top:20px!important;padding-bottom:20px!important;padding-top:20px!important;padding-bottom:20px!important}.et_pb_text_1_tb_footer{padding-right:0%!important;padding-left:0%!important}.et_pb_image_0_tb_footer .et_pb_image_wrap img{width:auto}}</style>	
+	</body>
+</html>
