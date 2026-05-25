@@ -1004,6 +1004,40 @@ _PP_PLAN_URL_RE = re.compile(
     r"/floorplans/[^/]+/[^/]+/([a-z0-9][a-z0-9-]*?)-(\d{3,9})-(\d+)/?",
     re.IGNORECASE,
 )
+# 2026-05-25 chip #98 follow-up — Aria at Ella URL variant:
+# .../<state>/<property>/floorplans/<plan-slug>-<fpid>/fp_name/
+# occupancy_type/<type>/
+# Anchored to ``/fp_name/`` so it does not false-match on the V1
+# pattern (which has 3 path components after /floorplans/ and a
+# trailing ``-<phase>`` digit token, not a ``/fp_name/`` literal).
+# Live-verified 2026-05-25 across all 12 plans of ariaatella.com
+# (e.g. ``a1-730162``, ``a1eup-730171``, ``a1g-730166``).
+_PP_PLAN_URL_RE_V2 = re.compile(
+    r"/floorplans/([a-z0-9][a-z0-9-]*?)-(\d{3,9})/fp_name/",
+    re.IGNORECASE,
+)
+
+
+def _pp_plan_url_match(url: str) -> tuple[str, str] | None:
+    """Try both PP per-plan URL templates. Returns (slug, fpid) on hit.
+
+    Two known production templates as of 2026-05-25:
+      * V1 — risewestarlington / foxlake / 14fifty / etc.:
+        ``/floorplans/<state>/<property>/<slug>-<fpid>-<phase>/``
+      * V2 — Aria at Ella (chip #98 follow-up cohort):
+        ``/floorplans/<slug>-<fpid>/fp_name/occupancy_type/<type>/``
+
+    V1 wins if both match (the V1 pattern is stricter and includes a
+    phase token, so a V1 hit is unambiguous; V2 has only ``/fp_name/``
+    as its disambiguating anchor).
+    """
+    m = _PP_PLAN_URL_RE.search(url or "")
+    if m:
+        return (m.group(1), m.group(2))
+    m = _PP_PLAN_URL_RE_V2.search(url or "")
+    if m:
+        return (m.group(1), m.group(2))
+    return None
 
 
 def _pp_extract_card_uid(card: Any) -> str:
@@ -1044,22 +1078,245 @@ def _pp_extract_card_fpid(card: Any) -> str:
     return ""
 
 
+_PP_OPT_ROW_BED_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*bed[s]?\b|\bstudio\b", re.IGNORECASE
+)
+_PP_OPT_ROW_BATH_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*bath[s]?\b", re.IGNORECASE
+)
+# Aria emits ``data-date="06/06/2026"`` (MM/DD/YYYY) on the See-Details
+# button. The visible text "Available Jun 06, 2026" is the human form;
+# we prefer the numeric attr because it's locale-stable.
+_PP_OPT_ROW_DATA_DATE_RE = re.compile(
+    r"^\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*$"
+)
+# Fallback for the visible "Jun 06, 2026" / "June 6, 2026" form when
+# the See-Details button is missing or stripped.
+_PP_OPT_ROW_TEXT_DATE_RE = re.compile(
+    r"([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})"
+)
+_PP_OPT_ROW_MONTH_NAMES = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    "january": 1, "february": 2, "march": 3, "april": 4,
+    "june": 6, "july": 7, "august": 8, "september": 9,
+    "october": 10, "november": 11, "december": 12,
+}
+
+
+def _pp_opt_row_iso_date(s: str) -> str:
+    """Normalise PP availability strings to ``YYYY-MM-DD``.
+
+    Accepts the canonical ``data-date`` attribute (``MM/DD/YYYY``)
+    or the visible text (``"Jun 06, 2026"``). Empty string for
+    "Available Now" / blank / unparseable.
+    """
+    if not s:
+        return ""
+    s = s.strip()
+    m = _PP_OPT_ROW_DATA_DATE_RE.match(s)
+    if m:
+        mo, d, y = m.groups()
+        return f"{y}-{int(mo):02d}-{int(d):02d}"
+    m2 = _PP_OPT_ROW_TEXT_DATE_RE.search(s)
+    if m2:
+        month_name, d, y = m2.groups()
+        mo_num = _PP_OPT_ROW_MONTH_NAMES.get(month_name.lower())
+        if mo_num:
+            return f"{y}-{mo_num:02d}-{int(d):02d}"
+    return ""
+
+
+def _parse_pp_option_rows(
+    soup: Any, url: str, plan: str, derived_fpid: str
+) -> list[dict[str, str]]:
+    """Template U2 — Aria-style per-plan ``.option-row`` roster.
+
+    See ``parse_entrata_pp_unit_cards`` docstring for the markup
+    layout and rationale. This is the inner helper that does the
+    actual extraction once the caller has decided this is the right
+    template (no ``.unit-card`` markers but the page has option-row
+    data rows).
+
+    Returns ``[]`` when only the header row exists (``.option-row.
+    title`` is the column-headers row PP renders to label the table
+    on mobile — never a unit).
+    """
+    data_rows = [
+        r for r in soup.select(".option-row")
+        if "title" not in (r.get("class") or [])
+    ]
+    if not data_rows:
+        return []
+
+    # Beds/baths come from the page-level header — every row on a
+    # per-plan page shares the same bed/bath/sqft signature. PP's
+    # ``.fp-details-container`` carries "1 Bed / 1 Bath" text.
+    header_text = ""
+    header = soup.select_one(".fp-details-container")
+    if header:
+        header_text = header.get_text(" ", strip=True)
+
+    beds_val: int | None = None
+    bm = _PP_OPT_ROW_BED_RE.search(header_text)
+    if bm:
+        if bm.group(0).lower().startswith("studio"):
+            beds_val = 0
+        elif bm.group(1):
+            try:
+                beds_val = int(float(bm.group(1)))
+            except ValueError:
+                beds_val = None
+    baths_val = ""
+    bath_m = _PP_OPT_ROW_BATH_RE.search(header_text)
+    if bath_m:
+        baths_val = bath_m.group(1)
+
+    # If header didn't carry a usable plan name (rare; the chip #98
+    # caller usually passes one in), grab the H1 / h2 plan heading.
+    if not plan and header:
+        h1 = header.select_one("h1, h2, .fp-name, .fp-title")
+        if h1:
+            plan = h1.get_text(" ", strip=True)
+
+    units: list[dict[str, str]] = []
+    seen_keys: set[str] = set()
+    for row in data_rows:
+        first = row.select_one(".detail.first")
+        if not first:
+            continue
+        unit_num = first.get_text(" ", strip=True)
+        # Strip the ``"Unit "`` mobile-label prefix PP injects.
+        unit_num = re.sub(r"^unit\s+", "", unit_num, flags=re.IGNORECASE).strip()
+        if not unit_num:
+            continue
+
+        # Rent + lease term live in .detail.second. Use the
+        # ``.unit-rent`` / ``.fee-transparency-text`` selectors when
+        # present so we never grab a deposit / concession dollar
+        # token by accident.
+        rent_el = row.select_one(
+            ".detail.second .unit-rent, "
+            ".detail.second .fee-transparency-text, "
+            ".detail.second"
+        )
+        rent_text = rent_el.get_text(" ", strip=True) if rent_el else ""
+        rent_lo, rent_hi = _pp_money_low_high(rent_text)
+
+        lease_el = row.select_one(".lease-term-name")
+        lease_term = lease_el.get_text(" ", strip=True) if lease_el else ""
+
+        # Sqft + availability — both rendered as ``.detail.block`` in
+        # document order. PP labels them with a mobile-text label that
+        # we strip.
+        blocks = row.select(".detail.block")
+        sqft_val = ""
+        if blocks:
+            txt = blocks[0].get_text(" ", strip=True)
+            txt = re.sub(
+                r"^sq\.?\s*ft\.?\s*", "", txt, flags=re.IGNORECASE
+            ).strip()
+            sm = re.search(r"([\d,]+)", txt)
+            if sm:
+                sqft_val = sm.group(1).replace(",", "")
+        visible_avail = ""
+        if len(blocks) >= 2:
+            txt = blocks[1].get_text(" ", strip=True)
+            visible_avail = re.sub(
+                r"^available\s*", "", txt, flags=re.IGNORECASE
+            ).strip()
+
+        # data-* on the See-Details button is the authoritative source.
+        btn = row.select_one(
+            ".js-show-details, .detail.action button, .detail.action a"
+        )
+        data_unit = str(btn.get("data-unit") or "").strip() if btn else ""
+        data_fp = str(btn.get("data-floorplan") or "").strip() if btn else ""
+        data_date = str(btn.get("data-date") or "").strip() if btn else ""
+
+        avail_date = _pp_opt_row_iso_date(data_date) or _pp_opt_row_iso_date(
+            visible_avail
+        )
+        status = "AVAILABLE"
+
+        # Dedupe on (data-unit | unit_num). PP occasionally renders
+        # the same row twice when the plan has variant lease terms.
+        dedupe_key = data_unit or unit_num
+        if dedupe_key in seen_keys:
+            continue
+        seen_keys.add(dedupe_key)
+
+        source_ids: dict[str, Any] = {}
+        if data_unit:
+            source_ids["entrata_uid"] = data_unit
+        fpid = derived_fpid or data_fp
+        if fpid:
+            source_ids["entrata_fpid"] = fpid
+
+        units.append(
+            make_unit_dict(
+                floor_plan_name=plan,
+                bed_label=bed_label_from(beds_val, plan),
+                bedrooms=str(beds_val) if beds_val is not None else "",
+                bathrooms=baths_val,
+                sqft=sqft_val,
+                unit_number=unit_num,
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                availability_status=status,
+                availability_date=avail_date,
+                lease_term=lease_term,
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+                source_ids=source_ids or None,
+            )
+        )
+    return units
+
+
 def parse_entrata_pp_unit_cards(
     html: str, url: str, floor_plan_name: str = ""
 ) -> list[dict[str, str]]:
-    """Parse a Prospect Portal **per-plan** page's ``.unit-card`` roster.
+    """Parse a Prospect Portal **per-plan** page's per-apartment roster.
 
-    Each ``.unit-card`` is one real apartment unit. Returns unit-level
-    rows whose ``unit_number`` is the visible PP number (e.g. ``"184"``,
-    ``"8700"``) and whose ``source_ids.entrata_uid`` is the stable PP
-    numeric id (e.g. ``"5256171"``, ``"267"``) — this is what closes
-    canary 1ef1060 regr#9: the runner stops synthesising
-    ``inferred_<sha16>`` ids because every emitted row already has a
-    natural ``unit_number``.
+    Two DOM templates as of 2026-05-25:
+
+    Template U1 — ``.unit-card`` blocks (risewestarlington / foxlake /
+    most "newer" PP themes). Each ``.unit-card`` is one real unit. The
+    visible PP number lives in ``<h3 class="unit-number">`` and the
+    stable PP id in ``data-unit-id`` / ``data-uid`` / class suffix.
+
+    Template U2 — ``.option-row`` rows (Aria at Ella style, chip #98
+    follow-up). Same "per-plan page lists real units" semantics, but
+    different markup:
+
+      <div class="option-row">
+        <div class="detail first">Unit 2205</div>
+        <div class="detail second">
+          ...<span class="stat-value unit-rent">$1,344 /month</span>...
+          <span class="lease-term-name">18mo lease</span>
+        </div>
+        <div class="detail block">Sq.ft. 682</div>
+        <div class="detail block">Available Jun 06, 2026</div>
+        <div class="detail action">
+          <button class="js-show-details"
+                  data-floorplan="730162" data-unit="4632678"
+                  data-date="06/06/2026">See Details</button>
+        </div>
+      </div>
+
+    Each row emits unit-level data; ``data-unit`` becomes
+    ``source_ids.entrata_uid`` and ``data-floorplan`` becomes
+    ``source_ids.entrata_fpid``. ``data-date`` (MM/DD/YYYY) is the
+    canonical availability date — strictly preferred over the visible
+    ``"Available Jun 06, 2026"`` text because PP renders the data-date
+    in ISO-friendly numeric form.
 
     ``floor_plan_name`` is the parent plan label (e.g. ``"A1 Silver"``,
     ``"Abbington"``). When empty, the function derives it from the URL
-    slug (``a1-silver-1212885-1`` → ``"A1 Silver"``).
+    slug (``a1-silver-1212885-1`` → ``"A1 Silver"``;
+    ``a1-730162`` → ``"A1"``).
 
     Tier label: ``TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL``.
 
@@ -1067,23 +1324,28 @@ def parse_entrata_pp_unit_cards(
       * risewestarlington.com pid 1212885 → 1 unit (#184, uid 5256171)
       * foxlake.prospectportal.com fpid 1440 → 5 units (uids 267/338/
         306/...)
+      * ariaatella.com fpid 730162 → 3 units (#2205/1104/2104, uids
+        4632678/4632621/4632666)
     """
-    if not html or "unit-card" not in html:
+    if not html or ("unit-card" not in html and "option-row" not in html):
         return []
     from bs4 import BeautifulSoup
+
+    # Derive the plan name from the URL slug when caller didn't supply it.
+    plan = floor_plan_name
+    slug_fpid = _pp_plan_url_match(url or "")
+    derived_fpid = slug_fpid[1] if slug_fpid else ""
+    if not plan and slug_fpid:
+        slug = slug_fpid[0].replace("-", " ").strip()
+        plan = slug.title() if slug else ""
 
     soup = BeautifulSoup(html, "lxml")
     cards = soup.select(".unit-card")
     if not cards:
-        return []
-
-    # Derive the plan name from the URL slug when caller didn't supply it.
-    plan = floor_plan_name
-    mh = _PP_PLAN_URL_RE.search(url or "")
-    derived_fpid = mh.group(2) if mh else ""
-    if not plan and mh:
-        slug = mh.group(1).replace("-", " ").strip()
-        plan = slug.title() if slug else ""
+        # Template U2 (Aria at Ella style) — .option-row roster.
+        return _parse_pp_option_rows(
+            soup, url, plan or "", derived_fpid
+        )
 
     units: list[dict[str, str]] = []
     seen_uids: set[str] = set()
@@ -1261,8 +1523,10 @@ def find_entrata_pp_plan_links(index_html: str, origin: str) -> list[str]:
     origin_clean = (origin or "").rstrip("/")
     out: list[str] = []
     for href in candidates:
-        m = _PP_PLAN_URL_RE.search(href)
-        if not m:
+        # Accept either PP per-plan URL template (V1 phased or V2 Aria-
+        # style). _pp_plan_url_match returns None on non-matching hrefs
+        # (apply links, residents-portal links, the grid index itself).
+        if _pp_plan_url_match(href) is None:
             continue
         if href.startswith("http://") or href.startswith("https://"):
             absolute = href
