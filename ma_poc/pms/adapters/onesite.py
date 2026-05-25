@@ -219,6 +219,57 @@ def _generate_xyz_token(
     return base64.b64encode(parts.encode()).decode()
 
 
+# 2026-05-25 — Deep-probe residue on 195 TIER_1_API_ONESITE_WORKFLOW props
+# turned up three workflowstartup-body pollution patterns:
+#
+#   1. Huge-rent-range. Bridgewater Apartments (SiteId 3590166) returns
+#      ``MinPriceRange=1630, MaxPriceRange=8914`` on 1016sqft 2BR plans —
+#      the high value is short-term-lease / model-unit pricing leaking
+#      into the asking-rent envelope. Downstream rent-comparison alerts
+#      and unit-level matching get derailed by these implausible ranges.
+#      Empirical threshold from live HARs across 5 props: spread > $5000
+#      OR max/min ratio > 3.0 → max is unreliable; collapse to min.
+#
+#   2. Sqft cascade gap. The current cascade was
+#      ``Squarefeet → MinSquareFeet → MinUnitSquareFeet`` only. When a
+#      property publishes the upper bound only — ``MaxSquareFeet`` or
+#      ``MaxUnitSquareFeet`` — sqft fell through to 0 and got rewritten
+#      to the -1 "unknown" sentinel downstream.
+#
+#   3. Placeholder-row drop. The old guard skipped a plan only when
+#      ``sqft=0 AND rent_lo=0`` — but plans with no availability and
+#      ``MinPriceRange=MaxPriceRange=0`` (pure placeholder) still leaked
+#      a sqft-only bare-name row. Widen the drop to also fire when
+#      AvailableUnits=0 and both rent bounds are 0.
+_HUGE_RANGE_SPREAD_USD = 5000
+_HUGE_RANGE_RATIO = 3.0
+
+
+def _collapse_huge_rent_range(
+    rent_lo: int | None, rent_hi: int | None
+) -> tuple[int | None, int | None, bool]:
+    """Detect and collapse OneSite's short-term-lease MaxPriceRange leak.
+
+    Returns ``(rent_lo, rent_hi, clamped)``. When the high end is more
+    than ``_HUGE_RANGE_SPREAD_USD`` above the low OR the ratio exceeds
+    ``_HUGE_RANGE_RATIO``, set high to low (the asking 12-month rent is
+    the trustworthy floor; high reflects flex-term premiums or model
+    units). When inputs are inverted (lo > hi), swap them first so the
+    spread/ratio check is well-defined.
+    """
+    if rent_lo is None or rent_hi is None:
+        return rent_lo, rent_hi, False
+    if rent_lo <= 0 or rent_hi <= 0:
+        return rent_lo, rent_hi, False
+    if rent_lo > rent_hi:
+        rent_lo, rent_hi = rent_hi, rent_lo
+    spread = rent_hi - rent_lo
+    ratio = rent_hi / rent_lo if rent_lo else 0.0
+    if spread > _HUGE_RANGE_SPREAD_USD or ratio > _HUGE_RANGE_RATIO:
+        return rent_lo, rent_lo, True
+    return rent_lo, rent_hi, False
+
+
 def parse_onesite_workflowstartup(
     body: dict[str, Any], url: str
 ) -> list[dict[str, str]]:
@@ -228,11 +279,16 @@ def parse_onesite_workflowstartup(
     Walks ``Workflow.ActivityGroups[*].GroupActivities[*].Floorplans[]``
     (the ``__type`` is ``FloorplanSearchLeaseMgmtActivity``). Each
     floorplan emits one plan-level row with Name, Bedrooms, Bathrooms,
-    Squarefeet (or MinSquareFeet), MinPriceRange, MaxPriceRange,
-    AvailableUnits.
+    Squarefeet (or MinSquareFeet / MaxSquareFeet / MinUnitSquareFeet /
+    MaxUnitSquareFeet — first-non-zero wins), MinPriceRange,
+    MaxPriceRange, AvailableUnits.
 
-    Skips rows where both rent and sqft are zero (income-restricted
-    or call-for-pricing placeholders).
+    Drops plans that carry no usable signal:
+      • sqft=0 AND rent_lo=0  → call-for-pricing placeholder
+      • AvailableUnits=0 AND MinPriceRange=MaxPriceRange=0  → unlisted plan
+
+    Collapses anomalous MaxPriceRange to MinPriceRange when the spread
+    or ratio implies short-term-lease leakage (see ``_collapse_huge_rent_range``).
     """
     if not isinstance(body, dict):
         return []
@@ -268,10 +324,14 @@ def parse_onesite_workflowstartup(
                 name = str(fp.get("Name") or "")
                 beds = fp.get("Bedrooms")
                 baths = fp.get("Bathrooms")
+                # Widened cascade (2026-05-25): include the Max* keys
+                # so single-bound publications don't fall through to 0.
                 sqft = (
                     fp.get("Squarefeet")
                     or fp.get("MinSquareFeet")
+                    or fp.get("MaxSquareFeet")
                     or fp.get("MinUnitSquareFeet")
+                    or fp.get("MaxUnitSquareFeet")
                     or 0
                 )
                 rent_lo = fp.get("MinPriceRange") or 0
@@ -289,15 +349,30 @@ def parse_onesite_workflowstartup(
                 except (TypeError, ValueError):
                     rent_lo_i = None
                     rent_hi_i = None
+                try:
+                    avail_i = int(avail_count) if avail_count else 0
+                except (TypeError, ValueError):
+                    avail_i = 0
 
-                # Skip income-restricted-only or call-for-pricing rows
+                # Skip income-restricted / call-for-pricing rows
                 # (sqft=0 AND no rent → no useful dimension, drops past
                 # validity gate as a bare-name row).
                 if sqft_i == 0 and not rent_lo_i:
                     continue
+                # Skip placeholder rows: unlisted plans the operator
+                # carries in the catalog with no availability and no
+                # price floor. Pre-fix these contributed to the
+                # workflow-tier zero-rent residue.
+                if avail_i == 0 and not rent_lo_i and not rent_hi_i:
+                    continue
 
                 if rent_lo_i and not rent_hi_i:
                     rent_hi_i = rent_lo_i
+
+                # Collapse implausibly wide ranges (short-term-lease leak).
+                rent_lo_i, rent_hi_i, _clamped = _collapse_huge_rent_range(
+                    rent_lo_i, rent_hi_i
+                )
 
                 beds_i: int | None = None
                 if isinstance(beds, (int, float)):
@@ -325,7 +400,7 @@ def parse_onesite_workflowstartup(
                         rent_low=rent_lo_i,
                         rent_high=rent_hi_i,
                         availability_status="AVAILABLE",
-                        available_units=str(avail_count) if avail_count else "",
+                        available_units=str(avail_i) if avail_i else "",
                         source_api_url=url,
                         extraction_tier="TIER_1_API_ONESITE_WORKFLOW",
                     )
