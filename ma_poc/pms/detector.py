@@ -70,6 +70,7 @@ PmsName = Literal[
     "encoreskyline_template",
     "aspensquare",
     "edificecms",
+    "thinkreside",
     "marketapts",
     "rentcafe_unit_roster",
     "imt_spaces",
@@ -1018,6 +1019,39 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             0.92,
             ["Edifice CMS marker in HTML "
              "(edificecms.com / /edi-assets/ / BUILDER_LIVE)"],
+        )
+
+    # ThinkRESIDE / Resite Multi Family Marketing — DOM-only adapter
+    # for the Resite CMS family. Plan list (``<li data-beds>`` on
+    # /floorplans OR ``<div class="floorplan-item">`` on home) + per-
+    # plan ``fp-availability-list`` table render the unit roster
+    # inline; ``api.thinkresite.dev`` is a Walk-Score-style POI feed
+    # not unit data. Live-verified 2026-05-25 against Orchard Ridge
+    # (liveatorchardridge.com), Indy Flats (indyflatsapts.com), and
+    # Deer Run (liveatdeerrunapts.com) — all 3 fell to TIER_MERGED_
+    # CROSS_PAGE / generic plan-text with n_full=0 pre-fix.
+    #
+    # Fires at 0.87: above co-resident chat widgets (MeetElise / Jonah
+    # encoreskyline_template at 0.85; bare RentCafe / AppFolio
+    # substring at 0.80) so the SSR Resite plan list wins when both
+    # are present. Sits below Knock Doorway (0.90) and RealPage OLL /
+    # Edifice CMS (0.92), which remain the real PMS when their
+    # fingerprints appear (Orchard Ridge embeds Doorway → Knock wins).
+    if (
+        "thinkresite.dev" in h
+        or "themes.thinkresite.cloud" in h
+        or "media.thinkresite.cloud" in h
+        or "resite-themes.nyc3.digitaloceanspaces.com" in h
+        or "resiteimages.nyc3.cdn.digitaloceanspaces.com" in h
+        or "resite multi family marketing" in h
+    ):
+        yield (
+            "thinkreside",
+            0.87,
+            ["ThinkRESIDE / Resite Multi Family Marketing marker in HTML "
+             "(thinkresite.dev / themes.thinkresite.cloud / "
+             "resite-themes.nyc3.digitaloceanspaces.com / "
+             "Resite Multi Family Marketing)"],
         )
 
     _has_apts247_marker = "apts247" in h or "rentdynamics.com" in h
