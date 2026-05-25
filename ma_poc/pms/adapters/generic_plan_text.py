@@ -109,8 +109,50 @@ _REST_WINDOW = 100
 # this appears in the lookahead window BEFORE the $, we've crossed a
 # plan boundary (the current "plan" was a nav-menu item paired with a
 # later body plan's price). Drop the row.
+#
+# 2026-05-25 (deep-probe FINDINGS.md cluster A): added bare ``bed`` to the
+# alternation. ``_PLAN_LINE_RE`` already matches ``"2 Bed | 2 Bath"`` (note
+# ``bed`` is in its bed-token alternation) so the boundary check MUST
+# also recognise it; otherwise rent from plan-2 leaks back to plan-1.
+# Signature property: 1045 on the Park (Elementor "Starting at $X
+# 1 Bed | 1 Bath" cards).
 _NEXT_PLAN_BOUNDARY_RE = re.compile(
-    r"\d+\s*(?:bedroom|bdrm|bd|br)s?\b|\bstudio\b",
+    r"\d+\s*(?:bedroom|bdrm|bed|bd|br)s?\b|\bstudio\b",
+    re.IGNORECASE,
+)
+# 2026-05-25: Elementor-style "Starting at $X" / "From $X" cards put the
+# rent IMMEDIATELY BEFORE the bed/bath token rather than after it. The
+# forward lookahead (_REST_WINDOW after baths) misses these — so when
+# the forward search finds no rent, fall back to a tighter BACKWARDS
+# window (~_BACK_REST_WINDOW chars before the beds token). Gate: must
+# not cross a prior plan boundary (otherwise rent from plan N-1 would
+# leak to plan N). Signature: 1045 on the Park, Princeton Management
+# Elementor-themed WP sites, ~30 props in the GENERIC_PLAN_TEXT cohort
+# from the 2026-05-25 deep-probe.
+_BACK_REST_WINDOW = 80
+# Tight backwards window — used to PREFER a close-by backwards rent over
+# whatever the forward window might pick up. "Starting at $2,127 1 Bed
+# | 1 Bath" — the $X sits within ~25 chars before the beds token.
+_BACK_TIGHT_WINDOW = 30
+_BACK_PRICE_RE = re.compile(
+    # REQUIRE the "starting at" prefix — this is the Elementor-card
+    # signature. "From $X" is left out deliberately: Stargate-style
+    # plain plan rows use "X Bedroom / Y Bath From $Z" where the
+    # "From $Z" TRAILS its own plan, and would leak back into the next
+    # plan if accepted here. Forward-pass already handles "From $Z" for
+    # those rows.
+    r"starting\s+at\s+\$\s*([\d,]+(?:\.\d{1,2})?)\s*$",
+    re.IGNORECASE,
+)
+# Backwards-direction boundary: ANY bed-or-bath token in the look-back
+# window signals we've crossed a prior plan's text. Wider than the
+# forward boundary (which only checks for the NEXT plan opening) — here
+# we need to catch a prior plan's CLOSING tokens too. Without this,
+# Stargate-style text ("3 Bedroom / 2 Bathroom From $1655" preceded by
+# "2 Bedroom / 1.5 Bathroom From $1425") would have $1425 leak back
+# into plan 3's rent via the tight backwards lookup.
+_BACK_BOUNDARY_RE = re.compile(
+    r"\d+(?:\.\d+)?\s*(?:bedroom|bdrm|bed|bd|br|bathroom|bath|bth|ba)s?\b|\bstudio\b",
     re.IGNORECASE,
 )
 _SQFT_RE = re.compile(r"(\d[\d,]{2,4})\s*sq\.?\s*(?:ft|feet)", re.IGNORECASE)
@@ -507,26 +549,63 @@ def parse_generic_plan_text(body: str, url: str) -> list[dict]:
         sq_m = _SQFT_RE.search(rest)
         if sq_m:
             sqft = sq_m.group(1).replace(",", "")
-        # Rent — first $-amount above RENT_FLOOR in the proximity window.
-        # If the lookahead contains the start of ANOTHER plan-line BEFORE
-        # the first $-amount, we've crossed a plan boundary (current was
-        # a nav-menu item, not a real plan row). Drop the row.
         rent_low: int | None = None
         rent_high: int | None = None
-        for p_m in _PRICE_RE.finditer(rest):
-            low = money_to_int(p_m.group(1))
-            high = money_to_int(p_m.group(2)) if p_m.group(2) else low
-            if low is None or low < _RENT_FLOOR:
-                continue
-            # Boundary check — anything between match-start and the
-            # current $-position that looks like another plan-line means
-            # this $ doesn't belong to the current plan.
-            preceding = rest[: p_m.start()]
-            if _NEXT_PLAN_BOUNDARY_RE.search(preceding):
-                continue
-            rent_low = low
-            rent_high = high if high is not None else low
-            break
+        # 2026-05-25 (deep-probe cluster A): PREFER a tight backwards
+        # rent over the forward window. Elementor-style cards (1045 on
+        # the Park, Princeton Mgmt WP sites) put rent IMMEDIATELY
+        # BEFORE the bed/bath token: "Starting at $2,127 1 Bed | 1
+        # Bath". When the forward window picks first, it leaks the
+        # NEXT plan's rent (the boundary regex doesn't fire on bare
+        # "Starting at $X" between plans). A close backwards match
+        # is high-confidence — try it first within the tight window.
+        tight_start = max(0, m.start() - _BACK_TIGHT_WINDOW)
+        tight = body[tight_start:m.start()]
+        # Strip at the most recent prior plan boundary so anything left
+        # is text that genuinely leads our current plan. The Elementor
+        # signature (Starting at $X N Bed) survives — Stargate-style
+        # "From $X N Bedroom" doesn't because _BACK_PRICE_RE requires
+        # the "starting at" prefix.
+        boundary_iter = list(_BACK_BOUNDARY_RE.finditer(tight))
+        if boundary_iter:
+            tight = tight[boundary_iter[-1].end():]
+        tm = _BACK_PRICE_RE.search(tight)
+        if tm:
+            low = money_to_int(tm.group(1))
+            if low is not None and low >= _RENT_FLOOR:
+                rent_low = low
+                rent_high = low
+        # Forward window — only if tight backwards found nothing.
+        # If the forward window contains the start of ANOTHER plan-line
+        # BEFORE the first $-amount, we've crossed a plan boundary
+        # (current was a nav-menu item, not a real plan row). Drop.
+        if rent_low is None:
+            for p_m in _PRICE_RE.finditer(rest):
+                low = money_to_int(p_m.group(1))
+                high = money_to_int(p_m.group(2)) if p_m.group(2) else low
+                if low is None or low < _RENT_FLOOR:
+                    continue
+                preceding = rest[: p_m.start()]
+                if _NEXT_PLAN_BOUNDARY_RE.search(preceding):
+                    continue
+                rent_low = low
+                rent_high = high if high is not None else low
+                break
+        # Wider backwards fallback — same logic as tight, larger window.
+        # Catches "Starting at $X .. some text .. N Bed | N Bath" layouts
+        # where the rent and bed/bath aren't quite adjacent.
+        if rent_low is None:
+            back_start = max(0, m.start() - _BACK_REST_WINDOW)
+            back = body[back_start:m.start()]
+            boundary_iter = list(_BACK_BOUNDARY_RE.finditer(back))
+            if boundary_iter:
+                back = back[boundary_iter[-1].end():]
+            bm = _BACK_PRICE_RE.search(back)
+            if bm:
+                low = money_to_int(bm.group(1))
+                if low is not None and low >= _RENT_FLOOR:
+                    rent_low = low
+                    rent_high = low
         # Skip rows without a real rent — defends against rows like
         # "1 Bedroom 1 Bath required deposit $300".
         if rent_low is None:

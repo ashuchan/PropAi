@@ -137,6 +137,87 @@ def test_parse_dedupes_repeated_plan_rows() -> None:
     assert len(rows) == 2
 
 
+def test_elementor_starting_at_before_bed_bath_1045_on_the_park() -> None:
+    """2026-05-25 deep-probe cluster A — 1045 on the Park (Princeton Mgmt
+    Elementor-themed WP site, user-flagged 2026-05-25). Rent text
+    appears IMMEDIATELY BEFORE the bed/bath line::
+
+        Starting at $2,127 1 Bed | 1 Bath
+
+    Pre-fix the forward-only lookahead skipped these (no $ in the 100
+    chars after Bath) so emit was 0 rows. The backwards-lookup fix
+    catches them.
+    """
+    body = (
+        "Residences starting at $2,127\n"
+        "1 and 2 Bedroom Luxury Apartments\n"
+        "Starting at $2,865 2 Bed | 2 Bath\n"
+        "Starting at $2,509 2 Bed | 2 Bath\n"
+        "Starting at $2,127 1 Bed | 1 Bath\n"
+    )
+    rows = parse_generic_plan_text(body, "http://www.1045onthepark.com/")
+    # Each plan line yields one row; the two "2 Bed | 2 Bath" lines
+    # carry distinct rents ($2,865 + $2,509) so they're NOT dedup'd.
+    assert len(rows) >= 3, f"expected >=3 rows, got {len(rows)}: {rows}"
+    # 1-Bed row must be present (skipped entirely pre-fix)
+    has_one_bed = any(r.get("bedrooms") == "1" for r in rows)
+    assert has_one_bed, f"no 1-bed row: {[r.get('bedrooms') for r in rows]}"
+    # 2-Bed row must be present
+    has_two_bed = any(r.get("bedrooms") == "2" for r in rows)
+    assert has_two_bed, f"no 2-bed row: {[r.get('bedrooms') for r in rows]}"
+    # Three distinct rent levels must appear across all rows
+    rents = {int(r["market_rent_low"]) for r in rows if r.get("market_rent_low")}
+    assert 2127 in rents, f"missing $2,127 1-Bed rent: {rents}"
+    assert 2509 in rents, f"missing $2,509 2-Bed rent: {rents}"
+    assert 2865 in rents, f"missing $2,865 2-Bed rent: {rents}"
+
+
+def test_backwards_lookup_does_not_cross_prior_plan_boundary() -> None:
+    """Defensive: when previous plan's rent sits BEFORE the current
+    bed/bath token, the boundary check must stop the backwards search
+    from pulling it. Without the boundary guard the 1-Bed row would
+    inherit the previous 2-Bed's $3,500 rent."""
+    body = (
+        "Starting at $3,500 2 Bed | 2 Bath\n"
+        "Some amenity blurb in between, no dollar sign here.\n"
+        "1 Bed | 1 Bath"  # no rent before OR after — must skip
+    )
+    rows = parse_generic_plan_text(body, "u")
+    one_bed_rows = [r for r in rows if r.get("bedrooms") == "1"]
+    # Either the 1-bed row is skipped entirely (no rent found, correct),
+    # OR it has rent that is NOT the $3,500 from the prior plan.
+    for r in one_bed_rows:
+        rent = r.get("market_rent_low")
+        assert rent != 3500, f"1-bed row leaked prior plan's rent: {r}"
+
+
+def test_backwards_lookup_below_rent_floor_rejected() -> None:
+    """Defensive: a small $-amount (e.g. $150 application fee) just
+    before the bed/bath token must NOT be picked up as rent. Backwards
+    lookup must honor the RENT_FLOOR threshold (400)."""
+    body = "Application fee $150 1 Bed | 1 Bath"
+    rows = parse_generic_plan_text(body, "u")
+    # 1-bed row should NOT emit because no real rent is present.
+    one_bed_rent_rows = [
+        r for r in rows
+        if r.get("bedrooms") == "1" and r.get("market_rent_low")
+    ]
+    assert one_bed_rent_rows == [], (
+        f"backwards lookup picked up fee as rent: {one_bed_rent_rows}"
+    )
+
+
+def test_boundary_regex_recognizes_bare_bed_token() -> None:
+    """Regression: pre-fix the _NEXT_PLAN_BOUNDARY_RE only matched
+    ``bedroom|bdrm|bd|br`` (missing bare ``bed``), so forward-window
+    rent for the SECOND ``X Bed | X Bath`` plan would leak back to the
+    first. The boundary regex must now recognise bare ``bed`` too."""
+    from ma_poc.pms.adapters.generic_plan_text import _NEXT_PLAN_BOUNDARY_RE
+    assert _NEXT_PLAN_BOUNDARY_RE.search("2 Bed | 2 Bath") is not None
+    assert _NEXT_PLAN_BOUNDARY_RE.search("studio") is not None
+    assert _NEXT_PLAN_BOUNDARY_RE.search("1 Bedroom") is not None
+
+
 # ── adapter end-to-end ──
 
 

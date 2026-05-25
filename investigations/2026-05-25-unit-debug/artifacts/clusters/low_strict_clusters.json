@@ -1,0 +1,681 @@
+[
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [],
+    "count": 4,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      1146,
+      43715,
+      39953,
+      56144
+    ],
+    "tier_dist": {
+      "TIER_MERGED_CROSS_PAGE": 2,
+      "TIER_1_API": 1,
+      "TIER_1_API_REPLI360": 1
+    },
+    "samples": [
+      {
+        "pid": 1146,
+        "name": "Signal Pointe Apartment Homes",
+        "url": "http://www.signalpointe.com/"
+      },
+      {
+        "pid": 43715,
+        "name": "The Heritage at Boca Raton",
+        "url": "https://www.theheritageatbocaraton.com"
+      },
+      {
+        "pid": 39953,
+        "name": "Parker Towers",
+        "url": "https://www.parkertowers.com/"
+      },
+      {
+        "pid": 56144,
+        "name": "The 101",
+        "url": "http://www.the101kirkland.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans",
+    "fingerprint": [
+      "rentcafe",
+      "securecafe"
+    ],
+    "count": 4,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans)",
+    "pids": [
+      231522,
+      238993,
+      33471,
+      245783
+    ],
+    "tier_dist": {
+      "TIER_1_API_RENTCAFE_SECURECAFE": 2,
+      "TIER_1_DOM_RENTCAFE_NESTIN": 2
+    },
+    "samples": [
+      {
+        "pid": 231522,
+        "name": "Oakwood Estates",
+        "url": "https://www.oakwoodestatessiouxfalls.com/"
+      },
+      {
+        "pid": 238993,
+        "name": "Stony Creek",
+        "url": "http://www.liveatstonycreek.com/"
+      },
+      {
+        "pid": 33471,
+        "name": "Mills Crossing",
+        "url": "https://www.liveatmillscrossing.com"
+      },
+      {
+        "pid": 245783,
+        "name": "Panorama",
+        "url": "https://www.panoramachicagoapts.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_4_availability",
+    "fingerprint": [
+      "appfolio"
+    ],
+    "count": 2,
+    "action": "SHIP \u2014 drill into the matched path (4_availability)",
+    "pids": [
+      19927,
+      293188
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_APPFOLIO_VANITY": 2
+    },
+    "samples": [
+      {
+        "pid": 19927,
+        "name": "Country",
+        "url": "https://www.countryapts.com/"
+      },
+      {
+        "pid": 293188,
+        "name": "Arborview on the River",
+        "url": "https://www.arborviewspokane.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans",
+    "fingerprint": [
+      "securecafe"
+    ],
+    "count": 2,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans)",
+    "pids": [
+      37476,
+      272802
+    ],
+    "tier_dist": {
+      "TIER_1_API_RENTCAFE_SECURECAFE": 1,
+      "TIER_1_API_SIGHTMAP_IFRAME": 1
+    },
+    "samples": [
+      {
+        "pid": 37476,
+        "name": "Cole",
+        "url": "https://www.coleapts.com/cole-apartments-austin-tx/"
+      },
+      {
+        "pid": 272802,
+        "name": "The Residences at Water Square",
+        "url": "https://watersquareresidences.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_appfolio_NO_UNITS",
+    "fingerprint": [
+      "appfolio",
+      "wordpress"
+    ],
+    "count": 2,
+    "action": "DEBUG existing appfolio adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      284586,
+      252947
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_APPFOLIO_VANITY_PLAN_LEVEL": 2
+    },
+    "samples": [
+      {
+        "pid": 284586,
+        "name": "Valencia",
+        "url": "https://www.ardentcommunities.com/apartments/dublin/valencia?utm_source=google&utm_medium=organic&utm_campaign=gmb"
+      },
+      {
+        "pid": 252947,
+        "name": "Gage Crossing",
+        "url": "https://www.ardentcommunities.com/apartments/dublin/gage-crossing"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "appfolio"
+    ],
+    "count": 2,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      5488,
+      20386
+    ],
+    "tier_dist": {
+      "TIER_1_API_APPFOLIO": 2
+    },
+    "samples": [
+      {
+        "pid": 5488,
+        "name": "Arcadia 4127",
+        "url": "https://www.4127arcadia.com/"
+      },
+      {
+        "pid": 20386,
+        "name": "Escondido Apartments",
+        "url": "https://www.escondido-apts.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "cloudflare",
+      "sightmap"
+    ],
+    "count": 2,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      228359,
+      255578
+    ],
+    "tier_dist": {
+      "TIER_1_API_EQUITY": 2
+    },
+    "samples": [
+      {
+        "pid": 228359,
+        "name": "Milo",
+        "url": "https://www.equityapartments.com/denver/congress-park/milo-apartments"
+      },
+      {
+        "pid": 255578,
+        "name": "Circa Fitzsimons",
+        "url": "https://www.equityapartments.com/denver/central-park/circa-fitzsimons-apartments"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans",
+    "fingerprint": [],
+    "count": 2,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans)",
+    "pids": [
+      69307,
+      242565
+    ],
+    "tier_dist": {
+      "TIER_1_API_SIGHTMAP_DIRECT": 2
+    },
+    "samples": [
+      {
+        "pid": 69307,
+        "name": "Parq on Speer",
+        "url": "http://www.parqliving.com/"
+      },
+      {
+        "pid": 242565,
+        "name": "One Six Six",
+        "url": "https://onesixsixchicago.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "g5",
+      "rentmanager",
+      "resman"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      74031
+    ],
+    "tier_dist": {
+      "TIER_3_DOM": 1
+    },
+    "samples": [
+      {
+        "pid": 74031,
+        "name": "Emerald Pointe",
+        "url": "http://www.liveatemerald.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "rentmanager",
+      "rentvision",
+      "resman"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      36784
+    ],
+    "tier_dist": {
+      "TIER_MERGED_CROSS_PAGE": 1
+    },
+    "samples": [
+      {
+        "pid": 36784,
+        "name": "Cypress Grove",
+        "url": "https://www.cypressgroveaptliving.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans,3_floor-plans,4_availability",
+    "fingerprint": [],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans,3_floor-plans,4_availability)",
+    "pids": [
+      1152
+    ],
+    "tier_dist": {
+      "TIER_3_DOM": 1
+    },
+    "samples": [
+      {
+        "pid": 1152,
+        "name": "Sabal Club",
+        "url": "https://www.sabalclub.com"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "rentmanager",
+      "resman"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      25136
+    ],
+    "tier_dist": {
+      "TIER_3_DOM": 1
+    },
+    "samples": [
+      {
+        "pid": 25136,
+        "name": "Falls of Maplewood",
+        "url": "https://www.fallsofmaplewood.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_entrata_NO_UNITS",
+    "fingerprint": [
+      "amli",
+      "entrata",
+      "sightmap"
+    ],
+    "count": 1,
+    "action": "DEBUG existing entrata adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      261770
+    ],
+    "tier_dist": {
+      "TIER_MERGED_CROSS_PAGE": 1
+    },
+    "samples": [
+      {
+        "pid": 261770,
+        "name": "AMLI Broadway Park",
+        "url": "https://www.amli.com/apartments/denver/broadway-park-apartments/amli-broadway-park"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "securecafe"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      77168
+    ],
+    "tier_dist": {
+      "TIER_3_DOM": 1
+    },
+    "samples": [
+      {
+        "pid": 77168,
+        "name": "Des Arboles",
+        "url": "https://www.crosskeysapts.com"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "entrata",
+      "sightmap"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      6180
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_ENTRATA_PP_SSR": 1
+    },
+    "samples": [
+      {
+        "pid": 6180,
+        "name": "Renew One 59",
+        "url": "https://www.renewone59.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "cloudflare",
+      "entrata",
+      "wordpress"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      247218
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_ENTRATA_PP_SSR": 1
+    },
+    "samples": [
+      {
+        "pid": 247218,
+        "name": "Industry Tallahassee",
+        "url": "https://industry-tallahassee.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_appfolio_NO_UNITS",
+    "fingerprint": [
+      "appfolio",
+      "wix"
+    ],
+    "count": 1,
+    "action": "DEBUG existing appfolio adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      46581
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_APPFOLIO_VANITY": 1
+    },
+    "samples": [
+      {
+        "pid": 46581,
+        "name": "Villas on rock",
+        "url": "https://www.villasonrock.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "cloudflare",
+      "entrata",
+      "sightmap"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      35192
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_ENTRATA_PP_SSR": 1
+    },
+    "samples": [
+      {
+        "pid": 35192,
+        "name": "Enclave on Golden Triangle",
+        "url": "http://www.enclaveongoldentriangle.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "entrata"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      19939
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_GENERIC_PLAN_TEXT": 1
+    },
+    "samples": [
+      {
+        "pid": 19939,
+        "name": "Haven at South Mountain",
+        "url": "https://www.havenatsouthmountainapts.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "onesite"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      39995
+    ],
+    "tier_dist": {
+      "TIER_1_API_ONESITE_WORKFLOW": 1
+    },
+    "samples": [
+      {
+        "pid": 39995,
+        "name": "South Pointe",
+        "url": "https://www.southpointehanahan.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans,3_floor-plans,4_availability",
+    "fingerprint": [
+      "cloudflare",
+      "rentmanager",
+      "resman"
+    ],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans,3_floor-plans,4_availability)",
+    "pids": [
+      243936
+    ],
+    "tier_dist": {
+      "TIER_1_5_EMBEDDED": 1
+    },
+    "samples": [
+      {
+        "pid": 243936,
+        "name": "Centennial Gardens",
+        "url": "http://www.centennialgardensapts.com"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans,3_floor-plans,4_availability",
+    "fingerprint": [
+      "cloudflare",
+      "entrata",
+      "rentmanager",
+      "resman"
+    ],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans,3_floor-plans,4_availability)",
+    "pids": [
+      60305
+    ],
+    "tier_dist": {
+      "TIER_1_5_EMBEDDED": 1
+    },
+    "samples": [
+      {
+        "pid": 60305,
+        "name": "Preserve At Willow Springs",
+        "url": "https://www.preservethelifestyle.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans",
+    "fingerprint": [
+      "spherexx"
+    ],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans)",
+    "pids": [
+      42981
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_GENERIC_PLAN_TEXT": 1
+    },
+    "samples": [
+      {
+        "pid": 42981,
+        "name": "Alexander Pointe",
+        "url": "https://www.livealexanderpointefl.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans",
+    "fingerprint": [
+      "entrata"
+    ],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans)",
+    "pids": [
+      251384
+    ],
+    "tier_dist": {
+      "TIER_1_API_SIGHTMAP_IFRAME": 1
+    },
+    "samples": [
+      {
+        "pid": 251384,
+        "name": "Griffin 441",
+        "url": "https://griffin441.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_onesite_NO_UNITS",
+    "fingerprint": [
+      "onesite"
+    ],
+    "count": 1,
+    "action": "DEBUG existing onesite adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      21367
+    ],
+    "tier_dist": {
+      "TIER_1_API": 1
+    },
+    "samples": [
+      {
+        "pid": 21367,
+        "name": "4001 Midtown",
+        "url": "https://www.live4001midtown.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_g5_NO_UNITS",
+    "fingerprint": [
+      "g5"
+    ],
+    "count": 1,
+    "action": "DEBUG existing g5 adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      94997
+    ],
+    "tier_dist": {
+      "TIER_1_KNOCK_API": 1
+    },
+    "samples": [
+      {
+        "pid": 94997,
+        "name": "Sparq",
+        "url": "https://www.sparqsj.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "NO_FINGERPRINT_NO_API",
+    "fingerprint": [],
+    "count": 1,
+    "action": "PROBE \u2014 Chrome MCP rendered DOM; possible client-only React/Vue widget",
+    "pids": [
+      52562
+    ],
+    "tier_dist": {
+      "TIER_1_KNOCK_API": 1
+    },
+    "samples": [
+      {
+        "pid": 52562,
+        "name": "Juniper Square",
+        "url": "https://www.dwellara.com/property/park-place-manor"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "cloudflare",
+      "onesite",
+      "wordpress"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      14295
+    ],
+    "tier_dist": {
+      "TIER_1_API_ONESITE_WORKFLOW": 1
+    },
+    "samples": [
+      {
+        "pid": 14295,
+        "name": "Timber Ridge Apartment Homes",
+        "url": "https://www.myboulderapartment.com"
+      }
+    ]
+  }
+]
