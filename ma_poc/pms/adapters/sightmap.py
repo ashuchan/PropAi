@@ -184,7 +184,21 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
         if isinstance(area, (int, float)) and area > 0:
             sqft = str(int(area))
         else:
-            sqft = str(u.get("display_area") or "").strip()
+            # 2026-05-25 chip #10 follow-up: ``display_area`` occasionally
+            # carries a literal ``-1`` (and other non-positive sentinels)
+            # when the operator has not published square footage in
+            # SightMap. Earlier emit-then-flag handling left these rows
+            # with ``sqft="-1"`` (15 rows in TIER_1_API_SIGHTMAP_IFRAME_
+            # PLAN_LEVEL). Normalise non-positive numerics here so the
+            # downstream sqft=-1 cohort metric stops counting them.
+            display_area_raw = str(u.get("display_area") or "").strip()
+            sqft = display_area_raw
+            if display_area_raw:
+                try:
+                    if float(display_area_raw.replace(",", "")) <= 0:
+                        sqft = ""
+                except ValueError:
+                    pass
 
         beds = fp.get("bedroom_count")
         baths = fp.get("bathroom_count")
@@ -407,46 +421,83 @@ def _try_avalon_override_for_sightmap(
     return avalon_units
 
 
-def _drop_zero_info_sightmap_units(
-    units: list[dict[str, Any]], result: AdapterResult
-) -> int:
-    """Drop units with no rent AND no availability date — operator-published
-    placeholder rows that should not surface as AVAILABLE inventory.
+# Non-numeric rent_range sentinels that masquerade as "has rent" but
+# carry no positive price. Lowercased before comparison. Catches the
+# residue rows in TIER_1_API_SIGHTMAP_IFRAME_PLAN_LEVEL / _DIRECT_PLAN_LEVEL
+# / _DIRECT cohorts where ``display_price`` is a placeholder string the
+# original chip #10 exclude-set ({"", "$0", "0"}) missed.
+_SIGHTMAP_ZERO_RENT_SENTINELS: frozenset[str] = frozenset({
+    "", "$0", "0", "$0.00", "0.00", "$0,000",
+    "n/a", "na", "-", "—", "tbd", "call", "contact",
+    "call for pricing", "contact for pricing", "inquire",
+})
 
-    SightMap's ``data.units[]`` lists every leasable address on the property
-    map, even when the operator publishes no rent or turn date for that
-    unit (verified live 2026-05-25 on altisbluelake / eonflaglervillage /
-    hydeparkmckinney / 240parkave — every raw unit had ``price=None`` AND
-    ``display_price=None`` AND ``available_on=None`` AND
-    ``display_available_on=None``). ``parse_sightmap_payload`` was emitting
-    these with ``rent_range=""`` + ``availability_status="AVAILABLE"`` →
-    2,605 false-positive zero-rent rows in the canary report.
+
+def _sightmap_unit_has_rent(u: dict[str, Any]) -> bool:
+    """True iff *u* carries a positive numeric rent.
+
+    Checks every canonical rent field (chip #10 originally checked only
+    ``market_rent_low``/``market_rent_high``; post-process ``infer``
+    canonicalises to ``rent_low``/``rent_high`` so both must be sampled
+    to avoid the zero-rent residue cohort the chip #10 follow-up targets).
+    Non-numeric ``rent_range`` strings (``"TBD"``, ``"Call for pricing"``,
+    ``"—"``, ``"$0.00"``, etc.) are treated as no-rent via the
+    ``_SIGHTMAP_ZERO_RENT_SENTINELS`` set.
+    """
+    rr = str(u.get("rent_range") or "").strip()
+    if rr and rr.lower() not in _SIGHTMAP_ZERO_RENT_SENTINELS:
+        return True
+    for k in ("market_rent_low", "market_rent_high", "rent_low", "rent_high",
+              "asking_rent", "rent"):
+        v = u.get(k)
+        if isinstance(v, bool):  # bool is int subclass — exclude explicitly
+            continue
+        if isinstance(v, (int, float)) and v > 0:
+            return True
+    return False
+
+
+def _drop_zero_info_sightmap_units(
+    units: list[dict[str, Any]],
+    result: AdapterResult,
+    *,
+    keep_dated_no_rent: bool = False,
+) -> int:
+    """Drop SightMap units with no positive rent.
+
+    The original chip #10 (2026-05-25 ``dbd7d77``) dropped units that had
+    neither rent NOR an availability date — closing the 2,605-row
+    ``TIER_1_API_SIGHTMAP_IFRAME`` cluster from altisbluelake /
+    eonflaglervillage / hydeparkmckinney / 240parkave. That helper
+    intentionally kept "dated-but-not-priced" rows as informational
+    signal (the rescue chain then stamped ``data_gaps=["rent"]``).
+
+    Follow-up deep-probe 2026-05-25: the kept dated-no-rent rows are the
+    residue cohort: 199 in TIER_1_API_SIGHTMAP_IFRAME_PLAN_LEVEL, 80 in
+    TIER_1_API_SIGHTMAP_DIRECT_PLAN_LEVEL, 99 in TIER_1_API_SIGHTMAP_DIRECT.
+    The verdict layer (scraper.py ~L1236) downgrades these to ``_PLAN_LEVEL``
+    after no_rent retry exhaustion, but the dated-no-rent unit rows still
+    ship as zero-rent inventory. Default behaviour now drops them too.
 
     Filter gate (per unit):
-      - ``rent_range`` empty or in ``{"", "$0", "0"}``
-      - AND numeric ``market_rent_low``/``market_rent_high`` absent or zero
-      - AND ``availability_date`` empty or null-like
+      - no positive numeric rent in ANY canonical rent field
+        (``market_rent_low``/``_high``, ``rent_low``/``_high``,
+        ``asking_rent``, ``rent``)
+      - AND ``rent_range`` is empty / in ``_SIGHTMAP_ZERO_RENT_SENTINELS``
+        (catches ``"$0.00"``, ``"TBD"``, ``"—"``, ``"Call for pricing"``)
+
+    Set ``keep_dated_no_rent=True`` to opt into the original 2026-05-25
+    behaviour (keep rows that carry a populated ``availability_date``
+    even when rent is absent). No production caller takes that branch
+    after the follow-up — it's preserved for callers that explicitly
+    want the dated-no-rent informational rows.
 
     Mutates *units* in place. Returns the drop count. Appends a single
     ``sightmap-zero-info-dropped`` line to ``result.errors`` so the count
     is auditable per scrape.
-
-    Does NOT consider a unit's ``data_gaps`` / ``data_quality_flag`` — those
-    are caller-side flags set by ``_flag_sightmap_units_operator_rent_gap``
-    on the same condition, so the gates align by construction.
     """
     if not units:
         return 0
-
-    def _has_rent(u: dict[str, Any]) -> bool:
-        rr = str(u.get("rent_range") or "").strip()
-        if rr and rr not in {"", "$0", "0"}:
-            return True
-        for k in ("market_rent_low", "market_rent_high"):
-            v = u.get(k)
-            if isinstance(v, (int, float)) and v > 0:
-                return True
-        return False
 
     def _has_date(u: dict[str, Any]) -> bool:
         for k in ("availability_date", "available_date"):
@@ -461,16 +512,18 @@ def _drop_zero_info_sightmap_units(
     keep: list[dict[str, Any]] = []
     dropped = 0
     for u in units:
-        if _has_rent(u) or _has_date(u):
+        if _sightmap_unit_has_rent(u):
+            keep.append(u)
+        elif keep_dated_no_rent and _has_date(u):
             keep.append(u)
         else:
             dropped += 1
     if dropped:
         units[:] = keep
         result.errors.append(
-            f"sightmap-zero-info-dropped: {dropped} unit(s) had no rent "
-            f"and no availability date (operator publishes neither for "
-            f"this unit) — skipped to prevent false-positive AVAILABLE rows"
+            f"sightmap-zero-info-dropped: {dropped} unit(s) had no positive "
+            f"rent (operator publishes no price for this unit) — skipped "
+            f"to prevent false-positive AVAILABLE rows"
         )
     return dropped
 
@@ -620,13 +673,12 @@ class SightMapAdapter:
                 # case). If yes, swap in the Avalon-extracted units.
                 # If no Avalon signal, apply the rent-gap flag for
                 # genuinely non-Avalon operators (Rosera, Decron, etc.).
+                # 2026-05-25 chip #10 follow-up: share the rent predicate
+                # with the filter so paths agree on what "has rent" means
+                # (post-process canonicalises ``market_rent_*`` →
+                # ``rent_low/_high`` for some adapters).
                 _has_any_rent = any(
-                    str(u.get("rent_range") or "").strip() not in {"", "$0", "0"}
-                    or any(
-                        isinstance(u.get(k), (int, float)) and u.get(k) > 0
-                        for k in ("market_rent_low", "market_rent_high")
-                    )
-                    for u in result.units
+                    _sightmap_unit_has_rent(u) for u in result.units
                 )
                 if not _has_any_rent:
                     avalon_units = _try_avalon_override_for_sightmap(ctx, result)
@@ -740,12 +792,7 @@ class SightMapAdapter:
                     # taking the iframe-fallback path would still get
                     # wrongly flagged as rent-not-published.
                     _has_any_rent = any(
-                        str(u.get("rent_range") or "").strip() not in {"", "$0", "0"}
-                        or any(
-                            isinstance(u.get(k), (int, float)) and u.get(k) > 0
-                            for k in ("market_rent_low", "market_rent_high")
-                        )
-                        for u in result.units
+                        _sightmap_unit_has_rent(u) for u in result.units
                     )
                     if not _has_any_rent:
                         avalon_units = _try_avalon_override_for_sightmap(ctx, result)
