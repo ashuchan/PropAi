@@ -1490,6 +1490,76 @@ def _format_v2_unit(
     except Exception:
         floor_plan_id = None
 
+    # 2026-05-25 (canary 1ef1060 follow-up — per-unit concession + offer
+    # fields). The canonical ma_poc/core/schema_v2.py:_format_v2_unit emits
+    # 10 concession + offer columns per unit (concession_text,
+    # concession_text_clean, _concession_quality, concession_value,
+    # concession_source, offer_banner, offer_type, offer_target,
+    # offer_value, offer_conditions). The runner's _format_v2_unit was
+    # divergent — it dropped all of them, even though the adapters
+    # (via make_unit_dict in _parsing.py) populate concession_text and
+    # offer_* on every unit when the page carries a banner. Net effect
+    # in canary 1ef1060: 2,312 properties had a property-level
+    # ``concessions`` banner captured but ZERO units had per-unit
+    # concession/offer columns surfaced in the output.
+    #
+    # Sync the runner with schema_v2.py — same legacy-alias chain for
+    # the raw concession text, same concession_clean + offer_extract
+    # wiring. Additive: existing consumers that don't read these keys
+    # are unaffected; consumers that DO (offer reporting, xlsx export,
+    # downstream concession analytics) get parity with the canonical
+    # schema and the prod xlsx reference shape.
+    concession_text = unit.get("concession_text")
+    if not isinstance(concession_text, str) or not concession_text.strip():
+        concession_text = None
+    if not concession_text:
+        # Adapters emit concession under many names across parsers.
+        # Accept any string variant; non-strings fall through to None
+        # (the dict/list shapes get captured via the property-level
+        # ``concessions`` field upstream).
+        for _ck in (
+            "concession", "concessions", "specials_description",
+            "specialsDescription", "special", "specials",
+            "promotion", "promo", "offer", "offers",
+            "incentive", "incentives", "deal", "savings",
+            "discount", "free_rent", "look_and_lease",
+            "move_in_special",
+        ):
+            _cv = unit.get(_ck)
+            if isinstance(_cv, str) and _cv.strip():
+                concession_text = _cv.strip()
+                break
+
+    # Cleaned variant + quality classifier — both gated on a non-empty
+    # raw text. Importing the helpers lazily keeps the cold-start cost
+    # at zero for runs that never read these fields.
+    concession_text_clean = None
+    concession_quality = None
+    if concession_text:
+        try:
+            from ma_poc.core.concession_clean import (
+                classify_concession_quality,
+                clean_concession_text,
+            )
+            concession_text_clean = clean_concession_text(concession_text)
+            concession_quality = classify_concession_quality(concession_text)
+        except Exception:
+            # Never fail the unit emit on a concession-cleaning glitch —
+            # the raw text always survives via concession_text below.
+            concession_text_clean = None
+            concession_quality = None
+
+    # ``concession_value`` is a numeric (months free, $ off, etc.) that
+    # make_unit_dict sets when the offer_extract module successfully
+    # parses a structured offer. Coerce to float defensively — adapters
+    # have historically emitted strings or already-floats.
+    _cv_raw = unit.get("concession_value")
+    concession_value: float | None
+    try:
+        concession_value = float(_cv_raw) if _cv_raw not in (None, "") else None
+    except (TypeError, ValueError):
+        concession_value = None
+
     out: dict[str, Any] = {
         "beds": norm_beds,
         "baths": norm_baths,
@@ -1516,6 +1586,18 @@ def _format_v2_unit(
         "available_date": _format_date_str(unit.get("available_date")),
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date_str(unit.get("move_in_date") or unit.get("_move_in_date")),
+        # 2026-05-25 (canary 1ef1060 follow-up): concession + offer fields,
+        # synced with ma_poc/core/schema_v2.py:_format_v2_unit. 10 new keys.
+        "concession_text": concession_text,
+        "concession_text_clean": concession_text_clean,
+        "_concession_quality": concession_quality,
+        "concession_value": concession_value,
+        "concession_source": unit.get("concession_source") or None,
+        "offer_banner": unit.get("offer_banner") or None,
+        "offer_type": unit.get("offer_type") or None,
+        "offer_target": unit.get("offer_target") or None,
+        "offer_value": unit.get("offer_value") or None,
+        "offer_conditions": unit.get("offer_conditions") or None,
     }
 
     # Merge-rescue: if no natural id survived, derive a stable inferred id
