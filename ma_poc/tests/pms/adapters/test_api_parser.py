@@ -6,14 +6,12 @@ originals in scripts/entrata.py and scripts/scrape_properties.py.
 
 from __future__ import annotations
 
-import pytest
-
 from ma_poc.pms.adapters._api_parser import (
-    TARGET_JSONLD_TYPES,
     _RENT_KEYS,
     _RENT_MAX,
     _RENT_MIN,
     _UNIT_ID_KEYS,
+    TARGET_JSONLD_TYPES,
     _extract_rent,
     _find_list,
     _get,
@@ -28,7 +26,6 @@ from ma_poc.pms.adapters._api_parser import (
     realpage_units_from_body,
     realpage_units_to_adapter_shape,
 )
-
 
 # ── _money_to_int ──────────────────────────────────────────────────────────────
 
@@ -471,3 +468,196 @@ class TestPlanUnitForeignKeyJoin:
         units = parse_api_responses([{"url": "https://x.test/api", "body": body}])
         assert len(units) == 2
         assert {u["floor_plan_name"] for u in units} == {"1BR", "2BR"}
+
+    # ─────────────────────────────────────────────────────────────────
+    # 2026-05-25 — canary 1ef1060 regression #1 follow-up.
+    #
+    # ResMan / Razz / Vike-CMS shape (pmiflorida.com signature):
+    #   models: [{id: "2x2 Up", label: "2 Bedroom, 2 Bathroom",
+    #             beds: 2, baths: 2, sqft, rent, ...}]
+    #   units:  [{id: "1833",  model_id: "2x2 TH", beds: 2, baths: 2,
+    #             sqft: {...}, rent: {...}, ...}]
+    #
+    # Pre-fix: ``label`` survived the merge → all units that shared a
+    # plan collided on dedup_key (the unit_number ``_get`` chain picks
+    # ``label`` before ``id``). 345 units → 2 buckets. Affected 61
+    # properties × 7,048 units lost across the EMBEDDED tier.
+    #
+    # Post-fix: ``label`` is stripped from the plan side (promoted to
+    # ``planName`` if no ``name`` exists), and the unit's ``id`` is
+    # promoted to ``unit_number`` when no ``name`` is available.
+    # ─────────────────────────────────────────────────────────────────
+
+    def test_fk_unit_id_promoted_to_unit_number_via_id_not_label(self):
+        """ResMan-style shape: units carry ``id`` as the per-apartment
+        identifier; plans carry ``label`` as the display string. Without
+        the fix all units collapse to N buckets by label."""
+        body = {
+            "models": [
+                {"id": "2x2 TH", "label": "2 Bedroom, 2 Bathroom",
+                 "beds": 2, "baths": 2, "sqft": {"min": 1082, "max": 1082},
+                 "rent": {"min": 1505, "max": 1505}},
+                {"id": "1x1 L", "label": "1 Bedroom, 1 Bathroom",
+                 "beds": 1, "baths": 1, "sqft": {"min": 697, "max": 697},
+                 "rent": {"min": 1305, "max": 1305}},
+            ],
+            "units": [
+                {"id": "1833", "model_id": "2x2 TH", "beds": 2, "baths": 2,
+                 "sqft": {"min": 1082, "max": 1082},
+                 "rent": {"min": 1505, "max": 1505},
+                 "available": False, "floor_id": "N/A_1"},
+                {"id": "1835", "model_id": "2x2 TH", "beds": 2, "baths": 2,
+                 "sqft": {"min": 1082, "max": 1082},
+                 "rent": {"min": 1505, "max": 1505},
+                 "available": False, "floor_id": "N/A_1"},
+                {"id": "2053C", "model_id": "2x2 TH", "beds": 2, "baths": 2,
+                 "sqft": {"min": 1082, "max": 1082},
+                 "rent": {"min": 1505, "max": 1505},
+                 "available": True, "floor_id": "N/A_2"},
+                {"id": "201A", "model_id": "1x1 L", "beds": 1, "baths": 1,
+                 "sqft": {"min": 697, "max": 697},
+                 "rent": {"min": 1305, "max": 1305},
+                 "available": True, "floor_id": "N/A_1"},
+            ],
+        }
+        units = parse_api_responses(
+            [{"url": "embedded:json-block:vike_pageContext", "body": body}]
+        )
+        # All 4 distinct units must survive — no collapse to 2.
+        assert len(units) == 4, (
+            f"expected 4 distinct units; got {len(units)} (dedup collapsed "
+            f"on plan label?). Got unit_numbers: "
+            f"{[u['unit_number'] for u in units]}"
+        )
+        unit_nums = {u["unit_number"] for u in units}
+        assert unit_nums == {"1833", "1835", "2053C", "201A"}, (
+            f"unit_numbers must be the unit's ``id`` field, not the "
+            f"plan's ``label``; got {unit_nums}"
+        )
+        # floor_plan_name still resolves — promoted from plan's ``label``
+        # into ``planName`` during the merge.
+        plan_names = {u["floor_plan_name"] for u in units}
+        assert plan_names == {"2 Bedroom, 2 Bathroom", "1 Bedroom, 1 Bathroom"}
+
+    def test_fk_plan_label_promoted_when_no_name(self):
+        """Plans without a ``name`` field still surface their display
+        string via ``planName`` (promoted from ``label``). Ensures the
+        floor-plan column is never blank just because we stripped
+        ``label`` to fix the unit_number collision.
+
+        Note: FK-join requires ≥2 unit matches, so this fixture has
+        2 units sharing the same plan."""
+        body = {
+            "models": [
+                {"id": "P1", "label": "The Oakwood",
+                 "beds": 2, "sqft": {"min": 900}, "rent": {"min": 1600}},
+            ],
+            "units": [
+                {"id": "101", "model_id": "P1", "beds": 2,
+                 "sqft": {"min": 900}, "rent": {"min": 1600},
+                 "available": True},
+                {"id": "102", "model_id": "P1", "beds": 2,
+                 "sqft": {"min": 900}, "rent": {"min": 1600},
+                 "available": True},
+            ],
+        }
+        units = parse_api_responses([{"url": "x", "body": body}])
+        assert len(units) == 2
+        nums = {u["unit_number"] for u in units}
+        assert nums == {"101", "102"}, (
+            f"both units must keep their own ids; got {nums}"
+        )
+        plan_names = {u["floor_plan_name"] for u in units}
+        assert plan_names == {"The Oakwood"}, (
+            f"plan label must promote to floor_plan_name; got {plan_names}"
+        )
+
+    def test_fk_plan_name_still_wins_over_label_when_both_present(self):
+        """If a plan has BOTH ``name`` and ``label``, ``name`` is the
+        canonical floor-plan identifier — keep that promotion semantics
+        (pre-fix behaviour for plans that have a proper name).
+
+        FK-join requires ≥2 unit matches, so this fixture has 2 units."""
+        body = {
+            "models": [
+                {"id": "P1", "name": "Oakwood Premium",
+                 "label": "2BR/2BA — display string",
+                 "beds": 2, "sqft": {"min": 1100}, "rent": {"min": 2000}},
+            ],
+            "units": [
+                {"id": "201", "model_id": "P1", "beds": 2,
+                 "sqft": {"min": 1100}, "rent": {"min": 2000},
+                 "available": True},
+                {"id": "202", "model_id": "P1", "beds": 2,
+                 "sqft": {"min": 1100}, "rent": {"min": 2000},
+                 "available": True},
+            ],
+        }
+        units = parse_api_responses([{"url": "x", "body": body}])
+        assert len(units) == 2
+        # name wins over label as the canonical plan identifier
+        plan_names = {u["floor_plan_name"] for u in units}
+        assert plan_names == {"Oakwood Premium"}
+        # unit_number is each unit's own ``id``
+        nums = {u["unit_number"] for u in units}
+        assert nums == {"201", "202"}
+
+    def test_fk_unit_name_still_wins_over_unit_id_for_unit_number(self):
+        """When a unit has BOTH ``name`` and ``id``, ``name`` is the
+        per-apartment identifier (pre-fix promotion still applies). The
+        id-promotion is the FALLBACK for units that lack a name. Knock
+        / RentManager uses ``name=unit_number``; ResMan uses ``id``.
+
+        FK-join requires ≥2 unit matches, so this fixture has 2 units."""
+        body = {
+            "layouts": [
+                {"id": 1, "name": "The Oak", "area": 850, "beds": 1, "baths": 1},
+            ],
+            "units": [
+                {"layoutId": 1, "id": "internal-uuid-xxx", "name": "Apt 101",
+                 "displayPrice": 1500, "availableOn": "2026-06-01"},
+                {"layoutId": 1, "id": "internal-uuid-yyy", "name": "Apt 102",
+                 "displayPrice": 1550, "availableOn": "2026-06-15"},
+            ],
+        }
+        units = parse_api_responses([{"url": "x", "body": body}])
+        assert len(units) == 2
+        # name="Apt 101"/"Apt 102" wins over id="internal-uuid-xxx/yyy"
+        nums = {u["unit_number"] for u in units}
+        assert nums == {"Apt 101", "Apt 102"}, (
+            f"unit ``name`` must win over ``id``; got {nums}"
+        )
+
+    def test_fk_345_unit_pinecrest_signature_recovery(self):
+        """Synthesize 345 units across 7 plans (Villas at Pinecrest
+        signature). Pre-fix: ~7 buckets (dedup by plan label).
+        Post-fix: 345 distinct units (dedup by unit id)."""
+        plans = [
+            {"id": f"plan-{i}", "label": f"Plan {i} Display",
+             "beds": (i % 3) + 1, "baths": 1,
+             "sqft": {"min": 700 + i * 50}, "rent": {"min": 1300 + i * 100}}
+            for i in range(7)
+        ]
+        units = []
+        for i in range(345):
+            plan_idx = i % 7
+            units.append({
+                "id": f"unit-{i:04d}",
+                "model_id": f"plan-{plan_idx}",
+                "beds": (plan_idx % 3) + 1, "baths": 1,
+                "sqft": {"min": 700 + plan_idx * 50},
+                "rent": {"min": 1300 + plan_idx * 100},
+                "available": i % 5 == 0,
+            })
+        body = {"models": plans, "units": units}
+        result = parse_api_responses([{"url": "embedded:test", "body": body}])
+        assert len(result) == 345, (
+            f"345-unit dataset must survive merge; got {len(result)} "
+            f"(would be ~7 pre-fix due to label collision)"
+        )
+        # Every unit_number must be distinct
+        nums = {u["unit_number"] for u in result}
+        assert len(nums) == 345, (
+            f"unit_numbers must be unique; got {len(nums)} distinct "
+            f"out of 345 rows"
+        )
