@@ -90,3 +90,57 @@ Artifacts under `investigations/2026-05-25-unit-debug/`:
 | 5 | FLOORPLAN_INDEX_NO_UNITS no-fingerprint cluster — Chrome MCP probe | Chip | 4 sample → unknown |
 
 Action 1 doesn't conflict with any in-flight chip (`_parsing.py` chip owns shared regex; `generic_plan_text.py` is a separate adapter file).
+
+---
+
+# Wave 2 (2026-05-25, 160 fresh props) — top clusters
+
+| # | Cluster | Count | Action |
+|---|---|---:|---|
+| 1 | NO_FINGERPRINT_NO_API | 24 | SPAWN CHIP: Chrome MCP rendered DOM probe — custom CMSes / JS-only widgets |
+| 2 | HAS_UNIT_MARKERS_AT_2_floorplans rentcafe,securecafe | 16 | FALSE POSITIVE confirmed on 3 — heuristic counted JS `unit_number` variable. Real SecureCafe drill machinery handles these; chase what's blocking it (anti-bot? timing?) |
+| 3 | FLOORPLAN_INDEX_NO_UNITS cloudflare,entrata,sightmap | 12 | SPAWN CHIP: Cloudflare-fronted Entrata+SightMap drill |
+| 4 | FLOORPLAN_INDEX_NO_UNITS marketapts | 8 | Already chip-queued |
+| 5 | FETCH_ERROR | 5 | DEFER — DNS / hard fetch fail |
+| 6 | FINGERPRINT_g5_NO_UNITS | 5 | Likely operator-data-gap — verify + flag |
+| 7 | FLOORPLAN_INDEX_NO_UNITS wordpress | 4 | Same Elementor signature as 1045 on the Park; existing fix may already cover |
+
+---
+
+# sqft=-1 probe (52 props, 3,483 total units in cohort)
+
+**Triage:**
+- **42 SQFT_TRULY_ABSENT (81%)** — operator-data-gap; not a bug, flag it
+- **9 SQFT_FOUND_AT_*** (17%) — adapter miss, sqft IS on site
+- **1 BLOCKED** — defer
+
+**Per-tier extraction-miss rate (sample):**
+
+| Tier | Sample | Adapter miss % | Cohort units |
+|---|---:|---:|---:|
+| TIER_1_DOM_APPFOLIO_VANITY | 8 | 0% | 843 |
+| TIER_1_DOM_APPFOLIO_VANITY_PLAN_LEVEL | 3 | 0% | 252 |
+| TIER_1_DOM_GENERIC_PLAN_TEXT | 8 | 38% | 773 |
+| TIER_1_API_RENTCAFE_SECURECAFE | 6 | **67%** | 475 |
+| TIER_MERGED_CROSS_PAGE | 5 | 20% | 326 |
+| TIER_3_DOM | 5 | 20% | 211 |
+| TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL | 4 | 0% | 155 |
+| Others (10 tiers, samples 2-4) | 25 | 0-25% | ~450 |
+
+**Highest-leverage findings:**
+1. **AppFolio sqft = TRUE operator-data-gap** (0% adapter miss, 100% absent on 11 sampled). 1,095 units across ~100 props affected — should be FLAGGED as `data_gaps=["sqft"]` not counted against quality.
+2. **SecureCafe sqft = 67% adapter miss** — vanity site /floorplans pages do publish sqft but the SC drill doesn't FK-join from them. Patterns vary across sites (`"1 Bedroom, 1 Bathroom 700 sq. ft."` on vestaviaplace, `"B5 2 Bed / 2 Bath / 1119 sq ft"` on ardencebloom, JSON-in-script on themtroyal/alvista23). Universal fix is non-trivial — best as a chip.
+3. **GENERIC_PLAN_TEXT sqft = 38% adapter miss** — sqft is on `/floorplans` subpage but adapter operated on landing-page body. Orchestrator should chase subpages first; `_generic_dom_floorplans.py` may already handle but isn't being called consistently.
+
+---
+
+# Net actionable from waves 1+2+sqft probe
+
+| Action | Status |
+|---|---|
+| #1 ChromeMCP probe NO_FINGERPRINT_NO_API cluster (24p w2 + ~16 in main cohort) | **SPAWN CHIP** |
+| #2 SecureCafe sqft FK-join from vanity /floorplans | **SPAWN CHIP** (multi-pattern, multi-day) |
+| #3 GENERIC_PLAN_TEXT orchestrator subpage chase | **SPAWN CHIP** (touches orchestrator) |
+| #4 AppFolio data_gaps=["sqft"] flag | **SPAWN CHIP** (needs canary-export changes to make visible) |
+| #5 Cloudflare Entrata+SightMap FLOORPLAN_INDEX cohort (12p) | **SPAWN CHIP** |
+
