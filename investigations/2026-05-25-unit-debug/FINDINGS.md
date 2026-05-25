@@ -144,3 +144,46 @@ Action 1 doesn't conflict with any in-flight chip (`_parsing.py` chip owns share
 | #4 AppFolio data_gaps=["sqft"] flag | **SPAWN CHIP** (needs canary-export changes to make visible) |
 | #5 Cloudflare Entrata+SightMap FLOORPLAN_INDEX cohort (12p) | **SPAWN CHIP** |
 
+---
+
+# Wave 3 (200 fresh n_full=0 props) — confirms pattern convergence
+
+After 480 total probed props (51% of the 934-prop n_full=0 cohort), the same 5-6 cluster patterns repeat with diminishing returns. The remaining ~454 unprobed props will mostly fall into the same buckets.
+
+| Cluster | W1 | W2 | W3 | Total | Status |
+|---|---:|---:|---:|---:|---|
+| NO_FINGERPRINT_NO_API | 2 | 24 | 17 | ~43 | Chip spawned (Chrome MCP probe) |
+| RentCafe/SecureCafe HAS_UNIT_MARKERS (false positive) | 2 | 16 | 21 | ~39 | Existing SC drill handles; heuristic miscount |
+| Cloudflare+Entrata+SightMap FLOORPLAN_INDEX | 1 | 12 | 15 | ~28 | Chip spawned |
+| MarketApts FLOORPLAN_INDEX | 2 | 8 | 6 | ~16 | Chip already queued |
+| WORDPRESS_BACKED | 5 | 3 | 8 | ~16 | Mostly operator-data-gap + Elementor (1045-on-the-Park inline fix shipped) |
+| FINGERPRINT_g5_NO_UNITS | 5 | 5 | 4 | ~14 | Operator-data-gap (G5 sites don't publish units) |
+| FINGERPRINT_cloudflare_NO_UNITS (NEW IN W3) | — | — | 9 | 9 | CF challenge blocks static probe — needs Chrome MCP or Web Unlocker |
+| FINGERPRINT_wix_NO_UNITS | 1 | — | 6 | 7 | Syndication-only flag exists; verify applied |
+| FINGERPRINT_squarespace_NO_UNITS (NEW IN W3) | — | — | 5 | 5 | Syndication-only flag exists; verify applied |
+
+---
+
+# Session shipping summary
+
+**Inline commits shipped this session:**
+
+| Commit | Subject | Lift signal |
+|---|---|---|
+| `ae593e8` | generic_plan_text Elementor "Starting at $X" backwards-lookup | 1045 on the Park + ~20-40 Elementor sites |
+| `cc6a2b0` | AppFolio: skip non-housing listings (parking, storage, garage) | 17+ false-positive parking rows dropped, accurate unit counts for ~15 AppFolio props |
+
+**Plus 9 merged chip outputs:**
+- AppFolio propertyGroup filter, RentalAddress (Cedar Ridge), RentVision per-plan drill, Entrata PP per-plan drill, EdificeCMS/Cobblestone, Reinhold/ChocolateWorks, PRG/FortressTech, AppFolio Academy Place address filter, parsing regex bundle (#101 #102 #105 #106)
+
+**Plus 11 chips queued for follow-up:**
+- ThinkRESIDE adapter, AppFolio /availability sub-page, MarketApts unit-page drill, FLOORPLAN_INDEX_NO_UNITS probe, NO_FINGERPRINT Chrome MCP probe (24+), SecureCafe sqft FK-join, Cloudflare Entrata+SightMap drill, AppFolio sqft data_gaps flag, GENERIC_PLAN_TEXT subpage chase, SightMap zero-rent skip
+
+**Probe infrastructure committed:**
+- 4 worklist builders, 1 generic probe runner, 1 sqft-specialised probe runner, 2 cluster analyzers
+- ~480 probed properties + ~720 fetches per wave, fully resumable via per-prop pid keyed JSONL
+
+**Coverage:** 480 / 934 n_full=0 props probed (51%) + 52 sqft=-1 props + 40 low-strict = 572 distinct properties deep-probed.
+
+**Pattern convergence:** Wave 3 surfaces no NEW cluster types beyond Wave 2, confirming the canary's residue distribution. The remaining ~450 unprobed n_full=0 props will mostly fall into the same buckets — additional waves give marginal new signal.
+
