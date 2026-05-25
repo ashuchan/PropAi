@@ -500,6 +500,93 @@ def test_pure_knock_no_onesite_still_knock() -> None:
     assert r.pms == "knock"
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-25 canary 1ef1060 regression #7 — apts247 vs ResMan co-resident
+#
+# User-flagged via Encore on Mustang (pid 9186,
+# encoreonmustangapts.com) and Regency Grove (liveatregencygrove.com).
+# Both sites use the apts247 ``/api/v1/floorplans/?api_key=`` data API
+# (returns 11 / 10 real units with rent + sqft + unit_number) but
+# also link to ResMan applicant-registration URLs
+# (``<client>.myresman.com/Portal/Applicants/New/...``). The ResMan
+# adapter's discovery regex matches only the Availability portal
+# (``/Portal/Applicants/Availability?a=&p=``), so even though resman
+# WINS the detector at 0.90 tied with apts247, the adapter then fails
+# to find any portal URL and falls through to generic → TIER_3_DOM
+# with plan-level summaries (no real unit_number / sqft / date).
+#
+# Fix (this commit): when apts247 markers are also present, demote
+# resman to 0.85 so apts247 wins. Pure ResMan sites (no apts247
+# co-resident) keep firing at 0.90.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_apts247_wins_when_co_resident_with_resman_registration_link() -> None:
+    """The Encore on Mustang signature — apts247 widget + same-origin
+    /api/v1/floorplans/ API, with ResMan only as the apply-flow
+    target (not the leasing system)."""
+    html = (
+        '<html><head>'
+        '<script src="https://static2.apts247.info/js/communityextrainfo.min.js"></script>'
+        '<script src="https://static2.apts247.info/js/nextgen/floorplans/one/dist/main.min.js"></script>'
+        '<script>const api_key = "b7295ca5a2e768ac626242e3e1f7c08a0366782b";</script>'
+        '</head><body>'
+        '<a href="https://richmark.myresman.com/Portal/Access/ApplicantRegistration?accountID=1054">'
+        'Apply Now</a>'
+        '</body></html>'
+    )
+    r = detect_pms("https://www.encoreonmustangapts.com/", page_html=html)
+    assert r.pms == "apts247", (
+        f"co-resident apts247+ResMan must route to apts247 (the real data "
+        f"API); got pms={r.pms!r} confidence={r.confidence}"
+    )
+
+
+def test_pure_resman_no_apts247_still_resman() -> None:
+    """Sanity — when ResMan is the real PMS (no apts247 widget),
+    the resman detector still fires at the original 0.90 confidence.
+    Preserves the 35-site cohort that ResMan adapter handles correctly."""
+    html = (
+        '<html><body>'
+        '<a href="https://richmark.myresman.com/Portal/Applicants/Availability?'
+        'a=1054&p=abc-def">Check Availability</a>'
+        '</body></html>'
+    )
+    r = detect_pms("https://example-pure-resman.com/", page_html=html)
+    assert r.pms == "resman"
+    assert r.confidence >= 0.90, (
+        f"pure ResMan must still fire at full 0.90; got {r.confidence}"
+    )
+
+
+def test_pure_apts247_no_resman_still_apts247() -> None:
+    """Sanity — a pure apts247 site (no ResMan apply links) routes to
+    apts247 at 0.90."""
+    html = (
+        '<html><head>'
+        '<script src="https://static2.apts247.info/js/nextgen/main.min.js"></script>'
+        '</head></html>'
+    )
+    r = detect_pms("https://example-pure-apts247.com/", page_html=html)
+    assert r.pms == "apts247"
+
+
+def test_rentdynamics_marker_also_triggers_apts247_gate() -> None:
+    """The apts247 detector also fires on ``rentdynamics.com`` (same
+    company). Verify the Knock-gate also recognises that as the
+    co-resident-apts247 signal."""
+    html = (
+        '<html><body>'
+        '<script src="https://cdn.rentdynamics.com/widget.js"></script>'
+        '<a href="https://x.myresman.com/Portal/Applicants/Availability?a=1&p=2">Apply</a>'
+        '</body></html>'
+    )
+    r = detect_pms("https://example-rd.com/", page_html=html)
+    assert r.pms == "apts247", (
+        f"co-resident rentdynamics+ResMan must route to apts247; got {r.pms}"
+    )
+
+
 def test_commoncf_entrata_strong_marker_beats_squarespace_shell() -> None:
     # F0.3 regression test: ``commoncf.entrata.com`` was added to pass 1 as a
     # strong portal signal (it's an Entrata-served CDN host that only appears

@@ -949,20 +949,40 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # page. 2026-05-17 canary 842-pool deep-probe: 67+ sites the detector
     # missed (fell to LLM/floorplan). Portal is NOT Cloudflare-fronted, so
     # the ResMan adapter recovers Tier-1 unit-level even proxy-less.
+    #
+    # 2026-05-25 (user-flagged via Encore on Mustang pid 9186 + Regency
+    # Grove): the resman marker fires on properties where ResMan is the
+    # apply-flow target (``*.myresman.com/Portal/Applicants/New/...``
+    # registration link) while the actual leasing data is on the apts247
+    # ``/api/v1/floorplans/?api_key=`` API. Co-resident with apts247
+    # markers, resman wins yield-order at the tied 0.90 and the resman
+    # adapter then fails to find a portal URL (the registration link
+    # isn't a portal). Fix: when apts247 markers are also present,
+    # demote resman to 0.85 so apts247 wins. Same pattern as the
+    # 2026-05-25 Knock-vs-OneSite gate.
+    _has_apts247_marker = "apts247" in h or "rentdynamics.com" in h
     if "myresman.com" in h or "/portal/applicants/availability" in h:
-        yield (
-            "resman",
-            0.90,
-            ["ResMan marker in HTML "
-             "(myresman.com / Portal/Applicants/Availability)"],
-        )
+        if _has_apts247_marker:
+            yield (
+                "resman",
+                0.85,
+                ["ResMan marker present but apts247 co-resident — "
+                 "apts247 is the data API, ResMan is the apply-flow target"],
+            )
+        else:
+            yield (
+                "resman",
+                0.90,
+                ["ResMan marker in HTML "
+                 "(myresman.com / Portal/Applicants/Availability)"],
+            )
 
     # Apts247 / RentDynamics — JS leasing widget (static2.apts247.info /
     # media.apts247.info) with a SAME-ORIGIN /api/v1/floorplans/?api_key=
     # data API. 2026-05-17 canary Chrome-MCP no-signature deep-probe: a
     # ≥4-site cluster invisible to static curl_cffi (inventory is fetched
     # client-side). api_key is in the homepage HTML ⇒ deterministic Tier-1.
-    if "apts247" in h or "rentdynamics.com" in h:
+    if _has_apts247_marker:
         yield (
             "apts247",
             0.90,
