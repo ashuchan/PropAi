@@ -580,7 +580,9 @@ def test_template_f_multiple_rows_across_bedroom_tables() -> None:
 async def test_adapter_template_a_extract() -> None:
     payload = {"template": "A", "plans": [_PLAN_A_TWO_UNITS]}
     result = await MarketAptsAdapter().extract(_FakePage(payload), _ctx())  # type: ignore[arg-type]
-    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_A"
+    # Two unit-level rows → ``_UNIT_LEVEL`` suffix per the 2026-05-25
+    # deep-probe tier-label upgrade.
+    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_A_UNIT_LEVEL"
     assert len(result.units) == 2
     assert result.units[0]["unit_number"] == "213"
     assert result.confidence > 0.7
@@ -591,7 +593,8 @@ async def test_adapter_template_b_extract() -> None:
     payload = {"template": "B", "plans": [_PLAN_B_TWO_UNITS]}
     fake = _FakePage(payload, url="https://www.aspirethunderbird.com/floorplans")
     result = await MarketAptsAdapter().extract(fake, _ctx("https://www.aspirethunderbird.com/"))  # type: ignore[arg-type]
-    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_B"
+    # Drill walked → unit-level tier label.
+    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_B_UNIT_LEVEL"
     assert len(result.units) == 2
     assert result.units[0]["unit_number"] == "1060"
     assert result.units[0]["market_rent_low"] == 949
@@ -601,13 +604,13 @@ async def test_adapter_template_b_extract() -> None:
 @pytest.mark.asyncio
 async def test_adapter_template_c_extract() -> None:
     """End-to-end: Template C payload → Tier-1 DOM rows with tier
-    label ``TIER_1_DOM_MARKETAPTS_C``."""
+    label ``TIER_1_DOM_MARKETAPTS_C_UNIT_LEVEL`` (drilled)."""
     payload = {"template": "C", "plans": [_PLAN_C_STUDIO, _PLAN_C_ONE_BEDROOM]}
     fake = _FakePage(payload, url="https://www.thereserveatwatertowervillage.com/floorplans")
     result = await MarketAptsAdapter().extract(
         fake, _ctx("https://www.thereserveatwatertowervillage.com/")
     )  # type: ignore[arg-type]
-    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_C"
+    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_C_UNIT_LEVEL"
     assert len(result.units) == 3
     unit_numbers = sorted(u["unit_number"] for u in result.units)
     assert unit_numbers == ["2-106", "3-201", "4-114"]
@@ -617,15 +620,16 @@ async def test_adapter_template_c_extract() -> None:
 @pytest.mark.asyncio
 async def test_adapter_template_d_extract() -> None:
     """End-to-end: Template D payload → Tier-1 DOM rows with tier
-    label ``TIER_1_DOM_MARKETAPTS_D`` (D reuses the B parser internally
-    but the adapter stamps the D label so reporting can tell them
-    apart)."""
+    label ``TIER_1_DOM_MARKETAPTS_D_UNIT_LEVEL`` (D reuses the B parser
+    internally but the adapter stamps the D label so reporting can
+    tell them apart; ``_UNIT_LEVEL`` is appended because the drill
+    walked)."""
     payload = {"template": "D", "plans": [_PLAN_D_TWO_UNITS]}
     fake = _FakePage(payload, url="https://www.riverbankapartments.com/floor-plans")
     result = await MarketAptsAdapter().extract(
         fake, _ctx("https://www.riverbankapartments.com/")
     )  # type: ignore[arg-type]
-    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_D"
+    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_D_UNIT_LEVEL"
     assert len(result.units) == 2
     assert result.units[0]["unit_number"] == "19-411"
     assert result.units[0]["availability_date"] == "05/21/2026"
@@ -839,4 +843,455 @@ def test_dom_js_url_probe_includes_availability_path() -> None:
     # Order: /floorplans → /floor-plans → /availability
     assert fp_idx < fph_idx < avail_idx, (
         "URL probe order must be /floorplans → /floor-plans → /availability"
+    )
+
+
+# ── 2026-05-25 deep-probe regression: n_full=0 cohort fixes ─────────
+#
+# 15 TIER_1_DOM_MARKETAPTS properties routed correctly but emitted
+# zero unit-level rows in the canary. Live probe of Brookstone
+# Apartments (Template D) and Hill Country Villas (Template B)
+# revealed three bugs:
+#
+#   1. Template B drill-anchor regex only matched
+#      "View Available / View Details / See Available" — but live
+#      anchors read "3 Units Available", "1 Apartment Available",
+#      etc. Drill was never walked → plan-only rows.
+#   2. Drill row cells include mobile-only label spans
+#      (``<span class="visible-xs"><b>Unit:</b></span>``) that
+#      contaminate desktop textContent with "Unit: 0827" instead of
+#      "0827" → unit_number malformed.
+#   3. Template D drill anchors emit relative paths without a leading
+#      slash (``apartments/1-bedroom``); the previous origin-join only
+#      handled ``/-leading`` paths so the relative form fetched the
+#      wrong URL (resolving against the current page's directory
+#      instead of the site root).
+#
+# Fixtures are byte-snippets captured 2026-05-25 from the live sites.
+
+
+import re as _re_for_tests  # noqa: E402  intentionally aliased for test isolation
+from pathlib import Path  # noqa: E402
+
+from ma_poc.pms.adapters.marketapts import (  # noqa: E402
+    _MARKETAPTS_DOM_JS,
+    _strip_drill_cell_label,
+)
+
+_FIXTURES = Path(__file__).parent / "fixtures" / "marketapts"
+
+
+def _read_fixture(name: str) -> str:
+    return (_FIXTURES / name).read_text()
+
+
+def _js_drill_anchor_matches(href: str, text: str) -> bool:
+    """Python mirror of the Template B drill-anchor matcher in
+    ``_MARKETAPTS_DOM_JS``. Single source of truth for the regex —
+    extracted to a helper so the test below can exercise it against
+    live anchor wordings.
+    """
+    t = text.lower()
+    return bool(
+        _re_for_tests.search(r"/unit/", href)
+        or _re_for_tests.search(r"view\s+available|view\s+details|see\s+available", t)
+        or _re_for_tests.search(r"\b\d+\s+units?\s+available\b", t)
+        or _re_for_tests.search(r"\b\d+\s+apartments?\s+available\b", t)
+    )
+
+
+def test_template_b_drill_anchor_regex_matches_units_available_text() -> None:
+    """Hill Country Villas — drill anchor reads "3 Units Available" with
+    href ``/unit/a1-631``. The pre-2026-05-25 regex missed this wording
+    and the drill was never walked. Both ``href`` and ``text`` variants
+    must match to be defensive against future template tweaks."""
+    # Live-captured anchor.
+    assert _js_drill_anchor_matches("/unit/a1-631", "3 Units Available")
+    # Singular variant — observed on plans with exactly one unit.
+    assert _js_drill_anchor_matches("/unit/a1-710", "1 Unit Available")
+    # Brookstone-style apartments+available wording (Template D, but the
+    # Template B regex extension also covers it as defense-in-depth).
+    assert _js_drill_anchor_matches("apartments/1-bedroom", "2 Apartments Available")
+    assert _js_drill_anchor_matches("apartments/2-bedroom", "1 Apartment Available")
+
+
+def test_template_b_drill_anchor_regex_still_matches_legacy_wordings() -> None:
+    """Legacy "View Available / View Details" anchors observed on
+    Aspire Thunderbird / Coventry / Landmark must still match — the
+    2026-05-25 fix EXTENDS the regex, never narrows it."""
+    assert _js_drill_anchor_matches("/unit/1x1-cp3", "View Available Units")
+    assert _js_drill_anchor_matches("/unit/1x1-cc", "View Details")
+    assert _js_drill_anchor_matches("/unit/2x2", "See Available")
+
+
+def test_template_b_drill_anchor_regex_does_not_false_match_unrelated() -> None:
+    """The regex must NOT match marketing links like "Apply Online" or
+    image-lightbox anchors with empty text. Otherwise the drill walker
+    would fetch wrong URLs."""
+    # Image lightbox — empty text, href is a CDN image.
+    assert not _js_drill_anchor_matches(
+        "https://www.marketapts.com/images/apartments/floorplans/abc.jpg", ""
+    )
+    # Apply-online — different intent, must not be treated as drill.
+    assert not _js_drill_anchor_matches("/apply-online", "Apply Now")
+    # Echo Pointe / Portola Redlands "Limited | MORE INFO" — these
+    # properties have NO drill page, so the anchor must be ignored.
+    assert not _js_drill_anchor_matches("/apply-online", "Limited | MORE INFO")
+    # Schedule-a-tour — common sibling anchor in Template D blocks.
+    assert not _js_drill_anchor_matches("/schedule-a-tour", "Schedule a Tour")
+
+
+def test_js_source_contains_extended_drill_regex() -> None:
+    """Source-shape contract: the JS must carry the four-clause matcher
+    so a future maintainer doesn't unwittingly revert to the legacy
+    wording-only regex. If this assertion fails, the
+    ``_js_drill_anchor_matches`` Python mirror is out of sync with the
+    JS and the runtime behaviour drifts from tested behaviour."""
+    assert r"\d+\s+units?\s+available" in _MARKETAPTS_DOM_JS, (
+        "JS drill regex must match 'N Units Available' wording "
+        "(Hill Country Villas / Mountain Ridge / Franklin Flats)"
+    )
+    assert r"\d+\s+apartments?\s+available" in _MARKETAPTS_DOM_JS, (
+        "JS drill regex must match 'N Apartments Available' wording "
+        "(Brookstone / Azlee / Riverbank)"
+    )
+    assert r"/unit/" in _MARKETAPTS_DOM_JS, (
+        "JS drill regex must also accept ``/unit/`` href as a defensive "
+        "secondary signal (catches sites with idiosyncratic anchor text)"
+    )
+
+
+def test_js_source_normalises_relative_drill_urls() -> None:
+    """Brookstone Template D emits ``apartments/1-bedroom`` (no leading
+    slash). The previous origin-join only handled ``/-leading`` paths so
+    relative fetches resolved against the current page's directory
+    instead of the origin. The fix uses ``new URL(href,
+    document.baseURI)`` for explicit origin-anchored resolution.
+    """
+    # The new-URL idiom must appear at least once per drill loop (B, C, D).
+    assert _MARKETAPTS_DOM_JS.count("new URL(drillUrl, document.baseURI)") >= 2, (
+        "Templates B and D drill loops must normalise relative URLs via "
+        "new URL(drillUrl, document.baseURI)"
+    )
+
+
+def test_js_source_strips_mobile_label_spans() -> None:
+    """The drill-row cell extraction must remove ``.visible-xs`` and
+    ``.visible-sm`` label spans before reading textContent. Otherwise
+    Hill Country's "Unit: 0827" cell value becomes the literal unit
+    number — downstream parsing produces malformed rows."""
+    assert ".visible-xs, .visible-sm" in _MARKETAPTS_DOM_JS, (
+        "Drill row extraction must strip .visible-xs/.visible-sm mobile "
+        "label spans before reading cell text"
+    )
+    # The clone+remove pattern must be present — mutating the live DOM
+    # would corrupt subsequent extractions.
+    assert "rowClone.querySelectorAll" in _MARKETAPTS_DOM_JS, (
+        "Must clone the row before stripping label spans (avoid mutating "
+        "the live DOM)"
+    )
+
+
+def test_strip_drill_cell_label_removes_known_labels() -> None:
+    """Python-side defensive fallback for the JS label-strip — if a
+    site renders the label spans in a class the JS guard doesn't catch,
+    the cell text comes through as "Unit: 0827" instead of "0827". The
+    Python parser strips a known label prefix as a backstop."""
+    assert _strip_drill_cell_label("Unit: 0827") == "0827"
+    assert _strip_drill_cell_label("Rent: $749") == "$749"
+    assert _strip_drill_cell_label("Available: Now") == "Now"
+    assert _strip_drill_cell_label("Special:") == ""
+    assert _strip_drill_cell_label("Features: Corner Unit") == "Corner Unit"
+    # Already-clean cells pass through.
+    assert _strip_drill_cell_label("0827") == "0827"
+    assert _strip_drill_cell_label("$749") == "$749"
+    # Non-label content with a colon mid-string is left alone.
+    assert _strip_drill_cell_label("Apply Now: extra") == "Apply Now: extra"
+
+
+def test_template_b_parser_strips_contaminated_unit_number() -> None:
+    """When the JS label-strip didn't fire (defensive case), the Python
+    parser must still emit a clean unit_number. Hill Country drill cells
+    captured live: ``["Unit: 0827", "Rent: $749", "Available: Now",
+    "Special:", "Features: Corner Unit", "Apply"]``."""
+    plan = {
+        "template": "B",
+        "title": "A1-631",
+        "features": "Sq Feet: 631 Bedrooms: 1 Bathrooms: 1 Deposit: $200",
+        "startingPrice": "$ 749",
+        "drillPath": "/unit/a1-631",
+        "units": [
+            {
+                "cells": [
+                    "Unit: 0827",
+                    "Rent: $749",
+                    "Available: Now",
+                    "Special:",
+                    "Features: Corner Unit",
+                    "Apply",
+                ],
+                "dataAttrs": {},
+            },
+            {
+                "cells": [
+                    "Unit: 0833",
+                    "Rent: $749",
+                    "Available: Now",
+                    "Special:",
+                    "Features:",
+                    "Apply",
+                ],
+                "dataAttrs": {},
+            },
+        ],
+    }
+    rows = parse_marketapts_template_b([plan], "u")
+    assert len(rows) == 2, f"expected 2 unit rows, got {len(rows)}: {rows}"
+    assert rows[0]["unit_number"] == "0827"
+    assert rows[1]["unit_number"] == "0833"
+    assert rows[0]["market_rent_low"] == 749
+    assert rows[1]["market_rent_low"] == 749
+    # "Now" → blank availability date (= immediately available).
+    assert rows[0]["availability_date"] == ""
+    assert rows[0]["bedrooms"] == "1"
+    assert rows[0]["sqft"] == "631"
+    assert rows[0]["floor_plan_name"] == "A1-631"
+
+
+def test_hillcountry_live_drill_html_python_mirror() -> None:
+    """End-to-end against the live Hill Country drill fixture: parse
+    the row HTML with the Python JS-mirror, feed the resulting cells
+    into ``parse_marketapts_template_b``, expect 3 unit-level rows.
+    This is the documentary regression that ties the live HTML byte
+    pattern to the parser's expected output."""
+    drill_html = _read_fixture("hillcountry_unit_a1_631.html")
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(drill_html, "html.parser")
+    rows_dom = soup.select(".unit-table-row")
+    assert len(rows_dom) == 3, (
+        f"fixture must contain 3 unit-table-row entries; got {len(rows_dom)}"
+    )
+
+    # Mirror the JS clone+strip+children-text behaviour.
+    cells_per_row: list[list[str]] = []
+    for row in rows_dom:
+        # Strip mobile label spans (mirrors the JS clone+remove).
+        for n in row.select(".visible-xs, .visible-sm, .hidden-md, .hidden-lg"):
+            n.decompose()
+        cells = [
+            " ".join(c.get_text(" ", strip=True).split())
+            for c in row.find_all(recursive=False)
+            if c.name
+        ]
+        cells_per_row.append(cells)
+
+    plan = {
+        "template": "B",
+        "title": "A1-631",
+        "features": "Sq Feet: 631 Bedrooms: 1 Bathrooms: 1 Deposit: $200",
+        "startingPrice": "$ 749",
+        "drillPath": "/unit/a1-631",
+        "units": [{"cells": c, "dataAttrs": {}} for c in cells_per_row],
+    }
+    parsed = parse_marketapts_template_b([plan], "u")
+    assert len(parsed) == 3
+    unit_numbers = sorted(p["unit_number"] for p in parsed)
+    assert unit_numbers == ["0827", "0833", "1238"], (
+        f"unit_numbers={unit_numbers} — JS label-strip pattern must "
+        f"yield clean values; got contaminated cells if any prefix remains"
+    )
+    assert all(p["market_rent_low"] == 749 for p in parsed)
+    assert all(p["bedrooms"] == "1" for p in parsed)
+    assert all(p["sqft"] == "631" for p in parsed)
+    assert all(p["floor_plan_name"] == "A1-631" for p in parsed)
+
+
+def test_brookstone_live_drill_html_python_mirror() -> None:
+    """End-to-end against the live Brookstone Template D drill fixture:
+    2 unit-table-row entries with ``data-available-date`` ISO attrs.
+    The cells are plain (no Hill Country-style label prefix) but the
+    test exercises the same path so a future template tweak doesn't
+    silently break this site."""
+    drill_html = _read_fixture("brookstone_apartments_1br.html")
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(drill_html, "html.parser")
+    rows_dom = soup.select(".unit-table-row")
+    assert len(rows_dom) == 2
+
+    cells_per_row: list[list[str]] = []
+    data_attrs_per_row: list[dict[str, str]] = []
+    for row in rows_dom:
+        for n in row.select(".visible-xs, .visible-sm, .hidden-md, .hidden-lg"):
+            n.decompose()
+        cells = [
+            " ".join(c.get_text(" ", strip=True).split())
+            for c in row.find_all(recursive=False)
+            if c.name
+        ]
+        cells_per_row.append(cells)
+        # Convert kebab-case data attrs to camelCase (mirrors JS dataset).
+        attrs = {}
+        for k, v in row.attrs.items():
+            if k.startswith("data-"):
+                key = k[5:]
+                # Hyphen-to-camelcase: "available-date" → "availableDate"
+                parts = key.split("-")
+                cam = parts[0] + "".join(p.capitalize() for p in parts[1:])
+                attrs[cam] = v
+        data_attrs_per_row.append(attrs)
+
+    plan = {
+        "template": "D",
+        "title": "1 Bedroom",
+        "features": "BEDROOM: 1 BATHROOM: 1.0 SQ. FEET: 686",
+        "startingPrice": "$1,117",
+        "drillPath": "apartments/1-bedroom",  # no leading slash — relative
+        "units": [
+            {"cells": cells_per_row[i], "dataAttrs": data_attrs_per_row[i]}
+            for i in range(2)
+        ],
+    }
+    parsed = parse_marketapts_template_b([plan], "u")
+    assert len(parsed) == 2
+    unit_numbers = sorted(p["unit_number"] for p in parsed)
+    assert unit_numbers == ["136", "233"]
+    # data-available-date is the authoritative ISO; cell text "June 10,
+    # 2026" is the human-rendered form and the data attr wins.
+    avail_dates = sorted(p["availability_date"] for p in parsed)
+    assert avail_dates == ["06/10/2026", "07/10/2026"], (
+        f"Brookstone drill rows have data-available-date; got {avail_dates}"
+    )
+    assert sorted(p["market_rent_low"] for p in parsed) == [1117, 1242]
+
+
+def test_tier_label_plan_only_does_not_get_unit_level_suffix() -> None:
+    """When the drill fails (e.g. plan-only sites like Echo Pointe /
+    Portola Redlands with no /unit/ drill at all), every emitted row
+    has unit_number="" — the tier label must stay
+    ``TIER_1_DOM_MARKETAPTS_B`` without the ``_UNIT_LEVEL`` suffix.
+    Reporting uses this to separate "drill walked" from "plan-only"
+    extractions."""
+    plan = {
+        "template": "B",
+        "title": "1 Bedroom 1 Bathroom",
+        "features": "Sq Feet: 775 Bedrooms: 1 Bathrooms: 1 Deposit: $OAC",
+        "startingPrice": "$ 850",
+        "drillPath": "",  # no drill anchor matched
+        "units": [],
+    }
+    payload = {"template": "B", "plans": [plan]}
+    import asyncio
+
+    async def _run() -> object:
+        return await MarketAptsAdapter().extract(
+            _FakePage(payload, url="https://www.liveatechopointe.com/floorplans"),  # type: ignore[arg-type]
+            _ctx("https://www.liveatechopointe.com/"),
+        )
+
+    result = asyncio.run(_run())
+    # Plan-level fallback row emitted; no unit_number → no ``_UNIT_LEVEL``.
+    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_B", (  # type: ignore[attr-defined]
+        f"plan-only payload must NOT get _UNIT_LEVEL suffix; "
+        f"got {result.tier_used}"  # type: ignore[attr-defined]
+    )
+
+
+def test_tier_label_drilled_gets_unit_level_suffix_for_template_b() -> None:
+    """Mirror of the previous test: when the drill walked and any
+    admitted row carries a unit_number, ``_UNIT_LEVEL`` must be
+    appended. Same Template B but with drilled rows."""
+    plan = {
+        "template": "B",
+        "title": "A1-631",
+        "features": "Sq Feet: 631 Bedrooms: 1 Bathrooms: 1 Deposit: $200",
+        "startingPrice": "$ 749",
+        "drillPath": "/unit/a1-631",
+        "units": [
+            {
+                "cells": ["Unit: 0827", "Rent: $749", "Available: Now", "", "", "Apply"],
+                "dataAttrs": {},
+            },
+        ],
+    }
+    payload = {"template": "B", "plans": [plan]}
+    import asyncio
+
+    async def _run() -> object:
+        return await MarketAptsAdapter().extract(
+            _FakePage(payload, url="https://www.hillcountryvillasapartments.com/floorplans"),  # type: ignore[arg-type]
+            _ctx("https://www.hillcountryvillasapartments.com/"),
+        )
+
+    result = asyncio.run(_run())
+    assert result.tier_used == "TIER_1_DOM_MARKETAPTS_B_UNIT_LEVEL"  # type: ignore[attr-defined]
+    assert len(result.units) == 1  # type: ignore[attr-defined]
+    assert result.units[0]["unit_number"] == "0827"  # type: ignore[attr-defined]
+
+
+def test_hillcountry_listing_fixture_matches_template_b_layout() -> None:
+    """The Hill Country listing fixture must expose the markers that
+    Template B's branch (``.floorplan-item`` × N) keys on. If a future
+    template refactor renames the class, this test catches the drift
+    before the production fleet does."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(_read_fixture("hillcountry_floorplans.html"), "html.parser")
+    items = soup.select(".floorplan-item")
+    assert len(items) >= 2, (
+        f"hillcountry fixture must carry >=2 .floorplan-item cards "
+        f"(template B); got {len(items)}"
+    )
+    first = items[0]
+    # Title, features, num — Template B's three plan-level fields.
+    assert first.select_one(".floorplan-title")
+    assert first.select_one(".floorplan-features")
+    assert first.select_one(".floorplan-num")
+    # And the drill anchor — text must contain a "N Units Available"
+    # wording that the new regex catches.
+    drill_anchors = [
+        a for a in first.find_all("a")
+        if "/unit/" in (a.get("href") or "")
+    ]
+    assert drill_anchors, "fixture must contain a /unit/{slug} drill anchor"
+    text = drill_anchors[0].get_text(" ", strip=True).lower()
+    assert _re_for_tests.search(r"\d+\s+units?\s+available", text), (
+        f"drill anchor text {text!r} must match the 'N Units Available' "
+        f"wording the fixed regex keys on"
+    )
+
+
+def test_brookstone_listing_fixture_matches_template_d_layout() -> None:
+    """The Brookstone listing fixture must expose ``.floor-plans-block``
+    cards with ``apartments/{slug}`` (no leading slash) drill anchors.
+    This documents the live shape so a future template renaming is
+    caught immediately."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(_read_fixture("brookstone_floor_plans.html"), "html.parser")
+    blocks = soup.select(".floor-plans-block")
+    assert len(blocks) >= 2, (
+        f"brookstone fixture must carry >=2 .floor-plans-block cards; "
+        f"got {len(blocks)}"
+    )
+    first = blocks[0]
+    # The drill anchor has the relative-URL shape (no leading slash) —
+    # this is the exact case the ``new URL(drillUrl, document.baseURI)``
+    # fix targets.
+    drill_anchors = [
+        a for a in first.find_all("a")
+        if "apartments/" in (a.get("href") or "")
+        and not (a.get("href") or "").startswith("/")
+        and not (a.get("href") or "").startswith("http")
+    ]
+    assert drill_anchors, (
+        "brookstone fixture must contain a relative ``apartments/{slug}`` "
+        "drill anchor (the URL-normalisation regression case)"
+    )
+    # Text must match the "N Apartments Available" wording.
+    text = drill_anchors[0].get_text(" ", strip=True).lower()
+    assert _re_for_tests.search(r"\d+\s+apartments?\s+available", text), (
+        f"drill anchor text {text!r} must match the 'N Apartments "
+        f"Available' wording"
     )

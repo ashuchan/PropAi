@@ -237,6 +237,11 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     # site embeds availability.fortresstech.io/unit-availability via iframe;
     # the canonical landing slug carries the #availability anchor.
     "fortresstech": ("/", "/floorplans", "/floor-plans", "/availability"),
+    # 2026-05-25 — ThinkRESIDE / Resite Multi Family Marketing.
+    # Pattern-A themes (bns-community2019 / towncommunity) put the
+    # plan index at /floorplans; Pattern-B (ascent) puts plan cards
+    # on the home page but per-plan drills are also at /floorplans/{slug}.
+    "thinkreside": ("/floorplans", "/floor-plans", "/availability"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (
