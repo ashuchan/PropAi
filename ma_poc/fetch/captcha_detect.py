@@ -49,6 +49,22 @@ _CHALLENGE_ONLY_FINGERPRINTS: dict[str, list[bytes]] = {
         b"_pxhd",
         b"PerimeterX",
     ],
+    # Sucuri / SiteGuard CAPTCHA (sgcaptcha). Verified 2026-05-25 against
+    # canary 1ef1060 — affects ~738 units across the AppFolio cohort
+    # (Reserve at Belvedere, Heritage by Fairlawn, Vivid, Terrain,
+    # Reserve at Stone Port). Sucuri serves a ~12KB interstitial at
+    # /.well-known/sgcaptcha/?r=... or /.well-known/captcha/?y=... that
+    # carries a <title>Robot Challenge Screen</title> + a sgchallenge
+    # JS token. These markers do not appear on any real apartment page.
+    # Without this fingerprint the body inspector misses the wall and
+    # the page reaches the extractor as a successful 200/202 OK,
+    # producing 0 units and a misleading TIER_1_API_* ran_empty event.
+    "sucuri": [
+        b"Robot Challenge Screen",
+        b"sgchallenge",
+        b"/.well-known/sgcaptcha/",
+        b"/.well-known/captcha/",
+    ],
 }
 
 # Widget OR challenge — these strings appear on both REAL pages with

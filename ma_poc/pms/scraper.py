@@ -3347,7 +3347,14 @@ async def scrape_jugnu(
     _final_url = ""
     if fetch_result is not None:
         _final_url = str(getattr(fetch_result, "final_url", "") or "")
-        if "/.well-known/sgcaptcha/" in _final_url.lower():
+        _lower_url = _final_url.lower()
+        # 2026-05-25 canary 1ef1060: Sucuri uses both URL variants
+        # — /.well-known/sgcaptcha/ (the original) AND /.well-known/captcha/
+        # (observed on Belvedere). Detect both.
+        if (
+            "/.well-known/sgcaptcha/" in _lower_url
+            or "/.well-known/captcha/" in _lower_url
+        ):
             _sgcaptcha_walled = True
     if _sgcaptcha_walled:
         result = _empty_result(base_url)

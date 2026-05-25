@@ -326,6 +326,23 @@ class Fetcher:
             if captcha_detected and not result.captcha_detected:
                 result = dataclasses.replace(result, captcha_detected=True)
 
+            # 2026-05-25 (canary 1ef1060 follow-up): promote a captcha-
+            # interstitial to BOT_BLOCKED so the existing curl_cffi →
+            # Unlocker cascade at line ~680 fires. Pre-fix, Sucuri-walled
+            # pages reached the fetcher caller with outcome=OK + 12KB of
+            # challenge HTML, then propagated through the extractor as
+            # ran_empty — dropping ~738 units across the AppFolio cohort
+            # (Reserve at Belvedere, Heritage by Fairlawn, Vivid, Terrain).
+            # Cloudflare/PerimeterX already arrive as BOT_BLOCKED at the
+            # HTTP layer (403/503), so this promotion is a no-op for them.
+            # The promotion only affects the OK + captcha_detected combo,
+            # which is exactly the Sucuri / sgcaptcha 200/202 pattern.
+            if (
+                captcha_detected
+                and result.outcome == FetchOutcome.OK
+            ):
+                result = dataclasses.replace(result, outcome=FetchOutcome.BOT_BLOCKED)
+
             emit(
                 EventKind.FETCH_COMPLETED,
                 task.property_id,
