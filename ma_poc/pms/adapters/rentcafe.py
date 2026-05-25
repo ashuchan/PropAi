@@ -1054,15 +1054,27 @@ async def _try_rentcafe_securecafe_probe(
         # Third pass — only if gaps remain: apts247 plan-meta API.
         if any(not u.get("sqft") or str(u.get("sqft")) == "0" for u in units):
             _enrich_securecafe_units_with_apts247(units, ctx, html, result)
+        # Fourth pass — only if gaps STILL remain: fetch the vanity
+        # marketing /floorplans page and FK-join plan sqft onto units
+        # by (beds, baths). Covers the residual ~52-prop cohort where
+        # the operator publishes sqft on the public-facing page but
+        # neither apts247 nor RentCafe-WP plan-cards carry it — most
+        # of these are non-apts247 Yardi vanity sites (ysi.floorplansList
+        # JSON), data-attr-sprinkled marketing templates, or English-prose
+        # marketing copy ("1 Bedroom, 1 Bathroom 700 sq. ft.").
+        if any(not u.get("sqft") or str(u.get("sqft")) == "0" for u in units):
+            _enrich_securecafe_units_with_vanity_floorplans(
+                units, ctx, html, result
+            )
         # Final pass — for units still missing sqft after every
         # enrichment path returned empty, declare the operator does not
         # publish sqft. This is honest provenance: the SC drill produced
         # rent + unit_number + plan_name (real unit-level data); we
-        # tried 3 independent sources for sqft (plan-name, WP-cards,
-        # apts247) and all came back empty. ``_has_area`` honors the
-        # flag so the ``no_area`` retry doesn't fire → tier stays as
-        # TIER_1_API_RENTCAFE_SECURECAFE (not _PLAN_LEVEL); the verdict
-        # lands as SUCCESS, not SUCCESS_PLAN_LEVEL.
+        # tried 4 independent sources for sqft (plan-name, WP-cards,
+        # apts247, vanity /floorplans) and all came back empty. ``_has_
+        # area`` honors the flag so the ``no_area`` retry doesn't fire
+        # → tier stays as TIER_1_API_RENTCAFE_SECURECAFE (not _PLAN_
+        # LEVEL); the verdict lands as SUCCESS, not SUCCESS_PLAN_LEVEL.
         _flag_securecafe_units_operator_sqft_gap(units, result)
     if units:
         result.api_responses.append(
@@ -1398,4 +1410,498 @@ def _enrich_securecafe_units_with_apts247(
         result.errors.append(
             f"securecafe-apts247-enrich: filled fields on {n} units "
             f"from {len(plans)} apts247 plans"
+        )
+
+
+# ─── Vanity /floorplans sqft FK-join (cluster B, 2026-05-25) ─────────────
+#
+# Cohort: TIER_1_API_RENTCAFE_SECURECAFE shows ~67% adapter-miss rate for
+# sqft across ~52 properties (~475 units). The SC AvailUnitRow markup
+# omits Sq.Ft for these operators, the apts247 fallback no-ops on non-
+# apts247-backed sites, and the WP-cards fallback misses vanity templates
+# that don't carry the floorplans-box article. The vanity marketing
+# /floorplans page DOES publish sqft for ~67% of the cohort (~318 units
+# recoverable); we just need to fetch it, parse plan-level (beds, baths,
+# sqft, rent) tuples, and FK-join onto SecureCafe units by (beds, baths).
+#
+# Four patterns recognised, in priority order:
+#
+# (1) Yardi ysi.floorplansList JSON (alvista23, themtroyal, most Yardi
+#     vanity sites): ``<script>ysi.floorplansList = [{"Id":..., "Beds":1,
+#     "Baths":1.0, "MinSqFt":832, "MaxSqFt":832, "MinRent":1476, ...}]``.
+#     Fully structured — most reliable. Note: ``minSqft`` in JS function
+#     args (e.g. ``function setGA4Cookie(tour, fpname, size, minSqft,...)``)
+#     is NOT a data record; the parser filters JS-template noise by
+#     requiring the structured-object shape, not bare token presence.
+#
+# (2) data-beds=/data-baths=/data-sqft= attribute clusters (ardencebloom
+#     and other RentCafe-WP marketing templates): co-located attributes
+#     on a single element provide a tight (beds, baths, sqft) tuple.
+#
+# (3) "X Bed[room] / Y Bath / Z sq ft" slash-separated text (ardencebloom
+#     visible card text): bed/bath/sqft on the same line with explicit
+#     separators — tight enough to skip false matches in marketing prose.
+#
+# (4) "X Bedroom, Y Bathroom Z sq. ft." natural-language prose
+#     (vestaviaplace): English copy listing bed/bath/sqft together. The
+#     bed/bath co-location anchor keeps false positives near zero.
+#
+# All four patterns produce a uniform plan dict; the merge then walks
+# each SC unit missing sqft, finds matching plans by (beds, baths), and
+# picks the closest-rent plan when more than one matches.
+
+#: Paths to try when fetching the vanity floorplans page. Order matters —
+#: hyphenated variant covered vestaviaplace (Yardi marketing). Both are
+#: tried even when one returns 200 if no plan data was parsed (defensive
+#: against templates that serve a placeholder page on the wrong URL).
+VANITY_FLOORPLAN_PATHS: tuple[str, ...] = ("/floorplans", "/floor-plans")
+
+# ysi.floorplansList JSON shape — Yardi vanity-site template (alvista23,
+# themtroyal, etc.). Pattern: ``ysi.floorplansList = [ {...}, {...} ]``.
+# Captured greedily through the matching closing bracket; we use a stack-
+# free balanced-bracket scan instead of regex to handle nested ``[]``
+# arrays inside plan amenities.
+_YSI_FP_LIST_START_RE = re.compile(
+    r"ysi\.floorplansList\s*=\s*(\[)",
+    re.IGNORECASE,
+)
+
+# Data-attribute cluster on a single element (ardencebloom unitPlaceholder
+# style). Captures beds/baths/sqft in any order via three independent
+# look-aheads on the same element opening tag.
+_VANITY_DATA_ATTR_ELEM_RE = re.compile(
+    r"<[^<>]*?\bdata-beds\s*=\s*['\"]\s*(?P<beds>\d+(?:\.\d+)?)"
+    r"[^<>]*?\bdata-baths\s*=\s*['\"]\s*(?P<baths>\d+(?:\.\d+)?)"
+    r"[^<>]*?\bdata-sqft\s*=\s*['\"]\s*(?P<sqft>\d{2,5})"
+    r"[^<>]*?>",
+    re.IGNORECASE | re.DOTALL,
+)
+# Mirror: same trio but the attribute order beds/sqft/baths is also seen
+# in the wild (FortressTech-style markup variants). One reversed-order
+# capture suffices; permutations are rare enough that the (beds, baths)
+# join collapses any duplicates.
+_VANITY_DATA_ATTR_ALT_RE = re.compile(
+    r"<[^<>]*?\bdata-beds\s*=\s*['\"]\s*(?P<beds>\d+(?:\.\d+)?)"
+    r"[^<>]*?\bdata-sqft\s*=\s*['\"]\s*(?P<sqft>\d{2,5})"
+    r"[^<>]*?\bdata-baths\s*=\s*['\"]\s*(?P<baths>\d+(?:\.\d+)?)"
+    r"[^<>]*?>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# "X Bed / Y Bath / Z sq ft" slash-separated text. ardencebloom card label
+# uses this exact shape. Tolerates "Bed/Bedroom"/"Bath/Bathroom" and
+# whitespace around the slashes.
+_VANITY_SLASH_RE = re.compile(
+    r"(?P<beds>\d+)\s*(?:Bed|Bedroom)s?\s*/\s*"
+    r"(?P<baths>\d+(?:\.\d+)?)\s*(?:Bath|Bathroom)s?\s*/\s*"
+    r"(?P<sqft>\d{2,5})\s*sq",
+    re.IGNORECASE,
+)
+
+# "X Bedroom, Y Bathroom Z sq. ft." natural-language prose (vestaviaplace).
+# Requires the comma between bedroom and bathroom and the "sq" anchor to
+# avoid catching unrelated number triples in marketing copy.
+_VANITY_PROSE_RE = re.compile(
+    r"(?P<beds>\d+)\s*Bedroom[s]?\s*,\s*"
+    r"(?P<baths>\d+(?:\.\d+)?)\s*Bathroom[s]?\s+"
+    r"(?P<sqft>\d{2,5})\s*sq\.?\s*ft",
+    re.IGNORECASE,
+)
+
+
+def _slice_balanced_json_array(text: str, start: int) -> str:
+    """Return the substring beginning at ``text[start]`` (which must point
+    at an opening ``[``) up to and including the matching closing ``]``.
+
+    Tracks bracket depth and respects string-literal escapes; falls back
+    to the rest of ``text`` if no balance is found (unbalanced markup
+    will then surface as ``json.loads`` failure downstream, which the
+    caller treats as a no-op).
+    """
+    if start >= len(text) or text[start] != "[":
+        return ""
+    depth = 0
+    in_str: str | None = None
+    esc = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == in_str:
+                in_str = None
+            continue
+        if ch in ('"', "'"):
+            in_str = ch
+            continue
+        if ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return ""
+
+
+def parse_vanity_floorplans_for_sqft(html: str) -> list[dict[str, Any]]:
+    """Extract plan-level (beds, baths, sqft, rent_lo, rent_hi, name)
+    records from a rendered vanity ``/floorplans`` page.
+
+    The four recognised patterns are tried independently; their outputs
+    are merged + de-duplicated by (beds, baths, sqft). Returns ``[]``
+    when no pattern produces any record. Numeric fields are returned
+    as strings to match the SecureCafe dict shape (downstream callers
+    expect ``unit["sqft"]`` to be a string).
+
+    Each record dict carries:
+      - ``beds``: int (0 for studio)
+      - ``baths``: float
+      - ``sqft``: int (single value; ysi MinSqFt/MaxSqFt collapsed to MinSqFt
+        when equal, else stored as MinSqFt for join purposes — sqft cells
+        in SC AvailUnitRows are single numeric values, so single-value
+        is the right comparison shape)
+      - ``rent_lo`` / ``rent_hi``: int or None (for closest-rent tie-break)
+      - ``name``: str (best-effort plan name, may be empty)
+    """
+    if not html:
+        return []
+    out: list[dict[str, Any]] = []
+
+    # (1) ysi.floorplansList JSON — most reliable. Locate the start, then
+    # slice the balanced ``[ ... ]`` block and parse it. Defensive: if
+    # parsing fails (template literal placeholders, single-quotes in
+    # values), skip silently and let pattern 2-4 take over.
+    m = _YSI_FP_LIST_START_RE.search(html)
+    if m:
+        blob = _slice_balanced_json_array(html, m.start(1))
+        if blob:
+            try:
+                arr = json.loads(blob)
+            except (json.JSONDecodeError, ValueError):
+                arr = []
+            for entry in arr if isinstance(arr, list) else []:
+                if not isinstance(entry, dict):
+                    continue
+                beds_raw = entry.get("Beds", entry.get("beds"))
+                if beds_raw is None:
+                    continue
+                try:
+                    beds = int(float(beds_raw))
+                except (TypeError, ValueError):
+                    continue
+                if beds < 0:
+                    continue
+                baths_raw = entry.get("Baths", entry.get("baths"))
+                if baths_raw is None:
+                    continue
+                try:
+                    baths = float(baths_raw)
+                except (TypeError, ValueError):
+                    continue
+                if baths < 0:
+                    continue
+                # MinSqFt collapsed to int; 0 / blank is treated as missing.
+                sqft_raw = (
+                    entry.get("MinSqFt")
+                    or entry.get("minSqFt")
+                    or entry.get("minsqft")
+                    or entry.get("min_sqft")
+                    or 0
+                )
+                try:
+                    sqft = int(float(sqft_raw))
+                except (TypeError, ValueError):
+                    continue
+                if sqft <= 0:
+                    continue
+                rent_lo_raw = entry.get("MinRent") or entry.get("minRent")
+                rent_hi_raw = (
+                    entry.get("MaxRent") or entry.get("maxRent") or rent_lo_raw
+                )
+                try:
+                    rent_lo = int(float(rent_lo_raw)) if rent_lo_raw else None
+                except (TypeError, ValueError):
+                    rent_lo = None
+                try:
+                    rent_hi = int(float(rent_hi_raw)) if rent_hi_raw else None
+                except (TypeError, ValueError):
+                    rent_hi = None
+                name = str(
+                    entry.get("Name") or entry.get("name") or entry.get("FpName") or ""
+                ).strip()
+                out.append(
+                    {
+                        "beds": beds,
+                        "baths": baths,
+                        "sqft": sqft,
+                        "rent_lo": rent_lo,
+                        "rent_hi": rent_hi,
+                        "name": name,
+                        "source": "ysi_floorplansList",
+                    }
+                )
+
+    # (2) data-beds/baths/sqft attribute clusters.
+    for regex, label in (
+        (_VANITY_DATA_ATTR_ELEM_RE, "data_attr_bbs"),
+        (_VANITY_DATA_ATTR_ALT_RE, "data_attr_bsb"),
+    ):
+        for em in regex.finditer(html):
+            try:
+                beds = int(float(em.group("beds")))
+                baths = float(em.group("baths"))
+                sqft = int(em.group("sqft"))
+            except (TypeError, ValueError):
+                continue
+            if sqft <= 0 or beds < 0:
+                continue
+            out.append(
+                {
+                    "beds": beds,
+                    "baths": baths,
+                    "sqft": sqft,
+                    "rent_lo": None,
+                    "rent_hi": None,
+                    "name": "",
+                    "source": label,
+                }
+            )
+
+    # (3) "X Bed / Y Bath / Z sq ft" slash-separated label.
+    for sm in _VANITY_SLASH_RE.finditer(html):
+        try:
+            beds = int(sm.group("beds"))
+            baths = float(sm.group("baths"))
+            sqft = int(sm.group("sqft"))
+        except (TypeError, ValueError):
+            continue
+        if sqft <= 0:
+            continue
+        out.append(
+            {
+                "beds": beds,
+                "baths": baths,
+                "sqft": sqft,
+                "rent_lo": None,
+                "rent_hi": None,
+                "name": "",
+                "source": "slash_label",
+            }
+        )
+
+    # (4) "X Bedroom, Y Bathroom Z sq. ft." prose.
+    for pm in _VANITY_PROSE_RE.finditer(html):
+        try:
+            beds = int(pm.group("beds"))
+            baths = float(pm.group("baths"))
+            sqft = int(pm.group("sqft"))
+        except (TypeError, ValueError):
+            continue
+        if sqft <= 0:
+            continue
+        out.append(
+            {
+                "beds": beds,
+                "baths": baths,
+                "sqft": sqft,
+                "rent_lo": None,
+                "rent_hi": None,
+                "name": "",
+                "source": "prose",
+            }
+        )
+
+    # De-duplicate by (beds, baths, sqft). The ardencebloom template, for
+    # example, emits the same plan via both data-attrs AND the slash label
+    # → the merge would otherwise see the bucket as ambiguous and trigger
+    # the closest-rent tie-break on identical sqft values (still correct,
+    # but wastes diagnostic noise).
+    seen: set[tuple[int, float, int]] = set()
+    deduped: list[dict[str, Any]] = []
+    for p in out:
+        key = (int(p["beds"]), float(p["baths"]), int(p["sqft"]))
+        if key in seen:
+            # Preserve rent metadata from the FIRST occurrence (which is
+            # ysi.floorplansList when present — that's the structured
+            # source carrying rent_lo/rent_hi).
+            continue
+        seen.add(key)
+        deduped.append(p)
+    return deduped
+
+
+def fetch_vanity_floorplans_html(origin: str, timeout: int = 15) -> str:
+    """Probe ``{origin}/floorplans`` then ``{origin}/floor-plans``; return
+    the first body that yields any parseable plan record, else ``''``.
+
+    Each candidate URL is fetched via curl_cffi (chrome120 impersonation
+    through PROBE_PROXY_URL when set). The function does NOT raise — any
+    transport error returns ``""`` and the caller's enrichment chain
+    silently moves to the operator-gap flag pass.
+    """
+    if not origin:
+        return ""
+    try:
+        from ma_poc.pms.adapters._probe import probe_get
+    except ImportError:
+        return ""
+    for path in VANITY_FLOORPLAN_PATHS:
+        url = f"{origin.rstrip('/')}{path}"
+        try:
+            r = probe_get(url, timeout=timeout)
+        except Exception:
+            continue
+        if getattr(r, "status_code", 0) != 200:
+            continue
+        body = getattr(r, "text", "") or ""
+        if not body:
+            continue
+        # Only return if we can actually parse at least one plan record.
+        # If the operator serves a near-empty page on /floorplans but the
+        # real listing lives at /floor-plans (or vice-versa), keep going.
+        if parse_vanity_floorplans_for_sqft(body):
+            return body
+    return ""
+
+
+def merge_vanity_floorplans_into_securecafe(
+    units: list[dict[str, Any]], plans: list[dict[str, Any]]
+) -> int:
+    """FK-join plan sqft → SecureCafe units missing sqft, keyed on
+    ``(beds, baths)``. When more than one plan shares the (beds, baths)
+    bucket, pick the plan whose rent range is closest to the unit's rent
+    (best-guess FK). When no plan in the bucket carries rent metadata,
+    fall back to the median-sqft plan; when only one plan matches, use
+    it directly.
+
+    Per-unit values WIN; the merge only fills units whose sqft is empty
+    or "0". Returns the number of units that gained sqft for diagnostics.
+    """
+    if not units or not plans:
+        return 0
+    # Bucket plans by (beds, baths).
+    buckets: dict[tuple[int, float], list[dict[str, Any]]] = {}
+    for p in plans:
+        try:
+            key = (int(p["beds"]), float(p["baths"]))
+        except (TypeError, ValueError, KeyError):
+            continue
+        buckets.setdefault(key, []).append(p)
+
+    enriched = 0
+    for u in units:
+        existing = str(u.get("sqft") or "").strip()
+        if existing and existing != "0":
+            continue
+        try:
+            beds = int(float(str(u.get("bedrooms") or "").strip() or "x"))
+            baths = float(str(u.get("bathrooms") or "").strip() or "x")
+        except (TypeError, ValueError):
+            continue
+        candidates = buckets.get((beds, baths))
+        if not candidates:
+            continue
+        if len(candidates) == 1:
+            chosen = candidates[0]
+        else:
+            # Multi-plan bucket — pick closest by rent. Unit rent comes
+            # from market_rent_low (preferred) / market_rent_high; plan
+            # rent uses (rent_lo + rent_hi) / 2 when both present, else
+            # whichever is present, else fall back to median sqft (most
+            # likely the canonical plan).
+            unit_rent = u.get("market_rent_low") or u.get("market_rent_high")
+            try:
+                unit_rent_v = float(unit_rent) if unit_rent is not None else None
+            except (TypeError, ValueError):
+                unit_rent_v = None
+
+            def _plan_rent(p: dict[str, Any]) -> float | None:
+                lo, hi = p.get("rent_lo"), p.get("rent_hi")
+                try:
+                    if lo is not None and hi is not None:
+                        return (float(lo) + float(hi)) / 2.0
+                    if lo is not None:
+                        return float(lo)
+                    if hi is not None:
+                        return float(hi)
+                except (TypeError, ValueError):
+                    return None
+                return None
+
+            if unit_rent_v is not None and any(
+                _plan_rent(c) is not None for c in candidates
+            ):
+                # Bind unit_rent_v as a default arg to satisfy B023 — the
+                # closure is consumed synchronously by ``min(...)`` so the
+                # late-binding bug B023 guards against can't fire here, but
+                # the explicit binding keeps the lint clean and intent
+                # obvious to a future reader.
+                def _dist(
+                    p: dict[str, Any], _rent: float = unit_rent_v
+                ) -> float:
+                    pr = _plan_rent(p)
+                    if pr is None:
+                        # Plans without rent are deprioritised but still
+                        # selectable when no other plan has rent metadata.
+                        return float("inf")
+                    return abs(pr - _rent)
+
+                chosen = min(candidates, key=_dist)
+            else:
+                # No rent signal anywhere — pick the median-sqft plan.
+                # Stable: sort by sqft ascending, pick the middle index.
+                ordered = sorted(candidates, key=lambda p: int(p["sqft"]))
+                chosen = ordered[len(ordered) // 2]
+        try:
+            sqft_val = int(chosen["sqft"])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if sqft_val <= 0:
+            continue
+        u["sqft"] = str(sqft_val)
+        enriched += 1
+    return enriched
+
+
+def _enrich_securecafe_units_with_vanity_floorplans(
+    units: list[dict[str, Any]],
+    ctx: AdapterContext,
+    page_html: str,
+    result: AdapterResult,
+) -> None:
+    """Best-effort: fetch the vanity ``/floorplans`` page, parse plan-
+    level sqft, FK-join onto SecureCafe units by (beds, baths).
+
+    Parses the homepage HTML we already have in hand first — for some
+    vanity templates the ysi.floorplansList JSON is embedded site-wide.
+    Only spends a network round-trip when the in-hand parse returns
+    nothing. Any error is swallowed so the SC drill still ships its
+    rent + unit_number + plan_name payload (just with sqft gaps left
+    for the operator-gap flag pass to stamp honestly).
+    """
+    if not units:
+        return
+    # First — try the rendered homepage HTML we already have. Saves a
+    # round-trip on the alvista23-style sites where ysi.floorplansList is
+    # injected on every page (including the home page).
+    plans = parse_vanity_floorplans_for_sqft(page_html or "")
+    via = "homepage_html"
+    if not plans:
+        origin = _origin_from_ctx(ctx)
+        if not origin:
+            return
+        vp_html = fetch_vanity_floorplans_html(origin)
+        if not vp_html:
+            return
+        plans = parse_vanity_floorplans_for_sqft(vp_html)
+        via = "vanity_floorplans_probe"
+    if not plans:
+        return
+    n = merge_vanity_floorplans_into_securecafe(units, plans)
+    if n:
+        result.errors.append(
+            f"securecafe-vanity-floorplans-enrich: filled sqft on {n} units "
+            f"from {len(plans)} vanity plans (via={via})"
         )
