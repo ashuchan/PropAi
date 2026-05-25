@@ -152,7 +152,19 @@ def parse_knock_units(units_payload: dict[str, Any]) -> list[dict[str, Any]]:
             or u.get("ready_date")
             or ""
         )
-        status = "AVAILABLE" if (u.get("available") and not u.get("occupied")) else "UNAVAILABLE"
+        # 2026-05-25 (canary 1ef1060 post-mortem): the prior rule was
+        # ``status = AVAILABLE iff (u.available AND not u.occupied)``,
+        # which mis-flagged ~8,580 of 8,597 Knock units as UNAVAILABLE
+        # because Knock's `available` boolean is False/null on many
+        # actively-rentable units (it tracks a different signal than
+        # rentability). The units already passed the hidden/leased/
+        # reserved filter at line 117 + a $200-$50,000 rent gate at
+        # line 127, so by the time we're here they are real
+        # rent-published offerings. Default AVAILABLE; only mark
+        # UNAVAILABLE when explicitly occupied. This is what the
+        # downstream consumer (and the schema_v2 Q1 fallback) needs
+        # for the available_date scrape-time default to fire.
+        status = "UNAVAILABLE" if u.get("occupied") else "AVAILABLE"
 
         # 2026-05-19 capture-first: Knock payload carries concession as
         # `SpecialsDescription`/specials on the unit or layout. Was

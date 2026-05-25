@@ -139,7 +139,15 @@ def test_inferred_id_flag_passthrough() -> None:
 
 
 def test_date_placeholder_flag_passthrough() -> None:
-    """F4 placeholder string surfaces under the canonical key."""
+    """F4 placeholder string surfaces under the canonical key,
+    independently of whatever available_date resolves to.
+
+    2026-05-25: under the has_rent fallback added in the canary 1ef1060
+    follow-up, a unit with positive rent_low gets available_date
+    defaulted to the scrape date (rent published = rentable now). The
+    placeholder is still preserved on the separate ``_date_placeholder``
+    key for forensic visibility into the operator's original phrasing.
+    """
     unit = {
         "unit_id": "u101",
         "floor_plan_name": "A1",
@@ -149,8 +157,26 @@ def test_date_placeholder_flag_passthrough() -> None:
         "_date_placeholder": "Spring 2026",
     }
     out = _format_v2_unit(unit, _TS)
+    # F4 invariant: placeholder pass-through.
     assert out["_date_placeholder"] == "Spring 2026"
-    # available_date should be None when only the placeholder is present
+    # New (post-canary): rent published → scrape-date fallback fires.
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+
+
+def test_date_placeholder_without_rent_stays_none() -> None:
+    """Sister test to the above: with NO rent published, the
+    has_rent gate doesn't fire and the placeholder stays as the
+    only signal — available_date is None."""
+    unit = {
+        "unit_id": "u102",
+        "floor_plan_name": "A1",
+        "beds": 1,
+        "area": 750,
+        # no rent_low / rent_high
+        "_date_placeholder": "Spring 2026",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["_date_placeholder"] == "Spring 2026"
     assert out["available_date"] is None
 
 
@@ -323,11 +349,157 @@ def test_unavailable_with_empty_date_stays_none() -> None:
 
 def test_no_status_with_empty_date_stays_none() -> None:
     """Status field absent → no fallback (the prior 'genuinely unknown'
-    case stays unchanged)."""
+    case stays unchanged) — UNLESS rent is published. See the
+    ``rent_present_*`` block below for the rent-present escape hatch
+    added 2026-05-25."""
     unit = {"unit_id": "u-no-status", "floor_plan_name": "A1"}
     out = _format_v2_unit(unit, _TS)
     assert out["available_date"] is None
     assert out["availability_status"] is None
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-25 — canary 1ef1060 regression follow-up: has_rent escape
+#
+# The canary at SHA 1ef1060 lost ~605 full-rows because the Knock
+# adapter (and to a lesser degree G5 inventory + MERGED_CROSS_PAGE +
+# TIER_1_5_EMBEDDED) shipped units with rent + sqft + plan name + unit
+# number, but with status=UNAVAILABLE or null. The Q1 fallback only
+# fired on status="AVAILABLE", so available_date stayed None and the
+# row failed the 5-of-5 completeness check despite being a valid
+# rent-published listing.
+#
+# Fix: when a unit has positive rent published (rent_low or rent_high
+# > 1 after _format_rent normalization), treat that as the
+# rentable-now signal even if status is silent. Operators don't list
+# prices on units they can't rent.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_rent_present_status_unavailable_defaults_to_scrape_date() -> None:
+    """Canary 1ef1060 signature case: Knock-style unit with rent +
+    sqft + plan + unit_number, but status=UNAVAILABLE and no parseable
+    date. Pre-fix → available_date=None. Post-fix → scrape date.
+    """
+    unit = {
+        "unit_id": "u-knock-001",
+        "floor_plan_name": "A1",
+        "bedrooms": 1,
+        "bathrooms": 1,
+        "sqft": 750,
+        "rent_low": 1495.0,
+        "rent_high": 1495.0,
+        "availability_status": "UNAVAILABLE",
+        # No date field at all
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+    # Status is preserved as-is — we don't rewrite it, just fix the date.
+    assert out["availability_status"] == "UNAVAILABLE"
+    # All 5 core fields populated → row is now "full"
+    assert out["unit_id"] == "u-knock-001"
+    assert out["rent_low"] == 1495.0
+    assert out["area"] == 750
+    assert out["floor_plan_name"] == "A1"
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+
+
+def test_rent_present_status_null_defaults_to_scrape_date() -> None:
+    """G5 / MERGED_CROSS_PAGE / EMBEDDED case: rent published but
+    no status field at all. Pre-fix → None. Post-fix → scrape date."""
+    unit = {
+        "unit_id": "u-g5-001",
+        "floor_plan_name": "B2",
+        "bedrooms": 2,
+        "sqft": 1050,
+        "rent_low": 2100.0,
+        # No availability_status, no date
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+
+
+def test_rent_present_rent_high_only_still_triggers() -> None:
+    """Only rent_high populated (rent_range parser sometimes hits this
+    path) still counts as ``has_rent`` and triggers the fallback."""
+    unit = {
+        "unit_id": "u-rh-only",
+        "floor_plan_name": "C1",
+        "rent_high": 1850.0,
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+
+
+def test_rent_present_via_rent_range_string_triggers() -> None:
+    """Adapters that ship ``rent_range`` as a string (some DOM paths)
+    flow through parse_rent_range → rent_lo/rent_hi → has_rent=True."""
+    unit = {
+        "unit_id": "u-range",
+        "floor_plan_name": "D1",
+        "rent_range": "$1,800 - $2,200",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
+
+
+def test_no_rent_no_status_still_none() -> None:
+    """Genuine 'we have no data' case: no rent, no status, no date.
+    Must still produce available_date=None (don't manufacture a date
+    from thin air). This is the invariant that protects against
+    over-filling the column."""
+    unit = {
+        "unit_id": "u-nothing",
+        "floor_plan_name": "E1",
+        # No rent, no status, no date
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] is None
+
+
+def test_rent_zero_or_negative_does_not_trigger() -> None:
+    """``_format_rent`` rejects values ≤ 1 (sentinel / placeholder).
+    Those must NOT count as has_rent — they're the same as no rent."""
+    unit = {
+        "unit_id": "u-zero-rent",
+        "floor_plan_name": "F1",
+        "rent_low": 0,
+        "rent_high": -1,
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] is None
+    # Confirm the rent columns are also None (proving _format_rent
+    # gated both fields the same way)
+    assert out["rent_low"] is None
+    assert out["rent_high"] is None
+
+
+def test_rent_present_real_date_still_wins() -> None:
+    """When a real parseable date IS present, it wins over the
+    scrape-date fallback — regardless of has_rent. This protects
+    the existing date-precedence invariant."""
+    unit = {
+        "unit_id": "u-real-date",
+        "floor_plan_name": "G1",
+        "rent_low": 1700.0,
+        "availability_date": "2026-08-20",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == "2026-08-20"
+
+
+def test_rent_present_status_available_still_wins() -> None:
+    """Mixed-signal case: rent published AND status=AVAILABLE AND no
+    date. Either signal alone triggers fallback; both together still
+    produce scrape date (no double-counting or weird interaction)."""
+    unit = {
+        "unit_id": "u-both",
+        "floor_plan_name": "H1",
+        "rent_low": 1600.0,
+        "availability_status": "AVAILABLE",
+    }
+    out = _format_v2_unit(unit, _TS)
+    assert out["available_date"] == _TS.strftime("%Y-%m-%d")
 
 
 @pytest.mark.parametrize("text", [

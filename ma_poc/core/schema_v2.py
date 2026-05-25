@@ -308,6 +308,15 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         # Cortland / RentCafe rows ship the same combo when their API
         # has no specific move-in date. _available_date_raw still
         # preserves the original empty/odd string for forensics.
+        # 2026-05-25 (canary 1ef1060 follow-up): pass ``has_rent`` so the
+        # date resolver can default to scrape-date for units that carry
+        # a published rent but whose status field is null / UNAVAILABLE
+        # (Knock, G5, MERGED_CROSS_PAGE, TIER_1_5_EMBEDDED cohorts). A
+        # positive ``_format_rent`` return (>1) is the rentable-now
+        # signal — operators do not publish prices on un-rentable units.
+        # Note: rent_lo / rent_hi feed ``_format_rent`` separately below;
+        # we re-run the same gate here so the date logic sees the same
+        # truth as the rent columns will display.
         "available_date": _resolve_available_date(
             _format_date(_first(
                 unit, "available_date", "availability_date",
@@ -318,6 +327,10 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
                 or unit.get("_availability_status")
             ),
             scrape_ts,
+            has_rent=(
+                _format_rent(rent_lo) is not None
+                or _format_rent(rent_hi) is not None
+            ),
         ),
         # 2026-05-18 (capture-first): preserve the RAW availability string
         # even when _format_date can't normalize it (text/word/odd format).
@@ -564,12 +577,25 @@ def _resolve_available_date(
     parsed_date: str | None,
     status: str | None,
     scrape_ts: datetime,
+    *,
+    has_rent: bool = False,
 ) -> str | None:
-    """When the operator explicitly says the unit is AVAILABLE but
+    """When the operator effectively says the unit IS rentable but
     ships no parseable move-in date, default the date to the scrape
-    timestamp (i.e. "available today / now"). The status field is the
-    authoritative signal; an empty date string in that context means
-    "immediately" rather than "we don't know".
+    timestamp (i.e. "available today / now").
+
+    A unit is treated as rentable-now when EITHER:
+      * status explicitly says ``"AVAILABLE"``, OR
+      * ``has_rent`` — the unit has a positive rent value
+        published. The presence of a price is itself a strong
+        rentability signal: operators don't list rents on units
+        they can't rent. This catches the canary 1ef1060 regression
+        where the Knock adapter mis-flagged ~8,580 of 8,597
+        rent-published units as ``UNAVAILABLE`` because Knock's
+        ``available`` boolean is a separate signal that's often
+        False even when the unit IS being offered. The Knock adapter
+        was fixed in parallel, but ``has_rent`` is a defence-in-depth
+        for the next operator whose status field is similarly noisy.
 
     2026-05-24 (user Q): "if it does not show availability date but
     says available, what do we do?". Prior behaviour was to ship
@@ -579,13 +605,16 @@ def _resolve_available_date(
     forensic analysis can still distinguish the two cases.
 
     Behaviour:
-      * parsed_date present (any status)            → parsed_date
-      * parsed_date None + status == "AVAILABLE"    → scrape date
-      * parsed_date None + status anything else     → None (unchanged)
+      * parsed_date present                                  → parsed_date
+      * parsed_date None + status == "AVAILABLE"             → scrape date
+      * parsed_date None + has_rent=True                     → scrape date
+      * parsed_date None + status none/unknown + no rent     → None (unchanged)
     """
     if parsed_date:
         return parsed_date
     if status and status.upper() == "AVAILABLE":
+        return scrape_ts.strftime("%Y-%m-%d")
+    if has_rent:
         return scrape_ts.strftime("%Y-%m-%d")
     return parsed_date
 
