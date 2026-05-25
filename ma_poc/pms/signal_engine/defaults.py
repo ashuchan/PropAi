@@ -233,6 +233,10 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     # the canonical CMS extension; resolver also tries the bare path in
     # case the operator hides the extension.
     "edificecms": ("/floorplans.php", "/floorplans", "/floor-plans", "/availability"),
+    # 2026-05-25 — FortressTech (PRG Property Resources Group). The vanity
+    # site embeds availability.fortresstech.io/unit-availability via iframe;
+    # the canonical landing slug carries the #availability anchor.
+    "fortresstech": ("/", "/floorplans", "/floor-plans", "/availability"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (
