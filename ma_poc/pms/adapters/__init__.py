@@ -13,6 +13,7 @@ from ma_poc.pms.adapters.aspensquare import AspenSquareAdapter
 from ma_poc.pms.adapters.avalonbay import AvalonBayAdapter
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult, PmsAdapter
 from ma_poc.pms.adapters.cortland import CortlandAdapter
+from ma_poc.pms.adapters.edificecms import EdificeCmsAdapter
 from ma_poc.pms.adapters.encoreskyline_template import (
     EncoreSkylineTemplateAdapter,
 )
@@ -33,6 +34,7 @@ from ma_poc.pms.adapters.onesite import OneSiteAdapter
 from ma_poc.pms.adapters.realpage_cws import RealPageCwsAdapter
 from ma_poc.pms.adapters.realpage_oll import RealPageOllAdapter
 from ma_poc.pms.adapters.registry import all_adapters, get_adapter, register
+from ma_poc.pms.adapters.reinhold import ReinholdAdapter
 from ma_poc.pms.adapters.rentaladdress import RentalAddressAdapter
 from ma_poc.pms.adapters.rentcafe import RentCafeAdapter
 from ma_poc.pms.adapters.rentcafe_layout_tab import RentCafeLayoutTabAdapter
@@ -86,6 +88,7 @@ def _bootstrap_registry() -> None:
         MaacAdapter,
         IrvineAdapter,
         CortlandAdapter,
+        ReinholdAdapter,
         EquityAdapter,
         FunnelAdapter,
         TouchTourAdapter,

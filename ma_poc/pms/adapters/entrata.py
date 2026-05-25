@@ -929,6 +929,356 @@ def _parse_pp_unit_item(items: list[Any], url: str) -> list[dict[str, str]]:
     return units
 
 
+# ----------------------------------------------------------------------
+# Prospect Portal PER-PLAN unit-card drill (2026-05-25, canary 1ef1060
+# regr#9 — 212 properties / ~1,759 units flipped from inferred_* to
+# real unit_numbers).
+#
+# Background: parse_entrata_prospectportal_html (Templates A/B/C above)
+# parses the floorplan-grid INDEX page — one row per plan, with
+# ``unit_number=""``. Downstream, core/identity.compute_fallback_unit_id
+# hashes name+beds+baths+sqft into ``inferred_<hex>`` (per scraper.py:
+# 1044 note). The 212-prop cohort emits one inferred_* row per plan, so
+# verdict.py and unit-matching see synthetic ids instead of real ones.
+#
+# Drill mechanic: each PP-SSR plan link points to a per-plan SSR page
+# ``/floorplans/<state>/<property>/<plan-slug>-<fpid>-<phase>/`` that
+# server-renders the per-apartment roster as ``.unit-card`` blocks:
+#
+#   <div class="unit-card container-shape-dynamic unit-item-details-267"
+#        role="article">
+#     <div class="unit-header">
+#       <h3 class="unit-number"> 8700 </h3>
+#       ...
+#       <a data-fpid="1440" data-uid="267" data-uspid="267" data-fid="8"
+#          ...>Show on map</a>
+#     </div>
+#     ... "2 Bed • 2 Bath • 954 SqFt • 1 • Building 15" ...
+#     ... "Available Now" / "Available 06/15/2026" ...
+#     ... "from $1,595 per month" ...
+#   </div>
+#
+# Authoritative fields:
+#   * unit_number   ← ``<h3 class="unit-number">`` text (e.g. "8700")
+#   * data-unit-id  ← ``data-unit-id`` attr OR ``data-uid``/``data-uspid``
+#                     on the Show-on-map link OR the ``unit-item-details-
+#                     <NNN>`` class suffix — used as source_ids.entrata_uid
+#                     so the stable PP id survives merge.
+#   * data-fpid     ← floorplan id (when present on the map link)
+#
+# Live-verified 2026-05-25:
+#   * www.risewestarlington.com (.../a1-silver-1212885-1/) — 1 unit
+#   * foxlake.prospectportal.com (.../abbington-1440-1/) — 5 units
+# Both via curl_cffi chrome120; status 200, no CF challenge.
+
+# "1 Bed • 1 Bath • 480&nbsp;SqFt • 2 • 3605 • Available 07/21/2026"
+# splits cleanly on the dot-separator character (``•``) the PP template
+# uses to delineate stat cells. We also tolerate ``,`` and ``|`` because
+# some legacy PP themes use them in the same position.
+_PP_UNIT_CARD_SEP_RE = re.compile(r"[•|,]")
+_PP_UNIT_CARD_AVAIL_NOW_RE = re.compile(r"available\s+now", re.IGNORECASE)
+_PP_UNIT_CARD_AVAIL_MDY_RE = re.compile(
+    r"available\s+(\d{1,2})/(\d{1,2})/(\d{4})", re.IGNORECASE
+)
+# "from $1,595 per month" / "$1,595" / "$1,495 - $1,695"
+_PP_UNIT_CARD_RENT_RE = re.compile(
+    r"\$\s*([\d,]+)(?:\.\d{2})?", re.IGNORECASE
+)
+# Class suffix encoding the unit id, e.g. "unit-item-details-267".
+_PP_UNIT_CARD_ID_CLASS_RE = re.compile(r"unit-item-details-(\d+)")
+# Bed/bath/sqft tuples that may appear once in the same line, e.g.
+# "2 Bed • 2 Bath • 954 SqFt" or "Studio • 1 Bath • 480 SqFt".
+_PP_UNIT_CARD_BED_RE = re.compile(
+    r"(\d+)\s*bed[s]?\b|\bstudio\b", re.IGNORECASE
+)
+_PP_UNIT_CARD_BATH_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*bath[s]?\b", re.IGNORECASE
+)
+# Sqft tolerant to NBSP / "&nbsp" sans-semicolon / plain whitespace.
+_PP_UNIT_CARD_SQFT_RE = re.compile(
+    r"([\d,]+)[\s\xa0&\w]{0,8}?(?:sq\s*ft|sqft)", re.IGNORECASE
+)
+# Plan-slug-fpid extraction from the per-plan URL:
+# .../floorplans/<location>/<property>/<plan-slug>-<fpid>-<phase>/
+_PP_PLAN_URL_RE = re.compile(
+    r"/floorplans/[^/]+/[^/]+/([a-z0-9][a-z0-9-]*?)-(\d{3,9})-(\d+)/?",
+    re.IGNORECASE,
+)
+
+
+def _pp_extract_card_uid(card: Any) -> str:
+    """Return the stable PP unit id (``data-unit-id`` / ``data-uid`` /
+    ``data-uspid`` / ``unit-item-details-<n>`` class suffix). Empty
+    string when no id found — caller will fall back to the visible
+    ``unit-number`` text.
+
+    Order of preference matches PP's own equivalence: ``data-unit-id``
+    on the card root is the canonical attr, ``data-uid``/``data-uspid``
+    on the map-link is the same numeric id, and the class suffix
+    duplicates it on the root. Live capture from foxlake confirms all
+    three resolve to ``267`` for the same unit.
+    """
+    raw = str(card.get("data-unit-id") or "").strip()
+    if raw:
+        return raw
+    for el in card.select("[data-uid], [data-uspid], [data-unit-id]"):
+        for attr in ("data-unit-id", "data-uid", "data-uspid"):
+            v = str(el.get(attr) or "").strip()
+            if v:
+                return v
+    for cls in card.get("class") or []:
+        m = _PP_UNIT_CARD_ID_CLASS_RE.match(str(cls))
+        if m:
+            return m.group(1)
+    return ""
+
+
+def _pp_extract_card_fpid(card: Any) -> str:
+    """Return the floorplan id (``data-fpid``) if any descendant carries
+    it. Used to anchor the per-unit row to its parent plan when the
+    caller doesn't already know the fpid."""
+    for el in card.select("[data-fpid]"):
+        v = str(el.get("data-fpid") or "").strip()
+        if v:
+            return v
+    return ""
+
+
+def parse_entrata_pp_unit_cards(
+    html: str, url: str, floor_plan_name: str = ""
+) -> list[dict[str, str]]:
+    """Parse a Prospect Portal **per-plan** page's ``.unit-card`` roster.
+
+    Each ``.unit-card`` is one real apartment unit. Returns unit-level
+    rows whose ``unit_number`` is the visible PP number (e.g. ``"184"``,
+    ``"8700"``) and whose ``source_ids.entrata_uid`` is the stable PP
+    numeric id (e.g. ``"5256171"``, ``"267"``) — this is what closes
+    canary 1ef1060 regr#9: the runner stops synthesising
+    ``inferred_<sha16>`` ids because every emitted row already has a
+    natural ``unit_number``.
+
+    ``floor_plan_name`` is the parent plan label (e.g. ``"A1 Silver"``,
+    ``"Abbington"``). When empty, the function derives it from the URL
+    slug (``a1-silver-1212885-1`` → ``"A1 Silver"``).
+
+    Tier label: ``TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL``.
+
+    Live-verified 2026-05-25:
+      * risewestarlington.com pid 1212885 → 1 unit (#184, uid 5256171)
+      * foxlake.prospectportal.com fpid 1440 → 5 units (uids 267/338/
+        306/...)
+    """
+    if not html or "unit-card" not in html:
+        return []
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "lxml")
+    cards = soup.select(".unit-card")
+    if not cards:
+        return []
+
+    # Derive the plan name from the URL slug when caller didn't supply it.
+    plan = floor_plan_name
+    mh = _PP_PLAN_URL_RE.search(url or "")
+    derived_fpid = mh.group(2) if mh else ""
+    if not plan and mh:
+        slug = mh.group(1).replace("-", " ").strip()
+        plan = slug.title() if slug else ""
+
+    units: list[dict[str, str]] = []
+    seen_uids: set[str] = set()
+    for card in cards:
+        unit_num = ""
+        h3 = card.select_one(".unit-number")
+        if h3:
+            unit_num = h3.get_text(" ", strip=True)
+        uid = _pp_extract_card_uid(card)
+
+        # Need at least one of (unit_number, stable uid) — without either
+        # we'd just be emitting a placeholder row.
+        if not unit_num and not uid:
+            continue
+
+        # Dedupe on uid (preferred) or unit_num — PP sometimes repeats a
+        # card inside a "compare units" modal on the same page.
+        dedupe_key = uid or unit_num
+        if dedupe_key in seen_uids:
+            continue
+        seen_uids.add(dedupe_key)
+
+        # Flatten the card's visible text into one searchable blob; the
+        # individual stat tokens (bed / bath / sqft / building / floor /
+        # availability) live inside many small <span>s and the labels
+        # are inconsistent across PP themes, so a single regex sweep is
+        # more reliable than selector-per-field.
+        text = card.get_text(" ", strip=True)
+
+        beds_val: int | None = None
+        bm = _PP_UNIT_CARD_BED_RE.search(text)
+        if bm:
+            if bm.group(0).lower().startswith("studio"):
+                beds_val = 0
+            elif bm.group(1):
+                try:
+                    beds_val = int(bm.group(1))
+                except ValueError:
+                    beds_val = None
+        baths_val = ""
+        bath_m = _PP_UNIT_CARD_BATH_RE.search(text)
+        if bath_m:
+            baths_val = bath_m.group(1)
+        sqft_val = ""
+        sqft_m = _PP_UNIT_CARD_SQFT_RE.search(text)
+        if sqft_m:
+            sqft_val = sqft_m.group(1).replace(",", "")
+
+        # Rent: PP cards nest the canonical rent in ``.unit-pricing
+        # .price-value`` (verified rise/foxlake 2026-05-25). Older PP
+        # themes use a flat ``.unit-price`` element. The text-fallback
+        # MUST exclude ``.unit-deposit`` ("Deposit: $500") and the
+        # concession banner ("$305 Off Monthly Rent") — those leak
+        # dollar tokens that would otherwise win the first-match.
+        rent_text = ""
+        for sel in (
+            ".unit-pricing .price-value",
+            ".unit-pricing",
+            ".unit-price",
+        ):
+            el = card.select_one(sel)
+            if el:
+                rent_text = el.get_text(" ", strip=True)
+                if rent_text:
+                    break
+        rent_matches = _PP_UNIT_CARD_RENT_RE.findall(rent_text)
+        rent_lo: int | None = None
+        rent_hi: int | None = None
+        if rent_matches:
+            rent_lo = money_to_int(rent_matches[0])
+            rent_hi = money_to_int(rent_matches[-1])
+
+        # Availability: "Available Now" → today (left empty, downstream
+        # fills the scrape date) | "Available MM/DD/YYYY" → ISO date.
+        avail_date = ""
+        status = "AVAILABLE"
+        date_m = _PP_UNIT_CARD_AVAIL_MDY_RE.search(text)
+        if date_m:
+            mo, d, y = date_m.groups()
+            avail_date = f"{y}-{int(mo):02d}-{int(d):02d}"
+        # "Available Now" / no date → leave avail_date blank; status
+        # stays AVAILABLE so the downstream gate doesn't reject.
+
+        # Building / floor — best-effort, useful for downstream merge
+        # but not required for validity.
+        building = ""
+        bld_m = re.search(r"\bbuilding\s+([A-Za-z0-9-]+)", text, re.IGNORECASE)
+        if bld_m:
+            building = bld_m.group(1)
+
+        source_ids: dict[str, Any] = {}
+        if uid:
+            source_ids["entrata_uid"] = uid
+        fpid = derived_fpid or _pp_extract_card_fpid(card)
+        if fpid:
+            source_ids["entrata_fpid"] = fpid
+
+        # Final unit_number: visible PP number wins, then stable uid as
+        # the fallback ("ent-<uid>" prefix flags the synthesised case so
+        # consumers can tell the two apart in QA).
+        final_unit_num = unit_num or f"ent-{uid}"
+
+        units.append(
+            make_unit_dict(
+                floor_plan_name=plan,
+                bed_label=bed_label_from(beds_val, plan),
+                bedrooms=str(beds_val) if beds_val is not None else "",
+                bathrooms=baths_val,
+                sqft=sqft_val,
+                unit_number=final_unit_num,
+                building=building,
+                rent_range=format_rent_range(rent_lo, rent_hi),
+                rent_low=rent_lo,
+                rent_high=rent_hi,
+                availability_status=status,
+                availability_date=avail_date,
+                source_api_url=url,
+                extraction_tier="TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL",
+                source_ids=source_ids or None,
+            )
+        )
+    return units
+
+
+# Anchor selectors PP uses to link from the plan grid to a per-plan
+# detail page. The href matches ``/floorplans/<state>/<property>/<slug>
+# -<fpid>-<phase>/`` — _PP_PLAN_URL_RE pins the format. The ".fp-name-
+# link" is the most reliable selector on Template B index pages
+# (foxlake live capture: 7 fp-group-items × 1 fp-name-link each, all
+# matching). We also accept .fp-cta-link, .fp-link, and the
+# href-pattern fallback for themes that don't class the link.
+_PP_PLAN_LINK_SELECTORS = (
+    ".fp-name-link",
+    ".fp-cta-link",
+    "a.fp-link",
+    ".fp-card a[href*='/floorplans/']",
+    "li.fp-group-item a[href*='/floorplans/']",
+    "li.unit-item a[href*='/floorplans/']",
+)
+
+
+def find_entrata_pp_plan_links(index_html: str, origin: str) -> list[str]:
+    """Absolute per-plan SSR URLs discovered on a PP index page.
+
+    The PP plan grid (Templates A/B/C above) renders one anchor per plan
+    pointing to ``/floorplans/<state>/<property>/<slug>-<fpid>-<phase>/``
+    — that's the unit-card page parse_entrata_pp_unit_cards expects.
+    Returns absolute URLs deduped in document order; same-origin
+    candidates are preserved as-is, cross-origin hrefs are rewritten
+    onto ``origin`` so the drill stays on the property we're crawling.
+
+    Returns ``[]`` when the page has no PP plan grid (an Entrata-WP
+    detail page, a non-PP CMS, an Entrata API-only site).
+    """
+    if not index_html:
+        return []
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(index_html, "lxml")
+    candidates: list[str] = []
+    for sel in _PP_PLAN_LINK_SELECTORS:
+        for a in soup.select(sel):
+            href = str(a.get("href") or "").strip()
+            if not href:
+                continue
+            candidates.append(href)
+    # Fallback: scan every <a> for the URL pattern in case the theme
+    # didn't class the link. _PP_PLAN_URL_RE filters non-PP hrefs.
+    if not candidates:
+        for a in soup.select("a[href*='/floorplans/']"):
+            href = str(a.get("href") or "").strip()
+            if href:
+                candidates.append(href)
+
+    origin_clean = (origin or "").rstrip("/")
+    out: list[str] = []
+    for href in candidates:
+        m = _PP_PLAN_URL_RE.search(href)
+        if not m:
+            continue
+        if href.startswith("http://") or href.startswith("https://"):
+            absolute = href
+        elif href.startswith("/"):
+            absolute = origin_clean + href
+        else:
+            absolute = origin_clean + "/" + href
+        # Strip query / fragment to canonicalise.
+        absolute = absolute.split("?")[0].split("#")[0]
+        if not absolute.endswith("/"):
+            absolute += "/"
+        if absolute not in out:
+            out.append(absolute)
+    return out
+
+
 def find_entrata_fp_detail_links(index_html: str, origin: str) -> list[str]:
     """Absolute ``/floorplan/<slug>/`` detail URLs from an index page."""
     if not index_html:
@@ -1140,6 +1490,11 @@ class EntrataAdapter:
         # details.
         if base:
             pp_ssr_units: list[dict[str, str]] = []
+            # Tracks every index HTML body we successfully matched a PP
+            # template against — keyed by its absolute URL. Used by the
+            # per-plan unit-card drill (canary 1ef1060 regr#9) to find
+            # plan links without re-fetching the index.
+            pp_ssr_index_bodies: list[tuple[str, str]] = []
             fr_body_check = (
                 getattr(fr, "body", None) if fr is not None else None
             )
@@ -1153,12 +1508,13 @@ class EntrataAdapter:
                 "fp-card" in fr_body_check
                 or "fp-group-item" in fr_body_check
             ):
+                _cap_url = str(getattr(fr, "final_url", "") or base)
                 pp_ssr_units.extend(
                     parse_entrata_prospectportal_html(
-                        fr_body_check,
-                        str(getattr(fr, "final_url", "") or base),
+                        fr_body_check, _cap_url
                     )
                 )
+                pp_ssr_index_bodies.append((_cap_url, fr_body_check))
 
             # Step 2: discover deep ``/{city}/{slug}/(conventional|affordable)/``
             # candidates from the captured body, plus shallow guesses that
@@ -1209,6 +1565,62 @@ class EntrataAdapter:
                 pp_ssr_units.extend(
                     parse_entrata_prospectportal_html(cand_html, cand_url)
                 )
+                pp_ssr_index_bodies.append((cand_url, cand_html))
+
+            # Step 4 (canary 1ef1060 regr#9, 2026-05-25): unit-card drill.
+            # Templates A/B/C above produce plan-level rows with
+            # ``unit_number=""``; downstream the runner synthesises
+            # ``inferred_<sha16>`` ids from name+beds+baths+sqft. The
+            # per-plan SSR page at ``/floorplans/<state>/<property>/<slug>
+            # -<fpid>-<phase>/`` server-renders the real per-apartment
+            # roster as ``.unit-card`` blocks — parsing those gives every
+            # row a natural ``unit_number`` (e.g. "184", "8700") plus a
+            # stable ``source_ids.entrata_uid``, closing the regression.
+            #
+            # When the drill produces at least one unit-card row,
+            # ``pp_ssr_units`` is REPLACED — unit-level rows fully
+            # supersede plan-level rows from the same property, so
+            # keeping both would double-count. The drill is best-effort:
+            # any per-plan fetch that errors / 404s is skipped, and an
+            # empty drill leaves the plan-level rows intact.
+            pp_unit_card_rows: list[dict[str, str]] = []
+            seen_plan_urls: set[str] = set()
+            for _idx_url, _idx_html in pp_ssr_index_bodies:
+                plan_links = find_entrata_pp_plan_links(_idx_html, base)
+                for plan_url in plan_links:
+                    if plan_url in seen_plan_urls:
+                        continue
+                    seen_plan_urls.add(plan_url)
+                    # Cap drill fan-out — the largest PP properties have
+                    # ~30 plans; beyond that we trust the plan-level
+                    # rows rather than incur the per-plan fetch cost.
+                    if len(seen_plan_urls) > 30:
+                        break
+                    try:
+                        plan_html = await _entrata_static_fetch(plan_url)
+                    except Exception:
+                        plan_html = ""
+                    if not plan_html or "unit-card" not in plan_html:
+                        continue
+                    pp_unit_card_rows.extend(
+                        parse_entrata_pp_unit_cards(plan_html, plan_url)
+                    )
+
+            # Also check the captured body itself in case link-hop
+            # landed us directly on a per-plan page (the user-flagged
+            # cohort — risewestarlington / foxlake — does exactly this).
+            if (
+                isinstance(fr_body_check, str)
+                and fr_body_check
+                and "unit-card" in fr_body_check
+            ):
+                _cap_url = str(getattr(fr, "final_url", "") or base)
+                pp_unit_card_rows.extend(
+                    parse_entrata_pp_unit_cards(fr_body_check, _cap_url)
+                )
+
+            if pp_unit_card_rows:
+                pp_ssr_units = pp_unit_card_rows
 
             if pp_ssr_units:
                 from ma_poc.extraction.post_process import post_process
@@ -1220,10 +1632,19 @@ class EntrataAdapter:
                 if _pps.n_admitted > 0:
                     result.units = _pps.admitted
                     result.plan_summaries = _pps.plan_summaries
-                    result.winning_url = (
-                        deep_candidates[0] if deep_candidates else base
-                    )
-                    result.tier_used = "TIER_1_DOM_ENTRATA_PP_SSR"
+                    # When the drill fired, attribute the winning URL to
+                    # the first per-plan page we hit so downstream tier
+                    # attribution / debug traces point at the right page.
+                    if pp_unit_card_rows and seen_plan_urls:
+                        result.winning_url = next(iter(seen_plan_urls))
+                        result.tier_used = (
+                            "TIER_1_DOM_ENTRATA_PP_UNIT_LEVEL"
+                        )
+                    else:
+                        result.winning_url = (
+                            deep_candidates[0] if deep_candidates else base
+                        )
+                        result.tier_used = "TIER_1_DOM_ENTRATA_PP_SSR"
                     result.confidence = min(
                         0.92, 0.7 + 0.04 * _pps.n_admitted
                     )
@@ -1231,8 +1652,16 @@ class EntrataAdapter:
                         {
                             "url": result.winning_url or base,
                             "status": 200,
-                            "body": "<entrata-pp-ssr-grid>",
-                            "via": "entrata_pp_ssr",
+                            "body": (
+                                "<entrata-pp-unit-cards>"
+                                if pp_unit_card_rows
+                                else "<entrata-pp-ssr-grid>"
+                            ),
+                            "via": (
+                                "entrata_pp_unit_card_drill"
+                                if pp_unit_card_rows
+                                else "entrata_pp_ssr"
+                            ),
                         }
                     )
                     return result

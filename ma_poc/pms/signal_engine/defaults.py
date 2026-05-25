@@ -227,6 +227,12 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     # "rentmanager" without it, the floor-plans / availability / sitemap
     # sub-paths are the most likely carriers of the embedded endpoint.
     "rentmanager": ("/floorplans", "/floor-plans", "/availability", "/interactive-site-map"),
+    # 2026-05-25 — Edifice CMS (Hexagon IT Solutions). The /floorplans.php
+    # PHP page carries the \`\`getFloorPlan()\`\` ajax block with the
+    # property UUID — that is the only URL the adapter needs. .php is
+    # the canonical CMS extension; resolver also tries the bare path in
+    # case the operator hides the extension.
+    "edificecms": ("/floorplans.php", "/floorplans", "/floor-plans", "/availability"),
 }
 
 DEFAULT_UNIVERSAL_PRIORS: tuple[str, ...] = (

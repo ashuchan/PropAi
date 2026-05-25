@@ -62,12 +62,14 @@ PmsName = Literal[
     "irvine",
     "cortland",
     "equity",
+    "reinhold",
     "rentmanager",
     "rentvision",
     "rentaladdress",
     "residentservices365",
     "encoreskyline_template",
     "aspensquare",
+    "edificecms",
     "marketapts",
     "rentcafe_unit_roster",
     "imt_spaces",
@@ -113,12 +115,14 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "irvine": "api_first",
     "cortland": "api_first",
     "equity": "api_first",
+    "reinhold": "dom_first",
     "rentmanager": "api_first",
     "rentvision": "dom_first",
     "rentaladdress": "dom_first",
     "residentservices365": "dom_first",
     "encoreskyline_template": "dom_first",
     "aspensquare": "dom_first",
+    "edificecms": "api_first",
     "marketapts": "dom_first",
     "rentcafe_unit_roster": "dom_first",
     "imt_spaces": "dom_first",
@@ -776,6 +780,22 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             0.85,
             ["G5 marketing-cloud marker in HTML (g5marketingcloud / g5dxm.com / g5-c- URN)"],
         )
+    # 2026-05-25 (canary 1ef1060 regr#15): Reinhold Residential's custom
+    # Divi-child WordPress theme ships ``rr-unit-block`` SSR tables on
+    # /availability/ with full per-unit rent + date data inline. The
+    # ``rr-pricing-toggle`` + ``rr-unit-block`` class pair is unique to
+    # this operator (rr- = Reinhold Residential). Sister sites verified
+    # live: chocolateworks-living, shadyside-living, sharplesworks-living,
+    # trinityrow-living, waterfront2-living. Routed to ReinholdAdapter.
+    # Apply-button links go to securecafeapplicant.com (NOT .securecafe.com
+    # so the generic RentCafe-securecafe marker below does NOT collide).
+    if "rr-unit-block" in h and "rr-pricing-toggle" in h:
+        yield (
+            "reinhold",
+            0.92,
+            ["Reinhold Residential marker in HTML "
+             "(rr-unit-block + rr-pricing-toggle classes)"],
+        )
     # 365 ResidentServices (Apollo / collapsar theme) — a self-hosted CMS
     # used by a small operator cluster. Asset host fingerprint is stable
     # site-wide (used for plan-card images and theme css), so detection
@@ -977,6 +997,29 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # isn't a portal). Fix: when apts247 markers are also present,
     # demote resman to 0.85 so apts247 wins. Same pattern as the
     # 2026-05-25 Knock-vs-OneSite gate.
+    # Edifice CMS (Hexagon IT Solutions) — multifamily marketing CMS
+    # whose own public REST API at edificecms.com/myresman/public/api/
+    # front/{floorplans,units} serves UUID-keyed unit-level data. The
+    # CMS routes apply-flow traffic to ResMan portals so a co-resident
+    # ``myresman.com`` marker is the norm, not the exception — every
+    # Edifice site we've sampled embeds a ResMan apply link. Fire
+    # BEFORE the ResMan branch below so the canonical Edifice data
+    # path wins at 0.92 (beats ResMan's 0.90). Live-verified 2026-05-25
+    # on cobblestonephx.com (canary 1ef1060 regression #10) — 13
+    # floorplans, multi-unit roster per plan.
+    _has_edificecms_marker = (
+        "edificecms.com" in h
+        or "/edi-assets/" in h
+        or "builder_live" in h  # the inline ``var BUILDER_LIVE =`` config blob
+    )
+    if _has_edificecms_marker:
+        yield (
+            "edificecms",
+            0.92,
+            ["Edifice CMS marker in HTML "
+             "(edificecms.com / /edi-assets/ / BUILDER_LIVE)"],
+        )
+
     _has_apts247_marker = "apts247" in h or "rentdynamics.com" in h
     if "myresman.com" in h or "/portal/applicants/availability" in h:
         if _has_apts247_marker:
@@ -985,6 +1028,15 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
                 0.85,
                 ["ResMan marker present but apts247 co-resident — "
                  "apts247 is the data API, ResMan is the apply-flow target"],
+            )
+        elif _has_edificecms_marker:
+            # Same co-resident pattern: Edifice CMS owns the data API,
+            # ResMan owns the apply link. Demote ResMan so Edifice wins.
+            yield (
+                "resman",
+                0.85,
+                ["ResMan marker present but edificecms co-resident — "
+                 "Edifice owns the data API, ResMan is the apply-flow target"],
             )
         else:
             yield (
@@ -1344,9 +1396,20 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
     "g5": ("g5marketingcloud", "g5dxm.com", "g5-c-"),
     "rentvision": ("created by rentvision", "powered by rentvision", "rentvision.com"),
+    "reinhold": ("rr-unit-block", "rr-pricing-toggle", "reinholdresidential.com"),
     "residentservices365": ("365residentservices.com",),
     "encoreskyline_template": ("jonahwidget", "jonahdigital", "meetelise"),
     "aspensquare": ("aspensquare.com", "static.aspensquare.com"),
+    # Edifice CMS (Hexagon IT Solutions) — multifamily marketing CMS.
+    # Public same-vendor REST API at edificecms.com/myresman/public/api/
+    # front/{floorplans,units} serves UUID-keyed unit-level data.
+    # Live-verified 2026-05-25 on cobblestonephx.com.
+    "edificecms": (
+        "edificecms.com",
+        "assets.edificecms.com",
+        "/edi-assets/",
+        "builder_live",
+    ),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
     "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
     "rentmanager": (
