@@ -915,6 +915,10 @@ async def scrape(
         property_id=property_id or "unknown",
         fetch_result=fetch_result,
         property_name=_from_csv("name", "Name", "Property Name", "proj_name"),
+        # 2026-05-25 (regr#11b): street address from CSV — AppFolio adapter
+        # uses this to post-fetch-filter multi-property PMC vanity responses
+        # whose embed JS lacks a propertyGroup (Academy Place / riedman cohort).
+        address=_from_csv("address", "Address", "street", "Street", "street_address"),
         city=_from_csv("city", "City"),
         state=_from_csv("state", "State"),
         zip_code=_from_csv("zip", "Zip", "zip_code", "ZIP Code"),
@@ -1749,6 +1753,7 @@ async def scrape(
             property_id=property_id or "unknown",
             fetch_result=fetch_result,
             property_name=ctx.property_name,
+            address=ctx.address,
             city=ctx.city,
             state=ctx.state,
             zip_code=ctx.zip_code,

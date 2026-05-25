@@ -165,6 +165,249 @@ def find_appfolio_property_group(html: str) -> str | None:
     return m.group(1) if m else None
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-25 (canary 1ef1060 regr#11b follow-up to chip #100):
+# Post-fetch address filter for AppFolio multi-property PMC vanity-path
+# cross-contamination.
+#
+# Chip #100 added a URL-level ``filters[property_list]`` filter when the
+# embed JS exposes a ``propertyGroup``. But some multi-property PMCs
+# (e.g. ``riedman`` — Academy Place in Corning NY) ship an embed JS
+# WITHOUT a propertyGroup at all. The propertyGroup-based filter never
+# fires for those PMCs, so the vanity /listings response still leaks
+# the entire PMC: Academy Place was getting 190 units across Erie PA,
+# Canandaigua NY, Grand Island NY, Ithaca NY, Rochester NY, etc.
+#
+# This filter runs AFTER the SSR parse and operates on the parsed
+# units list. It uses the property's CSV-sourced street address +
+# ZIP (threaded through ``AdapterContext.address`` / ``zip_code``) to
+# drop listings whose address doesn't match the target. Strict by
+# default: ZIP must match exactly and street must fuzzy-match at
+# ≥85% via rapidfuzz ``token_set_ratio``.
+#
+# Returns ``(filtered_units, telemetry)``. Telemetry includes
+# ``filter_activated``, ``kept``, ``dropped``, and ``reason`` for the
+# adapter's error log + downstream observability.
+# ─────────────────────────────────────────────────────────────────────
+
+
+_APPFOLIO_ZIP_RE = re.compile(r"\b(\d{5})(?:-\d{4})?\b")
+_APPFOLIO_HOUSE_NUM_RE = re.compile(r"^\s*(\d+)")
+_APPFOLIO_APT_SUFFIX_RE = re.compile(
+    # ``\b`` anchors are required: without them, the previous ``t``
+    # alternative matched the final ``t`` inside ``West`` (followed by
+    # `` Third``) and ate half the street name. ``#`` doesn't need word
+    # boundary so it's a separate alternative.
+    r"\b(?:apt|apartment|unit|suite|ste)\b\.?\s*[\w\-]+|#\s*[\w\-]+",
+    re.IGNORECASE,
+)
+_DIRECTION_WORDS = {
+    "n": "north", "s": "south", "e": "east", "w": "west",
+    "ne": "northeast", "nw": "northwest", "se": "southeast", "sw": "southwest",
+}
+_ORDINAL_WORDS = {
+    "first": "1", "second": "2", "third": "3", "fourth": "4", "fifth": "5",
+    "sixth": "6", "seventh": "7", "eighth": "8", "ninth": "9", "tenth": "10",
+    "eleventh": "11", "twelfth": "12",
+}
+_STREET_TYPE_NORM = {
+    "st": "st", "street": "st",
+    "ave": "ave", "avenue": "ave", "av": "ave",
+    "rd": "rd", "road": "rd",
+    "blvd": "blvd", "boulevard": "blvd",
+    "dr": "dr", "drive": "dr",
+    "pkwy": "pkwy", "parkway": "pkwy", "pky": "pkwy",
+    "ln": "ln", "lane": "ln",
+    "ct": "ct", "court": "ct",
+    "cir": "cir", "circle": "cir",
+    "ter": "ter", "terrace": "ter",
+    "pl": "pl", "place": "pl",
+    "way": "way",
+    "trl": "trl", "trail": "trl",
+    "hwy": "hwy", "highway": "hwy",
+}
+
+
+def _normalize_street(s: str) -> str:
+    """Normalize a street address for fuzzy comparison.
+
+    Handles common AppFolio listing variations vs CSV-sourced canonical
+    addresses: direction abbreviations ("W" ↔ "West"), ordinal forms
+    ("3rd" ↔ "Third"), street-type abbreviations ("St" ↔ "Street"),
+    apartment/unit suffixes, and punctuation noise.
+
+    "11 W 3rd St" and "11 West Third St., Apt.111" both normalize to
+    "11 west 3 st" so ``rapidfuzz.token_set_ratio`` scores them ≈100.
+    """
+    if not s:
+        return ""
+    s = s.lower()
+    # Drop apt/unit suffixes BEFORE other token rewrites so they don't
+    # leak into the comparison string.
+    s = _APPFOLIO_APT_SUFFIX_RE.sub(" ", s)
+    # Ordinal words → numeric ("third" → "3").
+    for word, num in _ORDINAL_WORDS.items():
+        s = re.sub(rf"\b{word}\b", num, s)
+    # Strip ordinal suffixes ("3rd" → "3", "22nd" → "22").
+    s = re.sub(r"(\d+)(?:st|nd|rd|th)\b", r"\1", s)
+    # Direction abbreviations → full words ("w" → "west").
+    s = re.sub(
+        r"\b([nsew]|ne|nw|se|sw)\b\.?",
+        lambda m: _DIRECTION_WORDS.get(m.group(1), m.group(1)),
+        s,
+    )
+    # Street-type abbreviations → canonical short form.
+    def _norm_type(m: re.Match[str]) -> str:
+        return _STREET_TYPE_NORM.get(m.group(1), m.group(1))
+    s = re.sub(
+        r"\b(street|avenue|av|road|boulevard|drive|parkway|pky|lane|court|circle|terrace|place|trail|highway|st|ave|rd|blvd|dr|pkwy|ln|ct|cir|ter|pl|trl|hwy|way)\b\.?",
+        _norm_type,
+        s,
+    )
+    # Strip punctuation, squeeze whitespace.
+    s = re.sub(r"[^\w\s]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def _extract_zip(s: str) -> str:
+    """Return the 5-digit ZIP from a string (strips +4 suffix), or ''."""
+    if not s:
+        return ""
+    m = _APPFOLIO_ZIP_RE.search(s)
+    return m.group(1) if m else ""
+
+
+def _extract_house_number(s: str) -> str:
+    """Return the leading house number from a street string, or ''."""
+    if not s:
+        return ""
+    m = _APPFOLIO_HOUSE_NUM_RE.search(s)
+    return m.group(1) if m else ""
+
+
+def _address_matches(
+    listing_address: str,
+    ctx_address: str,
+    ctx_zip: str,
+    fuzzy_threshold: int,
+) -> bool:
+    """Return True when listing_address matches the property's address.
+
+    Match rules (strict):
+      - ZIP exact match (after stripping +4 suffix). If ctx_zip is empty,
+        this check is skipped (street-only fallback).
+      - Street fuzzy match via rapidfuzz token_set_ratio ≥ threshold,
+        comparing the listing's street portion (before first comma) to
+        ctx_address. If both have leading house numbers, they must match
+        exactly (rapidfuzz is too lenient on differing numbers).
+    """
+    if not listing_address:
+        return False
+
+    if ctx_zip:
+        zip_target = _extract_zip(ctx_zip)
+        zip_listing = _extract_zip(listing_address)
+        if zip_target and zip_listing and zip_target != zip_listing:
+            return False
+
+    if ctx_address:
+        # Take the street portion of the listing (before the first comma),
+        # so city/state/zip noise doesn't dilute the fuzzy score.
+        listing_street = listing_address.split(",")[0].strip()
+        # House number must match exactly when both sides supply one —
+        # otherwise "11 W 3rd St" and "171 E First St" can score >85
+        # under token_set_ratio (small token sets, lots of overlap).
+        hn_target = _extract_house_number(ctx_address)
+        hn_listing = _extract_house_number(listing_street)
+        if hn_target and hn_listing and hn_target != hn_listing:
+            return False
+        from rapidfuzz import fuzz
+        norm_target = _normalize_street(ctx_address)
+        norm_listing = _normalize_street(listing_street)
+        if not norm_target or not norm_listing:
+            return False
+        score = fuzz.token_set_ratio(norm_target, norm_listing)
+        if score < fuzzy_threshold:
+            return False
+
+    return True
+
+
+def filter_listings_by_property_address(
+    units: list[dict[str, Any]],
+    ctx_address: str,
+    ctx_zip: str,
+    *,
+    fuzzy_threshold: int = 85,
+    address_field: str = "floor_plan_name",
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Filter AppFolio vanity-path units down to those matching ctx address.
+
+    Used as the fallback when chip #100's ``propertyGroup`` URL filter
+    cannot fire (multi-property PMC whose embed JS omits propertyGroup —
+    e.g. ``riedman`` for Academy Place). The PMC-wide /listings response
+    leaks ALL of the PMC's units; this function drops those whose street
+    + ZIP don't match the target property.
+
+    Behaviour matrix:
+      - No ctx_address AND no ctx_zip → no-op (filter cannot run; pass-through)
+      - Only one distinct address in ``units`` → no-op (single-property PMC)
+      - Multi-address response + ctx supplied → filter runs; matched units
+        returned, plus telemetry (kept / dropped / reason)
+      - Filter rejects everything → return the ORIGINAL units with a
+        warning in telemetry (``reason='filter_rejected_all_fallback'``).
+        Emitting zero units would surface as a worse failure mode than
+        the contamination it was trying to fix; defer to validation
+        downstream to flag the address mismatch.
+
+    Returns ``(filtered_units, telemetry_dict)`` so the caller can log
+    activation + drop counts in ``AdapterResult.errors`` for the run
+    report.
+    """
+    telemetry: dict[str, Any] = {
+        "filter_activated": False,
+        "kept": len(units),
+        "dropped": 0,
+        "reason": "",
+    }
+
+    if not units:
+        telemetry["reason"] = "no_units_to_filter"
+        return units, telemetry
+
+    if not ctx_address and not ctx_zip:
+        telemetry["reason"] = "no_ctx_address_or_zip"
+        return units, telemetry
+
+    distinct_addresses = {
+        (u.get(address_field) or "").strip() for u in units
+    }
+    distinct_addresses.discard("")
+    if len(distinct_addresses) <= 1:
+        telemetry["reason"] = "single_address_in_response"
+        return units, telemetry
+
+    matched: list[dict[str, Any]] = []
+    for u in units:
+        addr = u.get(address_field) or ""
+        if _address_matches(addr, ctx_address, ctx_zip, fuzzy_threshold):
+            matched.append(u)
+
+    if not matched:
+        telemetry["filter_activated"] = True
+        telemetry["kept"] = len(units)
+        telemetry["dropped"] = 0
+        telemetry["reason"] = "filter_rejected_all_fallback"
+        return units, telemetry
+
+    telemetry["filter_activated"] = True
+    telemetry["kept"] = len(matched)
+    telemetry["dropped"] = len(units) - len(matched)
+    telemetry["reason"] = "address_filter_applied"
+    return matched, telemetry
+
+
 def parse_appfolio_detail_page(html: str, source_url: str) -> list[dict[str, Any]]:
     """Bug 7: parse a single AppFolio /listings/detail/<uuid> page into one unit.
 
@@ -673,6 +916,30 @@ class AppFolioAdapter:
                         r = await c.get(listings_url, headers=headers)
                     if r.status_code == 200 and "data-listing-id=" in r.text:
                         vanity_units = parse_appfolio_listings_ssr(r.text, listings_url)
+                        # 2026-05-25 (regr#11b): when chip #100's URL-level
+                        # propertyGroup filter could not fire (PMC embed JS
+                        # has no ``propertyGroup`` — e.g. ``riedman`` /
+                        # Academy Place), the vanity response still leaks
+                        # the entire PMC. Drop listings whose address +
+                        # ZIP don't match the target property. See
+                        # ``filter_listings_by_property_address`` above.
+                        if vanity_units and not property_group:
+                            ctx_address = getattr(ctx, "address", "") or ""
+                            ctx_zip = getattr(ctx, "zip_code", "") or ""
+                            vanity_units, addr_filter_tel = (
+                                filter_listings_by_property_address(
+                                    vanity_units, ctx_address, ctx_zip
+                                )
+                            )
+                            if addr_filter_tel.get("filter_activated"):
+                                result.errors.append(
+                                    "appfolio-vanity-address-filter: "
+                                    f"reason={addr_filter_tel['reason']} "
+                                    f"kept={addr_filter_tel['kept']} "
+                                    f"dropped={addr_filter_tel['dropped']} "
+                                    f"ctx_addr={ctx_address!r} "
+                                    f"ctx_zip={ctx_zip!r}"
+                                )
                         if vanity_units:
                             result.units = vanity_units
                             result.tier_used = "TIER_1_DOM_APPFOLIO_VANITY"
