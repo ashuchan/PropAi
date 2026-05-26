@@ -333,7 +333,7 @@ def _looks_blocked(resp: Any) -> bool:
     return bool(is_captcha and provider == "cloudflare")
 
 
-def probe_get(url: str, **kw: Any) -> Any:
+def probe_get(url: str, *, unlocker: bool = True, **kw: Any) -> Any:
     """curl_cffi GET with chrome impersonation + optional probe proxy.
 
     Raises ImportError if curl_cffi is unavailable (callers already guard
@@ -344,6 +344,19 @@ def probe_get(url: str, **kw: Any) -> Any:
     the proxied fetch comes back a Cloudflare challenge shell or a
     403/429/503 block, retry once via the Web Unlocker API. WU is never
     spent on a successful fetch.
+
+    Args:
+        url: Target URL.
+        unlocker: If False, skip Web Unlocker escalation entirely for this
+            call. Use for secondary/per-plan fetches inside an adapter loop
+            where WU budget should be reserved for the primary landing page
+            (e.g., Entrata per-floorplan unit drills after landing succeeds).
+            Default True preserves existing behaviour.
+        **kw: Forwarded to curl_cffi.requests.get.
+
+    2026-05-26 cost audit: LLM-tier re-fetches drove 52% of WU spend
+    (~7,682/14,655 calls/day). Callers that don't need WU escalation should
+    pass ``unlocker=False`` to avoid the cap being eaten by low-value fetches.
     """
     from curl_cffi import requests as _creq
 
@@ -355,7 +368,7 @@ def probe_get(url: str, **kw: Any) -> Any:
     try:
         resp = _creq.get(url, **opts)
     except Exception:
-        if web_unlocker_key():
+        if unlocker and web_unlocker_key():
             wu = web_unlocker_get(url, timeout=int(opts.get("timeout") or 25) + 95)
             if wu.status_code == 200:
                 log.info("web_unlocker.rescue url=%s via=transport_error", url)
@@ -382,7 +395,7 @@ def probe_get(url: str, **kw: Any) -> Any:
         except Exception:
             pass  # fall through to original resp / Web Unlocker escalation
 
-    if web_unlocker_key() and _looks_blocked(resp):
+    if unlocker and web_unlocker_key() and _looks_blocked(resp):
         wu = web_unlocker_get(url, timeout=int(opts.get("timeout") or 25) + 95)
         if wu.status_code == 200 and not _looks_blocked(wu):
             log.info("web_unlocker.rescue url=%s via=cf_shell_or_block", url)

@@ -1558,10 +1558,10 @@ def find_entrata_fp_detail_links(index_html: str, origin: str) -> list[str]:
     return out
 
 
-async def _entrata_static_fetch(url: str) -> str:
+async def _entrata_static_fetch(url: str, *, unlocker: bool = True) -> str:
     from ma_poc.pms.adapters._probe import probe_get
 
-    r = probe_get(url, timeout=20)
+    r = probe_get(url, timeout=20, unlocker=unlocker)
     return (r.text or "") if r.status_code == 200 else ""
 
 
@@ -2066,6 +2066,12 @@ class EntrataAdapter:
         # (data-floorplan / property_floorplan[id]) and carries
         # property[id]. probe_get auto-escalates to Web-Unlocker on the
         # CF challenge shell.
+        #
+        # 2026-05-26 cost audit: PP adapter was consuming ~30 WU calls/property
+        # (1 landing + 29 per-plan). Cap floor-plan loop at _PP_FP_WU_CAP (8)
+        # and allow WU for all calls on the same CF-protected domain.  This
+        # keeps the cost at 1+8=9 WU calls/PP property vs the old 30.
+        _PP_FP_WU_CAP = 8
         landing = ""
         try:
             r = await _entrata_static_fetch(
@@ -2091,7 +2097,7 @@ class EntrataAdapter:
 
         movein = date.today().isoformat()
         out: list[dict[str, str]] = []
-        for fid in fp_ids[:30]:
+        for fid in fp_ids[:_PP_FP_WU_CAP]:
             u = (
                 f"{portal}/?module=check_availability&is_secure=1"
                 f"&property[id]={prop_id}&action=view_unit_spaces"

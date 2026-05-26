@@ -748,7 +748,9 @@ async def scrape(
                     "/apartments/",
                 ):
                     try:
-                        _rr = _creqd_get(_root + _suffix, timeout=15)
+                        # 2026-05-26: PMS-discovery sub-probes are best-effort
+                        # page scans — no WU needed here.
+                        _rr = _creqd_get(_root + _suffix, timeout=15, unlocker=False)
                     except Exception:
                         continue
                     if _rr.status_code != 200 or not _rr.text:
@@ -1328,7 +1330,13 @@ async def scrape(
                         if _name_map:
                             break  # got something, stop probing
                         try:
-                            _r = _enrich_probe(_enrich_base + _path, timeout=12)
+                            # 2026-05-26 cost audit: enrichment sub-probes
+                            # (sqft/rent FK on /floorplans/ etc.) drove 52% of
+                            # WU spend. These are best-effort lookups on
+                            # publicly accessible plan pages — no WU needed.
+                            _r = _enrich_probe(
+                                _enrich_base + _path, timeout=12, unlocker=False
+                            )
                         except Exception:
                             continue
                         if _r.status_code != 200 or not _r.text:
