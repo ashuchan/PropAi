@@ -630,17 +630,18 @@ def test_host_keywords_include_goprisma_fortresstech() -> None:
     assert keywords["fortresstech.io"] == 115
 
 
-def test_known_plan_level_only_patterns_documents_harbor_group() -> None:
-    """grind600 finding: Harbor Group Management portfolio (12/600 sites)
-    is a confirmed plan-level-only dead-end — the per-plan ``/listing``
-    sub-page is empty and yields no unit data. The pattern is annotated
-    in resolver._KNOWN_PLAN_LEVEL_ONLY_PATTERNS so adapter authors can
-    short-circuit deep-probes for these portfolios without re-running
-    the original investigation. Pin the annotation so it doesn't drift
-    out of sync with the documented memory entry."""
+def test_known_plan_level_only_patterns_harbor_group_graduated() -> None:
+    """2026-05-26: Harbor Group Management graduated from plan-level-only.
+
+    Unit data lives at ``{prop-url}/{plan}/units`` (one level past the
+    ``/listing`` dead-end). Dedicated adapter ``_harbor_group.py`` ships
+    as sub-tier 2.55 in generic.py.
+
+    _KNOWN_PLAN_LEVEL_ONLY_PATTERNS must be empty (or not contain the
+    HGM pattern) to signal the graduation for future reviewers.
+    """
     from ma_poc.pms.resolver import _KNOWN_PLAN_LEVEL_ONLY_PATTERNS
-    assert "harborgroupmanagement.com/apartments/" in _KNOWN_PLAN_LEVEL_ONLY_PATTERNS, (
-        "Harbor Group Management must remain documented in "
-        "_KNOWN_PLAN_LEVEL_ONLY_PATTERNS — 12/600 grind600-confirmed "
-        "plan-level-only sites"
+    assert "harborgroupmanagement.com/apartments/" not in _KNOWN_PLAN_LEVEL_ONLY_PATTERNS, (
+        "Harbor Group Management has been graduated (dedicated adapter ships "
+        "2026-05-26) — remove it from _KNOWN_PLAN_LEVEL_ONLY_PATTERNS"
     )
