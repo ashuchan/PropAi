@@ -1415,6 +1415,9 @@ def _format_v2_unit(
         "available_units": unit.get("available_units"),
         "date_captured": None,
         "available_date": unit.get("available_date"),
+        "availability_status": (
+            unit.get("availability_status") or unit.get("_availability_status")
+        ),
         "lease_term": unit.get("lease_term") or unit.get("_lease_term"),
         "move_in_date": (
             unit.get("move_in_date") or unit.get("_move_in_date")
@@ -1584,6 +1587,14 @@ def _format_v2_unit(
         ),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         "available_date": _format_date_str(unit.get("available_date")),
+        # 2026-05-26: availability_status was absent from this function
+        # (present in core/schema_v2.py but never synced here).  That caused
+        # 93.9% of units to have a blank availability_status in the canary
+        # output.  Light normalization mirrors _norm_status() in schema_v2.py:
+        # uppercase known tokens; pass raw string through for everything else.
+        "availability_status": _norm_avail_status(
+            unit.get("availability_status") or unit.get("_availability_status")
+        ),
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date_str(unit.get("move_in_date") or unit.get("_move_in_date")),
         # 2026-05-25 (canary 1ef1060 follow-up): concession + offer fields,
@@ -2065,6 +2076,29 @@ def _format_zip(val: Any) -> str | None:
         return m.group(0)
     digits = _re.sub(r"\D", "", s)
     return digits.zfill(5)[:5] if digits else None
+
+
+def _norm_avail_status(val: Any) -> str | None:
+    """Normalise availability_status. Uppercases known tokens; passes
+    raw strings through (capture-first). Returns None when unset.
+
+    Mirrors _norm_status() in ma_poc/core/schema_v2.py — keep in sync.
+    """
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    u = s.upper()
+    if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED",
+             "LEASED", "PENDING", "UNKNOWN"):
+        return u
+    # Partial-match helpers for common raw strings from adapters
+    if "AVAILABLE" in u and "UNAVAILABLE" not in u:
+        return "AVAILABLE"
+    if u == "LEASED OUT" or "NOT AVAILABLE" in u or "UNAVAILABLE" in u:
+        return "UNAVAILABLE"
+    return s  # capture-first: preserve raw text for downstream QA
 
 
 def _format_rent(val: Any) -> float | None:

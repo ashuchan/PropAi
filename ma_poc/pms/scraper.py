@@ -3260,6 +3260,15 @@ async def scrape_jugnu(
     if partial_state is not None:
         _jugnu_budget["_external_partial_ref"] = partial_state
 
+    # Initialise soft-404 recovery state before the outcome block so the
+    # post-scrape() application (below) can safely reference these variables
+    # regardless of which branch executed.  Both are always set inside the
+    # ``if outcome_val != "OK"`` block when _soft_404_recovery becomes True,
+    # but Python's compiler doesn't know that — initialising here prevents
+    # UnboundLocalError on Python 3.12+.
+    _soft_404_recovery: bool = False
+    _soft_404_status_code: int | None = None
+
     # Delta 2: short-circuit on non-OK fetch
     # RC5: EMPTY_BODY gets a distinct verdict prefix so dashboards can
     # distinguish "server returned 200 but no content" from real unreachable.
@@ -3313,11 +3322,12 @@ async def scrape_jugnu(
                         pass
 
             if _soft_404_recovery:
-                # Fall through to extraction. Record the recovery on the
-                # result dict so reports can distinguish "soft-404 recovered"
-                # from "genuine 200 OK".
-                result["_soft_404_recovery"] = True
-                result["_soft_404_status"] = getattr(fetch_result, "status_code", None)
+                # Fall through to extraction. Stash the status now; we'll
+                # write it onto result AFTER scrape() returns below because
+                # result is not yet initialised at this point (the else
+                # branch that initialises it returns early). Accessing result
+                # here would raise UnboundLocalError on Python 3.12+.
+                _soft_404_status_code = getattr(fetch_result, "status_code", None)
                 # Don't short-circuit; continue past this block.
             else:
                 result = _empty_result(base_url)
@@ -3410,6 +3420,10 @@ async def scrape_jugnu(
         shared_budget=_jugnu_budget,
     )
     result["_property_id"] = property_id
+    # Apply soft-404 recovery marker now that result is initialised.
+    if _soft_404_recovery:
+        result["_soft_404_recovery"] = True
+        result["_soft_404_status"] = _soft_404_status_code
 
     # Telemetry B: attach fetch diagnostic (error_signature, final_url, body
     # size, captcha, proxy, identity) so the per-property report can render
