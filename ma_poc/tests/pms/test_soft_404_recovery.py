@@ -178,3 +178,101 @@ def test_scraper_marker_list_matches_test_helper() -> None:
             f"marker {m!r} present in test helper but missing from "
             f"production _SOFT_404_MARKERS — out of sync"
         )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Link-hop soft-404 recovery (2026-05-26, b186b5b follow-up).
+#
+# The original soft-404 hook fired in scrape_jugnu — i.e. on the L1
+# fetch of the property's base URL. b186b5b QC found ~330 properties in
+# the 70-shard canary where the link hopper's *sub-page* hop returned
+# DEAD_URL with a substantive body (≥10 KB, apartment-inventory markers)
+# and got short-circuited at the ``if outcome_val != "OK": continue``
+# gate. The 0ec4b94 canary salvaged the same sub-pages via RENDER
+# timeout (outcome=OK + TIMEOUT_SALVAGED); the new fetch pipeline is
+# faster, never trips the salvage path, classifies the same body as
+# DEAD_URL, and the link hopper drops it. Mirror the L1 soft-404 gate
+# on the sub-page hop.
+# ─────────────────────────────────────────────────────────────────────
+
+
+_LINK_HOP_SOFT_404_MARKERS: tuple[str, ...] = (
+    "/floor-plans",
+    "/floorplans",
+    "/availability",
+    "/available-units",
+    "/availableunits",
+    "/apartments/",
+    "sightmap.com/embed/",
+    "rentcafe.com",
+    "knockdoorway",
+    "g5marketingcloud",
+)
+
+
+def test_link_hop_soft_404_hook_present_in_scraper() -> None:
+    """The link-hop recovery hook lives in the link-hopper loop in
+    scraper.py — not in scrape_jugnu. Pin the symbols so a future
+    refactor that drops the gate fails loudly."""
+    src = _SCRAPER_PATH.read_text(encoding="utf-8")
+    for symbol in (
+        "_link_hop_soft_404",
+        "_LINK_HOP_SOFT_404_MARKERS",
+        "and not _link_hop_soft_404",
+    ):
+        assert symbol in src, (
+            f"scraper.py no longer references {symbol!r} — link-hop "
+            f"soft-404 recovery is out of sync with this test helper."
+        )
+
+
+def test_link_hop_marker_list_matches_production() -> None:
+    """Same drift-catcher as the L1 marker test but for the link-hop
+    marker list."""
+    src = _SCRAPER_PATH.read_text(encoding="utf-8")
+    match = re.search(
+        r"_LINK_HOP_SOFT_404_MARKERS\s*=\s*\((.*?)\)",
+        src,
+        re.DOTALL,
+    )
+    assert match is not None, (
+        "Could not find _LINK_HOP_SOFT_404_MARKERS tuple in scraper.py"
+    )
+    marker_block = match.group(1)
+    for m in _LINK_HOP_SOFT_404_MARKERS:
+        assert m in marker_block, (
+            f"marker {m!r} present in this test but missing from "
+            f"production _LINK_HOP_SOFT_404_MARKERS — out of sync"
+        )
+
+
+def test_link_hop_marker_includes_g5marketingcloud() -> None:
+    """ten68west.com (Pegasus Residential / G5 backend) — the canary
+    regression that prompted this hook. The hop body references
+    ``g5marketingcloud.com``; the universal markers also catch it via
+    ``/apartments/`` but g5marketingcloud is added explicitly so a
+    future strip of the universal markers doesn't drop the G5 cohort."""
+    assert "g5marketingcloud" in _LINK_HOP_SOFT_404_MARKERS
+
+
+def test_link_hop_recovery_fires_on_ten68west_shape() -> None:
+    """ten68west /apartments/ga/dallas/apply/availability — synthesised
+    from the actual 80 KB body shape: G5 SDK references + nav links
+    to /apartments/<state>/<city>/<slug>/floor-plans."""
+    body = (
+        '<!doctype html><html><head>'
+        '<script src="https://g5-api-proxy.g5marketingcloud.com/sdk.js"></script>'
+        '</head><body>'
+        '<a href="/apartments/ga/dallas/floor-plans">Floor Plans</a>'
+        '<a href="/apartments/ga/dallas/apply">Apply</a>'
+        '</body></html>'
+        + ("x" * 70_000)
+    )
+    assert _decide_soft_404_recovery("DEAD_URL", body.encode(), len(body)) is True
+
+
+def test_link_hop_recovery_does_not_fire_on_empty_404() -> None:
+    """The plain-404 page (no body, no markers) MUST still short-circuit
+    — otherwise we waste extraction on every dead URL in the hop queue."""
+    body = b"<html><body><h1>Not Found</h1></body></html>"
+    assert _decide_soft_404_recovery("DEAD_URL", body, len(body)) is False

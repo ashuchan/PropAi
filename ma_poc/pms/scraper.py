@@ -2758,7 +2758,51 @@ async def _try_link_hop(
             anchor=anchor[:60],
         )
 
-        if outcome_val != "OK":
+        # 2026-05-26 soft-404 recovery on link-hop sub-pages.
+        # Some operator pages serve HTTP 404 with substantive content
+        # (SSR HTML or Playwright-rendered DOM) that still carries the
+        # unit roster — e.g. ten68west.com/apartments/ga/dallas/apply/
+        # availability returns 404+80KB containing G5 unit data; the
+        # 0ec4b94 canary salvaged it via RENDER timeout (TIMEOUT_SALVAGED
+        # outcome=OK) but b186b5b's faster non-render tier classifies
+        # the same body as DEAD_URL. Mirror scrape_jugnu's soft-404
+        # recovery gate: if the DEAD_URL hop has ≥10KB of body AND
+        # at least one apartment-inventory nav marker, treat as OK
+        # so the extractor below can run against it. Genuine 404s have
+        # empty/minimal bodies and don't trip this gate. Scope of the
+        # 70-shard b186b5b QC: ~330 properties (~9.5%) had substantive-
+        # body DEAD_URL hops AND ended with 0 units; top URL patterns
+        # are exactly /availability, /floor-plans, /apartments — where
+        # the unit roster usually lives.
+        _link_hop_soft_404 = False
+        if outcome_val == "DEAD_URL":
+            _sub_body = getattr(sub_fetch, "body", None) or b""
+            _sub_size = len(_sub_body) if isinstance(_sub_body, (bytes, str)) else 0
+            if _sub_size >= 10_000:
+                try:
+                    _sub_str = (
+                        _sub_body.decode("utf-8", errors="replace")
+                        if isinstance(_sub_body, bytes)
+                        else _sub_body
+                    ).lower()
+                    _LINK_HOP_SOFT_404_MARKERS = (
+                        "/floor-plans",
+                        "/floorplans",
+                        "/availability",
+                        "/available-units",
+                        "/availableunits",
+                        "/apartments/",
+                        "sightmap.com/embed/",
+                        "rentcafe.com",
+                        "knockdoorway",
+                        "g5marketingcloud",
+                    )
+                    if any(m in _sub_str for m in _LINK_HOP_SOFT_404_MARKERS):
+                        _link_hop_soft_404 = True
+                except Exception:  # pragma: no cover — defensive
+                    pass
+
+        if outcome_val != "OK" and not _link_hop_soft_404:
             explored[sub_url] = False
             # Record this URL as blocked/failed in the session so adapter-level
             # hint synthesisers (securecafe_portal_detected, etc.) don't re-queue
