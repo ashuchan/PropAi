@@ -344,22 +344,22 @@ def parse_repli360_str(str_html: str, source_url: str) -> list[dict[str, Any]]:
                     rent = int(mm.group(0).replace(",", ""))
                 except (TypeError, ValueError):
                     rent = None
-        avail_txt = "AVAILABLE"
-        for td in tds:
-            t = td.get_text(" ", strip=True)
-            if "Availability" in t:
-                cleaned = t.replace("Availability", "").strip()
-                avail_txt = cleaned or "AVAILABLE"
-                break
+        # 2026-05-26 fix (#116 residue): getUnitListByFloor only returns
+        # available units — unavailable ones are excluded at the API level.
+        # Future-dated units show a US-format date ("06-05-2026") in the
+        # Availability cell, not "Available Now", so the prior check
+        #   "available" in avail_txt.lower()
+        # marked ~69% of units (all future-dated ones) as UNKNOWN.
+        # All rows returned by this endpoint are AVAILABLE; status should
+        # be unconditional. The ISO availability_date (from data-available_date)
+        # is the authoritative date signal regardless of the cell text.
         out.append(
             make_unit_dict(
                 unit_number=unit,
                 building=building,
                 rent_low=rent,
                 rent_high=rent,
-                availability_status="AVAILABLE"
-                if "available" in avail_txt.lower()
-                else "UNKNOWN",
+                availability_status="AVAILABLE",  # all getUnitListByFloor rows are available
                 availability_date=avail_date,
                 source_api_url=source_url,
                 extraction_tier=_TIER,

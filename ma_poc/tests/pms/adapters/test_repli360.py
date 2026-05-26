@@ -147,6 +147,46 @@ def test_parse_str_html_unit_level() -> None:
     assert units[1]["market_rent_low"] == 2410
 
 
+def test_parse_str_html_future_dated_unit_is_available() -> None:
+    """2026-05-26 fix (#116): units with future Availability dates (e.g.
+    '06-05-2026') were wrongly marked UNKNOWN because the prior check looked
+    for 'available' in the display text. getUnitListByFloor ONLY returns
+    units that are bookable — all rows must be AVAILABLE unconditionally.
+
+    royceattrumbull.com probe: 20/29 units (69%) had future dates and were
+    wrongly marked UNKNOWN before this fix.
+    """
+    str_html = """
+    <div><table><tbody>
+    <tr class="unitlisting 2 lease_term_wrap_2"
+        data-count="0"
+        data-available_date="2026-06-11"
+        data-engrain="">
+      <td>Building Number 6</td>
+      <td><span class="mobile_rrac">Unit Number</span><b class="unitNumber">6311</b></td>
+      <td class="unitTouring"></td>
+      <td><span class="mobile_rrac">Deposit</span>$1,000</td>
+      <td class="rrac_unit_price">
+        <span class="unit_price_value unit-rrac-price">$2,365</span>
+      </td>
+      <td><span class="mobile_rrac">Availability</span>06-11-2026</td>
+      <td></td>
+    </tr>
+    </tbody></table></div>
+    """
+    units = parse_repli360_str(str_html, "https://app.repli360.com/x")
+    assert len(units) == 1
+    u = units[0]
+    assert u["unit_number"] == "6311"
+    # Future-dated unit must be AVAILABLE (not UNKNOWN)
+    assert u["availability_status"] == "AVAILABLE", (
+        "getUnitListByFloor only returns bookable units; future-dated ones "
+        "must be AVAILABLE, not UNKNOWN"
+    )
+    assert u.get("availability_date") == "2026-06-11" or u.get("available_date") == "2026-06-11"
+    assert u["market_rent_low"] == 2365
+
+
 def test_parse_str_html_empty_and_malformed() -> None:
     assert parse_repli360_str("", "x") == []
     assert parse_repli360_str("<html><body>no units</body></html>", "x") == []
