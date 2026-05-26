@@ -97,6 +97,35 @@ DEFAULT_ANCHOR_KEYWORDS: tuple[tuple[str, int], ...] = (
     ("tour", 40),
     ("apply", 30),
     ("schedule", 20),
+    # 2026-05-26 (blockwall v2 Action 5): label variants from
+    # no_target_anchor cohort (61/300). "Models" was in PATH_KEYWORDS
+    # but missing as anchor text; "homes/explore/shop/residences/
+    # rates/vacancies" are common marketing-CMS nav labels the prior
+    # list missed. Weights chosen so /apartment, /lease etc. that
+    # leak through "homes" or "rates" still get out-scored by direct
+    # /floor-plan-and-pricing matches (95).
+    ("models", 80),
+    ("model", 70),
+    ("homes", 70),
+    ("our homes", 80),
+    ("see homes", 80),
+    ("explore", 50),
+    ("explore homes", 80),
+    ("shop", 50),
+    ("shop available", 80),
+    ("rates", 70),
+    ("rates & availability", 90),
+    ("pricing & availability", 90),
+    ("residences", 70),
+    ("our residences", 80),
+    ("view residences", 85),
+    ("see all units", 88),
+    ("see units", 80),
+    ("vacancies", 80),
+    ("see vacancies", 85),
+    ("now leasing", 70),
+    ("move in", 50),
+    ("move-in", 50),
 )
 
 DEFAULT_PATH_KEYWORDS: tuple[tuple[str, int], ...] = (

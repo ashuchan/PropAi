@@ -62,6 +62,12 @@ class CamoufoxPool:
         self._max_contexts = max_contexts
         self._semaphore = asyncio.Semaphore(max_contexts)
         self._browser: Any = None
+        # 2026-05-26 (blockwall v2 Action 4) — keep the AsyncCamoufox
+        # context-manager instance so close() can call its __aexit__.
+        # The pre-fix code stored only self._browser (the result of
+        # __aenter__) and then passed it as the `self` arg of
+        # AsyncCamoufox.__aexit__ on shutdown — wrong type, TypeError.
+        self._cf_ctx: Any = None
         self._lock = asyncio.Lock()
         self._fallback: Any = None  # BrowserContextPool fallback
 
@@ -79,8 +85,13 @@ class CamoufoxPool:
 
         await self._semaphore.acquire()
         await self._ensure_browser(identity)
+        # 2026-05-26 (blockwall v2 Action 4): Playwright's
+        # BrowserContext.new_context() rejects ``os=`` as an
+        # unexpected keyword argument → TypeError on every L1 fetch
+        # when ENABLE_CAMOUFOX=true. The ``os`` fingerprint setting
+        # belongs on AsyncCamoufox() (set in _ensure_browser); only
+        # Playwright-native kwargs go into context_opts here.
         context_opts: dict[str, Any] = {
-            "os": _platform_to_camoufox_os(identity.platform),
             "locale": identity.accept_language.split(",")[0],
             # camoufox handles UA, viewport, timezone, canvas/WebGL automatically
             # based on OS fingerprint — no need to set them manually
@@ -113,6 +124,10 @@ class CamoufoxPool:
                 headless=True,
                 os=_platform_to_camoufox_os(identity.platform),
             )
+            # Keep the context-manager instance so close() can call
+            # cf.__aexit__(None, None, None) on it — passing the browser
+            # to AsyncCamoufox.__aexit__ as `self` raises TypeError.
+            self._cf_ctx = cf
             self._browser = await cf.__aenter__()
             log.info("Launched camoufox Firefox browser")
 
@@ -130,12 +145,14 @@ class CamoufoxPool:
     async def close(self) -> None:
         if self._fallback is not None:
             return await self._fallback.close()
-        if self._browser:
+        if self._cf_ctx is not None:
             try:
-                from camoufox.async_api import AsyncCamoufox  # type: ignore[import]
-                await AsyncCamoufox.__aexit__(self._browser, None, None, None)
+                # 2026-05-26 fix: call __aexit__ on the *context-manager*
+                # instance (`self._cf_ctx`), not the browser object.
+                await self._cf_ctx.__aexit__(None, None, None)
             except Exception:
                 pass
+            self._cf_ctx = None
             self._browser = None
         log.info("camoufox pool closed")
 
