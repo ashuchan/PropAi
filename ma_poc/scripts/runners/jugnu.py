@@ -499,6 +499,36 @@ async def run_jugnu(
             if _partial_units:
                 failed["units"] = _partial_units
                 failed.setdefault("_meta", {})["partial_recovery"] = True
+            # 2026-05-27: stamp a verdict on the salvage record so run_report
+            # and slo_watcher tally these properties correctly. Without this,
+            # _meta.verdict is None and ~368 partial-recovery props fall into
+            # the silent-success bucket (full-fleet 82.20% reported vs 89.82%
+            # adjusted, jugnu-c612-may27 canary). The scrape_tier_used="FAILED"
+            # salvage marker is preserved; verdict is a separate field.
+            try:
+                from ma_poc.reporting.verdict import compute as _compute_verdict
+                # Pass partial units as a dict-shaped extract_result so
+                # compute() flows past the no-records FAILED branch and
+                # applies the rent-signal / inferred-UID downgrade rules
+                # to decide SUCCESS vs SUCCESS_PLAN_LEVEL vs PARTIAL.
+                # With zero partial units we want FAILED_NO_DATA — keep
+                # extract_result=None in that case.
+                _salvage_extract: Any = (
+                    {"units": _partial_units} if _partial_units else None
+                )
+                _salvage_verdict = _compute_verdict(
+                    fetch_outcome=None,
+                    extract_result=_salvage_extract,
+                    units=_partial_units or None,
+                )
+                _salvage_meta = failed.setdefault("_meta", {})
+                _salvage_meta["verdict"] = _salvage_verdict.verdict.value
+                _salvage_meta["verdict_reason"] = _salvage_verdict.reason
+            except Exception as _vexc:
+                log.warning(
+                    "partial-recovery verdict compute failed for %s: %s",
+                    task.property_id, _vexc,
+                )
             return failed
         except Exception as exc:
             log.error("Property %s crashed: %s", task.property_id, exc)
