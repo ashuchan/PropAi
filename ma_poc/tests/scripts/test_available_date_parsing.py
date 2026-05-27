@@ -61,6 +61,27 @@ _TODAY = datetime.now(UTC).strftime("%Y-%m-%d")
         ("", None),
         ("call for availability", None),
         ("garbage", None),
+        # 2026-05-26 (canary 87b837b QC): YYYYMMDD packed numeric
+        # — RentManager / older RealPage XMLs use this. 268 cases.
+        ("20260601", "2026-06-01"),
+        ("20261231", "2026-12-31"),
+        ("20260101", "2026-01-01"),
+        # 2026-05-26 (canary 87b837b QC): negative-status tokens
+        # must return None — they indicate UNAVAILABLE units, NOT
+        # "available now". 14 cases. Pre-fix the availability-prefix
+        # strip turned these into bare "Not " / "" which then matched
+        # the AVAILABLE_NOW fallback and incorrectly returned today.
+        ("Not Available", None),
+        ("Not Avail.", None),
+        ("Not Avail", None),
+        ("Unavailable", None),
+        ("UNAVAILABLE", None),
+        ("Leased", None),
+        ("Occupied", None),
+        ("Rented", None),
+        ("Off Market", None),
+        ("off-market", None),
+        ("No Availability", None),
     ],
 )
 def test_format_date_handles_all_adapter_forms(raw: object, expected: str | None) -> None:

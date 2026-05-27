@@ -660,6 +660,23 @@ def _format_date(val: Any) -> str | None:
     # Already ISO format (unchanged)
     if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
         return s
+    # 2026-05-26 (canary 87b837b QC follow-up): reject negative-status
+    # tokens BEFORE the availability-prefix strip. Inputs like
+    # "Not Available" / "Not Avail." / "Unavailable" / "Leased" /
+    # "Occupied" / "Rented" indicate UNAVAILABLE units — the
+    # ``availability_status`` field is the right place to track this,
+    # and ``available_date`` should stay empty. Pre-fix, the strip
+    # turned "Not Available" → "Not " → fell into ``not s`` → returned
+    # today (wrong: implies the unit IS available now). 14 cases in
+    # 87b837b's canary output.
+    _s_low = s.lower()
+    _NEGATIVE_TOKENS = (
+        "not available", "not avail", "unavailable",
+        "leased", "occupied", "rented", "off market", "off-market",
+        "no availability",
+    )
+    if any(tok in _s_low for tok in _NEGATIVE_TOKENS):
+        return None
     # Strip a leading availability label, e.g. "Available 6/25/26",
     # "Avail. 6/25/26", "Move-in 6/25/26", "Ready 6/25/26".
     s = re.sub(
@@ -671,6 +688,15 @@ def _format_date(val: Any) -> str | None:
     if not s:
         # Pure text like "Available" with no date ⇒ available now.
         return datetime.now(UTC).strftime("%Y-%m-%d")
+    # 2026-05-26: YYYYMMDD numeric (no separator). 268 cases in 87b837b
+    # — common from RentManager / older RealPage XMLs that emit dates
+    # as packed 8-digit ints. Checked BEFORE the strptime cascade so
+    # the bare-numeric form is parsed cleanly.
+    if re.match(r"^\d{8}$", s):
+        try:
+            return datetime.strptime(s, "%Y%m%d").strftime("%Y-%m-%d")
+        except ValueError:
+            pass
     # Try common formats — 4-digit-year set unchanged; 2-digit-year and
     # month-name forms added.
     for fmt in (
