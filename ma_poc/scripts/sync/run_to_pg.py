@@ -536,6 +536,11 @@ def _meta_to_outcome(meta: dict[str, Any]) -> ScrapeOutcome:
     verdict = meta.get("verdict")
     if verdict is not None:
         s = str(verdict).upper()
+        if s == "SUCCESS_NO_AVAILABILITY":
+            # 2026-05-27: surface operator-transparent zero-inventory
+            # state distinctly in the audit log so the failure_rate
+            # signal isn't inflated by waitlist / fully-leased properties.
+            return ScrapeOutcome.SUCCESS_NO_INVENTORY
         if s.startswith("SUCCESS"):
             return ScrapeOutcome.SUCCESS
         if s.startswith("CARRY") or s == "SKIPPED":

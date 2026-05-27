@@ -54,6 +54,15 @@ _NO_AVAILABILITY_PHRASES: tuple[str, ...] = (
     r"100%\s+leased",
     r"wait\s*list\s+only",
     r"join\s+(?:our|the)\s+wait\s*list",
+    # 2026-05-27 612-failure-grind cohort additions. Keep this list in
+    # sync with the chip/rentcafe-anchor-walk-waitlist phrase set so
+    # both classifiers fire on the same operator-transparency signal.
+    r"no\s+available\s+properties",
+    r"currently\s+no\s+available\s+(?:units?|apartments?|listings?)",
+    r"no\s+listings\s+matching",
+    r"add\s+to\s+(?:our\s+|the\s+)?wait\s*list",
+    r"all\s+units\s+leased",
+    r"fully\s+leased",
 )
 
 # Pre-compile a single combined regex. ``re.IGNORECASE`` covers the

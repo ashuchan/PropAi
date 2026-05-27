@@ -123,6 +123,12 @@ def build(
     tier_counts: Counter[str] = Counter()
     failed = 0
     carry_forward = 0
+    # 2026-05-27: operator-transparent zero-inventory state (waitlist /
+    # fully-leased / "no available units"). Counted toward the success
+    # numerator (see verdict.verdict_is_success) but surfaced separately
+    # in the report so dashboards can split "real extraction wins" from
+    # "operator says nothing to lease".
+    operator_transparency = 0
 
     # Read events.jsonl once up front. ``verdict_by_pid`` is the
     # authoritative secondary source consulted alongside ``_meta.verdict``
@@ -173,6 +179,8 @@ def build(
         # and no other failure signal.
         if verdict.startswith("FAILED") or "FAIL" in str(tier).upper():
             failed += 1
+        elif verdict == "SUCCESS_NO_AVAILABILITY":
+            operator_transparency += 1
         if meta.get("carry_forward_used"):
             carry_forward += 1
 
@@ -241,6 +249,7 @@ def build(
             "succeeded": total - failed,
             "failed": failed,
             "carry_forward": carry_forward,
+            "operator_transparency": operator_transparency,
             "success_rate_pct": round(success_rate, 2),
         },
         # F7: no_body_short_circuit removed — moved to pre_extraction_terminations
@@ -301,6 +310,7 @@ def build(
         f"- Succeeded: {total - failed}",
         f"- Failed: {failed}",
         f"- Carry-forward: {carry_forward}",
+        f"- Operator transparency (zero-inventory): {operator_transparency}",
         f"- Success rate: {success_rate:.1f}%",
         "",
         "## Tier Distribution",

@@ -217,3 +217,51 @@ def test_placeholder_records_matched_phrase_in_source_ids() -> None:
     sid = unit["source_ids"]
     assert sid["operator_published_state"] == "no_availability_now"
     assert "no available units" in sid["matched_phrase"]
+
+
+# ─── 2026-05-27 612-failure-grind cohort additions ─────────────────
+
+
+def test_detect_matches_no_available_properties() -> None:
+    """AppFolio empty-embed cohort (skyview-lofts, vistadelplaza)."""
+    html = "<div class='empty'>There are no available properties at this time.</div>"
+    assert detect_no_availability(html) is True
+
+
+def test_detect_matches_currently_no_available_listings() -> None:
+    """RentCafe empty-search cohort."""
+    html = "<p>There are currently no available units matching your search.</p>"
+    assert detect_no_availability(html) is True
+
+
+def test_detect_matches_no_listings_matching() -> None:
+    html = "<p>Sorry — no listings matching your filters right now.</p>"
+    assert detect_no_availability(html) is True
+
+
+def test_detect_matches_add_to_waitlist() -> None:
+    html = "<p>Add to our waitlist and we'll notify you.</p>"
+    assert detect_no_availability(html) is True
+
+
+def test_detect_matches_all_units_leased() -> None:
+    html = "<p>All units leased — applications closed.</p>"
+    assert detect_no_availability(html) is True
+
+
+# ─── Real-HTML fixtures (Chrome MCP / curl captured snippets) ─────
+
+
+def _fixture(name: str) -> str:
+    from pathlib import Path
+    return (
+        Path(__file__).parent / "fixtures" / "no_inventory" / name
+    ).read_text(encoding="utf-8")
+
+
+def test_detect_real_html_rentcafe_waitlist_livebrez() -> None:
+    assert detect_no_availability(_fixture("rentcafe_waitlist_livebrez.html")) is True
+
+
+def test_detect_real_html_appfolio_empty_skyview() -> None:
+    assert detect_no_availability(_fixture("appfolio_empty_skyview.html")) is True
