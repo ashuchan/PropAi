@@ -267,6 +267,36 @@ def test_pms_priors_for_each_supported_pms_injects_template_paths(
     assert first_anchor == f"pms_prior:{pms_name}"
 
 
+@pytest.mark.parametrize(
+    "pms_name",
+    ["realpage_oll", "realpage_cws"],
+)
+def test_realpage_priors_include_both_floorplan_path_variants(pms_name: str) -> None:
+    """2026-05-27 612-failure-grind chip: RealPage OLL/CWS sites are
+    split between ``/floorplans`` (unhyphenated) and ``/floor-plans``
+    (hyphenated). Tremont Burlington exposes rents on the unhyphenated
+    path; 81arch / domainontheparkway / many residue siblings expose
+    them on the hyphenated path. Both variants must appear in the prior
+    list (memory: feedback_no_shallow_probing — never just one)."""
+    from ma_poc.pms.detector import _STRATEGY_BY_PMS, DetectedPMS
+    from ma_poc.pms.scraper import _pms_priors_for
+
+    detected = DetectedPMS(
+        pms=pms_name,
+        confidence=0.9,
+        evidence=[f"fp:{pms_name}"],
+        recommended_strategy=_STRATEGY_BY_PMS.get(pms_name, "cascade"),
+    )
+    priors = _pms_priors_for(detected, "https://example.com/")
+    urls = {url for url, _score, _anchor in priors}
+    assert "https://example.com/floorplans" in urls, (
+        f"{pms_name} priors must include unhyphenated /floorplans; got {urls}"
+    )
+    assert "https://example.com/floor-plans" in urls, (
+        f"{pms_name} priors must include hyphenated /floor-plans; got {urls}"
+    )
+
+
 def test_pms_priors_falls_back_to_universal_when_pms_is_unknown() -> None:
     """When detection produces ``unknown``, the universal multifamily
     sub-path priors fire as a fallback. This decouples link-hop recovery

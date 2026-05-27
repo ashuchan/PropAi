@@ -195,7 +195,17 @@ DEFAULT_PMS_PRIORS: dict[str, tuple[str, ...]] = {
     "entrata": ("/floorplans", "/conventional/", "/apartments/", "/availability", "/leasing"),
     "appfolio": ("/listings", "/apartments", "/floor-plans"),
     "onesite": ("/floorplans", "/availability", "/apartments"),
-    "realpage_oll": ("/floorplans", "/availability"),
+    # 2026-05-27 — 612-failure-grind residue (~2,500 unit recovery).
+    # RealPage OLL sites split between /floorplans (unhyphenated) and
+    # /floor-plans (hyphenated). Tremont Burlington (Chrome-MCP-verified
+    # 9 rents at /floorplans/) and 81arch / domainontheparkway / many
+    # others in the realpage_oll cohort use the hyphenated form; the
+    # prior must try BOTH (memory: feedback_no_shallow_probing).
+    "realpage_oll": ("/floorplans", "/floor-plans", "/availability"),
+    # 2026-05-27 — RealPage CWS sites observed at both /floorplans and
+    # /floor-plans, with /floor-plans/availability also seen on the
+    # rpfp-container themes. Same both-variants rule as realpage_oll.
+    "realpage_cws": ("/floorplans", "/floor-plans", "/availability", "/floor-plans/availability"),
     "sightmap": ("/floorplans", "/availability"),
     "avalonbay": ("/floor-plans-pricing", "/apartments"),
     "amli": ("/floor-plans", "/availability"),
