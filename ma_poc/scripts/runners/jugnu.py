@@ -1438,6 +1438,62 @@ def _apply_p2_building_disambiguation(units: list[dict[str, Any]]) -> int:
     return rewritten
 
 
+def _apply_p2b_floor_plan_id_disambiguation(units: list[dict[str, Any]]) -> int:
+    """DIFFERENT_FLOOR_PLAN class — same unit_id, distinct floor_plan_id
+    on every occurrence. From the 87b837b QC (1,035 cases / 19.5% of
+    real-ID dups), this is dominated by:
+
+      • TIER_1_DOM_APPFOLIO_VANITY (794 = 77%) — small-property PMC
+        sites where ``floor_plan_name`` is actually the street address
+        and two different physical units share a unit-number (e.g.
+        "712 S 11th St #3" + "2224 A St - #3" both unit_id="3").
+      • TIER_1_KNOCK_API (48) — Knock CRM emits the same unit_id for
+        two genuinely different floor plans (B1 + CL).
+      • TIER_1_DOM_RENTCAFE_NESTIN (34) — cross-building "403" units
+        with different plan names (Venice / Monaco) but null building.
+
+    Same shape as P2 but the disambiguator is the first 8 chars of
+    ``floor_plan_id`` (a deterministic hash from the adapter, stable
+    across runs).
+
+    Conservative gates mirror P2:
+      • Skip if ANY member's floor_plan_id is empty/null
+      • Skip if all floor_plan_ids are the same (P1 EXACT_DUPE handles)
+      • Skip inferred_* and empty unit_ids
+
+    Runs AFTER P2 (so a unit already disambiguated to ``{bldg}-{uid}``
+    won't be re-prefixed) and BEFORE P1 (so distinct-plan units survive
+    the fingerprint dedup).
+
+    Returns the count of rewritten rows."""
+    from collections import defaultdict
+
+    groups: dict[Any, list[dict[str, Any]]] = defaultdict(list)
+    for u in units:
+        uid = u.get("unit_id")
+        if uid in (None, "", "null"):
+            continue
+        s = str(uid).strip()
+        if not s or s.startswith("inferred_"):
+            continue
+        groups[s].append(u)
+
+    rewritten = 0
+    for uid, group in groups.items():
+        if len(group) < 2:
+            continue
+        fp_ids = [(u.get("floor_plan_id") or "").strip() for u in group]
+        if any(fp == "" for fp in fp_ids):
+            continue
+        if len(set(fp_ids)) < 2:
+            continue
+        for u, fp in zip(group, fp_ids, strict=False):
+            fp_short = fp[:8]
+            u["unit_id"] = f"{fp_short}-{uid}"
+            rewritten += 1
+    return rewritten
+
+
 def _apply_p1_exact_dedup(units: list[dict[str, Any]]) -> int:
     """Drop rows whose canonical fingerprint matches an earlier row in
     the same list. Mutates ``units`` in place (deletes in reverse).
@@ -1464,12 +1520,18 @@ def _emit_v2_units_for_property(units: list[dict[str, Any]]) -> list[dict[str, A
          ``{building}-{unit_id}`` changes the fingerprint, so EXACT_DUPE
          dedup must run AFTER (otherwise a legit cross-bldg ID gets
          flagged as a dup by the bare unit_id).
-      2. P1 EXACT_DUPE dedup — drops rows with byte-identical
+      2. P2b floor_plan_id disambiguation — catches DIFFERENT_FLOOR_PLAN
+         cases where building is null but the units are genuinely
+         different (AppFolio address-as-fp_name, Knock cross-plan
+         collisions, RentCafe cross-bldg). Runs after P2 so it doesn't
+         re-prefix a unit already disambiguated by building.
+      3. P1 EXACT_DUPE dedup — drops rows with byte-identical
          fingerprints across the canonical field set.
     """
     if not units:
         return units
     _apply_p2_building_disambiguation(units)
+    _apply_p2b_floor_plan_id_disambiguation(units)
     _apply_p1_exact_dedup(units)
     return units
 
