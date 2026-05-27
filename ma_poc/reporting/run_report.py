@@ -129,6 +129,13 @@ def build(
     # in the report so dashboards can split "real extraction wins" from
     # "operator says nothing to lease".
     operator_transparency = 0
+    # 2026-05-27 follow-up: per-property trace + phrase histogram so the
+    # next-canary report lets a human grep WHICH props were classified
+    # and WHICH operator-transparency phrase fired most. Without these
+    # the bulk `operator_transparency` count is opaque — you can see "47
+    # classified" but can't tell whether the regex hit the right cohort.
+    operator_transparency_list: list[dict[str, str]] = []
+    operator_transparency_phrases: Counter[str] = Counter()
 
     # Read events.jsonl once up front. ``verdict_by_pid`` is the
     # authoritative secondary source consulted alongside ``_meta.verdict``
@@ -181,6 +188,24 @@ def build(
             failed += 1
         elif verdict == "SUCCESS_NO_AVAILABILITY":
             operator_transparency += 1
+            # Pull the matched phrase off the first unit's source_ids —
+            # set there by `_no_availability.placeholder_record()`. Falls
+            # back to "" if the operator-transparency verdict was emitted
+            # by a path that didn't go through the placeholder unit (e.g.
+            # the RentCafe-side detector in chip/rentcafe-anchor-walk).
+            units = p.get("units") or []
+            phrase = ""
+            if units and isinstance(units[0], dict):
+                sid = units[0].get("source_ids") or {}
+                phrase = str(sid.get("matched_phrase") or "")
+            operator_transparency_phrases[phrase or "(no phrase recorded)"] += 1
+            operator_transparency_list.append(
+                {
+                    "property_id": pid,
+                    "url": str(p.get("Website") or p.get("url") or ""),
+                    "matched_phrase": phrase,
+                }
+            )
         if meta.get("carry_forward_used"):
             carry_forward += 1
 
@@ -252,6 +277,15 @@ def build(
             "operator_transparency": operator_transparency,
             "success_rate_pct": round(success_rate, 2),
         },
+        # 2026-05-27 follow-up: full per-property trace + phrase histogram
+        # for SUCCESS_NO_AVAILABILITY. Lets a reviewer answer "WHICH
+        # properties got classified and WHICH phrase fired most" without
+        # re-grepping properties.json.
+        "operator_transparency_detail": {
+            "count": operator_transparency,
+            "phrase_histogram": dict(operator_transparency_phrases.most_common()),
+            "properties": sorted(operator_transparency_list, key=lambda r: r["property_id"]),
+        },
         # F7: no_body_short_circuit removed — moved to pre_extraction_terminations
         "tier_distribution": dict(real_tier_counts.most_common()),
         "pre_extraction_terminations": pre_extraction_terminations,
@@ -320,6 +354,41 @@ def build(
     ]
     for tier, count in tier_counts.most_common():
         md_lines.append(f"| {tier} | {count} |")
+
+    # 2026-05-27 follow-up: surface operator-transparency cohort with
+    # the matched phrase histogram + per-PID list. Skip the section
+    # entirely when zero properties classified — keeps the report clean
+    # for runs where the detector didn't fire.
+    if operator_transparency:
+        md_lines.extend(
+            [
+                "",
+                "## Operator Transparency (zero-inventory)",
+                "",
+                f"- Total: {operator_transparency}",
+                "",
+                "### Phrase histogram",
+                "",
+                "| Matched phrase | Count |",
+                "|---|---|",
+            ]
+        )
+        for phrase, count in operator_transparency_phrases.most_common():
+            # Escape pipes so a phrase containing `|` doesn't break the table.
+            safe = phrase.replace("|", r"\|") if phrase else "(no phrase recorded)"
+            md_lines.append(f"| {safe} | {count} |")
+        md_lines.extend(
+            [
+                "",
+                "### Property IDs",
+                "",
+            ]
+        )
+        for r in sorted(operator_transparency_list, key=lambda x: x["property_id"]):
+            phrase_note = f' — "{r["matched_phrase"]}"' if r["matched_phrase"] else ""
+            md_lines.append(
+                f"- {r['property_id']} — {r['url'] or '(no url)'}{phrase_note}"
+            )
 
     md_lines.extend(
         [
