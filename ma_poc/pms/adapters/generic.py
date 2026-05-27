@@ -3686,6 +3686,7 @@ class GenericAdapter:
                 from ma_poc.pms.adapters._no_availability import (
                     build_no_availability_placeholder,
                     detect_no_availability,
+                    is_empty_inventory_page,
                     matched_phrase,
                 )
 
@@ -3707,6 +3708,34 @@ class GenericAdapter:
                         "ran_units",
                         units=1,
                         reason="operator published explicit zero-availability state",
+                    )
+                    return result
+
+                # 2026-05-27 follow-up: phrase didn't fire, but the page
+                # itself may BE the empty inventory schema (operator has
+                # /floor-plans returning 200 with floor-plan-shaped head
+                # but zero rent/bed/sqft data). 75/80 reprobed
+                # operator-gap props fell into this bucket. Same
+                # SUCCESS_NO_AVAILABILITY verdict, distinct
+                # ``matched_phrase`` so the report-md histogram surfaces
+                # WHICH signal fired (operator-stated vs. operator-empty).
+                if is_empty_inventory_page(html):
+                    placeholder = build_no_availability_placeholder(
+                        source_url=ctx.base_url,
+                        property_name=getattr(ctx, "property_name", "")
+                        or "",
+                        matched_text="empty_inventory_page",
+                    )
+                    result.units = [placeholder]
+                    result.tier_used = "TIER_1_DOM_EMPTY_INVENTORY"
+                    result.winning_url = ctx.base_url
+                    result.confidence = 0.55  # lower than phrase-match
+                    result._operator_no_availability = True  # type: ignore[attr-defined]
+                    _log_attempt(
+                        "generic:empty_inventory_page",
+                        "ran_units",
+                        units=1,
+                        reason="resolved to canonical inventory URL, zero rent/bed/sqft signals",
                     )
                     return result
             except Exception as _na_exc:

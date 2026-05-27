@@ -265,3 +265,103 @@ def test_detect_real_html_rentcafe_waitlist_livebrez() -> None:
 
 def test_detect_real_html_appfolio_empty_skyview() -> None:
     assert detect_no_availability(_fixture("appfolio_empty_skyview.html")) is True
+
+
+# ─── 2026-05-27 follow-up: soft phrase + empty-page predicate ───────
+
+
+def test_detect_matches_no_results_found() -> None:
+    """RentCafe empty-search cohort (3 props in detector_hits_v2)."""
+    html = "<div class='results'>No results found</div>"
+    assert detect_no_availability(html) is True
+
+
+def test_detect_matches_no_results_match() -> None:
+    html = "<div class='results'>Sorry, no results match your search.</div>"
+    assert detect_no_availability(html) is True
+
+
+def test_is_empty_inventory_page_fires_on_canonical_empty_page() -> None:
+    """75/80 reprobed operator-gap props: /floor-plans page returns 200
+    with floor-plan-shaped head, zero rent/bed/sqft signals."""
+    from ma_poc.pms.adapters._no_availability import is_empty_inventory_page
+
+    html = (
+        "<html><head><title>Floor Plans — Sweetwater Apartments</title></head>"
+        "<body><h1>Our Floor Plans</h1>"
+        "<p>Welcome to Sweetwater Apartments. Explore our available "
+        "floor plans and find your perfect home.</p>"
+        "<div class='filter'>Filter by bedrooms, bathrooms, availability date.</div>"
+        # No rent / bed-count / sqft signals — operator just hasn't
+        # populated the listing yet. ×200 keeps us well over the
+        # 2500-byte min-html-bytes safety threshold.
+        + ("<p>More marketing copy about our beautiful community here. " * 200)
+        + "</body></html>"
+    )
+    assert is_empty_inventory_page(html) is True
+
+
+def test_is_empty_inventory_page_skips_pages_with_rent() -> None:
+    """A single $1,250 anywhere disqualifies — adapter should have
+    extracted that rent. Don't mask the bug."""
+    from ma_poc.pms.adapters._no_availability import is_empty_inventory_page
+
+    html = (
+        "<html><body>"
+        "<h1>Floor Plans</h1>"
+        + ("<p>marketing copy. " * 100)
+        + "<div>1BR from $1,250</div>"
+        "</body></html>"
+    )
+    assert is_empty_inventory_page(html) is False
+
+
+def test_is_empty_inventory_page_skips_marketing_homepage() -> None:
+    """No floor-plan-shaped keywords in the head → not the right page."""
+    from ma_poc.pms.adapters._no_availability import is_empty_inventory_page
+
+    html = (
+        "<html><head><title>Welcome to Sunset Manor</title></head>"
+        "<body><h1>Welcome Home</h1>"
+        + ("<p>We are a luxury community in San Francisco. " * 100)
+        + "<p>Contact us at (555) 123-4567 for more information.</p>"
+        "</body></html>"
+    )
+    assert is_empty_inventory_page(html) is False
+
+
+def test_is_empty_inventory_page_skips_short_pages() -> None:
+    """404 fallbacks that masquerade as 200 with thin content."""
+    from ma_poc.pms.adapters._no_availability import is_empty_inventory_page
+
+    html = "<html><body>floor plans not found</body></html>"
+    assert is_empty_inventory_page(html) is False
+
+
+def test_is_empty_inventory_page_tolerates_marketing_bedroom_mention() -> None:
+    """'We offer 1-3 bedroom apartments' marketing copy without rent
+    is still operator-empty — don't disqualify on 1 bed mention."""
+    from ma_poc.pms.adapters._no_availability import is_empty_inventory_page
+
+    html = (
+        "<html><head><title>Floor Plans</title></head>"
+        "<body><h1>Our Floor Plans</h1>"
+        "<p>Spacious 1 Bedroom apartments coming soon.</p>"
+        + ("<p>marketing copy about the property here. " * 200)
+        + "</body></html>"
+    )
+    assert is_empty_inventory_page(html) is True
+
+
+def test_is_empty_inventory_page_rejects_many_bed_signals() -> None:
+    """A real floor-plans page with 10+ bedroom counts has data we
+    should have extracted — adapter bug, not operator-empty."""
+    from ma_poc.pms.adapters._no_availability import is_empty_inventory_page
+
+    html = (
+        "<html><head><title>Floor Plans</title></head>"
+        "<body><h1>Floor Plans</h1>"
+        + "<div>1 Bedroom 1 Bathroom 700 sqft</div>" * 10
+        + "</body></html>"
+    )
+    assert is_empty_inventory_page(html) is False

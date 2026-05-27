@@ -63,6 +63,11 @@ _NO_AVAILABILITY_PHRASES: tuple[str, ...] = (
     r"add\s+to\s+(?:our\s+|the\s+)?wait\s*list",
     r"all\s+units\s+leased",
     r"fully\s+leased",
+    # 2026-05-27 follow-up: detector_hits_v2 cohort found 3 RentCafe
+    # empty-search pages publishing "no results found" / "no results match"
+    # when the property has zero units to list. Same operator-transparency
+    # signal — just a different phrase.
+    r"no\s+results?\s+(?:found|match)",
 )
 
 # Pre-compile a single combined regex. ``re.IGNORECASE`` covers the
@@ -121,6 +126,87 @@ def matched_phrase(html: str) -> str | None:
             continue
         return m.group(0).lower().strip()
     return None
+
+
+# ── Empty-inventory-page predicate (2026-05-27) ─────────────────────────────
+
+# Signals that the URL we resolved to is a canonical inventory page —
+# i.e. the operator's "here are the apartments" page, not a brochure
+# splash. Found in the page head (first ~10KB) to avoid footer false
+# positives.
+_INVENTORY_PAGE_KEYWORDS = re.compile(
+    # Word-bounded — "comm**unit**y" / "opport**unit**y" / "Sun**set**"
+    # are false positives without \b around units/apartments etc.
+    r"\bfloor\s*plans?\b|\bapartments?\b|\bavailab(?:le|ility)\b"
+    r"|\bunits?\b|\brentals?\b|\bresidences?\b",
+    re.IGNORECASE,
+)
+
+# Quantitative signals — if ANY of these fire >= the threshold the
+# page is NOT empty (there's data we should've extracted, so the
+# adapter has a bug; do NOT misclassify as no-inventory).
+_RENT_SIGNAL_RE = re.compile(r"\$\s*\d{1,2}[, ]?\d{3}")
+_BED_SIGNAL_RE = re.compile(r"\b\d\s*(?:BR|Bed|Bedroom)s?\b", re.IGNORECASE)
+_SQFT_SIGNAL_RE = re.compile(
+    r"\b\d{2,4}\s*(?:sq\.?\s*ft\.?|sqft|sf|square\s*feet)\b", re.IGNORECASE
+)
+
+
+def is_empty_inventory_page(
+    html: str,
+    *,
+    min_html_bytes: int = 2500,
+    max_bed_signals: int = 1,
+    max_sqft_signals: int = 1,
+) -> bool:
+    """True when the page LOOKS like an inventory listing page but
+    contains zero unit data — i.e. the operator is transparently
+    publishing an empty schema.
+
+    Discovered in the 2026-05-27 612-failure-grind reprobe: 75 of 80
+    "operator-gap" candidates fell into this bucket — the floor-plans
+    page exists, returns 200, mentions floor plans in the head, but
+    has no rent / bed / sqft signals. Daily-re-scrape model means it's
+    safe to call these SUCCESS_NO_AVAILABILITY: tomorrow's scrape will
+    detect new inventory the moment the operator publishes it.
+
+    Args:
+      html: rendered HTML of the page the adapter ultimately landed on.
+      min_html_bytes: page must be at least this large (filters 404
+        fallbacks that masquerade as 200 with thin content).
+      max_bed_signals: allow up to N "1 Bed" / "2 BR" hits (some pages
+        carry "We offer 1-3 bedroom homes" marketing copy without any
+        rent — that's still empty inventory).
+      max_sqft_signals: same idea for sqft.
+
+    Caller MUST already know:
+      • Zero units were extracted across all tiers (the gate that
+        triggers this check).
+      • The resolved URL looks like an inventory page (e.g. matched
+        /floor-plans or /availability via the adapter's path ladder).
+        This function double-checks the page content as a safety net.
+
+    Returns False on empty input or when ANY rent signal is present —
+    a single "$1,250" anywhere on the page disqualifies the call.
+    """
+    if not html or len(html) < min_html_bytes:
+        return False
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = text.replace(" ", " ").replace("&nbsp;", " ")
+    text = re.sub(r"\s+", " ", text)
+    # Page must mention inventory keywords near the top — guards
+    # against generic homepage misclassification.
+    if not _INVENTORY_PAGE_KEYWORDS.search(text[:10_000]):
+        return False
+    # Any rent signal disqualifies — we either should have extracted
+    # it (adapter bug) or the page is plan-with-rent (not empty).
+    if _RENT_SIGNAL_RE.search(text):
+        return False
+    if len(_BED_SIGNAL_RE.findall(text)) > max_bed_signals:
+        return False
+    if len(_SQFT_SIGNAL_RE.findall(text)) > max_sqft_signals:
+        return False
+    return True
 
 
 # ── Placeholder synthesis ───────────────────────────────────────────────────
