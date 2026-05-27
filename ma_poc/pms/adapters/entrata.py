@@ -1529,23 +1529,61 @@ class EntrataAdapter:
             # Step 2: discover deep ``/{city}/{slug}/(conventional|affordable)/``
             # candidates from the captured body, plus shallow guesses that
             # PP servers commonly 302 to the canonical deep path.
+            #
+            # 2026-05-27 (failure-grind chip): the prior regex required
+            # ``https?://`` absolute hrefs only; Entrata sites that emit
+            # the same nav as a root-relative path (``href="/city/prop/
+            # conventional/"``) were dropped. Both forms now feed the
+            # candidate list, and candidates whose slug matches the host
+            # are ranked first so the cap of 3 reaches the right page on
+            # multi-property portals. Reference impl:
+            # investigations/2026-05-27-failure-grind/artifacts/probe/
+            # entrata_deep_probe.py (14 rescues, ~30 estimated remaining).
             deep_candidates: list[str] = []
             if isinstance(fr_body_check, str) and fr_body_check:
                 _base_host = urlparse(base).netloc
-                _re_deep = re.compile(
+                # Host slug (e.g. "princetonbradford" from
+                # "www.princetonbradford.com") — used to rank anchors
+                # whose path segment overlaps with the property name.
+                _host_slug = re.sub(
+                    r"^www\.|\..*$", "", _base_host
+                ).lower()
+                _re_deep_abs = re.compile(
                     r'href=["\']'
                     r'(https?://[^"\']+/(?:[^/"\']+/){2,}'
                     r'(?:conventional|affordable)/?[^"\'?#]*?)["\']',
                     re.IGNORECASE,
                 )
-                for _m in _re_deep.finditer(fr_body_check):
+                _re_deep_rel = re.compile(
+                    r'href=["\']'
+                    r'(/(?:[^/"\']+/){2,}(?:conventional|affordable)/?[^"\'?#]*?)["\']',
+                    re.IGNORECASE,
+                )
+                _raw: list[str] = []
+                for _m in _re_deep_abs.finditer(fr_body_check):
                     cand = _m.group(1).split("?")[0].split("#")[0]
-                    if (
-                        cand
-                        and urlparse(cand).netloc.endswith(_base_host)
-                        and cand not in deep_candidates
-                    ):
-                        deep_candidates.append(cand)
+                    if cand and urlparse(cand).netloc.endswith(_base_host):
+                        _raw.append(cand)
+                for _m in _re_deep_rel.finditer(fr_body_check):
+                    rel = _m.group(1).split("?")[0].split("#")[0]
+                    if rel:
+                        _raw.append(base + rel)
+
+                def _slug_score(u: str) -> int:
+                    path = urlparse(u).path.lower()
+                    return 1 if _host_slug and _host_slug in path else 0
+
+                # Rank slug-matching first, then preserve discovery
+                # order; dedupe; cap at 3 to prevent runaway crawls.
+                _seen: set[str] = set()
+                _ranked = sorted(
+                    _raw, key=lambda u: -_slug_score(u)
+                )
+                for cand in _ranked:
+                    if cand in _seen:
+                        continue
+                    _seen.add(cand)
+                    deep_candidates.append(cand)
                     if len(deep_candidates) >= 3:
                         break
 
