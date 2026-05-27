@@ -72,8 +72,21 @@ async def test_residential_sets_tier() -> None:
 
 
 @pytest.mark.asyncio
-async def test_residential_bot_blocked_no_retry() -> None:
-    """BOT_BLOCKED on residential must return immediately — no retry."""
+async def test_residential_bot_blocked_retries_with_rotated_session() -> None:
+    """BOT_BLOCKED on residential triggers exactly one retry with a
+    rotated (salt+1) session — burning the same IP twice is wasted
+    work, and BrightData's pool is large enough that a fresh session
+    almost always lands on a different exit IP.
+
+    If the rotated session also 403s, BOT_BLOCKED is returned for the
+    escalator to take over.
+
+    (2026-05-24: prior to session-rotation this asserted call_count==1
+    on the assumption that retrying the same session was pointless.
+    Now we DO retry, but with a rotated session — different IP, real
+    chance of success.)"""
+    from ma_poc.fetch.proxy.session_burn import SessionBurnTracker
+
     task = _make_task()
     profile = _make_profile()
 
@@ -88,6 +101,205 @@ async def test_residential_bot_blocked_no_retry() -> None:
     adapter.request = fake_request
     adapter.aclose = AsyncMock()
 
+    captured_salts: list[int] = []
+
+    def fake_get_config(*, tier, canonical_id, country="us", session_salt=0):
+        captured_salts.append(session_salt)
+        cfg = MagicMock()
+        cfg.to_httpx_url.return_value = "http://***@proxy:33335"
+        cfg.session_id = f"s{session_salt}fake"
+        return cfg
+
+    tracker = SessionBurnTracker(rotate_after_failures=2)
+    with (
+        patch("ma_poc.fetch.providers.residential.BrightDataProvider.__init__", return_value=None),
+        patch("ma_poc.fetch.providers.residential.BrightDataProvider.get_config", side_effect=fake_get_config),
+        patch("ma_poc.fetch.providers.residential.make_http_client", return_value=adapter),
+        patch("ma_poc.fetch.providers.residential.asyncio.sleep", AsyncMock()),
+    ):
+        from ma_poc.fetch.providers.residential import ResidentialProvider
+        provider = ResidentialProvider(burn_tracker=tracker)
+        result = await provider.fetch(task, profile)
+
+    assert result.outcome == FetchOutcome.BOT_BLOCKED
+    assert call_count == 2, "BOT_BLOCKED triggers one rotated retry"
+    assert captured_salts == [0, 1], (
+        f"first attempt salt=0 (sticky), retry salt=1 (rotated); got {captured_salts}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_residential_force_rotates_session_on_threshold_bot_blocked() -> None:
+    """When the burn counter crosses the rotate threshold (default 2),
+    the provider must re-request a config with a bumped session_salt
+    and try once more — getting a fresh BrightData exit IP.
+
+    Verifies: 2 BOT_BLOCKED → get_config called twice with different
+    session_salt values."""
+    from ma_poc.fetch.proxy.session_burn import SessionBurnTracker
+
+    task = _make_task()
+    profile = _make_profile()
+
+    call_count = 0
+
+    async def fake_request(*args, **kwargs):  # noqa: ANN202
+        nonlocal call_count
+        call_count += 1
+        # Both attempts return BOT_BLOCKED so the rotated retry also fails
+        # — exercises the full rotate-then-give-up path.
+        return _adapter_resp(403, b"<html>blocked</html>")
+
+    adapter = AsyncMock()
+    adapter.request = fake_request
+    adapter.aclose = AsyncMock()
+
+    # Threshold 2: the first failure leaves salt at 0, the second bumps
+    # it to 1 — so the provider should retry once with salt=1.
+    tracker = SessionBurnTracker(rotate_after_failures=2)
+    captured_salts: list[int] = []
+
+    def fake_get_config(*, tier, canonical_id, country="us", session_salt=0):
+        captured_salts.append(session_salt)
+        cfg = MagicMock()
+        cfg.to_httpx_url.return_value = f"http://***@proxy:33335?salt={session_salt}"
+        cfg.session_id = f"s{session_salt:02d}fake"
+        return cfg
+
+    with (
+        patch("ma_poc.fetch.providers.residential.BrightDataProvider.__init__", return_value=None),
+        patch("ma_poc.fetch.providers.residential.BrightDataProvider.get_config", side_effect=fake_get_config),
+        patch("ma_poc.fetch.providers.residential.make_http_client", return_value=adapter),
+        patch("ma_poc.fetch.providers.residential.asyncio.sleep", AsyncMock()),  # skip 2s sleep
+    ):
+        from ma_poc.fetch.providers.residential import ResidentialProvider
+        provider = ResidentialProvider(burn_tracker=tracker)
+        result = await provider.fetch(task, profile)
+
+    assert call_count == 2, f"expected 2 attempts (initial + rotated), got {call_count}"
+    assert len(captured_salts) == 2, f"get_config should run twice, got {len(captured_salts)}"
+    assert captured_salts[0] == 0, "first attempt must use salt=0 (sticky)"
+    assert captured_salts[1] == 1, "second attempt must use rotated salt=1"
+    assert result.outcome == FetchOutcome.BOT_BLOCKED
+
+
+@pytest.mark.asyncio
+async def test_residential_rotated_attempt_succeeds_returns_ok() -> None:
+    """The happy-path of rotation: first attempt 403s, the rotated
+    attempt with a fresh IP gets through. Provider returns OK."""
+    from ma_poc.fetch.proxy.session_burn import SessionBurnTracker
+
+    task = _make_task()
+    profile = _make_profile()
+
+    responses = [
+        _adapter_resp(403, b"<html>blocked</html>"),
+        _adapter_resp(200, b"<html>real listings</html>"),
+    ]
+    call_idx = 0
+
+    async def fake_request(*args, **kwargs):  # noqa: ANN202
+        nonlocal call_idx
+        resp = responses[call_idx]
+        call_idx += 1
+        return resp
+
+    adapter = AsyncMock()
+    adapter.request = fake_request
+    adapter.aclose = AsyncMock()
+
+    tracker = SessionBurnTracker(rotate_after_failures=2)
+
+    with (
+        patch("ma_poc.fetch.providers.residential.BrightDataProvider.__init__", return_value=None),
+        patch("ma_poc.fetch.providers.residential.BrightDataProvider.get_config") as mock_get_cfg,
+        patch("ma_poc.fetch.providers.residential.make_http_client", return_value=adapter),
+        patch("ma_poc.fetch.providers.residential.asyncio.sleep", AsyncMock()),
+    ):
+        fake_cfg = MagicMock()
+        fake_cfg.to_httpx_url.return_value = "http://***@proxy:33335"
+        mock_get_cfg.return_value = fake_cfg
+
+        from ma_poc.fetch.providers.residential import ResidentialProvider
+        provider = ResidentialProvider(burn_tracker=tracker)
+        result = await provider.fetch(task, profile)
+
+    assert call_idx == 2
+    assert result.outcome == FetchOutcome.OK
+    # The burn counter must be reset on success
+    failures, salt, _ = tracker.state_snapshot(task.property_id)
+    assert failures == 0, "successful fetch must reset failure count"
+    # But the salt must remain — the rotated IP is the one that works
+    assert salt == 1, "salt must stick after a successful rotation"
+
+
+@pytest.mark.asyncio
+async def test_residential_carries_burn_state_across_fetches() -> None:
+    """Burn state is process-wide. A property that crossed the threshold
+    in run N must start run N+1 already on the rotated salt — no second
+    burn cycle required to reach the working IP."""
+    from ma_poc.fetch.proxy.session_burn import SessionBurnTracker
+
+    task = _make_task()
+    profile = _make_profile()
+
+    async def always_blocked(*args, **kwargs):  # noqa: ANN202
+        return _adapter_resp(403, b"<html>blocked</html>")
+
+    adapter = AsyncMock()
+    adapter.request = always_blocked
+    adapter.aclose = AsyncMock()
+
+    tracker = SessionBurnTracker(rotate_after_failures=2)
+    captured_salts: list[int] = []
+
+    def fake_get_config(*, tier, canonical_id, country="us", session_salt=0):
+        captured_salts.append(session_salt)
+        cfg = MagicMock()
+        cfg.to_httpx_url.return_value = "http://***@proxy:33335"
+        cfg.session_id = f"s{session_salt}"
+        return cfg
+
+    with (
+        patch("ma_poc.fetch.providers.residential.BrightDataProvider.__init__", return_value=None),
+        patch("ma_poc.fetch.providers.residential.BrightDataProvider.get_config", side_effect=fake_get_config),
+        patch("ma_poc.fetch.providers.residential.make_http_client", return_value=adapter),
+        patch("ma_poc.fetch.providers.residential.asyncio.sleep", AsyncMock()),
+    ):
+        from ma_poc.fetch.providers.residential import ResidentialProvider
+        provider = ResidentialProvider(burn_tracker=tracker)
+
+        # Run 1: should attempt salt=0, then rotate to salt=1
+        await provider.fetch(task, profile)
+        # Run 2: should START on salt=1 (carried over), then rotate to salt=2
+        await provider.fetch(task, profile)
+
+    # Expected sequence: [0, 1, 1, 2] — run1 uses 0 then 1, run2 inherits
+    # the rotated salt and bumps once more.
+    assert captured_salts == [0, 1, 1, 2], (
+        f"expected [0,1,1,2] across two fetches, got {captured_salts}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_residential_ok_resets_failure_count_not_salt() -> None:
+    """A successful fetch resets the consecutive-failure counter but
+    keeps the current salt — so the working IP stays in use."""
+    from ma_poc.fetch.proxy.session_burn import SessionBurnTracker
+
+    task = _make_task()
+    profile = _make_profile()
+    tracker = SessionBurnTracker(rotate_after_failures=2)
+
+    # Prime the tracker: simulate one prior failure that hasn't rotated yet
+    tracker.mark_failure(task.property_id)
+    failures, salt, _ = tracker.state_snapshot(task.property_id)
+    assert (failures, salt) == (1, 0)
+
+    adapter = AsyncMock()
+    adapter.request = AsyncMock(return_value=_adapter_resp(200, b"<html>ok</html>"))
+    adapter.aclose = AsyncMock()
+
     with (
         patch("ma_poc.fetch.providers.residential.BrightDataProvider.__init__", return_value=None),
         patch("ma_poc.fetch.providers.residential.BrightDataProvider.get_config") as mock_get_cfg,
@@ -98,11 +310,57 @@ async def test_residential_bot_blocked_no_retry() -> None:
         mock_get_cfg.return_value = fake_cfg
 
         from ma_poc.fetch.providers.residential import ResidentialProvider
-        provider = ResidentialProvider()
+        provider = ResidentialProvider(burn_tracker=tracker)
         result = await provider.fetch(task, profile)
 
-    assert result.outcome == FetchOutcome.BOT_BLOCKED
-    assert call_count == 1
+    assert result.outcome == FetchOutcome.OK
+    failures_after, salt_after, _ = tracker.state_snapshot(task.property_id)
+    assert failures_after == 0, "OK must reset counter"
+    assert salt_after == 0, "salt was not bumped (we were below threshold)"
+
+
+@pytest.mark.asyncio
+async def test_residential_hard_fail_does_not_trigger_rotation() -> None:
+    """HARD_FAIL (TLS errors, NXDOMAIN, 4xx-not-blocked) is terminal —
+    no proxy rotation will help, so the provider must NOT burn a
+    fresh session on these."""
+    from ma_poc.fetch.proxy.session_burn import SessionBurnTracker
+
+    task = _make_task()
+    profile = _make_profile()
+    tracker = SessionBurnTracker(rotate_after_failures=1)  # aggressive
+
+    call_count = 0
+
+    async def fake_request(*args, **kwargs):  # noqa: ANN202
+        nonlocal call_count
+        call_count += 1
+        # 451 → HARD_FAIL after classify (4xx not in dead-url set)
+        return _adapter_resp(401, b"<html>nope</html>")
+
+    adapter = AsyncMock()
+    adapter.request = fake_request
+    adapter.aclose = AsyncMock()
+
+    with (
+        patch("ma_poc.fetch.providers.residential.BrightDataProvider.__init__", return_value=None),
+        patch("ma_poc.fetch.providers.residential.BrightDataProvider.get_config") as mock_get_cfg,
+        patch("ma_poc.fetch.providers.residential.make_http_client", return_value=adapter),
+        patch("ma_poc.fetch.providers.residential.asyncio.sleep", AsyncMock()),
+    ):
+        fake_cfg = MagicMock()
+        fake_cfg.to_httpx_url.return_value = "http://***@proxy:33335"
+        mock_get_cfg.return_value = fake_cfg
+
+        from ma_poc.fetch.providers.residential import ResidentialProvider
+        provider = ResidentialProvider(burn_tracker=tracker)
+        result = await provider.fetch(task, profile)
+
+    assert result.outcome == FetchOutcome.HARD_FAIL
+    assert call_count == 1, "HARD_FAIL must not trigger a rotated retry"
+    # Tracker must not record a failure on HARD_FAIL
+    failures, salt, _ = tracker.state_snapshot(task.property_id)
+    assert failures == 0 and salt == 0
 
 
 @pytest.mark.asyncio

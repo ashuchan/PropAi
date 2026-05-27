@@ -1,0 +1,1634 @@
+<!doctype html >
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en"
+      class="ios-preview-native-scroll">
+<head>
+    <meta charset="utf-8">
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script type="text/javascript">
+    window._currentDevice = 'desktop';
+    window.Parameters = window.Parameters || {
+        HomeUrl: 'https://www.beaumontcove.net/',
+
+        AccountUUID: 'b53488935c9e4b648e5d0ed666d4a1aa',
+
+        SystemID: 'US_DIRECT_PRODUCTION',
+        SiteAlias: 'cbad8b42',
+        SiteType: atob('RFVEQU9ORQ=='),
+        PublicationDate: 'Mar 11, 2026',
+        ExternalUid: 'S1',
+        IsSiteMultilingual: false,
+        InitialPostAlias: '',
+        InitialPostPageUuid: '',
+        InitialDynamicItem: '',
+        DynamicPageInfo: {
+            isDynamicPage: false,
+            base64JsonRowData: 'null',
+        },
+        InitialPageAlias: 'home',
+        InitialPageUuid: 'db37967dd3c74cc394a374703312f948',
+        InitialPageId: '1200963200',
+        InitialEncodedPageAlias: 'aG9tZQ==',
+        InitialHeaderUuid: 'af81a0bed91f4ea99458628023baa7e8',
+        CurrentPageUrl: '',
+        IsCurrentHomePage: true,
+        AllowAjax: false,
+        AfterAjaxCommand: null,
+        HomeLinkText: 'Back To Home',
+        UseGalleryModule: false,
+        CurrentThemeName: 'Layout Theme',
+        ThemeVersion: '500000',
+        DefaultPageAlias: '',
+        RemoveDID: true,
+        WidgetStyleID: null,
+        IsHeaderFixed: false,
+        IsHeaderSkinny: false,
+        IsBfs: true,
+        StorePageAlias: 'null',
+        StorePagesUrls: 'e30=',
+        IsNewStore: 'false',
+        StorePath: '',
+        StoreId: 'null',
+        StoreVersion: 0,
+        StoreBaseUrl: '',
+        StoreCleanUrl: true,
+        StoreDisableScrolling: true,
+        IsStoreSuspended: false,
+        HasCustomDomain: true,
+        SimpleSite: false,
+        showCookieNotification: false,
+        cookiesNotificationMarkup: 'null',
+        translatedPageUrl: '',
+        isFastMigrationSite: false,
+        sidebarPosition: 'NA',
+        currentLanguage: 'en',
+        currentLocale: 'en',
+        NavItems: '{}',
+        errors: {
+            general: 'There was an error connecting to the page.<br/> Make sure you are not offline.',
+            password: 'Incorrect name/password combination',
+            tryAgain: 'Try again'
+        },
+        NavigationAreaParams: {
+            ShowBackToHomeOnInnerPages: true,
+            NavbarSize: -1,
+            NavbarLiveHomePage: 'https://www.beaumontcove.net/',
+            BlockContainerSelector: '.dmBody',
+            NavbarSelector: '#dmNav:has(a)',
+            SubNavbarSelector: '#subnav_main'
+        },
+        hasCustomCode: true,
+        planID: '7',
+        customTemplateId: 'null',
+        siteTemplateId: 'null',
+        productId: 'DM_DIRECT',
+        disableTracking: false,
+        pageType: 'FROM_SCRATCH',
+        isRuntimeServer: true,
+        isInEditor: false,
+        isInPreview: false,
+        hasNativeStore: false,
+        defaultLang: 'en',
+        hamburgerMigration: null,
+        isFlexSite: false
+    };
+
+    window.Parameters.LayoutID = {};
+    window.Parameters.LayoutID[window._currentDevice] = 6;
+    window.Parameters.LayoutVariationID = {};
+    window.Parameters.LayoutVariationID[window._currentDevice] = 5;
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- Injecting site-wide to the head -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script type="text/javascript" id="d_track_campaign">
+    (function() {
+        if (!window.location.search) {
+            return;
+        }
+        const cleanParams = window.location.search.substring(1); // Strip ?
+        const queryParams = cleanParams.split('&');
+
+        const expires = 'expires=' + new Date().getTime() + 24 * 60 * 60 * 1000;
+        const domain = 'domain=' + window.location.hostname;
+        const path = "path=/";
+
+        queryParams.forEach((param) => {
+            const [key, value = ''] = param.split('=');
+            if (key.startsWith('utm_')) {
+                const cookieName = "_dm_rt_" + key.substring(4);
+                const cookie = cookieName + "=" + value;
+                const joined = [cookie, expires, domain, path].join(";");
+                document.cookie = joined;
+            }
+        });
+    }());
+</script>
+<script type="text/javascript" >
+    var _dm_gaq = {};
+    var _gaq = _gaq || [];
+    var _dm_insite = [{ruleId: 1905437, ruleType: 'bfs'}];
+</script>
+
+
+
+
+
+
+<!-- End Injecting site-wide to the head -->
+
+<!-- Inject secured cdn script -->
+
+
+<!-- ========= Meta Tags ========= -->
+<!-- PWA settings -->
+<script>
+    function toHash(str) {
+        var hash = 5381, i = str.length;
+        while (i) {
+            hash = hash * 33 ^ str.charCodeAt(--i)
+        }
+        return hash >>> 0
+    }
+</script>
+<script>
+    (function (global) {
+    //const cacheKey = global.cacheKey;
+    const isOffline = 'onLine' in navigator && navigator.onLine === false;
+    const hasServiceWorkerSupport = 'serviceWorker' in navigator;
+    if (isOffline) {
+        console.log('offline mode');
+    }
+    if (!hasServiceWorkerSupport) {
+        console.log('service worker is not supported');
+    }
+    if (hasServiceWorkerSupport && !isOffline) {
+        window.addEventListener('load', function () {
+            const serviceWorkerPath = '/runtime-service-worker.js?v=3';
+            navigator.serviceWorker
+                .register(serviceWorkerPath, { scope: './' })
+                .then(
+                    function (registration) {
+                        // Registration was successful
+                        console.log(
+                            'ServiceWorker registration successful with scope: ',
+                            registration.scope
+                        );
+                    },
+                    function (err) {
+                        // registration failed :(
+                        console.log('ServiceWorker registration failed: ', err);
+                    }
+                )
+                .catch(function (err) {
+                    console.log(err);
+                });
+        });
+
+        // helper function to refresh the page
+        var refreshPage = (function () {
+            var refreshing;
+            return function () {
+                if (refreshing) return;
+                // prevent multiple refreshes
+                var refreshkey = 'refreshed' + location.href;
+                var prevRefresh = localStorage.getItem(refreshkey);
+                if (prevRefresh) {
+                    localStorage.removeItem(refreshkey);
+                    if (Date.now() - prevRefresh < 30000) {
+                        return; // dont go into a refresh loop
+                    }
+                }
+                refreshing = true;
+                localStorage.setItem(refreshkey, Date.now());
+                console.log('refereshing page');
+                window.location.reload();
+            };
+        })();
+
+        function messageServiceWorker(data) {
+            return new Promise(function (resolve, reject) {
+                if (navigator.serviceWorker.controller) {
+                    var worker = navigator.serviceWorker.controller;
+                    var messageChannel = new MessageChannel();
+                    messageChannel.port1.onmessage = replyHandler;
+                    worker.postMessage(data, [messageChannel.port2]);
+                    function replyHandler(event) {
+                        resolve(event.data);
+                    }
+                } else {
+                    resolve();
+                }
+            });
+        }
+    }
+})(window);
+</script>
+<!-- Add manifest -->
+<!-- End PWA settings -->
+
+
+
+<link rel="canonical" href="https://www.beaumontcove.net/">
+
+<meta id="view" name="viewport" content="initial-scale=1, minimum-scale=1, maximum-scale=5, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+<!--Add favorites icons-->
+
+<link rel="icon" type="image/x-icon" href="https://irp.cdn-website.com/cbad8b42/site_favicon_16_1684787927897.ico"/>
+
+<!-- End favorite icons -->
+<link rel="preconnect" href="https://lirp.cdn-website.com/"/>
+
+
+
+<!-- render the required CSS and JS in the head section -->
+<script id='d-js-dmapi'>
+    window.SystemID = 'US_DIRECT_PRODUCTION';
+
+    if (!window.dmAPI) {
+        window.dmAPI = {
+            registerExternalRuntimeComponent: function () {
+            },
+            getCurrentDeviceType: function () {
+                return window._currentDevice;
+            },
+            runOnReady: (ns, fn) => {
+                const safeFn = dmAPI.toSafeFn(fn);
+                ns = ns || 'global_' + Math.random().toString(36).slice(2, 11);
+                const eventName = 'afterAjax.' + ns;
+
+                if (document.readyState === 'complete') {
+                    $.DM.events.off(eventName).on(eventName, safeFn);
+                    setTimeout(function () {
+                        safeFn({
+                            isAjax: false,
+                        });
+                    }, 0);
+                } else {
+                    window?.waitForDeferred?.('dmAjax', () => {
+                        $.DM.events.off(eventName).on(eventName, safeFn);
+                        safeFn({
+                            isAjax: false,
+                        });
+                    });
+                }
+            },
+            toSafeFn: (fn) => {
+                if (fn?.safe) {
+                    return fn;
+                }
+                const safeFn = function (...args) {
+                    try {
+                        return fn?.apply(null, args);
+                    } catch (e) {
+                        console.log('function failed ' + e.message);
+                    }
+                };
+                safeFn.safe = true;
+                return safeFn;
+            }
+        };
+    }
+
+    if (!window.requestIdleCallback) {
+        window.requestIdleCallback = function (fn) {
+            setTimeout(fn, 0);
+        }
+    }
+</script>
+
+<!-- loadCSS function header.jsp-->
+
+
+
+
+
+
+<script id="d-js-load-css">
+/**
+ * There are a few <link> tags with CSS resource in them that are preloaded in the page
+ * in each of those there is a "onload" handler which invokes the loadCSS callback
+ * defined here.
+ * We are monitoring 3 main CSS files - the runtime, the global and the page.
+ * When each load we check to see if we can append them all in a batch. If threre
+ * is no page css (which may happen on inner pages) then we do not wait for it
+ */
+(function () {
+  let cssLinks = {};
+  function loadCssLink(link) {
+    link.onload = null;
+    link.rel = "stylesheet";
+    link.type = "text/css";
+  }
+  
+    function checkCss() {
+      const pageCssLink = document.querySelector("[id*='CssLink']");
+      const widgetCssLink = document.querySelector("[id*='widgetCSS']");
+
+        if (cssLinks && cssLinks.runtime && cssLinks.global && (!pageCssLink || cssLinks.page) && (!widgetCssLink || cssLinks.widget)) {
+            const storedRuntimeCssLink = cssLinks.runtime;
+            const storedPageCssLink = cssLinks.page;
+            const storedGlobalCssLink = cssLinks.global;
+            const storedWidgetCssLink = cssLinks.widget;
+
+            storedGlobalCssLink.disabled = true;
+            loadCssLink(storedGlobalCssLink);
+
+            if (storedPageCssLink) {
+                storedPageCssLink.disabled = true;
+                loadCssLink(storedPageCssLink);
+            }
+
+            if(storedWidgetCssLink) {
+                storedWidgetCssLink.disabled = true;
+                loadCssLink(storedWidgetCssLink);
+            }
+
+            storedRuntimeCssLink.disabled = true;
+            loadCssLink(storedRuntimeCssLink);
+
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    storedRuntimeCssLink.disabled = false;
+                    storedGlobalCssLink.disabled = false;
+                    if (storedPageCssLink) {
+                      storedPageCssLink.disabled = false;
+                    }
+                    if (storedWidgetCssLink) {
+                      storedWidgetCssLink.disabled = false;
+                    }
+                    // (SUP-4179) Clear the accumulated cssLinks only when we're
+                    // sure that the document has finished loading and the document 
+                    // has been parsed.
+                    if(document.readyState === 'interactive') {
+                      cssLinks = null;
+                    }
+                }, 0);
+            });
+        }
+    }
+  
+
+  function loadCSS(link) {
+    try {
+      var urlParams = new URLSearchParams(window.location.search);
+      var noCSS = !!urlParams.get("nocss");
+      var cssTimeout = urlParams.get("cssTimeout") || 0;
+
+      if (noCSS) {
+        return;
+      }
+      if (link.href && link.href.includes("d-css-runtime")) {
+        cssLinks.runtime = link;
+        checkCss();
+      } else if (link.id === "siteGlobalCss") {
+        cssLinks.global = link;
+        checkCss();
+      } 
+      
+      else if (link.id && link.id.includes("CssLink")) {
+        cssLinks.page = link;
+        checkCss();
+      } else if (link.id && link.id.includes("widgetCSS")) {
+        cssLinks.widget = link;
+        checkCss();
+      }
+      
+      else {
+        requestIdleCallback(function () {
+          window.setTimeout(function () {
+            loadCssLink(link);
+          }, parseInt(cssTimeout, 10));
+        });
+      }
+    } catch (e) {
+      throw e
+    }
+  }
+  window.loadCSS = window.loadCSS || loadCSS;
+})();
+</script>
+
+
+
+<script data-role="deferred-init" type="text/javascript">
+    /* usage: window.getDeferred(<deferred name>).resolve() or window.getDeferred(<deferred name>).promise.then(...)*/
+    function Def() {
+        this.promise = new Promise((function (a, b) {
+            this.resolve = a, this.reject = b
+        }).bind(this))
+    }
+
+    const defs = {};
+    window.getDeferred = function (a) {
+        return null == defs[a] && (defs[a] = new Def), defs[a]
+    }
+    window.waitForDeferred = function (b, a, c) {
+        let d = window?.getDeferred?.(b);
+        d
+            ? d.promise.then(a)
+            : c && ["complete", "interactive"].includes(document.readyState)
+                ? setTimeout(a, 1)
+                : c
+                    ? document.addEventListener("DOMContentLoaded", a)
+                    : console.error(`Deferred  does not exist`);
+    };
+</script>
+<style id="forceCssIncludes">
+    /* This file is auto-generated from a `scss` file with the same name */
+
+.videobgwrapper{overflow:hidden;position:absolute;z-index:0;width:100%;height:100%;top:0;left:0;pointer-events:none;border-radius:inherit}.videobgframe{position:absolute;width:101%;height:100%;top:50%;left:50%;transform:translateY(-50%) translateX(-50%);object-fit:fill}#dm video.videobgframe{margin:0}@media (max-width:767px){.dmRoot .dmPhotoGallery.newPhotoGallery:not(.photo-gallery-done){min-height:80vh}}@media (min-width:1025px){.dmRoot .dmPhotoGallery.newPhotoGallery:not(.photo-gallery-done){min-height:45vh}}@media (min-width:768px) and (max-width:1024px){.responsiveTablet .dmPhotoGallery.newPhotoGallery:not(.photo-gallery-done){min-height:45vh}}#dm [data-show-on-page-only]{display:none!important}#dmRoot div.stickyHeaderFix div.site_content{margin-top:0!important}#dmRoot div.stickyHeaderFix div.hamburger-header-container{position:relative}
+    
+
+</style>
+<style id="cssVariables" type="text/css">
+    
+</style>
+
+
+<style id="hideAnimFix">
+  .dmDesktopBody:not(.editGrid) [data-anim-desktop]:not([data-anim-desktop='none']), .dmDesktopBody:not(.editGrid) [data-anim-extended] {
+    visibility: hidden;
+  }
+
+  .dmDesktopBody:not(.editGrid) .dmNewParagraph[data-anim-desktop]:not([data-anim-desktop='none']), .dmDesktopBody:not(.editGrid) .dmNewParagraph[data-anim-extended] {
+    visibility: hidden !important;
+  }
+
+  #dmRoot:not(.editGrid) .flex-element [data-anim-extended] {
+    visibility: hidden;
+  }
+
+</style>
+
+
+
+<style id="criticalCss">
+    @charset "UTF-8";.display_None,.dmPopupMask{display:none}#dm .dmInner .dmWidget,.clearfix:after,.dmRespRow .dmRespRow:after,.dmRespRow:after,.dmSocialHub,.dmTwitterFeedWrapper,DIV.dmBody{clear:both}.clearfix:after,.dmDesktopBody:not(.editGrid) [data-anim-desktop]:not([data-anim-desktop=none]){visibility:hidden}.dmInner{min-height:100vh!important;position:relative}.dmDisplay_None{display:none!important}.clearfix:after{line-height:0;height:0}.clearfix:after,.clearfix:before{content:" ";display:table}.clearfix{display:inline-block}#dm .dmWidget .icon{font-size:26px}body.dmRoot #dm .dmOuter .dmInner .dmWidget .icon.hasFontIcon{height:26px;margin-top:-13px;line-height:normal;text-align:center;background-image:none}.dmRoot .hasFontIcon{background-image:none!important}.dmPopupMask{position:fixed;margin:0;width:10px;z-index:1000000999;top:0;left:0}#dmRoot .dmPopup,.dmPopup,.dmPopupClose:before,[data-display-type=block]{display:block}.dmPopup{text-align:left;position:fixed;top:10px;left:0;width:93%;z-index:1000009999!important;box-sizing:border-box;background:#f5f5f5;overflow-y:auto;height:100%}.dmPopup .dmPopupTitle{text-align:left;font:700 19px Helvetica,Arial;margin:20px 20px 35px;color:#999}#dm .dmInner .dmWidget,#dm .dmPhotoGallery.newPhotoGallery .photoGalleryThumbs .caption-container .caption-inner div,#dm .dmPhotoGallery.newPhotoGallery .photoGalleryThumbs .caption-container .caption-inner h3,#dm .dmPhotoGallery.newPhotoGallery.captionAlignment-center_center .photoGalleryThumbs .caption-container .caption-inner:not(:has(>.caption-link)) div,#dm .dmPhotoGallery.newPhotoGallery.captionAlignment-center_center .photoGalleryThumbs .caption-container .caption-inner:not(:has(>.caption-link)) h3,#dm .dmPhotoGallery.newPhotoGallery.captionAlignment-top_center .photoGalleryThumbs .caption-container .caption-inner:not(:has(>.caption-link)) div,#dm .dmPhotoGallery.newPhotoGallery.captionAlignment-top_center .photoGalleryThumbs .caption-container .caption-inner:not(:has(>.caption-link)) h3,.dmHeader,.dmPhotoGallery.newPhotoGallery .photoGalleryThumbs .caption-container .caption-inner,.dmPhotoGalleryHolder,.graphicWidget,.imageWidget a,.text-align-center{text-align:center}.lh-1,button,input{line-height:normal}#dmPopup{opacity:0}.dmPopupClose,.dmPopupClose:before{position:absolute;visibility:visible}.dmPopupClose{border-radius:25px;width:27px;height:27px;z-index:1;background-color:rgba(255,255,255,.4);top:12px;right:12px}.dmPopupClose:before{font-size:20px;color:#000;top:3px;right:3px}body.dmDesktopBody:not(.mac) .data::-webkit-scrollbar{width:5px;height:5px}body.dmDesktopBody:not(.mac) .data::-webkit-scrollbar-track{background:rgba(0,0,0,.1)}body.dmDesktopBody:not(.mac) .data::-webkit-scrollbar-thumb{background:#c8c8c8;box-shadow:inset 0 1px 2px #454545;border-radius:45px}.dmTwitterFeed{min-height:1px;min-width:1px}.dmRespRow.fullBleedMode>.dmRespColsWrapper{width:100%!important;max-width:100%!important}.dmRespRow.fullBleedMode{padding-left:0!important;padding-right:0!important}#dm .dmRespRow .dmRespColsWrapper{display:flex}#dm .hasBackgroundOverlay:not(.dmPopupPage):not(.layout-drawer){position:relative!important}#dm .hasBackgroundOverlay:not(.hasExtraLayerOverlay):before{display:block!important;position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;content:" "!important;border-radius:inherit}#dm .dmInner .dmWidget.align-center,.align-center{margin-left:auto;margin-right:auto}body.fix-mobile-scrolling{overflow:initial}#dmRoot{text-decoration-skip-ink:none}.fullSizeButton{width:100%!important;height:100%!important;margin:0!important}.dmform-title{padding-right:15px;padding-left:15px}body{-webkit-overflow-scrolling:touch}@media (min-width:1025px){:root{--btn-text-font-size:16px}}@media (min-width:768px) and (max-width:1024px){:root{--btn-text-font-size:16px}}nav{display:block}html{font-family:Source Sans Pro;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}h1{font-size:2em;margin:.67em 0}b{font-weight:700}hr{box-sizing:content-box;height:0}img{border:0;max-width:100%;-ms-interpolation-mode:bicubic;display:inline-block}svg:not(:root){overflow:hidden}button,input{font-family:inherit;font-size:100%;margin:0}button{text-transform:none;-webkit-appearance:button}button::-moz-focus-inner,input::-moz-focus-inner{border:0;padding:0}*,:after,:before{box-sizing:border-box}.dmRespRow.dmRespRowNoPadding{padding:0}.dmRespRow{padding-top:15px;padding-bottom:15px}.dmRespRow .dmRespRow:after,.dmRespRow .dmRespRow:before,.dmRespRow:after,.dmRespRow:before{content:" ";display:table}.dmRespRow,.dmRespRow .dmRespColsWrapper{max-width:960px;position:relative;margin:0 auto;width:100%}.dmRespRow .dmRespCol{position:relative;width:100%;display:inline-block;vertical-align:top;float:left}.dmRespRow .dmRespCol>*{max-width:100%}.dmRespRow .dmRespRow{width:auto;margin-top:0;margin-bottom:0;max-width:none}.dmDesktopBody .dmRespRow .large-2{position:relative;width:16.66667%}.dmDesktopBody .dmRespRow .large-3{position:relative;width:25%}.dmDesktopBody .dmRespRow .large-4{position:relative;width:33.33333%}.dmDesktopBody .dmRespRow .large-5{position:relative;width:41.66667%}.dmDesktopBody .dmRespRow .large-6{position:relative;width:50%}.dmDesktopBody .dmRespRow .large-12{position:relative;width:100%}.socialHubIcon,[class*=" dm-common-icons-"],[class*=" dm-social-icons-"]{font-family:dm-social-icons!important;speak:none;font-style:normal;font-weight:400;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.dm-social-icons-facebook:before{content:"\ea90"}.dm-social-icons-twitter:before{content:"\ea96"}.dm-social-icons-youtube:before{content:"\ea9d"}[class*=" dm-common-icons-"]{font-family:dm-common-icons!important}.dm-common-icons-close:before{content:"\e901"}#dm div.dmContent [class*=" icon-"],[class*=" icon-"]{font-family:FontAwesome!important;font-weight:400;font-style:normal;text-decoration:inherit;-webkit-font-smoothing:antialiased}[class*=" icon-"]:before{text-decoration:none;display:inline-block;speak:none}a [class*=" icon-"]{display:inline}[class*=" icon-"]{display:inline;width:auto;height:auto;line-height:normal;vertical-align:baseline;background-image:none;background-position:0 0;background-repeat:repeat;margin-top:0}.icon-star:before{content:"\f005"}.icon-angle-down:before{content:"\f107"}#dm .dmRespRow .dmRespCol>.dmWidget{overflow:initial}@media (min-width:768px){#dm .dmRespRow .dmRespCol>.dmWidget{width:280px;max-width:100%}}@media (max-width:767px){#dm .dmInner .dmWidget{width:100%}}#dm .dmInner .dmWidget:not(.displayNone){display:inline-block}#dm .dmInner .dmWidget:not(.flexButton):not(.displayNone)[data-display-type=block]{display:block}#dm .dmInner .dmWidget{text-decoration:none;margin:10px 0;position:relative;line-height:22px;box-shadow:none;background-image:none;padding:0;height:auto;border-style:solid;white-space:nowrap}#dm .dmInner .dmWidget:after{content:"";display:inline-block;height:100%;vertical-align:middle;width:0;margin-right:-.25em}#dm .dmInner .dmWidget .iconBg{position:absolute;left:0;width:50px;top:50%;margin-top:-13px}#dm .dmWidget .text{display:inline-block;vertical-align:middle;font-size:1.125em;line-height:normal;white-space:normal;padding:10px 7px;max-width:98%}.dmInner{min-width:768px!important}html:not(.ios-preview) #dm .hasStickyHeader .dmInner div.dmHeaderContainer{position:fixed!important;z-index:101;width:100%;min-width:768px}body:not(.responsiveTablet) #dm .dmInner #fcontainer .hide-for-large,body:not(.responsiveTablet) #dm .dmInner .dmBody .hide-for-large,body:not(.responsiveTablet) .hide-for-large{display:none!important}#dm div.dmInner .dmform[data-layout=layout-3] .dmforminput>:not(label):not(div):not(small):not(.frc-banner){background:0;border:0;border-radius:0;-webkit-appearance:none;border-bottom:1px solid;height:30px}.dmPhotoGallery.newPhotoGallery .photoGalleryThumbs .caption-container .caption-inner h3{margin:0;line-height:normal;font-size:21px}.dmPhotoGallery.newPhotoGallery .photoGalleryThumbs .caption-container .caption-inner .caption-text,.dmPhotoGallery.newPhotoGallery .photoGalleryThumbs .caption-container .caption-inner .caption-title{max-width:100%}#dm .dmPhotoGallery.newPhotoGallery.captionAlignment-top_center .photoGalleryThumbs .caption-container .caption-inner:not(:has(>.caption-link)){justify-content:flex-start;align-items:center}#dm .dmPhotoGallery.newPhotoGallery.captionAlignment-top_center .photoGalleryThumbs .caption-container .caption-inner .caption-button{margin:10px auto}#dm .dmPhotoGallery.newPhotoGallery.captionAlignment-center_center .photoGalleryThumbs .caption-container .caption-inner:not(:has(>.caption-link)){justify-content:center;align-items:center}#dm .dmPhotoGallery.newPhotoGallery.captionAlignment-center_center .photoGalleryThumbs .caption-container .caption-inner .caption-button{margin:10px auto}#dm .dmPhotoGallery.newPhotoGallery .dmPhotoGalleryHolder{width:100%;padding:0;display:none}#dm .dmPhotoGallery.newPhotoGallery .layout-container .photogallery-column .photoGalleryThumbs .image-container a img{display:none!important}#dm .dmPhotoGallery.newPhotoGallery .photoGalleryThumbs .caption-container .caption-inner{align-items:center;display:flex;flex-direction:column;justify-content:center;position:relative;overflow:hidden;z-index:1;background-color:rgba(255,255,255,.9);color:#333;padding:15px;height:100%;box-sizing:border-box}#dm .dmPhotoGallery.newPhotoGallery .photoGalleryThumbs .caption-container .caption-inner .caption-button{margin:10px auto;max-width:100%}#dm .dmPhotoGallery.newPhotoGallery .photoGalleryThumbs .caption-container .caption-inner .caption-button .text{padding:10px 20px!important}#dm .dmPhotoGallery.newPhotoGallery.text-layout-over .photoGalleryThumbs .caption-container{height:100%;width:100%;position:absolute;top:0;left:0;padding:inherit}#dm .dmPhotoGallery.newPhotoGallery.text-layout-over .photoGalleryThumbs .caption-inner{display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;min-height:0!important;padding:10px;transform:scale(1.05);opacity:0;filter:alpha(opacity=0)}#dm .dmRespRow.dmRespRowNoPadding,.dmContent,.dmInner ul:not(.defaultList),DIV.dmBody{padding:0}.graphicWidget{width:200px;height:200px;margin:10px auto}.graphicWidget svg.svg{width:100%;height:100%;color:#000;fill:#000}.imageWidget{position:relative}.imageWidget a{font-style:italic}.socialHubIcon{display:flex!important;align-items:center;justify-content:center}.socialHubIcon.style6{background:#617379}.style6.dmSocialFacebook{background:#1877f2}.style6.dmSocialTwitter{background:#0f1419}.style6.dmSocialYoutube{background:red}.widget-128151{margin:10px auto;min-height:173px}.pay-rent-button{width:200px;height:50px}.pay-rent-button svg{vertical-align:bottom;opacity:.75;width:1.25rem;height:1.25rem;margin-right:.5rem;display:inline-block;position:relative}*{border:0 solid #333;scrollbar-arrow-color:#fff;scrollbar-track-color:#F2F2F2;scrollbar-face-color:silver;scrollbar-highlight-color:silver;scrollbar-3dlight-color:silver;scrollbar-shadow-color:silver;scrollbar-darkshadow-color:silver;scrollbar-width:12px}body{width:100%;overflow:hidden;-webkit-text-size-adjust:100%!important;-ms-text-size-adjust:100%!important}A IMG{border:none}h1,h2,h3,h4,ul{margin-left:0;margin-right:0}.dmInner *{-webkit-font-smoothing:antialiased}span.oneIcon:before{display:inline-block}.clearfix,a,img,li,ul{vertical-align:top}#iscrollBody,#site_content{position:relative}.dmOuter{word-wrap:break-word}.dmInner{font-size:16px;background:#fff;color:#666}.dmDesktopBody .dmInner{min-width:960px}.dmInner a{color:#463939}.dmHeader{background:#68ccd1;color:#666;position:relative;width:100%;max-width:100%}.dmContent{margin:0}#site_content ul:not(.defaultList){-webkit-padding-start:0;-moz-padding-start:0;list-style-position:inside}#innerBar{position:relative;height:36px;width:100%;font-size:20px;margin:0;z-index:80}.dmRespRowsWrapper{max-width:960px;margin:0 auto}.dmRespCol>[dmle_extension]:not(:first-child){margin-top:10px}.dmLargeBody .imageWidget:not(.displayNone){display:inline-block;max-width:100%}#dm .dmRespColsWrapper,.dmStandardDesktop{display:block}.imageWidget:not(.displayNone) img{width:100%}h3{font-weight:400;font-size:23px}.dmNewParagraph{text-align:left;margin:8px 0;padding:2px 0}.dmLargeBody .dmRespRowsWrapper>.dmRespRow .dmRespCol,.dmLargeBody .fHeader .dmRespRow .dmRespCol{padding-left:.75%;padding-right:.75%}.dmLargeBody .dmRespRowsWrapper>.dmRespRow .dmRespCol:first-child,.dmLargeBody .fHeader .dmRespRow .dmRespCol:first-child{padding-left:0;padding-right:1.5%}.dmLargeBody .dmRespRowsWrapper>.dmRespRow .dmRespCol:last-child,.dmLargeBody .fHeader .dmRespRow .dmRespCol:last-child{padding-right:0;padding-left:1.5%}.dmLargeBody .dmRespRowsWrapper>.dmRespRow .dmRespCol:only-child,.dmLargeBody .fHeader .dmRespRow .dmRespCol:only-child{padding-left:0;padding-right:0}#innerBar.lineInnerBar{display:table;width:100%;box-shadow:none;-webkit-box-shadow:none;-moz-box-shadow:none;font-size:20px;margin-top:30px;margin-bottom:30px;background-color:transparent;color:#666}#innerBar .titleLine{display:table-cell;vertical-align:middle;width:50%}.dmPageTitleRow:not(#innerBar){display:none}.titleLine hr{min-height:1px;background-color:rgba(102,102,102,.2)}.dmLargeBody .dmFooterResp>.dmRespRow .dmRespCol{padding-left:.75%;padding-right:.75%}.dmLargeBody .dmFooterResp>.dmRespRow .dmRespCol:first-child{padding-left:0;padding-right:1.5%}.dmLargeBody .dmFooterResp>.dmRespRow .dmRespCol:last-child{padding-right:0;padding-left:1.5%}#dmFirstContainer .dmRespRowsWrapper:after,#dmFirstContainer .dmRespRowsWrapper:before{content:"";display:table}.dmInner a{outline:0;vertical-align:inherit}.dmLinksMenu>ul{display:block;margin:0;font-size:inherit}.dmStandardDesktop{margin:0 auto}#dm .dmInner .dmWidget{color:#f7f7f7;background-color:#f95759}#dm h3.dmwidget-title[hide=true]{display:none}#dm .dmwidget-title{margin:10px 0;font-size:23px;text-shadow:none;text-align:left;text-transform:capitalize;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;word-wrap:normal}#dm .dmDivider{display:block;margin:10px 0}.dmPhotoGalleryHolder{font-size:medium!important;margin:0;list-style:none}#dm .dmPhotoGallery .dmPhotoGalleryHolder{width:100%;padding:0}#dm .dmSocialHub a{display:inline-block;text-decoration:none;margin:0;vertical-align:bottom}.dmSocialHub>div{text-align:inherit}a span.socialHubIcon{width:36px;height:36px;font-size:31px;display:inline-block;text-align:center;margin-right:0;margin-bottom:5px;line-height:36px;box-sizing:content-box;background-image:none!important}.socialHubIcon.style6{font-size:24px;padding:4px;border-radius:50%;color:#fff}#dm .dmSocialHub .socialHubWrapper{display:inline-block;max-width:100%}.dmTwitterFeed.dmWwr{box-shadow:none;background-color:transparent}body{background-color:#eee}.dmDivider{min-height:2px;border:currentColor;color:grey;background:0 0}#dm .dmDividerWrapper{display:block}[dmle_extension=custom_extension] .dmWidget{width:150px;padding:0 7px}.main-navigation.unifiednav{-js-display:flex;display:flex;justify-content:flex-start;align-items:stretch;overflow:visible}.main-navigation.unifiednav ul{list-style:none;padding:0;margin:0;font-size:1rem}.main-navigation.unifiednav .unifiednav__container{-js-display:flex;display:flex;justify-content:flex-start;list-style:none}.main-navigation.unifiednav .unifiednav__container>.unifiednav__item-wrap{-js-display:flex;display:flex;justify-content:flex-start;position:relative;font-weight:400}.main-navigation.unifiednav .unifiednav__container:not([data-depth])>.unifiednav__item-wrap::after,.main-navigation.unifiednav .unifiednav__container:not([data-depth])>.unifiednav__item-wrap::before{content:'';align-self:center;font-weight:700}.main-navigation.unifiednav .unifiednav__container>.unifiednav__item-wrap>.unifiednav__item{-js-display:flex;display:flex;justify-content:flex-start;align-items:center;flex-direction:row;color:inherit;text-decoration:none;position:relative;padding:12px 15px;margin:0;font-weight:inherit;letter-spacing:.03em}.main-navigation.unifiednav .unifiednav__container:not([data-depth])>.unifiednav__item-wrap>.unifiednav__item{padding:0 15px}.main-navigation.unifiednav .unifiednav__container>.unifiednav__item-wrap>.unifiednav__item .nav-item-text{white-space:nowrap}.main-navigation.unifiednav .unifiednav__container:not([data-depth])>.unifiednav__item-wrap>.unifiednav__item .nav-item-text::after,.main-navigation.unifiednav .unifiednav__container:not([data-depth])>.unifiednav__item-wrap>.unifiednav__item .nav-item-text::before{content:'';width:100%;height:0;border:0 solid transparent;border-top-color:currentColor;display:block;opacity:0}.main-navigation.unifiednav.effect-bottom2{padding:calc(12px - .2em - 2px) 15px}.main-navigation.unifiednav.effect-bottom2 .unifiednav__container:not([data-depth])>.unifiednav__item-wrap>.unifiednav__item .nav-item-text::after,.main-navigation.unifiednav.effect-bottom2 .unifiednav__container:not([data-depth])>.unifiednav__item-wrap>.unifiednav__item .nav-item-text::before{transform:scaleX(0);border-top-width:2px;transform-origin:left}.main-navigation.unifiednav.effect-bottom2 .unifiednav__container:not([data-depth])>.unifiednav__item-wrap>.unifiednav__item .nav-item-text::after{margin-top:.2em}.main-navigation.unifiednav.effect-bottom2 .unifiednav__container:not([data-depth])>.unifiednav__item-wrap>.unifiednav__item .nav-item-text::before{margin-bottom:.2em;border-top-color:transparent}.main-navigation.unifiednav .unifiednav__container .unifiednav__item:not(.unifiednav__item_has-sub-nav) .icon{display:none}.main-navigation.unifiednav:not(.unifiednav_vertical)>.unifiednav__container{justify-content:inherit}#dm .p_hfcontainer nav.main-navigation.unifiednav{min-width:9em!important;text-align:initial!important}#dm .main-navigation.unifiednav:not([data-nav-structure=VERTICAL])>.unifiednav__container{flex-wrap:wrap;justify-content:inherit}#dm .main-navigation.unifiednav:not([data-nav-structure=VERTICAL])>.unifiednav__container .nav-item-text::before{text-align:left}#dm .main-navigation.unifiednav:not([data-nav-structure=VERTICAL]) .unifiednav__container:not([data-depth])>.unifiednav__item-wrap:not(:last-child)::after,#dm .main-navigation.unifiednav:not([data-nav-structure=VERTICAL]) .unifiednav__container:not([data-depth])>.unifiednav__item-wrap:not(:last-child)::before{content:''}#dm .dmBody .dmRespRowsWrapper{max-width:none;background-color:transparent}.dmLargeBody .dmRespRow{width:100%;max-width:none;margin-left:0;margin-right:0;padding-left:40px;padding-right:40px}.dm-bfs.dm-layout-home div.dmInner{background-color:#fff}.dmStandardDesktop .dmHeader{background-color:#68ccd1;max-width:100%}.standardHeaderLayout .dmHeader{float:none;display:block;height:auto}.dmRespRow:not(.dmPlaceHolderRespRow) .dmRespColsWrapper .dmRespCol:not(.content-removed).empty-column{min-height:100px}.dmRespRow:not(.dmPlaceHolderRespRow) .dmRespCol:not(.content-removed).empty-column,.dmRespRow:not(.dmPlaceHolderRespRow) .dmRespCol:not(.content-removed):empty{min-height:1px}#dm div.dmContent h1{color:#666;font-weight:400}#dm div.dmRespCol>*{line-height:normal}#dm div.dmContent h3{color:#fff}#dm div.dmInner{font-size:16px;font-family:Roboto,"Roboto Fallback";line-height:initial}#dm div.dmInner h1,#dm div.dmInner h2,#dm div.dmInner h3,#dm div.dmInner h4{font-family:Montserrat,"Montserrat Fallback"}#dm div.dmContent h2,#dm div.dmFooter h2{color:#333}#dm DIV.dmInner{background-repeat:no-repeat;background-image:url(https://irt-cdn.multiscreensite.com/047de7cb30704425a870a558c8880ad4/dms3rep/multi/site_background_education-2087x1173.jpg);background-size:cover;background-position:50% 0}#dm div.dmOuter div.dmInner{background-position:center center;background-repeat:repeat;background-size:auto}#dm div.dmContent h4{color:#333;font-family:Roboto,"Roboto Fallback";font-weight:400;color:rgba(54,73,87,1)}.dmLargeBody .dmBody .dmRespRowsWrapper{background-color:transparent}#dm div.dmContent h2,#dm div.dmFooter h2{font-weight:700}#dm div.dmContent h3{color:rgba(54,73,87,1)}#dm div.dmInner,#dm div.dmInner .dmRespCol{font-weight:300}#dm div.dmContent h1{font-family:Montserrat,"Montserrat Fallback";color:rgba(0,0,0,1)}#dm div.dmContent h3{font-weight:700;font-size:25px;line-height:initial}#dm div.dmContent h1,#dm div.dmContent h1 *{line-height:initial}#dm div.dmContent h2,#dm div.dmContent h2 *,#dm div.dmFooter h2,#dm div.dmFooter h2 *{line-height:initial}#dm div.dmContent h4,#dm div.dmContent h4 *{font-size:22px;line-height:initial}#dm div.dmContent h2,#dm div.dmFooter h2{font-size:38px}#dm DIV.dmOuter DIV.dmInner{background-image:none;background-color:rgba(255,255,255,1)}#dm div.dmContent h1{font-size:60px}#dm div.dmContent h2,#dm div.dmFooter h2,#dm div.p_hfcontainer h2{color:rgba(110,109,115,1);font-size:36px}@media all{:root{--btn-text-direction:ltr;--btn-border-r-color:var(--btn-border-color);--btn-border-l-color:var(--btn-border-color);--btn-border-b-width:var(--btn-border-width);--btn-border-width:2px;--btn-border-radius:0px;--btn-border-t-width:var(--btn-border-width);--btn-border-tl-radius:var(--btn-border-radius);--btn-border-br-radius:var(--btn-border-radius);--btn-border-bl-radius:var(--btn-border-radius);--btn-bg-color:rgb(114, 31, 22);--btn-border-color:rgba(0, 0, 0, 0);--btn-border-tr-radius:var(--btn-border-radius);--btn-border-r-width:var(--btn-border-width);--btn-bg-image:none;--btn-border-b-color:var(--btn-border-color);--btn-border-l-width:var(--btn-border-width);--btn-border-t-color:var(--btn-border-color);--btn-text-align:center;--btn-text-color:rgb(255, 255, 255);--btn-text-decoration:none;--btn-text-font-weight:700;--btn-icon-color:rgb(247, 247, 247);--btn-icon-fill:rgb(247, 247, 247);--btn-icon-wrpr-display:none;--btn-hover-border-b-color:var(--btn-hover-border-color);--btn-hover-bg:rgba(0, 0, 0, 0);--btn-hover-border-t-color:var(--btn-hover-border-color);--btn-hover-border-r-color:var(--btn-hover-border-color);--btn-hover-border-l-color:var(--btn-hover-border-color);--btn-hover-border-color:rgb(255, 255, 255);--btn-hover-text-color:var(--btn-text-color);--btn-hover-text-font-weight:700;--btn-hover-text-decoration:var(--btn-text-decoration);--btn-hover-text-font-style:var(--btn-text-font-style)}}@media (min-width:0px) and (max-width:767px){:root{--btn-text-font-size:16px}}#dm .dmWidget:not([data-buttonstyle]){overflow:initial;background-clip:border-box;border-radius:1px}#dm .dmWidget:not([data-buttonstyle]) .text{padding:16px 0}#dm .dmWidget:not([data-buttonstyle]) .iconBg{display:none}@media (min-width:768px){#dm .dmRespRow .dmRespCol>.dmWidget{width:222px}}#dm div.dmInner #site_content .dmWidget,#dm div.dmInner .dmHeader .dmWidget{background-color:var(--btn-bg-color);background-image:var(--btn-bg-image);border-color:var(--btn-border-color);border-bottom-color:var(--btn-border-b-color);border-left-color:var(--btn-border-l-color);border-right-color:var(--btn-border-r-color);border-top-color:var(--btn-border-t-color);border-radius:var(--btn-border-radius);border-bottom-left-radius:var(--btn-border-bl-radius);border-bottom-right-radius:var(--btn-border-br-radius);border-top-left-radius:var(--btn-border-tl-radius);border-top-right-radius:var(--btn-border-tr-radius);border-width:var(--btn-border-width);border-bottom-width:var(--btn-border-b-width);border-left-width:var(--btn-border-l-width);border-right-width:var(--btn-border-r-width);border-top-width:var(--btn-border-t-width);direction:var(--btn-text-direction);text-align:var(--btn-text-align)}#dm div.dmInner #site_content .dmWidget span.text{color:var(--btn-text-color);font-size:var(--btn-text-font-size);font-weight:var(--btn-text-font-weight);text-decoration:var(--btn-text-decoration)}#dm div.dmInner #site_content .dmWidget span.icon{color:var(--btn-icon-color);fill:var(--btn-icon-fill)}.u_1412206676,.u_1643717380,.u_1710980642{background-position:0 0!important;background-size:auto!important;margin:0!important;color:#282828!important;text-align:center!important;background-image:none!important;background-repeat:repeat!important}#dm div.dmInner #site_content .dmWidget:not([data-buttonstyle]) .iconBg{display:var(--btn-icon-wrpr-display)}#dm .dmInner div.dmHeader,#dm .dmInner div.dmHeader.u_hcontainer,#dm .dmInner div.u_hcontainer{background-color:rgba(255,255,255,1)!important;box-shadow:rgba(0,0,0,.25) 0 3px 11px 0!important;-moz-box-shadow:rgba(0,0,0,.25) 0 3px 11px 0!important;-webkit-box-shadow:rgba(0,0,0,.25) 0 3px 11px 0!important}#dm .p_hfcontainer .main-navigation.unifiednav:not(.unifiednav_vertical) .unifiednav__container:not([data-depth])>.unifiednav__item-wrap:not(:last-child)::after,#dm .p_hfcontainer .main-navigation.unifiednav:not(.unifiednav_vertical) .unifiednav__container:not([data-depth])>.unifiednav__item-wrap:not(:last-child)::before{font-size:14px!important}#dm .p_hfcontainer .u_1034046171.main-navigation.unifiednav .unifiednav__container:not([data-depth])>.unifiednav__item-wrap>.unifiednav__item{padding-right:30px!important;padding-left:30px!important}#dm .p_hfcontainer div.u_1850571922 img{border-radius:0!important;-moz-border-radius:0!important;-webkit-border-radius:0!important}#dm .p_hfcontainer .u_1034046171.main-navigation.unifiednav:not(.unifiednav_vertical) .unifiednav__container:not([data-depth])>.unifiednav__item-wrap:not(:last-child)::after,#dm .p_hfcontainer .u_1034046171.main-navigation.unifiednav:not(.unifiednav_vertical) .unifiednav__container:not([data-depth])>.unifiednav__item-wrap:not(:last-child)::before{font-size:14px!important}.u_1710980642{background-color:rgba(0,0,0,0)!important;padding:0 14.39px 0 0!important}.u_1412206676{background-color:#fff!important;padding:66px 40px!important}.u_1643717380{background-color:rgba(0,0,0,0)!important;padding:0 0 0 14.39px!important}#dm .p_hfcontainer div.u_1577743741{background-color:rgba(115,31,22,1)!important;border-style:solid!important;border-width:0!important;border-color:rgba(201,201,201,1)!important}#dm .d-page-1716942098 DIV.dmInner,#dm .p_hfcontainer div.u_1412206676{background-color:rgba(255,255,255,1)!important}#dm .p_hfcontainer nav.u_1034046171.main-navigation.unifiednav .unifiednav__container:not([data-depth])>.unifiednav__item-wrap>.unifiednav__item{color:rgba(255,255,255,1)!important;font-size:14px!important}#dm .p_hfcontainer nav.u_1034046171.main-navigation.unifiednav.effect-bottom2 .unifiednav__container:not([data-depth])>.unifiednav__item-wrap>.unifiednav__item .nav-item-text::after{border-top-width:1px!important;border-top-style:solid!important;border-top-color:rgba(255,255,255,1)!important}div.u_1472103650 .pay-rent-button{border-style:solid!important;border-width:2px!important;border-color:rgba(114,31,22,1)!important;background-color:rgba(0,0,0,0)!important}div.u_1472103650 .pay-rent-button span.text{color:rgba(114,31,22,1)!important}#dm .dmInner div.u_hcontainer{float:none!important;top:0!important;left:0!important;width:100%!important;position:relative!important;height:auto!important;max-width:100%!important;min-width:0!important;text-align:center!important;padding:12.5px 0!important;margin:0 auto!important}.fHeader #hcontainer.dmHeader[freeheader=true]{padding-top:initial!important;padding-bottom:initial!important}#dm .p_hfcontainer div.u_1105811038{padding-left:0!important}#dm .p_hfcontainer nav.u_1034046171.main-navigation.unifiednav:not(.unifiednav_vertical) .unifiednav__container:not([data-depth])>.unifiednav__item-wrap:not(:last-child)::after,#dm .p_hfcontainer nav.u_1034046171.main-navigation.unifiednav:not(.unifiednav_vertical) .unifiednav__container:not([data-depth])>.unifiednav__item-wrap:not(:last-child)::before{padding-top:0!important;padding-bottom:0!important;margin-top:0!important;margin-bottom:0!important}#dm .p_hfcontainer div.u_1577743741{margin-top:0!important;padding:10px 15px!important}#dm .dmInner div.fHeader .dmHeader[freeheader=true]{margin-top:0!important;margin-bottom:0!important;padding:0!important}#dm .p_hfcontainer nav.u_1034046171{float:none!important;top:0!important;left:0!important;width:1425.68px!important;position:relative!important;height:auto!important;max-width:100%!important;justify-content:center!important;align-items:stretch!important;min-width:0!important;text-align:center!important;padding:10px 15px 6.8px!important;margin:0 auto!important}#dm .p_hfcontainer div.u_1758588750{padding-left:10px!important}#dm .p_hfcontainer div.u_1588422069{padding:0!important}#dm .p_hfcontainer .u_1917682843 .socialHubInnerDiv a{margin-right:31px!important}#dm .p_hfcontainer div.u_1412206676{float:none!important;top:0!important;left:0!important;width:100%!important;position:relative!important;height:auto!important;max-width:none!important;min-width:0!important;text-align:center!important;padding:66px 40px!important;margin:0 auto!important}#dm .p_hfcontainer div.u_1917682843{float:none!important;top:0!important;left:0!important;width:465.61px!important;position:relative!important;height:auto!important;max-width:100%!important;min-width:0!important;text-align:left!important;display:block!important;padding:0!important;margin:0!important}#dm .p_hfcontainer div.u_1310837196,#dm .p_hfcontainer h2.u_1798653708{width:465.61px!important;position:relative!important;padding:2px 0!important;float:none!important;left:0!important;max-width:100%!important;min-width:0!important;height:auto!important;top:0!important;text-align:left!important}#dm .p_hfcontainer h2.u_1798653708{margin:0 auto!important}#dm .p_hfcontainer div.u_1310837196{margin:0!important}#dm .p_hfcontainer div.u_1850571922{float:none!important;top:0!important;left:0!important;width:195.99px!important;position:relative!important;max-width:100%!important;min-width:0!important;text-align:center!important;display:block!important;padding:0!important;margin:10px auto 0!important}#dm .dmBody div.u_1303223582,#dm .dmBody div.u_1556770158,#dm .p_hfcontainer div.u_1167490507{float:none!important;left:0!important;width:100%!important;position:relative!important;text-align:center!important}#dm .p_hfcontainer div.u_1167490507{top:0!important;height:auto!important;max-width:none!important;min-width:0!important;padding:10px 15px!important;margin:0 auto!important}div.u_1472103650{width:calc(100% - 0px)!important;height:auto!important;display:block!important;float:none!important;top:0!important;left:0!important;position:relative!important;max-width:79px!important;min-width:25px!important;text-align:center!important;padding:0!important}#dm .p_hfcontainer div.u_1472103650{float:none!important;top:0!important;left:0!important;width:131px!important;position:relative!important;height:auto!important;max-width:100%!important;min-width:0!important;text-align:center!important;display:block!important;padding:0!important;margin:38px auto 0!important}#dm .dmBody div.u_1084771456 .svg,#dm .dmBody div.u_1717955564 .svg{width:50%!important}.stickyHeaderSpacer{height:222.77px!important}#dm .dmBody div.u_1414742659{background-color:rgba(0,0,0,0)!important;background-image:none!important}#dm .dmBody div.u_1048161822,#dm .dmBody div.u_1500162096,#dm .dmBody div.u_1593917333{background-image:url(https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/half_background_white-308x477-1920w.png),url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9TpUUqHSwo4pChOlkQFemoVShChVArtOpgcukXNGlIUlwcBdeCgx+LVQcXZ10dXAVB8APEzc1J0UVK/F9aaBHjwXE/3t173L0DhEaFaVbPBKDptplOJsRsblUMvEJAGEEMIi4zy5iTpBQ8x9c9fHy9i/Es73N/jn41bzHAJxLPMsO0iTeIZzZtg/M+cYSVZJX4nHjcpAsSP3JdafEb56LLAs+MmJn0PHGEWCx2sdLFrGRqxNPEUVXTKV/ItljlvMVZq9RY+578haG8vrLMdZojSGIRS5AgQkENZVRgI0arToqFNO0nPPzDrl8il0KuMhg5FlCFBtn1g//B726twtRkKymUAHpfHOdjFAjsAs2643wfO07zBPA/A1d6x19tAPFP0usdLXoEhLeBi+uOpuwBlzvA0JMhm7Ir+WkKhQLwfkbflAMGboG+tVZv7X2cPgAZ6ip1AxwcAmNFyl73eHewu7d/z7T7+wFwJnKmZ9+MiwAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+UCDwksLkLIPkkAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAAAC0lEQVQI12NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=)!important;background-color:rgba(0,0,0,0)!important}#dm .dmBody div.u_1784985905 .caption-container .caption-text{color:rgba(51,51,51,1)!important;font-size:16px!important}#dm .dmBody div.u_1925092773 hr{color:rgba(254,157,98,1)!important;height:0!important;min-height:0!important;background:0 0!important;background-size:initial!important;border-width:1px!important;border-color:currentColor!important;border-top-style:solid!important}#dm .dmBody div.u_1084771456 .svg,#dm .dmBody div.u_1575311475 .svg,#dm .dmBody div.u_1717955564 .svg,#dm .dmBody div.u_1763253063 .svg,#dm .dmBody div.u_1906545860 .svg{color:rgba(249,191,151,1)!important;fill:rgba(249,191,151,1)!important}#dm .dmBody div.u_1084771456,#dm .dmBody div.u_1717955564{border-color:rgba(249,191,151,1)!important;border-width:2px!important;background-color:rgba(0,0,0,0)!important;border-style:solid!important}#dm .dmBody .u_1487256152 .caption-inner{-webkit-border-top-right-radius:0!important;-webkit-border-bottom-right-radius:0!important;-webkit-border-bottom-left-radius:0!important;-webkit-border-top-left-radius:0!important;border-radius:0!important;-moz-border-radius:0!important;-webkit-border-radius:0!important}#dm .dmBody div.u_1084771456{border-radius:50%!important;-moz-border-radius:50%!important;-webkit-border-radius:50%!important}#dm .dmBody div.u_1717955564{border-radius:50%!important;-moz-border-radius:50%!important;-webkit-border-radius:50%!important}#dm .dmBody div.u_1394761105 hr,#dm .dmBody div.u_1887201653 hr{height:0!important;border-width:1px!important;border-top-style:solid!important}#dm .dmBody div.u_1394761105 hr{color:rgba(254,157,98,1)!important;min-height:0!important;background:0 0!important;background-size:initial!important;border-color:currentColor!important}#dm .dmBody div.u_1801184050,#dm .dmBody div.u_Testimonials{background-color:rgba(241,243,244,1)!important}#dm .dmBody div.u_1801184050{background-image:none!important}#dm .dmBody div.u_1175801847 .dmwidget-title{font-weight:700!important;color:rgba(255,255,255,1)!important;font-size:35px!important}#dm .dmBody .u_HOME:before{opacity:.5!important;background-color:#000!important}#dm .dmBody div.u_1175801847 input:not([type=submit]){border-bottom-width:1px!important;border-bottom-style:solid!important;border-bottom-color:rgba(115,31,22,1)!important}#dm .dmBody div.u_1784985905 .caption-container .caption-title{font-weight:700!important;color:rgba(115,31,22,1)!important}#dm .dmBody div.u_1784985905 .caption-inner{background-color:rgba(255,255,255,.61)!important}#dm .dmBody div.u_HOME:before{background-color:rgba(122,122,122,1)!important;opacity:.6!important}#dm .dmBody div.u_1026128952,#dm .dmBody div.u_1683288213,#dm .dmBody div.u_1889468954{line-height:200%!important}#dm .dmBody .u_1666965075:before{opacity:.5!important;background-color:#fff!important}#dm .dmBody div.u_1666965075:before{background-color:rgba(0,0,0,0)!important;opacity:.6!important}#dm .dmBody div.u_1418045269{background-image:linear-gradient(450deg,rgba(244,244,244,1) 0,rgba(241,243,244,1) 100%)!important;background-origin:border-box!important}#dm .dmBody div.u_1887201653 hr{color:rgba(0,0,0,1)!important;min-height:0!important;background:0 0!important;background-size:initial!important;border-color:currentColor!important}#dm .dmBody div.u_1666965075{background-image:none!important;background-color:rgba(248,249,252,1)!important;border-style:solid!important;border-width:0!important;border-color:rgba(238,238,238,1)!important}#dm .dmBody div.u_HOME{background-color:rgba(0,0,0,0)!important;background-image:url(https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/04-3171-20S-20108th-20E-20Ave-20Apt-20C-111-1920w.jpg),url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9TpUUqHSwo4pChOlkQFemoVShChVArtOpgcukXNGlIUlwcBdeCgx+LVQcXZ10dXAVB8APEzc1J0UVK/F9aaBHjwXE/3t173L0DhEaFaVbPBKDptplOJsRsblUMvEJAGEEMIi4zy5iTpBQ8x9c9fHy9i/Es73N/jn41bzHAJxLPMsO0iTeIZzZtg/M+cYSVZJX4nHjcpAsSP3JdafEb56LLAs+MmJn0PHGEWCx2sdLFrGRqxNPEUVXTKV/ItljlvMVZq9RY+578haG8vrLMdZojSGIRS5AgQkENZVRgI0arToqFNO0nPPzDrl8il0KuMhg5FlCFBtn1g//B726twtRkKymUAHpfHOdjFAjsAs2643wfO07zBPA/A1d6x19tAPFP0usdLXoEhLeBi+uOpuwBlzvA0JMhm7Ir+WkKhQLwfkbflAMGboG+tVZv7X2cPgAZ6ip1AxwcAmNFyl73eHewu7d/z7T7+wFwJnKmZ9+MiwAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+UCDwksLkLIPkkAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAAAC0lEQVQI12NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=)!important}#dm .dmBody div.u_1414742659{background-repeat:repeat!important;background-size:auto!important;background-position:center center!important;padding:0!important}#dm .dmBody div.u_1303223582,#dm .dmBody div.u_1556770158{top:0!important;max-width:calc(100% - 0px)!important;min-width:25px!important;height:auto!important;display:block!important;padding:0!important;margin:0!important}#dm .dmBody div.u_1048161822,#dm .dmBody div.u_1593917333{background-size:cover!important;padding:40px 20px!important;background-repeat:no-repeat!important;background-position:center center!important}#dm .dmBody div.u_1048161822{margin-left:20px!important;margin-right:0!important}#dm .dmBody div.u_1250169002,#dm .dmBody div.u_1601731570{display:block!important;padding:0!important;float:none!important;top:0!important;width:100%!important;position:relative!important;height:auto!important;left:0!important;max-width:calc(100% - 0px)!important;min-width:25px!important}#dm .dmBody div.u_1601731570{text-align:left!important;margin:0 auto!important}#dm .dmBody div.u_1250169002{text-align:left!important;margin:16px auto 0!important}#dm .dmBody h4.u_1228286436{float:none!important;top:0!important;max-width:calc(100% - 0px)!important;left:0!important;width:100%!important;position:relative!important;min-width:25px!important;text-align:left!important;height:auto!important;padding:2px 0!important;margin:51px 0 8px!important}#dm .dmBody div.u_1500162096{background-position:center center!important;background-repeat:no-repeat!important;background-size:cover!important;margin-right:20px!important;padding:40px 20px!important}#dm .dmBody div.u_1666965075,#dm .dmBody div.u_1801184050{background-repeat:repeat!important;background-size:cover!important}#dm .dmBody div.u_1103702468{float:none!important;top:0!important;max-width:calc(100% - 0px)!important;left:0!important;width:100%!important;position:relative!important;min-width:25px!important;text-align:left!important;height:auto!important;display:block!important;padding:0!important;margin:16px auto 0!important}#dm .dmBody div.u_1084771456,#dm .dmBody div.u_1717955564{width:112px!important;height:112px!important;float:none!important;top:0!important;position:relative!important;display:block!important;max-width:100%!important}#dm .dmBody div.u_1084771456{margin-top:1px!important;margin-bottom:0!important;left:0!important;margin-right:auto!important;margin-left:calc(100% - 112px)!important;min-width:0!important;text-align:center!important;padding:0!important}#dm .dmBody div.u_1076961848{padding-top:15px!important;padding-bottom:110px!important}#dm .dmBody .u_1784985905 .caption-inner{padding-left:39px!important;padding-right:39px!important}#dm .dmBody div.u_1717955564{left:0!important;min-width:0!important;text-align:center!important;margin:1px auto 0!important;padding:0!important}#dm .dmBody div.u_1394761105,#dm .dmBody div.u_1801184050,#dm .dmBody h4.u_1932257932{min-width:0!important;text-align:center!important;height:auto!important}#dm .dmBody div.u_1801184050{float:none!important;top:0!important;max-width:none!important;left:0!important;width:100%!important;position:relative!important;background-attachment:fixed!important;padding:0 20px 100px!important}#dm .dmBody div.u_1394761105{float:none!important;top:0!important;left:0!important;width:84px!important;position:relative!important;max-width:100%!important;display:block!important;donedragging:true!important;padding:0!important;margin:0 auto!important}#dm .dmBody h2.u_1781569790,#dm .dmBody h4.u_1932257932{float:none!important;top:0!important;left:0!important;position:relative!important;padding:2px 0!important;width:100%!important;display:block!important}#dm .dmBody h4.u_1932257932{max-width:100%!important;margin:18px auto!important}#dm .dmBody h2.u_1781569790{max-width:calc(100% - 0px)!important;min-width:25px!important;text-align:center!important;height:auto!important}#dm .dmBody div.u_1925092773,#dm .dmBody div.u_Testimonials{float:none!important;top:0!important;left:0!important;position:relative!important;min-width:0!important;text-align:center!important;margin:0 auto!important;height:auto!important}#dm .dmBody div.u_1925092773{width:84px!important;max-width:100%!important;display:block!important;padding:0!important}#dm .dmBody div.u_Testimonials{width:100%!important;max-width:none!important;padding:50px 40px 0!important}#dm .dmBody h4.u_1590445939,#dm .dmBody h4.u_1813040098{max-width:100%!important;width:calc(100% - 0px)!important;text-align:left!important;padding:2px 0!important;float:none!important;top:0!important;left:0!important;position:relative!important}#dm .dmBody h4.u_1813040098{min-width:25px!important;height:auto!important;margin:9px auto 8px!important}#dm .dmBody h4.u_1590445939{min-width:25px!important;height:auto!important;margin:30px auto 8px!important}#dm .dmBody div.u_1575311475,#dm .dmBody div.u_1763253063,#dm .dmBody div.u_1906545860{width:calc(100% - 106px)!important;height:54px!important;max-width:54px!important;min-width:25px!important;padding:0!important;text-align:center!important}#dm .dmBody div.u_1906545860{float:none!important;top:0!important;left:0!important;position:relative!important;margin:100px 106.34px 10px 106.33px!important}#dm .dmBody div.u_1575311475,#dm .dmBody div.u_1763253063{float:none!important;top:0!important;left:0!important;position:relative!important;margin:100px auto 10px!important}#dm .dmBody div.u_1887201653,#dm .dmBody div.u_HOME,#dm .dmBody h2.u_1202687916{float:none!important;top:0!important;left:0!important;position:relative!important;height:auto!important}#dm .dmBody div.u_HOME{max-width:none!important;width:100%!important;min-width:0!important;text-align:center!important;background-repeat:no-repeat!important;background-size:cover!important;background-attachment:fixed!important;padding:254px 40px!important;margin:0 auto!important}#dm .dmBody div.u_1887201653{width:84px!important;max-width:calc(100% - 0px)!important;min-width:25px!important;text-align:center!important;display:block!important;padding:0!important;margin:16px 0 0!important}#dm .dmBody h2.u_1202687916{max-width:100%!important;width:584px!important;min-width:0!important;text-align:left!important;display:block!important;padding:2px 0!important;margin:0 auto 8px 0!important}#dm .dmBody div.u_1026128952,#dm .dmBody div.u_1683288213,#dm .dmBody div.u_1889468954{max-width:100%!important;width:290.89px!important;text-align:left!important;display:block!important}#dm .dmBody div.u_1418045269{padding:100px 0 100px 40px!important}#dm .dmBody div.u_1026128952,#dm .dmBody div.u_1666965075,#dm .dmBody div.u_1683288213,#dm .dmBody div.u_1889468954{float:none!important;top:0!important;left:0!important;position:relative!important;height:auto!important;min-width:0!important;padding:0!important}#dm .dmBody div.u_1889468954{margin:8px auto 0 0!important}#dm .dmBody div.u_1666965075{background-position:center center!important;background-attachment:fixed!important;width:100%!important;max-width:none!important;text-align:start!important}.font-size-20{font-size:20px!important} #dm .dmPhotoGallery.newPhotoGallery .dmPhotoGalleryHolder:not(.photo-gallery-done) {display: none;} @media (max-width:767px){ [data-hidden-on-mobile] {display:none!important}}
+    .dmDesktopBody [data-anim-desktop]:not([data-anim-desktop='none']) {
+      visibility: hidden;
+    }
+
+    
+</style>
+
+
+
+<style id="fontFallbacks">
+    @font-face {
+  font-family: "Roboto Fallback";
+  src: local('Arial');
+  ascent-override: 92.6709%;
+  descent-override: 24.3871%;
+  size-adjust: 100.1106%;
+  line-gap-override: 0%;
+ }@font-face {
+  font-family: "Montserrat Fallback";
+  src: local('Arial');
+  ascent-override: 84.9466%;
+  descent-override: 22.0264%;
+  size-adjust: 113.954%;
+  line-gap-override: 0%;
+ }@font-face {
+  font-family: "Quicksand Fallback";
+  src: local('Arial');
+  ascent-override: 94.9261%;
+  descent-override: 23.7315%;
+  size-adjust: 105.3451%;
+  line-gap-override: 0%;
+ }@font-face {
+  font-family: "Helvetica Fallback";
+  src: local('Arial');
+  ascent-override: 77.002%;
+  descent-override: 22.998%;
+  line-gap-override: 0%;
+ }
+</style>
+
+
+<!-- End render the required css and JS in the head section -->
+
+
+
+
+
+
+
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.beaumontcove.net/">
+
+  <title>
+    Welcome to Beaumont Cove Apartments | Tulsa, Oklahoma
+  </title>
+  <meta name="description" content="Here at Beaumont Cove, we have everything you need in a home. With spacious closets, abundant storage,  on-site laundry facilities and courtesy patrol, our apartment homes are suited for all."/>
+
+  <!-- Messenger Chat Plugin Code -->  <div id="fb-root">
+  </div>
+  <!-- Your Chat Plugin code -->  <div id="fb-customer-chat" class="fb-customerchat">
+  </div>
+  <script>
+
+
+
+
+
+
+	var chatbox = document.getElementById('fb-customer-chat');
+	chatbox.setAttribute('page_id', '108107313895622');
+	chatbox.setAttribute('attribution', 'biz_inbox');
+
+
+  
+
+  
+
+  </script>
+  <!-- Your SDK code -->  <script>
+
+
+
+
+
+
+	window.fbAsyncInit = function () {
+		FB.init({
+			xfbml: true,
+			version: 'v14.0'
+		});
+	};
+
+	(function (d, s, id) {
+		var js,
+			fjs = d.getElementsByTagName(s)[0];
+		if (d.getElementById(id)) return;
+		js = d.createElement(s);
+		js.id = id;
+		js.src = 'https://connect.facebook.net/en_US/sdk/xfbml.customerchat.js';
+		fjs.parentNode.insertBefore(js, fjs);
+	})(document, 'script', 'facebook-jssdk');
+
+
+  
+
+  
+
+  </script>
+
+  <meta name="twitter:card" content="summary"/>
+  <meta name="twitter:title" content="Welcome to Beaumont Cove Apartments | Tulsa, Oklahoma"/>
+  <meta name="twitter:description" content="Here at Beaumont Cove, we have everything you need in a home. With spacious closets, abundant storage,  on-site laundry facilities and courtesy patrol, our apartment homes are suited for all."/>
+  <meta property="og:description" content="Here at Beaumont Cove, we have everything you need in a home. With spacious closets, abundant storage,  on-site laundry facilities and courtesy patrol, our apartment homes are suited for all."/>
+  <meta property="og:title" content="Welcome to Beaumont Cove Apartments | Tulsa, Oklahoma"/>
+
+
+
+
+<!-- SYS- VVNfRElSRUNUX1BST0RVQ1RJT04= -->
+</head>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<body id="dmRoot" data-page-alias="home"  class="dmRoot dmDesktopBody fix-mobile-scrolling addCanvasBorder dmResellerSite dmLargeBody "
+      style="padding:0;margin:0;"
+      
+    >
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- ========= Site Content ========= -->
+<div id="dm" class='dmwr'>
+    
+    <div class="dm_wrapper standard-var5 widgetStyle-3 standard">
+         <div dmwrapped="true" id="1901957768" class="dm-home-page" themewaschanged="true"> <div dmtemplateid="StandardLayoutMultiD" class="standardHeaderLayout dm-bfs dm-layout-home hasAnimations inMiniHeaderMode hasStickyHeader hamburger-reverse dmPageBody d-page-1716942098 inputs-css-clean dmFreeHeader" id="dm-outer-wrapper" data-page-class="1716942098" data-soch="true" data-background-parallax-selector=".dmHomeSection1, .dmSectionParallex"> <div id="dmStyle_outerContainer" class="dmOuter"> <div id="dmStyle_innerContainer" class="dmInner"> <div class="dmLayoutWrapper standard-var dmStandardDesktop"> <div> <div id="iscrollBody"> <div id="site_content"> <div class="dmHeaderContainer fHeader d-header-wrapper"> <div id="hcontainer" class="u_hcontainer dmHeader p_hfcontainer" freeheader="true" headerlayout="725" layout="3e258119881349f1b0afec8887fc1e4b===header" data-scrollable-target="body" data-scrollable-target-threshold="1" data-scroll-responder-id="1" logo-size-target="100%"> <div dm:templateorder="85" class="dmHeaderResp dmHeaderStack noSwitch" id="1709005236"> <div class="u_1167490507 dmRespRow dmDefaultListContentRow fullBleedChanged fullBleedMode" style="text-align:center" id="1167490507"> <div class="dmRespColsWrapper" id="1193627641"> <div class="u_1105811038 dmRespCol small-12 large-4 medium-4 empty-column" id="1105811038"></div> 
+ <div class="u_1758588750 dmRespCol small-12 large-4 medium-4" id="1758588750"> <div class="u_1850571922 imageWidget align-center" data-widget-type="image" id="1850571922" data-element-type="image" data-binding="W3siYmluZGluZ05hbWUiOiJpbWFnZSIsInZhbHVlIjoic2l0ZV9pbWFnZXMubG9nbyJ9XQ=="> <a href="/" id="1257448748"><img src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/BeaumontLogo-1920w.PNG" id="1768680613" class="" data-dm-image-path="https://irp-cdn.multiscreensite.com/cbad8b42/dms3rep/multi/BeaumontLogo.PNG" alt="Beaumont Cove Apartments Logo" data-diy-image="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+</div> 
+ <div class="u_1588422069 small-12 dmRespCol large-4 medium-4" id="1588422069"> <div class="u_1472103650 widget-cb7086 dmCustomWidget" data-lazy-load="" data-title="" id="1472103650" dmle_extension="custom_extension" data-element-type="custom_extension" data-binding="W3siYmluZGluZ05hbWUiOiJkYXRhYmFzZSIsInZhbHVlIjoic2l0ZV90ZXh0LmFwcGZvbGlvIGRhdGFiYXNlIn1d" icon="false" surround="false" data-widget-id="cb708684876c4db58028e8c547609bf2" data-widget-version="83" data-widget-config="eyJyZW50QnV0dG9uVGV4dCI6IlBheSBSZW50IiwidFBvcnRhbCI6dHJ1ZSwib1BvcnRhbFRleHQiOiJPd25lciBQb3J0YWwiLCJ0UG9ydGFsR3JvdXAiOm51bGwsIm9Qb3J0YWxUaXRsZSI6dHJ1ZSwiaGlkZUJ1dHRvbkljb24iOm51bGwsImxheW91dCI6InBheS1yZW50LWJ1dHRvbiIsInRQb3J0YWxUaXRsZSI6dHJ1ZSwib1BvcnRhbCI6dHJ1ZSwiZGF0YWJhc2UiOiI8cCBjbGFzcz1cInJ0ZUJsb2NrXCI+YXRsYXNwbTwvcD4iLCJwb3J0Zm9saW9JRCI6bnVsbCwidFBvcnRhbFRleHQiOiJPbmxpbmUgUG9ydGFsIiwib1BvcnRhbEdyb3VwIjpudWxsfQ=="> <a class="pay-rent-button dmWidget fullSizeButton" aria-label="Pay Rent using the Online Portal (opens in a new tab)" rel="noopener" target="_blank" href=""> <span class="text"> <svg aria-hidden="true" focusable="false" data-prefix="far" data-icon="credit-card" class="svg-inline--fa fa-credit-card fa-w-18" role="img" xmlns="http://www.w3.org/2000/svg" viewbox="0 0 576 512"> <path fill="currentColor" d="M527.9 32H48.1C21.5 32 0 53.5 0 80v352c0 26.5 21.5 48 48.1 48h479.8c26.6 0 48.1-21.5 48.1-48V80c0-26.5-21.5-48-48.1-48zM54.1 80h467.8c3.3 0 6 2.7 6 6v42H48.1V86c0-3.3 2.7-6 6-6zm467.8 352H54.1c-3.3 0-6-2.7-6-6V256h479.8v170c0 3.3-2.7 6-6 6zM192 332v40c0 6.6-5.4 12-12 12h-72c-6.6 0-12-5.4-12-12v-40c0-6.6 5.4-12 12-12h72c6.6 0 12 5.4 12 12zm192 0v40c0 6.6-5.4 12-12 12H236c-6.6 0-12-5.4-12-12v-40c0-6.6 5.4-12 12-12h136c6.6 0 12 5.4 12 12z"></path> 
+</svg> 
+Pay Rent</span> 
+</a> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="dmRespRow u_1577743741 fullBleedChanged fullBleedMode" style="text-align: center;" id="1577743741"> <div class="dmRespColsWrapper" id="1249791723"> <div class="u_1049588871 dmRespCol small-12 medium-12 large-12" id="1049588871"> <nav class="u_1034046171 effect-bottom2 main-navigation unifiednav dmLinksMenu" role="navigation" layout-main="horizontal_nav_layout_1" layout-sub="submenu_horizontal_2" data-show-vertical-sub-items="HOVER" id="1034046171" dmle_extension="onelinksmenu" data-element-type="onelinksmenu" wr="true" icon="true" surround="true" adwords="" navigation-id="unifiedNav"> <ul role="menubar" class="unifiednav__container unav-top  " data-auto="navigation-pages"> <li role="menuitem" class=" unifiednav__item-wrap " data-auto="more-pages" data-depth="0"> <a href="/#OVERVIEW" class="unifiednav__item unav-item unav-top-item  dmUDNavigationItem_010101694996  " target="" data-target-page-alias=""> <span class="nav-item-text " data-link-text="
+         OVERVIEW
+        " data-auto="page-text-style">OVERVIEW<span class="icon icon-angle-down"></span> 
+</span> 
+</a> 
+</li> 
+ <li role="menuitem" class=" unifiednav__item-wrap " data-auto="more-pages" data-depth="0"> <a href="/#PROPERTYDETAILS" class="unifiednav__item unav-item unav-top-item  dmUDNavigationItem_010101785123  " target="" data-target-page-alias=""> <span class="nav-item-text " data-link-text="
+         PROPERTY DETAILS
+        " data-auto="page-text-style">PROPERTY DETAILS<span class="icon icon-angle-down"></span> 
+</span> 
+</a> 
+</li> 
+ <li role="menuitem" class=" unifiednav__item-wrap " data-auto="more-pages" data-depth="0"> <a href="/#PHOTOS" class="unifiednav__item unav-item unav-top-item  dmUDNavigationItem_010101136121  " target="" data-target-page-alias=""> <span class="nav-item-text " data-link-text="
+         PHOTOS
+        " data-auto="page-text-style">PHOTOS<span class="icon icon-angle-down"></span> 
+</span> 
+</a> 
+</li> 
+ <li role="menuitem" class=" unifiednav__item-wrap " data-auto="more-pages" data-depth="0"> <a href="/#FLOORPLANS" class="unifiednav__item unav-item unav-top-item  dmUDNavigationItem_010101499965  " target="" data-target-page-alias=""> <span class="nav-item-text " data-link-text="
+         FLOOR PLANS
+        " data-auto="page-text-style">FLOOR PLANS<span class="icon icon-angle-down"></span> 
+</span> 
+</a> 
+</li> 
+ <li role="menuitem" class=" unifiednav__item-wrap " data-auto="more-pages" data-depth="0"> <a href="/availability" class="unifiednav__item unav-item unav-top-item  dmUDNavigationItem_010101968693  " target="" data-target-page-alias=""> <span class="nav-item-text " data-link-text="
+         AVAILABILITY
+        " data-auto="page-text-style">AVAILABILITY<span class="icon icon-angle-down"></span> 
+</span> 
+</a> 
+</li> 
+ <li role="menuitem" class=" unifiednav__item-wrap " data-auto="more-pages" data-depth="0"> <a href="/#Residents" class="unifiednav__item unav-item unav-top-item  dmUDNavigationItem_01010167064  " target="" data-target-page-alias=""> <span class="nav-item-text " data-link-text="
+         RESIDENTS
+        " data-auto="page-text-style">RESIDENTS<span class="icon icon-angle-down"></span> 
+</span> 
+</a> 
+</li> 
+ <li role="menuitem" class=" unifiednav__item-wrap " data-auto="more-pages" data-depth="0"> <a href="/#CONTACTUS" class="unifiednav__item unav-item unav-top-item  dmUDNavigationItem_010101191877  " target="" data-target-page-alias=""> <span class="nav-item-text " data-link-text="
+         CONTACT
+        " data-auto="page-text-style">CONTACT<span class="icon icon-angle-down"></span> 
+</span> 
+</a> 
+</li> 
+</ul> 
+</nav> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="stickyHeaderSpacer" id="stickyHeaderSpacer" data-new="true"></div> 
+ <div class="dmRespRow dmRespRowStable dmRespRowNoPadding dmPageTitleRow "> <div class="dmRespColsWrapper"> <div class="large-12 dmRespCol"> <div id="innerBar" class="innerBar lineInnerBar dmDisplay_None"> <div class="titleLine display_None"><hr/></div> 
+<!-- Page title is hidden in css for new responsive sites. It is left here only so we don't break old sites. Don't copy it to new layouts --> <div id="pageTitleText"></div> 
+ <div class="titleLine display_None"><hr/></div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div dmwrapped="true" id="dmFirstContainer" class="dmBody u_dmStyle_template_home dm-home-page" themewaschanged="true"> <div id="allWrapper" class="allWrapper"><!-- navigation placeholders --> <div id="dm_content" class="dmContent" role="main"> <div dm:templateorder="170" class="dmHomeRespTmpl mainBorder dmRespRowsWrapper dmFullRowRespTmpl" id="1716942098"> <div class="u_HOME dmRespRow fullBleedChanged hasBackgroundOverlay dmSectionNoParallax" style="text-align: center;" id="HOME" data-anchor="HOME" data-gallery-bg="eyJzbGlkZXMiOlsiaHR0cHM6Ly9saXJwLmNkbi13ZWJzaXRlLmNvbS9jYmFkOGI0Mi9kbXMzcmVwL211bHRpL29wdC8wNC0zMTcxLTIwUy0yMDEwOHRoLTIwRS0yMEF2ZS0yMEFwdC0yMEMtMTExLTE5MjB3LmpwZyIsImh0dHBzOi8vbGlycC5jZG4td2Vic2l0ZS5jb20vY2JhZDhiNDIvZG1zM3JlcC9tdWx0aS9vcHQvMDItMzE3MS0yMFMtMjAxMDh0aC0yMEUtMjBBdmUtMjBBcHQtMjBDLTEwMS0xOTIwdy5qcGciLCJodHRwczovL2xpcnAuY2RuLXdlYnNpdGUuY29tL2NiYWQ4YjQyL2RtczNyZXAvbXVsdGkvb3B0LzEwLTExMV8zMTQ3K1MrMTA4dGgrRStBdmUtMTkyMHcuanBnIiwiaHR0cHM6Ly9saXJwLmNkbi13ZWJzaXRlLmNvbS9jYmFkOGI0Mi9kbXMzcmVwL211bHRpL29wdC8wMS0xKy0rMzE2NStTKzEwOHRoK0UrQXZlLTEwMC0xOTIwdy5qcGciLCJodHRwczovL2xpcnAuY2RuLXdlYnNpdGUuY29tL2NiYWQ4YjQyL2RtczNyZXAvbXVsdGkvb3B0LzA5LTMxNzEtMjBTLTIwMTA4dGgtMjBFLTIwQXZlLTIwQXB0LTIwQy0xMzYtMTkyMHcuanBnIiwiaHR0cHM6Ly9saXJwLmNkbi13ZWJzaXRlLmNvbS9jYmFkOGI0Mi9kbXMzcmVwL211bHRpL29wdC8xNS0xKy0rMzE2NStTKzEwOHRoK0UrQXZlLTE3MC0xOTIwdy5qcGciXX0="> <div class="dmRespColsWrapper u_1568127116" id="1568127116"> <div class="dmRespCol small-12 u_1414742659 medium-12 large-12" id="1414742659"> <div class="dmTwitterFeedWrapper" data-element-type="dTwitterId" id="1037810606"> <div class="dmTwitterFeed dmWwr dmTwitterNoScroll" twitterusername="twitter" numberoftweets="3" twittertype="Profile" hideheaderfooter="" lang="en" id="1627563854"></div> 
+</div> 
+ <div class="widget-128151 dmCustomWidget" data-lazy-load="" data-title="" id="1053154748" dmle_extension="custom_extension" data-element-type="custom_extension" icon="false" surround="false" data-widget-id="128151275e4145de9c457a6ae729489e" data-widget-version="115" data-widget-config="eyJoZWlnaHRfbW9iaWxlIjoiNTAwIiwiaXNTaG93Q292ZXJQaG90byI6dHJ1ZSwid2lkdGgiOiIzNDAiLCJtZXNzYWdlcyI6bnVsbCwidGltZWxpbmUiOnRydWUsImlzTGFyZ2VIZWFkZXIiOnRydWUsImlzRnJpZW5kc1Bob3RvcyI6dHJ1ZSwiZXZlbnRzIjpudWxsLCJ1cmwiOiJodHRwczovL3d3dy5mYWNlYm9vay5jb20vZmFjZWJvb2siLCJoZWlnaHQiOiI1MDAiLCJkaW1lbnNpb25zIjpudWxsfQ=="> <div class="fallback" style="width:340px;"><!--<span class="fallback-text">Click to add Facebook feed</span>--><!--<svg xmlns="http://www.w3.org/2000/svg" width="62" height="46" viewBox="0 0 62 46">--><!--        <g fill="#FFF" fill-rule="evenodd">--><!--        <path d="M24.65.057H18.8c-6.75 0-11.025 4.343-11.025 11.2v5.257H1.7c-.45 0-.9.457-.9.915v7.542c0 .458.45.915.9.915h6.075v18.971c0 .457.45.914.9.914h7.875c.45 0 .9-.457.9-.914V25.886h6.975c.45 0 .9-.457.9-.915V17.43c0-.229 0-.458-.225-.686-.225-.229-.45-.229-.675-.229H17.45v-4.343c0-2.057.45-3.2 3.15-3.2h4.05c.45 0 .9-.457.9-.914V.971c0-.457-.45-.914-.9-.914z"/>--><!--        <path fill-rule="nonzero" d="M61.325 34.343h-29.7V.057h29.7v34.286zm-27-2.514H58.85V2.57H34.325V31.83z"/>--><!--        <path d="M37.7 7.143h17.775v2.743H37.7zM37.7 11.943h17.775v2.743H37.7zM37.7 17.2h17.775v10.057H37.7z"/>--><!--    </g>--><!--</svg>--></div> 
+ <div class="fb-page" data-facebook-widget="true" data-href="https://www.facebook.com/facebook" data-tabs="timeline,," data-small-header="false" data-hide-cover="false" data-show-facepile="true" data-height="500" data-adapt-container-width="true"> <blockquote cite="https://www.facebook.com/facebook" class="fb-xfbml-parse-ignore"> <a href="https://www.facebook.com/facebook"></a> 
+</blockquote> 
+</div> 
+</div> 
+ <span id="1346630203"></span> 
+ <h1 class="u_1060925900 dmNewParagraph" id="1060925900" data-element-type="paragraph" spellcheck="false" aria-label="To enrich screen reader interactions, please activate Accessibility in Grammarly extension settings"><div style="text-align: center;"><span style="color: rgb(255, 255, 255); background-color: rgba(0, 0, 0, 0); font-weight: 700;">WELCOME HOME</span></div></h1> <h4 class="u_1932257932 dmNewParagraph" id="1932257932" data-element-type="paragraph" data-styletopreserve="{" background-image":""}"="" spellcheck="false"><div style="text-align: center;"><font color="#ffffff"><span style="font-family:Quicksand, 'Quicksand Fallback';"><span style="font-weight: 400;"></span><span style="font-weight: 400;"><span style="font-weight: inherit;"></span></span></span></font></div><span style="color:rgb(255, 255, 255);font-weight:400;font-family:Montserrat, 'Montserrat Fallback';" class="font-size-20 lh-1"><div style="text-align: center;"><span class="lh-1">&nbsp;</span>WELCOME HOME TO BEAUMONT COVE APARTMENT COMMUNITY</div><div style="text-align: center;">ASK ABOUT OUR MOVE IN SPECIAL!&nbsp;</div></span><div style="text-align: center;"><font color="#ffffff" face="Quicksand"></font></div></h4> <a data-display-type="block" class="u_1991997084 align-center dmButtonLink dmWidget dmWwr default dmOnlyButton dmDefaultGradient" file="false" href="/availability" data-element-type="dButtonLinkId" id="1991997084"> <span class="iconBg" id="1385910584"> <span class="icon hasFontIcon icon-star" id="1572477385"></span> 
+</span> 
+ <span class="text" id="1965930302">AVAILABILITY</span> 
+</a> 
+</div> 
+</div> 
+</div> 
+ <div class="dmRespRow u_OVERVIEW" style="text-align: center;" id="OVERVIEW" data-anchor="OVERVIEW"> <div class="dmRespColsWrapper" id="1465921196"> <div class="dmRespCol small-12 medium-12 large-12" id="1643813231"> <h2 class="u_1700347418 dmNewParagraph" id="1700347418" style="display: block;" data-element-type="paragraph"><div style=";text-align: center;"><span style=";color: rgb(255, 255, 255);"></span></div><div style=";text-align: left;"><span style=";color: rgb(255, 255, 255);"></span></div><span><div style="text-align: center;"><font style="color: rgb(115, 31, 22);">OVERVIEW</font></div></span><div style=";text-align: left;"><span style=";color: rgb(255, 255, 255);"></span></div></h2> <div class="u_1602925796 dmDividerWrapper clearfix" id="1602925796" layout="divider-style-1" data-element-type="dDividerId" data-widget-version="2"><hr class="dmDivider" style="min-height: 2px; border:none; background:grey" id="1960779908"/></div> 
+ <h3 class="dmNewParagraph u_1647205292" data-element-type="paragraph" id="1647205292" style="text-align: center; transition: opacity 1s ease-in-out 0s;"><font color="#5c5c5c">ONE AND TWO BEDROOM APARTMENT HOMES</font></h3> <div class="u_1631186053 dmNewParagraph" id="1631186053" style="line-height: initial; text-align: center;" data-version="5"><p class="size-18 m-size-14"><span style="display: initial;" class="font-size-18 m-font-size-14">With immediate access to Hwy 169 and the Broken Arrow Expressway, Beaumont Cove places you just minutes from everything you need for effortless living.</span></p><p><br/></p><p class="size-18 m-size-14"><span style="display: initial;" class="font-size-18 m-font-size-14">At Beaumont Cove, our residents enjoy a comfortable, worry-free lifestyle with 24/7 emergency maintenance, an on-site laundry facility, Courtesy Patrol, engaging monthly resident events, and attentive, bilingual management dedicated to exceptional service. Our reliable on-site maintenance team ensures your home is always well taken care of.</span></p><p class="text-align-center m-text-align-left"><br/></p><p class="text-align-center m-text-align-left size-18 m-size-14"><span style="display: initial;" class="font-size-18 m-font-size-14">Visit or call us today to explore our availability &mdash; we look forward to welcoming you!</span></p></div></div> 
+</div> 
+</div> 
+ <div class="u_1008648753 dmRespRow" style="text-align: center;" id="1008648753" data-page-element-type="section" data-page-element-id="1689965832" data-anim-extended="eyJkZXNrdG9wIjp7InRyaWdnZXIiOiJub25lIiwiYW5pbWF0aW9uIjpudWxsfX0="> <div class="dmRespColsWrapper" id="1087897767"> <div class="dmRespCol small-12 medium-12 large-12 u_1059153317" id="1059153317"> <div class="u_1802236398 dmNewParagraph" id="1802236398" style="display: block; transition: none 0s ease 0s; text-align: center;" data-element-type="paragraph" data-version="5"> <h2 class="m-size-36 size-26" style="line-height: initial;"><span class="m-font-size-36 font-size-26" m-font-size-set="true" style="color:rgb(70, 75, 84);display:initial;font-family:Helvetica, 'Helvetica Fallback';">TESTIMONIALS</span><span class="m-font-size-36 font-size-18" m-font-size-set="true" style="color:rgb(70, 75, 84);display:initial;font-family:Helvetica, 'Helvetica Fallback';"><span class="ql-cursor">﻿</span></span></h2> 
+</div> <div class="u_1516832190 dmRespRow" id="1516832190"> <div class="dmRespColsWrapper" id="1864309587"> <div class="dmRespCol small-12 large-4 medium-4 u_1581926089" id="1581926089"> <div class="u_1601804540 dmDividerWrapper clearfix" id="1601804540" layout="divider-style-1" data-element-type="dDividerId" data-widget-version="2"><hr class="dmDivider" style="min-height: 2px; border:none; background:grey" id="1109992240"/></div> 
+ <div class="u_1263603510 graphicWidget" data-widget-type="graphic" id="1263603510" data-element-type="graphic"> <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="142" viewbox="0 0 200 142" id="1055456171" class="svg u_1055456171" data-icon-custom="true" data-icon-name="Untitled-1.svg" alt="Quote Icon"> <metadata id="1059305736"><!--?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?--> <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 5.6-c138 79.159824, 2016/09/14-01:09:01        " id="1626323832"> <rdf:rdf xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" id="1813174742"> <rdf:description rdf:about="" id="1292239542"></rdf:description> 
+</rdf:rdf> 
+</x:xmpmeta> 
+<!--?xpacket end="w"?--></metadata> 
+ <image id="Vector_Smart_Object" data-name="Vector Smart Object" x="29" y="16" width="143" height="113" xlink:href="data:img/png;base64,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"></image> 
+</svg> 
+</div> 
+ <div class="u_1228855039 dmNewParagraph" id="1228855039" style="transition: opacity 1s ease-in-out;" data-version="5"><p style="line-height: 1.5;"><strong style="font-weight: bold; display: initial; color: rgb(0, 0, 0);">MASSIEL C.</strong></p></div> <div class="u_1029130425 dmNewParagraph" id="1029130425" style="transition: opacity 1s ease-in-out 0s; display: block;" data-element-type="paragraph" data-version="5"><p class="m-size-16" style="line-height: 1.5;"><span class="m-font-size-16" m-font-size-set="true" style="display: initial; font-weight: normal; font-style: italic;">4 years of being residents, and renewing a new contract, a good place to live if you want to have everything close by.</span><strong m-font-size-set="true" class="m-font-size-16" style="display: initial; text-decoration: underline; font-style: italic; font-weight: bold;"><span class="ql-cursor">﻿</span></strong></p></div></div> 
+ <div class="dmRespCol small-12 large-4 medium-4 u_1620352275" id="1620352275"> <div class="u_1336574667 dmDividerWrapper clearfix" id="1336574667" layout="divider-style-1" data-element-type="dDividerId" data-widget-version="2"><hr class="dmDivider" style="min-height: 2px; border:none; background:grey" id="1535200778"/></div> 
+ <div class="u_1699910359 graphicWidget" data-widget-type="graphic" id="1699910359" data-element-type="graphic"> <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="142" viewbox="0 0 200 142" id="1828824833" class="svg u_1828824833" data-icon-custom="true" data-icon-name="Untitled-1.svg" alt="Quote Icon"> <metadata id="1494013532"><!--?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?--> <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 5.6-c138 79.159824, 2016/09/14-01:09:01        " id="1619389694"> <rdf:rdf xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" id="1364037273"> <rdf:description rdf:about="" id="1524199113"></rdf:description> 
+</rdf:rdf> 
+</x:xmpmeta> 
+<!--?xpacket end="w"?--></metadata> 
+ <image id="1106972266" data-name="Vector Smart Object" x="29" y="16" width="143" height="113" xlink:href="data:img/png;base64,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"></image> 
+</svg> 
+</div> 
+ <div class="u_1170321638 dmNewParagraph" id="1170321638" style="transition: opacity 1s ease-in-out;" data-version="5"><p class="m-size-16 size-16" style="line-height: 1.5;"><strong class="m-font-size-16 font-size-16" m-font-size-set="true" style="color:rgb(70, 75, 84);font-weight:bold;display:initial;font-family:Helvetica, 'Helvetica Fallback';">MARIA E.</strong></p></div> <div class="u_1166275155 dmNewParagraph" id="1166275155" style="transition: opacity 1s ease-in-out 0s; display: block;" data-element-type="paragraph" data-version="5"><p class="m-size-16" style="line-height: 1.5;"><span class="m-font-size-16" m-font-size-set="true" style="font-style: italic; display: initial; font-weight: normal;">The staff at reception were both very friendly and they kept the green areas clean and well-maintained.</span></p></div></div> 
+ <div class="dmRespCol large-4 medium-4 small-12 u_1482911262" id="1482911262"> <div class="u_1566349350 dmDividerWrapper clearfix" id="1566349350" layout="divider-style-1" data-element-type="dDividerId" data-widget-version="2"><hr class="dmDivider" style="min-height: 2px; border:none; background:grey" id="1731951883"/></div> 
+ <div class="u_1754687064 graphicWidget" data-widget-type="graphic" id="1754687064" data-element-type="graphic"> <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="142" viewbox="0 0 200 142" id="1679367928" class="svg u_1679367928" data-icon-custom="true" data-icon-name="Untitled-1.svg" alt="Quote Icon"> <metadata id="1042549403"><!--?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?--> <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 5.6-c138 79.159824, 2016/09/14-01:09:01        " id="1604037888"> <rdf:rdf xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" id="1630444473"> <rdf:description rdf:about="" id="1100448417"></rdf:description> 
+</rdf:rdf> 
+</x:xmpmeta> 
+<!--?xpacket end="w"?--></metadata> 
+ <image id="1052339727" data-name="Vector Smart Object" x="29" y="16" width="143" height="113" xlink:href="data:img/png;base64,iVBORw0KGgoAAAANSUhEUgAAAI8AAABxCAQAAABG8jhxAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAACxIAAAsSAdLdfvwAAAAHdElNRQfhBA0MHAdnLy0AAAAIOElEQVR42t2daWwWRRjHf+9aCoXailBuBKqgIMiNB4h4oijEC+MdPIiiGIz4QQ3ExgSDMQZPgkqwSfEA/KCAB8YzRE5RFOUoctoiV+GlF7S0XT+8rbRlj5nZnRnjf740u33f/eU/s/vuPvPMswnklcsghtCXzuSQU7/tMH9TTCHrWc9+he+MRzmMYSD96UE3smkBwDEOUMRWNrGGTdTqO3grbmIef+GGtO3MYQxnGLQlwSXM4fdQsqMs4k4y4gfowxyOhB6+cSsmj24GrGnPTHZKkZXxNgPiAxjAUqnDn2o15NNLozXdmcdxRbblDIkO0JUC6hQBUq2aubTVYE02Lypb09AK6BwFYRLJiACptp/bYjbnBopjIStlshpAO5bHAtDQPuTMmKzJ4J1YyZbKj+5B7IkVwcWlkAtiMKcHG2In20V/GYRrKYsdwcUlyeiI5gzjoBayUq4SRZhAtRYEF5dKrolgzkiOaSOrZoIIwvUazUkZdKWiORdTqZWsmuvCEAZrOq0at2MMVDCnN4e0k5UzOAghR8MF2avtpr2kOdlsN0JWRAd/iGVGEFxcviAhZc8SY2Tf4HgjPGQMwcXlcQlzJhslm+6F0J1SoxDlwg+snTT+Xnm1E5x7OkSBUQQXlwJBez40TvZ5c4ShER881doIAXNGWOByubopxJdWIL4UsMcO2erGCBdaQXBx6RdizhBrZKOB+h+xaYJXgfj1ZMj+R62RTQVIABmU6Ii/CqmCHI777s2imExLZCfpyiEHGGfNHGjDuIC9462ZAy24LXVyTbSGAHBzwD6hZ2idZAkcjpBtEeIo7XA996RRQpZFsuOc7dDPqjnQlr4+e/pbNQcyGOZwmVUEgJE+24fbBmOEExzhMCK/OK99sgGO1mk6MfXx2Z5rG4zeDj1tM3g9HwPQ3TYYXR062Wago8/2SDOY8ZA5Fm8JG5RVn2rSXC0kvyd+ZTik22YA2nhutXfH/K+c6F/xf5ZDhW0E/DopaRsLHEpsIwB1nluTtrFwHQ7ZZgDKPbcesI1FqcN22wxUU+O5vdA2GEmH32wz+I4S+x1X5rDJNgP7fLb/bBuMAw5rfKIt5lTks321dbKDDof5xTLEnz7bj1g/8YsdEJpt0in/a8xnlsn2OMAiyxBbfPd8ZJlsZyqN5Lc4s8SllUWZ777NvqFWEzo/dTv/jkWEnQHmwFsWyarZmfqjjeR6iThb8AmUyVFrZBsbHgYreMNaH60N3Ftukez3U3+eqSlfOLxdGgKZyQFLZNNOhRLKyLPSQydD77rKLZE1G9cOqyz00I8CmA4rLZBV07JxIKqOB6ky3kPfCfxPHQ8GZHHo0mqqmsbptvKYcYivhf5rO48YJ/PsuPlGB3AlrYRxXzV8cl3hBZFuNJdvhURvpikv2VRpSb9ppNasMQYxVWq4p/O1MbIl/hiZfGsI4hzJ60HrmFco+rf7gvvpIwMIGyXNATgj5oWS3q0qLOcpwdPUaobIU7AHYAonNJMtE8G4RPMiIfWVpYPYopXsXjGM1rxElSaEDcrmAKQzI/Iqdr9W5jPn76lcFmlZb/FUJHtSZPnUaCDLlwU5n/kxr+OspUtkewDO410qYrZnlApIFpP5PrbeErr4CSqbJ1gV2wiPNO93FhN5nTWRfzvGRYHwVEceZiF/RrZnSuMvlVvReUoO3cjlAh5VWlW8l14+WRnR1Z7hDGesYkJyku4+CRFKmqTUQ89psqaxPlAim930S6Jmh0nVnqhXBW8bsEelRNfJ5pHtqPaMUfjMe0ZSrlRy6hdQHCdCtsKDR42RTOqWCj8eNaenwEcbPZcrfH4xuw3YM4qW0p8pYFe8EK8o9FCf6IcVkHxssVo6vBKqbdIQ+UbMgR3SZK/FjTBUoYd6GDFHfmX1Me/SIlGuPXdJf2Iee4zYc6v0J17kYLwIjkD9y6athLONmJOQjlPtkpgxEdQV0gPY1CzaKGkyDUt6ZaPRm0gzZM8CSTINKXqdJSuM1alFURSUJVneq9J3uV0E5Un2kLksr6clyaZHP2RzpfO3FMJeY0uu09grRbZWR+Fk2TDGjYbMgbukuKqUIg4hSpOMyc01Zk6CX6TI8nRAyI2dzQZXq94uRbZKx2+p3NipUgq2qslhswRZUk9gRa5835ToBxSW3Ki+QwdCJvslEBYYNCeD3RJk7+qBmCWBsD7+J5kAPS9BtlHP9bCnxLz2fkPBi5R6SJAd0VU35GNhhEqGGjRHpqbqSfHC1XKaIIxQy3ij5twocWJpqmWXRZEwgtkE4CyJB4mXdEHMFUZ4xqg5MmQLlSfNQzRaOANilmFzRgubs1RXOZVs4SrgLxs2R5zsW323Ge8LIsyOfihJLRQ2p7UuhLsFEZ41bs6dgmQr9JmTK/ienCeMm9NLcCHlYn0lnFrxswDAcT0PeIFqyU9C5ryp80VqIit0DvkWZtSpNwXIamPIfw3QAwII23RE+kM1UYAsyU06EYYJPOZ9aqXi6kWUh5L9oTcXpAv7QofuTF13oYFqJ/AuwHyZzHZ5ZbAu9IpzvQVroAXfhJ5U9+hFSIS+G2KFtZqUYT8WX+kvJhocEyxlqpWTCmBGIFkJk/STPRaI8InFUq/3BnDVMT/o7Uhx6daAbNNfGWvNGhgbkPbwg5ni16N8V95s4X6rJUT93+22XsMKDU8N8Hm+Wsktlqur9uOw5wm1ovnbbPQp1+NOZx8vx/K6zKhkpwdydzDLZD3wDk0mh2v4iVmM+E9U5O3ajGwVL5gqs98wCZ9gAT0pYgeFbGMD66i07Uq9clhGNoXsZheb2cBGkzWC/wHLQslB3DeyfAAAAABJRU5ErkJggg=="></image> 
+</svg> 
+</div> 
+ <div class="u_1766443759 dmNewParagraph" id="1766443759" style="transition: opacity 1s ease-in-out;" data-version="5"><p class="m-size-16 size-16" style="line-height: 1.5;"><strong class="m-font-size-16 font-size-16" m-font-size-set="true" style="color:rgb(70, 75, 84);font-weight:bold;display:initial;font-family:Helvetica, 'Helvetica Fallback';">ANTONIO R.</strong></p></div> <div class="u_1164815224 dmNewParagraph" id="1164815224" style="transition: opacity 1s ease-in-out;" data-element-type="paragraph" data-version="5"><p class="m-size-16" style="line-height: 1.5;"><span class="m-font-size-16" m-font-size-set="true" style="font-style: italic; display: initial; font-weight: normal;">Just renewed for another year, love it here</span></p></div></div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="u_1666965075 dmRespRow dmSectionParallaxNew fullBleedChanged fullBleedMode hide-for-large" style="text-align: center;" id="1666965075" data-anchor="PROPERTY DETAILS"> <div class="dmRespColsWrapper" id="1250675334"> <div class="u_1418045269 dmRespCol small-12 medium-12 large-12" id="1418045269"> <h2 class="u_1202687916 dmNewParagraph" id="1202687916" data-element-type="paragraph"><div style=";text-align: center;"><span style=";color: rgb(255, 255, 255);"></span></div><div style=";text-align: left;"><span style=";color: rgb(255, 255, 255);"></span></div><span><div style="text-align: left;"><font style="color: rgb(115, 31, 22);">PROPERTY DETAILS</font></div></span><div style=";text-align: left;"><span style=";color: rgb(255, 255, 255);"></span></div></h2> <div class="u_1887201653 dmDividerWrapper clearfix" id="1887201653" layout="divider-style-1" data-element-type="dDividerId" data-widget-version="2"><hr class="dmDivider" style="min-height: 2px; border:none; background:grey" id="1607290955"/></div> 
+ <div class="dmRespRow" id="1511310537"> <div class="dmRespColsWrapper" id="1805900520"> <div class="dmRespCol small-12 large-4 medium-4" id="1705205495"> <div class="u_1889468954 dmNewParagraph" id="1889468954"><div style="font-family:inherit;text-align:left;"><span style="font-size: 22px;"><b style=""><font style="color: rgb(110, 109, 115);">APARTMENT FEATURES</font></b></span></div></div> <div class="dmNewParagraph" data-element-type="paragraph" id="1574747091" style="transition: opacity 1s ease-in-out 0s;"><ul class="innerList defaultList" style="color: rgb(0, 0, 0);"><li><font style="color: rgb(0, 0, 0);">New double payne thermal windows</font></li><li><font style="color: rgb(0, 0, 0);">Spacious Closets</font></li><li><font style="color: rgb(0, 0, 0);">Abundant storage</font></li><li><font style="color: rgb(0, 0, 0);">Faux hardwood floors*</font></li><li><font style="color: rgb(0, 0, 0);">New Carpet*</font></li><li><font style="color: rgb(0, 0, 0);">New Paint in Earth Tone colors*</font></li><li><font style="color: rgb(0, 0, 0);">Granite Counter Tops*</font></li><li><font style="color: rgb(0, 0, 0);">New Cabinets*</font></li></ul></div></div> 
+ <div class="u_1798295270 dmRespCol small-12 large-5 medium-5" id="1798295270"> <div class="u_1026128952 dmNewParagraph" id="1026128952" style="display: block;"><div style="font-family:inherit;text-align:left;"><font style="color: rgb(110, 109, 115);"><span style="font-size: 22px;"><b style="">COMMUNITY FEATURES</b></span></font></div></div> <div class="dmNewParagraph" data-element-type="paragraph" id="1184266289" style="transition: opacity 1s ease-in-out 0s;"><div><b><font style="color: rgb(0, 0, 0);">Just a few of our great amenities include:</font></b></div><ul class="innerList defaultList" style="color: rgb(0, 0, 0);"><li><font style="color: rgb(0, 0, 0);">WATER &amp; TRASH INCLUDED in Rental Rate</font></li><li><font style="color: rgb(0, 0, 0);">Union Public Schools</font></li><li><font style="color: rgb(0, 0, 0);">Professionally landscaped grounds</font></li><li><font style="color: rgb(0, 0, 0);">On-Site Laundry Facility</font></li><li><font style="color: rgb(0, 0, 0);">Courtesy Patrol</font></li><li><font style="color: rgb(0, 0, 0);">24/7 Emergency Maintenance</font></li><li><font style="color: rgb(0, 0, 0);">Bilingual On-site Staff</font></li><li><font style="color: rgb(0, 0, 0);">On-Line Tenant Portal</font></li><li><font style="color: rgb(0, 0, 0);">Calls answered every day until 9PM</font></li></ul></div></div> 
+ <div class="u_1208394909 dmRespCol small-12 large-3 medium-3" id="1208394909"> <div class="u_1683288213 dmNewParagraph" id="1683288213" style="display: block;"><div style="font-family:inherit;text-align:left;"><font style="color: rgb(110, 109, 115);"><span style="font-size: 22px;"><b style="">TERMS</b></span></font></div></div> <div class="dmNewParagraph" data-element-type="paragraph" id="1228009901" style="transition: opacity 1s ease-in-out 0s;"><ul class="innerList defaultList" style="color: rgb(0, 0, 0);"><li><font style="color: rgb(0, 0, 0);"><b>Beds |</b>&nbsp;1-2</font></li><li><font style="color: rgb(0, 0, 0);"><b>Baths|</b> 
+1-2</font></li><li><font style="color: rgb(0, 0, 0);"><b>Security Deposit |</b> 
+TBD<br/></font></li><li><font style="color: rgb(0, 0, 0);"><b>Application Fee |</b> 
+TBD</font></li></ul></div></div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="u_PROPERTYDETAILS dmRespRow dmSectionParallaxNew fullBleedChanged fullBleedMode hide-for-medium hide-for-small" style="text-align: center;" id="PROPERTYDETAILS" data-anchor="PROPERTY DETAILS"> <div class="dmRespColsWrapper" id="1071636935"> <div class="u_1094029783 dmRespCol small-12 large-6 medium-6" id="1094029783"> <div class="u_1004567458 dmSpacer" id="1004567458" data-element-type="spacer"></div> 
+</div> 
+ <div class="u_1279708004 dmRespCol small-12 large-6 medium-6" id="1279708004"> <div class="u_1823686917 dmNewParagraph" id="1823686917" data-element-type="paragraph" data-version="5"> <h2 class="text-align-left m-text-align-center"><span style=""><div class="text-align-left"><span class="text-align-left"><span style="color:rgb(115, 31, 22);text-align:left;">PROPERTY DETAILS</span></span></div></span></h2> 
+</div> <div class="dmRespRow" id="1498148304"> <div class="dmRespColsWrapper" id="1843529552"> <div class="u_1994487198 dmRespCol small-12 medium-6 large-6" id="1994487198"> <div class="u_1274377526 dmNewParagraph" id="1274377526" style="display: block;"><div style="font-family:inherit;text-align:left;"><font style="color: rgb(110, 109, 115);"><span style="font-size: 22px;"><b style="">COMMUNITY FEATURES</b></span></font></div></div> <div class="dmNewParagraph" data-element-type="paragraph" id="1525049292" style="transition: opacity 1s ease-in-out 0s;" data-version="5"><p style="line-height: 16px;"><span style="display: initial;">&nbsp;</span></p> <ul class="defaultList bullet"><li style="color: rgb(0, 0, 0);"><span style="display: initial; color: rgb(0, 0, 0);">Union Schools</span></li><li style="color: rgb(0, 0, 0);"><span style="display: initial; color: rgb(0, 0, 0);">Professionally Landscaped Grounds</span></li><li style="color: rgb(0, 0, 0);"><span style="display: initial; color: rgb(0, 0, 0);">On-Site Laundry Facility</span></li><li style="color: rgb(0, 0, 0);"><span style="display: initial; color: rgb(0, 0, 0);">Courtesy Patrol</span></li><li style="color: rgb(0, 0, 0);"><span style="display: initial; color: rgb(0, 0, 0);">24/7 Emergency Maintenance</span></li><li style="color: rgb(0, 0, 0);"><span style="display: initial; color: rgb(0, 0, 0);">Bilingual On-site Staff</span></li><li style="color: rgb(0, 0, 0);"><span style="display: initial; color: rgb(0, 0, 0);">On-Line Tenant Portal</span><span style="display: initial;"><span class="ql-cursor">﻿</span></span></li></ul> 
+<p style="line-height: 16px;"><span style="display: initial;">&nbsp;<br/></span></p></div></div> 
+ <div class="u_1091847120 dmRespCol small-12 medium-6 large-6" id="1091847120"> <div class="u_1582144313 dmNewParagraph" id="1582144313" style="display: block;"><div style="font-family:inherit;text-align:left;"><font style="color: rgb(110, 109, 115);"><span style="font-size: 22px;"><b style="">TERMS</b></span></font></div></div> <div class="dmNewParagraph" data-element-type="paragraph" id="1700283727" style="transition: opacity 1s ease-in-out 0s;" data-version="5"><p class="text-align-left" style="line-height: 16px;"><span style="display: initial;">&nbsp;</span></p> <ul class="defaultList bullet"><li class="text-align-left" style="color: rgb(0, 0, 0);"><span class="" style="color: rgb(0, 0, 0); font-weight: normal; display: initial;"><span style="color: rgb(0, 0, 0); font-weight: normal; display: initial;">Deposit</span> 
+</span><strong style="color: rgb(0, 0, 0); font-weight: normal; display: initial;">|</strong><span class="" style="color: rgb(0, 0, 0); font-weight: normal; display: initial;"> <span style="color: rgb(0, 0, 0); font-weight: normal; display: initial;">Starting at</span></span><span single-space="true" class="" style="display: initial; font-weight: normal;"> <span style="display: initial; font-weight: normal;"></span> 
+</span><span style="color: rgb(0, 0, 0); display: initial;">$150 - $250<br/></span></li><li class="text-align-left" style="color: rgb(0, 0, 0);"><span style="color: rgb(0, 0, 0); font-weight: normal; display: initial;">Application Fee</span><span single-space="true" class="" style="display: initial;"> <span style="display: initial;"></span> 
+</span><strong style="display: initial; color: rgb(0, 0, 0); font-weight: bold;">|</strong><span class="" style="display: initial; color: rgb(0, 0, 0);"> <span style="display: initial; color: rgb(0, 0, 0);">$40 Per Adult</span></span></li><li class="text-align-left" style="color: rgb(0, 0, 0);"><span style="color: rgb(0, 0, 0); font-weight: normal; display: initial;">Pet Fee</span><strong style="color: rgb(0, 0, 0); font-weight: bold; display: initial;">&nbsp;|</strong><span class="" style="display: initial; color: rgb(0, 0, 0);"> <span style="display: initial; color: rgb(0, 0, 0);">$175, limit of 2 pets</span></span></li></ul> 
+<p class="text-align-left" style="line-height: 16px;"><span style="display: initial;">&nbsp;<br/></span></p></div></div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="u_1869485852 dmRespRow dmSectionParallaxNew fullBleedChanged fullBleedMode" style="text-align: center;" id="1869485852" data-page-element-type="section" data-page-element-id="1124046839"> <div class="dmRespColsWrapper" id="1787476057"> <div class="u_1746918243 dmRespCol small-12 medium-6 large-6" id="1746918243"> <div class="u_1058639422 dmNewParagraph" id="1058639422" data-element-type="paragraph" data-version="5"> <h2><span style="display: initial;">Neighborhood</span></h2> 
+</div> <div class="u_1841468103 dmDividerWrapper clearfix" id="1841468103" layout="divider-style-1" data-element-type="dDividerId" data-widget-version="2"><hr class="dmDivider" style="min-height: 2px; border:none; background:grey" id="1259754133"/></div> 
+ <div class="dmRespRow u_1593064355 fullBleedChanged fullBleedMode" id="1593064355"> <div class="dmRespColsWrapper" id="1890031067"> <div class="u_1492101232 dmRespCol small-12 large-4 medium-4" id="1492101232"> <div class="u_1096711302 dmNewParagraph" data-element-type="paragraph" id="1096711302" style="transition: none; display: block; text-align: center;" data-version="5"> <h3 class="text-align-left"><span style="display: initial;">Good Eats</span></h3> 
+</div> <div class="dmNewParagraph" data-element-type="paragraph" id="1427128231" data-version="5" data-styletopreserve="{" background-image":""}"=""> <ul class="defaultList bullet"><li style="line-height: initial;"><span style="font-weight: normal; display: initial;">El Patron Cocina Mexicana</span></li><li style="line-height: initial;"><span style="font-weight: normal; display: initial;">Applebee's Grill + Bar</span></li><li style="line-height: initial;"><span style="font-weight: normal; display: initial;">Cheddar's Scratch Kitchen</span></li><li style="line-height: initial;"><span style="font-weight: normal; display: initial;">Tacos El Rinconcito</span></li><li style="line-height: initial;"><span style="display: initial; font-weight: normal;">El Ranchero Food Trucks</span></li><li style="line-height: initial;"><span class="" style="display: initial; font-weight: normal;"><span style="display: initial; font-weight: normal;">Starbucks</span> 
+</span></li></ul> 
+<p><span style="display: initial;"><br/></span></p></div></div> 
+ <div class="u_1882031182 dmRespCol small-12 large-4 medium-4" id="1882031182"> <div class="u_1233886995 dmNewParagraph" data-element-type="paragraph" id="1233886995" style="transition: opacity 1s ease-in-out 0s; line-height: initial; text-align: center;" data-version="5"> <h3 class="text-align-left"><span style="display: initial;">Education</span></h3> 
+</div> <div class="dmNewParagraph" data-element-type="paragraph" id="1303177709" style="transition: opacity 1s ease-in-out 0s;" data-version="5"> <ul class="defaultList bullet"><li style="line-height: initial;"><span style="display: initial;">Ochoa Elementary School<br/></span></li><li style="line-height: initial;"><span class="" style="display: initial;"><span style="display: initial;">Union 6th, 7th, 8th, &amp; 9th Grade Centers</span> 
+</span></li><li style="line-height: initial;"><span class="" style="display: initial;"><span style="display: initial;">Union High School</span> 
+</span></li><li style="line-height: initial;"><span style="display: initial;">Tulsa Community College<br/></span></li><li style="line-height: initial;"><span style="display: initial;">The University of Tulsa <br/></span></li><li style="line-height: initial;"><span class="" style="display: initial;"><span style="display: initial;">Tulsa Welding School</span> 
+</span></li></ul> 
+<p style="line-height: 1.5;"><span style="display: initial;"><br/></span></p></div></div> 
+ <div class="dmRespCol large-4 medium-4 small-12 u_1808183530" id="1808183530"> <div class="u_1673311548 dmNewParagraph" data-element-type="paragraph" id="1673311548" style="transition: opacity 1s ease-in-out 0s; line-height: initial; text-align: center;" data-version="5"> <h3 class="text-align-left"><span style="display: initial;">Around Town</span></h3> 
+</div> <div class="dmNewParagraph" data-element-type="paragraph" id="1364844877" style="transition: opacity 1s ease-in-out 0s;" data-version="5"> <ul class="defaultList bullet"><li><span style="display: initial;">Walmart Supercenter (walking distance)</span></li><li><span style="display: initial;">Woodland Hills Mall</span></li><li><span style="display: initial;">The Gathering Place</span></li><li><span style="display: initial;">Chapin Park (dog park, trails)</span></li><li><span style="display: initial;">Tulsa Zoo<br/></span></li></ul> 
+</div></div> 
+</div> 
+</div> 
+</div> 
+ <div class="dmRespCol small-12 medium-6 large-6 u_1511441552" id="1511441552"> <div class="u_1965707026 default align-center flexButton inlineMap" data-type="inlineMap" data-lat="36.116024" data-lng="-95.85391" data-address="10851 East 33rd Street South, Tulsa, Oklahoma 74146, United States" data-height="" data-msid="" data-mapurl="" data-lang="en" data-color-scheme="" data-zoom="13" data-layout="" data-popup-display="" data-popup-show="false" data-popup-title="" data-popup-title-visible="false" data-popup-description="" data-popup-description-visible="false" id="1965707026" dmle_extension="mapextension" data-element-type="mapextension" modedesktop="map" modemobile="button" addresstodisplay="10851 East 33rd Street South, Tulsa, Oklahoma 74146, United States" geocompleteaddress="10851 East 33rd Street South, Tulsa, Oklahoma 74146, United States" data-popup-display-desktop="" data-popup-display-mobile="" data-display-type="block" dmmapsource="dm" modetablet="map" wr="true" icon="true" surround="true" adwords="" icon-name="icon-map-marker" street="" city="" country="US" country_full="United States" state="" zip="" business="River Walk Apartments" provider="mapbox" lon="-95.85391" lat="36.116024" zoom="13"> <div class="mapContainer" style="height: 100%; width: 100%; overflow: hidden; z-index: 0;"></div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="dmRespRow fullBleedChanged fullBleedMode u_PHOTOS" id="PHOTOS" data-anchor="PHOTOS"> <div class="dmRespColsWrapper" id="1620414482"> <div class="dmRespCol large-12 medium-12 small-12 u_1911646931" id="1911646931"> <div class="u_1455358081 dmNewParagraph" id="1455358081" data-element-type="paragraph" data-version="5" style="transition: none; text-align: left; display: block;"> <h2 class="text-align-center"><span class="" style="display: initial; color: rgb(115, 31, 22);"><span style="display: initial; color: rgb(115, 31, 22);">&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; PHOTOS&nbsp;</span> 
+</span></h2> 
+</div> <div class="u_1487256152 dmPhotoGallery newPhotoGallery dmPhotoGalleryResp photo-gallery-done text-layout-over captionAlignment-center_center photoGallery" galleryoptionsparams="{thumbnailsPerRow: 3, rowsToShow: 3, imageScaleMethod: true}" data-desktop-layout="square" data-desktop-columns="3" data-element-type="dPhotoGalleryId" data-desktop-text-layout="over" id="1487256152" data-placeholder="false" data-image-hover-effect="zoomout" data-rows-to-show="100" data-image-animation="none"> <div class="dmPhotoGalleryHolder clearfix gallery shadowEffectToChildren gallery4inArow" id="1362986591"></div> 
+ <div class="layout-container square"> <div class="photogallery-row " data-index=""> <div class="photogallery-column column-3" data-index="0"> <div index="0" class="photoGalleryThumbs animated  " data-index="0"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1352515557" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/04-3171-20S-20108th-20E-20Ave-20Apt-20C-111.jpg" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/04-3171-20S-20108th-20E-20Ave-20Apt-20C-111-640w.jpg');"><img id="1434340505" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/04-3171-20S-20108th-20E-20Ave-20Apt-20C-111-1920w.jpg" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1611892936" class="caption-container u_1611892936" style="display:none"> <span class="caption-inner"> <a id="1298824325" class="caption-button dmWidget  clearfix u_1298824325" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-column column-3" data-index="1"> <div index="1" class="photoGalleryThumbs animated  " data-index="1"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1245818950" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/02-3171-20S-20108th-20E-20Ave-20Apt-20C-101.jpg" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/02-3171-20S-20108th-20E-20Ave-20Apt-20C-101-640w.jpg');"><img id="1035631236" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/02-3171-20S-20108th-20E-20Ave-20Apt-20C-101-1920w.jpg" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1135785668" class="caption-container u_1135785668" style="display:none"> <span class="caption-inner"> <a id="1831130165" class="caption-button dmWidget  clearfix u_1831130165" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-column column-3" data-index="2"> <div index="2" class="photoGalleryThumbs animated  " data-index="2"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1034547909" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/15-141_3147+S+108th+E+Ave.jpg" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/15-141_3147+S+108th+E+Ave-640w.jpg');"><img id="1177444920" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/15-141_3147+S+108th+E+Ave-1920w.jpg" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1829288912" class="caption-container u_1829288912" style="display:none"> <span class="caption-inner"> <a id="1427113138" class="caption-button dmWidget  clearfix u_1427113138" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-row " data-index=""> <div class="photogallery-column column-3" data-index="3"> <div index="3" class="photoGalleryThumbs animated  " data-index="3"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1119481540" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/10-111_3147+S+108th+E+Ave.jpg" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/10-111_3147+S+108th+E+Ave-640w.jpg');"><img id="1484026489" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/10-111_3147+S+108th+E+Ave-1920w.jpg" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1214534005" class="caption-container u_1214534005" style="display:none"> <span class="caption-inner"> <a id="1176105859" class="caption-button dmWidget  clearfix u_1176105859" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-column column-3" data-index="4"> <div index="4" class="photoGalleryThumbs animated  " data-index="4"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1081213621" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/06-3171-20S-20108th-20E-20Ave-20Apt-20C-121.jpg" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/06-3171-20S-20108th-20E-20Ave-20Apt-20C-121-640w.jpg');"><img id="1299356942" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/06-3171-20S-20108th-20E-20Ave-20Apt-20C-121-1920w.jpg" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1976635899" class="caption-container u_1976635899" style="display:none"> <span class="caption-inner"> <a id="1559161490" class="caption-button dmWidget  clearfix u_1559161490" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-column column-3" data-index="5"> <div index="5" class="photoGalleryThumbs animated  " data-index="5"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1619724686" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/01-1+-+3165+S+108th+E+Ave-100.jpg" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/01-1+-+3165+S+108th+E+Ave-100-640w.jpg');"><img id="1669719200" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/01-1+-+3165+S+108th+E+Ave-100-1920w.jpg" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1631584464" class="caption-container u_1631584464" style="display:none"> <span class="caption-inner"> <a id="1364623091" class="caption-button dmWidget  clearfix u_1364623091" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-row " data-index=""> <div class="photogallery-column column-3" data-index="6"> <div index="6" class="photoGalleryThumbs animated  " data-index="6"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1825789186" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/09-3171-20S-20108th-20E-20Ave-20Apt-20C-136.jpg" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/09-3171-20S-20108th-20E-20Ave-20Apt-20C-136-640w.jpg');"><img id="1806202696" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/09-3171-20S-20108th-20E-20Ave-20Apt-20C-136-1920w.jpg" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1577821202" class="caption-container u_1577821202" style="display:none"> <span class="caption-inner"> <a id="1735340964" class="caption-button dmWidget  clearfix u_1735340964" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-column column-3" data-index="7"> <div index="7" class="photoGalleryThumbs animated  " data-index="7"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1757675301" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/11-3171-20S-20108th-20E-20Ave-20Apt-20C-146.jpg" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/11-3171-20S-20108th-20E-20Ave-20Apt-20C-146-640w.jpg');"><img id="1462782408" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/11-3171-20S-20108th-20E-20Ave-20Apt-20C-146-1920w.jpg" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1122028256" class="caption-container u_1122028256" style="display:none"> <span class="caption-inner"> <a id="1384516492" class="caption-button dmWidget  clearfix u_1384516492" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-column column-3" data-index="8"> <div index="8" class="photoGalleryThumbs animated  " data-index="8"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1924553302" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/09-1+-+3165+S+108th+E+Ave-140.jpg" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/09-1+-+3165+S+108th+E+Ave-140-640w.jpg');"><img id="1769395512" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/09-1+-+3165+S+108th+E+Ave-140-1920w.jpg" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1190441635" class="caption-container u_1190441635" style="display:none"> <span class="caption-inner"> <a id="1151804657" class="caption-button dmWidget  clearfix u_1151804657" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-row " data-index=""> <div class="photogallery-column column-3" data-index="9"> <div index="9" class="photoGalleryThumbs animated  " data-index="9"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1171402473" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/P4U_7986.JPG" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/P4U_7986-640w.JPG');"><img id="1313358331" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/P4U_7986-1920w.JPG" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1501974780" class="caption-container u_1501974780" style="display:none"> <span class="caption-inner"> <a id="1344877005" class="caption-button dmWidget  clearfix u_1344877005" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-column column-3" data-index="10"> <div index="10" class="photoGalleryThumbs animated  " data-index="10"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1390520242" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/15-1+-+3165+S+108th+E+Ave-170.jpg" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/15-1+-+3165+S+108th+E+Ave-170-640w.jpg');"><img id="1896901725" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/15-1+-+3165+S+108th+E+Ave-170-1920w.jpg" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1904039351" class="caption-container u_1904039351" style="display:none"> <span class="caption-inner"> <a id="1412401686" class="caption-button dmWidget  clearfix u_1412401686" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-column column-3" data-index="11"> <div index="11" class="photoGalleryThumbs animated  " data-index="11"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1963740109" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/P4U_7977.JPG" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/P4U_7977-640w.JPG');"><img id="1941850585" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/P4U_7977-1920w.JPG" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1214517694" class="caption-container u_1214517694" style="display:none"> <span class="caption-inner"> <a id="1454402696" class="caption-button dmWidget  clearfix u_1454402696" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="dmRespRow" id="1791058318"> <div class="dmRespColsWrapper" id="1917812840"> <div class="dmRespCol empty-column large-12 medium-12 small-12" id="1768514858"></div> 
+</div> 
+</div> 
+ <div class="dmRespRow u_FLOORPLANS" style="text-align: center;" id="FLOORPLANS" data-anchor="FLOORPLANS"> <div class="dmRespColsWrapper" id="1212164135"> <div class="u_1521680417 dmRespCol small-12 medium-12 large-12" id="1521680417"> <div class="u_1339038826 dmNewParagraph" id="1339038826" style="display: block;" data-element-type="paragraph" data-version="5"> <h2 class="text-align-center"><span style=""><div class="text-align-center"><span class="text-align-center"><span style="color:rgb(115, 31, 22);text-align:center;">FLOOR PLANS</span></span></div></span></h2> 
+</div> <div class="u_1179477731 dmDividerWrapper clearfix" id="1179477731" layout="divider-style-1" data-element-type="dDividerId" data-widget-version="2"><hr class="dmDivider" style="min-height: 2px; border:none; background:grey" id="1635328968"/></div> 
+ <div class="u_1784985905 dmPhotoGallery dmPhotoGalleryResp newPhotoGallery photo-gallery-done text-layout-bottom captionAlignment-top_center photoGallery" data-desktop-text-layout="bottom" id="1784985905" data-image-hover-effect="zoomout" data-desktop-layout="square" data-desktop-columns="2" data-mobile-columns="1" data-rows-to-show="100" data-tablet-layout="square" data-mobile-layout="square" data-element-type="dPhotoGalleryId" data-placeholder="false" data-desktop-caption-alignment="top_center"> <div class="dmPhotoGalleryHolder clearfix gallery shadowEffectToChildren gallery4inArow" id="1362986591"></div> 
+ <div class="layout-container square"> <div class="photogallery-row " data-index=""> <div class="photogallery-column column-2" data-index="0"> <div index="0" class="photoGalleryThumbs animated  " data-index="0"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1658794190" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/1+%281%29.png" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/1+%281%29-640w.png');"><img id="1911277385" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/1+%281%29-1920w.png" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1055237260" class="caption-container u_1055237260" style="display:none"> <span class="caption-inner"> <a id="1812035809" class="caption-button dmWidget  clearfix u_1812035809" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="photogallery-column column-2" data-index="1"> <div index="1" class="photoGalleryThumbs animated  " data-index="1"> <div class="thumbnailInnerWrapper" style="opacity: 1;"> <div class="image-container revealed"> <a data-dm-multisize-attr="temp" data-dm-force-device="mobile" class="u_1574761196" data-image-url="https://irp.cdn-website.com/cbad8b42/dms3rep/multi/2+%281%29.png" style="background-image: url('https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/2+%281%29-640w.png');"><img id="1699003697" data-src="https://lirp.cdn-website.com/cbad8b42/dms3rep/multi/opt/2+%281%29-1920w.png" alt="" onerror="handleImageLoadError(this)"/></a> 
+</div> 
+ <div id="1898656690" class="caption-container u_1898656690" style="display:none"> <span class="caption-inner"> <a id="1265869595" class="caption-button dmWidget  clearfix u_1265869595" href="" style=""> <span class="iconBg"> <span class="icon hasFontIcon "></span> 
+</span> 
+ <span class="text">Button</span> 
+</a> 
+</span> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="u_Residents dmRespRow dmSectionParallaxNew hasBackgroundOverlay" style="text-align: center;" id="Residents" data-anchor="Residents"> <div class="dmRespColsWrapper" id="1355364692"> <div class="dmRespCol small-12 medium-4 large-4 u_1733373082" id="1733373082"> <span id="1218819229"></span> 
+ <div class="graphicWidget u_1270825245" data-widget-type="graphic" id="1270825245" data-layout="graphic-style-2" data-element-type="graphic"> <a id="1353882652" file="false" class="" target="_blank" href="https://atlaspm.appfolio.com/connect" aria-label="web_desktop_mobile"> <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 100 100" id="1097276046" class="svg u_1097276046" data-icon-name="web_desktop_mobile" alt="computer icon - click to login"> <path d="M44.71,61.63a1.51,1.51,0,1,0,1.51,1.51A1.51,1.51,0,0,0,44.71,61.63Zm0,1.75a.24.24,0,1,1,.24-.24A.24.24,0,0,1,44.71,63.38Z" id="1673969432"></path> 
+ <path d="M85.58,69.37H68.65a.88.88,0,0,0,0,1.75H85.58a.88.88,0,1,0,0-1.75Z" id="1804943747"></path> 
+ <path d="M86.08,41.47H78V26.26a4.35,4.35,0,0,0-4.34-4.34H15.77a4.35,4.35,0,0,0-4.34,4.34V63.83A4.08,4.08,0,0,0,15.5,67.9H34.42a17.31,17.31,0,0,1-.28,3.74,5.79,5.79,0,0,1-3.22,3.84A1.34,1.34,0,0,0,30.18,77a1.51,1.51,0,0,0,1.51,1.1h26A1.51,1.51,0,0,0,59.23,77a1.34,1.34,0,0,0-.74-1.51,5.79,5.79,0,0,1-3.22-3.84A17.37,17.37,0,0,1,55,67.9H65.65v7.68a2.5,2.5,0,0,0,2.5,2.5H86.08a2.5,2.5,0,0,0,2.5-2.5V44A2.5,2.5,0,0,0,86.08,41.47ZM13.18,26.26a2.59,2.59,0,0,1,2.59-2.59H73.65a2.59,2.59,0,0,1,2.59,2.59V41.47H68.15a2.5,2.5,0,0,0-2.5,2.5v14.4H13.18ZM53.55,72a7.16,7.16,0,0,0,3,4.35H32.88a7.16,7.16,0,0,0,3-4.35,19,19,0,0,0,.32-4.08H53.24A19,19,0,0,0,53.55,72Zm1.57-5.84H15.5a2.32,2.32,0,0,1-2.32-2.32V60.12H65.65v6Zm31.7,9.43a.75.75,0,0,1-.75.75H68.15a.75.75,0,0,1-.75-.75V67h0V44a.75.75,0,0,1,.75-.75H86.08a.75.75,0,0,1,.75.75Z" id="1352033363"></path> 
+ <path d="M77.11,72.32a1.44,1.44,0,1,0,1.44,1.44A1.44,1.44,0,0,0,77.11,72.32Zm0,1.75a.31.31,0,1,1,.31-.31A.31.31,0,0,1,77.11,74.07Z" id="1281685680"></path> 
+ <path d="M75,46.75h4.2a.88.88,0,1,0,0-1.75H75a.88.88,0,1,0,0,1.75Z" id="1665184037"></path> 
+</svg> 
+</a> 
+</div> 
+ <h3 class="dmNewParagraph u_1050547369" id="1050547369" style="transition: opacity 1s ease-in-out; display: block;" data-element-type="paragraph"><div style=""><span class="lh-1 font-size-21" style=""><span style="" class=" lh-1">Pay Rent Online</span></span></div></h3> <div class="dmNewParagraph" id="1874484485" style="transition: opacity 1s ease-in-out;"><div style="text-align: center;"><span style="color: rgb(255, 255, 255);">Securely pay rent online from anywhere. Set up automatic payments so you always pay on time.</span></div></div></div> 
+ <div class="dmRespCol small-12 medium-4 large-4 u_1408677826" id="1408677826"> <span id="1993443438"></span> 
+ <div class="graphicWidget u_1480354812" data-widget-type="graphic" id="1480354812" data-layout="graphic-style-2" data-element-type="graphic"> <a href="/availability" id="1765657901" file="false" aria-label="li-house"> <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 100 100" id="1986337047" class="svg u_1986337047" data-icon-name="li-house" alt="house icon - click to go to vacancies page"> <path d="M81.7,38.8L50.6,18c-0.3-0.2-0.8-0.2-1.2,0L18.3,38.8c-0.4,0.3-0.6,0.7-0.4,1.2c0.1,0.4,0.5,0.7,1,0.7h9.3v40.5
+	c0,0.6,0.5,1,1,1h10.4h20.8h10.4c0.6,0,1-0.5,1-1V40.7h9.3c0.5,0,0.9-0.3,1-0.7C82.3,39.5,82.1,39,81.7,38.8z M40.7,80.1V51h18.7
+	v29.1H40.7z M70.8,38.6c-0.6,0-1,0.5-1,1v40.5h-8.3V50c0-0.6-0.5-1-1-1H39.6c-0.6,0-1,0.5-1,1v30.1h-8.3V39.6c0-0.6-0.5-1-1-1h-7
+	L50,20.1l27.7,18.5H70.8z" id="1115988903"></path> 
+</svg> 
+</a> 
+</div> 
+ <h3 class="u_1566496323 dmNewParagraph" id="1566496323" style="transition: opacity 1s ease-in-out;" data-element-type="paragraph"><div style=""><span class="font-size-21 lh-1"><span style="" class=" lh-1">View Availability</span></span></div></h3> <div class="dmNewParagraph" id="1646058904" style="transition: opacity 1s ease-in-out;"><div style="text-align: center;"><span style="color: rgb(255, 255, 255);">Ready to find your new home? Explore our available units and apply online today!</span></div></div></div> 
+ <div class="dmRespCol small-12 medium-4 large-4 u_1676703827" id="1676703827"> <span id="1884083296"></span> 
+ <div class="graphicWidget u_1726587345" data-widget-type="graphic" id="1726587345" data-layout="graphic-style-2" data-element-type="graphic"> <a id="1039616826" file="false" class="" target="_blank" href="https://atlaspm.appfolio.com/connect/users/request_access" aria-label="li-computer_screen"> <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 100 100" id="1990466459" class="svg u_1990466459" data-icon-name="li-computer_screen" alt="computer icon - click to sign up"> <path d="M85.8,9.7H22c-3.4,0-6.1,2.8-6.1,6.1v51.6c0,3.4,2.8,6.1,6.1,6.1h18.4v9.8H29.3v2.5h49.1v-2.5H67.4v-9.8h18.4
+	c3.4,0,6.1-2.8,6.1-6.1V15.8C92,12.4,89.2,9.7,85.8,9.7z M22,12.1h63.9c2,0,3.7,1.7,3.7,3.7v43H18.3v-43
+	C18.3,13.8,19.9,12.1,22,12.1z M64.9,83.3H42.8v-9.8h22.1V83.3z M85.8,71.1H22c-2,0-3.7-1.7-3.7-3.7v-6.1h71.2v6.1
+	C89.5,69.4,87.8,71.1,85.8,71.1z" id="1835259058"></path> 
+</svg> 
+</a> 
+</div> 
+ <h3 class="u_1781992810 dmNewParagraph" id="1781992810" style="transition: opacity 1s ease-in-out;" data-element-type="paragraph"><div style=""><span class="font-size-21 lh-1" style=""><span style="" class=" lh-1">Sign Up</span></span></div></h3> <div class="dmNewParagraph" id="1014227814" style="transition: opacity 1s ease-in-out;"><div style="text-align: center;"><span style="color: rgb(255, 255, 255);">Sign up today to pay rent, submit maintenance requests, and view your online account from anywhere.</span></div></div></div> 
+</div> 
+</div> 
+ <div class="dmRespRow u_CONTACTUS" style="text-align: center;" id="CONTACTUS" data-anchor="CONTACT US"> <div class="dmRespColsWrapper u_1635654355" id="1635654355"> <div class="u_1782080768 dmRespCol small-12 large-4 medium-4" id="1782080768"> <h2 class="dmNewParagraph" id="1991507006" data-element-type="paragraph"><font style="color: rgb(115, 31, 22);">CONTACT US</font></h2> <div class="u_1691984591 dmDividerWrapper clearfix" id="1691984591" layout="divider-style-1" data-element-type="dDividerId" data-widget-version="2"><hr class="dmDivider" style="min-height: 2px; border:none; background:grey" id="1694421899"/></div> 
+ <div class="dmNewParagraph u_1162189138" data-element-type="paragraph" id="1162189138" data-binding="W3siYmluZGluZ05hbWUiOiJ0ZXh0IiwidmFsdWUiOiJjb250ZW50X2xpYnJhcnkuZ2xvYmFsLnBob25lLjEyNDE5OTUyNTQifV0=" data-diy-text="">918-664-0020</div> <div class="dmNewParagraph u_1441793579" data-element-type="paragraph" id="1441793579" data-binding="W3siYmluZGluZ05hbWUiOiJ0ZXh0IiwidmFsdWUiOiJjb250ZW50X2xpYnJhcnkuMjQ1MTU2MjMwIn1d" data-diy-text="">10851 East 33rd Street South, Tulsa, Oklahoma 74146, United States</div> <span id="1225222617" class="u_1225222617"></span> 
+</div> 
+ <div class="u_1307971814 dmRespCol small-12 large-8 medium-8" id="1307971814"> <span id="1100135618"></span> 
+ <div class="u_1175801847 dmform default native-inputs" id="1175801847" data-layout="layout-3" data-element-type="dContactUsRespId"> <h3 class="dmform-title dmwidget-title" id="1296929219" hide="true">Contact Us</h3> 
+ <div class="dmform-wrapper" id="1527812854" captcha-lang="en"> <form method="post" class="dmRespDesignRow" locale="ENGLISH" id="1388467671"> <div class="dmforminput required  small-12 dmRespDesignCol medium-6 large-6" id="1391531839"> <label for="1436177386" id="1545947192" data-dm-for="dmform-0">Name</label> 
+<input type="text" class="" name="dmform-0" id="1436177386"/><input type="hidden" name="label-dmform-0" value="Name" id="1364058377" class=""/></div> 
+ <div class="dmforminput required  small-12 dmRespDesignCol medium-6 large-6" id="1944048990"> <label for="1914089159" id="1534522705" data-dm-for="dmform-2">Phone</label> 
+<input type="tel" class="" name="dmform-2" id="1914089159"/><input type="hidden" name="label-dmform-2" value="Phone" id="1566987306" class=""/></div> 
+ <div class="dmforminput required  small-12 dmRespDesignCol medium-12 large-12" id="1805814824"> <label for="1857240300" id="1948221751" data-dm-for="dmform-1">Email</label> 
+<input type="email" class="" name="dmform-1" id="1857240300"/><input type="hidden" name="label-dmform-1" value="Email" id="1005918322" class=""/></div> 
+ <div class="dmforminput small-12 dmRespDesignCol medium-12 large-12" id="1176949754"> <label for="1194066175" id="1363678198" data-dm-for="dmform-3">Message</label> 
+<input type="text" name="dmform-3" id="1194066175"/><input type="hidden" name="label-dmform-3" value="Message" id="1779320474" class=""/></div> 
+ <span id="1538711799" class="dmWidgetClear"></span> 
+ <div class="dmformsubmit dmWidget R" id="1752453636"><input class="" name="submit" type="submit" value="SEND" id="1491980662"/></div> 
+<input name="dmformsendto" type="hidden" value="O0wrseIfFLt0kWgwXU420qvRrwTQoicIxejZu7Ty5Q/2rNXRap6uAnLGKsXSZRIUXMLsUZGGBAA=" id="1605973679" class="" data-dec="true"/><input class="dmActionInput" type="hidden" name="action" value="/_dm/s/rt/widgets/dmform.submit.jsp" id="1188909426"/><input name="dmformsubject" type="hidden" value="Contact Us - Form Message" id="1675517851" class=""/><input name="dmformsubmitparams" type="hidden" value="8mpKnCSiNQXK/d9M7IDrS0Hahh0tGT3jpShtE57/QsQemzE+KoDYKYZbpH7PGR+9rz90/AiWb35ANG0Or/4E3R5vaWBSQCxcCfHhEybjS7Is23myt92Sy6gb2HGwVG5+J4HTiWgRrKjjpPr1vxQeTNpe221ygfDZB8JD+qPkmlCrlX0QBSoOgyP1nE68vbBycfvIKHqv3/bdtaxPn3a+qZbZi37p6U36N4lrIHfhipE=" data-dec="true"/><input type="hidden" name="page_uuid" value="db37967dd3c74cc394a374703312f948"/></form> 
+</div> 
+ <div class="dmform-success" style="display:none" id="1013016318">Thank you for contacting us.<br id="1286638839"/>We will get back to you as soon as possible</div> 
+ <div class="dmform-error" style="display:none" id="1986887468">Oops, there was an error sending your message.<br id="1045676264"/>Please try again later</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="dmFooterContainer"> <div id="fcontainer" class="u_fcontainer f_hcontainer dmFooter p_hfcontainer"> <div dm:templateorder="250" class="dmFooterResp generalFooter" id="1943048428"> <div class="u_1037475843 dmRespRow fullBleedChanged fullBleedMode" style="text-align: center;" id="1037475843"> <div class="dmRespColsWrapper" id="1123060757"> <div class="dmRespCol small-12 medium-12 large-12" id="1312662958"> <span id="1492735884"></span> 
+ <div class="u_1467769362 default dmDefaultGradient align-center inlineMap" data-type="inlineMap" data-lat="36.11692" data-lng="-95.8552" data-address="3147 S 108th East Ave, Tulsa, OK 74146, United States" data-height="" data-msid="" data-mapurl="" data-lang="en" data-color-scheme="" data-zoom="13" data-layout="layout4" data-popup-display="" data-popup-show="false" data-popup-title="" data-popup-title-visible="false" data-popup-description="" data-popup-description-visible="false" id="1467769362" dmle_extension="mapextension" data-element-type="mapextension" modedesktop="map" modemobile="map" addresstodisplay="3147 S 108th East Ave, Tulsa, OK 74146, United States" geocompleteaddress="3147 S 108th East Ave, Tulsa, OK 74146, United States" data-popup-display-desktop="" data-popup-display-mobile="" data-display-type="block" layout="layout4" modetablet="map" wr="true" icon="true" surround="true" description="FIND US" adwords="" icon-name="icon-map-marker" street="" city="" country="US" country_full="United States" state="" zip="" provider="mapbox" lon="-95.8552" lat="36.11692" zoom="13"> <div class="mapContainer" style="height: 100%; width: 100%; overflow: hidden; z-index: 0;"></div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="u_1803795718 dmRespRow" style="text-align: center;" id="1803795718"> <div class="dmRespColsWrapper" id="1222391602"> <div class="u_1289095790 dmRespCol small-12 large-7 medium-7" id="1289095790"> <h3 class="u_1121416251 dmNewParagraph" data-element-type="paragraph" id="1121416251" style="text-align: center; transition: opacity 1s ease-in-out 0s;"><font style="color: rgb(238, 238, 238);">Contact Us</font></h3> <div class="u_1454895971 dmRespRow" id="1454895971"> <div class="dmRespColsWrapper" id="1115965144"> <div class="u_1214899856 dmRespCol large-2 medium-2 small-12" id="1214899856"> <div class="u_1994359009 graphicWidget" data-element-type="graphic" data-widget-type="graphic" id="1994359009"> <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 768 1792" id="1043346984" class="svg u_1043346984" data-icon-name="fa-mobile-phone" alt="mobile phone icon"> <path fill="inherit" d="M464 1408q0-33-23.5-56.5t-56.5-23.5-56.5 23.5-23.5 56.5 23.5 56.5 56.5 23.5 56.5-23.5 23.5-56.5zM672 1248v-704q0-13-9.5-22.5t-22.5-9.5h-512q-13 0-22.5 9.5t-9.5 22.5v704q0 13 9.5 22.5t22.5 9.5h512q13 0 22.5-9.5t9.5-22.5zM480 400q0-16-16-16h-160q-16 0-16 16t16 16h160q16 0 16-16zM768 384v1024q0 52-38 90t-90 38h-512q-52 0-90-38t-38-90v-1024q0-52 38-90t90-38h512q52 0 90 38t38 90z" id="1457148912"></path> 
+</svg> 
+</div> 
+</div> 
+ <div class="u_1662228933 dmRespCol large-10 medium-10 small-12" id="1662228933"> <div class="u_1830285163 dmNewParagraph" data-element-type="paragraph" id="1830285163" style="transition: none 0s ease 0s; display: block;" data-binding="W3siYmluZGluZ05hbWUiOiJ0ZXh0IiwidmFsdWUiOiJjb250ZW50X2xpYnJhcnkuZ2xvYmFsLnBob25lLjEyNDE5OTUyNTQifV0=" data-diy-text="">918-664-0020</div></div> 
+</div> 
+</div> 
+ <div class="u_1099919731 dmRespRow" id="1099919731"> <div class="dmRespColsWrapper" id="1870760097"> <div class="u_1791649779 dmRespCol large-2 medium-2 small-12" id="1791649779"> <div class="u_1685059622 graphicWidget" data-element-type="graphic" data-widget-type="graphic" id="1685059622"> <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 1792 1792" id="1731054288" class="svg u_1731054288" data-icon-name="fa-envelope" alt="envelope icon"> <path fill="inherit" d="M1792 710v794q0 66-47 113t-113 47h-1472q-66 0-113-47t-47-113v-794q44 49 101 87 362 246 497 345 57 42 92.5 65.5t94.5 48 110 24.5h1 1q51 0 110-24.5t94.5-48 92.5-65.5q170-123 498-345 57-39 100-87zM1792 416q0 79-49 151t-122 123q-376 261-468 325-10 7-42.5 30.5t-54 38-52 32.5-57.5 27-50 9h-1-1q-23 0-50-9t-57.5-27-52-32.5-54-38-42.5-30.5q-91-64-262-182.5t-205-142.5q-62-42-117-115.5t-55-136.5q0-78 41.5-130t118.5-52h1472q65 0 112.5 47t47.5 113z" id="1979969152"></path> 
+</svg> 
+</div> 
+</div> 
+ <div class="u_1930946696 dmRespCol large-10 medium-10 small-12" id="1930946696"> <div class="u_1516348949 dmNewParagraph" data-element-type="paragraph" id="1516348949" style="text-align: center; transition: opacity 1s ease-in-out 0s;" data-binding="W3siYmluZGluZ05hbWUiOiJ0ZXh0IiwidmFsdWUiOiJjb250ZW50X2xpYnJhcnkuZ2xvYmFsLmVtYWlsLjEyMTYxMzM5NTUifV0=" data-diy-text="">manager@beaumontcove.net</div></div> 
+</div> 
+</div> 
+ <div class="u_1768908651 dmRespRow" id="1768908651" mode="1"> <div class="dmRespColsWrapper" id="1827831146"> <div class="u_1735752337 dmRespCol small-12 large-2 medium-2" id="1735752337"> <div class="u_1782331225 graphicWidget" data-element-type="graphic" data-widget-type="graphic" id="1782331225"> <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 70 70" id="1692757595" class="svg u_1692757595" data-icon-name="wp-location_pin" alt="location marker icon"> <path d="M35,10c-9.4,0-17,7.6-17,17c0,4.1,1.5,8,4.1,11.1l0.1,0.1c4.6,5.3,7.9,10.8,9.9,16.4l1,3.7l0,0.1c0.3,1.1,1,1.6,1.9,1.6
+	c0.9,0,1.6-0.5,1.9-1.6l1-3.8c1.9-5.6,5.3-11.2,9.9-16.4l0.1-0.1C50.5,35,52,31.1,52,27C52,17.6,44.4,10,35,10z M35,33
+	c-3.3,0-6-2.7-6-6s2.7-6,6-6c3.3,0,6,2.7,6,6S38.3,33,35,33z" id="1459728056"></path> 
+</svg> 
+</div> 
+</div> 
+ <div class="u_1869871457 dmRespCol small-12 large-10 medium-10" id="1869871457"> <div class="u_1311238443 dmNewParagraph" data-element-type="paragraph" id="1311238443" style="text-align: center; transition: opacity 1s ease-in-out 0s;" data-binding="W3siYmluZGluZ05hbWUiOiJ0ZXh0IiwidmFsdWUiOiJjb250ZW50X2xpYnJhcnkuMjQ1MTU2MjMwIn1d" data-diy-text="">10851 East 33rd Street South, Tulsa, Oklahoma 74146, United States</div></div> 
+</div> 
+</div> 
+ <div class="u_1640361358 dmRespRow" id="1640361358" mode="1"> <div class="dmRespColsWrapper" id="1324587621"> <div class="u_1739719144 dmRespCol small-12 large-2 medium-2" id="1739719144"> <div class="u_1587142802 graphicWidget" data-element-type="graphic" data-widget-type="graphic" id="1587142802"> <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 1536 1792" id="1378639383" class="svg u_1378639383" alt="location marker icon" data-icon-name="fa-clock-o"> <path fill="inherit" d="M896 544v448q0 14-9 23t-23 9h-320q-14 0-23-9t-9-23v-64q0-14 9-23t23-9h224v-352q0-14 9-23t23-9h64q14 0 23 9t9 23zM1312 896q0-148-73-273t-198-198-273-73-273 73-198 198-73 273 73 273 198 198 273 73 273-73 198-198 73-273zM1536 896q0 209-103 385.5t-279.5 279.5-385.5 103-385.5-103-279.5-279.5-103-385.5 103-385.5 279.5-279.5 385.5-103 385.5 103 279.5 279.5 103 385.5z"></path> 
+</svg> 
+</div> 
+</div> 
+ <div class="u_1670505891 dmRespCol small-12 large-10 medium-10" id="1670505891"> <div class="u_1979512067 dmNewParagraph text-align-center" data-element-type="paragraph" id="1979512067" style="transition:opacity 1s ease-in-out 0s;" data-version="5"><p><span style="display: initial;">Monday - Friday: 9:00 AM - 6:00 PM</span></p><p><span style="display: initial;">Saturday: 10:00 AM - 2:00 PM</span></p><p><span style="display: initial;">Sunday: Closed</span></p></div></div> 
+</div> 
+</div> 
+</div> 
+ <div class="u_1528602162 dmRespCol small-12 large-5 medium-5" id="1528602162"> <div class="widget-cb7086 u_1119138023 dmCustomWidget" data-lazy-load="" data-title="" id="1119138023" dmle_extension="custom_extension" data-element-type="custom_extension" data-binding="W3siYmluZGluZ05hbWUiOiJkYXRhYmFzZSIsInZhbHVlIjoic2l0ZV90ZXh0LmFwcGZvbGlvIGRhdGFiYXNlIn1d" icon="false" surround="false" data-widget-id="cb708684876c4db58028e8c547609bf2" data-widget-version="83" data-widget-config="eyJyZW50QnV0dG9uVGV4dCI6IlBheSBSZW50IiwidFBvcnRhbCI6dHJ1ZSwib1BvcnRhbFRleHQiOiJPd25lciBQb3J0YWwiLCJ0UG9ydGFsR3JvdXAiOm51bGwsIm9Qb3J0YWxUaXRsZSI6dHJ1ZSwiaGlkZUJ1dHRvbkljb24iOm51bGwsImxheW91dCI6ImZvb3Rlci1saW5rcyIsInRQb3J0YWxUaXRsZSI6dHJ1ZSwib1BvcnRhbCI6ZmFsc2UsImRhdGFiYXNlIjoiPHAgY2xhc3M9XCJydGVCbG9ja1wiPmF0bGFzcG08L3A+IiwicG9ydGZvbGlvSUQiOm51bGwsInRQb3J0YWxUZXh0IjoiT25saW5lIFBvcnRhbCIsIm9Qb3J0YWxHcm91cCI6bnVsbH0="> <div class="footer-links-layout"> <div class="tportal center"> <h3 class="portal-heading">Online Portal</h3> 
+ <p class="start-text"> <a class="login-link normal-link" aria-label="Log into the Online Portal (opens in a new tab)" rel="noopener" target="_blank" href="">Log In</a> 
+</p> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div class="dmRespRow u_1434508917" style="text-align: center;" id="1434508917"> <div class="dmRespColsWrapper" id="1164905859"> <div class="u_1033519312 dmRespCol small-12 large-10 medium-10" id="1033519312"> <div class="u_1502558635 dmNewParagraph" data-element-type="paragraph" id="1502558635" style="" data-version="5" data-styletopreserve="{"background-image":""}"><p class="m-text-align-center size-14"><a href="/sitemap" class="font-size-14" style="display: initial; font-weight: bold; color: rgb(255, 255, 255); text-decoration: none;">Sitemap</a></p><p class="m-text-align-center size-11 m-size-9"><span style="display: initial; color: rgb(255, 255, 255);" class="font-size-11 m-font-size-9">We are pledged to the letter and spirit of U.S. policy for the achievement of equal housing opportunity throughout the Nation. We encourage and support an affirmative advertising and marketing programs in which there are no barriers to obtaining housing because of race, color, religion, sex (including gender identity and sexual orientation), handicap, familial status, or national origin.</span></p></div> <div class="u_1070723938 dmNewParagraph" data-element-type="paragraph" id="1070723938" style="transition: opacity 1s ease-in-out 0s; text-align: left; display: block;" data-version="5"><p class="m-text-align-center size-14"><span class="font-size-14" style="display: initial; color: rgb(255, 255, 255);">&copy; 2023 All Rights Reserved.</span><span style="display: initial;"><span class="ql-cursor">﻿</span></span></p></div> <div class="u_1744915457 dmNewParagraph" data-element-type="paragraph" id="1744915457" style="transition: opacity 1s ease-in-out 0s;" data-binding="W3siYmluZGluZ05hbWUiOiJ0ZXh0IiwidmFsdWUiOiJzaXRlX3RleHQuY29tcGFueSBuYW1lIn1d" data-diy-text=""><p class="rteBlock">Beaumont Cove Apartments</p></div></div> 
+ <div class="u_1666378195 dmRespCol small-12 large-2 medium-2" id="1666378195"> <div class="widget-dc6c10 u_1841371321 dmCustomWidget" data-lazy-load="" data-title="" id="1841371321" dmle_extension="custom_extension" data-element-type="custom_extension" wr="false" icon="false" surround="false" data-widget-id="dc6c10203cb748908861f7aadb733c17" data-widget-version="12" data-widget-config="eyJmb290ZXItaW1hZ2UiOiJodHRwczovL2Nkbi5hcHBmb2xpb3dlYnNpdGVzLmNvbS9zaXRlcy9yZXNvdXJjZXMvaW1hZ2VzL3Bvd2VyZWQtYnktYXBwZm9saW8ucG5nIn0="><img src="https://cdn.appfoliowebsites.com/sites/resources/images/powered-by-appfolio.png" alt="AppFolio Property Manager" class="apm-footer-logo" width="150" height="56" onerror="handleImageLoadError(this)"/></div> 
+</div> 
+</div> 
+</div> 
+</div> 
+ <div id="1236746004" dmle_extension="powered_by" data-element-type="powered_by" icon="true" surround="false"></div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+</div> 
+
+    </div>
+</div>
+<!--  Add full CSS and Javascript before the close tag of the body if needed -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- Google Fonts Include -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- loadCSS function fonts.jsp-->
+
+
+
+<link rel="preload" href="https://irp.cdn-website.com/fonts/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Quicksand:ital,wght@0,300..700;1,300..700&amp;subset=latin-ext&amp;display=swap"  as="style" fetchpriority="low" onload="loadCSS(this)" />
+
+
+
+
+
+<!-- RT CSS Include d-css-runtime-desktop-one-package-structured-global-->
+<link rel="preload" as="style" fetchpriority="low" onload="loadCSS(this)" href="https://static.cdn-website.com/mnlt/production/6478/_dm/s/rt/dist/css/d-css-runtime-desktop-one-package-structured-global.min.css" />
+
+<!-- End of RT CSS Include -->
+
+<link rel="preload" href="https://irp.cdn-website.com/WIDGET_CSS/254f0fbe56e6255f7b56cac278a712c8.css" id="widgetCSS" as="style" fetchpriority="low" onload="loadCSS(this)" />
+
+<!-- Support `img` size attributes -->
+<style>img[width][height] {
+  height: auto;
+}</style>
+
+<!-- Support showing sticky element on page only -->
+<style>
+  body[data-page-alias="home"] #dm [data-show-on-page-only="home"] {
+    display: block !important;
+  }
+</style>
+
+<!-- This is populated in Ajax navigation -->
+<style id="pageAdditionalWidgetsCss" type="text/css">
+</style>
+
+
+
+
+<!-- Site CSS -->
+<link rel="preload" href="https://irp.cdn-website.com/cbad8b42/files/cbad8b42_withFlex_1.min.css?v=81" id="siteGlobalCss" as="style" fetchpriority="low" onload="loadCSS(this)" />
+
+
+
+<style id="customWidgetStyle" type="text/css">
+    
+</style>
+<style id="innerPagesStyle" type="text/css">
+    
+</style>
+
+
+<style
+        id="additionalGlobalCss" type="text/css"
+>
+</style>
+
+<!-- Page CSS -->
+<link rel="preload" href="https://irp.cdn-website.com/cbad8b42/files/cbad8b42_home_withFlex_1.min.css?v=81" id="homeCssLink" as="style" fetchpriority="low" onload="loadCSS(this)" />
+
+<style id="pagestyle" type="text/css">
+    
+</style>
+
+<style id="pagestyleDevice" type="text/css">
+    
+</style>
+
+<!-- Flex Sections CSS -->
+
+
+
+
+
+<style id="globalFontSizeStyle" type="text/css">
+    .font-size-20, .size-20, .size-20 > font { font-size: 20px !important; }.font-size-18, .size-18, .size-18 > font { font-size: 18px !important; }.font-size-26, .size-26, .size-26 > font { font-size: 26px !important; }.font-size-16, .size-16, .size-16 > font { font-size: 16px !important; }.font-size-21, .size-21, .size-21 > font { font-size: 21px !important; }.font-size-14, .size-14, .size-14 > font { font-size: 14px !important; }.font-size-11, .size-11, .size-11 > font { font-size: 11px !important; }
+</style>
+<style id="pageFontSizeStyle" type="text/css">
+</style>
+
+<!-- ========= JS Section ========= -->
+<script>
+    var isWLR = true;
+
+    window.customWidgetsFunctions = {};
+    window.customWidgetsStrings = {};
+    window.collections = {};
+    window.currentLanguage = "ENGLISH"
+    window.isSitePreview = false;
+</script>
+<script>
+    window.customWidgetsFunctions["cb708684876c4db58028e8c547609bf2~83"] = function (element, data, api) {
+        (()=>{function t(){let t=document.createElement("div");t.id="oportal",element.appendChild(t);let e=window.getComputedStyle(t).getPropertyValue("color"),o=element.querySelector(".oportal");if(o){e&&(o.style.color=e);let n=window.getComputedStyle(t).getPropertyValue("text-align");n&&(o.style.textAlign=n)}t.remove();let n=document.createElement("div");n.id="tportal",element.appendChild(n);let a=window.getComputedStyle(n).getPropertyValue("color"),l=element.querySelector(".tportal");if(l){a&&(l.style.color=a);let t=window.getComputedStyle(n).getPropertyValue("text-align");t&&(l.style.textAlign=t)}n.remove()}dmAPI.runOnReady("load",()=>{!function(){if(!data.config.database&&data.inEditor&&(element.innerHTML='<div class="portal-links"><p class="warning">Connect this widget to the AppFolio Database field by right-clicking and selecting \'Connect to Data\'.</p></div>'),data.config.database){var e,o,n;let a=data.config.database?data.config.database.includes('<p class="rteBlock">')?jQuery(data.config.database).text():data.config.database:"",l=data.config.portfolioID?data.config.portfolioID.includes('<p class="rteBlock">')?`&portfolio_uuid=${jQuery(data.config.portfolioID).text()}`:`&portfolio_uuid=${data.config.portfolioID}`:"",i={pay_rent:{log_in:`https://${a}.appfolio.com/connect/users/sign_in?a=cw&utm_source=apmsites_v3&utm_campaign=pay_rent_button${l}`},online_portal:{log_in:`https://${a}.appfolio.com/connect/users/sign_in?a=cw&utm_source=apmsites_v3&utm_campaign=tportal_login${l}`,sign_up:`https://${a}.appfolio.com/connect/users/request_access?a=cw&utm_source=apmsites_v3&utm_campaign=tportal_self_signup${l}`},owner_portal:{log_in:`https://${a}.appfolio.com/oportal/users/log_in?a=cw&utm_source=apmsites_v3&utm_campaign=oportal_login${l}`,sign_up:`https://${a}.appfolio.com/oportal/users/sign_up?a=cw&utm_source=apmsites_v3&utm_campaign=oportal_self_signup${l}`}};switch(data.config.layout){case"pay-rent-button":e=i,$(element).find(".pay-rent-button").attr("href",e.pay_rent.log_in);break;case"portal-page":o=i,data.config.tPortal&&($(element).find(".portal-page-layout .tportal .portal-button").attr("href",o.online_portal.log_in),$(element).find(".portal-page-layout .tportal .sign-up-link").attr("href",o.online_portal.sign_up)),data.config.oPortal&&($(element).find(".portal-page-layout .oportal .portal-button").attr("href",o.owner_portal.log_in),$(element).find(".portal-page-layout .oportal .sign-up-link").attr("href",o.owner_portal.sign_up)),t();break;case"footer-links":n=i,data.config.tPortal&&($(element).find(".footer-links-layout .tportal .login-link").attr("href",n.online_portal.log_in),$(element).find(".footer-links-layout .tportal .sign-up-link").attr("href",n.online_portal.sign_up)),data.config.oPortal&&($(element).find(".footer-links-layout .oportal .login-link").attr("href",n.owner_portal.log_in),$(element).find(".footer-links-layout .oportal .sign-up-link").attr("href",n.owner_portal.sign_up)),t()}}}()}),$(element).find(".pay-rent-button").on("click",()=>gtag("event","Online Portal",{button_clicked:"Pay Rent Button"})),$(element).find(".portal-page-layout .tportal .sign-up-link").on("click",()=>gtag("event","Online Portal",{button_clicked:"Portal Page Get Started"})),$(element).find(".portal-page-layout .tportal .portal-button").on("click",()=>gtag("event","Online Portal",{button_clicked:"Portal Page Login"})),$(element).find(".portal-page-layout .oportal .sign-up-link").on("click",()=>gtag("event","Owner Portal",{button_clicked:"Portal Page Get Started"})),$(element).find(".portal-page-layout .oportal .portal-button").on("click",()=>gtag("event","Owner Portal",{button_clicked:"Portal Page Login"})),$(element).find(".footer-links-layout .tportal .sign-up-link").on("click",()=>gtag("event","Online Portal",{button_clicked:"Footer Get Started"})),$(element).find(".footer-links-layout .tportal .login-link").on("click",()=>gtag("event","Online Portal",{button_clicked:"Footer Login"})),$(element).find(".footer-links-layout .oportal .sign-up-link").on("click",()=>gtag("event","Owner Portal",{button_clicked:"Footer Get Started"})),$(element).find(".footer-links-layout .oportal .login-link").on("click",()=>gtag("event","Owner Portal",{button_clicked:"Footer Login"}))})();
+    };
+</script>
+<script>
+    window.customWidgetsFunctions["128151275e4145de9c457a6ae729489e~115"] = function (element, data, api) {
+        ///There is a problem with changing the width, because widget resizing is off.
+element.style.setProperty('width', data.config.width + 'px', 'important');
+
+    };
+</script>
+<script>
+    window.customWidgetsFunctions["dc6c10203cb748908861f7aadb733c17~12"] = function (element, data, api) {
+        null
+    };
+</script>
+<script>
+    if (!window.customWidgetsStrings["128151275e4145de9c457a6ae729489e"]) {
+        window.customWidgetsStrings["128151275e4145de9c457a6ae729489e"] = {};
+    }
+    var value = "dGVzdCBlbmJn";
+    window.customWidgetsStrings["128151275e4145de9c457a6ae729489e"]["FacebookFeed.widgetTitle"] = atob(
+        value);
+</script>
+<script type="text/javascript">
+
+    var d_version = "production_6478";
+    var build = "2026-05-22T17_04_27";
+    window['v' + 'ersion'] = d_version;
+
+    function buildEditorParent() {
+        window.isMultiScreen = true;
+        window.editorParent = {};
+        window.previewParent = {};
+        window.assetsCacheQueryParam = "?version=2026-05-22T17_04_27";
+        try {
+            var _p = window.parent;
+            if (_p && _p.document && _p.$ && _p.$.dmfw) {
+                window.editorParent = _p;
+            } else if (_p.isSitePreview) {
+                window.previewParent = _p;
+            }
+        } catch (e) {
+
+        }
+    }
+
+    buildEditorParent();
+</script>
+
+<!-- Load jQuery -->
+<script type="text/javascript" id='d-js-jquery'
+        src="https://static.cdn-website.com/libs/jquery/jquery-3.7.0.min.js"></script>
+<!-- End Load jQuery -->
+<!-- Injecting site-wide before scripts -->
+<!-- End Injecting site-wide to the head -->
+
+
+<script>
+    var _jquery = window.$;
+
+    var jqueryAliases = ['$', 'jquery', 'jQuery'];
+
+    jqueryAliases.forEach((alias) => {
+        Object.defineProperty(window, alias, {
+            get() {
+                return _jquery;
+            },
+            set() {
+                console.warn("Trying to over-write the global jquery object!");
+            }
+        });
+    });
+    window.jQuery.migrateMute = true;
+</script>
+<script>
+    window.cookiesNotificationMarkupPreview = 'null';
+</script>
+
+<!-- HEAD RT JS Include -->
+<script id='d-js-params'>
+    window.INSITE = window.INSITE || {};
+    window.INSITE.device = "desktop";
+
+    window.rtCommonProps = {};
+    rtCommonProps["rt.ajax.ajaxScriptsFix"] =true;
+    rtCommonProps["rt.pushnotifs.sslframe.encoded"] = 'aHR0cHM6Ly97c3ViZG9tYWlufS5wdXNoLW5vdGlmcy5jb20=';
+    rtCommonProps["runtimecollector.url"] = 'https://rtc.multiscreensite.com';
+    rtCommonProps["performance.tabletPreview.removeScroll"] = 'false';
+    rtCommonProps["inlineEditGrid.snap"] =true;
+    rtCommonProps["popup.insite.cookie.ttl"] = '0.5';
+    rtCommonProps["rt.pushnotifs.force.button"] =true;
+    rtCommonProps["common.mapbox.token"] = 'pk.SCRUBBED_FOR_PUSH_PROTECTION';
+    rtCommonProps["common.mapbox.js.override"] =false;
+    rtCommonProps["common.here.appId"] = 'iYvDjIQ2quyEu0rg0hLo';
+    rtCommonProps["common.here.appCode"] = '1hcIxLJcbybmtBYTD9Z1UA';
+    rtCommonProps["isCoverage.test"] =false;
+    rtCommonProps["ecommerce.ecwid.script"] = 'https://app.multiscreenstore.com/script.js';
+    rtCommonProps["common.resources.dist.cdn"] =true;
+    rtCommonProps["common.build.dist.folder"] = 'production/6478';
+    rtCommonProps["common.resources.cdn.host"] = 'https://static.cdn-website.com';
+    rtCommonProps["common.resources.folder"] = 'https://static.cdn-website.com/mnlt/production/6478';
+    rtCommonProps["feature.flag.runtime.backgroundSlider.preload.slowly"] =true;
+    rtCommonProps["feature.flag.runtime.newAnimation.enabled"] =true;
+    rtCommonProps["feature.flag.runtime.newAnimation.jitAnimation.enabled"] =true;
+    rtCommonProps["feature.flag.sites.google.analytics.gtag"] =true;
+    rtCommonProps["feature.flag.runOnReadyNewTask"] =true;
+    rtCommonProps["isAutomation.test"] =false;
+    rtCommonProps["booking.cal.api.domain"] = 'api.cal.com';
+
+    
+    rtCommonProps['common.mapsProvider'] = 'mapbox';
+    
+    rtCommonProps['common.mapsProvider.version'] = '0.52.0';
+    rtCommonProps['common.geocodeProvider'] = 'mapbox';
+    rtCommonProps['server.for.resources'] = '';
+    rtCommonProps['feature.flag.lazy.widgets'] = true;
+    rtCommonProps['feature.flag.single.wow'] = false;
+    rtCommonProps['feature.flag.disallowPopupsInEditor'] = true;
+    rtCommonProps['feature.flag.mark.anchors'] = true;
+    rtCommonProps['captcha.public.key'] = '6LffcBsUAAAAAMU-MYacU-6QHY4iDtUEYv_Ppwlz';
+    rtCommonProps['captcha.invisible.public.key'] = '6LeiWB8UAAAAAHYnVJM7_-7ap6bXCUNGiv7bBPME';
+    rtCommonProps["images.sizes.small"] =160;
+    rtCommonProps["images.sizes.mobile"] =640;
+    rtCommonProps["images.sizes.tablet"] =1280;
+    rtCommonProps["images.sizes.desktop"] =1920;
+    rtCommonProps["modules.resources.cdn"] =true;
+    rtCommonProps["import.images.storage.imageCDN"] = 'https://lirp.cdn-website.com/';
+    rtCommonProps["feature.flag.runtime.inp.threshold"] =150;
+    rtCommonProps["feature.flag.performance.logs"] =false;
+    rtCommonProps["site.widget.form.captcha.type"] = 'g_recaptcha';
+    rtCommonProps["friendly.captcha.site.key"] = 'FCMGSQG9GVNMFS8K';
+    rtCommonProps["cookiebot.mapbox.consent.category"] = 'marketing';
+    rtCommonProps["termly.mapbox.consent.category"] = 'performance';
+    // feature flags that's used out of runtime module (in  legacy files)
+    rtCommonProps["platform.monolith.personalization.dateTimeCondition.popupMsgAction.moveToclient.enabled"] =true;
+
+    window.rtFlags = {};
+    rtFlags["unsuspendEcwidStoreOnRuntime.enabled"] =true;
+    rtFlags["scripts.widgetCount.enabled"] =true;
+    rtFlags["fnb.animations.tracking.enabled"] =true;
+    rtFlags["ecom.ecwidNewUrlStructure.enabled"] = false;
+    rtFlags["ecom.ecwid.accountPage.emptyBaseUrl.enabled"] = true;
+    rtFlags["ecom.ecwid.pages.links.disable.listeners"] = true;
+    rtFlags["ecom.ecwid.storefrontV3.enabled"] = false;
+    rtFlags["ecom.ecwid.old.store.fix.facebook.share"] = true;
+    rtFlags["feature.flag.photo.gallery.exact.size"] =true;
+    rtFlags["geocode.search.localize"] =false;
+    rtFlags["feature.flag.runtime.newAnimation.asyncInit.setTimeout.enabled"] =false;
+    rtFlags["twitter.heightLimit.enabled"] = true;
+    rtFlags["runtime.lottieOverflow"] =false;
+    rtFlags["runtime.monitoring.sentry.ignoreErrors"] = "";
+    rtFlags["streamline.monolith.personalization.supportMultipleConditions.enabled"] =false;
+    rtFlags["flex.animation.design.panel.layout"] =true;
+    rtFlags["runtime.cwv.report.cls.enabled"] =false;
+    rtFlags["runtime.cwv.report.lcp.enabled"] =false;
+    rtFlags["contact.form.useActiveForm"] =true;
+    rtFlags["contact.form.custom.errors.enabled"] =false;
+    rtFlags["runtime.ssr.productStore.internal.observer"] =true;
+    rtFlags["runtime.ssr.productCustomizations"] =true;
+    rtFlags["runtime.ssr.runtime.filter-sort.newFilterSortWidgetWithOptions.enabled"] =true;
+    rtFlags["runtime.ssr.ssrSlider.jumpThreshold.enabled"] =true;
+</script>
+<script src="https://static.cdn-website.com/mnlt/production/6478/_dm/s/rt/dist/scripts/d-js-one-runtime-unified-desktop.min.js"  id="d-js-core"></script>
+<!-- End of HEAD RT JS Include -->
+<script src="https://static.cdn-website.com/mnlt/production/6478/_dm/s/rt/dist/scripts/d-js-jquery-migrate.min.js" ></script>
+<script>
+    
+    $(window).bind("orientationchange", function (e) {
+        $.layoutManager.initLayout();
+        
+    });
+    $(document).resize(function () {
+        
+    });
+</script>
+<script src="/_dm/s/rt/smart/message.js?r&#x3D;1" type="text/javascript"></script><script src="/_dm/s/rt/smart/helpers.js" type="text/javascript"></script><script src="/_dm/s/rt/smart/userVisitsConditionService.js?v&#x3D;1" type="text/javascript"></script><script src="/_dm/s/rt/smart/timeRangeConditionService.js" type="text/javascript"></script><script src="https://static.cdn-website.com/libs/rrule/2.8.1/rrule.min.js" type="text/javascript"></script><script>(function(global){
+global.insiteScripts.message({useNew: true, ruleId : '1905437', ruleType : 'bfs', settings : 'eyJjb25kaXRpb25zX251bWJlciI6IjEiLCJiYWNrZ3JvdW5kIjoicmdiYSgxMTUsIDMxLCAyMiwgMSkiLCJib2R5IjoiJTNDZm9udCUyMGNvbG9yJTNEJTIyJTIzZmZmZmZmJTIyJTIwZmFjZSUzRCUyMkFCZWVaZWUlMjIlMjBzaXplJTNEJTIyNCUyMiUzRSUzQ3UlM0UlM0NhJTIwZmlsZSUzRCUyMmZhbHNlJTIyJTIwcmF3X3VybCUzRCUyMiUyMiUyMGhyZWYlM0QlMjIlMjIlMjBydW50aW1lX3VybCUzRCUyMiUyMiUyMHRhcmdldCUzRCUyMl9ibGFuayUyMiUzRSUzQ2ElMjBmaWxlJTNEJTIyZmFsc2UlMjIlMjByYXdfdXJsJTNEJTIyaHR0cHMlM0ElMkYlMkZpcnAtY2RuLm11bHRpc2NyZWVuc2l0ZS5jb20lMkYzYmMzMDRlNiUyRmZpbGVzJTJGdXBsb2FkZWQlMkZBdGxhcyUyNTIwYW5kJTI1MjBNdXNrb2dlZSUyNTIwd2UlMjUyMGFyZSUyNTIwb3BlbiUyNTIwZmx5ZXIlMjUyMCUyNTI4MSUyNTI5LmpwZyUyMiUyMGhyZWYlM0QlMjJodHRwcyUzQSUyRiUyRmlycC1jZG4ubXVsdGlzY3JlZW5zaXRlLmNvbSUyRjNiYzMwNGU2JTJGZmlsZXMlMkZ1cGxvYWRlZCUyRkF0bGFzJTI1MjBhbmQlMjUyME11c2tvZ2VlJTI1MjB3ZSUyNTIwYXJlJTI1MjBvcGVuJTI1MjBmbHllciUyNTIwJTI1MjgxJTI1MjkuanBnJTIyJTIwcnVudGltZV91cmwlM0QlMjJodHRwcyUzQSUyRiUyRmlycC1jZG4ubXVsdGlzY3JlZW5zaXRlLmNvbSUyRjNiYzMwNGU2JTJGZmlsZXMlMkZ1cGxvYWRlZCUyRkF0bGFzJTI1MjBhbmQlMjUyME11c2tvZ2VlJTI1MjB3ZSUyNTIwYXJlJTI1MjBvcGVuJTI1MjBmbHllciUyNTIwJTI1MjgxJTI1MjkuanBnJTIyJTIwdGFyZ2V0JTNEJTIyX2JsYW5rJTIyJTNFVG8lMjBWaWV3JTIwT3VyJTIwQ09WSUQtMTklMjBVcGRhdGVzJTIwUGFnZSUyMENsaWNrJTIwSGVyZSUzQyUyRmElM0UlM0MlMkZhJTNFJTNDJTJGdSUzRSUzQyUyRmZvbnQlM0UlM0NhJTIwZmlsZSUzRCUyMmZhbHNlJTIyJTIwcmF3X3VybCUzRCUyMiUyRnNpdGUlMkZjYmFkOGI0MiUyRiUzRm5lZSUzRHRydWUlMjZhbXAlM0JlZCUzRHRydWUlMjZhbXAlM0JzaG93T3JpZ2luYWwlM0R0cnVlJTI2YW1wJTNCcHJldmlldyUzRHRydWUlMjZhbXAlM0JkbV90cnlfbW9kZSUzRHRydWUlMjZhbXAlM0JkbV9jaGVja1N5bmMlM0QxJTIyJTIwaHJlZiUzRCUyMiUyRiUyMiUyMHJ1bnRpbWVfdXJsJTNEJTIyJTJGJTIyJTNFJTNDJTJGYSUzRSUzQ2RpdiUzRSUzQ2ZvbnQlMjBmYWNlJTNEJTIyUm9ib3RvJTIyJTIwc2l6ZSUzRCUyMjQlMjIlMjBjb2xvciUzRCUyMiUyM2ZmZmZmZiUyMiUzRSUzQyUyRmZvbnQlM0UlM0MlMkZkaXYlM0UifQ==', duration : 25, isForced : false });
+})(this);</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script type="text/javascript" id="d_track_sp">
+    ;(function(p,l,o,w,i,n,g){if(!p[i]){p.GlobalSnowplowNamespace=p.GlobalSnowplowNamespace||[];
+        p.GlobalSnowplowNamespace.push(i);p[i]=function(){(p[i].q=p[i].q||[]).push(arguments)
+        };p[i].q=p[i].q||[];n=l.createElement(o);g=l.getElementsByTagName(o)[0];n.async=1;
+        n.src=w;g.parentNode.insertBefore(n,g)}}(window,document,"script","//d32hwlnfiv2gyn.cloudfront.net/sp-2.0.0-dm-0.1.min.js","snowplow"));
+    window.dmsnowplow  = window.snowplow;
+
+    dmsnowplow('newTracker', 'cf', 'd32hwlnfiv2gyn.cloudfront.net', { // Initialise a tracker
+        appId: 'cbad8b42'
+    });
+
+    // snowplow queries element styles so we wait until CSS calculations are done.
+    requestAnimationFrame(() => {
+        dmsnowplow('trackPageView');
+        _dm_insite.forEach((rule) => {
+            // Specifically in popup only the client knows if it is shown or not so we don't always want to track its impression here
+            // the tracking is in popup.js
+            if (rule.actionName !== "popup") {
+                dmsnowplow('trackStructEvent', 'insite', 'impression', rule.ruleType, rule.ruleId);
+            }
+            window?.waitForDeferred?.('dmAjax', () => {
+                $.DM.events.trigger('event-ruleTriggered', {value: rule});
+            });
+        });
+    });
+</script>
+
+
+
+<div style="display:none;" id="P6iryBW0Wu"></div>
+
+<!-- photoswipe markup -->
+
+
+
+
+
+
+
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div> 
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+<div id="fb-root"
+        data-locale="en"></div>
+<!-- Alias: cbad8b42 -->
+<div class="dmPopupMask" id="dmPopupMask"></div>
+<div id="dmPopup" class="dmPopup">
+	<div class="dmPopupCloseWrapper"> <div class="dmPopupClose dm-common-icons-close oneIcon" onclick="dmHidePopup(event);"></div> </div>
+ 	<div class="dmPopupTitle"> <span></span> Share by:</div> 
+	<div class="data"></div>
+</div><script id="d_track_personalization">
+	window?.waitForDeferred?.('dmAjax', () => {
+		// Collects client data and updates cookies used by smart sites
+		window.expireDays = 365;
+		window.visitLength = 30 * 60000;
+		$.setCookie("dm_timezone_offset", (new Date()).getTimezoneOffset(), window.expireDays);
+			setSmartSiteCookiesInternal("dm_this_page_view","dm_last_page_view","dm_total_visits","dm_last_visit");
+	});
+</script>
+<script type="text/javascript">
+    
+    Parameters.NavigationAreaParams.MoreButtonText = 'MORE';
+    
+    Parameters.NavigationAreaParams.LessButtonText = 'LESS';
+    Parameters.HomeLinkText = 'Home';
+    </script>
+<!--  End Script tags -->
+<!--  Site Wide Html Markup -->
+<div id="swh-cfd5b9cca80c4f8a81b9dc479488e6da"><div data-wrapper-source="appstore" > <script>    if (window.location.search.match(/[?,&]preview=true/) && window.top !== window) {      window.__AudioEyePreviewMode=true;    }  </script>  <script type="text/javascript">!function(){    var b=function(){      window.__AudioEyeSiteHash = "ba0f6705f19d19cf5e5bccfe412ad87a";      window.__AudioEyeInstallSource = "duda";      var a=document.createElement("script");      a.src="https://wsmcdn.audioeye.com/aem.js";      a.type="text/javascript";      a.setAttribute("async","");      document.getElementsByTagName("body")[0].appendChild(a)};      "complete"!==document.readyState?window.addEventListener?window.addEventListener("load",b):window.attachEvent&&window.attachEvent("onload",b):b()}();    </script> </div></div><!--  Site Wide Html Markup -->
+<!--  Begin Product Custom HTML Markup -->
+<script src="https://cdn.appfoliowebsites.com/sites/resources/js/appfolio-global-scripts.js" defer></script><!--  End Product Custom HTML Markup -->
+</body>
+</html>

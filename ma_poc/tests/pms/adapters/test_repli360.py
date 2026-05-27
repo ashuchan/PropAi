@@ -19,6 +19,8 @@ from ma_poc.pms.adapters.repli360 import (
     _movein_today,
     find_repli360_floorplans,
     find_repli360_script_url,
+    merge_repli360_plan_meta,
+    parse_repli360_plan_meta,
     parse_repli360_str,
 )
 from ma_poc.pms.detector import _detect_html_markers
@@ -236,3 +238,229 @@ def test_detector_repli360_weak_marker_only_still_routes() -> None:
         '<a onclick="getUnitListByFloor(this,\'A1\',2,1619)">x</a>'
     )
     assert res is not None and res[0] == "repli360"
+
+
+# ─── 2026-05-22 PLAN_LEVEL→unit plan-meta merge (Repli360 PARTIAL fix) ─
+
+# Captured from the marquisonevans.com (site_id 1649) template-render
+# response: per-plan card layout is <h2>plan-name</h2> immediately
+# followed by "<beds-word/digit> Bedroom[s] | N Bath[s] | <span>SQFT</
+# span> sq.ft." and then the per-plan View Details anchor whose onclick
+# carries the floorPlanID. The plan-meta parser keys on the onclick and
+# walks BACKWARDS to pick up the nearest plan card.
+_TPL_RENDER_HTML = """
+<div class="plan-list">
+  <div class="card">
+    <h2>1A</h2>
+    <p>One Bedroom | 1 Bath | <span>670</span> sq.ft. | <span>14</span> Units Available</p>
+    <a class="btn" onclick="getUnitListByFloor(this,'4832490', 2, 1649, '');">View Details</a>
+  </div>
+  <div class="card">
+    <h2>2B</h2>
+    <p>Two Bedrooms | 2 Baths | <span>1100</span> sq.ft. | <span>3</span> Units Available</p>
+    <a class="btn" onclick="getUnitListByFloor(this,'4832491', 2, 1649, '');">View Details</a>
+  </div>
+  <div class="card">
+    <h2>S1</h2>
+    <p>Studio | 1 Bath | <span>520</span> sq.ft. | <span>1</span> Unit Available</p>
+    <a class="btn" onclick="getUnitListByFloor(this,'4832492', 2, 1649, '');">View Details</a>
+  </div>
+  <div class="card">
+    <h2>3PH</h2>
+    <p>3 Bedrooms | 2.5 Baths | <span>1600</span> sq.ft.</p>
+    <a class="btn" onclick="getUnitListByFloor(this,'4832493', 2, 1649, '');">View Details</a>
+  </div>
+</div>
+"""
+
+
+def test_parse_plan_meta_extracts_name_beds_baths_sqft() -> None:
+    """The four plan-card patterns we see in marquisonevans/royce/etc.:
+    "One Bedroom | 1 Bath" (word beds), "Two Bedrooms | 2 Baths" (word
+    plural), "Studio | 1 Bath" (no Bedroom word), "3 Bedrooms | 2.5
+    Baths" (digit beds + fractional baths)."""
+    meta = parse_repli360_plan_meta(_TPL_RENDER_HTML)
+    assert set(meta.keys()) == {"4832490", "4832491", "4832492", "4832493"}
+    assert meta["4832490"] == {
+        "floor_plan_name": "1A",
+        "bedrooms": "1",
+        "bathrooms": "1",
+        "sqft": "670",
+    }
+    assert meta["4832491"] == {
+        "floor_plan_name": "2B",
+        "bedrooms": "2",
+        "bathrooms": "2",
+        "sqft": "1100",
+    }
+    # Studio → bedrooms "0", no "Bedroom" word in source.
+    assert meta["4832492"] == {
+        "floor_plan_name": "S1",
+        "bedrooms": "0",
+        "bathrooms": "1",
+        "sqft": "520",
+    }
+    # Digit-prefix beds and fractional baths.
+    assert meta["4832493"] == {
+        "floor_plan_name": "3PH",
+        "bedrooms": "3",
+        "bathrooms": "2.5",
+        "sqft": "1600",
+    }
+
+
+def test_parse_plan_meta_empty_and_no_onclick() -> None:
+    assert parse_repli360_plan_meta("") == {}
+    assert parse_repli360_plan_meta("<html><body>no onclick here</body></html>") == {}
+
+
+def test_parse_plan_meta_dedup_repeated_onclick() -> None:
+    """A floorPlanID can appear in multiple tabs (All Available, Filter
+    by Beds, etc.); first card wins so we don't accidentally pick up a
+    later, less-specific occurrence."""
+    html = """
+    <div><h2>1A</h2>
+      <p>One Bedroom | 1 Bath | <span>670</span> sq.ft.</p>
+      <a onclick="getUnitListByFloor(this,'4832490',2,1649)">x</a>
+    </div>
+    <div><h2>1A-duplicate</h2>
+      <p>Two Bedrooms | 2 Baths | <span>9999</span> sq.ft.</p>
+      <a onclick="getUnitListByFloor(this,'4832490',2,1649)">x</a>
+    </div>
+    """
+    meta = parse_repli360_plan_meta(html)
+    assert meta == {
+        "4832490": {
+            "floor_plan_name": "1A",
+            "bedrooms": "1",
+            "bathrooms": "1",
+            "sqft": "670",
+        }
+    }
+
+
+def test_parse_plan_meta_onclick_with_missing_meta_yields_empty_dict() -> None:
+    """An onclick whose preceding window has none of the expected meta
+    markup should still appear in the map (with an empty value) — the
+    adapter's .get(fpid, {}) pattern then merges nothing for that plan
+    rather than skipping the floorplan entirely."""
+    html = '<a onclick="getUnitListByFloor(this,\'X1\',2,1649)">x</a>'
+    meta = parse_repli360_plan_meta(html)
+    assert meta == {"X1": {}}
+
+
+def test_parse_plan_meta_picks_nearest_plan_card() -> None:
+    """When two plan cards exist and the second onclick must pick up the
+    second card (not the first). Verifies the backward-window join is
+    correctly bounded to the nearest preceding card."""
+    html = """
+    <h2>1A</h2><p>One Bedroom | 1 Bath | <span>670</span> sq.ft.</p>
+    <a onclick="getUnitListByFloor(this,'FP1',2,1649)">x</a>
+    <h2>2B</h2><p>Two Bedrooms | 2 Baths | <span>1100</span> sq.ft.</p>
+    <a onclick="getUnitListByFloor(this,'FP2',2,1649)">x</a>
+    """
+    meta = parse_repli360_plan_meta(html)
+    assert meta["FP1"]["floor_plan_name"] == "1A"
+    assert meta["FP1"]["sqft"] == "670"
+    assert meta["FP2"]["floor_plan_name"] == "2B"
+    assert meta["FP2"]["sqft"] == "1100"
+
+
+def test_merge_plan_meta_fills_missing_only() -> None:
+    """The merge MUST fill empty plan-level fields and MUST NOT overwrite
+    per-unit values that came back from getUnitListByFloor (rent and
+    unit_number are the only per-unit-authoritative fields today, but
+    other adapters in the future may populate beds/baths per unit; the
+    helper has to be defensive)."""
+    units = [
+        {
+            "unit_number": "4114",
+            "rent_range": "$2335",
+            "sqft": "",
+            "bedrooms": "",
+            "bathrooms": "",
+            "floor_plan_name": "",
+        },
+        {
+            "unit_number": "4115",
+            "rent_range": "$2400",
+            "sqft": "999",  # already set — must not be overwritten
+            "bedrooms": "1",
+            "bathrooms": "1",
+            "floor_plan_name": "OverrideMe",
+        },
+    ]
+    meta = {
+        "floor_plan_name": "1A",
+        "sqft": "670",
+        "bedrooms": "1",
+        "bathrooms": "1",
+    }
+    merge_repli360_plan_meta(units, meta)
+    assert units[0]["sqft"] == "670"
+    assert units[0]["bedrooms"] == "1"
+    assert units[0]["floor_plan_name"] == "1A"
+    # Per-unit value preserved on unit #2.
+    assert units[1]["sqft"] == "999"
+    assert units[1]["floor_plan_name"] == "OverrideMe"
+
+
+def test_merge_plan_meta_no_op_when_meta_empty() -> None:
+    units = [{"unit_number": "4114", "sqft": ""}]
+    merge_repli360_plan_meta(units, {})
+    assert units == [{"unit_number": "4114", "sqft": ""}]
+
+
+def test_end_to_end_plan_meta_lifts_units_to_rent_plus_sqft() -> None:
+    """The success-bar test: this mirrors the per-floorplan loop in
+    ``Repli360Adapter.extract`` — parse template-render plan_meta once,
+    parse each floorplan's getUnitListByFloor str into units, merge
+    meta in. The resulting units must have BOTH rent (from str HTML)
+    AND sqft (from plan meta) — that combination is the Surgex success
+    criterion that lifts repli360 out of PARTIAL."""
+    # 1. Plan-level metadata from /admin/template-render.
+    tpl_html = (
+        "<h2>1A</h2><p>One Bedroom | 1 Bath | <span>670</span> sq.ft.</p>"
+        "<a onclick=\"getUnitListByFloor(this,'4832490',2,1649)\">x</a>"
+    )
+    plan_meta = parse_repli360_plan_meta(tpl_html)
+    assert "4832490" in plan_meta
+
+    # 2. Per-unit rows from a getUnitListByFloor response (the existing
+    # _STR_HTML fixture — 2 units, both have rent, NEITHER has sqft).
+    units = parse_repli360_str(_STR_HTML, "https://app.repli360.com/x")
+    assert all(not u.get("sqft") for u in units)
+    assert all(u.get("market_rent_low") for u in units)
+
+    # 3. Apply the meta merge as the adapter does.
+    merge_repli360_plan_meta(units, plan_meta["4832490"])
+
+    # 4. Verify the success bar: ≥1 unit with rent AND sqft AND beds.
+    rent_and_sqft = [u for u in units if u.get("market_rent_low") and u.get("sqft")]
+    assert len(rent_and_sqft) == 2, (
+        "Every unit must gain sqft from the plan meta merge"
+    )
+    assert rent_and_sqft[0]["sqft"] == "670"
+    assert rent_and_sqft[0]["bedrooms"] == "1"
+    assert rent_and_sqft[0]["bathrooms"] == "1"
+    assert rent_and_sqft[0]["floor_plan_name"] == "1A"
+
+
+def test_parse_plan_meta_word_to_digit_map_complete() -> None:
+    """Every word in the One..Six map should resolve correctly. Anything
+    above Six (rare for residential) falls through to the literal."""
+    cases = [
+        ("One Bedroom", "1"),
+        ("Two Bedrooms", "2"),
+        ("Three Bedrooms", "3"),
+        ("Four Bedrooms", "4"),
+        ("Five Bedrooms", "5"),
+        ("Six Bedrooms", "6"),
+    ]
+    for phrase, expected in cases:
+        html = (
+            f"<h2>X</h2><p>{phrase} | 1 Bath | <span>500</span> sq.ft.</p>"
+            f"<a onclick=\"getUnitListByFloor(this,'FP',2,1)\">x</a>"
+        )
+        meta = parse_repli360_plan_meta(html)
+        assert meta["FP"]["bedrooms"] == expected, phrase

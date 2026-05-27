@@ -135,6 +135,10 @@ async def recover_universal_embed(
     )
     from ma_poc.pms.adapters._leaseleads_embed import recover_leaseleads_embed
     from ma_poc.pms.adapters._pms_portal_hop import recover_pms_portal
+    from ma_poc.pms.adapters._g5_recovery import recover_g5
+    from ma_poc.pms.adapters._sightmap_subpage_recovery import (
+        recover_sightmap_subpage,
+    )
 
     try:
         units = await recover_appfolio_embed(page, ctx)
@@ -164,6 +168,42 @@ async def recover_universal_embed(
         if generic_units:
             mark_attempted(ctx, "generic_dom")
             return generic_units, "TIER_3_DOM_GENERIC", "generic_dom"
+
+        # SightMap subpage recovery (2026-05-24): closes the
+        # TIER_1_API_SIGHTMAP P1 cohort (131 props) where prod scored
+        # SUCCESS via SightMap but canary's detector misrouted to
+        # RentCafe/Funnel/etc. because the embed only lives at
+        # /floorplans/ one nav-hop deep. Probes that family of
+        # subpaths, splices a matching body into ctx, and lets
+        # SightMapAdapter discover the embed code + canonical API URL.
+        # Live-verified 8/10 in the cohort sample.
+        sm_units = await recover_sightmap_subpage(page, ctx)
+        if sm_units:
+            mark_attempted(ctx, "sightmap_subpage")
+            # The recovery stamps its own extraction_tier; prefer that
+            # over a generic label to keep cohort reporting accurate.
+            tier = "TIER_1_API_SIGHTMAP_SUBPAGE_RECOVERY"
+            if isinstance(sm_units[0], dict):
+                t = str(sm_units[0].get("extraction_tier") or "").strip()
+                if t:
+                    tier = t
+            return sm_units, tier, "sightmap_subpage"
+
+        # G5 recovery (2026-05-24): closes the TIER_1_API generic /
+        # Knock-misroute sub-cohort where the property has a g5-cl-*
+        # URN in its body but the detector picked a different PMS
+        # adapter that returned 0 units. Pairs with the G5 adapter's
+        # own curl_cffi + URN-candidate retry (commit 642c41b) — this
+        # wrapper just makes G5 reachable from the misroute path.
+        g5_units = await recover_g5(page, ctx)
+        if g5_units:
+            mark_attempted(ctx, "g5_recovery")
+            tier = "TIER_1_API_G5_RECOVERY"
+            if isinstance(g5_units[0], dict):
+                t = str(g5_units[0].get("extraction_tier") or "").strip()
+                if t:
+                    tier = t
+            return g5_units, tier, "g5_recovery"
     except Exception as exc:  # pragma: no cover — defensive
         log.debug("universal-recovery chain raised err=%s", exc)
 

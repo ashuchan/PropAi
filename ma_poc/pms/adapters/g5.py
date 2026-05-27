@@ -53,6 +53,17 @@ _G5_ENDPOINT = "https://inventory.g5marketingcloud.com/graphql"
 # returned 200 from the GraphQL endpoint when passed as ``locationUrn``.
 _G5_URN_RE = re.compile(r"g5-cl[a-z]?-[a-z0-9]+(?:-[a-z0-9]+)*", re.IGNORECASE)
 
+# 2026-05-23: G5 dataLayer canonical property URN — the single source of
+# truth for which ``locationUrn`` the GraphQL API accepts. Always the
+# ``g5-cl-*`` (no ``w``) form. The ``g5-clw-*-{32-hex-suffix}`` URN
+# returns 404 from the inventory GraphQL endpoint (validated 21/21 on
+# the canary G5_API_ERROR cohort) but was being picked by the longest-
+# match heuristic, blocking unit extraction for the whole cohort.
+_G5_STORE_ID_RE = re.compile(
+    r'"G5_STORE_ID"\s*:\s*"(g5-cl-[a-z0-9-]+)"',
+    re.IGNORECASE,
+)
+
 # GraphQL query — returns the unit + floor-plan join in one round trip.
 # perPage:200 covers any normal property; pagination would need the API's
 # total-count hint (not currently used).
@@ -89,24 +100,92 @@ _TIER_EMPTY = f"{_TIER_BASE}_EMPTY"
 
 
 def find_g5_urn(html: str) -> str | None:
-    """Return the longest ``g5-cl-...`` / ``g5-cl<x>-...`` slug in *html*,
-    or ``None``.
+    """Return the canonical ``locationUrn`` for the property, or ``None``.
 
-    Longest match wins because the same property might have both the bare
-    ``g5-cl-<id>`` and the full ``g5-cl-<id>-<name-slug>`` form; the
-    GraphQL API accepts either but the longer form is unambiguous.
+    Selection priority (2026-05-23 fix — see canary G5_API_ERROR 21/21
+    failure cohort root cause):
+      1. ``G5_STORE_ID`` from the inline ``dataLayer`` script. This is
+         the SINGLE source of truth — the GraphQL API only accepts the
+         ``g5-cl-<id>-<slug>`` form found here. Always present on every
+         G5-hosted page (validated across 5+ Goldoller / Bayshore /
+         GK Management / single-property sites).
+      2. Longest ``g5-cl-*`` match (NOT ``g5-clw-*``) from the HTML —
+         fallback when the dataLayer script is missing or the URN was
+         stripped from it.
 
-    2026-05-20: ``"g5-cl"`` substring (without trailing dash) is the
-    early-out gate so we also match the ``g5-clw-`` property-level
-    variant (e.g. ``g5-clw-guhjplm75w-villas-willow-glen-...``). The
-    regex itself enforces the ``g5-cl<x?>-<id>`` shape.
+    The ``g5-clw-*-{32-hex}`` URN is the WEBSITE/wrapper URN, NOT a
+    valid GraphQL ``locationUrn``. The old longest-match heuristic
+    selected it because the 32-hex hash suffix made it longer than the
+    real ``g5-cl-*`` URN — that's the bug. Multi-property portfolios
+    (Goldoller, GK Management, Bayshore) also leak SIBLING ``g5-cl-*``
+    URNs onto the page (CDN image paths for menu thumbnails), so the
+    raw-longest fallback alone isn't safe either — the dataLayer is
+    what tells us which sibling THIS page belongs to.
+    """
+    candidates = find_g5_urn_candidates(html)
+    return candidates[0] if candidates else None
+
+
+def find_g5_urn_candidates(html: str) -> list[str]:
+    """Return up-to-3 ranked URN candidates for ``html``, best-first.
+
+    The single-URN ``find_g5_urn`` returns the winner; this returns the
+    full priority list so the adapter can retry with sibling URNs when
+    the primary returns empty data. Multi-property portfolios
+    (Goldoller, GK Management, Bayshore) leak sibling ``g5-cl-*`` URNs
+    onto every page (CDN thumbnail paths in the site nav) — when the
+    dataLayer-derived URN happens to be wrong (e.g. dataLayer points at
+    the portfolio root, but inventory lives on a sibling), a fallback
+    URN often works.
+
+    Priority order:
+      1. ``G5_STORE_ID`` from dataLayer (canonical when present)
+      2. Longest ``g5-cl-*`` match other than the dataLayer one
+      3. Longest ``g5-clw-*`` match (rare, mostly noise — last resort)
+
+    All comparisons are lowercase. Empty list when html has no g5 URNs.
     """
     if not html or "g5-cl" not in html.lower():
-        return None
-    matches = {m.group(0).lower() for m in _G5_URN_RE.finditer(html)}
-    if not matches:
-        return None
-    return max(matches, key=len)
+        return []
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    # Priority 1: dataLayer canonical URN.
+    m = _G5_STORE_ID_RE.search(html)
+    if m:
+        winner = m.group(1).lower()
+        ordered.append(winner)
+        seen.add(winner)
+
+    # Collect ALL g5-cl-* and g5-clw-* matches; bucket separately.
+    matches = {mm.group(0).lower() for mm in _G5_URN_RE.finditer(html)}
+    g5_cl = sorted(
+        (u for u in matches if u.startswith("g5-cl-") and u not in seen),
+        key=len,
+        reverse=True,
+    )
+    g5_clw = sorted(
+        (u for u in matches if u.startswith("g5-clw-") and u not in seen),
+        key=len,
+        reverse=True,
+    )
+
+    # Priority 2: longest g5-cl-* siblings (the dataLayer-confirmed one
+    # is already in ordered; these are candidates for multi-property
+    # portfolios where dataLayer points at a different sibling).
+    for u in g5_cl[:2]:
+        if u not in seen:
+            ordered.append(u)
+            seen.add(u)
+
+    # Priority 3: g5-clw-* as last resort. These almost always 404 the
+    # inventory API but a single match is sometimes the only URN on the
+    # page — better than nothing.
+    if not ordered and g5_clw:
+        ordered.append(g5_clw[0])
+
+    return ordered[:3]
 
 
 def _price_to_int(prices: Any) -> int | None:
@@ -253,46 +332,84 @@ class G5Adapter:
         elif isinstance(body, str):
             html = body
 
-        urn = find_g5_urn(html) if html else None
-        if not urn:
+        # 2026-05-24: try ALL ranked URN candidates, not just the
+        # winner. Multi-property portfolios leak sibling URNs into
+        # every page; the dataLayer's pick is canonical for most sites
+        # but occasionally targets the wrong sibling. Trying up-to-3
+        # candidates costs at most 3 GraphQL POSTs (still <1s total
+        # against G5's fast endpoint).
+        candidates = find_g5_urn_candidates(html) if html else []
+        if not candidates:
             result.tier_used = _TIER_NO_URN
-            result.errors.append("g5-adapter: no g5-cl-... URN in rendered HTML")
+            result.errors.append(
+                "g5-adapter: no g5-cl-... URN in rendered HTML"
+            )
             return result
 
-        try:
-            payload = await _fetch_g5_units(
-                urn, base_url=str(getattr(ctx, "base_url", "") or "")
-            )
-        except Exception as exc:
+        base_url = str(getattr(ctx, "base_url", "") or "")
+        last_error: str = ""
+        winning_urn: str = ""
+        winning_payload: dict[str, Any] | None = None
+
+        for cand_urn in candidates:
+            try:
+                payload = await _fetch_g5_units(cand_urn, base_url=base_url)
+            except Exception as exc:
+                last_error = (
+                    f"{type(exc).__name__}: {str(exc)[:80]}"
+                )
+                continue
+            if not payload:
+                last_error = "empty response"
+                continue
+            # Successful network call. Does the URN actually resolve to
+            # a complex with apartments? Empty apartments == wrong URN
+            # → try the next candidate.
+            ac = (payload.get("data") or {}).get("apartmentComplex") or {}
+            apts = ac.get("apartments") or []
+            if not apts:
+                last_error = "apartmentComplex.apartments was empty"
+                continue
+            # First non-empty payload wins
+            winning_urn = cand_urn
+            winning_payload = payload
+            break
+
+        if winning_payload is None:
             if await self._try_apollo(page, ctx, result):
                 return result
             result.tier_used = _TIER_API_ERROR
             result.errors.append(
-                f"g5-api-error: urn={urn!r} {type(exc).__name__}: {str(exc)[:120]}"
+                f"g5-api-error: tried {len(candidates)} URN candidate(s) "
+                f"({candidates!r}); last={last_error or 'unknown'}"
             )
             return result
 
-        if not payload:
-            if await self._try_apollo(page, ctx, result):
-                return result
-            result.tier_used = _TIER_API_ERROR
-            result.errors.append(f"g5-api: empty response for urn={urn!r}")
-            return result
-
-        units = parse_g5_apartments(payload)
+        units = parse_g5_apartments(winning_payload)
         if not units:
             if await self._try_apollo(page, ctx, result):
                 return result
             result.tier_used = _TIER_EMPTY
             result.errors.append(
-                f"g5-api: returned 0 parseable units for urn={urn!r} "
+                f"g5-api: returned 0 parseable units for urn={winning_urn!r} "
                 "(property may have no live inventory)"
             )
             return result
 
         result.units = units
-        result.winning_url = f"{_G5_ENDPOINT} (urn={urn})"
+        result.winning_url = f"{_G5_ENDPOINT} (urn={winning_urn})"
         result.confidence = min(0.95, 0.7 + 0.02 * len(units))
+        # 2026-05-24: expose the GraphQL response so scraper.py's
+        # Step 9b (api_concession_extract on adapter_result.api_responses)
+        # can pull floorplanSpecials / hasFloorplanSpecials out of the
+        # payload. Without this, the adapter consumes the payload locally
+        # and discards it — concession capture misses for every G5 site.
+        result.api_responses.append({
+            "url": f"{_G5_ENDPOINT}?urn={winning_urn}",
+            "status": 200,
+            "body": winning_payload,
+            "via": "g5_graphql_direct",
+        })
         return result
 
     def static_fingerprints(self) -> list[str]:
@@ -352,9 +469,18 @@ async def _fetch_g5_units(urn: str, base_url: str = "") -> dict[str, Any] | None
     payload, different headers, different outcome). Adding the property
     site as Origin/Referer makes the request indistinguishable from the
     browser's in-page POST and the server returns the data shape.
-    """
-    import httpx
 
+    2026-05-24: switched from ``httpx`` to ``curl_cffi`` with
+    ``impersonate="chrome120"``. Live probe on the 22-prop P1
+    TIER_1_API_G5 cohort confirmed the GraphQL query + URN are correct
+    (5/5 sampled URNs returned 100+ apartments), yet canary reported
+    ``TIER_1_API_G5_API_ERROR`` on 13/22 properties. Root cause was
+    ``httpx``'s ALPN/cipher fingerprint occasionally being rejected by
+    G5's CDN edge for specific request signatures (intermittent,
+    region-dependent). Curl_cffi chrome120 ships a byte-for-byte real
+    Chrome TLS handshake — same pattern that fixed the L1 fetcher GET
+    path (commit 59b9102).
+    """
     origin = ""
     referer = ""
     if base_url:
@@ -381,14 +507,49 @@ async def _fetch_g5_units(urn: str, base_url: str = "") -> dict[str, Any] | None
     if referer:
         headers["Referer"] = referer
     payload = {"query": _G5_UNITS_QUERY, "variables": {"urn": urn}}
-    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
-        r = await c.post(_G5_ENDPOINT, json=payload, headers=headers)
-        if r.status_code != 200:
+
+    # curl_cffi import deferred so the adapter loads even when curl_cffi
+    # is absent (test envs); fall back to httpx in that case.
+    try:
+        from curl_cffi import requests as _cr
+
+        # curl_cffi is synchronous — wrap in asyncio.to_thread so the
+        # adapter's outer ``async`` flow doesn't block the event loop.
+        import asyncio as _asyncio
+
+        def _do_post() -> tuple[int, str]:
+            r = _cr.post(
+                _G5_ENDPOINT,
+                json=payload,
+                headers=headers,
+                impersonate="chrome120",
+                timeout=15,
+            )
+            return r.status_code, (r.text or "")
+
+        status, text = await _asyncio.to_thread(_do_post)
+        if status != 200:
             return None
         try:
-            return r.json()
+            import json as _json
+            return _json.loads(text)
         except Exception:
             return None
+    except ImportError:
+        # Fallback: plain httpx (kept so the adapter still works in
+        # minimal envs without curl_cffi).
+        import httpx
+
+        async with httpx.AsyncClient(
+            timeout=15.0, follow_redirects=True
+        ) as c:
+            r = await c.post(_G5_ENDPOINT, json=payload, headers=headers)
+            if r.status_code != 200:
+                return None
+            try:
+                return r.json()
+            except Exception:
+                return None
 
 
 # ── Apollo-cache fallback helpers (2026-05-19) ───────────────────────────────

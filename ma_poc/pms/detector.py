@@ -62,11 +62,16 @@ PmsName = Literal[
     "irvine",
     "cortland",
     "equity",
+    "reinhold",
     "rentmanager",
     "rentvision",
+    "rentaladdress",
     "residentservices365",
     "encoreskyline_template",
     "aspensquare",
+    "edificecms",
+    "fortresstech",
+    "thinkreside",
     "marketapts",
     "rentcafe_unit_roster",
     "imt_spaces",
@@ -112,11 +117,16 @@ _STRATEGY_BY_PMS: dict[str, Strategy] = {
     "irvine": "api_first",
     "cortland": "api_first",
     "equity": "api_first",
+    "reinhold": "dom_first",
     "rentmanager": "api_first",
     "rentvision": "dom_first",
+    "rentaladdress": "dom_first",
     "residentservices365": "dom_first",
     "encoreskyline_template": "dom_first",
     "aspensquare": "dom_first",
+    "edificecms": "api_first",
+    "fortresstech": "dom_first",
+    "thinkreside": "dom_first",
     "marketapts": "dom_first",
     "rentcafe_unit_roster": "dom_first",
     "imt_spaces": "dom_first",
@@ -544,8 +554,36 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # misrouted to funnel/g5/knock/onesite because the chat widget won.
     # Same rationale as the AppFolio tenant-portal and Repli360 strong-host
     # fixes.
+    #
+    # 2026-05-25 (canary 1ef1060 regr#3): Knock-gate the 0.92. The bucket-B
+    # elevation overcorrected on 62 Knock-PMS properties (e.g. The Maya
+    # at livethemaya.com, Park West at parkwestfortworth.com) where Knock
+    # IS the real leasing system and ``onlineleasing.realpage.com`` is
+    # just an APPLY link target (``<a href="https://8946105.onlineleasing
+    # .realpage.com/#k=84971">apply</a>``). Flipping these to OneSite
+    # dropped them from real per-unit data (Knock Doorway API: 177 units
+    # on The Maya, 132 on Park West) to plan-level inference (OneSite
+    # workflow: 13 / 4 ``inferred_*`` rows). 1,786 units total lost across
+    # the cohort.
+    #
+    # The discriminator: when ``doorway.knck.io`` or ``knockDoorway`` are
+    # also present, Knock is almost always the real PMS — those markers
+    # only ship from a working Knock-Doorway install. The 9 RealPage-OLL
+    # SPA cohort the elevation originally fixed do NOT have Knock
+    # fingerprints (RealPage-OLL is the real leasing system, no Knock
+    # co-resident). Demote OneSite to 0.85 (below Knock's 0.90) in the
+    # Knock+OneSite co-resident case so Knock wins the route.
+    _has_knock_marker = "doorway.knck.io" in h or "knockdoorway" in h
     if "onlineleasing.realpage.com" in h:
-        yield "onesite", 0.92, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
+        if _has_knock_marker:
+            yield (
+                "onesite",
+                0.85,
+                ["OneSite portal link present but Knock fingerprint co-resident "
+                 "— OneSite is the apply-link target, Knock is the real PMS"],
+            )
+        else:
+            yield "onesite", 0.92, ["OneSite portal marker in HTML (onlineleasing.realpage.com)"]
     # RealPage OLL (Online Leasing) wizard — the "Category-D" cluster
     # (~187 props). Vanity marketing sites hop to ``leasing.realpage.com``
     # / embed an ``rp-leasing-widget`` / link ``<property>/content/apply#k=``
@@ -555,7 +593,17 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # above and does not regress it. Routed to ``realpage_oll`` whose
     # adapter intercepts the OLL.SearchFloorPlan PUT response.
     if (
-        "leasing.realpage.com" in h
+        # 2026-05-25 (canary 1ef1060 regr#3): the bare substring
+        # ``leasing.realpage.com`` ALSO matches ``onlineleasing
+        # .realpage.com`` (the OneSite portal subdomain), causing the
+        # realpage_oll matcher to fire on every OneSite property —
+        # including those with co-resident Knock fingerprints. URL
+        # boundary (``://leasing.realpage.com``) restricts to the
+        # standalone ``leasing.realpage.com`` host that realpage_oll
+        # actually targets. The 9 RealPage-OLL SPA cohort that motivated
+        # this matcher use ``leasing.realpage.com/`` as their actual
+        # leasing host — they keep matching via this stricter check.
+        "://leasing.realpage.com" in h
         or "rp-leasing-widget" in h
         or "rp.leasing.appservice" in h
         or "/content/apply#k=" in h
@@ -568,15 +616,28 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
         # GraphQL inventory call 404'd because G5 is not the PMS here.
         or "cs-cdn.realpage.com/oll" in h
     ):
-        yield (
-            "realpage_oll",
-            # STRONG (0.92) — definitive leasing-wizard markers, must beat a
-            # co-resident chat widget (funnel/knock at 0.90). See the
-            # onlineleasing.realpage.com note above.
-            0.92,
-            ["RealPage OLL wizard marker in HTML (leasing.realpage.com / "
-             "rp-leasing-widget / RP.Leasing.AppService / /content/apply#k=)"],
-        )
+        # 2026-05-25 (canary 1ef1060 regr#3): Knock-gate the 0.92 the
+        # same way as the OneSite matcher above. Knock fingerprints are
+        # rare on real RealPage-OLL pages, so a co-resident Knock signal
+        # almost always means Knock is the real PMS and RealPage OLL is
+        # the apply-flow target.
+        if _has_knock_marker:
+            yield (
+                "realpage_oll",
+                0.85,
+                ["RealPage OLL marker present but Knock fingerprint co-resident "
+                 "— Knock is the real PMS"],
+            )
+        else:
+            yield (
+                "realpage_oll",
+                # STRONG (0.92) — definitive leasing-wizard markers, must beat a
+                # co-resident chat widget (funnel/knock at 0.90). See the
+                # onlineleasing.realpage.com note above.
+                0.92,
+                ["RealPage OLL wizard marker in HTML (leasing.realpage.com / "
+                 "rp-leasing-widget / RP.Leasing.AppService / /content/apply#k=)"],
+            )
     # Entrata routing. ``/Apartments/module/`` alone is too broad — Entrata
     # exposes a generic tenant login form at
     # ``/Apartments/module/application_authentication/`` that many vanity
@@ -723,6 +784,22 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             0.85,
             ["G5 marketing-cloud marker in HTML (g5marketingcloud / g5dxm.com / g5-c- URN)"],
         )
+    # 2026-05-25 (canary 1ef1060 regr#15): Reinhold Residential's custom
+    # Divi-child WordPress theme ships ``rr-unit-block`` SSR tables on
+    # /availability/ with full per-unit rent + date data inline. The
+    # ``rr-pricing-toggle`` + ``rr-unit-block`` class pair is unique to
+    # this operator (rr- = Reinhold Residential). Sister sites verified
+    # live: chocolateworks-living, shadyside-living, sharplesworks-living,
+    # trinityrow-living, waterfront2-living. Routed to ReinholdAdapter.
+    # Apply-button links go to securecafeapplicant.com (NOT .securecafe.com
+    # so the generic RentCafe-securecafe marker below does NOT collide).
+    if "rr-unit-block" in h and "rr-pricing-toggle" in h:
+        yield (
+            "reinhold",
+            0.92,
+            ["Reinhold Residential marker in HTML "
+             "(rr-unit-block + rr-pricing-toggle classes)"],
+        )
     # 365 ResidentServices (Apollo / collapsar theme) — a self-hosted CMS
     # used by a small operator cluster. Asset host fingerprint is stable
     # site-wide (used for plan-card images and theme css), so detection
@@ -747,6 +824,43 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             "rentvision",
             0.85,
             ["RentVision CMS marker in HTML (created/powered by RentVision / rentvision.com)"],
+        )
+    # 2026-05-25 (canary 1ef1060 regr#8): RentalAddress.com is a small-
+    # operator marketing CMS (cedarridgeapts.rentaladdress.com signature)
+    # serving SSR /floor_plans pages with deterministic ``.floor_plan_list``
+    # + ``.{field} value`` div pairs (square_feet, bedrooms, bathrooms,
+    # rent, deposit). Pre-fix the generic plan-text parser saw "598" sqft
+    # as part of the plan name string ("598 Bedroom / 1 Bath"). Fires on
+    # the canonical hostname; sister sites on the same platform recover
+    # for free.
+    if "rentaladdress.com" in h or "floor_plan_list" in h:
+        yield (
+            "rentaladdress",
+            0.88,
+            ["RentalAddress.com CMS marker in HTML "
+             "(rentaladdress.com host / .floor_plan_list container)"],
+        )
+    # 2026-05-25 (canary 1ef1060 regr#14): FortressTech is a Next.js-based
+    # leasing-portal vendor that serves unit-level data via an iframe SSR
+    # hydration payload. Operator marketing sites are typically Squarespace
+    # shells (PRG Property Resources Group portfolio) that embed
+    # ``<iframe src=…(availability|embed).fortresstech.io/unit-availability/
+    # {orgId}/{propertyId}/…>``. The auth-only ``portal.fortresstech.io``
+    # subdomain is excluded — it never carries unit data. Detector fires on
+    # the iframe-host substring; the adapter then refetches the iframe URL
+    # and parses ``self.__next_f.push`` React-Query chunks.
+    if (
+        "availability.fortresstech.io/unit-availability" in h
+        or "embed.fortresstech.io/unit-availability" in h
+    ):
+        yield (
+            "fortresstech",
+            0.90,
+            [
+                "FortressTech unit-availability iframe marker in HTML "
+                "((availability|embed).fortresstech.io/unit-availability/"
+                "{orgId}/{propertyId}/)"
+            ],
         )
     # Encoreskyline-template marketing family driven by the Jonah Digital /
     # MeetElise widget. Per-plan /floorplans/{slug}/ pages render real
@@ -898,20 +1012,105 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # page. 2026-05-17 canary 842-pool deep-probe: 67+ sites the detector
     # missed (fell to LLM/floorplan). Portal is NOT Cloudflare-fronted, so
     # the ResMan adapter recovers Tier-1 unit-level even proxy-less.
-    if "myresman.com" in h or "/portal/applicants/availability" in h:
+    #
+    # 2026-05-25 (user-flagged via Encore on Mustang pid 9186 + Regency
+    # Grove): the resman marker fires on properties where ResMan is the
+    # apply-flow target (``*.myresman.com/Portal/Applicants/New/...``
+    # registration link) while the actual leasing data is on the apts247
+    # ``/api/v1/floorplans/?api_key=`` API. Co-resident with apts247
+    # markers, resman wins yield-order at the tied 0.90 and the resman
+    # adapter then fails to find a portal URL (the registration link
+    # isn't a portal). Fix: when apts247 markers are also present,
+    # demote resman to 0.85 so apts247 wins. Same pattern as the
+    # 2026-05-25 Knock-vs-OneSite gate.
+    # Edifice CMS (Hexagon IT Solutions) — multifamily marketing CMS
+    # whose own public REST API at edificecms.com/myresman/public/api/
+    # front/{floorplans,units} serves UUID-keyed unit-level data. The
+    # CMS routes apply-flow traffic to ResMan portals so a co-resident
+    # ``myresman.com`` marker is the norm, not the exception — every
+    # Edifice site we've sampled embeds a ResMan apply link. Fire
+    # BEFORE the ResMan branch below so the canonical Edifice data
+    # path wins at 0.92 (beats ResMan's 0.90). Live-verified 2026-05-25
+    # on cobblestonephx.com (canary 1ef1060 regression #10) — 13
+    # floorplans, multi-unit roster per plan.
+    _has_edificecms_marker = (
+        "edificecms.com" in h
+        or "/edi-assets/" in h
+        or "builder_live" in h  # the inline ``var BUILDER_LIVE =`` config blob
+    )
+    if _has_edificecms_marker:
         yield (
-            "resman",
-            0.90,
-            ["ResMan marker in HTML "
-             "(myresman.com / Portal/Applicants/Availability)"],
+            "edificecms",
+            0.92,
+            ["Edifice CMS marker in HTML "
+             "(edificecms.com / /edi-assets/ / BUILDER_LIVE)"],
         )
+
+    # ThinkRESIDE / Resite Multi Family Marketing — DOM-only adapter
+    # for the Resite CMS family. Plan list (``<li data-beds>`` on
+    # /floorplans OR ``<div class="floorplan-item">`` on home) + per-
+    # plan ``fp-availability-list`` table render the unit roster
+    # inline; ``api.thinkresite.dev`` is a Walk-Score-style POI feed
+    # not unit data. Live-verified 2026-05-25 against Orchard Ridge
+    # (liveatorchardridge.com), Indy Flats (indyflatsapts.com), and
+    # Deer Run (liveatdeerrunapts.com) — all 3 fell to TIER_MERGED_
+    # CROSS_PAGE / generic plan-text with n_full=0 pre-fix.
+    #
+    # Fires at 0.87: above co-resident chat widgets (MeetElise / Jonah
+    # encoreskyline_template at 0.85; bare RentCafe / AppFolio
+    # substring at 0.80) so the SSR Resite plan list wins when both
+    # are present. Sits below Knock Doorway (0.90) and RealPage OLL /
+    # Edifice CMS (0.92), which remain the real PMS when their
+    # fingerprints appear (Orchard Ridge embeds Doorway → Knock wins).
+    if (
+        "thinkresite.dev" in h
+        or "themes.thinkresite.cloud" in h
+        or "media.thinkresite.cloud" in h
+        or "resite-themes.nyc3.digitaloceanspaces.com" in h
+        or "resiteimages.nyc3.cdn.digitaloceanspaces.com" in h
+        or "resite multi family marketing" in h
+    ):
+        yield (
+            "thinkreside",
+            0.87,
+            ["ThinkRESIDE / Resite Multi Family Marketing marker in HTML "
+             "(thinkresite.dev / themes.thinkresite.cloud / "
+             "resite-themes.nyc3.digitaloceanspaces.com / "
+             "Resite Multi Family Marketing)"],
+        )
+
+    _has_apts247_marker = "apts247" in h or "rentdynamics.com" in h
+    if "myresman.com" in h or "/portal/applicants/availability" in h:
+        if _has_apts247_marker:
+            yield (
+                "resman",
+                0.85,
+                ["ResMan marker present but apts247 co-resident — "
+                 "apts247 is the data API, ResMan is the apply-flow target"],
+            )
+        elif _has_edificecms_marker:
+            # Same co-resident pattern: Edifice CMS owns the data API,
+            # ResMan owns the apply link. Demote ResMan so Edifice wins.
+            yield (
+                "resman",
+                0.85,
+                ["ResMan marker present but edificecms co-resident — "
+                 "Edifice owns the data API, ResMan is the apply-flow target"],
+            )
+        else:
+            yield (
+                "resman",
+                0.90,
+                ["ResMan marker in HTML "
+                 "(myresman.com / Portal/Applicants/Availability)"],
+            )
 
     # Apts247 / RentDynamics — JS leasing widget (static2.apts247.info /
     # media.apts247.info) with a SAME-ORIGIN /api/v1/floorplans/?api_key=
     # data API. 2026-05-17 canary Chrome-MCP no-signature deep-probe: a
     # ≥4-site cluster invisible to static curl_cffi (inventory is fetched
     # client-side). api_key is in the homepage HTML ⇒ deterministic Tier-1.
-    if "apts247" in h or "rentdynamics.com" in h:
+    if _has_apts247_marker:
         yield (
             "apts247",
             0.90,
@@ -1256,9 +1455,24 @@ _HTML_FINGERPRINTS: dict[str, tuple[str, ...]] = {
     "funnel": ("nestiolistings.com", "nestio_", "data-nestio-"),
     "g5": ("g5marketingcloud", "g5dxm.com", "g5-c-"),
     "rentvision": ("created by rentvision", "powered by rentvision", "rentvision.com"),
+    "reinhold": ("rr-unit-block", "rr-pricing-toggle", "reinholdresidential.com"),
     "residentservices365": ("365residentservices.com",),
     "encoreskyline_template": ("jonahwidget", "jonahdigital", "meetelise"),
     "aspensquare": ("aspensquare.com", "static.aspensquare.com"),
+    # Edifice CMS (Hexagon IT Solutions) — multifamily marketing CMS.
+    # Public same-vendor REST API at edificecms.com/myresman/public/api/
+    # front/{floorplans,units} serves UUID-keyed unit-level data.
+    # Live-verified 2026-05-25 on cobblestonephx.com.
+    "edificecms": (
+        "edificecms.com",
+        "assets.edificecms.com",
+        "/edi-assets/",
+        "builder_live",
+    ),
+    "fortresstech": (
+        "availability.fortresstech.io/unit-availability",
+        "embed.fortresstech.io/unit-availability",
+    ),
     "touchtour": ("mytouchtour.com", "liveovation.com"),
     "spherexx": ("presentation.spherexx.app", "ssploader.js", "sspcfg"),
     "rentmanager": (

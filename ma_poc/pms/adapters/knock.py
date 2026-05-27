@@ -37,6 +37,14 @@ from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters.base import AdapterContext, AdapterResult
 
+
+# 2026-05-24: per-call capture buffer for the raw doorway-api responses.
+# ``_fetch_knock_units`` resets and writes to this; the adapter reads from
+# it after the fetch to surface the responses via
+# ``result.api_responses.append(...)``. Single-call lifetime — fine for
+# async because each fetch resets at the top.
+LAST_FETCH_RAW_RESPONSES: list[dict[str, Any]] = []
+
 if TYPE_CHECKING:
     from playwright.async_api import Page
 
@@ -144,7 +152,19 @@ def parse_knock_units(units_payload: dict[str, Any]) -> list[dict[str, Any]]:
             or u.get("ready_date")
             or ""
         )
-        status = "AVAILABLE" if (u.get("available") and not u.get("occupied")) else "UNAVAILABLE"
+        # 2026-05-25 (canary 1ef1060 post-mortem): the prior rule was
+        # ``status = AVAILABLE iff (u.available AND not u.occupied)``,
+        # which mis-flagged ~8,580 of 8,597 Knock units as UNAVAILABLE
+        # because Knock's `available` boolean is False/null on many
+        # actively-rentable units (it tracks a different signal than
+        # rentability). The units already passed the hidden/leased/
+        # reserved filter at line 117 + a $200-$50,000 rent gate at
+        # line 127, so by the time we're here they are real
+        # rent-published offerings. Default AVAILABLE; only mark
+        # UNAVAILABLE when explicitly occupied. This is what the
+        # downstream consumer (and the schema_v2 Q1 fallback) needs
+        # for the available_date scrape-time default to fire.
+        status = "UNAVAILABLE" if u.get("occupied") else "AVAILABLE"
 
         # 2026-05-19 capture-first: Knock payload carries concession as
         # `SpecialsDescription`/specials on the unit or layout. Was
@@ -252,6 +272,12 @@ class KnockAdapter:
                     f"https://doorway-api.knockrentals.com/v1/property/community/{comm_id}"
                 )
                 result.confidence = min(0.9, 0.6 + 0.02 * len(units))
+                # 2026-05-24: surface raw API responses so scraper.py
+                # Step 9b can pull leasingSpecial / leasingSpecialIsActive
+                # out of the community-API body. Without this, concession
+                # capture silently misses for every Knock site.
+                for _raw in LAST_FETCH_RAW_RESPONSES:
+                    result.api_responses.append(_raw)
                 return result
             result.errors.append("knock-adapter: Doorway API returned no units for community_id")
 
@@ -276,6 +302,9 @@ class KnockAdapter:
                 )
                 result.tier_used = "TIER_1_KNOCK_API_BY_DOMAIN"
                 result.confidence = min(0.9, 0.6 + 0.02 * len(units))
+                # Surface raw API responses (see Path 1 comment for rationale)
+                for _raw in LAST_FETCH_RAW_RESPONSES:
+                    result.api_responses.append(_raw)
                 return result
             if pid is None:
                 result.errors.append(
@@ -311,8 +340,19 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
 
     This is its own coroutine so the adapter ``extract`` method stays
     focused on orchestration.
+
+    2026-05-24: also captures the community-API response (which carries
+    ``property.data.leasing.terms.leasingSpecial``) into the module-level
+    ``LAST_FETCH_RAW_RESPONSES`` so the adapter can surface it via
+    ``result.api_responses.append(...)``. This is what scraper.py Step 9b
+    reads to pull concession text out of Knock API responses.
     """
     import httpx
+
+    # Reset capture buffer for this call (single-threaded inside an
+    # async fetch; only the current adapter consumes it).
+    global LAST_FETCH_RAW_RESPONSES
+    LAST_FETCH_RAW_RESPONSES = []
 
     headers = {
         "User-Agent": (
@@ -344,9 +384,20 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
         if r.status_code != 200:
             return []
         try:
-            prop_data = r.json().get("property") or {}
+            community_body = r.json()
+            prop_data = community_body.get("property") or {}
         except Exception:
             return []
+        # 2026-05-24: capture the community-API body so the adapter can
+        # surface it for the scraper's concession scan. This is where
+        # ``property.data.leasing.terms.leasingSpecial`` lives —
+        # confirmed on livebrez.com / hamburgfarmslex.com HARs.
+        LAST_FETCH_RAW_RESPONSES.append({
+            "url": community_url,
+            "status": 200,
+            "body": community_body,
+            "via": "knock_community",
+        })
         numeric_id = prop_data.get("id")
         if not numeric_id:
             return []
@@ -355,7 +406,14 @@ async def _fetch_knock_units(comm_id: str, kind: str = "community") -> list[dict
         if r2.status_code != 200:
             return []
         try:
-            return parse_knock_units(r2.json())
+            units_body = r2.json()
+            LAST_FETCH_RAW_RESPONSES.append({
+                "url": units_url,
+                "status": 200,
+                "body": units_body,
+                "via": "knock_units",
+            })
+            return parse_knock_units(units_body)
         except Exception:
             return []
 

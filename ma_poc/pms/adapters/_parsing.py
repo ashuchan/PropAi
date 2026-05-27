@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import re
 from typing import Any
+from urllib.parse import parse_qs, unquote, urlsplit
 
 
 def money_to_int(s: str) -> int | None:
@@ -168,6 +169,40 @@ def is_junk_unit_number(val: Any) -> bool:
     return False
 
 
+# ── Canonical bath / sqft regexes (PR-Parsing-hardening 2026-05-25) ──────
+# Single source of truth used by adapters and the generic DOM scanner so
+# that fixes to the regex don't have to be propagated across files.
+#
+# Regression #13 (canary 1ef1060): "1 Bathroom" / "2 Bathrooms" text on
+# primeurbanproperties.com fell through the older `(?:bath|ba)\b`
+# pattern (the trailing \b after the alternation rejects "bath" when
+# followed by "room"). The canonical form below accepts "bath",
+# "baths", "bathroom", "bathrooms", and "BA" — case-insensitive.
+#
+# Regression #16: "1,200 ft²" / "950 ft2" on eaglepointestates.com
+# returned -1 because neither the unicode superscript nor the ASCII
+# "ft2" form was matched. The canonical form below adds those plus
+# "ft^2", "sf", and "square feet|foot|ft".
+BATH_RE = re.compile(
+    r"\b(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?|ba)\b",
+    re.IGNORECASE,
+)
+
+SQFT_RE = re.compile(
+    r"(\d[\d,]*)\s*(?:"
+    r"sq\.?\s?ft\.?|sqft|"
+    # "sf" alone is OK only when followed by a non-word boundary or end —
+    # without the lookahead a token like "sfgate" matches "sf".
+    r"s\.?f\.?(?=\b|\W|$)|"
+    # ft² / ft^2 / ft2 — the unicode superscript ² isn't a \w char so
+    # the trailing variants use explicit lookaheads instead of \b.
+    r"ft\s*(?:²|\^2|\b2\b|2(?=\W|$))|"
+    r"square\s*(?:feet|foot|ft)"
+    r")",
+    re.IGNORECASE,
+)
+
+
 # Patterns for inferring bed/bath count from a floor-plan / unit name.
 # Runs in declared order; first match wins. Patterns are designed to be
 # narrow enough that they don't false-positive on unrelated marketing
@@ -219,12 +254,12 @@ _WORD_BED_RE = re.compile(
     r"\b(one|two|three|four|five)\s*(?:bd|br|bed(?:room)?s?)\b",
     re.IGNORECASE,
 )
-# Standalone bath count: "1 Bath", "2.5 BA". Used only when bed was
-# already inferred by a separate pass — never seeds beds from a bath.
-_BATH_ONLY_RE = re.compile(
-    r"\b(\d(?:\.\d)?)\s*(?:ba|bath(?:room)?s?)\b",
-    re.IGNORECASE,
-)
+# Standalone bath count: "1 Bath", "2.5 BA", "1 Bathroom", "2 Bathrooms".
+# Used only when bed was already inferred by a separate pass — never
+# seeds beds from a bath. Aliases the canonical ``BATH_RE`` above; kept
+# as a separate name only to keep the existing infer_bed_bath callsite
+# independent of the public canonical regex.
+_BATH_ONLY_RE = BATH_RE
 _WORD_TO_INT = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
 
 
@@ -441,6 +476,258 @@ def _unwrap_name_blob(val: Any) -> str:
     return s
 
 
+def enrich_unit_concession_fields(
+    unit: dict[str, Any],
+    *,
+    property_concession_text: str | None = None,
+) -> dict[str, Any]:
+    """Backfill canonical concession + offer fields on any unit dict.
+
+    Idempotent. Safe to call on units produced by:
+      * ``make_unit_dict`` (already populated — this is a no-op)
+      * Raw-dict adapters that bypass ``make_unit_dict`` (e.g.
+        ``_api_parser.py``, ``_html_extract.py``, ``knock.py``,
+        ``_air_communities.py``, ``_amli.py``)
+
+    Reads source text in this priority:
+      1. ``unit['concession_text']`` (canonical, already set)
+      2. ``unit['concession']`` (legacy, set by adapters that pass
+         ``concession=`` to make_unit_dict OR build raw dicts)
+      3. ``property_concession_text`` (caller-provided fallback —
+         typically ``result['concessions_text']`` from scraper.py's
+         property-level banner capture)
+
+    Whatever source wins, populates these canonical fields in-place:
+      * concession_text       — raw text (canonical key)
+      * concession            — legacy mirror for back-compat readers
+      * concession_text_clean — de-leaked variant (clean_concession_text)
+      * _concession_quality   — classifier label (clean/leak/empty)
+      * concession_value      — numeric value (normalize_concession)
+      * concession_source     — preserved if already set, else None
+      * offer_banner          — short offer phrase
+      * offer_type            — categorical (free_rent/dollar_off/...)
+      * offer_target          — rent/deposit/app_fee/...
+      * offer_value           — formatted string with unit ("6 weeks")
+      * offer_conditions      — semicolon-delimited key:value pairs
+
+    Returns the same dict (for chaining). Never raises — all extraction
+    failures swallow silently and leave the canonical fields as None.
+    """
+    # Determine the source text (capture-first priority)
+    text: str | None = None
+    for key in ("concession_text", "concession"):
+        v = unit.get(key)
+        if isinstance(v, str) and v.strip():
+            text = v
+            break
+    if text is None and property_concession_text:
+        if isinstance(property_concession_text, str) and property_concession_text.strip():
+            text = property_concession_text
+
+    # Always populate the canonical keys (None when no source)
+    cleaned = None
+    quality = None
+    derived_value = None
+    if text:
+        try:
+            from ma_poc.core.concession_clean import (
+                classify_concession_quality,
+                clean_concession_text,
+            )
+
+            cleaned = clean_concession_text(text)
+            quality = classify_concession_quality(text)
+        except Exception:
+            cleaned = text
+            quality = None
+        # Derive value only when caller hasn't set it
+        if not unit.get("concession_value"):
+            try:
+                from ma_poc.core.concession_normalize import normalize_concession
+
+                obj = normalize_concession(text)
+                if isinstance(obj, dict):
+                    inner = obj.get("obj") or {}
+                    if isinstance(inner, dict):
+                        for slot in ("free", "rr"):
+                            v = inner.get(slot)
+                            if isinstance(v, dict) and v.get("dollarsLow"):
+                                derived_value = float(v["dollarsLow"])
+                                break
+            except Exception:
+                pass
+
+    # Offer taxonomy (5 fields)
+    offer_fields: dict[str, Any] = {
+        "offer_banner": None,
+        "offer_type": None,
+        "offer_target": None,
+        "offer_value": None,
+        "offer_conditions": None,
+    }
+    if text:
+        try:
+            from ma_poc.core.offer_extract import extract_offer
+
+            offer_fields = extract_offer(text)
+        except Exception:
+            pass
+
+    # Stamp the canonical keys (only set when not already populated by adapter)
+    unit["concession"] = text or unit.get("concession") or ""
+    unit["concession_text"] = text
+    if "concession_text_clean" not in unit or unit.get("concession_text_clean") is None:
+        unit["concession_text_clean"] = cleaned
+    if "_concession_quality" not in unit or unit.get("_concession_quality") is None:
+        unit["_concession_quality"] = quality
+    if not unit.get("concession_value") and derived_value is not None:
+        unit["concession_value"] = derived_value
+    elif "concession_value" not in unit:
+        unit["concession_value"] = None
+    if "concession_source" not in unit:
+        unit["concession_source"] = None
+    # Offer fields — only set when not already populated
+    for k, v in offer_fields.items():
+        if unit.get(k) in (None, ""):
+            unit[k] = v
+    return unit
+
+
+# ── Floor-plan-name URL-slug fallback (regression #12, canary 1ef1060) ──
+# When extraction yields an empty / "~" / "Unknown" plan name AND the
+# source URL encodes the plan as a slug, derive a readable name. Observed
+# on lifeatalexis.com: `?floorplan=1-bed-1-bath-1992` produced
+# floor_plan_name="~" because no DOM element carried the plan text.
+#
+# Recognised slug locations (case-insensitive):
+#   - query param: ``?floorplan=…``, ``?floor_plan=…``, ``?plan=…``,
+#                  ``?fp=…``, ``?unit_gallery=…``
+#   - path segment AFTER ``/floorplans/`` or ``/floor-plans/`` (when
+#     the slug isn't the literal word "floorplans" again)
+_EMPTY_PLAN_NAME_TOKENS: frozenset[str] = frozenset({
+    "", "~", "-", "—", "n/a", "na", "none", "null", "unknown", "tbd",
+})
+
+_PLAN_SLUG_QUERY_KEYS: tuple[str, ...] = (
+    "floorplan", "floor_plan", "floorplan_name", "fp", "plan", "unit_gallery",
+)
+
+_PLAN_PATH_PREFIXES: tuple[str, ...] = (
+    "/floorplans/", "/floor-plans/", "/floorplan/", "/floor-plan/",
+)
+
+
+def _looks_empty_plan_name(name: Any) -> bool:
+    """True when ``name`` is the kind of value we want to backfill."""
+    if name is None:
+        return True
+    if not isinstance(name, str):
+        return False
+    return name.strip().lower() in _EMPTY_PLAN_NAME_TOKENS
+
+
+def _titleize_slug(slug: str, *, trim_trailing_id: bool = True) -> str:
+    """Convert ``"1-bed-1-bath-1992"`` -> ``"1 Bed 1 Bath"``.
+
+    Splits on hyphen / underscore, titlecases each token (digit tokens are
+    preserved as-is). When ``trim_trailing_id`` is True, a trailing
+    purely-numeric token of 3+ digits is dropped — that's almost always
+    the per-unit id concatenated to the plan slug, not part of the plan
+    name. ``"1-bed-1-bath-1992"`` -> ``"1 Bed 1 Bath"``; a 1- or 2-digit
+    trailing token (e.g. "the-aspen-2") stays put.
+    """
+    if not slug:
+        return ""
+    raw = unquote(slug).strip()
+    if not raw:
+        return ""
+    raw = raw.replace("_", "-")
+    parts = [p for p in raw.split("-") if p.strip()]
+    if not parts:
+        return ""
+    if trim_trailing_id and len(parts) > 1:
+        last = parts[-1]
+        if last.isdigit() and len(last) >= 3:
+            parts = parts[:-1]
+    out_tokens: list[str] = []
+    for p in parts:
+        if p.isdigit():
+            out_tokens.append(p)
+        else:
+            out_tokens.append(p[0].upper() + p[1:].lower())
+    return " ".join(out_tokens).strip()
+
+
+def derive_plan_name_from_url(url: str | None) -> str:
+    """Best-effort plan-name derivation from a floorplan URL.
+
+    Looks first in the query string for any of ``_PLAN_SLUG_QUERY_KEYS``
+    (``?floorplan=…`` is the canonical case). If nothing useful is there,
+    scans the path for a ``/floorplans/{slug}/`` segment and uses the
+    segment immediately after the prefix. Returns "" when neither yields
+    a slug — caller is responsible for not overwriting a real name.
+    """
+    if not url or not isinstance(url, str):
+        return ""
+    try:
+        parts = urlsplit(url)
+    except (ValueError, TypeError):
+        return ""
+    if parts.query:
+        try:
+            params = parse_qs(parts.query, keep_blank_values=False)
+        except (ValueError, TypeError):
+            params = {}
+        lc_params: dict[str, list[str]] = {k.lower(): v for k, v in params.items()}
+        for key in _PLAN_SLUG_QUERY_KEYS:
+            vals = lc_params.get(key)
+            if vals and vals[0].strip():
+                derived = _titleize_slug(vals[0])
+                if derived:
+                    return derived
+    path = (parts.path or "").lower()
+    for prefix in _PLAN_PATH_PREFIXES:
+        i = path.find(prefix)
+        if i < 0:
+            continue
+        tail = parts.path[i + len(prefix):]
+        first_seg = tail.split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
+        if first_seg and first_seg.lower() not in _PLAN_PATH_PREFIXES:
+            derived = _titleize_slug(first_seg)
+            if derived:
+                return derived
+    return ""
+
+
+# ── Unit-number sqft-leak guard (regression #17, canary 1ef1060) ────────
+# spearheadproperties.com renders a per-property table where the size cell
+# bleeds into the unit-id slot when a generic DOM scanner walks adjacent
+# <td> elements:
+#   <td>1</td><td>1</td><td>623 sq ft</td><td> 8/21/2026</td>
+# The scanner emits unit_number="623 sq ft" and sqft="" (the regex was
+# consumed). Defensive cleanup at make_unit_dict time:
+#   1. If unit_number contains a sqft signature, strip it.
+#   2. If what remains is empty / whitespace, clear unit_number — better
+#      to emit "" than a leaked sqft token.
+def clean_unit_number(val: str) -> str:
+    """Strip leaked sqft text from a unit-number string.
+
+    Returns the cleaned string. When the input contains nothing but sqft
+    text, returns "" — caller may emit the row anyway (sqft can be
+    recovered separately) but the bogus identifier won't ship.
+    """
+    if not val or not isinstance(val, str):
+        return val or ""
+    s = val.strip()
+    if not s:
+        return ""
+    if not SQFT_RE.search(s):
+        return s
+    cleaned = SQFT_RE.sub("", s).strip()
+    cleaned = re.sub(r"[\s,;|/\-]+", " ", cleaned).strip()
+    return cleaned
+
+
 def make_unit_dict(
     *,
     floor_plan_name: str = "",
@@ -456,6 +743,9 @@ def make_unit_dict(
     rent_high: int | None = None,
     deposit: str = "",
     concession: str = "",
+    concession_text: str | None = None,
+    concession_value: float | None = None,
+    concession_source: str | None = None,
     availability_status: str = "AVAILABLE",
     available_units: str = "",
     availability_date: str = "",
@@ -464,6 +754,8 @@ def make_unit_dict(
     source_api_url: str = "",
     extraction_tier: str = "",
     source_ids: dict[str, Any] | None = None,
+    data_gaps: list[str] | None = None,
+    data_quality_flag: str = "",
 ) -> dict[str, Any]:
     """Build a standard unit dict in the format expected by the pipeline.
 
@@ -494,6 +786,115 @@ def make_unit_dict(
     # without changing per-adapter signatures.
     floor_plan_name = _unwrap_name_blob(floor_plan_name)
 
+    # Regression #12 (canary 1ef1060): adapter emitted "~" / empty plan
+    # names on lifeatalexis.com when the extractor found no plan label in
+    # the DOM but the URL slug encoded one (`?floorplan=1-bed-1-bath-1992`
+    # → "1 Bed 1 Bath"). Only triggers when the current name is junk AND a
+    # slug is available, so well-extracted names pass through unchanged.
+    if _looks_empty_plan_name(floor_plan_name):
+        derived = derive_plan_name_from_url(source_api_url)
+        if derived:
+            floor_plan_name = derived
+
+    # Regression #17 (canary 1ef1060): spearheadproperties.com generic DOM
+    # scan emitted unit_number="623 sq ft" because adjacent <td> cells
+    # (sqft column + unit column) collapsed during text extraction. Strip
+    # sqft-shaped substrings from unit_number; if nothing meaningful
+    # remains, clear it so we don't ship a fake identifier.
+    unit_number = clean_unit_number(unit_number)
+
+    # ── Centralised concession normalization (2026-05-24) ────────────────
+    # Pre-fix: adapters emitted only the legacy ``concession`` string and
+    # the cleanup (core/concession_clean + core/concession_normalize) only
+    # ran at v2-output time. Cross-tier merges in _merge_fns.py preserve
+    # ``concession_text``/``_value``/``_source`` (canonical) but not
+    # ``concession`` (legacy) — silently dropping the offer at merge time.
+    #
+    # Post-fix: any text on either input (legacy ``concession=`` or
+    # canonical ``concession_text=``) flows through the cleanup pipeline
+    # here, so all adapters get:
+    #   * ``concession`` — raw input preserved verbatim (back-compat)
+    #   * ``concession_text`` — same raw text in the canonical key the
+    #     merge / schema_v2 / observation report consume
+    #   * ``concession_text_clean`` — de-leaked variant (JS/CSS prefix
+    #     stripped); always present when source text was present
+    #   * ``_concession_quality`` — classifier label (clean / partial_leak
+    #     / heavy_leak / no_signal) for triage
+    #   * ``concession_value`` — numeric value parsed by normalize_concession
+    #     when present; preserved unchanged when caller supplied it
+    #   * ``concession_source`` — caller-supplied or None
+    # Caller-supplied canonical fields take precedence over derived values
+    # (capture-first; never overwrite what the parser explicitly knows).
+    raw_concession_text: str | None = None
+    if isinstance(concession_text, str) and concession_text.strip():
+        raw_concession_text = concession_text
+    elif isinstance(concession, str) and concession.strip():
+        raw_concession_text = concession
+
+    cleaned_concession: str | None = None
+    concession_quality: str | None = None
+    derived_concession_value: float | None = None
+    if raw_concession_text:
+        try:
+            from ma_poc.core.concession_clean import (
+                classify_concession_quality,
+                clean_concession_text,
+            )
+
+            cleaned_concession = clean_concession_text(raw_concession_text)
+            concession_quality = classify_concession_quality(raw_concession_text)
+        except Exception:
+            # Cleanup is best-effort — never block unit emission.
+            cleaned_concession = raw_concession_text
+            concession_quality = None
+        # Caller-supplied concession_value wins; only derive when absent.
+        if concession_value is None:
+            try:
+                from ma_poc.core.concession_normalize import normalize_concession
+
+                _obj = normalize_concession(raw_concession_text)
+                if isinstance(_obj, dict):
+                    # The canonical RealPage shape carries dollar value at
+                    # ``obj.free.dollarsLow`` or ``obj.rr.dollarsLow``. Either
+                    # surfaces as the numeric concession_value at unit level.
+                    _inner = _obj.get("obj") or {}
+                    if isinstance(_inner, dict):
+                        for _slot in ("free", "rr"):
+                            _v = (_inner.get(_slot) or {})
+                            if isinstance(_v, dict) and _v.get("dollarsLow"):
+                                derived_concession_value = float(_v["dollarsLow"])
+                                break
+            except Exception:
+                pass
+
+    final_concession_value = concession_value
+    if final_concession_value is None and derived_concession_value is not None:
+        final_concession_value = derived_concession_value
+
+    # ── Offer-taxonomy extraction (2026-05-24) ───────────────────────
+    # Matches the 8-column reference xlsx schema:
+    #   offer_banner       (short offer-only phrase, ~20-100 chars)
+    #   offer_type         (free_rent / dollar_off / waived_fee / ...)
+    #   offer_target       (rent / deposit / app_fee / amenity_fee / ...)
+    #   offer_value        ("6 weeks" / "$400" / "50%" / "1 month")
+    #   offer_conditions   ("deadline:May 31st; unit_scope:select; ...")
+    # All 5 keys always present (None when no signal).
+    offer_fields: dict[str, Any] = {
+        "offer_banner": None,
+        "offer_type": None,
+        "offer_target": None,
+        "offer_value": None,
+        "offer_conditions": None,
+    }
+    if raw_concession_text:
+        try:
+            from ma_poc.core.offer_extract import extract_offer
+
+            offer_fields = extract_offer(raw_concession_text)
+        except Exception:
+            # Offer extraction is best-effort; never block unit emission.
+            pass
+
     return {
         "floor_plan_name": floor_plan_name,
         "bed_label": bed_label,
@@ -507,7 +908,21 @@ def make_unit_dict(
         "market_rent_low": rent_low,
         "market_rent_high": rent_high,
         "deposit": deposit,
-        "concession": concession,
+        # Legacy + canonical concession fields. All populated from the
+        # same source text so downstream code can read either; the merge
+        # in _merge_fns.py preserves the canonical ones explicitly.
+        "concession": raw_concession_text or "",
+        "concession_text": raw_concession_text,
+        "concession_text_clean": cleaned_concession,
+        "_concession_quality": concession_quality,
+        "concession_value": final_concession_value,
+        "concession_source": concession_source,
+        # ── Offer taxonomy (2026-05-24, matches xlsx schema) ─────────
+        "offer_banner": offer_fields["offer_banner"],
+        "offer_type": offer_fields["offer_type"],
+        "offer_target": offer_fields["offer_target"],
+        "offer_value": offer_fields["offer_value"],
+        "offer_conditions": offer_fields["offer_conditions"],
         "availability_status": availability_status,
         "available_units": available_units,
         # Bug 2026-05-13: the v2 schema reader (core/schema_v2.py:242) looks
@@ -534,4 +949,17 @@ def make_unit_dict(
         # behavior change; adapters populate per-PMS incrementally with
         # grounded field names (no signature churn thereafter).
         "source_ids": dict(source_ids) if source_ids else {},
+        # 2026-05-23: documented data gaps. An adapter that has verified
+        # (by exhausting all enrichment paths) that the OPERATOR does not
+        # publish a given field stamps it here, e.g. ``data_gaps=["sqft"]``
+        # + ``data_quality_flag="SQFT_NOT_PUBLISHED"``. Downstream then:
+        #   - validation.schema_gate._has_area treats a documented sqft
+        #     gap as "area-present" so the no_area retry trigger doesn't
+        #     fire on legitimately-incomplete-but-extracted units.
+        #   - reporting.verdict can distinguish "parser missed it" from
+        #     "operator data gap" instead of stamping SUCCESS_PLAN_LEVEL
+        #     across both. Empty list / empty string for adapters that
+        #     don't (yet) flag gaps — zero behavior change.
+        "data_gaps": list(data_gaps) if data_gaps else [],
+        "data_quality_flag": data_quality_flag,
     }

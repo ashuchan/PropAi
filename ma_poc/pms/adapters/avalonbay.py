@@ -22,6 +22,7 @@ Key findings:
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
 
 from ma_poc.pms.adapters._parsing import (
@@ -78,9 +79,43 @@ def parse_avalonbay_units(
         else:
             fp_name = get_field(item, "floorPlanName", "floorplanName", "name", "planName")
 
-        # Rent from individual unit or from summary by bedroom count
+        # Rent from individual unit or from summary by bedroom count.
+        # 2026-05-23: Avalon's rendered-HTML Fusion blob (the dominant
+        # source for the 43+ TIER_1_5_EMBEDDED properties in the
+        # area-but-no-rent cohort) nests rent at
+        # ``startingAtPricesUnfurnished.prices.price`` / ``.netEffective
+        # Price``. The flat ``minRent`` / ``price`` paths the adapter
+        # checked first miss it entirely — units extract with sqft +
+        # unit_id but no rent, downgrading the verdict to SUCCESS_PLAN_
+        # LEVEL with reason "no_rent_signal". Verified live across 5
+        # Avalon sites 2026-05-23 (montville, meydenbauer, union,
+        # frisco, alderwood) — all use the same nested layout.
         rent_lo = money_to_int(get_field(item, "minRent", "rent_min", "price", "askingRent"))
         rent_hi = money_to_int(get_field(item, "maxRent", "rent_max", "maxAskingRent"))
+        if rent_lo is None:
+            nested_prices = (
+                (item.get("startingAtPricesUnfurnished") or {}).get("prices") or {}
+            )
+            if isinstance(nested_prices, dict):
+                # Prefer the published "price" (asking rent before concessions);
+                # fall back to netEffective which is identical when no promo,
+                # smaller when a promo applies (we keep both lo/hi separate).
+                # The Fusion JSON ships these as int literals (not strings) so
+                # money_to_int (string-only) won't accept them — coerce via
+                # int()/float() first, str-fallback for safety.
+                def _coerce_rent(v: Any) -> int | None:
+                    if v is None:
+                        return None
+                    if isinstance(v, (int, float)):
+                        n = int(v)
+                        return n if n > 0 else None
+                    return money_to_int(str(v))
+
+                rent_lo = (
+                    _coerce_rent(nested_prices.get("price"))
+                    or _coerce_rent(nested_prices.get("netEffectivePrice"))
+                )
+        # Bedroom-summary fallback only when per-unit and nested both empty.
         if rent_lo is None and beds is not None and beds in starting_rents:
             rent_lo = starting_rents[beds]
 
@@ -113,6 +148,114 @@ def parse_avalonbay_units(
             )
         )
     return units
+
+
+# ─── HTML embedded-JSON extractor (Fusion CMS, 2026-05-23) ────────────────
+
+# Avalon's avaloncommunities.com property pages are SSR'd with the Fusion
+# CMS (Arc Publishing). The full unit inventory ships inline in a
+# ``<script id="fusion-metadata">`` blob containing
+# ``Fusion.globalContent = { …, "units": [ {unitId, unitName, bedroomNumber,
+# bathroomNumber, squareFeet, floorPlan: {name}, availableDateUnfurnished,
+# startingAtPricesUnfurnished: {prices: {price, totalPrice, netEffective
+# Price}}, … }, … ] }``. The data is COMPLETE — every field the adapter
+# needs is present. The TIER_1_5_EMBEDDED generic embedded-JSON tier
+# extracted ``unitId`` + ``squareFeet`` but missed the nested rent path
+# entirely (43 properties stamped SUCCESS_PLAN_LEVEL by no_rent_signal).
+#
+# Verified live across 5 Avalon properties 2026-05-23 (montville,
+# meydenbauer, union, frisco, alderwood): all use the same Fusion shape
+# with 28-82 ``startingAtPricesUnfurnished`` blocks per page and unit_id
+# prefix ``AVB-``.
+_FUSION_UNITS_ARRAY_RE = re.compile(
+    r'"units"\s*:\s*\[\s*(?=\{[^}]*"unitId"\s*:\s*"AVB-)', re.DOTALL
+)
+# Gate: whitespace-tolerant. Live Fusion ships compact JSON, but the
+# tests construct synthetic blobs via json.dumps (default separators
+# include spaces). Either form must clear the gate.
+_AVALON_UNIT_GATE_RE = re.compile(r'"unitId"\s*:\s*"AVB-', re.IGNORECASE)
+
+
+def _extract_balanced_array(html: str, start: int) -> str:
+    """Given an index of an opening '[', return the substring up to the
+    matching ']'. Respects nested {} and [] and JSON string literals.
+    Returns '' if no balanced close found within the rest of html.
+    """
+    if start >= len(html) or html[start] != "[":
+        return ""
+    depth = 0
+    i = start
+    in_str = False
+    esc = False
+    while i < len(html):
+        c = html[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+        else:
+            if c == '"':
+                in_str = True
+            elif c == "[":
+                depth += 1
+            elif c == "]":
+                depth -= 1
+                if depth == 0:
+                    return html[start : i + 1]
+        i += 1
+    return ""
+
+
+def parse_avalonbay_html(html: str, url: str) -> list[dict[str, Any]]:
+    """Extract Avalon unit dicts from a property page's embedded Fusion JSON.
+
+    Returns ``[]`` when the page is not an Avalon Fusion-CMS page (the
+    ``"units":[{ "unitId":"AVB-`` signature is the gate — anchored on
+    both the array key and the Avalon-specific unit_id prefix so this
+    cannot misfire on a non-Avalon page that happens to carry a
+    ``"units":[…]`` array).
+
+    Each found unit dict is passed through the existing
+    :func:`parse_avalonbay_units`, which handles the bedroomNumber /
+    squareFeet / floorPlan.name / startingAtPricesUnfurnished.prices.
+    price extraction. Single source of truth for Avalon field mapping.
+    """
+    if not html or not _AVALON_UNIT_GATE_RE.search(html):
+        return []
+    m = _FUSION_UNITS_ARRAY_RE.search(html)
+    if not m:
+        # The whitespace-tolerant lookahead fallback handles synthetic
+        # JSON.dumps fixtures (spaces after colons) — live Fusion is
+        # compact and matched by the primary regex.
+        m = re.search(
+            r'"units"\s*:\s*\[\s*(?=\{\s*"unitId"\s*:\s*"AVB-)',
+            html,
+            re.DOTALL,
+        )
+        if not m:
+            return []
+    # Walk back from the regex match to find the '[' that opens the array.
+    arr_start = m.end() - 1
+    # The lookahead ate '{' but the array opens before it — find it.
+    arr_open = html.rfind("[", m.start(), arr_start + 1)
+    if arr_open < 0:
+        return []
+    arr_str = _extract_balanced_array(html, arr_open)
+    if not arr_str:
+        return []
+    try:
+        import json
+        items = json.loads(arr_str)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(items, list):
+        return []
+    return parse_avalonbay_units(
+        [it for it in items if isinstance(it, dict)], url
+    )
 
 
 class AvalonBayAdapter:
@@ -176,6 +319,42 @@ class AvalonBayAdapter:
                 if units:
                     all_units.extend(units)
                     result.api_responses.append(resp)
+
+        # 2026-05-23: when no API-response path produced units, parse
+        # the rendered HTML's Fusion embedded JSON. Avalon is SSR — the
+        # complete unit inventory ships inline; the API-response path
+        # only fires on a separate XHR which the browser may or may not
+        # have replayed. This adds a deterministic source-of-truth fall-
+        # through that lifts ~43 EMBEDDED-tier-classified Avalon
+        # properties from SUCCESS_PLAN_LEVEL to true SUCCESS.
+        if not all_units:
+            html = ""
+            fr = getattr(ctx, "fetch_result", None)
+            body = getattr(fr, "body", None) if fr is not None else None
+            if isinstance(body, bytes):
+                html = body.decode("utf-8", errors="replace")
+            elif isinstance(body, str):
+                html = body
+            base_url = str(getattr(ctx, "base_url", "") or "")
+            if html:
+                html_units = parse_avalonbay_html(html, base_url)
+                if html_units:
+                    all_units.extend(html_units)
+                    # Stamp the HTML source so the verdict layer / report
+                    # can distinguish this path from the XHR path. Same
+                    # tier root, distinct suffix.
+                    for u in all_units:
+                        if u.get("extraction_tier") == "TIER_1_API_AVALONBAY":
+                            u["extraction_tier"] = "TIER_1_HTML_AVALONBAY_FUSION"
+                    result.tier_used = "TIER_1_HTML_AVALONBAY_FUSION"
+                    result.api_responses.append(
+                        {
+                            "url": base_url,
+                            "status": 200,
+                            "body": "<avalonbay-fusion-html>",
+                            "via": "html_embedded_fusion",
+                        }
+                    )
 
         if all_units:
             from ma_poc.extraction.post_process import post_process

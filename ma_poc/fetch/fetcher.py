@@ -44,7 +44,6 @@ from .retry_policy import RetryPolicy
 from .robots import RobotsConsumer
 from .stealth import Identity, IdentityPool
 
-
 # F3 — re-exported so the spec-aligned test path
 # (tests/fetch/test_silent_403_classification.py) imports them from
 # ma_poc.fetch.fetcher. Single source of truth still lives in
@@ -175,7 +174,7 @@ class Fetcher:
         self._browsers = browsers
         self._retry = retry
 
-    async def fetch(self, task: CrawlTask, profile: "ScrapeProfile | None" = None) -> FetchResult:
+    async def fetch(self, task: CrawlTask, profile: ScrapeProfile | None = None) -> FetchResult:
         """Top-level entry. Never raises on transient errors.
 
         When ENABLE_TIER_ESCALATION is True and a profile is supplied, delegates
@@ -327,6 +326,23 @@ class Fetcher:
             if captcha_detected and not result.captcha_detected:
                 result = dataclasses.replace(result, captcha_detected=True)
 
+            # 2026-05-25 (canary 1ef1060 follow-up): promote a captcha-
+            # interstitial to BOT_BLOCKED so the existing curl_cffi →
+            # Unlocker cascade at line ~680 fires. Pre-fix, Sucuri-walled
+            # pages reached the fetcher caller with outcome=OK + 12KB of
+            # challenge HTML, then propagated through the extractor as
+            # ran_empty — dropping ~738 units across the AppFolio cohort
+            # (Reserve at Belvedere, Heritage by Fairlawn, Vivid, Terrain).
+            # Cloudflare/PerimeterX already arrive as BOT_BLOCKED at the
+            # HTTP layer (403/503), so this promotion is a no-op for them.
+            # The promotion only affects the OK + captcha_detected combo,
+            # which is exactly the Sucuri / sgcaptcha 200/202 pattern.
+            if (
+                captcha_detected
+                and result.outcome == FetchOutcome.OK
+            ):
+                result = dataclasses.replace(result, outcome=FetchOutcome.BOT_BLOCKED)
+
             emit(
                 EventKind.FETCH_COMPLETED,
                 task.property_id,
@@ -454,6 +470,121 @@ class Fetcher:
 
         return last_result
 
+    async def _try_curl_cffi_fallback(
+        self, task: CrawlTask, start_ms: int
+    ) -> FetchResult | None:
+        """Free Cloudflare-bypass fallback via curl_cffi chrome120
+        impersonation. No API costs, no proxy needed.
+
+        Background — 2026-05-23 canary diagnostic: 116 properties in the
+        ``generic:no_body_short_circuit`` cohort failed with
+        ``FetchOutcome.BOT_BLOCKED`` from patchright RENDER. Probing the
+        same hosts with ``curl_cffi`` and ``impersonate="chrome120"``
+        yielded **12/12 (100%) bypass** of the Cloudflare 403 walls:
+        each returned 200 OK with the full marketing HTML (87KB-325KB).
+
+        Why curl_cffi works where patchright doesn't:
+          • Cloudflare's TLS fingerprint (JA3/JA4) detection is the
+            primary block. Patchright/Playwright presents a Chromium TLS
+            stack; curl_cffi forges the exact byte-for-byte Chrome 120
+            JA3 hash that real desktop Chrome ships.
+          • Plain HTTP/2 headers match a real Chrome session — no SPA
+            rendering needed for server-rendered marketing HTML.
+
+        Why fire BEFORE the paid Unlocker:
+          • Zero cost, zero rate limit
+          • Works on plain server-rendered HTML (Entrata /conventional/,
+            small-operator vanity sites — the dominant CF-blocked shape)
+          • Falls through to Unlocker on its own failures (SPA pages
+            that need JS execution still escalate)
+
+        Returns the FetchResult on a successful 200 response with body
+        ≥1KB, or None when curl_cffi is unavailable / response was
+        non-200 / body still empty.
+        """
+        try:
+            from ..pms.adapters._probe import probe_get
+        except Exception as exc:
+            log.warning("curl_cffi fallback unavailable: %s", exc)
+            return None
+
+        # 2026-05-24 (post-canary diagnosis): try DIRECT first, then
+        # fall back to proxied. Canary 2026-05-23-focused-3886351 result:
+        # 0/141 BOT_BLOCKED residue recovered when PROBE_PROXY_URL was
+        # set (BrightData residential). Direct re-probe on 5/5 random
+        # residue → 5/5 returned 200 OK. The BrightData IP pool is
+        # burned on these CF-fronted vanity hosts; direct works because
+        # the GCP worker IP isn't on the operator's CF blocklist.
+        # Priority chain:
+        #   1. Direct (no proxy) — works for ~95% of CF-walled sites
+        #   2. Proxied (PROBE_PROXY_URL) — only useful for Yardi
+        #      SecureCafe tenancy where GCP IPs are explicitly blocked
+        r = None
+        used_proxy = False
+        try:
+            # Force-disable proxy on this call regardless of PROBE_PROXY_URL.
+            r = probe_get(task.url, timeout=20, proxies={}, verify=True)
+        except Exception as exc:
+            log.warning(
+                "curl_cffi direct fallback fetch failed for %s: %s",
+                task.property_id, exc,
+            )
+
+        status = getattr(r, "status_code", 0) if r is not None else 0
+        body = getattr(r, "text", "") or "" if r is not None else ""
+
+        # If direct didn't bypass AND a residential proxy is configured,
+        # try the proxied path as a second attempt (handles Yardi/CF
+        # tenancy that blocks GCP IPs).
+        if (status != 200 or len(body) < 1024) and os.environ.get(
+            "PROBE_PROXY_URL", ""
+        ).strip():
+            try:
+                r2 = probe_get(task.url, timeout=20)
+            except Exception as exc:
+                log.warning(
+                    "curl_cffi proxied fallback fetch failed for %s: %s",
+                    task.property_id, exc,
+                )
+                r2 = None
+            if r2 is not None:
+                status2 = getattr(r2, "status_code", 0)
+                body2 = getattr(r2, "text", "") or ""
+                if status2 == 200 and len(body2) >= 1024:
+                    r = r2
+                    status = status2
+                    body = body2
+                    used_proxy = True
+
+        # 1KB floor weeds out residual CF "Just a moment" stubs (~7KB
+        # but flagged by patchright); honest content is always larger.
+        # We accept 200 OK with reasonable body size.
+        if r is None or status != 200 or len(body) < 1024:
+            return None
+
+        emit(
+            EventKind.FETCH_TIER_ESCALATED,
+            task.property_id,
+            tier="CURL_CFFI_CHROME120_PROXIED" if used_proxy else "CURL_CFFI_CHROME120",
+            reason="render_bot_blocked",
+        )
+        # Construct an OK FetchResult that the rest of the pipeline
+        # treats as a normal successful fetch.
+        from .contracts import FetchOutcome as _FO
+        elapsed = int(time.time() * 1000) - start_ms
+        return FetchResult(
+            url=task.url,
+            outcome=_FO.OK,
+            status=200,
+            body=body.encode("utf-8", errors="replace"),
+            headers={},
+            render_mode=task.render_mode,
+            final_url=getattr(r, "url", task.url) or task.url,
+            attempts=1,
+            elapsed_ms=elapsed,
+            error_signature="curl_cffi_chrome120_bypass",
+        )
+
     async def _try_unlocker_fallback(
         self, task: CrawlTask, start_ms: int
     ) -> FetchResult | None:
@@ -526,14 +657,51 @@ class Fetcher:
             # tier is enabled, fall back to JUST the Unlocker. This does
             # NOT re-introduce 0e85fbf's regression — the plain-GET lower
             # tiers (DIRECT/DC_PROXY) are never engaged here.
-            if (
-                render_result.outcome == FetchOutcome.BOT_BLOCKED
-                and ENABLE_TIER_ESCALATION
-                and ENABLE_UNLOCKER_TIER
+            if render_result.outcome in (
+                FetchOutcome.BOT_BLOCKED,
+                FetchOutcome.TRANSIENT,
+                FetchOutcome.RATE_LIMITED,
+                FetchOutcome.HARD_FAIL,
             ):
-                unlocked = await self._try_unlocker_fallback(task, start_ms)
-                if unlocked is not None and unlocked.outcome == FetchOutcome.OK:
-                    return unlocked
+                # 2026-05-23: Free curl_cffi chrome120 bypass tried FIRST.
+                # Validated bypass rates on the canary's
+                # no_body_short_circuit cohort:
+                #   • BOT_BLOCKED (Cloudflare 403): 12/12 (100%)
+                #   • TRANSIENT (timeouts, RENDER-mode flakes): 9/15 (60%)
+                #   • RATE_LIMITED (Essex Playwright pacing): 3/3 (100%)
+                #   • HARD_FAIL (Playwright SSL errors): 2/4 (50%) —
+                #     toapts.com + marquettemanagement.reslisting.com
+                #     return 200 OK 100-356KB via curl_cffi when
+                #     Playwright fails on the cert handshake.
+                # The 40% TRANSIENT misses are DNS/SSL failures on dead
+                # domains — those propagate through unchanged (no harm
+                # done — they remain TRANSIENT and the verdict layer
+                # handles them).
+                # RATE_LIMITED via curl_cffi works because the rate-limit
+                # is on the Playwright UA/IP combination — the curl_cffi
+                # request to the SAME host on the SAME box uses a
+                # different TLS fingerprint + UA, often falling outside
+                # the operator's bot-pacing throttle (validated 3/3 on
+                # essexapartmenthomes.com 2026-05-23).
+                # Zero cost, zero proxy, no flag gate — we always try the
+                # free option before any paid escalation OR before
+                # returning the original failure outcome unchanged.
+                cffi_result = await self._try_curl_cffi_fallback(task, start_ms)
+                if cffi_result is not None and cffi_result.outcome == FetchOutcome.OK:
+                    return cffi_result
+                # Fall through to the paid Unlocker only on BOT_BLOCKED
+                # (TRANSIENT misses are typically operator-side and the
+                # Unlocker doesn't help with DNS/SSL/connection errors;
+                # RATE_LIMITED would only be made worse by hitting the
+                # same host through another paid path).
+                if (
+                    render_result.outcome == FetchOutcome.BOT_BLOCKED
+                    and ENABLE_TIER_ESCALATION
+                    and ENABLE_UNLOCKER_TIER
+                ):
+                    unlocked = await self._try_unlocker_fallback(task, start_ms)
+                    if unlocked is not None and unlocked.outcome == FetchOutcome.OK:
+                        return unlocked
             return render_result
 
         # HEAD or GET via tier-aware HTTP client (S2/S3/S4).
@@ -586,6 +754,35 @@ class Fetcher:
             if resp.cookies:
                 jar.update_from_response(host, resp.cookies)
 
+            # 2026-05-24: DIRECT-tier httpx → curl_cffi auto-escalation on
+            # BOT_BLOCKED. The plain httpx client lacks TLS-fingerprint
+            # impersonation, so Cloudflare- and Imperva-fronted vanity
+            # sites return 403 even when curl_cffi chrome120 works.
+            # Random-sample probe 2026-05-24 on 50 FAILED_UNREACHABLE
+            # props in the focused-3886351 canary showed httpx 9/10 = 90%
+            # 403 vs curl_cffi 10/10 = 100% 200 OK — with 29/50 being
+            # Entrata Prospect Portal sites our Template A/B/C adapters
+            # would extract from immediately.
+            #
+            # Trigger conditions:
+            #   * tier is DIRECT (proxy is None)
+            #   * method is GET (not HEAD — we want the body)
+            #   * outcome is BOT_BLOCKED (the failure mode we know
+            #     curl_cffi bypasses; TRANSIENT/HARD_FAIL DNS/SSL
+            #     failures aren't TLS-fingerprint related)
+            #
+            # Cost: one extra round-trip per BOT_BLOCKED, only on
+            # failures. Healthy sites are unaffected.
+            if (
+                method == "GET"
+                and outcome == FetchOutcome.BOT_BLOCKED
+                and tier == FetchTier.DIRECT
+                and proxy is None
+            ):
+                cffi_result = await self._try_curl_cffi_fallback(task, start_ms)
+                if cffi_result is not None and cffi_result.outcome == FetchOutcome.OK:
+                    return cffi_result
+
             return FetchResult(
                 url=task.url,
                 outcome=outcome,
@@ -603,6 +800,23 @@ class Fetcher:
             )
         except Exception as exc:
             outcome, sig = classify(None, {}, None, exception=exc)
+            # 2026-05-24: same auto-escalation on transient httpx
+            # failures (TLS handshake aborts, HTTP/2 protocol errors,
+            # connection resets). curl_cffi often succeeds where httpx
+            # raises because its chrome120 TLS fingerprint passes
+            # cloud-WAF protocol-level gates that httpx triggers.
+            if (
+                method == "GET"
+                and outcome in (FetchOutcome.BOT_BLOCKED, FetchOutcome.HARD_FAIL)
+                and tier == FetchTier.DIRECT
+                and proxy is None
+            ):
+                try:
+                    cffi_result = await self._try_curl_cffi_fallback(task, start_ms)
+                    if cffi_result is not None and cffi_result.outcome == FetchOutcome.OK:
+                        return cffi_result
+                except Exception:
+                    pass
             return FetchResult(
                 url=task.url,
                 outcome=outcome,
@@ -900,7 +1114,6 @@ class Fetcher:
             # Only fires on JS_CHALLENGE pages, NOT WAF "Attention Required"
             # (which shows "Sorry, you have been blocked" and can't auto-solve).
             if body_text and 512 <= len(body_text) <= 20_000:
-                import re as _re_cf
                 _CF_JS_PATTERNS = (
                     b"Just a moment", b"challenge-platform", b"__cf_chl_",
                     b"Checking your browser",

@@ -250,7 +250,46 @@ def _is_essex_availability(body: Any, url: str) -> bool:
     return "pricing_by_date" in r and "unit_id" in r
 
 
-def parse_essex_availability(body: dict[str, Any], source_url: str) -> list[dict[str, Any]]:
+def build_unit_id_to_name_map(bulk_body: Any) -> dict[str, str]:
+    """Build a ``{unit_id_str: displayed_name}`` map from an Essex bulk
+    SPA response (the ``floorplans[*].units[*]`` shape). Used by the
+    per-unit availability fallback to resolve the displayed unit name
+    when the per-unit endpoint only carries ``unit_id``.
+
+    2026-05-24: defensive code. The per-unit fallback fires when the
+    bulk SPA path returns nothing usable but Playwright captured
+    individual ``/api/properties/{pid}/units/{uid}/availability`` XHRs.
+    Per-unit responses don't carry the ``name`` field; without this
+    map the fallback would ship the 7-digit internal ``unit_id`` as
+    ``unit_number``. Verified live 2026-05-24 across 10 Essex
+    properties — the bulk path wins 100 % of the time today, but
+    leaving the fallback un-hardened invites a future regression.
+    """
+    out: dict[str, str] = {}
+    if not isinstance(bulk_body, dict):
+        return out
+    result = bulk_body.get("result")
+    if not isinstance(result, dict):
+        return out
+    for fp in result.get("floorplans") or []:
+        if not isinstance(fp, dict):
+            continue
+        for u in fp.get("units") or []:
+            if not isinstance(u, dict):
+                continue
+            uid = u.get("unit_id")
+            name = u.get("name")
+            if uid is None or name in (None, ""):
+                continue
+            out[str(uid)] = str(name)
+    return out
+
+
+def parse_essex_availability(
+    body: dict[str, Any],
+    source_url: str,
+    unit_id_to_name: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
     """One Essex ``/availability`` response → at most one unit-level dict.
 
     The endpoint is per-unit. The canonical asking rent is the
@@ -260,6 +299,12 @@ def parse_essex_availability(body: dict[str, Any], source_url: str) -> list[dict
     = the first ``pricing_by_date`` entry whose ``terms_by_month`` is
     non-empty (an empty list means the unit is not available that day).
     Returns [] when no date has any term (unit not currently available).
+
+    2026-05-24: ``unit_id_to_name`` lets the caller pass a map built
+    from the bulk SPA response so we can ship the displayed unit name
+    (e.g. ``"G104"``) instead of the internal 7-digit ``unit_id``
+    (e.g. ``"6302046"``). Falls back to ``str(unit_id)`` only when no
+    mapping is available — preserving prior behaviour.
     """
     r = body.get("result")
     if not isinstance(r, dict):
@@ -297,9 +342,15 @@ def parse_essex_availability(body: dict[str, Any], source_url: str) -> list[dict
         return []
     deposit = pick.get("deposit")
 
+    # Prefer the displayed unit name from the bulk-response map when
+    # available; fall back to the 7-digit internal unit_id otherwise.
+    display_unit_no = (
+        (unit_id_to_name or {}).get(str(unit_id)) or str(unit_id)
+    )
+
     return [
         make_unit_dict(
-            unit_number=str(unit_id),
+            unit_number=display_unit_no,
             floor_plan_name=str(fp_id or ""),
             rent_low=rent,
             rent_high=rent,
@@ -361,6 +412,22 @@ class EssexAdapter:
                 result.confidence = min(0.90, 0.7 + 0.05 * len(bulk_units))
                 return result
 
+        # 2026-05-24: build a unit_id → displayed-name map from ANY
+        # bulk-shape response we've captured (passively or via active
+        # fetch). The per-unit /availability endpoint only carries
+        # unit_id, so without this map the fallback ships the 7-digit
+        # internal id as unit_number. Even when bulk had no units to
+        # parse (e.g. zero current availability + Playwright captured
+        # individual per-unit XHRs from a stale state), the floorplan
+        # list often still carries the unit_id→name pairs we need.
+        unit_id_to_name: dict[str, str] = {}
+        for rsp in api_responses:
+            b = rsp.get("body")
+            if _is_essex_bulk(b):
+                unit_id_to_name.update(build_unit_id_to_name_map(b))
+        for src in bulk_sources:
+            unit_id_to_name.update(build_unit_id_to_name_map(src.get("body")))
+
         all_units: list[dict[str, Any]] = []
         seen: set[str] = set()
         for resp in api_responses:
@@ -371,7 +438,7 @@ class EssexAdapter:
             if not isinstance(body, dict):
                 continue
             try:
-                units = parse_essex_availability(body, url)
+                units = parse_essex_availability(body, url, unit_id_to_name)
             except Exception as exc:  # noqa: BLE001 — never raise from an adapter
                 result.errors.append(f"essex-parse-error: {type(exc).__name__}: {exc}")
                 continue

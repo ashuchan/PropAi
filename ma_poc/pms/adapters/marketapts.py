@@ -211,12 +211,28 @@ async () => {
   }
 
   // ── Template B — drill-per-plan (.floorplan-item + /unit/{slug})
+  //
+  // 2026-05-25 deep-probe fix (15 n_full=0 TIER_1_DOM_MARKETAPTS
+  // properties): the drill-anchor matcher previously only accepted the
+  // "View Available / View Details / See Available" wording. Live probe
+  // of Hill Country Villas, Mountain Ridge -apts and Franklin Flats
+  // shows the actual wording is "3 Units Available" / "1 Unit Available"
+  // / "2 Apartments Available" — the count + noun + "Available" form.
+  // Without matching it, the drill is never walked and the adapter
+  // emits plan-only rows (n_full=0). Extend the regex to cover all
+  // observed wordings AND match on ``href`` containing ``/unit/`` as a
+  // defensive secondary signal (every probed Template B site uses that
+  // path prefix).
   const bItems = Array.from(doc.querySelectorAll('.floorplan-item'));
   if (bItems.length > 0) {
     const planTasks = bItems.map((item) => {
       const drillAnchor = Array.from(item.querySelectorAll('a')).find((a) => {
+        const href = a.getAttribute('href') || '';
         const t = (a.innerText || a.textContent || '').toLowerCase();
-        return /view\s+available|view\s+details|see\s+available/.test(t);
+        return /\/unit\//.test(href) ||
+               /view\s+available|view\s+details|see\s+available/.test(t) ||
+               /\b\d+\s+units?\s+available\b/.test(t) ||
+               /\b\d+\s+apartments?\s+available\b/.test(t);
       });
       const title = T(item.querySelector('.floorplan-title'));
       const features = T(item.querySelector('.floorplan-features'));
@@ -233,14 +249,31 @@ async () => {
     for (const task of planTasks) {
       let units = [];
       if (task.drillPath) {
+        // Normalise relative drill URLs (e.g. ``apartments/1-bedroom``
+        // without a leading slash, observed on Brookstone Template D)
+        // against ``document.baseURI`` so the fetch always resolves to
+        // the site root rather than the current page's directory.
         let drillUrl = task.drillPath;
-        if (drillUrl.startsWith('/')) drillUrl = location.origin + drillUrl;
+        try {
+          drillUrl = new URL(drillUrl, document.baseURI).href;
+        } catch (e) {
+          if (drillUrl.startsWith('/')) drillUrl = location.origin + drillUrl;
+        }
         try {
           const r = await fetch(drillUrl, {credentials: 'include'});
           if (r.ok) {
             const drillDoc = new DOMParser().parseFromString(await r.text(), 'text/html');
             units = Array.from(drillDoc.querySelectorAll('.unit-table-row')).map((row) => {
-              const cells = Array.from(row.children).map((c) => T(c));
+              // Strip mobile-only label spans before reading cell text.
+              // Hill Country / sibling Template B drill rows wrap each
+              // cell value with a ``.visible-xs.visible-sm`` ``<b>Unit:</b>``
+              // label that shows on mobile but is hidden on desktop —
+              // textContent picks it up regardless, contaminating the
+              // cell with "Unit: 0827" instead of "0827". Cloning and
+              // removing the labels keeps the live DOM unchanged.
+              const rowClone = row.cloneNode(true);
+              rowClone.querySelectorAll('.visible-xs, .visible-sm, .hidden-md, .hidden-lg').forEach((n) => n.remove());
+              const cells = Array.from(rowClone.children).map((c) => T(c));
               return {cells: cells, dataAttrs: Object.assign({}, row.dataset || {})};
             });
           }
@@ -273,7 +306,11 @@ async () => {
     const planRows = [];
     for (const href of unitHrefs) {
       let drillUrl = href;
-      if (drillUrl.startsWith('/')) drillUrl = location.origin + drillUrl;
+      try {
+        drillUrl = new URL(drillUrl, document.baseURI).href;
+      } catch (e) {
+        if (drillUrl.startsWith('/')) drillUrl = location.origin + drillUrl;
+      }
       let title = '';
       let specsBlob = '';
       let units = [];
@@ -288,7 +325,9 @@ async () => {
                            T(drillDoc.body).slice(0, 2000);
           specsBlob = bodyText;
           units = Array.from(drillDoc.querySelectorAll('.unit-details')).map((row) => {
-            const cells = Array.from(row.children).map((c) => T(c));
+            const rowClone = row.cloneNode(true);
+            rowClone.querySelectorAll('.visible-xs, .visible-sm, .hidden-md, .hidden-lg').forEach((n) => n.remove());
+            const cells = Array.from(rowClone.children).map((c) => T(c));
             return {cells: cells, dataAttrs: Object.assign({}, row.dataset || {})};
           });
         }
@@ -334,14 +373,25 @@ async () => {
     for (const task of planTasks) {
       let units = [];
       if (task.drillPath) {
+        // Template D drill URLs sometimes lack a leading slash
+        // (Brookstone Apartments emits ``apartments/1-bedroom``); use
+        // ``new URL`` against ``document.baseURI`` so resolution is
+        // explicit and origin-anchored regardless of the listing page
+        // URL.
         let drillUrl = task.drillPath;
-        if (drillUrl.startsWith('/')) drillUrl = location.origin + drillUrl;
+        try {
+          drillUrl = new URL(drillUrl, document.baseURI).href;
+        } catch (e) {
+          if (drillUrl.startsWith('/')) drillUrl = location.origin + drillUrl;
+        }
         try {
           const r = await fetch(drillUrl, {credentials: 'include'});
           if (r.ok) {
             const drillDoc = new DOMParser().parseFromString(await r.text(), 'text/html');
             units = Array.from(drillDoc.querySelectorAll('.unit-table-row')).map((row) => {
-              const cells = Array.from(row.children).map((c) => T(c));
+              const rowClone = row.cloneNode(true);
+              rowClone.querySelectorAll('.visible-xs, .visible-sm, .hidden-md, .hidden-lg').forEach((n) => n.remove());
+              const cells = Array.from(rowClone.children).map((c) => T(c));
               return {cells: cells, dataAttrs: Object.assign({}, row.dataset || {})};
             });
           }
@@ -447,6 +497,28 @@ _DATE_LIKE_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+# Defensive Python-side fallback for the mobile-only label spans the JS
+# strips before serialising cells. If a site renders the labels in a
+# DOM shape the JS guard doesn't catch (e.g. ``<small class="d-md-none">``
+# variants), the cell text comes through as ``"Unit: 0827"`` instead of
+# ``"0827"``. This regex strips a leading single-word label (one of the
+# known columns) plus its colon so positional parsing keeps working.
+_DRILL_CELL_LABEL_RE = re.compile(
+    r"^\s*(?:unit|rent|available|special|features?|sq\s*\.?\s*ft|sqft|sq\s*ft|sqfeet)\s*:\s*",
+    re.IGNORECASE,
+)
+
+
+def _strip_drill_cell_label(cell: str) -> str:
+    """Strip a mobile-only label prefix ("Unit:", "Rent:", etc.) from a
+    drill-row cell value. Defensive — the JS layer already removes the
+    ``.visible-xs`` / ``.visible-sm`` label spans on most sites; this
+    handles edge cases where the label class doesn't match the JS
+    selector list. Called for every drill cell in Templates B / C / D.
+    """
+    if not cell:
+        return cell
+    return _DRILL_CELL_LABEL_RE.sub("", cell, count=1).strip()
 
 
 def _parse_template_a_features(features_text: str) -> tuple[int | None, str, str]:
@@ -661,8 +733,14 @@ def parse_marketapts_template_b(
             data_attrs = u.get("dataAttrs") or {}
             if not isinstance(cells_raw, list):
                 continue
-            # Strip empty cells; Apply-button cell sometimes interleaves.
-            cells = [str(c).strip() for c in cells_raw if str(c).strip()]
+            # Strip empty cells AND any mobile-only "Label:" prefix the
+            # JS layer didn't already remove. Apply-button cell sometimes
+            # interleaves; the empty filter drops it.
+            cells = [
+                _strip_drill_cell_label(str(c).strip())
+                for c in cells_raw
+                if _strip_drill_cell_label(str(c).strip())
+            ]
             if not cells:
                 continue
             unit_no = cells[0]
@@ -760,7 +838,11 @@ def parse_marketapts_template_c(
             cells_raw = u.get("cells") or []
             if not isinstance(cells_raw, list):
                 continue
-            cells = [str(c).strip() for c in cells_raw if str(c).strip()]
+            cells = [
+                _strip_drill_cell_label(str(c).strip())
+                for c in cells_raw
+                if _strip_drill_cell_label(str(c).strip())
+            ]
             if not cells:
                 continue
             unit_no = cells[0]
@@ -1075,7 +1157,19 @@ class MarketAptsAdapter:
             result.units = pp.admitted
             result.plan_summaries = pp.plan_summaries
             result.winning_url = winning
-            result.tier_used = f"TIER_1_DOM_MARKETAPTS_{template}"
+            # Tier label: append ``_UNIT_LEVEL`` when at least one
+            # admitted row carries a unit_number — i.e. the per-plan
+            # drill walked successfully. Without the suffix the row is
+            # plan-level only (every unit_number empty). Downstream
+            # reporting uses this to separate the "drill walked"
+            # outcome from the "plan-only fallback" outcome introduced
+            # by the 2026-05-25 deep-probe fix.
+            has_unit_level = any(
+                str(row.get("unit_number") or "").strip()
+                for row in pp.admitted
+            )
+            suffix = "_UNIT_LEVEL" if has_unit_level else ""
+            result.tier_used = f"TIER_1_DOM_MARKETAPTS_{template}{suffix}"
             result.confidence = min(0.92, 0.65 + 0.04 * pp.n_admitted)
             return result
 

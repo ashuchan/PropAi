@@ -289,8 +289,10 @@ def test_find_g5_urn_g5_clw_substring_gate() -> None:
 
 
 def test_find_g5_urn_picks_longest_clw_form() -> None:
-    """When both bare ``g5-clw-<id>`` and full slug forms appear, prefer
-    the longer (fully-qualified) form just like the ``g5-cl-`` case."""
+    """When ONLY ``g5-clw-*`` URNs are present (no G5_STORE_ID, no
+    ``g5-cl-*``), the longest ``g5-clw-*`` form is returned as a
+    last-resort fallback. The API will likely 404 it but the cascade
+    needs SOMETHING to record."""
     html = (
         '<a href="https://x/g5-clw-guhjplm75w">x</a>'
         '<a href="https://x/g5-clw-guhjplm75w-villas-willow-glen-ccd198fe3a9da82ff16f099a096c1d91">y</a>'
@@ -300,6 +302,66 @@ def test_find_g5_urn_picks_longest_clw_form() -> None:
         "g5-clw-guhjplm75w-villas-willow-glen-"
         "ccd198fe3a9da82ff16f099a096c1d91"
     )
+
+
+# ── 2026-05-23: G5_STORE_ID dataLayer priority (G5_API_ERROR fix) ────
+
+
+def test_find_g5_urn_prefers_g5_store_id_over_g5_clw() -> None:
+    """The canonical fix for the canary G5_API_ERROR cohort (21
+    properties): when the page has both ``G5_STORE_ID`` in the inline
+    dataLayer AND a ``g5-clw-*-{hash}`` URN (the website wrapper that
+    returns 404 from the GraphQL API), prefer the ``G5_STORE_ID``.
+    Validated against parkviewapartmentliving.com et al — flipped 18
+    of 21 from API_ERROR to SUCCESS on the same canary cohort."""
+    html = (
+        '<script>'
+        'dataLayer.push({'
+        '"G5_CLIENT_ID":"g5-c-60jdsuatx-goldoller-management-services-llc",'
+        '"G5_STORE_ID":"g5-cl-1o9zp7jp8n-goldoller-management-services-llc-groveport-oh",'
+        '"G5_INDUSTRY_ID":"Apartments"'
+        '});'
+        '</script>'
+        '<img src="//cdn/g5-clw-gqrxx9trkl-winchester-park-7ea658a58541a41b7778182534fd46e7/x.png">'
+    )
+    urn = find_g5_urn(html)
+    assert urn == "g5-cl-1o9zp7jp8n-goldoller-management-services-llc-groveport-oh"
+
+
+def test_find_g5_urn_prefers_g5_cl_over_g5_clw_when_no_store_id() -> None:
+    """Fallback path: no dataLayer G5_STORE_ID, but both ``g5-cl-*`` and
+    ``g5-clw-*`` URNs are in the HTML. Pick the ``g5-cl-*`` form (the
+    real GraphQL-acceptable one) even though the ``g5-clw-*`` may be
+    longer."""
+    html = (
+        '<img src="//cdn/g5-clw-gqrxx9trkl-winchester-park-7ea658a58541a41b7778182534fd46e7/x.png">'
+        '<img src="//cdn/g5-cl-1o9zp7jp8n-goldoller-management-services-llc-groveport-oh/y.png">'
+    )
+    urn = find_g5_urn(html)
+    assert urn == "g5-cl-1o9zp7jp8n-goldoller-management-services-llc-groveport-oh"
+
+
+def test_find_g5_urn_g5_store_id_handles_double_quoted_value() -> None:
+    """G5 dataLayer always uses double-quotes (JSON-shaped)."""
+    html = '<script>{"G5_STORE_ID": "g5-cl-abc123-test-property"}</script>'
+    assert find_g5_urn(html) == "g5-cl-abc123-test-property"
+
+
+def test_find_g5_urn_g5_store_id_extracted_even_when_sibling_urls_leak() -> None:
+    """Multi-property G5 portfolios (Goldoller, Bayshore, GK Mgmt)
+    leak SIBLING ``g5-cl-*`` URNs into menu thumbnails / nav CDN paths.
+    G5_STORE_ID is the unique source of truth for THIS property."""
+    html = (
+        '<script>'
+        '"G5_STORE_ID":"g5-cl-1o9zooo9co-goldoller-management-services-llc-fort-wayne-in"'
+        '</script>'
+        # Sibling Goldoller properties leaking into menu nav
+        '<img src="//cdn/g5-cl-1oi63j752h-gk-management-co-inc-multi-livermore-ca/a.png">'
+        '<img src="//cdn/g5-cl-1o9zoo4yw0-goldoller-management-services-llc-westerville-oh/b.png">'
+    )
+    urn = find_g5_urn(html)
+    # Must select THIS property's URN, not a sibling
+    assert urn == "g5-cl-1o9zooo9co-goldoller-management-services-llc-fort-wayne-in"
 
 
 def test_g5_units_query_includes_floorplan_specials_subfields() -> None:
@@ -363,16 +425,17 @@ def test_parse_g5_apartments_empty_payload_returns_empty() -> None:
 
 @pytest.mark.asyncio
 async def test_extract_happy_path(mocker) -> None:
-    mock_response = mocker.Mock()
-    mock_response.status_code = 200
-    mock_response.json = mocker.Mock(return_value=_REAL_G5_PAYLOAD)
+    """Mock at _fetch_g5_units boundary so the test works for both the
+    curl_cffi-primary path (2026-05-24) and the httpx fallback."""
+    captured_urns: list[str] = []
 
-    async def _mock_post(self, url, json=None, headers=None):  # noqa: ANN001
-        assert url == "https://inventory.g5marketingcloud.com/graphql"
-        assert json["variables"]["urn"] == "g5-cl-1jsdmzcxpf-king-s-manor-apartments"
-        return mock_response
+    async def _mock_fetch(urn: str, base_url: str = "") -> dict:
+        captured_urns.append(urn)
+        return _REAL_G5_PAYLOAD
 
-    mocker.patch("httpx.AsyncClient.post", _mock_post)
+    mocker.patch(
+        "ma_poc.pms.adapters.g5._fetch_g5_units", side_effect=_mock_fetch
+    )
 
     detected = detect_pms(
         "https://www.morgan-properties.com/apartments/pa/harrisburg/kings-manor-apartments/",
@@ -394,6 +457,8 @@ async def test_extract_happy_path(mocker) -> None:
     assert len(result.units) == 2
     assert result.units[0]["availability_date"] == "2026-01-26"
     assert result.confidence >= 0.7
+    # The first (dataLayer-canonical) URN candidate must be tried first.
+    assert captured_urns[0] == "g5-cl-1jsdmzcxpf-king-s-manor-apartments"
 
 
 @pytest.mark.asyncio
@@ -416,14 +481,15 @@ async def test_extract_no_urn_returns_clean_failure(mocker) -> None:
 
 @pytest.mark.asyncio
 async def test_extract_api_error_recorded(mocker) -> None:
-    mock_response = mocker.Mock()
-    mock_response.status_code = 500
-    mock_response.json = mocker.Mock(side_effect=ValueError)
+    """When the fetch returns None for every URN candidate, the adapter
+    should record _TIER_API_ERROR and the error message must list how
+    many candidates were tried."""
+    async def _mock_fetch(urn: str, base_url: str = "") -> dict | None:
+        return None  # simulate non-200 response
 
-    async def _mock_post(self, url, json=None, headers=None):  # noqa: ANN001
-        return mock_response
-
-    mocker.patch("httpx.AsyncClient.post", _mock_post)
+    mocker.patch(
+        "ma_poc.pms.adapters.g5._fetch_g5_units", side_effect=_mock_fetch
+    )
 
     ctx = AdapterContext(
         base_url="https://www.morgan-properties.com/apartments/pa/harrisburg/kings-manor-apartments/",
@@ -439,6 +505,8 @@ async def test_extract_api_error_recorded(mocker) -> None:
     result = await G5Adapter().extract(_DummyPage(), ctx)
     assert result.tier_used.startswith("TIER_1_API_G5_")
     assert len(result.units) == 0
+    # Should record that at least one URN candidate was tried.
+    assert any("URN candidate" in e for e in result.errors)
 
 
 def test_detect_g5_from_inventory_host() -> None:
@@ -450,3 +518,145 @@ def test_detect_g5_from_inventory_host() -> None:
     result = detect_pms("https://www.morgan-properties.com/", page_html=html)
     assert result.pms == "g5"
     assert result.recommended_strategy == "api_first"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-24: URN-candidate retry + curl_cffi switch for G5_API_ERROR
+# P1 cohort. The dataLayer-derived URN occasionally points at the
+# wrong sibling in multi-property portfolios; trying up to 3 ranked
+# candidates recovers those properties without changing the canonical
+# fast-path.
+# ─────────────────────────────────────────────────────────────────────
+
+from ma_poc.pms.adapters.g5 import find_g5_urn_candidates
+
+
+def test_find_g5_urn_candidates_returns_dataLayer_first() -> None:
+    """When dataLayer carries a G5_STORE_ID, it MUST be the first
+    candidate — that's the canonical URN for the page. dataLayer is
+    rendered as JSON-encoded ``"G5_STORE_ID": "..."``."""
+    html = (
+        '<script>{"G5_STORE_ID": "g5-cl-1abc-the-property"}</script>'
+        "<img src='https://g5-assets-cld-res.cloudinary.com/image/upload/"
+        "g5-cl-1xyz-other-sibling/foo.jpg'>"
+    )
+    cands = find_g5_urn_candidates(html)
+    assert cands[0] == "g5-cl-1abc-the-property"
+    # The sibling URN appears as a fallback candidate
+    assert "g5-cl-1xyz-other-sibling" in cands
+
+
+def test_find_g5_urn_candidates_falls_back_to_longest_g5_cl() -> None:
+    """No dataLayer → take the longest g5-cl-* match."""
+    html = "<img src='/g5-cl-1short/a.jpg'><img src='/g5-cl-1longer-name/b.jpg'>"
+    cands = find_g5_urn_candidates(html)
+    assert cands[0] == "g5-cl-1longer-name"
+
+
+def test_find_g5_urn_candidates_prefers_g5_cl_over_g5_clw() -> None:
+    """The g5-clw-* (wrapper) URN is rejected as primary even when
+    longer — it 404s the inventory API every time."""
+    html = (
+        "<img src='/g5-clw-1foo-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/a.jpg'>"
+        "<img src='/g5-cl-1foo-short/b.jpg'>"
+    )
+    cands = find_g5_urn_candidates(html)
+    assert cands[0] == "g5-cl-1foo-short"
+
+
+def test_find_g5_urn_candidates_returns_empty_for_no_g5_html() -> None:
+    assert find_g5_urn_candidates("<html><body>nothing</body></html>") == []
+
+
+def test_find_g5_urn_candidates_dedupes_dataLayer_match() -> None:
+    """If the same URN appears in BOTH the dataLayer and the HTML body
+    (CDN thumbnails), it must appear exactly once in the candidates."""
+    html = (
+        "<script>var G5_STORE_ID = 'g5-cl-1abc-property';</script>"
+        "<img src='/g5-cl-1abc-property/thumbnail.jpg'>"
+    )
+    cands = find_g5_urn_candidates(html)
+    assert cands.count("g5-cl-1abc-property") == 1
+
+
+def test_find_g5_urn_candidates_caps_at_three() -> None:
+    """Cost-control: probe at most 3 URN candidates per property."""
+    html = (
+        "<script>var G5_STORE_ID = 'g5-cl-1a-one';</script>"
+        + "".join(f"<img src='/g5-cl-1b-{i}/x.jpg'>" for i in range(10))
+    )
+    cands = find_g5_urn_candidates(html)
+    assert len(cands) <= 3
+
+
+@pytest.mark.asyncio
+async def test_extract_retries_with_sibling_urn_when_first_returns_empty(
+    mocker,
+) -> None:
+    """Multi-property portfolio: dataLayer URN returns an empty
+    apartmentComplex (wrong sibling); the second candidate returns
+    real apartments. Adapter must use the second one."""
+    html = (
+        "<script>var G5_STORE_ID = 'g5-cl-1wrong-sibling';</script>"
+        "<img src='/g5-cl-1right-target/foo.jpg'>"
+        "<a href='https://inventory.g5marketingcloud.com/'>x</a>"
+    )
+
+    EMPTY_PAYLOAD = {"data": {"apartmentComplex": {"apartments": []}}}
+    REAL_PAYLOAD = _REAL_G5_PAYLOAD
+
+    call_args = []
+    async def _mock_fetch(urn: str, base_url: str = "") -> dict:
+        call_args.append(urn)
+        return EMPTY_PAYLOAD if urn == "g5-cl-1wrong-sibling" else REAL_PAYLOAD
+
+    mocker.patch(
+        "ma_poc.pms.adapters.g5._fetch_g5_units", side_effect=_mock_fetch
+    )
+
+    detected = detect_pms("https://example.com/", page_html=html)
+    ctx = AdapterContext(
+        base_url="https://example.com/",
+        detected=detected,
+        profile=None,
+        expected_total_units=None,
+        property_id="9999",
+        fetch_result=_StubFetchResult(body=html.encode("utf-8")),
+    )
+    result = await G5Adapter().extract(_DummyPage(), ctx)
+    assert result.tier_used == "TIER_1_API_G5"
+    assert len(result.units) == 2  # _REAL_G5_PAYLOAD has 2 apartments
+    # Both URNs should have been attempted, in priority order
+    assert call_args == ["g5-cl-1wrong-sibling", "g5-cl-1right-target"]
+
+
+@pytest.mark.asyncio
+async def test_extract_stops_at_first_non_empty_urn(mocker) -> None:
+    """When the FIRST URN candidate returns real data, the second/
+    third are NOT tried — saves needless API calls."""
+    html = (
+        "<script>var G5_STORE_ID = 'g5-cl-1first';</script>"
+        "<img src='/g5-cl-1second-noise/x.jpg'>"
+    )
+    call_count = 0
+    async def _mock_fetch(urn: str, base_url: str = "") -> dict:
+        nonlocal call_count
+        call_count += 1
+        return _REAL_G5_PAYLOAD
+
+    mocker.patch(
+        "ma_poc.pms.adapters.g5._fetch_g5_units", side_effect=_mock_fetch
+    )
+
+    detected = detect_pms("https://example.com/", page_html=html)
+    ctx = AdapterContext(
+        base_url="https://example.com/",
+        detected=detected,
+        profile=None,
+        expected_total_units=None,
+        property_id="9999",
+        fetch_result=_StubFetchResult(body=html.encode("utf-8")),
+    )
+    result = await G5Adapter().extract(_DummyPage(), ctx)
+    assert result.tier_used == "TIER_1_API_G5"
+    assert call_count == 1, "second candidate must not be probed after a win"

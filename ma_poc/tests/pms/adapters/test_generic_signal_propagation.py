@@ -134,7 +134,16 @@ def _suppress_deterministic_tiers():
 
     Patches the module-level bindings the adapter uses (these are
     bound at module import via ``from ... import name``, so patching
-    the source module wouldn't be observed)."""
+    the source module wouldn't be observed).
+
+    2026-05-24: also suppress GenericPlanTextAdapter's
+    ``parse_generic_plan_text`` — pre-this-date the adapter
+    hard-required a live Playwright page so a stub ``page`` made it
+    no-op silently. The static-body fallback shipped 2026-05-24 now
+    runs against ``ctx.fetch_result.body`` even with a stub page, so
+    on the unit-bearing ``_passing_html()`` it would extract plans and
+    pre-empt the LLM path these tests exercise. Patching it back to
+    empty keeps the test scope on LLM-hint propagation."""
     with patch(
         "ma_poc.pms.adapters.generic.parse_generic_api",
         return_value=[],
@@ -149,6 +158,9 @@ def _suppress_deterministic_tiers():
         return_value=[],
     ), patch(
         "ma_poc.pms.adapters.generic.extract_embedded_blobs_from_html",
+        return_value=[],
+    ), patch(
+        "ma_poc.pms.adapters.generic_plan_text.parse_generic_plan_text",
         return_value=[],
     ):
         yield
@@ -489,6 +501,7 @@ async def test_property_amenities_surfaced_to_result_dict() -> None:
     block — that's the key the existing aggregator at
     ``aggregate_property_amenities`` reads as ``explicit``."""
     from types import SimpleNamespace
+
     from ma_poc.pms.scraper import scrape
 
     dom_units = [_llm_unit()]

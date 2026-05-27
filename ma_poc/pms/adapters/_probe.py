@@ -30,6 +30,7 @@ import contextvars
 import json
 import logging
 import os
+import threading
 import urllib.request
 from typing import Any
 
@@ -104,6 +105,88 @@ def web_unlocker_zone() -> str:
     return os.getenv("WEB_UNLOCKER_ZONE", "web_unlocker1").strip() or "web_unlocker1"
 
 
+# ----------------------------------------------------------------------
+# Web Unlocker hard call-cap (2026-05-24)
+# ----------------------------------------------------------------------
+# Per-shard budget guard. The jugnu-unlocker-test-3886351-fl9gv canary
+# fired 3,180 Unlocker calls before user cancellation (target ceiling
+# was $2-3; actual ~$4.65-9.30 depending on BD tier rate). Without a
+# hard cap, a single shard that hits a long tail of CF-walled
+# ProspectPortal hosts can balloon spend an order of magnitude past
+# the per-property gate (``_probe_prospectportal`` already gates per-
+# property, but the orchestrator runs many props per shard).
+#
+# Reads ``WEB_UNLOCKER_MAX_CALLS_PER_JOB`` at call time so tests +
+# canary configs can flip it without restart. 0 / unset / non-numeric
+# = no cap (preserves existing behaviour for legacy configs).
+# Recommended production setting: 500 (~$0.75-$1.50/shard worst case).
+#
+# Counter is module-level + per-process. Cloud Run jobs spawn one
+# process per task (shard), so each shard has its own 0-initialised
+# counter — the cap is per-shard, not per-job. If a job has 32 shards
+# at cap=500 the worst case is 32 × 500 × $3/1000 = $48; tighten the
+# cap further (or shard-count further) for cost-sensitive runs.
+_WU_LOCK: threading.Lock  # initialised below; defer import for module-load speed
+_wu_call_count: int = 0
+_wu_cap_warned: bool = False  # log the first cap-hit per shard only
+
+
+def _wu_cap() -> int:
+    """Read ``WEB_UNLOCKER_MAX_CALLS_PER_JOB`` env var. 0 = no cap."""
+    raw = os.getenv("WEB_UNLOCKER_MAX_CALLS_PER_JOB", "").strip()
+    if not raw:
+        return 0
+    try:
+        v = int(raw)
+        return v if v > 0 else 0
+    except ValueError:
+        return 0
+
+
+def reset_web_unlocker_call_count() -> None:
+    """Reset the per-process counter. For tests / per-job init only —
+    never call in production scraper code."""
+    global _wu_call_count, _wu_cap_warned
+    with _WU_LOCK:
+        _wu_call_count = 0
+        _wu_cap_warned = False
+
+
+def web_unlocker_call_count() -> int:
+    """Read the current per-process Unlocker call count. Useful for
+    cost-ledger telemetry + tests."""
+    with _WU_LOCK:
+        return _wu_call_count
+
+
+def _wu_try_reserve_call() -> bool:
+    """Reserve one Unlocker call slot. Returns True if allowed, False
+    if the per-process cap is exhausted. Atomic under the module
+    lock — safe for the async pool's worker threads.
+
+    Logs a single warning the first time the cap blocks a call, so
+    operators see it without log spam."""
+    global _wu_call_count, _wu_cap_warned
+    cap = _wu_cap()
+    with _WU_LOCK:
+        if cap and _wu_call_count >= cap:
+            if not _wu_cap_warned:
+                log.warning(
+                    "web_unlocker.cap_reached cap=%d count=%d "
+                    "— further calls return empty (set "
+                    "WEB_UNLOCKER_MAX_CALLS_PER_JOB higher to raise)",
+                    cap,
+                    _wu_call_count,
+                )
+                _wu_cap_warned = True
+            return False
+        _wu_call_count += 1
+        return True
+
+
+_WU_LOCK = threading.Lock()
+
+
 class _WUResponse:
     """Minimal curl_cffi-response shim (``.status_code/.text/.url``)."""
 
@@ -115,18 +198,67 @@ class _WUResponse:
         self.url = url
 
 
+def _wu_safe_url(url: str) -> str:
+    """Percent-encode reserved characters that BrightData Web Unlocker's
+    URL validator rejects with HTTP 400.
+
+    2026-05-24 (jugnu-unlocker-test-3886351-fl9gv): 78 web_unlocker.error
+    occurrences, all on Entrata ProspectPortal ``view_unit_spaces``
+    URLs with un-encoded square brackets in the query
+    (``property[id]=1125701&property_floorplan[id]=1125372``). BD's
+    gateway returns ``HTTPError: HTTP Error 400: Bad Request`` for
+    these — billed or not, they burn the
+    ``_probe_prospectportal`` retry budget without ever clearing CF.
+
+    Fix: split the URL into components and percent-encode each piece
+    with a tight safe-set. ``[`` → ``%5B``, ``]`` → ``%5D`` while
+    standard query separators (``&``, ``=``, ``?``) and path slashes
+    stay literal. Idempotent — already-encoded URLs survive unchanged
+    because ``quote(...)`` with the right ``safe`` skips ``%``.
+    """
+    if not url:
+        return url
+    from urllib.parse import quote, urlsplit, urlunsplit
+
+    parts = urlsplit(url)
+    # Path: keep ``/`` plus the standard RFC 3986 pchar set; encode
+    # ``[`` ``]`` ``{`` ``}`` if they ever leak into a path.
+    safe_path = "/-._~!$&'()*+,;=:@%"
+    # Query: keep ``&`` ``=`` ``?`` ``+`` literal; encode brackets and
+    # other reserved gen-delims that the BD gateway is strict about.
+    safe_query = "=&?+-._~!$'()*,;:@/%"
+    new_path = quote(parts.path, safe=safe_path)
+    new_query = quote(parts.query, safe=safe_query)
+    new_fragment = quote(parts.fragment, safe=safe_query)
+    return urlunsplit(
+        (parts.scheme, parts.netloc, new_path, new_query, new_fragment)
+    )
+
+
 def web_unlocker_get(url: str, timeout: int = 120) -> _WUResponse:
     """Fetch *url* through the BrightData Web Unlocker API (raw HTML).
 
     Returns a ``_WUResponse`` with ``status_code`` 200 on a solved page,
     or 0 on transport/auth error (callers treat non-200 as empty). The
     Web Unlocker auto-solves Cloudflare managed challenges server-side.
+
+    Budget gate: respects ``WEB_UNLOCKER_MAX_CALLS_PER_JOB`` (see
+    ``_wu_try_reserve_call`` for semantics). When the cap is hit
+    further calls return ``_WUResponse(0, "", url)`` without ever
+    contacting BD — caller sees the same shape as an unconfigured
+    key, so the cascade falls through to the next rung naturally.
     """
     key = web_unlocker_key()
     if not key:
         return _WUResponse(0, "", url)
+    if not _wu_try_reserve_call():
+        # Cap-blocked. Return the same empty shape callers already
+        # handle for missing-key / transport-error cases — no special
+        # path needed downstream.
+        return _WUResponse(0, "", url)
+    safe_url = _wu_safe_url(url)
     body = json.dumps(
-        {"zone": web_unlocker_zone(), "url": url, "format": "raw"}
+        {"zone": web_unlocker_zone(), "url": safe_url, "format": "raw"}
     ).encode()
     req = urllib.request.Request(
         _WU_API,

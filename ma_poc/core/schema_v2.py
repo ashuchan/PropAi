@@ -298,9 +298,61 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         # ``adapters/_api_parser.py`` (SightMap line 305, RealPage line
         # 450, generic line 611) also emit the long form. Accept either
         # — ``available_date`` wins when both are populated.
-        "available_date": _format_date(_first(
-            unit, "available_date", "availability_date", "internalAvailableDate",
-            "availableDate", "date_available", "dateAvailable")),
+        # 2026-05-24: when availability_status="AVAILABLE" AND the
+        # date field is empty/unparseable, default to the scrape date
+        # (the unit IS available now — that's what the status says).
+        # Previously this case produced available_date=None which made
+        # the row look incomplete to downstream consumers even though
+        # the operator explicitly flagged it as available. Real cases:
+        # UDR JSON-LD ships available_date="" + status AVAILABLE; some
+        # Cortland / RentCafe rows ship the same combo when their API
+        # has no specific move-in date. _available_date_raw still
+        # preserves the original empty/odd string for forensics.
+        # 2026-05-25 (canary 1ef1060 follow-up): pass ``has_rent`` so the
+        # date resolver can default to scrape-date for units that carry
+        # a published rent but whose status field is null / UNAVAILABLE
+        # (Knock, G5, MERGED_CROSS_PAGE, TIER_1_5_EMBEDDED cohorts). A
+        # positive ``_format_rent`` return (>1) is the rentable-now
+        # signal — operators do not publish prices on un-rentable units.
+        # Note: rent_lo / rent_hi feed ``_format_rent`` separately below;
+        # we re-run the same gate here so the date logic sees the same
+        # truth as the rent columns will display.
+        #
+        # 2026-05-25 (user-flagged via Cedar Ridge + Pleasant View Gardens
+        # / JCM Living cohort): gate has_rent on a REAL unit identity.
+        # PLAN_LEVEL tiers (GENERIC_PLAN_TEXT_PLAN_LEVEL,
+        # APPFOLIO_VANITY_PLAN_LEVEL, REPLI360_PLAN_LEVEL, etc.) emit
+        # synthetic rows for plans where the operator advertises rent
+        # ranges + a "Check Availability" CTA button but DOES NOT
+        # publish per-unit availability. Each row gets an
+        # ``inferred_*`` fallback unit_id (via assign_fallback_unit_id
+        # downstream). Manufacturing an available_date on these rows
+        # would be incorrect — the operator never said any unit was
+        # actually available. Only fire has_rent fallback when the
+        # unit dict carries a real (non-empty, non-"null") identifier
+        # — Knock / G5 / etc. always do; plan-level summaries don't.
+        # Cohort impact: protects ~310 plan-level rows across 16 tier
+        # categories (TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL,
+        # TIER_1_DOM_ENTRATA_PP_SSR_PLAN_LEVEL, etc.) from getting
+        # a fabricated scrape-date stamp.
+        "available_date": _resolve_available_date(
+            _format_date(_first(
+                unit, "available_date", "availability_date",
+                "internalAvailableDate", "availableDate",
+                "date_available", "dateAvailable")),
+            _norm_status(
+                unit.get("availability_status")
+                or unit.get("_availability_status")
+            ),
+            scrape_ts,
+            has_rent=(
+                (
+                    _format_rent(rent_lo) is not None
+                    or _format_rent(rent_hi) is not None
+                )
+                and uid not in (None, "", "null")
+            ),
+        ),
         # 2026-05-18 (capture-first): preserve the RAW availability string
         # even when _format_date can't normalize it (text/word/odd format).
         # Data has value; cleaning can be done later off the raw. Clean
@@ -357,6 +409,16 @@ def _format_v2_unit(unit: dict, scrape_ts: datetime, property_id: str = "") -> d
         ),
         "concession_value": _safe_float(unit.get("concession_value")),
         "concession_source": unit.get("concession_source") or None,
+        # 2026-05-24 offer-taxonomy fields (xlsx reference schema parity).
+        # All 5 are populated by make_unit_dict via ma_poc/core/offer_extract.py
+        # when concession text is present. None when no offer signal.
+        # See ma_poc/tests/core/test_offer_extract.py for the regression
+        # oracle anchored on real xlsx rows.
+        "offer_banner": unit.get("offer_banner") or None,
+        "offer_type": unit.get("offer_type") or None,
+        "offer_target": unit.get("offer_target") or None,
+        "offer_value": unit.get("offer_value") or None,
+        "offer_conditions": unit.get("offer_conditions") or None,
         # 2026-05-20 (canary-output surfacing): PMS-native identifiers
         # the adapters populate via ``source_ids={...}`` in make_unit_dict
         # — used as JOIN keys against external sources (RealPage, SurgeX,
@@ -506,6 +568,78 @@ def _format_area(val: Any) -> int:
     return -1
 
 
+# 2026-05-24 (user follow-up to Q1): "apply now / apply" should also be
+# considered AVAILABLE. The prior fixed-string set missed common operator
+# CTA-style phrasings. This regex matches any phrase where the operator
+# is plausibly saying "available now" — including "Apply Now", "Lease
+# Today", "Move-In Immediately", "Currently Vacant", "Call For Details"
+# (operator-gated date = available now). The status field is the
+# authoritative signal anyway; the date-text recognizer just rescues
+# rows where the operator wrote a phrase instead of a date.
+_AVAILABLE_NOW_RE = re.compile(
+    r"\bavail"                                   # available / availability / availabilities
+    r"|\bapply\s+(?:now|today|by)\b"             # CTAs in date field
+    r"|\blease\s+(?:now|today|by)\b"
+    r"|\bmove[\s-]?in"                           # Move-in / Move In / Movein
+    r"|\bmoves?[\s-]?in\b"                       # Move In Now / Moves In
+    r"|\bready\b"
+    r"|\bvacant\b"
+    r"|\bcurrently\b"                            # "Currently Vacant" / "Currently Leasing"
+    r"|\b(?:now|today|immediate|immediately)\b"  # standalone time tokens
+    r"|\bcall\s+(?:for|us|today|now)\b"          # "Call For Details" — operator-gated
+    r"|\b(?:tba|tbd)\b"                          # to be announced / determined
+    r"|\bto\s+be\s+(?:announced|determined|set)\b"
+    r"|\binquire\b",                             # "Inquire For Details" — operator-gated
+    re.IGNORECASE,
+)
+
+
+def _resolve_available_date(
+    parsed_date: str | None,
+    status: str | None,
+    scrape_ts: datetime,
+    *,
+    has_rent: bool = False,
+) -> str | None:
+    """When the operator effectively says the unit IS rentable but
+    ships no parseable move-in date, default the date to the scrape
+    timestamp (i.e. "available today / now").
+
+    A unit is treated as rentable-now when EITHER:
+      * status explicitly says ``"AVAILABLE"``, OR
+      * ``has_rent`` — the unit has a positive rent value
+        published. The presence of a price is itself a strong
+        rentability signal: operators don't list rents on units
+        they can't rent. This catches the canary 1ef1060 regression
+        where the Knock adapter mis-flagged ~8,580 of 8,597
+        rent-published units as ``UNAVAILABLE`` because Knock's
+        ``available`` boolean is a separate signal that's often
+        False even when the unit IS being offered. The Knock adapter
+        was fixed in parallel, but ``has_rent`` is a defence-in-depth
+        for the next operator whose status field is similarly noisy.
+
+    2026-05-24 (user Q): "if it does not show availability date but
+    says available, what do we do?". Prior behaviour was to ship
+    ``None`` which made the row look incomplete; consumers reading
+    just ``available_date`` would treat the unit as date-unknown.
+    The fix preserves the raw value in ``_available_date_raw`` so
+    forensic analysis can still distinguish the two cases.
+
+    Behaviour:
+      * parsed_date present                                  → parsed_date
+      * parsed_date None + status == "AVAILABLE"             → scrape date
+      * parsed_date None + has_rent=True                     → scrape date
+      * parsed_date None + status none/unknown + no rent     → None (unchanged)
+    """
+    if parsed_date:
+        return parsed_date
+    if status and status.upper() == "AVAILABLE":
+        return scrape_ts.strftime("%Y-%m-%d")
+    if has_rent:
+        return scrape_ts.strftime("%Y-%m-%d")
+    return parsed_date
+
+
 def _format_date(val: Any) -> str | None:
     """Normalize date to YYYY-MM-DD. Returns None if unparseable.
 
@@ -521,7 +655,8 @@ def _format_date(val: Any) -> str | None:
     """
     if val is None or val == "":
         return None
-    s = str(val).strip()
+    s_orig = str(val).strip()
+    s = s_orig
     # Already ISO format (unchanged)
     if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
         return s
@@ -535,10 +670,6 @@ def _format_date(val: Any) -> str | None:
     ).strip()
     if not s:
         # Pure text like "Available" with no date ⇒ available now.
-        return datetime.now(UTC).strftime("%Y-%m-%d")
-    low = s.lower()
-    if low in ("now", "today", "immediate", "immediately", "available",
-               "available now", "now available", "ready now"):
         return datetime.now(UTC).strftime("%Y-%m-%d")
     # Try common formats — 4-digit-year set unchanged; 2-digit-year and
     # month-name forms added.
@@ -570,6 +701,18 @@ def _format_date(val: Any) -> str | None:
             )
         except ValueError:
             continue
+    # 2026-05-24 (user follow-up): final fallback — run the AVAILABLE-NOW
+    # regex on the ORIGINAL string (before prefix strip) so phrasings
+    # like "Available 24/7" (strips to "24/7" which isn't a date) still
+    # resolve to today. The regex uses fuzzy anchors (\\bavail / apply
+    # \\s+(?:now|today) / lease \\s+(?:now|today) / move[\\s-]?in /
+    # ready / vacant / call \\s+(?:for|us|today|now) / inquire / tba /
+    # tbd / currently / standalone now/today/immediate) so any operator
+    # CTA-style phrasing intent ⇒ available now. Runs LAST so real
+    # date strings always win (e.g. "Available 6/25/26" parses 6/25/26
+    # via earlier date-format pass, never reaches here).
+    if _AVAILABLE_NOW_RE.search(s_orig.lower()):
+        return datetime.now(UTC).strftime("%Y-%m-%d")
     return None
 
 

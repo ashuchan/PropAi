@@ -190,6 +190,98 @@ def test_body_size_none_preserves_backcompat_behavior() -> None:
     assert provider == "recaptcha"
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-25 — Sucuri / SiteGuard sgcaptcha fingerprint (canary 1ef1060)
+#
+# AppFolio PROBE cohort (4 props × ~190 units avg = ~738 units) silently
+# served Sucuri interstitials that our existing detectors missed because
+# the wall returns HTTP 200/202 (not 403) and the body uses none of
+# the cloudflare/recaptcha/hcaptcha/perimeterx markers. Adding the
+# Sucuri provider so the wall promotes to BOT_BLOCKED and the existing
+# Unlocker cascade can recover the unit data.
+#
+# Real fixture bytes captured from terrainaustin.com/.well-known/sgcaptcha/
+# probe on 2026-05-25 (12 KB challenge body).
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_sucuri_sgcaptcha_title_marker() -> None:
+    """Sucuri's <title>Robot Challenge Screen</title> is the most
+    distinctive marker — verbatim from the captured 2026-05-25 body."""
+    body = (
+        b'<!doctype html><html lang="en"><head>'
+        b'<title>Robot Challenge Screen</title>'
+        b'<script>const sgchallenge="21:1779683624:abc";</script>'
+        b'</head><body></body></html>'
+    )
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is True
+    assert provider == "sucuri"
+
+
+def test_sucuri_sgchallenge_js_token() -> None:
+    """The sgchallenge JS token alone is sufficient — the title may be
+    missing on some Sucuri variants."""
+    body = b'<html><body><script>const sgchallenge="abc";</script></body></html>'
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is True
+    assert provider == "sucuri"
+
+
+def test_sucuri_well_known_sgcaptcha_path_in_body() -> None:
+    """Pages that embed the /.well-known/sgcaptcha/ path as a meta-refresh
+    target (the no-script fallback Sucuri injects) — also Sucuri."""
+    body = (
+        b'<html><head>'
+        b'<meta http-equiv="refresh" content="0;/.well-known/sgcaptcha/?r=%2F">'
+        b'</head><body></body></html>'
+    )
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is True
+    assert provider == "sucuri"
+
+
+def test_sucuri_well_known_captcha_path_in_body() -> None:
+    """Belvedere observed final_url at /.well-known/captcha/ (no 'sg' prefix).
+    The body for that variant carries the bare /.well-known/captcha/ path."""
+    body = (
+        b'<html><head>'
+        b'<meta http-equiv="refresh" content="0;/.well-known/captcha/?y=ipc:1">'
+        b'</head></html>'
+    )
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is True
+    assert provider == "sucuri"
+
+
+def test_sucuri_marker_on_large_body_still_flagged() -> None:
+    """Sucuri lives in the challenge-only bucket — always flagged
+    regardless of body size (no widget-form false-positive worry,
+    since Robot Challenge Screen never appears on real apartment pages)."""
+    body = (
+        b'<html><head><title>Robot Challenge Screen</title></head>'
+        + b"x" * 200_000
+        + b'</html>'
+    )
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is True
+    assert provider == "sucuri"
+
+
+def test_clean_html_with_word_challenge_is_not_sucuri() -> None:
+    """The word 'challenge' appears on real apartment-leasing pages
+    ('challenge yourself to', 'no leasing challenges') but we don't
+    use it as a Sucuri fingerprint. Verify a clean page with that
+    word isn't false-flagged."""
+    body = (
+        b'<html><body><h1>Live the Challenge</h1>'
+        b'<p>Modern apartments, on-site fitness challenge.</p>'
+        b'</body></html>'
+    )
+    is_captcha, provider = looks_like_captcha(body, body_size=len(body))
+    assert is_captcha is False
+
+
 def test_real_shea_first_4kb_with_full_size_is_not_captcha() -> None:
     """Synthesized from the actual 2026-05-20 live-probe bytes —
     sheaapartments.com/citylights first 4KB has g-recaptcha inside

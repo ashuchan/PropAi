@@ -1,0 +1,661 @@
+[
+  {
+    "verdict": "FINGERPRINT_g5_NO_UNITS",
+    "fingerprint": [
+      "g5"
+    ],
+    "count": 4,
+    "action": "DEBUG existing g5 adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      255637,
+      72121,
+      225389,
+      39789
+    ],
+    "tier_dist": {
+      "TIER_3_DOM": 2,
+      "TIER_1_KNOCK_API": 2
+    },
+    "samples": [
+      {
+        "pid": 255637,
+        "name": "Tuscany at Gabriella Pointe",
+        "url": "https://www.rentanapt.com/apartments/az/gilbert/e-warner-rd/"
+      },
+      {
+        "pid": 72121,
+        "name": "Mango Tree",
+        "url": "https://www.mangotreeapt.com/"
+      },
+      {
+        "pid": 225389,
+        "name": "Evergreen at River Oaks I",
+        "url": "https://www.evergreenatriveroaks.com/"
+      },
+      {
+        "pid": 39789,
+        "name": "Nash Springs",
+        "url": "https://www.nashspringsapts.com/?utm_source=obl&utm_medium=organic"
+      }
+    ]
+  },
+  {
+    "verdict": "WORDPRESS_BACKED",
+    "fingerprint": [
+      "wordpress"
+    ],
+    "count": 4,
+    "action": "PROBE \u2014 check wp-json/wp/v2 for custom unit endpoints",
+    "pids": [
+      255903,
+      232583,
+      21976,
+      63577
+    ],
+    "tier_dist": {
+      "TIER_1_API": 3,
+      "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL": 1
+    },
+    "samples": [
+      {
+        "pid": 255903,
+        "name": "Elements",
+        "url": "https://www.elements-apartments.com/"
+      },
+      {
+        "pid": 232583,
+        "name": "Custer Crossing Apartments",
+        "url": "https://princetonmanagement.com/communities/custer-crossing-apartments/"
+      },
+      {
+        "pid": 21976,
+        "name": "Century Square Townhomes",
+        "url": "https://princetonmanagement.com/communities/century-square-townhomes/"
+      },
+      {
+        "pid": 63577,
+        "name": "1045 on the Park",
+        "url": "http://www.1045onthepark.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "BLOCKED_HTTP_403",
+    "fingerprint": [],
+    "count": 3,
+    "action": "DEFER \u2014 Fetcher escalation already shipped (commit 59b9102)",
+    "pids": [
+      268888,
+      224563,
+      67154
+    ],
+    "tier_dist": {
+      "TIER_1_API_RENTCAFE_SHAPE_REJECTED": 1,
+      "generic:sgcaptcha_wall": 2
+    },
+    "samples": [
+      {
+        "pid": 268888,
+        "name": "Artthaus Jack London",
+        "url": "https://arthaus.mov/building-community.php?slug=arthaus-jack-london"
+      },
+      {
+        "pid": 224563,
+        "name": "Highlands at Huckleberry II",
+        "url": "https://www.highlandsapartmentsva.com/"
+      },
+      {
+        "pid": 67154,
+        "name": "Southern Pine Apartments",
+        "url": "https://www.southernpineapts.com"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "wordpress"
+    ],
+    "count": 2,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      24360,
+      2948
+    ],
+    "tier_dist": {
+      "TIER_1_API": 1,
+      "NOT_ENCORESKYLINE_TEMPLATE": 1
+    },
+    "samples": [
+      {
+        "pid": 24360,
+        "name": "Wildwood Manor Apartments",
+        "url": "https://www.wildwoodmanorapts.com/"
+      },
+      {
+        "pid": 2948,
+        "name": "Crystal Woods of Alexandria",
+        "url": "https://www.crystalwoodsapts.com"
+      }
+    ]
+  },
+  {
+    "verdict": "FETCH_ERROR",
+    "fingerprint": [],
+    "count": 2,
+    "action": "TRIAGE",
+    "pids": [
+      275900,
+      263498
+    ],
+    "tier_dist": {
+      "generic:no_body_short_circuit": 2
+    },
+    "samples": [
+      {
+        "pid": 275900,
+        "name": "Aria",
+        "url": "https://www.liveatthearia.com/"
+      },
+      {
+        "pid": 263498,
+        "name": "The Julington",
+        "url": "https://risejulington.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "NO_FINGERPRINT_NO_API",
+    "fingerprint": [],
+    "count": 2,
+    "action": "PROBE \u2014 Chrome MCP rendered DOM; possible client-only React/Vue widget",
+    "pids": [
+      12880,
+      226992
+    ],
+    "tier_dist": {
+      "generic:no_body_short_circuit": 1,
+      "?": 1
+    },
+    "samples": [
+      {
+        "pid": 12880,
+        "name": "Rockridge Park",
+        "url": "https://www.villaserenacommunities.com/rockridge-park/"
+      },
+      {
+        "pid": 226992,
+        "name": null,
+        "url": "https://www.forestridgebloomington.com/forest-ridge-bloomington-in/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans",
+    "fingerprint": [
+      "rentcafe",
+      "securecafe"
+    ],
+    "count": 2,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans)",
+    "pids": [
+      239536,
+      294552
+    ],
+    "tier_dist": {
+      "TIER_1_API_RENTCAFE_SHAPE_REJECTED": 1,
+      "TIER_1_KNOCK_API": 1
+    },
+    "samples": [
+      {
+        "pid": 239536,
+        "name": "Cheateau Vincennes",
+        "url": "http://www.chateauvincennesapts.com/"
+      },
+      {
+        "pid": 294552,
+        "name": "Red Hawk Laurel Grey",
+        "url": "https://www.redhawklaurelgrey.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "marketapts"
+    ],
+    "count": 2,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      18752,
+      28391
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_MARKETAPTS": 2
+    },
+    "samples": [
+      {
+        "pid": 18752,
+        "name": "Brookstone Apartments",
+        "url": "https://www.liveatbrookstoneapartments.com/?utm_source=GMB&utm_medium=organic"
+      },
+      {
+        "pid": 28391,
+        "name": "Hill Country Villas",
+        "url": "http://www.hillcountryvillasapartments.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_onesite_NO_UNITS",
+    "fingerprint": [
+      "g5",
+      "onesite"
+    ],
+    "count": 1,
+    "action": "DEBUG existing onesite adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      12368
+    ],
+    "tier_dist": {
+      "TIER_3_DOM": 1
+    },
+    "samples": [
+      {
+        "pid": 12368,
+        "name": "Ballantyne",
+        "url": "https://www.rentanapt.com/ballantyne"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans",
+    "fingerprint": [
+      "365res"
+    ],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans)",
+    "pids": [
+      217605
+    ],
+    "tier_dist": {
+      "TIER_3_DOM": 1
+    },
+    "samples": [
+      {
+        "pid": 217605,
+        "name": "Bennett Pointe",
+        "url": "https://www.livebennettpointe.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_entrata_NO_UNITS",
+    "fingerprint": [
+      "cloudflare",
+      "entrata",
+      "sightmap"
+    ],
+    "count": 1,
+    "action": "DEBUG existing entrata adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      20551
+    ],
+    "tier_dist": {
+      "TIER_1_API": 1
+    },
+    "samples": [
+      {
+        "pid": 20551,
+        "name": "Rise at the Preserve",
+        "url": "https://www.riseatthepreserve.com/?utm_source=google_business&utm_medium=profile&utm_campaign=google"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_rentcafe_NO_UNITS",
+    "fingerprint": [
+      "rentcafe",
+      "securecafe"
+    ],
+    "count": 1,
+    "action": "DEBUG existing rentcafe adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      58341
+    ],
+    "tier_dist": {
+      "TIER_1_API_RENTCAFE_SHAPE_REJECTED": 1
+    },
+    "samples": [
+      {
+        "pid": 58341,
+        "name": "Heritage Park",
+        "url": "http://heritageparkolympia.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "rentcafe",
+      "securecafe"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      42593
+    ],
+    "tier_dist": {
+      "TIER_3_DOM": 1
+    },
+    "samples": [
+      {
+        "pid": 42593,
+        "name": "Harbor Tower Apartments",
+        "url": "http://www.harbortowerapartments.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "WORDPRESS_BACKED",
+    "fingerprint": [
+      "rentcafe",
+      "wordpress"
+    ],
+    "count": 1,
+    "action": "PROBE \u2014 check wp-json/wp/v2 for custom unit endpoints",
+    "pids": [
+      58546
+    ],
+    "tier_dist": {
+      "TIER_1_API_RENTCAFE_SHAPE_REJECTED": 1
+    },
+    "samples": [
+      {
+        "pid": 58546,
+        "name": "Lake Park Estates",
+        "url": "https://wright-weber.com/property/LakePark"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      218893
+    ],
+    "tier_dist": {
+      "?": 1
+    },
+    "samples": [
+      {
+        "pid": 218893,
+        "name": null,
+        "url": "https://www.voltaatvoyager.com/volta-at-voyager-colorado-springs-colorado/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans,3_floor-plans",
+    "fingerprint": [
+      "rentcafe",
+      "securecafe"
+    ],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans,3_floor-plans)",
+    "pids": [
+      42345
+    ],
+    "tier_dist": {
+      "TIER_1_KNOCK_API": 1
+    },
+    "samples": [
+      {
+        "pid": 42345,
+        "name": "SouthRidge",
+        "url": "https://www.southridgekc.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_2_floorplans",
+    "fingerprint": [
+      "cloudflare",
+      "entrata",
+      "sightmap"
+    ],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (2_floorplans)",
+    "pids": [
+      12550
+    ],
+    "tier_dist": {
+      "?": 1
+    },
+    "samples": [
+      {
+        "pid": 12550,
+        "name": null,
+        "url": "https://www.liveatcuestas.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_rentcafe_NO_UNITS",
+    "fingerprint": [
+      "rentcafe",
+      "securecafe",
+      "sightmap"
+    ],
+    "count": 1,
+    "action": "DEBUG existing rentcafe adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      13977
+    ],
+    "tier_dist": {
+      "TIER_MERGED_CROSS_PAGE": 1
+    },
+    "samples": [
+      {
+        "pid": 13977,
+        "name": "Mizner Park Apartments",
+        "url": "https://www.gables.com/communities/florida/boca-raton/mizner-park-apartments/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "cloudflare",
+      "onesite"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      284987
+    ],
+    "tier_dist": {
+      "TIER_MERGED_CROSS_PAGE": 1
+    },
+    "samples": [
+      {
+        "pid": 284987,
+        "name": "Orchard Ridge",
+        "url": "https://www.liveatorchardridge.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_3_floor-plans",
+    "fingerprint": [
+      "cloudflare",
+      "wordpress"
+    ],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (3_floor-plans)",
+    "pids": [
+      42180
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL": 1
+    },
+    "samples": [
+      {
+        "pid": 42180,
+        "name": "The Courtyard at Jefferson",
+        "url": "http://www.courtyardatjefferson.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_wix_NO_UNITS",
+    "fingerprint": [
+      "wix"
+    ],
+    "count": 1,
+    "action": "DEBUG existing wix adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      263732
+    ],
+    "tier_dist": {
+      "SYNDICATION_ONLY_WIX": 1
+    },
+    "samples": [
+      {
+        "pid": 263732,
+        "name": "Hoyt Tower",
+        "url": "https://www.hoyttowernewark.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FLOORPLAN_INDEX_NO_UNITS",
+    "fingerprint": [
+      "wix"
+    ],
+    "count": 1,
+    "action": "PROBE DEEPER \u2014 Chrome MCP click-through to find unit pages",
+    "pids": [
+      34523
+    ],
+    "tier_dist": {
+      "SYNDICATION_ONLY_WIX": 1
+    },
+    "samples": [
+      {
+        "pid": 34523,
+        "name": "Constellation Ranch",
+        "url": "https://www.constellationranchtx.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_onesite_NO_UNITS",
+    "fingerprint": [
+      "onesite"
+    ],
+    "count": 1,
+    "action": "DEBUG existing onesite adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      36777
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_REALPAGE_CWS": 1
+    },
+    "samples": [
+      {
+        "pid": 36777,
+        "name": "Huntington Woods",
+        "url": "https://www.HuntingtonWoodsapts.com"
+      }
+    ]
+  },
+  {
+    "verdict": "FINGERPRINT_appfolio_NO_UNITS",
+    "fingerprint": [
+      "appfolio",
+      "squarespace"
+    ],
+    "count": 1,
+    "action": "DEBUG existing appfolio adapter \u2014 fingerprint matched but no units",
+    "pids": [
+      19955
+    ],
+    "tier_dist": {
+      "TIER_1_API_APPFOLIO": 1
+    },
+    "samples": [
+      {
+        "pid": 19955,
+        "name": "Brookside",
+        "url": "https://www.brooksidejohnsoncreek.com/"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_4_availability",
+    "fingerprint": [
+      "appfolio"
+    ],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (4_availability)",
+    "pids": [
+      284175
+    ],
+    "tier_dist": {
+      "TIER_1_API_APPFOLIO": 1
+    },
+    "samples": [
+      {
+        "pid": 284175,
+        "name": "SCS Athens",
+        "url": "https://www.livescs.com/property/scs-athens"
+      }
+    ]
+  },
+  {
+    "verdict": "HAS_UNIT_MARKERS_AT_3_floor-plans",
+    "fingerprint": [
+      "cloudflare"
+    ],
+    "count": 1,
+    "action": "SHIP \u2014 drill into the matched path (3_floor-plans)",
+    "pids": [
+      232495
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_REALPAGE_CWS": 1
+    },
+    "samples": [
+      {
+        "pid": 232495,
+        "name": "Inverness Apartments",
+        "url": "https://www.invernessapthome.com"
+      }
+    ]
+  },
+  {
+    "verdict": "WORDPRESS_BACKED",
+    "fingerprint": [
+      "cloudflare",
+      "wordpress"
+    ],
+    "count": 1,
+    "action": "PROBE \u2014 check wp-json/wp/v2 for custom unit endpoints",
+    "pids": [
+      30237
+    ],
+    "tier_dist": {
+      "TIER_1_DOM_GENERIC_PLAN_TEXT_PLAN_LEVEL": 1
+    },
+    "samples": [
+      {
+        "pid": 30237,
+        "name": "Forest View",
+        "url": "https://venterraliving.com/apartments/forest-view/"
+      }
+    ]
+  }
+]

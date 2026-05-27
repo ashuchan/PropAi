@@ -125,3 +125,92 @@ def test_to_httpx_format_urlencodes_credentials(bd_env: None) -> None:
     # the shape of the URL and that no raw '@' leaks from the auth part.
     assert mapping["http://"].startswith("http://brd-customer-hl_testcust")
     assert mapping["http://"].endswith("@brd.superproxy.io:33335")
+
+
+# ─── session_salt — force-rotation extension (2026-05-24) ────────────
+
+
+def test_session_salt_zero_reproduces_unsalted_session_id(bd_env: None) -> None:
+    """Backward compat: salt=0 (default) must produce the same session-id
+    as before — existing properties keep their sticky exit IPs."""
+    prov = BrightDataProvider()
+    a = prov.get_config(tier=ProxyTier.RESIDENTIAL, canonical_id="prop_xyz")
+    b = prov.get_config(
+        tier=ProxyTier.RESIDENTIAL, canonical_id="prop_xyz", session_salt=0
+    )
+    assert a.session_id == b.session_id
+
+
+def test_session_salt_positive_produces_different_session_id(bd_env: None) -> None:
+    """Bumping salt must change the session-id so BrightData hands out
+    a different exit IP."""
+    prov = BrightDataProvider()
+    base = prov.get_config(tier=ProxyTier.RESIDENTIAL, canonical_id="prop_xyz")
+    rotated = prov.get_config(
+        tier=ProxyTier.RESIDENTIAL, canonical_id="prop_xyz", session_salt=1
+    )
+    assert base.session_id != rotated.session_id
+    assert rotated.username is not None
+    # The rotated session-id must still flow through into the username
+    assert rotated.session_id in (rotated.username or "")
+
+
+def test_session_salt_values_produce_distinct_ids(bd_env: None) -> None:
+    """Distinct salts must produce distinct session-ids (no collisions
+    in our 10-char hash slice within small salt range)."""
+    prov = BrightDataProvider()
+    ids = {
+        prov.get_config(
+            tier=ProxyTier.RESIDENTIAL, canonical_id="prop_xyz", session_salt=s
+        ).session_id
+        for s in range(0, 8)
+    }
+    assert len(ids) == 8, f"expected 8 distinct session-ids, got {len(ids)}"
+
+
+def test_session_salt_same_salt_same_id(bd_env: None) -> None:
+    """Same canonical_id + same salt = same session-id (deterministic)."""
+    prov = BrightDataProvider()
+    a = prov.get_config(
+        tier=ProxyTier.RESIDENTIAL, canonical_id="prop_xyz", session_salt=3
+    )
+    b = prov.get_config(
+        tier=ProxyTier.RESIDENTIAL, canonical_id="prop_xyz", session_salt=3
+    )
+    assert a.session_id == b.session_id
+
+
+def test_session_salt_negative_rejected(bd_env: None) -> None:
+    """Negative salts are nonsensical (would imply pre-rotation)."""
+    prov = BrightDataProvider()
+    with pytest.raises(ValueError, match="session_salt must be >= 0"):
+        prov.get_config(
+            tier=ProxyTier.RESIDENTIAL,
+            canonical_id="prop_xyz",
+            session_salt=-1,
+        )
+
+
+def test_session_salt_does_not_leak_across_canonical_ids(bd_env: None) -> None:
+    """Property A with salt=1 and Property B with salt=0 must produce
+    different session-ids — salt rotation must not collide across
+    property boundaries."""
+    prov = BrightDataProvider()
+    a_salted = prov.get_config(
+        tier=ProxyTier.RESIDENTIAL, canonical_id="prop_A", session_salt=1
+    )
+    b_clean = prov.get_config(
+        tier=ProxyTier.RESIDENTIAL, canonical_id="prop_B", session_salt=0
+    )
+    assert a_salted.session_id != b_clean.session_id
+
+
+def test_session_salt_dc_tier_also_honors_salt(bd_env: None) -> None:
+    """Force-rotation works on the DC tier as well (some operators
+    block DC IPs aggressively; same mechanism applies)."""
+    prov = BrightDataProvider()
+    base = prov.get_config(tier=ProxyTier.DATACENTER, canonical_id="prop_dc")
+    rotated = prov.get_config(
+        tier=ProxyTier.DATACENTER, canonical_id="prop_dc", session_salt=2
+    )
+    assert base.session_id != rotated.session_id

@@ -29,6 +29,10 @@ class AdapterContext:
     # extracted city against CSV city) have the context. Before Phase 2
     # these were hard-coded to "" in the generic adapter's LLM call.
     property_name: str = ""
+    # 2026-05-25 (canary 1ef1060 regr#11b): street address from CSV,
+    # threaded through so the AppFolio adapter can post-fetch-filter
+    # multi-property PMC vanity responses (Academy Place / riedman cohort).
+    address: str = ""
     city: str = ""
     state: str = ""
     zip_code: str = ""

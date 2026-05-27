@@ -1,0 +1,415 @@
+[
+ {
+  "property_id": "269346",
+  "name": "Ashford Apartment Homes",
+  "url": "https://rjamesproperties.com/ashford-brook/",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "38298",
+  "name": "Courtyard",
+  "url": "http://courtyardgretna.com/",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "52934",
+  "name": "Davis Creek",
+  "url": "https://daviscreekapartments.com/",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "244705",
+  "name": "Devine District",
+  "url": "https://devinedistrict.com/",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "270766",
+  "name": "Hue97",
+  "url": "https://www.hue97.com/#",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "72631",
+  "name": "Linden Lane",
+  "url": "http://www.lindenlaneapartmenthomes.com/",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "235473",
+  "name": "Rooftop 252",
+  "url": "http://www.rooftop252.com/",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "33738",
+  "name": "Sagamore Court",
+  "url": "https://www.forestproperties.net/property/sagamore-court/",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.67
+ },
+ {
+  "property_id": "38677",
+  "name": "Tor View Village",
+  "url": "www.torviewvillageapts.com",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.68
+ },
+ {
+  "property_id": "22964",
+  "name": "Tropicana Village Apartments",
+  "url": "https://www.tropicanavillageapartments.com/",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "46336",
+  "name": "Westbury Square",
+  "url": "https://www.westburyportlandtx.com/",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "15014",
+  "name": "Wildwood Park",
+  "url": "http://www.rentdittmar.com/apartment-communities/wildwood-park",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "12927",
+  "name": "Wyvernwood Garden",
+  "url": "http://www.wyvernwoodla.com",
+  "their_tier": "TIER_1_API",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "217552",
+  "name": "Anson",
+  "url": "https://www.ansonliving.com/",
+  "their_tier": "TIER_1_API_G5",
+  "spa_conf": 0.68
+ },
+ {
+  "property_id": "18389",
+  "name": "Westgate Village",
+  "url": "https://www.fmgnj.com/apartments/pa/malvern/westgate-village/",
+  "their_tier": "TIER_1_API_G5_API_ERROR",
+  "spa_conf": 0.68
+ },
+ {
+  "property_id": "21367",
+  "name": "4001 Midtown",
+  "url": "https://www.live4001midtown.com/",
+  "their_tier": "TIER_1_API_ONESITE",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "18194",
+  "name": "Parke Place Townhomes",
+  "url": "https://www.forestproperties.net/property/availabilities/parke-place-village",
+  "their_tier": "TIER_1_API_REALPAGE_OLL",
+  "spa_conf": 0.66
+ },
+ {
+  "property_id": "54758",
+  "name": "Marquis on Evans",
+  "url": "https://www.cwsapartments.com/apartments/tx/san-antonio/marquis-on-evans/",
+  "their_tier": "TIER_1_API_REPLI360",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "52347",
+  "name": "Aspen Court",
+  "url": "www.liveaspencourt.com",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "68318",
+  "name": "Broadway",
+  "url": "https://www.livethebroadway.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "72766",
+  "name": "Fox Ridge",
+  "url": "https://www.liveatfoxridge.com/?utm_source=GBP&utm_medium=organic&utm_knock=gbp",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "251167",
+  "name": "Metro at Fireclay II",
+  "url": "http://www.metroatfireclay.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "272287",
+  "name": "Parc at Roxbury",
+  "url": "https://www.parcatroxbury.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "71747",
+  "name": "The Atlas",
+  "url": "http://www.copperwoodut.com/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "60353",
+  "name": "The George",
+  "url": "https://www.thegeorgenewbrunswick.com/?utm_source=GBP&utm_medium=organic&utm_campaign=appointment",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "252534",
+  "name": "The Mark at Fishers District",
+  "url": "https://www.themarkatfishersdistrict.com/the-mark-at-fishers-district-fishers-in/",
+  "their_tier": "TIER_1_API_SIGHTMAP",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "97506",
+  "name": "Roebling Lofts I",
+  "url": "http://roeblinglofts.com/",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "spa_conf": 0.68
+ },
+ {
+  "property_id": "6395",
+  "name": "Serena Woods",
+  "url": "https://www.villaserenacommunities.com/serena-woods",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "276548",
+  "name": "Villas at Sandy Creek",
+  "url": "https://villasatsandycreek.com/",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "296794",
+  "name": "Willow Creek",
+  "url": "https://www.homesteadpropertiestn.com/directory/willow-creek/",
+  "their_tier": "TIER_1_DOM_APPFOLIO_SSR",
+  "spa_conf": 0.68
+ },
+ {
+  "property_id": "13072",
+  "name": "Boynton Place",
+  "url": "https://www.robbinspropertyllc.com/apartments/fl/boynton-beach/boynton-place-apartments/",
+  "their_tier": "TIER_1_PROFILE_MAPPING",
+  "spa_conf": 0.68
+ },
+ {
+  "property_id": "64618",
+  "name": "70 Pine",
+  "url": "http://www.70pine.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "245993",
+  "name": "Alberta Square",
+  "url": "https://www.glendalecommunities.com/property/alberta-square/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "302701",
+  "name": "Ascent At Fitzsimons",
+  "url": "https://ascentfitzsimons.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "54104",
+  "name": "Aspen Hills",
+  "url": "https://www.squareone.properties/property-detail/?pid=20&location=1",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "274886",
+  "name": "Aster Village Two",
+  "url": "https://parkplace380.com/listings/aster-village-two/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "18752",
+  "name": "Brookstone Apartments",
+  "url": "https://www.liveatbrookstoneapartments.com/?utm_source=GMB&utm_medium=organic",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "246351",
+  "name": "Chatsworth Village Townhomes",
+  "url": "https://www.glendalecommunities.com/property/chatsworth-townhouses/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "257905",
+  "name": "Cypress Lofts",
+  "url": "https://cypresslofts.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "74528",
+  "name": "Grand Oaks",
+  "url": "https://grandoaks-apartments.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "68375",
+  "name": "Haven at Highland Knolls",
+  "url": "http://www.havenhighlandknolls.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "95594",
+  "name": "Highline",
+  "url": "https://highline321.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "258343",
+  "name": "Keystone on 8th",
+  "url": "https://www.keystoneon8th.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "2198",
+  "name": "Lincoln Green",
+  "url": "www.lincolngreenapartments.com",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "53773",
+  "name": "Mallard Cove",
+  "url": "http://mallardcove.org/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "46986",
+  "name": "Mountain Ridge Manor",
+  "url": "http://www.mountainridgemanor.com",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "12959",
+  "name": "Oak Bend",
+  "url": "https://www.oakbendapt.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.68
+ },
+ {
+  "property_id": "287001",
+  "name": "Park Terrace",
+  "url": "https://park-terrace-apts.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "2382",
+  "name": "Quincy Ridge",
+  "url": "https://quincyridgeapts.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "284175",
+  "name": "SCS Athens",
+  "url": "https://www.livescs.com/property/scs-athens",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.68
+ },
+ {
+  "property_id": "69928",
+  "name": "The Azlee",
+  "url": "https://www.theazleeapartments.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "9473",
+  "name": "The Village Cliffs",
+  "url": "https://www.thevillagedallas.com/properties/the-village-cliffs/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.7
+ },
+ {
+  "property_id": "268954",
+  "name": "The Villages at Sunnybrook",
+  "url": "https://www.thevillagesatsunnybrook.com/?utm_source=GoogleLocalListing&utm_medium=ogranic&utm_campaign=GMB",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "23306",
+  "name": "Villas Willow Glen",
+  "url": "www.villaswillowglen.com",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.68
+ },
+ {
+  "property_id": "46581",
+  "name": "Villas on rock",
+  "url": "https://www.villasonrock.com/",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "52182",
+  "name": "Woodside Village Apartments",
+  "url": "http://www.woodsideapartments.net",
+  "their_tier": "TIER_3_DOM",
+  "spa_conf": 0.69
+ },
+ {
+  "property_id": "290807",
+  "name": "Meri Palm Bay",
+  "url": "https://www.meripalmbay.com/",
+  "their_tier": "TIER_MERGED_CROSS_PAGE",
+  "spa_conf": 0.68
+ },
+ {
+  "property_id": "72732",
+  "name": "The Willows",
+  "url": "http://www.centralmngt.com/Search?Community=15",
+  "their_tier": "TIER_MERGED_CROSS_PAGE",
+  "spa_conf": 0.65
+ },
+ {
+  "property_id": "68703",
+  "name": "Waterford Trails",
+  "url": "https://www.alapts.com/apartments/tx/spring/waterford-trails/",
+  "their_tier": "TIER_MERGED_CROSS_PAGE",
+  "spa_conf": 0.69
+ }
+]

@@ -12,6 +12,7 @@ import pytest
 
 from ma_poc.pms.adapters.appfolio import (
     AppFolioAdapter,
+    _extract_unit_from_address,
     parse_appfolio_detail_page,
     parse_appfolio_listings_ssr,
 )
@@ -125,6 +126,140 @@ def test_ssr_parser_returns_empty_when_no_listing_cards() -> None:
         "https://example.com",
     )
     assert units == []
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2026-05-24 — audit xlsx (2026-05-23) flagged 9 AppFolio properties
+# with "didn't find this unit". Root cause: SSR adapter stored
+# unit_number = listing_id (AppFolio internal). The real unit number
+# lives in the address suffix (e.g. '#810', 'Apt 429', '- V024,').
+# These tests pin the address-suffix extractor + verify the SSR parser
+# prefers the parsed suffix over the listing_id.
+# ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("addr, expected", [
+    # Pattern 1 — hash-prefixed (Carlton / Becovic — most common)
+    ("1422 Som Center Road #810, Mayfield Heights, OH 44124", "810"),
+    ("1414 Som Center Road #503, Mayfield Heights, OH 44124", "503"),
+    ("6012 N Kenmore Ave #2D, Chicago, IL 60660", "2D"),
+    ("1552.5 W Juneway Ter. #3H, Chicago, IL 60626", "3H"),
+    ("1556 W Juneway Ter. #1O, Chicago, IL 60626", "1O"),
+    ("5840 Mckahan Ct #5840, Columbus, OH 43232", "5840"),
+    # Pattern 2 — Apt/Apartment (kelseymanagement → Brantley Pines)
+    ("2620 Wild Pines Ln, Apt 429, Naples, FL 34112", "429"),
+    ("9305 Takomah Trail, Apt 213, Tampa, FL 33617", "213"),
+    ("4803 Mandy Avenue, Apt 8, Tampa, FL 33617", "8"),
+    # Pattern 3 — Suite / Unit / Ste
+    ("123 Main St, Suite 12, Anytown, CA 90001", "12"),
+    ("123 Main St, Unit 5B, Anytown, CA 90001", "5B"),
+    ("123 Main St, Ste 200, Anytown, CA 90001", "200"),
+    # Pattern 4 — dash-separated suffix before comma (bargeprops + becovic)
+    ("3623 McCann Road - 2043, Longview, TX 75602", "2043"),
+    ("1625 W Howard - 305, Chicago, IL 60626", "305"),
+    ("3050 E. Fountain Blvd - 3050-302, Colorado Springs, CO 80910",
+     "3050-302"),
+    ("Parker Apartments - V024, 5105 Bullard Road, Tyler, TX 75703", "V024"),
+    # Pattern 5 — trailing numeric before first comma (no dash, no hash)
+    ("301 W. Hawkins Parkway 1116, Longview, TX", "1116"),
+    ("1810 Marlandwood Road 9208, Temple, TX 76502", "9208"),
+    # Pattern 6 — inter-comma alphanumeric token
+    # (americancapitalrealty/Citadel + Riverside North)
+    ("4121 San Antonio St, 614, Odessa, TX 79765", "614"),
+    ("1349 Redmond Circle, G1-47, Rome, GA 30165", "G1-47"),
+    # No unit (single-family / townhouse) — empty
+    ("355 Monument Road, Jacksonville, FL 32225", ""),
+    ("7789 Club Ridge Rd, Westerville, OH 43081", ""),
+    ("301 Nat Turner Blvd, Newport News, VA 23606", ""),
+    ("852 Park Road, Westerville, OH 43081", ""),
+    # Defensive — empty / None-like
+    ("", ""),
+])
+def test_extract_unit_from_address_matrix(addr: str, expected: str) -> None:
+    """End-to-end fixture set — every shape from the 9 AppFolio audit
+    failures + the 5 live tenants probed on 2026-05-24."""
+    assert _extract_unit_from_address(addr) == expected
+
+
+def test_ssr_parser_prefers_address_suffix_over_listing_id() -> None:
+    """The 2026-05-23 audit's signature case: address contains '#810';
+    the listing_id is 760. The fixed parser must surface unit_number =
+    '810' (what the website displays), not 760 (internal id). The
+    listing_id is preserved in source_ids for provenance."""
+    html = """
+    <article class="listing-item result js-listing-item" data-listing-id="760">
+      <div class="js-listing-blurb-rent">$1,939</div>
+      <div class="js-listing-blurb-bed-bath">3 bd / 2 ba</div>
+      <div class="js-listing-square-feet">Square Feet: 904</div>
+      <div class="js-listing-available">5/30/26</div>
+      <div class="js-listing-address">
+        <span>1422 Som Center Road #810, Mayfield Heights, OH 44124</span>
+      </div>
+    </article>
+    """
+    units = parse_appfolio_listings_ssr(html, "https://carltonequities.appfolio.com/listings")
+    assert len(units) == 1
+    u = units[0]
+    assert u["unit_number"] == "810", (
+        f"expected '810' (from #810 in address), got {u['unit_number']!r} "
+        f"— the AppFolio listing_id leak is back."
+    )
+    # Address should be the floor_plan_name (it's the only meaningful
+    # plan identifier these SSR rows ship).
+    assert "1422 Som Center Road" in u["floor_plan_name"]
+    # listing_id preserved in source_ids for downstream provenance.
+    # (Make_unit_dict returns it as 'source_ids', a serialized dict, OR
+    # it appears in the appfolio_listing_id field on the unit dict —
+    # the exact representation depends on make_unit_dict's contract.)
+    # Smoke check: 760 must appear SOMEWHERE in the row so we can
+    # cross-reference back to AppFolio later if needed.
+    assert "760" in str(u), "listing_id 760 should be preserved in the unit dict"
+
+
+def test_ssr_parser_handles_address_span_without_inner_tag() -> None:
+    """kelseymanagement (Brantley Pines I) shape: the address text sits
+    DIRECTLY inside the js-listing-address span, with no inner <span>.
+    The prior regex required an inner tag — this is the bug that made
+    Brantley Pines' floor_plan_name collapse to 'AppFolio listing 193'."""
+    html = """
+    <article class="listing-item js-listing-item" data-listing-id="193">
+      <div class="js-listing-blurb-rent">$1,625</div>
+      <div class="js-listing-blurb-bed-bath">2 bd / 2 ba</div>
+      <div class="js-listing-square-feet">Square Feet: 616</div>
+      <div class="js-listing-available">6/1/26</div>
+      <span class="u-pad-rm js-listing-address">2620 Wild Pines Ln, Apt 429, Naples, FL 34112</span>
+    </article>
+    """
+    units = parse_appfolio_listings_ssr(html, "https://kelseymanagement.appfolio.com/listings")
+    assert len(units) == 1
+    u = units[0]
+    assert u["unit_number"] == "429", (
+        f"address-suffix should extract 'Apt 429' → '429'; "
+        f"got {u['unit_number']!r} (likely the listing_id 193 leaked)"
+    )
+    assert "2620 Wild Pines Ln" in u["floor_plan_name"]
+    assert u["floor_plan_name"] != "AppFolio listing 193", (
+        "floor_plan_name should be the address, not the bare listing_id fallback"
+    )
+
+
+def test_ssr_parser_falls_back_to_listing_id_when_address_has_no_unit() -> None:
+    """Single-family rentals (e.g. '355 Monument Road, Jacksonville, FL')
+    legitimately have no unit suffix. Rather than drop the unit_number
+    entirely (which would break row identity), fall back to the
+    listing_id — this preserves the prior behaviour for that cohort."""
+    html = """
+    <article class="listing-item js-listing-item" data-listing-id="9328">
+      <div class="js-listing-blurb-rent">$2,200</div>
+      <div class="js-listing-blurb-bed-bath">3 bd / 2 ba</div>
+      <div class="js-listing-square-feet">Square Feet: 1,500</div>
+      <span class="js-listing-address">101 Little Bay Avenue, Yorktown, VA 23693</span>
+    </article>
+    """
+    units = parse_appfolio_listings_ssr(html, "https://artcraft.appfolio.com/listings")
+    assert len(units) == 1
+    # No # / Apt / dash — fall back to listing_id (the only stable id we have)
+    assert units[0]["unit_number"] == "9328"
 
 
 # ---- AppFolioAdapter end-to-end with SSR fallback ------------------------

@@ -42,6 +42,15 @@ class Verdict(StrEnum):
     #: not a failure. ``verdict_is_success`` recognises both ``SUCCESS`` and
     #: ``SUCCESS_PLAN_LEVEL`` so the headline metric counts both correctly.
     SUCCESS_PLAN_LEVEL = "SUCCESS_PLAN_LEVEL"
+    #: 2026-05-23: the operator's site explicitly publishes "no units
+    #: available at this time" (or one of nine sibling phrases — see
+    #: ``ma_poc.pms.adapters._no_availability``). The page was scraped
+    #: successfully and we captured the operator's actual stated state;
+    #: there is just nothing to lease right now. Counts toward the
+    #: success-rate numerator (we DID extract what the operator publishes),
+    #: but is intentionally distinct from SUCCESS so dashboards can split
+    #: "zero-inventory operators" from "with-inventory extractions".
+    SUCCESS_NO_AVAILABILITY = "SUCCESS_NO_AVAILABILITY"
     FAILED_UNREACHABLE = "FAILED_UNREACHABLE"
     FAILED_NO_DATA = "FAILED_NO_DATA"
     CARRY_FORWARD = "CARRY_FORWARD"
@@ -59,7 +68,11 @@ class Verdict(StrEnum):
 #: future addition of another success-class verdict (e.g. a hypothetical
 #: ``SUCCESS_ENRICHED``) lands cleanly in one place.
 _SUCCESS_VERDICTS: frozenset[str] = frozenset(
-    {Verdict.SUCCESS.value, Verdict.SUCCESS_PLAN_LEVEL.value}
+    {
+        Verdict.SUCCESS.value,
+        Verdict.SUCCESS_PLAN_LEVEL.value,
+        Verdict.SUCCESS_NO_AVAILABILITY.value,
+    }
 )
 
 
@@ -119,6 +132,7 @@ def compute(
     plan_summaries: list[Any] | None = None,
     verdict_quality_override: str | None = None,
     units: list[dict[str, Any]] | None = None,
+    operator_no_availability: bool = False,
 ) -> VerdictResult:
     """Compute the verdict for a property scrape.
 
@@ -143,6 +157,12 @@ def compute(
             numeric rent value, downgrade to SUCCESS_PLAN_LEVEL. Catches
             the 1,031-prop inflated-SUCCESS bucket flagged by the 2026-05-20
             JSON-LD recovery audit.
+        operator_no_availability: 2026-05-23. The page carried an
+            explicit "no units available" statement (krcapartments-class
+            cohort, ~10 properties). When True AND extraction produced
+            no records, return SUCCESS_NO_AVAILABILITY instead of
+            FAILED_NO_DATA — the scrape succeeded; the operator is just
+            reporting zero inventory right now.
 
     Returns:
         VerdictResult with verdict, reason, and source.
@@ -173,6 +193,18 @@ def compute(
         if records is None and isinstance(extract_result, dict):
             records = extract_result.get("records", extract_result.get("units", []))
         if not records:
+            # 2026-05-23: operator-published "no availability" wins over
+            # FAILED_NO_DATA. We DID extract the operator's stated state
+            # (zero inventory); that's a successful scrape, not a missing-
+            # data failure. Keep this check above the plan_summaries
+            # fallback — when both signals are present, the explicit
+            # zero-availability statement is the more authoritative one.
+            if operator_no_availability:
+                return VerdictResult(
+                    Verdict.SUCCESS_NO_AVAILABILITY,
+                    "operator published zero availability",
+                    "extract",
+                )
             # Stage 2: a property with plan-level data but no per-unit records
             # is SUCCESS_PLAN_LEVEL, not FAILED_NO_DATA. The page genuinely
             # exposed plan summaries; that's the only thing the site offers.
@@ -184,6 +216,12 @@ def compute(
                 )
             return VerdictResult(Verdict.FAILED_NO_DATA, "no records extracted", "extract")
     else:
+        if operator_no_availability:
+            return VerdictResult(
+                Verdict.SUCCESS_NO_AVAILABILITY,
+                "operator published zero availability",
+                "extract",
+            )
         if plan_summaries:
             return VerdictResult(
                 Verdict.SUCCESS_PLAN_LEVEL,
@@ -201,6 +239,15 @@ def compute(
 
     # F1: if units were extracted but all are hollow and no rescue tier helped
     if units_hollow:
+        # 2026-05-23: hollow units + explicit operator-no-availability
+        # statement → SUCCESS_NO_AVAILABILITY. The "hollow units" are
+        # the no-availability placeholder rows the adapter emitted.
+        if operator_no_availability:
+            return VerdictResult(
+                Verdict.SUCCESS_NO_AVAILABILITY,
+                "units hollow; operator published zero availability",
+                "validate",
+            )
         # Stage 2: same plan-level-rescue path applies when units are hollow.
         if plan_summaries:
             return VerdictResult(

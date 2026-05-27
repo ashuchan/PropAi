@@ -222,25 +222,58 @@ _CW_NUM = (
     r"eleven|twelve)"
 )
 _PROPERTY_CONCESSION_RE = re.compile(
-    rf"\b{_CW_NUM}[\s-]*(?:full[\s-]+)?(?:weeks?|months?)['’]?s?[\s-]*"
-    r"(?:of[\s-]+)?(?:rent[\s-]+)?(?:free|complimentary|on\s+us)\b"
+    # NUMBER weeks/months [of] [base|effective|monthly|total|select|premium]
+    # [rent] free|complimentary|on us
+    # 2026-05-24: added the qualifier-word slot so phrasing like
+    # "10 Weeks Base Rent Free" (theblakeoptimistpark.com), "6 months
+    # effective rent free", "12 weeks monthly rent waived" match.
+    # 2026-05-24 (post-100-prop-vision audit): also allow a noise char
+    # between the unit ("weeks*"/"weeks†") and the FREE keyword —
+    # Austin Midtown ships "4 WEEKS* FREE" with the disclaimer asterisk
+    # directly attached, which the prior \s* gap did not match.
+    rf"\b{_CW_NUM}[\s-]*(?:full[\s-]+)?(?:weeks?|months?)['’*†‡]?s?[\s-]*"
+    r"(?:of[\s-]+)?(?:(?:base|effective|monthly|total|select|premium|"
+    r"market)[\s-]+)?(?:rent[\s-]+)?(?:free|complimentary|on\s+us|waived)\b"
     rf"|\b(?:rent[\s-]?)?free\s+(?:for\s+)?(?:{_CW_NUM}\s+)?(?:full\s+)?"
     r"(?:weeks?|months?)\b"
     rf"|\b(?:first|1st)\s+(?:{_CW_NUM}\s+)?(?:full\s+)?months?\b"
     r"[^.!?]{0,40}\bfree\b"
     r"|\bfree\s+rent\b|\bmonths?\s+on\s+us\b"
-    r"|\$\s?\d{1,3}(?:,\d{3})*\s*(?:off|gift\s*card|credit|cash|savings|"
-    r"welcome\s+bonus)\b"
+    # Dollar-amount concessions. 2026-05-24 (post-100-prop-vision audit):
+    # widened the digit class from \d{1,3}(?:,\d{3})* to also accept
+    # raw \d{4,5} — Jefferson Place ("$1000 Off") and similar omit the
+    # thousands comma. Also added "concession" + "rent concession" to
+    # the trailing keyword set: 42 West Apartments ships "$300 One-Time
+    # Rent Concession at Move-In" without "off"/"credit"/etc.
+    r"|\$\s?(?:\d{1,3}(?:,\d{3})*|\d{4,5})\s*(?:off|gift\s*card|credit|"
+    r"cash|savings|welcome\s+bonus|(?:one[\s-]+time\s+)?(?:rent[\s-]+)?"
+    r"concession)\b"
     r"|\bsave\s+(?:up\s+to\s+)?\$\s?\d"
     r"|\$\s?\d{2,5}\s+(?:welcome\s+)?bonus\b"
     r"|\breduced\s+rents?\b|\brent\s+as\s+low\s+as\s+\$"
     r"|\blook[\s-]*(?:and|&|\+|n)?[\s-]*lease\b"
-    r"|\b(?:move[- ]?in|mi)\s+special\b"
-    r"|\b(?:rent|lease|deposit|move[- ]?in)\s+special\b"
-    r"|\blimited[- ]time\s+(?:offer|special|savings|deal)\b"
+    # 2026-05-24 (post-1000-prop-sweep blind-spot probe): pluralize the
+    # 'special' anchors so 'move-in specials' / 'current specials' /
+    # 'leasing specials' match — Abberly Centerpointe ships
+    # "Select apartment homes are now offering move-in specials" as
+    # a banner and the prior \bspecial\b failed the s-suffix.
+    r"|\b(?:move[- ]?in|mi)\s+specials?\b"
+    r"|\b(?:rent|lease|deposit|move[- ]?in)\s+specials?\b"
+    r"|\b(?:current|new|featured|limited[- ]time|leasing)\s+specials?\b"
+    # 2026-05-24: 'N Month/Months/Week/Weeks Off' (no $ prefix) — the
+    # Shea Apartments pattern "Up to 1 Month Off" / "1 Month Off"
+    # used as a header callout. Distinct from $N off (already covered).
+    r"|\b(?:up\s+to\s+)?\d+\s*(?:weeks?|months?)\s+off\b"
+    r"|\blimited[- ]time\s+(?:offer|special|savings|deal)s?\b"
     r"|\breduced\s+deposit\b"
     r"|\bwaived\s+(?:application|admin(?:istration)?|amenity|"
-    r"move[- ]?in|deposit)\s*fees?\b",
+    r"move[- ]?in|deposit)\s*fees?\b"
+    # 2026-05-24 (post-blakeoptimistpark verification): "Exclusive Offer"
+    # is a common header phrase used to introduce concessions. Standalone
+    # match captures the offer context even when the rest of the phrase
+    # uses unusual phrasing the other branches don't reach.
+    r"|\bexclusive\s+offer\b"
+    r"|\b(?:special|exclusive)\s+(?:lease|move[- ]in)\s+offer\b",
     re.IGNORECASE,
 )
 
@@ -578,6 +611,101 @@ async def scrape(
         except Exception:
             pass
 
+    # --- Step 3b: API-response concession capture (2026-05-24) ----------------
+    # The page-HTML banner regex (Step 3 above) catches the dominant 80%+
+    # case where the offer is displayed on the property's marketing page.
+    # The 3-17% remainder lives in API JSON responses captured by
+    # adapters (Knock leasingSpecial, G5 marketing-center
+    # specialDisplayText, RentCafe bannerText/offer_description, Wix
+    # promotion, Yardi SecureCafe bannerText, etc.).
+    #
+    # extract_api_concession() knows ALL the PMS-specific field name
+    # variations and filters out GDPR/cookie consent UI strings,
+    # Wix branding placeholders, and Yardi empty-state copy. Walks the
+    # captured API responses, returns the longest meaningful text found.
+    #
+    # Only runs when the HTML banner produced nothing (capture-first:
+    # the page banner is usually more authoritative than the API field
+    # because it reflects what end-users see).
+    if not result.get("concessions_text"):
+        try:
+            from ma_poc.core.api_concession_extract import (
+                extract_api_concession,
+            )
+
+            _captured = getattr(ctx, "_api_responses", []) or []
+            _api_conc: str | None = None
+            for _resp in _captured:
+                if not isinstance(_resp, dict):
+                    continue
+                _body = _resp.get("body")
+                if _body is None:
+                    continue
+                # Body may be a dict (already-parsed JSON) or string
+                _parsed: object | None = None
+                if isinstance(_body, (dict, list)):
+                    _parsed = _body
+                elif isinstance(_body, (str, bytes)):
+                    try:
+                        import json as _json_a
+                        _txt = (
+                            _body.decode("utf-8", "replace")
+                            if isinstance(_body, bytes) else _body
+                        )
+                        _parsed = _json_a.loads(_txt)
+                    except Exception:
+                        _parsed = None
+                if _parsed is None:
+                    continue
+                _candidate = extract_api_concession(_parsed)
+                if _candidate and (
+                    _api_conc is None or len(_candidate) > len(_api_conc)
+                ):
+                    _api_conc = _candidate
+            if _api_conc:
+                result["concessions_text"] = _api_conc[:300]
+        except Exception:
+            pass
+
+    # --- Step 3c: rendered-DOM popup/banner concession rescan (2026-05-24) ---
+    # Step 3 scans static HTML. Step 3b scans pre-captured API responses.
+    # The 100-prop VISION audit
+    # (investigations/2026-05-24-cascade-fixes-grind/CONCESSION_100PROP_VISION_VERIFICATION.md)
+    # found ~9% of random properties carry concession banners that are
+    # PHYSICALLY ABSENT from static HTML — React/Vue/Angular-hydrated
+    # popups, [role="dialog"] modals that fire on a JS timeout, banner
+    # divs that mount only after the bundle's fetch() resolves
+    # (Cortland Brier Creek, Blossoms at Brentwood, Austin Midtown,
+    # Colina Ranch Hill, Prose Riviana, Quarry Alamo Heights, Museum
+    # Terrace, Jefferson Place, 42 West Apartments — all confirmed by
+    # diffing curl_cffi vs Playwright-rendered DOM on 2026-05-24).
+    #
+    # When a Playwright session is already open AND Steps 3/3b returned
+    # no concession, scan the rendered DOM's popup/modal/banner elements
+    # (plus full body innerText as a recall fallback) and re-run the
+    # canonical _PROPERTY_CONCESSION_RE. Reuses the open browser context
+    # so the marginal cost is one page.evaluate() — near-zero on routes
+    # that already render. curl-only routes still see the static-only
+    # gap; closing that requires upgrading those routes to Playwright
+    # (separate ticket).
+    #
+    # Tag concession_source so downstream provenance can distinguish
+    # static-HTML vs rendered-DOM captures.
+    if page is not None and not result.get("concessions_text"):
+        try:
+            from ma_poc.core.rendered_dom_concession import (
+                scan_rendered_dom_for_concession,
+            )
+
+            _rendered = await scan_rendered_dom_for_concession(
+                page, _PROPERTY_CONCESSION_RE
+            )
+            if _rendered:
+                result["concessions_text"] = _rendered[:300]
+                result["concession_source"] = "DOM_POPUP_RENDERED"
+        except Exception:
+            pass
+
     # --- Step 4: Re-detect with page HTML if available ---
     if page_html:
         html_detection = detect_pms(_effective_url, csv_row=csv_row, page_html=page_html)
@@ -760,8 +888,8 @@ async def scrape(
         }
         if profile is not None:
             try:
-                from ma_poc.services.source_planner import compute_budget
                 from ma_poc.models.scrape_profile import ProfileMaturity
+                from ma_poc.services.source_planner import compute_budget
                 is_cold = profile.confidence.maturity == ProfileMaturity.COLD
                 budget = compute_budget(profile, is_cold=is_cold)
             except Exception:
@@ -787,6 +915,10 @@ async def scrape(
         property_id=property_id or "unknown",
         fetch_result=fetch_result,
         property_name=_from_csv("name", "Name", "Property Name", "proj_name"),
+        # 2026-05-25 (regr#11b): street address from CSV — AppFolio adapter
+        # uses this to post-fetch-filter multi-property PMC vanity responses
+        # whose embed JS lacks a propertyGroup (Academy Place / riedman cohort).
+        address=_from_csv("address", "Address", "street", "Street", "street_address"),
         city=_from_csv("city", "City"),
         state=_from_csv("state", "State"),
         zip_code=_from_csv("zip", "Zip", "zip_code", "ZIP Code"),
@@ -945,7 +1077,11 @@ async def scrape(
         from ma_poc.pms.empty_exit import empty_exit_reason, is_empty_exit
         from ma_poc.validation.schema_gate import (
             property_has_area_signal as _retry_area_signal,
+        )
+        from ma_poc.validation.schema_gate import (
             property_has_rent_signal as _retry_rent_signal,
+        )
+        from ma_poc.validation.schema_gate import (
             property_passes_quality_gate as _retry_quality_gate,
         )
 
@@ -957,7 +1093,7 @@ async def scrape(
             _retry_os.environ.get("PATH_B_MAX_RETRIES", "2")
         )
 
-        def _retry_trigger_reason(res: "AdapterResult") -> str | None:
+        def _retry_trigger_reason(res: AdapterResult) -> str | None:
             """Return ``"empty_exit"`` / ``"quality_gate"`` / ``"no_rent"``
             / ``"no_area"`` / None. None means the adapter is fine."""
             if is_empty_exit(res.tier_used) and not res.units:
@@ -971,7 +1107,7 @@ async def scrape(
                     return "no_area"
             return None
 
-        def _retry_win_condition(res: "AdapterResult") -> bool:
+        def _retry_win_condition(res: AdapterResult) -> bool:
             """A retry winner must have units AND pass dimension gate AND
             have a rent signal. Same-or-worse quality is not promoted."""
             return bool(
@@ -984,7 +1120,7 @@ async def scrape(
         # data isn't lost if all retries fail. Only relevant when the
         # baseline HAS units — for empty_exit triggers there's nothing
         # to preserve.
-        _baseline_result: "AdapterResult | None" = (
+        _baseline_result: AdapterResult | None = (
             adapter_result if adapter_result.units else None
         )
         _baseline_adapter_name = adapter_name
@@ -1103,6 +1239,186 @@ async def scrape(
             result["_plan_level_reason"] = _initial_trigger_reason
     except Exception:  # pragma: no cover — Path B/C must never block scrape
         pass
+
+    # --- F1.5: Bi-directional subpage cross-page enrichment (2026-05-24) ----
+    # Pre-LLM cheap pass: when the cascade winner emitted plan-level units
+    # that are missing EITHER rent OR sqft, probe known marketing subpages
+    # (/floorplans, /floor-plans, /apartments, /pricing) for the missing
+    # dimension and merge by floor_plan_name match.
+    #
+    # Two directions:
+    #   1. area→rent (original 2026-05-23 case): TIER_3_DOM stops at
+    #      plan-level with area+beds but no rent; subpage has prices.
+    #      Cohort: Greenarch, Village Square, Rustic Woods, etc.
+    #   2. rent→sqft (NEW 2026-05-24): plan-level adapters (Repli360,
+    #      RentCafe SecureCafe, SightMap, AppFolio SSR) emit rent but
+    #      no sqft; subpage has sqft. Cohort: 13 of 32 P1 TIER_MERGED
+    #      props (Repli360 6, RentCafe SecureCafe 4, SightMap 2,
+    #      AppFolio 1) carry plan-level rent that needs sqft enrichment
+    #      to clear strict-pass.
+    #
+    # Costs nothing when units already have both dimensions (early-skip).
+    try:
+        from ma_poc.pms.adapters._probe import probe_get as _enrich_probe
+        from ma_poc.pms.adapters.generic_plan_text import (
+            _bodytext_from_fetch_result,
+            parse_generic_plan_text,
+        )
+
+        units_now = adapter_result.units or []
+        if units_now:
+            n_with_rent = sum(
+                1 for u in units_now
+                if u.get("market_rent_low") or u.get("market_rent_high")
+                or u.get("rent_low") or u.get("rent_high")
+            )
+            n_with_area = sum(
+                1 for u in units_now
+                if u.get("sqft") or u.get("area")
+            )
+            # Decide which dimension to enrich. Skip when units already
+            # have both (no benefit) or have neither (the F1.5 sub-
+            # probe can't synthesize fields from nothing).
+            _missing: str | None = None
+            if n_with_rent == 0 and n_with_area > 0:
+                _missing = "rent"
+            elif n_with_area == 0 and n_with_rent > 0:
+                _missing = "sqft"
+            # Also enrich the partial case: SOME have one dim, others
+            # have the other. Trigger when fewer than half have both.
+            elif n_with_rent > 0 and n_with_area > 0:
+                _both = sum(
+                    1 for u in units_now
+                    if (u.get("market_rent_low") or u.get("rent_low"))
+                    and (u.get("sqft") or u.get("area"))
+                )
+                if _both < len(units_now) * 0.5:
+                    # Pick the dimension fewer units have — that's the
+                    # one most worth probing for.
+                    _missing = "sqft" if n_with_area < n_with_rent else "rent"
+
+            if _missing:
+                from urllib.parse import urlparse as _enrich_urlparse
+
+                _enrich_origin = ""
+                _enrich_fr = getattr(ctx, "fetch_result", None)
+                if _enrich_fr is not None:
+                    _enrich_origin = str(getattr(_enrich_fr, "final_url", "") or "")
+                _enrich_origin = _enrich_origin or getattr(ctx, "base_url", "") or ""
+                _ep = _enrich_urlparse(_enrich_origin)
+                _enrich_base = (
+                    f"{_ep.scheme}://{_ep.netloc}" if _ep.scheme and _ep.netloc else ""
+                )
+
+                if _enrich_base:
+                    # Probe common subpages and build a per-name map of
+                    # the MISSING dimension. The map value tuple holds
+                    # (rent_low, rent_high, sqft) — only the slot we
+                    # actually need is consulted at merge time.
+                    _name_map: dict[
+                        str, tuple[int | None, int | None, str | None]
+                    ] = {}
+                    for _path in (
+                        "/floorplans/", "/floorplans",
+                        "/floor-plans/", "/floor-plans",
+                        "/availability/", "/availability",
+                        "/apartments/", "/apartments",
+                        "/pricing/", "/pricing",
+                    ):
+                        if _name_map:
+                            break  # got something, stop probing
+                        try:
+                            _r = _enrich_probe(_enrich_base + _path, timeout=12)
+                        except Exception:
+                            continue
+                        if _r.status_code != 200 or not _r.text:
+                            continue
+                        _sub_text = _r.text
+                        # Synthesise bodyText (script/style strip + tag drop)
+                        class _StubCtx:
+                            pass
+                        _stub = _StubCtx()
+                        _stub.fetch_result = type("_FR", (), {"body": _sub_text.encode("utf-8", "replace")})()
+                        _body_text = _bodytext_from_fetch_result(_stub)  # type: ignore[arg-type]
+                        if not _body_text:
+                            continue
+                        _sub_rows = parse_generic_plan_text(
+                            _body_text, _enrich_base + _path
+                        )
+                        for _row in _sub_rows:
+                            _rname = (_row.get("floor_plan_name") or "").strip().lower()
+                            if not _rname:
+                                continue
+                            _rlo = _row.get("market_rent_low") or _row.get("rent_low")
+                            _rhi = _row.get("market_rent_high") or _row.get("rent_high")
+                            _rsq = _row.get("sqft") or _row.get("area")
+                            # Only record when this row carries the
+                            # dimension we're trying to enrich; avoids
+                            # polluting the map with no-info entries.
+                            if _missing == "rent" and (_rlo or _rhi):
+                                _name_map[_rname] = (
+                                    int(_rlo) if _rlo else None,
+                                    int(_rhi) if _rhi else None,
+                                    None,
+                                )
+                            elif _missing == "sqft" and _rsq:
+                                _name_map[_rname] = (
+                                    None, None, str(_rsq).strip(),
+                                )
+
+                    # Merge by exact-name OR substring match (floor plan
+                    # names often vary slightly between primary tier and
+                    # subpage e.g. "Sedona" vs "The Sedona").
+                    if _name_map:
+                        _merged = 0
+                        for _u in units_now:
+                            # Skip units that already have the dim we'd merge.
+                            if _missing == "rent" and (
+                                _u.get("market_rent_low") or _u.get("rent_low")
+                            ):
+                                continue
+                            if _missing == "sqft" and (
+                                _u.get("sqft") or _u.get("area")
+                            ):
+                                continue
+                            _uname = str(_u.get("floor_plan_name") or "").strip().lower()
+                            if not _uname:
+                                continue
+                            _hit = _name_map.get(_uname)
+                            if not _hit:
+                                for _k, _v in _name_map.items():
+                                    if _uname in _k or _k in _uname:
+                                        _hit = _v
+                                        break
+                            if not _hit:
+                                continue
+                            _rlo, _rhi, _rsq = _hit
+                            if _missing == "rent":
+                                if _rlo is not None:
+                                    _u["market_rent_low"] = _rlo
+                                    _u["rent_low"] = _rlo
+                                if _rhi is not None:
+                                    _u["market_rent_high"] = _rhi
+                                    _u["rent_high"] = _rhi
+                                _merged += 1
+                            elif _missing == "sqft" and _rsq:
+                                _u["sqft"] = _rsq
+                                if "area" not in _u or not _u.get("area"):
+                                    _u["area"] = _rsq
+                                _merged += 1
+                        if _merged:
+                            adapter_result.errors.append(
+                                f"subpage-{_missing}-enrichment: merged "
+                                f"{_missing} into {_merged}/{len(units_now)} "
+                                f"units from subpage probe "
+                                f"({len(_name_map)} plans found)"
+                            )
+    except Exception as _enrich_exc:  # noqa: BLE001 — never block scraping
+        log.debug(
+            "Subpage cross-page enrichment failed for %s: %s",
+            property_id,
+            _enrich_exc,
+        )
 
     # --- F2: LLM rescue for Tier-1 API adapters --------------------------------
     # When the adapter captures API responses but produces no substantive units,
@@ -1376,9 +1692,26 @@ async def scrape(
                         if _r.status_code == 200 and "sightmap.com" in (_r.text or "").lower():
                             # Splice sub-page HTML in so SightMapAdapter's
                             # _entry_html_from_ctx picks up the embed code.
+                            # 2026-05-24: FetchResult is a frozen dataclass —
+                            # direct ``_fr2.body = ...`` raises
+                            # ``cannot assign to field 'body'``. Use
+                            # ``dataclasses.replace`` to mint a new immutable
+                            # record and swap it onto the (mutable) ctx. Also
+                            # encode str→bytes because the contract types
+                            # ``body`` as ``bytes | None`` and downstream
+                            # ``_entry_html_from_ctx`` decodes either way.
                             _fr2 = getattr(ctx, "fetch_result", None)
                             if _fr2 is not None:
-                                _fr2.body = _r.text  # type: ignore[attr-defined]
+                                import dataclasses as _dc
+
+                                _new_body = (
+                                    _r.text.encode("utf-8", "replace")
+                                    if isinstance(_r.text, str)
+                                    else (_r.text or b"")
+                                )
+                                ctx.fetch_result = _dc.replace(
+                                    _fr2, body=_new_body
+                                )
                             sm_signal = True
                             fallback_chain.append("entrata:fp_subpage_fetched")
                     except Exception as _sub_exc:  # pragma: no cover
@@ -1420,6 +1753,7 @@ async def scrape(
             property_id=property_id or "unknown",
             fetch_result=fetch_result,
             property_name=ctx.property_name,
+            address=ctx.address,
             city=ctx.city,
             state=ctx.state,
             zip_code=ctx.zip_code,
@@ -1528,6 +1862,85 @@ async def scrape(
     # Surface full {url, body} records and the winning URL so downstream
     # (profile_updater, reporting) can learn from what worked.
     result["_raw_api_responses"] = list(adapter_result.api_responses)
+
+    # --- Step 9b: API-concession rescan on adapter-initiated responses ---
+    # Step 3b (above) scanned ctx._api_responses — the responses the
+    # Playwright route interceptor caught during the initial page render.
+    # Adapters that make their OWN follow-up API calls (G5 _fetch_g5_units
+    # POST, Knock direct doorway-api GET, SightMap /sightmaps/{id} fetch,
+    # etc.) put those responses in adapter_result.api_responses, NOT in
+    # ctx._api_responses — so Step 3b missed them.
+    #
+    # This pass re-runs the same extractor over the adapter's own captures.
+    # Only overwrites concessions_text when:
+    #   - Step 3 (HTML banner) found nothing AND
+    #   - Step 3b (intercepted XHR) found nothing AND
+    #   - the adapter's API response has a meaningful concession field
+    # Capture-first: the marketing-page banner is authoritative when
+    # present; this is a last-resort source for API-first cohorts.
+    if not result.get("concessions_text") and adapter_result.api_responses:
+        try:
+            from ma_poc.core.api_concession_extract import (
+                extract_api_concession,
+            )
+
+            _best: str | None = None
+            for _resp in adapter_result.api_responses:
+                if not isinstance(_resp, dict):
+                    continue
+                _body = _resp.get("body")
+                if _body is None:
+                    continue
+                _parsed: object | None = None
+                if isinstance(_body, (dict, list)):
+                    _parsed = _body
+                elif isinstance(_body, (str, bytes)):
+                    try:
+                        import json as _json_9b
+                        _txt = (
+                            _body.decode("utf-8", "replace")
+                            if isinstance(_body, bytes) else _body
+                        )
+                        _parsed = _json_9b.loads(_txt)
+                    except Exception:
+                        _parsed = None
+                if _parsed is None:
+                    continue
+                _c = extract_api_concession(_parsed)
+                if _c and (_best is None or len(_c) > len(_best)):
+                    _best = _c
+            if _best:
+                result["concessions_text"] = _best[:300]
+        except Exception:
+            pass
+
+    # --- Step 9c: backfill canonical concession + offer fields on EVERY unit ---
+    # Catches raw-dict adapters that bypass make_unit_dict:
+    #   * _api_parser.py (3 raw-dict sites)
+    #   * _html_extract.py (6 raw-dict sites — all emit "concession": "")
+    #   * knock.py, _air_communities.py, _amli.py, _funnel.py,
+    #     _nestio_widget.py, _realpage_leasing.py
+    # All emit the legacy ``concession`` field but miss the canonical
+    # canonical fields (concession_text/concession_text_clean/
+    # _concession_quality/concession_value/concession_source) AND the
+    # offer_* taxonomy. This pass walks every unit and backfills via
+    # the unified helper, using the property-level ``concessions_text``
+    # (now populated by Step 3 / 3b / 9b) as fallback source.
+    try:
+        from ma_poc.pms.adapters._parsing import enrich_unit_concession_fields
+
+        _property_text = result.get("concessions_text")
+        for _u in result.get("units") or []:
+            if isinstance(_u, dict):
+                enrich_unit_concession_fields(
+                    _u, property_concession_text=_property_text
+                )
+    except Exception as _enrich_exc:  # pragma: no cover — defensive
+        log.debug(
+            "Unit concession enrichment failed for %s: %s",
+            property_id, _enrich_exc,
+        )
+
     if adapter_result.winning_url:
         result["_winning_page_url"] = adapter_result.winning_url
     result["_fallback_chain"] = fallback_chain
@@ -1589,6 +2002,15 @@ async def scrape(
     prop_amen = getattr(adapter_result, "_property_amenities", None)
     if prop_amen:
         result["property_amenities"] = list(prop_amen)
+
+    # 2026-05-23: propagate the operator-no-availability flag the
+    # generic adapter sets when the page carries an explicit "no units
+    # available" statement (krcapartments cohort). The runner reads
+    # ``result["_operator_no_availability"]`` and passes it to
+    # ``compute_verdict`` so the property is classified
+    # SUCCESS_NO_AVAILABILITY instead of FAILED_NO_DATA.
+    if getattr(adapter_result, "_operator_no_availability", False):
+        result["_operator_no_availability"] = True
 
     reset_clearance_cookies(_clr_token)
     return result
@@ -1683,15 +2105,29 @@ def _characterize_html(page_html: str) -> dict[str, Any]:
 # Phase 2: scoring constants imported from signal_engine.defaults — single
 # source of truth. Aliases preserved here so existing code at call sites
 # compiles without changes until Phase 4 cleanup removes the definitions.
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_ANCHOR_KEYWORDS as _LINK_ANCHOR_KEYWORDS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_HOST_KEYWORDS as _LINK_HOST_KEYWORDS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_PATH_KEYWORDS as _LINK_PATH_KEYWORDS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_PMS_PRIORS as _PMS_SUB_PATH_PRIORS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    DEFAULT_UNIVERSAL_PRIORS as _UNIVERSAL_SUB_PATH_PRIORS,
+)
+from ma_poc.pms.signal_engine.defaults import (
+    EMBEDDED_PORTAL_SCORE as _EMBEDDED_PORTAL_SCORE,
+)
 from ma_poc.pms.signal_engine.defaults import (  # noqa: E402
     LLM_HINT_SCORE as _LLM_HINT_SCORE,
-    EMBEDDED_PORTAL_SCORE as _EMBEDDED_PORTAL_SCORE,
+)
+from ma_poc.pms.signal_engine.defaults import (
     PMS_PRIOR_SCORE as _PMS_PRIOR_SCORE,
-    DEFAULT_ANCHOR_KEYWORDS as _LINK_ANCHOR_KEYWORDS,
-    DEFAULT_PATH_KEYWORDS as _LINK_PATH_KEYWORDS,
-    DEFAULT_HOST_KEYWORDS as _LINK_HOST_KEYWORDS,
-    DEFAULT_PMS_PRIORS as _PMS_SUB_PATH_PRIORS,
-    DEFAULT_UNIVERSAL_PRIORS as _UNIVERSAL_SUB_PATH_PRIORS,
 )
 
 _LLM_HINT_ANCHOR_PREFIX = "llm-hint:"
@@ -2150,7 +2586,8 @@ async def _try_link_hop(
     # this makes SourceRanker the canonical ordering authority.
     try:
         from ma_poc.pms.signal_engine.defaults import create_default_ranker as _mk_ranker
-        from ma_poc.pms.signal_engine.models import SourceKind as _SK, SourceSignal as _SS
+        from ma_poc.pms.signal_engine.models import SourceKind as _SK
+        from ma_poc.pms.signal_engine.models import SourceSignal as _SS
 
         def _anchor_to_kind(anchor: str) -> _SK:
             a = anchor.lower()
@@ -2801,8 +3238,8 @@ async def scrape_jugnu(
     }
     if profile is not None:
         try:
-            from ma_poc.services.source_planner import compute_budget as _cb
             from ma_poc.models.scrape_profile import ProfileMaturity as _PM
+            from ma_poc.services.source_planner import compute_budget as _cb
             _jugnu_budget = _cb(profile, is_cold=profile.confidence.maturity == _PM.COLD)
         except Exception:
             pass
@@ -2915,7 +3352,14 @@ async def scrape_jugnu(
     _final_url = ""
     if fetch_result is not None:
         _final_url = str(getattr(fetch_result, "final_url", "") or "")
-        if "/.well-known/sgcaptcha/" in _final_url.lower():
+        _lower_url = _final_url.lower()
+        # 2026-05-25 canary 1ef1060: Sucuri uses both URL variants
+        # — /.well-known/sgcaptcha/ (the original) AND /.well-known/captcha/
+        # (observed on Belvedere). Detect both.
+        if (
+            "/.well-known/sgcaptcha/" in _lower_url
+            or "/.well-known/captcha/" in _lower_url
+        ):
             _sgcaptcha_walled = True
     if _sgcaptcha_walled:
         result = _empty_result(base_url)
@@ -3006,8 +3450,8 @@ async def scrape_jugnu(
         else:
             # Phase G2: consult planner when main has units
             try:
-                from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
                 from ma_poc.models.source import SourceId, from_legacy_unit
+                from ma_poc.services.source_planner import evaluate_completeness, plan_next_action
                 _pu = [
                     from_legacy_unit(u, SourceId.API_GENERIC_NARROW, base_url, "", 0.85)
                     for u in (result.get("units") or [])

@@ -1,0 +1,933 @@
+{
+  "name": "appfolio-listings",
+  "values": [
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=4366+S.+109th+East+Avenue+601+Tulsa%2C+OK+74146&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=36.1108295,-95.8566621",
+        "address_latitude": 36.1008295,
+        "database_url": "https://atlaspm.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/atlaspm/images/1f040632-92f8-41c5-86f8-4978809d6e93/large.png",
+        "rental_application_url": "https://atlaspm.appfolio.com/listings/rental_applications/new?listable_uid=53a31e04-5232-480b-ac6c-87ef49a13233&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "74146",
+        "full_address": "4366 S. 109th East Avenue, 601, Tulsa, OK 74146",
+        "utilities": "Optional All Bills Paid",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/464230eb-2a23-4b3b-b558-36bf1a54c1de/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/84dd4607-2d77-47b8-80f7-e464f09bbb1b/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/97bde995-eb7d-4bd6-b5a0-23b121e8da55/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/ac800ac6-e7ba-4ba4-897a-91a2ea8f776b/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/eaf7174f-feb3-4bd2-bcc7-8726e8b6bd56/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/3f45541b-2401-4a60-be86-7aa22bf65da0/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/0ce2487f-253c-4f5e-af18-7eff35eda219/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/cdc474ba-8367-4905-8654-4715fbbc4826/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/b8309c21-b419-48d0-a016-afbc2935c106/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/73f414ef-797b-4300-b7b8-2a9d1a94edbb/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/56ab3612-a6f0-4b28-a633-a615c4c71d50/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/2e0e9f8d-826a-47c6-9728-d34a85234bf5/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/267b61d9-d511-42ad-a391-79824daf8021/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/0e4fca2c-1f4b-4b84-8385-466d2004f173/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/9869e0fa-ebc9-45a7-a2be-d13c46267d58/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/90b98197-10c0-47e0-bfd5-19ad516c811c/large.jpg"
+          }
+        ],
+        "portfolio_url": "www.towercrossing.net",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Dogs allowed",
+        "unit_template_uuid": null,
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "4044 South 109th East Avenue",
+            "city": "Tulsa",
+            "region": "OK",
+            "postalCode": "74146",
+            "country": "US"
+          }
+        },
+        "square_feet": 900.0,
+        "id": 89,
+        "property_uid": "7",
+        "payee_account_number_token": "ddafdc37-e629-4331-a872-36b13965e006",
+        "posted_to_website_at": "2026-05-18T15:21:17.000Z",
+        "contact_phone_number": "(918) 622-4043",
+        "payee_routing_number": "103000648",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 65,
+            "name": "fully managed properties"
+          },
+          {
+            "id": 33,
+            "name": "managed complexes"
+          },
+          {
+            "id": 57,
+            "name": "monthly analysis reports"
+          },
+          {
+            "id": 114,
+            "name": "mortgage recon group"
+          },
+          {
+            "id": 108,
+            "name": "properties for bulk charges update"
+          },
+          {
+            "id": 15,
+            "name": "rent tulsa"
+          },
+          {
+            "id": 3,
+            "name": "tower crossing"
+          },
+          {
+            "id": 4,
+            "name": "tower crossing apartments"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 2.0,
+        "address_address2": "601",
+        "address_address1": "4366 S. 109th East Avenue",
+        "bedrooms": 2,
+        "meta_description": "Discover a bright and open 900 sq. ft. floorplan featuring modern amenities and exceptional convenience:\r\n\r\nApartment Features:\r\n\u2022 Two full bathrooms\r\n\u2022 Washer and dryer connections\r\n\u2022 Private balcony\r\n\u2022 Easy access to parking\r\n\u2022 All bills included option available for $1,130 (includes water, trash, and electricity)\r\n\u2022 High speed internet (250MB/s) available at reduced rate\r\n\u2022 Fully equipped kitchen: dishwasher, refrigerator, stove, and garbage disposal\r\n\u2022 Elegant vinyl wood flooring in the kitchen, dining, and bathroom\r\n\u2022 Spacious bedrooms' closets and entryway storage\r\n\u2022 Central heating and air conditioning\r\n\u2022 Cable-ready for easy setup\r\n\r\nCommunity Amenities:\r\n\u2022 Located in the Union School District: (McAuliffe Elementary)\r\n\u2022 On-site fitness room and saltwater pool with sundeck\r\n\u2022 24/7 access to the on-site laundry facility\r\n\u2022 24 hour emergency maintenance service\r\n\u2022 Bilingual office staff and courtesy patrol for peace of mind\r\n\r\nRental Information:\r\n\u2713 All bills paid option available\r\n\u2713 Deposits starting at $250\r\n\u2713 Pet-friendly community! (pets under 25lbs)\r\n\u2713 Application process with same-day approval\r\n\r\nConveniently located just off the 169 highway and near supermarkets, gyms, restaurants, and parks, this apartment offers both comfort and accessibility\r\n\r\nNote: Features and availability may vary.",
+        "listable_uid": "53a31e04-5232-480b-ac6c-87ef49a13233",
+        "portfolio_address2": "",
+        "portfolio_address1": "4044 South 109th East Avenue",
+        "contact_email_address": "manager@towercrossing.net",
+        "deposit": 250.0,
+        "application_fee": 40.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Private Balcony, Corner Unit, Next To Parking, Fitness Room, All Bills Paid Option, 2 FULL Baths, Washer/Dryer Connections",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 16785,
+        "portfolio_city": "Tulsa",
+        "appliances": "Stove, Dishwasher, Refrigerator",
+        "by_the_bed": false,
+        "address_state": "OK",
+        "created_at": "2016-02-03T16:31:22.000Z",
+        "marketing_title": "Stunning Two Bedroom Apartment with Private Balcony Overlooking Parking! Two Full Baths! W/D Connections!",
+        "unit_template_name": null,
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/atlaspm/images/464230eb-2a23-4b3b-b558-36bf1a54c1de/medium.jpg",
+        "updated_at": "2026-05-19T15:27:10.000Z",
+        "fee_label": "Application Fee",
+        "address_longitude": -95.8566621,
+        "property_type": "Multi-Family",
+        "market_rent": 1000.0,
+        "customization_uuid": "df3e8704eabc11eeaab1eacc02f7ad97",
+        "affordable": false,
+        "portfolio_phone_number": "(918) 622-4043",
+        "virtual_showing": false,
+        "posted_to_internet": 16786,
+        "database_name": "atlaspm",
+        "address_postal_code": "74146",
+        "address_country": "US",
+        "available_date": "2026-05-30",
+        "portfolio_name": "Tower Crossing Apartments",
+        "marketing_description": "Discover a bright and open 900 sq. ft. floorplan featuring modern amenities and exceptional convenience:<br/><br/>Apartment Features:<br/>\u2022 Two full bathrooms<br/>\u2022 Washer and dryer connections<br/>\u2022 Private balcony<br/>\u2022 Easy access to parking<br/>\u2022 All bills included option available for $1,130 (includes water, trash, and electricity)<br/>\u2022 High speed internet (250MB/s) available at reduced rate<br/>\u2022 Fully equipped kitchen: dishwasher, refrigerator, stove, and garbage disposal<br/>\u2022 Elegant vinyl wood flooring in the kitchen, dining, and bathroom<br/>\u2022 Spacious bedrooms' closets and entryway storage<br/>\u2022 Central heating and air conditioning<br/>\u2022 Cable-ready for easy setup<br/><br/>Community Amenities:<br/>\u2022 Located in the Union School District: (McAuliffe Elementary)<br/>\u2022 On-site fitness room and saltwater pool with sundeck<br/>\u2022 24/7 access to the on-site laundry facility<br/>\u2022 24 hour emergency maintenance service<br/>\u2022 Bilingual office staff and courtesy patrol for peace of mind<br/><br/>Rental Information:<br/>\u2713 All bills paid option available<br/>\u2713 Deposits starting at $250<br/>\u2713 Pet-friendly community! (pets under 25lbs)<br/>\u2713 Application process with same-day approval<br/><br/>Conveniently located just off the 169 highway and near supermarkets, gyms, restaurants, and parks, this apartment offers both comfort and accessibility<br/><br/>Note: Features and availability may vary.",
+        "address_city": "Tulsa",
+        "property_year_built": 1980,
+        "room_template_id": null,
+        "rent_range": [
+          1000.0,
+          1000.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "OK",
+        "location": {
+          "address": {
+            "streetAddress": "4366 S. 109th East Avenue, 601",
+            "city": "Tulsa",
+            "region": "OK",
+            "postalCode": "74146",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "36.1008295",
+            "longitude": "-95.8566621"
+          }
+        },
+        "schedule_showing_url": "https://atlaspm.appfolio.com/listings/showings/new?listable_uid=53a31e04-5232-480b-ac6c-87ef49a13233"
+      },
+      "page_item_url": "53a31e04-5232-480b-ac6c-87ef49a13233"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=411+West+K.+Place+411+Jenks%2C+OK+74037&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=36.042717,-95.974375",
+        "address_latitude": 36.032717,
+        "database_url": "https://atlaspm.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/atlaspm/images/ec55ab7f-9d44-49dd-b2c9-f155d57ed02a/large.jpg",
+        "rental_application_url": "https://atlaspm.appfolio.com/listings/rental_applications/new?listable_uid=0ba623b0-685d-4909-a193-60e71257313f&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "74037",
+        "full_address": "411 West K. Place, 411, Jenks, OK 74037",
+        "utilities": "",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/6d59f951-12be-4c91-8647-85b70b8828b7/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/7f4e0f0e-aed0-4eb3-9e74-205b116f8af9/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/bcfb5cf4-07f1-4249-80ac-4bf140b0813c/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/42760b60-ebde-469f-9349-299120c27181/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/040e2f7c-153c-41ce-b83a-672d3e2227d3/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/7632e6f8-9e5b-41d1-ab56-747c18613262/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/c1b366bd-2d35-4806-8352-778c8f24315b/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/b1f96d69-5113-4163-80be-bae81da82918/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/4eb184e8-9269-452e-b4f7-105ad8f600e1/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/5e4f8a21-56f7-4032-ad0b-8faeca9dc5ad/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/4c4fd25c-add0-405e-b1c3-bf4bb7568362/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/815f0b9e-2205-4d9c-b7cd-486dfa38aa3a/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/0e41645d-8bf5-48f7-8398-04b596574cd3/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/0cd3bc00-bf43-4457-af1d-0a672bdfa86c/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/f7b5c8d1-c433-41f4-80af-025a2aa10fee/original.jpg"
+          }
+        ],
+        "portfolio_url": "http://www.summit-jenks.com/",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Not Specified",
+        "unit_template_uuid": "c797df5b-960f-11ee-b6c3-02094d1ce055",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "411 West K Place",
+            "city": "Jenks",
+            "region": "OK",
+            "postalCode": "74037",
+            "country": "US"
+          }
+        },
+        "square_feet": 1130.0,
+        "id": 200,
+        "property_uid": "6",
+        "payee_account_number_token": "c85f7eb4-15ea-4447-869b-2ffa1c26b768",
+        "posted_to_website_at": "2026-04-13T15:27:39.000Z",
+        "contact_phone_number": "(918) 299-8600",
+        "payee_routing_number": "103000648",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 57,
+            "name": "monthly analysis reports"
+          },
+          {
+            "id": 114,
+            "name": "mortgage recon group"
+          },
+          {
+            "id": 108,
+            "name": "properties for bulk charges update"
+          },
+          {
+            "id": 7,
+            "name": "summit"
+          },
+          {
+            "id": 91,
+            "name": "summit apartments llc"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 2.0,
+        "address_address2": "411",
+        "address_address1": "411 West K. Place",
+        "bedrooms": 3,
+        "meta_description": "Welcome Home to The Summit of Jenks 918-299-8600\r\n411 West K Place Jenks, OK 74037 (NE Corner of 91st (\"K\") & Elm/Peoria)\r\n\r\nWe are conveniently located in the Heart of Jenks where shopping and entertainment is right around the corner. You will love how peaceful our community is and how friendly the residents are!\r\n\r\nApplication Fee $40.00 (Per person over 18 years of age)\r\n\r\n\r\n**Only responsible for electric and renter's insurance**\r\n\r\nApartment Amenities:\r\n\u2022 Total Electric Unit (No Gas Bill!)\r\n\u2022 Spacious Closets\r\n\u2022 Stainless Steel Sinks\r\n\u2022 Garbage Disposal\r\n\u2022 Full Size Washer/Dryer Connections\r\n\r\nComplex Info:\r\n\u2022 New Exterior Paint & Siding\r\n\u2022 Interior Paint Earth Tones\r\n\u2022 Sparkling Salt Water Swimming Pool\r\n\u2022 Large Playground\r\n\u2022 School Bus Stop on Property\r\n\u2022 24/7 Laundry Facility\r\n\u2022 24-HOUR Emergency Maintenance\r\n\u2022 Manicured Grounds\r\n\u2022 Peaceful Community\r\n\r\n1/2 Mile from Riverwalk Crossing\r\nLess than 3 miles from Tulsa Hills Shopping\r\n1/2 North from Main Street Jenks\r\n1/2 Mile from Jenks High School\r\n\r\nBusiness Hours:\r\nMonday - Friday 9:30AM - 5:30PM\r\n\r\nWe do not accept Section 8 (Housing Vouchers)\r\nWe do not accept felons.",
+        "listable_uid": "0ba623b0-685d-4909-a193-60e71257313f",
+        "portfolio_address2": "",
+        "portfolio_address1": "411 West K Place",
+        "contact_email_address": "summitjenks@gmail.com",
+        "deposit": 450.0,
+        "application_fee": 40.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 16588,
+        "portfolio_city": "Jenks",
+        "appliances": "",
+        "by_the_bed": false,
+        "address_state": "OK",
+        "created_at": "2016-05-17T15:50:20.000Z",
+        "marketing_title": "3 Bedroom 2 Bath Located in the Heart of Jenks!!",
+        "unit_template_name": "The Phoenix 3/2",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/atlaspm/images/6d59f951-12be-4c91-8647-85b70b8828b7/medium.jpeg",
+        "updated_at": "2026-04-13T15:49:10.000Z",
+        "fee_label": "Application Fee",
+        "address_longitude": -95.974375,
+        "property_type": "Multi-Family",
+        "market_rent": 1399.0,
+        "customization_uuid": "df3e8704eabc11eeaab1eacc02f7ad97",
+        "affordable": false,
+        "portfolio_phone_number": "(918) 299-8600",
+        "virtual_showing": false,
+        "posted_to_internet": 16589,
+        "database_name": "atlaspm",
+        "address_postal_code": "74037",
+        "address_country": "US",
+        "available_date": "2026-06-30",
+        "portfolio_name": "Summit Apartments LLC",
+        "marketing_description": "Welcome Home to The Summit of Jenks 918-299-8600<br/>411 West K Place Jenks, OK 74037 (NE Corner of 91st (\"K\") & Elm/Peoria)<br/><br/>We are conveniently located in the Heart of Jenks where shopping and entertainment is right around the corner. You will love how peaceful our community is and how friendly the residents are!<br/><br/>Application Fee $40.00 (Per person over 18 years of age)<br/><br/><br/>**Only responsible for electric and renter's insurance**<br/><br/>Apartment Amenities:<br/>\u2022 Total Electric Unit (No Gas Bill!)<br/>\u2022 Spacious Closets<br/>\u2022 Stainless Steel Sinks<br/>\u2022 Garbage Disposal<br/>\u2022 Full Size Washer/Dryer Connections<br/><br/>Complex Info:<br/>\u2022 New Exterior Paint & Siding<br/>\u2022 Interior Paint Earth Tones<br/>\u2022 Sparkling Salt Water Swimming Pool<br/>\u2022 Large Playground<br/>\u2022 School Bus Stop on Property<br/>\u2022 24/7 Laundry Facility<br/>\u2022 24-HOUR Emergency Maintenance<br/>\u2022 Manicured Grounds<br/>\u2022 Peaceful Community<br/><br/>1/2 Mile from Riverwalk Crossing<br/>Less than 3 miles from Tulsa Hills Shopping<br/>1/2 North from Main Street Jenks<br/>1/2 Mile from Jenks High School<br/><br/>Business Hours:<br/>Monday - Friday 9:30AM - 5:30PM<br/><br/>We do not accept Section 8 (Housing Vouchers)<br/>We do not accept felons.",
+        "address_city": "Jenks",
+        "property_year_built": 1986,
+        "room_template_id": null,
+        "rent_range": [
+          1399.0,
+          1399.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Not Specified",
+        "youtube_video_id": null,
+        "portfolio_state": "OK",
+        "location": {
+          "address": {
+            "streetAddress": "411 West K. Place, 411",
+            "city": "Jenks",
+            "region": "OK",
+            "postalCode": "74037",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "36.032717",
+            "longitude": "-95.974375"
+          }
+        },
+        "schedule_showing_url": "https://atlaspm.appfolio.com/listings/showings/new?listable_uid=0ba623b0-685d-4909-a193-60e71257313f"
+      },
+      "page_item_url": "0ba623b0-685d-4909-a193-60e71257313f"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=411+West+K.+Place+612+Jenks%2C+OK+74037&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=36.042717,-95.974375",
+        "address_latitude": 36.032717,
+        "database_url": "https://atlaspm.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/atlaspm/images/ec55ab7f-9d44-49dd-b2c9-f155d57ed02a/large.jpg",
+        "rental_application_url": "https://atlaspm.appfolio.com/listings/rental_applications/new?listable_uid=8c1ce9d2-9b0a-4801-b09d-b734bc221e12&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "74037",
+        "full_address": "411 West K. Place, 612, Jenks, OK 74037",
+        "utilities": "",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/c9f7f711-cd96-4939-a412-cdac3be3d3cd/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/428bcc9f-b806-40fc-ae79-b3b6b21887d0/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/d4054c1a-0e71-4231-8298-881c3ec51b7f/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/e142ff14-2f94-4be9-a405-d2156b4ef561/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/e632c620-3f89-4442-89ce-ccd9e0348a1b/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/585a79e6-6603-4a34-9fe0-d5e72faa17d0/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/fb7e6eee-616b-4e4e-88a1-4c24b2293852/original.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/1d21ed8c-37fd-486d-976c-486ea1a59629/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/51824fab-4b06-4479-979b-eba4b5ee5c7e/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/c1e4bc8b-f5ea-45f9-91c6-a3e41c3e42ec/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/6b49c4b6-5c8d-449f-9d1d-90f24fcfaef3/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/4eb184e8-9269-452e-b4f7-105ad8f600e1/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/5e4f8a21-56f7-4032-ad0b-8faeca9dc5ad/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/4c4fd25c-add0-405e-b1c3-bf4bb7568362/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/815f0b9e-2205-4d9c-b7cd-486dfa38aa3a/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/0e41645d-8bf5-48f7-8398-04b596574cd3/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/0cd3bc00-bf43-4457-af1d-0a672bdfa86c/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/f7b5c8d1-c433-41f4-80af-025a2aa10fee/original.jpg"
+          }
+        ],
+        "portfolio_url": "http://www.summit-jenks.com/",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Not Specified",
+        "unit_template_uuid": "309db22f-939a-11ee-b6c3-02094d1ce055",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "411 West K Place",
+            "city": "Jenks",
+            "region": "OK",
+            "postalCode": "74037",
+            "country": "US"
+          }
+        },
+        "square_feet": 540.0,
+        "id": 212,
+        "property_uid": "6",
+        "payee_account_number_token": "c85f7eb4-15ea-4447-869b-2ffa1c26b768",
+        "posted_to_website_at": "2026-04-20T14:43:38.000Z",
+        "contact_phone_number": "(918) 299-8600",
+        "payee_routing_number": "103000648",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 57,
+            "name": "monthly analysis reports"
+          },
+          {
+            "id": 114,
+            "name": "mortgage recon group"
+          },
+          {
+            "id": 108,
+            "name": "properties for bulk charges update"
+          },
+          {
+            "id": 7,
+            "name": "summit"
+          },
+          {
+            "id": 91,
+            "name": "summit apartments llc"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 1.0,
+        "address_address2": "612",
+        "address_address1": "411 West K. Place",
+        "bedrooms": 1,
+        "meta_description": "Welcome Home to The Summit of Jenks 918-299-8600\r\n411 West K Place Jenks, OK 74037 (NE Corner of 91st (\"K\") & Elm/Peoria)\r\n\r\nYour new home is just minutes from the Creek Turnpike and Highway 75 for all your commuting needs and near Tulsa Hills, featuring restaurants and shopping. You will love how peaceful our community is and how friendly the residents are!\r\n\r\nCall Today to schedule a tour!\r\n----------------------------------------\r\n\r\n\r\n\u2022 Water & Trash included in Rent\r\n\u2022 Tenant pays Electric and Renters Insurance\r\n\r\nApartment Amenities:\r\n\u2022 Wi-Fi Ready\r\n\u2022 Spacious Closets\r\n\u2022 Stainless Steel Sinks\r\n\u2022 Garbage Disposal\r\n\r\n\r\nComplex Info:\r\n\u2022 New Exterior Paint & Siding\r\n\u2022 Interior Paint Earth Tones\r\n\u2022 Sparkling Salt Water Swimming Pool\r\n\u2022 Large Playground\r\n\u2022 School Bus Stop on Property\r\n\u2022 24/7 Laundry Facility\r\n\u2022 24-HOUR Emergency Maintenance\r\n\u2022 Manicured Grounds\r\n\u2022 Peaceful Community\r\n\r\n1/2 Mile from Riverwalk Crossing\r\nLess than 3 miles from Tulsa Hills Shopping\r\n1/2 North from Main Street Jenks\r\n1/2 Mile from Jenks High School\r\n\r\nBusiness Hours:\r\nMonday - Friday 9:30AM - 5:30PM\r\n\r\nWe do not accept Section 8 (Housing Vouchers)\r\nWe do not accept felons.",
+        "listable_uid": "8c1ce9d2-9b0a-4801-b09d-b734bc221e12",
+        "portfolio_address2": "",
+        "portfolio_address1": "411 West K Place",
+        "contact_email_address": "summitjenks@gmail.com",
+        "deposit": 250.0,
+        "application_fee": 40.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 16631,
+        "portfolio_city": "Jenks",
+        "appliances": "",
+        "by_the_bed": false,
+        "address_state": "OK",
+        "created_at": "2016-05-25T15:04:22.000Z",
+        "marketing_title": "Cozy 1 Bedroom",
+        "unit_template_name": "The San Antonio 1/1 (no w/d connections)",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/atlaspm/images/c9f7f711-cd96-4939-a412-cdac3be3d3cd/medium.jpeg",
+        "updated_at": "2026-04-20T14:49:08.000Z",
+        "fee_label": "Application Fee",
+        "address_longitude": -95.974375,
+        "property_type": "Multi-Family",
+        "market_rent": 899.0,
+        "customization_uuid": "df3e8704eabc11eeaab1eacc02f7ad97",
+        "affordable": false,
+        "portfolio_phone_number": "(918) 299-8600",
+        "virtual_showing": false,
+        "posted_to_internet": 16632,
+        "database_name": "atlaspm",
+        "address_postal_code": "74037",
+        "address_country": "US",
+        "available_date": "2026-05-31",
+        "portfolio_name": "Summit Apartments LLC",
+        "marketing_description": "Welcome Home to The Summit of Jenks 918-299-8600<br/>411 West K Place Jenks, OK 74037 (NE Corner of 91st (\"K\") & Elm/Peoria)<br/><br/>Your new home is just minutes from the Creek Turnpike and Highway 75 for all your commuting needs and near Tulsa Hills, featuring restaurants and shopping. You will love how peaceful our community is and how friendly the residents are!<br/><br/>Call Today to schedule a tour!<br/>----------------------------------------<br/><br/><br/>\u2022 Water & Trash included in Rent<br/>\u2022 Tenant pays Electric and Renters Insurance<br/><br/>Apartment Amenities:<br/>\u2022 Wi-Fi Ready<br/>\u2022 Spacious Closets<br/>\u2022 Stainless Steel Sinks<br/>\u2022 Garbage Disposal<br/><br/><br/>Complex Info:<br/>\u2022 New Exterior Paint & Siding<br/>\u2022 Interior Paint Earth Tones<br/>\u2022 Sparkling Salt Water Swimming Pool<br/>\u2022 Large Playground<br/>\u2022 School Bus Stop on Property<br/>\u2022 24/7 Laundry Facility<br/>\u2022 24-HOUR Emergency Maintenance<br/>\u2022 Manicured Grounds<br/>\u2022 Peaceful Community<br/><br/>1/2 Mile from Riverwalk Crossing<br/>Less than 3 miles from Tulsa Hills Shopping<br/>1/2 North from Main Street Jenks<br/>1/2 Mile from Jenks High School<br/><br/>Business Hours:<br/>Monday - Friday 9:30AM - 5:30PM<br/><br/>We do not accept Section 8 (Housing Vouchers)<br/>We do not accept felons.",
+        "address_city": "Jenks",
+        "property_year_built": 1986,
+        "room_template_id": null,
+        "rent_range": [
+          899.0,
+          899.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "OK",
+        "location": {
+          "address": {
+            "streetAddress": "411 West K. Place, 612",
+            "city": "Jenks",
+            "region": "OK",
+            "postalCode": "74037",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "36.032717",
+            "longitude": "-95.974375"
+          }
+        },
+        "schedule_showing_url": "https://atlaspm.appfolio.com/listings/showings/new?listable_uid=8c1ce9d2-9b0a-4801-b09d-b734bc221e12"
+      },
+      "page_item_url": "8c1ce9d2-9b0a-4801-b09d-b734bc221e12"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=411+West+K.+Place+505+Jenks%2C+OK+74037&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=36.042717,-95.974375",
+        "address_latitude": 36.032717,
+        "database_url": "https://atlaspm.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/atlaspm/images/ec55ab7f-9d44-49dd-b2c9-f155d57ed02a/large.jpg",
+        "rental_application_url": "https://atlaspm.appfolio.com/listings/rental_applications/new?listable_uid=f365c55b-db4a-434f-b4c0-25f915881289&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "74037",
+        "full_address": "411 West K. Place, 505, Jenks, OK 74037",
+        "utilities": "",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/af4e7088-a1db-4a03-802a-f1f9fbe64fe2/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/e7d958e0-937e-4ab9-add3-84e62be4f5e4/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/7bb5f2be-979b-41d1-871e-7b270d056255/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/579fd5de-4bb9-416e-9c71-2bb32a04caa1/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/f79aa964-cfe2-43f2-b3fb-46046d7fdbd4/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/08dce34f-f6de-4f64-a50e-67b9abba25c5/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/845ba9b9-30e9-4c06-9658-646b87a69365/large.jpeg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/9c896afd-f728-4f1b-83f3-87fde68ddd42/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/4eb184e8-9269-452e-b4f7-105ad8f600e1/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/5e4f8a21-56f7-4032-ad0b-8faeca9dc5ad/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/4c4fd25c-add0-405e-b1c3-bf4bb7568362/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/815f0b9e-2205-4d9c-b7cd-486dfa38aa3a/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/0e41645d-8bf5-48f7-8398-04b596574cd3/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/0cd3bc00-bf43-4457-af1d-0a672bdfa86c/original.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/leads_marketing_photos/f7b5c8d1-c433-41f4-80af-025a2aa10fee/original.jpg"
+          }
+        ],
+        "portfolio_url": "http://www.summit-jenks.com/",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Not Specified",
+        "unit_template_uuid": "f8af5d58-960e-11ee-b6c3-02094d1ce055",
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "411 West K Place",
+            "city": "Jenks",
+            "region": "OK",
+            "postalCode": "74037",
+            "country": "US"
+          }
+        },
+        "square_feet": 860.0,
+        "id": 360,
+        "property_uid": "6",
+        "payee_account_number_token": "c85f7eb4-15ea-4447-869b-2ffa1c26b768",
+        "posted_to_website_at": "2026-05-15T16:41:59.000Z",
+        "contact_phone_number": "(918) 299-8600",
+        "payee_routing_number": "103000648",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 57,
+            "name": "monthly analysis reports"
+          },
+          {
+            "id": 114,
+            "name": "mortgage recon group"
+          },
+          {
+            "id": 108,
+            "name": "properties for bulk charges update"
+          },
+          {
+            "id": 7,
+            "name": "summit"
+          },
+          {
+            "id": 91,
+            "name": "summit apartments llc"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 2.0,
+        "address_address2": "505",
+        "address_address1": "411 West K. Place",
+        "bedrooms": 2,
+        "meta_description": "Welcome Home to The Summit of Jenks 918-299-8600\r\n411 West K Place Jenks, OK 74037 (NE Corner of 91st (\"K\") & Elm/Peoria)\r\n\r\nWe are conveniently located in the Heart of Jenks where shopping and entertainment is right around the corner. You will love how peaceful our community is and how friendly the residents are!\r\n\r\nApplication Fee $40.00 (Per person over 18 years of age)\r\n\r\n\r\n**Only responsible for electric and renter's insurance**\r\n\r\nApartment Amenities:\r\n\u2022 Total Electric Unit (No Gas Bill!)\r\n\u2022 Spacious Closets\r\n\u2022 Stainless Steel Sinks\r\n\u2022 Garbage Disposal\r\n\u2022 Full Size Washer/Dryer Connections\r\n\r\nComplex Info:\r\n\u2022 New Exterior Paint & Siding\r\n\u2022 Interior Paint Earth Tones\r\n\u2022 Sparkling Salt Water Swimming Pool\r\n\u2022 Large Playground\r\n\u2022 School Bus Stop on Property\r\n\u2022 24/7 Laundry Facility\r\n\u2022 24-HOUR Emergency Maintenance\r\n\u2022 Manicured Grounds\r\n\u2022 Peaceful Community\r\n\r\n1/2 Mile from Riverwalk Crossing\r\nLess than 3 miles from Tulsa Hills Shopping\r\n1/2 North from Main Street Jenks\r\n1/2 Mile from Jenks High School\r\n\r\nBusiness Hours:\r\nMonday - Friday 9:30AM - 5:30PM\r\n\r\nWe do not accept Section 8 (Housing Vouchers)\r\nWe do not accept felons.",
+        "listable_uid": "f365c55b-db4a-434f-b4c0-25f915881289",
+        "portfolio_address2": "",
+        "portfolio_address1": "411 West K Place",
+        "contact_email_address": "summitjenks@gmail.com",
+        "deposit": 350.0,
+        "application_fee": 40.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 16783,
+        "portfolio_city": "Jenks",
+        "appliances": "",
+        "by_the_bed": false,
+        "address_state": "OK",
+        "created_at": "2016-10-06T19:50:14.000Z",
+        "marketing_title": "2 Bedroom 2 Bath Located in the Heart of Jenks!!",
+        "unit_template_name": "The Atlanta 2/2",
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/atlaspm/images/af4e7088-a1db-4a03-802a-f1f9fbe64fe2/medium.jpeg",
+        "updated_at": "2026-05-15T17:27:19.000Z",
+        "fee_label": "Application Fee",
+        "address_longitude": -95.974375,
+        "property_type": "Multi-Family",
+        "market_rent": 1079.0,
+        "customization_uuid": "df3e8704eabc11eeaab1eacc02f7ad97",
+        "affordable": false,
+        "portfolio_phone_number": "(918) 299-8600",
+        "virtual_showing": false,
+        "posted_to_internet": 16784,
+        "database_name": "atlaspm",
+        "address_postal_code": "74037",
+        "address_country": "US",
+        "available_date": "2026-07-15",
+        "portfolio_name": "Summit Apartments LLC",
+        "marketing_description": "Welcome Home to The Summit of Jenks 918-299-8600<br/>411 West K Place Jenks, OK 74037 (NE Corner of 91st (\"K\") & Elm/Peoria)<br/><br/>We are conveniently located in the Heart of Jenks where shopping and entertainment is right around the corner. You will love how peaceful our community is and how friendly the residents are!<br/><br/>Application Fee $40.00 (Per person over 18 years of age)<br/><br/><br/>**Only responsible for electric and renter's insurance**<br/><br/>Apartment Amenities:<br/>\u2022 Total Electric Unit (No Gas Bill!)<br/>\u2022 Spacious Closets<br/>\u2022 Stainless Steel Sinks<br/>\u2022 Garbage Disposal<br/>\u2022 Full Size Washer/Dryer Connections<br/><br/>Complex Info:<br/>\u2022 New Exterior Paint & Siding<br/>\u2022 Interior Paint Earth Tones<br/>\u2022 Sparkling Salt Water Swimming Pool<br/>\u2022 Large Playground<br/>\u2022 School Bus Stop on Property<br/>\u2022 24/7 Laundry Facility<br/>\u2022 24-HOUR Emergency Maintenance<br/>\u2022 Manicured Grounds<br/>\u2022 Peaceful Community<br/><br/>1/2 Mile from Riverwalk Crossing<br/>Less than 3 miles from Tulsa Hills Shopping<br/>1/2 North from Main Street Jenks<br/>1/2 Mile from Jenks High School<br/><br/>Business Hours:<br/>Monday - Friday 9:30AM - 5:30PM<br/><br/>We do not accept Section 8 (Housing Vouchers)<br/>We do not accept felons.",
+        "address_city": "Jenks",
+        "property_year_built": 1986,
+        "room_template_id": null,
+        "rent_range": [
+          1079.0,
+          1079.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Not Specified",
+        "youtube_video_id": null,
+        "portfolio_state": "OK",
+        "location": {
+          "address": {
+            "streetAddress": "411 West K. Place, 505",
+            "city": "Jenks",
+            "region": "OK",
+            "postalCode": "74037",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "36.032717",
+            "longitude": "-95.974375"
+          }
+        },
+        "schedule_showing_url": "https://atlaspm.appfolio.com/listings/showings/new?listable_uid=f365c55b-db4a-434f-b4c0-25f915881289"
+      },
+      "page_item_url": "f365c55b-db4a-434f-b4c0-25f915881289"
+    },
+    {
+      "data": {
+        "google_map_url": "http://maps.google.com/maps?f=q&amp;source=s_q&amp;hl=en&amp;q=4424+S.+109th+East+Avenue+402+Tulsa%2C+OK+74146&amp;ie=UTF8&amp;z=14&amp;output=embed&amp;iwloc=A&amp;ll=36.1099813,-95.8560734",
+        "address_latitude": 36.0999813,
+        "database_url": "https://atlaspm.appfolio.com/",
+        "allow_guest_cards": true,
+        "logo_url": "https://images.cdn.appfolio.com/atlaspm/images/1f040632-92f8-41c5-86f8-4978809d6e93/large.png",
+        "rental_application_url": "https://atlaspm.appfolio.com/listings/rental_applications/new?listable_uid=7fa5ab3d-a932-4564-9311-403cbae86db5&source=Website",
+        "available": true,
+        "advertised_lease_term": null,
+        "portfolio_postal_code": "74146",
+        "full_address": "4424 S. 109th East Avenue, 402, Tulsa, OK 74146",
+        "utilities": "",
+        "photos": [
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/37e63fe5-0d5c-4aff-8bab-5291e8a98ca9/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/c2b60508-d2e0-458b-a5f9-4b045660c487/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/c689895e-0fd5-422f-88f1-589fefd1baae/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/3f7d7476-9e7f-4463-bea5-5e3e4caef5bb/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/619230bd-4fb2-42e4-9df2-23a14ce11353/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/5e79c324-5ab5-4591-a195-d42a122a88fd/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/d1624604-ae10-490e-9031-3bb20041ac60/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/173306bc-67b7-469f-8178-9559401c086e/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/5bd322fb-aba1-4b47-920b-5b2d7fd7b7fe/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/8710a002-99e2-43eb-8277-bf6f0d412304/large.png"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/f1463c73-6a4b-4533-b2b4-d6ab4780c66a/large.jpg"
+          },
+          {
+            "url": "https://images.cdn.appfolio.com/atlaspm/images/9a74e735-1c8b-45b0-abe1-b68005cc61e0/large.jpg"
+          }
+        ],
+        "portfolio_url": "www.towercrossing.net",
+        "total_monthly_price_range": [],
+        "fee_values": [],
+        "dogs": "Small dogs allowed",
+        "unit_template_uuid": null,
+        "portfolio_location": {
+          "address": {
+            "streetAddress": "4044 South 109th East Avenue",
+            "city": "Tulsa",
+            "region": "OK",
+            "postalCode": "74146",
+            "country": "US"
+          }
+        },
+        "square_feet": 500.0,
+        "id": 886,
+        "property_uid": "7",
+        "payee_account_number_token": "ddafdc37-e629-4331-a872-36b13965e006",
+        "posted_to_website_at": "2026-05-19T14:32:52.000Z",
+        "contact_phone_number": "(918) 622-4043",
+        "payee_routing_number": "103000648",
+        "revenue_management_property": false,
+        "property_lists": [
+          {
+            "id": 65,
+            "name": "fully managed properties"
+          },
+          {
+            "id": 33,
+            "name": "managed complexes"
+          },
+          {
+            "id": 57,
+            "name": "monthly analysis reports"
+          },
+          {
+            "id": 114,
+            "name": "mortgage recon group"
+          },
+          {
+            "id": 108,
+            "name": "properties for bulk charges update"
+          },
+          {
+            "id": 15,
+            "name": "rent tulsa"
+          },
+          {
+            "id": 3,
+            "name": "tower crossing"
+          },
+          {
+            "id": 4,
+            "name": "tower crossing apartments"
+          }
+        ],
+        "youtube_video_url": null,
+        "rent_or_starting_at": "RENT",
+        "bathrooms": 1.0,
+        "address_address2": "402",
+        "address_address1": "4424 S. 109th East Avenue",
+        "bedrooms": 0,
+        "meta_description": "Discover a bright and open 500 sq. ft. floorplan featuring modern amenities and exceptional convenience:\r\n\r\nApartment Features:\r\n\r\n\u2022Granite countertops\r\n\u2022Downstairs apartment\r\n\u2022Private patio\r\n\u2022Next to office/laundry\r\n\u2022All bills included option available for $904/mon (includes water, trash and electricity)\r\n\u2022High-speed internet (250MB/s) available at a reduced rate\r\n\u2022Fully equipped kitchen: dishwasher, refrigerator, stove, and garbage disposal\r\n\u2022Elegant vinyl wood flooring in the kitchen, dining, and bathroom\r\n\u2022Spacious bedroom closet and entryway storage\r\n\u2022Central heating and air conditioning\r\n\u2022Cable-ready for easy setup\r\n\r\nCommunity Amenities:\r\n\u2022Located in the Union School District (McAuliffe Elementary)\r\n\u2022On-site fitness room and saltwater pool with sundeck\r\n\u202224/7 access to the on-site laundry facility\r\n\u202224-hour emergency maintenance service\r\n\u2022Outdoor charcoal grills for residents\r\n\u2022Bilingual office staff and courtesy patrol for peace of mind\r\n\r\nRental Information:\r\n\u2022Deposits starting at $150\r\n\u2022Pet-friendly community (pets under 25lbs)\r\n\u2022Application process with same-day approval\r\n\r\nConveniently located just off the 169 highway and near supermarkets, gyms, restaurants, and parks, this apartment offers both comfort and accessibility.\r\n\r\nNote: Features and availability may vary.",
+        "listable_uid": "7fa5ab3d-a932-4564-9311-403cbae86db5",
+        "portfolio_address2": "",
+        "portfolio_address1": "4044 South 109th East Avenue",
+        "contact_email_address": "manager@towercrossing.net",
+        "deposit": 150.0,
+        "application_fee": 40.0,
+        "admin_fee_payee_account_number_token": null,
+        "allow_submitting_online_applications": true,
+        "amenities": "Downstairs, granite countertops, Private Patio, Facing Parking Lot, Fitness Room, All Bills Paid Option, New Carpet 2022",
+        "admin_fee_payee_routing_number": null,
+        "move_in_prices": null,
+        "admin_fee": null,
+        "posted_to_website": 16791,
+        "portfolio_city": "Tulsa",
+        "appliances": "",
+        "by_the_bed": false,
+        "address_state": "OK",
+        "created_at": "2018-05-17T14:00:14.000Z",
+        "marketing_title": "Stunning Studio Apartment with Granite Countertops! Private Patio Overlooking the Parking Lot! High Speed Internet Available!",
+        "unit_template_name": null,
+        "pre_leasing_term_id": null,
+        "default_photo_thumbnail_url": "https://images.cdn.appfolio.com/atlaspm/images/37e63fe5-0d5c-4aff-8bab-5291e8a98ca9/medium.jpg",
+        "updated_at": "2026-05-21T19:27:35.000Z",
+        "fee_label": "Application Fee",
+        "address_longitude": -95.8560734,
+        "property_type": "Multi-Family",
+        "market_rent": 774.0,
+        "customization_uuid": "df3e8704eabc11eeaab1eacc02f7ad97",
+        "affordable": false,
+        "portfolio_phone_number": "(918) 622-4043",
+        "virtual_showing": false,
+        "posted_to_internet": 16788,
+        "database_name": "atlaspm",
+        "address_postal_code": "74146",
+        "address_country": "US",
+        "available_date": "2026-05-31",
+        "portfolio_name": "Tower Crossing Apartments",
+        "marketing_description": "Discover a bright and open 500 sq. ft. floorplan featuring modern amenities and exceptional convenience:<br/><br/>Apartment Features:<br/><br/>\u2022Granite countertops<br/>\u2022Downstairs apartment<br/>\u2022Private patio<br/>\u2022Next to office/laundry<br/>\u2022All bills included option available for $904/mon (includes water, trash and electricity)<br/>\u2022High-speed internet (250MB/s) available at a reduced rate<br/>\u2022Fully equipped kitchen: dishwasher, refrigerator, stove, and garbage disposal<br/>\u2022Elegant vinyl wood flooring in the kitchen, dining, and bathroom<br/>\u2022Spacious bedroom closet and entryway storage<br/>\u2022Central heating and air conditioning<br/>\u2022Cable-ready for easy setup<br/><br/>Community Amenities:<br/>\u2022Located in the Union School District (McAuliffe Elementary)<br/>\u2022On-site fitness room and saltwater pool with sundeck<br/>\u202224/7 access to the on-site laundry facility<br/>\u202224-hour emergency maintenance service<br/>\u2022Outdoor charcoal grills for residents<br/>\u2022Bilingual office staff and courtesy patrol for peace of mind<br/><br/>Rental Information:<br/>\u2022Deposits starting at $150<br/>\u2022Pet-friendly community (pets under 25lbs)<br/>\u2022Application process with same-day approval<br/><br/>Conveniently located just off the 169 highway and near supermarkets, gyms, restaurants, and parks, this apartment offers both comfort and accessibility.<br/><br/>Note: Features and availability may vary.",
+        "address_city": "Tulsa",
+        "property_year_built": 1980,
+        "room_template_id": null,
+        "rent_range": [
+          774.0,
+          774.0
+        ],
+        "bedroom_type": null,
+        "portfolio_country": "US",
+        "cats": "Cats allowed",
+        "youtube_video_id": null,
+        "portfolio_state": "OK",
+        "location": {
+          "address": {
+            "streetAddress": "4424 S. 109th East Avenue, 402",
+            "city": "Tulsa",
+            "region": "OK",
+            "postalCode": "74146",
+            "country": "US"
+          },
+          "geo": {
+            "latitude": "36.0999813",
+            "longitude": "-95.8560734"
+          }
+        },
+        "schedule_showing_url": "https://atlaspm.appfolio.com/listings/showings/new?listable_uid=7fa5ab3d-a932-4564-9311-403cbae86db5"
+      },
+      "page_item_url": "7fa5ab3d-a932-4564-9311-403cbae86db5"
+    }
+  ],
+  "fields": null,
+  "language": "ENGLISH",
+  "filters": null,
+  "page": {
+    "pageSize": 100,
+    "pageNumber": 0,
+    "totalPages": 1,
+    "totalItems": 5
+  },
+  "sortBy": [],
+  "search": null
+}

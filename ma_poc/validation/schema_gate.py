@@ -130,17 +130,67 @@ def _is_positive_numeric(value: Any) -> bool:
     return False
 
 
+def _rent_gap_documented(unit: dict[str, Any]) -> bool:
+    """True when an adapter has verified-and-flagged that the OPERATOR
+    does not publish rent for this unit.
+
+    Parallel to :func:`_sqft_gap_documented`. The flag is set by an
+    adapter only when 100% of extracted units have no rent value AND
+    the structure is clearly unit-level (≥3 units with unit_id +
+    area + plan_name). The strongest signal in the wild is SightMap's
+    ``show_pricing=true`` config with every unit's ``price: null`` —
+    the operator enabled the price column in the widget but didn't
+    populate prices, often because they prefer "rent on contact"
+    leasing flow.
+
+    Treating a documented gap as rent-present here stops the
+    ``no_rent`` retry from firing and stops the verdict layer from
+    downgrading to SUCCESS_PLAN_LEVEL — the unit ships as honest
+    SUCCESS with transparent ``data_gaps=["rent"]``.
+    """
+    gaps = unit.get("data_gaps")
+    if isinstance(gaps, (list, tuple)) and "rent" in gaps:
+        return True
+    flag = str(unit.get("data_quality_flag") or "").upper()
+    return flag == "RENT_NOT_PUBLISHED"
+
+
 def _has_rent(unit: dict[str, Any]) -> bool:
-    """True when the unit carries at least one numeric rent value."""
-    return any(_is_positive_numeric(unit.get(k)) for k in _RENT_FIELDS)
+    """True when the unit carries at least one numeric rent value
+    OR carries a documented rent data gap (operator did not publish)."""
+    if any(_is_positive_numeric(unit.get(k)) for k in _RENT_FIELDS):
+        return True
+    return _rent_gap_documented(unit)
 
 
 _AREA_FIELDS: tuple[str, ...] = ("sqft", "area", "_sqft", "size", "square_feet")
 
 
+def _sqft_gap_documented(unit: dict[str, Any]) -> bool:
+    """True when an adapter has verified-and-flagged that the OPERATOR
+    does not publish sqft for this unit.
+
+    The flag is set by an adapter only after exhausting all enrichment
+    paths (e.g. for SecureCafe: plan-name regex, WP-cards, apts247 API
+    all returned nothing). Treating a documented gap as area-present
+    here stops the ``no_area`` retry from firing on legitimately-
+    incomplete-but-extracted units — the property ships as SUCCESS with
+    transparent ``data_gaps=["sqft"]`` instead of being marketed as
+    SUCCESS_PLAN_LEVEL when the operator simply isn't publishing it.
+    """
+    gaps = unit.get("data_gaps")
+    if isinstance(gaps, (list, tuple)) and "sqft" in gaps:
+        return True
+    flag = str(unit.get("data_quality_flag") or "").upper()
+    return flag == "SQFT_NOT_PUBLISHED"
+
+
 def _has_area(unit: dict[str, Any]) -> bool:
-    """True when the unit carries at least one numeric sqft/area value."""
-    return any(_is_positive_numeric(unit.get(k)) for k in _AREA_FIELDS)
+    """True when the unit carries at least one numeric sqft/area value
+    OR carries a documented sqft data gap (operator did not publish)."""
+    if any(_is_positive_numeric(unit.get(k)) for k in _AREA_FIELDS):
+        return True
+    return _sqft_gap_documented(unit)
 
 
 def property_has_rent_signal(
