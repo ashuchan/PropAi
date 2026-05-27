@@ -25,6 +25,11 @@ class ScrapeOutcome(StrEnum):
     SKIPPED = "SKIPPED"
     FAILED = "FAILED"
     PARTIAL = "PARTIAL"
+    # 2026-05-27: operator-transparent "no available units" / waitlist /
+    # fully-leased state. The scrape succeeded and we captured the
+    # operator's stated zero-inventory state — distinct from FAILED.
+    # Mirrors Verdict.SUCCESS_NO_AVAILABILITY at the audit-log layer.
+    SUCCESS_NO_INVENTORY = "SUCCESS_NO_INVENTORY"
 
 
 class ScrapeEvent(BaseModel):
