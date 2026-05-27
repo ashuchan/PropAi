@@ -54,6 +54,13 @@ _NO_AVAILABILITY_PHRASES: tuple[str, ...] = (
     r"100%\s+leased",
     r"wait\s*list\s+only",
     r"join\s+(?:our|the)\s+wait\s*list",
+    # 2026-05-27 RentCafe waitlist cohort (612-failure-grind row 2). Three
+    # additional phrases observed on livebrez / larsonapts / 201walnut and
+    # ~31 sibling RentCafe properties where the operator publishes a true
+    # zero-inventory state via a CTA or empty-search banner.
+    r"add\s+to\s+wait\s*list",
+    r"no\s+listings?\s+matching",
+    r"currently\s+no\s+available",
 )
 
 # Pre-compile a single combined regex. ``re.IGNORECASE`` covers the

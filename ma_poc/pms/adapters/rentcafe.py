@@ -539,6 +539,31 @@ class RentCafeAdapter:
                     f"{str(nestin_exc)[:120]}"
                 )
 
+        # 2026-05-27 (612-failure-grind row 2): anchor-walk fallback. ~34
+        # RentCafe properties publish units only at a vanity sub-path
+        # (``/availability``, ``/floor-plans``, etc.) that the well-known
+        # tiers above don't probe. Mirror entrata_deep_probe's homepage
+        # anchor regex, fetch each candidate, and try the existing parsers.
+        try:
+            anchor_units = await _try_rentcafe_anchor_walk(page, ctx, result)
+        except Exception as aw_exc:  # never crash adapter
+            anchor_units = []
+            result.errors.append(
+                f"rentcafe-anchor-walk-error: {type(aw_exc).__name__}: "
+                f"{str(aw_exc)[:120]}"
+            )
+        if anchor_units:
+            from ma_poc.extraction.post_process import post_process
+            pp = post_process(
+                anchor_units, property_id=getattr(ctx, "property_id", None)
+            )
+            if pp.n_admitted > 0:
+                result.units = pp.admitted
+                result.plan_summaries = pp.plan_summaries
+                result.tier_used = f"{_TIER_BASE}_ANCHOR_WALK"
+                result.confidence = min(0.88, 0.65 + 0.04 * pp.n_admitted)
+                return result
+
         # Failure path: re-stamp tier_used with a structured sub-code so the
         # downstream report can distinguish misrouting from genuine zero data.
         tier_code, err_msg = _classify_rentcafe_failure(api_responses)
@@ -910,6 +935,146 @@ def parse_securecafe_availableunits(html: str, source_url: str) -> list[dict[str
                 )
             )
     return units
+
+
+# ── RentCafe anchor-walk fallback ───────────────────────────────────────────
+# 2026-05-27 (612-failure-grind row 2). Out of the box, the RentCafe adapter
+# only drills to the well-known endpoints it already knows about:
+# ``/wp-json/middleware/v1/getFloorplans/``, securecafe ``availableunits.aspx``,
+# the rentcafe-hosted ``fp-unit`` table, and the Nestin per-plan layout. The
+# 612-failure-grind refined probe rescued 34 RentCafe properties that publish
+# units at a vanity sub-path discoverable only from the homepage's own
+# anchors: ``/availability``, ``/apartments``, ``/floor-plans``,
+# ``/rentcafe-listings``, ``/listings``. This helper mirrors the
+# ``entrata_deep_probe.py`` anchor-walk: regex the homepage for those paths,
+# fetch the top candidates via curl_cffi, and feed the strongest response
+# into the existing RentCafe parsers (hosted-table ``fp-unit`` or securecafe
+# ``AvailUnitRow``). It's the cheapest possible drill — single regex scan,
+# capped at 6 candidate URLs, capped at the first that yields a parsable
+# unit table.
+
+_RC_ANCHOR_DRILL_RE = re.compile(
+    r"""href=["']([^"']*?/(?:availability|apartments|floor-?plans|"""
+    r"""rentcafe-listings|listings|availableunits)/?[^"']*)["']""",
+    re.IGNORECASE,
+)
+
+
+def _discover_rentcafe_anchors(html: str, origin: str, base_url: str) -> list[str]:
+    """Return de-duplicated absolute URLs for drill candidates found in *html*.
+
+    Only same-host anchors are returned. Caller is expected to cap the
+    candidate list (see ``_try_rentcafe_anchor_walk``).
+    """
+    if not html or not origin:
+        return []
+    from urllib.parse import urljoin, urlparse
+
+    try:
+        host = urlparse(origin).netloc
+    except Exception:
+        return []
+    if not host:
+        return []
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in _RC_ANCHOR_DRILL_RE.finditer(html):
+        href = m.group(1).strip()
+        if not href:
+            continue
+        if href.startswith(("http://", "https://")):
+            full = href
+        elif href.startswith("/"):
+            full = urljoin(origin + "/", href.lstrip("/"))
+        else:
+            full = urljoin(base_url or (origin + "/"), href)
+        try:
+            ph = urlparse(full).netloc
+        except Exception:
+            continue
+        if ph != host:
+            continue
+        # Skip obvious dead-ends.
+        low = full.lower()
+        if "/module/" in low or "/applic" in low or "#" in low.split("?", 1)[0]:
+            if "#" in low.split("?", 1)[0]:
+                full = full.split("#", 1)[0]
+            else:
+                continue
+        if full in seen:
+            continue
+        seen.add(full)
+        out.append(full)
+    return out
+
+
+async def _try_rentcafe_anchor_walk(
+    page: Page,
+    ctx: AdapterContext,
+    result: AdapterResult,
+) -> list[dict[str, Any]]:
+    """Walk anchor-discovered availability paths from the rendered homepage.
+
+    Tries the well-known RentCafe parsers on each candidate. Returns parsed
+    unit dicts on first hit, ``[]`` on any failure. Never raises.
+    """
+    try:
+        from ma_poc.pms.adapters._probe import probe_get
+    except ImportError:
+        return []
+    try:
+        from ma_poc.pms.adapters.generic import _get_page_html
+        html = await _get_page_html(page, ctx)
+    except Exception:
+        html = ""
+    if not html:
+        fr = getattr(ctx, "fetch_result", None)
+        body = getattr(fr, "body", None) if fr is not None else None
+        if isinstance(body, bytes):
+            html = body.decode("utf-8", errors="replace")
+        elif isinstance(body, str):
+            html = body
+    if not html:
+        return []
+
+    origin = _origin_from_ctx(ctx)
+    base_url = str(getattr(ctx, "base_url", "") or "")
+    candidates = _discover_rentcafe_anchors(html, origin, base_url)
+    if not candidates:
+        return []
+
+    # Cap to 6 to bound the request burst (matches entrata_deep_probe).
+    for cand in candidates[:6]:
+        try:
+            r = probe_get(cand, timeout=20)
+        except Exception as exc:
+            result.errors.append(
+                f"rentcafe-anchor-walk-fetch-error[{cand}]: "
+                f"{type(exc).__name__}: {str(exc)[:80]}"
+            )
+            continue
+        if getattr(r, "status_code", 0) != 200:
+            continue
+        body_text = getattr(r, "text", "") or ""
+        if len(body_text) < 1500:
+            continue
+
+        # SecureCafe availableunits markup — reuse existing parser.
+        if "AvailUnitRow" in body_text:
+            units = parse_securecafe_availableunits(body_text, cand)
+            if units:
+                result.winning_url = cand
+                return units
+
+        # RentCafe-hosted SSR fp-unit table — reuse existing parser.
+        if "fp-unit" in body_text:
+            units = parse_rentcafe_hosted_table(body_text, cand)
+            if units:
+                result.winning_url = cand
+                return units
+
+    return []
 
 
 async def _try_rentcafe_securecafe_probe(
