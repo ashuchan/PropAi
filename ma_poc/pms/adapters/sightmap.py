@@ -1401,14 +1401,38 @@ async def _try_sightmap_iframe_fallback(
     html = _entry_html_from_ctx(ctx)
     if not html:
         return []
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/124.0.0.0 Safari/537.36"
-        ),
+
+    # 2026-05-27 chip: operators that embed sightmap.com/embed/{id} on a
+    # non-sightmap host return richer unit-level JSON when the embed
+    # request carries a Referer pointing at the operator site (the
+    # SightMap CDN gates some payload fields by Referer origin). Derive
+    # the operator origin from ctx.base_url and thread it as Referer on
+    # both the embed-page fetch and the downstream api fetch. UA is
+    # bumped to Chrome 120 to match the impersonation profile already
+    # used in _try_direct_sightmap_api_probe.
+    operator_referer: str | None = None
+    try:
+        from urllib.parse import urlparse as _urlparse
+        _p = _urlparse(getattr(ctx, "base_url", "") or "")
+        if _p.scheme and _p.netloc and "sightmap.com" not in _p.netloc:
+            operator_referer = f"{_p.scheme}://{_p.netloc}/"
+    except Exception:
+        operator_referer = None
+
+    chrome120_ua = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
+    base_headers = {
+        "User-Agent": chrome120_ua,
         "Accept": "text/html,application/json,*/*;q=0.8",
     }
+    embed_headers = dict(base_headers)
+    if operator_referer:
+        embed_headers["Referer"] = operator_referer
+    # Local alias for back-compat with the rest of this function.
+    headers = embed_headers
 
     # Pass 1: direct API URLs inline in HTML (Angular SPA bundle pattern).
     # Faster than the embed-page indirection and works when the iframe
@@ -1456,13 +1480,19 @@ async def _try_sightmap_iframe_fallback(
         import httpx
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as c:
             embed_url = f"https://sightmap.com/embed/{embed_code}"
-            er = await c.get(embed_url, headers=headers)
+            er = await c.get(embed_url, headers=embed_headers)
             if er.status_code != 200 or not er.text:
                 return []
             api_url = extract_sightmap_api_url(er.text)
             if not api_url:
                 return []
-            ar = await c.get(api_url, headers=headers)
+            # API call: Referer is the embed URL itself (mirrors the
+            # browser's iframe → XHR chain).
+            api_headers = dict(base_headers)
+            api_headers["Referer"] = embed_url
+            if operator_referer:
+                api_headers["Origin"] = operator_referer.rstrip("/")
+            ar = await c.get(api_url, headers=api_headers)
             if ar.status_code != 200:
                 return []
             try:
