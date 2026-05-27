@@ -211,6 +211,115 @@ def is_empty_inventory_page(
     return True
 
 
+# ── Pre-leasing / interest-list predicate (2026-05-27 follow-up) ────────────
+
+# Operator-transparent "we have nothing to lease yet but here's our
+# interest form" signals. ~30 sites in the 612-failure-grind cohort
+# publish a homepage with one of these phrases and no inventory module.
+# Daily-rescrape flips to SUCCESS the moment they wire up listings.
+_PRE_LEASING_PHRASES: tuple[str, ...] = (
+    r"coming\s+soon",
+    r"pre[\-\s]?leasing",
+    r"(?:join|sign\s+up\s+for)\s+(?:our|the)\s+"
+    r"(?:interest|priority|vip|wait)\s+list",
+    r"vip\s+(?:list|signup|sign[-\s]?up)",
+    r"reserve\s+your\s+(?:unit|home|spot|apartment)",
+    r"(?:opening|leasing\s+begins?)\s+"
+    r"(?:soon|fall|spring|summer|winter|\d{4})",
+)
+
+_PRE_LEASING_RE = re.compile(
+    "|".join(f"(?:{p})" for p in _PRE_LEASING_PHRASES),
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _strip_to_text(html: str) -> str:
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = text.replace(" ", " ").replace("&nbsp;", " ")
+    return re.sub(r"\s+", " ", text)
+
+
+def is_pre_leasing_site(html: str) -> bool:
+    """True when the page carries a clear pre-leasing / interest-list
+    statement that is NOT inside a hypothetical clause.
+
+    Same shape as ``detect_no_availability`` but with a distinct phrase
+    set — pre-leasing sites typically don't say "no units available,"
+    they say "coming soon" / "join the VIP list."
+    """
+    if not html:
+        return False
+    text = _strip_to_text(html)
+    for m in _PRE_LEASING_RE.finditer(text):
+        prefix = text[max(0, m.start() - 60) : m.start()]
+        if _HYPOTHETICAL_PREFIX_RE.search(prefix):
+            continue
+        return True
+    return False
+
+
+def matched_phrase_for_preleasing(html: str) -> str | None:
+    """First pre-leasing phrase match (lower-cased, whitespace-collapsed)."""
+    if not html:
+        return None
+    text = _strip_to_text(html)
+    for m in _PRE_LEASING_RE.finditer(text):
+        prefix = text[max(0, m.start() - 60) : m.start()]
+        if _HYPOTHETICAL_PREFIX_RE.search(prefix):
+            continue
+        return m.group(0).lower().strip()
+    return None
+
+
+# ── Brochure-only-site predicate (2026-05-27 follow-up) ─────────────────────
+
+# Apartment/community keywords on the homepage — guards against
+# classifying unrelated non-housing sites (the resolver could have
+# landed on a parked domain).
+_HOUSING_KEYWORDS_RE = re.compile(
+    r"\bapartments?\b|\bcommunity\b|\bresidences?\b|\bleasing\b"
+    r"|\bfloor\s*plans?\b|\brentals?\b|\bhomes?\s+for\s+(?:rent|lease)\b",
+    re.IGNORECASE,
+)
+
+
+def is_brochure_only_site(
+    home_html: str,
+    inventory_paths_attempted: list[str] | tuple[str, ...] | None,
+    inventory_pages_reachable: list[str] | tuple[str, ...] | None,
+    *,
+    min_html_bytes: int = 2500,
+) -> bool:
+    """True when the homepage looks like a healthy marketing brochure
+    BUT no inventory subpath ever returned a usable page.
+
+    Args:
+      home_html: rendered homepage HTML.
+      inventory_paths_attempted: paths the resolver/link-hop tried
+        (e.g. ``["/floor-plans", "/availability", "/apartments"]``).
+        Must be non-empty — without an attempt we can't conclude the
+        operator is brochure-only.
+      inventory_pages_reachable: subset of the attempted paths that
+        returned 200 with inventory-page keywords. MUST be empty for
+        this predicate to fire — if ANY reachable inventory page
+        exists, the empty-inventory-page predicate is the right caller.
+
+    Returns False on short HTML, no attempts, any reachable inventory
+    page, or no housing keywords on the homepage.
+    """
+    if not home_html or len(home_html) < min_html_bytes:
+        return False
+    if not inventory_paths_attempted:
+        return False
+    if inventory_pages_reachable:
+        return False
+    text = _strip_to_text(home_html)
+    if not _HOUSING_KEYWORDS_RE.search(text):
+        return False
+    return True
+
+
 # ── Placeholder synthesis ───────────────────────────────────────────────────
 
 

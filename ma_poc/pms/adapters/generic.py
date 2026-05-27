@@ -3840,6 +3840,70 @@ class GenericAdapter:
                         reason="resolved to canonical inventory URL, zero rent/bed/sqft signals",
                     )
                     return result
+
+                # 2026-05-27 follow-up: pre-leasing / interest-list
+                # check. Fires on "Coming Soon" / "Join the VIP list"
+                # / "Pre-leasing" phrasing — ~30 sites in the
+                # 612-failure-grind cohort. More specific than the
+                # brochure-only check that follows.
+                from ma_poc.pms.adapters._no_availability import (
+                    is_brochure_only_site,
+                    is_pre_leasing_site,
+                    matched_phrase_for_preleasing,
+                )
+
+                pl_match = matched_phrase_for_preleasing(html)
+                if pl_match and is_pre_leasing_site(html):
+                    placeholder = build_no_availability_placeholder(
+                        source_url=ctx.base_url,
+                        property_name=getattr(ctx, "property_name", "")
+                        or "",
+                        matched_text=pl_match,
+                    )
+                    result.units = [placeholder]
+                    result.tier_used = "TIER_1_DOM_PRE_LEASING"
+                    result.winning_url = ctx.base_url
+                    result.confidence = 0.55
+                    result._operator_no_availability = True  # type: ignore[attr-defined]
+                    _log_attempt(
+                        "generic:pre_leasing",
+                        "ran_units",
+                        units=1,
+                        reason=f"pre-leasing phrase: {pl_match[:40]}",
+                    )
+                    return result
+
+                # 2026-05-27 follow-up: brochure-only site — homepage
+                # is substantive but NO inventory subpath was
+                # reachable. ~150 sites in the 612-failure-grind
+                # cohort. Requires the resolver to have populated
+                # ctx.inventory_paths_attempted (no attempts → no
+                # claim).
+                attempted = list(
+                    getattr(ctx, "inventory_paths_attempted", []) or []
+                )
+                reachable = list(
+                    getattr(ctx, "inventory_pages_reachable", []) or []
+                )
+                if is_brochure_only_site(html, attempted, reachable):
+                    placeholder = build_no_availability_placeholder(
+                        source_url=ctx.base_url,
+                        property_name=getattr(ctx, "property_name", "")
+                        or "",
+                        matched_text="brochure_only_site",
+                    )
+                    result.units = [placeholder]
+                    result.tier_used = "TIER_1_DOM_BROCHURE_ONLY"
+                    result.winning_url = ctx.base_url
+                    result.confidence = 0.50
+                    result._operator_no_availability = True  # type: ignore[attr-defined]
+                    _log_attempt(
+                        "generic:brochure_only",
+                        "ran_units",
+                        units=1,
+                        reason=f"healthy homepage, {len(attempted)} inventory paths attempted, 0 reachable",
+                    )
+                    return result
             except Exception as _na_exc:
                 # Detector must never crash the pipeline — log and
                 # continue to the final no-units return below.
