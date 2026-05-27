@@ -81,6 +81,26 @@ def test_slo_reads_jugnu_extract_result_tier() -> None:
     assert "success_rate" not in names  # 95% meets the 95% threshold
 
 
+def test_slo_success_no_availability_counts_as_success() -> None:
+    """2026-05-27. RentCafe waitlist-cohort properties resolve to
+    SUCCESS_NO_AVAILABILITY (operator published zero inventory). The
+    scrape itself succeeded, so the SLO must count them toward the
+    success-rate numerator — they MUST NOT increment failure_rate."""
+    props = [
+        {
+            "_meta": {
+                "verdict": "SUCCESS_NO_AVAILABILITY",
+                "canonical_id": f"nai{i}",
+            },
+            "_extract_result": {"tier_used": "TIER_1_DOM_NO_AVAILABILITY"},
+        }
+        for i in range(100)
+    ]
+    violations = check({"llm": 0.0}, props)
+    names = [v.name for v in violations]
+    assert "success_rate" not in names
+
+
 # ── llm_tax_avoidance_rate ──────────────────────────────────────────────────
 
 

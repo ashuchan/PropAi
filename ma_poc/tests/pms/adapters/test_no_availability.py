@@ -79,6 +79,27 @@ def test_detect_matches_waitlist_only_variants() -> None:
     assert detect_no_availability("<p>Join the wait list</p>") is True
 
 
+# ─── 2026-05-27 RentCafe 612-grind row 2 phrases ─────────────────────
+
+
+def test_detect_matches_add_to_waitlist_cta() -> None:
+    """RentCafe waitlist CTA button text — livebrez cohort."""
+    html = "<button class='cta'>ADD TO WAITLIST</button>"
+    assert detect_no_availability(html) is True
+
+
+def test_detect_matches_no_listings_matching_banner() -> None:
+    """RentCafe empty-search banner — larsonapts cohort."""
+    html = "<div class='banner'>No listings matching your criteria.</div>"
+    assert detect_no_availability(html) is True
+
+
+def test_detect_matches_currently_no_available_terse() -> None:
+    """Terse RentCafe template — 201walnut cohort."""
+    html = "<p>Currently no available apartments.</p>"
+    assert detect_no_availability(html) is True
+
+
 # ─── rejection: hypothetical guard ───────────────────────────────────
 
 
