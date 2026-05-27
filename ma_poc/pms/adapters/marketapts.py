@@ -147,9 +147,21 @@ async () => {
     // /availability fallback. The self-fetch only "wins" when the candidate
     // doc carries an expected selector OR a Template-F table, so adding
     // paths has no false-positive risk.
+    // 2026-05-26: some MarketApts SPA deployments (e.g. mountainridgemanor.com,
+    // theazleeapartments.com, embarcatwestjordan.com) use server-side routing
+    // that returns the homepage shell for all paths when fetched without XHR
+    // headers. Adding ``X-Requested-With: XMLHttpRequest`` and the axios-style
+    // Accept header triggers the server to return SSR HTML for the requested
+    // path. This is safe for all other MarketApts sites (they ignore the header)
+    // and for non-MarketApts sites (the self-fetch is not reached when the
+    // current page already carries the plan-selector markers).
+    const _xhrHeaders = {
+      'Accept': 'application/json, text/plain, */*',
+      'X-Requested-With': 'XMLHttpRequest'
+    };
     for (const path of ['/floorplans', '/floor-plans', '/availability']) {
       try {
-        const r = await fetch(location.origin + path, {credentials: 'include'});
+        const r = await fetch(location.origin + path, {credentials: 'include', headers: _xhrHeaders});
         if (r.ok) {
           const candidate = new DOMParser().parseFromString(await r.text(), 'text/html');
           if (

@@ -748,7 +748,9 @@ async def scrape(
                     "/apartments/",
                 ):
                     try:
-                        _rr = _creqd_get(_root + _suffix, timeout=15)
+                        # 2026-05-26: PMS-discovery sub-probes are best-effort
+                        # page scans — no WU needed here.
+                        _rr = _creqd_get(_root + _suffix, timeout=15, unlocker=False)
                     except Exception:
                         continue
                     if _rr.status_code != 200 or not _rr.text:
@@ -1328,7 +1330,13 @@ async def scrape(
                         if _name_map:
                             break  # got something, stop probing
                         try:
-                            _r = _enrich_probe(_enrich_base + _path, timeout=12)
+                            # 2026-05-26 cost audit: enrichment sub-probes
+                            # (sqft/rent FK on /floorplans/ etc.) drove 52% of
+                            # WU spend. These are best-effort lookups on
+                            # publicly accessible plan pages — no WU needed.
+                            _r = _enrich_probe(
+                                _enrich_base + _path, timeout=12, unlocker=False
+                            )
                         except Exception:
                             continue
                         if _r.status_code != 200 or not _r.text:
@@ -2750,7 +2758,51 @@ async def _try_link_hop(
             anchor=anchor[:60],
         )
 
-        if outcome_val != "OK":
+        # 2026-05-26 soft-404 recovery on link-hop sub-pages.
+        # Some operator pages serve HTTP 404 with substantive content
+        # (SSR HTML or Playwright-rendered DOM) that still carries the
+        # unit roster — e.g. ten68west.com/apartments/ga/dallas/apply/
+        # availability returns 404+80KB containing G5 unit data; the
+        # 0ec4b94 canary salvaged it via RENDER timeout (TIMEOUT_SALVAGED
+        # outcome=OK) but b186b5b's faster non-render tier classifies
+        # the same body as DEAD_URL. Mirror scrape_jugnu's soft-404
+        # recovery gate: if the DEAD_URL hop has ≥10KB of body AND
+        # at least one apartment-inventory nav marker, treat as OK
+        # so the extractor below can run against it. Genuine 404s have
+        # empty/minimal bodies and don't trip this gate. Scope of the
+        # 70-shard b186b5b QC: ~330 properties (~9.5%) had substantive-
+        # body DEAD_URL hops AND ended with 0 units; top URL patterns
+        # are exactly /availability, /floor-plans, /apartments — where
+        # the unit roster usually lives.
+        _link_hop_soft_404 = False
+        if outcome_val == "DEAD_URL":
+            _sub_body = getattr(sub_fetch, "body", None) or b""
+            _sub_size = len(_sub_body) if isinstance(_sub_body, (bytes, str)) else 0
+            if _sub_size >= 10_000:
+                try:
+                    _sub_str = (
+                        _sub_body.decode("utf-8", errors="replace")
+                        if isinstance(_sub_body, bytes)
+                        else _sub_body
+                    ).lower()
+                    _LINK_HOP_SOFT_404_MARKERS = (
+                        "/floor-plans",
+                        "/floorplans",
+                        "/availability",
+                        "/available-units",
+                        "/availableunits",
+                        "/apartments/",
+                        "sightmap.com/embed/",
+                        "rentcafe.com",
+                        "knockdoorway",
+                        "g5marketingcloud",
+                    )
+                    if any(m in _sub_str for m in _LINK_HOP_SOFT_404_MARKERS):
+                        _link_hop_soft_404 = True
+                except Exception:  # pragma: no cover — defensive
+                    pass
+
+        if outcome_val != "OK" and not _link_hop_soft_404:
             explored[sub_url] = False
             # Record this URL as blocked/failed in the session so adapter-level
             # hint synthesisers (securecafe_portal_detected, etc.) don't re-queue
@@ -3252,6 +3304,15 @@ async def scrape_jugnu(
     if partial_state is not None:
         _jugnu_budget["_external_partial_ref"] = partial_state
 
+    # Initialise soft-404 recovery state before the outcome block so the
+    # post-scrape() application (below) can safely reference these variables
+    # regardless of which branch executed.  Both are always set inside the
+    # ``if outcome_val != "OK"`` block when _soft_404_recovery becomes True,
+    # but Python's compiler doesn't know that — initialising here prevents
+    # UnboundLocalError on Python 3.12+.
+    _soft_404_recovery: bool = False
+    _soft_404_status_code: int | None = None
+
     # Delta 2: short-circuit on non-OK fetch
     # RC5: EMPTY_BODY gets a distinct verdict prefix so dashboards can
     # distinguish "server returned 200 but no content" from real unreachable.
@@ -3305,11 +3366,12 @@ async def scrape_jugnu(
                         pass
 
             if _soft_404_recovery:
-                # Fall through to extraction. Record the recovery on the
-                # result dict so reports can distinguish "soft-404 recovered"
-                # from "genuine 200 OK".
-                result["_soft_404_recovery"] = True
-                result["_soft_404_status"] = getattr(fetch_result, "status_code", None)
+                # Fall through to extraction. Stash the status now; we'll
+                # write it onto result AFTER scrape() returns below because
+                # result is not yet initialised at this point (the else
+                # branch that initialises it returns early). Accessing result
+                # here would raise UnboundLocalError on Python 3.12+.
+                _soft_404_status_code = getattr(fetch_result, "status_code", None)
                 # Don't short-circuit; continue past this block.
             else:
                 result = _empty_result(base_url)
@@ -3402,6 +3464,10 @@ async def scrape_jugnu(
         shared_budget=_jugnu_budget,
     )
     result["_property_id"] = property_id
+    # Apply soft-404 recovery marker now that result is initialised.
+    if _soft_404_recovery:
+        result["_soft_404_recovery"] = True
+        result["_soft_404_status"] = _soft_404_status_code
 
     # Telemetry B: attach fetch diagnostic (error_signature, final_url, body
     # size, captcha, proxy, identity) so the per-property report can render

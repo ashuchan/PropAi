@@ -225,6 +225,34 @@ class Fetcher:
         identity = self._identities.pick(sticky_key=task.property_id)
         proxy = self._proxy_pool.pick(sticky_key=task.property_id)
 
+        # 2026-05-26 (blockwall v2 Action 3): derive a path-scope clearance
+        # hint URL from profile.navigation.winning_page_url. _do_render
+        # (called via _do_request) does a best-effort secondary
+        # page.goto(path_scope_hint) AFTER capturing the homepage body so
+        # CF mints clearance scoped to the target path (cf_clearance is
+        # path-scoped under CF bot-fight mode). Strategy origin:
+        # investigations/2026-05-21-t3-grind/artifacts/blockwall_v2/
+        # STRATEGY.md Action 3 — the 83 "both blocked" cohort where
+        # homepage isn't CF-protected but /conventional/ is. The hint
+        # only fires when host matches and the URL differs from the
+        # entry (cross-host clearance is useless).
+        path_scope_hint: str | None = None
+        if (
+            task.render_mode == RenderMode.RENDER
+            and profile is not None
+        ):
+            try:
+                _wpu = getattr(getattr(profile, "navigation", None), "winning_page_url", None)
+                if (
+                    isinstance(_wpu, str)
+                    and _wpu
+                    and _wpu != task.url
+                    and urlparse(_wpu).netloc == host
+                ):
+                    path_scope_hint = _wpu
+            except Exception:  # pragma: no cover — defensive
+                path_scope_hint = None
+
         emit(
             EventKind.FETCH_STARTED,
             task.property_id,
@@ -286,6 +314,7 @@ class Fetcher:
                     cached_lm,
                     attempt,
                     start_ms,
+                    path_scope_hint=path_scope_hint,
                 )
             except Exception as exc:
                 outcome, sig = classify(None, {}, None, exception=exc)
@@ -627,6 +656,8 @@ class Fetcher:
         last_modified: str | None,
         attempt: int,
         start_ms: int,
+        *,
+        path_scope_hint: str | None = None,
     ) -> FetchResult:
         """Execute a single HTTP request or Playwright render.
 
@@ -638,13 +669,17 @@ class Fetcher:
             last_modified: Cached Last-Modified for conditional request.
             attempt: Current attempt number.
             start_ms: Timestamp when the overall fetch started.
+            path_scope_hint: Optional URL to chain-navigate after the
+                primary goto, so CF mints clearance scoped to that path
+                (blockwall v2 Action 3). Only honoured in RENDER mode.
 
         Returns:
             FetchResult for this attempt.
         """
         if task.render_mode == RenderMode.RENDER:
             render_result = await self._do_render(
-                task, identity, proxy, attempt, start_ms
+                task, identity, proxy, attempt, start_ms,
+                path_scope_hint=path_scope_hint,
             )
             # RENDER tasks bypass the tier escalator (commit 0e85fbf — the
             # escalator's plain-GET lower tiers serve un-rendered HTML for
@@ -840,6 +875,8 @@ class Fetcher:
         proxy: str | None,
         attempt: int,
         start_ms: int,
+        *,
+        path_scope_hint: str | None = None,
     ) -> FetchResult:
         """Render a page with Playwright, capturing network requests.
 
@@ -849,6 +886,10 @@ class Fetcher:
             proxy: Proxy URL or None.
             attempt: Current attempt number.
             start_ms: Overall fetch start timestamp.
+            path_scope_hint: Optional URL to chain-navigate after the
+                primary goto so CF mints clearance scoped to its path
+                (blockwall v2 Action 3 — 83/300 "both blocked" cohort
+                where homepage isn't CF-protected but the target is).
 
         Returns:
             FetchResult with body and network_log populated.
@@ -1353,6 +1394,40 @@ class Fetcher:
             final_url = page.url
             resp_headers = {k.lower(): v for k, v in (resp.headers if resp else {}).items()}
             body_head = body[:4096]
+
+            # 2026-05-26 (blockwall v2 Action 3): chain-navigate to the
+            # path-scope hint AFTER capturing the homepage body. CF's
+            # ``cf_clearance`` cookie is path-scoped under bot-fight
+            # mode; minting it on ``/`` doesn't earn access to
+            # ``/conventional/``. By navigating to the target inside
+            # the same Playwright context, the patchright Chromium UA
+            # solves the challenge for the deeper path, and the
+            # resulting cookies persist on the context (harvested
+            # below). 300-property A/B (STRATEGY.md) found 83 props
+            # in this exact pattern. Time-bounded + never raises;
+            # primary body_text already captured so a failure here
+            # only forfeits the secondary clearance, never the L1
+            # result.
+            if (
+                path_scope_hint
+                and nav_exc is None
+                and resp is not None
+                and 200 <= (resp.status or 0) < 400
+            ):
+                try:
+                    await asyncio.wait_for(
+                        page.goto(
+                            path_scope_hint,
+                            wait_until="domcontentloaded",
+                            timeout=15000,
+                        ),
+                        timeout=18.0,
+                    )
+                    # Brief settle so CF challenge JS can mint the
+                    # path-scoped cf_clearance cookie before harvest.
+                    await asyncio.sleep(1.0)
+                except Exception:
+                    pass  # path-scope is best-effort
 
             # Cookie-mint reuse (option b): harvest the clearance cookies the
             # patchright context just earned by passing the CF/DataDome

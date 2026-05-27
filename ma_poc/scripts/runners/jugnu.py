@@ -1361,7 +1361,9 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
         "pmc": _pick(_csv("Management Company") or _csv("pmc"), md.get("management_company")),
         "website_design": website_design,
         "concessions": concessions_text,
-        "units": [_format_v2_unit(u, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)) for u in units],
+        "units": _emit_v2_units_for_property(
+            [_format_v2_unit(u, scrape_ts, _v2_property_id_for_unit(meta, apartment_id)) for u in units]
+        ),
         # Keep _meta for internal tracking (stripped on final delivery)
         "_meta": meta,
         "_extract_result": _extract_result_summary(result),
@@ -1378,6 +1380,190 @@ def _v2_property_id_for_unit(meta: dict[str, Any], apartment_id: int | None) -> 
     unit in the same property still hashes consistently.
     """
     return str(meta.get("canonical_id") or apartment_id or "").strip()
+
+
+# 2026-05-26 (canary 87b837b QC follow-up): post-extraction unit dedup
+# + cross-building disambiguation. The 87b837b run had 9,773 duplicate-
+# unit_id rows across 347 properties:
+#   • 66.5% EXACT_DUPE  — same unit emitted twice from multi-source
+#     merge (generic adapter pulling from /availability AND /floor-plans)
+#   • 19.5% DIFFERENT_FLOOR_PLAN — same unit# in two different plans
+#     (adapter mismerge; left for follow-up)
+#   • 11.9% BUILDING_DIFFERS  — same unit# in two different buildings
+#     (operator-legitimate; disambiguate by prefixing with building)
+#   •  1.8% RENT_DIFFERS, 0.2% AVAIL_STATUS_DIFFERS, 0.1% OTHER —
+#     snapshot conflicts; not deduped (need a tiebreaker policy).
+#
+# P1 (EXACT_DUPE filter):
+#   Drop a row when an earlier row in the same property has byte-for-byte
+#   identical values across the canonical fingerprint
+#   (unit_id, beds, baths, area, rent_low, rent_high, floor_plan_name,
+#    building, availability_status). First occurrence kept.
+#
+# P2 (BUILDING_DIFFERS disambiguation):
+#   When 2+ rows share unit_id AND all rows in the collision group have
+#   a non-empty building value AND the building values differ, rewrite
+#   each row's unit_id to ``{building}-{unit_id}`` so downstream dedup /
+#   identity / per-unit FK queries treat them as distinct entities.
+#   The original value is preserved in the existing ``unit_id_raw``
+#   capture-first field, so QA can audit the rewrite.
+#
+# Both passes run only on units that already came out of
+# _format_v2_unit (post-junk-filter, post-fallback-id) — so an empty /
+# ``inferred_*`` unit_id is left untouched by both.
+
+_DEDUP_FINGERPRINT_FIELDS: tuple[str, ...] = (
+    "unit_id",
+    "beds",
+    "baths",
+    "area",
+    "rent_low",
+    "rent_high",
+    "floor_plan_name",
+    "building",
+    "availability_status",
+)
+
+
+def _dedup_fingerprint(u: dict[str, Any]) -> tuple[Any, ...]:
+    """Canonical key for P1 EXACT_DUPE detection.
+    Keep simple/stable — change cascades to QC numbers."""
+    return tuple(u.get(k) for k in _DEDUP_FINGERPRINT_FIELDS)
+
+
+def _apply_p2_building_disambiguation(units: list[dict[str, Any]]) -> int:
+    """For each unit_id that appears 2+ times in ``units`` AND has a
+    non-empty distinct ``building`` on EVERY occurrence, rewrite
+    each row's unit_id to ``{building}-{unit_id}``. Mutates in place.
+
+    Returns the number of rows that were rewritten."""
+    from collections import defaultdict
+
+    groups: dict[Any, list[dict[str, Any]]] = defaultdict(list)
+    for u in units:
+        uid = u.get("unit_id")
+        if uid in (None, "", "null"):
+            continue
+        s = str(uid).strip()
+        if not s or s.startswith("inferred_"):
+            continue
+        groups[s].append(u)
+
+    rewritten = 0
+    for uid, group in groups.items():
+        if len(group) < 2:
+            continue
+        # Require every member to have a non-empty building
+        buildings = [(u.get("building") or "").strip() for u in group]
+        if any(b == "" for b in buildings):
+            continue
+        # Require at least 2 distinct buildings (otherwise same-bldg
+        # collisions are EXACT_DUPE-class, not BUILDING_DIFFERS)
+        if len(set(buildings)) < 2:
+            continue
+        for u, b in zip(group, buildings, strict=False):
+            new_uid = f"{b}-{uid}"
+            u["unit_id"] = new_uid
+            rewritten += 1
+    return rewritten
+
+
+def _apply_p2b_floor_plan_id_disambiguation(units: list[dict[str, Any]]) -> int:
+    """DIFFERENT_FLOOR_PLAN class — same unit_id, distinct floor_plan_id
+    on every occurrence. From the 87b837b QC (1,035 cases / 19.5% of
+    real-ID dups), this is dominated by:
+
+      • TIER_1_DOM_APPFOLIO_VANITY (794 = 77%) — small-property PMC
+        sites where ``floor_plan_name`` is actually the street address
+        and two different physical units share a unit-number (e.g.
+        "712 S 11th St #3" + "2224 A St - #3" both unit_id="3").
+      • TIER_1_KNOCK_API (48) — Knock CRM emits the same unit_id for
+        two genuinely different floor plans (B1 + CL).
+      • TIER_1_DOM_RENTCAFE_NESTIN (34) — cross-building "403" units
+        with different plan names (Venice / Monaco) but null building.
+
+    Same shape as P2 but the disambiguator is the first 8 chars of
+    ``floor_plan_id`` (a deterministic hash from the adapter, stable
+    across runs).
+
+    Conservative gates mirror P2:
+      • Skip if ANY member's floor_plan_id is empty/null
+      • Skip if all floor_plan_ids are the same (P1 EXACT_DUPE handles)
+      • Skip inferred_* and empty unit_ids
+
+    Runs AFTER P2 (so a unit already disambiguated to ``{bldg}-{uid}``
+    won't be re-prefixed) and BEFORE P1 (so distinct-plan units survive
+    the fingerprint dedup).
+
+    Returns the count of rewritten rows."""
+    from collections import defaultdict
+
+    groups: dict[Any, list[dict[str, Any]]] = defaultdict(list)
+    for u in units:
+        uid = u.get("unit_id")
+        if uid in (None, "", "null"):
+            continue
+        s = str(uid).strip()
+        if not s or s.startswith("inferred_"):
+            continue
+        groups[s].append(u)
+
+    rewritten = 0
+    for uid, group in groups.items():
+        if len(group) < 2:
+            continue
+        fp_ids = [(u.get("floor_plan_id") or "").strip() for u in group]
+        if any(fp == "" for fp in fp_ids):
+            continue
+        if len(set(fp_ids)) < 2:
+            continue
+        for u, fp in zip(group, fp_ids, strict=False):
+            fp_short = fp[:8]
+            u["unit_id"] = f"{fp_short}-{uid}"
+            rewritten += 1
+    return rewritten
+
+
+def _apply_p1_exact_dedup(units: list[dict[str, Any]]) -> int:
+    """Drop rows whose canonical fingerprint matches an earlier row in
+    the same list. Mutates ``units`` in place (deletes in reverse).
+
+    Returns the number of dropped rows."""
+    seen: set[tuple[Any, ...]] = set()
+    drop_indices: list[int] = []
+    for i, u in enumerate(units):
+        fp = _dedup_fingerprint(u)
+        if fp in seen:
+            drop_indices.append(i)
+        else:
+            seen.add(fp)
+    for i in reversed(drop_indices):
+        del units[i]
+    return len(drop_indices)
+
+
+def _emit_v2_units_for_property(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per-property post-extraction normalisation step.
+
+    Pipeline order is important:
+      1. P2 building disambiguation FIRST — rewriting unit_id to
+         ``{building}-{unit_id}`` changes the fingerprint, so EXACT_DUPE
+         dedup must run AFTER (otherwise a legit cross-bldg ID gets
+         flagged as a dup by the bare unit_id).
+      2. P2b floor_plan_id disambiguation — catches DIFFERENT_FLOOR_PLAN
+         cases where building is null but the units are genuinely
+         different (AppFolio address-as-fp_name, Knock cross-plan
+         collisions, RentCafe cross-bldg). Runs after P2 so it doesn't
+         re-prefix a unit already disambiguated by building.
+      3. P1 EXACT_DUPE dedup — drops rows with byte-identical
+         fingerprints across the canonical field set.
+    """
+    if not units:
+        return units
+    _apply_p2_building_disambiguation(units)
+    _apply_p2b_floor_plan_id_disambiguation(units)
+    _apply_p1_exact_dedup(units)
+    return units
 
 
 def _format_v2_unit(
@@ -1445,6 +1631,9 @@ def _format_v2_unit(
         "available_units": unit.get("available_units"),
         "date_captured": None,
         "available_date": unit.get("available_date"),
+        "availability_status": (
+            unit.get("availability_status") or unit.get("_availability_status")
+        ),
         "lease_term": unit.get("lease_term") or unit.get("_lease_term"),
         "move_in_date": (
             unit.get("move_in_date") or unit.get("_move_in_date")
@@ -1472,6 +1661,21 @@ def _format_v2_unit(
             uid = None
     except Exception:
         pass
+
+    # 2026-05-26 (canary 87b837b QC): drop ``floor_plan_name`` when it
+    # equals the unit_id. 555 units in 87b837b had identical fpn=uid
+    # values like ``fpn='259'=uid='259'`` — the adapter fell back to
+    # using the unit number as the plan name. That's not a real plan
+    # name; it pollutes plan-level analytics and inflates plan-level
+    # cardinality. Nulling lets ``compute_floor_plan_id`` below
+    # derive a deterministic id from beds+baths only — units with
+    # the same bed/bath count will then correctly share a plan id.
+    if (
+        fp_name is not None
+        and uid is not None
+        and str(fp_name).strip() == str(uid).strip()
+    ):
+        fp_name = None
 
     # Bed/bath fallback inference from the floor-plan name. Only fills
     # gaps — never overwrites a source value. Drives down the pool of
@@ -1614,6 +1818,14 @@ def _format_v2_unit(
         ),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
         "available_date": _format_date_str(unit.get("available_date")),
+        # 2026-05-26: availability_status was absent from this function
+        # (present in core/schema_v2.py but never synced here).  That caused
+        # 93.9% of units to have a blank availability_status in the canary
+        # output.  Light normalization mirrors _norm_status() in schema_v2.py:
+        # uppercase known tokens; pass raw string through for everything else.
+        "availability_status": _norm_avail_status(
+            unit.get("availability_status") or unit.get("_availability_status")
+        ),
         "lease_term": _safe_int_gt1(unit.get("lease_term") or unit.get("_lease_term")),
         "move_in_date": _format_date_str(unit.get("move_in_date") or unit.get("_move_in_date")),
         # 2026-05-25 (canary 1ef1060 follow-up): concession + offer fields,
@@ -2095,6 +2307,29 @@ def _format_zip(val: Any) -> str | None:
         return m.group(0)
     digits = _re.sub(r"\D", "", s)
     return digits.zfill(5)[:5] if digits else None
+
+
+def _norm_avail_status(val: Any) -> str | None:
+    """Normalise availability_status. Uppercases known tokens; passes
+    raw strings through (capture-first). Returns None when unset.
+
+    Mirrors _norm_status() in ma_poc/core/schema_v2.py — keep in sync.
+    """
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    u = s.upper()
+    if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED",
+             "LEASED", "PENDING", "UNKNOWN"):
+        return u
+    # Partial-match helpers for common raw strings from adapters
+    if "AVAILABLE" in u and "UNAVAILABLE" not in u:
+        return "AVAILABLE"
+    if u == "LEASED OUT" or "NOT AVAILABLE" in u or "UNAVAILABLE" in u:
+        return "UNAVAILABLE"
+    return s  # capture-first: preserve raw text for downstream QA
 
 
 def _format_rent(val: Any) -> float | None:

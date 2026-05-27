@@ -110,6 +110,12 @@ from ma_poc.pms.adapters._merge_fns import (
 from ma_poc.pms.adapters._udr import (
     parse_udr_jsonld as _parse_udr,
 )
+from ma_poc.pms.adapters._harbor_group import (
+    detect_harbor_group as _detect_harbor_group,
+    harbor_prop_base as _hgm_prop_base,
+    parse_harbor_floor_plans as _parse_hgm_floor_plans,
+    parse_harbor_units_page as _parse_hgm_units,
+)
 from ma_poc.pms.adapters._merge_fns import (
     find_unit_list as _find_unit_list,
 )
@@ -1860,6 +1866,61 @@ class GenericAdapter:
                         result.units, sources_already_run, ctx, decision_log
                     )
                     if _aird is None or _aird.action == "STOP":
+                        result._decision_log = decision_log  # type: ignore[attr-defined]
+                        return result
+                    skip_llm = False
+
+            # ── Sub-tier 2.55 (2026-05-26): Harbor Group Management ──────────
+            # Drupal CMS ("perq_stable" theme) with a 3-level URL family:
+            #   {prop-url}/floor-plans         — plan slug index
+            #   {prop-url}/{plan}/listing      — plan description (no units)
+            #   {prop-url}/{plan}/units        — SSR unit cards ← gold
+            # 3 properties in 4982-prop CSV (Aurella Cary, Waterford Village,
+            # The Canterbury). Detection is URL-based because the Drupal HTML
+            # has no unique clientlib/meta marker.
+            # All pages are plain SSR — no Playwright, no WU needed.
+            if not result.units and _detect_harbor_group(ctx.base_url or ""):
+                t0 = _time.monotonic()
+                hgm_units: list[dict[str, Any]] = []
+                try:
+                    from ma_poc.pms.adapters._probe import probe_get as _hgm_pg
+                    prop_base = _hgm_prop_base(ctx.base_url or "")
+                    fp_url = prop_base.rstrip("/") + "/floor-plans"
+                    fp_resp = _hgm_pg(fp_url, timeout=15, unlocker=False)
+                    fp_html = (fp_resp.text or "") if fp_resp.status_code == 200 else ""
+                    plan_slugs = _parse_hgm_floor_plans(fp_html, base_url=prop_base)
+                    for _slug in plan_slugs:
+                        units_url = f"{prop_base.rstrip('/')}/{_slug}/units"
+                        u_resp = _hgm_pg(units_url, timeout=15, unlocker=False)
+                        u_html = (u_resp.text or "") if u_resp.status_code == 200 else ""
+                        slug_units = _parse_hgm_units(
+                            u_html,
+                            plan_slug=_slug,
+                            base_url=units_url,
+                        )
+                        hgm_units.extend(slug_units)
+                except Exception as _hgmx:
+                    result.errors.append(f"harbor-group-error: {_hgmx}")
+                _log_attempt(
+                    "generic:harbor_group",
+                    "ran_units" if hgm_units else "ran_empty",
+                    units=len(hgm_units),
+                    reason="" if hgm_units else "HGM detected but no unit cards found",
+                    duration_ms=int((_time.monotonic() - t0) * 1000),
+                )
+                if hgm_units:
+                    result.units = _merge_into_result_units(
+                        result.units, hgm_units, property_id=ctx.property_id
+                    )
+                    result.tier_used = "TIER_3_DOM"
+                    result.winning_url = ctx.base_url
+                    result.confidence = min(0.88, 0.65 + 0.04 * len(result.units))
+                    from ma_poc.models.source import SourceId as _SI_HGM
+                    sources_already_run.add(_SI_HGM.DOM_CASCADE)
+                    _hgmd = _assess_and_decide(
+                        result.units, sources_already_run, ctx, decision_log
+                    )
+                    if _hgmd is None or _hgmd.action == "STOP":
                         result._decision_log = decision_log  # type: ignore[attr-defined]
                         return result
                     skip_llm = False

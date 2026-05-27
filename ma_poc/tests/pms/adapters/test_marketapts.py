@@ -846,6 +846,26 @@ def test_dom_js_url_probe_includes_availability_path() -> None:
     )
 
 
+def test_dom_js_self_fetch_uses_xhr_headers() -> None:
+    """2026-05-26: mountainridgemanor.com cluster (SPA with server-side routing)
+    returns the homepage shell for all paths unless the request includes
+    ``X-Requested-With: XMLHttpRequest`` and an axios-style Accept header.
+    The DOM JS self-fetch must include these headers so the server returns
+    SSR content for the probed path instead of the empty SPA shell.
+    """
+    from ma_poc.pms.adapters.marketapts import _MARKETAPTS_DOM_JS
+    src = _MARKETAPTS_DOM_JS
+    assert "X-Requested-With" in src, (
+        "DOM JS self-fetch must set X-Requested-With: XMLHttpRequest header "
+        "(required by MarketApts SPA routing to return SSR content instead of "
+        "the homepage shell — affects mountainridgemanor, theazleeapartments, "
+        "embarcatwestjordan cluster)"
+    )
+    assert "application/json" in src, (
+        "DOM JS self-fetch must include axios-style Accept header for SPA routing"
+    )
+
+
 # ── 2026-05-25 deep-probe regression: n_full=0 cohort fixes ─────────
 #
 # 15 TIER_1_DOM_MARKETAPTS properties routed correctly but emitted

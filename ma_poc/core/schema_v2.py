@@ -640,6 +640,27 @@ def _resolve_available_date(
     return parsed_date
 
 
+_DATE_SANITY_YEARS = 5  # ±5 years from today is the acceptance window
+
+
+def _is_date_in_sane_range(iso_date: str) -> bool:
+    """True when the ISO date is within ±_DATE_SANITY_YEARS of today.
+
+    Operators sometimes leave decade-old ``available_date`` values on
+    their pages (87b837b QC: 32 dates from 2009 / 2019 on real
+    properties, status=AVAILABLE). These are unambiguous data-entry
+    garbage and shouldn't propagate. Range chosen conservatively:
+    ±5 years catches the obvious junk without dropping legit
+    ``available since 8 months ago`` data."""
+    try:
+        d = datetime.strptime(iso_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return False
+    today = datetime.now(UTC).date()
+    delta_days = (d - today).days
+    return -_DATE_SANITY_YEARS * 365 <= delta_days <= _DATE_SANITY_YEARS * 365
+
+
 def _format_date(val: Any) -> str | None:
     """Normalize date to YYYY-MM-DD. Returns None if unparseable.
 
@@ -652,14 +673,43 @@ def _format_date(val: Any) -> str | None:
     ``Available|Avail|Move-in|Ready`` prefix; 2-digit years; month-name
     forms; and relative "now/today/immediate/available" → scrape date.
     ISO and 4-digit ``m/d/Y`` behave EXACTLY as before (additive only).
+
+    2026-05-26 (canary 87b837b QC): every parsed date now passes
+    through _is_date_in_sane_range — operator-emitted garbage like
+    "2009-07-08" returns None.
     """
+    def _accept(iso: str | None) -> str | None:
+        """Inner-helper: apply the ±5yr sanity bound to every parsed
+        output. Calls that return today's date for relative tokens
+        (Available Now / etc.) are safe — today is within range."""
+        if iso is None:
+            return None
+        return iso if _is_date_in_sane_range(iso) else None
+
     if val is None or val == "":
         return None
     s_orig = str(val).strip()
     s = s_orig
     # Already ISO format (unchanged)
     if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
-        return s
+        return _accept(s)
+    # 2026-05-26 (canary 87b837b QC follow-up): reject negative-status
+    # tokens BEFORE the availability-prefix strip. Inputs like
+    # "Not Available" / "Not Avail." / "Unavailable" / "Leased" /
+    # "Occupied" / "Rented" indicate UNAVAILABLE units — the
+    # ``availability_status`` field is the right place to track this,
+    # and ``available_date`` should stay empty. Pre-fix, the strip
+    # turned "Not Available" → "Not " → fell into ``not s`` → returned
+    # today (wrong: implies the unit IS available now). 14 cases in
+    # 87b837b's canary output.
+    _s_low = s.lower()
+    _NEGATIVE_TOKENS = (
+        "not available", "not avail", "unavailable",
+        "leased", "occupied", "rented", "off market", "off-market",
+        "no availability",
+    )
+    if any(tok in _s_low for tok in _NEGATIVE_TOKENS):
+        return None
     # Strip a leading availability label, e.g. "Available 6/25/26",
     # "Avail. 6/25/26", "Move-in 6/25/26", "Ready 6/25/26".
     s = re.sub(
@@ -670,7 +720,16 @@ def _format_date(val: Any) -> str | None:
     ).strip()
     if not s:
         # Pure text like "Available" with no date ⇒ available now.
-        return datetime.now(UTC).strftime("%Y-%m-%d")
+        return _accept(datetime.now(UTC).strftime("%Y-%m-%d"))
+    # 2026-05-26: YYYYMMDD numeric (no separator). 268 cases in 87b837b
+    # — common from RentManager / older RealPage XMLs that emit dates
+    # as packed 8-digit ints. Checked BEFORE the strptime cascade so
+    # the bare-numeric form is parsed cleanly.
+    if re.match(r"^\d{8}$", s):
+        try:
+            return _accept(datetime.strptime(s, "%Y%m%d").strftime("%Y-%m-%d"))
+        except ValueError:
+            pass
     # Try common formats — 4-digit-year set unchanged; 2-digit-year and
     # month-name forms added.
     for fmt in (
@@ -680,12 +739,12 @@ def _format_date(val: Any) -> str | None:
         "%b %d, %y", "%b %d %y",
     ):
         try:
-            return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
+            return _accept(datetime.strptime(s, fmt).strftime("%Y-%m-%d"))
         except ValueError:
             continue
     # If it's a datetime string, take just the date part (unchanged)
     if len(s) >= 10 and re.match(r"^\d{4}-\d{2}-\d{2}", s):
-        return s[:10]
+        return _accept(s[:10])
     # 2026-05-19: no-year month-name forms ("May 19", "Jun. 7", "Jul. 18")
     # — Razz/Spherexx embedded portals omit the year. Product rule: assume
     # the current (run) year. Strip a trailing '.' on an abbreviated month
@@ -694,7 +753,7 @@ def _format_date(val: Any) -> str | None:
     s_no_year = re.sub(r"^([A-Za-z]{3,9})\.", r"\1", s)
     for fmt in ("%b %d", "%B %d"):
         try:
-            return (
+            return _accept(
                 datetime.strptime(s_no_year, fmt)
                 .replace(year=datetime.now(UTC).year)
                 .strftime("%Y-%m-%d")
@@ -712,7 +771,7 @@ def _format_date(val: Any) -> str | None:
     # date strings always win (e.g. "Available 6/25/26" parses 6/25/26
     # via earlier date-format pass, never reaches here).
     if _AVAILABLE_NOW_RE.search(s_orig.lower()):
-        return datetime.now(UTC).strftime("%Y-%m-%d")
+        return _accept(datetime.now(UTC).strftime("%Y-%m-%d"))
     return None
 
 

@@ -34,6 +34,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
+from ma_poc.pms.adapters._parsing import SQFT_RE, clean_unit_number
 from ma_poc.pms.adapters._daily_runner_parsers import (
     _jsonld_floor_size,
     _jsonld_item_has_unit_signal,
@@ -1140,6 +1141,13 @@ _TABLE_HEADER_VOCAB: dict[str, str] = {
     "floor plan": "floor_plan_name",
     "floorplan": "floor_plan_name",
     "name": "floor_plan_name",
+    # "Unit Type" headers describe the floor-plan template ("1 Bedroom
+    # Unit - A", "Studio", "2BR Premium"), not a per-unit identifier.
+    # Spearhead Properties (Oak-I, Eden Roc) renders this column with
+    # phrases like "1 Bedroom Unit - A" — it is the floor-plan name.
+    # Listed BEFORE the bare "unit" substring fallback so the exact
+    # match wins for "Unit Type" headers.
+    "unit type": "floor_plan_name",
     "unit": "unit_number",
     "unit #": "unit_number",
     "unit number": "unit_number",
@@ -1164,6 +1172,12 @@ _TABLE_HEADER_VOCAB: dict[str, str] = {
     "sq. ft": "sqft",
     "square feet": "sqft",
     "square footage": "sqft",
+    # "Unit Size" — Spearhead's column header for the sqft value. The
+    # bare "unit" substring fallback would otherwise route this to
+    # ``unit_number`` (and clobber the real unit-id slot), leaking sqft
+    # text like "623 sq ft" into the unit identifier. Explicit exact
+    # match here wins before the substring fallback runs.
+    "unit size": "sqft",
     "size": "sqft",
     "area": "sqft",
     # rent
@@ -1382,6 +1396,23 @@ def extract_units_from_html_tables(
                     unit["sqft"] = _parse_int_token(raw)
                 else:
                     unit[canon] = raw
+
+            # Defensive sqft-leak guard (chip #106 follow-up, 2026-05-25).
+            # When two columns happen to both substring-match the same
+            # canonical field (e.g. "Unit Type" + "Unit Size" both via the
+            # bare "unit" fallback before this commit), the last cell wins
+            # and the unit_number slot can carry sqft text like "623 sq ft".
+            # The vocab fix above prevents this for known Spearhead headers,
+            # but a future CMS with a new substring collision could still
+            # leak. Strip a sqft signature from unit_number when present,
+            # and recover sqft into the empty sqft slot so we don't drop
+            # the size to -1 downstream.
+            if isinstance(unit["unit_number"], str) and unit["unit_number"]:
+                leaked = unit["unit_number"]
+                if SQFT_RE.search(leaked):
+                    if not unit["sqft"]:
+                        unit["sqft"] = _parse_int_token(leaked)
+                    unit["unit_number"] = clean_unit_number(leaked)
 
             # Per-row presence filter: need beds + (rent OR sqft).
             if not unit["bedrooms"]:

@@ -61,10 +61,63 @@ _TODAY = datetime.now(UTC).strftime("%Y-%m-%d")
         ("", None),
         ("call for availability", None),
         ("garbage", None),
+        # 2026-05-26 (canary 87b837b QC): YYYYMMDD packed numeric
+        # — RentManager / older RealPage XMLs use this. 268 cases.
+        ("20260601", "2026-06-01"),
+        ("20261231", "2026-12-31"),
+        ("20260101", "2026-01-01"),
+        # 2026-05-26 (canary 87b837b QC): negative-status tokens
+        # must return None — they indicate UNAVAILABLE units, NOT
+        # "available now". 14 cases. Pre-fix the availability-prefix
+        # strip turned these into bare "Not " / "" which then matched
+        # the AVAILABLE_NOW fallback and incorrectly returned today.
+        ("Not Available", None),
+        ("Not Avail.", None),
+        ("Not Avail", None),
+        ("Unavailable", None),
+        ("UNAVAILABLE", None),
+        ("Leased", None),
+        ("Occupied", None),
+        ("Rented", None),
+        ("Off Market", None),
+        ("off-market", None),
+        ("No Availability", None),
+        # 2026-05-26 (canary 87b837b QC): ±5yr sanity bound. Operator-
+        # emitted decade-old dates ("2009-07-08") and far-future dates
+        # past the acceptance window are clearly garbage; the parser
+        # must NOT propagate them. 32+ cases observed in 87b837b output.
+        ("2009-07-08", None),     # 17yr stale — junk
+        ("2019-04-21", None),     # 7yr stale — junk
+        ("1999-12-31", None),     # 27yr stale — junk
+        ("2050-01-01", None),     # 24yr future — junk
+        ("2040-06-15", None),     # 14yr future — junk
+        # In-window dates MUST still pass — these are the legit
+        # "available since N months ago" cases the bound preserves.
+        ("2025-09-14", "2025-09-14"),  # ~8mo stale — legit
+        ("2024-12-01", "2024-12-01"),  # ~17mo stale — legit
     ],
 )
 def test_format_date_handles_all_adapter_forms(raw: object, expected: str | None) -> None:
     assert _format_date(raw) == expected
+
+
+def test_sanity_bound_rejects_far_past_iso_dates() -> None:
+    """The ±5yr bound applies to ISO dates too — the early-return ISO
+    path must NOT bypass the sanity check (pre-fix, "2009-07-08" went
+    through directly because it matched the ISO regex at line ~668)."""
+    assert _format_date("2009-07-08") is None
+    assert _format_date("1995-01-01") is None
+    assert _format_date("2050-01-01") is None
+
+
+def test_sanity_bound_keeps_borderline_dates() -> None:
+    """Dates within ±5yr of today must still pass. Don't over-correct."""
+    from datetime import UTC, datetime
+    today = datetime.now(UTC).date()
+    yr = today.year
+    # ~3 years stale and ~3 years future — both well within bound
+    assert _format_date(f"{yr - 3}-01-15") == f"{yr - 3}-01-15"
+    assert _format_date(f"{yr + 3}-01-15") == f"{yr + 3}-01-15"
 
 
 @pytest.mark.parametrize(

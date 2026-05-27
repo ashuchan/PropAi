@@ -41,15 +41,28 @@ _DEFAULTS = {"impersonate": "chrome120", "timeout": 25, "allow_redirects": True}
 # Cookie-mint reuse (option b, 2026-05-18). The fetcher's patchright
 # render solves the CF/DataDome challenge and harvests the clearance
 # cookies onto FetchResult.clearance_cookies; scraper.scrape() installs
-# them here for the duration of one property's adapter dispatch. The
-# probes below auto-attach them so the cheap curl_cffi active-fetch
-# (MAAC/Irvine/Cortland/Essex/Equity/SightMap-iframe) reuses the solved
-# clearance instead of hitting the wall again. ContextVar ⇒ per-asyncio-
-# task isolation: concurrent property scrapes never share clearance.
-# Empty by default ⇒ no behaviour change off the cookie-mint path.
+# them here for the duration of one property's adapter dispatch.
+# ContextVar ⇒ per-asyncio-task isolation: concurrent property scrapes
+# never share clearance. Empty by default ⇒ no behaviour change off the
+# cookie-mint path.
+#
+# 2026-05-26 (blockwall-v2 A/B, 300 props): cookie reuse is now OPT-IN
+# per host. The 300-property A/B (2026-05-25) found: helped=0, hurt=10.
+# Root cause: patchright Chromium UA mints cf_clearance; curl_cffi
+# chrome120 presents it with a different User-Agent → CF sees a
+# stolen-cookie replay → triggers fresh IUAM bot-fight on sites that
+# were previously accessible without cookies. Default: don't attach
+# minted clearance cookies unless the host is in the allowlist.
 _clearance_cookies: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar(
     "probe_clearance_cookies", default=None
 )
+
+# Allowlist of hosts where cookie-mint reuse is known to help.
+# Starts empty per the 300-property A/B verdict. Add entries ONLY when
+# a new A/B confirms that attaching cf_clearance unblocks that host AND
+# does not trigger bot-fight on sibling paths (i.e. the Chromium UA
+# that minted the cookie matches the chrome120 impersonation UA).
+_CLEARANCE_REUSE_HOST_ALLOWLIST: frozenset[str] = frozenset()
 
 
 def set_clearance_cookies(
@@ -71,16 +84,33 @@ def reset_clearance_cookies(token: contextvars.Token[dict[str, str] | None]) -> 
         pass
 
 
-def _with_clearance(opts: dict[str, Any]) -> dict[str, Any]:
-    """Merge task-scoped clearance cookies under any explicit ``cookies=``.
+def _with_clearance(opts: dict[str, Any], url: str | None = None) -> dict[str, Any]:
+    """Merge task-scoped clearance cookies — opt-in per host.
 
-    Explicit per-call cookies win on key collision (the adapter knows its
-    own endpoint better than a generic CF cookie). No-op when no clearance
-    has been minted for this task.
+    Explicit per-call ``cookies=`` values always pass through unchanged.
+    Minted CF clearance cookies are only injected when the target host
+    appears in ``_CLEARANCE_REUSE_HOST_ALLOWLIST`` (empty by default).
+
+    Background: the 300-property A/B (2026-05-25) showed that attaching
+    patchright-minted cf_clearance to curl_cffi chrome120 requests helped
+    0 properties and hurt 10 by triggering CF bot-fight via UA-binding
+    mismatch.  The allowlist lets us re-enable per-host if future evidence
+    shows a specific host benefits.
     """
     minted = _clearance_cookies.get() or {}
     if not minted:
         return opts
+    # Host-based opt-in gate.  When url is None the host is unknowable,
+    # so treat as "not in allowlist" and do not attach.
+    if url is None:
+        return opts
+    try:
+        from urllib.parse import urlparse as _up
+        host = _up(url).netloc.lower()
+    except Exception:
+        return opts
+    if host not in _CLEARANCE_REUSE_HOST_ALLOWLIST:
+        return opts  # default: don't attach minted cookies
     explicit = opts.get("cookies") or {}
     if isinstance(explicit, dict):
         opts["cookies"] = {**minted, **explicit}
@@ -303,7 +333,7 @@ def _looks_blocked(resp: Any) -> bool:
     return bool(is_captcha and provider == "cloudflare")
 
 
-def probe_get(url: str, **kw: Any) -> Any:
+def probe_get(url: str, *, unlocker: bool = True, **kw: Any) -> Any:
     """curl_cffi GET with chrome impersonation + optional probe proxy.
 
     Raises ImportError if curl_cffi is unavailable (callers already guard
@@ -314,10 +344,23 @@ def probe_get(url: str, **kw: Any) -> Any:
     the proxied fetch comes back a Cloudflare challenge shell or a
     403/429/503 block, retry once via the Web Unlocker API. WU is never
     spent on a successful fetch.
+
+    Args:
+        url: Target URL.
+        unlocker: If False, skip Web Unlocker escalation entirely for this
+            call. Use for secondary/per-plan fetches inside an adapter loop
+            where WU budget should be reserved for the primary landing page
+            (e.g., Entrata per-floorplan unit drills after landing succeeds).
+            Default True preserves existing behaviour.
+        **kw: Forwarded to curl_cffi.requests.get.
+
+    2026-05-26 cost audit: LLM-tier re-fetches drove 52% of WU spend
+    (~7,682/14,655 calls/day). Callers that don't need WU escalation should
+    pass ``unlocker=False`` to avoid the cap being eaten by low-value fetches.
     """
     from curl_cffi import requests as _creq
 
-    opts: dict[str, Any] = _with_clearance({**_DEFAULTS, **kw})
+    opts: dict[str, Any] = _with_clearance({**_DEFAULTS, **kw}, url=url)
     px = probe_proxies()
     if px:
         opts.setdefault("proxies", px)
@@ -325,14 +368,34 @@ def probe_get(url: str, **kw: Any) -> Any:
     try:
         resp = _creq.get(url, **opts)
     except Exception:
-        if web_unlocker_key():
+        if unlocker and web_unlocker_key():
             wu = web_unlocker_get(url, timeout=int(opts.get("timeout") or 25) + 95)
             if wu.status_code == 200:
                 log.info("web_unlocker.rescue url=%s via=transport_error", url)
                 return wu
         raise
 
-    if web_unlocker_key() and _looks_blocked(resp):
+    # 2026-05-26 (blockwall-v2 A/B): if we attached cookies (via the
+    # allowlist or explicit kw) and the response is a CF IUAM block,
+    # retry once without cookies. UA-binding mismatch between the
+    # patchright Chromium UA (that minted cf_clearance) and curl_cffi
+    # chrome120 (that presents it) triggers a fresh bot-fight challenge
+    # on sites that would otherwise be accessible without cookies.
+    if _looks_blocked(resp) and opts.get("cookies"):
+        opts_no_cookies = {k: v for k, v in opts.items() if k != "cookies"}
+        try:
+            resp2 = _creq.get(url, **opts_no_cookies)
+            if not _looks_blocked(resp2):
+                log.info(
+                    "probe_get.cookie_strip_retry url=%s status=%s→%s",
+                    url, getattr(resp, "status_code", "?"),
+                    getattr(resp2, "status_code", "?"),
+                )
+                return resp2
+        except Exception:
+            pass  # fall through to original resp / Web Unlocker escalation
+
+    if unlocker and web_unlocker_key() and _looks_blocked(resp):
         wu = web_unlocker_get(url, timeout=int(opts.get("timeout") or 25) + 95)
         if wu.status_code == 200 and not _looks_blocked(wu):
             log.info("web_unlocker.rescue url=%s via=cf_shell_or_block", url)
@@ -354,7 +417,7 @@ def probe_post(url: str, data: Any = None, **kw: Any) -> Any:
     """
     from curl_cffi import requests as _creq
 
-    opts: dict[str, Any] = _with_clearance({**_DEFAULTS, **kw})
+    opts: dict[str, Any] = _with_clearance({**_DEFAULTS, **kw}, url=url)
     px = probe_proxies()
     if px:
         opts.setdefault("proxies", px)

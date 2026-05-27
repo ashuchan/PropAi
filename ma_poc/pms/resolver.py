@@ -181,18 +181,17 @@ _LEASING_PORTAL_DOMAINS = frozenset(
 # documented dead-end sub-path; deep-probe attempts waste time and emit
 # zero strict units.
 #
-#   - Harbor Group Management — 12 / 600 sites (2.0%). Pattern
-#     ``harborgroupmanagement.com/apartments/{state}/{city}/{slug}``
-#     exposes plan cards with "N Homes Available". The per-plan
-#     ``…/{slug}/listing`` sub-page is empty (verified 2026-05-21
-#     deep-probe on Aurella Cary, Waterford Village, The Canterbury).
+#   - Harbor Group Management — GRADUATED 2026-05-26. Unit data lives
+#     at ``…/{plan}/units`` (one level deeper than the ``…/{plan}/listing``
+#     dead-end). Dedicated adapter ``_harbor_group.py`` ships as sub-tier
+#     2.55 in generic.py. No longer plan-level-only.
 #
 # This constant is documented for future-adapter-author discovery.
 # Not yet wired into resolver hop logic — call sites that already
 # handle these brands (e.g. a custom Harbor Group adapter) should
 # reference this constant when deciding to short-circuit deep probes.
 _KNOWN_PLAN_LEVEL_ONLY_PATTERNS: tuple[str, ...] = (
-    "harborgroupmanagement.com/apartments/",
+    # empty — all known plan-level-only brands now have dedicated adapters
 )
 
 
