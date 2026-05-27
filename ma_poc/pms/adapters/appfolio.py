@@ -1087,6 +1087,39 @@ class AppFolioAdapter:
                                 break
                             total_pages = page_total
                             page_number += 1
+                    # 2026-05-26 (canary 87b837b QC follow-up): PMC-wide
+                    # contamination on the DUDA path. axiomproperties.com
+                    # returned 455 units across 106 distinct fp_names
+                    # (= 106 distinct street addresses); gbatx.com 440
+                    # units / 266 addresses. The Duda collection API
+                    # serves the FULL PMC inventory unless the property-
+                    # group query parameter is set, and on these two PMC
+                    # sites the embed JS lacks ``propertyGroup`` so the
+                    # collection comes back un-scoped.
+                    #
+                    # Same fix as the VANITY path (chip #107): drop
+                    # units whose address + ZIP don't match the CSV
+                    # property context. DUDA stores the address in
+                    # ``full_address`` which is mapped to
+                    # ``floor_plan_name`` by ``parse_collection_payload``
+                    # — the filter's default ``address_field`` matches.
+                    if duda_units and not duda_property_group:
+                        ctx_address = getattr(ctx, "address", "") or ""
+                        ctx_zip = getattr(ctx, "zip_code", "") or ""
+                        duda_units, addr_filter_tel = (
+                            filter_listings_by_property_address(
+                                duda_units, ctx_address, ctx_zip
+                            )
+                        )
+                        if addr_filter_tel.get("filter_activated"):
+                            result.errors.append(
+                                "appfolio-duda-address-filter: "
+                                f"reason={addr_filter_tel['reason']} "
+                                f"kept={addr_filter_tel['kept']} "
+                                f"dropped={addr_filter_tel['dropped']} "
+                                f"ctx_addr={ctx_address!r} "
+                                f"ctx_zip={ctx_zip!r}"
+                            )
                     if duda_units:
                         result.units = duda_units
                         result.tier_used = "TIER_1_API_APPFOLIO_DUDA"
