@@ -1632,6 +1632,21 @@ def _format_v2_unit(
     except Exception:
         pass
 
+    # 2026-05-26 (canary 87b837b QC): drop ``floor_plan_name`` when it
+    # equals the unit_id. 555 units in 87b837b had identical fpn=uid
+    # values like ``fpn='259'=uid='259'`` — the adapter fell back to
+    # using the unit number as the plan name. That's not a real plan
+    # name; it pollutes plan-level analytics and inflates plan-level
+    # cardinality. Nulling lets ``compute_floor_plan_id`` below
+    # derive a deterministic id from beds+baths only — units with
+    # the same bed/bath count will then correctly share a plan id.
+    if (
+        fp_name is not None
+        and uid is not None
+        and str(fp_name).strip() == str(uid).strip()
+    ):
+        fp_name = None
+
     # Bed/bath fallback inference from the floor-plan name. Only fills
     # gaps — never overwrites a source value. Drives down the pool of
     # plans whose ``beds``/``baths`` is NULL in ``units``, which is the
