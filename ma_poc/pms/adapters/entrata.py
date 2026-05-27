@@ -414,6 +414,18 @@ _PP_FPID_RE = re.compile(
     re.IGNORECASE,
 )
 
+# 2026-05-27 — LeaseLeads-fallback HTML signal. We accept either the
+# rendered iframe ``embed.leaseleads.co/<uuid>`` (post-JS DOM) or the
+# static ``LeaseLeadsEmbed('<uuid>')`` init call (pre-JS markup, the
+# only signal in curl-fetched HTML on the live Lumina site). Either
+# form is enough to justify a single ``recover_leaseleads_embed``
+# attempt — the helper itself re-validates by sniffing the live DOM.
+_LEASELEADS_HTML_SIGNAL_RE = re.compile(
+    r"""(?:embed\.leaseleads\.co/[0-9a-f-]{36}"""
+    r"""|LeaseLeadsEmbed\(\s*['"][0-9a-f-]{36})""",
+    re.IGNORECASE,
+)
+
 
 def _pp_iso(s: str) -> str:
     """``2026/05/17`` | ``2026-05-17`` → ``2026-05-17``; else ''."""
@@ -1794,6 +1806,43 @@ class EntrataAdapter:
                 result.tier_used = "TIER_1_DOM_ENTRATA_PROSPECTPORTAL"
                 result.confidence = min(0.92, 0.7 + 0.04 * _ppp.n_admitted)
                 return result
+
+        # 2026-05-27 — LeaseLeads-embed fallback (additive). When an upstream
+        # detector misroutes a LeaseLeads-shell property to Entrata (the
+        # marketing site loads a ``LeaseLeads`` virtual-leasing-agent JS
+        # bundle that emits Entrata-ish fingerprints), the primary Entrata
+        # path produces zero units. The site itself embeds a public
+        # LeaseLeads iframe of the form
+        # ``https://embed.leaseleads.co/<uuid>/floor-plans`` whose backing
+        # JSON API (``api.leaseleads.co/api/v2/property/<uuid>/floor-plans``)
+        # is auth-free. Wired via the shared ``recover_leaseleads_embed``
+        # helper that powers the Squarespace/Wix universal-recovery chain.
+        # Live-verified against Lumina (pid 72391, liveatlumina.com).
+        # Runs BEFORE the empty-exit label below so a successful
+        # LeaseLeads recovery returns SUCCESS instead of TIER_*_EMPTY.
+        if not result.units and page is not None:
+            try:
+                html = await page.content()
+            except Exception:
+                html = ""
+            if html and _LEASELEADS_HTML_SIGNAL_RE.search(html):
+                from ma_poc.pms.adapters._leaseleads_embed import (
+                    recover_leaseleads_embed,
+                )
+
+                try:
+                    ll_units = await recover_leaseleads_embed(page, ctx)
+                except Exception:
+                    ll_units = []
+                if ll_units:
+                    # may13: post_process classifies leaseleads units as
+                    # plan-level (different promotion logic than the chip
+                    # base 442c559). Skip post_process — assign units
+                    # directly. The helper's output is already validated.
+                    result.units = list(ll_units)
+                    result.tier_used = "TIER_1_API_LEASELEADS"
+                    result.confidence = min(0.93, 0.7 + 0.04 * len(ll_units))
+                    return result
 
         # 2026-05-20: emit a structured empty-exit label so Path B retry
         # can route this property to its next-best PMS candidate. The

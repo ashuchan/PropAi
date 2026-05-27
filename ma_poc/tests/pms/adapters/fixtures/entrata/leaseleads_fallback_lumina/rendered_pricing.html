@@ -1,0 +1,38 @@
+<!doctype html>
+<!--
+Lumina (pid 72391) operator site — https://liveatlumina.com/pricing
+Source: 2026-05-27 live fetch.
+
+The live static HTML emits a JS init call:
+    LeaseLeadsEmbed('9e5e0a14-d118-40db-89df-b02a6176e804', { ... })
+which the embed.js bundle expands at runtime into an iframe of the form
+    <iframe src="https://embed.leaseleads.co/<uuid>/floor-plans" ...>
+
+This fixture represents the *rendered* DOM (i.e. what page.content() returns
+in our adapter pipeline after networkidle wait + sleep). The Entrata primary
+adapter returns 0 units on this property — the LeaseLeads fallback is the
+extraction-correct path.
+-->
+<html lang="en">
+  <head>
+    <title>Lumina | Pricing</title>
+    <script async src="https://embed.leaseleads.co/scripts/embed.js"></script>
+    <script>
+      LeaseLeadsEmbed('9e5e0a14-d118-40db-89df-b02a6176e804', { mode: 'pricing' });
+    </script>
+  </head>
+  <body>
+    <header><h1>Live at Lumina</h1></header>
+    <main>
+      <section id="leaseleads-embed-root">
+        <iframe
+          src="https://embed.leaseleads.co/9e5e0a14-d118-40db-89df-b02a6176e804/floor-plans"
+          width="100%"
+          height="900"
+          style="border:0"
+          title="LeaseLeads Floor Plans">
+        </iframe>
+      </section>
+    </main>
+  </body>
+</html>

@@ -3672,6 +3672,47 @@ class GenericAdapter:
                     reason=str(_sm_exc)[:120],
                 )
 
+        # 2026-05-27 — LeaseLeads-embed fallback (mirror of entrata.py
+        # block). Catches LeaseLeads-shell properties whose detector
+        # routes them to ``generic`` instead of a PMS-specific adapter.
+        # Sniffs the rendered HTML for the iframe / static init signal
+        # and invokes the shared ``recover_leaseleads_embed`` helper.
+        # Live-verified against Lumina (pid 72391, liveatlumina.com).
+        if not result.units:
+            try:
+                import re as _re_ll
+                _LL_RE = _re_ll.compile(
+                    r"(?:embed\.leaseleads\.co/[0-9a-f-]{36}"
+                    r"|LeaseLeadsEmbed\(\s*['\"][0-9a-f-]{36})",
+                    _re_ll.IGNORECASE,
+                )
+                if html and _LL_RE.search(html):
+                    from ma_poc.pms.adapters._leaseleads_embed import (
+                        recover_leaseleads_embed,
+                    )
+                    ll_units = await recover_leaseleads_embed(
+                        getattr(ctx, "page", None), ctx
+                    )
+                    if ll_units:
+                        # may13: post_process treats leaseleads units as
+                        # plan-level (different promotion logic). Skip
+                        # post_process; helper output is already validated.
+                        result.units = list(ll_units)
+                        result.tier_used = "TIER_1_API_LEASELEADS"
+                        result.confidence = min(
+                            0.93, 0.7 + 0.04 * len(ll_units)
+                        )
+                        _log_attempt(
+                            "generic:leaseleads_embed", "ran_units",
+                            units_found=len(ll_units),
+                        )
+                        return result
+            except Exception as _ll_exc:
+                _log_attempt(
+                    "generic:leaseleads_embed", "errored",
+                    reason=str(_ll_exc)[:120],
+                )
+
         # 2026-05-23: operator-published "no availability now" detector.
         # Last resort BEFORE we declare the page extractionless. ~10
         # krcapartments-class properties publish an explicit
