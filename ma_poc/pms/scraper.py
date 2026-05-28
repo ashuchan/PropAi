@@ -3365,6 +3365,48 @@ async def scrape_jugnu(
                     except Exception:  # pragma: no cover — defensive
                         pass
 
+            # 2026-05-28: TRANSIENT/BOT_BLOCKED salvage. The 2026-05-27 c612
+            # canary surfaced ~10 truth=Y props where Playwright returned
+            # TRANSIENT/BOT_BLOCKED but direct curl_cffi gets 200 OK with a
+            # substantive body in <1s (Squarespace + AppFolio embeds, simple
+            # SSR sites). Try one curl_cffi hop before short-circuiting.
+            # Soft-404 path takes precedence (DEAD_URL handled above).
+            _transient_salvage = False
+            if outcome_val in ("TRANSIENT", "BOT_BLOCKED") and not _soft_404_recovery:
+                try:
+                    import dataclasses as _dc
+
+                    from curl_cffi import requests as _cc
+
+                    from ma_poc.fetch.contracts import FetchOutcome
+                    _r = _cc.get(
+                        base_url,
+                        impersonate="chrome120",
+                        timeout=12,
+                        verify=False,
+                        allow_redirects=True,
+                    )
+                    _body_text = _r.text if isinstance(_r.text, str) else ""
+                    if _r.status_code == 200 and len(_body_text) >= 5000:
+                        _body_bytes = _body_text.encode("utf-8", errors="replace")
+                        fetch_result = _dc.replace(
+                            fetch_result,
+                            outcome=FetchOutcome.OK,
+                            status=200,
+                            body=_body_bytes,
+                            final_url=str(getattr(_r, "url", None) or base_url),
+                            error_signature="salvaged_via_curl_cffi",
+                        )
+                        outcome_val = "OK"
+                        _transient_salvage = True
+                        log.info(
+                            "TRANSIENT salvage succeeded for %s (%d bytes)",
+                            base_url,
+                            len(_body_bytes),
+                        )
+                except Exception as _exc:  # pragma: no cover — defensive
+                    log.debug("TRANSIENT salvage failed for %s: %s", base_url, _exc)
+
             if _soft_404_recovery:
                 # Fall through to extraction. Stash the status now; we'll
                 # write it onto result AFTER scrape() returns below because
@@ -3373,6 +3415,10 @@ async def scrape_jugnu(
                 # here would raise UnboundLocalError on Python 3.12+.
                 _soft_404_status_code = getattr(fetch_result, "status_code", None)
                 # Don't short-circuit; continue past this block.
+            elif _transient_salvage:
+                # Salvage replaced fetch_result with OK + real body; fall
+                # through to the normal extraction pipeline below.
+                pass
             else:
                 result = _empty_result(base_url)
                 result["_property_id"] = property_id
