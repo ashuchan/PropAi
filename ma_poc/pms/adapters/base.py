@@ -45,6 +45,12 @@ class AdapterContext:
     # generic-fallback handoff. When 0, the generic LLM gate stays open
     # even on detected (non-unknown) PMS hosts.
     adapter_unit_count: int = 0
+    # 2026-05-27 brochure/pre-leasing classifier observability: paths
+    # the resolver/link-hop attempted vs. those that returned a real
+    # inventory page (200 + floor-plan keywords). Pure observability —
+    # adapters that don't populate these are ignored by the classifier.
+    inventory_paths_attempted: list[str] = field(default_factory=list)
+    inventory_pages_reachable: list[str] = field(default_factory=list)
 
 
 @dataclass

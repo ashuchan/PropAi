@@ -386,3 +386,111 @@ def test_is_empty_inventory_page_rejects_many_bed_signals() -> None:
         + "</body></html>"
     )
     assert is_empty_inventory_page(html) is False
+
+
+# ─── 2026-05-27 brochure-only + pre-leasing predicates ───────────────
+
+
+from ma_poc.pms.adapters._no_availability import (  # noqa: E402
+    is_brochure_only_site,
+    is_pre_leasing_site,
+    matched_phrase_for_preleasing,
+)
+
+
+def _brochure_home(extra: str = "") -> str:
+    # Substantive homepage with apartment/community keywords.
+    return (
+        "<html><body>"
+        + "<header>Welcome to Maple Ridge Apartments</header>"
+        + "<section>Our community offers modern residences with "
+        + "thoughtful amenities. Visit our leasing office today.</section>"
+        + "<p>" + ("Lorem ipsum apartments leasing community " * 60) + "</p>"
+        + extra
+        + "</body></html>"
+    )
+
+
+def test_preleasing_coming_soon() -> None:
+    html = "<html><body><h1>Maple Ridge</h1><p>Coming Soon — Fall 2026</p></body></html>"
+    assert is_pre_leasing_site(html) is True
+    assert (matched_phrase_for_preleasing(html) or "").startswith("coming")
+
+
+def test_preleasing_vip_list() -> None:
+    html = "<p>Join our VIP list for early access to leasing.</p>"
+    assert is_pre_leasing_site(html) is True
+
+
+def test_preleasing_interest_list() -> None:
+    html = "<p>Sign up for the interest list to reserve your spot.</p>"
+    assert is_pre_leasing_site(html) is True
+
+
+def test_preleasing_reserve_your_apartment() -> None:
+    html = "<div>Reserve your apartment today.</div>"
+    assert is_pre_leasing_site(html) is True
+
+
+def test_preleasing_pre_leasing_phrase() -> None:
+    assert is_pre_leasing_site("<p>Now pre-leasing for 2026.</p>") is True
+    assert is_pre_leasing_site("<p>Now pre leasing for 2026.</p>") is True
+
+
+def test_preleasing_opening_soon() -> None:
+    assert is_pre_leasing_site("<p>Leasing begins fall 2026.</p>") is True
+
+
+def test_preleasing_hypothetical_prefix_rejected() -> None:
+    html = "<p>If you join our VIP list we'll email you when leasing opens.</p>"
+    # Wrapped in hypothetical clause — must not fire.
+    assert is_pre_leasing_site(html) is False
+
+
+def test_preleasing_negative_on_normal_inventory_page() -> None:
+    html = "<p>1 Bed 1 Bath $1,450/mo — Available 5/1.</p>"
+    assert is_pre_leasing_site(html) is False
+    assert matched_phrase_for_preleasing(html) is None
+
+
+def test_brochure_only_positive() -> None:
+    html = _brochure_home()
+    assert is_brochure_only_site(
+        html,
+        inventory_paths_attempted=["/floor-plans", "/availability", "/apartments"],
+        inventory_pages_reachable=[],
+    ) is True
+
+
+def test_brochure_only_negative_when_inventory_reachable() -> None:
+    html = _brochure_home()
+    assert is_brochure_only_site(
+        html,
+        inventory_paths_attempted=["/floor-plans"],
+        inventory_pages_reachable=["/floor-plans"],
+    ) is False
+
+
+def test_brochure_only_negative_no_attempts() -> None:
+    # Without an attempted-paths list we can't claim brochure-only.
+    assert is_brochure_only_site(_brochure_home(), [], []) is False
+    assert is_brochure_only_site(_brochure_home(), None, None) is False
+
+
+def test_brochure_only_negative_short_html() -> None:
+    html = "<html><body>tiny</body></html>"
+    assert is_brochure_only_site(
+        html, ["/floor-plans"], []
+    ) is False
+
+
+def test_brochure_only_negative_no_housing_keywords() -> None:
+    # Long enough but unrelated content — don't flag as brochure-only.
+    html = (
+        "<html><body>"
+        + "<h1>Steve's Auto Repair</h1>"
+        + "<p>We fix cars. Call us today for an estimate.</p>"
+        + ("Engine repair brakes tires alignment " * 80)
+        + "</body></html>"
+    )
+    assert is_brochure_only_site(html, ["/floor-plans"], []) is False
