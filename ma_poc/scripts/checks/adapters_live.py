@@ -172,7 +172,13 @@ async def scrape_one(cid: str, expected_pms: str, url: str) -> dict:
             page.on("response", _on_response)
 
             try:
-                await page.goto(url, wait_until="networkidle", timeout=30000)
+                # 2026-05-28: domcontentloaded + 2s fixed settle (was
+                # networkidle:30s). Heavy-JS sites (Elise AI, G5, Wix)
+                # never reach networkidle because of persistent
+                # WebSockets/mutation-observers — the production fetcher
+                # made the same swap (fetch/fetcher.py:1014). Cap at 20s
+                # to match production budget.
+                await page.goto(url, wait_until="domcontentloaded", timeout=20000)
                 await asyncio.sleep(2.0)
             except Exception as e:
                 result["errors"].append(f"Navigation: {type(e).__name__}: {str(e)[:100]}")

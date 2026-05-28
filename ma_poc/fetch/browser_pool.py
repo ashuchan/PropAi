@@ -92,13 +92,90 @@ def _parse_blocked_types(val: str | None) -> frozenset[str]:
 _BLOCKED_RESOURCE_TYPES = _parse_blocked_types(os.getenv("BLOCK_RESOURCE_TYPES"))
 
 
-async def _resource_block_route(route: object) -> None:
-    """page.route("**/*") handler: abort blocked resource types, pass rest."""
+# 2026-05-28 — Time-sink third-party host blocklist. The 2026-05-27 c612
+# canary surfaced 77 per-property 600s timeouts where direct curl_cffi
+# fetched the same site in <1s — i.e. the page itself is fine, but our
+# Playwright session stalls on background bundles. Pattern analysis of
+# the 77 timeouts found 26 sites carrying Elise AI chatbot bundles (open
+# persistent WebSockets that keep network active) and 19 sites carrying
+# G5 marketing bundles (heavy analytics + mutation observers). These
+# third-party assets contribute nothing to unit-extraction — blocking
+# them at the route layer lets the page finish loading cleanly without
+# changing any extraction logic.
+#
+# Membership rule: domain MUST be confirmed as (a) third-party (never the
+# property's own host), (b) carrying no extractable unit data, AND (c)
+# observed to cause stalls in real canary runs. Don't add a host on
+# speculation — false positives can break legit SSR rent extraction.
+_BLOCKED_HOST_SUFFIXES: frozenset[str] = frozenset({
+    # Chatbots / virtual leasing agents — heavy WebSocket workers
+    "meetelise.com",         # Elise AI — 26 timeouts in c612 canary
+    "elise.com",
+    "sierra.chat",           # Sierra AI chatbot
+    "theconversioncloud.com",  # Conversion Cloud chatbot
+    "nestiolistings.com",    # Nestio chat widget
+    "rentgrata.com",         # Rentgrata lead widget
+    # Marketing / analytics bundles that stall page-load
+    "g5search.com",          # G5 marketing — 19 timeouts in c612 canary
+    "g5dxcdn.com",
+    "g5marketingcloud.com",
+    # Tag managers / generic analytics (still let GA/GTM document loads
+    # through if we ever depend on them, but their script bundles are
+    # the issue). Resource-type blocking image/font/media already covers
+    # pixel beacons; this catches the heavy script bundles.
+    "googletagmanager.com",
+    "doubleclick.net",
+    "go-mpulse.net",
+    "visitor-analytics.io",
+    "hotjar.com",
+    "userway.org",
+    # Note: NOT blocking google-analytics.com itself, as some legit
+    # extraction paths read GA-injected JSON for property-id discovery.
+})
+
+
+def _host_is_blocked(url: str) -> bool:
+    """True when ``url``'s host matches any entry in ``_BLOCKED_HOST_SUFFIXES``.
+
+    Matches on suffix (so ``foo.meetelise.com`` matches ``meetelise.com``)
+    but not on prefix-only (so ``meetelise.com.evil.com`` would NOT match
+    — but the urlparse netloc is the eTLD+1 in practice).
+    """
     try:
-        rtype = route.request.resource_type  # type: ignore[attr-defined]
+        from urllib.parse import urlparse
+        host = urlparse(url).netloc.lower()
     except Exception:
-        rtype = ""
+        return False
+    if not host:
+        return False
+    # Strip port if present
+    if ":" in host:
+        host = host.split(":", 1)[0]
+    for suffix in _BLOCKED_HOST_SUFFIXES:
+        if host == suffix or host.endswith("." + suffix):
+            return True
+    return False
+
+
+async def _resource_block_route(route: object) -> None:
+    """page.route("**/*") handler: abort blocked resource types AND blocked
+    third-party hosts, pass everything else through."""
+    req = None
+    rtype = ""
+    url = ""
     try:
+        req = route.request  # type: ignore[attr-defined]
+        rtype = req.resource_type
+        url = req.url
+    except Exception:
+        pass
+    try:
+        # 2026-05-28: host-blocklist precedes resource-type check so a
+        # `xhr` request to meetelise.com still gets aborted (resource-type
+        # alone never blocks xhr/fetch/document).
+        if url and _host_is_blocked(url):
+            await route.abort()  # type: ignore[attr-defined]
+            return
         if rtype in _BLOCKED_RESOURCE_TYPES:
             await route.abort()  # type: ignore[attr-defined]
         else:
