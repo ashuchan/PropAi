@@ -2409,8 +2409,17 @@ def _format_zip(val: Any) -> str | None:
 
 
 def _norm_avail_status(val: Any) -> str | None:
-    """Normalise availability_status. Uppercases known tokens; passes
-    raw strings through (capture-first). Returns None when unset.
+    """Normalise availability_status into the enum
+    {AVAILABLE, UNAVAILABLE, WAITLIST, WAITLISTED, LEASED, PENDING, UNKNOWN}
+    or None when unset.
+
+    2026-05-31 QC update: the previous capture-first behaviour leaked 181
+    free-text values into output ("Notice - Application Pending", "Sign
+    Waitlist", "Call for Details!", "Only 1 Vacant Apartment Left!").
+    Now every recognized phrase maps to its enum value, and any
+    unrecognized non-empty string maps to UNKNOWN — never raw text.
+    Downstream QA can still inspect the original via ``*_raw`` companion
+    fields preserved by ``make_unit_dict``.
 
     Mirrors _norm_status() in ma_poc/core/schema_v2.py — keep in sync.
     """
@@ -2420,15 +2429,35 @@ def _norm_avail_status(val: Any) -> str | None:
     if not s:
         return None
     u = s.upper()
+    # 1. Exact enum match — single source of truth for the verb set.
     if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED",
              "LEASED", "PENDING", "UNKNOWN"):
         return u
-    # Partial-match helpers for common raw strings from adapters
-    if "AVAILABLE" in u and "UNAVAILABLE" not in u:
-        return "AVAILABLE"
-    if u == "LEASED OUT" or "NOT AVAILABLE" in u or "UNAVAILABLE" in u:
+    # 2. Phrase-based partial matches. Order matters — PENDING and
+    # WAITLIST are checked before AVAILABLE because "application
+    # pending" / "join waitlist" can co-occur with AVAILABLE-ish
+    # framing on operator pages but the real semantic is the more
+    # specific state.
+    if "PENDING" in u or "APPLICATION" in u:
+        return "PENDING"
+    if "WAITLIST" in u or "WAIT LIST" in u or "WAIT-LIST" in u:
+        return "WAITLIST"
+    # UNAVAILABLE-shaped phrases checked BEFORE LEASED so "leased out"
+    # / "not available" don't get caught as plain LEASED.
+    if (
+        "NOT AVAILABLE" in u
+        or "UNAVAILABLE" in u
+        or "SOLD OUT" in u
+        or "LEASED OUT" in u
+    ):
         return "UNAVAILABLE"
-    return s  # capture-first: preserve raw text for downstream QA
+    if "LEASED" in u or "OCCUPIED" in u:
+        return "LEASED"
+    # "AVAILABLE NOW", "Only N Vacant", "Now Available" — count these as AVAILABLE
+    if "AVAILABLE" in u or "VACANT" in u or "NOW LEASING" in u:
+        return "AVAILABLE"
+    # 3. Everything else (free-text noise) → UNKNOWN. Don't leak raw.
+    return "UNKNOWN"
 
 
 def _format_rent(val: Any) -> float | None:

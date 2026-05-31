@@ -862,9 +862,17 @@ def _first(unit: dict, *keys: str) -> Any:
 
 
 def _norm_status(val: Any) -> str | None:
-    """Light availability-status normalization. Uppercases the common
-    AVAILABLE/UNAVAILABLE/WAITLIST tokens; otherwise passes the raw
-    string through (capture-first). None when unset."""
+    """Normalise availability_status into the enum
+    {AVAILABLE, UNAVAILABLE, WAITLIST, WAITLISTED, LEASED, PENDING, UNKNOWN}
+    or None when unset.
+
+    2026-05-31 QC update: prior capture-first behaviour leaked 181
+    free-text values into output. Now every recognized phrase maps to
+    its enum value; any unrecognized non-empty string maps to UNKNOWN.
+
+    Mirrors _norm_avail_status() in ma_poc/scripts/runners/jugnu.py —
+    keep in sync.
+    """
     if val is None:
         return None
     s = str(val).strip()
@@ -874,7 +882,22 @@ def _norm_status(val: Any) -> str | None:
     if u in ("AVAILABLE", "UNAVAILABLE", "WAITLIST", "WAITLISTED",
              "LEASED", "PENDING", "UNKNOWN"):
         return u
-    return s
+    if "PENDING" in u or "APPLICATION" in u:
+        return "PENDING"
+    if "WAITLIST" in u or "WAIT LIST" in u or "WAIT-LIST" in u:
+        return "WAITLIST"
+    if (
+        "NOT AVAILABLE" in u
+        or "UNAVAILABLE" in u
+        or "SOLD OUT" in u
+        or "LEASED OUT" in u
+    ):
+        return "UNAVAILABLE"
+    if "LEASED" in u or "OCCUPIED" in u:
+        return "LEASED"
+    if "AVAILABLE" in u or "VACANT" in u or "NOW LEASING" in u:
+        return "AVAILABLE"
+    return "UNKNOWN"
 
 
 def _safe_lease_term(val: Any) -> int | None:
