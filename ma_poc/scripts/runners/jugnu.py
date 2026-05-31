@@ -1542,6 +1542,53 @@ def _apply_p1_exact_dedup(units: list[dict[str, Any]]) -> int:
     return len(drop_indices)
 
 
+def _apply_p3_inferred_id_collision_suffix(units: list[dict[str, Any]]) -> int:
+    """2026-05-31: ``inferred_<sha>`` IDs are derived from (canonical_id,
+    floor_plan_name, beds, baths) — by design, two units with the same
+    plan-anchor (per ``compute_inferred_unit_id`` in _parsing.py:415) get
+    the same ID. P1 EXACT_DUPE then collapses byte-identical rows. But
+    when the same inferred-ID maps to 2+ rows that differ on area, rent,
+    building, or availability_status (i.e. real distinct units sharing a
+    plan), P1 keeps them all and downstream sees collisions:
+
+      pid=55797 had ``inferred_abd603c978cdfc32`` × 32, byredwood
+      portfolio sites had identical 122-row patterns, etc. — 3,924 extra
+      collision rows across 456 props in the may13 may28 canary.
+
+    Fix: after P1 dedup, append a stable per-row suffix to break the
+    collisions while preserving the plan-anchor in the prefix. Suffix
+    is short, deterministic (sha of the row's full fingerprint), and
+    safe across runs of the same input (no random component).
+
+    Only fires on ``inferred_*`` IDs — real adapter-provided unit_ids
+    are never modified.
+
+    Returns count of rewritten rows."""
+    from collections import defaultdict
+    import hashlib as _hl
+
+    groups: dict[str, list[int]] = defaultdict(list)
+    for i, u in enumerate(units):
+        uid = u.get("unit_id")
+        if not isinstance(uid, str) or not uid.startswith("inferred_"):
+            continue
+        groups[uid].append(i)
+
+    rewritten = 0
+    for uid, idxs in groups.items():
+        if len(idxs) < 2:
+            continue
+        # Suffix each row with first 6 chars of sha of its full fingerprint.
+        # Stable across runs — same inputs → same suffix.
+        for i in idxs:
+            u = units[i]
+            fp = _dedup_fingerprint(u)
+            sfx = _hl.sha256(repr(fp).encode()).hexdigest()[:6]
+            u["unit_id"] = f"{uid}-{sfx}"
+            rewritten += 1
+    return rewritten
+
+
 def _emit_v2_units_for_property(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Per-property post-extraction normalisation step.
 
@@ -1560,10 +1607,62 @@ def _emit_v2_units_for_property(units: list[dict[str, Any]]) -> list[dict[str, A
     """
     if not units:
         return units
+    # P0 — fp_name canonicalization (2026-05-31): when the same
+    # floor_plan_id maps to multiple case-variant names within a
+    # property (e.g. 'A5' + 'a5', 'Llano' + 'LLano', Holland
+    # Residential's 'C2R TWO BEDROOM RENOVATED' + 'C2r Two Bedroom
+    # Renovated'), pick the most-frequent case-form and rewrite all
+    # rows to it. Without this the same plan shows up as two distinct
+    # entries in plan-level analytics. Runs BEFORE dedup so case-
+    # variants collapse correctly under P1's fingerprint match.
+    _apply_p0_fp_name_canonicalization(units)
     _apply_p2_building_disambiguation(units)
     _apply_p2b_floor_plan_id_disambiguation(units)
     _apply_p1_exact_dedup(units)
+    # P3 runs LAST — only fires on inferred_* IDs that survive P1
+    # because their fingerprints differ on area / rent / building.
+    _apply_p3_inferred_id_collision_suffix(units)
     return units
+
+
+def _apply_p0_fp_name_canonicalization(units: list[dict[str, Any]]) -> int:
+    """For each distinct floor_plan_id, find the most-common case-form
+    of floor_plan_name and rewrite all rows to that form.
+
+    Tie-break (when two case-forms have equal counts): prefer the form
+    with more uppercase letters in the first 3 chars (typical operator
+    style — "A5" beats "a5", "C2R TWO BEDROOM" beats "C2r Two Bedroom").
+    """
+    from collections import Counter, defaultdict
+
+    groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for u in units:
+        fpid = u.get("floor_plan_id")
+        fpn = u.get("floor_plan_name")
+        if fpid and isinstance(fpn, str) and fpn.strip():
+            groups[fpid].append(u)
+
+    rewritten = 0
+    for fpid, group in groups.items():
+        names = [u.get("floor_plan_name") for u in group]
+        if len(set(names)) < 2:
+            continue
+        counter = Counter(names)
+        max_count = max(counter.values())
+        tied = [n for n, c in counter.items() if c == max_count]
+        if len(tied) == 1:
+            canonical = tied[0]
+        else:
+            # Tie-break: prefer the form with more uppercase in first 3 chars
+            canonical = max(
+                tied,
+                key=lambda s: sum(1 for c in s[:3] if c.isupper()),
+            )
+        for u in group:
+            if u.get("floor_plan_name") != canonical:
+                u["floor_plan_name"] = canonical
+                rewritten += 1
+    return rewritten
 
 
 def _format_v2_unit(

@@ -92,6 +92,21 @@ _JUNK_PLAN_PATTERNS = (
     re.compile(r"^(MODULE|WIDGET|COMPONENT|CMS|PLUGIN)[_\- ]", re.I),
     re.compile(r"\b(lease\s*magnet|pop[- ]?up|gravity\s*forms?|mobile\s*form)\b", re.I),
     re.compile(r"^\[[^\]]{2,30}\].*?(magnet|pop|form|mobile)\b", re.I),  # vendor-prefixed CMS entries
+    # 2026-05-31 — QC on may13 canary surfaced 646 junk fp_names. Three
+    # distinct fall-backs that are NOT real plan names emerge when an
+    # adapter has no plan label and substitutes a placeholder:
+    #   • '~' (217) — TIER_1_5_EMBEDDED Next/Nuxt blob default when
+    #     plan-name field is empty; chip #101 mapped some of these to
+    #     '1 Bed 1 Bath' but the EMBEDDED path bypasses that fix.
+    #   • '1 Bed 1 Bath' / '0 Bed 1 Bath' (213) — slug-style default
+    #     emitted as a literal label by generic plan-text + Knock when
+    #     no plan name is found; this is bed/bath count text, not a
+    #     plan identifier.
+    # Reject all three so downstream stores null floor_plan_name and
+    # the plan-id derivation falls back to beds+baths deterministically
+    # (per chip #146).
+    re.compile(r"^~+$"),
+    re.compile(r"^\d\s+bed\s+\d(?:\.5)?\s+bath$", re.I),
 )
 
 # Unit number tokens that are obviously navigation text or stop-words, not
