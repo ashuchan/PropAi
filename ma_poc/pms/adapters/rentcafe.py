@@ -308,6 +308,50 @@ _TIER_SHAPE_REJECTED = f"{_TIER_BASE}_SHAPE_REJECTED"
 _TIER_LIST_EMPTY = f"{_TIER_BASE}_LIST_EMPTY"
 _TIER_PARSE_ZERO = f"{_TIER_BASE}_PARSE_ZERO"
 
+# 2026-05-31 — paths that the detector misroute most often actually
+# hosts unit data on. Mirrors the Knock _KNOCK_EMPTY_FALLTHROUGH_PATHS
+# choice. Same-host only; the orchestrator's link-hop layer will fetch
+# these via the normal probe ladder and the subsequent DOM / plan-text
+# tiers do the extraction.
+_RENTCAFE_SHAPE_REJECTED_FALLTHROUGH_PATHS: tuple[str, ...] = (
+    "/floorplans",
+    "/floor-plans",
+    "/availability",
+    "/available-units",
+    "/apartments",
+    "/units",
+)
+
+
+def _rentcafe_shape_rejected_emit_subpage_hints(
+    result: Any, base_url: str
+) -> None:
+    """Append floor-plan family URLs as subpage hints on ``result``.
+
+    Mirrors knock.py ``_knock_empty_emit_subpage_hints`` exactly so
+    downstream link-hop treats both signals the same. Idempotent: if
+    a candidate already exists in
+    ``result._embedded_floorplan_subpage_hints`` it is skipped.
+    """
+    from urllib.parse import urljoin, urlparse
+
+    parsed = urlparse(base_url)
+    if not parsed.scheme or not parsed.netloc:
+        return  # malformed — emit nothing rather than bad URLs
+
+    existing = list(getattr(result, "_embedded_floorplan_subpage_hints", None) or [])
+    existing_urls: set[str] = {u for u, _ in existing}
+
+    additions: list[tuple[str, str]] = []
+    for path in _RENTCAFE_SHAPE_REJECTED_FALLTHROUGH_PATHS:
+        candidate = urljoin(base_url, path)
+        if candidate in existing_urls:
+            continue
+        additions.append((candidate, "rentcafe_shape_rejected_fallthrough"))
+
+    if additions:
+        result._embedded_floorplan_subpage_hints = existing + additions  # type: ignore[attr-defined]
+
 
 def _classify_rentcafe_failure(api_responses: list[dict[str, Any]]) -> tuple[str, str]:
     """Return (tier_code, machine-readable error message) for a failed run."""
@@ -570,6 +614,28 @@ class RentCafeAdapter:
         result.tier_used = tier_code
         result.confidence = 0.0
         result.errors.append(err_msg)
+
+        # ── SHAPE_REJECTED fallthrough (2026-05-31) ─────────────────
+        # When the RentCafe adapter declares SHAPE_REJECTED — i.e. it
+        # captured network responses but NONE matched the RentCafe
+        # envelope/key signature — the property is almost certainly a
+        # detector misroute. Pattern from the 2026-05-28 canary QC
+        # (404-prop residue): operator's homepage carries a SecureCafe
+        # / rentcafe.com LINK (lease application portal) but the actual
+        # PMS is custom WordPress / Wix / Squarespace with rents in
+        # static HTML. Detector tags as RentCafe → no RentCafe API
+        # responses fire → SHAPE_REJECTED → property fails despite
+        # data being trivially extractable.
+        #
+        # Mirrors the Knock empty-API fallthrough pattern (knock.py
+        # line 334, chip 2026-05-21). Surfaces standard floor-plan
+        # subpath URLs as link-hop hints so the orchestrator drives
+        # the next tier (DOM scan + generic_plan_text + empty-inventory
+        # predicate) against the right URL.
+        _rcsr_base_url = str(getattr(ctx, "base_url", "") or "")
+        if tier_code == _TIER_SHAPE_REJECTED and _rcsr_base_url:
+            _rentcafe_shape_rejected_emit_subpage_hints(result, _rcsr_base_url)
+
         return result
 
     def static_fingerprints(self) -> list[str]:
