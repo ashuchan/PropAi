@@ -51,6 +51,15 @@ from ma_poc.pms.adapters._amli import (
 from ma_poc.pms.adapters._amli import (
     parse_amli_trpc_blob as _parse_amli,
 )
+from ma_poc.pms.adapters._camden import (
+    detect_camden_next_data as _detect_camden,
+)
+from ma_poc.pms.adapters._camden import (
+    is_camden_host as _is_camden_host,
+)
+from ma_poc.pms.adapters._camden import (
+    parse_camden_next_data as _parse_camden,
+)
 from ma_poc.pms.adapters._apts247 import (
     build_floorplans_url as _apts247_build_url,
 )
@@ -2330,6 +2339,34 @@ class GenericAdapter:
                             result.errors.append(f"amli-parse-error: {_ax}")
                 if amli_units:
                     embedded_units = amli_units
+                # ── Sub-tier 4a' (Camden, 2026-06-27): when none of the
+                # other Next.js variants matched, try Camden's
+                # ``__NEXT_DATA__.props.pageProps.suggestedFloorPlans``
+                # extractor. Camden Property Trust runs 165+ properties
+                # on camdenliving.com and the static-fetch tier sees
+                # the same shell HTML for every URL — the inventory
+                # lives in the page state blob. Host-gated to avoid
+                # firing on non-Camden Next.js blobs that happen to
+                # carry an unrelated "suggestedFloorPlans" key.
+                if not embedded_units and _is_camden_host(
+                    ctx.base_url or getattr(ctx, "winning_url", "") or ""
+                ):
+                    for blob in embedded:
+                        body = blob.get("body") or ""
+                        if not isinstance(body, str):
+                            continue
+                        if not _detect_camden(body):
+                            continue
+                        try:
+                            camden_units = _parse_camden(
+                                body, source_url=ctx.base_url or ""
+                            )
+                        except Exception as _cx:
+                            result.errors.append(f"camden-parse-error: {_cx}")
+                            camden_units = []
+                        if camden_units:
+                            embedded_units = camden_units
+                            break
                 else:
                     try:
                         embedded_units = _dr_parse_api_responses(embedded) or []
