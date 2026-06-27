@@ -160,6 +160,7 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
         if isinstance(fp, dict) and fp.get("id") is not None:
             fp_by_id[str(fp["id"])] = fp
 
+    seen_fp_ids: set[str] = set()
     for u in raw_units:
         if not isinstance(u, dict):
             continue
@@ -172,6 +173,7 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
             dropped += 1
             continue
         fp = fp_by_id[fp_id]
+        seen_fp_ids.add(fp_id)
 
         price = u.get("price")
         price_i: int | None = None
@@ -231,6 +233,44 @@ def parse_sightmap_payload(body: Any, url: str) -> tuple[list[dict[str, str]], i
                 extraction_tier=_TIER_BASE,
             )
         )
+
+    # 2026-06-27 chip: plan-level rows for floor plans with NO units in units[].
+    # SightMap's units[] commonly omits sold-out / not-yet-released plans (e.g.
+    # townhome HH*/TH* prefixes on Billingsley properties). Without this pass,
+    # those plans never appear in the output and the property's catalogue is
+    # truncated (Hudson 18/30, Hastings End 12/25, August Hills 9/15 vs
+    # apartments.com ground truth, 2026-06-27 QC). Emit one row per such plan
+    # marked UNAVAILABLE / available_units="0" so downstream catalogue diff
+    # surfaces the full inventory while the operator's published-rent gate keeps
+    # unit-level metrics unaffected.
+    for fp_id, fp in fp_by_id.items():
+        if fp_id in seen_fp_ids:
+            continue
+        beds = fp.get("bedroom_count")
+        baths = fp.get("bathroom_count")
+        name = fp.get("name") or fp.get("filter_label") or ""
+        units_out.append(
+            make_unit_dict(
+                floor_plan_name=str(name),
+                bed_label=bed_label_from(beds, str(name)),
+                bedrooms=str(beds) if beds is not None else "",
+                bathrooms=str(baths) if baths is not None else "",
+                sqft="",
+                unit_number="",
+                floor="",
+                building="",
+                rent_range="",
+                concession="",
+                availability_status="UNAVAILABLE",
+                available_units="0",
+                availability_date="",
+                source_ids={"sightmap_floor_plan_id": fp_id},
+                source_api_url=url,
+                extraction_tier=_TIER_BASE,
+                data_quality_flag="SIGHTMAP_PLAN_PRESENCE",
+            )
+        )
+
     return units_out, dropped
 
 
@@ -512,7 +552,12 @@ def _drop_zero_info_sightmap_units(
     keep: list[dict[str, Any]] = []
     dropped = 0
     for u in units:
-        if _sightmap_unit_has_rent(u):
+        # Plan-presence rows (floor plans with no units in units[]) are catalogue
+        # markers by construction — no rent expected. Keep them; the zero-info
+        # filter targets unit-level rows operators failed to price.
+        if u.get("data_quality_flag") == "SIGHTMAP_PLAN_PRESENCE":
+            keep.append(u)
+        elif _sightmap_unit_has_rent(u):
             keep.append(u)
         elif keep_dated_no_rent and _has_date(u):
             keep.append(u)
