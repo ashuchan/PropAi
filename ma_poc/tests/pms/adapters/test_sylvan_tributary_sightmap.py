@@ -166,8 +166,8 @@ def test_parse_sightmap_payload_returns_125_priced_units() -> None:
     assert _is_sightmap_response(body)
 
     units, dropped = parse_sightmap_payload(body, responses[0]["url"])
-    assert len(units) == 125, (
-        f"Expected 125 units, got {len(units)} (dropped {dropped})"
+    assert len(units) == 126, (
+        f"Expected 126 units (125 priced + 1 plan-presence row for empty plan), got {len(units)} (dropped {dropped})"
     )
     assert dropped == 0
 
@@ -176,6 +176,7 @@ def test_parse_sightmap_payload_returns_125_priced_units() -> None:
     no_rent = [
         u for u in units
         if str(u.get("rent_range") or "").strip() in {"", "$0", "0"}
+        and u.get("data_quality_flag") != "SIGHTMAP_PLAN_PRESENCE"
     ]
     assert not no_rent, (
         f"Expected 0 units without rent; got {len(no_rent)} "
@@ -183,7 +184,10 @@ def test_parse_sightmap_payload_returns_125_priced_units() -> None:
     )
 
     # All units must have a real availability date.
-    no_date = [u for u in units if not u.get("availability_date")]
+    no_date = [
+        u for u in units if not u.get("availability_date")
+        and u.get("data_quality_flag") != "SIGHTMAP_PLAN_PRESENCE"
+    ]
     assert not no_date, (
         f"Expected 0 units without availability_date; "
         f"got {len(no_date)}"
@@ -210,7 +214,7 @@ async def test_adapter_extract_from_captured_xhr() -> None:
 
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert isinstance(result, AdapterResult)
-    assert len(result.units) == 125
+    assert len(result.units) == 126
     assert result.tier_used.startswith("TIER_1_API_SIGHTMAP")
     # Must NOT be the rent-gap or zero-info tier — Sylvan publishes rent.
     assert "OPERATOR_RENT_NOT_PUBLISHED" not in result.tier_used
@@ -303,7 +307,7 @@ async def test_adapter_iframe_fallback_when_xhr_uncaptured(monkeypatch) -> None:
 
     result = await adapter.extract(_DummyPage(), ctx)  # type: ignore[arg-type]
     assert isinstance(result, AdapterResult)
-    assert len(result.units) == 125, (
+    assert len(result.units) == 126, (
         f"Iframe-fallback produced {len(result.units)} units, expected 125. "
         f"tier={result.tier_used!r} errors={result.errors[:3]}"
     )
