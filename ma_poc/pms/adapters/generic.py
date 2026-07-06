@@ -2352,8 +2352,14 @@ class GenericAdapter:
                     ctx.base_url or getattr(ctx, "winning_url", "") or ""
                 ):
                     for blob in embedded:
-                        body = blob.get("body") or ""
-                        if not isinstance(body, str):
+                        body = blob.get("body")
+                        # body may be a raw HTML string or a pre-parsed JSON
+                        # dict (extract_embedded_blobs_from_html json.loads'es
+                        # script-tag contents). _detect_camden + _parse_camden
+                        # both accept either shape.
+                        if body is None:
+                            continue
+                        if not isinstance(body, (str, dict)):
                             continue
                         if not _detect_camden(body):
                             continue

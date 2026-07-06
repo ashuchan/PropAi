@@ -1437,6 +1437,41 @@ class GenericPlanTextAdapter:
         result = AdapterResult(tier_used="TIER_1_DOM_GENERIC_PLAN_TEXT")
         body = ""
 
+        # 2026-06-27: Camden Living NEXT_DATA short-circuit.
+        # Camden's 165+ properties route here (no PMS fingerprint hits);
+        # inventory lives in __NEXT_DATA__.props.pageProps.suggestedFloorPlans
+        # rather than the visible DOM, so plan-text regex sees only the
+        # "Starting at $X" hero. Parse the blob directly.
+        try:
+            from ma_poc.pms.adapters._camden import (
+                is_camden_host as _is_camden_host,
+                detect_camden_next_data as _detect_camden,
+                parse_camden_next_data as _parse_camden,
+            )
+            _camden_url = str(getattr(ctx, "base_url", "") or "")
+            if _is_camden_host(_camden_url):
+                fr = getattr(ctx, "fetch_result", None)
+                raw = getattr(fr, "body", None) if fr is not None else None
+                if isinstance(raw, bytes):
+                    raw_html = raw.decode("utf-8", errors="replace")
+                elif isinstance(raw, str):
+                    raw_html = raw
+                else:
+                    raw_html = ""
+                if raw_html and _detect_camden(raw_html):
+                    try:
+                        camden_units = _parse_camden(raw_html, source_url=_camden_url)
+                    except Exception as _cx:
+                        result.errors.append(f"camden-parse-error: {_cx}")
+                        camden_units = []
+                    if camden_units:
+                        result.units = camden_units
+                        result.tier_used = "TIER_1_DOM_CAMDEN_NEXT_DATA"
+                        result.confidence = 0.9
+                        return result
+        except Exception as _cx_outer:
+            result.errors.append(f"camden-wiring-error: {_cx_outer}")
+
         # 2026-05-24: prior implementation hard-required a live Playwright
         # page (page.evaluate to harvest document.body innerText). Phase
         # 6 of the canary scraper dispatches this adapter with a stub

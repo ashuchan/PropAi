@@ -67,15 +67,33 @@ def is_camden_host(url: str | None) -> bool:
     return bool(_CAMDEN_HOST_RE.search(host))
 
 
-def detect_camden_next_data(html: str) -> bool:
-    """Cheap fingerprint: ``__NEXT_DATA__`` present AND
-    ``suggestedFloorPlans`` key appears somewhere in the page.
-    Both checks string-based so we never parse JSON we won't use."""
-    if not html or len(html) < 1000:
+def detect_camden_next_data(html_or_blob: Any) -> bool:
+    """Cheap fingerprint. Accepts either:
+      • raw HTML string — fires when ``__NEXT_DATA__`` script tag + the
+        ``suggestedFloorPlans`` key both appear.
+      • parsed JSON dict (already-extracted blob body from
+        ``extract_embedded_blobs_from_html``) — fires when the dict has
+        ``props.pageProps.suggestedFloorPlans``.
+
+    Single function so the caller doesn't need to know whether it's
+    holding a string or a dict.
+    """
+    if html_or_blob is None:
         return False
-    if 'id="__NEXT_DATA__"' not in html:
+    # Parsed dict path (from extract_embedded_blobs_from_html)
+    if isinstance(html_or_blob, dict):
+        sfp = (
+            html_or_blob.get("props", {})
+            .get("pageProps", {})
+            .get("suggestedFloorPlans")
+        )
+        return isinstance(sfp, list) and len(sfp) > 0
+    # Raw HTML string path (direct/live tests)
+    if not isinstance(html_or_blob, str) or len(html_or_blob) < 1000:
         return False
-    return "suggestedFloorPlans" in html
+    if 'id="__NEXT_DATA__"' not in html_or_blob:
+        return False
+    return "suggestedFloorPlans" in html_or_blob
 
 
 def _coerce_int(v: Any) -> int | None:
@@ -128,25 +146,37 @@ def _iso_date_only(s: Any) -> str | None:
 
 
 def parse_camden_next_data(
-    html: str, source_url: str = ""
+    html_or_blob: Any, source_url: str = ""
 ) -> list[dict[str, Any]]:
-    """Parse the ``__NEXT_DATA__`` blob and emit one unit dict per
-    available unit. Returns [] when:
-      - the blob doesn't parse as JSON
+    """Parse the ``__NEXT_DATA__`` payload and emit one unit dict per
+    available unit. Accepts either a raw HTML string or a pre-parsed
+    JSON dict (the blob body shape produced by
+    ``extract_embedded_blobs_from_html`` — that helper already
+    ``json.loads`` 's script-tag contents before they reach adapters).
+
+    Returns [] when:
+      - input is empty / None / wrong type
+      - regex can't find __NEXT_DATA__ in raw HTML
+      - JSON parsing fails
       - suggestedFloorPlans is missing/empty
-      - any other unexpected shape
 
     Never raises — caller appends to result.units unconditionally.
     """
-    if not html:
+    if html_or_blob is None:
         return []
-    m = _NEXT_DATA_RE.search(html)
-    if not m:
-        return []
-    try:
-        nd = json.loads(m.group(1))
-    except Exception:
-        return []
+    # Already-parsed blob path: take dict as-is
+    if isinstance(html_or_blob, dict):
+        nd = html_or_blob
+    else:
+        if not isinstance(html_or_blob, str) or not html_or_blob:
+            return []
+        m = _NEXT_DATA_RE.search(html_or_blob)
+        if not m:
+            return []
+        try:
+            nd = json.loads(m.group(1))
+        except Exception:
+            return []
     sfp = (
         nd.get("props", {})
         .get("pageProps", {})
@@ -204,6 +234,14 @@ def parse_camden_next_data(
                 "area": sqft,
                 "rent_low": rent_low,
                 "rent_high": rent_high,
+                # Aliases — schema_v2._format_v2_unit reads these names
+                # before falling back to rent_low; legacy consumers also
+                # look for asking_rent. Emit all so the field survives any
+                # downstream normalizer.
+                "market_rent_low": rent_low,
+                "market_rent_high": rent_high,
+                "asking_rent": rent_low,
+                "rent": rent_low,
                 "availability_status": "AVAILABLE",
                 "available_date": move_in,
                 "source_api_url": source_url or "",
