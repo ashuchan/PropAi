@@ -2281,6 +2281,56 @@ _LINK_SKIP_PATTERNS: tuple[str, ...] = (
 )
 
 
+# 2026-06-27: Parent-landlord aggregator hosts that publish a per-property
+# landing page (no rent / floor-plan data of their own) and link out to the
+# property's own marketing site. Example: streetlights.com/properties/the-
+# beverly/ → thebeverlyonescottsdale.com. When the entry URL matches one of
+# these, _rank_internal_links lets external `.com` links survive the
+# same-site/portal gate so _try_link_hop can recover the real property site.
+#
+# Detection is host-substring against the entry URL. Keep this list tight:
+# every entry forces the ranker to spend a hop slot on an off-site link.
+_PARENT_LANDLORD_HOSTS: tuple[str, ...] = (
+    "streetlights.com",
+)
+
+# Junk hosts that show up in parent-landlord pages but aren't property sites
+# (analytics, portfolio investor portals, subcontractor portals, social).
+# Used only when the entry host matched _PARENT_LANDLORD_HOSTS.
+_PARENT_LANDLORD_EXTERNAL_JUNK: frozenset[str] = frozenset({
+    "google.com", "googletagmanager.com", "developers.google.com",
+    "facebook.com", "instagram.com", "twitter.com", "x.com",
+    "linkedin.com", "youtube.com", "tiktok.com",
+    "monsterinsights.com", "teamupdraft.com", "wpforms.com",
+    "smartbidnet.com", "securecc.smartbidnet.com",
+    # Streetlights' own investor portal — not the property site.
+    "streetlightsres.com", "investors.streetlightsres.com",
+})
+
+
+def _is_parent_landlord_entry(entry_host: str) -> bool:
+    """True when entry_host is a known parent-landlord aggregator that
+    only links to the real property site externally."""
+    h = (entry_host or "").lower()
+    return any(p in h for p in _PARENT_LANDLORD_HOSTS)
+
+
+def _is_parent_landlord_external_candidate(link_host: str) -> bool:
+    """True when link_host looks like a real property marketing site (not
+    a social, analytics, or investor-portal junk host). Used by
+    _rank_internal_links to allow external link-hop ONLY when the entry
+    host is a parent-landlord aggregator."""
+    h = (link_host or "").lower().lstrip(".")
+    if not h or "." not in h:
+        return False
+    # Strip leading www. for the junk-host check
+    bare = h[4:] if h.startswith("www.") else h
+    if bare in _PARENT_LANDLORD_EXTERNAL_JUNK:
+        return False
+    # Final guard — must look like a real .com / .net property site
+    return any(bare.endswith("." + tld) or bare.endswith(tld) for tld in (".com", ".net", ".co"))
+
+
 def _rank_internal_links(
     page_html: str,
     base_url: str,
@@ -2374,8 +2424,24 @@ def _rank_internal_links(
             or base_host.endswith("." + link_host)
         )
         is_portal = any(link_host.endswith(suf) for suf, _ in _LINK_HOST_KEYWORDS)
-        if not (is_same_site or is_portal):
+        # 2026-06-27: Parent-landlord aggregators (streetlights.com etc)
+        # publish per-property landing pages that ONLY link to the property's
+        # own external site. Allow off-site .com hops in that narrow case so
+        # the link-hop tier can recover the real site (verified live:
+        # streetlights.com/properties/the-beverly/ → thebeverlyonescottsdale.com
+        # gives 68 units once the hop is allowed through).
+        is_external_property = (
+            _is_parent_landlord_entry(base_host)
+            and _is_parent_landlord_external_candidate(link_host)
+        )
+        if not (is_same_site or is_portal or is_external_property):
             continue
+        # Boost external-property candidates so the hop budget actually
+        # spends a slot on them — without this they'd score 0 from the
+        # keyword tables (anchor text on parent sites is usually the
+        # property name, not "floor plans").
+        if is_external_property and not is_same_site:
+            score = max(score, _PMS_PRIOR_SCORE + 200)
 
         # Skip the base URL itself
         if resolved.rstrip("/") == base_url.rstrip("/"):
