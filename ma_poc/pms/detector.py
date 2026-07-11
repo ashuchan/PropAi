@@ -1111,12 +1111,28 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # ≥4-site cluster invisible to static curl_cffi (inventory is fetched
     # client-side). api_key is in the homepage HTML ⇒ deterministic Tier-1.
     if _has_apts247_marker:
-        yield (
-            "apts247",
-            0.90,
-            ["Apts247/RentDynamics marker in HTML "
-             "(apts247.info widget / same-origin /api/v1/ data API)"],
-        )
+        if "imtresidential.com" in h:
+            # 2026-07-11 adapter audit: IMT's own portfolio pages embed a
+            # ``rentdynamics_key`` config value (RentDynamics is their
+            # pricing SDK), which trips this marker and outranked
+            # imt_spaces (0.90 > 0.85) — imtgallery421 routed to apts247
+            # and extracted 0 units while the page carries 185 rent
+            # strings. Same co-resident pattern as resman/edificecms
+            # above: demote so the IMT rule wins.
+            yield (
+                "apts247",
+                0.80,
+                ["apts247/RentDynamics marker present but "
+                 "imtresidential.com co-resident — IMT Spaces owns the "
+                 "page; RentDynamics is only their pricing SDK"],
+            )
+        else:
+            yield (
+                "apts247",
+                0.90,
+                ["Apts247/RentDynamics marker in HTML "
+                 "(apts247.info widget / same-origin /api/v1/ data API)"],
+            )
 
     # Repli360 / rrac popup family (royce-like caf_v2 cluster — 158 sites
     # across the 5K, ~0 real units in prod, falls to TIER_4_LLM floorplan-
@@ -1317,6 +1333,19 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
             ["IMT 'Spaces' theme marker in HTML "
              "(imtresidential.com host or spaces-community-* class) + "
              "article.spaces-plan with data-spaces-plan attr"],
+        )
+    elif "imtresidential.com" in h:
+        # 2026-07-11 adapter audit: IMT vanity landing pages (e.g.
+        # /imtgallery421/) do NOT statically embed the spaces-plan
+        # articles — those live on /properties/{slug}/apartments/.
+        # The host marker alone is unambiguous (IMT's own portfolio
+        # domain), so route to imt_spaces anyway; the adapter's
+        # static-subpage fallback hops to the apartments page.
+        yield (
+            "imt_spaces",
+            0.85,
+            ["imtresidential.com host marker (IMT portfolio domain; "
+             "plans live on /properties/{slug}/apartments/ subpage)"],
         )
     # 2026-05-21 HAR validation: RealPage CWS (Community Website Solution)
     # ships the RPFP (RealPage Floor Plans) widget that renders plan

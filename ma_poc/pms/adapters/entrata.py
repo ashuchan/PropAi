@@ -1870,6 +1870,46 @@ class EntrataAdapter:
             ):
                 deep_candidates.append(base + path)
 
+            # 2026-07-11 adapter audit: hosted Prospect Portal SPAs
+            # (villagewestside.prospectportal.com) serve the SAME shell
+            # for every path — /conventional/ and /floorplans/ never
+            # carry fp-card markers, so Steps 2-3 come up empty and the
+            # property falls to plan-text junk. But the shell embeds
+            # Entrata's internal id ("property_id":"540130"), and the
+            # server-rendered module endpoint
+            # /Apartments/module/property_info/property_id/{pid}
+            # returns the full fp-card index (7 plans + fp_name plan
+            # links on the reference portal). Append it so Step 3's
+            # existing parser + Step 4's unit-card drill just work.
+            #
+            # The pid must come from the SSR config script. The captured
+            # body is often the Playwright-RENDERED DOM, where JS may have
+            # stripped that config block — so if the token isn't in the
+            # captured body, re-fetch the origin ROOT statically (the
+            # curl shell reliably carries "property_id":"<pid>").
+            if "prospectportal.com" in urlparse(base).netloc:
+                _pid = ""
+                _pid_re = re.compile(r'"property_id"\s*:\s*"?(\d{3,12})"?')
+                if isinstance(fr_body_check, str) and fr_body_check:
+                    _m = _pid_re.search(fr_body_check)
+                    if _m:
+                        _pid = _m.group(1)
+                if not _pid:
+                    try:
+                        _root_html = await _entrata_static_fetch(base + "/")
+                    except Exception:
+                        _root_html = ""
+                    if _root_html:
+                        _m = _pid_re.search(_root_html)
+                        if _m:
+                            _pid = _m.group(1)
+                if _pid:
+                    deep_candidates.append(
+                        base
+                        + "/Apartments/module/property_info/property_id/"
+                        + _pid
+                    )
+
             # Step 3: fetch and try the PP SSR parser. Stop on first
             # body that admits at least one validity-gated row.
             for cand_url in dict.fromkeys(deep_candidates):

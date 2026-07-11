@@ -1472,6 +1472,80 @@ class GenericPlanTextAdapter:
         except Exception as _cx_outer:
             result.errors.append(f"camden-wiring-error: {_cx_outer}")
 
+        # 2026-07-11 adapter audit: UDR short-circuit. UDR's ~16 portfolio
+        # properties (udr.com) also route here (zero PMS fingerprints on
+        # their custom stack) — the plan-text regex then emits 2-3 junk
+        # plan rows from the landing hero while the real per-unit
+        # inventory is a Schema.org ItemList on /apartments-pricing/.
+        # Same pattern as the Camden short-circuit above.
+        try:
+            _udr_url = str(getattr(ctx, "base_url", "") or "")
+            if "udr.com" in _udr_url.lower():
+                from ma_poc.pms.adapters._udr import (
+                    parse_udr_jsonld as _sc_parse_udr,
+                )
+
+                fr = getattr(ctx, "fetch_result", None)
+                raw = getattr(fr, "body", None) if fr is not None else None
+                if isinstance(raw, bytes):
+                    _udr_html = raw.decode("utf-8", errors="replace")
+                elif isinstance(raw, str):
+                    _udr_html = raw
+                else:
+                    _udr_html = ""
+                udr_units = []
+                if _udr_html:
+                    try:
+                        udr_units = _sc_parse_udr(_udr_html, source_url=_udr_url)
+                    except Exception as _ux:
+                        result.errors.append(f"udr-parse-error: {_ux}")
+                if not udr_units and "/apartments-pricing" not in _udr_url:
+                    # Hop to the pricing subpage: naive append first, then
+                    # the 3-segment community root (catalog rows sometimes
+                    # point at junk leaves like /contact-us/).
+                    from urllib.parse import urlparse as _udr_urlparse
+
+                    _cands = [_udr_url.rstrip("/") + "/apartments-pricing/"]
+                    try:
+                        _pu = _udr_urlparse(_udr_url)
+                        _segs = [s for s in _pu.path.split("/") if s]
+                        if len(_segs) > 3:
+                            _cands.append(
+                                f"{_pu.scheme}://{_pu.netloc}/"
+                                + "/".join(_segs[:3])
+                                + "/apartments-pricing/"
+                            )
+                    except Exception:
+                        pass
+                    try:
+                        from ma_poc.pms.adapters._probe import probe_get
+
+                        for _cand in _cands:
+                            try:
+                                _resp = probe_get(_cand, timeout=15)
+                            except Exception:
+                                continue
+                            if getattr(_resp, "status_code", 0) == 404:
+                                continue
+                            _h = getattr(_resp, "text", "") or ""
+                            if not _h:
+                                continue
+                            udr_units = _sc_parse_udr(_h, source_url=_cand)
+                            if udr_units:
+                                result.errors.append(
+                                    f"udr: recovered via pricing hop ({_cand})"
+                                )
+                                break
+                    except Exception as _uhx:
+                        result.errors.append(f"udr-hop-error: {_uhx}")
+                if udr_units:
+                    result.units = udr_units
+                    result.tier_used = "TIER_1_JSONLD_UDR"
+                    result.confidence = 0.9
+                    return result
+        except Exception as _ux_outer:
+            result.errors.append(f"udr-wiring-error: {_ux_outer}")
+
         # 2026-05-24: prior implementation hard-required a live Playwright
         # page (page.evaluate to harvest document.body innerText). Phase
         # 6 of the canary scraper dispatches this adapter with a stub

@@ -2317,6 +2317,56 @@ class GenericAdapter:
                 except Exception as _ux:
                     udr_units = []
                     result.errors.append(f"udr-parse-error: {_ux}")
+                # 2026-07-11 audit: the ItemList lives ONLY on the
+                # /apartments-pricing/ subpage — a landing-page entry
+                # (…/edgewater/) parses to zero. Hop there statically
+                # before giving up (Edgewater: 0 → 1 real unit; the
+                # plan-text fallback was emitting 3 plan-level rows).
+                if not udr_units:
+                    _u_base = (ctx.base_url or "").rstrip("/")
+                    if _u_base and "/apartments-pricing" not in _u_base:
+                        from urllib.parse import urlparse as _u_urlparse
+
+                        _u_cands: list[str] = [_u_base + "/apartments-pricing/"]
+                        try:
+                            _u_p = _u_urlparse(_u_base)
+                            _u_segs = [s for s in _u_p.path.split("/") if s]
+                            # UDR URL shape is /{market}/{area}/{community}/…;
+                            # catalog rows sometimes point at a junk leaf
+                            # (Cambridge Woods → /contact-us/, 404s the naive
+                            # append). Also try the 3-segment community root.
+                            if len(_u_segs) > 3:
+                                _u_root = (
+                                    f"{_u_p.scheme}://{_u_p.netloc}/"
+                                    + "/".join(_u_segs[:3])
+                                )
+                                _u_cands.append(_u_root + "/apartments-pricing/")
+                        except Exception:
+                            pass
+                        try:
+                            from ma_poc.pms.adapters._probe import probe_get
+
+                            for _u_pricing in _u_cands:
+                                try:
+                                    _u_resp = probe_get(_u_pricing, timeout=15)
+                                except Exception:
+                                    continue
+                                if getattr(_u_resp, "status_code", 0) == 404:
+                                    continue
+                                _u_html = getattr(_u_resp, "text", "") or ""
+                                if not _u_html:
+                                    continue
+                                udr_units = _parse_udr(
+                                    _u_html, source_url=_u_pricing
+                                )
+                                if udr_units:
+                                    result.errors.append(
+                                        "udr: recovered via "
+                                        f"/apartments-pricing/ hop ({_u_pricing})"
+                                    )
+                                    break
+                        except Exception as _uhx:
+                            result.errors.append(f"udr-pricing-hop-error: {_uhx}")
                 if udr_units:
                     embedded_units = udr_units
 
