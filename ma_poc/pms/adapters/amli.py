@@ -295,22 +295,58 @@ class AmliAdapter:
         )
         # Inherit cookies + UA from the already-rendered page so Cloudflare
         # treats this as a continuation of the human-looking session.
-        try:
-            request = page.context.request
-            resp = await request.get(submarket_url, timeout=15000)
-        except Exception as exc:  # noqa: BLE001 — adapter never raises
-            result.errors.append(f"AMLI: submarket fetch failed: {type(exc).__name__}: {exc}")
-            return result
+        # 2026-07-11 adapter audit: the jugnu fetch-only path dispatches
+        # with a STUB page (no .context) — the prior hard requirement made
+        # every AMLI property die here (AttributeError) and fall through
+        # to rent-less cross-page-merge junk. curl_cffi chrome
+        # impersonation fetches the same _next/data JSON fine (amli.com
+        # doesn't interactive-challenge that path), so use it whenever a
+        # live browser context isn't available.
+        payload: Any = None
+        browser_ctx = getattr(page, "context", None)
+        if browser_ctx is not None:
+            try:
+                request = browser_ctx.request
+                resp = await request.get(submarket_url, timeout=15000)
+            except Exception as exc:  # noqa: BLE001 — adapter never raises
+                result.errors.append(
+                    f"AMLI: submarket fetch failed: {type(exc).__name__}: {exc}"
+                )
+                return result
+            if not resp.ok:
+                result.errors.append(
+                    f"AMLI: submarket fetch returned HTTP {resp.status}"
+                )
+                return result
+            try:
+                payload = await resp.json()
+            except Exception as exc:  # noqa: BLE001
+                result.errors.append(
+                    f"AMLI: submarket JSON parse failed: {type(exc).__name__}"
+                )
+                return result
+        else:
+            try:
+                import json as _json
 
-        if not resp.ok:
-            result.errors.append(f"AMLI: submarket fetch returned HTTP {resp.status}")
-            return result
+                from ma_poc.pms.adapters._probe import probe_get
 
-        try:
-            payload = await resp.json()
-        except Exception as exc:  # noqa: BLE001
-            result.errors.append(f"AMLI: submarket JSON parse failed: {type(exc).__name__}")
-            return result
+                _static_resp = probe_get(submarket_url, timeout=15)
+                _status = getattr(_static_resp, "status_code", 0)
+                if _status != 200:
+                    result.errors.append(
+                        f"AMLI: static submarket fetch returned HTTP {_status}"
+                    )
+                    return result
+                payload = _json.loads(getattr(_static_resp, "text", "") or "")
+                result.errors.append(
+                    "AMLI: submarket JSON via static fetch (no live page context)"
+                )
+            except Exception as exc:  # noqa: BLE001
+                result.errors.append(
+                    f"AMLI: static submarket fetch failed: {type(exc).__name__}: {exc}"
+                )
+                return result
 
         result.api_responses.append({"url": submarket_url, "body": payload})
 

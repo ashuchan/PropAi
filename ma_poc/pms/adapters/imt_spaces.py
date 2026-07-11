@@ -97,6 +97,74 @@ def _normalize_iso_date(s: str) -> str:
     return ""
 
 
+_ARTICLE_TAG_RE = re.compile(r"<article\b[^>]*spaces-plan[^>]*>", re.IGNORECASE)
+_ATTR_RE = re.compile(r'([a-zA-Z][a-zA-Z0-9\-]*)\s*=\s*"([^"]*)"')
+
+
+def _camel_dataset_key(attr: str) -> str:
+    """``data-spaces-sort-plan-name`` -> ``spacesSortPlanName`` (HTML
+    dataset camel-casing, so the static path feeds the same parser as
+    the live element.dataset path)."""
+    parts = attr[len("data-"):].split("-")
+    return parts[0] + "".join(p.capitalize() for p in parts[1:])
+
+
+def parse_imt_spaces_articles_from_html(html: str) -> list[dict]:
+    """Static-HTML twin of the DOM JS: pull ``article.spaces-plan``
+    opening tags out of raw HTML and emit the same plan-dict shape
+    (``{classes, titleAttr, data:{camelCased}}``). IMT server-renders
+    the data-* attributes, so no JS execution is needed."""
+    if not html:
+        return []
+    plans: list[dict] = []
+    for m in _ARTICLE_TAG_RE.finditer(html):
+        tag = m.group(0)
+        attrs = dict(_ATTR_RE.findall(tag))
+        classes = attrs.get("class", "")
+        if "spaces-plan" not in classes:
+            continue
+        data = {
+            _camel_dataset_key(k): v
+            for k, v in attrs.items()
+            if k.lower().startswith("data-")
+        }
+        plans.append({
+            "classes": classes,
+            "titleAttr": attrs.get("title", ""),
+            "data": data,
+        })
+    return plans
+
+
+def _static_subpage_candidates(entry_url: str, entry_html: str) -> list[str]:
+    """Candidate apartments-page URLs for the static fallback.
+
+    2026-07-11 audit: IMT vanity landings (``/imtgallery421/``) don't
+    embed plans — the canonical page is ``/properties/{slug}/apartments/``
+    and the landing HTML references its own canonical slug. Emit those
+    first, then the naive ``{entry}/apartments/`` shape as a last resort.
+    """
+    from urllib.parse import urlparse
+
+    out: list[str] = []
+    try:
+        pu = urlparse(entry_url)
+        origin = f"{pu.scheme}://{pu.netloc}"
+    except Exception:
+        return out
+    seen: set[str] = set()
+    for slug in re.findall(r"/properties/([a-z0-9\-]+)/", entry_html or "")[:6]:
+        u = f"{origin}/properties/{slug}/apartments/"
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+    if entry_url:
+        naive = entry_url.rstrip("/") + "/apartments/"
+        if naive not in seen:
+            out.append(naive)
+    return out[:4]
+
+
 def parse_imt_spaces_plans(plans: list[dict], url: str) -> list[dict]:
     """Emit plan-level rows from IMT Spaces ``article.spaces-plan`` data."""
     out: list[dict] = []
@@ -163,29 +231,64 @@ class ImtSpacesAdapter:
 
     async def extract(self, page: Page, ctx: AdapterContext) -> AdapterResult:
         result = AdapterResult(tier_used="TIER_1_DOM_IMT_SPACES")
-        evaluate = getattr(page, "evaluate", None)
-        if not callable(evaluate):
-            result.confidence = 0.0
-            result.errors.append("imt_spaces: no live page")
-            return result
-        try:
-            payload = await evaluate(_IMT_SPACES_DOM_JS)
-        except Exception as exc:
-            log.debug("imt_spaces evaluate failed err=%s", exc)
-            payload = None
-        if not isinstance(payload, dict) or not payload.get("ok"):
-            reason = payload.get("reason") if isinstance(payload, dict) else "DOM JS returned non-dict"
-            result.confidence = 0.0
-            result.errors.append(f"imt_spaces: {reason}")
-            return result
+        plans: list[dict] = []
+        winning = self._winning_url(page, ctx)
 
-        plans = payload.get("plans") or []
-        if not isinstance(plans, list) or not plans:
+        # Live-DOM path (preferred when the orchestrator hands us a real
+        # Playwright page whose DOM already carries the plan articles).
+        evaluate = getattr(page, "evaluate", None)
+        if callable(evaluate):
+            try:
+                payload = await evaluate(_IMT_SPACES_DOM_JS)
+            except Exception as exc:
+                log.debug("imt_spaces evaluate failed err=%s", exc)
+                payload = None
+            if isinstance(payload, dict) and payload.get("ok"):
+                got = payload.get("plans") or []
+                if isinstance(got, list):
+                    plans = got
+
+        # Static subpage fallback (2026-07-11 audit): vanity landing pages
+        # (/imtgallery421/) don't carry the articles — they live on
+        # /properties/{slug}/apartments/. Derive the canonical slug from
+        # the entry HTML, probe the apartments page via curl, and parse
+        # the server-rendered data-* attributes statically.
+        if not plans:
+            entry_html = ""
+            fr = getattr(ctx, "fetch_result", None)
+            raw = getattr(fr, "body", None) if fr is not None else None
+            if isinstance(raw, bytes):
+                entry_html = raw.decode("utf-8", errors="replace")
+            elif isinstance(raw, str):
+                entry_html = raw
+            # Entry page itself may already carry the articles statically
+            # (canonical /apartments/ URLs do).
+            plans = parse_imt_spaces_articles_from_html(entry_html)
+            if not plans and entry_html:
+                try:
+                    from ma_poc.pms.adapters._probe import probe_get
+
+                    base_url = str(getattr(ctx, "base_url", "") or "")
+                    for cand in _static_subpage_candidates(base_url, entry_html):
+                        try:
+                            resp = probe_get(cand, timeout=15)
+                            body = getattr(resp, "text", "") or ""
+                        except Exception:
+                            continue
+                        plans = parse_imt_spaces_articles_from_html(body)
+                        if plans:
+                            winning = cand
+                            result.errors.append(
+                                f"imt_spaces: static-subpage fallback via {cand}"
+                            )
+                            break
+                except Exception as exc:  # noqa: BLE001 — fallback is best-effort
+                    result.errors.append(f"imt_spaces: subpage probe failed: {exc}")
+
+        if not plans:
             result.confidence = 0.0
             result.errors.append("imt_spaces: zero spaces-plan articles")
             return result
-
-        winning = self._winning_url(page, ctx)
         rows = parse_imt_spaces_plans(plans, winning)
         if not rows:
             result.confidence = 0.0

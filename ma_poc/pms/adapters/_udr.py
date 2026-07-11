@@ -125,10 +125,16 @@ def _extract_unit_from_udr_name(name: str) -> str:
     """
     if not name:
         return ""
-    m = _UDR_NAME_RE.match(name.strip())
+    s = name.strip()
+    m = _UDR_NAME_RE.match(s)
     if m:
         return m.group(1).strip()
-    return name.strip()
+    # 2026-07-11: UDR dropped the "#<seq> - " infix — names now read
+    # "Apartment 404" with the unit number directly after the word.
+    m2 = re.match(r"^Apartments?\s*#?\s*([A-Z0-9][A-Z0-9\-]*)\s*$", s, re.IGNORECASE)
+    if m2:
+        return m2.group(1).strip()
+    return s
 
 
 def _is_udr_apartment_item(item: Any) -> bool:
@@ -185,6 +191,11 @@ def parse_udr_jsonld(html: str, source_url: str = "") -> list[dict[str, Any]]:
         if block.get("@type") != "ItemList":
             continue
         items = block.get("itemListElement") or []
+        if isinstance(items, dict):
+            # 2026-07-11 audit: single-unit communities serialize
+            # itemListElement as ONE ListItem dict, not a list
+            # (Edgewater — 1 available unit). Wrap it.
+            items = [items]
         if not isinstance(items, list):
             continue
 
