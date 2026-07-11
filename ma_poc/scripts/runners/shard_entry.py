@@ -182,6 +182,28 @@ def _upload_artifacts(bucket_name: str, run_date: str, task_idx: int, schema_ver
     else:
         print(f"[shard_entry] dlq.jsonl not found at {dlq_local}; skipping", file=sys.stderr)
 
+    # 2026-07-11: upload raw_html/ (the fetcher writes gzipped page HTML to
+    # ``{DATA_DIR}/raw_html/{date}/{id}.html.gz`` — a sibling of the run dir,
+    # so upload_prefix(run_dir) misses it). Shipping it gives failed-case
+    # post-mortems the EXACT HTML the canary fetched, with no live-refetch
+    # drift on CF-walled or since-changed sites. DATA_DIR is forced to
+    # /tmp/data above so this path is stable.
+    raw_html_dir = Path("/tmp/data") / "raw_html"
+    if raw_html_dir.exists():
+        try:
+            rc = gcs.upload_prefix(raw_html_dir, dest_prefix + "raw_html/")
+            print(
+                f"[shard_entry] Uploaded {rc} raw_html files → {dest_prefix}raw_html/",
+                file=sys.stderr,
+            )
+        except Exception as exc:  # noqa: BLE001 — must not mask runner exit
+            print(f"[shard_entry] Failed to upload raw_html: {exc}", file=sys.stderr)
+    else:
+        print(
+            f"[shard_entry] raw_html dir not found at {raw_html_dir}; skipping",
+            file=sys.stderr,
+        )
+
 
 def _resolve_shard_canonical_ids_db(
     task_idx: int, task_count: int, limit: int | None
@@ -466,6 +488,14 @@ def main() -> None:
     # timeout a wedged subprocess takes its artifacts to the grave (the
     # exact failure mode that left stuck shards undebuggable).
     runner_subprocess_timeout = float(os.environ.get("SHARD_RUNNER_TIMEOUT_SECONDS", "13500"))
+    # 2026-07-11: align DATA_DIR env with the runner's hardcoded
+    # ``--data-dir /tmp/data``. The fetcher persists raw HTML to
+    # ``os.getenv("DATA_DIR")/raw_html`` (env, NOT the --data-dir arg), so
+    # without this the raw HTML lands in the app-root data tree and is never
+    # uploaded → no page-HTML for failed-case post-mortems. Forcing the env
+    # to match puts raw_html under /tmp/data/raw_html where _upload_artifacts
+    # ships it to GCS. The child subprocess inherits os.environ.
+    os.environ["DATA_DIR"] = "/tmp/data"
     try:
         try:
             result = subprocess.run(cmd, check=False, timeout=runner_subprocess_timeout)
