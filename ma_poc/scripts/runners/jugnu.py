@@ -1685,6 +1685,9 @@ def _format_v2_unit(
     Jugnu unit on its way out, so JSON-LD / Tier-4-LLM / cross-page-merger
     records that previously dropped at upsert time now keep an anchor.
     """
+    # Delegate the available-now → scrape-date fallback to the canonical
+    # resolver (single source of truth; see the available_date field below).
+    from ma_poc.core.schema_v2 import _resolve_available_date
     # 2026-05-19 capture-first: snapshot the ORIGINAL source value for
     # every emitted field BEFORE any inference / junk-scrub / lossy
     # formatting. Emitted as first-class ``<field>_raw`` columns at the
@@ -1916,7 +1919,32 @@ def _format_v2_unit(
             else None
         ),
         "date_captured": scrape_ts.strftime("%Y-%m-%d %H:%M:%S"),
-        "available_date": _format_date_str(unit.get("available_date")),
+        # 2026-07-11 quality sweep: this runner-duplicate of _format_v2_unit
+        # formatted the raw date but NEVER applied the available-now →
+        # scrape-date fallback that core/schema_v2._resolve_available_date
+        # adds (delegated here, single source of truth — same fix pattern as
+        # _format_date_str above). Without it, has-rent/AVAILABLE units that
+        # ship no explicit move-in date (Knock, G5, TIER_1_5_EMBEDDED,
+        # MERGED_CROSS_PAGE, RENTCAFE_LT …) kept available_date=None:
+        # fleet-wide available_date was 45.6% in the 2026-07-11 canary,
+        # concentrated in these tiers at 0-6% despite 99-100% rent. The
+        # canonical transform applies the default; the production jugnu path
+        # didn't, so it never took effect. has_rent is gated on a REAL unit
+        # identity so plan-level synthetic rows don't get a fabricated stamp.
+        "available_date": _resolve_available_date(
+            _format_date_str(unit.get("available_date")),
+            _norm_avail_status(
+                unit.get("availability_status") or unit.get("_availability_status")
+            ),
+            scrape_ts,
+            has_rent=(
+                (
+                    _format_rent(rent_lo_raw) is not None
+                    or _format_rent(rent_hi_raw) is not None
+                )
+                and uid not in (None, "", "null")
+            ),
+        ),
         # 2026-05-26: availability_status was absent from this function
         # (present in core/schema_v2.py but never synced here).  That caused
         # 93.9% of units to have a blank availability_status in the canary
