@@ -3372,7 +3372,76 @@ async def scrape_jugnu(
             # SSR sites). Try one curl_cffi hop before short-circuiting.
             # Soft-404 path takes precedence (DEAD_URL handled above).
             _transient_salvage = False
+            # 2026-07-11 failure-sweep: the BOT_BLOCKED classifier
+            # false-positives on real pages that merely carry a co-resident
+            # reCAPTCHA/challenge widget (a contact form, a chat bot), then
+            # the no_body short-circuit throws away a perfectly good
+            # Playwright-RENDER body. Verified live: 5/5 such properties
+            # (RentCafe/Entrata/SightMap/Knock) extract 39/24/28/4/1 units
+            # once the pipeline is allowed to run. Of a 45-sample of the 686
+            # captcha-flagged no_body cases, every one with a persisted body
+            # had real unit/floor-plan content, none were true CF shells.
+            #
+            # Prefer that in-hand render body over the curl re-fetch below
+            # (which often re-trips the same CF wall on these hosts). Fall
+            # through ONLY when the body is not an actual CF challenge shell
+            # AND carries unit/floor-plan signals — true shells (which carry
+            # 'challenge-platform' / 'just a moment') stay short-circuited.
             if outcome_val in ("TRANSIENT", "BOT_BLOCKED") and not _soft_404_recovery:
+                try:
+                    import dataclasses as _dcr
+
+                    from ma_poc.fetch.contracts import FetchOutcome as _FOr
+                    _ob = getattr(fetch_result, "body", None)
+                    _os = (
+                        _ob.decode("utf-8", "replace")
+                        if isinstance(_ob, bytes)
+                        else (_ob if isinstance(_ob, str) else "")
+                    )
+                    if _os and len(_os) >= 20_000:
+                        _ol = _os.lower()
+                        _is_cf_shell = any(
+                            m in _ol
+                            for m in (
+                                "challenge-platform",
+                                "just a moment",
+                                "_cf_chl",
+                                "cf-browser-verification",
+                                "/cdn-cgi/challenge",
+                            )
+                        )
+                        _has_signals = (
+                            "fp-card" in _ol
+                            or "sightmap" in _ol
+                            or "securecafe" in _ol
+                            or "knockdoorway" in _ol
+                            or "rentcafe" in _ol
+                            or "/apartments/module/" in _ol
+                            or ("floorplan" in _ol and "bed" in _ol)
+                            or (_ol.count("$") >= 3 and ("bed" in _ol or "bath" in _ol))
+                            or ("application/ld+json" in _ol and "apartment" in _ol)
+                        )
+                        if (not _is_cf_shell) and _has_signals:
+                            fetch_result = _dcr.replace(
+                                fetch_result,
+                                outcome=_FOr.OK,
+                                error_signature="salvaged_render_body_real",
+                            )
+                            outcome_val = "OK"
+                            _transient_salvage = True
+                            log.info(
+                                "RENDER-body salvage: BOT_BLOCKED false-positive "
+                                "on %s (%d bytes, unit signals present)",
+                                base_url,
+                                len(_os),
+                            )
+                except Exception as _exc:  # pragma: no cover — defensive
+                    log.debug("render-body salvage failed for %s: %s", base_url, _exc)
+            if (
+                outcome_val in ("TRANSIENT", "BOT_BLOCKED")
+                and not _soft_404_recovery
+                and not _transient_salvage
+            ):
                 try:
                     import dataclasses as _dc
 
