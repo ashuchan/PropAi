@@ -941,11 +941,27 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
     # Public Doorway API serves full unit data: 2026-05-13 probe of
     # liveatcalista.com returned 53 units (incl. availableOn, price).
     if "doorway.knck.io" in h or "knockdoorway" in h:
-        yield (
-            "knock",
-            0.90,
-            ["Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"],
-        )
+        # 2026-07-11 audit: a Knock CHAT widget (knockDoorway.openContact /
+        # openScheduling) is often co-resident with a real ResMan
+        # Availability portal (regaliabellaterra et al). Knock is chat-only
+        # there; ResMan owns the unit data. knock@0.90 tied resman@0.90 and
+        # won on yield order → TIER_1_KNOCK_API returned 0 units. Demote
+        # knock below resman, scoped tightly to the ResMan availability DATA
+        # path so genuine Knock-data sites (liveatcalista, livethemaya —
+        # knockDoorway present, no ResMan portal) are untouched.
+        if "/portal/applicants/availability" in h:
+            yield (
+                "knock",
+                0.85,
+                ["Knock/Doorway chat marker present but ResMan Availability "
+                 "portal co-resident — ResMan owns the unit data"],
+            )
+        else:
+            yield (
+                "knock",
+                0.90,
+                ["Knock/Doorway marker in HTML (doorway.knck.io / knockDoorway)"],
+            )
     # G5 Marketing Cloud — multifamily CMS used by Morgan Properties, Aimco,
     # Bell Partners, ZRS, JMG, BH. Identified by ``inventory.g5marketingcloud``
     # (the GraphQL endpoint) or the ``g5-cl-...`` URN slug referenced in
@@ -1381,9 +1397,16 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
         "page-content-floorplans" in h
         and "floorplans-layout-tab" in h
     ):
+        # 2026-07-11 audit: bumped 0.86 → 0.92 so the SPECIFIC layout-tab
+        # theme marker outranks the generic `rentcafe`@0.90 (and the
+        # co-resident securecafe marker). Previously the generic RentCafe
+        # adapter won, SHAPE_REJECTED, and the layout-tab adapter was only
+        # reachable via the fragile Path-B retry chain — Tudor Place stayed
+        # 0-units. RentCafeLayoutTabAdapter now extracts code-only via drill
+        # hops; if it fails, the retry still falls back to rentcafe.
         yield (
             "rentcafe_layout_tab",
-            0.86,
+            0.92,
             ["RentCafe layout-tab theme marker in HTML "
              "(.page-content-floorplans + .floorplans-layout-tab)"],
         )

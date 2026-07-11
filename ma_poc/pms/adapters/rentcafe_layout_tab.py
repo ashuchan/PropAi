@@ -133,6 +133,67 @@ _TEXT_ROW_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+# 2026-07-11 audit: modern RentCafe layout-tab drills render each available
+# unit as an anchor whose onclick fires
+#   applyGAClick('<plan>','<N Bed(s)>','<sqft>','<rentLow>','<rentHigh>','<unit#>')
+# arg6 is the displayed unit number (preserves underscores like "840_09").
+# This is SSR (present in raw HTML) so it works code-only — no browser.
+_APPLY_GA_RE = re.compile(
+    r"applyGAClick\(\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'"
+    r"\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*,\s*'([^']*)'\s*\)",
+    re.IGNORECASE,
+)
+# Drill anchors on raw listing HTML — accept BOTH root-relative
+# (/floorplans/{slug}) and absolute (https://host/floorplans/{slug}) hrefs;
+# the Playwright-rendered DOM often rewrites relative hrefs to absolute.
+_DRILL_ANCHOR_RE = re.compile(
+    r"""href=["'](?:https?://[^"'/]+)?(/floorplans/[^"'?#/][^"'?#]*)["']""",
+    re.IGNORECASE,
+)
+
+
+def _ga_int(s: str) -> int | None:
+    try:
+        return int(round(float(s.replace(",", "")))) if s else None
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_rentcafe_lt_applyga(raw_html: str, drill_url: str) -> list[dict]:
+    """Parse applyGAClick(plan,beds,sqft,rentLow,rentHigh,unit#) handlers from
+    RAW drill HTML. Returns one row per handler (NO dedup — the caller applies
+    a run-global dedup because a drill page can render the full roster)."""
+    out: list[dict] = []
+    for m in _APPLY_GA_RE.finditer(raw_html or ""):
+        plan, beds_lbl, sqft_raw, rlo_raw, rhi_raw, unit = (
+            g.strip() for g in m.groups()
+        )
+        if not unit:
+            continue
+        beds = "0" if "studio" in beds_lbl.lower() else "".join(
+            c for c in beds_lbl if c.isdigit()
+        )
+        sqft = "".join(c for c in sqft_raw if c.isdigit())
+        rlo, rhi = _ga_int(rlo_raw), _ga_int(rhi_raw)
+        out.append(
+            make_unit_dict(
+                floor_plan_name=plan,
+                bed_label=beds_lbl or bed_label_from(None, plan),
+                bedrooms=beds,
+                bathrooms="",
+                sqft=sqft,
+                unit_number=unit,
+                rent_low=rlo,
+                rent_high=(rhi or rlo),
+                rent_range=format_rent_range(rlo, rhi or rlo),
+                availability_status="AVAILABLE",
+                available_units="1",
+                source_api_url=drill_url,
+                extraction_tier="TIER_1_DOM_RENTCAFE_LT",
+            )
+        )
+    return out
+
 _PLAN_SPECS_RE = re.compile(
     # Accept "Bed", "Beds", "Bedroom", "Bedrooms" without requiring a word
     # boundary right after the noun (Tudor Place uses "Beds", Campo Basso
@@ -294,9 +355,10 @@ class RentCafeLayoutTabAdapter:
         result = AdapterResult(tier_used="TIER_1_DOM_RENTCAFE_LT")
         evaluate = getattr(page, "evaluate", None)
         if not callable(evaluate):
-            result.confidence = 0.0
-            result.errors.append("rentcafe_lt: no live page")
-            return result
+            # 2026-07-11 audit: jugnu fetch-only path passes a stub page, so
+            # the DOM-JS drill-walker can't run. Extract the same applyGAClick
+            # SSR data statically via curl subpage hops instead of dead-ending.
+            return await self._extract_code_only(page, ctx, result)
         try:
             payload = await evaluate(_RENTCAFE_LT_DOM_JS)
         except Exception as exc:
@@ -332,6 +394,108 @@ class RentCafeLayoutTabAdapter:
         result.confidence = 0.0
         result.errors.append(
             f"rentcafe_lt: {len(rows)} rows failed unit_validity post-process"
+        )
+        return result
+
+    async def _extract_code_only(
+        self, page: Page, ctx: AdapterContext, result: AdapterResult
+    ) -> AdapterResult:
+        """Static drill-walk for the jugnu fetch-only path. Reads the listing
+        HTML from ctx.fetch_result.body (hopping to /floorplans if needed),
+        curls each /floorplans/{slug} drill, parses applyGAClick SSR rows, and
+        applies a RUN-GLOBAL dedup by unit_number — a drill page can render the
+        FULL roster, so per-drill dedup alone over-counts (Pickwick: 5 drills ×
+        44 units = 220 without the global dedup)."""
+        from urllib.parse import urlparse
+
+        from ma_poc.pms.adapters._probe import probe_get
+
+        # Listing HTML: prefer the already-fetched body, else curl /floorplans.
+        fr = getattr(ctx, "fetch_result", None)
+        raw = getattr(fr, "body", None) if fr is not None else None
+        if isinstance(raw, bytes):
+            listing = raw.decode("utf-8", errors="replace")
+        elif isinstance(raw, str):
+            listing = raw
+        else:
+            listing = ""
+        base = str(getattr(ctx, "base_url", "") or "")
+        p = urlparse(base)
+        origin = f"{p.scheme}://{p.netloc}" if p.scheme and p.netloc else base.rstrip("/")
+
+        # Always fetch the RAW /floorplans server HTML via curl: the
+        # Playwright-rendered fetch_result.body drops the raw root-relative
+        # drill hrefs (Tudor: 0 drills from the rendered DOM vs 1 from raw).
+        # Prefer the raw curl listing; fall back to the rendered body only if
+        # the curl fails.
+        try:
+            r = probe_get(origin + "/floorplans", timeout=20)
+            if getattr(r, "status_code", 0) == 200 and getattr(r, "text", ""):
+                listing = r.text
+        except Exception as exc:  # noqa: BLE001 — best-effort
+            result.errors.append(f"rentcafe_lt: /floorplans probe failed: {exc}")
+
+        collected: list[dict] = []
+        # The rendered listing may already carry unit anchors inline — parse
+        # them too (harmless; global dedup below removes any overlap).
+        collected.extend(parse_rentcafe_lt_applyga(listing, origin + "/floorplans"))
+
+        drills = sorted({m for m in _DRILL_ANCHOR_RE.findall(listing)})
+        if not drills and not collected:
+            result.confidence = 0.0
+            result.errors.append("rentcafe_lt: no drill anchors in listing (code-only)")
+            return result
+
+        for d in drills:
+            try:
+                rr = probe_get(origin + d, timeout=20)
+            except Exception:
+                continue
+            if getattr(rr, "status_code", 0) != 200:
+                continue
+            drill_html = getattr(rr, "text", "") or ""
+            if not drill_html:
+                continue
+            rows = parse_rentcafe_lt_applyga(drill_html, origin + d)
+            if not rows:
+                # Legacy tabular/text drills (Tudorplace/Campobasso) —
+                # reuse the existing text parser as a fallback.
+                rows = parse_rentcafe_layout_tab(
+                    [{"drillPath": d, "bodyText": drill_html}], origin
+                )
+            collected.extend(rows)
+
+        # RUN-GLOBAL dedup by unit_number (plan-level rows with no unit_number
+        # are kept as-is — they're not roster duplicates).
+        deduped: list[dict] = []
+        seen: set[str] = set()
+        for u in collected:
+            un = str(u.get("unit_number") or "").strip().upper()
+            if un:
+                if un in seen:
+                    continue
+                seen.add(un)
+            deduped.append(u)
+
+        if not deduped:
+            result.confidence = 0.0
+            result.errors.append(
+                f"rentcafe_lt: {len(drills)} drills yielded zero units (code-only)"
+            )
+            return result
+
+        from ma_poc.extraction.post_process import post_process
+
+        pp = post_process(deduped, property_id=getattr(ctx, "property_id", None))
+        if pp.n_admitted > 0:
+            result.units = pp.admitted
+            result.plan_summaries = pp.plan_summaries
+            result.winning_url = origin + "/floorplans"
+            result.confidence = min(0.92, 0.7 + 0.02 * pp.n_admitted)
+            return result
+        result.confidence = 0.0
+        result.errors.append(
+            f"rentcafe_lt: {len(deduped)} rows failed unit_validity (code-only)"
         )
         return result
 

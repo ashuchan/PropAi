@@ -18,6 +18,7 @@ Run. Deterministic Tier-1, no LLM.
 """
 from __future__ import annotations
 
+import html as _html
 import json
 import re
 from typing import TYPE_CHECKING, Any
@@ -163,6 +164,13 @@ def find_resman_availability_url(html: str) -> str | None:
     if not html:
         return None
     m = _RESMAN_AVAIL_RE.search(html)
+    if m:
+        return m.group(0)
+    # 2026-07-11 audit: CMS templates HTML-entity-encode the href — Regalia
+    # serves ``?a=1450&amp;p=…`` and Bridge/Pine/Barrett serve
+    # ``?a&#61;1956&amp;p&#61;…`` (both ``=``→``&#61;`` and ``&``→``&amp;``).
+    # The raw regex misses all of them; unescape first, then re-match.
+    m = _RESMAN_AVAIL_RE.search(_html.unescape(html))
     return m.group(0) if m else None
 
 
