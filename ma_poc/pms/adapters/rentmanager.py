@@ -55,6 +55,17 @@ _RM_EID_RE = re.compile(
     r"https?://([a-z0-9-]+)\.(?:ua|twa|owa)\.rentmanager\.com",
     re.IGNORECASE,
 )
+# 2026-07-11 audit: management landing pages expose only the PropertyListing
+# widget URL (e.g. high.ua.rentmanager.com/PropertyListing?template=highlandProp)
+# — no verbatim Search_Result. The Unit template is the PropertyListing
+# template with the trailing 'Prop' swapped for 'Unit' (highlandProp →
+# highlandUnit). This beats the eid-synthesis fallback, which wrongly builds
+# '<eid>Unit' (highUnit) when the corp id (high) ≠ template prefix (highland).
+_RM_PROPLIST_RE = re.compile(
+    r"https?://([a-z0-9-]+\.(?:ua|twa|owa)\.rentmanager\.com)/PropertyListing\?"
+    r"[^\s\"'<>]*?template=([A-Za-z0-9_]+)",
+    re.IGNORECASE,
+)
 _RM_MARK_RE = re.compile(
     r"\.ua\.rentmanager\.com|\.twa\.rentmanager\.com|cdn\.rentmanager\.com"
     r"|iloveleasing\.com",
@@ -88,16 +99,43 @@ def _rm_iso(s: str) -> str:
     return ""
 
 
+def _derive_search_url_from_property_listing(html: str) -> str:
+    """Derive the Unit-Availability Search_Result URL from a PropertyListing
+    widget URL: same host (forced to the ``ua.*`` API host), Unit template =
+    PropertyListing template with a trailing 'Prop' swapped for 'Unit'.
+    Returns '' when no PropertyListing template is present."""
+    clean = (html or "").replace("&#038;", "&").replace("&amp;", "&")
+    m = _RM_PROPLIST_RE.search(clean)
+    if not m:
+        return ""
+    host, tmpl = m.group(1), m.group(2)
+    unit_tmpl = (
+        re.sub(r"Prop$", "Unit", tmpl)
+        if tmpl.lower().endswith("prop")
+        else tmpl + "Unit"
+    )
+    host = re.sub(r"\.(?:twa|owa)\.", ".ua.", host, flags=re.IGNORECASE)
+    return (
+        f"https://{host}/Search_Result?command=Search_Result"
+        f"&template={unit_tmpl}&locations=default&maxperpage=9999"
+    )
+
+
 def find_rentmanager_search_url(html: str) -> str:
     """Return a ready-to-call ``ua.rentmanager.com/Search_Result`` URL.
 
     Prefer the verbatim URL in the static HTML (carries the right
     ``template``/``locations``). Bump ``maxperpage`` to pull every unit
-    in one GET (avoids the 99/page pagination). '' when not RentManager.
+    in one GET (avoids the 99/page pagination). Falls back to deriving the
+    Unit template from a PropertyListing widget URL (management landing
+    pages). '' when not RentManager.
     """
     m = _RM_SEARCH_URL_RE.search(html or "")
     if not m:
-        return ""
+        # 2026-07-11 audit: PropertyListing-only landing pages carry no
+        # verbatim Search_Result URL — derive it from the PropertyListing
+        # template (highlandProp → highlandUnit) before giving up.
+        return _derive_search_url_from_property_listing(html)
     url = m.group(0).replace("&#038;", "&").replace("&amp;", "&").rstrip("\"'")
     if re.search(r"[?&]maxperpage=\d+", url, re.IGNORECASE):
         url = re.sub(r"([?&]maxperpage=)\d+", r"\g<1>9999", url, flags=re.IGNORECASE)
@@ -204,6 +242,35 @@ class RentManagerAdapter:
                         result.api_responses.append(
                             {"url": search_url, "status": 200,
                              "via": "rentmanager_ua_probe"}
+                        )
+                        return result
+                    # 2026-07-11 audit: rent-bearing admission exemption.
+                    # Many operators' RentManager Unit templates expose
+                    # unit# + market_rent + availability but NO beds/baths/
+                    # sqft, so the shared dimension gate rejects every row
+                    # (Highland: 1094 parsed / 0 admitted). A Search_Result
+                    # record is authoritative Tier-1 operator data — real
+                    # unit number + real market rent, deduped by unitid — so
+                    # admit rows carrying a unit_number AND a rent even
+                    # without dimensions. Scoped to THIS adapter; the shared
+                    # validity gate is untouched. Tier is suffixed
+                    # _RENT_ONLY and confidence capped so a dimensioned tier,
+                    # if one ever exists for the property, still wins.
+                    rent_bearing = [
+                        u for u in units
+                        if str(u.get("unit_number") or "").strip()
+                        and (u.get("market_rent_low") or 0)
+                    ]
+                    if rent_bearing:
+                        result.units = rent_bearing
+                        result.winning_url = search_url
+                        result.tier_used = f"{_TIER}_RENT_ONLY"
+                        result.confidence = min(
+                            0.85, 0.65 + 0.02 * len(rent_bearing)
+                        )
+                        result.api_responses.append(
+                            {"url": search_url, "status": 200,
+                             "via": "rentmanager_ua_probe_rent_only"}
                         )
                         return result
                     result.errors.append(
