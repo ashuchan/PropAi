@@ -311,3 +311,12 @@ def test_bare_accept_in_marketing_copy_untouched():
 def test_script_leak_still_wins_over_cookie_chrome():
     t = "function() {} Cookie Preferences 1 month free"
     assert classify_concession_quality(t) == "unclean_script_leak"
+
+
+def test_half_off_recognized_as_specific_offer():
+    # 2026-07-12 no-concession decomposition: greenarchtulsa hero banner
+    # "Half off first month rent…" was the only confirmed residual recall
+    # miss in a 37-prop sample — worded-fraction discounts had no branch.
+    t = "Half off first month rent when you lease our Greenwood unit!"
+    assert classify_concession_quality(t) == "clean"
+    assert clean_concession_text(t) == t

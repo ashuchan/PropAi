@@ -232,6 +232,7 @@ _BANNER_HEADER_RE = re.compile(
 _SPECIFIC_OFFER_RE = re.compile(
     r"\$\s*\d"  # dollar amount
     r"|\d+\s*%"  # percentage off
+    r"|half\s+off"  # worded-fraction discount (greenarchtulsa 2026-07-12)
     r"|\d+\s+(?:weeks?|months?|days?)\s+(?:free|of\s+free|on\s+us|complimentary)"
     r"|free\s+rent"
     r"|free\s+\w+\s+for"
@@ -337,6 +338,7 @@ _OFFER_PHRASES: tuple[str, ...] = (
     r"week\s+(?:of\s+)?(?:rent\s+)?free\b",
     r"up\s+to\s+\d{1,3}\s+(?:weeks?|months?)\s+(?:(?:of\s+)?rent\s+)?free",
     r"\$\d{1,4}\s+off",
+    r"half\s+off(?:\s+(?:your\s+)?first\s+month(?:['\u2019]?s)?\s+rent)?",
     r"\d{1,3}%\s+off",
     r"save\s+up\s+to\s+\$?\d{1,4}",
     r"save\s+\$\d{1,4}",
