@@ -24,6 +24,7 @@ from ma_poc.config.feature_flags import (
     ENABLE_RESIDENTIAL_TIER,
     ENABLE_TIER_ESCALATION,
     ENABLE_UNLOCKER_TIER,
+    SKIP_RESIDENTIAL_WHEN_UNLOCKER,
 )
 from ma_poc.fetch.contracts import FetchOutcome, FetchResult
 from ma_poc.models.fetch_tier import FetchTier
@@ -61,10 +62,19 @@ def _build_ladder(floor: FetchTier) -> list[FetchTier]:
     DLQ_PARK is never included in the active ladder — it's signalled by
     exhaustion.
     """
+    # 2026-07-12 (cost-minimization): residential is 100%-wasted upstream of
+    # unlocker (prod 2026-05-27: 964/964 residential escalations fell through
+    # to unlocker; residential recovers 0, unlocker 91%). When both are on and
+    # SKIP_RESIDENTIAL_WHEN_UNLOCKER is set, drop residential so the ladder is
+    # DIRECT→(DC)→UNLOCKER — same recovery, no wasted per-GB spend or 2s-RPS
+    # delay. See feature_flags.SKIP_RESIDENTIAL_WHEN_UNLOCKER.
+    _residential_on = ENABLE_RESIDENTIAL_TIER and not (
+        ENABLE_UNLOCKER_TIER and SKIP_RESIDENTIAL_WHEN_UNLOCKER
+    )
     all_tiers: list[tuple[FetchTier, bool]] = [
         (FetchTier.DIRECT, True),
         (FetchTier.DC_PROXY, ENABLE_DC_PROXY_TIER),
-        (FetchTier.RESIDENTIAL, ENABLE_RESIDENTIAL_TIER),
+        (FetchTier.RESIDENTIAL, _residential_on),
         # FlareSolverr sits between RESIDENTIAL and UNLOCKER. It handles CF
         # JS challenges locally (no proxy cost) but can't bypass WAF blocks.
         (FetchTier.FLARESOLVERR, ENABLE_FLARESOLVERR_TIER),
