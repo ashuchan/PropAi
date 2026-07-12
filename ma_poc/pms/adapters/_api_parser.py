@@ -1181,6 +1181,44 @@ def parse_api_responses(
                 "available_on", "availableOn", "display_available_on", "readyDate",
             )
             status = _get(item, "status", "availability_status", "leaseStatus", "Status", "unit_status")
+            # 2026-07-11 status sweep: TIER_1_5_EMBEDDED shipped 16,400/16,568
+            # units (98%) with NULL availability_status because the CMS unit
+            # blobs carry availability under a boolean/date "available" key
+            # this walker never read (only the *count* keys above and the
+            # status strings). Live-verified shape on the cohort
+            # (laureloaksapartmenthomes/horseshoeapartments/syncatgreentrails,
+            # ResMan-fed WP widget): ``available: false`` for occupied units,
+            # ``available: "!Date:2026-08-18T00:00:00.000Z"`` for future
+            # availability (which also carries the availability DATE the
+            # ``avail_dt`` chain above misses). Map: bool/truthy-string →
+            # AVAILABLE/UNAVAILABLE; date-bearing string → AVAILABLE + backfill
+            # avail_dt. Explicit ``status`` keys still win; absent key keeps
+            # the prior behaviour. Raw ``item.get`` (not ``_get``) so a
+            # literal ``false`` is not coerced/skipped.
+            flag_status = ""
+            if not status:
+                _avail_flag: Any = None
+                for _ak in ("available", "is_available", "isAvailable", "Available"):
+                    if _ak in item:
+                        _avail_flag = item.get(_ak)
+                        break
+                if isinstance(_avail_flag, bool):
+                    flag_status = "AVAILABLE" if _avail_flag else "UNAVAILABLE"
+                elif isinstance(_avail_flag, (int, float)):
+                    flag_status = "AVAILABLE" if _avail_flag else "UNAVAILABLE"
+                elif isinstance(_avail_flag, str) and _avail_flag.strip():
+                    _af = _avail_flag.strip().lower()
+                    if _af in ("true", "yes", "y", "1", "now", "available"):
+                        flag_status = "AVAILABLE"
+                    elif _af in ("false", "no", "n", "0", "unavailable",
+                                 "occupied", "leased"):
+                        flag_status = "UNAVAILABLE"
+                    else:
+                        _dm = re.search(r"(\d{4}-\d{2}-\d{2})", _avail_flag)
+                        if _dm:
+                            flag_status = "AVAILABLE"
+                            if not avail_dt:
+                                avail_dt = _dm.group(1)
             # ``id`` is intentionally last so it only fires when no specific
             # unit_number key matched — guards against picking a row's
             # database PK on JSON shapes where ``id`` is non-unit semantics.
@@ -1248,7 +1286,7 @@ def parse_api_responses(
                 "rent_range": rent_display,
                 "deposit": deposit,
                 "concession": concession,
-                "availability_status": status or ("AVAILABLE" if (avail and avail != "0") else ""),
+                "availability_status": status or flag_status or ("AVAILABLE" if (avail and avail != "0") else ""),
                 "available_units": avail,
                 "availability_date": avail_dt,
                 "source_api_url": url,
