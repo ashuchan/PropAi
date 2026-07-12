@@ -707,6 +707,18 @@ def _format_date(val: Any) -> str | None:
         "not available", "not avail", "unavailable",
         "leased", "occupied", "rented", "off market", "off-market",
         "no availability",
+        # 2026-07-12: "Call/Contact/Inquire FOR availability" means the
+        # operator does NOT publish a date — letting it reach the CTA
+        # fallback below fabricates an "available now" stamp. Distinct
+        # from "Call For Details"/"Call Now" CTAs, which stay
+        # available-now per the 2026-05-24 rule. Prefix forms cover the
+        # full words ("call for avail" ⊂ "call for availability").
+        # 0 units in the 2026-07-11 canary carry these in the date
+        # field — this closes the path (and the long-failing
+        # "call for availability"→None test) before an operator
+        # exercises it.
+        "call for avail", "contact for avail", "inquire for avail",
+        "call about avail", "email for avail",
     )
     if any(tok in _s_low for tok in _NEGATIVE_TOKENS):
         return None
