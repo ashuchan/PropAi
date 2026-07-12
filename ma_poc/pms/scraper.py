@@ -2418,6 +2418,44 @@ def _rank_internal_links(
     return ranked[:limit]
 
 
+def _is_priced_sightmap_result(result: dict[str, Any]) -> bool:
+    """True when *result* is a SightMap direct-API extraction that already
+    carries a priced unit roster.
+
+    The SightMap embed is site-global: one successful SightMap API call
+    returns the FULL priced inventory across every floor plan. Once that has
+    happened there is nothing to gain from the per-plan subpage accumulation
+    crawl — each additional hop re-renders the marketing page (paying the CF-
+    clearance cost again) and re-fetches the SAME embed. On GCP that per-hop
+    clearance cost pushes large SightMap properties past the 600s per-property
+    wall: cltexchange.com (105 units / 86 priced, extracted ~20s in on the
+    first floorplan page) then link-hopped through 15+ redundant subpages and
+    timed out into a phantom-null geometry salvage — the same shape hit a
+    16-property cohort in the 2026-07-11 canary. Short-circuiting the crawl on
+    this signal recovers the real priced roster instead.
+
+    Guards keep the short-circuit conservative:
+    - Only fires on ``TIER_1_API_SIGHTMAP*`` tiers, EXCLUDING ``*_PLAN_LEVEL``
+      (those have no unit-level rent — a subpage walk may still enrich them).
+    - Requires a MAJORITY of units to carry rent, so a thin/partial SightMap
+      parse (or the "full map, no prices" first embed of a two-embed property,
+      which ``_try_subpage_sightmap_with_prices`` must still walk to price)
+      does not suppress a legitimate multi-page accumulation.
+    """
+    tier = str(result.get("extraction_tier_used") or "")
+    if not tier.startswith("TIER_1_API_SIGHTMAP") or "PLAN_LEVEL" in tier:
+        return False
+    units = result.get("units") or []
+    if not units:
+        return False
+    from ma_poc.pms.adapters.sightmap import _sightmap_unit_has_rent
+
+    priced = sum(
+        1 for u in units if isinstance(u, dict) and _sightmap_unit_has_rent(u)
+    )
+    return priced >= max(1, (len(units) + 1) // 2)
+
+
 async def _try_link_hop(
     entry_url: str,
     entry_page_html: str,
@@ -3088,6 +3126,28 @@ async def _try_link_hop(
                                     continue
                         fp_hints.append((lnk_url, "html_subpage"))
             if fp_hints and not _in_floorplan_accumulation:
+                # 2026-07-11: SightMap crawl short-circuit. If the base
+                # floorplan result is ALREADY a priced SightMap direct-API
+                # extraction, its site-global embed carries the full roster —
+                # entering per-plan subpage accumulation would only re-render
+                # the page and re-fetch the SAME embed on every hop (the sink
+                # that timed cltexchange.com + a 15-property cohort into
+                # phantom-null salvages). Return the complete result now,
+                # mirroring the good-single-page return path below.
+                if _is_priced_sightmap_result(sub_result):
+                    emit(
+                        EventKind.LINK_HOP_RECOVERED,
+                        property_id,
+                        entry_url=entry_url,
+                        sub_url=sub_url,
+                        units=len(sub_result.get("units") or []),
+                        tier=sub_result.get("extraction_tier_used"),
+                        hop_index=idx,
+                        score=score,
+                    )
+                    sub_result["_best_units_page"] = _best_units_page[0] or sub_url
+                    sub_result["_best_units_count"] = _best_units_page[1]
+                    return sub_result
                 # Mark accumulation mode so recursive sub-pages are merged,
                 # not treated as new floor-plan index pages.
                 _in_floorplan_accumulation = True
