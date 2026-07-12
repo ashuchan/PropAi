@@ -238,3 +238,85 @@ def test_quality_flag_distinguishes_clean_from_dirty() -> None:
         assert actual == expected, (
             f"classify({text!r}) = {actual!r}, expected {expected!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# 2026-07-12 cookie-consent chrome (unclean_cookie_chrome).
+#
+# The rendered-DOM banner walker's [class*="banner"]/[class*="notice"]-style
+# selectors also match OneTrust/CookieYes consent bars; adjacent renders
+# concatenate consent UI with the marketing banner. Pre-fix these classified
+# "clean" (no code-leak markers) so clean_concession_text returned the
+# polluted text unchanged. Fixtures below are live captures (2026-07-11
+# canary + 2026-07-12 repro).
+# ---------------------------------------------------------------------------
+
+_LEESQUARE = (
+    "Privacy Policy Accept Deny Non-Essential Close Cookie Preferences X "
+    "2 Months Free Base Rent on 2-Bedroom Homes. Live Grand. Save Big."
+)
+_BANYAN = (
+    "ACCEPT DECLINE Up to 10 weeks free on select luxury apartment "
+    "homes!* *Restrictions apply"
+)
+
+
+def test_cookie_chrome_classified():
+    assert classify_concession_quality(_LEESQUARE) == "unclean_cookie_chrome"
+    assert classify_concession_quality(_BANYAN) == "unclean_cookie_chrome"
+
+
+def test_cookie_chrome_leading_run_stripped():
+    assert clean_concession_text(_LEESQUARE) == (
+        "2 Months Free Base Rent on 2-Bedroom Homes. Live Grand. Save Big."
+    )
+    assert clean_concession_text(_BANYAN) == (
+        "Up to 10 weeks free on select luxury apartment homes!* "
+        "*Restrictions apply"
+    )
+
+
+def test_pure_cookie_text_cleans_to_empty():
+    t = (
+        "We use cookies to improve your experience. Accept All Cookies "
+        "Reject All Cookie Settings"
+    )
+    assert classify_concession_quality(t) == "unclean_cookie_chrome"
+    assert clean_concession_text(t) == ""
+
+
+def test_offer_before_chrome_head_preserved():
+    t = (
+        "x Apply today for ONLY $99.00 + FREE RENT! X How we use cookies "
+        "We use cookies and similar technologies to analyze traffic"
+    )
+    out = clean_concession_text(t)
+    assert "$99.00" in out and "FREE RENT" in out
+    assert "cookies" not in out.lower()
+
+
+def test_trailing_chrome_truncated_from_offer_window():
+    t = "2 Months Free Base Rent! Restrictions apply. Cookie Preferences"
+    out = clean_concession_text(t)
+    assert out == "2 Months Free Base Rent! Restrictions apply."
+
+
+def test_bare_accept_in_marketing_copy_untouched():
+    # "accept" alone is NOT a strong consent anchor — legit copy survives.
+    t = "Accept our gift: 1 month free on select homes!"
+    assert classify_concession_quality(t) == "clean"
+    assert clean_concession_text(t) == t
+
+
+def test_script_leak_still_wins_over_cookie_chrome():
+    t = "function() {} Cookie Preferences 1 month free"
+    assert classify_concession_quality(t) == "unclean_script_leak"
+
+
+def test_half_off_recognized_as_specific_offer():
+    # 2026-07-12 no-concession decomposition: greenarchtulsa hero banner
+    # "Half off first month rent…" was the only confirmed residual recall
+    # miss in a 37-prop sample — worded-fraction discounts had no branch.
+    t = "Half off first month rent when you lease our Greenwood unit!"
+    assert classify_concession_quality(t) == "clean"
+    assert clean_concession_text(t) == t

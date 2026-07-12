@@ -110,6 +110,93 @@ _STYLE_LEAK_MARKERS: tuple[str, ...] = (
     "flex-direction",
 )
 
+# 2026-07-12 concession-quality sweep: cookie-consent UI chrome leaking
+# into the captured banner text. The rendered-DOM banner walker queries
+# ``[class*="banner"]``/``[class*="notice"]``-style selectors that also
+# match OneTrust/CookieYes consent bars, and when the consent bar and the
+# marketing banner render adjacently the captured window concatenates
+# both. Live shapes (2026-07-11 canary + fresh repro):
+#   "Privacy Policy Accept Deny Non-Essential Close Cookie Preferences X
+#    2 Months Free Base Rent on 2-Bedroom Homes…"   (liveatleesquare)
+#   "ACCEPT DECLINE Up to 10 weeks free on select…" (banyanonwashington)
+# Pre-fix these classified "clean" (no code-leak markers) so
+# clean_concession_text returned them UNCHANGED at step 1 — a false-clean.
+# Markers are multi-word consent-specific vocabulary; single common words
+# ("close", "accept") are deliberately NOT markers on their own — they
+# participate only in the leading-run stripper below once a strong marker
+# anchors the run.
+_COOKIE_CHROME_MARKERS: tuple[str, ...] = (
+    "cookie preferences",
+    "cookie settings",
+    "cookies policy",
+    "cookie policy",
+    "we use cookies",
+    "use of cookies",
+    "accept all cookies",
+    "manage cookies",
+    "consent preferences",
+    "accept deny",
+    "accept decline",
+    "non-essential",
+    "nonessential cookies",
+    "reject all",
+    "privacy policy accept",
+)
+
+# Leading consent-chrome run stripper. Engages only at the START of the
+# text and only when the run OPENS with a strong consent token; it then
+# keeps consuming the weak UI words that follow (Accept / Deny / Close /
+# X / Preferences …) until real copy begins. Strong-anchor requirement
+# keeps legitimate marketing text safe — "Accept our gift of 1 month
+# free" never matches because bare "accept" is not a strong opener.
+_COOKIE_CHROME_STRONG_RE = re.compile(
+    r"^\s*(?:"
+    r"privacy\s+policy"
+    r"|cookies?\s+(?:preferences|settings|policy|notice|consent)"
+    r"|we\s+use\s+cookies"
+    r"|this\s+(?:web)?site\s+uses\s+cookies"
+    r"|manage\s+cookies"
+    r"|consent(?:\s+preferences)?"
+    r"|accept\s+(?:all|deny|decline)"
+    r"|reject\s+all"
+    r"|non[-\s]essential"
+    r")\b",
+    re.IGNORECASE,
+)
+_COOKIE_CHROME_TOKEN_RE = re.compile(
+    r"^\s*(?:"
+    r"privacy\s+policy|cookies?(?:\s+(?:preferences|settings|policy|notice|consent))?"
+    r"|we\s+use\s+cookies[^.!?]{0,80}[.!?]?"
+    r"|this\s+(?:web)?site\s+uses\s+cookies[^.!?]{0,80}[.!?]?"
+    r"|manage\s+cookies|consent(?:\s+preferences)?"
+    r"|accept(?:\s+all)?|deny|decline|reject(?:\s+all)?"
+    r"|non[-\s]essential|essential\s+only|opt[-\s]?out"
+    r"|preferences|settings|close|got\s+it|i\s+agree|agree|ok(?:ay)?"
+    r"|[x✕×]"
+    r")\b[\s:|,·.!—–-]*",
+    re.IGNORECASE,
+)
+
+
+def _strip_leading_cookie_chrome(text: str) -> str:
+    """Remove a leading cookie-consent UI run from *text*.
+
+    Anchored: only strips when the text OPENS with a strong consent token
+    (see ``_COOKIE_CHROME_STRONG_RE``); then iteratively consumes the weak
+    consent/UI tokens that follow. Returns the remainder (may be the
+    original text when no strong anchor at position 0).
+    """
+    if not _COOKIE_CHROME_STRONG_RE.match(text):
+        return text
+    out = text
+    for _ in range(40):  # bounded — each iteration must consume ≥1 char
+        m = _COOKIE_CHROME_TOKEN_RE.match(out)
+        if not m or m.end() == 0:
+            break
+        out = out[m.end():]
+    return out.strip()
+
+
 # Duda CMS — the signature is ``Functions["hash~N"] = function``.
 _DMAPI_RE = re.compile(r"Functions\[[\"'][a-f0-9]+~\d+[\"']\]\s*=\s*function", re.I)
 
@@ -145,6 +232,7 @@ _BANNER_HEADER_RE = re.compile(
 _SPECIFIC_OFFER_RE = re.compile(
     r"\$\s*\d"  # dollar amount
     r"|\d+\s*%"  # percentage off
+    r"|half\s+off"  # worded-fraction discount (greenarchtulsa 2026-07-12)
     r"|\d+\s+(?:weeks?|months?|days?)\s+(?:free|of\s+free|on\s+us|complimentary)"
     r"|free\s+rent"
     r"|free\s+\w+\s+for"
@@ -209,6 +297,11 @@ def classify_concession_quality(text: str | None) -> str:
         return "unclean_script_leak"
     if style_hit:
         return "unclean_style_leak"
+    # 2026-07-12: cookie-consent chrome. Runs after the code-leak
+    # categories (a row with JS AND consent text is a script leak first)
+    # and before orphan-prefix. See _COOKIE_CHROME_MARKERS.
+    if any(m in sl for m in _COOKIE_CHROME_MARKERS):
+        return "unclean_cookie_chrome"
     if _LEADING_ORPHAN_RE.match(text):
         return "unclean_orphan_prefix"
     # Header-only check runs LAST so it doesn't shadow the leak
@@ -245,6 +338,7 @@ _OFFER_PHRASES: tuple[str, ...] = (
     r"week\s+(?:of\s+)?(?:rent\s+)?free\b",
     r"up\s+to\s+\d{1,3}\s+(?:weeks?|months?)\s+(?:(?:of\s+)?rent\s+)?free",
     r"\$\d{1,4}\s+off",
+    r"half\s+off(?:\s+(?:your\s+)?first\s+month(?:['\u2019]?s)?\s+rent)?",
     r"\d{1,3}%\s+off",
     r"save\s+up\s+to\s+\$?\d{1,4}",
     r"save\s+\$\d{1,4}",
@@ -325,6 +419,39 @@ def clean_concession_text(text: str | None) -> str:
     quality = classify_concession_quality(text)
     if quality in ("clean", "empty"):
         return text.strip()
+    if quality == "unclean_cookie_chrome":
+        # 2026-07-12: strip the leading consent-UI run, then re-clean the
+        # remainder (it may still carry other leak classes, or be clean).
+        # A run that consumes the ENTIRE text means the capture was pure
+        # consent UI with no offer at all — the honest clean value is ""
+        # (the quality flag preserves the why). When the chrome is NOT a
+        # leading run (marker mid-text), fall through to the offer-phrase
+        # extraction below, which truncates at the first chrome marker.
+        stripped = _strip_leading_cookie_chrome(text)
+        if not stripped:
+            return ""
+        if stripped != text.strip():
+            return clean_concession_text(stripped)
+        # Offer-BEFORE-chrome shape ("…$99.00 + FREE RENT! X How we use
+        # cookies…"): no leading run to strip, but the copy ahead of the
+        # first consent marker carries the offer. Cut there and re-clean
+        # the head (which by construction contains no cookie markers, so
+        # the recursion terminates). Trailing solitary close-button
+        # tokens ("… X") are trimmed off the result.
+        _tl = text.lower()
+        _cut = min(
+            (_tl.find(m) for m in _COOKIE_CHROME_MARKERS if m in _tl),
+            default=-1,
+        )
+        if _cut > 0:
+            _head = text[:_cut]
+            if _OFFER_RE.search(_head):
+                _head_clean = clean_concession_text(_head)
+                if _head_clean:
+                    return re.sub(
+                        r"(?:\s+(?:[x✕×]|how))+\s*$", "", _head_clean,
+                        flags=re.IGNORECASE,
+                    ).rstrip(" ,;:-—–")
     if quality == "unclean_header_only":
         # Nothing to extract — the text IS the banner header, there
         # is no body to mine. Return whitespace-normalized so it's
@@ -396,6 +523,16 @@ def clean_concession_text(text: str | None) -> str:
         tail_match = re.search(r'"\s*,\s*"', snippet)
         if tail_match:
             snippet = snippet[:tail_match.start()]
+        # 2026-07-12: truncate at the first cookie-consent marker — the
+        # sentence-terminator extension above can pull a trailing consent
+        # bar into the window ("…Restrictions apply. Cookie Preferences").
+        _snip_l = snippet.lower()
+        _cookie_cut = min(
+            (_snip_l.find(m) for m in _COOKIE_CHROME_MARKERS if m in _snip_l),
+            default=-1,
+        )
+        if _cookie_cut > 0:
+            snippet = snippet[:_cookie_cut]
         return snippet.rstrip(' ,;:.-—–"').strip()
 
     # Pass 2 — code/text boundary split.

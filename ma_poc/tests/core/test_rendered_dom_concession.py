@@ -520,3 +520,14 @@ def test_scraper_has_step_3c_invocation() -> None:
         "scraper.py no longer tags concession_source='DOM_POPUP_RENDERED' — "
         "Step 3c's provenance attribution is broken."
     )
+
+
+def test_property_concession_re_half_off_and_percent():
+    """2026-07-12: worded-fraction + percent discounts (greenarchtulsa
+    "Half off first month rent…" — the only confirmed recall miss in a
+    37-prop no-capture sample)."""
+    from ma_poc.pms.scraper import _PROPERTY_CONCESSION_RE as R
+
+    assert R.search("Half off first month rent when you lease our Greenwood unit!")
+    assert R.search("Get 50% off your second month!")
+    assert not R.search("Our halfway house is off the main road")

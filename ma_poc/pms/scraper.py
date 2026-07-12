@@ -273,7 +273,15 @@ _PROPERTY_CONCESSION_RE = re.compile(
     # match captures the offer context even when the rest of the phrase
     # uses unusual phrasing the other branches don't reach.
     r"|\bexclusive\s+offer\b"
-    r"|\b(?:special|exclusive)\s+(?:lease|move[- ]in)\s+offer\b",
+    r"|\b(?:special|exclusive)\s+(?:lease|move[- ]in)\s+offer\b"
+    # 2026-07-12 (no-concession cohort decomposition): worded-fraction and
+    # percent discounts. greenarchtulsa.com ships "Half off first month
+    # rent when you lease our Greenwood unit!" as a static hero banner —
+    # the only confirmed residual recall miss in a 37-prop no-capture
+    # sample; neither "half off" nor "N% off" had a branch here (only
+    # "$N off" / "N weeks|months off").
+    r"|\bhalf\s+off\b"
+    r"|\b\d{1,3}\s*%\s+off\b",
     re.IGNORECASE,
 )
 
