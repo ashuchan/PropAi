@@ -185,3 +185,51 @@ def test_numeric_rent_detected_across_field_variants():
     assert not _salvage_unit_has_numeric_rent({"rent_range": ""})
     assert not _salvage_unit_has_numeric_rent({"data_gaps": ["rent"]})  # gap ≠ numeric
     assert not _salvage_unit_has_numeric_rent({"market_rent_low": 0})
+
+
+# ---------------------------------------------------------------------------
+# 2026-07-12 (38198b6 canary QC): timeout salvages must emit V2-FORMATTED
+# units. Pre-fix, `return failed` shipped RAW adapter dicts (rent_range /
+# market_rent_low / bed_label ...) into properties.json — libertybayclub's
+# salvage carried market_rent_low=2390 + real dates yet v2 consumers read
+# rent_low/available_date as null. The handler now routes the salvage
+# through _format_output (the success path's chokepoint); this pins the
+# transformation contract on the exact liberty unit shape.
+# ---------------------------------------------------------------------------
+
+
+def test_salvage_units_format_to_v2():
+    from ma_poc.scripts.runners.jugnu import _format_output
+
+    raw_unit = {
+        "floor_plan_name": "Abby", "bed_label": "1 Bedroom",
+        "bedrooms": "1", "bathrooms": "1", "sqft": "780",
+        "unit_number": "109", "floor": "118725", "building": "1",
+        "rent_range": "$2,390", "market_rent_low": 2390,
+        "market_rent_high": 2390,
+        "availability_status": "AVAILABLE",
+        "available_date": "2026-09-11",
+        "extraction_tier": "TIER_1_API_SIGHTMAP_DIRECT",
+        "source_ids": {"sightmap_unit_id": "x1"},
+    }
+    meta = {
+        "canonical_id": "251766", "scrape_tier_used": "FAILED",
+        "scrape_errors": ["per_property_timeout:600s"],
+        "carry_forward_used": False, "partial_recovery": True,
+    }
+    out = _format_output(
+        {"units": [raw_unit], "base_url": "https://x.test/", "_meta": meta},
+        {"property_id": "251766", "apartment_id": "251766"},
+        "v2",
+    )
+    u = out["units"][0]
+    assert u["unit_id"] == "109"
+    assert u["rent_low"] == 2390.0
+    assert u["area"] == 780
+    assert u["beds"] == 1
+    assert u["available_date"] == "2026-09-11"
+    # the _meta sharing contract: salvage markers + later verdict stamps
+    # must land on the emitted record
+    assert out["_meta"] is meta
+    assert out["_meta"]["partial_recovery"] is True
+    assert out["_meta"]["scrape_tier_used"] == "FAILED"
