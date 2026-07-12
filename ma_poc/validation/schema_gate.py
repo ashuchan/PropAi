@@ -193,6 +193,58 @@ def _has_area(unit: dict[str, Any]) -> bool:
     return _sqft_gap_documented(unit)
 
 
+def _is_plan_presence_marker(unit: dict[str, Any]) -> bool:
+    """True when *unit* is a catalogue-presence MARKER row, not a real unit.
+
+    2026-07-11 quality sweep. ``sightmap.parse_sightmap_payload`` (2026-06-27
+    chip) emits one row per floor plan that has NO units in ``units[]`` —
+    sold-out / not-yet-released plans — marked UNAVAILABLE / available_units=0
+    / ``data_quality_flag="SIGHTMAP_PLAN_PRESENCE"`` so the downstream
+    catalogue diff sees the full plan inventory. Those rows carry no rent BY
+    DESIGN. Counting them in the rent/area-signal DENOMINATORS made a
+    property whose every actually-available unit HAS rent+sqft+uid look like
+    it "has no rent signal" whenever sold-out plans outnumbered available
+    units (e.g. thecharlesslc: 21 real priced units + 26 sold-out plan
+    markers → 21/47 = 45% < 0.5). That false negative (a) fired the Path-B
+    no_rent/no_area retry for nothing, and (b) stamped the tier
+    ``*_PLAN_LEVEL`` + verdict SUCCESS_PLAN_LEVEL — mislabelling genuinely
+    unit-level extractions as plan-level (109 props / 1,750 real priced unit
+    rows in the 2026-07-11 canary).
+
+    Two shapes, kept tight:
+    - explicit: ``data_quality_flag == "SIGHTMAP_PLAN_PRESENCE"``
+    - generic sold-out marker: no real unit identity (unit_id/unit_number
+      empty or ``inferred_*``) AND explicitly UNAVAILABLE AND zero/absent
+      available_units AND no numeric rent. All four must hold — a real
+      no-rent unit row keeps its identity or availability and stays in the
+      denominator.
+    """
+    flag = str(unit.get("data_quality_flag") or "").upper()
+    if flag == "SIGHTMAP_PLAN_PRESENCE":
+        return True
+    uid = str(unit.get("unit_id") or unit.get("unit_number") or "").strip()
+    if uid and not uid.startswith("inferred_"):
+        return False
+    if str(unit.get("availability_status") or "").upper() != "UNAVAILABLE":
+        return False
+    avail_n = str(unit.get("available_units") or "").strip()
+    if avail_n not in ("", "0", "0.0", "None"):
+        return False
+    return not any(_is_positive_numeric(unit.get(k)) for k in _RENT_FIELDS)
+
+
+def _signal_denominator(units: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rows that count toward the rent/area-signal ratio.
+
+    Plan-presence marker rows are excluded — they carry no rent/area BY
+    DESIGN, so they may not dilute the signal of the real units they ride
+    along with. When EVERY row is a marker, fall back to the full list so
+    the property still (correctly) reads as no-signal / plan-level.
+    """
+    real = [u for u in units if not _is_plan_presence_marker(u)]
+    return real if real else units
+
+
 def property_has_rent_signal(
     units: list[dict[str, Any]],
     threshold: float = 0.5,
@@ -203,11 +255,16 @@ def property_has_rent_signal(
     where every row has dimensions but no rent — this predicate is the
     signal that catches that shape and lets the Path C retry mechanism
     fire. Empty list returns False (no units → no rent signal).
+
+    Plan-presence marker rows (sold-out plans emitted for catalogue
+    completeness) are excluded from the ratio — see
+    :func:`_is_plan_presence_marker`.
     """
     if not units:
         return False
-    good = sum(1 for u in units if _has_rent(u))
-    return (good / len(units)) >= threshold
+    rows = _signal_denominator(units)
+    good = sum(1 for u in rows if _has_rent(u))
+    return (good / len(rows)) >= threshold
 
 
 def property_has_area_signal(
@@ -218,11 +275,15 @@ def property_has_area_signal(
 
     Used alongside rent-signal to detect the "name+beds+baths only" shape
     that some JSON-LD and plan-card adapters emit. Empty list → False.
+
+    Plan-presence marker rows are excluded from the ratio — see
+    :func:`_is_plan_presence_marker`.
     """
     if not units:
         return False
-    good = sum(1 for u in units if _has_area(u))
-    return (good / len(units)) >= threshold
+    rows = _signal_denominator(units)
+    good = sum(1 for u in rows if _has_area(u))
+    return (good / len(rows)) >= threshold
 
 
 @dataclass(frozen=True)
