@@ -497,6 +497,26 @@ async def run_jugnu(
             # Surface partial units in the failed record so the run report can
             # show partial data rather than a zero-unit timeout row.
             if _partial_units:
+                # 2026-07-11 quality sweep: a TIMEOUT salvage with ZERO
+                # numeric-rent units is the "phantom roster" shape — a
+                # geometry roster (all rows, no prices) salvaged before the
+                # price join ran. When any unit carries a false
+                # data_gaps=["rent"] / RENT_NOT_PUBLISHED flag, it suppresses
+                # the verdict's no_rent_signal → SUCCESS_PLAN_LEVEL downgrade
+                # and leaves every row marked AVAILABLE. Neutralise the
+                # unearned flag so the salvage verdict computed below lands on
+                # SUCCESS_PLAN_LEVEL (held), not an inflated unit-level
+                # SUCCESS with phantom available inventory. Gated on
+                # zero-numeric-rent so partial salvages that DID capture real
+                # prices are left untouched. See _neutralize_unearned_rent_gap.
+                if not any(
+                    _salvage_unit_has_numeric_rent(_u)
+                    for _u in _partial_units
+                    if isinstance(_u, dict)
+                ):
+                    for _u in _partial_units:
+                        if isinstance(_u, dict):
+                            _neutralize_unearned_rent_gap(_u)
                 failed["units"] = _partial_units
                 failed.setdefault("_meta", {})["partial_recovery"] = True
             # 2026-05-27: stamp a verdict on the salvage record so run_report
@@ -2303,6 +2323,70 @@ def _append_issue_to_run(run_dir: Path, issue: Any) -> None:
             _f.write(line + "\n")
     except Exception as exc:
         log.debug("_append_issue_to_run failed: %s", exc)
+
+
+def _salvage_unit_has_numeric_rent(unit: dict[str, Any]) -> bool:
+    """True when a timeout-salvaged unit carries a *numeric* rent value.
+
+    Mirrors the numeric arm of ``schema_gate._has_rent`` (the ``_RENT_FIELDS``
+    positive-numeric check) PLUS a ``rent_range`` string parse — timeout-
+    salvaged units are still in the raw ``make_unit_dict`` shape where rent
+    lives under ``rent_range`` (a string like "$1,450"), not the v2
+    ``rent_low``/``rent_high`` numerics. Deliberately EXCLUDES the
+    ``_rent_gap_documented`` arm: a "documented" gap is exactly the false
+    signal this predicate exists to see past (see
+    :func:`_neutralize_unearned_rent_gap`).
+    """
+    for k in (
+        "asking_rent", "market_rent_low", "market_rent_high",
+        "rent_low", "rent_high", "rent",
+    ):
+        v = unit.get(k)
+        if v in (None, ""):
+            continue
+        try:
+            if float(str(v).replace(",", "").replace("$", "")) > 0:
+                return True
+        except (TypeError, ValueError):
+            pass
+    rr = unit.get("rent_range")
+    if rr:
+        try:
+            from ma_poc.pms.adapters._parsing import parse_rent_range
+
+            lo, hi = parse_rent_range(str(rr))
+            if (lo and lo > 0) or (hi and hi > 0):
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def _neutralize_unearned_rent_gap(unit: dict[str, Any]) -> None:
+    """Strip a false "operator doesn't publish rent" flag off a timeout salvage.
+
+    2026-07-11 quality sweep. A per-property TIMEOUT partial-recovery is an
+    INTERRUPTED extraction, not an exhausted one. SightMap (and similar)
+    geometry rosters accumulated mid-hop can carry a ``data_gaps=["rent"]`` /
+    ``data_quality_flag="RENT_NOT_PUBLISHED"`` flag — but ``schema_gate.
+    _rent_gap_documented``'s contract is that an adapter sets it only after
+    *exhausting* enrichment. The timeout pre-empted that, so on a salvage where
+    NO unit carries a numeric rent the flag is a verified false positive
+    (cltexchange.com unit 10113237 salvaged rent=null, but SightMap's own API
+    publishes it at $1,450 / 703 sqft — we simply timed out before the price
+    join). Left in place it (a) makes ``property_has_rent_signal`` return True,
+    suppressing the verdict layer's ``no_rent_signal → SUCCESS_PLAN_LEVEL``
+    downgrade so the property inflates into a unit-level SUCCESS, and (b) leaves
+    every geometry row marked AVAILABLE — phantom priced-null inventory
+    (cltexchange 647 "available" units vs ~86 genuinely leasable). Drop the
+    unearned gap flag, demote availability to UNKNOWN (honest: we never
+    determined it), and mark the row QA_HELD.
+    """
+    gaps = unit.get("data_gaps")
+    if isinstance(gaps, list) and "rent" in gaps:
+        unit["data_gaps"] = [g for g in gaps if g != "rent"]
+    unit["data_quality_flag"] = "QA_HELD"
+    unit["availability_status"] = "UNKNOWN"
 
 
 def _make_failed_record(
