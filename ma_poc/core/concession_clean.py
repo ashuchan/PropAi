@@ -249,6 +249,26 @@ _SPECIFIC_OFFER_RE = re.compile(
 )
 
 
+# 2026-07-12: the broadest offer-ish vocabulary — ANY of these words
+# means the text at least talks about an offer (the specific-offer regex
+# above then grades whether it carries actionable terms). Absence of ALL
+# of them = amenity/nav noise captured as concession text
+# ("no_offer_signal" label). Deliberately broad: this gate only has to
+# separate offers from amenity lists, not grade offer quality.
+_ANY_OFFER_SIGNAL_RE = re.compile(
+    r"\bspecials?\b|\boffer(?:s|ing)?\b|\bfree\b|\bdiscount\w*\b"
+    r"|\bwaived?\b|\bcredit\b|\bsav(?:e|ings)\b|\bdeal\b|\bpromo\w*\b"
+    r"|\bconcession\w*\b|\bbonus\b|\breduced?\b|\boff\b"
+    # flip-audit additions (2026-07-11 corpus): "6 Weeks ON US",
+    # "NO RENT until Aug", "Flash SALE" are real offers with none of the
+    # words above; look-lease must tolerate the HTML-entity ampersand.
+    r"|\bon\s+us\b|\bno\s+rent\b|\bsale\b|\bincentives?\b"
+    r"|look[\s\-]*(?:and|&(?:amp;)?|\+|n)?[\s\-]*lease"
+    r"|move[\s\-]?in|\$\s*\d|\d+\s*%",
+    re.IGNORECASE,
+)
+
+
 def classify_concession_quality(text: str | None) -> str:
     """Return a short quality label for *text*.
 
@@ -313,6 +333,15 @@ def classify_concession_quality(text: str | None) -> str:
     # sentence-split orphaned it).
     if _BANNER_HEADER_RE.match(text.strip()) and not _SPECIFIC_OFFER_RE.search(text):
         return "unclean_header_only"
+    # 2026-07-12 (no-concession decomposition): amenity/nav noise stored
+    # as concession text — "Stackable Machines provided Stainless
+    # Appliances…", nav menus, community-feature lists (~1,000+ canary
+    # units). Per the module contract (preserve-and-flag, never discard)
+    # the text ships unchanged; this label lets consumers filter rows
+    # that carry NO offer-ish vocabulary at all. Runs last: any leak
+    # class or header phrase above wins first.
+    if not _ANY_OFFER_SIGNAL_RE.search(text):
+        return "no_offer_signal"
     return "clean"
 
 
@@ -452,11 +481,12 @@ def clean_concession_text(text: str | None) -> str:
                         r"(?:\s+(?:[x✕×]|how))+\s*$", "", _head_clean,
                         flags=re.IGNORECASE,
                     ).rstrip(" ,;:-—–")
-    if quality == "unclean_header_only":
-        # Nothing to extract — the text IS the banner header, there
-        # is no body to mine. Return whitespace-normalized so it's
-        # safe in xlsx cells; quality flag tells reporting to display
-        # with caution.
+    if quality in ("unclean_header_only", "no_offer_signal"):
+        # Nothing to extract — either the text IS the banner header
+        # (no body), or it carries no offer vocabulary at all
+        # (amenity/nav noise; preserve-and-flag contract). Return
+        # whitespace-normalized so it's safe in xlsx cells; the
+        # quality flag tells reporting to display/filter accordingly.
         return re.sub(r"\s+", " ", text).strip()
 
     # Pass 1 — offer-phrase extraction. Most reliable.

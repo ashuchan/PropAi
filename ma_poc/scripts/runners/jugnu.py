@@ -1364,6 +1364,30 @@ def _format_v2(result: dict[str, Any], csv_row: dict[str, Any]) -> dict[str, Any
 
     concessions_text = result.get("concessions_text") or md.get("concessions")
 
+    # 2026-07-12 (concession propagation gap, 94 props in the 2026-07-11
+    # canary): the property-level banner has TWO sources — the scraper's
+    # ``concessions_text`` (Steps 3/3b/3c, smeared to units by scraper.py
+    # Step 9c) AND the page-metadata ``md["concessions"]``, which only
+    # ever fed this property field: units shipped with empty concession
+    # columns even though the property-level banner was captured. Backfill
+    # here — the single formatting chokepoint — so EVERY source and EVERY
+    # path (including timeout-salvage records that bypass Step 9c) reaches
+    # the unit rows. ``enrich_unit_concession_fields`` is idempotent:
+    # units that already carry text are untouched.
+    if concessions_text:
+        try:
+            from ma_poc.pms.adapters._parsing import (
+                enrich_unit_concession_fields,
+            )
+
+            for _u in units:
+                if isinstance(_u, dict):
+                    enrich_unit_concession_fields(
+                        _u, property_concession_text=concessions_text
+                    )
+        except Exception:  # defensive — never block the property emit
+            pass
+
     prop: dict[str, Any] = {
         "apartment_id": apartment_id,
         "proj_name": _pick(
