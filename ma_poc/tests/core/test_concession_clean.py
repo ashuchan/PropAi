@@ -320,3 +320,35 @@ def test_half_off_recognized_as_specific_offer():
     t = "Half off first month rent when you lease our Greenwood unit!"
     assert classify_concession_quality(t) == "clean"
     assert clean_concession_text(t) == t
+
+
+# ---------------------------------------------------------------------------
+# 2026-07-12 no_offer_signal — amenity/nav noise stored as concession text.
+# Preserve-and-flag: text ships unchanged; the label lets consumers filter.
+# Flip-audit on the 2026-07-11 corpus: 76 rows flagged, 0 real offers among
+# them (guards below pin the offer shapes that MUST stay clean).
+# ---------------------------------------------------------------------------
+
+
+def test_amenity_noise_flagged_no_offer_signal():
+    for t in [
+        "Cable, wi-fi, and valet trash included!",
+        "Stackable Machines provided Stainless Appliances/Self Cleaning Ovens",
+        "Now Accepting Applications for Summer 2026 Availability!",
+        "False",
+    ]:
+        assert classify_concession_quality(t) == "no_offer_signal", t
+        # preserve-and-flag: cleaner returns the text, not ""
+        assert clean_concession_text(t) == t
+
+
+def test_real_offers_never_flagged():
+    for t in [
+        "New window 0 Look &amp; Lease: Up to 6 Weeks On Us! *Valid on select units.",
+        "Flash Sale! No rent until Aug! Certain exclusions may apply",
+        "6 weeks FREE on Select Floorplans",
+        "$250 off first month",
+        "Please contact the Leasing Office for any current leasing incentives!",
+        "Move-in special available now",
+    ]:
+        assert classify_concession_quality(t) != "no_offer_signal", t
