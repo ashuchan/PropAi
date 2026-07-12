@@ -13,7 +13,7 @@ month-name were silently dropped fleet-wide. These tests pin:
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -154,15 +154,36 @@ def test_iso_and_four_digit_unchanged_additive_guarantee() -> None:
 # Regression: dateutil rejects "Available <date>"/"Available Now"; the
 # canonical-parser fallback recovers them. dateutil-parseable inputs and
 # the past-date guard are unchanged (additive).
+# 2026-07-12: fixtures are computed FUTURE dates, not hardcoded strings —
+# the originals ("Available 7/10/26", "Available May 19") were future when
+# written (2026-05-19), but the extractor's past-date guard correctly
+# rejects them once the calendar passes them, so the tests started failing
+# with the code working as designed. ~30 days ahead keeps every form
+# future; the no-year month-name case additionally requires the future
+# date to fall in the current year (the parser assumes the run year), so
+# it skips in December runs rather than asserting a wrong year.
+_FUT = (datetime.now(UTC) + timedelta(days=30)).date()
+_FUT_ISO = _FUT.isoformat()
+_FUT_MDY2 = f"{_FUT.month}/{_FUT.day}/{_FUT:%y}"          # e.g. "8/11/26"
+_FUT_MONTHNAME = f"{_FUT:%B} {_FUT.day}"                   # e.g. "August 11"
+
+
 @pytest.mark.parametrize(
     ("card", "expected"),
     [
-        ('<div class="unit-available">Available 7/10/26</div>', "2026-07-10"),
-        ('<div class="availability">Available May 19</div>', f"{_CUR}-05-19"),
+        (f'<div class="unit-available">Available {_FUT_MDY2}</div>', _FUT_ISO),
+        pytest.param(
+            f'<div class="availability">Available {_FUT_MONTHNAME}</div>',
+            _FUT_ISO,
+            marks=pytest.mark.skipif(
+                _FUT.year != datetime.now(UTC).year,
+                reason="no-year month-name form assumes the current year",
+            ),
+        ),
         ('<span class="avail-date">Available Now</span>', _TODAY),
         # Regression: dateutil path unchanged
-        ('<time datetime="2026-08-01">Aug 1</time>', "2026-08-01"),
-        ('<div class="available">7/10/26</div>', "2026-07-10"),
+        (f'<time datetime="{_FUT_ISO}">{_FUT:%b} {_FUT.day}</time>', _FUT_ISO),
+        (f'<div class="available">{_FUT_MDY2}</div>', _FUT_ISO),
     ],
 )
 def test_dom_card_label_prefixed_dates_recovered(card: str, expected: str) -> None:
