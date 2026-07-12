@@ -117,6 +117,40 @@ log = logging.getLogger(__name__)
 _CLEARANCE_EXACT = {"cf_clearance", "__cf_bm", "datadome"}
 _CLEARANCE_PREFIX = ("__ddg", "incap_ses", "visid_incap", "nlbi_")
 
+# 2026-07-12 (residential-minimization): CF managed-challenge markers. The
+# marker in the first few KB is the RELIABLE discriminator between a solvable
+# "Just a moment" JS challenge (patchright auto-solves it on the same IP —
+# no residential proxy needed) and a real page. A prior size cap (body ≤20KB)
+# excluded the modern ~27KB CF interstitial and disabled the solver entirely.
+_CF_JS_CHALLENGE_MARKERS: tuple[bytes, ...] = (
+    b"just a moment", b"challenge-platform", b"__cf_chl_",
+    b"checking your browser", b"cf-browser-verification",
+    b"/cdn-cgi/challenge",
+)
+# WAF hard-ban markers — NOT auto-solvable (residential/backoff, not a wait).
+_CF_WAF_BAN_MARKERS: tuple[bytes, ...] = (
+    b"attention required", b"sorry, you have been blocked",
+)
+
+
+def cf_challenge_state(body_text: str | None) -> str:
+    """Classify a rendered body's Cloudflare state from its opening bytes.
+
+    Returns ``"challenge"`` (solvable JS challenge — wait for auto-solve),
+    ``"waf"`` (hard ban — cannot auto-solve), or ``"none"``. The decision
+    reads only the first 4 KB (lowercased): a genuine apartment page never
+    opens with "Just a moment", so this is a precise gate that — unlike the
+    stale ``len<=20_000`` cap it replaces — does not depend on body size.
+    """
+    if not body_text or len(body_text) < 512:
+        return "none"
+    head = body_text.encode("utf-8", errors="replace")[:4096].lower()
+    if any(m in head for m in _CF_WAF_BAN_MARKERS):
+        return "waf"
+    if any(m in head for m in _CF_JS_CHALLENGE_MARKERS):
+        return "challenge"
+    return "none"
+
 
 async def _harvest_clearance_cookies(page: Any) -> dict[str, str]:
     """Return ``{name: value}`` of bot-wall clearance cookies from *page*.
@@ -1140,55 +1174,60 @@ class Fetcher:
                 except Exception as _scroll_exc:
                     log.debug("fetch.scroll_trigger failed for %s: %s", task.url, _scroll_exc)
 
-            # CF JS challenge auto-solve (2026-05-12):
+            # CF JS challenge auto-solve (2026-05-12; gate fixed 2026-07-12):
             # Cloudflare's Tier-1 "Just a moment..." protection is a JS
             # challenge that runs for ~5-10 seconds then redirects to the real
             # page. patchright handles navigator.webdriver, so the challenge
             # CAN solve itself if we wait long enough.
             #
-            # Detection: body contains "Just a moment" OR "challenge-platform"
-            # AND current body < 20KB (CF challenge pages are ~10KB).
-            # Action: wait 20 more seconds, re-read — if body grew and CF
-            # patterns are gone, challenge solved. If still blocked, return
-            # BOT_BLOCKED so the tier escalator can escalate.
+            # 2026-07-12 (residential-minimization): the ORIGINAL upper gate
+            # ``len(body) <= 20_000`` ("CF challenge pages are ~10KB") is stale
+            # — the modern CF managed-challenge interstitial is a fixed ~27KB
+            # template. In the 38198b6 canary, ALL 63 CF_CHALLENGE no_body
+            # props carried body_bytes 27.3-28.5KB, so this gate EXCLUDED every
+            # one of them: the auto-solver never fired (elapsed ~7.5s, no 20s
+            # wait) and the property fell to no_body — even though 87% of the
+            # walled cohort is exactly this solvable challenge. The REAL
+            # discriminator is the CF marker in the first bytes (a real
+            # apartment page never opens with "Just a moment"); the size cap
+            # was a redundant heuristic. Drop the upper bound, widen the marker
+            # scan to 4KB, and poll (early-exit) instead of a blind 20s sleep —
+            # faster on the common ~5-8s solve, more robust on the slow tail.
             #
             # Only fires on JS_CHALLENGE pages, NOT WAF "Attention Required"
             # (which shows "Sorry, you have been blocked" and can't auto-solve).
-            if body_text and 512 <= len(body_text) <= 20_000:
-                _CF_JS_PATTERNS = (
-                    b"Just a moment", b"challenge-platform", b"__cf_chl_",
-                    b"Checking your browser",
+            if cf_challenge_state(body_text) == "challenge":
+                log.info(
+                    "fetch.cf_js_challenge_detected url=%s body=%d -- polling up to 25s for auto-solve",
+                    task.url, len(body_text),
                 )
-                _body_bytes_check = body_text.encode("utf-8", errors="replace")[:1024]
-                _is_cf_js_challenge = any(p in _body_bytes_check for p in _CF_JS_PATTERNS)
-                # Don't trigger on WAF blocks — they show "Sorry, you have been blocked"
-                _is_cf_waf = b"Attention Required" in _body_bytes_check or b"Sorry, you have been blocked" in _body_bytes_check
-                if _is_cf_js_challenge and not _is_cf_waf:
-                    log.info(
-                        "fetch.cf_js_challenge_detected url=%s body=%d -- waiting 20s for auto-solve",
-                        task.url, len(body_text),
-                    )
+                _solved = False
+                # Poll every 2.5s up to ~25s; exit the moment the CF markers
+                # vanish from the (re-read) page. Faster than a blind 20s sleep
+                # on the common ~5-8s solve, and covers the slow tail. A
+                # transient page.content() failure (CF redirect destroys the
+                # execution context mid-navigation) is swallowed PER ITERATION
+                # so one bad read doesn't abort the remaining polls.
+                for _ in range(10):
+                    await asyncio.sleep(2.5)
                     try:
-                        await asyncio.sleep(20.0)
-                        _body_after_challenge = await asyncio.wait_for(page.content(), timeout=8.0)
-                        if _body_after_challenge and len(_body_after_challenge) > len(body_text):
-                            _still_cf = any(
-                                p in _body_after_challenge.encode("utf-8", errors="replace")[:1024]
-                                for p in _CF_JS_PATTERNS
-                            )
-                            if not _still_cf:
-                                body_text = _body_after_challenge
-                                log.info(
-                                    "fetch.cf_js_challenge_solved url=%s body_after=%d",
-                                    task.url, len(body_text),
-                                )
-                            else:
-                                log.info(
-                                    "fetch.cf_js_challenge_unsolved url=%s still_blocked=True",
-                                    task.url,
-                                )
+                        _after = await asyncio.wait_for(page.content(), timeout=8.0)
                     except Exception as _cf_exc:
-                        log.debug("fetch.cf_challenge_wait failed for %s: %s", task.url, _cf_exc)
+                        log.debug("fetch.cf_challenge_poll read failed for %s: %s", task.url, _cf_exc)
+                        continue
+                    if _after and len(_after) >= 512 and cf_challenge_state(_after) == "none":
+                        body_text = _after
+                        _solved = True
+                        log.info(
+                            "fetch.cf_js_challenge_solved url=%s body_after=%d",
+                            task.url, len(body_text),
+                        )
+                        break
+                if not _solved:
+                    log.info(
+                        "fetch.cf_js_challenge_unsolved url=%s still_blocked=True",
+                        task.url,
+                    )
 
             # 2026-05 Fix B + Fix 5 + Fix 7 — portal-aware late-render wait
             # with extended portal list and in-memory per-host learning.
