@@ -519,6 +519,37 @@ async def run_jugnu(
                             _neutralize_unearned_rent_gap(_u)
                 failed["units"] = _partial_units
                 failed.setdefault("_meta", {})["partial_recovery"] = True
+                # 2026-07-12 (38198b6 canary QC): format the salvage like
+                # every other emitted record. Pre-fix, `return failed`
+                # shipped the RAW adapter dicts (rent_range /
+                # market_rent_low / bed_label ...) straight into
+                # properties.json — schema-inconsistent rows that v2
+                # consumers read as null (libertybayclub salvage carried
+                # market_rent_low=2390 + real dates, yet rent_low/
+                # available_date showed empty downstream). Route through
+                # _format_output — the same chokepoint as the success
+                # path — so salvaged units get the full v2 transform
+                # (rent parse, date resolve, fallback ids, junk filter).
+                # _format_v2's setdefault contract keeps failed["_meta"]
+                # the SAME object, so the salvage markers above and the
+                # verdict stamped below land on the emitted record.
+                if schema_version == "v2":
+                    try:
+                        failed = _format_output(
+                            {
+                                "units": _partial_units,
+                                "base_url": task.url,
+                                "_meta": failed["_meta"],
+                            },
+                            csv_row,
+                            schema_version,
+                        )
+                    except Exception as _fmt_exc:
+                        log.warning(
+                            "salvage v2-format failed for %s: %s — "
+                            "emitting raw units",
+                            task.property_id, _fmt_exc,
+                        )
             # 2026-05-27: stamp a verdict on the salvage record so run_report
             # and slo_watcher tally these properties correctly. Without this,
             # _meta.verdict is None and ~368 partial-recovery props fall into
