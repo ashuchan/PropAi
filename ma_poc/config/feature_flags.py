@@ -27,6 +27,19 @@ ENABLE_UNLOCKER_TIER: Final[bool] = (
     and os.environ.get("ENABLE_UNLOCKER_TIER", "false").lower() == "true"
 )
 
+# 2026-07-12 (cost-minimization): when BOTH residential and unlocker are on,
+# drop RESIDENTIAL from the ladder. Production run 2026-05-27 proved the
+# residential tier is 100% wasted upstream of unlocker: 964/964 properties
+# that escalated to RESIDENTIAL then ALSO escalated to UNLOCKER (residential
+# recovers 0 — it fetches the ~27KB CF challenge with a no-JS client and
+# fails), while UNLOCKER cleared 91% of the same blocks. So residential just
+# adds per-GB spend + a 2s-RPS delay before the tier that actually works.
+# Default True (skip the wasted tier); set false to keep DIRECT→…→RESIDENTIAL
+# →UNLOCKER for a config that wants residential as a distinct fallback.
+SKIP_RESIDENTIAL_WHEN_UNLOCKER: Final[bool] = (
+    os.environ.get("SKIP_RESIDENTIAL_WHEN_UNLOCKER", "true").lower() == "true"
+)
+
 # FlareSolverr tier — local Docker service for CF JS-challenge bypass.
 # Only useful for Tier-1 "Just a moment..." challenges, NOT WAF blocks.
 # Enable with: ENABLE_FLARESOLVERR_TIER=true + docker run FlareSolverr on :8191

@@ -24,6 +24,7 @@ import asyncio
 import json
 import logging
 import os
+import threading
 import time
 import urllib.request
 from typing import TYPE_CHECKING
@@ -55,6 +56,65 @@ _IDENTITIES = IdentityPool()
 # Cloudflare bot-fight on Entrata /conventional/ pages that the proxy/RENDER
 # path 403s — see investigations/2026-05-22-validation-grind.
 _WU_API = "https://api.brightdata.com/request"
+
+# ── Per-property Web-Unlocker call cap (2026-07-12 cost-minimization) ────────
+# Production run 2026-05-27 analysis: the fetch-layer Unlocker tier fired
+# ~14,650 times/run — an average of 4.7 unlocker calls PER unlocked-property,
+# because every subpage hop of a walled property's link-hop crawl escalates
+# to Unlocker independently. A long tail of 325 props (each 5-42 calls)
+# consumed 79% of all Unlocker spend. Unlocker is billed per REQUEST
+# (BrightData $1.5-3/1000), so this multiplier IS the cost.
+#
+# The existing WEB_UNLOCKER_MAX_CALLS_PER_JOB (in pms/adapters/_probe.py) caps
+# only the ADAPTER-probe path and only per-shard — it does NOT bound the
+# fetch-layer escalator that produces the 4.7×/prop. This adds a PER-PROPERTY
+# ceiling: once a property has spent its Unlocker budget (default 5), further
+# hops for that property skip Unlocker (return a synthetic BOT_BLOCKED so the
+# cascade falls through / the property ships with the pages it already
+# unlocked). cap=5 → ~45% fewer calls, cap=3 → ~60%, keeping the majority
+# (609/964 props use ≤3) whole. Tunable; 0/unset = no cap (legacy behaviour).
+# Counter is per-process (per-shard); Cloud Run runs one process per shard.
+_WU_PROP_LOCK = threading.Lock()
+_wu_prop_counts: dict[str, int] = {}
+
+
+def _wu_prop_cap() -> int:
+    """``WEB_UNLOCKER_MAX_CALLS_PER_PROPERTY`` — 0/unset/invalid = no cap."""
+    raw = os.getenv("WEB_UNLOCKER_MAX_CALLS_PER_PROPERTY", "").strip()
+    if not raw:
+        return 0
+    try:
+        v = int(raw)
+        return v if v > 0 else 0
+    except ValueError:
+        return 0
+
+
+def _wu_try_reserve_property(property_id: str) -> bool:
+    """Reserve one Unlocker call for *property_id*. False when the
+    per-property cap is already exhausted. Atomic; safe across the pool's
+    worker threads. An empty property_id is never capped (defensive)."""
+    cap = _wu_prop_cap()
+    if not cap or not property_id:
+        return True
+    with _WU_PROP_LOCK:
+        n = _wu_prop_counts.get(property_id, 0)
+        if n >= cap:
+            return False
+        _wu_prop_counts[property_id] = n + 1
+        return True
+
+
+def reset_unlocker_property_counts() -> None:
+    """Clear the per-property counter. For tests / per-job init only."""
+    with _WU_PROP_LOCK:
+        _wu_prop_counts.clear()
+
+
+def unlocker_property_call_count(property_id: str) -> int:
+    """Current per-property Unlocker call count (telemetry / tests)."""
+    with _WU_PROP_LOCK:
+        return _wu_prop_counts.get(property_id, 0)
 
 
 def _web_unlocker_key() -> str:
@@ -163,6 +223,34 @@ class UnlockerProvider:
     ) -> FetchResult:
         start_ms = _now_ms()
         attempts = [int(_TIER)]
+        # Per-property cost cap (2026-07-12): if this property has already
+        # spent its Unlocker budget, do NOT call BrightData again — return a
+        # synthetic BOT_BLOCKED so the escalator treats it as a normal miss
+        # and the property ships with the pages it already unlocked. This is
+        # what bounds the 4.7-calls/property runaway. See _wu_try_reserve_property.
+        if not _wu_try_reserve_property(getattr(task, "property_id", "") or ""):
+            log.info(
+                "unlocker.property_cap_reached property_id=%s url=%s cap=%d "
+                "— skipping paid call",
+                getattr(task, "property_id", ""), task.url, _wu_prop_cap(),
+            )
+            return _stamp(
+                FetchResult(
+                    url=task.url,
+                    outcome=FetchOutcome.BOT_BLOCKED,
+                    status=None,
+                    body=None,
+                    headers={},
+                    render_mode=task.render_mode,
+                    final_url=task.url,
+                    attempts=1,
+                    elapsed_ms=0,
+                    error_signature="unlocker_property_cap",
+                    proxy_used="***unlocker***",
+                ),
+                _TIER,
+                attempts,
+            )
         if self._mode == "api":
             result = await _api_attempt(task, start_ms)
         else:
