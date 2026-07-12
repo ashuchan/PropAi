@@ -55,8 +55,17 @@ if TYPE_CHECKING:
 # JS source until the browser executes the bundle). Confirmed live against
 # 3 raw-fetched HTMLs (flatirondistrictataustinranch, altaaptstarga,
 # unionthompson) on 2026-05-20: original regex 0/3, relaxed regex 3/3.
+# 2026-07-12: the public_key group was ``[a-f0-9]{20,40}`` (lowercase hex
+# only), which silently failed on the newer BASE64 public keys Knock now
+# emits, e.g. ``init(\"VzlINUlZMlNVRDBNN1JFTjpUWEgxOURPTjhRU1hLTlRP\",
+# \"community\",\"3838514011eb718b\")`` (impressionsapts, ~57 prod props
+# detected-as-knock that fell through to LLM). The community_id (group 3)
+# was always well-formed; only the key class was too narrow. Broadened to
+# the base64/base64url alphabet so both hex and base64 keys match. The
+# community_id extraction — the only value the Tier-1 community API needs —
+# is unchanged.
 _KNOCK_INIT_RE = re.compile(
-    r"knockDoorway\.init\s*\(\s*\\?['\"]([a-f0-9]{20,40})\\?['\"]\s*,\s*"
+    r"knockDoorway\.init\s*\(\s*\\?['\"]([A-Za-z0-9+/=_-]{20,60})\\?['\"]\s*,\s*"
     r"\\?['\"](community|application|public)\\?['\"]\s*,\s*"
     r"\\?['\"]([a-zA-Z0-9_-]{8,40})\\?['\"]",
     re.IGNORECASE,

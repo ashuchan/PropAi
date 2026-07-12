@@ -55,6 +55,30 @@ def test_find_knock_ids_json_escaped_init_call() -> None:
     assert cid == "69e936e6567a11ef"
 
 
+def test_find_knock_ids_base64_public_key() -> None:
+    """Public key in BASE64 form, not lowercase hex.
+
+    2026-07-12 prod evidence (impressionsapts.com + ~57 detected-as-knock
+    props that fell through to LLM): Knock now emits base64 public keys,
+    e.g. ``init(\\"VzlINUlZMlNVRDBNN1JFTjpUWEgxOURPTjhRU1hLTlRP\\",
+    \\"community\\",\\"3838514011eb718b\\")``. The old regex bounded the
+    key to ``[a-f0-9]{20,40}`` (hex only), silently failing on the base64
+    key and never reaching the well-formed community_id — so the Tier-1
+    Doorway API call never fired and the property fell to LLM. The key
+    class must accept the base64/base64url alphabet. Live-verified: the
+    recovered community_id resolves to numeric id 2010536 → 13 units."""
+    html = (
+        '<html><body><script id="__NEXT_DATA__" type="application/json">'
+        r'knockDoorway.init(\"VzlINUlZMlNVRDBNN1JFTjpUWEgxOURPTjhRU1hLTlRP\",'
+        r'\"community\",\"3838514011eb718b\")'
+        "</script></body></html>"
+    )
+    pk, kind, cid = find_knock_ids(html)
+    assert pk == "VzlINUlZMlNVRDBNN1JFTjpUWEgxOURPTjhRU1hLTlRP"
+    assert kind == "community"
+    assert cid == "3838514011eb718b"
+
+
 def test_find_knock_ids_missing_returns_none_triple() -> None:
     """No knockDoorway anywhere → ``(None, None, None)``."""
     html = "<html><body>nothing here</body></html>"
