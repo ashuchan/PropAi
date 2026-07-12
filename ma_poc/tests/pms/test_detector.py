@@ -1167,6 +1167,23 @@ def test_jonah_alone_still_routes_to_encoreskyline_template() -> None:
     assert result.confidence >= 0.85
 
 
+def test_jonah_knock_integration_routes_to_knock() -> None:
+    """2026-07-12: ``JonahWidget.knock(...)`` is a real Knock backend, not the
+    generic encoreskyline template. It must route to the knock adapter (which
+    resolves the community_id → Doorway Tier-1 units) and outrank the
+    encoreskyline yield. 5/6 prod props recovered real units this way."""
+    html = (
+        "<html><body>"
+        "<script>JonahWidget.knock({init:["
+        "'VzlINUlZMlNVRDBNN1JFTjpUWEgxOURPTjhRU1hLTlRP',"
+        "'community','3838514011eb718b']});</script>"
+        "</body></html>"
+    )
+    result = detect_pms("https://example.com/", page_html=html)
+    assert result.pms == "knock"
+    assert result.confidence >= 0.90
+
+
 def test_jonah_widget_does_not_block_entrata_widget() -> None:
     """If a page has Jonah marker AND Entrata widget markers, Entrata
     must win — the encoreskyline_template adapter can't extract from

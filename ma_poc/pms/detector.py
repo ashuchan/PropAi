@@ -889,7 +889,19 @@ def _iter_html_markers(page_html: str) -> Iterator[tuple[PmsName, float, list[st
         or "onlineleasing.realpage.com" in h
         or ".appfolio.com/listings" in h
     )
-    if (
+    # 2026-07-12: Jonah's Knock integration (``JonahWidget.knock({init:[...]})``)
+    # is a real Knock backend, not the generic encoreskyline template. Route it
+    # to the knock adapter (which resolves the community_id → Doorway Tier-1
+    # units) at a confidence that outranks the encoreskyline yield. The bare
+    # ``jonahwidget`` / ``meetelise`` chat-widget markers (no ``.knock``) stay
+    # on encoreskyline_template.
+    if "jonahwidget.knock" in h and not _has_competing_pms_marker:
+        yield (
+            "knock",
+            0.90,
+            ["Jonah Knock integration (JonahWidget.knock init) → Knock Doorway"],
+        )
+    elif (
         "jonahwidget" in h
         or "jonahdigital" in h
         or "meetelise" in h

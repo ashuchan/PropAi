@@ -79,6 +79,28 @@ def test_find_knock_ids_base64_public_key() -> None:
     assert cid == "3838514011eb718b"
 
 
+def test_find_knock_ids_jonahwidget_knock_wrapper() -> None:
+    """Jonah Digital wrapper form ``JonahWidget.knock({init:[...]})``.
+
+    2026-07-12 prod evidence (6 encoreskyline-detected props, e.g. pids
+    60038/1783/284136): Jonah sites init the SAME Knock backend via
+    ``JonahWidget.knock({init:['<public_key>','community','<community_id>']})``
+    — identical (key, kind, community_id) arg shape, different call wrapper.
+    5/6 resolved to real Doorway Tier-1 units (10/31/10/3/65). The regex
+    prefix must accept both call forms."""
+    html = (
+        "<html><body><script>"
+        "JonahWidget.knock({init:["
+        "'VzlINUlZMlNVRDBNN1JFTjpUWEgxOURPTjhRU1hLTlRP',"
+        "'community','3838514011eb718b']})"
+        "</script></body></html>"
+    )
+    pk, kind, cid = find_knock_ids(html)
+    assert pk == "VzlINUlZMlNVRDBNN1JFTjpUWEgxOURPTjhRU1hLTlRP"
+    assert kind == "community"
+    assert cid == "3838514011eb718b"
+
+
 def test_find_knock_ids_missing_returns_none_triple() -> None:
     """No knockDoorway anywhere → ``(None, None, None)``."""
     html = "<html><body>nothing here</body></html>"

@@ -64,8 +64,19 @@ if TYPE_CHECKING:
 # the base64/base64url alphabet so both hex and base64 keys match. The
 # community_id extraction — the only value the Tier-1 community API needs —
 # is unchanged.
+# 2026-07-12b: Jonah Digital sites (encoreskyline_template detection cohort)
+# init the SAME Knock backend via a wrapper —
+# ``JonahWidget.knock({init:['<public_key>','community','<community_id>']})``
+# — with an identical (public_key, kind, community_id) argument shape. The
+# prefix is now an alternation over both call forms; the three captured
+# groups and the JSON-escaped-quote handling are shared. Verified: the
+# community_ids from 6 such prod props resolve via the Doorway community API
+# to the exact numeric ids prod link-hopped to, yielding 130 units with rent.
+# Pairs with a detector reroute (jonahwidget.knock -> knock) so the Knock
+# adapter is actually dispatched instead of encoreskyline_template.
 _KNOCK_INIT_RE = re.compile(
-    r"knockDoorway\.init\s*\(\s*\\?['\"]([A-Za-z0-9+/=_-]{20,60})\\?['\"]\s*,\s*"
+    r"(?:knockDoorway\.init\s*\(|JonahWidget\.knock\s*\(\s*\{\s*init\s*:\s*\[)\s*"
+    r"\\?['\"]([A-Za-z0-9+/=_-]{20,60})\\?['\"]\s*,\s*"
     r"\\?['\"](community|application|public)\\?['\"]\s*,\s*"
     r"\\?['\"]([a-zA-Z0-9_-]{8,40})\\?['\"]",
     re.IGNORECASE,
